@@ -124,8 +124,9 @@ describe('Full Conversation Flow', () => {
     );
 
     if (sessionResponse.status !== 201) {
-      const errorData = await parseResponse<{ error: string }>(sessionResponse);
-      console.error('Session creation failed:', errorData);
+      throw new Error(
+        `Session creation failed: ${sessionResponse.status} ${await sessionResponse.text()}`
+      );
     }
 
     expect(sessionResponse.status).toBe(201);
@@ -220,7 +221,11 @@ describe('Full Conversation Flow', () => {
     const sessionResponse = await createProjectSession(
       createActionArgs(createSessionRequest, { projectId })
     );
-    expect(sessionResponse.status).toBe(201);
+    if (sessionResponse.status !== 201) {
+      throw new Error(
+        `Session creation failed: ${sessionResponse.status} ${await sessionResponse.text()}`
+      );
+    }
     const sessionData = await parseResponse<SessionInfo>(sessionResponse);
     const sessionId: ThreadId = sessionData.id as ThreadId;
 

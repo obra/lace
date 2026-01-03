@@ -3,13 +3,13 @@
 
 // React Router v7 uses standard Response.json()
 import { randomUUID } from 'crypto';
-import { getSessionService } from '@lace/web/lib/server/session-service';
 import { MessageResponse } from '@lace/web/types/api';
-import { asThreadId, type ThreadId } from '@lace/web/types/core';
-import { ThreadIdSchema, MessageRequestSchema } from '@lace/web/lib/validation/schemas';
+import { MessageRequestSchema } from '@lace/web/lib/validation/schemas';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { logger } from '@lace/core/utils/logger';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { SessionIdSchema } from '@lace/ent-protocol';
 import type { Route } from './+types/api.threads.$threadId.message';
 
 // Type guard for unknown error values
@@ -30,20 +30,12 @@ export async function action({ request, params }: Route.ActionArgs) {
   // }
 
   try {
-    const sessionService = getSessionService();
     const { threadId: threadIdParam } = params;
 
-    // Validate thread ID with Zod
-    const threadIdResult = ThreadIdSchema.safeParse(threadIdParam);
-    if (!threadIdResult.success) {
-      return createErrorResponse(
-        threadIdResult.error.errors[0]?.message || 'Invalid thread ID format',
-        400,
-        { code: 'VALIDATION_FAILED' }
-      );
+    // Supervisor-backed "threadId" is an agent protocol sessionId (opaque string)
+    if (!SessionIdSchema.safeParse(threadIdParam).success) {
+      return createErrorResponse('Invalid thread ID format', 400, { code: 'VALIDATION_FAILED' });
     }
-
-    const threadId: ThreadId = asThreadId(threadIdResult.data);
 
     // Parse and validate request body with Zod
     let bodyRaw: unknown;
@@ -67,26 +59,12 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const body = bodyResult.data;
 
-    // Determine session ID (parent thread for agents, or self for sessions)
-    const sessionIdStr: string = threadId.includes('.')
-      ? (threadId.split('.')[0] ?? threadId)
-      : threadId;
+    const supervisor = getSupervisor();
+    const workspace = supervisor
+      .listWorkspaceSessions()
+      .find((ws) => ws.agents.some((a) => a.sessionId === threadIdParam));
 
-    const sessionIdResult = ThreadIdSchema.safeParse(sessionIdStr);
-    if (!sessionIdResult.success) {
-      throw new Error('Invalid session ID derived from thread ID');
-    }
-    const sessionId: ThreadId = asThreadId(sessionIdResult.data);
-
-    // Get agent instance through session
-    const session = await sessionService.getSession(sessionId);
-    if (!session) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
-    }
-
-    const agent = session.getAgent(threadId);
-
-    if (!agent) {
+    if (!workspace) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
@@ -94,21 +72,25 @@ export async function action({ request, params }: Route.ActionArgs) {
     const messageId = randomUUID();
 
     // Process message asynchronously
-    void agent.sendMessage(body.message).catch((error: unknown) => {
-      logger.error('Message processing error', {
-        threadId,
-        sessionId,
-        messageId,
-        error: isError(error)
-          ? { name: error.name, message: error.message }
-          : { type: typeof error },
+    void supervisor
+      .promptSession(workspace.workspaceSessionId, threadIdParam, [
+        { type: 'text', text: body.message },
+      ])
+      .catch((error: unknown) => {
+        logger.error('Message processing error', {
+          threadId: threadIdParam,
+          sessionId: workspace.workspaceSessionId,
+          messageId,
+          error: isError(error)
+            ? { name: error.name, message: error.message }
+            : { type: typeof error },
+        });
       });
-    });
 
     // Return immediate acknowledgment
     const response: MessageResponse = {
       status: 'accepted' as const,
-      threadId,
+      threadId: threadIdParam as any,
       messageId,
     };
 

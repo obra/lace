@@ -1,13 +1,14 @@
 // ABOUTME: Session API endpoints under projects hierarchy - GET sessions by project, POST new session
 // ABOUTME: Uses Project class methods for session management with proper project-session relationships
 
-import { Project, Session, ProviderRegistry } from '@lace/web/lib/server/lace-imports';
+import { Project, ProviderRegistry } from '@lace/web/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { generateSessionName } from '@lace/web/lib/server/session-naming-helper';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.sessions';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 
 const CreateSessionSchema = z.object({
   name: z.string().min(1).optional(), // Optional for both flows
@@ -27,16 +28,16 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const sessionData = project.getSessions();
-
-    // Convert SessionData to Session format with agent count for list efficiency
-    const sessions = sessionData.map((data) => ({
-      id: data.id,
-      name: data.name,
-      createdAt: data.createdAt,
-      agentCount: data.agentCount,
-      // Full agent details will be populated when individual session is selected
-    }));
+    const supervisor = getSupervisor();
+    const sessions = supervisor
+      .listWorkspaceSessions()
+      .filter((s) => s.projectId === projectId)
+      .map((s) => ({
+        id: s.workspaceSessionId,
+        name: s.name ?? 'Session',
+        createdAt: new Date(s.createdAt),
+        agentCount: s.agents.length,
+      }));
 
     return createSuperjsonResponse(sessions);
   } catch (error: unknown) {
@@ -63,8 +64,6 @@ export async function action({ request, params }: Route.ActionArgs) {
       return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Clear provider cache to ensure fresh credentials are loaded
-
     // Determine session name - either provided or generated from initialMessage
     let sessionName: string;
     if (validatedData.name) {
@@ -76,32 +75,34 @@ export async function action({ request, params }: Route.ActionArgs) {
       sessionName = 'New Session';
     }
 
-    // Create session using Session.create with project inheritance
-    const session = await Session.create({
-      name: sessionName,
-      description: validatedData.description,
-      projectId: projectId,
-      configuration: {
-        ...validatedData.configuration,
-        providerInstanceId: validatedData.providerInstanceId,
-        modelId: validatedData.modelId,
-        workspaceMode: validatedData.workspaceMode || 'container', // Default to container mode
-        initialMessage: validatedData.initialMessage, // Store for pre-filling
-      },
+    const supervisor = getSupervisor();
+    const created = await supervisor.createWorkspaceSession(project.getWorkingDirectory());
+    supervisor.updateWorkspaceSession(created.workspaceSessionId, { projectId, name: sessionName });
+    supervisor.upsertAgentSessionMeta(created.workspaceSessionId, {
+      sessionId: created.sessionId,
+      name: 'coordinator',
+      connectionId: validatedData.providerInstanceId,
+      modelId: validatedData.modelId,
     });
 
-    // Convert to API format
-    const sessionInfo = session.getInfo();
+    await supervisor
+      .getPeer(created.workspaceSessionId, created.sessionId)
+      .request('ent/session/configure', {
+        connectionId: validatedData.providerInstanceId,
+        modelId: validatedData.modelId,
+        approvalMode: 'ask',
+      });
+
     const sessionData = {
-      id: session.getId(),
-      name: sessionInfo?.name || sessionName,
-      createdAt: sessionInfo?.createdAt || new Date(),
+      id: created.workspaceSessionId,
+      name: sessionName,
+      createdAt: new Date(),
     };
 
     // If we have initialMessage, spawn background helper to generate better name
     if (validatedData.initialMessage) {
       void spawnSessionNamingHelper(
-        session.getId(),
+        created.workspaceSessionId,
         projectId,
         project.getName(),
         validatedData.initialMessage,
@@ -148,7 +149,7 @@ export async function action({ request, params }: Route.ActionArgs) {
  * Spawn background helper to generate session name and emit SESSION_UPDATED event
  */
 async function spawnSessionNamingHelper(
-  sessionId: string,
+  workspaceSessionId: string,
   projectId: string,
   projectName: string,
   initialMessage: string,
@@ -168,10 +169,8 @@ async function spawnSessionNamingHelper(
       modelId: fallbackModel.modelId,
     });
 
-    // Update session name using the generalized update method
-    Session.updateSession(sessionId, {
-      name: generatedName,
-    });
+    const supervisor = getSupervisor();
+    supervisor.updateWorkspaceSession(workspaceSessionId, { name: generatedName });
 
     // Emit SESSION_UPDATED event via SSE
     const eventManager = EventStreamManager.getInstance();
@@ -181,7 +180,7 @@ async function spawnSessionNamingHelper(
         name: generatedName,
       },
       context: {
-        sessionId,
+        sessionId: workspaceSessionId,
         projectId,
       },
       transient: true,

@@ -1,14 +1,12 @@
 // ABOUTME: Agent spawning API endpoints for creating and listing agents within a session
 // ABOUTME: Agents are child threads (sessionId.N) that run within a session
 
-import { getSessionService } from '@lace/web/lib/server/session-service';
 import { CreateAgentRequest } from '@lace/web/types/api';
-import { asThreadId, ThreadId } from '@lace/web/types/core';
-import { isValidThreadId as isClientValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-session-id-validation';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
-import type { Agent } from '@lace/web/lib/server/lace-imports';
 import { logger } from '@lace/core/utils/logger';
 import type { Route } from './+types/api.sessions.$sessionId.agents';
 
@@ -33,32 +31,31 @@ function isCreateAgentRequest(body: unknown): body is CreateAgentRequest {
   );
 }
 
-// Type guard for ThreadId using client-safe validation
-function isValidThreadId(sessionId: string): boolean {
-  return isClientValidThreadId(sessionId);
-}
-
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const sessionService = getSessionService();
     const { sessionId: sessionIdParam } = params as { sessionId: string };
 
-    if (!isValidThreadId(sessionIdParam)) {
+    const parsed = WorkspaceSessionIdSchema.safeParse(sessionIdParam);
+    if (!parsed.success) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const sessionId = asThreadId(sessionIdParam as string);
-
-    const session = await sessionService.getSession(sessionId);
-
-    if (!session) {
+    const supervisor = getSupervisor();
+    const record = supervisor.getWorkspaceSession(parsed.data);
+    if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Get agents from Session instance and transform to DTOs for API response
-    const agents = session.getAgents();
-    const agentInfos = agents.map((agent) => agent.getInfo());
-    return createSuperjsonResponse(agentInfos);
+    return createSuperjsonResponse(
+      record.agents.map((a) => ({
+        threadId: a.sessionId,
+        name: a.name ?? '',
+        providerInstanceId: a.connectionId,
+        modelId: a.modelId,
+        status: 'running',
+        createdAt: new Date(a.createdAt),
+      }))
+    );
   } catch (_error: unknown) {
     return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
@@ -73,14 +70,13 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   try {
-    const sessionService = getSessionService();
     const { sessionId: sessionIdParam } = params as { sessionId: string };
 
-    if (!isValidThreadId(sessionIdParam)) {
+    const parsed = WorkspaceSessionIdSchema.safeParse(sessionIdParam);
+    if (!parsed.success) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
-
-    const sessionId = asThreadId(sessionIdParam as string);
+    const workspaceSessionId = parsed.data;
 
     // Parse and validate request body
     const bodyData: unknown = await request.json();
@@ -91,21 +87,17 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const body: CreateAgentRequest = bodyData;
 
-    // Get session and spawn agent directly
-    const session = await sessionService.getSession(sessionId);
-    if (!session) {
+    const supervisor = getSupervisor();
+
+    const ws = supervisor.getWorkspaceSession(workspaceSessionId);
+    if (!ws) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Spawn agent - agent will validate and create its own provider during initialization
-    let agent: Agent;
+    // Spawn agent process (agent protocol session) and configure it
+    let created;
     try {
-      agent = session.spawnAgent({
-        name: body.name || '',
-        providerInstanceId: body.providerInstanceId,
-        modelId: body.modelId,
-        persona: body.persona,
-      });
+      created = await supervisor.createAgentSession(workspaceSessionId);
     } catch (error) {
       // Log full error for server debugging while keeping client response sanitized
       console.error('Failed to spawn agent:', error);
@@ -116,39 +108,30 @@ export async function action({ request, params }: Route.ActionArgs) {
       );
     }
 
-    // No approval callback setup needed - Agent owns approval flow
+    supervisor.upsertAgentSessionMeta(workspaceSessionId, {
+      sessionId: created.sessionId,
+      name: body.name || '',
+      connectionId: body.providerInstanceId,
+      modelId: body.modelId,
+    });
 
-    // CRITICAL: Setup event handlers for real-time updates
-    // Without this, newly spawned agents won't emit events to the UI until page refresh
-    await sessionService.setupAgentEventHandlers(agent);
-
-    // Ensure newly spawned agents get SSE error handlers registered
-    EventStreamManager.getInstance().registerSession(session);
-
-    // Convert to API format - use agent's improved API
-    const metadata = agent.getThreadMetadata();
-    const tokenUsage = agent.getTokenUsage();
+    await supervisor
+      .getPeer(workspaceSessionId, created.sessionId)
+      .request('ent/session/configure', {
+        connectionId: body.providerInstanceId,
+        modelId: body.modelId,
+        approvalMode: 'ask',
+      });
 
     const agentResponse = {
-      threadId: agent.threadId,
-      name: agent.name,
+      threadId: created.sessionId,
+      name: body.name || '',
       providerInstanceId: body.providerInstanceId,
       modelId: body.modelId,
-      status: agent.status,
-      createdAt: (metadata?.createdAt as Date) || undefined,
-      tokenUsage,
+      status: 'running',
+      createdAt: new Date(),
+      tokenUsage: undefined,
     };
-
-    // Send initial message if provided
-    if (body.initialMessage?.trim()) {
-      void agent.sendMessage(body.initialMessage.trim()).catch((error: unknown) => {
-        logger.error('Initial message sending error', {
-          threadId: agent.threadId,
-          sessionId,
-          error: isError(error) ? error.message : String(error),
-        });
-      });
-    }
 
     // Test SSE broadcast
     const sseManager = EventStreamManager.getInstance();
@@ -157,10 +140,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       timestamp: new Date(),
       data: `Agent "${agentResponse.name}" spawned successfully`,
       context: {
-        sessionId,
+        sessionId: workspaceSessionId,
         projectId: undefined,
         taskId: undefined,
-        threadId: agentResponse.threadId as ThreadId,
+        threadId: agentResponse.threadId as string,
       },
     };
     sseManager.broadcast(testEvent);
@@ -170,7 +153,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       timestamp: new Date(),
       data: {
         type: 'agent:spawned',
-        agentThreadId: agentResponse.threadId as ThreadId,
+        agentThreadId: agentResponse.threadId as any,
         providerInstanceId: body.providerInstanceId,
         modelId: body.modelId,
         context: {
@@ -181,17 +164,17 @@ export async function action({ request, params }: Route.ActionArgs) {
       },
       transient: true,
       context: {
-        sessionId,
-        projectId: session.getProjectId(),
+        sessionId: workspaceSessionId,
+        projectId: undefined,
         taskId: undefined,
-        threadId: agentResponse.threadId as ThreadId,
+        threadId: agentResponse.threadId as string,
       },
     });
 
     return createSuperjsonResponse(agentResponse, {
       status: 201,
       headers: {
-        Location: `/api/agents/${agent.threadId}`,
+        Location: `/api/agents/${agentResponse.threadId}`,
       },
     });
   } catch (error: unknown) {
