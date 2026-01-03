@@ -223,6 +223,34 @@ describe('Supervisor (E2E)', () => {
     ]);
   });
 
+  it('persists workspace session metadata to laceDir', async () => {
+    supervisor = new Supervisor({
+      laceDir,
+      onPermissionRequest: async () => ({ decision: 'allow' }),
+    });
+
+    const ws = await supervisor.createWorkspaceSession(workDir);
+    await supervisor.createAgentSession(ws.workspaceSessionId);
+
+    await supervisor.shutdown();
+    supervisor = undefined;
+
+    supervisor = new Supervisor({
+      laceDir,
+      onPermissionRequest: async () => ({ decision: 'allow' }),
+    });
+
+    const stored = supervisor
+      .listWorkspaceSessions()
+      .find((s) => s.workspaceSessionId === ws.workspaceSessionId);
+    expect(stored).toBeTruthy();
+    expect(stored).toMatchObject({
+      workspaceSessionId: ws.workspaceSessionId,
+      workDir,
+    });
+    expect(stored?.sessionIds.length).toBe(2);
+  });
+
   it('can attach to an existing sessionId and read durable events', async () => {
     const originalTestProvider = process.env.LACE_AGENT_TEST_PROVIDER;
     process.env.LACE_AGENT_TEST_PROVIDER = '1';

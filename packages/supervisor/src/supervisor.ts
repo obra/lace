@@ -1,6 +1,7 @@
 import type { JsonRpcPeer } from '@lace/ent-protocol';
 import { SessionIdSchema } from '@lace/ent-protocol';
 import { SupervisorAgentProcess, type PermissionDecision } from './supervisor-agent-process';
+import { WorkspaceSessionStore, type WorkspaceSessionRecord } from './workspace-session-store';
 
 export type WorkspaceSessionHandle = {
   workspaceSessionId: string;
@@ -25,6 +26,7 @@ export type SupervisorOptions = {
 
 export class Supervisor {
   private readonly laceDir: string;
+  private readonly store: WorkspaceSessionStore;
   private readonly sessions = new Map<
     string,
     {
@@ -33,12 +35,12 @@ export class Supervisor {
       agentsBySessionId: Map<string, SupervisorAgentProcess>;
     }
   >();
-  private nextWorkspaceSessionId = 1;
   private readonly onSessionUpdate?: SupervisorOptions['onSessionUpdate'];
   private readonly onPermissionRequest?: SupervisorOptions['onPermissionRequest'];
 
   constructor(options: SupervisorOptions) {
     this.laceDir = options.laceDir;
+    this.store = new WorkspaceSessionStore(this.laceDir);
     this.onSessionUpdate = options.onSessionUpdate;
     this.onPermissionRequest = options.onPermissionRequest;
   }
@@ -138,7 +140,8 @@ export class Supervisor {
   }
 
   async createWorkspaceSession(workDir: string): Promise<WorkspaceSessionHandle> {
-    const workspaceSessionId = `ws_${this.nextWorkspaceSessionId++}`;
+    const workspaceSessionId = this.store.createWorkspaceSessionId();
+    this.store.create(workspaceSessionId, workDir);
 
     this.sessions.set(workspaceSessionId, {
       workDir,
@@ -164,9 +167,12 @@ export class Supervisor {
       throw new Error('Invalid sessionId');
     }
 
-    const workspaceSessionId = `ws_${this.nextWorkspaceSessionId++}`;
+    const workspaceSessionId = this.store.createWorkspaceSessionId();
 
     const loaded = await this.spawnLoadedAgentSession(workspaceSessionId, sessionId);
+
+    this.store.create(workspaceSessionId, loaded.workDir);
+    this.store.addSessionId(workspaceSessionId, sessionId);
 
     this.sessions.set(workspaceSessionId, {
       workDir: loaded.workDir,
@@ -189,6 +195,7 @@ export class Supervisor {
     ws.agentsBySessionId.set(created.sessionId, created.agent);
 
     if (!ws.primarySessionId) ws.primarySessionId = created.sessionId;
+    this.store.addSessionId(workspaceSessionId, created.sessionId);
 
     return { sessionId: created.sessionId, pid: created.pid };
   }
@@ -198,6 +205,7 @@ export class Supervisor {
   }
 
   async prompt(workspaceSessionId: string, content: unknown[]): Promise<unknown> {
+    this.store.touch(workspaceSessionId);
     return await this.getPeer(workspaceSessionId).request('session/prompt', { content });
   }
 
@@ -206,7 +214,12 @@ export class Supervisor {
     sessionId: string,
     content: unknown[]
   ): Promise<unknown> {
+    this.store.touch(workspaceSessionId);
     return await this.getPeer(workspaceSessionId, sessionId).request('session/prompt', { content });
+  }
+
+  listWorkspaceSessions(): WorkspaceSessionRecord[] {
+    return this.store.list();
   }
 
   async listProviders(workspaceSessionId: string): Promise<{
