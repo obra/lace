@@ -177,6 +177,52 @@ describe('Supervisor (E2E)', () => {
     );
   });
 
+  it('can create multiple agent sessions inside one workspace session', async () => {
+    const permissionRequests: Array<{
+      workspaceSessionId: string;
+      params: Record<string, unknown>;
+    }> = [];
+
+    supervisor = new Supervisor({
+      laceDir,
+      onPermissionRequest: async (workspaceSessionId, params) => {
+        permissionRequests.push({ workspaceSessionId, params });
+        return { decision: 'allow' };
+      },
+    });
+
+    const ws = await supervisor.createWorkspaceSession(workDir);
+    const second = await supervisor.createAgentSession(ws.workspaceSessionId);
+
+    expect(second.sessionId).not.toBe(ws.sessionId);
+    expect(second.pid).not.toBe(ws.pid);
+
+    await withTimeout(
+      supervisor.promptSession(ws.workspaceSessionId, ws.sessionId, [
+        { type: 'text', text: 'run: echo first' },
+      ]),
+      10_000,
+      'prompt (first)'
+    );
+    await withTimeout(
+      supervisor.promptSession(ws.workspaceSessionId, second.sessionId, [
+        { type: 'text', text: 'run: echo second' },
+      ]),
+      10_000,
+      'prompt (second)'
+    );
+
+    const seen = permissionRequests.map((r) => ({
+      workspaceSessionId: r.workspaceSessionId,
+      sessionId: r.params.sessionId,
+    }));
+
+    expect(seen).toEqual([
+      { workspaceSessionId: ws.workspaceSessionId, sessionId: ws.sessionId },
+      { workspaceSessionId: ws.workspaceSessionId, sessionId: second.sessionId },
+    ]);
+  });
+
   it('can attach to an existing sessionId and read durable events', async () => {
     const originalTestProvider = process.env.LACE_AGENT_TEST_PROVIDER;
     process.env.LACE_AGENT_TEST_PROVIDER = '1';

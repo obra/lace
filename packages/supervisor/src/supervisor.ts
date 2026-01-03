@@ -9,6 +9,11 @@ export type WorkspaceSessionHandle = {
   pid: number;
 };
 
+export type AgentSessionHandle = {
+  sessionId: string;
+  pid: number;
+};
+
 export type SupervisorOptions = {
   laceDir: string;
   onSessionUpdate?: (workspaceSessionId: string, update: Record<string, unknown>) => void;
@@ -23,9 +28,9 @@ export class Supervisor {
   private readonly sessions = new Map<
     string,
     {
-      agent: SupervisorAgentProcess;
-      sessionId: string;
       workDir: string;
+      primarySessionId: string;
+      agentsBySessionId: Map<string, SupervisorAgentProcess>;
     }
   >();
   private nextWorkspaceSessionId = 1;
@@ -38,17 +43,44 @@ export class Supervisor {
     this.onPermissionRequest = options.onPermissionRequest;
   }
 
-  async createWorkspaceSession(workDir: string): Promise<WorkspaceSessionHandle> {
-    const workspaceSessionId = `ws_${this.nextWorkspaceSessionId++}`;
+  private requireWorkspace(workspaceSessionId: string) {
+    const found = this.sessions.get(workspaceSessionId);
+    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
+    return found;
+  }
+
+  private requireAgent(workspaceSessionId: string, sessionId?: string) {
+    const ws = this.requireWorkspace(workspaceSessionId);
+    const resolvedSessionId = sessionId ?? ws.primarySessionId;
+    const agent = ws.agentsBySessionId.get(resolvedSessionId);
+    if (!agent) {
+      throw new Error(
+        `Unknown sessionId for workspaceSessionId ${workspaceSessionId}: ${resolvedSessionId}`
+      );
+    }
+    return { agent, sessionId: resolvedSessionId, workDir: ws.workDir };
+  }
+
+  private async spawnNewAgentSession(
+    workspaceSessionId: string,
+    workDir: string
+  ): Promise<{ agent: SupervisorAgentProcess; sessionId: string; pid: number }> {
+    let activeSessionId: string | undefined;
 
     const agent = new SupervisorAgentProcess({
       laceDir: this.laceDir,
       onSessionUpdate: (update) => {
-        if (this.onSessionUpdate) this.onSessionUpdate(workspaceSessionId, update);
+        if (!activeSessionId) return;
+        if (this.onSessionUpdate)
+          this.onSessionUpdate(workspaceSessionId, { sessionId: activeSessionId, ...update });
       },
       onPermissionRequest: async (params) => {
+        if (!activeSessionId) return { decision: 'deny' };
         if (!this.onPermissionRequest) return { decision: 'deny' };
-        return await this.onPermissionRequest(workspaceSessionId, params);
+        return await this.onPermissionRequest(workspaceSessionId, {
+          sessionId: activeSessionId,
+          ...params,
+        });
       },
     });
 
@@ -58,32 +90,31 @@ export class Supervisor {
     });
 
     const created = (await agent.peer.request('session/new', { workDir })) as { sessionId: string };
+    activeSessionId = created.sessionId;
 
-    this.sessions.set(workspaceSessionId, { agent, sessionId: created.sessionId, workDir });
-
-    return {
-      workspaceSessionId,
-      sessionId: created.sessionId,
-      workDir,
-      pid: agent.proc.pid ?? -1,
-    };
+    return { agent, sessionId: created.sessionId, pid: agent.proc.pid ?? -1 };
   }
 
-  async attachWorkspaceSession(sessionId: string): Promise<WorkspaceSessionHandle> {
-    if (!SessionIdSchema.safeParse(sessionId).success) {
-      throw new Error('Invalid sessionId');
-    }
-
-    const workspaceSessionId = `ws_${this.nextWorkspaceSessionId++}`;
+  private async spawnLoadedAgentSession(
+    workspaceSessionId: string,
+    sessionId: string
+  ): Promise<{ agent: SupervisorAgentProcess; workDir: string; pid: number }> {
+    let activeSessionId: string | undefined = sessionId;
 
     const agent = new SupervisorAgentProcess({
       laceDir: this.laceDir,
       onSessionUpdate: (update) => {
-        if (this.onSessionUpdate) this.onSessionUpdate(workspaceSessionId, update);
+        if (!activeSessionId) return;
+        if (this.onSessionUpdate)
+          this.onSessionUpdate(workspaceSessionId, { sessionId: activeSessionId, ...update });
       },
       onPermissionRequest: async (params) => {
+        if (!activeSessionId) return { decision: 'deny' };
         if (!this.onPermissionRequest) return { decision: 'deny' };
-        return await this.onPermissionRequest(workspaceSessionId, params);
+        return await this.onPermissionRequest(workspaceSessionId, {
+          sessionId: activeSessionId,
+          ...params,
+        });
       },
     });
 
@@ -103,26 +134,79 @@ export class Supervisor {
       throw new Error(`Session not found: ${sessionId}`);
     }
 
-    this.sessions.set(workspaceSessionId, { agent, sessionId, workDir: meta.workDir });
+    return { agent, workDir: meta.workDir, pid: agent.proc.pid ?? -1 };
+  }
+
+  async createWorkspaceSession(workDir: string): Promise<WorkspaceSessionHandle> {
+    const workspaceSessionId = `ws_${this.nextWorkspaceSessionId++}`;
+
+    this.sessions.set(workspaceSessionId, {
+      workDir,
+      primarySessionId: '',
+      agentsBySessionId: new Map(),
+    });
+
+    const created = await this.createAgentSession(workspaceSessionId);
+
+    const ws = this.requireWorkspace(workspaceSessionId);
+    ws.primarySessionId = created.sessionId;
+
+    return {
+      workspaceSessionId,
+      workDir,
+      sessionId: created.sessionId,
+      pid: created.pid,
+    };
+  }
+
+  async attachWorkspaceSession(sessionId: string): Promise<WorkspaceSessionHandle> {
+    if (!SessionIdSchema.safeParse(sessionId).success) {
+      throw new Error('Invalid sessionId');
+    }
+
+    const workspaceSessionId = `ws_${this.nextWorkspaceSessionId++}`;
+
+    const loaded = await this.spawnLoadedAgentSession(workspaceSessionId, sessionId);
+
+    this.sessions.set(workspaceSessionId, {
+      workDir: loaded.workDir,
+      primarySessionId: sessionId,
+      agentsBySessionId: new Map([[sessionId, loaded.agent]]),
+    });
 
     return {
       workspaceSessionId,
       sessionId,
-      workDir: meta.workDir,
-      pid: agent.proc.pid ?? -1,
+      workDir: loaded.workDir,
+      pid: loaded.pid,
     };
   }
 
-  getPeer(workspaceSessionId: string): JsonRpcPeer {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    return found.agent.peer;
+  async createAgentSession(workspaceSessionId: string): Promise<AgentSessionHandle> {
+    const ws = this.requireWorkspace(workspaceSessionId);
+
+    const created = await this.spawnNewAgentSession(workspaceSessionId, ws.workDir);
+    ws.agentsBySessionId.set(created.sessionId, created.agent);
+
+    if (!ws.primarySessionId) ws.primarySessionId = created.sessionId;
+
+    return { sessionId: created.sessionId, pid: created.pid };
+  }
+
+  getPeer(workspaceSessionId: string, sessionId?: string): JsonRpcPeer {
+    return this.requireAgent(workspaceSessionId, sessionId).agent.peer;
   }
 
   async prompt(workspaceSessionId: string, content: unknown[]): Promise<unknown> {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    return await found.agent.peer.request('session/prompt', { content });
+    return await this.getPeer(workspaceSessionId).request('session/prompt', { content });
+  }
+
+  async promptSession(
+    workspaceSessionId: string,
+    sessionId: string,
+    content: unknown[]
+  ): Promise<unknown> {
+    return await this.getPeer(workspaceSessionId, sessionId).request('session/prompt', { content });
   }
 
   async listProviders(workspaceSessionId: string): Promise<{
@@ -133,9 +217,7 @@ export class Supervisor {
       supportsCatalogRefresh?: boolean;
     }>;
   }> {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    return (await found.agent.peer.request('ent/providers/list')) as any;
+    return (await this.getPeer(workspaceSessionId).request('ent/providers/list')) as any;
   }
 
   async listConnections(
@@ -150,9 +232,10 @@ export class Supervisor {
       accountLabel?: string;
     }>;
   }> {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    return (await found.agent.peer.request('ent/connections/list', params ?? {})) as any;
+    return (await this.getPeer(workspaceSessionId).request(
+      'ent/connections/list',
+      params ?? {}
+    )) as any;
   }
 
   async upsertConnection(
@@ -162,63 +245,67 @@ export class Supervisor {
       connection: { connectionId?: string; name: string; config: Record<string, unknown> };
     }
   ): Promise<{ connectionId: string; providerId: string; created: boolean }> {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    return (await found.agent.peer.request('ent/connections/upsert', params)) as any;
+    return (await this.getPeer(workspaceSessionId).request(
+      'ent/connections/upsert',
+      params
+    )) as any;
   }
 
   async deleteConnection(
     workspaceSessionId: string,
     params: { connectionId: string }
   ): Promise<{ ok: true }> {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    return (await found.agent.peer.request('ent/connections/delete', params)) as any;
+    return (await this.getPeer(workspaceSessionId).request(
+      'ent/connections/delete',
+      params
+    )) as any;
   }
 
   async connectionCredentialStatus(
     workspaceSessionId: string,
     params: { connectionId: string }
   ): Promise<{ connectionId: string; state: string; accountLabel?: string; expiresAt?: string }> {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    return (await found.agent.peer.request('ent/connections/credentials/status', params)) as any;
+    return (await this.getPeer(workspaceSessionId).request(
+      'ent/connections/credentials/status',
+      params
+    )) as any;
   }
 
   async connectionCredentialStart(
     workspaceSessionId: string,
     params: { connectionId: string; method?: 'api_key' | 'device_code' | 'browser' | 'token' }
   ): Promise<unknown> {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    return await found.agent.peer.request('ent/connections/credentials/start', params);
+    return await this.getPeer(workspaceSessionId).request(
+      'ent/connections/credentials/start',
+      params
+    );
   }
 
   async connectionCredentialSubmit(
     workspaceSessionId: string,
     params: { connectionId: string; values: Record<string, string> }
   ): Promise<{ ok: boolean; error?: string }> {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    return (await found.agent.peer.request('ent/connections/credentials/submit', params)) as any;
+    return (await this.getPeer(workspaceSessionId).request(
+      'ent/connections/credentials/submit',
+      params
+    )) as any;
   }
 
   async connectionCredentialClear(
     workspaceSessionId: string,
     params: { connectionId: string }
   ): Promise<{ ok: true }> {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    return (await found.agent.peer.request('ent/connections/credentials/clear', params)) as any;
+    return (await this.getPeer(workspaceSessionId).request(
+      'ent/connections/credentials/clear',
+      params
+    )) as any;
   }
 
   async listModels(
     workspaceSessionId: string,
     params: { connectionId: string }
   ): Promise<{ providerId: string; connectionId: string; models: Array<{ modelId: string }> }> {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    return (await found.agent.peer.request('ent/models/list', params)) as any;
+    return (await this.getPeer(workspaceSessionId).request('ent/models/list', params)) as any;
   }
 
   async listJobs(workspaceSessionId: string): Promise<{
@@ -232,9 +319,7 @@ export class Supervisor {
       startTime: string;
     }>;
   }> {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    return (await found.agent.peer.request('ent/job/list')) as any;
+    return (await this.getPeer(workspaceSessionId).request('ent/job/list')) as any;
   }
 
   async jobOutput(
@@ -247,31 +332,28 @@ export class Supervisor {
       afterOffset?: number;
     }
   ): Promise<unknown> {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    return await found.agent.peer.request('ent/job/output', params);
+    return await this.getPeer(workspaceSessionId).request('ent/job/output', params);
   }
 
   async killJob(
     workspaceSessionId: string,
     params: { jobId: string }
   ): Promise<{ success: boolean }> {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    return (await found.agent.peer.request('ent/job/kill', params)) as any;
+    return (await this.getPeer(workspaceSessionId).request('ent/job/kill', params)) as any;
   }
 
   cancel(workspaceSessionId: string): void {
-    const found = this.sessions.get(workspaceSessionId);
-    if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    found.agent.peer.notify('session/cancel');
+    this.getPeer(workspaceSessionId).notify('session/cancel');
   }
 
   async shutdownWorkspaceSession(workspaceSessionId: string): Promise<void> {
     const found = this.sessions.get(workspaceSessionId);
     if (!found) return;
     this.sessions.delete(workspaceSessionId);
-    await found.agent.shutdown();
+    const agents = Array.from(found.agentsBySessionId.values());
+    for (const agent of agents) {
+      await agent.shutdown();
+    }
   }
 
   async shutdown(): Promise<void> {
