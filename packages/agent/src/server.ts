@@ -1,34 +1,25 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { ensureLaceDir } from '@lace/core/config/lace-dir';
 import type { JsonRpcPeer } from '@lace/ent-protocol';
+import {
+  ensureSessionFiles,
+  getSessionDir,
+  listSessions,
+  loadSession,
+  readSessionState,
+  writeSessionMeta,
+  writeSessionState,
+  type LoadedSession,
+  type SessionState,
+} from './storage/session-store';
+import { appendDurableEvent, readDurableEvents } from './storage/event-log';
 
 export type AgentServerState = {
   initialized: boolean;
-  activeSessionId: string | null;
+  activeSession: LoadedSession | null;
 };
 
 export function createAgentServerState(): AgentServerState {
-  return { initialized: false, activeSessionId: null };
-}
-
-function ensureAgentSessionsDir(): string {
-  const laceDir = ensureLaceDir();
-  const sessionsDir = path.join(laceDir, 'agent-sessions');
-  fs.mkdirSync(sessionsDir, { recursive: true });
-  return sessionsDir;
-}
-
-function writeSessionMeta(
-  sessionDir: string,
-  meta: { sessionId: string; workDir: string; created: string }
-): void {
-  fs.mkdirSync(sessionDir, { recursive: true });
-  fs.writeFileSync(path.join(sessionDir, 'meta.json'), JSON.stringify(meta, null, 2), {
-    encoding: 'utf8',
-    mode: 0o600,
-  });
+  return { initialized: false, activeSession: null };
 }
 
 export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerState): void {
@@ -59,9 +50,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     return {
       models: [],
       mcpServers: [],
-      currentSession: state.activeSessionId
+      currentSession: state.activeSession
         ? {
-            sessionId: state.activeSessionId,
+            sessionId: state.activeSession.meta.sessionId,
             messageCount: 0,
             tokensUsed: 0,
             costUsd: 0,
@@ -83,11 +74,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const sessionId = `sess_${randomUUID()}`;
     const created = new Date().toISOString();
 
-    const sessionsDir = ensureAgentSessionsDir();
-    const sessionDir = path.join(sessionsDir, sessionId);
+    const sessionDir = getSessionDir(sessionId);
     writeSessionMeta(sessionDir, { sessionId, workDir: parsed.workDir, created });
+    writeSessionState(sessionDir, { nextEventSeq: 1, nextStreamSeq: 1 });
+    ensureSessionFiles(sessionDir);
 
-    state.activeSessionId = sessionId;
+    state.activeSession = loadSession(sessionId);
 
     return { sessionId, created };
   });
@@ -98,37 +90,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const parsed = params as { workDir?: string } | undefined;
     const workDirFilter = parsed?.workDir;
 
-    const sessionsDir = ensureAgentSessionsDir();
-    const sessionIds = fs
-      .readdirSync(sessionsDir, { withFileTypes: true })
-      .filter((d) => d.isDirectory())
-      .map((d) => d.name);
-
-    const sessions = sessionIds
-      .map((sessionId) => {
-        const metaPath = path.join(sessionsDir, sessionId, 'meta.json');
-        try {
-          const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
-            sessionId: string;
-            workDir: string;
-            created: string;
-          };
-
-          return {
-            sessionId: meta.sessionId,
-            created: meta.created,
-            lastActive: meta.created,
-            messageCount: 0,
-            workDir: meta.workDir,
-          };
-        } catch {
-          return null;
-        }
-      })
-      .filter((s): s is NonNullable<typeof s> => !!s)
-      .filter((s) => (workDirFilter ? s.workDir === workDirFilter : true));
-
-    return { sessions };
+    return { sessions: listSessions(workDirFilter) };
   });
 
   peer.onRequest('session/load', async (params) => {
@@ -138,17 +100,81 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     if (!parsed?.sessionId) throw new Error('sessionId is required');
     if (parsed.fork) throw new Error('fork not implemented');
 
-    const sessionsDir = ensureAgentSessionsDir();
-    const metaPath = path.join(sessionsDir, parsed.sessionId, 'meta.json');
-    if (!fs.existsSync(metaPath)) throw new Error('Session not found');
-
-    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { created: string };
-
-    state.activeSessionId = parsed.sessionId;
+    const loaded = loadSession(parsed.sessionId);
+    state.activeSession = loaded;
     return {
       sessionId: parsed.sessionId,
       messageCount: 0,
-      lastActive: meta.created,
+      lastActive: loaded.meta.created,
+    };
+  });
+
+  peer.onRequest('ent/session/events', async (params) => {
+    if (!state.initialized) throw new Error('Not initialized');
+    if (!state.activeSession) throw new Error('No active session');
+
+    const parsed = params as
+      | { afterEventSeq?: number; limit?: number; types?: string[] }
+      | undefined;
+    const result = readDurableEvents(state.activeSession.dir, {
+      afterEventSeq: parsed?.afterEventSeq,
+      limit: parsed?.limit,
+      types: parsed?.types,
+    });
+
+    return result;
+  });
+
+  peer.onRequest('session/prompt', async (params) => {
+    if (!state.initialized) throw new Error('Not initialized');
+    if (!state.activeSession) throw new Error('No active session');
+
+    const parsed = params as { content: unknown[] };
+    const turnId = `turn_${randomUUID()}`;
+
+    let sessionState: SessionState = readSessionState(state.activeSession.dir);
+    const writeAndAdvance = (event: {
+      type: string;
+      data: Record<string, unknown>;
+      turnSeq: number;
+    }) => {
+      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+        type: event.type,
+        data: event.data,
+        turnId,
+        turnSeq: event.turnSeq,
+      });
+      sessionState = nextState;
+    };
+
+    writeAndAdvance({ type: 'prompt', data: { content: parsed.content }, turnSeq: 0 });
+    writeAndAdvance({ type: 'turn_start', data: {}, turnSeq: 1 });
+
+    peer.notify('session/update', {
+      sessionId: state.activeSession.meta.sessionId,
+      streamSeq: sessionState.nextStreamSeq,
+      turnId,
+      turnSeq: 0,
+      type: 'text_delta',
+      text: 'hello',
+    });
+    sessionState = { ...sessionState, nextStreamSeq: sessionState.nextStreamSeq + 1 };
+
+    writeAndAdvance({
+      type: 'message',
+      data: { content: [{ type: 'text', text: 'hello' }] },
+      turnSeq: 2,
+    });
+    writeAndAdvance({ type: 'turn_end', data: { stopReason: 'end_turn' }, turnSeq: 3 });
+
+    writeSessionState(state.activeSession.dir, sessionState);
+    state.activeSession = loadSession(state.activeSession.meta.sessionId);
+
+    return {
+      turnId,
+      stopReason: 'end_turn',
+      content: [{ type: 'text', text: 'hello' }],
+      usage: { inputTokens: 0, outputTokens: 0 },
     };
   });
 }
