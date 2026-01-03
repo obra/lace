@@ -61,6 +61,24 @@ Refactor Lace so **each agent session runs as its own standalone OS process** sp
 
 ---
 
+## Local Development Credentials (Read Before Running Anything Networked)
+
+**Never put real API keys in docs, PRs, commit messages, screenshots, or test fixtures.**
+
+If you need to manually verify OpenAI integration during development, set an env var locally:
+
+```sh
+export OPENAI_API_KEY="YOUR_KEY_HERE"
+```
+
+Guidance:
+- Prefer keeping secrets in a local-only mechanism (`.envrc`, shell profile, password manager), not in tracked files.
+- Automated tests MUST NOT require real credentials. Use fakes/mocks for unit tests and treat “real provider” runs as manual smoke tests.
+
+If a secret ever lands in git history or documentation, treat it as compromised and rotate it immediately.
+
+---
+
 ## Glossary (Use These Terms Consistently)
 
 - **Agent**: A single conversation stream with tools + provider + local execution (one OS process).
@@ -623,4 +641,3 @@ Acceptance:
   - supervisor sees job stream
   - parent agent only consumes report
 - Verify tasks UI/routes are removed and nothing references TaskManager.
-
