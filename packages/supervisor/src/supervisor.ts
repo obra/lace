@@ -68,6 +68,46 @@ export class Supervisor {
     };
   }
 
+  async attachWorkspaceSession(sessionId: string): Promise<WorkspaceSessionHandle> {
+    const workspaceSessionId = `ws_${this.nextWorkspaceSessionId++}`;
+
+    const agent = new SupervisorAgentProcess({
+      laceDir: this.laceDir,
+      onSessionUpdate: (update) => {
+        if (this.onSessionUpdate) this.onSessionUpdate(workspaceSessionId, update);
+      },
+      onPermissionRequest: async (params) => {
+        if (!this.onPermissionRequest) return { decision: 'deny' };
+        return await this.onPermissionRequest(workspaceSessionId, params);
+      },
+    });
+
+    await agent.peer.request('initialize', {
+      protocolVersion: '1.0',
+      config: { approvalMode: 'ask' },
+    });
+
+    await agent.peer.request('session/load', { sessionId });
+
+    const list = (await agent.peer.request('session/list', {})) as {
+      sessions: Array<{ sessionId: string; workDir: string }>;
+    };
+    const meta = list.sessions.find((s) => s.sessionId === sessionId);
+    if (!meta) {
+      await agent.shutdown();
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+
+    this.sessions.set(workspaceSessionId, { agent, sessionId, workDir: meta.workDir });
+
+    return {
+      workspaceSessionId,
+      sessionId,
+      workDir: meta.workDir,
+      pid: agent.proc.pid ?? -1,
+    };
+  }
+
   getPeer(workspaceSessionId: string): JsonRpcPeer {
     const found = this.sessions.get(workspaceSessionId);
     if (!found) throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);

@@ -176,4 +176,44 @@ describe('Supervisor (E2E)', () => {
       'tool_use completed updates'
     );
   });
+
+  it('can attach to an existing sessionId and read durable events', async () => {
+    supervisor = new Supervisor({
+      laceDir,
+      onPermissionRequest: async () => ({ decision: 'allow' }),
+    });
+
+    const created = await supervisor.createWorkspaceSession(workDir);
+    await withTimeout(
+      supervisor.prompt(created.workspaceSessionId, [{ type: 'text', text: 'hi' }]),
+      5_000,
+      'prompt (created)'
+    );
+
+    await supervisor.shutdown();
+    supervisor = undefined;
+
+    supervisor = new Supervisor({
+      laceDir,
+      onPermissionRequest: async () => ({ decision: 'allow' }),
+    });
+
+    const attached = await supervisor.attachWorkspaceSession(created.sessionId);
+    const events = (await withTimeout(
+      supervisor.getPeer(attached.workspaceSessionId).request('ent/session/events', {
+        afterEventSeq: 0,
+        limit: 100,
+      }),
+      2_000,
+      'ent/session/events (attached)'
+    )) as { events: Array<{ type: string; eventSeq: number }>; hasMore: boolean };
+
+    expect(events.events.map((e) => e.type)).toEqual([
+      'prompt',
+      'turn_start',
+      'message',
+      'turn_end',
+    ]);
+    expect(events.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4]);
+  });
 });
