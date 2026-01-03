@@ -1,290 +1,129 @@
-// ABOUTME: Tests for pending approvals API route
-// ABOUTME: Verifies recovery query integration with core ThreadManager
+// ABOUTME: Tests for pending approvals API route (supervisor-backed)
+// ABOUTME: Verifies filtering and error handling for agent-session approvals
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loader as GET } from '@lace/web/app/routes/api.threads.$threadId.approvals.pending';
-import { getSessionService } from '@lace/web/lib/server/session-service';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createLoaderArgs } from '@lace/web/test-utils/route-test-helpers';
 
-// Mock the session service
-vi.mock('@lace/web/lib/server/session-service');
-const mockGetSessionService = vi.mocked(getSessionService);
+vi.mock('server-only', () => ({}));
 
-interface MockToolExecutor {
-  getTool?: ReturnType<typeof vi.fn>;
-}
+const mockGetSupervisor = vi.fn();
+const mockListPendingPermissions = vi.fn();
 
-interface MockAgent {
-  getPendingApprovals: ReturnType<typeof vi.fn>;
-  toolExecutor: MockToolExecutor;
-}
-
-interface MockSession {
-  getAgent: ReturnType<typeof vi.fn>;
-  getAgents: ReturnType<typeof vi.fn>;
-}
-
-interface MockSessionService {
-  createSession: ReturnType<typeof vi.fn>;
-  getSession: ReturnType<typeof vi.fn>;
-  setupAgentEventHandlers: ReturnType<typeof vi.fn>;
-  updateSession: ReturnType<typeof vi.fn>;
-  clearActiveSessions: ReturnType<typeof vi.fn>;
-}
+vi.mock('@lace/web/lib/server/supervisor-service', async () => {
+  const actual = await vi.importActual<typeof import('@lace/web/lib/server/supervisor-service')>(
+    '@lace/web/lib/server/supervisor-service'
+  );
+  return {
+    ...actual,
+    getSupervisor: () => mockGetSupervisor(),
+    listPendingPermissions: (...args: unknown[]) => mockListPendingPermissions(...args),
+  };
+});
 
 describe('GET /api/threads/[threadId]/approvals/pending', () => {
-  let mockAgent: MockAgent;
-  let mockSession: MockSession;
-  let mockSessionService: MockSessionService;
-
   beforeEach(() => {
-    // Create mock Agent
-    mockAgent = {
-      getPendingApprovals: vi.fn(),
-      toolExecutor: {
-        getTool: vi.fn().mockReturnValue({
-          description: 'Mock tool description',
-          annotations: { readOnlyHint: false },
-        }),
-      },
-    };
-
-    // Create mock Session
-    mockSession = {
-      getAgent: vi.fn().mockReturnValue(mockAgent),
-      getAgents: vi.fn().mockReturnValue([{ threadId: 'lace_20250101_test12' }]),
-    };
-
-    // Create mock SessionService
-    mockSessionService = {
-      createSession: vi.fn(),
-      getSession: vi.fn().mockReturnValue(mockSession),
-      setupAgentEventHandlers: vi.fn(),
-      updateSession: vi.fn(),
-      clearActiveSessions: vi.fn(),
-    };
-
-    mockGetSessionService.mockReturnValue(
-      mockSessionService as unknown as ReturnType<typeof getSessionService>
-    );
+    mockGetSupervisor.mockReset();
+    mockListPendingPermissions.mockReset();
   });
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should return pending approvals from ThreadManager', async () => {
-    const threadId = 'lace_20250101_test12';
-    const mockPendingApprovals = [
-      {
-        toolCallId: 'call_456',
-        toolCall: { name: 'bash', arguments: { command: 'ls' } },
-        requestedAt: new Date('2025-01-24T12:00:00Z'),
-      },
-      {
-        toolCallId: 'call_789',
-        toolCall: { name: 'file-write', arguments: { path: '/test.txt', content: 'test' } },
-        requestedAt: new Date('2025-01-24T12:01:00Z'),
-      },
-    ];
+  it('should return pending approvals for the requested agent session', async () => {
+    const threadId = 'agent_1';
 
-    // Expected JSON response (dates become ISO strings, includes requestData)
-    const expectedJsonResponse = [
+    mockGetSupervisor.mockReturnValue({
+      listWorkspaceSessions: () => [
+        { workspaceSessionId: 'ws_1', agents: [{ sessionId: threadId }, { sessionId: 'agent_2' }] },
+      ],
+    });
+
+    mockListPendingPermissions.mockReturnValue([
       {
-        toolCallId: 'call_456',
-        toolCall: { name: 'bash', arguments: { command: 'ls' } },
+        toolCallId: 'call_a',
+        agentSessionId: threadId,
+        toolCall: { name: 'file_write', arguments: { path: 'a.txt' } },
+        params: {},
         requestedAt: new Date('2025-01-24T12:00:00.000Z'),
-        requestData: {
-          requestId: 'call_456',
-          toolName: 'bash',
-          input: { command: 'ls' },
-          isReadOnly: false,
-          toolDescription: 'Mock tool description',
-          toolAnnotations: { readOnlyHint: false },
-          riskLevel: 'moderate',
-        },
       },
       {
-        toolCallId: 'call_789',
-        toolCall: { name: 'file-write', arguments: { path: '/test.txt', content: 'test' } },
+        toolCallId: 'call_b',
+        agentSessionId: 'agent_2',
+        toolCall: { name: 'file_write', arguments: { path: 'b.txt' } },
+        params: {},
         requestedAt: new Date('2025-01-24T12:01:00.000Z'),
-        requestData: {
-          requestId: 'call_789',
-          toolName: 'file-write',
-          input: { path: '/test.txt', content: 'test' },
-          isReadOnly: false,
-          toolDescription: 'Mock tool description',
-          toolAnnotations: { readOnlyHint: false },
-          riskLevel: 'moderate',
-        },
       },
-    ];
-
-    mockAgent.getPendingApprovals.mockReturnValue(mockPendingApprovals);
+    ]);
 
     const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
     const response = await GET(createLoaderArgs(request, { threadId }));
 
-    // Verify Agent.getPendingApprovals was called
-    expect(mockAgent.getPendingApprovals).toHaveBeenCalledWith();
-
-    // Verify response
     expect(response.status).toBe(200);
     const data = await parseResponse<unknown[]>(response);
-    expect(data).toEqual(expectedJsonResponse);
+    expect(Array.isArray(data)).toBe(true);
+    expect(data).toHaveLength(1);
   });
 
-  it('should return empty array when no pending approvals', async () => {
-    const threadId = 'lace_20250101_test45';
+  it('should return empty array when no pending approvals exist for the agent', async () => {
+    const threadId = 'agent_1';
 
-    mockAgent.getPendingApprovals.mockReturnValue([]);
+    mockGetSupervisor.mockReturnValue({
+      listWorkspaceSessions: () => [
+        { workspaceSessionId: 'ws_1', agents: [{ sessionId: threadId }] },
+      ],
+    });
+
+    mockListPendingPermissions.mockReturnValue([]);
 
     const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
     const response = await GET(createLoaderArgs(request, { threadId }));
 
-    expect(mockAgent.getPendingApprovals).toHaveBeenCalledWith();
     expect(response.status).toBe(200);
-
     const data = await parseResponse<unknown[]>(response);
     expect(data).toEqual([]);
   });
 
-  it('should return error if agent not found', async () => {
-    const threadId = 'lace_20250101_fake01';
+  it('should return 404 if agent session is not found in any workspace session', async () => {
+    const threadId = 'agent_1';
 
-    // Mock agent not found
-    mockSession.getAgent.mockReturnValue(null);
-    mockSession.getAgents.mockReturnValue([]);
+    mockGetSupervisor.mockReturnValue({
+      listWorkspaceSessions: () => [],
+    });
 
     const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
     const response = await GET(createLoaderArgs(request, { threadId }));
-
-    // Should not call getPendingApprovals if agent not found
-    expect(mockAgent.getPendingApprovals).not.toHaveBeenCalled();
 
     expect(response.status).toBe(404);
-    const data = await parseResponse<{ error: string; code?: string; details?: unknown }>(response);
-    expect(data).toEqual({
-      error: 'Agent not found for thread lace_20250101_fake01. Available agents: ',
-      code: 'RESOURCE_NOT_FOUND',
-      details: {
-        requestedAgent: 'lace_20250101_fake01',
-        availableAgents: [],
-      },
-    });
+    const data = await parseResponse<{ error: string; code?: string }>(response);
+    expect(data).toEqual({ error: 'Agent not found', code: 'RESOURCE_NOT_FOUND' });
   });
 
-  it('should handle multiple pending approvals with different tool types', async () => {
-    const threadId = 'lace_20250101_test78';
-    const mockPendingApprovals = [
-      {
-        toolCallId: 'call_bash',
-        toolCall: {
-          name: 'bash',
-          arguments: { command: 'rm -rf /important' },
-        },
-        requestedAt: new Date('2025-01-24T10:00:00Z'),
-      },
-      {
-        toolCallId: 'call_file_write',
-        toolCall: {
-          name: 'file-write',
-          arguments: { path: '/etc/passwd', content: 'malicious' },
-        },
-        requestedAt: new Date('2025-01-24T10:01:00Z'),
-      },
-      {
-        toolCallId: 'call_url_fetch',
-        toolCall: {
-          name: 'url-fetch',
-          arguments: { url: 'https://malicious.com/data' },
-        },
-        requestedAt: new Date('2025-01-24T10:02:00Z'),
-      },
-    ];
-
-    // Expected JSON response (dates become ISO strings, includes requestData)
-    const expectedJsonResponse = [
-      {
-        toolCallId: 'call_bash',
-        toolCall: {
-          name: 'bash',
-          arguments: { command: 'rm -rf /important' },
-        },
-        requestedAt: new Date('2025-01-24T10:00:00Z'),
-        requestData: {
-          requestId: 'call_bash',
-          toolName: 'bash',
-          input: { command: 'rm -rf /important' },
-          isReadOnly: false,
-          toolDescription: 'Mock tool description',
-          toolAnnotations: { readOnlyHint: false },
-          riskLevel: 'moderate',
-        },
-      },
-      {
-        toolCallId: 'call_file_write',
-        toolCall: {
-          name: 'file-write',
-          arguments: { path: '/etc/passwd', content: 'malicious' },
-        },
-        requestedAt: new Date('2025-01-24T10:01:00Z'),
-        requestData: {
-          requestId: 'call_file_write',
-          toolName: 'file-write',
-          input: { path: '/etc/passwd', content: 'malicious' },
-          isReadOnly: false,
-          toolDescription: 'Mock tool description',
-          toolAnnotations: { readOnlyHint: false },
-          riskLevel: 'moderate',
-        },
-      },
-      {
-        toolCallId: 'call_url_fetch',
-        toolCall: {
-          name: 'url-fetch',
-          arguments: { url: 'https://malicious.com/data' },
-        },
-        requestedAt: new Date('2025-01-24T10:02:00Z'),
-        requestData: {
-          requestId: 'call_url_fetch',
-          toolName: 'url-fetch',
-          input: { url: 'https://malicious.com/data' },
-          isReadOnly: false,
-          toolDescription: 'Mock tool description',
-          toolAnnotations: { readOnlyHint: false },
-          riskLevel: 'moderate',
-        },
-      },
-    ];
-
-    mockAgent.getPendingApprovals.mockReturnValue(mockPendingApprovals);
-
+  it('should return 400 for invalid thread ID', async () => {
+    const threadId = 'bad..id';
     const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
     const response = await GET(createLoaderArgs(request, { threadId }));
-
-    expect(response.status).toBe(200);
-    const data = await parseResponse<unknown[]>(response);
-    expect(data).toHaveLength(3);
-    expect(data).toEqual(expectedJsonResponse);
+    expect(response.status).toBe(400);
   });
 
-  it('should handle Agent errors gracefully', async () => {
-    const threadId = 'lace_20250101_test99';
+  it('should return 500 when pending approval query fails', async () => {
+    const threadId = 'agent_1';
 
-    mockAgent.getPendingApprovals.mockImplementation(() => {
-      throw new Error('Database connection failed');
+    mockGetSupervisor.mockReturnValue({
+      listWorkspaceSessions: () => [
+        { workspaceSessionId: 'ws_1', agents: [{ sessionId: threadId }] },
+      ],
+    });
+
+    mockListPendingPermissions.mockImplementation(() => {
+      throw new Error('boom');
     });
 
     const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
     const response = await GET(createLoaderArgs(request, { threadId }));
 
     expect(response.status).toBe(500);
-    const data = await parseResponse<{ error: string; code?: string }>(response);
-    expect(data).toEqual({
-      error: 'Failed to get pending approvals',
-      code: 'INTERNAL_SERVER_ERROR',
-    });
   });
 });

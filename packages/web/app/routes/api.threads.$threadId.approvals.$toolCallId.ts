@@ -89,6 +89,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const mappedDecision = decision === 'deny' ? 'deny' : 'allow';
     const resolved = resolvePendingPermission({
       workspaceSessionId: workspace.workspaceSessionId,
+      agentSessionId: threadId,
       toolCallId,
       decision: mappedDecision,
     });

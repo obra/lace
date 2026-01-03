@@ -4,7 +4,11 @@
 import { z } from 'zod';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { getSupervisor, resolvePendingPermission } from '@lace/web/lib/server/supervisor-service';
+import {
+  getSupervisor,
+  listPendingPermissions,
+  resolvePendingPermission,
+} from '@lace/web/lib/server/supervisor-service';
 import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-session-id-validation';
 import type { Route } from './+types/api.sessions.$sessionId.approvals.$toolCallId';
 
@@ -58,8 +62,21 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const mappedDecision = decision === 'deny' ? 'deny' : 'allow';
     const decodedToolCallId = decodeURIComponent(toolCallId);
+    const matches = listPendingPermissions(workspaceSessionId).filter(
+      (p) => p.toolCallId === decodedToolCallId
+    );
+
+    if (matches.length === 0) {
+      return createErrorResponse('Tool call not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+    }
+
+    if (matches.length > 1) {
+      return createErrorResponse('Tool call is ambiguous', 409, { code: 'VALIDATION_FAILED' });
+    }
+
     const resolved = resolvePendingPermission({
       workspaceSessionId,
+      agentSessionId: matches[0]!.agentSessionId,
       toolCallId: decodedToolCallId,
       decision: mappedDecision,
     });

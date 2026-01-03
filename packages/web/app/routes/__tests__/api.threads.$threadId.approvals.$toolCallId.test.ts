@@ -1,259 +1,206 @@
-// ABOUTME: Tests for tool approval response API route
-// ABOUTME: Verifies integration with core ThreadManager approval system
+// ABOUTME: Tests for approval decision API route (supervisor-backed)
+// ABOUTME: Verifies decision mapping and resolution of pending permissions
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { action as POST } from '@lace/web/app/routes/api.threads.$threadId.approvals.$toolCallId';
-import { getSessionService } from '@lace/web/lib/server/session-service';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 
-// Mock the session service
-vi.mock('@lace/web/lib/server/session-service');
-const mockGetSessionService = vi.mocked(getSessionService);
+vi.mock('server-only', () => ({}));
 
-interface MockAgent {
-  handleApprovalResponse: ReturnType<typeof vi.fn>;
-}
+const mockGetSupervisor = vi.fn();
+const mockListPendingPermissions = vi.fn();
+const mockResolvePendingPermission = vi.fn();
 
-interface MockSession {
-  getAgent: ReturnType<typeof vi.fn>;
-}
-
-interface MockSessionService {
-  getSession: ReturnType<typeof vi.fn>;
-  setupAgentEventHandlers: ReturnType<typeof vi.fn>;
-  updateSession: ReturnType<typeof vi.fn>;
-  clearActiveSessions: ReturnType<typeof vi.fn>;
-}
+vi.mock('@lace/web/lib/server/supervisor-service', async () => {
+  const actual = await vi.importActual<typeof import('@lace/web/lib/server/supervisor-service')>(
+    '@lace/web/lib/server/supervisor-service'
+  );
+  return {
+    ...actual,
+    getSupervisor: () => mockGetSupervisor(),
+    listPendingPermissions: (...args: unknown[]) => mockListPendingPermissions(...args),
+    resolvePendingPermission: (...args: unknown[]) => mockResolvePendingPermission(...args),
+  };
+});
 
 describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
-  let mockAgent: MockAgent;
-  let mockSession: MockSession;
-  let mockSessionService: MockSessionService;
-
   beforeEach(() => {
-    // Create mock Agent
-    mockAgent = {
-      handleApprovalResponse: vi.fn(),
-    };
-
-    // Create mock Session
-    mockSession = {
-      getAgent: vi.fn().mockReturnValue(mockAgent),
-    };
-
-    // Create mock SessionService
-    mockSessionService = {
-      getSession: vi.fn().mockReturnValue(mockSession),
-      setupAgentEventHandlers: vi.fn(),
-      updateSession: vi.fn(),
-      clearActiveSessions: vi.fn(),
-    };
-
-    mockGetSessionService.mockReturnValue(
-      mockSessionService as unknown as ReturnType<typeof getSessionService>
-    );
+    mockGetSupervisor.mockReset();
+    mockListPendingPermissions.mockReset();
+    mockResolvePendingPermission.mockReset();
   });
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should create TOOL_APPROVAL_RESPONSE event with correct data', async () => {
-    const threadId = 'lace_20250101_test12';
-    const toolCallId = 'call_456';
-    const decision = 'allow_once';
+  it('should resolve an approval (allow_once -> allow)', async () => {
+    const threadId = 'agent_1';
+    const toolCallId = 'call_123';
 
-    // Create mock request
+    mockGetSupervisor.mockReturnValue({
+      listWorkspaceSessions: () => [
+        { workspaceSessionId: 'ws_1', agents: [{ sessionId: threadId }] },
+      ],
+    });
+
+    mockListPendingPermissions.mockReturnValue([
+      { toolCallId, agentSessionId: threadId, params: {}, requestedAt: new Date() },
+    ]);
+
+    mockResolvePendingPermission.mockReturnValue(true);
+
     const request = new Request(
-      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      `http://localhost/api/threads/${threadId}/approvals/${encodeURIComponent(toolCallId)}`,
       {
         method: 'POST',
-        body: JSON.stringify({ decision }),
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: 'allow_once' }),
       }
     );
 
-    // Call the API route
     const response = await POST(createActionArgs(request, { threadId, toolCallId }));
-
-    // Verify Agent.handleApprovalResponse was called correctly
-    expect(mockAgent.handleApprovalResponse).toHaveBeenCalledWith(toolCallId, decision);
-
-    // Verify response
     expect(response.status).toBe(200);
-    const data = await parseResponse<{ success: boolean }>(response);
-    expect(data).toEqual({ success: true });
+    expect(mockResolvePendingPermission).toHaveBeenCalledWith({
+      workspaceSessionId: 'ws_1',
+      agentSessionId: threadId,
+      toolCallId,
+      decision: 'allow',
+    });
   });
 
-  it('should handle different approval decisions', async () => {
-    const threadId = 'lace_20250101_test12';
-    const toolCallId = 'call_456';
-    const decisions = ['allow_once', 'allow_session', 'deny'];
+  it('should resolve an approval (deny -> deny)', async () => {
+    const threadId = 'agent_1';
+    const toolCallId = 'call_123';
 
-    for (const decision of decisions) {
-      const request = new Request(
-        `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ decision }),
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+    mockGetSupervisor.mockReturnValue({
+      listWorkspaceSessions: () => [
+        { workspaceSessionId: 'ws_1', agents: [{ sessionId: threadId }] },
+      ],
+    });
 
-      const response = await POST(createActionArgs(request, { threadId, toolCallId }));
+    mockListPendingPermissions.mockReturnValue([
+      { toolCallId, agentSessionId: threadId, params: {}, requestedAt: new Date() },
+    ]);
 
-      expect(mockAgent.handleApprovalResponse).toHaveBeenCalledWith(toolCallId, decision);
-
-      expect(response.status).toBe(200);
-      const data = await parseResponse<{ success: boolean }>(response);
-      expect(data).toEqual({ success: true });
-
-      // Clear mocks between iterations
-      vi.clearAllMocks();
-      mockGetSessionService.mockReturnValue(
-        mockSessionService as unknown as ReturnType<typeof getSessionService>
-      );
-      mockSessionService.getSession.mockReturnValue(mockSession);
-      mockSession.getAgent.mockReturnValue(mockAgent);
-    }
-  });
-
-  it('should return error if agent not found', async () => {
-    const threadId = 'lace_20250101_test12';
-    const toolCallId = 'call_456';
-    const decision = 'allow_once';
-
-    // Mock agent not found
-    mockSession.getAgent.mockReturnValue(null);
+    mockResolvePendingPermission.mockReturnValue(true);
 
     const request = new Request(
-      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      `http://localhost/api/threads/${threadId}/approvals/${encodeURIComponent(toolCallId)}`,
       {
         method: 'POST',
-        body: JSON.stringify({ decision }),
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: 'deny' }),
       }
     );
 
     const response = await POST(createActionArgs(request, { threadId, toolCallId }));
+    expect(response.status).toBe(200);
+    expect(mockResolvePendingPermission).toHaveBeenCalledWith({
+      workspaceSessionId: 'ws_1',
+      agentSessionId: threadId,
+      toolCallId,
+      decision: 'deny',
+    });
+  });
 
-    // Should not call handleApprovalResponse if agent not found
-    expect(mockAgent.handleApprovalResponse).not.toHaveBeenCalled();
+  it('should return 404 if agent session not found', async () => {
+    const threadId = 'agent_1';
+    const toolCallId = 'call_123';
 
+    mockGetSupervisor.mockReturnValue({
+      listWorkspaceSessions: () => [],
+    });
+
+    const request = new Request(
+      `http://localhost/api/threads/${threadId}/approvals/${encodeURIComponent(toolCallId)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: 'allow_once' }),
+      }
+    );
+
+    const response = await POST(createActionArgs(request, { threadId, toolCallId }));
     expect(response.status).toBe(404);
     const data = await parseResponse<{ error: string; code?: string }>(response);
-    expect(data).toEqual({ error: 'Agent not found for thread', code: 'RESOURCE_NOT_FOUND' });
+    expect(data).toEqual({ error: 'Agent not found', code: 'RESOURCE_NOT_FOUND' });
+  });
+
+  it('should return 404 if tool call not found', async () => {
+    const threadId = 'agent_1';
+    const toolCallId = 'call_123';
+
+    mockGetSupervisor.mockReturnValue({
+      listWorkspaceSessions: () => [
+        { workspaceSessionId: 'ws_1', agents: [{ sessionId: threadId }] },
+      ],
+    });
+
+    mockListPendingPermissions.mockReturnValue([]);
+
+    const request = new Request(
+      `http://localhost/api/threads/${threadId}/approvals/${encodeURIComponent(toolCallId)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: 'allow_once' }),
+      }
+    );
+
+    const response = await POST(createActionArgs(request, { threadId, toolCallId }));
+    expect(response.status).toBe(404);
   });
 
   it('should return error for invalid JSON', async () => {
-    const threadId = 'lace_20250101_test12';
-    const toolCallId = 'call_456';
+    const threadId = 'agent_1';
+    const toolCallId = 'call_123';
 
     const request = new Request(
-      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      `http://localhost/api/threads/${threadId}/approvals/${encodeURIComponent(toolCallId)}`,
       {
         method: 'POST',
-        body: 'invalid json',
         headers: { 'Content-Type': 'application/json' },
+        body: 'not json',
       }
     );
 
     const response = await POST(createActionArgs(request, { threadId, toolCallId }));
-
     expect(response.status).toBe(400);
-    const data = await parseResponse<{ error: string }>(response);
-    expect(data).toHaveProperty('error');
   });
 
   it('should return error for missing decision', async () => {
-    const threadId = 'lace_20250101_test12';
-    const toolCallId = 'call_456';
+    const threadId = 'agent_1';
+    const toolCallId = 'call_123';
 
     const request = new Request(
-      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      `http://localhost/api/threads/${threadId}/approvals/${encodeURIComponent(toolCallId)}`,
       {
         method: 'POST',
-        body: JSON.stringify({}), // Missing decision
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
       }
     );
 
     const response = await POST(createActionArgs(request, { threadId, toolCallId }));
-
     expect(response.status).toBe(400);
-    const data = await parseResponse<{ error: string }>(response);
-    expect(data).toHaveProperty('error');
   });
 
-  it('should handle duplicate approval requests gracefully', async () => {
-    const threadId = 'lace_20250101_test12';
-    const toolCallId = 'call_456';
-    const decision = 'allow_once';
-
-    // Mock the first call to succeed (agent handles it gracefully)
-    mockAgent.handleApprovalResponse.mockResolvedValueOnce(undefined);
-
-    // Mock the second call to also succeed (agent handles duplicates)
-    mockAgent.handleApprovalResponse.mockResolvedValueOnce(undefined);
-
-    // First request should succeed
-    const request1 = new Request(
-      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ decision }),
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
-
-    const response1 = await POST(createActionArgs(request1, { threadId, toolCallId }));
-
-    expect(response1.status).toBe(200);
-    const data1 = await parseResponse<{ success: boolean }>(response1);
-    expect(data1).toEqual({ success: true });
-
-    // Second request (duplicate) should also succeed
-    const request2 = new Request(
-      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ decision }),
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
-
-    const response2 = await POST(createActionArgs(request2, { threadId, toolCallId }));
-
-    expect(response2.status).toBe(200);
-    const data2 = await parseResponse<{ success: boolean }>(response2);
-    expect(data2).toEqual({ success: true });
-
-    // Verify handleApprovalResponse was called twice
-    expect(mockAgent.handleApprovalResponse).toHaveBeenCalledTimes(2);
-  });
-
-  it('should throw non-constraint errors normally', async () => {
-    const threadId = 'lace_20250101_test12';
-    const toolCallId = 'call_456';
-    const decision = 'allow_once';
-
-    // Mock handleApprovalResponse to throw a non-constraint error
-    mockAgent.handleApprovalResponse.mockRejectedValueOnce(new Error('Some other agent error'));
+  it('should return 400 for invalid thread ID', async () => {
+    const threadId = 'bad..id';
+    const toolCallId = 'call_123';
 
     const request = new Request(
-      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      `http://localhost/api/threads/${threadId}/approvals/${encodeURIComponent(toolCallId)}`,
       {
         method: 'POST',
-        body: JSON.stringify({ decision }),
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: 'allow_once' }),
       }
     );
 
     const response = await POST(createActionArgs(request, { threadId, toolCallId }));
-
-    expect(response.status).toBe(500);
-    const data = await parseResponse<{ error: string; code?: string }>(response);
-    expect(data).toEqual({ error: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+    expect(response.status).toBe(400);
   });
 });

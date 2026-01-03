@@ -15,6 +15,7 @@ declare global {
         {
           workspaceSessionId: string;
           agentSessionId: string;
+          toolCallId: string;
           toolCall?: { name: string; arguments: Record<string, unknown> };
           params: Record<string, unknown>;
           createdAt: number;
@@ -31,6 +32,7 @@ declare global {
         {
           workspaceSessionId: string;
           agentSessionId: string;
+          toolCallId: string;
           toolCall: { name: string; arguments: Record<string, unknown> };
           createdAt: number;
         }
@@ -40,6 +42,10 @@ declare global {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function permissionKey(agentSessionId: string, toolCallId: string): string {
+  return `${agentSessionId}:${toolCallId}`;
 }
 
 type ToolResultContentItem =
@@ -107,9 +113,11 @@ function updateToLaceEvents(params: {
 
     if (status === 'pending' || status === 'awaiting_permission') {
       if (toolCallId && name && agentSessionId) {
-        global.laceWebPendingToolCalls?.set(toolCallId, {
+        const key = permissionKey(agentSessionId, toolCallId);
+        global.laceWebPendingToolCalls?.set(key, {
           workspaceSessionId,
           agentSessionId,
+          toolCallId,
           toolCall: { name, arguments: input },
           createdAt: Date.now(),
         });
@@ -218,7 +226,8 @@ export function getSupervisor(): Supervisor {
         decision: 'allow' | 'deny';
         updatedInput?: Record<string, unknown>;
       }>((resolve) => {
-        const toolCallFromUpdates = pendingToolCalls?.get(toolCallId);
+        const key = permissionKey(agentSessionId, toolCallId);
+        const toolCallFromUpdates = pendingToolCalls?.get(key);
         const toolCall =
           toolCallFromUpdates &&
           toolCallFromUpdates.workspaceSessionId === workspaceSessionId &&
@@ -226,11 +235,12 @@ export function getSupervisor(): Supervisor {
             ? toolCallFromUpdates.toolCall
             : undefined;
 
-        if (pendingToolCalls) pendingToolCalls.delete(toolCallId);
+        if (pendingToolCalls) pendingToolCalls.delete(key);
 
-        pending.set(toolCallId, {
+        pending.set(key, {
           workspaceSessionId,
           agentSessionId,
+          toolCallId,
           ...(toolCall ? { toolCall } : {}),
           params,
           createdAt: Date.now(),
@@ -238,10 +248,10 @@ export function getSupervisor(): Supervisor {
         });
 
         setTimeout(() => {
-          const still = pending.get(toolCallId);
+          const still = pending.get(key);
           if (!still) return;
-          pending.delete(toolCallId);
-          pendingToolCalls?.delete(toolCallId);
+          pending.delete(key);
+          pendingToolCalls?.delete(key);
           still.resolve({ decision: 'deny' });
         }, timeoutMs);
       });
@@ -265,10 +275,10 @@ export function listPendingPermissions(workspaceSessionId: string): Array<{
   const pending = global.laceWebPendingPermissions;
   if (!pending) return [];
 
-  return Array.from(pending.entries())
-    .filter(([, v]) => v.workspaceSessionId === workspaceSessionId)
-    .map(([toolCallId, v]) => ({
-      toolCallId,
+  return Array.from(pending.values())
+    .filter((v) => v.workspaceSessionId === workspaceSessionId)
+    .map((v) => ({
+      toolCallId: v.toolCallId,
       agentSessionId: v.agentSessionId,
       ...(v.toolCall ? { toolCall: v.toolCall } : {}),
       params: v.params,
@@ -279,6 +289,7 @@ export function listPendingPermissions(workspaceSessionId: string): Array<{
 
 export function resolvePendingPermission(params: {
   workspaceSessionId: string;
+  agentSessionId?: string;
   toolCallId: string;
   decision: 'allow' | 'deny';
   updatedInput?: Record<string, unknown>;
@@ -286,12 +297,23 @@ export function resolvePendingPermission(params: {
   const pending = global.laceWebPendingPermissions;
   if (!pending) return false;
 
-  const found = pending.get(params.toolCallId);
+  const key = params.agentSessionId
+    ? permissionKey(params.agentSessionId, params.toolCallId)
+    : undefined;
+
+  const found =
+    key && pending.has(key)
+      ? pending.get(key)
+      : Array.from(pending.values()).find(
+          (v) =>
+            v.workspaceSessionId === params.workspaceSessionId && v.toolCallId === params.toolCallId
+        );
   if (!found) return false;
   if (found.workspaceSessionId !== params.workspaceSessionId) return false;
 
-  pending.delete(params.toolCallId);
-  global.laceWebPendingToolCalls?.delete(params.toolCallId);
+  const resolvedKey = permissionKey(found.agentSessionId, found.toolCallId);
+  pending.delete(resolvedKey);
+  global.laceWebPendingToolCalls?.delete(resolvedKey);
   found.resolve({
     decision: params.decision,
     ...(params.updatedInput ? { updatedInput: params.updatedInput } : {}),
