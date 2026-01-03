@@ -6,14 +6,7 @@ import readline from 'node:readline';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { asSessionId, createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
-
-type CliArgs = {
-  agentCmd?: string;
-  workDir: string;
-  loadSessionId?: string;
-  approvalMode?: string;
-  timeoutMs?: number;
-};
+import { helpText, parseArgs } from './args';
 
 type PermissionRequestParams = {
   sessionId?: string;
@@ -27,80 +20,6 @@ type PermissionRequestParams = {
   options?: Array<{ optionId: string; label: string }>;
   requestedAt?: string;
 };
-
-function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { workDir: process.cwd() };
-
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === '--agent-cmd') {
-      const v = argv[++i];
-      if (!v) throw new Error('--agent-cmd requires a value');
-      args.agentCmd = v;
-      continue;
-    }
-    if (a === '--workdir') {
-      const v = argv[++i];
-      if (!v) throw new Error('--workdir requires a value');
-      args.workDir = v;
-      continue;
-    }
-    if (a === '--load') {
-      const v = argv[++i];
-      if (!v) throw new Error('--load requires a sessionId');
-      args.loadSessionId = v;
-      continue;
-    }
-    if (a === '--approval-mode') {
-      const v = argv[++i];
-      if (!v) throw new Error('--approval-mode requires a value');
-      args.approvalMode = v;
-      continue;
-    }
-    if (a === '--timeout-ms') {
-      const v = argv[++i];
-      if (!v) throw new Error('--timeout-ms requires a number');
-      const n = Number(v);
-      if (!Number.isFinite(n) || n <= 0) throw new Error('--timeout-ms must be a positive number');
-      args.timeoutMs = Math.trunc(n);
-      continue;
-    }
-    if (a === '--new') {
-      continue;
-    }
-    if (a === '--no-color') {
-      continue;
-    }
-    if (a === '--help' || a === '-h') {
-      printHelpAndExit(0);
-    }
-    throw new Error(`Unknown arg: ${a}`);
-  }
-
-  return args;
-}
-
-function printHelpAndExit(code: number): never {
-  const lines = [
-    'lace (Ent protocol CLI client)',
-    '',
-    'Usage:',
-    '  lace [--agent-cmd "<command>"] [--workdir <path>] [--load <sessionId>]',
-    '',
-    'Flags:',
-    '  --agent-cmd "<command>"   Command to spawn (default: lace-agent if on PATH, else built agent)',
-    '  --workdir <path>          Sets agent cwd and session workDir (default: current dir)',
-    '  --load <sessionId>        Load an existing session instead of creating a new one',
-    '  --approval-mode <mode>    Passed to initialize.config.approvalMode (Lace agents may use it)',
-    '  --timeout-ms <n>          Client-side request timeout in ms',
-    '  --no-color                (reserved; currently unused)',
-    '',
-    'REPL:',
-    '  :help, :exit, :status, :new [workDir], :load <sessionId>, :list, :prompt <text>, :cancel, :raw <json>',
-  ];
-  process.stdout.write(`${lines.join('\n')}\n`);
-  process.exit(code);
-}
 
 function isCommandOnPath(command: string): boolean {
   if (process.platform === 'win32') {
@@ -204,8 +123,14 @@ type PendingPermission = {
 };
 
 async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
-  if (args.loadSessionId && process.argv.includes('--new')) {
+  const parsedArgs = parseArgs(process.argv.slice(2));
+  if (parsedArgs.kind === 'help') {
+    process.stdout.write(parsedArgs.text);
+    process.exit(parsedArgs.exitCode);
+  }
+  const args = parsedArgs.args;
+
+  if (args.loadSessionId && args.explicitNew) {
     process.stderr.write('Error: --new and --load cannot be used together\n');
     process.exit(2);
   }

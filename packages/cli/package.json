@@ -17,7 +17,10 @@
     "build": "tsc && tsc-alias -p tsconfig.json -f -fe .js",
     "build:clean": "rm -rf dist && npm run build",
     "typecheck": "tsc --noEmit",
-    "dev": "tsx src/main.ts"
+    "dev": "tsx src/main.ts",
+    "pretest": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@lace/ent-protocol": "file:../ent-protocol"
@@ -25,7 +28,7 @@
   "devDependencies": {
     "@types/node": "^22.16.0",
     "tsc-alias": "^1.8.16",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.4"
   }
 }
-
