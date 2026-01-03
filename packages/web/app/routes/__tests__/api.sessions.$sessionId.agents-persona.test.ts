@@ -19,23 +19,15 @@ import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
-// Mock only external dependencies
-vi.mock('@lace/web/lib/server/approval-manager', () => ({
-  getApprovalManager: () => ({
-    requestApproval: vi.fn().mockResolvedValue('allow_once'),
-  }),
-}));
-
 // Import after mocks
 import { action as POST } from '@lace/web/app/routes/api.sessions.$sessionId.agents';
-import { getSessionService, SessionService } from '@lace/web/lib/server/session-service';
-import { Project, Session } from '@lace/web/lib/server/lace-imports';
+import { action as createWorkspaceSession } from '@lace/web/app/routes/api.projects.$projectId.sessions';
+import { Project } from '@lace/web/lib/server/lace-imports';
 
 describe('Agent Creation API - Persona and Message Support', () => {
   const context = setupWebTest();
-  let sessionService: SessionService;
   let testProject: Project;
-  let sessionId: string;
+  let workspaceSessionId: string;
   let providerInstanceId: string;
 
   beforeEach(async () => {
@@ -61,21 +53,28 @@ describe('Agent Creation API - Persona and Message Support', () => {
       modelId: 'claude-3-5-haiku-20241022',
     });
 
-    sessionService = getSessionService();
-    const sessionInstance = Session.create({
-      name: 'Test Session',
-      projectId: testProject.getId(),
-    });
-    const session = sessionInstance.getInfo()!;
-    sessionId = session.id as string;
+    const createRequest = new Request(
+      `http://localhost/api/projects/${testProject.getId()}/sessions`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Test Session',
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      }
+    );
+
+    const createResponse = await createWorkspaceSession(
+      createActionArgs(createRequest, { projectId: testProject.getId() })
+    );
+    expect(createResponse.status).toBe(201);
+    const created = await parseResponse<{ id: string }>(createResponse);
+    workspaceSessionId = created.id;
   });
 
   afterEach(async () => {
-    // Clean up agents before tearing down persistence
-    if (sessionService) {
-      sessionService.clearActiveSessions();
-    }
-
     await cleanupTestProviderInstances([providerInstanceId]);
     vi.clearAllMocks();
   });
@@ -85,7 +84,7 @@ describe('Agent Creation API - Persona and Message Support', () => {
       name: 'Code Review Agent',
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
-      persona: 'code-reviewer',
+      persona: 'coding-agent',
     };
 
     const mockRequest = new Request('http://localhost', {
@@ -94,7 +93,7 @@ describe('Agent Creation API - Persona and Message Support', () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const response = await POST(createActionArgs(mockRequest, { sessionId }));
+    const response = await POST(createActionArgs(mockRequest, { sessionId: workspaceSessionId }));
     const data = await parseResponse(response);
 
     expect(response.status).toBe(201);
@@ -110,7 +109,7 @@ describe('Agent Creation API - Persona and Message Support', () => {
       name: 'Helper Agent',
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
-      persona: 'default',
+      persona: 'lace',
       initialMessage: 'Hello! Please help me with my project.',
     };
 
@@ -120,7 +119,7 @@ describe('Agent Creation API - Persona and Message Support', () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const response = await POST(createActionArgs(mockRequest, { sessionId }));
+    const response = await POST(createActionArgs(mockRequest, { sessionId: workspaceSessionId }));
     const data = await parseResponse(response);
 
     expect(response.status).toBe(201);
@@ -140,7 +139,7 @@ describe('Agent Creation API - Persona and Message Support', () => {
       name: 'Full Featured Agent',
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
-      persona: 'code-reviewer',
+      persona: 'coding-agent',
       initialMessage: 'Please review my TypeScript code.',
     };
 
@@ -150,7 +149,7 @@ describe('Agent Creation API - Persona and Message Support', () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const response = await POST(createActionArgs(mockRequest, { sessionId }));
+    const response = await POST(createActionArgs(mockRequest, { sessionId: workspaceSessionId }));
 
     expect(response.status).toBe(201);
   });
@@ -169,7 +168,7 @@ describe('Agent Creation API - Persona and Message Support', () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const response = await POST(createActionArgs(mockRequest, { sessionId }));
+    const response = await POST(createActionArgs(mockRequest, { sessionId: workspaceSessionId }));
 
     expect(response.status).toBe(400);
     const data = await parseResponse<{ error: string }>(response);
@@ -190,7 +189,7 @@ describe('Agent Creation API - Persona and Message Support', () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const response = await POST(createActionArgs(mockRequest, { sessionId }));
+    const response = await POST(createActionArgs(mockRequest, { sessionId: workspaceSessionId }));
 
     expect(response.status).toBe(400);
     const data = await parseResponse<{ error: string }>(response);
@@ -211,7 +210,7 @@ describe('Agent Creation API - Persona and Message Support', () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const response = await POST(createActionArgs(mockRequest, { sessionId }));
+    const response = await POST(createActionArgs(mockRequest, { sessionId: workspaceSessionId }));
 
     expect(response.status).toBe(201);
     const data = await parseResponse(response);
