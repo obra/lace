@@ -54,6 +54,41 @@ Design spec: `docs/plans/2026-01-03/agent-process-refactor-spec.md`
 
 ---
 
+## Implementation Order (Non-Negotiable)
+
+This refactor has a lot of surface area. To avoid "random walk" implementation and half-migrated systems, do the work in this order:
+
+1. **Protocol + process foundation**
+   - `@lace/ent-protocol` (NDJSON stdio + JSON-RPC peer)
+   - `lace-agent` process that can `initialize`, `session/new`/`session/load`, `session/prompt`, stream `session/update`, and persist JSONL durable events
+   - `@lace/supervisor` that spawns one agent process per `sessionId`
+
+2. **Web cutover to supervisor**
+   - `packages/web` talks only to supervisor (no direct `@lace/core` runtime objects in web runtime path)
+   - Streaming updates + approvals UI are wired through supervisor
+
+3. **ToolContext refactor (enable tools in agent process)**
+   - Remove `context.agent` coupling in core tools by expanding `ToolContext` with explicit fields/callbacks
+   - Make it possible to run the existing tool implementations inside `lace-agent`
+
+4. **Real agent loop inside `lace-agent`**
+   - Move from the deterministic “hello + run: …” stub to the real provider-driven loop (LLM → tools → approvals → continue)
+   - Approvals must pause/resume correctly and survive agent restarts
+
+5. **Provider/connection configuration APIs**
+   - Implement the Ent `ent/providers/*`, `ent/connections/*`, `ent/models/*` surface so the supervisor/web can configure providers without owning credentials
+
+6. **Jobs/subagents**
+   - Implement `ent/job/*` and treat subagents as jobs (not protocol peers)
+
+7. **Flag-day removals**
+   - Remove Tasks and TaskManager integration
+   - Remove SQLite/ThreadManager/Session runtime path once web/supervisor/agent are stable
+
+If you’re tempted to skip ahead: don’t. This order exists to keep the system runnable at each milestone.
+
+---
+
 ## Key Docs (Read These First)
 
 - Protocol spec: `docs/protocol-spec.md`
@@ -184,6 +219,8 @@ For each task below, do not mark it done until:
 # Work Breakdown (Bite-Sized Tasks)
 
 Each section is intended to become one PR or a small sequence of PRs. Keep PRs small.
+
+Important: follow the **Implementation Order (Non-Negotiable)** section above when sequencing work. The PR numbering below is historical and is not a substitute for that required ordering.
 
 ---
 
@@ -332,6 +369,43 @@ Before integrating the full LLM/tools stack, build a minimal, deterministic loop
     - ensures streamSeq ordering
 - Acceptance:
   - A protocol client can render a complete “turn” without providers/tools.
+
+---
+
+## PR4.5 — Refactor `ToolContext` (enable tools in agent process)
+
+This is the critical mechanical refactor that makes “tools run in the agent process” possible without smuggling dependencies via `context.agent`. Keep this PR focused and heavily tested.
+
+### Task 4.5.1: Expand `ToolContext` and remove `context.agent` dependencies
+
+- Goal:
+  - Tools and `ToolExecutor` must be runnable without a live `Agent` object.
+  - All tool dependencies should be explicit fields/callbacks on `ToolContext`.
+- Touch:
+  - `packages/core/src/tools/types.ts` (expand `ToolContext`)
+  - `packages/core/src/tools/executor.ts` (stop calling `context.agent.getFullSession()`)
+  - `packages/core/src/tools/tool.ts` (stop calling `context.agent.hasFileBeenRead(...)`)
+- Required `ToolContext` shape (minimum viable; keep it small):
+  - `signal: AbortSignal`
+  - `workingDirectory?: string`
+  - `toolTempDir?: string`
+  - `processEnv?: NodeJS.ProcessEnv`
+  - `workspaceInfo?: ...` (existing)
+  - `workspaceManager?: ...` (existing)
+  - `hasFileBeenRead?: (path: string) => boolean` (agent-implemented, derived from its history)
+- Tests:
+  - Add a focused test proving that at least one existing tool (e.g. `file_read`) runs with a `ToolContext` that does **not** include `agent`.
+  - Update/replace tests that currently pass `agent` through ToolContext.
+- Acceptance:
+  - `ToolExecutor.execute()` works without `context.agent` when given a complete explicit `ToolContext`.
+
+### Task 4.5.2: Fix delegate/task-based tool dependencies (prep for Tasks removal)
+
+- Touch:
+  - `packages/core/src/tools/implementations/delegate.ts` (or whichever delegate implementation is live after Tasks removal)
+  - Any task-manager tools that rely on `context.agent.threadId` (these will be removed later, but make the refactor safe and incremental)
+- Tests:
+  - Update only what’s required to keep the suite green. Avoid feature changes in this PR.
 
 ---
 
