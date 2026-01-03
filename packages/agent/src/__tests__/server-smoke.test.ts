@@ -4,11 +4,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
-import { createAgentRpcMethods, createAgentServerState } from '../server';
+import { createAgentServerState, registerAgentRpcMethods } from '../server';
 
-function createPairedPeers(
-  methods: Record<string, (params: unknown) => unknown | Promise<unknown>>
-) {
+function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
   const bToA = new PassThrough();
 
@@ -16,7 +14,8 @@ function createPairedPeers(
   const serverTransport = createNdjsonStdioTransport({ readable: aToB, writable: bToA });
 
   const client = new JsonRpcPeer(clientTransport, { idPrefix: 'c_' });
-  const server = new JsonRpcPeer(serverTransport, { idPrefix: 'a_', methods });
+  const server = new JsonRpcPeer(serverTransport, { idPrefix: 'a_' });
+  register(server);
 
   return { client, server };
 }
@@ -40,8 +39,7 @@ describe('agent rpc server (smoke)', () => {
 
   it('handles initialize and session/new', async () => {
     const state = createAgentServerState();
-    const methods = createAgentRpcMethods(state);
-    const { client, server } = createPairedPeers(methods);
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
     const init = await client.request('initialize', { protocolVersion: '1.0' });
     expect(init).toMatchObject({ protocolVersion: '1.0' });
