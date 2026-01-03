@@ -15,6 +15,8 @@ This plan assumes you will implement the work in small PRs with clean review poi
 
 Refactor Lace so **each agent session runs as its own standalone OS process** speaking an **ACP-aligned JSON-RPC 2.0 protocol over stdio**, orchestrated by a **supervisor** that powers the web UI; switch persistence to **agent-owned JSONL** (flag day) and **remove the Tasks feature** for now.
 
+Design spec: `docs/plans/2026-01-03/agent-process-refactor-spec.md`
+
 ---
 
 ## Goals (What “Done” Means)
