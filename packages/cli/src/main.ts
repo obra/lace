@@ -413,6 +413,7 @@ async function main(): Promise<void> {
     }
 
     if (!connectionId) {
+      printLine('configure: no existing connection selected; creating a new one');
       const providersRes = (await req('ent/providers/list', {})) as any;
       const providers: ProviderInfo[] = Array.isArray(providersRes?.providers)
         ? (providersRes.providers as ProviderInfo[])
@@ -445,6 +446,9 @@ async function main(): Promise<void> {
       connectionId = upsert.connectionId;
     }
 
+    printLine(`configure: using connectionId ${connectionId}`);
+
+    printLine('configure: checking credentials');
     const credStart = (await req('ent/connections/credentials/start', { connectionId })) as any;
     if (credStart?.kind === 'needs_input' && Array.isArray(credStart.fields)) {
       const values: Record<string, string> = {};
@@ -487,6 +491,7 @@ async function main(): Promise<void> {
       }
     }
 
+    printLine('configure: listing models');
     const modelsRes = (await req('ent/models/list', { connectionId })) as any;
     const models: Array<{ modelId?: string }> = Array.isArray(modelsRes?.models)
       ? modelsRes.models
@@ -508,6 +513,7 @@ async function main(): Promise<void> {
       modelId = chosen;
     }
 
+    printLine('configure: applying session config');
     const configured = (await req('ent/session/configure', { connectionId, modelId })) as any;
     const effectiveConnectionId =
       typeof configured?.config?.connectionId === 'string'
@@ -663,24 +669,13 @@ async function main(): Promise<void> {
     startNextPermissionIfNeeded();
   };
 
-  let lineQueue = Promise.resolve();
+  let runningCommand = false;
+  const queuedLines: string[] = [];
 
-  const processLine = async (line: string) => {
+  const processQueuedLine = async (line: string) => {
     promptShown = false;
     try {
-      if (pendingQuestionResolve && activePrompt !== 'permission') {
-        const resolve = pendingQuestionResolve;
-        pendingQuestionResolve = null;
-        resolve(line);
-        startNextPermissionIfNeeded();
-        return;
-      }
-
-      if (activePrompt === 'permission') {
-        handlePermissionLine(line);
-      } else {
-        await handleReplLine(line);
-      }
+      await handleReplLine(line);
     } catch (err) {
       const d = describeError(err);
       if (d.message === 'Closed') return;
@@ -693,8 +688,39 @@ async function main(): Promise<void> {
     }
   };
 
+  const drainQueue = () => {
+    if (runningCommand) return;
+    if (activePrompt === 'permission') return;
+    if (pendingQuestionResolve) return;
+
+    const next = queuedLines.shift();
+    if (!next) return;
+
+    runningCommand = true;
+    void processQueuedLine(next).finally(() => {
+      runningCommand = false;
+      drainQueue();
+    });
+  };
+
   rl.on('line', (line) => {
-    lineQueue = lineQueue.then(() => processLine(line));
+    if (pendingQuestionResolve && activePrompt !== 'permission') {
+      const resolve = pendingQuestionResolve;
+      pendingQuestionResolve = null;
+      promptShown = false;
+      resolve(line);
+      startNextPermissionIfNeeded();
+      showPrompt();
+      return;
+    }
+
+    if (activePrompt === 'permission') {
+      handlePermissionLine(line);
+      return;
+    }
+
+    queuedLines.push(line);
+    drainQueue();
   });
 
   rl.on('close', () => {
