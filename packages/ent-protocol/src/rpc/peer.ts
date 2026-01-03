@@ -1,4 +1,17 @@
-import type { JsonRpcId, JsonRpcMessage, JsonRpcTransport } from '../transport/types';
+import {
+  JSONRPC,
+  JSONRPCClient,
+  JSONRPCServer,
+  createJSONRPCNotification,
+  createJSONRPCRequest,
+  createJSONRPCSuccessResponse,
+  isJSONRPCRequest,
+  isJSONRPCResponse,
+  type JSONRPCID,
+  type JSONRPCRequest,
+  type JSONRPCResponse,
+} from 'json-rpc-2.0';
+import type { JsonRpcId, JsonRpcTransport } from '../transport/types';
 
 export type JsonRpcMethodHandler = (params: unknown) => unknown | Promise<unknown>;
 
@@ -7,119 +20,112 @@ export type JsonRpcPeerOptions = {
   methods?: Record<string, JsonRpcMethodHandler>;
 };
 
-type PendingRequest = {
-  resolve: (value: unknown) => void;
-  reject: (reason: unknown) => void;
-};
-
 export class JsonRpcPeer {
   private readonly transport: JsonRpcTransport;
-  private readonly methods = new Map<string, JsonRpcMethodHandler>();
-  private readonly pending = new Map<JsonRpcId, PendingRequest>();
+  private readonly server: JSONRPCServer<void>;
+  private readonly client: JSONRPCClient<void>;
   private readonly idPrefix: 'c_' | 'a_';
   private nextId = 1;
+  private closed = false;
   private unsubscribe?: () => void;
 
   constructor(transport: JsonRpcTransport, options: JsonRpcPeerOptions) {
     this.transport = transport;
     this.idPrefix = options.idPrefix;
 
+    this.server = new JSONRPCServer();
+    this.client = new JSONRPCClient((payload) => {
+      this.transport.send(payload as any);
+      return Promise.resolve();
+    });
+
     if (options.methods) {
       for (const [method, handler] of Object.entries(options.methods)) {
-        this.methods.set(method, handler);
+        this.onRequest(method, handler);
       }
     }
 
     this.unsubscribe = this.transport.onMessage((msg) => {
-      void this.handleMessage(msg);
+      void this.handleMessage(msg as unknown);
     });
   }
 
   close(): void {
+    if (this.closed) return;
+    this.closed = true;
     this.unsubscribe?.();
+    this.client.rejectAllPendingRequests('Closed');
     this.transport.close();
   }
 
   onRequest(method: string, handler: JsonRpcMethodHandler): void {
-    this.methods.set(method, handler);
+    this.server.removeMethod(method);
+    this.server.addMethod(method, (params) => handler(params));
   }
 
   notify(method: string, params?: unknown): void {
-    this.transport.send({ jsonrpc: '2.0', method, params } as JsonRpcMessage);
+    if (this.closed) return;
+    const notification = createJSONRPCNotification(method, params);
+    this.transport.send(notification as any);
   }
 
   request(method: string, params?: unknown): Promise<unknown> {
-    const id = `${this.idPrefix}${this.nextId++}`;
-
-    this.transport.send({ jsonrpc: '2.0', id, method, params } as JsonRpcMessage);
-
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-    });
+    const { result } = this.requestWithId(method, params);
+    return result;
   }
 
   requestWithId(
     method: string,
     params?: unknown
   ): { requestId: JsonRpcId; result: Promise<unknown> } {
-    const requestId = `${this.idPrefix}${this.nextId++}`;
+    const requestId = this.createRequestId();
+    const request: JSONRPCRequest = createJSONRPCRequest(requestId as JSONRPCID, method, params);
 
-    this.transport.send({ jsonrpc: '2.0', id: requestId, method, params } as JsonRpcMessage);
-
-    const result = new Promise<unknown>((resolve, reject) => {
-      this.pending.set(requestId, { resolve, reject });
+    const result = Promise.resolve(
+      this.client.requestAdvanced(request) as PromiseLike<unknown>
+    ).then((response) => {
+      if (Array.isArray(response)) throw new Error('Unexpected batch response');
+      const r = response as JSONRPCResponse;
+      if (r.error) return Promise.reject(r.error);
+      return r.result;
     });
 
     return { requestId, result };
   }
 
   abandonRequest(requestId: JsonRpcId): void {
-    this.pending.delete(requestId);
+    const id = requestId as JSONRPCID;
+    this.client.receive(createJSONRPCSuccessResponse(id, null));
   }
 
-  private async handleMessage(msg: JsonRpcMessage): Promise<void> {
-    // Response
-    if ('id' in msg && ('result' in msg || 'error' in msg)) {
-      const pending = this.pending.get(msg.id);
-      if (!pending) return;
+  private createRequestId(): JsonRpcId {
+    return `${this.idPrefix}${this.nextId++}`;
+  }
 
-      this.pending.delete(msg.id);
-      if ('error' in msg) pending.reject(msg.error);
-      else pending.resolve(msg.result);
+  private async handleMessage(msg: unknown): Promise<void> {
+    if (this.closed) return;
+
+    if (isJSONRPCResponse(msg)) {
+      this.client.receive(msg as JSONRPCResponse);
       return;
     }
 
-    // Request vs notification
-    if (!('method' in msg)) return;
+    if (!isJSONRPCRequest(msg)) return;
 
-    const handler = this.methods.get(msg.method);
-    if (!handler) {
-      if ('id' in msg) {
-        this.transport.send({
-          jsonrpc: '2.0',
-          id: msg.id,
-          error: { code: -32601, message: `Method not found: ${msg.method}` },
-        } as JsonRpcMessage);
-      }
+    const response = await this.server.receive(msg as JSONRPCRequest, undefined);
+    if (response) {
+      this.transport.send(response as any);
       return;
     }
 
-    try {
-      const result = await handler(msg.params);
-      if ('id' in msg) {
-        this.transport.send({ jsonrpc: '2.0', id: msg.id, result } as JsonRpcMessage);
-      }
-    } catch (error) {
-      if ('id' in msg) {
-        this.transport.send({
-          jsonrpc: '2.0',
-          id: msg.id,
-          error: {
-            code: -32603,
-            message: error instanceof Error ? error.message : 'Internal error',
-          },
-        } as JsonRpcMessage);
-      }
-    }
+    // Notification => no response.
+    if ((msg as JSONRPCRequest).id === undefined) return;
+
+    // Shouldn't happen, but avoid hanging the caller if it does.
+    this.transport.send({
+      jsonrpc: JSONRPC,
+      id: (msg as JSONRPCRequest).id ?? null,
+      error: { code: -32603, message: 'Internal error' },
+    } as any);
   }
 }
