@@ -18,7 +18,7 @@
     "build:clean": "rm -rf dist && npm run build",
     "typecheck": "tsc --noEmit",
     "dev": "tsx src/main.ts",
-    "pretest": "npm run build",
+    "pretest": "cd ../.. && npm run build --workspace=packages/agent && npm run build --workspace=packages/cli",
     "test": "vitest run",
     "test:watch": "vitest"
   },
