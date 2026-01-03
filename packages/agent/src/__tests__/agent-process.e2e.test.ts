@@ -241,6 +241,81 @@ describe('lace-agent process (E2E over stdio)', () => {
     }
   );
 
+  it('supports ent/session/configure and reports config via ent/agent/status', async () => {
+    agent = spawnAgentProcess({ laceDir });
+
+    await withTimeout(
+      agent.peer.request('initialize', { protocolVersion: '1.0', config: { approvalMode: 'ask' } }),
+      2_000,
+      'initialize'
+    );
+
+    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+    const configured = (await withTimeout(
+      agent.peer.request('ent/session/configure', { approvalMode: 'approve', maxBudgetUsd: 1.25 }),
+      2_000,
+      'ent/session/configure'
+    )) as { applied: string[]; config: Record<string, unknown> };
+
+    expect(configured.applied).toEqual(expect.arrayContaining(['approvalMode', 'maxBudgetUsd']));
+    expect(configured.config.approvalMode).toBe('approve');
+    expect(configured.config.maxBudgetUsd).toBe(1.25);
+
+    const status = (await withTimeout(
+      agent.peer.request('ent/agent/status'),
+      2_000,
+      'ent/agent/status'
+    )) as { limits: { maxBudgetUsd?: number } };
+
+    expect(status.limits.maxBudgetUsd).toBe(1.25);
+  });
+
+  it('emits a context_injected update and durable event for ent/session/inject', async () => {
+    agent = spawnAgentProcess({ laceDir });
+
+    const updates: unknown[] = [];
+    agent.peer.onRequest('session/update', async (params) => {
+      updates.push(params);
+      return undefined;
+    });
+
+    await withTimeout(
+      agent.peer.request('initialize', { protocolVersion: '1.0' }),
+      2_000,
+      'initialize'
+    );
+    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+    agent.peer.notify('ent/session/inject', {
+      content: [{ type: 'text', text: 'Injected' }],
+      priority: 'normal',
+    });
+
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          const injected = updates.find((u) => (u as any)?.type === 'context_injected');
+          if (injected) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      2_000,
+      'session/update context_injected'
+    );
+
+    const durable = (await withTimeout(
+      agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+      2_000,
+      'ent/session/events'
+    )) as { events: Array<{ eventSeq: number; type: string; data: Record<string, unknown> }> };
+
+    expect(durable.events[0]?.type).toBe('context_injected');
+    expect(durable.events[0]?.data.priority).toBe('normal');
+  });
+
   it('can cancel a turn that is awaiting permission', { timeout: 15_000 }, async () => {
     agent = spawnAgentProcess({ laceDir });
 

@@ -11,6 +11,20 @@ export type SessionMeta = {
 export type SessionState = {
   nextEventSeq: number;
   nextStreamSeq: number;
+  config?: {
+    executionMode?: 'plan' | 'execute';
+    approvalMode?:
+      | 'ask'
+      | 'approveReads'
+      | 'approveEdits'
+      | 'approve'
+      | 'deny'
+      | 'dangerouslySkipPermissions';
+    connectionId?: string;
+    modelId?: string;
+    maxBudgetUsd?: number;
+    maxThinkingTokens?: number;
+  };
   pendingPermissions?: Array<{
     toolCallId: string;
     requestId?: string;
@@ -63,6 +77,7 @@ export function readSessionState(sessionDir: string): SessionState {
     return {
       nextEventSeq: typeof parsed.nextEventSeq === 'number' ? parsed.nextEventSeq : 1,
       nextStreamSeq: typeof parsed.nextStreamSeq === 'number' ? parsed.nextStreamSeq : 1,
+      config: typeof parsed.config === 'object' && parsed.config ? parsed.config : undefined,
       pendingPermissions: Array.isArray(parsed.pendingPermissions) ? parsed.pendingPermissions : [],
     };
   } catch {

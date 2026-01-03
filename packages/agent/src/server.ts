@@ -27,6 +27,10 @@ export type AgentServerState = {
       | 'approve'
       | 'deny'
       | 'dangerouslySkipPermissions';
+    connectionId?: string;
+    modelId?: string;
+    maxBudgetUsd?: number;
+    maxThinkingTokens?: number;
   };
   activeTurn: null | {
     turnId: string;
@@ -50,7 +54,15 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const parsed = params as
       | {
           protocolVersion?: string;
-          config?: { approvalMode?: string; executionMode?: string };
+          config?: {
+            approvalMode?: string;
+            executionMode?: string;
+            providerId?: string;
+            connectionId?: string;
+            modelId?: string;
+            maxBudgetUsd?: number;
+            maxThinkingTokens?: number;
+          };
         }
       | undefined;
 
@@ -70,6 +82,14 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       state.config.approvalMode = approvalMode;
     }
 
+    if (typeof parsed?.config?.connectionId === 'string')
+      state.config.connectionId = parsed.config.connectionId;
+    if (typeof parsed?.config?.modelId === 'string') state.config.modelId = parsed.config.modelId;
+    if (typeof parsed?.config?.maxBudgetUsd === 'number')
+      state.config.maxBudgetUsd = parsed.config.maxBudgetUsd;
+    if (typeof parsed?.config?.maxThinkingTokens === 'number')
+      state.config.maxThinkingTokens = parsed.config.maxThinkingTokens;
+
     return {
       protocolVersion: '1.0',
       agentInfo: { name: 'lace-agent', version: '0.1.0' },
@@ -77,7 +97,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         streaming: true,
         multiTurn: true,
         tools: [shellExecTool],
-        'ent/contextInjection': false,
+        'ent/contextInjection': true,
         'ent/backgroundJobs': false,
         'ent/fileCheckpointing': false,
         'ent/structuredOutput': false,
@@ -92,6 +112,10 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('ent/agent/status', async (_params: unknown) => {
     if (!state.initialized) throw new Error('Not initialized');
+
+    const effectiveConfig = state.activeSession?.state.config
+      ? { ...state.config, ...state.activeSession.state.config }
+      : state.config;
 
     const pendingPermissions: PermissionRequest[] = [];
     if (state.activeSession) {
@@ -122,6 +146,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             messageCount: 0,
             tokensUsed: 0,
             costUsd: 0,
+            connectionId: effectiveConfig.connectionId,
+            modelId: effectiveConfig.modelId,
           }
         : undefined,
       currentTurn: state.activeTurn
@@ -133,6 +159,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         : undefined,
       pendingPermissions,
       limits: {
+        maxBudgetUsd: effectiveConfig.maxBudgetUsd,
         budgetUsedUsd: 0,
       },
     };
@@ -150,7 +177,18 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const sessionDir = getSessionDir(sessionId);
     writeSessionMeta(sessionDir, { sessionId, workDir: parsed.workDir, created });
-    writeSessionState(sessionDir, { nextEventSeq: 1, nextStreamSeq: 1 });
+    writeSessionState(sessionDir, {
+      nextEventSeq: 1,
+      nextStreamSeq: 1,
+      config: {
+        executionMode: state.config.executionMode,
+        approvalMode: state.config.approvalMode,
+        connectionId: state.config.connectionId,
+        modelId: state.config.modelId,
+        maxBudgetUsd: state.config.maxBudgetUsd,
+        maxThinkingTokens: state.config.maxThinkingTokens,
+      },
+    });
     ensureSessionFiles(sessionDir);
 
     state.activeSession = loadSession(sessionId);
@@ -185,6 +223,131 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       messageCount: 0,
       lastActive: loaded.meta.created,
     };
+  });
+
+  peer.onRequest('ent/session/configure', async (params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+
+    const parsed = params as Partial<{
+      connectionId: string;
+      modelId: string;
+      maxThinkingTokens: number;
+      maxBudgetUsd: number;
+      approvalMode:
+        | 'ask'
+        | 'approveReads'
+        | 'approveEdits'
+        | 'approve'
+        | 'deny'
+        | 'dangerouslySkipPermissions';
+    }>;
+
+    const currentState = readSessionState(state.activeSession.dir);
+    const currentConfig = currentState.config || {};
+    const effectiveBefore = { ...state.config, ...currentConfig };
+    const nextConfig = { ...currentConfig };
+    const applied: string[] = [];
+
+    if (
+      typeof parsed.connectionId === 'string' &&
+      parsed.connectionId !== effectiveBefore.connectionId
+    ) {
+      nextConfig.connectionId = parsed.connectionId;
+      applied.push('connectionId');
+    }
+
+    if (typeof parsed.modelId === 'string' && parsed.modelId !== effectiveBefore.modelId) {
+      nextConfig.modelId = parsed.modelId;
+      applied.push('modelId');
+    }
+
+    if (
+      typeof parsed.maxThinkingTokens === 'number' &&
+      parsed.maxThinkingTokens !== effectiveBefore.maxThinkingTokens
+    ) {
+      nextConfig.maxThinkingTokens = parsed.maxThinkingTokens;
+      applied.push('maxThinkingTokens');
+    }
+
+    if (
+      typeof parsed.maxBudgetUsd === 'number' &&
+      parsed.maxBudgetUsd !== effectiveBefore.maxBudgetUsd
+    ) {
+      nextConfig.maxBudgetUsd = parsed.maxBudgetUsd;
+      applied.push('maxBudgetUsd');
+    }
+
+    if (
+      parsed.approvalMode &&
+      parsed.approvalMode !== effectiveBefore.approvalMode &&
+      (parsed.approvalMode === 'ask' ||
+        parsed.approvalMode === 'approveReads' ||
+        parsed.approvalMode === 'approveEdits' ||
+        parsed.approvalMode === 'approve' ||
+        parsed.approvalMode === 'deny' ||
+        parsed.approvalMode === 'dangerouslySkipPermissions')
+    ) {
+      nextConfig.approvalMode = parsed.approvalMode;
+      applied.push('approvalMode');
+    }
+
+    const nextState = { ...currentState, config: nextConfig };
+    writeSessionState(state.activeSession.dir, nextState);
+    state.activeSession = loadSession(state.activeSession.meta.sessionId);
+
+    const effectiveAfter = { ...state.config, ...(state.activeSession.state.config || {}) };
+
+    return {
+      applied,
+      config: {
+        connectionId: effectiveAfter.connectionId,
+        modelId: effectiveAfter.modelId,
+        maxThinkingTokens: effectiveAfter.maxThinkingTokens,
+        maxBudgetUsd: effectiveAfter.maxBudgetUsd,
+        approvalMode: effectiveAfter.approvalMode,
+      },
+    };
+  });
+
+  peer.onRequest('ent/session/inject', async (params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+
+    const parsed = params as { content: unknown[]; priority: 'immediate' | 'normal' | 'deferred' };
+    const priority =
+      parsed?.priority === 'immediate' ||
+      parsed?.priority === 'normal' ||
+      parsed?.priority === 'deferred'
+        ? parsed.priority
+        : 'normal';
+
+    let sessionState: SessionState = readSessionState(state.activeSession.dir);
+    const { nextState } = appendDurableEvent(state.activeSession.dir, sessionState, {
+      type: 'context_injected',
+      data: { content: Array.isArray(parsed?.content) ? parsed.content : [], priority },
+    });
+    sessionState = nextState;
+    writeSessionState(state.activeSession.dir, sessionState);
+    state.activeSession = { ...state.activeSession, state: sessionState };
+
+    peer.notify('session/update', {
+      sessionId: state.activeSession.meta.sessionId,
+      streamSeq: sessionState.nextStreamSeq,
+      turnId: state.activeTurn?.turnId,
+      turnSeq: state.activeTurn ? 0 : undefined,
+      type: 'context_injected',
+      priority,
+      messageCount: 0,
+    });
+
+    writeSessionState(state.activeSession.dir, {
+      ...sessionState,
+      nextStreamSeq: sessionState.nextStreamSeq + 1,
+    });
+
+    state.activeSession = loadSession(state.activeSession.meta.sessionId);
+    return undefined;
   });
 
   peer.onRequest('ent/session/events', async (params: unknown) => {
@@ -223,6 +386,10 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     if (!state.initialized) throw new Error('Not initialized');
     if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
     if (state.activeTurn) throw { code: 2, message: 'SessionBusy' };
+
+    const effectiveConfig = state.activeSession.state.config
+      ? { ...state.config, ...state.activeSession.state.config }
+      : state.config;
 
     const parsed = params as { content: unknown[] };
     const turnId = `turn_${randomUUID()}`;
@@ -282,7 +449,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const runMatch = promptText.match(/^\s*run:\s*(.+)\s*$/m);
     const command = runMatch?.[1]?.trim();
 
-    if (command && state.config.executionMode === 'execute') {
+    if (command && effectiveConfig.executionMode === 'execute') {
       const toolCallId = `tool_${randomUUID()}`;
       const toolInput = { command } as Record<string, unknown>;
       let shouldExecuteTool = true;
@@ -298,11 +465,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
       const requiresPermission =
         shellExecTool.requiresPermission &&
-        state.config.approvalMode !== 'approve' &&
-        state.config.approvalMode !== 'dangerouslySkipPermissions' &&
-        state.config.approvalMode !== 'deny';
+        effectiveConfig.approvalMode !== 'approve' &&
+        effectiveConfig.approvalMode !== 'dangerouslySkipPermissions' &&
+        effectiveConfig.approvalMode !== 'deny';
 
-      if (state.config.approvalMode === 'deny') {
+      if (effectiveConfig.approvalMode === 'deny') {
         const denied: ToolResult = {
           outcome: 'denied',
           content: [{ type: 'error', message: 'Denied by policy' }],

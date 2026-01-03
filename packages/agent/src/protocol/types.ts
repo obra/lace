@@ -34,6 +34,11 @@ export type ToolResult = {
 export type SessionUpdate =
   | { type: 'text_delta'; text: string }
   | {
+      type: 'context_injected';
+      priority: 'immediate' | 'normal' | 'deferred';
+      messageCount: number;
+    }
+  | {
       type: 'tool_use';
       toolCallId: string;
       name: string;
