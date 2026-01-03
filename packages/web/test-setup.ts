@@ -2,6 +2,7 @@
 // ABOUTME: Global test configuration and mocks for server-only modules
 
 import { vi, afterAll, afterEach, beforeAll } from 'vitest';
+import { shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 import '@testing-library/jest-dom';
 
 // Import superjson to ensure it's available in test environment
@@ -212,9 +213,11 @@ vi.spyOn(console, 'info').mockImplementation(() => {});
 };
 
 // Cleanup after each individual test
-afterEach(() => {
+afterEach(async () => {
   // Reset all vitest mocks and timers
   vi.clearAllMocks();
   vi.clearAllTimers();
   vi.useRealTimers();
+
+  await shutdownSupervisorForTests();
 });

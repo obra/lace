@@ -258,3 +258,12 @@ export function resolvePendingPermission(params: {
   });
   return true;
 }
+
+export async function shutdownSupervisorForTests(): Promise<void> {
+  const supervisor = global.laceWebSupervisor;
+  if (!supervisor) return;
+
+  global.laceWebSupervisor = undefined;
+  global.laceWebPendingPermissions?.clear();
+  await supervisor.shutdown();
+}
