@@ -521,6 +521,24 @@ async function main(): Promise<void> {
     );
   };
 
+  const sendPrompt = (text: string) => {
+    const promise = withTimeout(
+      conn.peer.request('session/prompt', { content: promptTextToContent(text) }),
+      args.timeoutMs,
+      'session/prompt'
+    );
+
+    void promise.catch((err) => {
+      if (shuttingDown) return;
+      const d = describeError(err);
+      if (d.message === 'Closed') return;
+      printLine(`error: ${d.message}`);
+      if (d.isMissingProviderConfig) {
+        printLine('Hint: run :configure');
+      }
+    });
+  };
+
   const handleReplLine = async (line: string) => {
     const trimmed = line.trimEnd();
     if (trimmed.length === 0) return;
@@ -581,11 +599,7 @@ async function main(): Promise<void> {
         return;
       }
       if (cmd === 'prompt') {
-        await withTimeout(
-          conn.peer.request('session/prompt', { content: promptTextToContent(argText) }),
-          args.timeoutMs,
-          'session/prompt'
-        );
+        sendPrompt(argText);
         return;
       }
       if (cmd === 'cancel') {
@@ -616,11 +630,7 @@ async function main(): Promise<void> {
       throw new Error(`Unknown command: :${cmd}`);
     }
 
-    await withTimeout(
-      conn.peer.request('session/prompt', { content: promptTextToContent(trimmed) }),
-      args.timeoutMs,
-      'session/prompt'
-    );
+    sendPrompt(trimmed);
   };
 
   const handlePermissionLine = (line: string) => {
@@ -653,33 +663,38 @@ async function main(): Promise<void> {
     startNextPermissionIfNeeded();
   };
 
-  rl.on('line', (line) => {
-    promptShown = false;
-    void (async () => {
-      try {
-        if (pendingQuestionResolve && activePrompt !== 'permission') {
-          const resolve = pendingQuestionResolve;
-          pendingQuestionResolve = null;
-          resolve(line);
-          startNextPermissionIfNeeded();
-          return;
-        }
+  let lineQueue = Promise.resolve();
 
-        if (activePrompt === 'permission') {
-          handlePermissionLine(line);
-        } else {
-          await handleReplLine(line);
-        }
-      } catch (err) {
-        const d = describeError(err);
-        printLine(`error: ${d.message}`);
-        if (d.isMissingProviderConfig) {
-          printLine('Hint: run :configure');
-        }
-      } finally {
-        showPrompt();
+  const processLine = async (line: string) => {
+    promptShown = false;
+    try {
+      if (pendingQuestionResolve && activePrompt !== 'permission') {
+        const resolve = pendingQuestionResolve;
+        pendingQuestionResolve = null;
+        resolve(line);
+        startNextPermissionIfNeeded();
+        return;
       }
-    })();
+
+      if (activePrompt === 'permission') {
+        handlePermissionLine(line);
+      } else {
+        await handleReplLine(line);
+      }
+    } catch (err) {
+      const d = describeError(err);
+      if (d.message === 'Closed') return;
+      printLine(`error: ${d.message}`);
+      if (d.isMissingProviderConfig) {
+        printLine('Hint: run :configure');
+      }
+    } finally {
+      showPrompt();
+    }
+  };
+
+  rl.on('line', (line) => {
+    lineQueue = lineQueue.then(() => processLine(line));
   });
 
   rl.on('close', () => {
