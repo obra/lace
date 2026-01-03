@@ -74,7 +74,7 @@ Follow ACP naming patterns for maximum compatibility:
 | camelCase | `sessionId`, `toolCallId` | Matches JSON/JavaScript conventions |
 | Verb phrases for methods | `session/prompt`, `ent/connections/credentials/start` | Action-oriented naming |
 
-**Identifier opacity**: All identifier fields (`sessionId`, `turnId`, `jobId`, `toolCallId`, `providerId`, `modelId`, `connectionId`, `checkpointId`, `taskId`, `optionId`, `requestId`) are opaque strings. Clients MUST NOT parse, validate, or assume structure in these values. Note: `eventSeq` is a numeric sequence, not an opaque string.
+**Identifier opacity**: All identifier fields (`sessionId`, `turnId`, `jobId`, `toolCallId`/`toolUseId`, `providerId`, `modelId`, `connectionId`, `checkpointId`, `taskId`, `optionId`, `requestId`) are opaque strings. Clients MUST NOT parse, validate, or assume structure in these values. Note: `eventSeq` is a numeric sequence, not an opaque string. Note: `toolCallId` and `toolUseId` are the same identifier (see §8.1).
 
 **Ent extensions**: Methods prefixed with `ent/` are protocol extensions not in ACP. The prefix makes it clear which parts are standard vs extended.
 
@@ -1237,6 +1237,8 @@ type ContentBlock =
   | { type: "tool_use"; toolUseId: string; name: string; input: object }
   | { type: "tool_result"; toolUseId: string; content: string; isError?: boolean }
 ```
+
+**toolUseId vs toolCallId**: ContentBlock uses `toolUseId` for Anthropic API compatibility. This is the **same identifier** as `toolCallId` used in `session/update` and `session/request_permission`. Implementations MUST treat them as equivalent—when correlating tool executions across streaming updates, permission requests, and content blocks, `toolUseId === toolCallId`.
 
 ---
 
