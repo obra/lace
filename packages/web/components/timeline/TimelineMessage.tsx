@@ -252,38 +252,6 @@ export function TimelineMessage({
         </div>
       );
 
-    // Task events
-    case 'TASK_CREATED':
-      return (
-        <div className="flex justify-center">
-          <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-2 text-sm text-primary">
-            <div className="flex items-center gap-2">
-              <span>📝</span>
-              <span>Task created: {event.data.task?.title || event.data.taskId}</span>
-            </div>
-          </div>
-        </div>
-      );
-
-    case 'TASK_UPDATED':
-      return (
-        <div className="flex justify-center my-1">
-          <div className="bg-info/10 border border-info/20 rounded-lg px-3 py-1 text-xs text-info">
-            ✓ Updated task: {event.data.task?.title || event.data.taskId}
-          </div>
-        </div>
-      );
-
-    case 'TASK_DELETED':
-      return (
-        <div className="flex justify-center">
-          <Alert
-            variant="warning"
-            title={`Task deleted: ${event.data.task?.title || event.data.taskId}`}
-          />
-        </div>
-      );
-
     // System notification
     case 'SYSTEM_NOTIFICATION': {
       const severity = event.data?.severity || 'info';
@@ -306,7 +274,6 @@ export function TimelineMessage({
     case 'PROJECT_CREATED':
     case 'PROJECT_UPDATED':
     case 'PROJECT_DELETED':
-    case 'TASK_NOTE_ADDED':
       return null;
 
     case 'AGENT_ERROR':

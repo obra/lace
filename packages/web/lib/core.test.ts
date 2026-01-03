@@ -2,7 +2,7 @@
 // ABOUTME: Ensures all expected types and functions are exported correctly
 
 import { describe, it, expect } from 'vitest';
-import type { ThreadId, Task } from '@lace/web/types/core';
+import type { ThreadId } from '@lace/web/types/core';
 import { isThreadId, asThreadId, EVENT_TYPES, ApprovalDecision } from '@lace/web/types/core';
 
 describe('Core Type Imports', () => {
@@ -24,14 +24,5 @@ describe('Core Type Imports', () => {
     expect(EVENT_TYPES).toContain('USER_MESSAGE');
     expect(EVENT_TYPES).toContain('AGENT_MESSAGE');
     expect(EVENT_TYPES).toContain('TOOL_CALL');
-  });
-
-  it('should export Task types', () => {
-    // This test verifies the type exists by using it
-    const task: Partial<Task> = {
-      title: 'Test task',
-      status: 'pending',
-    };
-    expect(task.title).toBe('Test task');
   });
 });

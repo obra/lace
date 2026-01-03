@@ -81,7 +81,6 @@ import { ChatInput } from '@lace/web/components/chat/ChatInput';
 
 // ORGANISMS - Complex interactive components
 import GoogleDocChatMessage from '@lace/web/components/organisms/GoogleDocChatMessage';
-import { TaskBoardModal } from '@lace/web/components/modals/TaskBoardModal';
 import { ToolApprovalModal } from '@lace/web/components/modals/ToolApprovalModal';
 import type { PendingApproval } from '@lace/web/types/api';
 import { ApprovalDecision } from '@lace/web/types/core';
@@ -108,7 +107,6 @@ const AtomItem: React.FC<{
  */
 export default function PlaygroundPage() {
   const [activeCategory, setActiveCategory] = useState<ComponentCategory>('atoms');
-  const [showTaskModal, setShowTaskModal] = useState(false);
   const [showBasicModal, setShowBasicModal] = useState(false);
   const [showAnimatedModal, setShowAnimatedModal] = useState(false);
   const [showToolApprovalModal, setShowToolApprovalModal] = useState(false);
@@ -768,28 +766,6 @@ export default function PlaygroundPage() {
           <div className="space-y-6">
             <div className="border border-accent/20 rounded p-4 bg-accent/5">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-sm bg-accent/20 text-accent px-2 py-1 rounded">O1</span>
-                <span className="text-lg font-semibold">TaskBoardModal</span>
-              </div>
-              <div className="text-sm text-base-content/70 mb-3">
-                <strong>Composition:</strong> Full kanban board with drag-and-drop task management
-              </div>
-              <div className="text-xs bg-base-200 p-2 rounded mb-3">
-                <strong>Built from:</strong>
-                <br />
-                🧪 <span className="text-secondary">Molecules:</span> MessageHeader(M1),
-                ChatInput(M2)
-                <br />
-                🔬 <span className="text-primary">Atoms:</span> Badge(4), AnimatedButton(6),
-                StatusDot(2), Avatar(3), NavigationButton(10)
-              </div>
-              <button className="btn btn-primary" onClick={() => setShowTaskModal(true)}>
-                Open Task Board
-              </button>
-            </div>
-
-            <div className="border border-accent/20 rounded p-4 bg-accent/5">
-              <div className="flex items-center gap-2 mb-3">
                 <span className="text-sm bg-accent/20 text-accent px-2 py-1 rounded">O1.5</span>
                 <span className="text-lg font-semibold">ToolApprovalModal</span>
               </div>
@@ -1026,8 +1002,6 @@ export default function PlaygroundPage() {
       <div className="min-h-96">{renderContent()}</div>
 
       {/* Modals */}
-      <TaskBoardModal isOpen={showTaskModal} onClose={() => setShowTaskModal(false)} tasks={[]} />
-
       <Modal
         isOpen={showBasicModal}
         onClose={() => setShowBasicModal(false)}

@@ -4,36 +4,12 @@
 import { z } from 'zod';
 import { logger } from '@lace/core/utils/logger';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
-import { TASK_STATUS_VALUES } from '@lace/core/tasks/task-status';
 
 // Route parameter validation schemas
 export const ProjectIdSchema = z.string().uuid('Invalid project ID format');
 export const SessionIdSchema = z
   .string()
   .regex(/^lace_\d{8}_[a-z0-9]{6}(\.\d+)*$/, 'Invalid session ID format');
-export const TaskIdSchema = z.string().min(1, 'Task ID cannot be empty');
-
-// Request body validation schemas
-export const CreateTaskSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().optional(),
-  prompt: z.string().min(1, 'Prompt is required'),
-  priority: z.enum(['low', 'medium', 'high']).default('medium'),
-  assignedTo: z.string().optional(),
-});
-
-export const UpdateTaskSchema = z.object({
-  title: z.string().min(1).optional(),
-  description: z.string().optional(),
-  status: z.enum(TASK_STATUS_VALUES as [string, ...string[]]).optional(),
-  priority: z.enum(['low', 'medium', 'high']).optional(),
-  assignedTo: z.string().optional(),
-});
-
-export const AddNoteSchema = z.object({
-  content: z.string().min(1, 'Note content is required'),
-  author: z.string().optional(),
-});
 
 // Validation helper
 export function validateRouteParams<T>(params: unknown, schema: z.ZodSchema<T>): T {

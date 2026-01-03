@@ -1,10 +1,19 @@
 // ABOUTME: High-level test to ensure web package TypeScript compilation is clean
 // ABOUTME: Catches type errors and linting issues that could break development
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { execSync } from 'child_process';
 
 describe.sequential('Web Package TypeScript Compilation', () => {
+  beforeAll(() => {
+    execSync('npm run typegen', {
+      stdio: 'pipe',
+      encoding: 'utf8',
+      cwd: process.cwd(),
+      timeout: 30000,
+    });
+  }, 35000);
+
   it('should pass TypeScript type checking', () => {
     expect(() => {
       // Run TypeScript compiler without emitting files

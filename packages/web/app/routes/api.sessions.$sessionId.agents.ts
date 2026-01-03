@@ -122,6 +122,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     // Without this, newly spawned agents won't emit events to the UI until page refresh
     await sessionService.setupAgentEventHandlers(agent);
 
+    // Ensure newly spawned agents get SSE error handlers registered
+    EventStreamManager.getInstance().registerSession(session);
+
     // Convert to API format - use agent's improved API
     const metadata = agent.getThreadMetadata();
     const tokenUsage = agent.getTokenUsage();
@@ -161,6 +164,29 @@ export async function action({ request, params }: Route.ActionArgs) {
       },
     };
     sseManager.broadcast(testEvent);
+
+    sseManager.broadcast({
+      type: 'AGENT_SPAWNED',
+      timestamp: new Date(),
+      data: {
+        type: 'agent:spawned',
+        agentThreadId: agentResponse.threadId as ThreadId,
+        providerInstanceId: body.providerInstanceId,
+        modelId: body.modelId,
+        context: {
+          actor: 'human',
+          isHuman: true,
+        },
+        timestamp: new Date(),
+      },
+      transient: true,
+      context: {
+        sessionId,
+        projectId: session.getProjectId(),
+        taskId: undefined,
+        threadId: agentResponse.threadId as ThreadId,
+      },
+    });
 
     return createSuperjsonResponse(agentResponse, {
       status: 201,

@@ -78,10 +78,6 @@ vi.mock('@lace/web/components/sidebar/SessionSection', () => ({
   SessionSection: () => <div data-testid="session-section">Session Section</div>,
 }));
 
-vi.mock('@lace/web/components/sidebar/TaskSidebarSection', () => ({
-  TaskSidebarSection: () => <div data-testid="task-section">Task Section</div>,
-}));
-
 vi.mock('@lace/web/components/sidebar/FeedbackSection', () => ({
   FeedbackSection: () => <div data-testid="feedback-section">Feedback Section</div>,
 }));

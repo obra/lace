@@ -8,7 +8,6 @@ import { ProjectProvider } from '@lace/web/components/providers/ProjectProvider'
 import { SessionProvider } from '@lace/web/components/providers/SessionProvider';
 import { EventStreamProvider } from '@lace/web/components/providers/EventStreamProvider';
 import { ToolApprovalProvider } from '@lace/web/components/providers/ToolApprovalProvider';
-import { TaskProvider } from '@lace/web/components/providers/TaskProvider';
 import { ScrollProvider } from '@lace/web/components/providers/ScrollProvider';
 import { AgentPageContent } from '@lace/web/components/pages/AgentPageContent';
 import type { ThreadId } from '@lace/web/types/core';
@@ -39,16 +38,14 @@ export default function ProjectSessionAgent() {
                 sessionId={sessionId! as ThreadId}
                 agentId={agentId! as ThreadId}
               >
-                <TaskProvider projectId={projectId!} sessionId={sessionId! as ThreadId}>
-                  <ScrollProvider>
-                    <AgentPageContent
-                      key={agentId}
-                      projectId={projectId!}
-                      sessionId={sessionId!}
-                      agentId={agentId!}
-                    />
-                  </ScrollProvider>
-                </TaskProvider>
+                <ScrollProvider>
+                  <AgentPageContent
+                    key={agentId}
+                    projectId={projectId!}
+                    sessionId={sessionId!}
+                    agentId={agentId!}
+                  />
+                </ScrollProvider>
               </EventStreamProvider>
             </ToolApprovalProvider>
           </SessionProvider>

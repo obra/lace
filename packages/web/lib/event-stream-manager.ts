@@ -2,15 +2,7 @@
 // ABOUTME: Manages global event distribution with client-side filtering
 
 // StreamEvent removed - using LaceEvent directly
-import type {
-  Task,
-  TaskContext,
-  ThreadId,
-  LaceEvent,
-  ErrorType,
-  ErrorPhase,
-} from '@lace/web/types/core';
-import { asThreadId } from '@lace/web/types/core';
+import type { LaceEvent, ErrorType, ErrorPhase } from '@lace/web/types/core';
 import type { Session, Agent } from '@lace/web/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
 import { logger } from '@lace/core/utils/logger';
@@ -46,52 +38,6 @@ function hasErrorCode(error: unknown): error is Error & { code: string } {
 
 // No conversion needed - JSON.stringify happens at the network boundary
 
-// TaskManager event interfaces
-interface TaskCreatedEvent {
-  type: 'task:created';
-  task: Task;
-  context: TaskContext;
-  timestamp: Date;
-}
-
-interface TaskUpdatedEvent {
-  type: 'task:updated';
-  task: Task;
-  context: TaskContext;
-  timestamp: Date;
-}
-
-interface TaskDeletedEvent {
-  type: 'task:deleted';
-  taskId: string;
-  task?: Task;
-  context: TaskContext;
-  timestamp: Date;
-}
-
-interface TaskNoteAddedEvent {
-  type: 'task:note_added';
-  task: Task;
-  context: TaskContext;
-  timestamp: Date;
-}
-
-interface AgentSpawnedEvent {
-  type: 'agent:spawned';
-  taskId?: string;
-  agentThreadId: ThreadId;
-  providerInstanceId: string;
-  modelId: string;
-  context: {
-    actor: string;
-    isHuman: boolean;
-  };
-  timestamp: Date;
-}
-
-// NOTE: These events come from our own TaskManager, so the types are known and safe.
-// Using explicit casting to satisfy ESLint while maintaining type safety.
-
 // Client connection with subscription filters
 interface ClientConnection {
   id: string;
@@ -125,79 +71,11 @@ export class EventStreamManager {
     this.startKeepAlive();
   }
 
-  // Register a Session to forward its TaskManager events to the stream
-  // Called once per Session instance from SessionService
+  // Register a Session to forward its agent events to the stream
+  // Called from SessionService
   registerSession(session: Session): void {
-    const taskManager = session.getTaskManager();
     const sessionId = session.getId();
     const projectId = session.getProjectId();
-
-    // Use WeakSet to ensure we only add listeners once per TaskManager
-    if (EventStreamManager.registeredTaskManagers.has(taskManager)) {
-      return;
-    }
-
-    EventStreamManager.registeredTaskManagers.add(taskManager);
-
-    // Convert TaskManager events to LaceEvent format
-    taskManager.on('task:created', (event: unknown) => {
-      const e = event as TaskCreatedEvent;
-      this.broadcast({
-        type: 'TASK_CREATED',
-        data: { taskId: e.task.id, ...e },
-        context: { projectId, sessionId, taskId: e.task.id },
-        transient: true,
-      });
-    });
-
-    taskManager.on('task:updated', (event: unknown) => {
-      const e = event as TaskUpdatedEvent;
-      this.broadcast({
-        type: 'TASK_UPDATED',
-        data: { taskId: e.task?.id || '', ...e },
-        context: { projectId, sessionId, taskId: e.task?.id },
-        transient: true,
-      });
-    });
-
-    taskManager.on('task:deleted', (event: unknown) => {
-      const e = event as TaskDeletedEvent;
-      this.broadcast({
-        type: 'TASK_DELETED',
-        data: { ...e },
-        context: { projectId, sessionId, taskId: e.taskId },
-        transient: true,
-      });
-    });
-
-    taskManager.on('task:note_added', (event: unknown) => {
-      const e = event as TaskNoteAddedEvent;
-      this.broadcast({
-        type: 'TASK_NOTE_ADDED',
-        data: { taskId: e.task?.id || '', ...e },
-        context: { projectId, sessionId, taskId: e.task?.id },
-        transient: true,
-      });
-    });
-
-    taskManager.on('agent:spawned', (event: unknown) => {
-      const e = event as AgentSpawnedEvent;
-      this.broadcast({
-        type: 'AGENT_SPAWNED',
-        data: e,
-        context: { projectId, sessionId, taskId: e.taskId, threadId: e.agentThreadId },
-        transient: true,
-      });
-    });
-
-    // Handle agent spawning events to register error handlers for new agents
-    taskManager.on('agent:spawned', (event: unknown) => {
-      const e = event as { agentThreadId: string };
-      const newAgent = session.getAgent(asThreadId(e.agentThreadId));
-      if (newAgent) {
-        this.registerAgentErrorHandler(newAgent, e.agentThreadId, projectId || '', sessionId || '');
-      }
-    });
 
     // Handle agent errors for existing agents
     const agents = session.getAgents();
@@ -261,18 +139,6 @@ export class EventStreamManager {
     });
   }
 
-  // Method to register error handlers for newly spawned agents (for manual spawning)
-  registerAgentErrorHandlers(session: Session, agentThreadId: string): void {
-    const agent = session.getAgent(asThreadId(agentThreadId));
-    if (agent) {
-      const projectId = session.getProjectId();
-      const sessionId = session.getId();
-      this.registerAgentErrorHandler(agent, agentThreadId, projectId || '', sessionId || '');
-    }
-  }
-
-  // WeakSet to track registered TaskManager instances
-  private static registeredTaskManagers = new WeakSet<object>();
   // WeakSet to track agents that already have error listeners registered
   private static registeredAgents = new WeakSet<Agent>();
 

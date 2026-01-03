@@ -1,5 +1,5 @@
 // ABOUTME: Shared sidebar content component for mobile and desktop sidebars
-// ABOUTME: Contains ProjectSection, SessionSection, and TaskSidebarSection with conditional mobile behaviors
+// ABOUTME: Contains ProjectSection, SessionSection, and AgentsSection with conditional mobile behaviors
 
 'use client';
 
@@ -8,7 +8,6 @@ import { ThreadId } from '@lace/web/types/core';
 import { ProjectSection } from '@lace/web/components/sidebar/ProjectSection';
 import { SessionSection } from '@lace/web/components/sidebar/SessionSection';
 import { AgentsSection } from '@lace/web/components/sidebar/AgentsSection';
-import { TaskSidebarSection } from '@lace/web/components/sidebar/TaskSidebarSection';
 import { FeedbackSection } from '@lace/web/components/sidebar/FeedbackSection';
 import { FileBrowserSection } from '@lace/web/components/sidebar/FileBrowserSection';
 import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
@@ -79,9 +78,6 @@ export const SidebarContent = memo(function SidebarContent({
             createAgentButtonRef={createAgentButtonRef}
           />
         )}
-
-        {/* TASK MANAGEMENT */}
-        <TaskSidebarSection onCloseMobileNav={isMobile ? onCloseMobileNav : undefined} />
 
         {/* FILE BROWSER */}
         {sessionDetails && sessionDetails.id && (

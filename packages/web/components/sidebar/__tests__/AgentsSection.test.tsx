@@ -86,27 +86,6 @@ vi.mock('@lace/web/components/providers/SessionProvider', () => ({
   }),
 }));
 
-vi.mock('@lace/web/components/providers/TaskProvider', () => ({
-  useOptionalTaskContext: () => ({
-    taskManager: {
-      tasks: [],
-      isLoading: false,
-      isCreating: false,
-      isUpdating: false,
-      isDeleting: false,
-      error: null,
-      refetch: vi.fn(),
-      createTask: vi.fn(),
-      updateTask: vi.fn(),
-      deleteTask: vi.fn(),
-      completeTask: vi.fn(),
-      handleTaskUpdated: vi.fn(),
-      handleTaskDeleted: vi.fn(),
-      handleTaskNoteAdded: vi.fn(),
-    },
-  }),
-}));
-
 describe('AgentsSection', () => {
   const _tempLaceDir = setupWebTest(); // Following testing docs pattern
   let providerInstanceId: string;

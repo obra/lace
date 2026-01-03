@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useSSEStore } from '@lace/web/lib/sse-store';
-import type { LaceEvent, Task, AgentErrorData } from '@lace/web/types/core';
+import type { LaceEvent, AgentErrorData } from '@lace/web/types/core';
 import type { SessionPendingApproval } from '@lace/web/types/api';
 
 // Runtime type guard for AgentErrorData
@@ -17,18 +17,6 @@ function isAgentErrorData(value: unknown): value is AgentErrorData {
     'isRetryable' in value &&
     typeof (value as Record<string, unknown>).message === 'string'
   );
-}
-
-// Re-export types from original for compatibility
-export interface TaskEvent {
-  type: 'task:created' | 'task:updated' | 'task:deleted' | 'task:note_added';
-  task?: Task;
-  taskId?: string;
-  context: {
-    actor: string;
-    isHuman?: boolean;
-  };
-  timestamp: Date;
 }
 
 interface ProjectEvent {
@@ -81,13 +69,6 @@ interface EventHandlers {
   onToolResult?: (event: LaceEvent) => void;
   onSystemMessage?: (event: LaceEvent) => void;
   onAgentStateChange?: (agentId: string, from: string, to: string) => void;
-
-  // Task events
-  onTaskEvent?: (event: TaskEvent) => void;
-  onTaskCreated?: (event: TaskEvent) => void;
-  onTaskUpdated?: (event: TaskEvent) => void;
-  onTaskDeleted?: (event: TaskEvent) => void;
-  onTaskNoteAdded?: (event: TaskEvent) => void;
 
   // Approval events
   onApprovalRequest?: (approval: SessionPendingApproval) => void;
@@ -222,34 +203,6 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
               if (data.agentId && data.from !== undefined && data.to !== undefined) {
                 currentOptions.onAgentStateChange?.(data.agentId, data.from, data.to);
               }
-            }
-            break;
-          case 'TASK_CREATED':
-            {
-              const taskEvent = event.data as TaskEvent;
-              currentOptions.onTaskEvent?.(taskEvent);
-              currentOptions.onTaskCreated?.(taskEvent);
-            }
-            break;
-          case 'TASK_UPDATED':
-            {
-              const taskEvent = event.data as TaskEvent;
-              currentOptions.onTaskEvent?.(taskEvent);
-              currentOptions.onTaskUpdated?.(taskEvent);
-            }
-            break;
-          case 'TASK_DELETED':
-            {
-              const taskEvent = event.data as TaskEvent;
-              currentOptions.onTaskEvent?.(taskEvent);
-              currentOptions.onTaskDeleted?.(taskEvent);
-            }
-            break;
-          case 'TASK_NOTE_ADDED':
-            {
-              const taskEvent = event.data as TaskEvent;
-              currentOptions.onTaskEvent?.(taskEvent);
-              currentOptions.onTaskNoteAdded?.(taskEvent);
             }
             break;
           case 'TOOL_APPROVAL_REQUEST':

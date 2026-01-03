@@ -100,18 +100,6 @@ vi.mock('@lace/web/components/sidebar/AgentsSection', () => ({
   ),
 }));
 
-vi.mock('@lace/web/components/sidebar/TaskSidebarSection', () => ({
-  TaskSidebarSection: ({ onCloseMobileNav }: { onCloseMobileNav?: () => void }) => (
-    <div data-testid="task-section">
-      {onCloseMobileNav && (
-        <button onClick={onCloseMobileNav} data-testid="close-mobile-nav-task">
-          Close
-        </button>
-      )}
-    </div>
-  ),
-}));
-
 // Import mocked hooks
 import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
 import { useProjectContext } from '@lace/web/components/providers/ProjectProvider';
@@ -202,10 +190,9 @@ describe('SidebarContent', () => {
       expect(screen.getByTestId('project-section')).toBeInTheDocument();
       expect(screen.getByTestId('session-section')).toBeInTheDocument();
       expect(screen.getByTestId('agents-section')).toBeInTheDocument();
-      expect(screen.getByTestId('task-section')).toBeInTheDocument();
     });
 
-    it('renders only task section when no project is selected', () => {
+    it('renders no sections when no project is selected', () => {
       mockUseProjectsContext.mockReturnValue(
         createMockProjectsContext({
           selectedProject: null,
@@ -222,10 +209,9 @@ describe('SidebarContent', () => {
       expect(screen.queryByTestId('project-section')).not.toBeInTheDocument();
       expect(screen.queryByTestId('session-section')).not.toBeInTheDocument();
       expect(screen.queryByTestId('agents-section')).not.toBeInTheDocument();
-      expect(screen.getByTestId('task-section')).toBeInTheDocument();
     });
 
-    it('renders project and task sections when no session is available', () => {
+    it('renders only project section when no session is available', () => {
       mockUseOptionalSessionContext.mockReturnValue(null);
 
       render(<SidebarContent {...defaultProps} />);
@@ -233,7 +219,6 @@ describe('SidebarContent', () => {
       expect(screen.getByTestId('project-section')).toBeInTheDocument();
       expect(screen.queryByTestId('session-section')).not.toBeInTheDocument();
       expect(screen.queryByTestId('agents-section')).not.toBeInTheDocument();
-      expect(screen.getByTestId('task-section')).toBeInTheDocument();
     });
   });
 
@@ -262,7 +247,6 @@ describe('SidebarContent', () => {
       expect(screen.getByTestId('close-mobile-nav-project')).toBeInTheDocument();
       expect(screen.getByTestId('close-mobile-nav-session')).toBeInTheDocument();
       expect(screen.getByTestId('close-mobile-nav-agents')).toBeInTheDocument();
-      expect(screen.getByTestId('close-mobile-nav-task')).toBeInTheDocument();
     });
 
     it('does not pass onCloseMobileNav to sections in desktop mode', () => {
@@ -271,7 +255,6 @@ describe('SidebarContent', () => {
       expect(screen.queryByTestId('close-mobile-nav-project')).not.toBeInTheDocument();
       expect(screen.queryByTestId('close-mobile-nav-session')).not.toBeInTheDocument();
       expect(screen.queryByTestId('close-mobile-nav-agents')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('close-mobile-nav-task')).not.toBeInTheDocument();
     });
 
     it('works without onCloseMobileNav callback', () => {
@@ -308,9 +291,8 @@ describe('SidebarContent', () => {
       screen.getByTestId('close-mobile-nav-project').click();
       screen.getByTestId('close-mobile-nav-session').click();
       screen.getByTestId('close-mobile-nav-agents').click();
-      screen.getByTestId('close-mobile-nav-task').click();
 
-      expect(mockHandlers.onCloseMobileNav).toHaveBeenCalledTimes(4);
+      expect(mockHandlers.onCloseMobileNav).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -344,7 +326,6 @@ describe('SidebarContent', () => {
       render(<SidebarContent {...defaultProps} />);
 
       expect(screen.queryByTestId('project-section')).not.toBeInTheDocument();
-      expect(screen.getByTestId('task-section')).toBeInTheDocument();
     });
 
     it('handles null session details gracefully', () => {
@@ -354,7 +335,6 @@ describe('SidebarContent', () => {
 
       expect(screen.queryByTestId('session-section')).not.toBeInTheDocument();
       expect(screen.getByTestId('project-section')).toBeInTheDocument();
-      expect(screen.getByTestId('task-section')).toBeInTheDocument();
     });
   });
 });

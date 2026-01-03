@@ -146,14 +146,17 @@ export function ProviderInstanceCard({
 
         // Apply global price filter
         if (globalFilters.maxPromptCostPerMillion !== undefined) {
+          const promptCost = model.cost_per_1m_in ?? Number.POSITIVE_INFINITY;
+          const outputCost = model.cost_per_1m_out ?? Number.POSITIVE_INFINITY;
+
           if (globalFilters.maxPromptCostPerMillion === 0) {
             // Free only filter - both input and output must be free
-            if (model.cost_per_1m_in !== 0 || model.cost_per_1m_out !== 0) {
+            if (promptCost !== 0 || outputCost !== 0) {
               return false;
             }
           } else {
             // Max cost filter
-            if (model.cost_per_1m_in > globalFilters.maxPromptCostPerMillion) {
+            if (promptCost > globalFilters.maxPromptCostPerMillion) {
               return false;
             }
           }

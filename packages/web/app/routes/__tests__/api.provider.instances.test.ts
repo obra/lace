@@ -1,7 +1,7 @@
 // ABOUTME: Tests for provider instances API endpoint (GET/POST /api/provider/instances)
 // ABOUTME: Verifies instance listing and creation with real implementations
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loader as GET, action as POST } from '@lace/web/app/routes/api.provider.instances';
@@ -18,9 +18,37 @@ import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 describe('Provider Instances API', () => {
   const tempContext = setupWebTest();
   let tempDir: string;
+  let originalOpenAiApiKey: string | undefined;
+  let originalOpenAiKey: string | undefined;
+  let originalAnthropicKey: string | undefined;
+  let originalAnthropicApiKey: string | undefined;
 
   beforeEach(() => {
     tempDir = tempContext.tempDir;
+
+    originalOpenAiApiKey = process.env.OPENAI_API_KEY;
+    originalOpenAiKey = process.env.OPENAI_KEY;
+    originalAnthropicKey = process.env.ANTHROPIC_KEY;
+    originalAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
+
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.OPENAI_KEY;
+    delete process.env.ANTHROPIC_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+  });
+
+  afterEach(() => {
+    if (originalOpenAiApiKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalOpenAiApiKey;
+
+    if (originalOpenAiKey === undefined) delete process.env.OPENAI_KEY;
+    else process.env.OPENAI_KEY = originalOpenAiKey;
+
+    if (originalAnthropicKey === undefined) delete process.env.ANTHROPIC_KEY;
+    else process.env.ANTHROPIC_KEY = originalAnthropicKey;
+
+    if (originalAnthropicApiKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = originalAnthropicApiKey;
   });
 
   describe('GET /api/provider/instances', () => {

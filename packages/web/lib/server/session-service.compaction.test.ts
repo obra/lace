@@ -34,7 +34,6 @@ describe('SessionService compaction event streaming', () => {
     getId: MockedFunction<() => ThreadId>;
     getProjectId: MockedFunction<() => string>;
     getAgent: MockedFunction<(threadId: ThreadId) => unknown>;
-    getTaskManager: MockedFunction<() => unknown>;
   };
   let mockAgent: ReturnType<typeof createMockAgent>;
 
@@ -65,7 +64,6 @@ describe('SessionService compaction event streaming', () => {
       getId: vi.fn().mockReturnValue('session_123' as ThreadId),
       getProjectId: vi.fn().mockReturnValue('project_123'),
       getAgent: vi.fn().mockReturnValue(mockAgent),
-      getTaskManager: vi.fn().mockReturnValue({}),
     };
 
     vi.mocked(Session.getByIdSync).mockReturnValue(mockSession as unknown as Session);

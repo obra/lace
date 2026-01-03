@@ -3,20 +3,12 @@
 
 'use client';
 
-import React, { memo, useState } from 'react';
+import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faRobot,
-  faSquare,
-  faChevronRight,
-  faChevronDown,
-  faPlus,
-} from '@lace/web/lib/fontawesome';
+import { faRobot, faPlus } from '@lace/web/lib/fontawesome';
 import { SidebarItem, SidebarSection } from '@lace/web/components/layout/Sidebar';
 import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
-import { useOptionalTaskContext } from '@lace/web/components/providers/TaskProvider';
-import { getStatusBgColor } from '@lace/web/lib/task-status-ui';
-import type { ThreadId, AgentInfo, Task } from '@lace/web/types/core';
+import type { ThreadId, AgentInfo } from '@lace/web/types/core';
 
 interface AgentsSectionProps {
   isMobile?: boolean;
@@ -35,8 +27,6 @@ export function AgentsSection({
 }: AgentsSectionProps) {
   // Get context data
   const { sessionDetails, selectedAgent } = useSessionContext();
-  const taskContext = useOptionalTaskContext();
-  const [expandedAgents, setExpandedAgents] = useState<Set<ThreadId>>(new Set());
 
   // Don't render if no session or no agents
   if (!sessionDetails?.agents || sessionDetails.agents.length === 0) {
@@ -59,32 +49,6 @@ export function AgentsSection({
 
   const getAgentStatusBadgeClass = (status: AgentInfo['status']) =>
     STATUS_BADGE[status] ?? 'badge-neutral';
-
-  const getAgentTasks = (agentId: ThreadId) => {
-    if (!taskContext?.taskManager?.tasks) {
-      return { inProgress: null, other: [] };
-    }
-
-    const allTasks = taskContext.taskManager.tasks;
-    const agentTasks = allTasks.filter((task) => task.assignedTo === agentId);
-
-    const inProgress = agentTasks.find((task) => task.status === 'in_progress') || null;
-    const other = agentTasks.filter((task) => task.status !== 'in_progress');
-
-    return { inProgress, other };
-  };
-
-  const toggleAgentExpansion = (agentId: ThreadId) => {
-    setExpandedAgents((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(agentId)) {
-        newSet.delete(agentId);
-      } else {
-        newSet.add(agentId);
-      }
-      return newSet;
-    });
-  };
 
   const addAgentButton = onCreateAgent ? (
     <button
@@ -110,9 +74,6 @@ export function AgentsSection({
         {' '}
         {/* Tighter spacing */}
         {sessionDetails.agents.map((agent) => {
-          const { inProgress, other } = getAgentTasks(agent.threadId);
-          const isExpanded = expandedAgents.has(agent.threadId);
-
           return (
             <div key={agent.threadId} className="space-y-1">
               <div className="flex items-center gap-1">
@@ -136,48 +97,6 @@ export function AgentsSection({
                   </div>
                 </SidebarItem>
               </div>
-
-              {/* In-progress task - show directly */}
-              {inProgress && (
-                <div className="ml-2 flex items-center gap-1.5 text-xs text-base-content/60">
-                  <FontAwesomeIcon icon={faSquare} className="w-2.5 h-2.5" />
-                  <span className="truncate">{inProgress.title}</span>
-                </div>
-              )}
-
-              {/* Other tasks - collapsible */}
-              {other.length > 0 && (
-                <div className="ml-2">
-                  <button
-                    onClick={() => toggleAgentExpansion(agent.threadId)}
-                    className="flex items-center gap-1.5 text-xs text-base-content/50 hover:text-base-content/70 transition-colors py-0.5"
-                  >
-                    <FontAwesomeIcon
-                      icon={isExpanded ? faChevronDown : faChevronRight}
-                      className="w-2.5 h-2.5"
-                    />
-                    <span>
-                      {other.length} other task{other.length === 1 ? '' : 's'}
-                    </span>
-                  </button>
-
-                  {isExpanded && (
-                    <div className="ml-4 mt-1 space-y-1">
-                      {other.map((task) => (
-                        <div
-                          key={task.id}
-                          className="flex items-center gap-1.5 text-xs text-base-content/50"
-                        >
-                          <div
-                            className={`w-2 h-2 rounded-full ${getStatusBgColor(task.status)}`}
-                          />
-                          <span className="truncate">{task.title}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           );
         })}

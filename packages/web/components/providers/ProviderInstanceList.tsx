@@ -117,12 +117,15 @@ export function ProviderInstanceList() {
 
         // Apply price filter
         if (globalFilters.maxPromptCostPerMillion !== undefined) {
+          const promptCost = model.cost_per_1m_in ?? Number.POSITIVE_INFINITY;
+          const outputCost = model.cost_per_1m_out ?? Number.POSITIVE_INFINITY;
+
           if (globalFilters.maxPromptCostPerMillion === 0) {
-            if (model.cost_per_1m_in !== 0 || model.cost_per_1m_out !== 0) {
+            if (promptCost !== 0 || outputCost !== 0) {
               return false;
             }
           } else {
-            if (model.cost_per_1m_in > globalFilters.maxPromptCostPerMillion) {
+            if (promptCost > globalFilters.maxPromptCostPerMillion) {
               return false;
             }
           }
@@ -294,12 +297,15 @@ export function ProviderInstanceList() {
                     }
 
                     if (globalFilters.maxPromptCostPerMillion !== undefined) {
+                      const promptCost = model.cost_per_1m_in ?? Number.POSITIVE_INFINITY;
+                      const outputCost = model.cost_per_1m_out ?? Number.POSITIVE_INFINITY;
+
                       if (globalFilters.maxPromptCostPerMillion === 0) {
-                        if (model.cost_per_1m_in !== 0 || model.cost_per_1m_out !== 0) {
+                        if (promptCost !== 0 || outputCost !== 0) {
                           return false;
                         }
                       } else {
-                        if (model.cost_per_1m_in > globalFilters.maxPromptCostPerMillion) {
+                        if (promptCost > globalFilters.maxPromptCostPerMillion) {
                           return false;
                         }
                       }

@@ -5,7 +5,6 @@ import { useParams } from 'react-router';
 import { ProjectsProvider } from '@lace/web/components/providers/ProjectsProvider';
 import { ProjectProvider } from '@lace/web/components/providers/ProjectProvider';
 import { SessionProvider } from '@lace/web/components/providers/SessionProvider';
-import { TaskProvider } from '@lace/web/components/providers/TaskProvider';
 import { UIProvider } from '@lace/web/components/providers/UIProvider';
 import { ProjectPageContent } from '@lace/web/components/pages/ProjectPageContent';
 
@@ -24,9 +23,7 @@ export default function Project() {
       >
         <ProjectProvider projectId={projectId!} selectedSessionId={null}>
           <SessionProvider sessionId={null} selectedAgentId={null} onAgentChange={noOpCallback}>
-            <TaskProvider projectId={projectId!} sessionId={null}>
-              <ProjectPageContent projectId={projectId!} />
-            </TaskProvider>
+            <ProjectPageContent projectId={projectId!} />
           </SessionProvider>
         </ProjectProvider>
       </ProjectsProvider>

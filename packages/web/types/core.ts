@@ -23,15 +23,6 @@ export type { ToolCall, ToolResult, ToolAnnotations, ToolPolicy } from '@lace/co
 
 export type { FileEditDiffContext } from '@lace/core/tools/implementations/file_edit';
 
-export type {
-  Task,
-  TaskNote,
-  TaskStatus,
-  TaskPriority,
-  TaskContext,
-  TaskFilters,
-} from '@lace/core/tasks/types';
-
 export type { AgentState, AgentInfo } from '@lace/core/agents/agent';
 
 export type { ProviderInfo, ProviderResponse, ModelInfo } from '@lace/core/providers/base-provider';
