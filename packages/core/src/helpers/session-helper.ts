@@ -165,15 +165,22 @@ export class SessionHelper extends BaseHelper {
 
       // Build context with parent agent (inherit session policies)
       const composedSignal = this.options.abortSignal ?? signal ?? new AbortController().signal;
+      const projectId = session?.getProjectId?.();
       const context: ToolContext = {
         signal: composedSignal,
-        agent: this.options.parentAgent, // Key difference - has agent context
-        workingDirectory: session?.getWorkingDirectory(),
+        workingDirectory: session?.getWorkingDirectory?.(),
+        threadId: this.options.parentAgent.threadId,
+        projectId,
+        toolTempRoot: projectId ? session?.getSessionTempDir?.() : undefined,
+        workspaceInfo: session?.getWorkspaceInfo?.(),
+        workspaceManager: session?.getWorkspaceManager?.(),
+        hasFileBeenRead: (path: string) => this.options.parentAgent.hasFileBeenRead(path),
+        taskManager: session?.getTaskManager?.(),
       };
 
       logger.debug('SessionHelper requesting tool permission', {
         toolName: toolCall.name,
-        hasAgent: !!context.agent,
+        threadId: context.threadId,
         hasWorkingDir: !!context.workingDirectory,
       });
 

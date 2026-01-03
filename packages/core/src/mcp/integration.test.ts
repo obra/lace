@@ -163,10 +163,11 @@ describe('MCP Integration E2E', () => {
       arguments: { message: 'Hello MCP Integration!' },
     };
 
-    // Create proper context for execution with agent (required for approval)
+    // Create context for execution (agent-owned approval flow; ToolExecutor only executes)
     const context = {
       signal: new AbortController().signal,
-      agent: coordinatorAgent,
+      threadId: coordinatorAgent.threadId,
+      projectId: session.getProjectId(),
     };
 
     // Step 6: Execute tool through ToolExecutor (this tests the new simplified flow)
@@ -268,7 +269,8 @@ describe('MCP Integration E2E', () => {
 
     const result = await toolExecutor.execute(toolCall, {
       signal: new AbortController().signal,
-      agent: agent,
+      threadId: agent!.threadId,
+      projectId: session.getProjectId(),
     });
 
     // Should execute successfully because of allow approval level

@@ -86,7 +86,10 @@ describe('FileEditTool Integration Tests', () => {
     // Create context with real agent
     context = {
       workingDirectory: process.cwd(),
-      agent,
+      threadId: agent.threadId,
+      projectId: session.getProjectId(),
+      toolTempRoot: session.getSessionTempDir(),
+      hasFileBeenRead: (path: string) => agent.hasFileBeenRead(path),
       signal: new AbortController().signal,
     };
 
@@ -904,7 +907,11 @@ describe('FileEditTool Integration Tests', () => {
             },
           ],
         },
-        { signal: new AbortController().signal, workingDirectory: testDir }
+        {
+          signal: new AbortController().signal,
+          workingDirectory: testDir,
+          hasFileBeenRead: () => true,
+        }
       );
 
       expect(result.status).toBe('completed');
@@ -924,7 +931,11 @@ describe('FileEditTool Integration Tests', () => {
             },
           ],
         },
-        { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
+        {
+          signal: new AbortController().signal,
+          workingDirectory: '/some/other/dir',
+          hasFileBeenRead: () => true,
+        }
       );
 
       expect(result.status).toBe('completed');

@@ -59,19 +59,19 @@ describe('Workspace Integration', () => {
 
       // Create mock tool context with read tracking
       const filesRead = new Set<string>();
-      const mockAgent = {
-        getThreadId: () => session.getId(),
-        hasFileBeenRead: (path: string) => filesRead.has(path),
-        markFileAsRead: (path: string) => filesRead.add(path),
-      } as any;
+      const workspaceInfo = session.getWorkspaceInfo()!;
 
       const mockSignal = new AbortController().signal;
 
       const toolContext: ToolContext = {
-        agent: mockAgent,
         signal: mockSignal,
         workingDirectory: tempProjectDir,
         toolTempDir: tempProjectDir, // For bash output files
+        threadId: session.getId(),
+        projectId: project.getId(),
+        workspaceInfo,
+        workspaceManager: session.getWorkspaceManager(),
+        hasFileBeenRead: (path: string) => filesRead.has(path),
       };
 
       // Test BashTool execution through workspace
@@ -103,19 +103,19 @@ describe('Workspace Integration', () => {
       await session.waitForWorkspace();
 
       const filesRead = new Set<string>();
-      const mockAgent = {
-        getThreadId: () => session.getId(),
-        hasFileBeenRead: (path: string) => filesRead.has(path),
-        markFileAsRead: (path: string) => filesRead.add(path),
-      } as any;
+      const workspaceInfo = session.getWorkspaceInfo()!;
 
       const mockSignal = new AbortController().signal;
 
       const toolContext: ToolContext = {
-        agent: mockAgent,
         signal: mockSignal,
         workingDirectory: tempProjectDir,
         toolTempDir: tempProjectDir,
+        threadId: session.getId(),
+        projectId: project.getId(),
+        workspaceInfo,
+        workspaceManager: session.getWorkspaceManager(),
+        hasFileBeenRead: (path: string) => filesRead.has(path),
       };
 
       // Test FileReadTool
@@ -127,7 +127,7 @@ describe('Workspace Integration', () => {
       expect((readContent as any).text).toContain('Original content');
 
       // Test FileWriteTool (mark test.txt as read to allow writes)
-      filesRead.add('test.txt');
+      filesRead.add(join(workspaceInfo.clonePath, 'test.txt'));
       const writeTool = new FileWriteTool();
       const writeResult = await writeTool.execute(
         {
@@ -161,19 +161,19 @@ describe('Workspace Integration', () => {
       await session.waitForWorkspace();
 
       const filesRead = new Set<string>();
-      const mockAgent = {
-        getThreadId: () => session.getId(),
-        hasFileBeenRead: (path: string) => filesRead.has(path),
-        markFileAsRead: (path: string) => filesRead.add(path),
-      } as any;
+      const workspaceInfo = session.getWorkspaceInfo()!;
 
       const mockSignal = new AbortController().signal;
 
       const toolContext: ToolContext = {
-        agent: mockAgent,
         signal: mockSignal,
         workingDirectory: tempProjectDir,
         toolTempDir: tempProjectDir,
+        threadId: session.getId(),
+        projectId: project.getId(),
+        workspaceInfo,
+        workspaceManager: session.getWorkspaceManager(),
+        hasFileBeenRead: (path: string) => filesRead.has(path),
       };
 
       // Use bash to create a file
@@ -228,14 +228,16 @@ describe('Workspace Integration', () => {
       });
       await session.waitForWorkspace();
 
-      const mockAgent = {
-        getThreadId: () => session.getId(),
-      } as any;
+      const workspaceInfo = session.getWorkspaceInfo()!;
 
       const toolContext: ToolContext = {
-        agent: mockAgent,
         signal: new AbortController().signal,
         workingDirectory: tempProjectDir,
+        threadId: session.getId(),
+        projectId: project.getId(),
+        workspaceInfo,
+        workspaceManager: session.getWorkspaceManager(),
+        hasFileBeenRead: () => true,
       };
 
       // Create a subdirectory with a file
@@ -274,14 +276,16 @@ describe('Workspace Integration', () => {
       });
       await session.waitForWorkspace();
 
-      const mockAgent = {
-        getThreadId: () => session.getId(),
-      } as any;
+      const workspaceInfo = session.getWorkspaceInfo()!;
 
       const toolContext: ToolContext = {
-        agent: mockAgent,
         signal: new AbortController().signal,
         workingDirectory: tempProjectDir,
+        threadId: session.getId(),
+        projectId: project.getId(),
+        workspaceInfo,
+        workspaceManager: session.getWorkspaceManager(),
+        hasFileBeenRead: () => true,
       };
 
       // Write using absolute path

@@ -134,7 +134,9 @@ describe('Multi-Agent Task Manager Integration', () => {
     // with different actors (threadIds) working on shared tasks
     mainAgentContext = {
       signal: new AbortController().signal,
-      agent,
+      threadId: session.getId(),
+      projectId: project.getId(),
+      taskManager: session.getTaskManager(),
     };
 
     // For testing purposes, we'll use the same agent for all contexts
@@ -142,11 +144,15 @@ describe('Multi-Agent Task Manager Integration', () => {
     // who created/updated tasks, not from the agent
     agent2Context = {
       signal: new AbortController().signal,
-      agent,
+      threadId: asThreadId('lace_20250703_parent.2'),
+      projectId: project.getId(),
+      taskManager: session.getTaskManager(),
     };
     agent3Context = {
       signal: new AbortController().signal,
-      agent,
+      threadId: asThreadId('lace_20250703_parent.3'),
+      projectId: project.getId(),
+      taskManager: session.getTaskManager(),
     };
   });
 
@@ -201,7 +207,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       const assignResult = await updateTool.execute(
         {
           taskId,
-          assignTo: agent2Context.agent!.threadId,
+          assignTo: agent2Context.threadId!,
         },
         mainAgentContext
       );
@@ -209,8 +215,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       expect(assignResult.status).toBe('completed');
 
       // Step 4: Agent2 sees the task in their list (using agent2's tools)
-      const agent2ListTool = agent2Context.agent!.toolExecutor.getTool('task_list') as TaskListTool;
-      const listResult2 = await agent2ListTool.execute(
+      const listResult2 = await listTool.execute(
         {
           filter: 'mine',
         },
@@ -315,7 +320,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       const actualAgentResult = await updateTool.execute(
         {
           taskId,
-          assignTo: agent3Context.agent!.threadId,
+          assignTo: agent3Context.threadId!,
         },
         mainAgentContext
       );
@@ -325,7 +330,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       // Verify reassignment using TaskViewTool
       const viewResult2 = await viewTool.execute({ taskId }, mainAgentContext);
       expect(viewResult2.status).toBe('completed');
-      expect(viewResult2.content?.[0]?.text).toContain(agent3Context.agent!.threadId);
+      expect(viewResult2.content?.[0]?.text).toContain(agent3Context.threadId!);
     });
   });
 
@@ -334,7 +339,9 @@ describe('Multi-Agent Task Manager Integration', () => {
       // Create a different parent thread context
       const otherAgentContext: ToolContext = {
         signal: new AbortController().signal,
-        agent: session.getAgent(session.getId())!,
+        threadId: session.getId(),
+        projectId: project.getId(),
+        taskManager: session.getTaskManager(),
       };
 
       // Create task in main thread
@@ -418,7 +425,9 @@ describe('Multi-Agent Task Manager Integration', () => {
 
       const session2Context = {
         signal: new AbortController().signal,
-        agent: session2.getAgent(session2.getId())!,
+        threadId: session2.getId(),
+        projectId: project2.getId(),
+        taskManager: session2.getTaskManager(),
       };
 
       try {
@@ -540,7 +549,7 @@ describe('Multi-Agent Task Manager Integration', () => {
               title: 'Task assigned to agent2',
               prompt: 'Do something else',
               priority: 'medium',
-              assignedTo: agent2Context.agent!.threadId,
+              assignedTo: agent2Context.threadId!,
             },
           ],
         },
@@ -554,7 +563,7 @@ describe('Multi-Agent Task Manager Integration', () => {
               title: 'Task created by agent2',
               prompt: 'Do another thing',
               priority: 'low',
-              assignedTo: mainAgentContext.agent!.threadId,
+              assignedTo: mainAgentContext.threadId!,
             },
           ],
         },

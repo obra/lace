@@ -160,7 +160,10 @@ describe('Agent Approval Orchestration', () => {
 
       // Tool should now be executed through the complete approval pipeline
       expect(executeSpy).toHaveBeenCalledTimes(1);
-      expect(executeSpy).toHaveBeenCalledWith(toolCall, expect.objectContaining({ agent }));
+      expect(executeSpy).toHaveBeenCalledWith(
+        toolCall,
+        expect.objectContaining({ threadId: agent.threadId })
+      );
     });
 
     it('should handle denied approvals properly', async () => {

@@ -1,7 +1,7 @@
 // ABOUTME: Integration tests for temp directory functionality across all layers
 // ABOUTME: Tests the complete flow from process temp to tool-call directories
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getProcessTempDir, clearProcessTempDirCache } from '@lace/core/config/lace-dir';
 import { Project } from '@lace/core/projects/project';
 import { Session } from '@lace/core/sessions/session';
@@ -98,13 +98,10 @@ describe('Temp Directory Integration', () => {
   });
 
   it('should create proper directory hierarchy through ToolExecutor', async () => {
-    const agent = session.getAgent(session.getId())!;
-    // Mock agent approval for tests
-    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
-
     const context: ToolContext = {
       signal: new AbortController().signal,
-      agent,
+      projectId: project.getId(),
+      toolTempRoot: session.getSessionTempDir(),
     };
 
     await toolExecutor.execute(
@@ -138,11 +135,10 @@ describe('Temp Directory Integration', () => {
   });
 
   it('should handle file operations through ToolExecutor', async () => {
-    const agent = session.getAgent(session.getId())!;
-
     const context: ToolContext = {
       signal: new AbortController().signal,
-      agent,
+      projectId: project.getId(),
+      toolTempRoot: session.getSessionTempDir(),
     };
 
     await toolExecutor.execute(
@@ -173,13 +169,10 @@ describe('Temp Directory Integration', () => {
   });
 
   it('should maintain stability across ToolExecutor instances', async () => {
-    const agent = session.getAgent(session.getId())!;
-    // Mock agent approval for tests
-    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
-
     const context: ToolContext = {
       signal: new AbortController().signal,
-      agent,
+      projectId: project.getId(),
+      toolTempRoot: session.getSessionTempDir(),
     };
 
     // Execute with first ToolExecutor instance

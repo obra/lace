@@ -256,28 +256,6 @@ export class ToolExecutor {
   }
 
   /**
-   * Create temp directory for a tool call
-   */
-  private async createToolTempDirectory(toolCallId: string, context: ToolContext): Promise<string> {
-    if (!context.agent) {
-      throw new Error('Agent context required for temp directory creation');
-    }
-
-    // Get session instance and use its temp directory method
-    const session = await context.agent.getFullSession();
-    if (!session) {
-      throw new Error('Session not found for temp directory creation');
-    }
-    const sessionTempDir = session.getSessionTempDir();
-
-    // Create tool-specific directory
-    const toolTempDir = join(sessionTempDir, `${ToolExecutor.TOOL_CALL_TEMP_PREFIX}${toolCallId}`);
-    mkdirSync(toolTempDir, { recursive: true });
-
-    return toolTempDir;
-  }
-
-  /**
    * Execute a tool directly without approval complexity.
    * Agent owns approval flow - ToolExecutor just executes when told.
    */
@@ -289,29 +267,21 @@ export class ToolExecutor {
     // Create enhanced context with environment and temp directory
     let toolContext: ToolContext = context || {};
 
-    // Merge project environment variables if agent is available
-    if (context?.agent) {
-      const session = await context.agent.getFullSession();
-      const projectId = session?.getProjectId();
+    if (!toolContext.toolTempDir && toolContext.toolTempRoot) {
+      const toolTempDir = join(
+        toolContext.toolTempRoot,
+        `${ToolExecutor.TOOL_CALL_TEMP_PREFIX}${toolCall.id}`
+      );
+      mkdirSync(toolTempDir, { recursive: true });
+      toolContext = { ...toolContext, toolTempDir };
+    }
 
-      // Create merged environment for subprocess execution
-      if (projectId) {
-        const projectEnv = this.envManager.getMergedEnvironment(projectId);
-        toolContext.processEnv = { ...process.env, ...projectEnv };
-      }
-
-      // Use the LLM-provided tool call ID and create temp directory
-      const toolTempDir = await this.createToolTempDirectory(toolCall.id, context);
-
-      // Get workspace context from session - wait for it if needed
-      const workspaceContext = session ? await session.waitForWorkspace() : undefined;
-
-      // Enhanced context with temp directory, workspace info, and workspace manager
+    // Merge project environment variables (agent runtime provides projectId)
+    if (toolContext.projectId) {
+      const projectEnv = this.envManager.getMergedEnvironment(toolContext.projectId);
       toolContext = {
         ...toolContext,
-        toolTempDir,
-        workspaceInfo: workspaceContext?.info,
-        workspaceManager: workspaceContext?.manager,
+        processEnv: { ...process.env, ...projectEnv, ...(toolContext.processEnv || {}) },
       };
     }
 

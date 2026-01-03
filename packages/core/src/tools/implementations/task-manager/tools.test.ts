@@ -26,7 +26,6 @@ import {
 } from '@lace/core/test-utils/provider-instances';
 import { Session } from '@lace/core/sessions/session';
 import { Project } from '@lace/core/projects/project';
-import type { Agent } from '@lace/core/agents/agent';
 import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
 import { ProviderRegistry } from '@lace/core/providers/registry';
@@ -144,14 +143,11 @@ describe('Enhanced Task Manager Tools', () => {
     taskAddNoteTool = tools.find((t) => t.name === 'task_add_note') as TaskAddNoteTool;
     taskViewTool = tools.find((t) => t.name === 'task_view') as TaskViewTool;
 
-    const agent = session.getAgent(session.getId());
-    if (!agent) {
-      throw new Error('Failed to get agent from session');
-    }
-
     toolContext = {
       signal: new AbortController().signal,
-      agent,
+      threadId: session.getId(),
+      projectId: project.getId(),
+      taskManager: session.getTaskManager(),
     };
   });
 
@@ -192,8 +188,8 @@ describe('Enhanced Task Manager Tools', () => {
       expect(taskCreateTool).toBeDefined();
       expect(taskCreateTool.name).toBe('task_create');
 
-      // Test that tools can access TaskManager via agent
-      expect(toolContext.agent).toBeDefined();
+      // Test that tools can access TaskManager via context
+      expect(toolContext.threadId).toBeDefined();
       expect(session.getTaskManager()).toBeDefined();
 
       // Test that task creation works with toolContext-based TaskManager
@@ -363,11 +359,7 @@ describe('Enhanced Task Manager Tools', () => {
         {
           ...toolContext,
           signal: new AbortController().signal,
-          agent: {
-            ...toolContext.agent!,
-            threadId: agent2ThreadId,
-            getFullSession: toolContext.agent!.getFullSession.bind(toolContext.agent),
-          } as unknown as Agent,
+          threadId: agent2ThreadId,
         }
       );
     });
@@ -380,11 +372,7 @@ describe('Enhanced Task Manager Tools', () => {
         {
           ...toolContext,
           signal: new AbortController().signal,
-          agent: {
-            ...toolContext.agent!,
-            threadId: agent1ThreadId,
-            getFullSession: toolContext.agent!.getFullSession.bind(toolContext.agent),
-          } as unknown as Agent,
+          threadId: agent1ThreadId,
         }
       );
 
@@ -692,11 +680,7 @@ describe('Enhanced Task Manager Tools', () => {
         {
           ...toolContext,
           signal: new AbortController().signal,
-          agent: {
-            ...toolContext.agent!,
-            threadId: agent2ThreadId,
-            getFullSession: toolContext.agent!.getFullSession.bind(toolContext.agent),
-          } as unknown as Agent,
+          threadId: agent2ThreadId,
         }
       );
 
@@ -751,11 +735,7 @@ describe('Enhanced Task Manager Tools', () => {
         {
           ...toolContext,
           signal: new AbortController().signal,
-          agent: {
-            ...toolContext.agent!,
-            threadId: agent2ThreadId,
-            getFullSession: toolContext.agent!.getFullSession.bind(toolContext.agent),
-          } as unknown as Agent,
+          threadId: agent2ThreadId,
         }
       );
     });

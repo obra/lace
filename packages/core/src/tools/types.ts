@@ -1,9 +1,9 @@
 // ABOUTME: Tool system type definitions and interfaces
 // ABOUTME: Model-agnostic tool definitions compatible with multiple AI SDKs and MCP
 
-import type { Agent } from '@lace/core/agents/agent';
 import type { CombinedTokenUsage } from '@lace/core/token-management/types';
 import type { IWorkspaceManager } from '@lace/core/workspace/workspace-manager';
+import type { TaskManager } from '@lace/core/tasks/task-manager';
 
 export interface ToolContext {
   // Execution control - required for cancellation
@@ -13,10 +13,12 @@ export interface ToolContext {
   workingDirectory?: string;
 
   // Temp directory management - provided by ToolExecutor
+  toolTempRoot?: string; // Root directory where ToolExecutor creates per-call temp dirs
   toolTempDir?: string; // Tool-specific temp directory for bash output
 
-  // Agent reference - provides access to threadId, session, and other context
-  agent?: Agent;
+  // Identity/context metadata (provided by the agent runtime)
+  threadId?: string;
+  projectId?: string;
 
   // Environment variables for subprocess execution
   processEnv?: NodeJS.ProcessEnv;
@@ -34,6 +36,12 @@ export interface ToolContext {
 
   // Workspace manager - provided by ToolExecutor to avoid circular dependencies
   workspaceManager?: IWorkspaceManager;
+
+  // Implemented by the agent runtime from its history
+  hasFileBeenRead?: (path: string) => boolean;
+
+  // Legacy feature support (to be removed when Tasks are removed)
+  taskManager?: TaskManager;
 }
 
 export interface ToolAnnotations {

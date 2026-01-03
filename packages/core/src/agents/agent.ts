@@ -4,7 +4,7 @@
 import { EventEmitter } from 'events';
 import { resolve } from 'path';
 import { AIProvider, ProviderMessage } from '@lace/core/providers/base-provider';
-import { ToolCall, ToolResult } from '@lace/core/tools/types';
+import { ToolCall, ToolContext, ToolResult } from '@lace/core/tools/types';
 import { Tool } from '@lace/core/tools/tool';
 import { ToolExecutor } from '@lace/core/tools/executor';
 import { ApprovalDecision, ToolPolicy } from '@lace/core/tools/types';
@@ -1576,11 +1576,7 @@ export class Agent extends EventEmitter {
         );
       }
 
-      const toolContext = {
-        signal: this._getToolAbortSignal(),
-        workingDirectory,
-        agent: this,
-      };
+      const toolContext = this._buildToolContext(session, workingDirectory);
 
       // Agent owns permission checking (new callback-free flow)
       const permission = await this._checkToolPermission(toolCall);
@@ -1721,11 +1717,7 @@ export class Agent extends EventEmitter {
         );
       }
 
-      const toolContext = {
-        signal: this._getToolAbortSignal(),
-        workingDirectory,
-        agent: this,
-      };
+      const toolContext = this._buildToolContext(session, workingDirectory);
 
       // Execute through ToolExecutor's approved tool method
       // This bypasses permission checks (already approved) but ensures proper context setup
@@ -2566,6 +2558,23 @@ export class Agent extends EventEmitter {
 
     // Compaction handling is now automatic through event sourcing
     // TokenBudgetManager no longer needed for compaction tracking
+  }
+
+  private _buildToolContext(session: Session, workingDirectory?: string): ToolContext {
+    const projectId = session.getProjectId();
+    const toolTempRoot = projectId ? session.getSessionTempDir() : undefined;
+
+    return {
+      signal: this._getToolAbortSignal(),
+      workingDirectory,
+      toolTempRoot,
+      threadId: this._threadId,
+      projectId,
+      workspaceInfo: session.getWorkspaceInfo(),
+      workspaceManager: session.getWorkspaceManager(),
+      hasFileBeenRead: (path: string) => this.hasFileBeenRead(path),
+      taskManager: session.getTaskManager(),
+    };
   }
 
   /**

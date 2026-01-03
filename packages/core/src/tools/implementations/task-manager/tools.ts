@@ -87,8 +87,7 @@ Bulk planning: task_create({ tasks: [
   private async getTaskManagerFromContext(
     context?: ToolContext
   ): Promise<import('@lace/core/tasks/task-manager').TaskManager | null> {
-    const session = await context?.agent?.getFullSession();
-    return session?.getTaskManager() || null;
+    return context?.taskManager || null;
   }
 
   protected async executeValidated(
@@ -98,7 +97,7 @@ Bulk planning: task_create({ tasks: [
     if (context.signal.aborted) {
       return this.createCancellationResult();
     }
-    if (!context?.agent?.threadId) {
+    if (!context.threadId) {
       return this.createError('No thread context available');
     }
 
@@ -109,7 +108,7 @@ Bulk planning: task_create({ tasks: [
 
     try {
       const taskContext = {
-        actor: context.agent.threadId,
+        actor: context.threadId,
         isHuman: false,
       };
 
@@ -207,8 +206,7 @@ Example: task_list({ filter: "mine", includeCompleted: false })`;
   private async getTaskManagerFromContext(
     context?: ToolContext
   ): Promise<import('@lace/core/tasks/task-manager').TaskManager | null> {
-    const session = await context?.agent?.getFullSession();
-    return session?.getTaskManager() || null;
+    return context?.taskManager || null;
   }
 
   protected async executeValidated(
@@ -218,7 +216,7 @@ Example: task_list({ filter: "mine", includeCompleted: false })`;
     if (context.signal.aborted) {
       return this.createCancellationResult();
     }
-    if (!context?.agent?.threadId) {
+    if (!context.threadId) {
       return this.createError('No thread context available');
     }
 
@@ -229,7 +227,7 @@ Example: task_list({ filter: "mine", includeCompleted: false })`;
 
     try {
       const taskContext = {
-        actor: context.agent.threadId,
+        actor: context.threadId,
         isHuman: false,
       };
 
@@ -315,8 +313,7 @@ Example: task_complete({ id: "task_123", message: "Fixed authentication bug in a
   private async getTaskManagerFromContext(
     context?: ToolContext
   ): Promise<import('@lace/core/tasks/task-manager').TaskManager | null> {
-    const session = await context?.agent?.getFullSession();
-    return session?.getTaskManager() || null;
+    return context?.taskManager || null;
   }
 
   protected async executeValidated(
@@ -326,7 +323,7 @@ Example: task_complete({ id: "task_123", message: "Fixed authentication bug in a
     if (context.signal.aborted) {
       return this.createCancellationResult();
     }
-    if (!context?.agent?.threadId) {
+    if (!context.threadId) {
       return this.createError('No thread context available');
     }
 
@@ -337,13 +334,13 @@ Example: task_complete({ id: "task_123", message: "Fixed authentication bug in a
 
     try {
       const taskContext = {
-        actor: context.agent.threadId,
+        actor: context.threadId,
         isHuman: false,
       };
 
       logger.debug('TaskCompleteTool: Starting task completion', {
         taskId: args.id,
-        actor: context.agent.threadId,
+        actor: context.threadId,
       });
 
       // Add the completion message as a note first
@@ -418,8 +415,7 @@ Other examples:
   private async getTaskManagerFromContext(
     context?: ToolContext
   ): Promise<import('@lace/core/tasks/task-manager').TaskManager | null> {
-    const session = await context?.agent?.getFullSession();
-    return session?.getTaskManager() || null;
+    return context?.taskManager || null;
   }
 
   protected async executeValidated(
@@ -429,7 +425,7 @@ Other examples:
     if (context.signal.aborted) {
       return this.createCancellationResult();
     }
-    if (!context?.agent?.threadId) {
+    if (!context.threadId) {
       return this.createError('No thread context available');
     }
 
@@ -445,7 +441,7 @@ Other examples:
 
     try {
       const taskContext = {
-        actor: context.agent.threadId,
+        actor: context.threadId,
         isHuman: false,
       };
 
@@ -523,8 +519,7 @@ Notes become part of permanent task history - write for future readers.`;
   private async getTaskManagerFromContext(
     context?: ToolContext
   ): Promise<import('@lace/core/tasks/task-manager').TaskManager | null> {
-    const session = await context?.agent?.getFullSession();
-    return session?.getTaskManager() || null;
+    return context?.taskManager || null;
   }
 
   protected async executeValidated(
@@ -534,7 +529,7 @@ Notes become part of permanent task history - write for future readers.`;
     if (context.signal.aborted) {
       return this.createCancellationResult();
     }
-    if (!context?.agent?.threadId) {
+    if (!context.threadId) {
       return this.createError('No thread context available');
     }
 
@@ -545,7 +540,7 @@ Notes become part of permanent task history - write for future readers.`;
 
     try {
       const taskContext = {
-        actor: context.agent.threadId,
+        actor: context.threadId,
         isHuman: false,
       };
 
@@ -594,8 +589,7 @@ Example: task_view({ taskId: "task_123" })`;
   private async getTaskManagerFromContext(
     context?: ToolContext
   ): Promise<import('@lace/core/tasks/task-manager').TaskManager | null> {
-    const session = await context?.agent?.getFullSession();
-    return session?.getTaskManager() || null;
+    return context?.taskManager || null;
   }
 
   protected async executeValidated(
@@ -605,7 +599,7 @@ Example: task_view({ taskId: "task_123" })`;
     if (context.signal.aborted) {
       return this.createCancellationResult();
     }
-    if (!context?.agent?.threadId) {
+    if (!context.threadId) {
       return this.createError('No thread context available');
     }
 
@@ -616,7 +610,7 @@ Example: task_view({ taskId: "task_123" })`;
 
     try {
       const taskContext = {
-        actor: context.agent.threadId,
+        actor: context.threadId,
         isHuman: false,
       };
 

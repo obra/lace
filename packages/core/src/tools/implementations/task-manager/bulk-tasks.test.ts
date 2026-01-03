@@ -93,7 +93,9 @@ describe('Bulk Task Creation', () => {
       },
       {
         signal: new AbortController().signal,
-        agent: session.getAgent(session.getId())!,
+        threadId: session.getId(),
+        projectId: project.getId(),
+        taskManager: session.getTaskManager(),
       }
     );
 
@@ -111,7 +113,9 @@ describe('Bulk Task Creation', () => {
       },
       {
         signal: new AbortController().signal,
-        agent: session.getAgent(session.getId())!,
+        threadId: session.getId(),
+        projectId: project.getId(),
+        taskManager: session.getTaskManager(),
       }
     );
 
@@ -132,7 +136,9 @@ describe('Bulk Task Creation', () => {
       },
       {
         signal: new AbortController().signal,
-        agent: session.getAgent(session.getId())!,
+        threadId: session.getId(),
+        projectId: project.getId(),
+        taskManager: session.getTaskManager(),
       }
     );
 
@@ -153,7 +159,9 @@ describe('Bulk Task Creation', () => {
       },
       {
         signal: new AbortController().signal,
-        agent: session.getAgent(session.getId())!,
+        threadId: session.getId(),
+        projectId: project.getId(),
+        taskManager: session.getTaskManager(),
       }
     );
 
@@ -182,7 +190,9 @@ describe('Bulk Task Creation', () => {
       },
       {
         signal: new AbortController().signal,
-        agent: session.getAgent(session.getId())!,
+        threadId: session.getId(),
+        projectId: project.getId(),
+        taskManager: session.getTaskManager(),
       }
     );
 
@@ -215,7 +225,9 @@ describe('Bulk Task Creation', () => {
       },
       {
         signal: new AbortController().signal,
-        agent: session.getAgent(session.getId())!,
+        threadId: session.getId(),
+        projectId: project.getId(),
+        taskManager: session.getTaskManager(),
       }
     );
 
@@ -244,7 +256,9 @@ describe('Bulk Task Creation', () => {
       },
       {
         signal: abortController.signal,
-        agent: session.getAgent(session.getId())!,
+        threadId: session.getId(),
+        projectId: project.getId(),
+        taskManager: session.getTaskManager(),
       }
     );
 

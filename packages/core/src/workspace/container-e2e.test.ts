@@ -121,19 +121,16 @@ describe('Container E2E Test', () => {
 
       // Create tool context
       const filesRead = new Set<string>();
-      const mockAgent = {
-        getThreadId: () => session.getId(),
-        hasFileBeenRead: (path: string) => filesRead.has(path),
-        markFileAsRead: (path: string) => filesRead.add(path),
-      } as any;
 
       const toolContext: ToolContext = {
-        agent: mockAgent,
         signal: new AbortController().signal,
         workingDirectory: '/workspace', // Use container's working directory
         toolTempDir: tempProjectDir,
         workspaceManager: session.getWorkspaceManager(),
         workspaceInfo: session.getWorkspaceInfo(),
+        threadId: session.getId(),
+        projectId: session.getProjectId(),
+        hasFileBeenRead: (path: string) => filesRead.has(path),
       };
 
       // Test 1: Execute bash command in container

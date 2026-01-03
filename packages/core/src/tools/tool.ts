@@ -222,19 +222,13 @@ export abstract class Tool {
       await stat(resolvedPath);
 
       // File exists - check if it was read
-      if (!context?.agent) {
-        // No agent context - this is likely a test environment or direct tool call
-        // Skip read protection for unit tests, but log a warning
-        if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
-          return this.createError(
-            'Tool context missing agent reference. This is a system error - please report it.'
-          );
-        }
-        // In test environment, skip the read protection check
-        return null;
+      if (!context?.hasFileBeenRead) {
+        return this.createError(
+          'Tool context missing hasFileBeenRead(). This is a system error - please report it.'
+        );
       }
 
-      if (!context.agent.hasFileBeenRead(resolvedPath)) {
+      if (!context.hasFileBeenRead(resolvedPath)) {
         return this.createError(
           `File ${filePath} exists but hasn't been read in this conversation. ` +
             `Use file_read to examine the current contents before modifying.`

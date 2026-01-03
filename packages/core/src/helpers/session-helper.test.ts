@@ -77,14 +77,20 @@ describe('SessionHelper', () => {
       getToolPolicy: vi.fn().mockReturnValue('require-approval'),
       getEffectiveConfiguration: vi.fn().mockReturnValue({ tools: undefined }), // No tool allowlist restrictions
       getWorkingDirectory: vi.fn().mockReturnValue('/session/dir'),
+      getProjectId: vi.fn().mockReturnValue(undefined),
+      getWorkspaceInfo: vi.fn().mockReturnValue(undefined),
+      getWorkspaceManager: vi.fn().mockReturnValue(undefined),
+      getTaskManager: vi.fn().mockReturnValue(undefined),
       getTools: vi.fn().mockReturnValue([testTool]),
     };
     mockSession = sessionPartial as Session;
 
     // Mock agent
     const agentPartial: Partial<Agent> = {
+      threadId: 'lace_20250101_test01' as any,
       getFullSession: vi.fn().mockResolvedValue(mockSession),
       getAvailableTools: vi.fn().mockReturnValue([testTool]),
+      hasFileBeenRead: vi.fn().mockReturnValue(true),
       toolExecutor,
     };
     mockAgent = agentPartial as Agent;
@@ -194,7 +200,7 @@ describe('SessionHelper', () => {
       // Should execute tool directly
       expect(executeSpy).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'test_tool' }),
-        expect.objectContaining({ agent: mockAgent })
+        expect.objectContaining({ threadId: mockAgent.threadId })
       );
     });
 
