@@ -1,4 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 
@@ -21,9 +23,9 @@ export class SupervisorAgentProcess {
   private readonly transportClose: () => void;
 
   constructor(options: SupervisorAgentProcessOptions) {
-    const agentMainPath =
-      options.agentPath ?? fileURLToPath(new URL('../../agent/dist/main.js', import.meta.url));
-    const agentCwd = fileURLToPath(new URL('../../agent', import.meta.url));
+    const resolved = resolveAgentPaths(options.agentPath);
+    const agentMainPath = resolved.agentMainPath;
+    const agentCwd = resolved.agentCwd;
 
     this.proc = spawn(process.execPath, [agentMainPath], {
       cwd: agentCwd,
@@ -61,4 +63,58 @@ export class SupervisorAgentProcess {
       this.proc.once('exit', () => resolve());
     });
   }
+}
+
+function resolveAgentPaths(agentPathOverride?: string): {
+  agentMainPath: string;
+  agentCwd: string;
+} {
+  if (agentPathOverride) {
+    const resolvedMain = resolvePath(agentPathOverride);
+    const cwd = resolvePath(resolvedMain, '../..');
+    return { agentMainPath: resolvedMain, agentCwd: cwd };
+  }
+
+  const fromFileUrl = tryResolveFromImportMetaUrl();
+  if (fromFileUrl) return fromFileUrl;
+
+  const fromCwd = tryResolveFromCwd();
+  if (fromCwd) return fromCwd;
+
+  throw new Error('Could not resolve lace agent entrypoint (packages/agent/dist/main.js)');
+}
+
+function tryResolveFromImportMetaUrl(): { agentMainPath: string; agentCwd: string } | null {
+  try {
+    const base = new URL(import.meta.url);
+    if (base.protocol !== 'file:') return null;
+
+    const agentMainUrl = new URL('../../agent/dist/main.js', base);
+    const agentCwdUrl = new URL('../../agent', base);
+
+    if (agentMainUrl.protocol !== 'file:' || agentCwdUrl.protocol !== 'file:') return null;
+
+    const agentMainPath = fileURLToPath(agentMainUrl);
+    const agentCwd = fileURLToPath(agentCwdUrl);
+    return { agentMainPath, agentCwd };
+  } catch {
+    return null;
+  }
+}
+
+function tryResolveFromCwd(): { agentMainPath: string; agentCwd: string } | null {
+  const bases = [
+    process.cwd(),
+    resolvePath(process.cwd(), '..'),
+    resolvePath(process.cwd(), '../..'),
+    resolvePath(process.cwd(), '../../..'),
+  ];
+
+  for (const base of bases) {
+    const agentCwd = join(base, 'packages', 'agent');
+    const agentMainPath = join(agentCwd, 'dist', 'main.js');
+    if (existsSync(agentMainPath)) return { agentMainPath, agentCwd };
+  }
+
+  return null;
 }
