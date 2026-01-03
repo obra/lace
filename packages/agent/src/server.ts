@@ -1,4 +1,16 @@
 import { randomUUID } from 'node:crypto';
+import { spawn, type ChildProcess } from 'node:child_process';
+import {
+  mkdirSync,
+  existsSync,
+  appendFileSync,
+  readFileSync,
+  statSync,
+  openSync,
+  readSync,
+  closeSync,
+} from 'node:fs';
+import { join } from 'node:path';
 import type { JsonRpcPeer } from '@lace/ent-protocol';
 import {
   ensureSessionFiles,
@@ -19,6 +31,7 @@ import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
 import type { CatalogModel } from '@lace/core/providers/catalog/types';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
+const JOB_LOG_DIR = 'jobs';
 
 function toNonEmptyString(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -71,6 +84,37 @@ function mapCatalogModelToModelInfo(model: CatalogModel, providerId: string) {
   };
 }
 
+type JobType = 'shell' | 'subagent';
+type JobStatus = 'running' | 'completed' | 'failed' | 'cancelled';
+
+type JobState = {
+  jobId: string;
+  parentJobId?: string;
+  type: JobType;
+  status: JobStatus;
+  description?: string;
+  command?: string;
+  startedAt: string;
+  originTurnId?: string;
+  originTurnSeq?: number;
+  exitCode?: number;
+  outputPath: string;
+  proc?: ChildProcess;
+  finished: boolean;
+  completion: Promise<void>;
+  resolveCompletion: () => void;
+};
+
+function ensureJobLogDir(sessionDir: string): string {
+  const dir = join(sessionDir, JOB_LOG_DIR);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
+  return dir;
+}
+
+function getJobOutputPath(sessionDir: string, jobId: string): string {
+  return join(ensureJobLogDir(sessionDir), `${jobId}.log`);
+}
+
 export type AgentServerState = {
   initialized: boolean;
   activeSession: LoadedSession | null;
@@ -97,6 +141,9 @@ export type AgentServerState = {
   providerCatalog: ProviderCatalogManager;
   providerCatalogLoaded: boolean;
   providerInstances: ProviderInstanceManager;
+  jobs: Map<string, JobState>;
+  sessionMutex: Promise<void>;
+  jobStreaming: 'full' | 'coalesced' | 'none';
 };
 
 export function createAgentServerState(): AgentServerState {
@@ -108,14 +155,366 @@ export function createAgentServerState(): AgentServerState {
     providerCatalog: new ProviderCatalogManager(),
     providerCatalogLoaded: false,
     providerInstances: new ProviderInstanceManager(),
+    jobs: new Map(),
+    sessionMutex: Promise.resolve(),
+    jobStreaming: 'full',
   };
 }
 
 export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerState): void {
+  const runExclusive = async <T>(work: () => Promise<T> | T): Promise<T> => {
+    const previous = state.sessionMutex;
+    let release!: () => void;
+    const next = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    state.sessionMutex = previous.then(() => next);
+    await previous;
+    try {
+      return await work();
+    } finally {
+      release();
+    }
+  };
+
+  const emitSessionUpdate = async (
+    update: SessionUpdate,
+    context?: { turnId?: string; turnSeq?: number; jobId?: string }
+  ) => {
+    if (!state.activeSession) return;
+
+    await runExclusive(() => {
+      const sessionState = readSessionState(state.activeSession!.dir);
+      peer.notify('session/update', {
+        sessionId: state.activeSession!.meta.sessionId,
+        streamSeq: sessionState.nextStreamSeq,
+        turnId: context?.turnId,
+        turnSeq: context?.turnSeq,
+        jobId: context?.jobId,
+        ...update,
+      });
+      writeSessionState(state.activeSession!.dir, {
+        ...sessionState,
+        nextStreamSeq: sessionState.nextStreamSeq + 1,
+      });
+      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+    });
+  };
+
+  const startShellJob = async (options: {
+    command: string;
+    description?: string;
+    parentJobId?: string;
+    turnContext?: { turnId: string; turnSeq: number };
+  }): Promise<{ jobId: string }> => {
+    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+
+    const jobId = `job_${randomUUID()}`;
+    const startedAt = new Date().toISOString();
+    const outputPath = getJobOutputPath(state.activeSession.dir, jobId);
+
+    let resolveCompletion!: () => void;
+    const completion = new Promise<void>((resolve) => {
+      resolveCompletion = resolve;
+    });
+
+    const job: JobState = {
+      jobId,
+      parentJobId: options.parentJobId,
+      type: 'shell',
+      status: 'running',
+      description: options.description,
+      command: options.command,
+      startedAt,
+      originTurnId: options.turnContext?.turnId,
+      originTurnSeq: options.turnContext?.turnSeq,
+      outputPath,
+      finished: false,
+      completion,
+      resolveCompletion,
+    };
+
+    state.jobs.set(jobId, job);
+
+    await runExclusive(() => {
+      let sessionState = readSessionState(state.activeSession!.dir);
+      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+        type: 'job_started',
+        turnId: options.turnContext?.turnId,
+        turnSeq: options.turnContext?.turnSeq,
+        data: {
+          jobId,
+          parentJobId: options.parentJobId,
+          jobType: 'shell',
+          description: options.description,
+          command: options.command,
+        },
+      });
+      sessionState = nextState;
+      writeSessionState(state.activeSession!.dir, sessionState);
+      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+    });
+
+    await emitSessionUpdate(
+      {
+        type: 'job_started',
+        jobId,
+        parentJobId: options.parentJobId,
+        jobType: 'shell',
+        description: options.description,
+      },
+      options.turnContext
+        ? { turnId: options.turnContext.turnId, turnSeq: options.turnContext.turnSeq }
+        : undefined
+    );
+
+    void runShellJobProcess(job);
+    return { jobId };
+  };
+
+  const runShellJobProcess = (job: JobState) => {
+    const finalizeJob = async (options: { exitCode?: number } = {}) => {
+      if (!state.activeSession) return;
+      if (job.finished) {
+        job.resolveCompletion();
+        return;
+      }
+
+      if (job.status === 'running') {
+        job.status = 'failed';
+      }
+
+      if (typeof options.exitCode === 'number') {
+        job.exitCode = options.exitCode;
+      }
+
+      job.proc = undefined;
+      job.finished = true;
+
+      await runExclusive(() => {
+        let sessionState = readSessionState(state.activeSession!.dir);
+        const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+          type: 'job_finished',
+          data: {
+            jobId: job.jobId,
+            parentJobId: job.parentJobId,
+            outcome: job.status,
+            ...(typeof options.exitCode === 'number' ? { exitCode: options.exitCode } : {}),
+          },
+        });
+        sessionState = nextState;
+        writeSessionState(state.activeSession!.dir, sessionState);
+        state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+      });
+
+      await emitSessionUpdate({
+        type: 'job_finished',
+        jobId: job.jobId,
+        parentJobId: job.parentJobId,
+        ...(typeof job.exitCode === 'number' ? { exitCode: job.exitCode } : {}),
+        outcome: job.status,
+      });
+
+      job.resolveCompletion();
+    };
+
+    void (async () => {
+      if (!state.activeSession) return;
+      if (job.proc || job.finished) return;
+
+      const sessionState = readSessionState(state.activeSession.dir);
+      const effectiveConfig = sessionState.config
+        ? { ...state.config, ...sessionState.config }
+        : state.config;
+
+      const requiresPermission =
+        shellExecTool.requiresPermission &&
+        effectiveConfig.approvalMode !== 'approve' &&
+        effectiveConfig.approvalMode !== 'dangerouslySkipPermissions' &&
+        effectiveConfig.approvalMode !== 'deny';
+
+      if (effectiveConfig.approvalMode === 'deny') {
+        job.status = 'cancelled';
+        await finalizeJob();
+        return;
+      }
+
+      if (requiresPermission) {
+        const toolCallId = `tool_${randomUUID()}`;
+        const toolInput = { command: job.command ?? '' } as Record<string, unknown>;
+        const permissionTurnId = job.originTurnId ?? `turn_${randomUUID()}`;
+        const permissionTurnSeq = job.originTurnSeq ?? 0;
+
+        await emitSessionUpdate({
+          type: 'job_update',
+          jobId: job.jobId,
+          parentJobId: job.parentJobId,
+          jobType: 'shell',
+          channel: 'internal',
+          update: {
+            type: 'tool_use',
+            toolCallId,
+            name: shellExecTool.name,
+            kind: shellExecTool.kind,
+            input: toolInput,
+            status: 'awaiting_permission',
+          },
+        });
+
+        const requestedAt = new Date().toISOString();
+        const { requestId, result } = peer.requestWithId('session/request_permission', {
+          sessionId: state.activeSession.meta.sessionId,
+          turnId: permissionTurnId,
+          turnSeq: permissionTurnSeq,
+          jobId: job.jobId,
+          tool: shellExecTool.name,
+          kind: shellExecTool.kind,
+          resource: String(job.command ?? ''),
+          options: [
+            { optionId: 'allow', label: 'Allow' },
+            { optionId: 'deny', label: 'Deny' },
+          ],
+          requestedAt,
+          toolCallId,
+        });
+
+        await runExclusive(() => {
+          const next = readSessionState(state.activeSession!.dir);
+          next.pendingPermissions = next.pendingPermissions ?? [];
+          next.pendingPermissions.push({
+            requestId: String(requestId),
+            toolCallId,
+            turnId: permissionTurnId,
+            turnSeq: permissionTurnSeq,
+            jobId: job.jobId,
+            tool: shellExecTool.name,
+            kind: shellExecTool.kind,
+            resource: String(job.command ?? ''),
+            options: [
+              { optionId: 'allow', label: 'Allow' },
+              { optionId: 'deny', label: 'Deny' },
+            ],
+            requestedAt,
+            input: toolInput,
+          });
+          writeSessionState(state.activeSession!.dir, next);
+          state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+        });
+
+        const decision = (await result) as { decision?: string };
+
+        await runExclusive(() => {
+          const next = readSessionState(state.activeSession!.dir);
+          next.pendingPermissions = (next.pendingPermissions ?? []).filter(
+            (p) => p.toolCallId !== toolCallId
+          );
+          writeSessionState(state.activeSession!.dir, next);
+          state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+        });
+
+        if (job.finished || job.status === 'cancelled') {
+          return;
+        }
+
+        if (decision?.decision !== 'allow') {
+          const denied: ToolResult = {
+            outcome: 'denied',
+            content: [{ type: 'error', message: 'Denied by user' }],
+          };
+
+          await emitSessionUpdate({
+            type: 'job_update',
+            jobId: job.jobId,
+            parentJobId: job.parentJobId,
+            jobType: 'shell',
+            channel: 'internal',
+            update: {
+              type: 'tool_use',
+              toolCallId,
+              name: shellExecTool.name,
+              kind: shellExecTool.kind,
+              input: toolInput,
+              status: 'denied',
+              result: denied,
+            },
+          });
+
+          job.status = 'cancelled';
+          await finalizeJob();
+          return;
+        }
+      }
+
+      const proc = spawn(job.command ?? '', {
+        cwd: state.activeSession.meta.workDir,
+        shell: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      job.proc = proc;
+
+      proc.stdout!.setEncoding('utf8');
+      proc.stderr!.setEncoding('utf8');
+
+      const appendOutput = async (chunk: string) => {
+        if (!state.activeSession) return;
+        await runExclusive(() => {
+          appendFileSync(job.outputPath, chunk, { encoding: 'utf8' });
+        });
+      };
+
+      const onStdout = async (chunk: string) => {
+        await appendOutput(chunk);
+        if (state.jobStreaming === 'none') return;
+        await emitSessionUpdate({
+          type: 'job_update',
+          jobId: job.jobId,
+          parentJobId: job.parentJobId,
+          jobType: 'shell',
+          channel: 'stdout',
+          update: { type: 'text_delta', text: chunk },
+        });
+      };
+
+      const onStderr = async (chunk: string) => {
+        await appendOutput(chunk);
+        if (state.jobStreaming === 'none') return;
+        await emitSessionUpdate({
+          type: 'job_update',
+          jobId: job.jobId,
+          parentJobId: job.parentJobId,
+          jobType: 'shell',
+          channel: 'stderr',
+          update: { type: 'text_delta', text: chunk },
+        });
+      };
+
+      proc.stdout!.on('data', (chunk) => void onStdout(chunk as string));
+      proc.stderr!.on('data', (chunk) => void onStderr(chunk as string));
+
+      proc.on('close', (code) => {
+        void (async () => {
+          if (job.finished) {
+            job.resolveCompletion();
+            return;
+          }
+
+          const exitCode = code ?? 0;
+          if (job.status !== 'cancelled') {
+            job.status = exitCode === 0 ? 'completed' : 'failed';
+          }
+
+          await finalizeJob({ exitCode });
+        })();
+      });
+    })();
+  };
+
   peer.onRequest('initialize', async (params: unknown) => {
     const parsed = params as
       | {
           protocolVersion?: string;
+          capabilities?: { 'ent/jobStreaming'?: 'full' | 'coalesced' | 'none' };
           config?: {
             approvalMode?: string;
             executionMode?: string;
@@ -152,6 +551,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     if (typeof parsed?.config?.maxThinkingTokens === 'number')
       state.config.maxThinkingTokens = parsed.config.maxThinkingTokens;
 
+    const jobStreaming = parsed?.capabilities?.['ent/jobStreaming'];
+    if (jobStreaming === 'full' || jobStreaming === 'coalesced' || jobStreaming === 'none') {
+      state.jobStreaming = jobStreaming;
+    }
+
     return {
       protocolVersion: '1.0',
       agentInfo: { name: 'lace-agent', version: '0.1.0' },
@@ -160,7 +564,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         multiTurn: true,
         tools: [shellExecTool],
         'ent/contextInjection': true,
-        'ent/backgroundJobs': false,
+        'ent/backgroundJobs': true,
         'ent/fileCheckpointing': false,
         'ent/structuredOutput': false,
         'ent/providers': { list: true, connections: true, models: true },
@@ -233,6 +637,101 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       await state.providerCatalog.loadCatalogs();
       state.providerCatalogLoaded = true;
     }
+  };
+
+  const deriveJobsForActiveSession = (): Array<{
+    jobId: string;
+    parentJobId?: string;
+    type: JobType;
+    status: JobStatus;
+    description?: string;
+    command?: string;
+    startTime: string;
+    exitCode?: number;
+  }> => {
+    if (!state.activeSession) return [];
+
+    const sessionDir = state.activeSession.dir;
+    const eventsPath = join(sessionDir, 'events.jsonl');
+    let raw = '';
+    try {
+      raw = readFileSync(eventsPath, 'utf8');
+    } catch {
+      return [];
+    }
+
+    const byId = new Map<
+      string,
+      {
+        jobId: string;
+        parentJobId?: string;
+        type: JobType;
+        status: JobStatus;
+        description?: string;
+        command?: string;
+        startTime: string;
+        exitCode?: number;
+      }
+    >();
+
+    const lines = raw.split('\n');
+    for (const line of lines) {
+      if (!line) continue;
+      try {
+        const parsed = JSON.parse(line) as { type?: string; timestamp?: string; data?: any };
+        if (parsed.type !== 'job_started' && parsed.type !== 'job_finished') continue;
+        const timestamp = typeof parsed.timestamp === 'string' ? parsed.timestamp : undefined;
+        const data = parsed.data ?? {};
+        const jobId = toNonEmptyString(data.jobId);
+        if (!jobId) continue;
+
+        if (parsed.type === 'job_started') {
+          const jobType = data.jobType === 'subagent' ? 'subagent' : 'shell';
+          const startTime = timestamp ?? new Date().toISOString();
+          byId.set(jobId, {
+            jobId,
+            parentJobId: toNonEmptyString(data.parentJobId) ?? undefined,
+            type: jobType,
+            status: 'running',
+            description: toNonEmptyString(data.description) ?? undefined,
+            command: toNonEmptyString(data.command) ?? undefined,
+            startTime,
+          });
+        } else {
+          const existing = byId.get(jobId);
+          const exitCode = typeof data.exitCode === 'number' ? data.exitCode : undefined;
+          const outcome =
+            data.outcome === 'completed' ||
+            data.outcome === 'failed' ||
+            data.outcome === 'cancelled'
+              ? data.outcome
+              : undefined;
+
+          if (existing) {
+            existing.status = outcome ?? existing.status;
+            existing.exitCode = exitCode;
+          } else {
+            byId.set(jobId, {
+              jobId,
+              type: 'shell',
+              status: outcome ?? 'failed',
+              startTime: timestamp ?? new Date().toISOString(),
+              exitCode,
+            });
+          }
+        }
+      } catch {
+        // Ignore malformed lines.
+      }
+    }
+
+    for (const job of byId.values()) {
+      if (job.status === 'running' && !state.jobs.has(job.jobId)) {
+        job.status = 'failed';
+      }
+    }
+
+    return Array.from(byId.values());
   };
 
   peer.onRequest('ent/providers/list', async (_params: unknown) => {
@@ -516,6 +1015,162 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const models = provider.models.map((m) => mapCatalogModelToModelInfo(m, providerId));
     return { providerId, connectionId, models };
+  });
+
+  peer.onRequest('ent/job/list', async (_params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+
+    const jobs = deriveJobsForActiveSession().map((j) => ({
+      jobId: j.jobId,
+      parentJobId: j.parentJobId,
+      type: j.type,
+      status: j.status,
+      description: j.description,
+      command: j.command,
+      startTime: j.startTime,
+    }));
+
+    return { jobs };
+  });
+
+  peer.onRequest('ent/job/output', async (params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+
+    const parsed = params as {
+      jobId: string;
+      block?: boolean;
+      timeout?: number;
+      tailBytes?: number;
+      afterOffset?: number;
+    };
+
+    const jobId = toNonEmptyString(parsed?.jobId);
+    if (!jobId) throw new Error('jobId is required');
+
+    const block = !!parsed.block;
+    const timeout = typeof parsed.timeout === 'number' && parsed.timeout > 0 ? parsed.timeout : 0;
+
+    const runningJob = state.jobs.get(jobId);
+    if (block && runningJob?.status === 'running') {
+      await Promise.race([
+        runningJob.completion,
+        timeout > 0
+          ? new Promise<void>((resolve) => setTimeout(resolve, timeout))
+          : new Promise<void>(() => {}),
+      ]);
+    }
+
+    const jobs = deriveJobsForActiveSession();
+    const record = jobs.find((j) => j.jobId === jobId);
+    if (!record) throw { code: 1, message: 'JobNotFound' };
+
+    const sessionDir = state.activeSession.dir;
+    const outputPath = getJobOutputPath(sessionDir, jobId);
+
+    let totalBytes = 0;
+    try {
+      totalBytes = statSync(outputPath).size;
+    } catch {
+      totalBytes = 0;
+    }
+
+    const afterOffset =
+      typeof parsed.afterOffset === 'number' && parsed.afterOffset >= 0 ? parsed.afterOffset : 0;
+    const tailBytes =
+      typeof parsed.tailBytes === 'number' && parsed.tailBytes > 0 ? parsed.tailBytes : 0;
+
+    const clampedAfter = Math.min(afterOffset, totalBytes);
+    const startOffset =
+      tailBytes > 0 ? Math.max(clampedAfter, totalBytes - tailBytes) : clampedAfter;
+    const bytesToRead = Math.max(0, totalBytes - startOffset);
+
+    let output = '';
+    if (bytesToRead > 0) {
+      const fd = openSync(outputPath, 'r');
+      try {
+        const buf = Buffer.allocUnsafe(bytesToRead);
+        const read = readSync(fd, buf, 0, bytesToRead, startOffset);
+        output = buf.subarray(0, read).toString('utf8');
+      } finally {
+        closeSync(fd);
+      }
+    }
+
+    return {
+      status: record.status,
+      output,
+      ...(record.exitCode !== undefined ? { exitCode: record.exitCode } : {}),
+      outputMeta: {
+        totalBytes,
+        returnedOffset: startOffset,
+        returnedBytes: Buffer.byteLength(output, 'utf8'),
+        truncated: startOffset > 0,
+      },
+      report: {
+        summary:
+          record.status === 'completed'
+            ? 'Job completed'
+            : record.status === 'cancelled'
+              ? 'Job cancelled'
+              : record.status === 'running'
+                ? 'Job running'
+                : 'Job failed',
+        ...(record.status === 'failed' ? { error: 'Job failed' } : {}),
+      },
+    };
+  });
+
+  peer.onRequest('ent/job/kill', async (params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+
+    const parsed = params as { jobId: string };
+    const jobId = toNonEmptyString(parsed?.jobId);
+    if (!jobId) throw new Error('jobId is required');
+
+    const job = state.jobs.get(jobId);
+    if (!job || job.status !== 'running') return { success: false };
+
+    job.status = 'cancelled';
+
+    if (job.proc) {
+      job.proc.kill('SIGTERM');
+      return { success: true };
+    }
+
+    // Job is awaiting permission or otherwise not yet started; finalize immediately.
+    if (!job.finished) {
+      job.finished = true;
+
+      await runExclusive(() => {
+        let sessionState = readSessionState(state.activeSession!.dir);
+        const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+          type: 'job_finished',
+          data: { jobId: job.jobId, parentJobId: job.parentJobId, outcome: job.status },
+        });
+        sessionState = nextState;
+        writeSessionState(state.activeSession!.dir, sessionState);
+        state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+      });
+
+      await emitSessionUpdate({
+        type: 'job_finished',
+        jobId: job.jobId,
+        parentJobId: job.parentJobId,
+        outcome: job.status,
+      });
+
+      job.resolveCompletion();
+    }
+
+    return { success: true };
+  });
+
+  peer.onRequest('ent/job/inject', async (_params: unknown) => {
+    // This is a notification in the protocol, but support it as a no-op request for resilience.
+    return undefined;
   });
 
   peer.onRequest('session/new', async (params: unknown) => {
@@ -802,6 +1457,52 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const runMatch = promptText.match(/^\s*run:\s*(.+)\s*$/m);
     const command = runMatch?.[1]?.trim();
 
+    const jobMatch = promptText.match(/^\s*job:\s*(.+)\s*$/m);
+    const jobCommand = jobMatch?.[1]?.trim();
+    let deferredJob: JobState | null = null;
+
+    if (jobCommand && effectiveConfig.executionMode === 'execute') {
+      const jobId = `job_${randomUUID()}`;
+      const startedAt = new Date().toISOString();
+      const outputPath = getJobOutputPath(state.activeSession.dir, jobId);
+
+      let resolveCompletion!: () => void;
+      const completion = new Promise<void>((resolve) => {
+        resolveCompletion = resolve;
+      });
+
+      const job: JobState = {
+        jobId,
+        type: 'shell',
+        status: 'running',
+        description: 'Background shell job',
+        command: jobCommand,
+        startedAt,
+        originTurnId: turnId,
+        originTurnSeq: 1,
+        outputPath,
+        finished: false,
+        completion,
+        resolveCompletion,
+      };
+
+      state.jobs.set(jobId, job);
+
+      writeAndAdvance({
+        type: 'job_started',
+        data: { jobId, jobType: 'shell', description: job.description, command: jobCommand },
+      });
+
+      emitUpdate(1, {
+        type: 'job_started',
+        jobId,
+        jobType: 'shell',
+        description: job.description,
+      });
+
+      deferredJob = job;
+    }
+
     if (command && effectiveConfig.executionMode === 'execute') {
       const toolCallId = `tool_${randomUUID()}`;
       const toolInput = { command } as Record<string, unknown>;
@@ -1079,6 +1780,10 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     writeSessionState(state.activeSession.dir, sessionState);
     state.activeSession = loadSession(state.activeSession.meta.sessionId);
     state.activeTurn = null;
+
+    if (deferredJob) {
+      runShellJobProcess(deferredJob);
+    }
 
     return {
       turnId,

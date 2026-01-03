@@ -31,7 +31,7 @@ export type ToolResult = {
   meta?: Record<string, unknown>;
 };
 
-export type SessionUpdate =
+export type SessionUpdateInner =
   | { type: 'text_delta'; text: string }
   | {
       type: 'context_injected';
@@ -54,6 +54,31 @@ export type SessionUpdate =
         | 'timeout'
         | 'cancelled';
       result?: ToolResult;
+    };
+
+export type SessionUpdate =
+  | SessionUpdateInner
+  | {
+      type: 'job_started';
+      jobId: string;
+      parentJobId?: string;
+      jobType: 'shell' | 'subagent';
+      description?: string;
+    }
+  | {
+      type: 'job_finished';
+      jobId: string;
+      parentJobId?: string;
+      exitCode?: number;
+      outcome: 'completed' | 'failed' | 'cancelled';
+    }
+  | {
+      type: 'job_update';
+      jobId: string;
+      parentJobId?: string;
+      jobType?: 'shell' | 'subagent';
+      channel?: 'stdout' | 'stderr' | 'internal';
+      update: SessionUpdateInner;
     };
 
 export type PermissionRequest = {
