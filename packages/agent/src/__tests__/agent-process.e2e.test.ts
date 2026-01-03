@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
@@ -33,7 +33,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     'initializes, creates a session, streams updates, and persists durable events',
     { timeout: 15_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir });
+      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
       const updates: unknown[] = [];
       agent.peer.onRequest('session/update', async (params) => {
@@ -53,11 +53,13 @@ describe('lace-agent process (E2E over stdio)', () => {
         'session/new'
       )) as { sessionId: string };
 
+      writeFileSync(join(workDir, 'hello.txt'), 'hi from disk\n', 'utf8');
+
       const promptResult = (await withTimeout(
         agent.peer.request('session/prompt', {
-          content: [{ type: 'text', text: 'hi' }],
+          content: [{ type: 'text', text: 'read file hello.txt' }],
         }),
-        2_000,
+        10_000,
         'session/prompt'
       )) as { turnId: string };
 
@@ -67,7 +69,10 @@ describe('lace-agent process (E2E over stdio)', () => {
             const match = updates.find((u) => {
               const p = u as Record<string, unknown>;
               return (
-                p?.type === 'text_delta' && p?.text === 'hello' && p?.turnId === promptResult.turnId
+                p?.type === 'tool_use' &&
+                p?.name === 'file_read' &&
+                p?.status === 'completed' &&
+                p?.turnId === promptResult.turnId
               );
             });
             if (match) {
@@ -76,8 +81,8 @@ describe('lace-agent process (E2E over stdio)', () => {
             }
           }, 10);
         }),
-        2_000,
-        'session/update stream'
+        5_000,
+        'session/update tool_use stream'
       );
 
       const durable = (await withTimeout(
@@ -91,9 +96,11 @@ describe('lace-agent process (E2E over stdio)', () => {
         'prompt',
         'turn_start',
         'message',
+        'tool_use',
+        'message',
         'turn_end',
       ]);
-      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4]);
+      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6]);
 
       const list = (await withTimeout(
         agent.peer.request('session/list', { workDir }),
@@ -106,7 +113,7 @@ describe('lace-agent process (E2E over stdio)', () => {
   );
 
   it('keeps JSONL session history across agent restarts', { timeout: 15_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir });
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
     await withTimeout(
       agent.peer.request('initialize', { protocolVersion: '1.0' }),
       2_000,
@@ -119,16 +126,20 @@ describe('lace-agent process (E2E over stdio)', () => {
       'session/new'
     )) as { sessionId: string };
 
+    writeFileSync(join(workDir, 'hello.txt'), 'hi from disk\n', 'utf8');
+
     await withTimeout(
-      agent.peer.request('session/prompt', { content: [{ type: 'text', text: 'hi' }] }),
-      2_000,
+      agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'read file hello.txt' }],
+      }),
+      10_000,
       'session/prompt'
     );
 
     await agent.shutdown();
     agent = undefined;
 
-    agent = spawnAgentProcess({ laceDir });
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
     await withTimeout(
       agent.peer.request('initialize', { protocolVersion: '1.0' }),
       2_000,
@@ -151,9 +162,11 @@ describe('lace-agent process (E2E over stdio)', () => {
       'prompt',
       'turn_start',
       'message',
+      'tool_use',
+      'message',
       'turn_end',
     ]);
-    expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4]);
+    expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   it(
@@ -238,6 +251,76 @@ describe('lace-agent process (E2E over stdio)', () => {
       ]);
 
       expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5]);
+    }
+  );
+
+  it(
+    'requests permission before running file_write and exposes pending permissions via ent/agent/status',
+    { timeout: 20_000 },
+    async () => {
+      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+
+      let permissionParams: Record<string, unknown> | undefined;
+      let resolvePermission:
+        | ((value: { decision: string; updatedInput?: Record<string, unknown> }) => void)
+        | undefined;
+
+      agent.peer.onRequest('session/request_permission', async (params) => {
+        permissionParams = params as Record<string, unknown>;
+        return await new Promise((resolve) => {
+          resolvePermission = resolve as any;
+        });
+      });
+
+      await withTimeout(
+        agent.peer.request('initialize', {
+          protocolVersion: '1.0',
+          config: { approvalMode: 'ask' },
+        }),
+        2_000,
+        'initialize'
+      );
+
+      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+      const promptPromise = agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'write file out.txt' }],
+      });
+
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          const interval = setInterval(() => {
+            if (permissionParams) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 10);
+        }),
+        5_000,
+        'permission request'
+      );
+
+      expect(permissionParams).toMatchObject({
+        tool: 'file_write',
+        sessionId: expect.any(String),
+        turnId: expect.any(String),
+        toolCallId: expect.any(String),
+      });
+
+      const status = (await withTimeout(
+        agent.peer.request('ent/agent/status', {}),
+        2_000,
+        'ent/agent/status'
+      )) as { pendingPermissions: Array<{ tool: string }> };
+
+      expect(status.pendingPermissions.find((p) => p.tool === 'file_write')).toBeTruthy();
+
+      resolvePermission?.({ decision: 'allow' });
+
+      await withTimeout(promptPromise, 10_000, 'session/prompt (write)');
+
+      expect(existsSync(join(workDir, 'out.txt'))).toBe(true);
+      expect(readFileSync(join(workDir, 'out.txt'), 'utf8')).toContain('written by test provider');
     }
   );
 

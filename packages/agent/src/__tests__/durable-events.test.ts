@@ -38,32 +38,41 @@ describe('durable events', () => {
   });
 
   it('writes and replays durable events for a prompt', async () => {
+    const originalTestProvider = process.env.LACE_AGENT_TEST_PROVIDER;
+    process.env.LACE_AGENT_TEST_PROVIDER = '1';
+
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
-    await client.request('initialize', { protocolVersion: '1.0' });
-    const created = await client.request('session/new', { workDir: process.cwd() });
+    try {
+      await client.request('initialize', { protocolVersion: '1.0' });
+      const created = await client.request('session/new', { workDir: process.cwd() });
 
-    const promptResult = await client.request('session/prompt', {
-      content: [{ type: 'text', text: 'hi' }],
-    });
-    expect(promptResult).toMatchObject({ turnId: expect.any(String), stopReason: 'end_turn' });
+      const promptResult = await client.request('session/prompt', {
+        content: [{ type: 'text', text: 'hi' }],
+      });
+      expect(promptResult).toMatchObject({ turnId: expect.any(String), stopReason: 'end_turn' });
 
-    const eventsResult = await client.request('ent/session/events', { limit: 50 });
-    expect(eventsResult).toMatchObject({
-      events: expect.any(Array),
-      hasMore: expect.any(Boolean),
-    });
+      const eventsResult = await client.request('ent/session/events', { limit: 50 });
+      expect(eventsResult).toMatchObject({
+        events: expect.any(Array),
+        hasMore: expect.any(Boolean),
+      });
 
-    const types = (eventsResult as any).events.map((e: any) => e.type);
-    expect(types).toEqual(['prompt', 'turn_start', 'message', 'turn_end']);
-    expect((eventsResult as any).events[0]).toMatchObject({
-      eventSeq: 1,
-      turnId: promptResult.turnId,
-    });
+      const types = (eventsResult as any).events.map((e: any) => e.type);
+      expect(types).toEqual(['prompt', 'turn_start', 'message', 'turn_end']);
+      expect((eventsResult as any).events[0]).toMatchObject({
+        eventSeq: 1,
+        turnId: promptResult.turnId,
+      });
 
-    client.close();
-    server.close();
-    expect(created).toBeTruthy();
+      expect(created).toBeTruthy();
+    } finally {
+      if (originalTestProvider === undefined) delete process.env.LACE_AGENT_TEST_PROVIDER;
+      else process.env.LACE_AGENT_TEST_PROVIDER = originalTestProvider;
+
+      client.close();
+      server.close();
+    }
   });
 });

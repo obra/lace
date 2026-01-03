@@ -9,7 +9,10 @@ export type SpawnedAgent = {
   stderr: () => string;
 };
 
-export function spawnAgentProcess(options: { laceDir: string }): SpawnedAgent {
+export function spawnAgentProcess(options: {
+  laceDir: string;
+  env?: Record<string, string>;
+}): SpawnedAgent {
   const agentMainPath = fileURLToPath(new URL('../../../dist/main.js', import.meta.url));
   const agentCwd = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -17,7 +20,7 @@ export function spawnAgentProcess(options: { laceDir: string }): SpawnedAgent {
 
   const proc = spawn(process.execPath, [agentMainPath], {
     cwd: agentCwd,
-    env: { ...process.env, LACE_DIR: options.laceDir },
+    env: { ...process.env, LACE_DIR: options.laceDir, ...(options.env || {}) },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 

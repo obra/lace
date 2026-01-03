@@ -33,7 +33,7 @@ describe('lace-agent subagents (E2E over stdio)', () => {
     'spawns a subagent job and exposes its output via ent/job/output',
     { timeout: 20_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir });
+      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
       const updates: Array<Record<string, unknown>> = [];
       let subagentJobId: string | undefined;
@@ -89,12 +89,12 @@ describe('lace-agent subagents (E2E over stdio)', () => {
       )) as { status: string; output: string };
 
       expect(output.status).toBe('completed');
-      expect(output.output).toContain('hello');
+      expect(output.output).toContain('No tool result found');
     }
   );
 
   it('forwards subagent permission requests with jobId', { timeout: 20_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir });
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
     let subagentJobId: string | undefined;
     let permissionParams: Record<string, unknown> | undefined;

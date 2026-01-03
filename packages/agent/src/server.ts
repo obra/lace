@@ -10,7 +10,7 @@ import {
   readSync,
   closeSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import {
   ensureSessionFiles,
@@ -24,11 +24,20 @@ import {
   type SessionState,
 } from './storage/session-store';
 import { appendDurableEvent, readDurableEvents } from './storage/event-log';
-import type { PermissionRequest, SessionUpdate, ToolResult } from './protocol/types';
+import type { PermissionRequest, SessionUpdate, ToolInfo, ToolResult } from './protocol/types';
 import { shellExecTool, runShellExec } from './tools/shell-exec';
 import { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
 import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
 import type { CatalogModel } from '@lace/core/providers/catalog/types';
+import { ProviderRegistry } from '@lace/core/providers/registry';
+import type { AIProvider, ProviderMessage } from '@lace/core/providers/base-provider';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import type { Tool as CoreTool } from '@lace/core/tools/tool';
+import type {
+  ToolCall as CoreToolCall,
+  ToolResult as CoreToolResult,
+} from '@lace/core/tools/types';
+import { TestAgentProvider } from './runtime/test-provider';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
 const JOB_LOG_DIR = 'jobs';
@@ -117,6 +126,262 @@ function ensureJobLogDir(sessionDir: string): string {
 
 function getJobOutputPath(sessionDir: string, jobId: string): string {
   return join(ensureJobLogDir(sessionDir), `${jobId}.log`);
+}
+
+function extractTextFromContentBlocks(content: unknown[]): string {
+  if (!Array.isArray(content)) return '';
+  return content
+    .filter(
+      (b) =>
+        b &&
+        typeof b === 'object' &&
+        (b as any).type === 'text' &&
+        typeof (b as any).text === 'string'
+    )
+    .map((b) => String((b as any).text))
+    .join('\n');
+}
+
+function toolKindFromName(name: string): ToolInfo['kind'] {
+  if (name === 'file_read') return 'read';
+  if (name === 'file_find') return 'search';
+  if (name === 'ripgrep_search') return 'search';
+  if (name === 'url_fetch') return 'fetch';
+  if (name === 'bash') return 'execute';
+  if (name === 'file_write') return 'edit';
+  if (name === 'file_edit') return 'edit';
+  return 'other';
+}
+
+function protocolToolInfoForCoreTool(tool: CoreTool): ToolInfo {
+  const kind = toolKindFromName(tool.name);
+  return {
+    name: tool.name,
+    description: tool.description,
+    kind,
+    inputSchema: tool.inputSchema as any,
+    requiresPermission: kind !== 'read' && kind !== 'search',
+  };
+}
+
+function protocolToolResultFromCore(result: CoreToolResult): ToolResult {
+  const outcome: ToolResult['outcome'] =
+    result.status === 'completed'
+      ? 'completed'
+      : result.status === 'denied'
+        ? 'denied'
+        : result.status === 'aborted'
+          ? 'cancelled'
+          : 'failed';
+
+  const content: ToolResult['content'] = (result.content || []).map((c) => {
+    if (c.type === 'text') return { type: 'text', text: c.text ?? '' };
+    if (c.type === 'image')
+      return { type: 'image', data: c.data ?? '', mediaType: 'application/octet-stream' };
+    if (c.type === 'resource') return { type: 'text', text: c.uri ?? '' };
+    return { type: 'text', text: '' };
+  });
+
+  return { outcome, content, ...(result.metadata ? { meta: result.metadata as any } : {}) };
+}
+
+function coreToolResultFromProtocol(result: ToolResult, toolCallId: string): CoreToolResult {
+  const status: CoreToolResult['status'] =
+    result.outcome === 'completed'
+      ? 'completed'
+      : result.outcome === 'denied'
+        ? 'denied'
+        : result.outcome === 'cancelled'
+          ? 'aborted'
+          : 'failed';
+
+  const content: CoreToolResult['content'] = result.content.map((c) => {
+    if (c.type === 'text') return { type: 'text', text: c.text };
+    if (c.type === 'json') return { type: 'text', text: JSON.stringify(c.data, null, 2) };
+    if (c.type === 'image') return { type: 'image', data: c.data };
+    if (c.type === 'error') return { type: 'text', text: c.message };
+    return { type: 'text', text: '' };
+  });
+
+  return {
+    id: toolCallId,
+    content,
+    status,
+    ...(result.meta ? { metadata: result.meta } : {}),
+  };
+}
+
+function shouldAskPermission(
+  approvalMode: AgentServerState['config']['approvalMode'],
+  toolKind: ReturnType<typeof toolKindFromName>
+): boolean {
+  if (approvalMode === 'dangerouslySkipPermissions' || approvalMode === 'approve') return false;
+  if (approvalMode === 'deny') return false;
+
+  if (approvalMode === 'approveReads') {
+    return toolKind !== 'read' && toolKind !== 'search';
+  }
+
+  if (approvalMode === 'approveEdits') {
+    return toolKind !== 'read' && toolKind !== 'search' && toolKind !== 'edit';
+  }
+
+  // ask
+  return toolKind !== 'read' && toolKind !== 'search';
+}
+
+function isTestProviderEnabled(): boolean {
+  return process.env.LACE_AGENT_TEST_PROVIDER === '1';
+}
+
+async function createProviderForTurn(options: {
+  connectionId?: string;
+  modelId?: string;
+}): Promise<AIProvider> {
+  if (isTestProviderEnabled()) {
+    return new TestAgentProvider();
+  }
+
+  const connectionId = toNonEmptyString(options.connectionId);
+  const modelId = toNonEmptyString(options.modelId);
+  if (!connectionId || !modelId) {
+    throw new Error('Missing provider configuration: connectionId and modelId are required');
+  }
+
+  const registry = ProviderRegistry.getInstance();
+  return await registry.createProviderFromInstanceAndModel(connectionId, modelId);
+}
+
+function createToolExecutorForMode(executionMode: 'plan' | 'execute'): {
+  executor: ToolExecutor;
+  toolsForProvider: CoreTool[];
+} {
+  const executor = new ToolExecutor();
+  executor.registerAllAvailableTools();
+
+  const allTools = executor.getAllTools();
+  const toolsForProvider =
+    executionMode === 'plan'
+      ? allTools.filter((t) => {
+          const kind = toolKindFromName(t.name);
+          return kind === 'read' || kind === 'search';
+        })
+      : allTools;
+
+  return { executor, toolsForProvider };
+}
+
+function buildProviderMessagesFromDurableEvents(sessionDir: string): ProviderMessage[] {
+  const eventsPath = join(sessionDir, 'events.jsonl');
+  let raw = '';
+  try {
+    raw = readFileSync(eventsPath, 'utf8');
+  } catch {
+    return [];
+  }
+
+  const messages: ProviderMessage[] = [];
+  const lines = raw.split('\n');
+
+  for (const line of lines) {
+    if (!line) continue;
+    try {
+      const parsed = JSON.parse(line) as { type?: string; data?: Record<string, unknown> };
+      const type = typeof parsed.type === 'string' ? parsed.type : '';
+      const data = typeof parsed.data === 'object' && parsed.data ? parsed.data : {};
+
+      if (type === 'prompt') {
+        const content = extractTextFromContentBlocks((data as any).content);
+        if (content.trim()) messages.push({ role: 'user', content });
+        continue;
+      }
+
+      if (type === 'context_injected') {
+        const content = extractTextFromContentBlocks((data as any).content);
+        if (content.trim()) messages.push({ role: 'system', content });
+        continue;
+      }
+
+      if (type === 'message') {
+        const content =
+          typeof (data as any).content === 'string'
+            ? (data as any).content
+            : extractTextFromContentBlocks((data as any).content);
+        messages.push({ role: 'assistant', content: content ?? '' });
+        continue;
+      }
+
+      if (type === 'tool_use') {
+        const toolCallId = toNonEmptyString((data as any).toolCallId);
+        const name = toNonEmptyString((data as any).name);
+        const input = (data as any).input;
+        const result = (data as any).result as ToolResult | undefined;
+        if (!toolCallId || !name) continue;
+
+        const toolCall: CoreToolCall = {
+          id: toolCallId,
+          name,
+          arguments: typeof input === 'object' && input ? (input as any) : {},
+        };
+
+        if (messages.length === 0 || messages[messages.length - 1]!.role !== 'assistant') {
+          messages.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
+        } else {
+          const last = messages[messages.length - 1]!;
+          last.toolCalls = [...(last.toolCalls || []), toolCall];
+        }
+
+        if (result) {
+          const coreResult = coreToolResultFromProtocol(result, toolCallId);
+          const last = messages[messages.length - 1];
+          const canAppendToUser =
+            last && last.role === 'user' && last.toolResults && last.toolResults.length > 0;
+          if (canAppendToUser) {
+            last.toolResults!.push(coreResult);
+          } else {
+            messages.push({ role: 'user', content: '', toolResults: [coreResult] });
+          }
+        }
+
+        continue;
+      }
+    } catch {
+      // Ignore malformed lines.
+    }
+  }
+
+  return messages;
+}
+
+function deriveFilesReadFromDurableEvents(sessionDir: string, workDir: string): Set<string> {
+  const eventsPath = join(sessionDir, 'events.jsonl');
+  let raw = '';
+  try {
+    raw = readFileSync(eventsPath, 'utf8');
+  } catch {
+    return new Set();
+  }
+
+  const read = new Set<string>();
+  for (const line of raw.split('\n')) {
+    if (!line) continue;
+    try {
+      const parsed = JSON.parse(line) as { type?: string; data?: any };
+      if (parsed.type !== 'tool_use') continue;
+      const data = parsed.data ?? {};
+      if (data.name !== 'file_read') continue;
+      const result = data.result as ToolResult | undefined;
+      if (!result || result.outcome !== 'completed') continue;
+      const input = data.input ?? {};
+      const p = toNonEmptyString(input.path);
+      if (!p) continue;
+      const absolute = isAbsolutePath(p) ? p : resolvePath(workDir, p);
+      read.add(absolute);
+    } catch {
+      // ignore malformed lines
+    }
+  }
+  return read;
 }
 
 export type AgentServerState = {
@@ -759,13 +1024,22 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       state.jobStreaming = jobStreaming;
     }
 
+    const { toolsForProvider } = createToolExecutorForMode('execute');
+    const toolInfos: ToolInfo[] = [];
+    const seenToolNames = new Set<string>();
+    for (const info of [shellExecTool, ...toolsForProvider.map(protocolToolInfoForCoreTool)]) {
+      if (seenToolNames.has(info.name)) continue;
+      seenToolNames.add(info.name);
+      toolInfos.push(info);
+    }
+
     return {
       protocolVersion: '1.0',
       agentInfo: { name: 'lace-agent', version: '0.1.0' },
       capabilities: {
         streaming: true,
         multiTurn: true,
-        tools: [shellExecTool],
+        tools: toolInfos,
         'ent/contextInjection': true,
         'ent/backgroundJobs': true,
         'ent/fileCheckpointing': false,
@@ -1632,8 +1906,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       sessionState = { ...sessionState, nextStreamSeq: sessionState.nextStreamSeq + 1 };
     };
 
-    emitUpdate(0, { type: 'text_delta', text: 'hello' });
-
     if (abortController.signal.aborted) {
       writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
 
@@ -1662,6 +1934,416 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const subagentMatch = promptText.match(/^\s*subagent:\s*(.+)\s*$/m);
     const subagentText = subagentMatch?.[1]?.trim();
+
+    if (!command && !jobCommand && !subagentText) {
+      const maxTurns =
+        typeof (params as any)?.maxTurns === 'number' && Number.isFinite((params as any).maxTurns)
+          ? Math.max(1, Math.trunc((params as any).maxTurns))
+          : 10;
+
+      const workDir = state.activeSession.meta.workDir;
+      const filesRead = deriveFilesReadFromDurableEvents(state.activeSession.dir, workDir);
+
+      const { executor: toolExecutor, toolsForProvider } = createToolExecutorForMode(
+        effectiveConfig.executionMode
+      );
+
+      const provider = await createProviderForTurn({
+        connectionId: effectiveConfig.connectionId,
+        modelId: effectiveConfig.modelId,
+      });
+
+      let providerMessages = buildProviderMessagesFromDurableEvents(state.activeSession.dir);
+      let finalAssistantContent = '';
+      let stopReason: 'end_turn' | 'max_tokens' | 'max_turns' | 'cancelled' | 'budget_exceeded' =
+        'end_turn';
+
+      let streamTurnSeq = 0;
+
+      let completedTurns = 0;
+
+      try {
+        for (; completedTurns < maxTurns; completedTurns++) {
+          const messageTurnSeq = streamTurnSeq++;
+          let streamedAny = false;
+
+          const onToken = (payload: { token?: string }) => {
+            if (abortController.signal.aborted) return;
+            if (!payload?.token) return;
+            streamedAny = true;
+            emitUpdate(messageTurnSeq, { type: 'text_delta', text: payload.token });
+          };
+
+          provider.on('token', onToken);
+          const response = await provider.createStreamingResponse(
+            providerMessages,
+            toolsForProvider,
+            effectiveConfig.modelId || 'unknown-model',
+            abortController.signal
+          );
+          provider.off('token', onToken);
+
+          if (abortController.signal.aborted) {
+            stopReason = 'cancelled';
+            break;
+          }
+
+          const assistantText = typeof response.content === 'string' ? response.content : '';
+          finalAssistantContent = assistantText;
+
+          if (!streamedAny && assistantText.length > 0) {
+            emitUpdate(messageTurnSeq, { type: 'text_delta', text: assistantText });
+          }
+
+          writeAndAdvance({ type: 'message', data: { content: assistantText } });
+
+          const toolCalls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
+          if (toolCalls.length === 0) {
+            stopReason = response.stopReason === 'max_tokens' ? 'max_tokens' : 'end_turn';
+            break;
+          }
+
+          providerMessages = [
+            ...providerMessages,
+            {
+              role: 'assistant',
+              content: assistantText,
+              toolCalls: toolCalls.map((tc) => ({
+                id: tc.id,
+                name: tc.name,
+                arguments: tc.arguments,
+              })),
+            },
+          ];
+
+          let shouldContinue = true;
+
+          for (const toolCall of toolCalls) {
+            const toolCallId = toNonEmptyString(toolCall.id) ?? `tool_${randomUUID()}`;
+            const toolName = toNonEmptyString(toolCall.name) ?? '';
+            const toolInput =
+              typeof toolCall.arguments === 'object' && toolCall.arguments
+                ? (toolCall.arguments as Record<string, unknown>)
+                : {};
+
+            const toolTurnSeq = streamTurnSeq++;
+            const kind = toolKindFromName(toolName);
+
+            emitUpdate(toolTurnSeq, {
+              type: 'tool_use',
+              toolCallId,
+              name: toolName,
+              kind,
+              input: toolInput,
+              status: 'pending',
+            });
+
+            if (effectiveConfig.approvalMode === 'deny') {
+              const denied: ToolResult = {
+                outcome: 'denied',
+                content: [{ type: 'error', message: 'Denied by policy' }],
+              };
+
+              emitUpdate(toolTurnSeq, {
+                type: 'tool_use',
+                toolCallId,
+                name: toolName,
+                kind,
+                input: toolInput,
+                status: 'denied',
+                result: denied,
+              });
+
+              writeAndAdvance({
+                type: 'tool_use',
+                data: { toolCallId, name: toolName, kind, input: toolInput, result: denied },
+              });
+
+              shouldContinue = false;
+              continue;
+            }
+
+            if (effectiveConfig.executionMode === 'plan' && kind !== 'read' && kind !== 'search') {
+              const denied: ToolResult = {
+                outcome: 'denied',
+                content: [{ type: 'error', message: 'Tool denied in plan mode' }],
+              };
+
+              emitUpdate(toolTurnSeq, {
+                type: 'tool_use',
+                toolCallId,
+                name: toolName,
+                kind,
+                input: toolInput,
+                status: 'denied',
+                result: denied,
+              });
+
+              writeAndAdvance({
+                type: 'tool_use',
+                data: { toolCallId, name: toolName, kind, input: toolInput, result: denied },
+              });
+
+              shouldContinue = false;
+              continue;
+            }
+
+            const tool = toolExecutor.getTool(toolName);
+            if (!tool) {
+              const failed: ToolResult = {
+                outcome: 'failed',
+                content: [{ type: 'error', message: `Tool not found: ${toolName}` }],
+              };
+
+              emitUpdate(toolTurnSeq, {
+                type: 'tool_use',
+                toolCallId,
+                name: toolName,
+                kind,
+                input: toolInput,
+                status: 'failed',
+                result: failed,
+              });
+
+              writeAndAdvance({
+                type: 'tool_use',
+                data: { toolCallId, name: toolName, kind, input: toolInput, result: failed },
+              });
+
+              shouldContinue = false;
+              continue;
+            }
+
+            let finalInput = toolInput;
+
+            const needsPermission = shouldAskPermission(effectiveConfig.approvalMode, kind);
+            if (needsPermission) {
+              state.activeTurn = {
+                turnId,
+                startedAt,
+                status: 'awaiting_permission',
+                abortController,
+              };
+
+              const options = [
+                { optionId: 'allow', label: 'Allow' },
+                { optionId: 'deny', label: 'Deny' },
+              ];
+
+              emitUpdate(toolTurnSeq, {
+                type: 'tool_use',
+                toolCallId,
+                name: toolName,
+                kind,
+                input: toolInput,
+                status: 'awaiting_permission',
+              });
+
+              type PendingPermission = NonNullable<SessionState['pendingPermissions']>[number];
+              const pending: PendingPermission = {
+                toolCallId,
+                requestId: `perm_${toolCallId}`,
+                turnId,
+                turnSeq: toolTurnSeq,
+                tool: toolName,
+                kind,
+                resource: toolName,
+                options,
+                requestedAt: new Date().toISOString(),
+                input: toolInput,
+              };
+
+              sessionState.pendingPermissions = [
+                ...(sessionState.pendingPermissions || []),
+                pending,
+              ];
+              writeSessionState(state.activeSession.dir, sessionState);
+              state.activeSession = { ...state.activeSession, state: sessionState };
+
+              const { result } = peer.requestWithId('session/request_permission', {
+                sessionId: state.activeSession.meta.sessionId,
+                turnId,
+                turnSeq: toolTurnSeq,
+                toolCallId,
+                tool: toolName,
+                kind,
+                resource: toolName,
+                options,
+              });
+
+              const abortPromise = new Promise<never>((_, reject) => {
+                abortController.signal.addEventListener(
+                  'abort',
+                  () => reject(new Error('cancelled')),
+                  {
+                    once: true,
+                  }
+                );
+              });
+
+              let permissionResponse: any;
+              try {
+                permissionResponse = await Promise.race([result, abortPromise]);
+              } catch {
+                sessionState.pendingPermissions = (sessionState.pendingPermissions || []).filter(
+                  (p) => p.toolCallId !== toolCallId
+                );
+                writeSessionState(state.activeSession.dir, sessionState);
+                state.activeSession = { ...state.activeSession, state: sessionState };
+
+                const cancelled: ToolResult = {
+                  outcome: 'cancelled',
+                  content: [{ type: 'error', message: 'Cancelled' }],
+                };
+
+                emitUpdate(toolTurnSeq, {
+                  type: 'tool_use',
+                  toolCallId,
+                  name: toolName,
+                  kind,
+                  input: toolInput,
+                  status: 'cancelled',
+                  result: cancelled,
+                });
+
+                writeAndAdvance({
+                  type: 'tool_use',
+                  data: { toolCallId, name: toolName, kind, input: toolInput, result: cancelled },
+                });
+
+                shouldContinue = false;
+                continue;
+              }
+
+              sessionState.pendingPermissions = (sessionState.pendingPermissions || []).filter(
+                (p) => p.toolCallId !== toolCallId
+              );
+              writeSessionState(state.activeSession.dir, sessionState);
+              state.activeSession = { ...state.activeSession, state: sessionState };
+
+              const decision = toNonEmptyString(permissionResponse?.decision);
+              if (
+                permissionResponse?.updatedInput &&
+                typeof permissionResponse.updatedInput === 'object'
+              ) {
+                finalInput = permissionResponse.updatedInput as Record<string, unknown>;
+              }
+
+              if (decision === 'deny') {
+                const denied: ToolResult = {
+                  outcome: 'denied',
+                  content: [{ type: 'error', message: 'Denied by user' }],
+                };
+
+                emitUpdate(toolTurnSeq, {
+                  type: 'tool_use',
+                  toolCallId,
+                  name: toolName,
+                  kind,
+                  input: toolInput,
+                  status: 'denied',
+                  result: denied,
+                });
+
+                writeAndAdvance({
+                  type: 'tool_use',
+                  data: { toolCallId, name: toolName, kind, input: toolInput, result: denied },
+                });
+
+                shouldContinue = false;
+                continue;
+              }
+            }
+
+            emitUpdate(toolTurnSeq, {
+              type: 'tool_use',
+              toolCallId,
+              name: toolName,
+              kind,
+              input: finalInput,
+              status: 'running',
+            });
+
+            const coreResult = await toolExecutor.execute(
+              { id: toolCallId, name: toolName, arguments: finalInput },
+              {
+                signal: abortController.signal,
+                workingDirectory: workDir,
+                toolTempRoot: join(state.activeSession.dir, 'tool-temp'),
+                hasFileBeenRead: (p) =>
+                  filesRead.has(isAbsolutePath(p) ? p : resolvePath(workDir, p)),
+              }
+            );
+
+            if (toolName === 'file_read' && coreResult.status === 'completed') {
+              const p = toNonEmptyString(finalInput.path);
+              if (p) filesRead.add(isAbsolutePath(p) ? p : resolvePath(workDir, p));
+            }
+
+            const protocolResult = protocolToolResultFromCore(coreResult);
+            const terminalStatus =
+              protocolResult.outcome === 'completed'
+                ? 'completed'
+                : protocolResult.outcome === 'denied'
+                  ? 'denied'
+                  : protocolResult.outcome === 'cancelled'
+                    ? 'cancelled'
+                    : 'failed';
+
+            emitUpdate(toolTurnSeq, {
+              type: 'tool_use',
+              toolCallId,
+              name: toolName,
+              kind,
+              input: finalInput,
+              status: terminalStatus,
+              result: protocolResult,
+            });
+
+            writeAndAdvance({
+              type: 'tool_use',
+              data: { toolCallId, name: toolName, kind, input: finalInput, result: protocolResult },
+            });
+
+            providerMessages = [
+              ...providerMessages,
+              { role: 'user', content: '', toolResults: [coreResult] },
+            ];
+
+            if (coreResult.status !== 'completed') {
+              shouldContinue = false;
+            }
+          }
+
+          if (!shouldContinue) {
+            break;
+          }
+        }
+
+        if (abortController.signal.aborted) {
+          stopReason = 'cancelled';
+        }
+      } finally {
+        provider.cleanup();
+      }
+
+      if (stopReason === 'end_turn' && completedTurns >= maxTurns) {
+        stopReason = 'max_turns';
+      }
+
+      writeAndAdvance({ type: 'turn_end', data: { stopReason } });
+      writeSessionState(state.activeSession.dir, sessionState);
+      state.activeSession = loadSession(state.activeSession.meta.sessionId);
+      state.activeTurn = null;
+
+      return {
+        turnId,
+        stopReason,
+        content:
+          finalAssistantContent.length > 0 ? [{ type: 'text', text: finalAssistantContent }] : [],
+        usage: { inputTokens: 0, outputTokens: 0 },
+      };
+    }
 
     const deferredJobs: JobState[] = [];
     let nextJobTurnSeq = 1;
