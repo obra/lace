@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ensureLaceDir } from '../config/lace-dir';
+import { asSessionId } from '@lace/ent-protocol';
 
 export type SessionMeta = {
   sessionId: string;
@@ -54,12 +55,14 @@ function agentSessionsDir(): string {
 }
 
 export function getSessionDir(sessionId: string): string {
-  return path.join(agentSessionsDir(), sessionId);
+  return path.join(agentSessionsDir(), asSessionId(sessionId));
 }
 
 export function readSessionMeta(sessionDir: string): SessionMeta {
   const metaPath = path.join(sessionDir, 'meta.json');
-  return JSON.parse(fs.readFileSync(metaPath, 'utf8')) as SessionMeta;
+  const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as SessionMeta;
+  asSessionId(meta.sessionId);
+  return meta;
 }
 
 export function writeSessionMeta(sessionDir: string, meta: SessionMeta): void {

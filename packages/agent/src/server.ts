@@ -11,7 +11,7 @@ import {
   closeSync,
 } from 'node:fs';
 import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
-import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
+import { createNdjsonStdioTransport, JsonRpcPeer, SessionIdSchema } from '@lace/ent-protocol';
 import {
   ensureSessionFiles,
   getSessionDir,
@@ -1692,6 +1692,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const parsed = params as { sessionId: string; fork?: boolean };
     if (!parsed?.sessionId) throw new Error('sessionId is required');
+    if (!SessionIdSchema.safeParse(parsed.sessionId).success) {
+      throw { code: -32602, message: 'InvalidParams' };
+    }
     if (parsed.fork) throw new Error('fork not implemented');
 
     if (state.activeSession && state.activeSession.meta.sessionId !== parsed.sessionId) {
