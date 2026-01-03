@@ -248,7 +248,7 @@ describe('Supervisor (E2E)', () => {
       workspaceSessionId: ws.workspaceSessionId,
       workDir,
     });
-    expect(stored?.sessionIds.length).toBe(2);
+    expect(stored?.agents.length).toBe(2);
   });
 
   it('can attach to an existing sessionId and read durable events', async () => {

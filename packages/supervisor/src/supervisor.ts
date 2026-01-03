@@ -172,7 +172,7 @@ export class Supervisor {
     const loaded = await this.spawnLoadedAgentSession(workspaceSessionId, sessionId);
 
     this.store.create(workspaceSessionId, loaded.workDir);
-    this.store.addSessionId(workspaceSessionId, sessionId);
+    this.store.upsertAgent(workspaceSessionId, { sessionId });
 
     this.sessions.set(workspaceSessionId, {
       workDir: loaded.workDir,
@@ -195,7 +195,7 @@ export class Supervisor {
     ws.agentsBySessionId.set(created.sessionId, created.agent);
 
     if (!ws.primarySessionId) ws.primarySessionId = created.sessionId;
-    this.store.addSessionId(workspaceSessionId, created.sessionId);
+    this.store.upsertAgent(workspaceSessionId, { sessionId: created.sessionId });
 
     return { sessionId: created.sessionId, pid: created.pid };
   }

@@ -5,7 +5,16 @@ import { dirname, join } from 'node:path';
 export type WorkspaceSessionRecord = {
   workspaceSessionId: string;
   workDir: string;
-  sessionIds: string[];
+  projectId?: string;
+  name?: string;
+  agents: Array<{
+    sessionId: string;
+    name?: string;
+    connectionId?: string;
+    modelId?: string;
+    createdAt: string;
+    lastUsedAt: string;
+  }>;
   createdAt: string;
   lastUsedAt: string;
 };
@@ -40,7 +49,7 @@ export class WorkspaceSessionStore {
     const record: WorkspaceSessionRecord = {
       workspaceSessionId,
       workDir,
-      sessionIds: [],
+      agents: [],
       createdAt: now,
       lastUsedAt: now,
     };
@@ -50,7 +59,10 @@ export class WorkspaceSessionStore {
     return record;
   }
 
-  addSessionId(workspaceSessionId: string, sessionId: string): void {
+  update(
+    workspaceSessionId: string,
+    updates: Partial<Pick<WorkspaceSessionRecord, 'projectId' | 'name'>>
+  ): void {
     this.loadIfNeeded();
 
     const record = this.recordsById.get(workspaceSessionId);
@@ -58,11 +70,49 @@ export class WorkspaceSessionStore {
       throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
     }
 
-    if (!record.sessionIds.includes(sessionId)) {
-      record.sessionIds.push(sessionId);
-    }
+    if (typeof updates.projectId === 'string') record.projectId = updates.projectId;
+    if (typeof updates.name === 'string') record.name = updates.name;
 
     record.lastUsedAt = new Date().toISOString();
+    this.save();
+  }
+
+  upsertAgent(
+    workspaceSessionId: string,
+    params: {
+      sessionId: string;
+      name?: string;
+      connectionId?: string;
+      modelId?: string;
+    }
+  ): void {
+    this.loadIfNeeded();
+
+    const record = this.recordsById.get(workspaceSessionId);
+    if (!record) {
+      throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
+    }
+
+    const now = new Date().toISOString();
+    const existing = record.agents.find((a) => a.sessionId === params.sessionId);
+
+    if (existing) {
+      if (typeof params.name === 'string') existing.name = params.name;
+      if (typeof params.connectionId === 'string') existing.connectionId = params.connectionId;
+      if (typeof params.modelId === 'string') existing.modelId = params.modelId;
+      existing.lastUsedAt = now;
+    } else {
+      record.agents.push({
+        sessionId: params.sessionId,
+        ...(typeof params.name === 'string' ? { name: params.name } : {}),
+        ...(typeof params.connectionId === 'string' ? { connectionId: params.connectionId } : {}),
+        ...(typeof params.modelId === 'string' ? { modelId: params.modelId } : {}),
+        createdAt: now,
+        lastUsedAt: now,
+      });
+    }
+
+    record.lastUsedAt = now;
     this.save();
   }
 
@@ -95,7 +145,7 @@ export class WorkspaceSessionStore {
         item !== null &&
         'workspaceSessionId' in item &&
         'workDir' in item &&
-        'sessionIds' in item &&
+        'agents' in item &&
         'createdAt' in item &&
         'lastUsedAt' in item
       ) {
