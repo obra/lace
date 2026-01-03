@@ -1,1 +1,1 @@
-export * from './supervisor-agent-process.js';
+export * from './supervisor-agent-process';

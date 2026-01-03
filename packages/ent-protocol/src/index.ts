@@ -1,3 +1,3 @@
-export * from './transport/stdio.js';
-export * from './transport/types.js';
-export * from './rpc/peer.js';
+export * from './transport/stdio';
+export * from './transport/types';
+export * from './rpc/peer';

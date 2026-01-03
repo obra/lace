@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ensureLaceDir } from '../config/lace-dir.js';
+import { ensureLaceDir } from '../config/lace-dir';
 
 export type SessionMeta = {
   sessionId: string;

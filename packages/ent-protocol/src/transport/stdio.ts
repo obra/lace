@@ -4,7 +4,7 @@ import type {
   JsonRpcMessageHandler,
   JsonRpcTransport,
   NdjsonStdioTransportOptions,
-} from './types.js';
+} from './types';
 
 const JsonRpcBaseSchema = z.object({
   jsonrpc: z.literal('2.0'),

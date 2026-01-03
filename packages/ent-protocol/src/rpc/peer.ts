@@ -1,4 +1,4 @@
-import type { JsonRpcId, JsonRpcMessage, JsonRpcTransport } from '../transport/types.js';
+import type { JsonRpcId, JsonRpcMessage, JsonRpcTransport } from '../transport/types';
 
 export type JsonRpcMethodHandler = (params: unknown) => unknown | Promise<unknown>;
 

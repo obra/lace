@@ -1,5 +1,5 @@
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
-import { createAgentServerState, registerAgentRpcMethods } from './server.js';
+import { createAgentServerState, registerAgentRpcMethods } from './server';
 
 const state = createAgentServerState();
 const transport = createNdjsonStdioTransport({ readable: process.stdin, writable: process.stdout });

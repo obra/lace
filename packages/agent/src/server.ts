@@ -10,10 +10,10 @@ import {
   writeSessionState,
   type LoadedSession,
   type SessionState,
-} from './storage/session-store.js';
-import { appendDurableEvent, readDurableEvents } from './storage/event-log.js';
-import type { PermissionRequest, SessionUpdate, ToolResult } from './protocol/types.js';
-import { shellExecTool, runShellExec } from './tools/shell-exec.js';
+} from './storage/session-store';
+import { appendDurableEvent, readDurableEvents } from './storage/event-log';
+import type { PermissionRequest, SessionUpdate, ToolResult } from './protocol/types';
+import { shellExecTool, runShellExec } from './tools/shell-exec';
 
 export type AgentServerState = {
   initialized: boolean;

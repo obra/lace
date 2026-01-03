@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import type { ToolInfo, ToolResult } from '../protocol/types.js';
+import type { ToolInfo, ToolResult } from '../protocol/types';
 
 export type ShellExecInput = {
   command: string;
