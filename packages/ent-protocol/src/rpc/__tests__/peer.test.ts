@@ -27,6 +27,24 @@ describe('JsonRpcPeer', () => {
     b.close();
   });
 
+  it('supports requestWithId and abandonRequest', async () => {
+    const { a, b } = createPairedPeers();
+    b.onRequest('ping', () => ({ ok: true }));
+
+    const first = a.requestWithId('ping');
+    expect(first.requestId).toMatch(/^c_/);
+    await expect(first.result).resolves.toEqual({ ok: true });
+
+    const second = a.requestWithId('ping');
+    a.abandonRequest(second.requestId);
+
+    // Allow response to arrive after abandonment without hanging or throwing.
+    await new Promise((r) => setTimeout(r, 10));
+
+    a.close();
+    b.close();
+  });
+
   it('delivers notifications without expecting a response', async () => {
     const { a, b } = createPairedPeers();
     const seen: unknown[] = [];

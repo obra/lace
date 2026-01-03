@@ -58,6 +58,25 @@ export class JsonRpcPeer {
     });
   }
 
+  requestWithId(
+    method: string,
+    params?: unknown
+  ): { requestId: JsonRpcId; result: Promise<unknown> } {
+    const requestId = `${this.idPrefix}${this.nextId++}`;
+
+    this.transport.send({ jsonrpc: '2.0', id: requestId, method, params } as JsonRpcMessage);
+
+    const result = new Promise<unknown>((resolve, reject) => {
+      this.pending.set(requestId, { resolve, reject });
+    });
+
+    return { requestId, result };
+  }
+
+  abandonRequest(requestId: JsonRpcId): void {
+    this.pending.delete(requestId);
+  }
+
   private async handleMessage(msg: JsonRpcMessage): Promise<void> {
     // Response
     if ('id' in msg && ('result' in msg || 'error' in msg)) {

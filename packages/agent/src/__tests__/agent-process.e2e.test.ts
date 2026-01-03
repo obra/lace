@@ -155,4 +155,167 @@ describe('lace-agent process (E2E over stdio)', () => {
     ]);
     expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4]);
   });
+
+  it(
+    'requests permission before running shell.exec and records a tool_use event',
+    { timeout: 15_000 },
+    async () => {
+      agent = spawnAgentProcess({ laceDir });
+
+      const updates: unknown[] = [];
+      agent.peer.onRequest('session/update', async (params) => {
+        updates.push(params);
+        return undefined;
+      });
+
+      let lastPermissionParams: Record<string, unknown> | undefined;
+      agent.peer.onRequest('session/request_permission', async (params) => {
+        lastPermissionParams = params as Record<string, unknown>;
+        return { decision: 'allow' };
+      });
+
+      await withTimeout(
+        agent.peer.request('initialize', {
+          protocolVersion: '1.0',
+          config: { approvalMode: 'ask' },
+        }),
+        2_000,
+        'initialize'
+      );
+
+      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+      const promptResult = (await withTimeout(
+        agent.peer.request('session/prompt', {
+          content: [{ type: 'text', text: 'run: echo hi' }],
+        }),
+        10_000,
+        'session/prompt'
+      )) as { turnId: string };
+
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          const interval = setInterval(() => {
+            const toolFinished = updates.find((u) => {
+              const p = u as Record<string, unknown>;
+              const result = p?.result as Record<string, unknown> | undefined;
+              return (
+                p?.type === 'tool_use' &&
+                p?.status === 'completed' &&
+                result?.outcome === 'completed'
+              );
+            });
+            if (toolFinished) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 10);
+        }),
+        5_000,
+        'tool_use completed update'
+      );
+
+      expect(lastPermissionParams).toMatchObject({
+        tool: 'shell.exec',
+        resource: 'echo hi',
+        sessionId: expect.any(String),
+        turnId: promptResult.turnId,
+        toolCallId: expect.any(String),
+      });
+
+      const durable = (await withTimeout(
+        agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+        2_000,
+        'ent/session/events'
+      )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
+
+      expect(durable.events.map((e) => e.type)).toEqual([
+        'prompt',
+        'turn_start',
+        'tool_use',
+        'message',
+        'turn_end',
+      ]);
+
+      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5]);
+    }
+  );
+
+  it('can cancel a turn that is awaiting permission', { timeout: 15_000 }, async () => {
+    agent = spawnAgentProcess({ laceDir });
+
+    const updates: unknown[] = [];
+    agent.peer.onRequest('session/update', async (params) => {
+      updates.push(params);
+      return undefined;
+    });
+
+    let sawPermissionRequest = false;
+    agent.peer.onRequest('session/request_permission', async () => {
+      sawPermissionRequest = true;
+      return await new Promise(() => undefined);
+    });
+
+    await withTimeout(
+      agent.peer.request('initialize', { protocolVersion: '1.0', config: { approvalMode: 'ask' } }),
+      2_000,
+      'initialize'
+    );
+
+    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+    const promptPromise = agent.peer.request('session/prompt', {
+      content: [{ type: 'text', text: 'run: echo will-not-run' }],
+    });
+
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          if (sawPermissionRequest) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      2_000,
+      'permission request received'
+    );
+
+    agent.peer.notify('session/cancel');
+
+    const cancelled = (await withTimeout(
+      promptPromise as Promise<unknown>,
+      5_000,
+      'prompt cancelled'
+    )) as {
+      stopReason: string;
+    };
+    expect(cancelled.stopReason).toBe('cancelled');
+
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          const match = updates.find((u) => {
+            const p = u as Record<string, unknown>;
+            return p?.type === 'tool_use' && p?.status === 'cancelled';
+          });
+          if (match) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      5_000,
+      'tool_use cancelled update'
+    );
+
+    const status = (await withTimeout(
+      agent.peer.request('ent/agent/status'),
+      2_000,
+      'ent/agent/status'
+    )) as { pendingPermissions: unknown[]; currentTurn?: unknown };
+
+    expect(status.pendingPermissions).toEqual([]);
+    expect(status.currentTurn).toBeUndefined();
+  });
 });
