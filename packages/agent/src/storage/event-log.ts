@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { SessionState } from './session-store';
+import type { SessionState } from './session-store.js';
 
 export type DurableEvent = {
   eventSeq: number;

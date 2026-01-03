@@ -10,8 +10,8 @@ import {
   writeSessionState,
   type LoadedSession,
   type SessionState,
-} from './storage/session-store';
-import { appendDurableEvent, readDurableEvents } from './storage/event-log';
+} from './storage/session-store.js';
+import { appendDurableEvent, readDurableEvents } from './storage/event-log.js';
 
 export type AgentServerState = {
   initialized: boolean;
@@ -40,12 +40,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     };
   });
 
-  peer.onRequest('ent/agent/ping', async () => {
+  peer.onRequest('ent/agent/ping', async (_params: unknown) => {
     if (!state.initialized) throw new Error('Not initialized');
     return { ok: true, timestamp: new Date().toISOString() };
   });
 
-  peer.onRequest('ent/agent/status', async () => {
+  peer.onRequest('ent/agent/status', async (_params: unknown) => {
     if (!state.initialized) throw new Error('Not initialized');
     return {
       models: [],
@@ -65,7 +65,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     };
   });
 
-  peer.onRequest('session/new', async (params) => {
+  peer.onRequest('session/new', async (params: unknown) => {
     if (!state.initialized) throw new Error('Not initialized');
 
     const parsed = params as { workDir: string; persona?: string; systemPrompt?: unknown };
@@ -84,7 +84,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     return { sessionId, created };
   });
 
-  peer.onRequest('session/list', async (params) => {
+  peer.onRequest('session/list', async (params: unknown) => {
     if (!state.initialized) throw new Error('Not initialized');
 
     const parsed = params as { workDir?: string } | undefined;
@@ -93,7 +93,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     return { sessions: listSessions(workDirFilter) };
   });
 
-  peer.onRequest('session/load', async (params) => {
+  peer.onRequest('session/load', async (params: unknown) => {
     if (!state.initialized) throw new Error('Not initialized');
 
     const parsed = params as { sessionId: string; fork?: boolean };
@@ -109,7 +109,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     };
   });
 
-  peer.onRequest('ent/session/events', async (params) => {
+  peer.onRequest('ent/session/events', async (params: unknown) => {
     if (!state.initialized) throw new Error('Not initialized');
     if (!state.activeSession) throw new Error('No active session');
 
@@ -125,7 +125,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     return result;
   });
 
-  peer.onRequest('session/prompt', async (params) => {
+  peer.onRequest('session/prompt', async (params: unknown) => {
     if (!state.initialized) throw new Error('Not initialized');
     if (!state.activeSession) throw new Error('No active session');
 

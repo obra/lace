@@ -15,12 +15,12 @@
   "scripts": {
     "build": "tsc",
     "build:clean": "rm -rf dist && npm run build",
+    "pretest": "cd ../.. && npm run build --workspace=packages/ent-protocol && npm run build --workspace=packages/agent",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@lace/core": "file:../core",
     "@lace/ent-protocol": "file:../ent-protocol"
   },
   "devDependencies": {
@@ -29,4 +29,3 @@
     "vitest": "^3.2.4"
   }
 }
-
