@@ -17,7 +17,6 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '@lace/web/lib/server/lace-imports';
-import { Session } from '@lace/web/lib/server/lace-imports';
 import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import { promises as fs } from 'fs';
@@ -62,23 +61,34 @@ describe('Session API endpoints under projects', () => {
 
   describe('GET /api/projects/:projectId/sessions', () => {
     it('should return sessions for project', async () => {
-      // Create additional sessions in the project
-      Session.create({
-        name: 'Session 1',
-        projectId,
-        configuration: {
-          providerInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        },
-      });
-      Session.create({
-        name: 'Session 2',
-        projectId,
-        configuration: {
-          providerInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        },
-      });
+      // Create workspace sessions via the API so they are visible to the supervisor-backed loader
+      await POST(
+        createActionArgs(
+          new Request(`http://localhost/api/projects/${projectId}/sessions`, {
+            method: 'POST',
+            body: JSON.stringify({
+              name: 'Session 1',
+              providerInstanceId,
+              modelId: 'claude-3-5-haiku-20241022',
+            }),
+          }),
+          { projectId }
+        )
+      );
+
+      await POST(
+        createActionArgs(
+          new Request(`http://localhost/api/projects/${projectId}/sessions`, {
+            method: 'POST',
+            body: JSON.stringify({
+              name: 'Session 2',
+              providerInstanceId,
+              modelId: 'claude-3-5-haiku-20241022',
+            }),
+          }),
+          { projectId }
+        )
+      );
 
       const response = await GET(
         createLoaderArgs(new Request(`http://localhost/api/projects/${projectId}/sessions`), {
@@ -102,8 +112,7 @@ describe('Session API endpoints under projects', () => {
       expect(session2).toBeDefined();
     });
 
-    it('should return sessions when only default session exists', async () => {
-      // Project.create() auto-creates a default session
+    it('should return empty array when no workspace sessions exist', async () => {
       const response = await GET(
         createLoaderArgs(new Request(`http://localhost/api/projects/${projectId}/sessions`), {
           projectId,
@@ -113,7 +122,7 @@ describe('Session API endpoints under projects', () => {
       const data = await parseResponse<SessionInfo[]>(response);
 
       expect(response.status).toBe(200);
-      expect(data.length).toBeGreaterThan(0); // At least the default session
+      expect(data).toHaveLength(0);
     });
 
     it('should return 404 when project not found', async () => {

@@ -1,5 +1,5 @@
 // ABOUTME: Gold-standard test for persona system prompt generation via API
-// ABOUTME: Uses mock provider pattern to verify different personas generate different prompts
+// ABOUTME: Verifies different personas result in different injected system prompts
 
 /**
  * @vitest-environment node
@@ -9,39 +9,29 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { promises as fs } from 'fs';
 import { join } from 'path';
+import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
+  Project,
 } from '@lace/web/lib/server/lace-imports';
-import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
-import * as promptsModule from '@lace/core/config/prompts';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
-// Mock external dependencies
-vi.mock('@lace/web/lib/server/approval-manager', () => ({
-  getApprovalManager: () => ({
-    requestApproval: vi.fn().mockResolvedValue('allow_once'),
-  }),
-}));
-
 // Import after mocks
 import { action as POST } from '@lace/web/app/routes/api.sessions.$sessionId.agents';
-import { getSessionService, SessionService } from '@lace/web/lib/server/session-service';
-import { Project, Session } from '@lace/web/lib/server/lace-imports';
-import { asThreadId } from '@lace/web/types/core';
+import { action as createWorkspaceSession } from '@lace/web/app/routes/api.projects.$projectId.sessions';
 
 describe('Agent Creation API - Persona System Prompt Generation', () => {
   const context = setupWebTest();
-  let sessionService: SessionService;
-  let testProject: Project;
-  let sessionId: string;
-  let providerInstanceId: string;
-  let mockLoadPromptConfig: ReturnType<typeof vi.fn>;
+  let workspaceSessionId: string = '';
+  let providerInstanceId: string = '';
+  let projectId: string = '';
 
   beforeEach(async () => {
-    // Set up environment
     process.env = {
       ...process.env,
       ANTHROPIC_KEY: 'test-key',
@@ -55,56 +45,46 @@ describe('Agent Creation API - Persona System Prompt Generation', () => {
       apiKey: 'test-anthropic-key',
     });
 
-    // Create real project and session
     const testDir = join(context.tempProjectDir, 'persona-prompts');
     await fs.mkdir(testDir, { recursive: true });
-    testProject = Project.create('Test Project', testDir, 'Test project for persona prompts', {
-      providerInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
-    });
+    const testProject = Project.create(
+      'Test Project',
+      testDir,
+      'Test project for persona prompts',
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
+    projectId = testProject.getId();
 
-    sessionService = getSessionService();
-    const sessionInstance = Session.create({
-      name: 'Test Session',
-      projectId: testProject.getId(),
-    });
-    const session = sessionInstance.getInfo()!;
-    sessionId = session.id as string;
+    const createSessionRequest = new Request(
+      `http://localhost/api/projects/${projectId}/sessions`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Test Session',
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      }
+    );
 
-    // Mock loadPromptConfig to track persona usage and return different prompts
-    mockLoadPromptConfig = vi.fn();
-    vi.spyOn(promptsModule, 'loadPromptConfig').mockImplementation(mockLoadPromptConfig);
+    const createResponse = await createWorkspaceSession(
+      createActionArgs(createSessionRequest, { projectId })
+    );
+    expect(createResponse.status).toBe(201);
+    const created = await parseResponse<{ id: string }>(createResponse);
+    workspaceSessionId = created.id;
   });
 
   afterEach(async () => {
-    if (sessionService) {
-      sessionService.clearActiveSessions();
-    }
     await cleanupTestProviderInstances([providerInstanceId]);
     vi.clearAllMocks();
   });
 
-  it('should call loadPromptConfig with correct persona for each agent', async () => {
-    // Mock different prompt responses for different personas
-    mockLoadPromptConfig
-      .mockImplementationOnce(async (options) => {
-        expect(options.persona).toBe('lace'); // First agent defaults to lace
-        return {
-          systemPrompt: 'You are Lace, a pragmatic AI coding partner...',
-          userInstructions: '',
-          filesCreated: [],
-        };
-      })
-      .mockImplementationOnce(async (options) => {
-        expect(options.persona).toBe('session-summary'); // Second agent has specific persona
-        return {
-          systemPrompt: 'You are a session summarization specialist...',
-          userInstructions: '',
-          filesCreated: [],
-        };
-      });
-
-    // Create agent with default persona (should be 'lace')
+  it('should generate and inject system prompts for each agent persona', async () => {
     const defaultAgentBody = {
       name: 'Default Agent',
       providerInstanceId,
@@ -119,12 +99,12 @@ describe('Agent Creation API - Persona System Prompt Generation', () => {
           body: JSON.stringify(defaultAgentBody),
           headers: { 'Content-Type': 'application/json' },
         }),
-        { sessionId }
+        { sessionId: workspaceSessionId }
       )
     );
     expect(defaultResponse.status).toBe(201);
+    const defaultAgent = await parseResponse<{ threadId: string }>(defaultResponse);
 
-    // Create agent with session-summary persona
     const summaryAgentBody = {
       name: 'Summary Agent',
       providerInstanceId,
@@ -139,49 +119,52 @@ describe('Agent Creation API - Persona System Prompt Generation', () => {
           body: JSON.stringify(summaryAgentBody),
           headers: { 'Content-Type': 'application/json' },
         }),
-        { sessionId }
+        { sessionId: workspaceSessionId }
       )
     );
     expect(summaryResponse.status).toBe(201);
+    const summaryAgent = await parseResponse<{ threadId: string }>(summaryResponse);
 
-    // Get the session and access the actual Agent instances
-    const session = await sessionService.getSession(asThreadId(sessionId));
-    const agents = session!.getAgents();
-    const defaultAgent = agents.find((a) => a.getInfo().name === 'Default Agent');
-    const summaryAgent = agents.find((a) => a.getInfo().name === 'Summary Agent');
+    const defaultInjectedPrompt = await getInjectedText(workspaceSessionId, defaultAgent.threadId);
+    const summaryInjectedPrompt = await getInjectedText(workspaceSessionId, summaryAgent.threadId);
 
-    expect(defaultAgent).toBeDefined();
-    expect(summaryAgent).toBeDefined();
-    expect(defaultAgent!.getInfo().persona).toBe('lace');
-    expect(summaryAgent!.getInfo().persona).toBe('session-summary');
-
-    // Access the actual Agent instances from the session's internal agent map
-    // This is the proper way to get Agent instances for testing system prompt generation
-    const sessionInternal = session as unknown as {
-      _agents: Map<string, { initialize(): Promise<void> }>;
-    };
-    const defaultAgentInternal = sessionInternal._agents.get(defaultAgent!.threadId);
-    const summaryAgentInternal = sessionInternal._agents.get(summaryAgent!.threadId);
-
-    expect(defaultAgentInternal).toBeDefined();
-    expect(summaryAgentInternal).toBeDefined();
-
-    // Initialize agents to trigger system prompt generation
-    await defaultAgentInternal!.initialize();
-    await summaryAgentInternal!.initialize();
-
-    // Verify loadPromptConfig was called with the correct personas
-    expect(mockLoadPromptConfig).toHaveBeenCalledTimes(2);
-
-    // Verify the personas passed to loadPromptConfig
-    expect(mockLoadPromptConfig).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({ persona: 'lace' })
+    expect(defaultInjectedPrompt).toContain(
+      'You are Lace, a pragmatic AI coding partner for a human.'
     );
+    expect(defaultInjectedPrompt).not.toContain('You are a specialized summary agent');
 
-    expect(mockLoadPromptConfig).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ persona: 'session-summary' })
+    expect(summaryInjectedPrompt).toContain('You are a specialized summary agent');
+    expect(summaryInjectedPrompt).not.toContain(
+      'You are Lace, a pragmatic AI coding partner for a human.'
     );
   });
 });
+
+async function getInjectedText(
+  workspaceSessionId: string,
+  agentSessionId: string
+): Promise<string> {
+  const supervisor = getSupervisor();
+  const peer = supervisor.getPeer(workspaceSessionId, agentSessionId);
+
+  const result = (await peer.request('ent/session/events', {
+    types: ['context_injected'],
+  })) as { events: Array<{ type: string; data: Record<string, unknown> }>; hasMore: boolean };
+
+  const injected = result.events.find((e) => e.type === 'context_injected');
+  if (!injected) {
+    throw new Error('No context_injected event found');
+  }
+
+  const content = injected.data.content;
+  if (!Array.isArray(content)) {
+    throw new Error('context_injected event missing content array');
+  }
+
+  const first = content[0] as { type?: unknown; text?: unknown } | undefined;
+  if (!first || first.type !== 'text' || typeof first.text !== 'string') {
+    throw new Error('context_injected event does not include a text payload');
+  }
+
+  return first.text;
+}

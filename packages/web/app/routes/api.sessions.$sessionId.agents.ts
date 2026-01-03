@@ -127,33 +127,31 @@ export async function action({ request, params }: Route.ActionArgs) {
       approvalMode: 'ask',
     });
 
-    const persona = typeof body.persona === 'string' ? body.persona.trim() : '';
-    if (persona) {
-      try {
-        personaRegistry.validatePersona(persona);
-      } catch (error) {
-        return createErrorResponse(
-          error instanceof Error ? error.message : 'Invalid persona',
-          400,
-          { code: 'VALIDATION_FAILED' }
-        );
-      }
+    const requestedPersona = typeof body.persona === 'string' ? body.persona.trim() : '';
+    const persona = requestedPersona || 'lace';
 
-      const promptManager = new PromptManager({
-        session: { getWorkingDirectory: () => ws.workDir },
-        project: { getWorkingDirectory: () => ws.workDir },
+    try {
+      personaRegistry.validatePersona(persona);
+    } catch (error) {
+      return createErrorResponse(error instanceof Error ? error.message : 'Invalid persona', 400, {
+        code: 'VALIDATION_FAILED',
       });
+    }
 
-      const systemPrompt = await promptManager.generateSystemPrompt(persona);
-      if (systemPrompt.trim()) {
-        try {
-          await peer.request('ent/session/inject', {
-            content: [{ type: 'text', text: systemPrompt }],
-            priority: 'immediate',
-          });
-        } catch (error) {
-          console.error('Failed to inject persona prompt:', error);
-        }
+    const promptManager = new PromptManager({
+      session: { getWorkingDirectory: () => ws.workDir },
+      project: { getWorkingDirectory: () => ws.workDir },
+    });
+
+    const systemPrompt = await promptManager.generateSystemPrompt(persona);
+    if (systemPrompt.trim()) {
+      try {
+        await peer.request('ent/session/inject', {
+          content: [{ type: 'text', text: systemPrompt }],
+          priority: 'immediate',
+        });
+      } catch (error) {
+        console.error('Failed to inject persona prompt:', error);
       }
     }
 
