@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import readline from 'node:readline';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -113,6 +114,11 @@ function isCommandOnPath(command: string): boolean {
 function defaultAgentCmd(): string {
   if (isCommandOnPath('lace-agent')) return 'lace-agent';
   const agentMainPath = fileURLToPath(new URL('../../agent/dist/main.js', import.meta.url));
+  if (!existsSync(agentMainPath)) {
+    throw new Error(
+      'No default agent command found. Build the agent with `npm run build --workspace=packages/agent`, install `lace-agent`, or pass `--agent-cmd`.'
+    );
+  }
   return `${process.execPath} ${agentMainPath}`;
 }
 
