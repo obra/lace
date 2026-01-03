@@ -7,6 +7,7 @@ import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-ses
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
+import { PromptManager, personaRegistry } from '@lace/web/lib/server/lace-imports';
 import type { Route } from './+types/api.sessions.$sessionId.agents';
 
 // Type guard for unknown error values
@@ -51,7 +52,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
         name: a.name ?? '',
         providerInstanceId: a.connectionId,
         modelId: a.modelId,
-        status: 'running',
+        status: 'idle',
         createdAt: new Date(a.createdAt),
       }))
     );
@@ -93,6 +94,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
+    const nextAgentIndex = ws.agents.length;
+    const requestedName = typeof body.name === 'string' ? body.name.trim() : '';
+    const agentName = requestedName || `Agent-${nextAgentIndex}`;
+
     // Spawn agent process (agent protocol session) and configure it
     let created;
     try {
@@ -109,25 +114,67 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     supervisor.upsertAgentSessionMeta(workspaceSessionId, {
       sessionId: created.sessionId,
-      name: body.name || '',
+      name: agentName,
       connectionId: body.providerInstanceId,
       modelId: body.modelId,
     });
 
-    await supervisor
-      .getPeer(workspaceSessionId, created.sessionId)
-      .request('ent/session/configure', {
-        connectionId: body.providerInstanceId,
-        modelId: body.modelId,
-        approvalMode: 'ask',
+    const peer = supervisor.getPeer(workspaceSessionId, created.sessionId);
+
+    await peer.request('ent/session/configure', {
+      connectionId: body.providerInstanceId,
+      modelId: body.modelId,
+      approvalMode: 'ask',
+    });
+
+    const persona = typeof body.persona === 'string' ? body.persona.trim() : '';
+    if (persona) {
+      try {
+        personaRegistry.validatePersona(persona);
+      } catch (error) {
+        return createErrorResponse(
+          error instanceof Error ? error.message : 'Invalid persona',
+          400,
+          { code: 'VALIDATION_FAILED' }
+        );
+      }
+
+      const promptManager = new PromptManager({
+        session: { getWorkingDirectory: () => ws.workDir },
+        project: { getWorkingDirectory: () => ws.workDir },
       });
+
+      const systemPrompt = await promptManager.generateSystemPrompt(persona);
+      if (systemPrompt.trim()) {
+        try {
+          await peer.request('ent/session/inject', {
+            content: [{ type: 'text', text: systemPrompt }],
+            priority: 'immediate',
+          });
+        } catch (error) {
+          console.error('Failed to inject persona prompt:', error);
+        }
+      }
+    }
+
+    const initialMessage =
+      typeof body.initialMessage === 'string' ? body.initialMessage.trim() : '';
+    if (initialMessage) {
+      void supervisor
+        .promptSession(workspaceSessionId, created.sessionId, [
+          { type: 'text', text: initialMessage },
+        ])
+        .catch((error) => {
+          console.error('Failed to send initial message:', error);
+        });
+    }
 
     const agentResponse = {
       threadId: created.sessionId,
-      name: body.name || '',
+      name: agentName,
       providerInstanceId: body.providerInstanceId,
       modelId: body.modelId,
-      status: 'running',
+      status: 'idle',
       createdAt: new Date(),
       tokenUsage: undefined,
     };

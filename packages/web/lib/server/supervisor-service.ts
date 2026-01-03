@@ -15,12 +15,24 @@ declare global {
         {
           workspaceSessionId: string;
           agentSessionId: string;
+          toolCall?: { name: string; arguments: Record<string, unknown> };
           params: Record<string, unknown>;
           createdAt: number;
           resolve: (decision: {
             decision: 'allow' | 'deny';
             updatedInput?: Record<string, unknown>;
           }) => void;
+        }
+      >
+    | undefined;
+  var laceWebPendingToolCalls:
+    | Map<
+        string,
+        {
+          workspaceSessionId: string;
+          agentSessionId: string;
+          toolCall: { name: string; arguments: Record<string, unknown> };
+          createdAt: number;
         }
       >
     | undefined;
@@ -93,20 +105,20 @@ function updateToLaceEvents(params: {
 
     const events: LaceEvent[] = [];
 
-    if (status === 'pending') {
+    if (status === 'pending' || status === 'awaiting_permission') {
+      if (toolCallId && name && agentSessionId) {
+        global.laceWebPendingToolCalls?.set(toolCallId, {
+          workspaceSessionId,
+          agentSessionId,
+          toolCall: { name, arguments: input },
+          createdAt: Date.now(),
+        });
+      }
+
       events.push({
         type: 'TOOL_CALL',
         timestamp: new Date(),
         data: { id: toolCallId, name, arguments: input },
-        context: baseContext,
-      });
-    }
-
-    if (status === 'awaiting_permission') {
-      events.push({
-        type: 'TOOL_APPROVAL_REQUEST',
-        timestamp: new Date(),
-        data: { toolCallId },
         context: baseContext,
       });
     }
@@ -147,6 +159,7 @@ export function getSupervisor(): Supervisor {
 
   const laceDir = ensureLaceDir();
   if (!global.laceWebPendingPermissions) global.laceWebPendingPermissions = new Map();
+  if (!global.laceWebPendingToolCalls) global.laceWebPendingToolCalls = new Map();
 
   global.laceWebSupervisor = new Supervisor({
     laceDir,
@@ -197,6 +210,7 @@ export function getSupervisor(): Supervisor {
 
       const pending = global.laceWebPendingPermissions;
       if (!pending) return { decision: 'deny' };
+      const pendingToolCalls = global.laceWebPendingToolCalls;
 
       const timeoutMs = 5 * 60 * 1000;
 
@@ -204,9 +218,20 @@ export function getSupervisor(): Supervisor {
         decision: 'allow' | 'deny';
         updatedInput?: Record<string, unknown>;
       }>((resolve) => {
+        const toolCallFromUpdates = pendingToolCalls?.get(toolCallId);
+        const toolCall =
+          toolCallFromUpdates &&
+          toolCallFromUpdates.workspaceSessionId === workspaceSessionId &&
+          toolCallFromUpdates.agentSessionId === agentSessionId
+            ? toolCallFromUpdates.toolCall
+            : undefined;
+
+        if (pendingToolCalls) pendingToolCalls.delete(toolCallId);
+
         pending.set(toolCallId, {
           workspaceSessionId,
           agentSessionId,
+          ...(toolCall ? { toolCall } : {}),
           params,
           createdAt: Date.now(),
           resolve,
@@ -216,6 +241,7 @@ export function getSupervisor(): Supervisor {
           const still = pending.get(toolCallId);
           if (!still) return;
           pending.delete(toolCallId);
+          pendingToolCalls?.delete(toolCallId);
           still.resolve({ decision: 'deny' });
         }, timeoutMs);
       });
@@ -232,6 +258,7 @@ export function isAgentSessionId(value: string): boolean {
 export function listPendingPermissions(workspaceSessionId: string): Array<{
   toolCallId: string;
   agentSessionId: string;
+  toolCall?: { name: string; arguments: Record<string, unknown> };
   params: Record<string, unknown>;
   requestedAt: Date;
 }> {
@@ -243,6 +270,7 @@ export function listPendingPermissions(workspaceSessionId: string): Array<{
     .map(([toolCallId, v]) => ({
       toolCallId,
       agentSessionId: v.agentSessionId,
+      ...(v.toolCall ? { toolCall: v.toolCall } : {}),
       params: v.params,
       requestedAt: new Date(v.createdAt),
     }))
@@ -263,6 +291,7 @@ export function resolvePendingPermission(params: {
   if (found.workspaceSessionId !== params.workspaceSessionId) return false;
 
   pending.delete(params.toolCallId);
+  global.laceWebPendingToolCalls?.delete(params.toolCallId);
   found.resolve({
     decision: params.decision,
     ...(params.updatedInput ? { updatedInput: params.updatedInput } : {}),
@@ -276,5 +305,6 @@ export async function shutdownSupervisorForTests(): Promise<void> {
 
   global.laceWebSupervisor = undefined;
   global.laceWebPendingPermissions?.clear();
+  global.laceWebPendingToolCalls?.clear();
   await supervisor.shutdown();
 }

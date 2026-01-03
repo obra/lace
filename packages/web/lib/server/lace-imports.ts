@@ -55,5 +55,6 @@ export { ApprovalPendingError, ApprovalDecision } from '@lace/core/tools/types';
 export { ensureLaceDir } from '@lace/core/config/lace-dir';
 export { UserSettingsManager } from '@lace/core/config/user-settings';
 export { MCPConfigLoader } from '@lace/core/config/mcp-config-loader';
+export { PromptManager } from '@lace/core/config/prompt-manager';
 export { personaRegistry } from '@lace/core/config/persona-registry';
 export type { PersonaInfo } from '@lace/core/config/persona-registry';

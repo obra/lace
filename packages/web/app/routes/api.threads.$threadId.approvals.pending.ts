@@ -1,114 +1,55 @@
 // ABOUTME: Recovery API that uses core ThreadManager query methods
-// ABOUTME: Thin web layer over core approval system
+// ABOUTME: Thin web layer over supervisor-backed approval system
 
-import { z } from 'zod';
-import { getSessionService } from '@lace/web/lib/server/session-service';
-import { asThreadId } from '@lace/web/types/core';
-import { ThreadIdSchema } from '@lace/web/lib/validation/schemas';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { logger } from '@lace/core/utils/logger';
+import { SessionIdSchema } from '@lace/ent-protocol';
+import { getSupervisor, listPendingPermissions } from '@lace/web/lib/server/supervisor-service';
 import type { Route } from './+types/api.threads.$threadId.approvals.pending';
-
-// Validation schema
-const ParamsSchema = z.object({
-  threadId: ThreadIdSchema,
-});
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    // Validate parameters
-    const paramsResult = ParamsSchema.safeParse(params);
-    if (!paramsResult.success) {
-      return createErrorResponse('Invalid parameters', 400, {
-        code: 'VALIDATION_ERROR',
-        details: paramsResult.error.format(),
-      });
+    const { threadId: threadIdParam } = params as { threadId: string };
+    if (!SessionIdSchema.safeParse(threadIdParam).success) {
+      return createErrorResponse('Invalid thread ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const { threadId } = paramsResult.data;
-
-    // Get session first, then agent (following existing pattern)
-    const sessionService = getSessionService();
-
-    // Determine session ID (parent thread for agents, or self for sessions)
-    const sessionIdStr: string = threadId.includes('.')
-      ? (threadId.split('.')[0] ?? threadId)
-      : threadId;
-
-    const session = await sessionService.getSession(asThreadId(sessionIdStr));
-    if (!session) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+    const supervisor = getSupervisor();
+    const workspace = supervisor
+      .listWorkspaceSessions()
+      .find((ws) => ws.agents.some((a) => a.sessionId === threadIdParam));
+    if (!workspace) {
+      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const agent = session.getAgent(asThreadId(threadId));
-    if (!agent) {
-      // Enhanced diagnostics for agent not found error
-      const availableAgents = session.getAgents();
-      const agentIds = availableAgents.map((a) => a.threadId);
+    const pending = listPendingPermissions(workspace.workspaceSessionId)
+      .filter((p) => p.agentSessionId === threadIdParam)
+      .map((p) => {
+        const toolName =
+          typeof p.toolCall?.name === 'string'
+            ? p.toolCall.name
+            : typeof p.params.tool === 'string'
+              ? p.params.tool
+              : '';
+        const toolCall = { name: toolName, arguments: p.toolCall?.arguments ?? {} };
 
-      logger.error(`[TOOL_APPROVAL] Agent not found for thread ${threadId}. Available agents:`, {
-        agentIds,
-      });
-
-      return createErrorResponse(
-        `Agent not found for thread ${threadId}. Available agents: ${agentIds.join(', ')}`,
-        404,
-        {
-          code: 'RESOURCE_NOT_FOUND',
-          details: {
-            requestedAgent: threadId,
-            availableAgents: agentIds,
+        return {
+          toolCallId: p.toolCallId,
+          toolCall,
+          requestedAt: p.requestedAt,
+          requestData: {
+            requestId: p.toolCallId,
+            toolName: toolCall.name,
+            input: toolCall.arguments,
+            isReadOnly: false,
+            toolDescription: undefined,
+            toolAnnotations: undefined,
+            riskLevel: 'moderate' as const,
           },
-        }
-      );
-    }
+        };
+      });
 
-    // Use Agent interface to get pending approvals
-    const rawPendingApprovals = agent.getPendingApprovals();
-
-    // Reconstruct ToolApprovalRequestData for each pending approval
-    const pendingApprovals = rawPendingApprovals.map((approval) => {
-      const toolCall = approval.toolCall as { name: string; arguments: unknown };
-
-      // Try to get tool from executor to determine metadata (may not be available in all contexts)
-      let tool;
-      try {
-        tool = agent.toolExecutor.getTool?.(toolCall.name);
-      } catch {
-        // Tool not available, use defaults
-        tool = null;
-      }
-
-      const isReadOnly = tool?.annotations?.readOnlyHint ?? false;
-
-      // Determine risk level based on tool annotations
-      let riskLevel: 'safe' | 'moderate' | 'destructive' = 'moderate';
-      if (tool?.annotations?.readOnlyHint) {
-        riskLevel = 'safe';
-      } else if (tool?.annotations?.destructiveHint) {
-        riskLevel = 'destructive';
-      }
-
-      const requestData = {
-        requestId: approval.toolCallId,
-        toolName: toolCall.name,
-        input: toolCall.arguments,
-        isReadOnly,
-        toolDescription: tool?.description,
-        toolAnnotations: tool?.annotations,
-        riskLevel,
-      };
-
-      return {
-        toolCallId: approval.toolCallId,
-        toolCall: approval.toolCall,
-        requestedAt: approval.requestedAt,
-        requestData,
-      };
-    });
-
-    return createSuperjsonResponse(pendingApprovals);
+    return createSuperjsonResponse(pending);
   } catch (_error) {
     return createErrorResponse('Failed to get pending approvals', 500, {
       code: 'INTERNAL_SERVER_ERROR',

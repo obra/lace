@@ -1,18 +1,21 @@
 // ABOUTME: Thin API layer that uses core ThreadManager for approval responses
-// ABOUTME: Web-specific route that delegates to core event system
+// ABOUTME: Web-specific route that delegates to supervisor-backed approval system
 
 import { z } from 'zod';
-import { getSessionService } from '@lace/web/lib/server/session-service';
-import { asThreadId, ApprovalDecision } from '@lace/web/types/core';
-import { ThreadIdSchema, ToolCallIdSchema } from '@lace/web/lib/validation/schemas';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { SessionIdSchema } from '@lace/ent-protocol';
+import {
+  getSupervisor,
+  listPendingPermissions,
+  resolvePendingPermission,
+} from '@lace/web/lib/server/supervisor-service';
 import type { Route } from './+types/api.threads.$threadId.approvals.$toolCallId';
 
 // Validation schemas
 const ParamsSchema = z.object({
-  threadId: ThreadIdSchema,
-  toolCallId: ToolCallIdSchema,
+  threadId: z.string().min(1),
+  toolCallId: z.string().min(1),
 });
 
 const BodySchema = z.object({
@@ -41,6 +44,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const { threadId, toolCallId: encodedToolCallId } = paramsResult.data;
 
+    if (!SessionIdSchema.safeParse(threadId).success) {
+      return createErrorResponse('Invalid thread ID format', 400, { code: 'VALIDATION_FAILED' });
+    }
+
     // Decode the URL-encoded tool call ID
     const toolCallId = decodeURIComponent(encodedToolCallId);
 
@@ -64,28 +71,30 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const { decision } = bodyResult.data;
 
-    // Get session first, then agent (following existing pattern)
-    const sessionService = getSessionService();
-
-    // Determine session ID (parent thread for agents, or self for sessions)
-    const sessionIdStr: string = threadId.includes('.')
-      ? (threadId.split('.')[0] ?? threadId)
-      : threadId;
-
-    const session = await sessionService.getSession(asThreadId(sessionIdStr));
-    if (!session) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+    const supervisor = getSupervisor();
+    const workspace = supervisor
+      .listWorkspaceSessions()
+      .find((ws) => ws.agents.some((a) => a.sessionId === threadId));
+    if (!workspace) {
+      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const agent = session.getAgent(asThreadId(threadId));
-    if (!agent) {
-      return createErrorResponse('Agent not found for thread', 404, { code: 'RESOURCE_NOT_FOUND' });
+    const pending = listPendingPermissions(workspace.workspaceSessionId).find(
+      (p) => p.toolCallId === toolCallId
+    );
+    if (!pending || pending.agentSessionId !== threadId) {
+      return createErrorResponse('Tool call not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Use Agent interface - no direct ThreadManager access
-    // Convert string literal to ApprovalDecision enum
-    const approvalDecision = decision as ApprovalDecision;
-    await agent.handleApprovalResponse(toolCallId, approvalDecision);
+    const mappedDecision = decision === 'deny' ? 'deny' : 'allow';
+    const resolved = resolvePendingPermission({
+      workspaceSessionId: workspace.workspaceSessionId,
+      toolCallId,
+      decision: mappedDecision,
+    });
+    if (!resolved) {
+      return createErrorResponse('Tool call not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+    }
 
     return createSuperjsonResponse({ success: true });
   } catch (_error) {
