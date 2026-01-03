@@ -222,6 +222,29 @@ export class Supervisor {
     return this.store.list();
   }
 
+  getWorkspaceSession(workspaceSessionId: string): WorkspaceSessionRecord | undefined {
+    return this.store.get(workspaceSessionId);
+  }
+
+  updateWorkspaceSession(
+    workspaceSessionId: string,
+    updates: Partial<Pick<WorkspaceSessionRecord, 'projectId' | 'name'>>
+  ): void {
+    this.store.update(workspaceSessionId, updates);
+  }
+
+  upsertAgentSessionMeta(
+    workspaceSessionId: string,
+    params: {
+      sessionId: string;
+      name?: string;
+      connectionId?: string;
+      modelId?: string;
+    }
+  ): void {
+    this.store.upsertAgent(workspaceSessionId, params);
+  }
+
   async listProviders(workspaceSessionId: string): Promise<{
     providers: Array<{
       providerId: string;
