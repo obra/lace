@@ -1,5 +1,5 @@
 // ABOUTME: Agent spawning API endpoints for creating and listing agents within a session
-// ABOUTME: Agents are child threads (sessionId.N) that run within a session
+// ABOUTME: Agents are independent agent sessions within a workspace session
 
 import { CreateAgentRequest } from '@lace/web/types/api';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
@@ -7,7 +7,6 @@ import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-ses
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
-import { logger } from '@lace/core/utils/logger';
 import type { Route } from './+types/api.sessions.$sessionId.agents';
 
 // Type guard for unknown error values
@@ -133,27 +132,13 @@ export async function action({ request, params }: Route.ActionArgs) {
       tokenUsage: undefined,
     };
 
-    // Test SSE broadcast
     const sseManager = EventStreamManager.getInstance();
-    const testEvent = {
-      type: 'LOCAL_SYSTEM_MESSAGE' as const,
-      timestamp: new Date(),
-      data: `Agent "${agentResponse.name}" spawned successfully`,
-      context: {
-        sessionId: workspaceSessionId,
-        projectId: undefined,
-        taskId: undefined,
-        threadId: agentResponse.threadId as string,
-      },
-    };
-    sseManager.broadcast(testEvent);
-
     sseManager.broadcast({
       type: 'AGENT_SPAWNED',
       timestamp: new Date(),
       data: {
         type: 'agent:spawned',
-        agentThreadId: agentResponse.threadId as any,
+        agentThreadId: agentResponse.threadId,
         providerInstanceId: body.providerInstanceId,
         modelId: body.modelId,
         context: {
@@ -167,7 +152,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         sessionId: workspaceSessionId,
         projectId: undefined,
         taskId: undefined,
-        threadId: agentResponse.threadId as string,
+        threadId: agentResponse.threadId,
       },
     });
 

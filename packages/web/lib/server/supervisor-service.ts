@@ -8,9 +8,7 @@ import type { LaceEvent } from '@lace/web/types/core';
 import { SessionIdSchema } from '@lace/ent-protocol';
 
 declare global {
-  // eslint-disable-next-line no-var
   var laceWebSupervisor: Supervisor | undefined;
-  // eslint-disable-next-line no-var
   var laceWebPendingPermissions:
     | Map<
         string,
@@ -28,13 +26,29 @@ declare global {
     | undefined;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+type ToolResultContentItem =
+  | { type: 'text'; text: string }
+  | { type: 'json'; data: unknown }
+  | { type: 'image'; data: string; mediaType?: string }
+  | { type: 'error'; message: string; code?: string };
+
+function isToolResultContentItem(value: unknown): value is ToolResultContentItem {
+  if (!isRecord(value)) return false;
+
+  if (value.type === 'text') return typeof value.text === 'string';
+  if (value.type === 'json') return 'data' in value;
+  if (value.type === 'image') return typeof value.data === 'string';
+  if (value.type === 'error') return typeof value.message === 'string';
+
+  return false;
+}
+
 function toToolResultContent(
-  content: Array<
-    | { type: 'text'; text: string }
-    | { type: 'json'; data: unknown }
-    | { type: 'image'; data: string; mediaType?: string }
-    | { type: 'error'; message: string; code?: string }
-  >
+  content: ToolResultContentItem[]
 ): Array<{ type: 'text'; text: string }> {
   return content.map((c) => {
     if (c.type === 'text') return { type: 'text', text: c.text };
@@ -74,7 +88,7 @@ function updateToLaceEvents(params: {
   if (type === 'tool_use') {
     const toolCallId = typeof update.toolCallId === 'string' ? update.toolCallId : '';
     const name = typeof update.name === 'string' ? update.name : '';
-    const input = typeof update.input === 'object' && update.input ? update.input : {};
+    const input = isRecord(update.input) ? update.input : {};
     const status = typeof update.status === 'string' ? update.status : '';
 
     const events: LaceEvent[] = [];
@@ -104,10 +118,11 @@ function updateToLaceEvents(params: {
         status === 'timeout' ||
         status === 'cancelled') &&
       update.result &&
-      typeof update.result === 'object'
+      isRecord(update.result)
     ) {
-      const result = update.result as { outcome?: string; content?: unknown[] };
-      const content = Array.isArray(result.content) ? (result.content as any[]) : [];
+      const result = update.result;
+      const rawContent = Array.isArray(result.content) ? result.content : [];
+      const content = rawContent.filter(isToolResultContentItem);
 
       events.push({
         type: 'TOOL_RESULT',
@@ -141,8 +156,7 @@ export function getSupervisor(): Supervisor {
 
       const record = supervisor.getWorkspaceSession(workspaceSessionId);
       const projectId = record?.projectId;
-      const agentSessionId =
-        typeof (update as any).sessionId === 'string' ? (update as any).sessionId : undefined;
+      const agentSessionId = typeof update.sessionId === 'string' ? update.sessionId : undefined;
 
       const events = updateToLaceEvents({
         workspaceSessionId,
@@ -162,12 +176,9 @@ export function getSupervisor(): Supervisor {
       const record = supervisor?.getWorkspaceSession(workspaceSessionId);
       const projectId = record?.projectId;
 
-      const agentSessionId =
-        typeof (params as any).sessionId === 'string'
-          ? String((params as any).sessionId)
-          : undefined;
+      const agentSessionId = typeof params.sessionId === 'string' ? params.sessionId : undefined;
 
-      const toolCallId = String((params as any).toolCallId ?? '');
+      const toolCallId = typeof params.toolCallId === 'string' ? params.toolCallId : '';
 
       manager.broadcast({
         type: 'TOOL_APPROVAL_REQUEST',
@@ -196,7 +207,7 @@ export function getSupervisor(): Supervisor {
         pending.set(toolCallId, {
           workspaceSessionId,
           agentSessionId,
-          params: params as Record<string, unknown>,
+          params,
           createdAt: Date.now(),
           resolve,
         });

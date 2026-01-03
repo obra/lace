@@ -185,7 +185,7 @@ interface CompactionCompleteData {
 interface AgentSpawnedData {
   type: 'agent:spawned'; // For compatibility with existing handlers
   taskId?: string;
-  agentThreadId: ThreadId;
+  agentThreadId: string;
   providerInstanceId: string;
   modelId: string;
   context: {
@@ -197,7 +197,7 @@ interface AgentSpawnedData {
 
 export interface AgentSummaryUpdatedData {
   summary: string;
-  agentThreadId: ThreadId;
+  agentThreadId: string;
   timestamp: Date;
 }
 

@@ -90,7 +90,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     // Return immediate acknowledgment
     const response: MessageResponse = {
       status: 'accepted' as const,
-      threadId: threadIdParam as any,
+      threadId: threadIdParam,
       messageId,
     };
 

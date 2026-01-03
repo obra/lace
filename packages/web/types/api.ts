@@ -3,7 +3,6 @@
 
 // Import core types from unified core imports
 import type {
-  ThreadId,
   ProviderInfo as BackendProviderInfo,
   ModelInfo as BackendModelInfo,
   AgentInfo,
@@ -78,7 +77,7 @@ export interface CreateAgentRequest {
 
 export interface MessageResponse {
   status: 'accepted';
-  threadId: ThreadId;
+  threadId: string;
   messageId: string;
 }
 
