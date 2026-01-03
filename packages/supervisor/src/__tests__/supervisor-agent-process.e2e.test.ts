@@ -216,4 +216,112 @@ describe('Supervisor (E2E)', () => {
     ]);
     expect(events.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4]);
   });
+
+  it('surfaces provider config and jobs via Supervisor wrappers', async () => {
+    const updates: Array<{ workspaceSessionId: string; update: Record<string, unknown> }> = [];
+
+    supervisor = new Supervisor({
+      laceDir,
+      onSessionUpdate: (workspaceSessionId, update) => updates.push({ workspaceSessionId, update }),
+      onPermissionRequest: async () => ({ decision: 'allow' }),
+    });
+
+    const ws = await supervisor.createWorkspaceSession(workDir);
+
+    const providers = await withTimeout(
+      supervisor.listProviders(ws.workspaceSessionId),
+      2_000,
+      'providers/list'
+    );
+    expect(providers.providers.length).toBeGreaterThan(0);
+
+    const providerId =
+      providers.providers.find((p) => p.providerId === 'openai')?.providerId ??
+      providers.providers[0].providerId;
+
+    const createdConn = await withTimeout(
+      supervisor.upsertConnection(ws.workspaceSessionId, {
+        providerId,
+        connection: { name: 'E2E Connection', config: {} },
+      }),
+      2_000,
+      'connections/upsert'
+    );
+    expect(createdConn).toMatchObject({
+      providerId,
+      created: true,
+      connectionId: expect.any(String),
+    });
+
+    const connections = await withTimeout(
+      supervisor.listConnections(ws.workspaceSessionId),
+      2_000,
+      'connections/list'
+    );
+    expect(
+      connections.connections.find((c) => c.connectionId === createdConn.connectionId)
+    ).toMatchObject({
+      credentialState: 'missing',
+    });
+
+    const creds = await withTimeout(
+      supervisor.connectionCredentialSubmit(ws.workspaceSessionId, {
+        connectionId: createdConn.connectionId,
+        values: { apiKey: 'sk-supervisor-e2e' },
+      }),
+      2_000,
+      'credentials/submit'
+    );
+    expect(creds.ok).toBe(true);
+
+    const status = await withTimeout(
+      supervisor.connectionCredentialStatus(ws.workspaceSessionId, {
+        connectionId: createdConn.connectionId,
+      }),
+      2_000,
+      'credentials/status'
+    );
+    expect(status.state).toBe('ready');
+
+    const models = await withTimeout(
+      supervisor.listModels(ws.workspaceSessionId, { connectionId: createdConn.connectionId }),
+      2_000,
+      'models/list'
+    );
+    expect(models.models.length).toBeGreaterThan(0);
+
+    await withTimeout(
+      supervisor.prompt(ws.workspaceSessionId, [{ type: 'text', text: 'job: echo hi' }]),
+      10_000,
+      'prompt job'
+    );
+
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          const done = updates.find(
+            (u) =>
+              u.workspaceSessionId === ws.workspaceSessionId && u.update.type === 'job_finished'
+          );
+          if (done) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      5_000,
+      'job_finished update'
+    );
+
+    const jobs = await withTimeout(supervisor.listJobs(ws.workspaceSessionId), 2_000, 'job/list');
+    expect(jobs.jobs.length).toBeGreaterThan(0);
+
+    const jobId = jobs.jobs[jobs.jobs.length - 1].jobId;
+    const output = (await withTimeout(
+      supervisor.jobOutput(ws.workspaceSessionId, { jobId }),
+      2_000,
+      'job/output'
+    )) as { output: string };
+    expect(output.output).toContain('hi');
+  });
 });
