@@ -178,43 +178,51 @@ describe('Supervisor (E2E)', () => {
   });
 
   it('can attach to an existing sessionId and read durable events', async () => {
-    supervisor = new Supervisor({
-      laceDir,
-      onPermissionRequest: async () => ({ decision: 'allow' }),
-    });
-
-    const created = await supervisor.createWorkspaceSession(workDir);
-    await withTimeout(
-      supervisor.prompt(created.workspaceSessionId, [{ type: 'text', text: 'hi' }]),
-      5_000,
-      'prompt (created)'
-    );
-
-    await supervisor.shutdown();
-    supervisor = undefined;
+    const originalTestProvider = process.env.LACE_AGENT_TEST_PROVIDER;
+    process.env.LACE_AGENT_TEST_PROVIDER = '1';
 
     supervisor = new Supervisor({
       laceDir,
       onPermissionRequest: async () => ({ decision: 'allow' }),
     });
 
-    const attached = await supervisor.attachWorkspaceSession(created.sessionId);
-    const events = (await withTimeout(
-      supervisor.getPeer(attached.workspaceSessionId).request('ent/session/events', {
-        afterEventSeq: 0,
-        limit: 100,
-      }),
-      2_000,
-      'ent/session/events (attached)'
-    )) as { events: Array<{ type: string; eventSeq: number }>; hasMore: boolean };
+    try {
+      const created = await supervisor.createWorkspaceSession(workDir);
+      await withTimeout(
+        supervisor.prompt(created.workspaceSessionId, [{ type: 'text', text: 'hi' }]),
+        5_000,
+        'prompt (created)'
+      );
 
-    expect(events.events.map((e) => e.type)).toEqual([
-      'prompt',
-      'turn_start',
-      'message',
-      'turn_end',
-    ]);
-    expect(events.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4]);
+      await supervisor.shutdown();
+      supervisor = undefined;
+
+      supervisor = new Supervisor({
+        laceDir,
+        onPermissionRequest: async () => ({ decision: 'allow' }),
+      });
+
+      const attached = await supervisor.attachWorkspaceSession(created.sessionId);
+      const events = (await withTimeout(
+        supervisor.getPeer(attached.workspaceSessionId).request('ent/session/events', {
+          afterEventSeq: 0,
+          limit: 100,
+        }),
+        2_000,
+        'ent/session/events (attached)'
+      )) as { events: Array<{ type: string; eventSeq: number }>; hasMore: boolean };
+
+      expect(events.events.map((e) => e.type)).toEqual([
+        'prompt',
+        'turn_start',
+        'message',
+        'turn_end',
+      ]);
+      expect(events.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4]);
+    } finally {
+      if (originalTestProvider === undefined) delete process.env.LACE_AGENT_TEST_PROVIDER;
+      else process.env.LACE_AGENT_TEST_PROVIDER = originalTestProvider;
+    }
   });
 
   it('surfaces provider config and jobs via Supervisor wrappers', async () => {
