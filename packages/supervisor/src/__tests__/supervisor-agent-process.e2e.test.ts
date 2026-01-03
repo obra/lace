@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SupervisorAgentProcess } from '../supervisor-agent-process';
+import { Supervisor } from '../supervisor';
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -88,5 +89,91 @@ describe('SupervisorAgentProcess (E2E)', () => {
       resource: 'echo hi',
       toolCallId: expect.any(String),
     });
+  });
+});
+
+describe('Supervisor (E2E)', () => {
+  let laceDir: string;
+  let workDir: string;
+  let supervisor: Supervisor | undefined;
+
+  beforeEach(() => {
+    laceDir = mkdtempSync(join(tmpdir(), 'lace-supervisor2-e2e-store-'));
+    workDir = mkdtempSync(join(tmpdir(), 'lace-supervisor2-e2e-wd-'));
+  });
+
+  afterEach(async () => {
+    if (supervisor) {
+      await supervisor.shutdown();
+      supervisor = undefined;
+    }
+
+    rmSync(laceDir, { recursive: true, force: true });
+    rmSync(workDir, { recursive: true, force: true });
+  });
+
+  it('runs two workspace sessions as two agent processes', async () => {
+    const updates: Array<{ workspaceSessionId: string; update: Record<string, unknown> }> = [];
+    const permissionRequests: Array<{
+      workspaceSessionId: string;
+      params: Record<string, unknown>;
+    }> = [];
+
+    supervisor = new Supervisor({
+      laceDir,
+      onSessionUpdate: (workspaceSessionId, update) => updates.push({ workspaceSessionId, update }),
+      onPermissionRequest: async (workspaceSessionId, params) => {
+        permissionRequests.push({ workspaceSessionId, params });
+        return { decision: 'allow' };
+      },
+    });
+
+    const a = await supervisor.createWorkspaceSession(workDir);
+    const b = await supervisor.createWorkspaceSession(workDir);
+
+    expect(a.workspaceSessionId).not.toBe(b.workspaceSessionId);
+    expect(a.sessionId).not.toBe(b.sessionId);
+    expect(a.pid).not.toBe(b.pid);
+
+    await withTimeout(
+      supervisor.prompt(a.workspaceSessionId, [{ type: 'text', text: 'run: echo a' }]),
+      10_000,
+      'prompt (a)'
+    );
+    await withTimeout(
+      supervisor.prompt(b.workspaceSessionId, [{ type: 'text', text: 'run: echo b' }]),
+      10_000,
+      'prompt (b)'
+    );
+
+    expect(permissionRequests.map((r) => r.workspaceSessionId).sort()).toEqual([
+      a.workspaceSessionId,
+      b.workspaceSessionId,
+    ]);
+
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          const doneA = updates.find(
+            (u) =>
+              u.workspaceSessionId === a.workspaceSessionId &&
+              u.update.type === 'tool_use' &&
+              u.update.status === 'completed'
+          );
+          const doneB = updates.find(
+            (u) =>
+              u.workspaceSessionId === b.workspaceSessionId &&
+              u.update.type === 'tool_use' &&
+              u.update.status === 'completed'
+          );
+          if (doneA && doneB) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      5_000,
+      'tool_use completed updates'
+    );
   });
 });
