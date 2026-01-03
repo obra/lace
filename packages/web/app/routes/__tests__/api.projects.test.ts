@@ -18,78 +18,9 @@ interface ErrorResponse {
 // Setup test context BEFORE imports
 const context = setupWebTest();
 
-// Mock external dependencies (database persistence) but not business logic
-const projectStore = new Map<string, Record<string, unknown>>();
-const sessionStore = new Map<string, Record<string, unknown>>();
-
-vi.mock('@lace/core/persistence/database', () => {
-  return {
-    getPersistence: vi.fn(() => ({
-      // Mock the persistence layer to use in-memory storage for testing
-      loadAllProjects: vi.fn(() => {
-        return Array.from(projectStore.values()) as Record<string, unknown>[];
-      }),
-      loadProject: vi.fn((projectId: string) => {
-        return projectStore.get(projectId) || null;
-      }),
-      saveProject: vi.fn((project: Record<string, unknown> & { id: string }) => {
-        projectStore.set(project.id, project);
-      }),
-      // Mock method needed by Project.getSessions() -> Project.getSessionCount()
-      loadSessionsByProject: vi.fn((_projectId: string) => {
-        // Return empty sessions for now - we can add session testing later if needed
-        return [];
-      }),
-      // Session methods needed by Session.create()
-      saveSession: vi.fn((session: Record<string, unknown> & { id: string }) => {
-        sessionStore.set(session.id, session);
-      }),
-      loadSession: vi.fn((sessionId: string) => {
-        return sessionStore.get(sessionId) || null;
-      }),
-    })),
-    // resetPersistence needed by setupWebTest()
-    resetPersistence: vi.fn(),
-  };
-});
-
-// Mock ThreadManager for session counting - external dependency
-vi.mock('@lace/core/threads/thread-manager', () => ({
-  ThreadManager: vi.fn(() => ({
-    getSessionsForProject: vi.fn(() => []), // Empty array for clean tests
-    generateThreadId: vi.fn(() => {
-      const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const random = Math.random().toString(36).substring(2, 8);
-      return `lace_${date}_${random}`;
-    }),
-    createThread: vi.fn((threadId?: string, _sessionId?: string, _projectId?: string) => {
-      // Return the provided threadId or generate a new one
-      return (
-        threadId ||
-        `lace_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}_${Math.random().toString(36).substring(2, 8)}`
-      );
-    }),
-    getThread: vi.fn((threadId: string) => {
-      // Return a mock thread object when requested
-      return {
-        id: threadId,
-        metadata: {},
-        events: [],
-      };
-    }),
-    saveThread: vi.fn((thread: unknown) => {
-      // Mock saving thread - just return success
-      return thread as typeof thread;
-    }),
-  })),
-}));
-
 describe('Projects API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Clear the in-memory stores between tests
-    projectStore.clear();
-    sessionStore.clear();
   });
 
   describe('GET /api/projects', () => {
@@ -126,14 +57,14 @@ describe('Projects API', () => {
         description: 'First project',
         workingDirectory: dir1,
         isArchived: false,
-        sessionCount: 0,
+        sessionCount: 1,
       });
       expect(returnedProject2).toMatchObject({
         name: 'Project 2',
         description: 'Second project',
         workingDirectory: dir2,
         isArchived: false,
-        sessionCount: 0,
+        sessionCount: 1,
       });
     });
 
@@ -180,7 +111,7 @@ describe('Projects API', () => {
         description: 'A new project',
         workingDirectory: newDir,
         isArchived: false,
-        sessionCount: 0,
+        sessionCount: 1,
       });
       expect(data.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
       expect(data.createdAt).toBeTruthy();
@@ -221,7 +152,7 @@ describe('Projects API', () => {
         description: '', // Default empty description
         workingDirectory: minimalDir,
         isArchived: false,
-        sessionCount: 0,
+        sessionCount: 1,
       });
     });
 
@@ -268,28 +199,7 @@ describe('Projects API', () => {
     });
 
     it('should handle creation errors gracefully', async () => {
-      // Arrange: Create temp directory first
-      const errorTestDir = join(context.tempProjectDir, 'error-test');
-      await fs.mkdir(errorTestDir, { recursive: true });
-
-      // Mock persistence layer to simulate database error
-      const mockPersistence = {
-        loadAllProjects: vi.fn(() => []),
-        loadProject: vi.fn(() => null),
-        saveProject: vi.fn(() => {
-          throw new Error('Database connection failed');
-        }),
-        // Need to add session methods since Project.create() creates a session
-        saveSession: vi.fn(),
-        loadSession: vi.fn(() => null),
-        loadSessionsByProject: vi.fn(() => []),
-      };
-
-      // Override the persistence mock for this test
-      const { getPersistence } = await import('@lace/core/persistence/database');
-      vi.mocked(getPersistence).mockReturnValue(
-        mockPersistence as unknown as ReturnType<typeof getPersistence>
-      );
+      const errorTestDir = join(context.tempProjectDir, 'missing-directory');
 
       const requestBody = {
         name: 'Test Project',
@@ -308,7 +218,7 @@ describe('Projects API', () => {
 
       // Assert: API handles the persistence error gracefully
       expect(response.status).toBe(500);
-      expect(data.error).toBe('Database connection failed');
+      expect(data.error).toContain('does not exist');
     });
   });
 });
