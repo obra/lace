@@ -7,9 +7,6 @@ import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 
 // Route parameter validation schemas
 export const ProjectIdSchema = z.string().uuid('Invalid project ID format');
-export const SessionIdSchema = z
-  .string()
-  .regex(/^lace_\d{8}_[a-z0-9]{6}(\.\d+)*$/, 'Invalid session ID format');
 
 // Validation helper
 export function validateRouteParams<T>(params: unknown, schema: z.ZodSchema<T>): T {
