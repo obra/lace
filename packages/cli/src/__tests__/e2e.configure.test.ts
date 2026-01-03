@@ -55,7 +55,7 @@ describe('cli e2e (:configure)', () => {
 
     proc.stdin.write('hi\n');
 
-    await waitFor(() => lines.some((l) => l === 'text: ok'), 10_000);
+    await waitFor(() => lines.some((l) => l === 'ok'), 10_000);
 
     proc.stdin.write(':exit\n');
 

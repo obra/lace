@@ -67,7 +67,26 @@ describe('cli e2e', () => {
 
     proc.stdin.write('allow\n');
 
-    await waitFor(() => lines.some((l) => l === 'text: ok'), 10_000);
+    await waitFor(() => lines.some((l) => l === 'ok'), 10_000);
+
+    proc.stdin.write(':exit\n');
+
+    const exitCode = await new Promise<number>((resolveExit) => {
+      proc.once('exit', (code) => resolveExit(code ?? 1));
+    });
+
+    expect(exitCode).toBe(0);
+  });
+
+  it('coalesces streamed text deltas into a single line', async () => {
+    const workDir = await mkdtemp(resolve(tmpdir(), 'lace-cli-test-'));
+    const agentPath = resolve(__dirname, 'fixtures/fake-agent-streaming.mjs');
+
+    const { proc, lines } = spawnCli(workDir, agentPath);
+
+    proc.stdin.write(':prompt hi\n');
+
+    await waitFor(() => lines.some((l) => l === 'Hello world!'), 10_000);
 
     proc.stdin.write(':exit\n');
 

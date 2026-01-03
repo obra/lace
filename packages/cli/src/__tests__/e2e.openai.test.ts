@@ -201,7 +201,14 @@ describe('cli e2e (OpenAI, opt-in)', () => {
       })}\n`
     );
 
-    await waitFor(() => lines.some((l) => l.startsWith('text: ')), 60_000);
+    await waitFor(
+      () =>
+        !!findJsonLine(
+          lines,
+          (obj) => obj?.stopReason === 'end_turn' && typeof obj?.turnId === 'string'
+        ),
+      60_000
+    );
 
     proc.stdin.write(':exit\n');
 

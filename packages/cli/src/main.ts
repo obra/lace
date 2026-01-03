@@ -165,22 +165,50 @@ async function main(): Promise<void> {
   const interactive = process.stdin.isTTY && process.stdout.isTTY;
   let shuttingDown = false;
 
+  const TEXT_STREAM_IDLE_MS = 250;
+  let textStreamActive = false;
+  let textStreamAtLineStart = true;
+  let textStreamIdleTimer: NodeJS.Timeout | null = null;
+
   const pendingPermissions: PendingPermission[] = [];
   let activePermission: PendingPermission | undefined;
 
   let pendingQuestionResolve: ((line: string) => void) | null = null;
 
+  const clearTextStreamIdleTimer = () => {
+    if (!textStreamIdleTimer) return;
+    clearTimeout(textStreamIdleTimer);
+    textStreamIdleTimer = null;
+  };
+
+  const scheduleTextStreamIdle = () => {
+    clearTextStreamIdleTimer();
+    textStreamIdleTimer = setTimeout(() => {
+      textStreamActive = false;
+      if (!textStreamAtLineStart) {
+        process.stdout.write('\n');
+        textStreamAtLineStart = true;
+      }
+      promptShown = false;
+      showPrompt();
+    }, TEXT_STREAM_IDLE_MS);
+  };
+
   const showPrompt = () => {
     if (!interactive) return;
     if (promptShown) return;
+    if (textStreamActive && activePrompt === 'repl' && !pendingQuestionResolve) return;
     promptShown = true;
     process.stdout.write(activePrompt === 'permission' ? permissionPrompt : replPrompt);
   };
 
   const printBlock = (lines: string[]) => {
-    if (promptShown) process.stdout.write('\n');
+    clearTextStreamIdleTimer();
+    if (promptShown || (textStreamActive && !textStreamAtLineStart)) process.stdout.write('\n');
     promptShown = false;
+    textStreamAtLineStart = true;
     for (const line of lines) process.stdout.write(`${line}\n`);
+    if (textStreamActive) scheduleTextStreamIdle();
     showPrompt();
   };
 
@@ -261,11 +289,31 @@ async function main(): Promise<void> {
     if (updateType === 'tool_use') captureToolUse(p);
     if (p.type === 'job_update') captureToolUse((p as any).update);
 
+    const writeTextDelta = (text: string) => {
+      clearTextStreamIdleTimer();
+      if (promptShown) process.stdout.write('\n');
+      promptShown = false;
+      textStreamActive = true;
+      process.stdout.write(text);
+      textStreamAtLineStart = text.endsWith('\n');
+      scheduleTextStreamIdle();
+    };
+
+    if (p.type === 'text_delta' && typeof (p as any).text === 'string') {
+      writeTextDelta((p as any).text);
+      return undefined;
+    }
+
+    if (p.type === 'job_update') {
+      const inner = (p as any).update;
+      if (inner?.type === 'text_delta' && typeof inner.text === 'string') {
+        writeTextDelta(inner.text);
+        return undefined;
+      }
+    }
+
     const summary = (() => {
       const type = p.type;
-      if (type === 'text_delta' && typeof (p as any).text === 'string') {
-        return `text: ${firstLine((p as any).text).replaceAll('\n', '\\n')}`;
-      }
       if (type === 'tool_use') {
         const toolCallId = typeof (p as any).toolCallId === 'string' ? (p as any).toolCallId : '?';
         const name = typeof (p as any).name === 'string' ? (p as any).name : '?';
@@ -285,9 +333,6 @@ async function main(): Promise<void> {
       if (type === 'job_update') {
         const jobId = typeof (p as any).jobId === 'string' ? (p as any).jobId : '?';
         const inner = (p as any).update;
-        if (inner?.type === 'text_delta' && typeof inner.text === 'string') {
-          return `job ${jobId} text: ${firstLine(inner.text).replaceAll('\n', '\\n')}`;
-        }
         if (inner?.type === 'tool_use') {
           const toolCallId = typeof inner.toolCallId === 'string' ? inner.toolCallId : '?';
           const name = typeof inner.name === 'string' ? inner.name : '?';
