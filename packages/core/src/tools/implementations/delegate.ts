@@ -75,8 +75,7 @@ Multiple delegations: delegate({ tasks: [
 
   // Get TaskManager from session context
   private async getTaskManagerFromContext(context?: ToolContext): Promise<TaskManager | null> {
-    const session = await context?.agent?.getFullSession();
-    return session?.getTaskManager() || null;
+    return context?.taskManager || null;
   }
 
   protected async executeValidated(
@@ -166,7 +165,7 @@ Multiple delegations: delegate({ tasks: [
       logger.debug('DelegateTool: Creating task with agent spawning', {
         title,
         assignedTo: assigneeSpec,
-        actor: context?.agent?.threadId || 'unknown',
+        actor: context?.threadId || 'unknown',
       });
 
       // Create task with assignment in single operation
@@ -178,7 +177,7 @@ Multiple delegations: delegate({ tasks: [
           assignedTo: assigneeSpec,
         },
         {
-          actor: context?.agent?.threadId || 'human',
+          actor: context?.threadId || 'human',
         }
       );
 
@@ -197,7 +196,7 @@ Multiple delegations: delegate({ tasks: [
       const result = await this.waitForTaskCompletion(
         task.id,
         taskManager,
-        context?.agent?.threadId || 'unknown',
+        context?.threadId || 'unknown',
         context?.signal
       );
 
@@ -287,6 +286,27 @@ Please complete the task and provide your response in the expected format.`;
       logger.debug('DelegateTool: Registered task update handler', {
         taskId,
       });
+
+      // If the task completed before we subscribed (fast mocks), resolve immediately.
+      const getTask = (
+        taskManager as unknown as {
+          getTask?: (id: string, ctx: TaskContext) => Task | null;
+        }
+      ).getTask;
+      if (typeof getTask === 'function') {
+        const existing = getTask.call(taskManager, taskId, { actor: creatorThreadId });
+        if (existing?.status === 'completed') {
+          logger.debug('DelegateTool: Task already completed when subscribing', { taskId });
+          taskManager.off('task:updated', handleTaskUpdate);
+          signal?.removeEventListener('abort', abortHandler);
+          resolve(this.extractResponseFromTask(existing));
+        } else if (existing?.status === 'blocked') {
+          logger.debug('DelegateTool: Task already blocked when subscribing', { taskId });
+          taskManager.off('task:updated', handleTaskUpdate);
+          signal?.removeEventListener('abort', abortHandler);
+          reject(new Error(`Task ${taskId} is blocked`));
+        }
+      }
     });
   }
 

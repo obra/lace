@@ -26,6 +26,15 @@ import { mkdirSync } from 'fs';
 
 // Using shared delegation test utilities
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timed out after ${ms}ms: ${label}`)), ms)
+    ),
+  ]);
+}
+
 describe('Task-Based DelegateTool Integration', () => {
   const tempLaceDirContext = setupCoreTest();
   let tempProjectDir: string;
@@ -38,24 +47,32 @@ describe('Task-Based DelegateTool Integration', () => {
     setupTestProviderDefaults();
 
     // Create test provider instance
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
+    providerInstanceId = await withTimeout(
+      createTestProviderInstance({
+        catalogId: 'anthropic',
+        models: ['claude-3-5-haiku-20241022'],
+        displayName: 'Test Anthropic Instance',
+        apiKey: 'test-anthropic-key',
+      }),
+      10_000,
+      'createTestProviderInstance'
+    );
 
     // Create temp project directory
     tempProjectDir = join(tempLaceDirContext.tempDir, 'test-delegation');
     mkdirSync(tempProjectDir, { recursive: true });
 
     // Use shared delegation test setup with MSW
-    testSetup = await createDelegationTestSetup({
-      sessionName: 'Task-Based Delegate Test Session',
-      projectName: 'Task-Based Test Project',
-      projectPath: tempProjectDir,
-      model: 'claude-3-5-haiku-20241022',
-    });
+    testSetup = await withTimeout(
+      createDelegationTestSetup({
+        sessionName: 'Task-Based Delegate Test Session',
+        projectName: 'Task-Based Test Project',
+        projectPath: tempProjectDir,
+        model: 'claude-3-5-haiku-20241022',
+      }),
+      10_000,
+      'createDelegationTestSetup'
+    );
 
     // Create delegate tool and inject TaskManager
     delegateTool = new DelegateTool();
@@ -64,7 +81,8 @@ describe('Task-Based DelegateTool Integration', () => {
 
     context = {
       signal: new AbortController().signal,
-      agent, // Access to threadId and session via agent
+      threadId: agent.threadId,
+      taskManager: testSetup.session.getTaskManager(),
     };
   });
 
@@ -106,7 +124,7 @@ describe('Task-Based DelegateTool Integration', () => {
       );
 
       expect(result).toBeDefined();
-      expect(result.status).toBe('completed');
+      expect(result.status, result.content[0]?.text).toBe('completed');
       expect(result.content[0].text).toContain('Integration test completed successfully');
     }, 15000); // Increase timeout to 15 seconds
 
@@ -212,7 +230,6 @@ describe('Task-Based DelegateTool Integration', () => {
 
       const abortedContext: ToolContext = {
         signal: abortController.signal,
-        agent: context.agent,
       };
 
       const result = await delegateTool.execute(

@@ -1,71 +1,112 @@
 // ABOUTME: Tests for the delegate tool
-// ABOUTME: Validates subagent creation, execution, and tool approval flow
+// ABOUTME: Validates task-based delegation flow without Session/Workspace dependencies
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { EventEmitter } from 'events';
 import { DelegateTool } from '@lace/core/tools/implementations/delegate';
-import { setupCoreTest, cleanupSession } from '@lace/core/test-utils/core-test-setup';
 import type { ToolContext } from './types';
-import {
-  createDelegationTestSetup,
-  DelegationTestSetup,
-} from '@lace/core/test-utils/delegation-test-helper';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/core/test-utils/provider-instances';
-import { join } from 'path';
-import { mkdirSync } from 'fs';
+import type { Task, TaskContext } from '@lace/core/tasks/types';
 
-// Using shared delegation test utilities
+class FakeTaskManager extends EventEmitter {
+  private tasks = new Map<string, Task>();
+  private responseQueue: string[] = [];
+  private nextId = 1;
+  private blockedMode = false;
+
+  setResponses(responses: string[]): void {
+    this.responseQueue = [...responses];
+    this.blockedMode = false;
+  }
+
+  setBlockedMode(): void {
+    this.responseQueue = [];
+    this.blockedMode = true;
+  }
+
+  createTask = async (
+    input: {
+      title: string;
+      prompt: string;
+      priority: string;
+      assignedTo: string;
+    },
+    context: TaskContext
+  ): Promise<Task> => {
+    const id = `task_${this.nextId++}`;
+    const createdBy = context.actor;
+
+    const task: Task = {
+      id,
+      title: input.title,
+      prompt: input.prompt,
+      priority: input.priority as any,
+      status: 'in_progress',
+      assignedTo: input.assignedTo as any,
+      createdBy,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      notes: [],
+    };
+
+    this.tasks.set(id, task);
+
+    setTimeout(() => {
+      const updated = this.tasks.get(id);
+      if (!updated) return;
+
+      if (this.blockedMode) {
+        updated.status = 'blocked';
+        this.emit('task:updated', {
+          task: { ...updated },
+          context: { actor: 'agent_1' },
+          type: 'task:updated',
+        });
+        return;
+      }
+
+      const response = this.responseQueue.shift() ?? 'Mock delegation response';
+      updated.status = 'completed';
+      updated.notes = [
+        ...updated.notes,
+        {
+          id: `note_${id}`,
+          taskId: id,
+          author: 'agent_1',
+          content: response,
+          createdAt: new Date(),
+        } as any,
+      ];
+      updated.updatedAt = new Date();
+
+      this.emit('task:updated', {
+        task: { ...updated },
+        context: { actor: 'agent_1' },
+        type: 'task:updated',
+      });
+    }, 1);
+
+    return task;
+  };
+
+  getTask = (id: string, _context: TaskContext): Task | null => {
+    return this.tasks.get(id) || null;
+  };
+}
 
 describe('DelegateTool', () => {
-  const tempLaceDirContext = setupCoreTest();
-  let tempProjectDir: string;
-  let testSetup: DelegationTestSetup;
   let tool: DelegateTool;
+  let taskManager: FakeTaskManager;
   let context: ToolContext;
-  let providerInstanceId: string;
+  const providerInstanceId = 'test-anthropic';
 
-  beforeEach(async () => {
-    // Create test provider instance
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Delegate Instance',
-      apiKey: 'test-anthropic-key',
-    });
-
-    // Create temp project directory
-    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-delegation');
-    mkdirSync(tempProjectDir, { recursive: true });
-
-    // Use shared delegation test setup
-    testSetup = await createDelegationTestSetup({
-      sessionName: 'Delegate Test Session',
-      projectName: 'Delegate Test Project',
-      projectPath: tempProjectDir,
-      model: 'claude-3-5-haiku-20241022',
-    });
-
-    // Get tool from session agent's toolExecutor
-    const agent = testSetup.session.getAgent(testSetup.session.getId());
-    const toolExecutor = agent!.toolExecutor;
-    tool = toolExecutor.getTool('delegate') as DelegateTool;
-
+  beforeEach(() => {
+    tool = new DelegateTool();
+    taskManager = new FakeTaskManager();
     context = {
       signal: new AbortController().signal,
-      agent: agent!, // Access to threadId and session via agent
+      threadId: 'thread_test_1',
+      taskManager: taskManager as any,
     };
-  });
-
-  afterEach(async () => {
-    vi.clearAllMocks();
-    if (testSetup.session) {
-      await cleanupSession(testSetup.session);
-    }
-    if (providerInstanceId) {
-      await cleanupTestProviderInstances([providerInstanceId]);
-    }
   });
 
   it('should have correct metadata', () => {
@@ -75,7 +116,7 @@ describe('DelegateTool', () => {
   });
 
   it('should delegate a simple task with default model', async () => {
-    testSetup.setMockResponses(['Analysis complete: 3 test failures identified']);
+    taskManager.setResponses(['Analysis complete: 3 test failures identified']);
 
     const result = await tool.execute(
       {
@@ -92,13 +133,13 @@ describe('DelegateTool', () => {
     );
 
     // Test the actual behavior - delegation should work and return results
-    expect(result.status).toBe('completed');
+    expect(result.status, result.content[0]?.text).toBe('completed');
     expect(result.content[0]?.text).toContain('Analysis complete: 3 test failures identified');
     expect(result.metadata?.taskTitle).toBe('Analyze test failures');
   });
 
   it('should handle custom provider:model format', async () => {
-    testSetup.setMockResponses(['Custom model response']);
+    taskManager.setResponses(['Custom model response']);
 
     const result = await tool.execute(
       {
@@ -120,7 +161,7 @@ describe('DelegateTool', () => {
   });
 
   it('should create delegate thread and execute subagent', async () => {
-    testSetup.setMockResponses(['Directory listed successfully']);
+    taskManager.setResponses(['Directory listed successfully']);
 
     const result = await tool.execute(
       {
@@ -143,7 +184,7 @@ describe('DelegateTool', () => {
   });
 
   it('should format the subagent system prompt correctly', async () => {
-    testSetup.setMockResponses(['Task completed']);
+    taskManager.setResponses(['Task completed']);
 
     const result = await tool.execute(
       {
@@ -184,7 +225,7 @@ describe('DelegateTool', () => {
   });
 
   it('should collect all subagent responses', async () => {
-    testSetup.setMockResponses(['Task completed with combined responses']);
+    taskManager.setResponses(['Task completed with combined responses']);
 
     const result = await tool.execute(
       {
@@ -205,7 +246,7 @@ describe('DelegateTool', () => {
   });
 
   it('should include delegate thread ID in result metadata', async () => {
-    testSetup.setMockResponses(['Task completed with metadata']);
+    taskManager.setResponses(['Task completed with metadata']);
 
     const result = await tool.execute(
       {
@@ -230,7 +271,7 @@ describe('DelegateTool', () => {
     const validModels = [`${providerInstanceId}:claude-3-5-haiku-20241022`];
 
     for (const model of validModels) {
-      testSetup.setMockResponses(['Valid model response']);
+      taskManager.setResponses(['Valid model response']);
 
       const result = await tool.execute(
         {

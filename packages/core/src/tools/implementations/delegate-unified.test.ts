@@ -58,7 +58,8 @@ describe('Unified Delegate API', () => {
 
     const context: ToolContext = {
       signal: new AbortController().signal,
-      agent: mockAgent,
+      threadId: mockAgent.threadId,
+      taskManager: mockTaskManager,
     };
 
     // Mock task completion event
@@ -112,7 +113,8 @@ describe('Unified Delegate API', () => {
 
     const context: ToolContext = {
       signal: new AbortController().signal,
-      agent: mockAgent,
+      threadId: mockAgent.threadId,
+      taskManager: mockTaskManager,
     };
 
     // Mock different task IDs and completions
@@ -178,7 +180,8 @@ describe('Unified Delegate API', () => {
 
     const context: ToolContext = {
       signal: new AbortController().signal,
-      agent: mockAgent,
+      threadId: mockAgent.threadId,
+      taskManager: mockTaskManager,
     };
 
     const result = await delegateTool.execute(args, context);
@@ -211,7 +214,8 @@ describe('Unified Delegate API', () => {
 
       const context: ToolContext = {
         signal: new AbortController().signal,
-        agent: mockAgent,
+        threadId: mockAgent.threadId,
+        taskManager: mockTaskManager,
       };
 
       // Mock immediate completion

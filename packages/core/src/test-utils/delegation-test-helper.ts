@@ -32,6 +32,9 @@ let globalMockState = {
   responses: ['Integration test completed successfully'],
   index: 0,
   isBlockedMode: false,
+  completedTaskIds: new Set<string>(),
+  blockedTaskIds: new Set<string>(),
+  toolCallIndex: 0,
 };
 
 export async function createDelegationTestSetup(options?: {
@@ -65,6 +68,9 @@ export async function createDelegationTestSetup(options?: {
     responses: options?.responses || ['Integration test completed successfully'],
     index: 0,
     isBlockedMode: false,
+    completedTaskIds: new Set<string>(),
+    blockedTaskIds: new Set<string>(),
+    toolCallIndex: 0,
   };
 
   // Create a proper mock provider class that extends AIProvider
@@ -110,8 +116,18 @@ export async function createDelegationTestSetup(options?: {
 
         // Check if we're in blocked mode
         if (globalMockState.isBlockedMode) {
+          if (globalMockState.blockedTaskIds.has(taskId)) {
+            return Promise.resolve({
+              content: `Task ${taskId} is already blocked.`,
+              usage: { promptTokens: 10, completionTokens: 10, totalTokens: 20 },
+              toolCalls: [],
+            });
+          }
+
+          globalMockState.blockedTaskIds.add(taskId);
+
           const toolCall: ToolCall = {
-            id: 'task_update_call',
+            id: `task_update_call_${taskId}_${globalMockState.toolCallIndex++}`,
             name: 'task_update',
             arguments: { taskId, status: 'blocked' },
           };
@@ -122,10 +138,19 @@ export async function createDelegationTestSetup(options?: {
           });
         }
 
+        if (globalMockState.completedTaskIds.has(taskId)) {
+          return Promise.resolve({
+            content: `Task ${taskId} has already been completed.`,
+            usage: { promptTokens: 10, completionTokens: 10, totalTokens: 20 },
+            toolCalls: [],
+          });
+        }
+
         const response = this.getNextResponse();
+        globalMockState.completedTaskIds.add(taskId);
 
         const toolCall: ToolCall = {
-          id: 'delegation_task_complete',
+          id: `delegation_task_complete_${taskId}_${globalMockState.toolCallIndex++}`,
           name: 'task_complete',
           arguments: { id: taskId, message: response },
         };
@@ -248,6 +273,9 @@ export async function createDelegationTestSetup(options?: {
   const setMockResponses = (responses: string[]) => {
     globalMockState.responses = responses;
     globalMockState.index = 0;
+    globalMockState.completedTaskIds.clear();
+    globalMockState.blockedTaskIds.clear();
+    globalMockState.toolCallIndex = 0;
   };
 
   const setupBlockedTaskResponse = () => {
@@ -258,6 +286,9 @@ export async function createDelegationTestSetup(options?: {
 
     // Set a flag to indicate we want blocked responses
     globalMockState.isBlockedMode = true;
+    globalMockState.completedTaskIds.clear();
+    globalMockState.blockedTaskIds.clear();
+    globalMockState.toolCallIndex = 0;
   };
 
   // Cleanup function to tear down test resources
