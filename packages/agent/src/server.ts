@@ -140,6 +140,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('session/new', async (params: unknown) => {
     if (!state.initialized) throw new Error('Not initialized');
+    if (state.activeSession) throw { code: 2, message: 'SessionBusy' };
 
     const parsed = params as { workDir: string; persona?: string; systemPrompt?: unknown };
     if (!parsed?.workDir) throw new Error('workDir is required');
@@ -173,6 +174,10 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     if (!parsed?.sessionId) throw new Error('sessionId is required');
     if (parsed.fork) throw new Error('fork not implemented');
 
+    if (state.activeSession && state.activeSession.meta.sessionId !== parsed.sessionId) {
+      throw { code: 2, message: 'SessionBusy' };
+    }
+
     const loaded = loadSession(parsed.sessionId);
     state.activeSession = loaded;
     return {
@@ -184,7 +189,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('ent/session/events', async (params: unknown) => {
     if (!state.initialized) throw new Error('Not initialized');
-    if (!state.activeSession) throw new Error('No active session');
+    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
 
     const parsed = params as
       | { afterEventSeq?: number; limit?: number; types?: string[] }
@@ -216,7 +221,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('session/prompt', async (params: unknown) => {
     if (!state.initialized) throw new Error('Not initialized');
-    if (!state.activeSession) throw new Error('No active session');
+    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+    if (state.activeTurn) throw { code: 2, message: 'SessionBusy' };
 
     const parsed = params as { content: unknown[] };
     const turnId = `turn_${randomUUID()}`;

@@ -7,6 +7,7 @@ import {
   createJSONRPCSuccessResponse,
   isJSONRPCRequest,
   isJSONRPCResponse,
+  JSONRPCErrorException,
   type JSONRPCID,
   type JSONRPCRequest,
   type JSONRPCResponse,
@@ -18,6 +19,12 @@ export type JsonRpcMethodHandler = (params: unknown) => unknown | Promise<unknow
 export type JsonRpcPeerOptions = {
   idPrefix: 'c_' | 'a_';
   methods?: Record<string, JsonRpcMethodHandler>;
+};
+
+export type JsonRpcErrorLike = {
+  code: number;
+  message: string;
+  data?: unknown;
 };
 
 export class JsonRpcPeer {
@@ -60,7 +67,16 @@ export class JsonRpcPeer {
 
   onRequest(method: string, handler: JsonRpcMethodHandler): void {
     this.server.removeMethod(method);
-    this.server.addMethod(method, (params) => handler(params));
+    this.server.addMethod(method, async (params) => {
+      try {
+        return await handler(params);
+      } catch (error) {
+        if (this.isJsonRpcErrorLike(error)) {
+          throw new JSONRPCErrorException(error.message, error.code, error.data);
+        }
+        throw error;
+      }
+    });
   }
 
   notify(method: string, params?: unknown): void {
@@ -100,6 +116,12 @@ export class JsonRpcPeer {
 
   private createRequestId(): JsonRpcId {
     return `${this.idPrefix}${this.nextId++}`;
+  }
+
+  private isJsonRpcErrorLike(value: unknown): value is JsonRpcErrorLike {
+    if (!value || typeof value !== 'object') return false;
+    const v = value as Record<string, unknown>;
+    return typeof v.code === 'number' && typeof v.message === 'string';
   }
 
   private async handleMessage(msg: unknown): Promise<void> {
