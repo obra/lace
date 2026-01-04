@@ -2731,36 +2731,32 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     state.activeTurn = { turnId, startedAt, status: 'running', abortController };
 
-    let sessionState: SessionState = readSessionState(state.activeSession.dir);
     let durableTurnSeq = 0;
-    const writeAndAdvance = (event: { type: string; data: Record<string, unknown> }) => {
-      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
-        type: event.type,
-        data: event.data,
-        turnId,
-        turnSeq: durableTurnSeq++,
+    const writeAndAdvance = async (event: { type: string; data: Record<string, unknown> }) => {
+      await runExclusive(() => {
+        if (!state.activeSession) return;
+        let sessionState: SessionState = readSessionState(state.activeSession.dir);
+        const { nextState } = appendDurableEvent(state.activeSession.dir, sessionState, {
+          type: event.type,
+          data: event.data,
+          turnId,
+          turnSeq: durableTurnSeq++,
+        });
+        sessionState = nextState;
+        writeSessionState(state.activeSession.dir, sessionState);
+        state.activeSession = { ...state.activeSession, state: sessionState };
       });
-      sessionState = nextState;
     };
 
-    writeAndAdvance({ type: 'prompt', data: { content: parsed.content } });
-    writeAndAdvance({ type: 'turn_start', data: {} });
+    await writeAndAdvance({ type: 'prompt', data: { content: parsed.content } });
+    await writeAndAdvance({ type: 'turn_start', data: {} });
 
-    const emitUpdate = (turnSeq: number, update: SessionUpdate) => {
-      peer.notify('session/update', {
-        sessionId: state.activeSession!.meta.sessionId,
-        streamSeq: sessionState.nextStreamSeq,
-        turnId,
-        turnSeq,
-        ...update,
-      });
-      sessionState = { ...sessionState, nextStreamSeq: sessionState.nextStreamSeq + 1 };
+    const emitUpdate = async (turnSeq: number, update: SessionUpdate) => {
+      await emitSessionUpdate(update, { turnId, turnSeq });
     };
 
     if (abortController.signal.aborted) {
-      writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
-
-      writeSessionState(state.activeSession.dir, sessionState);
+      await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
       state.activeSession = loadSession(state.activeSession.meta.sessionId);
       state.activeTurn = null;
 
@@ -2823,7 +2819,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             if (abortController.signal.aborted) return;
             if (!payload?.token) return;
             streamedAny = true;
-            emitUpdate(messageTurnSeq, { type: 'text_delta', text: payload.token });
+            void emitUpdate(messageTurnSeq, { type: 'text_delta', text: payload.token });
           };
 
           provider.on('token', onToken);
@@ -2844,10 +2840,10 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           finalAssistantContent = assistantText;
 
           if (!streamedAny && assistantText.length > 0) {
-            emitUpdate(messageTurnSeq, { type: 'text_delta', text: assistantText });
+            await emitUpdate(messageTurnSeq, { type: 'text_delta', text: assistantText });
           }
 
-          writeAndAdvance({ type: 'message', data: { content: assistantText } });
+          await writeAndAdvance({ type: 'message', data: { content: assistantText } });
 
           const toolCalls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
           if (toolCalls.length === 0) {
@@ -2881,7 +2877,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             const toolTurnSeq = streamTurnSeq++;
             const kind = toolKindFromName(toolName);
 
-            emitUpdate(toolTurnSeq, {
+            await emitUpdate(toolTurnSeq, {
               type: 'tool_use',
               toolCallId,
               name: toolName,
@@ -2896,7 +2892,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 content: [{ type: 'error', message: 'Denied by policy' }],
               };
 
-              emitUpdate(toolTurnSeq, {
+              await emitUpdate(toolTurnSeq, {
                 type: 'tool_use',
                 toolCallId,
                 name: toolName,
@@ -2906,7 +2902,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 result: denied,
               });
 
-              writeAndAdvance({
+              await writeAndAdvance({
                 type: 'tool_use',
                 data: { toolCallId, name: toolName, kind, input: toolInput, result: denied },
               });
@@ -2921,7 +2917,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 content: [{ type: 'error', message: 'Tool denied in plan mode' }],
               };
 
-              emitUpdate(toolTurnSeq, {
+              await emitUpdate(toolTurnSeq, {
                 type: 'tool_use',
                 toolCallId,
                 name: toolName,
@@ -2931,7 +2927,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 result: denied,
               });
 
-              writeAndAdvance({
+              await writeAndAdvance({
                 type: 'tool_use',
                 data: { toolCallId, name: toolName, kind, input: toolInput, result: denied },
               });
@@ -2947,7 +2943,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 content: [{ type: 'error', message: `Tool not found: ${toolName}` }],
               };
 
-              emitUpdate(toolTurnSeq, {
+              await emitUpdate(toolTurnSeq, {
                 type: 'tool_use',
                 toolCallId,
                 name: toolName,
@@ -2957,7 +2953,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 result: failed,
               });
 
-              writeAndAdvance({
+              await writeAndAdvance({
                 type: 'tool_use',
                 data: { toolCallId, name: toolName, kind, input: toolInput, result: failed },
               });
@@ -2982,7 +2978,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 { optionId: 'deny', label: 'Deny' },
               ];
 
-              emitUpdate(toolTurnSeq, {
+              await emitUpdate(toolTurnSeq, {
                 type: 'tool_use',
                 toolCallId,
                 name: toolName,
@@ -2991,28 +2987,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 status: 'awaiting_permission',
               });
 
-              type PendingPermission = NonNullable<SessionState['pendingPermissions']>[number];
-              const pending: PendingPermission = {
-                toolCallId,
-                requestId: `perm_${toolCallId}`,
-                turnId,
-                turnSeq: toolTurnSeq,
-                tool: toolName,
-                kind,
-                resource: toolName,
-                options,
-                requestedAt: new Date().toISOString(),
-                input: toolInput,
-              };
-
-              sessionState.pendingPermissions = [
-                ...(sessionState.pendingPermissions || []),
-                pending,
-              ];
-              writeSessionState(state.activeSession.dir, sessionState);
-              state.activeSession = { ...state.activeSession, state: sessionState };
-
-              const { result } = peer.requestWithId('session/request_permission', {
+              const requestedAt = new Date().toISOString();
+              const { requestId, result } = peer.requestWithId('session/request_permission', {
                 sessionId: state.activeSession.meta.sessionId,
                 turnId,
                 turnSeq: toolTurnSeq,
@@ -3021,7 +2997,26 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 kind,
                 resource: toolName,
                 options,
-                requestedAt: pending.requestedAt,
+                requestedAt,
+              });
+
+              await runExclusive(() => {
+                const next = readSessionState(state.activeSession!.dir);
+                next.pendingPermissions = next.pendingPermissions ?? [];
+                next.pendingPermissions.push({
+                  requestId: String(requestId),
+                  toolCallId,
+                  turnId,
+                  turnSeq: toolTurnSeq,
+                  tool: toolName,
+                  kind,
+                  resource: toolName,
+                  options,
+                  requestedAt,
+                  input: toolInput,
+                });
+                writeSessionState(state.activeSession!.dir, next);
+                state.activeSession = loadSession(state.activeSession!.meta.sessionId);
               });
 
               const abortPromise = new Promise<never>((_, reject) => {
@@ -3038,18 +3033,22 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
               try {
                 permissionResponse = await Promise.race([result, abortPromise]);
               } catch {
-                sessionState.pendingPermissions = (sessionState.pendingPermissions || []).filter(
-                  (p) => p.toolCallId !== toolCallId
-                );
-                writeSessionState(state.activeSession.dir, sessionState);
-                state.activeSession = { ...state.activeSession, state: sessionState };
+                peer.abandonRequest(requestId);
+                await runExclusive(() => {
+                  const next = readSessionState(state.activeSession!.dir);
+                  next.pendingPermissions = (next.pendingPermissions ?? []).filter(
+                    (p) => p.toolCallId !== toolCallId
+                  );
+                  writeSessionState(state.activeSession!.dir, next);
+                  state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+                });
 
                 const cancelled: ToolResult = {
                   outcome: 'cancelled',
                   content: [{ type: 'error', message: 'Cancelled' }],
                 };
 
-                emitUpdate(toolTurnSeq, {
+                await emitUpdate(toolTurnSeq, {
                   type: 'tool_use',
                   toolCallId,
                   name: toolName,
@@ -3059,7 +3058,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                   result: cancelled,
                 });
 
-                writeAndAdvance({
+                await writeAndAdvance({
                   type: 'tool_use',
                   data: { toolCallId, name: toolName, kind, input: toolInput, result: cancelled },
                 });
@@ -3068,11 +3067,14 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 continue;
               }
 
-              sessionState.pendingPermissions = (sessionState.pendingPermissions || []).filter(
-                (p) => p.toolCallId !== toolCallId
-              );
-              writeSessionState(state.activeSession.dir, sessionState);
-              state.activeSession = { ...state.activeSession, state: sessionState };
+              await runExclusive(() => {
+                const next = readSessionState(state.activeSession!.dir);
+                next.pendingPermissions = (next.pendingPermissions ?? []).filter(
+                  (p) => p.toolCallId !== toolCallId
+                );
+                writeSessionState(state.activeSession!.dir, next);
+                state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+              });
 
               const decision = toNonEmptyString(permissionResponse?.decision);
               if (
@@ -3088,7 +3090,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                   content: [{ type: 'error', message: 'Denied by user' }],
                 };
 
-                emitUpdate(toolTurnSeq, {
+                await emitUpdate(toolTurnSeq, {
                   type: 'tool_use',
                   toolCallId,
                   name: toolName,
@@ -3098,7 +3100,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                   result: denied,
                 });
 
-                writeAndAdvance({
+                await writeAndAdvance({
                   type: 'tool_use',
                   data: { toolCallId, name: toolName, kind, input: toolInput, result: denied },
                 });
@@ -3108,7 +3110,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
               }
             }
 
-            emitUpdate(toolTurnSeq, {
+            await emitUpdate(toolTurnSeq, {
               type: 'tool_use',
               toolCallId,
               name: toolName,
@@ -3211,7 +3213,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                     ? 'cancelled'
                     : 'failed';
 
-            emitUpdate(toolTurnSeq, {
+            await emitUpdate(toolTurnSeq, {
               type: 'tool_use',
               toolCallId,
               name: toolName,
@@ -3221,7 +3223,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
               result: protocolResult,
             });
 
-            writeAndAdvance({
+            await writeAndAdvance({
               type: 'tool_use',
               data: { toolCallId, name: toolName, kind, input: finalInput, result: protocolResult },
             });
@@ -3252,8 +3254,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         stopReason = 'max_turns';
       }
 
-      writeAndAdvance({ type: 'turn_end', data: { stopReason } });
-      writeSessionState(state.activeSession.dir, sessionState);
+      await writeAndAdvance({ type: 'turn_end', data: { stopReason } });
       state.activeSession = loadSession(state.activeSession.meta.sessionId);
       state.activeTurn = null;
 
@@ -3296,12 +3297,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
       state.jobs.set(jobId, job);
 
-      writeAndAdvance({
+      await writeAndAdvance({
         type: 'job_started',
         data: { jobId, jobType: 'shell', description: job.description, command: jobCommand },
       });
 
-      emitUpdate(nextJobTurnSeq++, {
+      await emitUpdate(nextJobTurnSeq++, {
         type: 'job_started',
         jobId,
         jobType: 'shell',
@@ -3339,7 +3340,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
       state.jobs.set(jobId, job);
 
-      writeAndAdvance({
+      await writeAndAdvance({
         type: 'job_started',
         data: {
           jobId,
@@ -3349,7 +3350,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         },
       });
 
-      emitUpdate(nextJobTurnSeq++, {
+      await emitUpdate(nextJobTurnSeq++, {
         type: 'job_started',
         jobId,
         jobType: 'subagent',
@@ -3366,7 +3367,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       const toolInput = { command } as Record<string, unknown>;
       let shouldExecuteTool = true;
 
-      emitUpdate(1, {
+      await emitUpdate(1, {
         type: 'tool_use',
         toolCallId,
         name: toolName,
@@ -3384,7 +3385,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         };
 
         shouldExecuteTool = false;
-        emitUpdate(1, {
+        await emitUpdate(1, {
           type: 'tool_use',
           toolCallId,
           name: toolName,
@@ -3394,7 +3395,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           result: denied,
         });
 
-        writeAndAdvance({
+        await writeAndAdvance({
           type: 'tool_use',
           data: {
             toolCallId,
@@ -3419,7 +3420,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             { optionId: 'deny', label: 'Deny' },
           ];
 
-          emitUpdate(1, {
+          await emitUpdate(1, {
             type: 'tool_use',
             toolCallId,
             name: toolName,
@@ -3428,23 +3429,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             status: 'awaiting_permission',
           });
 
-          type PendingPermission = NonNullable<SessionState['pendingPermissions']>[number];
-          const pending: PendingPermission = {
-            toolCallId,
-            turnId,
-            turnSeq: 1,
-            tool: toolName,
-            kind,
-            resource: command,
-            options,
-            requestedAt: new Date().toISOString(),
-            input: toolInput,
-          };
-
-          sessionState.pendingPermissions = [...(sessionState.pendingPermissions || []), pending];
-          writeSessionState(state.activeSession.dir, sessionState);
-          state.activeSession = { ...state.activeSession, state: sessionState };
-
+          const requestedAt = new Date().toISOString();
           const { requestId, result } = peer.requestWithId('session/request_permission', {
             sessionId: state.activeSession.meta.sessionId,
             turnId,
@@ -3454,15 +3439,27 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             kind,
             resource: command,
             options,
-            requestedAt: pending.requestedAt,
+            requestedAt,
           });
 
-          pending.requestId = String(requestId);
-          sessionState.pendingPermissions = (sessionState.pendingPermissions || []).map((p) =>
-            p.toolCallId === toolCallId ? pending : p
-          );
-          writeSessionState(state.activeSession.dir, sessionState);
-          state.activeSession = { ...state.activeSession, state: sessionState };
+          await runExclusive(() => {
+            const next = readSessionState(state.activeSession!.dir);
+            next.pendingPermissions = next.pendingPermissions ?? [];
+            next.pendingPermissions.push({
+              requestId: String(requestId),
+              toolCallId,
+              turnId,
+              turnSeq: 1,
+              tool: toolName,
+              kind,
+              resource: command,
+              options,
+              requestedAt,
+              input: toolInput,
+            });
+            writeSessionState(state.activeSession!.dir, next);
+            state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+          });
 
           const abortPromise = new Promise<never>((_, reject) => {
             abortController.signal.addEventListener('abort', () => reject(new Error('cancelled')), {
@@ -3476,18 +3473,21 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           } catch {
             peer.abandonRequest(requestId);
 
-            sessionState.pendingPermissions = (sessionState.pendingPermissions || []).filter(
-              (p) => p.toolCallId !== toolCallId
-            );
-            writeSessionState(state.activeSession.dir, sessionState);
-            state.activeSession = { ...state.activeSession, state: sessionState };
+            await runExclusive(() => {
+              const next = readSessionState(state.activeSession!.dir);
+              next.pendingPermissions = (next.pendingPermissions ?? []).filter(
+                (p) => p.toolCallId !== toolCallId
+              );
+              writeSessionState(state.activeSession!.dir, next);
+              state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+            });
 
             const cancelled: ToolResult = {
               outcome: 'cancelled',
               content: [{ type: 'error', message: 'Cancelled' }],
             };
 
-            emitUpdate(1, {
+            await emitUpdate(1, {
               type: 'tool_use',
               toolCallId,
               name: toolName,
@@ -3497,7 +3497,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
               result: cancelled,
             });
 
-            writeAndAdvance({
+            await writeAndAdvance({
               type: 'tool_use',
               data: {
                 toolCallId,
@@ -3507,9 +3507,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 result: cancelled,
               },
             });
-            writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
-
-            writeSessionState(state.activeSession.dir, sessionState);
+            await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
             state.activeSession = loadSession(state.activeSession.meta.sessionId);
             state.activeTurn = null;
 
@@ -3521,11 +3519,14 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             };
           }
 
-          sessionState.pendingPermissions = (sessionState.pendingPermissions || []).filter(
-            (p) => p.toolCallId !== toolCallId
-          );
-          writeSessionState(state.activeSession.dir, sessionState);
-          state.activeSession = { ...state.activeSession, state: sessionState };
+          await runExclusive(() => {
+            const next = readSessionState(state.activeSession!.dir);
+            next.pendingPermissions = (next.pendingPermissions ?? []).filter(
+              (p) => p.toolCallId !== toolCallId
+            );
+            writeSessionState(state.activeSession!.dir, next);
+            state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+          });
           state.activeTurn = { turnId, startedAt, status: 'running', abortController };
 
           const decision = permissionResponse?.decision;
@@ -3536,7 +3537,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             };
 
             shouldExecuteTool = false;
-            emitUpdate(1, {
+            await emitUpdate(1, {
               type: 'tool_use',
               toolCallId,
               name: toolName,
@@ -3546,7 +3547,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
               result: denied,
             });
 
-            writeAndAdvance({
+            await writeAndAdvance({
               type: 'tool_use',
               data: {
                 toolCallId,
@@ -3564,7 +3565,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
               finalInput = permissionResponse.updatedInput as Record<string, unknown>;
             }
 
-            emitUpdate(1, {
+            await emitUpdate(1, {
               type: 'tool_use',
               toolCallId,
               name: toolName,
@@ -3574,7 +3575,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             });
           }
         } else {
-          emitUpdate(1, {
+          await emitUpdate(1, {
             type: 'tool_use',
             toolCallId,
             name: toolName,
@@ -3606,7 +3607,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                   ? 'cancelled'
                   : 'failed';
 
-          emitUpdate(1, {
+          await emitUpdate(1, {
             type: 'tool_use',
             toolCallId,
             name: toolName,
@@ -3616,7 +3617,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             result,
           });
 
-          writeAndAdvance({
+          await writeAndAdvance({
             type: 'tool_use',
             data: {
               toolCallId,
@@ -3628,9 +3629,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           });
 
           if (terminalStatus === 'cancelled') {
-            writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
-
-            writeSessionState(state.activeSession.dir, sessionState);
+            await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
             state.activeSession = loadSession(state.activeSession.meta.sessionId);
             state.activeTurn = null;
 
@@ -3645,13 +3644,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       }
     }
 
-    writeAndAdvance({
+    await writeAndAdvance({
       type: 'message',
       data: { content: [{ type: 'text', text: 'hello' }] },
     });
-    writeAndAdvance({ type: 'turn_end', data: { stopReason: 'end_turn' } });
-
-    writeSessionState(state.activeSession.dir, sessionState);
+    await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'end_turn' } });
     state.activeSession = loadSession(state.activeSession.meta.sessionId);
     state.activeTurn = null;
 
