@@ -1,11 +1,14 @@
 // ABOUTME: Supervisor singleton for web server routes
 // ABOUTME: Bridges supervisor session updates into EventStreamManager SSE broadcasts
 
-import { Supervisor } from '@lace/supervisor';
+import {
+  Supervisor,
+  type PermissionRequestParams,
+  type SessionUpdateParams,
+} from '@lace/supervisor';
 import { ensureLaceDir } from '@lace/web/lib/server/lace-imports';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import type { LaceEvent } from '@lace/web/types/core';
-import { isSessionId } from '@lace/ent-protocol';
 
 declare global {
   var laceWebSupervisor: Supervisor | undefined;
@@ -17,7 +20,7 @@ declare global {
           agentSessionId: string;
           toolCallId: string;
           toolCall?: { name: string; arguments: Record<string, unknown> };
-          params: Record<string, unknown>;
+          params: PermissionRequestParams;
           createdAt: number;
           resolve: (decision: {
             decision: 'allow' | 'deny';
@@ -58,7 +61,7 @@ function isToolResultContentItem(value: unknown): value is ToolResultContentItem
   if (!isRecord(value)) return false;
 
   if (value.type === 'text') return typeof value.text === 'string';
-  if (value.type === 'json') return 'data' in value;
+  if (value.type === 'json') return 'data' in value && value.data !== undefined;
   if (value.type === 'image') return typeof value.data === 'string';
   if (value.type === 'error') return typeof value.message === 'string';
 
@@ -80,7 +83,7 @@ function updateToLaceEvents(params: {
   workspaceSessionId: string;
   projectId?: string;
   agentSessionId?: string;
-  update: Record<string, unknown>;
+  update: SessionUpdateParams;
 }): LaceEvent[] {
   const { workspaceSessionId, projectId, agentSessionId, update } = params;
   const type = update.type;
@@ -141,7 +144,7 @@ function updateToLaceEvents(params: {
       isRecord(update.result)
     ) {
       const result = update.result;
-      const rawContent = Array.isArray(result.content) ? result.content : [];
+      const rawContent: unknown[] = Array.isArray(result.content) ? result.content : [];
       const content = rawContent.filter(isToolResultContentItem);
 
       events.push({
@@ -177,7 +180,7 @@ export function getSupervisor(): Supervisor {
 
       const record = supervisor.getWorkspaceSession(workspaceSessionId);
       const projectId = record?.projectId;
-      const agentSessionId = typeof update.sessionId === 'string' ? update.sessionId : undefined;
+      const agentSessionId = update.sessionId;
 
       const events = updateToLaceEvents({
         workspaceSessionId,
@@ -197,9 +200,8 @@ export function getSupervisor(): Supervisor {
       const record = supervisor?.getWorkspaceSession(workspaceSessionId);
       const projectId = record?.projectId;
 
-      const agentSessionId = typeof params.sessionId === 'string' ? params.sessionId : undefined;
-
-      const toolCallId = typeof params.toolCallId === 'string' ? params.toolCallId : '';
+      const agentSessionId = params.sessionId;
+      const toolCallId = params.toolCallId;
 
       manager.broadcast({
         type: 'TOOL_APPROVAL_REQUEST',
@@ -211,10 +213,6 @@ export function getSupervisor(): Supervisor {
           ...(agentSessionId ? { threadId: agentSessionId } : {}),
         },
       });
-
-      if (!agentSessionId || !isSessionId(agentSessionId)) {
-        return { decision: 'deny' };
-      }
 
       const pending = global.laceWebPendingPermissions;
       if (!pending) return { decision: 'deny' };
@@ -259,10 +257,6 @@ export function getSupervisor(): Supervisor {
   });
 
   return global.laceWebSupervisor;
-}
-
-export function isAgentSessionId(value: string): boolean {
-  return isSessionId(value);
 }
 
 export function listPendingPermissions(workspaceSessionId: string): Array<{

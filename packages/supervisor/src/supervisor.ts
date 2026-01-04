@@ -1,35 +1,82 @@
-import type { JsonRpcPeer } from '@lace/ent-protocol';
-import { isSessionId } from '@lace/ent-protocol';
-import { SupervisorAgentProcess, type PermissionDecision } from './supervisor-agent-process';
+import { z } from 'zod';
+import {
+  EntConnectionsCredentialsClearRequestSchema,
+  EntConnectionsCredentialsClearResponseSchema,
+  EntConnectionsCredentialsStartRequestSchema,
+  EntConnectionsCredentialsStartResponseSchema,
+  EntConnectionsCredentialsStatusRequestSchema,
+  EntConnectionsCredentialsStatusResponseSchema,
+  EntConnectionsCredentialsSubmitRequestSchema,
+  EntConnectionsCredentialsSubmitResponseSchema,
+  EntConnectionsDeleteRequestSchema,
+  EntConnectionsDeleteResponseSchema,
+  EntConnectionsListRequestSchema,
+  EntConnectionsListResponseSchema,
+  EntConnectionsUpsertRequestSchema,
+  EntConnectionsUpsertResponseSchema,
+  EntJobKillRequestSchema,
+  EntJobKillResponseSchema,
+  EntJobListRequestSchema,
+  EntJobListResponseSchema,
+  EntJobOutputRequestSchema,
+  EntJobOutputResponseSchema,
+  EntModelsListRequestSchema,
+  EntModelsListResponseSchema,
+  EntProvidersListRequestSchema,
+  EntProvidersListResponseSchema,
+  InitializeRequestSchema,
+  InitializeResponseSchema,
+  isSessionId,
+  type JsonRpcPeer,
+  type SessionId,
+  SessionListRequestSchema,
+  SessionListResponseSchema,
+  SessionLoadRequestSchema,
+  SessionLoadResponseSchema,
+  SessionNewRequestSchema,
+  SessionNewResponseSchema,
+  SessionPromptRequestSchema,
+  SessionPromptResponseSchema,
+} from '@lace/ent-protocol';
+import {
+  SupervisorAgentProcess,
+  type PermissionDecision,
+  type PermissionRequestParams,
+  type SessionUpdateParams,
+} from './supervisor-agent-process';
 import { WorkspaceSessionStore, type WorkspaceSessionRecord } from './workspace-session-store';
 
-function supervisorInitializeParams(config?: Record<string, unknown>): Record<string, unknown> {
-  return {
+type InitializeParams = z.infer<typeof InitializeRequestSchema>['params'];
+type SessionPromptParams = z.infer<typeof SessionPromptRequestSchema>['params'];
+type SessionPromptResult = z.infer<typeof SessionPromptResponseSchema>['result'];
+
+function supervisorInitializeParams(config?: Record<string, unknown>): InitializeParams {
+  return InitializeRequestSchema.shape.params.parse({
     protocolVersion: '1.0',
     clientInfo: { name: 'lace-supervisor', version: '0.1.0' },
     capabilities: { streaming: true, permissions: true, 'ent/jobStreaming': 'full' },
     ...(config ? { config } : {}),
-  };
+  });
 }
 
 export type WorkspaceSessionHandle = {
   workspaceSessionId: string;
-  sessionId: string;
+  sessionId: SessionId;
   workDir: string;
   pid: number;
 };
 
 export type AgentSessionHandle = {
-  sessionId: string;
+  sessionId: SessionId;
   pid: number;
 };
 
 export type SupervisorOptions = {
   laceDir: string;
-  onSessionUpdate?: (workspaceSessionId: string, update: Record<string, unknown>) => void;
+  onSessionUpdate?: (workspaceSessionId: string, update: SessionUpdateParams) => void;
   onPermissionRequest?: (
     workspaceSessionId: string,
-    params: Record<string, unknown>
+    params: PermissionRequestParams
   ) => Promise<PermissionDecision>;
 };
 
@@ -40,8 +87,8 @@ export class Supervisor {
     string,
     {
       workDir: string;
-      primarySessionId: string;
-      agentsBySessionId: Map<string, SupervisorAgentProcess>;
+      primarySessionId: SessionId | null;
+      agentsBySessionId: Map<SessionId, SupervisorAgentProcess>;
     }
   >();
   private readonly onSessionUpdate?: SupervisorOptions['onSessionUpdate'];
@@ -62,7 +109,12 @@ export class Supervisor {
 
   private requireAgent(workspaceSessionId: string, sessionId?: string) {
     const ws = this.requireWorkspace(workspaceSessionId);
-    const resolvedSessionId = sessionId ?? ws.primarySessionId;
+    const resolvedSessionId = sessionId
+      ? (sessionId as SessionId)
+      : (ws.primarySessionId ?? undefined);
+    if (!resolvedSessionId) {
+      throw new Error(`No primary session for workspaceSessionId ${workspaceSessionId}`);
+    }
     const agent = ws.agentsBySessionId.get(resolvedSessionId);
     if (!agent) {
       throw new Error(
@@ -75,29 +127,39 @@ export class Supervisor {
   private async spawnNewAgentSession(
     workspaceSessionId: string,
     workDir: string
-  ): Promise<{ agent: SupervisorAgentProcess; sessionId: string; pid: number }> {
-    let activeSessionId: string | undefined;
+  ): Promise<{ agent: SupervisorAgentProcess; sessionId: SessionId; pid: number }> {
+    let activeSessionId: SessionId | undefined;
 
     const agent = new SupervisorAgentProcess({
       laceDir: this.laceDir,
       onSessionUpdate: (update) => {
         if (!activeSessionId) return;
-        if (this.onSessionUpdate)
-          this.onSessionUpdate(workspaceSessionId, { sessionId: activeSessionId, ...update });
+        if (update.sessionId !== activeSessionId) return;
+        if (this.onSessionUpdate) this.onSessionUpdate(workspaceSessionId, update);
       },
       onPermissionRequest: async (params) => {
         if (!activeSessionId) return { decision: 'deny' };
+        if (params.sessionId !== activeSessionId) return { decision: 'deny' };
         if (!this.onPermissionRequest) return { decision: 'deny' };
-        return await this.onPermissionRequest(workspaceSessionId, {
-          sessionId: activeSessionId,
-          ...params,
-        });
+        return await this.onPermissionRequest(workspaceSessionId, params);
       },
     });
 
-    await agent.peer.request('initialize', supervisorInitializeParams({ approvalMode: 'ask' }));
+    await requestEnt(
+      agent.peer,
+      'initialize',
+      InitializeRequestSchema.shape.params,
+      InitializeResponseSchema.shape.result,
+      supervisorInitializeParams({ approvalMode: 'ask' })
+    );
 
-    const created = (await agent.peer.request('session/new', { workDir })) as { sessionId: string };
+    const created = await requestEnt(
+      agent.peer,
+      'session/new',
+      SessionNewRequestSchema.shape.params,
+      SessionNewResponseSchema.shape.result,
+      { workDir }
+    );
     activeSessionId = created.sessionId;
 
     return { agent, sessionId: created.sessionId, pid: agent.proc.pid ?? -1 };
@@ -105,34 +167,48 @@ export class Supervisor {
 
   private async spawnLoadedAgentSession(
     workspaceSessionId: string,
-    sessionId: string
+    sessionId: SessionId
   ): Promise<{ agent: SupervisorAgentProcess; workDir: string; pid: number }> {
-    let activeSessionId: string | undefined = sessionId;
+    let activeSessionId: SessionId | undefined = sessionId;
 
     const agent = new SupervisorAgentProcess({
       laceDir: this.laceDir,
       onSessionUpdate: (update) => {
         if (!activeSessionId) return;
-        if (this.onSessionUpdate)
-          this.onSessionUpdate(workspaceSessionId, { sessionId: activeSessionId, ...update });
+        if (update.sessionId !== activeSessionId) return;
+        if (this.onSessionUpdate) this.onSessionUpdate(workspaceSessionId, update);
       },
       onPermissionRequest: async (params) => {
         if (!activeSessionId) return { decision: 'deny' };
+        if (params.sessionId !== activeSessionId) return { decision: 'deny' };
         if (!this.onPermissionRequest) return { decision: 'deny' };
-        return await this.onPermissionRequest(workspaceSessionId, {
-          sessionId: activeSessionId,
-          ...params,
-        });
+        return await this.onPermissionRequest(workspaceSessionId, params);
       },
     });
 
-    await agent.peer.request('initialize', supervisorInitializeParams({ approvalMode: 'ask' }));
+    await requestEnt(
+      agent.peer,
+      'initialize',
+      InitializeRequestSchema.shape.params,
+      InitializeResponseSchema.shape.result,
+      supervisorInitializeParams({ approvalMode: 'ask' })
+    );
 
-    await agent.peer.request('session/load', { sessionId });
+    await requestEnt(
+      agent.peer,
+      'session/load',
+      SessionLoadRequestSchema.shape.params,
+      SessionLoadResponseSchema.shape.result,
+      { sessionId }
+    );
 
-    const list = (await agent.peer.request('session/list', {})) as {
-      sessions: Array<{ sessionId: string; workDir: string }>;
-    };
+    const list = await requestEnt(
+      agent.peer,
+      'session/list',
+      SessionListRequestSchema.shape.params,
+      SessionListResponseSchema.shape.result,
+      {}
+    );
     const meta = list.sessions.find((s) => s.sessionId === sessionId);
     if (!meta) {
       await agent.shutdown();
@@ -148,7 +224,7 @@ export class Supervisor {
 
     this.sessions.set(workspaceSessionId, {
       workDir,
-      primarySessionId: '',
+      primarySessionId: null,
       agentsBySessionId: new Map(),
     });
 
@@ -207,18 +283,33 @@ export class Supervisor {
     return this.requireAgent(workspaceSessionId, sessionId).agent.peer;
   }
 
-  async prompt(workspaceSessionId: string, content: unknown[]): Promise<unknown> {
+  async prompt(
+    workspaceSessionId: string,
+    content: SessionPromptParams['content']
+  ): Promise<SessionPromptResult> {
     this.store.touch(workspaceSessionId);
-    return await this.getPeer(workspaceSessionId).request('session/prompt', { content });
+    return await requestEnt(
+      this.getPeer(workspaceSessionId),
+      'session/prompt',
+      SessionPromptRequestSchema.shape.params,
+      SessionPromptResponseSchema.shape.result,
+      { content }
+    );
   }
 
   async promptSession(
     workspaceSessionId: string,
     sessionId: string,
-    content: unknown[]
-  ): Promise<unknown> {
+    content: SessionPromptParams['content']
+  ): Promise<SessionPromptResult> {
     this.store.touch(workspaceSessionId);
-    return await this.getPeer(workspaceSessionId, sessionId).request('session/prompt', { content });
+    return await requestEnt(
+      this.getPeer(workspaceSessionId, sessionId),
+      'session/prompt',
+      SessionPromptRequestSchema.shape.params,
+      SessionPromptResponseSchema.shape.result,
+      { content }
+    );
   }
 
   listWorkspaceSessions(): WorkspaceSessionRecord[] {
@@ -268,7 +359,13 @@ export class Supervisor {
       supportsCatalogRefresh?: boolean;
     }>;
   }> {
-    return (await this.getPeer(workspaceSessionId).request('ent/providers/list')) as any;
+    return await requestEnt(
+      this.getPeer(workspaceSessionId),
+      'ent/providers/list',
+      EntProvidersListRequestSchema.shape.params,
+      EntProvidersListResponseSchema.shape.result,
+      {}
+    );
   }
 
   async listConnections(
@@ -283,10 +380,13 @@ export class Supervisor {
       accountLabel?: string;
     }>;
   }> {
-    return (await this.getPeer(workspaceSessionId).request(
+    return await requestEnt(
+      this.getPeer(workspaceSessionId),
       'ent/connections/list',
+      EntConnectionsListRequestSchema.shape.params,
+      EntConnectionsListResponseSchema.shape.result,
       params ?? {}
-    )) as any;
+    );
   }
 
   async upsertConnection(
@@ -296,38 +396,50 @@ export class Supervisor {
       connection: { connectionId?: string; name: string; config: Record<string, unknown> };
     }
   ): Promise<{ connectionId: string; providerId: string; created: boolean }> {
-    return (await this.getPeer(workspaceSessionId).request(
+    return await requestEnt(
+      this.getPeer(workspaceSessionId),
       'ent/connections/upsert',
+      EntConnectionsUpsertRequestSchema.shape.params,
+      EntConnectionsUpsertResponseSchema.shape.result,
       params
-    )) as any;
+    );
   }
 
   async deleteConnection(
     workspaceSessionId: string,
     params: { connectionId: string }
   ): Promise<{ ok: true }> {
-    return (await this.getPeer(workspaceSessionId).request(
+    return await requestEnt(
+      this.getPeer(workspaceSessionId),
       'ent/connections/delete',
+      EntConnectionsDeleteRequestSchema.shape.params,
+      EntConnectionsDeleteResponseSchema.shape.result,
       params
-    )) as any;
+    );
   }
 
   async connectionCredentialStatus(
     workspaceSessionId: string,
     params: { connectionId: string }
   ): Promise<{ connectionId: string; state: string; accountLabel?: string; expiresAt?: string }> {
-    return (await this.getPeer(workspaceSessionId).request(
+    return await requestEnt(
+      this.getPeer(workspaceSessionId),
       'ent/connections/credentials/status',
+      EntConnectionsCredentialsStatusRequestSchema.shape.params,
+      EntConnectionsCredentialsStatusResponseSchema.shape.result,
       params
-    )) as any;
+    );
   }
 
   async connectionCredentialStart(
     workspaceSessionId: string,
     params: { connectionId: string; method?: 'api_key' | 'device_code' | 'browser' | 'token' }
   ): Promise<unknown> {
-    return await this.getPeer(workspaceSessionId).request(
+    return await requestEnt(
+      this.getPeer(workspaceSessionId),
       'ent/connections/credentials/start',
+      EntConnectionsCredentialsStartRequestSchema.shape.params,
+      EntConnectionsCredentialsStartResponseSchema.shape.result,
       params
     );
   }
@@ -336,27 +448,39 @@ export class Supervisor {
     workspaceSessionId: string,
     params: { connectionId: string; values: Record<string, string> }
   ): Promise<{ ok: boolean; error?: string }> {
-    return (await this.getPeer(workspaceSessionId).request(
+    return await requestEnt(
+      this.getPeer(workspaceSessionId),
       'ent/connections/credentials/submit',
+      EntConnectionsCredentialsSubmitRequestSchema.shape.params,
+      EntConnectionsCredentialsSubmitResponseSchema.shape.result,
       params
-    )) as any;
+    );
   }
 
   async connectionCredentialClear(
     workspaceSessionId: string,
     params: { connectionId: string }
   ): Promise<{ ok: true }> {
-    return (await this.getPeer(workspaceSessionId).request(
+    return await requestEnt(
+      this.getPeer(workspaceSessionId),
       'ent/connections/credentials/clear',
+      EntConnectionsCredentialsClearRequestSchema.shape.params,
+      EntConnectionsCredentialsClearResponseSchema.shape.result,
       params
-    )) as any;
+    );
   }
 
   async listModels(
     workspaceSessionId: string,
     params: { connectionId: string }
   ): Promise<{ providerId: string; connectionId: string; models: Array<{ modelId: string }> }> {
-    return (await this.getPeer(workspaceSessionId).request('ent/models/list', params)) as any;
+    return await requestEnt(
+      this.getPeer(workspaceSessionId),
+      'ent/models/list',
+      EntModelsListRequestSchema.shape.params,
+      EntModelsListResponseSchema.shape.result,
+      params
+    );
   }
 
   async listJobs(workspaceSessionId: string): Promise<{
@@ -370,7 +494,13 @@ export class Supervisor {
       startTime: string;
     }>;
   }> {
-    return (await this.getPeer(workspaceSessionId).request('ent/job/list')) as any;
+    return await requestEnt(
+      this.getPeer(workspaceSessionId),
+      'ent/job/list',
+      EntJobListRequestSchema.shape.params,
+      EntJobListResponseSchema.shape.result,
+      {}
+    );
   }
 
   async jobOutput(
@@ -383,14 +513,26 @@ export class Supervisor {
       afterOffset?: number;
     }
   ): Promise<unknown> {
-    return await this.getPeer(workspaceSessionId).request('ent/job/output', params);
+    return await requestEnt(
+      this.getPeer(workspaceSessionId),
+      'ent/job/output',
+      EntJobOutputRequestSchema.shape.params,
+      EntJobOutputResponseSchema.shape.result,
+      params
+    );
   }
 
   async killJob(
     workspaceSessionId: string,
     params: { jobId: string }
   ): Promise<{ success: boolean }> {
-    return (await this.getPeer(workspaceSessionId).request('ent/job/kill', params)) as any;
+    return await requestEnt(
+      this.getPeer(workspaceSessionId),
+      'ent/job/kill',
+      EntJobKillRequestSchema.shape.params,
+      EntJobKillResponseSchema.shape.result,
+      params
+    );
   }
 
   cancel(workspaceSessionId: string): void {
@@ -413,4 +555,16 @@ export class Supervisor {
       await this.shutdownWorkspaceSession(id);
     }
   }
+}
+
+async function requestEnt<ParamsSchema extends z.ZodTypeAny, ResultSchema extends z.ZodTypeAny>(
+  peer: JsonRpcPeer,
+  method: string,
+  paramsSchema: ParamsSchema,
+  resultSchema: ResultSchema,
+  params: z.input<ParamsSchema>
+): Promise<z.output<ResultSchema>> {
+  const parsedParams = paramsSchema.parse(params);
+  const result = await peer.request(method, parsedParams);
+  return resultSchema.parse(result);
 }

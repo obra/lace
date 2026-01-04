@@ -2,18 +2,26 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
+import { z } from 'zod';
+import {
+  createNdjsonStdioTransport,
+  JsonRpcPeer,
+  SessionRequestPermissionRequestSchema,
+  SessionRequestPermissionResponseSchema,
+  SessionUpdateNotificationSchema,
+} from '@lace/ent-protocol';
 
-export type PermissionDecision = {
-  decision: string;
-  updatedInput?: Record<string, unknown>;
-};
+export type SessionUpdateParams = z.infer<typeof SessionUpdateNotificationSchema>['params'];
+export type PermissionRequestParams = z.infer<
+  typeof SessionRequestPermissionRequestSchema
+>['params'];
+export type PermissionDecision = z.infer<typeof SessionRequestPermissionResponseSchema>['result'];
 
 export type SupervisorAgentProcessOptions = {
   laceDir: string;
   agentPath?: string;
-  onSessionUpdate?: (update: Record<string, unknown>) => void;
-  onPermissionRequest?: (params: Record<string, unknown>) => Promise<PermissionDecision>;
+  onSessionUpdate?: (update: SessionUpdateParams) => void;
+  onPermissionRequest?: (params: PermissionRequestParams) => Promise<PermissionDecision>;
 };
 
 export class SupervisorAgentProcess {
@@ -41,13 +49,16 @@ export class SupervisorAgentProcess {
     this.peer = new JsonRpcPeer(transport, { idPrefix: 'c_' });
 
     this.peer.onRequest('session/update', async (params) => {
-      if (options.onSessionUpdate) options.onSessionUpdate(params as Record<string, unknown>);
+      const parsed = SessionUpdateNotificationSchema.shape.params.parse(params);
+      if (options.onSessionUpdate) options.onSessionUpdate(parsed);
       return undefined;
     });
 
     this.peer.onRequest('session/request_permission', async (params) => {
       if (!options.onPermissionRequest) return { decision: 'deny' };
-      return await options.onPermissionRequest(params as Record<string, unknown>);
+      const parsed = SessionRequestPermissionRequestSchema.shape.params.parse(params);
+      const decision = await options.onPermissionRequest(parsed);
+      return SessionRequestPermissionResponseSchema.shape.result.parse(decision);
     });
   }
 

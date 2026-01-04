@@ -1,11 +1,11 @@
 // ABOUTME: Centralized validators for supervisor-backed IDs (workspace sessions + agent sessions)
 // ABOUTME: WorkspaceSessionId is ws_<uuid>; AgentSessionId uses Ent protocol sessionId rules
 
-import { asSessionId, isSessionId } from '@lace/ent-protocol';
+import { asSessionId, isSessionId, type SessionId } from '@lace/ent-protocol';
 import { WorkspaceSessionIdSchema } from './workspace-session-id-validation';
 
 export type WorkspaceSessionId = string & { readonly __brand: 'WorkspaceSessionId' };
-export type AgentSessionId = string & { readonly __brand: 'AgentSessionId' };
+export type AgentSessionId = SessionId;
 
 export function isWorkspaceSessionId(value: string): value is WorkspaceSessionId {
   return WorkspaceSessionIdSchema.safeParse(value).success;
@@ -21,6 +21,5 @@ export function isAgentSessionId(value: string): value is AgentSessionId {
 }
 
 export function asAgentSessionId(value: string): AgentSessionId {
-  asSessionId(value);
-  return value as AgentSessionId;
+  return asSessionId(value);
 }
