@@ -70,3 +70,13 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
 - Notes:
   - Tests kill the spawned fake agent process explicitly to avoid hanging the test runner.
   - Shared test helpers live in `packages/tui/tests/common/mod.rs` to keep the e2e tests DRY.
+
+### 2026-01-04 — Bootstrap (initialize + session/new)
+
+- Added a bootstrap helper (`packages/tui/src/protocol/bootstrap.rs`) that:
+  - sends `initialize` and then `session/new` (or `session/load`)
+  - returns the active `sessionId`
+- Tests:
+  - `cd packages/tui && cargo test` (see `packages/tui/tests/bootstrap.rs`)
+- Notes:
+  - Bootstrap responds `deny` if a permission request happens unexpectedly during startup (should be rare).

@@ -33,6 +33,7 @@ pub fn spawn_node_fixture(name: &str) -> (TempDir, AgentTransport) {
   (workdir, transport)
 }
 
+#[allow(dead_code)]
 pub fn wait_for_line(transport: &AgentTransport, deadline: Instant) -> String {
   loop {
     match transport.try_recv_line() {
@@ -47,4 +48,3 @@ pub fn wait_for_line(transport: &AgentTransport, deadline: Instant) -> String {
     }
   }
 }
-
