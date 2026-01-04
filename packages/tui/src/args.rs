@@ -7,10 +7,11 @@ pub struct Args {
   pub workdir: Option<String>,
   pub load_session_id: Option<String>,
   pub explicit_new: bool,
+  pub timeout_ms: u64,
 }
 
 pub fn help_text() -> &'static str {
-  "Usage:\n  lace-tui [--agent-cmd <cmd>] [--workdir <path>] [--new | --load <sessionId>]\n\nOptions:\n  --agent-cmd <cmd>   Spawn this agent command (shell string)\n  --workdir <path>    Workdir for spawned agent/session (default: cwd)\n  --new               Start a new session (default)\n  --load <sessionId>  Load an existing session\n  -h, --help          Show help\n"
+  "Usage:\n  lace-tui [--agent-cmd <cmd>] [--workdir <path>] [--new | --load <sessionId>] [--timeout-ms <n>]\n\nOptions:\n  --agent-cmd <cmd>   Spawn this agent command (shell string)\n  --workdir <path>    Workdir for spawned agent/session (default: cwd)\n  --new               Start a new session (default)\n  --load <sessionId>  Load an existing session\n  --timeout-ms <n>    Client-side request timeout (default: 60000)\n  -h, --help          Show help\n"
 }
 
 impl Args {
@@ -24,6 +25,7 @@ impl Args {
       workdir: None,
       load_session_id: None,
       explicit_new: false,
+      timeout_ms: 60_000,
     };
 
     while let Some(raw) = argv.next() {
@@ -45,6 +47,16 @@ impl Args {
           args.load_session_id = Some(value.to_string_lossy().to_string());
         }
         "--new" => args.explicit_new = true,
+        "--timeout-ms" => {
+          let value = argv
+            .next()
+            .ok_or_else(|| "--timeout-ms expects a value".to_string())?;
+          let parsed = value
+            .to_string_lossy()
+            .parse::<u64>()
+            .map_err(|_| "--timeout-ms must be an integer".to_string())?;
+          args.timeout_ms = parsed;
+        }
         other => return Err(format!("Unknown argument: {other}")),
       }
     }
@@ -95,5 +107,10 @@ mod tests {
     let args = parse_strs(&["--load", "sess_1"]).unwrap();
     assert_eq!(args.load_session_id.as_deref(), Some("sess_1"));
   }
-}
 
+  #[test]
+  fn parses_timeout_ms() {
+    let args = parse_strs(&["--timeout-ms", "12345"]).unwrap();
+    assert_eq!(args.timeout_ms, 12345);
+  }
+}

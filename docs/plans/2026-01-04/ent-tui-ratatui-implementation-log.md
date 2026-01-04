@@ -122,3 +122,13 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
   - Help overlay (`?` or `F1`)
 - Tests:
   - `cd packages/tui && cargo test` (see `app::ui::tests::palette_filters_and_submits`)
+
+### 2026-01-04 — Request timeouts + pending map
+
+- Added basic request bookkeeping:
+  - `--timeout-ms` flag (default 60000)
+  - pending request map keyed by request id
+  - periodic expiry emits an Activity line like `timeout: c_7 (ent/models/list)`
+  - sessionId updates only happen when the response corresponds to `session/new` or `session/load`
+- Tests:
+  - `cd packages/tui && cargo test`

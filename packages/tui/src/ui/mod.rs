@@ -37,9 +37,10 @@ pub fn run_tui(args: Args) -> io::Result<()> {
   state.session_id = Some(session_id);
   state.workdir = workdir.to_string_lossy().to_string();
   state.next_client_seq = 3;
+  state.push_activity_line(format!("timeout-ms={}", args.timeout_ms));
 
   let mut terminal = TerminalGuard::init()?;
-  let res = run_loop(&mut terminal.terminal, &transport, &mut state);
+  let res = run_loop(&mut terminal.terminal, &transport, &mut state, args.timeout_ms);
   terminal.restore()?;
   res
 }
@@ -48,8 +49,11 @@ fn run_loop(
   terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
   transport: &AgentTransport,
   state: &mut AppState,
+  timeout_ms: u64,
 ) -> io::Result<()> {
   loop {
+    expire_timeouts(state, now_ms());
+
     while let Ok(line) = transport.try_recv_line() {
       handle_agent_line(transport, state, &line);
     }
@@ -73,7 +77,7 @@ fn run_loop(
             };
             if let Some(action) = action {
               let out = apply_ui_action(state, action);
-              send_outbound(transport, state, out)?;
+              send_outbound(transport, state, out, timeout_ms)?;
             }
             continue;
           }
@@ -105,7 +109,7 @@ fn run_loop(
             };
             if let Some(action) = action {
               let out = apply_ui_action(state, action);
-              send_outbound(transport, state, out)?;
+              send_outbound(transport, state, out, timeout_ms)?;
             }
             if state.should_exit {
               break;
@@ -168,7 +172,7 @@ fn run_loop(
 
           if let Some(action) = action {
             let out = apply_ui_action(state, action);
-            send_outbound(transport, state, out)?;
+            send_outbound(transport, state, out, timeout_ms)?;
           }
 
           if state.should_exit {
@@ -188,15 +192,17 @@ fn send_outbound(
   transport: &AgentTransport,
   state: &mut AppState,
   out: Vec<Outbound>,
+  timeout_ms: u64,
 ) -> io::Result<()> {
   for m in out {
     match m {
       Outbound::JsonRpcRequest { id, method, params } => {
-        let line = jsonrpc::encode_request(Value::String(id), &method, params);
+        let line = jsonrpc::encode_request(Value::String(id.clone()), &method, params);
         transport
           .send_line(line)
           .map_err(|e| io::Error::new(io::ErrorKind::BrokenPipe, e))?;
         state.push_activity_line(format!("{method}: sent"));
+        state.mark_request_sent(id, method, now_ms(), timeout_ms);
       }
       Outbound::JsonRpcResponse { id, result } => {
         let line = jsonrpc::encode_response_result(id, result);
@@ -249,15 +255,22 @@ fn handle_agent_line(transport: &AgentTransport, state: &mut AppState, line: &st
       if let Some(err) = error {
         state.push_activity_line(format!("error: {}", err.message));
       }
-      let should_refocus = id
-        .as_str()
-        .map(|s| state.active_prompt_request_ids.contains(s))
-        .unwrap_or(false);
-      reduce(state, AppEvent::RpcResponse { id });
-      if let Some(session_id) = extract_session_id(&result) {
-        state.session_id = Some(session_id.clone());
-        state.push_activity_line(format!("new session {session_id}"));
+      let mut should_refocus = false;
+      let mut pending_method: Option<String> = None;
+      if let Some(id_str) = id.as_str() {
+        should_refocus = state.active_prompt_request_ids.contains(id_str);
+        pending_method = state.take_pending_request(id_str).map(|p| p.method);
       }
+
+      reduce(state, AppEvent::RpcResponse { id: id.clone() });
+
+      if matches!(pending_method.as_deref(), Some("session/new" | "session/load")) {
+        if let Some(session_id) = extract_session_id(&result) {
+          state.session_id = Some(session_id.clone());
+          state.push_activity_line(format!("session: active {session_id}"));
+        }
+      }
+
       if should_refocus && state.active_permission.is_none() {
         state.focus = Focus::Input;
       }
@@ -269,6 +282,29 @@ fn extract_session_id(result: &Option<Value>) -> Option<String> {
   let Some(result) = result else { return None };
   let obj = result.as_object()?;
   obj.get("sessionId")?.as_str().map(|s| s.to_string())
+}
+
+fn now_ms() -> u64 {
+  use std::time::{SystemTime, UNIX_EPOCH};
+  let dur = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .unwrap_or_else(|_| std::time::Duration::from_secs(0));
+  dur.as_millis() as u64
+}
+
+fn expire_timeouts(state: &mut AppState, now_ms: u64) {
+  let mut expired: Vec<String> = Vec::new();
+  for (id, pending) in &state.pending_requests {
+    if now_ms.saturating_sub(pending.sent_at_ms) > pending.timeout_ms {
+      expired.push(id.clone());
+    }
+  }
+
+  for id in expired {
+    if let Some(p) = state.pending_requests.remove(&id) {
+      state.push_activity_line(format!("timeout: {} ({})", id, p.method));
+    }
+  }
 }
 
 fn handle_session_update(state: &mut AppState, params: &Value) {

@@ -79,6 +79,15 @@ pub struct AppState {
   pub should_exit: bool,
 
   pub next_client_seq: u64,
+
+  pub pending_requests: std::collections::HashMap<String, PendingRequest>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingRequest {
+  pub method: String,
+  pub sent_at_ms: u64,
+  pub timeout_ms: u64,
 }
 
 impl AppState {
@@ -118,6 +127,8 @@ impl AppState {
       should_exit: false,
 
       next_client_seq: 1,
+
+      pending_requests: std::collections::HashMap::new(),
     }
   }
 
@@ -125,6 +136,21 @@ impl AppState {
     let id = format!("c_{}", self.next_client_seq);
     self.next_client_seq += 1;
     id
+  }
+
+  pub fn mark_request_sent(&mut self, id: String, method: String, now_ms: u64, timeout_ms: u64) {
+    self.pending_requests.insert(
+      id,
+      PendingRequest {
+        method,
+        sent_at_ms: now_ms,
+        timeout_ms,
+      },
+    );
+  }
+
+  pub fn take_pending_request(&mut self, id: &str) -> Option<PendingRequest> {
+    self.pending_requests.remove(id)
   }
 
   pub fn push_activity_line(&mut self, line: String) {
@@ -189,5 +215,21 @@ impl AppState {
       Focus::Debug if !self.show_debug => self.focus = Focus::Input,
       _ => {}
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn pending_request_round_trip() {
+    let mut state = AppState::new();
+    state.mark_request_sent("c_1".to_string(), "session/prompt".to_string(), 100, 500);
+    let p = state.take_pending_request("c_1").unwrap();
+    assert_eq!(p.method, "session/prompt");
+    assert_eq!(p.sent_at_ms, 100);
+    assert_eq!(p.timeout_ms, 500);
+    assert!(state.take_pending_request("c_1").is_none());
   }
 }
