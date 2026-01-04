@@ -1,30 +1,16 @@
 // ABOUTME: REST API endpoints for session configuration - GET, PUT for configuration management
 // ABOUTME: Handles session configuration retrieval and updates with validation and inheritance
 
-import { getSessionService } from '@lace/web/lib/server/session-service';
-import { ToolCatalog, Project } from '@lace/web/lib/server/lace-imports';
-import { ToolPolicyResolver } from '@lace/web/lib/tool-policy-resolver';
-import type { ToolPolicy } from '@lace/web/types/core';
-import { ThreadId } from '@lace/web/types/core';
-import { isValidThreadId as isClientValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-session-id-validation';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
 import type { Route } from './+types/api.sessions.$sessionId.configuration';
 
-// Type guard for ThreadId using client-safe validation
-function isValidThreadId(sessionId: string): sessionId is ThreadId {
-  return isClientValidThreadId(sessionId);
-}
-
 const ConfigurationSchema = z.object({
   providerInstanceId: z.string().optional(),
   modelId: z.string().optional(),
-  maxTokens: z.number().positive().optional(),
-  tools: z.array(z.string()).optional(),
-  toolPolicies: z.record(z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
-  workingDirectory: z.string().optional(),
-  environmentVariables: z.record(z.string()).optional(),
   runtimeOverrides: z
     .object({
       permissionMode: z.enum(['normal', 'yolo', 'read-only']).optional(),
@@ -36,54 +22,25 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
     const { sessionId: sessionIdParam } = params as { sessionId: string };
 
-    if (!isValidThreadId(sessionIdParam)) {
+    const parsed = WorkspaceSessionIdSchema.safeParse(sessionIdParam);
+    if (!parsed.success) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const sessionId = sessionIdParam;
-    const sessionService = getSessionService();
-    const session = await sessionService.getSession(sessionId);
-
-    if (!session) {
+    const workspaceSessionId = parsed.data;
+    const supervisor = getSupervisor();
+    const record = supervisor.getWorkspaceSession(workspaceSessionId);
+    if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const configuration = session.getEffectiveConfiguration();
-
-    // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
-    const projectId = session.getProjectId();
-    if (!projectId) {
-      return createErrorResponse('Session has no associated project', 500, {
-        code: 'INTERNAL_SERVER_ERROR',
-      });
-    }
-    const project = Project.getById(projectId);
-    if (!project) {
-      return createErrorResponse('Associated project not found', 500, {
-        code: 'INTERNAL_SERVER_ERROR',
-      });
-    }
-    const availableTools = ToolCatalog.getAvailableTools(project);
-
-    // Get project policies for hierarchy resolution
-    const projectConfig = project.getConfiguration();
-
-    // Resolve tool policy hierarchy for progressive restriction
-    const toolPolicyHierarchy = {
-      project: projectConfig.toolPolicies as Record<string, ToolPolicy> | undefined,
-      session: configuration.toolPolicies,
-    };
-
-    const resolvedTools = ToolPolicyResolver.resolveSessionToolPolicies(
-      availableTools,
-      toolPolicyHierarchy
-    );
+    const coordinator = record.agents[0];
 
     return createSuperjsonResponse({
       configuration: {
-        ...configuration,
-        availableTools,
-        tools: resolvedTools,
+        providerInstanceId: coordinator?.connectionId,
+        modelId: coordinator?.modelId,
+        availableTools: [],
       },
     });
   } catch (error: unknown) {
@@ -106,78 +63,63 @@ export async function action({ request, params }: Route.ActionArgs) {
   try {
     const { sessionId: sessionIdParam } = params as { sessionId: string };
 
-    if (!isValidThreadId(sessionIdParam)) {
+    const parsed = WorkspaceSessionIdSchema.safeParse(sessionIdParam);
+    if (!parsed.success) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const sessionId = sessionIdParam;
+    const workspaceSessionId = parsed.data;
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = ConfigurationSchema.parse(body);
 
-    const sessionService = getSessionService();
-    const session = await sessionService.getSession(sessionId);
-
-    if (!session) {
+    const supervisor = getSupervisor();
+    const record = supervisor.getWorkspaceSession(workspaceSessionId);
+    if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Validate progressive restriction if toolPolicies are being updated
-    if (validatedData.toolPolicies) {
-      const projectId = session.getProjectId();
-      if (projectId) {
-        const project = Project.getById(projectId);
-        if (project) {
-          const projectConfig = project.getConfiguration();
-
-          // Check each tool policy change against project restrictions
-          for (const [tool, newPolicy] of Object.entries(validatedData.toolPolicies) as [
-            string,
-            ToolPolicy,
-          ][]) {
-            const projectPolicies = projectConfig.toolPolicies as
-              | Record<string, ToolPolicy>
-              | undefined;
-            if (projectPolicies) {
-              const projectPolicy = projectPolicies[tool];
-              if (
-                projectPolicy &&
-                !ToolPolicyResolver.isValidPolicyChange(tool, newPolicy, projectPolicy)
-              ) {
-                return createErrorResponse(
-                  `Tool '${tool}' cannot be set to '${newPolicy}' - more permissive than project policy '${projectPolicy}'`,
-                  400,
-                  { code: 'POLICY_VIOLATION' }
-                );
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // Update session configuration directly
-    session.updateConfiguration(validatedData);
-    const configuration = session.getEffectiveConfiguration();
-
-    // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
-    const projectId = session.getProjectId();
-    if (!projectId) {
-      return createErrorResponse('Session has no associated project', 500, {
+    const coordinator = record.agents[0];
+    if (!coordinator) {
+      return createErrorResponse('Session has no coordinator agent', 500, {
         code: 'INTERNAL_SERVER_ERROR',
       });
     }
-    const project = Project.getById(projectId);
-    if (!project) {
-      return createErrorResponse('Associated project not found', 500, {
-        code: 'INTERNAL_SERVER_ERROR',
+
+    const permissionMode = validatedData.runtimeOverrides?.permissionMode;
+    const approvalMode =
+      permissionMode === 'yolo'
+        ? 'dangerouslySkipPermissions'
+        : permissionMode === 'read-only'
+          ? 'approveReads'
+          : 'ask';
+
+    supervisor.upsertAgentSessionMeta(workspaceSessionId, {
+      sessionId: coordinator.sessionId,
+      ...(typeof validatedData.providerInstanceId === 'string'
+        ? { connectionId: validatedData.providerInstanceId }
+        : {}),
+      ...(typeof validatedData.modelId === 'string' ? { modelId: validatedData.modelId } : {}),
+    });
+
+    await supervisor
+      .getPeer(workspaceSessionId, coordinator.sessionId)
+      .request('ent/session/configure', {
+        ...(typeof validatedData.providerInstanceId === 'string'
+          ? { connectionId: validatedData.providerInstanceId }
+          : {}),
+        ...(typeof validatedData.modelId === 'string' ? { modelId: validatedData.modelId } : {}),
+        approvalMode,
       });
-    }
-    const availableTools = ToolCatalog.getAvailableTools(project);
 
     return createSuperjsonResponse({
       configuration: {
-        ...configuration,
-        availableTools,
+        providerInstanceId:
+          typeof validatedData.providerInstanceId === 'string'
+            ? validatedData.providerInstanceId
+            : coordinator.connectionId,
+        modelId:
+          typeof validatedData.modelId === 'string' ? validatedData.modelId : coordinator.modelId,
+        availableTools: [],
       },
     });
   } catch (error: unknown) {

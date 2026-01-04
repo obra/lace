@@ -1,19 +1,12 @@
 // ABOUTME: Session detail API endpoint for getting specific session information
 // ABOUTME: Returns session metadata and list of agents within the session
 
-import { getSessionService } from '@lace/web/lib/server/session-service';
-import { ThreadId } from '@lace/web/types/core';
-import { isValidThreadId as isClientValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { Session } from '@lace/web/lib/server/lace-imports';
+import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-session-id-validation';
 import { z } from 'zod';
 import type { Route } from './+types/api.sessions.$sessionId';
-
-// Type guard for ThreadId using client-safe validation
-function isValidThreadId(sessionId: string): sessionId is ThreadId {
-  return isClientValidThreadId(sessionId);
-}
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -29,30 +22,76 @@ const UpdateSessionSchema = z.object({
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const sessionService = getSessionService();
     const { sessionId: sessionIdParam } = params as { sessionId: string };
 
-    if (!isValidThreadId(sessionIdParam)) {
+    const parsed = WorkspaceSessionIdSchema.safeParse(sessionIdParam);
+    if (!parsed.success) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const sessionId = sessionIdParam;
+    const workspaceSessionId = parsed.data;
 
-    const session = await sessionService.getSession(sessionId);
+    const supervisor = getSupervisor();
+    const record = supervisor.getWorkspaceSession(workspaceSessionId);
 
-    if (!session) {
+    if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Convert Session instance to metadata for JSON response
-    const sessionInfo = session.getInfo();
-    const agents = session.getAgents();
+    const agentsWithStatus = await Promise.all(
+      record.agents.map(async (agent) => {
+        try {
+          const status = (await supervisor
+            .getPeer(workspaceSessionId, agent.sessionId)
+            .request('ent/agent/status', {})) as unknown;
+
+          const statusRecord = status as {
+            currentTurn?: { status?: string } | undefined;
+            pendingPermissions?: unknown[] | undefined;
+          };
+
+          const hasPendingPermissions = Array.isArray(statusRecord.pendingPermissions)
+            ? statusRecord.pendingPermissions.length > 0
+            : false;
+
+          const turnStatus =
+            statusRecord.currentTurn && typeof statusRecord.currentTurn === 'object'
+              ? statusRecord.currentTurn.status
+              : undefined;
+
+          const agentStatus =
+            hasPendingPermissions || turnStatus === 'awaiting_permission'
+              ? 'tool_execution'
+              : turnStatus === 'running'
+                ? 'thinking'
+                : 'idle';
+
+          return {
+            threadId: agent.sessionId,
+            name: agent.name ?? '',
+            providerInstanceId: agent.connectionId,
+            modelId: agent.modelId,
+            status: agentStatus,
+            createdAt: new Date(agent.createdAt),
+          };
+        } catch {
+          return {
+            threadId: agent.sessionId,
+            name: agent.name ?? '',
+            providerInstanceId: agent.connectionId,
+            modelId: agent.modelId,
+            status: 'idle',
+            createdAt: new Date(agent.createdAt),
+          };
+        }
+      })
+    );
 
     const sessionData = {
-      id: session.getId(),
-      name: sessionInfo?.name ?? 'Unknown',
-      createdAt: sessionInfo?.createdAt ?? new Date(),
-      agents: agents.map((agent) => agent.getInfo()),
+      id: record.workspaceSessionId,
+      name: record.name ?? 'Session',
+      createdAt: new Date(record.createdAt),
+      agents: agentsWithStatus,
     };
 
     return createSuperjsonResponse(sessionData);
@@ -71,18 +110,18 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   try {
-    const sessionService = getSessionService();
     const { sessionId: sessionIdParam } = params as { sessionId: string };
 
-    if (!isValidThreadId(sessionIdParam)) {
+    const parsed = WorkspaceSessionIdSchema.safeParse(sessionIdParam);
+    if (!parsed.success) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const sessionId = sessionIdParam;
+    const workspaceSessionId = parsed.data;
 
-    // Check if session exists
-    const existingSession = await sessionService.getSession(sessionId);
-    if (!existingSession) {
+    const supervisor = getSupervisor();
+    const existing = supervisor.getWorkspaceSession(workspaceSessionId);
+    if (!existing) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
@@ -99,41 +138,29 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const updates = bodyResult.data;
 
-    // Update session metadata using SessionService
-    sessionService.updateSession(sessionId, {
-      ...updates,
-      updatedAt: new Date(),
+    supervisor.updateWorkspaceSession(workspaceSessionId, {
+      ...(typeof updates.name === 'string' ? { name: updates.name } : {}),
     });
 
-    // Clear the active sessions cache so the session gets reloaded from database with updated info
-    sessionService.clearActiveSessions();
-
-    // Get updated session data
-    const updatedSession = await sessionService.getSession(sessionId);
-    if (!updatedSession) {
+    const record = supervisor.getWorkspaceSession(workspaceSessionId);
+    if (!record) {
       return createErrorResponse('Session not found after update', 500, {
         code: 'INTERNAL_SERVER_ERROR',
       });
     }
-
-    // Get updated session data directly from database to ensure we have the latest values
-    const updatedSessionData = Session.getSession(sessionId);
-    if (!updatedSessionData) {
-      return createErrorResponse('Session not found after update', 500, {
-        code: 'INTERNAL_SERVER_ERROR',
-      });
-    }
-
-    // Convert to API response format
-    const agents = updatedSession.getAgents();
 
     const sessionData = {
-      id: updatedSession.getId(),
-      name: (updatedSessionData as { name: string }).name,
-      description: (updatedSessionData as { description?: string }).description,
-      status: (updatedSessionData as { status?: string }).status,
-      createdAt: (updatedSessionData as { createdAt: Date }).createdAt,
-      agents: agents.map((agent) => agent.getInfo()),
+      id: record.workspaceSessionId,
+      name: record.name ?? 'Session',
+      createdAt: new Date(record.createdAt),
+      agents: record.agents.map((agent) => ({
+        threadId: agent.sessionId,
+        name: agent.name ?? '',
+        providerInstanceId: agent.connectionId,
+        modelId: agent.modelId,
+        status: 'idle',
+        createdAt: new Date(agent.createdAt),
+      })),
     };
 
     return createSuperjsonResponse(sessionData);
