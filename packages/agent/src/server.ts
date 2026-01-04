@@ -39,7 +39,6 @@ import {
   deriveFilesReadFromDurableEvents,
 } from './storage/files-from-events';
 import type { PermissionRequest, SessionUpdate, ToolInfo, ToolResult } from './protocol/types';
-import { shellExecTool, runShellExec } from './tools/shell-exec';
 import { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
 import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
 import type { CatalogModel } from '@lace/core/providers/catalog/types';
@@ -716,11 +715,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         ? { ...state.config, ...sessionState.config }
         : state.config;
 
-      const requiresPermission =
-        shellExecTool.requiresPermission &&
-        effectiveConfig.approvalMode !== 'approve' &&
-        effectiveConfig.approvalMode !== 'dangerouslySkipPermissions' &&
-        effectiveConfig.approvalMode !== 'deny';
+      const toolName = 'bash';
+      const kind = toolKindFromName(toolName);
+      const requiresPermission = shouldAskPermission(effectiveConfig.approvalMode, kind);
 
       if (effectiveConfig.approvalMode === 'deny') {
         job.status = 'cancelled';
@@ -743,8 +740,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           update: {
             type: 'tool_use',
             toolCallId,
-            name: shellExecTool.name,
-            kind: shellExecTool.kind,
+            name: toolName,
+            kind,
             input: toolInput,
             status: 'awaiting_permission',
           },
@@ -756,8 +753,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           turnSeq: permissionTurnSeq,
           jobId: job.jobId,
           toolCallId,
-          tool: shellExecTool.name,
-          kind: shellExecTool.kind,
+          tool: toolName,
+          kind,
           resource: String(job.command ?? ''),
           options: [
             { optionId: 'allow', label: 'Allow' },
@@ -785,8 +782,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             update: {
               type: 'tool_use',
               toolCallId,
-              name: shellExecTool.name,
-              kind: shellExecTool.kind,
+              name: toolName,
+              kind,
               input: toolInput,
               status: 'denied',
               result: denied,
@@ -1089,7 +1086,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const { toolsForProvider } = createToolExecutorForMode('execute');
     const toolInfos: ToolInfo[] = [];
     const seenToolNames = new Set<string>();
-    for (const info of [shellExecTool, ...toolsForProvider.map(protocolToolInfoForCoreTool)]) {
+    for (const tool of toolsForProvider) {
+      const info = protocolToolInfoForCoreTool(tool);
       if (seenToolNames.has(info.name)) continue;
       seenToolNames.add(info.name);
       toolInfos.push(info);
@@ -2199,14 +2197,14 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const subagentMatch = promptText.match(/^\s*subagent:\s*(.+)\s*$/m);
     const subagentText = subagentMatch?.[1]?.trim();
 
+    const workDir = state.activeSession.meta.workDir;
+    const filesRead = deriveFilesReadFromDurableEvents(state.activeSession.dir, workDir);
+
     if (!command && !jobCommand && !subagentText) {
       const maxTurns =
         typeof (params as any)?.maxTurns === 'number' && Number.isFinite((params as any).maxTurns)
           ? Math.max(1, Math.trunc((params as any).maxTurns))
           : 10;
-
-      const workDir = state.activeSession.meta.workDir;
-      const filesRead = deriveFilesReadFromDurableEvents(state.activeSession.dir, workDir);
 
       const { executor: toolExecutor, toolsForProvider } = createToolExecutorForMode(
         effectiveConfig.executionMode
@@ -2704,23 +2702,21 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     if (command && effectiveConfig.executionMode === 'execute') {
       const toolCallId = `tool_${randomUUID()}`;
+      const toolName = 'bash';
+      const kind = toolKindFromName(toolName);
       const toolInput = { command } as Record<string, unknown>;
       let shouldExecuteTool = true;
 
       emitUpdate(1, {
         type: 'tool_use',
         toolCallId,
-        name: shellExecTool.name,
-        kind: shellExecTool.kind,
+        name: toolName,
+        kind,
         input: toolInput,
         status: 'pending',
       });
 
-      const requiresPermission =
-        shellExecTool.requiresPermission &&
-        effectiveConfig.approvalMode !== 'approve' &&
-        effectiveConfig.approvalMode !== 'dangerouslySkipPermissions' &&
-        effectiveConfig.approvalMode !== 'deny';
+      const requiresPermission = shouldAskPermission(effectiveConfig.approvalMode, kind);
 
       if (effectiveConfig.approvalMode === 'deny') {
         const denied: ToolResult = {
@@ -2732,8 +2728,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         emitUpdate(1, {
           type: 'tool_use',
           toolCallId,
-          name: shellExecTool.name,
-          kind: shellExecTool.kind,
+          name: toolName,
+          kind,
           input: toolInput,
           status: 'denied',
           result: denied,
@@ -2743,13 +2739,14 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           type: 'tool_use',
           data: {
             toolCallId,
-            name: shellExecTool.name,
-            kind: shellExecTool.kind,
+            name: toolName,
+            kind,
             input: toolInput,
             result: denied,
           },
         });
       } else {
+        const { executor: toolExecutor } = createToolExecutorForMode('execute');
         let finalInput = toolInput;
 
         if (requiresPermission) {
@@ -2763,8 +2760,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           emitUpdate(1, {
             type: 'tool_use',
             toolCallId,
-            name: shellExecTool.name,
-            kind: shellExecTool.kind,
+            name: toolName,
+            kind,
             input: toolInput,
             status: 'awaiting_permission',
           });
@@ -2774,8 +2771,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             toolCallId,
             turnId,
             turnSeq: 1,
-            tool: shellExecTool.name,
-            kind: shellExecTool.kind,
+            tool: toolName,
+            kind,
             resource: command,
             options,
             requestedAt: new Date().toISOString(),
@@ -2791,8 +2788,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             turnId,
             turnSeq: 1,
             toolCallId,
-            tool: shellExecTool.name,
-            kind: shellExecTool.kind,
+            tool: toolName,
+            kind,
             resource: command,
             options,
           });
@@ -2830,8 +2827,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             emitUpdate(1, {
               type: 'tool_use',
               toolCallId,
-              name: shellExecTool.name,
-              kind: shellExecTool.kind,
+              name: toolName,
+              kind,
               input: toolInput,
               status: 'cancelled',
               result: cancelled,
@@ -2841,8 +2838,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
               type: 'tool_use',
               data: {
                 toolCallId,
-                name: shellExecTool.name,
-                kind: shellExecTool.kind,
+                name: toolName,
+                kind,
                 input: toolInput,
                 result: cancelled,
               },
@@ -2879,8 +2876,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             emitUpdate(1, {
               type: 'tool_use',
               toolCallId,
-              name: shellExecTool.name,
-              kind: shellExecTool.kind,
+              name: toolName,
+              kind,
               input: toolInput,
               status: 'denied',
               result: denied,
@@ -2890,8 +2887,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
               type: 'tool_use',
               data: {
                 toolCallId,
-                name: shellExecTool.name,
-                kind: shellExecTool.kind,
+                name: toolName,
+                kind,
                 input: toolInput,
                 result: denied,
               },
@@ -2907,8 +2904,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             emitUpdate(1, {
               type: 'tool_use',
               toolCallId,
-              name: shellExecTool.name,
-              kind: shellExecTool.kind,
+              name: toolName,
+              kind,
               input: finalInput,
               status: 'running',
             });
@@ -2917,27 +2914,42 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           emitUpdate(1, {
             type: 'tool_use',
             toolCallId,
-            name: shellExecTool.name,
-            kind: shellExecTool.kind,
+            name: toolName,
+            kind,
             input: finalInput,
             status: 'running',
           });
         }
 
         if (shouldExecuteTool && !abortController.signal.aborted) {
-          const commandToRun = String((finalInput as any).command || '');
-          const result = await runShellExec(
-            { command: commandToRun },
-            { defaultCwd: state.activeSession.meta.workDir, signal: abortController.signal }
+          const coreResult = await toolExecutor.execute(
+            { id: toolCallId, name: toolName, arguments: finalInput },
+            {
+              signal: abortController.signal,
+              workingDirectory: workDir,
+              toolTempRoot: join(state.activeSession.dir, 'tool-temp'),
+              hasFileBeenRead: (p) =>
+                filesRead.has(isAbsolutePath(p) ? p : resolvePath(workDir, p)),
+            }
           );
+
+          const result = protocolToolResultFromCore(coreResult);
+          const terminalStatus =
+            result.outcome === 'completed'
+              ? 'completed'
+              : result.outcome === 'denied'
+                ? 'denied'
+                : result.outcome === 'cancelled'
+                  ? 'cancelled'
+                  : 'failed';
 
           emitUpdate(1, {
             type: 'tool_use',
             toolCallId,
-            name: shellExecTool.name,
-            kind: shellExecTool.kind,
+            name: toolName,
+            kind,
             input: finalInput,
-            status: result.outcome,
+            status: terminalStatus,
             result,
           });
 
@@ -2945,14 +2957,14 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             type: 'tool_use',
             data: {
               toolCallId,
-              name: shellExecTool.name,
-              kind: shellExecTool.kind,
+              name: toolName,
+              kind,
               input: finalInput,
               result,
             },
           });
 
-          if (result.outcome === 'cancelled') {
+          if (terminalStatus === 'cancelled') {
             writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
 
             writeSessionState(state.activeSession.dir, sessionState);

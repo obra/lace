@@ -146,7 +146,7 @@ describe('lace-agent subagents (E2E over stdio)', () => {
 
     expect(permissionParams).toMatchObject({
       jobId: subagentJobId,
-      tool: 'shell.exec',
+      tool: 'bash',
       resource: 'echo hi',
       toolCallId: expect.stringContaining(`${subagentJobId}:`),
     });

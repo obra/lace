@@ -228,7 +228,7 @@ describe('lace-agent process (E2E over stdio)', () => {
   });
 
   it(
-    'requests permission before running shell.exec and records a tool_use event',
+    'requests permission before running bash and records a tool_use event',
     { timeout: 15_000 },
     async () => {
       agent = spawnAgentProcess({ laceDir });
@@ -287,7 +287,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
 
       expect(lastPermissionParams).toMatchObject({
-        tool: 'shell.exec',
+        tool: 'bash',
         resource: 'echo hi',
         sessionId: expect.any(String),
         turnId: promptResult.turnId,

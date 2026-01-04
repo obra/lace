@@ -91,7 +91,7 @@ describe('SupervisorAgentProcess (E2E)', () => {
     );
 
     expect(permissionRequests[0]).toMatchObject({
-      tool: 'shell.exec',
+      tool: 'bash',
       resource: 'echo hi',
       toolCallId: expect.any(String),
     });
