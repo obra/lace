@@ -635,6 +635,7 @@ Known duplicates (as of 2026-01-04):
 - `ent/session/compact` in `packages/agent/src/server.ts` is currently an ad-hoc implementation (local summarization + message dropping) and should be replaced by ported strategies.
 - `summarizeProviderMessages()` in `packages/agent/src/server.ts` duplicates core summarization behavior and does not use the provider.
 - `shell.exec` in `packages/agent/src/tools/shell-exec.ts` overlaps with `bash` in core; decide whether to standardize on one implementation and map protocol tool naming accordingly.
+- Connection config validation in `packages/agent/src/server.ts` (`getEndpointFromConfig`, credential-key checks) overlaps with core provider instance schemas; keep these consistent rather than drifting.
 
 ---
 
