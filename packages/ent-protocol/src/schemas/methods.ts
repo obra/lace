@@ -462,6 +462,7 @@ const EntSessionConfigureParamsSchema = z
     modelId: z.string().optional(),
     maxThinkingTokens: z.number().optional(),
     maxBudgetUsd: z.number().optional(),
+    mcpServers: z.array(McpServerConfigSchema).optional(),
     approvalMode: z
       .enum([
         'ask',

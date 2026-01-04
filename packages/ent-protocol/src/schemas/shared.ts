@@ -34,6 +34,8 @@ export const McpServerConfigSchema = z
     args: z.array(z.string()).optional(),
     env: z.record(z.string(), z.string()).optional(),
     transport: z.enum(['stdio', 'sse', 'http']).optional(),
+    enabled: z.boolean().optional(),
+    tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
   })
   .strict();
 export type McpServerConfig = z.infer<typeof McpServerConfigSchema>;
