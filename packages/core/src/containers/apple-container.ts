@@ -281,7 +281,7 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
 
     try {
       // Force remove to handle stuck containers
-      await execFileAsync('container', ['rm', '-f', containerId], { timeout: 10000 });
+      await execFileAsync('container', ['rm', '-f', containerId], { timeout: 30000 });
     } catch (error: unknown) {
       // Container might not exist, check if it's really there
       let containers: Array<{ id: string; status: string }> | null = null;
