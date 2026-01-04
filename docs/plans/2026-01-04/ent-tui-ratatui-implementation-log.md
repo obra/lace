@@ -48,3 +48,13 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
   - `cd packages/tui && cargo test`
 - Notes:
   - This is intentionally UI-agnostic so we can build reliable e2e tests without pixel snapshots.
+
+### 2026-01-04 — Minimal Ent decoding helpers
+
+- Added Ent-specific decoders (`packages/tui/src/protocol/ent.rs`) for:
+  - `session/update` → `AppEvent` (text_delta, turn_end, tool_use, job_update wrapper)
+  - `session/request_permission` params → `PermissionRequest`
+- Tests:
+  - `cd packages/tui && cargo test`
+- Notes:
+  - Decoder ignores unknown update types for now (YAGNI); we’ll expand as the UI needs more event types.
