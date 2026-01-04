@@ -72,6 +72,7 @@ pub fn jump_selected(state: &mut AppState) {
     match item.target {
         SearchTarget::ChatScroll(scroll) => {
             state.focus = Focus::Chat;
+            state.chat_follow = false;
             state.chat_scroll = scroll;
         }
         SearchTarget::ActivityIndex(idx) => {

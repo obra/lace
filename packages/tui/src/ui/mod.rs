@@ -102,6 +102,12 @@ fn run_loop(
         }
         state.activate_next_permission_if_needed();
 
+        if let Ok(size) = terminal.size() {
+            update_chat_autoscroll(
+                state,
+                ratatui::layout::Rect::new(0, 0, size.width, size.height),
+            );
+        }
         terminal.draw(|f| draw(f, state))?;
 
         if event::poll(Duration::from_millis(50))? {
@@ -1388,6 +1394,110 @@ fn sh_quote(s: &str) -> String {
     out
 }
 
+fn update_chat_autoscroll(state: &mut AppState, area: ratatui::layout::Rect) {
+    let Some(chat_rect) = compute_chat_rect(state, area) else {
+        state.chat_max_scroll = 0;
+        state.chat_scroll = 0;
+        state.chat_follow = true;
+        return;
+    };
+
+    let content_width = chat_rect.width.saturating_sub(2) as usize;
+    let content_height = chat_rect.height.saturating_sub(2) as usize;
+
+    let total_lines = chat_total_rendered_lines(state, content_width);
+    let max_scroll = total_lines
+        .saturating_sub(content_height)
+        .min(u16::MAX as usize) as u16;
+
+    state.chat_max_scroll = max_scroll;
+    if state.chat_follow {
+        state.chat_scroll = max_scroll;
+    } else {
+        state.chat_scroll = state.chat_scroll.min(max_scroll);
+    }
+}
+
+fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
+    if content_width == 0 {
+        return 0;
+    }
+
+    let mut total: usize = 0;
+    for m in &state.messages {
+        let prefix = match m.role {
+            Role::User => "user: ",
+            Role::Assistant => "assistant: ",
+        };
+        total += wrapped_line_count(content_width, prefix);
+
+        let mut text = m.text.clone();
+        if m.role == Role::Assistant && m.streaming {
+            text.push_str("▌");
+        }
+
+        if state.prefs.render_markdown {
+            for l in markdown::render_markdownish_lines(&text) {
+                total += wrapped_line_count(content_width, &l.text);
+            }
+        } else {
+            for l in text.lines() {
+                total += wrapped_line_count(content_width, l);
+            }
+        }
+
+        total += 1; // blank line after message
+    }
+    total
+}
+
+fn wrapped_line_count(width: usize, line: &str) -> usize {
+    let len = line.chars().count();
+    ((len.max(1) + width - 1) / width).max(1)
+}
+
+fn compute_chat_rect(
+    state: &AppState,
+    area: ratatui::layout::Rect,
+) -> Option<ratatui::layout::Rect> {
+    if !state.prefs.show_chat {
+        return None;
+    }
+
+    let input_height = if state.prefs.input_multiline { 7 } else { 3 };
+    let root = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Min(1),
+            Constraint::Length(input_height),
+        ])
+        .split(area);
+    let main_area = root[1];
+
+    let main_area = if state.prefs.show_debug {
+        let split = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(1), Constraint::Percentage(30)])
+            .split(main_area);
+        split[0]
+    } else {
+        main_area
+    };
+
+    match (state.prefs.show_chat, state.prefs.show_activity) {
+        (true, true) => {
+            let cols = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(62), Constraint::Percentage(38)])
+                .split(main_area);
+            Some(cols[0])
+        }
+        (true, false) => Some(main_area),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1486,5 +1596,35 @@ mod tests {
             Outbound::JsonRpcRequest { method, .. } => assert_eq!(method, "ent/connections/list"),
             _ => panic!("expected request"),
         }
+    }
+
+    #[test]
+    fn chat_autoscroll_follows_bottom_until_user_scrolls_up() {
+        let mut state = AppState::new_with_paths(None, None);
+        state.prefs.show_activity = false;
+        state.prefs.show_debug = false;
+
+        for i in 0..50 {
+            state.messages.push(crate::app::ChatMessage {
+                role: Role::Assistant,
+                text: format!("line {i}"),
+                streaming: false,
+                turn_id: None,
+                turn_seq: None,
+            });
+        }
+
+        let area = ratatui::layout::Rect::new(0, 0, 80, 24);
+        update_chat_autoscroll(&mut state, area);
+        assert_eq!(state.chat_scroll, state.chat_max_scroll);
+        assert!(state.chat_max_scroll > 0);
+
+        state.focus = Focus::Chat;
+        let _ = crate::app::ui::apply_ui_action(&mut state, crate::app::ui::UiAction::ScrollUp);
+        assert!(!state.chat_follow);
+
+        let before = state.chat_scroll;
+        update_chat_autoscroll(&mut state, area);
+        assert_eq!(state.chat_scroll, before);
     }
 }

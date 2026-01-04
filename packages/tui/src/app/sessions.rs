@@ -30,6 +30,7 @@ pub struct SessionSnapshot {
     pub activity: std::collections::VecDeque<activity::ActivityItem>,
     pub debug_lines: std::collections::VecDeque<String>,
     pub chat_scroll: u16,
+    pub chat_follow: bool,
     pub activity_scroll: u16,
     pub debug_scroll: u16,
     pub permission_allowlist: std::collections::HashMap<crate::app::PermissionAllowKey, String>,
@@ -211,6 +212,7 @@ pub fn prepare_for_session_switch(state: &mut AppState, target_session_id: Optio
                 activity: state.activity.clone(),
                 debug_lines: state.debug_lines.clone(),
                 chat_scroll: state.chat_scroll,
+                chat_follow: state.chat_follow,
                 activity_scroll: state.activity_scroll,
                 debug_scroll: state.debug_scroll,
                 permission_allowlist: state.permission_allowlist.clone(),
@@ -234,6 +236,7 @@ pub fn on_session_activated(state: &mut AppState, session_id: &str) {
         state.activity = snapshot.activity;
         state.debug_lines = snapshot.debug_lines;
         state.chat_scroll = snapshot.chat_scroll;
+        state.chat_follow = snapshot.chat_follow;
         state.activity_scroll = snapshot.activity_scroll;
         state.debug_scroll = snapshot.debug_scroll;
         state.permission_allowlist = snapshot.permission_allowlist;

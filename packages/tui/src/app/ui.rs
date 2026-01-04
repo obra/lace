@@ -154,6 +154,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             };
 
             state.focus = crate::app::Focus::Chat;
+            state.chat_follow = false;
             state.chat_scroll = chat_start_line_for_message_index(&state.messages, target_idx);
             Vec::new()
         }
@@ -379,7 +380,10 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         UiAction::ScrollUp => {
             use crate::app::Focus;
             match state.focus {
-                Focus::Chat => state.chat_scroll = state.chat_scroll.saturating_sub(1),
+                Focus::Chat => {
+                    state.chat_follow = false;
+                    state.chat_scroll = state.chat_scroll.saturating_sub(1);
+                }
                 Focus::Activity => state.activity_scroll = state.activity_scroll.saturating_sub(1),
                 Focus::Debug => state.debug_scroll = state.debug_scroll.saturating_sub(1),
                 Focus::Input => {
@@ -393,7 +397,15 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         UiAction::ScrollDown => {
             use crate::app::Focus;
             match state.focus {
-                Focus::Chat => state.chat_scroll = state.chat_scroll.saturating_add(1),
+                Focus::Chat => {
+                    state.chat_scroll = state
+                        .chat_scroll
+                        .saturating_add(1)
+                        .min(state.chat_max_scroll);
+                    if state.chat_scroll >= state.chat_max_scroll {
+                        state.chat_follow = true;
+                    }
+                }
                 Focus::Activity => state.activity_scroll = state.activity_scroll.saturating_add(1),
                 Focus::Debug => state.debug_scroll = state.debug_scroll.saturating_add(1),
                 Focus::Input => {
@@ -648,6 +660,7 @@ fn send_input(state: &mut AppState) -> Vec<Outbound> {
     state.input_buffer.clear();
     state.input_scroll = 0;
     state.input_history_index = None;
+    state.chat_follow = true;
 
     if line.is_empty() {
         return Vec::new();

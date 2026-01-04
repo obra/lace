@@ -79,6 +79,8 @@ pub struct AppState {
 
     pub focus: Focus,
     pub chat_scroll: u16,
+    pub chat_follow: bool,
+    pub chat_max_scroll: u16,
     pub activity_scroll: u16,
     pub debug_scroll: u16,
 
@@ -153,6 +155,8 @@ impl AppState {
 
             focus: Focus::Input,
             chat_scroll: 0,
+            chat_follow: true,
+            chat_max_scroll: 0,
             activity_scroll: 0,
             debug_scroll: 0,
 
