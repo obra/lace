@@ -13,6 +13,11 @@ pub enum AppEvent {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Outbound {
+  JsonRpcRequest {
+    id: String,
+    method: String,
+    params: Option<Value>,
+  },
   JsonRpcResponse { id: Value, result: Value },
 }
 

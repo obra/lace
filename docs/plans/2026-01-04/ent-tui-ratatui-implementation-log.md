@@ -80,3 +80,13 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
   - `cd packages/tui && cargo test` (see `packages/tui/tests/bootstrap.rs`)
 - Notes:
   - Bootstrap responds `deny` if a permission request happens unexpectedly during startup (should be rare).
+
+### 2026-01-04 — Input + pane toggles (headless)
+
+- Added headless UI actions (`packages/tui/src/app/ui.rs`) for:
+  - editing the input line
+  - Enter → append a user message and emit a `session/prompt` request
+  - input history up/down
+  - pane visibility toggles (chat/activity/debug)
+- Tests:
+  - `cd packages/tui && cargo test`

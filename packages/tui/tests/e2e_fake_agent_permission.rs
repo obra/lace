@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 fn apply_outbound(transport: &AgentTransport, out: Vec<Outbound>) {
   for m in out {
     match m {
+      Outbound::JsonRpcRequest { .. } => {}
       Outbound::JsonRpcResponse { id, result } => {
         transport
           .send_line(jsonrpc::encode_response_result(id, result))

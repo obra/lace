@@ -1,4 +1,5 @@
 pub mod reducer;
+pub mod ui;
 
 use serde_json::Value;
 
@@ -36,20 +37,71 @@ pub struct PermissionRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppState {
+  pub session_id: Option<String>,
+  pub workdir: String,
   pub messages: Vec<ChatMessage>,
   pub tool_inputs_by_tool_call_id: std::collections::HashMap<String, Value>,
   pub permission_queue: std::collections::VecDeque<PermissionRequest>,
   pub active_prompt_request_ids: std::collections::HashSet<String>,
+
+  pub input_buffer: String,
+  pub input_history: Vec<String>,
+  pub input_history_index: Option<usize>,
+
+  pub show_chat: bool,
+  pub show_activity: bool,
+  pub show_debug: bool,
+
+  pub activity: std::collections::VecDeque<String>,
+  pub debug_lines: std::collections::VecDeque<String>,
+
+  pub next_client_seq: u64,
 }
 
 impl AppState {
   pub fn new() -> Self {
     Self {
+      session_id: None,
+      workdir: String::new(),
       messages: Vec::new(),
       tool_inputs_by_tool_call_id: std::collections::HashMap::new(),
       permission_queue: std::collections::VecDeque::new(),
       active_prompt_request_ids: std::collections::HashSet::new(),
+
+      input_buffer: String::new(),
+      input_history: Vec::new(),
+      input_history_index: None,
+
+      show_chat: true,
+      show_activity: true,
+      show_debug: false,
+
+      activity: std::collections::VecDeque::new(),
+      debug_lines: std::collections::VecDeque::new(),
+
+      next_client_seq: 1,
     }
   }
-}
 
+  pub fn next_client_id(&mut self) -> String {
+    let id = format!("c_{}", self.next_client_seq);
+    self.next_client_seq += 1;
+    id
+  }
+
+  pub fn push_activity_line(&mut self, line: String) {
+    const MAX: usize = 200;
+    if self.activity.len() >= MAX {
+      self.activity.pop_front();
+    }
+    self.activity.push_back(line);
+  }
+
+  pub fn push_debug_line(&mut self, line: String) {
+    const MAX: usize = 400;
+    if self.debug_lines.len() >= MAX {
+      self.debug_lines.pop_front();
+    }
+    self.debug_lines.push_back(line);
+  }
+}
