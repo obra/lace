@@ -488,7 +488,7 @@ File checkpointing. Covers Claude SDK's `rewindFiles()`.
 {
   method: "ent/session/rewind",
   params: {
-    toEventSeq: number    // Rewind files to state at this event (from ent/session/events)
+    toEventSeq: number    // Rewind files to state at this checkpoint event (from ent/session/checkpoint)
   }
 }
 
