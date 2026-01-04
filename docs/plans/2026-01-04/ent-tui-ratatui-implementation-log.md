@@ -103,3 +103,12 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
   - `cd packages/tui && cargo test` (unit + scenario e2e)
 - Notes:
   - Permissions are now handled interactively via a modal (Up/Down/Enter) instead of auto-deciding.
+
+### 2026-01-04 — Focus + scroll
+
+- Added focus cycling and basic scrolling:
+  - `Tab` cycles focus across visible panes
+  - Up/Down scroll Chat/Activity/Debug when those panes are focused
+  - Up/Down navigate input history when Input is focused
+- Tests:
+  - `cd packages/tui && cargo test` (see `app::ui::tests::focus_cycle_skips_hidden_panes`)

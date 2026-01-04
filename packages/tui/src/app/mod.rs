@@ -9,6 +9,14 @@ pub enum Role {
   Assistant,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Focus {
+  Input,
+  Chat,
+  Activity,
+  Debug,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChatMessage {
   pub role: Role,
@@ -48,6 +56,11 @@ pub struct AppState {
   pub input_history: Vec<String>,
   pub input_history_index: Option<usize>,
 
+  pub focus: Focus,
+  pub chat_scroll: u16,
+  pub activity_scroll: u16,
+  pub debug_scroll: u16,
+
   pub show_chat: bool,
   pub show_activity: bool,
   pub show_debug: bool,
@@ -74,6 +87,11 @@ impl AppState {
       input_buffer: String::new(),
       input_history: Vec::new(),
       input_history_index: None,
+
+      focus: Focus::Input,
+      chat_scroll: 0,
+      activity_scroll: 0,
+      debug_scroll: 0,
 
       show_chat: true,
       show_activity: true,
@@ -118,6 +136,44 @@ impl AppState {
     if let Some(next) = self.permission_queue.pop_front() {
       self.active_permission = Some(next);
       self.active_permission_selected = 0;
+    }
+  }
+
+  pub fn focus_next(&mut self) {
+    if self.active_permission.is_some() {
+      return;
+    }
+
+    let mut order = Vec::new();
+    order.push(Focus::Input);
+    if self.show_chat {
+      order.push(Focus::Chat);
+    }
+    if self.show_activity {
+      order.push(Focus::Activity);
+    }
+    if self.show_debug {
+      order.push(Focus::Debug);
+    }
+
+    let Some(pos) = order.iter().position(|f| *f == self.focus) else {
+      self.focus = Focus::Input;
+      return;
+    };
+
+    let next = (pos + 1) % order.len();
+    self.focus = order[next];
+  }
+
+  pub fn ensure_focus_visible(&mut self) {
+    if self.active_permission.is_some() {
+      return;
+    }
+    match self.focus {
+      Focus::Chat if !self.show_chat => self.focus = Focus::Input,
+      Focus::Activity if !self.show_activity => self.focus = Focus::Input,
+      Focus::Debug if !self.show_debug => self.focus = Focus::Input,
+      _ => {}
     }
   }
 }

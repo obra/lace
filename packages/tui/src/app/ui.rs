@@ -12,6 +12,9 @@ pub enum UiAction {
   ToggleChat,
   ToggleActivity,
   ToggleDebug,
+  FocusNext,
+  ScrollUp,
+  ScrollDown,
 
   PermissionPrev,
   PermissionNext,
@@ -84,14 +87,41 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
     }
     UiAction::ToggleChat => {
       state.show_chat = !state.show_chat;
+      state.ensure_focus_visible();
       Vec::new()
     }
     UiAction::ToggleActivity => {
       state.show_activity = !state.show_activity;
+      state.ensure_focus_visible();
       Vec::new()
     }
     UiAction::ToggleDebug => {
       state.show_debug = !state.show_debug;
+      state.ensure_focus_visible();
+      Vec::new()
+    }
+    UiAction::FocusNext => {
+      state.focus_next();
+      Vec::new()
+    }
+    UiAction::ScrollUp => {
+      use crate::app::Focus;
+      match state.focus {
+        Focus::Chat => state.chat_scroll = state.chat_scroll.saturating_sub(1),
+        Focus::Activity => state.activity_scroll = state.activity_scroll.saturating_sub(1),
+        Focus::Debug => state.debug_scroll = state.debug_scroll.saturating_sub(1),
+        Focus::Input => {}
+      }
+      Vec::new()
+    }
+    UiAction::ScrollDown => {
+      use crate::app::Focus;
+      match state.focus {
+        Focus::Chat => state.chat_scroll = state.chat_scroll.saturating_add(1),
+        Focus::Activity => state.activity_scroll = state.activity_scroll.saturating_add(1),
+        Focus::Debug => state.debug_scroll = state.debug_scroll.saturating_add(1),
+        Focus::Input => {}
+      }
       Vec::new()
     }
     UiAction::PermissionPrev => {
@@ -236,5 +266,26 @@ mod tests {
       }
       _ => panic!("expected response"),
     }
+  }
+
+  #[test]
+  fn focus_cycle_skips_hidden_panes() {
+    use crate::app::Focus;
+
+    let mut state = AppState::new();
+    state.show_debug = true;
+    state.focus = Focus::Input;
+
+    apply_ui_action(&mut state, UiAction::FocusNext);
+    assert_eq!(state.focus, Focus::Chat);
+
+    apply_ui_action(&mut state, UiAction::ToggleChat);
+    assert_eq!(state.focus, Focus::Input);
+
+    apply_ui_action(&mut state, UiAction::FocusNext);
+    assert_eq!(state.focus, Focus::Activity);
+
+    apply_ui_action(&mut state, UiAction::FocusNext);
+    assert_eq!(state.focus, Focus::Debug);
   }
 }

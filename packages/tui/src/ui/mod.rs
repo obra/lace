@@ -1,7 +1,7 @@
 use crate::app::reducer::{reduce, AppEvent, Outbound};
 use crate::app::ui::{apply_ui_action, UiAction};
 use crate::app::AppState;
-use crate::app::Role;
+use crate::app::{Focus, Role};
 use crate::args::Args;
 use crate::protocol::bootstrap::bootstrap_session;
 use crate::protocol::{ent, jsonrpc};
@@ -97,11 +97,26 @@ fn run_loop(
           }
 
           let action = match key.code {
-            KeyCode::Enter => Some(UiAction::Enter),
-            KeyCode::Backspace => Some(UiAction::Backspace),
-            KeyCode::Up => Some(UiAction::HistoryPrev),
-            KeyCode::Down => Some(UiAction::HistoryNext),
-            KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+            KeyCode::Tab => Some(UiAction::FocusNext),
+            KeyCode::Up => match state.focus {
+              Focus::Input => Some(UiAction::HistoryPrev),
+              _ => Some(UiAction::ScrollUp),
+            },
+            KeyCode::Down => match state.focus {
+              Focus::Input => Some(UiAction::HistoryNext),
+              _ => Some(UiAction::ScrollDown),
+            },
+            KeyCode::Enter => match state.focus {
+              Focus::Input => Some(UiAction::Enter),
+              _ => None,
+            },
+            KeyCode::Backspace => match state.focus {
+              Focus::Input => Some(UiAction::Backspace),
+              _ => None,
+            },
+            KeyCode::Char(ch)
+              if state.focus == Focus::Input && !key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
               Some(UiAction::InputChar(ch))
             }
             _ => None,
@@ -186,12 +201,20 @@ fn handle_agent_line(transport: &AgentTransport, state: &mut AppState, line: &st
       if let Some(err) = error {
         state.push_activity_line(format!("error: {}", err.message));
       }
+      let should_refocus = id
+        .as_str()
+        .map(|s| state.active_prompt_request_ids.contains(s))
+        .unwrap_or(false);
       reduce(state, AppEvent::RpcResponse { id });
+      if should_refocus && state.active_permission.is_none() {
+        state.focus = Focus::Input;
+      }
     }
   }
 }
 
 fn handle_session_update(state: &mut AppState, params: &Value) {
+  let mut saw_turn_end = false;
   for ev in ent::decode_session_update(params) {
     match &ev {
       AppEvent::ToolUse { tool_call_id, .. } => state.push_activity_line(format!("tool_use {tool_call_id}")),
@@ -201,7 +224,13 @@ fn handle_session_update(state: &mut AppState, params: &Value) {
       )),
       _ => {}
     }
+    if matches!(ev, AppEvent::TurnEnd { .. }) {
+      saw_turn_end = true;
+    }
     reduce(state, ev);
+  }
+  if saw_turn_end && state.active_permission.is_none() {
+    state.focus = Focus::Input;
   }
 }
 
@@ -298,8 +327,9 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
   }
 
   Paragraph::new(Text::from(lines))
-    .block(Block::default().title("Chat").borders(Borders::ALL))
+    .block(focused_block("Chat", state.focus == Focus::Chat))
     .wrap(Wrap { trim: false })
+    .scroll((state.chat_scroll, 0))
 }
 
 fn render_activity(state: &AppState) -> Paragraph<'static> {
@@ -308,8 +338,9 @@ fn render_activity(state: &AppState) -> Paragraph<'static> {
     lines.push(Line::from(l.clone()));
   }
   Paragraph::new(Text::from(lines))
-    .block(Block::default().title("Activity").borders(Borders::ALL))
+    .block(focused_block("Activity", state.focus == Focus::Activity))
     .wrap(Wrap { trim: true })
+    .scroll((state.activity_scroll, 0))
 }
 
 fn render_debug(state: &AppState) -> Paragraph<'static> {
@@ -318,13 +349,14 @@ fn render_debug(state: &AppState) -> Paragraph<'static> {
     lines.push(Line::from(l.clone()));
   }
   Paragraph::new(Text::from(lines))
-    .block(Block::default().title("Debug").borders(Borders::ALL))
+    .block(focused_block("Debug", state.focus == Focus::Debug))
     .wrap(Wrap { trim: true })
+    .scroll((state.debug_scroll, 0))
 }
 
 fn render_input(state: &AppState) -> Paragraph<'static> {
   Paragraph::new(format!("> {}", state.input_buffer))
-    .block(Block::default().title("Input").borders(Borders::ALL))
+    .block(focused_block("Input", state.focus == Focus::Input))
 }
 
 fn render_permission_modal(state: &AppState) -> Paragraph<'static> {
@@ -359,6 +391,15 @@ fn render_permission_modal(state: &AppState) -> Paragraph<'static> {
   Paragraph::new(Text::from(lines))
     .block(Block::default().title("Permission").borders(Borders::ALL))
     .wrap(Wrap { trim: true })
+}
+
+fn focused_block(title: &'static str, focused: bool) -> Block<'static> {
+  let base = Block::default().title(title).borders(Borders::ALL);
+  if focused {
+    base.border_style(Style::default().fg(Color::Yellow))
+  } else {
+    base
+  }
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: ratatui::layout::Rect) -> ratatui::layout::Rect {
