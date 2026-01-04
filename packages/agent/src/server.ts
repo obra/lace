@@ -311,7 +311,12 @@ function isTestProviderEnabled(): boolean {
 }
 
 function assertInitialized(state: AgentServerState): void {
-  if (!state.initialized) throw { code: EntErrorCodes.NotInitialized, message: 'NotInitialized' };
+  if (!state.initialized)
+    throw {
+      code: EntErrorCodes.NotInitialized,
+      message: 'NotInitialized',
+      data: { category: 'agent_internal' },
+    };
 }
 
 async function createProviderForTurn(options: {
@@ -977,7 +982,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     turnContext?: { turnId: string; turnSeq: number };
   }): Promise<{ jobId: string }> => {
     if (!state.activeSession)
-      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
 
     const jobId = `job_${randomUUID()}`;
     const startedAt = new Date().toISOString();
@@ -1372,24 +1381,30 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('initialize', async (params: unknown) => {
     if (state.initialized)
-      throw { code: EntErrorCodes.AlreadyInitialized, message: 'AlreadyInitialized' };
+      throw {
+        code: EntErrorCodes.AlreadyInitialized,
+        message: 'AlreadyInitialized',
+        data: { category: 'agent_internal' },
+      };
 
     const parsed = params as Record<string, unknown> | undefined;
-    if (!parsed || typeof parsed !== 'object') throw { code: -32602, message: 'InvalidParams' };
+    if (!parsed || typeof parsed !== 'object')
+      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
 
-    if (parsed.protocolVersion !== '1.0') throw { code: -32602, message: 'InvalidParams' };
+    if (parsed.protocolVersion !== '1.0')
+      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
 
     const clientInfo = parsed.clientInfo as Record<string, unknown> | undefined;
     if (!clientInfo || typeof clientInfo !== 'object')
-      throw { code: -32602, message: 'InvalidParams' };
+      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
     if (typeof clientInfo.name !== 'string' || clientInfo.name.length === 0)
-      throw { code: -32602, message: 'InvalidParams' };
+      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
     if (typeof clientInfo.version !== 'string' || clientInfo.version.length === 0)
-      throw { code: -32602, message: 'InvalidParams' };
+      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
 
     const capabilities = parsed.capabilities as Record<string, unknown> | undefined;
     if (!capabilities || typeof capabilities !== 'object')
-      throw { code: -32602, message: 'InvalidParams' };
+      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
 
     const config = (parsed.config as Record<string, unknown> | undefined) ?? undefined;
 
@@ -1799,7 +1814,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const instances = await state.providerInstances.loadInstances();
     if (!instances.instances[connectionId])
-      throw { code: EntErrorCodes.ConnectionNotFound, message: 'ConnectionNotFound' };
+      throw {
+        code: EntErrorCodes.ConnectionNotFound,
+        message: 'ConnectionNotFound',
+        data: { category: 'provider' },
+      };
 
     const credential = state.providerInstances.loadCredential(connectionId);
     return {
@@ -1817,7 +1836,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const instances = await state.providerInstances.loadInstances();
     if (!instances.instances[connectionId])
-      throw { code: EntErrorCodes.ConnectionNotFound, message: 'ConnectionNotFound' };
+      throw {
+        code: EntErrorCodes.ConnectionNotFound,
+        message: 'ConnectionNotFound',
+        data: { category: 'provider' },
+      };
 
     const credential = state.providerInstances.loadCredential(connectionId);
     const requestedMethod = toNonEmptyString(parsed?.method);
@@ -1841,7 +1864,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const instances = await state.providerInstances.loadInstances();
     if (!instances.instances[connectionId])
-      throw { code: EntErrorCodes.ConnectionNotFound, message: 'ConnectionNotFound' };
+      throw {
+        code: EntErrorCodes.ConnectionNotFound,
+        message: 'ConnectionNotFound',
+        data: { category: 'provider' },
+      };
 
     const values = parsed?.values;
     if (!values || typeof values !== 'object') return { ok: false, error: 'values is required' };
@@ -1866,7 +1893,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const instances = await state.providerInstances.loadInstances();
     if (!instances.instances[connectionId])
-      throw { code: EntErrorCodes.ConnectionNotFound, message: 'ConnectionNotFound' };
+      throw {
+        code: EntErrorCodes.ConnectionNotFound,
+        message: 'ConnectionNotFound',
+        data: { category: 'provider' },
+      };
 
     await state.providerInstances.clearCredential(connectionId);
     return { ok: true };
@@ -1881,7 +1912,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const instances = await state.providerInstances.loadInstances();
     const instance = instances.instances[connectionId];
-    if (!instance) throw { code: EntErrorCodes.ConnectionNotFound, message: 'ConnectionNotFound' };
+    if (!instance)
+      throw {
+        code: EntErrorCodes.ConnectionNotFound,
+        message: 'ConnectionNotFound',
+        data: { category: 'provider' },
+      };
 
     await ensureProviderCatalogLoaded();
     const providerId = instance.catalogProviderId;
@@ -1895,7 +1931,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   peer.onRequest('ent/job/list', async (_params: unknown) => {
     assertInitialized(state);
     if (!state.activeSession)
-      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
 
     const jobs = deriveJobsForActiveSession().map((j) => ({
       jobId: j.jobId,
@@ -1913,7 +1953,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   peer.onRequest('ent/job/output', async (params: unknown) => {
     assertInitialized(state);
     if (!state.activeSession)
-      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
 
     const parsed = params as {
       jobId: string;
@@ -1941,7 +1985,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const jobs = deriveJobsForActiveSession();
     const record = jobs.find((j) => j.jobId === jobId);
-    if (!record) throw { code: EntErrorCodes.JobNotFound, message: 'JobNotFound' };
+    if (!record)
+      throw {
+        code: EntErrorCodes.JobNotFound,
+        message: 'JobNotFound',
+        data: { category: 'session' },
+      };
 
     const sessionDir = state.activeSession.dir;
     const outputPath = getJobOutputPath(sessionDir, jobId);
@@ -2002,7 +2051,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   peer.onRequest('ent/job/kill', async (params: unknown) => {
     assertInitialized(state);
     if (!state.activeSession)
-      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
 
     const parsed = params as { jobId: string };
     const jobId = toNonEmptyString(parsed?.jobId);
@@ -2050,7 +2103,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('session/new', async (params: unknown) => {
     assertInitialized(state);
-    if (state.activeSession) throw { code: AcpErrorCodes.SessionBusy, message: 'SessionBusy' };
+    if (state.activeSession)
+      throw {
+        code: AcpErrorCodes.SessionBusy,
+        message: 'SessionBusy',
+        data: { category: 'session' },
+      };
 
     const parsed = params as { workDir: string; persona?: string; systemPrompt?: unknown };
     if (!parsed?.workDir) throwInvalidParams('workDir is required');
@@ -2095,12 +2153,16 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const parsed = params as { sessionId: string; fork?: boolean };
     if (!parsed?.sessionId) throwInvalidParams('sessionId is required');
     if (!isSessionId(parsed.sessionId)) {
-      throw { code: -32602, message: 'InvalidParams' };
+      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
     }
     if (parsed.fork) throwInvalidParams('fork not implemented');
 
     if (state.activeSession && state.activeSession.meta.sessionId !== parsed.sessionId) {
-      throw { code: AcpErrorCodes.SessionBusy, message: 'SessionBusy' };
+      throw {
+        code: AcpErrorCodes.SessionBusy,
+        message: 'SessionBusy',
+        data: { category: 'session' },
+      };
     }
 
     let loaded: LoadedSession;
@@ -2108,7 +2170,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       loaded = loadSession(parsed.sessionId);
     } catch (error) {
       if (error instanceof Error && error.message === 'Session not found') {
-        throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
+        throw {
+          code: AcpErrorCodes.SessionNotFound,
+          message: 'SessionNotFound',
+          data: { category: 'session' },
+        };
       }
       throw error;
     }
@@ -2125,7 +2191,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   peer.onRequest('ent/session/configure', async (params: unknown) => {
     assertInitialized(state);
     if (!state.activeSession)
-      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
 
     const parsed = params as Partial<{
       connectionId: string;
@@ -2254,8 +2324,17 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   peer.onRequest('ent/session/compact', async (params: unknown) => {
     assertInitialized(state);
     if (!state.activeSession)
-      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
-    if (state.activeTurn) throw { code: AcpErrorCodes.SessionBusy, message: 'SessionBusy' };
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
+    if (state.activeTurn)
+      throw {
+        code: AcpErrorCodes.SessionBusy,
+        message: 'SessionBusy',
+        data: { category: 'session' },
+      };
 
     const parsed = params as
       | {
@@ -2393,8 +2472,17 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   peer.onRequest('ent/session/checkpoint', async (params: unknown) => {
     assertInitialized(state);
     if (!state.activeSession)
-      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
-    if (state.activeTurn) throw { code: AcpErrorCodes.SessionBusy, message: 'SessionBusy' };
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
+    if (state.activeTurn)
+      throw {
+        code: AcpErrorCodes.SessionBusy,
+        message: 'SessionBusy',
+        data: { category: 'session' },
+      };
 
     const parsed = params as { label?: string } | undefined;
     const label = toNonEmptyString(parsed?.label) ?? undefined;
@@ -2428,24 +2516,39 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   peer.onRequest('ent/session/rewind', async (params: unknown) => {
     assertInitialized(state);
     if (!state.activeSession)
-      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
-    if (state.activeTurn) throw { code: AcpErrorCodes.SessionBusy, message: 'SessionBusy' };
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
+    if (state.activeTurn)
+      throw {
+        code: AcpErrorCodes.SessionBusy,
+        message: 'SessionBusy',
+        data: { category: 'session' },
+      };
 
     const parsed = params as { toEventSeq: number };
     const toEventSeq =
       typeof parsed?.toEventSeq === 'number' && Number.isFinite(parsed.toEventSeq)
         ? Math.trunc(parsed.toEventSeq)
         : null;
-    if (toEventSeq === null || toEventSeq < 0) throw { code: -32602, message: 'InvalidParams' };
+    if (toEventSeq === null || toEventSeq < 0)
+      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
 
     return await runExclusive(() => {
       const sessionState = readSessionState(state.activeSession!.dir);
       const currentEventSeq = sessionState.nextEventSeq - 1;
-      if (toEventSeq > currentEventSeq) throw { code: -32602, message: 'InvalidParams' };
+      if (toEventSeq > currentEventSeq)
+        throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
 
       const checkpoint = findCheckpointByEventSeq(state.activeSession!.dir, toEventSeq);
       if (!checkpoint) {
-        throw { code: EntErrorCodes.CheckpointNotFound, message: 'CheckpointNotFound' };
+        throw {
+          code: EntErrorCodes.CheckpointNotFound,
+          message: 'CheckpointNotFound',
+          data: { category: 'session' },
+        };
       }
 
       const workDir = state.activeSession!.meta.workDir;
@@ -2468,7 +2571,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   peer.onRequest('ent/session/inject', async (params: unknown) => {
     assertInitialized(state);
     if (!state.activeSession)
-      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
 
     const parsed = params as { content: unknown[]; priority: 'immediate' | 'normal' | 'deferred' };
     const priority =
@@ -2509,7 +2616,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   peer.onRequest('ent/session/events', async (params: unknown) => {
     assertInitialized(state);
     if (!state.activeSession)
-      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
 
     const parsed = params as
       | { afterEventSeq?: number; limit?: number; types?: string[] }
@@ -2542,8 +2653,17 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   peer.onRequest('session/prompt', async (params: unknown) => {
     assertInitialized(state);
     if (!state.activeSession)
-      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
-    if (state.activeTurn) throw { code: AcpErrorCodes.SessionBusy, message: 'SessionBusy' };
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
+    if (state.activeTurn)
+      throw {
+        code: AcpErrorCodes.SessionBusy,
+        message: 'SessionBusy',
+        data: { category: 'session' },
+      };
 
     const effectiveConfig = state.activeSession.state.config
       ? { ...state.config, ...state.activeSession.state.config }
