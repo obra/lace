@@ -21,3 +21,15 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
 - Notes:
   - We classify inbound messages as Request/Response/Notification based on presence of `method` and `id`.
   - `id` is preserved as `serde_json::Value` to stay compatible with non-Lace agents.
+
+### 2026-01-04 — NDJSON transport (spawn + read/write)
+
+- Added a minimal spawn+stdio transport (`packages/tui/src/protocol/transport.rs`) that:
+  - spawns an agent via `sh -lc "<agent-cmd>"`
+  - reads NDJSON lines from stdout
+  - writes lines to stdin
+  - forwards agent stderr to our stderr
+- Tests:
+  - `cd packages/tui && cargo test` (includes a `cat` round-trip test)
+- Notes:
+  - This is intentionally low-level; higher-level JSON-RPC request tracking comes later.
