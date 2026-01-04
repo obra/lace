@@ -1,207 +1,89 @@
-// ABOUTME: Integration tests for agent message endpoint with summary generation
-// ABOUTME: Tests complete flow including SSE broadcasting with mocked AI provider
+// ABOUTME: Integration tests for supervisor-backed agent message endpoint
+// ABOUTME: Verifies prompt is forwarded to lace-agent (using built-in test provider)
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import '@testing-library/jest-dom/vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/core/test-utils/provider-instances';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '@lace/core/test-utils/provider-defaults';
-import { Project } from '@lace/core/projects/project';
-import { Session } from '@lace/web/lib/server/lace-imports';
 import { action } from '@lace/web/app/routes/api.agents.$agentId.message';
-import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
-import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
-import type { LaceEvent, AgentSummaryUpdatedData } from '@lace/web/types/core';
+import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 
-// Mock the AI provider HTTP responses
-const server = setupServer(
-  // Mock Anthropic API for the SessionHelper
-  http.post('https://api.anthropic.com/v1/messages', () => {
-    return HttpResponse.json({
-      id: 'msg_mock_summary',
-      type: 'message',
-      role: 'assistant',
-      content: [
-        {
-          type: 'text',
-          text: 'Setting up user authentication system',
-        },
-      ],
-      model: 'claude-3-5-haiku-20241022',
-      stop_reason: 'end_turn',
-      usage: {
-        input_tokens: 50,
-        output_tokens: 10,
-      },
-    });
-  })
-);
+// ✅ ESSENTIAL MOCK - Server-side module compatibility in test environment
+import { vi } from 'vitest';
+vi.mock('server-only', () => ({}));
 
-describe('Agent Message Endpoint with Summary Generation', () => {
-  const _tempLaceDir = setupWebTest();
-  let providerInstanceId: string;
-  let projectId: string;
-  let sessionId: string;
-  let agentId: string;
-  let capturedEvents: LaceEvent[] = [];
+type DurableEvent = { type: string; data: Record<string, unknown> };
 
-  beforeEach(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
-    setupTestProviderDefaults();
+async function waitForEvent(params: {
+  getEvents: () => Promise<DurableEvent[]>;
+  predicate: (e: DurableEvent) => boolean;
+  timeoutMs: number;
+}): Promise<DurableEvent> {
+  const start = Date.now();
+  while (Date.now() - start < params.timeoutMs) {
+    const events = await params.getEvents();
+    const found = events.find(params.predicate);
+    if (found) return found;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error('Timed out waiting for durable event');
+}
 
-    // Create test provider instance
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
+describe('Agent Message Endpoint (supervisor-backed)', () => {
+  const context = setupWebTest();
+  let originalTestProviderEnv: string | undefined;
 
-    // Create project with the test provider
-    const project = Project.create(
-      'Test Project',
-      process.cwd(),
-      'Project for agent summary testing',
-      {
-        providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      }
-    );
-    projectId = project.getId();
-
-    // Create session using Session.create() pattern
-    const sessionInstance = Session.create({
-      name: 'Test Session',
-      projectId,
-    });
-    const session = sessionInstance.getInfo()!;
-    sessionId = session.id;
-    agentId = sessionId; // Coordinator agent has same ID as session
-
-    // Register the session with EventStreamManager for proper event handling
-    const eventStreamManager = EventStreamManager.getInstance();
-    eventStreamManager.registerSession(sessionInstance);
-
-    // Capture SSE events
-    capturedEvents = [];
-    const originalBroadcast = eventStreamManager.broadcast.bind(eventStreamManager);
-    vi.spyOn(eventStreamManager, 'broadcast').mockImplementation((event: LaceEvent) => {
-      capturedEvents.push(event);
-      return originalBroadcast(event);
-    });
+  beforeEach(() => {
+    originalTestProviderEnv = process.env.LACE_AGENT_TEST_PROVIDER;
+    process.env.LACE_AGENT_TEST_PROVIDER = '1';
   });
 
   afterEach(async () => {
-    server.resetHandlers();
-    server.close();
-    cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances([providerInstanceId]);
-    vi.clearAllMocks();
+    process.env.LACE_AGENT_TEST_PROVIDER = originalTestProviderEnv;
+    await shutdownSupervisorForTests();
   });
 
-  it('should generate and broadcast agent summary when user sends message', async () => {
-    // Create request
-    const request = new Request('http://localhost:3000/api/agents/test-agent/message', {
+  it('records a prompt durable event when user sends message', async () => {
+    const supervisor = getSupervisor();
+    const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+
+    const request = new Request(`http://localhost:3000/api/agents/${created.sessionId}/message`, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: 'Help me set up user authentication',
-      }),
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'Hello from test' }),
     });
 
-    // Call the endpoint
     const response = await action({
       request,
-      params: { agentId },
-    } as { request: Request; params: { agentId: string }; context: Record<string, unknown> });
+      params: { agentId: created.sessionId },
+    } as unknown as {
+      request: Request;
+      params: { agentId: string };
+      context: Record<string, unknown>;
+    });
 
-    // Verify successful response
     expect(response.status).toBe(202);
-    const responseData = await response.json();
 
-    // Handle SuperJSON response format
-    const actualData = responseData.json || responseData;
-    expect(actualData.status).toBe('accepted');
-    expect(actualData.agentId).toBe(agentId);
-    expect(actualData.messageId).toBeDefined();
+    const peer = supervisor.getPeer(created.workspaceSessionId, created.sessionId);
+    const getEvents = async (): Promise<DurableEvent[]> => {
+      const result = (await peer.request('ent/session/events', { limit: 200 })) as {
+        events: DurableEvent[];
+      };
+      return result.events;
+    };
 
-    // Wait a bit for async summary generation
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // Verify AGENT_SUMMARY_UPDATED event was broadcast
-    const summaryEvent = capturedEvents.find((event) => event.type === 'AGENT_SUMMARY_UPDATED');
-    expect(summaryEvent).toBeDefined();
-    expect(summaryEvent!.context?.threadId).toBe(agentId);
-    expect(summaryEvent!.transient).toBe(true);
-    expect(summaryEvent!.context).toEqual({
-      projectId,
-      sessionId,
-      threadId: agentId,
+    const promptEvent = await waitForEvent({
+      getEvents,
+      predicate: (e) => e.type === 'prompt',
+      timeoutMs: 3000,
     });
 
-    // Verify event data structure - check that we got a real summary
-    const eventData = summaryEvent!.data as AgentSummaryUpdatedData;
-    expect(eventData.summary).toBeDefined();
-    expect(typeof eventData.summary).toBe('string');
-    expect(eventData.summary.length).toBeGreaterThan(0);
-    expect(eventData.agentThreadId).toBe(agentId);
-    expect(eventData.timestamp).toBeInstanceOf(Date);
-  });
+    const content = Array.isArray(promptEvent.data?.content)
+      ? (promptEvent.data.content as any[])
+      : [];
+    const text = content
+      .filter((b) => b?.type === 'text' && typeof b.text === 'string')
+      .map((b) => b.text)
+      .join('\n');
 
-  it('should include last agent response in summary context', async () => {
-    // This test verifies that the helper considers conversation history
-    // We'll mock a more specific response to prove it was called with context
-
-    // Mock the summary response to return different text showing it got context
-    server.use(
-      http.post('https://api.anthropic.com/v1/messages', () => {
-        return HttpResponse.json({
-          id: 'msg_mock_summary',
-          type: 'message',
-          content: [
-            {
-              type: 'text',
-              text: 'Continuing previous authentication work',
-            },
-          ],
-        });
-      })
-    );
-
-    const request = new Request('http://localhost:3000/api/agents/test-agent/message', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: 'Add password hashing',
-      }),
-    });
-
-    await action({
-      request,
-      params: { agentId },
-    } as { request: Request; params: { agentId: string }; context: Record<string, unknown> });
-
-    // Wait for summary generation
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // Verify AGENT_SUMMARY_UPDATED event was broadcast
-    const summaryEvent = capturedEvents.find((event) => event.type === 'AGENT_SUMMARY_UPDATED');
-    expect(summaryEvent).toBeDefined();
-
-    const eventData = summaryEvent!.data as AgentSummaryUpdatedData;
-    expect(eventData.summary).toBeDefined();
-    expect(typeof eventData.summary).toBe('string');
-    expect(eventData.summary.length).toBeGreaterThan(0);
+    expect(text).toContain('Hello from test');
   });
 });

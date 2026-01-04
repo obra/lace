@@ -1,73 +1,22 @@
-// ABOUTME: Tests for the workspace information API endpoint
-// ABOUTME: Validates endpoint behavior for container and local workspace modes
+// ABOUTME: Tests for the supervisor-backed workspace information API endpoint
+// ABOUTME: Workspace sessions always report local mode for now
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { loader } from '@lace/web/app/routes/api.sessions.$sessionId.workspace';
-import { Session } from '@lace/web/lib/server/lace-imports';
-import { Project } from '@lace/web/lib/server/lace-imports';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { createLoaderArgs } from '@lace/web/test-utils/route-test-helpers';
 import { parseResponse } from '@lace/web/lib/serialization';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '@lace/web/lib/server/lace-imports';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/web/lib/server/lace-imports';
-import { promises as fs } from 'fs';
-import { join } from 'path';
+import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 
 // ✅ ESSENTIAL MOCK - Server-side module compatibility in test environment
+import { vi } from 'vitest';
 vi.mock('server-only', () => ({}));
-
-// Mock URL fetch tool to avoid external HTTP requests
-vi.mock('@lace/core/tools/implementations/url-fetch', () => ({
-  UrlFetchTool: vi.fn(() => ({
-    name: 'url-fetch',
-    description: 'Fetch content from a URL (mocked)',
-    schema: {},
-    execute: vi.fn().mockResolvedValue({
-      isError: false,
-      content: [{ type: 'text', text: 'Mocked URL content' }],
-    }),
-  })),
-}));
-
-// Mock bash tool to avoid system command execution
-vi.mock('@lace/core/tools/implementations/bash', () => ({
-  BashTool: vi.fn(() => ({
-    name: 'bash',
-    description: 'Execute bash commands (mocked)',
-    schema: {},
-    execute: vi.fn().mockResolvedValue({
-      isError: false,
-      content: [{ type: 'text', text: 'Mocked bash output' }],
-    }),
-  })),
-}));
 
 describe('GET /api/sessions/:sessionId/workspace', () => {
   const context = setupWebTest();
-  let anthropicInstanceId: string;
 
-  beforeEach(async () => {
-    setupTestProviderDefaults();
-
-    // Create test provider instance
-    anthropicInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
-  });
-
-  afterEach(() => {
-    Session.clearRegistry();
-    cleanupTestProviderInstances();
-    cleanupTestProviderDefaults();
+  afterEach(async () => {
+    await shutdownSupervisorForTests();
   });
 
   it('returns 400 if session ID is missing', async () => {
@@ -80,9 +29,20 @@ describe('GET /api/sessions/:sessionId/workspace', () => {
     expect(data.code).toBe('VALIDATION_FAILED');
   });
 
-  it('returns 404 if session does not exist', async () => {
+  it('returns 400 if session id is invalid', async () => {
     const request = new Request('http://localhost:3005/api/sessions/nonexistent/workspace');
     const response = await loader(createLoaderArgs(request, { sessionId: 'nonexistent' }));
+    const data = await parseResponse<{ error: string; code: string }>(response);
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid session ID');
+    expect(data.code).toBe('VALIDATION_FAILED');
+  });
+
+  it('returns 404 if workspace session does not exist', async () => {
+    const id = 'ws_00000000-0000-0000-0000-000000000000';
+    const request = new Request(`http://localhost:3005/api/sessions/${id}/workspace`);
+    const response = await loader(createLoaderArgs(request, { sessionId: id }));
     const data = await parseResponse<{ error: string; code: string }>(response);
 
     expect(response.status).toBe(404);
@@ -90,120 +50,27 @@ describe('GET /api/sessions/:sessionId/workspace', () => {
     expect(data.code).toBe('RESOURCE_NOT_FOUND');
   });
 
-  it('returns workspace info for local mode session', async () => {
-    // Create test project
-    const testDir = join(context.tempProjectDir, 'local-workspace-test');
-    await fs.mkdir(testDir, { recursive: true });
+  it('returns workspace info for a workspace session', async () => {
+    const supervisor = getSupervisor();
+    const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
-    const project = Project.create('Test Project', testDir, 'Test project', {
-      providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
-    });
-
-    // Create session with local workspace mode
-    const session = Session.create({
-      name: 'Test Session',
-      projectId: project.getId(),
-      configuration: {
-        workspaceMode: 'local',
-      },
-    });
-
-    // Wait for workspace initialization
-    await session.waitForWorkspace();
-
-    const sessionId = session.getId();
-    const request = new Request(`http://localhost:3005/api/sessions/${sessionId}/workspace`);
-    const response = await loader(createLoaderArgs(request, { sessionId }));
+    const request = new Request(
+      `http://localhost:3005/api/sessions/${created.workspaceSessionId}/workspace`
+    );
+    const response = await loader(
+      createLoaderArgs(request, { sessionId: created.workspaceSessionId })
+    );
     const data = await parseResponse<{
-      mode: 'container' | 'local';
-      info: { sessionId: string; state: string } | null;
+      mode: 'container' | 'worktree' | 'local';
+      info: { sessionId: string; state: string; projectDir: string; clonePath: string } | null;
     }>(response);
 
     expect(response.status).toBe(200);
     expect(data.mode).toBe('local');
     expect(data.info).toBeDefined();
-    expect(data.info?.sessionId).toBe(session.getId());
+    expect(data.info?.sessionId).toBe(created.workspaceSessionId);
     expect(data.info?.state).toBe('running');
-  });
-
-  it('returns workspace info for container mode session', async () => {
-    // Skip on non-macOS platforms (containers only supported on macOS)
-    if (process.platform !== 'darwin') {
-      return;
-    }
-
-    // Create test project
-    const testDir = join(context.tempProjectDir, 'container-workspace-test');
-    await fs.mkdir(testDir, { recursive: true });
-
-    const project = Project.create('Test Project', testDir, 'Test project', {
-      providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
-    });
-
-    // Create session with container workspace mode
-    const session = Session.create({
-      name: 'Test Session',
-      projectId: project.getId(),
-      configuration: {
-        workspaceMode: 'container',
-      },
-    });
-
-    // Wait for workspace initialization
-    await session.waitForWorkspace();
-
-    const sessionId = session.getId();
-    const request = new Request(`http://localhost:3005/api/sessions/${sessionId}/workspace`);
-    const response = await loader(createLoaderArgs(request, { sessionId }));
-    const data = await parseResponse<{
-      mode: 'container' | 'local';
-      info: { containerId: string; branchName?: string; containerMountPath?: string } | null;
-    }>(response);
-
-    expect(response.status).toBe(200);
-    expect(data.mode).toBe('container');
-    expect(data.info).toBeDefined();
-    if (data.info) {
-      expect(data.info.containerId).toMatch(/^workspace-/);
-      expect(data.info.branchName).toBeDefined();
-      expect(data.info.containerMountPath).toBe('/workspace');
-    }
-  });
-
-  it('handles sessions where workspace is not yet initialized', async () => {
-    // Create test project
-    const testDir = join(context.tempProjectDir, 'uninit-workspace-test');
-    await fs.mkdir(testDir, { recursive: true });
-
-    const project = Project.create('Test Project', testDir, 'Test project', {
-      providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
-    });
-
-    // Create session
-    const session = Session.create({
-      name: 'Test Session',
-      projectId: project.getId(),
-      configuration: {
-        workspaceMode: 'local',
-      },
-    });
-
-    // Don't wait for workspace initialization - test immediate response
-
-    const sessionId = session.getId();
-    const request = new Request(`http://localhost:3005/api/sessions/${sessionId}/workspace`);
-    const response = await loader(createLoaderArgs(request, { sessionId }));
-    const data = await parseResponse<{
-      mode: 'container' | 'local';
-      info: unknown;
-    }>(response);
-
-    expect(response.status).toBe(200);
-    expect(data.mode).toBe('local');
-    // Info may be null if not initialized yet
-    expect(data.info === null || typeof data.info === 'object').toBe(true);
+    expect(data.info?.projectDir).toBe(context.tempProjectDir);
+    expect(data.info?.clonePath).toBe(context.tempProjectDir);
   });
 });

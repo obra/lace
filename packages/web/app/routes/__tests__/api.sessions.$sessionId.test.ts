@@ -1,392 +1,96 @@
-// ABOUTME: Unit tests for session detail API endpoint
-// ABOUTME: Tests getting specific session information using real functionality
+// ABOUTME: Integration tests for supervisor-backed session detail API endpoint
+// ABOUTME: Sessions are workspace sessions (ws_<uuid>) stored in supervisor workspace session store
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { loader as GET, action as PATCH } from '@lace/web/app/routes/api.sessions.$sessionId';
-import type { SessionInfo } from '@lace/web/types/core';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '@lace/web/lib/server/lace-imports';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/web/lib/server/lace-imports';
-import { getSessionService } from '@lace/web/lib/server/session-service';
-import { Project } from '@lace/web/lib/server/lace-imports';
-import { Session } from '@lace/web/lib/server/lace-imports';
 import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
-import { promises as fs } from 'fs';
-import { join } from 'path';
+import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 
-// ✅ ESSENTIAL MOCK - Next.js server-side module compatibility in test environment
-// Required for Next.js framework compatibility during testing
+// ✅ ESSENTIAL MOCK - Server-side module compatibility in test environment
+import { vi } from 'vitest';
 vi.mock('server-only', () => ({}));
-
-// Mock only external dependencies while using real tools
-// URL fetch tool might make external HTTP requests
-vi.mock('@lace/core/tools/implementations/url-fetch', () => ({
-  UrlFetchTool: vi.fn(() => ({
-    name: 'url-fetch',
-    description: 'Fetch content from a URL (mocked)',
-    schema: {},
-    execute: vi.fn().mockResolvedValue({
-      isError: false,
-      content: [{ type: 'text', text: 'Mocked URL content' }],
-    }),
-  })),
-}));
-
-// Bash tool executes system commands - mock to avoid side effects
-vi.mock('@lace/core/tools/implementations/bash', () => ({
-  BashTool: vi.fn(() => ({
-    name: 'bash',
-    description: 'Execute bash commands (mocked)',
-    schema: {},
-    execute: vi.fn().mockResolvedValue({
-      isError: false,
-      content: [{ type: 'text', text: 'Mocked bash output' }],
-    }),
-  })),
-}));
 
 describe('Session Detail API Route', () => {
   const context = setupWebTest();
-  let sessionService: ReturnType<typeof getSessionService>;
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
-  let anthropicInstanceId: string;
-
-  beforeEach(async () => {
-    setupTestProviderDefaults();
-    vi.clearAllMocks();
-
-    // Create test provider instance using the proper helper
-    anthropicInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
-
-    // Set up environment for session service
-    process.env = {
-      ...process.env,
-      ANTHROPIC_KEY: 'test-key',
-      LACE_DB_PATH: ':memory:',
-    };
-
-    sessionService = getSessionService();
-
-    // Mock console methods to prevent stderr pollution during tests
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-  });
 
   afterEach(async () => {
-    sessionService.clearActiveSessions();
-    // Clear global singleton
-    global.sessionService = undefined;
-    consoleErrorSpy.mockRestore();
-    consoleWarnSpy.mockRestore();
-
-    // Clean up provider defaults
-    cleanupTestProviderDefaults();
-
-    // Clean up provider instance
-    if (anthropicInstanceId) {
-      await cleanupTestProviderInstances([anthropicInstanceId]);
-    }
-
-    vi.clearAllMocks();
+    await shutdownSupervisorForTests();
   });
 
-  describe('GET /api/sessions/[sessionId]', () => {
-    it('should return session details with agents', async () => {
-      // Create a test project first
-      const testDir = join(context.tempProjectDir, 'session-detail-test');
-      await fs.mkdir(testDir, { recursive: true });
+  it('GET /api/sessions/:sessionId returns session details with agents', async () => {
+    const supervisor = getSupervisor();
+    const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+    supervisor.updateWorkspaceSession(created.workspaceSessionId, { name: 'Test Session' });
 
-      const testProject = Project.create('Test Project', testDir, 'Test project for API test', {
-        providerInstanceId: anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      });
-      const projectId = testProject.getId();
-
-      // Create a real session using the session service
-      const sessionInstance = Session.create({
-        name: 'Test Session',
-        projectId: projectId,
-      });
-      const session = sessionInstance.getInfo()!;
-      const sessionId = session.id;
-
-      const request = new Request(`http://localhost:3005/api/sessions/${sessionId}`);
-      const response = await GET(createLoaderArgs(request, { sessionId: String(sessionId) }));
-
-      expect(response.status).toBe(200);
-
-      const data = await parseResponse<SessionInfo>(response);
-      expect(data).toEqual(
-        expect.objectContaining({
-          id: sessionId,
-          name: 'Test Session',
-          createdAt: expect.any(Date) as Date,
-          agents: expect.arrayContaining([
-            expect.objectContaining({
-              threadId: sessionId,
-              name: 'Lace', // Coordinator agent is always named "Lace"
-              providerInstanceId: expect.any(String) as string,
-              modelId: 'claude-3-5-haiku-20241022',
-              status: expect.any(String) as string,
-            }),
-          ]) as unknown[],
-        })
-      );
+    const spawned = await supervisor.createAgentSession(created.workspaceSessionId);
+    supervisor.upsertAgentSessionMeta(created.workspaceSessionId, {
+      sessionId: spawned.sessionId,
+      name: 'Agent-1',
     });
 
-    it('should return 400 for invalid session ID format', async () => {
-      const invalidSessionId = 'non_existent';
+    const request = new Request(`http://localhost/api/sessions/${created.workspaceSessionId}`);
+    const response = await GET(
+      createLoaderArgs(request, { sessionId: created.workspaceSessionId })
+    );
 
-      const request = new Request(`http://localhost:3005/api/sessions/${invalidSessionId}`);
-      const response = await GET(createLoaderArgs(request, { sessionId: invalidSessionId }));
-      const data = await parseResponse<{ error: string }>(response);
+    expect(response.status).toBe(200);
+    const data = await parseResponse<{
+      id: string;
+      name: string;
+      createdAt: Date;
+      agents: Array<{ threadId: string; name: string }>;
+    }>(response);
 
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid session ID');
-    });
-
-    it('should handle invalid session ID format gracefully', async () => {
-      const invalidSessionId = 'invalid_session_id';
-
-      const request = new Request(`http://localhost:3005/api/sessions/${invalidSessionId}`);
-      const response = await GET(createLoaderArgs(request, { sessionId: invalidSessionId }));
-      const data = await parseResponse<{ error: string }>(response);
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid session ID');
-    });
+    expect(data.id).toBe(created.workspaceSessionId);
+    expect(data.name).toBe('Test Session');
+    expect(data.createdAt).toBeInstanceOf(Date);
+    expect(data.agents.map((a) => a.threadId)).toEqual(
+      expect.arrayContaining([created.sessionId, spawned.sessionId])
+    );
   });
 
-  describe('PATCH /api/sessions/[sessionId]', () => {
-    it('should update session metadata', async () => {
-      // Create a test project first
-      const testDir = join(context.tempProjectDir, 'session-update-test');
-      await fs.mkdir(testDir, { recursive: true });
+  it('GET /api/sessions/:sessionId returns 400 for invalid session id', async () => {
+    const request = new Request('http://localhost/api/sessions/invalid-session');
+    const response = await GET(createLoaderArgs(request, { sessionId: 'invalid-session' }));
 
-      const testProject = Project.create('Test Project', testDir, 'Test project for API test', {
-        providerInstanceId: anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      });
-      const projectId = testProject.getId();
-
-      // Create a real session using the session service
-      const sessionInstance = Session.create({
-        name: 'Original Session',
-        projectId: projectId,
-      });
-      const session = sessionInstance.getInfo()!;
-      const sessionId = session.id;
-
-      const updates = {
-        name: 'Updated Session Name',
-        description: 'Updated description',
-        status: 'archived',
-      };
-
-      const request = new Request(`http://localhost:3005/api/sessions/${sessionId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(updates),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const response = await PATCH(createActionArgs(request, { sessionId: String(sessionId) }));
-
-      if (response.status !== 200) {
-        const errorData = await parseResponse<{ error: string }>(response);
-        console.error('PATCH failed with status:', response.status);
-        console.error('Error data:', errorData);
-        // Don't throw - let the test assertion handle the failure
-      }
-      expect(response.status).toBe(200);
-
-      const data = await parseResponse<SessionInfo>(response);
-      expect(data).toEqual(
-        expect.objectContaining({
-          id: sessionId,
-          name: 'Updated Session Name',
-          description: 'Updated description',
-          status: 'archived',
-        })
-      );
-    });
-
-    it('should return 400 for invalid session ID format', async () => {
-      const invalidSessionId = 'non_existent';
-
-      const request = new Request(`http://localhost:3005/api/sessions/${invalidSessionId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ name: 'Updated Name' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const response = await PATCH(createActionArgs(request, { sessionId: invalidSessionId }));
-
-      const data = await parseResponse<{ error: string }>(response);
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid session ID');
-    });
-
-    it('should validate request data', async () => {
-      // Create a test project first
-      const testDir = join(context.tempProjectDir, 'session-validate-test');
-      await fs.mkdir(testDir, { recursive: true });
-
-      const testProject = Project.create('Test Project', testDir, 'Test project for API test', {
-        providerInstanceId: anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      });
-      const projectId = testProject.getId();
-
-      // Create a real session using the session service
-      const sessionInstance = Session.create({
-        name: 'Test Session',
-        projectId: projectId,
-      });
-      const session = sessionInstance.getInfo()!;
-      const sessionId = session.id;
-
-      const invalidUpdates = {
-        name: '', // Empty name should be invalid
-        status: 'invalid-status', // Invalid status should be invalid
-      };
-
-      const request = new Request(`http://localhost:3005/api/sessions/${sessionId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(invalidUpdates),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const response = await PATCH(createActionArgs(request, { sessionId: String(sessionId) }));
-
-      const data = await parseResponse<{ error: string; details?: unknown }>(response);
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid request data');
-      expect(data.details).toBeDefined();
-    });
-
-    it('should handle partial updates', async () => {
-      // Create a test project first
-      const testDir = join(context.tempProjectDir, 'session-partial-test');
-      await fs.mkdir(testDir, { recursive: true });
-
-      const testProject = Project.create('Test Project', testDir, 'Test project for API test', {
-        providerInstanceId: anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      });
-      const projectId = testProject.getId();
-
-      // Create a real session using the session service
-      const sessionInstance = Session.create({
-        name: 'Original Session',
-        projectId: projectId,
-      });
-      const session = sessionInstance.getInfo()!;
-      const sessionId = session.id;
-
-      // Only update name, leaving description and status unchanged
-      const partialUpdates = {
-        name: 'Partially Updated Session',
-      };
-
-      const request = new Request(`http://localhost:3005/api/sessions/${sessionId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(partialUpdates),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const response = await PATCH(createActionArgs(request, { sessionId: String(sessionId) }));
-
-      expect(response.status).toBe(200);
-
-      const data = await parseResponse<SessionInfo>(response);
-      expect(data).toEqual(
-        expect.objectContaining({
-          id: sessionId,
-          name: 'Partially Updated Session',
-        })
-      );
-    });
-
-    it('should handle invalid session ID format in updates', async () => {
-      const invalidSessionId = 'invalid_session_id';
-
-      const request = new Request(`http://localhost:3005/api/sessions/${invalidSessionId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ name: 'Updated Name' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const response = await PATCH(createActionArgs(request, { sessionId: invalidSessionId }));
-
-      const data = await parseResponse<{ error: string }>(response);
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid session ID');
-    });
+    expect(response.status).toBe(400);
+    const data = await parseResponse<{ error: string; code: string }>(response);
+    expect(data.code).toBe('VALIDATION_FAILED');
   });
 
-  describe('TDD: Direct Session Data Access', () => {
-    it('should return session data when session exists', async () => {
-      // This test verifies that PATCH route uses Session.getSession() directly
-      // instead of going through sessionService.getSessionData()
+  it('GET /api/sessions/:sessionId returns 404 for unknown workspace session id', async () => {
+    const id = 'ws_00000000-0000-0000-0000-000000000000';
+    const request = new Request(`http://localhost/api/sessions/${id}`);
+    const response = await GET(createLoaderArgs(request, { sessionId: id }));
 
-      // Mock the Session class directly
-      const { Session } = await import('@lace/core/sessions/session');
-      const mockDirectSessionData = {
-        id: 'lace_20250101_sess01',
-        name: 'Updated Session',
-        description: 'Updated description',
-        status: 'active',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        projectId: 'test-project',
-        configuration: { provider: 'anthropic' },
-      };
+    expect(response.status).toBe(404);
+    const data = await parseResponse<{ error: string; code: string }>(response);
+    expect(data.code).toBe('RESOURCE_NOT_FOUND');
+  });
 
-      // This should spy on the core Session.getSession() method being called directly
-      const sessionGetSpy = vi
-        .spyOn(Session, 'getSession')
-        .mockReturnValue(mockDirectSessionData as never);
+  it('PATCH /api/sessions/:sessionId updates session name', async () => {
+    const supervisor = getSupervisor();
+    const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+    supervisor.updateWorkspaceSession(created.workspaceSessionId, { name: 'Before' });
 
-      // Create a real session first for the route to work with
-      const testDir = join(context.tempProjectDir, 'session-tdd-test');
-      await fs.mkdir(testDir, { recursive: true });
-
-      const testProject = Project.create('TDD Test Project', testDir, 'TDD test project', {
-        providerInstanceId: anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      });
-      const sessionInstance = Session.create({
-        name: 'Test Session',
-        projectId: testProject.getId(),
-      });
-      const session = sessionInstance.getInfo()!;
-
-      const request = new Request(`http://localhost:3005/api/sessions/${session.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ name: 'Updated Session' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      // This should FAIL initially because route still uses sessionService.getSessionData
-      await PATCH(createActionArgs(request, { sessionId: session.id }));
-
-      // Verify Session.getSession was called directly (not through sessionService.getSessionData)
-      expect(sessionGetSpy).toHaveBeenCalledWith(session.id);
-
-      sessionGetSpy.mockRestore();
+    const request = new Request(`http://localhost/api/sessions/${created.workspaceSessionId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'After' }),
     });
+
+    const response = await PATCH(
+      createActionArgs(request, { sessionId: created.workspaceSessionId })
+    );
+
+    expect(response.status).toBe(200);
+    const data = await parseResponse<{ id: string; name: string }>(response);
+    expect(data.id).toBe(created.workspaceSessionId);
+    expect(data.name).toBe('After');
+
+    const reloaded = supervisor.getWorkspaceSession(created.workspaceSessionId);
+    expect(reloaded?.name).toBe('After');
   });
 });

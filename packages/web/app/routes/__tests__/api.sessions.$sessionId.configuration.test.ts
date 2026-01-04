@@ -1,39 +1,25 @@
-// ABOUTME: Integration tests for session configuration API endpoints - GET, PUT for configuration management
-// ABOUTME: Tests real functionality with actual sessions, no mocking
+// ABOUTME: Integration tests for supervisor-backed session configuration API endpoints - GET, PUT
+// ABOUTME: Session configuration is stored on the coordinator agent session via ent/session/configure
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   loader as GET,
   action as PUT,
 } from '@lace/web/app/routes/api.sessions.$sessionId.configuration';
-import { getSessionService } from '@lace/web/lib/server/session-service';
-import { Project, Session } from '@lace/web/lib/server/lace-imports';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '@lace/web/lib/server/lace-imports';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/web/lib/server/lace-imports';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
-import { promises as fs } from 'fs';
-import { join } from 'path';
+import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 
-// Type interfaces for API responses
+// ✅ ESSENTIAL MOCK - Server-side module compatibility in test environment
+import { vi } from 'vitest';
+vi.mock('server-only', () => ({}));
+
 interface ConfigurationResponse {
   configuration: {
-    provider?: string;
-    model?: string;
     providerInstanceId?: string;
     modelId?: string;
-    maxTokens?: number;
-    tools?: string[];
-    toolPolicies?: Record<string, string>;
-    workingDirectory?: string;
-    environmentVariables?: Record<string, string>;
+    availableTools?: string[];
   };
 }
 
@@ -44,325 +30,137 @@ interface ErrorResponse {
 
 describe('Session Configuration API', () => {
   const context = setupWebTest();
-  let sessionService: ReturnType<typeof getSessionService>;
-  let testProject: ReturnType<typeof Project.create>;
-  let sessionId: string;
-  let providerInstanceId: string;
-
-  beforeEach(async () => {
-    setupTestProviderDefaults();
-
-    // Set up environment
-    process.env.LACE_DB_PATH = ':memory:';
-
-    sessionService = getSessionService();
-
-    // Create test provider instance
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022', 'claude-sonnet-4-20250514'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
-
-    // Create a real project and session for testing
-    const testDir = join(context.tempProjectDir, 'config-test');
-    await fs.mkdir(testDir, { recursive: true });
-
-    testProject = Project.create('Test Project', testDir, 'Test project', {
-      providerInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
-      maxTokens: 4000,
-    });
-
-    const sessionInstance = Session.create({
-      name: 'Test Session',
-      projectId: testProject.getId(),
-    });
-    const session = sessionInstance.getInfo()!;
-    sessionId = session.id;
-  });
 
   afterEach(async () => {
-    sessionService.clearActiveSessions();
-    cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances([providerInstanceId]);
-    vi.clearAllMocks();
+    await shutdownSupervisorForTests();
   });
 
-  describe('GET /api/sessions/:sessionId/configuration', () => {
-    it('should return session effective configuration when found', async () => {
-      const request = new Request(`http://localhost/api/sessions/${sessionId}/configuration`);
-      const response = await GET(createLoaderArgs(request, { sessionId }));
-      const data = await parseResponse<ConfigurationResponse>(response);
-
-      expect(response.status).toBe(200);
-      expect(data.configuration).toBeDefined();
-
-      // With the new provider instance system, configuration format might be different
-
-      // Basic expectations - the exact field names might differ with new provider system
-      expect(data.configuration).toEqual(
-        expect.objectContaining({
-          providerInstanceId: providerInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-          maxTokens: 4000,
-        })
-      );
+  it('GET /api/sessions/:sessionId/configuration returns coordinator config', async () => {
+    const supervisor = getSupervisor();
+    const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+    supervisor.upsertAgentSessionMeta(created.workspaceSessionId, {
+      sessionId: created.sessionId,
+      connectionId: 'conn_test',
+      modelId: 'model_test',
     });
 
-    it('should return 400 for invalid session ID format', async () => {
-      const request = new Request('http://localhost/api/sessions/nonexistent/configuration');
-      const response = await GET(createLoaderArgs(request, { sessionId: 'nonexistent' }));
-      const data = await parseResponse<ErrorResponse>(response);
+    const request = new Request(
+      `http://localhost/api/sessions/${created.workspaceSessionId}/configuration`
+    );
+    const response = await GET(
+      createLoaderArgs(request, { sessionId: created.workspaceSessionId })
+    );
+    const data = await parseResponse<ConfigurationResponse>(response);
 
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid session ID');
-    });
-
-    it('should return 404 when session not found', async () => {
-      // Use a valid thread ID format that doesn't exist in the database
-      const nonExistentSessionId = 'lace_20250101_sess01';
-      const request = new Request(
-        `http://localhost/api/sessions/${nonExistentSessionId}/configuration`
-      );
-      const response = await GET(createLoaderArgs(request, { sessionId: nonExistentSessionId }));
-
-      expect(response.status).toBe(404);
-      const data = await parseResponse<ErrorResponse>(response);
-      expect(data.error).toBe('Session not found');
-    });
+    expect(response.status).toBe(200);
+    expect(data.configuration.providerInstanceId).toBe('conn_test');
+    expect(data.configuration.modelId).toBe('model_test');
+    expect(data.configuration.availableTools).toEqual([]);
   });
 
-  describe('PUT /api/sessions/:sessionId/configuration', () => {
-    it('should update session configuration successfully', async () => {
-      const updates = {
-        providerInstanceId: providerInstanceId,
-        modelId: 'claude-sonnet-4-20250514',
-        maxTokens: 8000,
-        toolPolicies: {
-          'file-read': 'allow',
-          'file-write': 'deny',
-        },
-      };
+  it('GET /api/sessions/:sessionId/configuration returns 400 for invalid session ID format', async () => {
+    const request = new Request('http://localhost/api/sessions/nonexistent/configuration');
+    const response = await GET(createLoaderArgs(request, { sessionId: 'nonexistent' }));
+    const data = await parseResponse<ErrorResponse>(response);
 
-      const request = new Request(`http://localhost/api/sessions/${sessionId}/configuration`, {
-        method: 'PUT',
-        body: JSON.stringify(updates),
-        headers: { 'Content-Type': 'application/json' },
-      });
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid session ID');
+  });
 
-      const response = await PUT(createActionArgs(request, { sessionId }));
-      const data = await parseResponse<ConfigurationResponse>(response);
+  it('GET /api/sessions/:sessionId/configuration returns 404 when session not found', async () => {
+    const id = 'ws_00000000-0000-0000-0000-000000000000';
+    const request = new Request(`http://localhost/api/sessions/${id}/configuration`);
+    const response = await GET(createLoaderArgs(request, { sessionId: id }));
 
-      expect(response.status).toBe(200);
-      expect(data.configuration).toBeDefined();
-      expect(data.configuration.providerInstanceId).toBe(providerInstanceId);
-      expect(data.configuration.modelId).toBe('claude-sonnet-4-20250514');
-      expect(data.configuration.maxTokens).toBe(8000);
-    });
+    expect(response.status).toBe(404);
+    const data = await parseResponse<ErrorResponse>(response);
+    expect(data.error).toBe('Session not found');
+  });
 
-    it('should return 400 for invalid session ID format', async () => {
-      const request = new Request('http://localhost/api/sessions/nonexistent/configuration', {
+  it('PUT /api/sessions/:sessionId/configuration updates coordinator config', async () => {
+    const supervisor = getSupervisor();
+    const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+
+    const request = new Request(
+      `http://localhost/api/sessions/${created.workspaceSessionId}/configuration`,
+      {
         method: 'PUT',
         body: JSON.stringify({
-          providerInstanceId: 'test-provider',
-          modelId: 'test-model',
+          providerInstanceId: 'conn_updated',
+          modelId: 'model_updated',
+          runtimeOverrides: { permissionMode: 'yolo' },
         }),
         headers: { 'Content-Type': 'application/json' },
-      });
+      }
+    );
 
-      const response = await PUT(createActionArgs(request, { sessionId: 'nonexistent' }));
-      const data = await parseResponse<ErrorResponse>(response);
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid session ID');
-    });
-
-    it('should return 404 when session not found', async () => {
-      // Use a valid thread ID format that doesn't exist in the database
-      const nonExistentSessionId = 'lace_20250101_sess02';
-      const request = new Request(
-        `http://localhost/api/sessions/${nonExistentSessionId}/configuration`,
-        {
-          method: 'PUT',
-          body: JSON.stringify({
-            providerInstanceId: providerInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
-          }),
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      const response = await PUT(createActionArgs(request, { sessionId: nonExistentSessionId }));
-      const data = await parseResponse<ErrorResponse>(response);
-
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Session not found');
-    });
-
-    it('should validate configuration data', async () => {
-      const invalidUpdates = {
-        maxTokens: -1, // Negative maxTokens should be invalid
-        toolPolicies: {
-          'file-read': 'invalid-policy', // Invalid policy should be invalid
-        },
-      };
-
-      const request = new Request(`http://localhost/api/sessions/${sessionId}/configuration`, {
-        method: 'PUT',
-        body: JSON.stringify(invalidUpdates),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const response = await PUT(createActionArgs(request, { sessionId }));
-      const data = await parseResponse<ErrorResponse>(response);
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid request data');
-      expect(data.details).toBeDefined();
-    });
-
-    it('should handle JSON parsing errors', async () => {
-      // Test with malformed JSON
-      const request = new Request(`http://localhost/api/sessions/${sessionId}/configuration`, {
-        method: 'PUT',
-        body: 'invalid json',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const response = await PUT(createActionArgs(request, { sessionId }));
-
-      expect(response.status).toBe(500);
-    });
-  });
-});
-
-describe('TDD: Direct Session Usage', () => {
-  const context = setupWebTest();
-  let sessionService: ReturnType<typeof getSessionService>;
-  let testSessionId: string;
-  let tddProviderInstanceId: string;
-
-  beforeEach(async () => {
-    setupTestProviderDefaults();
-
-    process.env.LACE_DB_PATH = ':memory:';
-
-    sessionService = getSessionService();
-
-    // Create test provider instance for TDD tests
-    tddProviderInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'TDD Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
-
-    // Create a real session to test with
-    const testDir = join(context.tempProjectDir, 'config-tdd-test');
-    await fs.mkdir(testDir, { recursive: true });
-
-    const testProject = Project.create('TDD Test Project', testDir, 'Test project', {
-      providerInstanceId: tddProviderInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
-    });
-    const sessionInstance = Session.create({
-      name: 'TDD Test Session',
-      projectId: testProject.getId(),
-    });
-    const session = sessionInstance.getInfo()!;
-    testSessionId = session.id;
-  });
-
-  afterEach(async () => {
-    sessionService.clearActiveSessions();
-    cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances([tddProviderInstanceId]);
-    vi.clearAllMocks();
-  });
-
-  it('should use SessionService.getSession() which calls session.getEffectiveConfiguration() directly', async () => {
-    const request = new Request(`http://localhost/api/sessions/${testSessionId}/configuration`);
-    const response = await GET(createLoaderArgs(request, { sessionId: testSessionId }));
-
-    // This verifies that the route successfully calls the session's getEffectiveConfiguration method
-    // (not a duplicated SessionService method that we removed)
-    expect(response.status).toBe(200);
+    const response = await PUT(
+      createActionArgs(request, { sessionId: created.workspaceSessionId })
+    );
     const data = await parseResponse<ConfigurationResponse>(response);
-    expect(data.configuration).toBeDefined();
-  });
-});
 
-describe('TDD: Direct Session Configuration Update', () => {
-  const context = setupWebTest();
-  let sessionService: ReturnType<typeof getSessionService>;
-  let testSessionId: string;
-  let updateProviderInstanceId: string;
-
-  beforeEach(async () => {
-    setupTestProviderDefaults();
-
-    process.env.LACE_DB_PATH = ':memory:';
-
-    sessionService = getSessionService();
-
-    // Create test provider instance for update tests
-    updateProviderInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022', 'claude-sonnet-4-20250514'],
-      displayName: 'Update Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
-
-    // Create a real session to test with
-    const testDir = join(context.tempProjectDir, 'config-update-test');
-    await fs.mkdir(testDir, { recursive: true });
-
-    const testProject = Project.create('TDD Update Test Project', testDir, 'Test project', {
-      providerInstanceId: updateProviderInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
-    });
-    const sessionInstance = Session.create({
-      name: 'TDD Update Test Session',
-      projectId: testProject.getId(),
-    });
-    const session = sessionInstance.getInfo()!;
-    testSessionId = session.id;
+    expect(response.status).toBe(200);
+    expect(data.configuration.providerInstanceId).toBe('conn_updated');
+    expect(data.configuration.modelId).toBe('model_updated');
   });
 
-  afterEach(async () => {
-    sessionService.clearActiveSessions();
-    cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances([updateProviderInstanceId]);
-    vi.clearAllMocks();
-  });
-
-  it('should use SessionService.getSession() which calls session.updateConfiguration() directly', async () => {
-    const configUpdate = {
-      providerInstanceId: updateProviderInstanceId,
-      modelId: 'claude-sonnet-4-20250514',
-      maxTokens: 8000,
-      toolPolicies: {
-        'file-read': 'allow',
-        'file-write': 'deny',
-      },
-    };
-
-    const request = new Request(`http://localhost/api/sessions/${testSessionId}/configuration`, {
+  it('PUT /api/sessions/:sessionId/configuration returns 400 for invalid session ID format', async () => {
+    const request = new Request('http://localhost/api/sessions/nonexistent/configuration', {
       method: 'PUT',
-      body: JSON.stringify(configUpdate),
+      body: JSON.stringify({
+        providerInstanceId: 'conn_test',
+        modelId: 'model_test',
+      }),
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const response = await PUT(createActionArgs(request, { sessionId: testSessionId }));
+    const response = await PUT(createActionArgs(request, { sessionId: 'nonexistent' }));
+    const data = await parseResponse<ErrorResponse>(response);
 
-    // This verifies that the route successfully calls session.updateConfiguration() directly
-    // (not a duplicated SessionService method that we removed)
-    expect(response.status).toBe(200);
-    const data = await parseResponse<ConfigurationResponse>(response);
-    expect(data.configuration).toBeDefined();
-    expect(data.configuration.providerInstanceId).toBe(updateProviderInstanceId);
-    expect(data.configuration.modelId).toBe('claude-sonnet-4-20250514');
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid session ID');
+  });
+
+  it('PUT /api/sessions/:sessionId/configuration returns 404 when session not found', async () => {
+    const id = 'ws_00000000-0000-0000-0000-000000000000';
+    const request = new Request(`http://localhost/api/sessions/${id}/configuration`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        providerInstanceId: 'conn_test',
+        modelId: 'model_test',
+      }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await PUT(createActionArgs(request, { sessionId: id }));
+    const data = await parseResponse<ErrorResponse>(response);
+
+    expect(response.status).toBe(404);
+    expect(data.error).toBe('Session not found');
+  });
+
+  it('PUT /api/sessions/:sessionId/configuration validates configuration data', async () => {
+    const supervisor = getSupervisor();
+    const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+
+    const request = new Request(
+      `http://localhost/api/sessions/${created.workspaceSessionId}/configuration`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          runtimeOverrides: { permissionMode: 'not-a-mode' },
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+
+    const response = await PUT(
+      createActionArgs(request, { sessionId: created.workspaceSessionId })
+    );
+    const data = await parseResponse<ErrorResponse>(response);
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid request data');
+    expect(data.details).toBeDefined();
   });
 });

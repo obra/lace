@@ -1,7 +1,7 @@
-// ABOUTME: Comprehensive tests for session-scoped file content retrieval API endpoint
-// ABOUTME: Tests secure file access, MIME type detection, size limits, and security controls
+// ABOUTME: Comprehensive tests for supervisor-backed session-scoped file content retrieval API endpoint
+// ABOUTME: Uses real filesystem + supervisor workspace session store (no core SessionService mocks)
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { loader } from '@lace/web/app/routes/api.sessions.$sessionId.files.$path';
 import { createLoaderArgs } from '@lace/web/test-utils/route-test-helpers';
 import { promises as fs } from 'fs';
@@ -10,89 +10,68 @@ import { tmpdir } from 'os';
 import { parseResponse } from '@lace/web/lib/serialization';
 import type { SessionFileContentResponse } from '@lace/web/types/session-files';
 import type { ApiErrorResponse } from '@lace/web/types/api';
-
-// Mock session service with dependency injection approach
-const mockGetSession = vi.fn();
-
-vi.mock('@lace/web/lib/server/session-service', () => ({
-  SessionService: vi.fn().mockImplementation(() => ({
-    getSession: mockGetSession,
-  })),
-}));
-
-vi.mock('@lace/web/types/core', () => ({
-  asThreadId: vi.fn().mockImplementation((id) => id),
-  isThreadId: vi.fn().mockReturnValue(true),
-}));
-
-// Test session ID - must match ThreadId format
-const testSessionId = 'lace_20250827_test01';
+import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 
 describe('/api/sessions/:sessionId/files/:path', () => {
+  setupWebTest();
+
   let testDir: string;
+  let workspaceSessionId: string;
 
   beforeEach(async () => {
-    vi.clearAllMocks();
-
-    // Create temp directory for test files
     testDir = await fs.mkdtemp(join(tmpdir(), 'session-files-test-'));
 
-    // Create test files
     await fs.writeFile(join(testDir, 'test.ts'), 'const message = "Hello TypeScript";');
     await fs.writeFile(join(testDir, 'package.json'), '{"name": "test", "version": "1.0.0"}');
     await fs.writeFile(join(testDir, 'README.md'), '# Test Project\nThis is a test project.');
 
-    // Create subdirectory with file
     await fs.mkdir(join(testDir, 'src'));
     await fs.writeFile(join(testDir, 'src', 'index.js'), 'console.log("Hello from subdirectory");');
 
-    // Create large file for size testing (over 1MB)
     const largeContent = 'x'.repeat(1024 * 1024 + 1);
     await fs.writeFile(join(testDir, 'large-file.txt'), largeContent);
 
-    // Create a binary file (fake PNG)
-    const binaryData = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]); // PNG header
+    const binaryData = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
     await fs.writeFile(join(testDir, 'image.png'), binaryData);
 
-    // Mock session with working directory
-    mockGetSession.mockResolvedValue({
-      getWorkingDirectory: () => testDir,
-    });
+    const supervisor = getSupervisor();
+    const created = await supervisor.createWorkspaceSession(testDir);
+    workspaceSessionId = created.workspaceSessionId;
   });
 
   afterEach(async () => {
-    // Clean up test directory
+    await shutdownSupervisorForTests();
+
     if (testDir) {
       await fs.rm(testDir, { recursive: true, force: true });
     }
   });
 
   it('should return file content for valid TypeScript file', async () => {
-    const request = new Request(`http://localhost/api/sessions/${testSessionId}/files/test.ts`);
-
-    const response = await loader(
-      createLoaderArgs(request, { sessionId: testSessionId, '*': 'test.ts' })
+    const request = new Request(
+      `http://localhost/api/sessions/${workspaceSessionId}/files/test.ts`
     );
 
-    if (response.status !== 200) {
-      const _errorData = await parseResponse(response);
-      // Error details logged for debugging
-    }
+    const response = await loader(
+      createLoaderArgs(request, { sessionId: workspaceSessionId, '*': 'test.ts' })
+    );
+
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionFileContentResponse>(response);
     expect(data.content).toBe('const message = "Hello TypeScript";');
-    expect(data.mimeType).toBe('video/mp2t'); // .ts extension incorrectly maps to MPEG transport stream
+    expect(data.mimeType).toBe('video/mp2t');
     expect(data.encoding).toBe('utf8');
     expect(data.path).toBe('test.ts');
   });
 
   it('should return file content for valid JSON file', async () => {
     const request = new Request(
-      `http://localhost/api/sessions/${testSessionId}/files/package.json`
+      `http://localhost/api/sessions/${workspaceSessionId}/files/package.json`
     );
 
     const response = await loader(
-      createLoaderArgs(request, { sessionId: testSessionId, '*': 'package.json' })
+      createLoaderArgs(request, { sessionId: workspaceSessionId, '*': 'package.json' })
     );
 
     expect(response.status).toBe(200);
@@ -104,11 +83,11 @@ describe('/api/sessions/:sessionId/files/:path', () => {
 
   it('should return file content from subdirectory', async () => {
     const request = new Request(
-      `http://localhost/api/sessions/${testSessionId}/files/src/index.js`
+      `http://localhost/api/sessions/${workspaceSessionId}/files/src/index.js`
     );
 
     const response = await loader(
-      createLoaderArgs(request, { sessionId: testSessionId, '*': 'src/index.js' })
+      createLoaderArgs(request, { sessionId: workspaceSessionId, '*': 'src/index.js' })
     );
 
     expect(response.status).toBe(200);
@@ -120,11 +99,11 @@ describe('/api/sessions/:sessionId/files/:path', () => {
 
   it('should reject files that are too large', async () => {
     const request = new Request(
-      `http://localhost/api/sessions/${testSessionId}/files/large-file.txt`
+      `http://localhost/api/sessions/${workspaceSessionId}/files/large-file.txt`
     );
 
     const response = await loader(
-      createLoaderArgs(request, { sessionId: testSessionId, '*': 'large-file.txt' })
+      createLoaderArgs(request, { sessionId: workspaceSessionId, '*': 'large-file.txt' })
     );
 
     expect(response.status).toBe(413);
@@ -136,37 +115,37 @@ describe('/api/sessions/:sessionId/files/:path', () => {
 
   it('should prevent path traversal attacks', async () => {
     const request = new Request(
-      `http://localhost/api/sessions/${testSessionId}/files/../../../etc/passwd`
+      `http://localhost/api/sessions/${workspaceSessionId}/files/../../../etc/passwd`
     );
 
     const response = await loader(
-      createLoaderArgs(request, { sessionId: testSessionId, '*': '../../../etc/passwd' })
+      createLoaderArgs(request, { sessionId: workspaceSessionId, '*': '../../../etc/passwd' })
     );
 
-    expect(response.status).toBe(400); // Caught by schema validation first
+    expect(response.status).toBe(400);
     const data = await parseResponse<ApiErrorResponse>(response);
     expect(data.code).toBe('INVALID_REQUEST');
   });
 
   it('should handle non-existent files', async () => {
     const request = new Request(
-      `http://localhost/api/sessions/${testSessionId}/files/non-existent.txt`
+      `http://localhost/api/sessions/${workspaceSessionId}/files/non-existent.txt`
     );
 
     const response = await loader(
-      createLoaderArgs(request, { sessionId: testSessionId, '*': 'non-existent.txt' })
+      createLoaderArgs(request, { sessionId: workspaceSessionId, '*': 'non-existent.txt' })
     );
 
-    expect(response.status).toBe(403); // Blocked by realpath validation
+    expect(response.status).toBe(404);
     const data = await parseResponse<ApiErrorResponse>(response);
-    expect(data.code).toBe('PATH_ACCESS_DENIED');
+    expect(data.code).toBe('FILE_NOT_FOUND');
   });
 
   it('should reject directories', async () => {
-    const request = new Request(`http://localhost/api/sessions/${testSessionId}/files/src`);
+    const request = new Request(`http://localhost/api/sessions/${workspaceSessionId}/files/src`);
 
     const response = await loader(
-      createLoaderArgs(request, { sessionId: testSessionId, '*': 'src' })
+      createLoaderArgs(request, { sessionId: workspaceSessionId, '*': 'src' })
     );
 
     expect(response.status).toBe(400);
@@ -174,41 +153,25 @@ describe('/api/sessions/:sessionId/files/:path', () => {
     expect(data.code).toBe('PATH_IS_DIRECTORY');
   });
 
-  it('should handle non-existent session', async () => {
-    mockGetSession.mockResolvedValue(null);
-
+  it('should return 400 for invalid session id', async () => {
     const request = new Request('http://localhost/api/sessions/invalid-session/files/test.ts');
 
     const response = await loader(
       createLoaderArgs(request, { sessionId: 'invalid-session', '*': 'test.ts' })
     );
 
-    expect(response.status).toBe(404);
-    const data = await parseResponse<ApiErrorResponse>(response);
-    expect(data.code).toBe('SESSION_NOT_FOUND');
-  });
-
-  it('should handle session without working directory', async () => {
-    mockGetSession.mockResolvedValue({
-      getWorkingDirectory: () => null,
-    });
-
-    const request = new Request(`http://localhost/api/sessions/${testSessionId}/files/test.ts`);
-
-    const response = await loader(
-      createLoaderArgs(request, { sessionId: testSessionId, '*': 'test.ts' })
-    );
-
     expect(response.status).toBe(400);
     const data = await parseResponse<ApiErrorResponse>(response);
-    expect(data.code).toBe('NO_WORKING_DIRECTORY');
+    expect(data.code).toBe('INVALID_REQUEST');
   });
 
   it('should detect MIME types correctly for various file extensions', async () => {
-    const request = new Request(`http://localhost/api/sessions/${testSessionId}/files/README.md`);
+    const request = new Request(
+      `http://localhost/api/sessions/${workspaceSessionId}/files/README.md`
+    );
 
     const response = await loader(
-      createLoaderArgs(request, { sessionId: testSessionId, '*': 'README.md' })
+      createLoaderArgs(request, { sessionId: workspaceSessionId, '*': 'README.md' })
     );
 
     expect(response.status).toBe(200);
@@ -218,10 +181,12 @@ describe('/api/sessions/:sessionId/files/:path', () => {
   });
 
   it('should reject binary files with appropriate error', async () => {
-    const request = new Request(`http://localhost/api/sessions/${testSessionId}/files/image.png`);
+    const request = new Request(
+      `http://localhost/api/sessions/${workspaceSessionId}/files/image.png`
+    );
 
     const response = await loader(
-      createLoaderArgs(request, { sessionId: testSessionId, '*': 'image.png' })
+      createLoaderArgs(request, { sessionId: workspaceSessionId, '*': 'image.png' })
     );
 
     expect(response.status).toBe(415);
@@ -231,30 +196,27 @@ describe('/api/sessions/:sessionId/files/:path', () => {
   });
 
   it('should prevent access to symlinked files outside working directory', async () => {
-    // Create a file outside the working directory
     const outsideDir = await fs.mkdtemp(join(tmpdir(), 'outside-test-'));
     await fs.writeFile(join(outsideDir, 'secret.txt'), 'This should not be accessible');
 
     try {
-      // Try to create a symlink to the outside file
       const symlinkPath = join(testDir, 'malicious-link');
       try {
         await fs.symlink(join(outsideDir, 'secret.txt'), symlinkPath);
 
         const request = new Request(
-          `http://localhost/api/sessions/${testSessionId}/files/malicious-link`
+          `http://localhost/api/sessions/${workspaceSessionId}/files/malicious-link`
         );
 
         const response = await loader(
-          createLoaderArgs(request, { sessionId: testSessionId, '*': 'malicious-link' })
+          createLoaderArgs(request, { sessionId: workspaceSessionId, '*': 'malicious-link' })
         );
 
         expect(response.status).toBe(403);
         const data = await parseResponse<ApiErrorResponse>(response);
         expect(data.code).toBe('PATH_ACCESS_DENIED');
-      } catch (_symlinkError) {
-        // Skip test if symlinks aren't supported (e.g., Windows without privileges)
-        console.warn('Skipping symlink test - symlinks not supported');
+      } catch {
+        // Skip if symlinks not supported
       }
     } finally {
       await fs.rm(outsideDir, { recursive: true, force: true });
