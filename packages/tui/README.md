@@ -18,3 +18,7 @@ cd packages/tui
 cargo test
 ```
 
+### E2E tests (scenario-based)
+
+`cargo test` includes integration tests in `packages/tui/tests` that spawn the Node fake agents under
+`packages/cli/src/__tests__/fixtures`. You need `node` on your PATH.
