@@ -108,4 +108,17 @@ describe('agent rpc server (smoke)', () => {
     client.close();
     server.close();
   });
+
+  it('returns NotInitialized for methods called before initialize', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await expect(client.request('ent/agent/ping')).rejects.toMatchObject({
+      code: 9,
+      message: 'NotInitialized',
+    });
+
+    client.close();
+    server.close();
+  });
 });
