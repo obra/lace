@@ -232,3 +232,55 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
   - `PgUp/PgDn` scrolls the focused pane, including multiline input.
 - Tests:
   - `cd packages/tui && cargo test` (see `app::transcript::*`, `app::clipboard::*`, `multiline_enter_inserts_newline_and_ctrl_enter_sends`)
+
+### 2026-01-04 — Preferences persistence (COULD)
+
+- Added persisted preferences:
+  - pane visibility, multiline toggle
+  - last used `connectionId` / `modelId` (used as default selections in Configure wizard)
+- Storage location:
+  - `$LACE_DIR/tui/preferences.json`, else
+  - `$XDG_STATE_HOME/lace/tui/preferences.json`, else
+  - `$HOME/.local/state/lace/tui/preferences.json`
+- Tests:
+  - `cd packages/tui && cargo test` (includes `app::prefs::*` and Configure-wizard preference selection tests)
+
+### 2026-01-04 — Theming + vim-ish keybind mode (COULD)
+
+- Added lightweight themes (palette):
+  - Theme: Dark / Light / High Contrast
+- Added keybind mode (palette):
+  - Keybinds: Default / Vim
+  - Vim mode remaps `j/k` → `Down/Up` when not focused on input.
+- Tests:
+  - `cd packages/tui && cargo test` (includes `ui::tests::vim_*` and `app::ui::*_updates_preferences`)
+
+### 2026-01-04 — Markdown-ish chat rendering (COULD)
+
+- Render fenced code blocks (``` fences) as boxed paragraphs in Chat when `render_markdown` is enabled:
+  - example: `┌─ <lang> ─`, `│ <line>`, `└─`
+- Added palette action: “Toggle Markdown Rendering”.
+- Tests:
+  - `cd packages/tui && cargo test` (includes `ui::markdown::*`)
+
+### 2026-01-04 — Manual smoke (real Lace agent)
+
+Commands run (from this worktree):
+
+```bash
+npm run build --workspace=packages/agent
+
+# Note: `.env` lives at `../../../.env` in this worktree (NOT `../../.env`).
+set -a && source ../../../.env >/dev/null 2>&1 && set +a
+cargo run --manifest-path packages/tui/Cargo.toml -- --workdir "$(pwd)" --agent-cmd "node packages/agent/dist/main.js"
+```
+
+Manual steps in the UI:
+- Open palette (`Ctrl+K`), select “Configure...”
+- Pick `OpenAI [ready]`, then pick model `gpt-4.1`
+- Prompt: `hi!`
+
+Observed:
+- Configure wizard completed and status bar updated to `conn=openai-openai model=gpt-4.1`.
+- Prompt streamed into a single coalesced assistant message and finalized on `turn_end`.
+- `Ctrl+C` exited and restored the terminal (alternate screen was left cleanly).
