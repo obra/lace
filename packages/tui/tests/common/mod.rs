@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tempfile::{tempdir, TempDir};
 
+#[allow(dead_code)]
 pub fn sh_quote(s: &str) -> String {
   let mut out = String::from("'");
   for ch in s.chars() {
@@ -16,6 +17,7 @@ pub fn sh_quote(s: &str) -> String {
   out
 }
 
+#[allow(dead_code)]
 pub fn fixture_path(name: &str) -> PathBuf {
   let here = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
   here
@@ -25,9 +27,25 @@ pub fn fixture_path(name: &str) -> PathBuf {
     .unwrap()
 }
 
+#[allow(dead_code)]
+pub fn tui_fixture_path(name: &str) -> PathBuf {
+  let here = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+  here.join("tests/fixtures").join(name).canonicalize().unwrap()
+}
+
+#[allow(dead_code)]
 pub fn spawn_node_fixture(name: &str) -> (TempDir, AgentTransport) {
   let workdir = tempdir().unwrap();
   let agent = fixture_path(name);
+  let agent_cmd = format!("node {}", sh_quote(agent.to_string_lossy().as_ref()));
+  let transport = AgentTransport::spawn_shell(&agent_cmd, workdir.path()).unwrap();
+  (workdir, transport)
+}
+
+#[allow(dead_code)]
+pub fn spawn_node_tui_fixture(name: &str) -> (TempDir, AgentTransport) {
+  let workdir = tempdir().unwrap();
+  let agent = tui_fixture_path(name);
   let agent_cmd = format!("node {}", sh_quote(agent.to_string_lossy().as_ref()));
   let transport = AgentTransport::spawn_shell(&agent_cmd, workdir.path()).unwrap();
   (workdir, transport)
