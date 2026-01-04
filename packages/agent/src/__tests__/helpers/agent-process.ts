@@ -9,6 +9,10 @@ export type SpawnedAgent = {
   stderr: () => string;
 };
 
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function spawnAgentProcess(options: {
   laceDir: string;
   env?: Record<string, string>;
@@ -38,15 +42,52 @@ export function spawnAgentProcess(options: {
       return;
     }
 
+    // Best-effort: kill any running jobs (especially subagents) before terminating the parent
+    // so we don't leave child processes holding files in the temp lace dir.
+    const killDeadlineMs = Date.now() + 2_000;
+    while (Date.now() < killDeadlineMs) {
+      try {
+        const jobsResult = (await peer.request('ent/job/list')) as unknown as {
+          jobs?: Array<{ jobId: string; status: string }>;
+        };
+
+        const running = (jobsResult.jobs ?? []).filter((j) => j.status === 'running');
+        if (running.length === 0) break;
+
+        for (const job of running) {
+          try {
+            await peer.request('ent/job/kill', { jobId: job.jobId });
+          } catch {
+            // Ignore and retry until deadline
+          }
+        }
+      } catch {
+        break;
+      }
+
+      await sleep(50);
+    }
+
     proc.kill('SIGTERM');
 
-    await new Promise<void>((resolve, reject) => {
-      const onExit = () => resolve();
-      const onError = (err: unknown) => reject(err);
+    await Promise.race([
+      new Promise<void>((resolve, reject) => {
+        const onExit = () => resolve();
+        const onError = (err: unknown) => reject(err);
 
-      proc.once('exit', onExit);
-      proc.once('error', onError);
-    });
+        proc.once('exit', onExit);
+        proc.once('error', onError);
+      }),
+      sleep(2_000),
+    ]);
+
+    if (proc.exitCode === null) {
+      proc.kill('SIGKILL');
+      await Promise.race([
+        new Promise<void>((resolve) => proc.once('exit', () => resolve())),
+        sleep(2_000),
+      ]);
+    }
 
     peer.close();
   };
