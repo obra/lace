@@ -994,7 +994,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       try {
         await childPeer.request('initialize', {
           protocolVersion: '1.0',
-          capabilities: { 'ent/jobStreaming': state.jobStreaming },
+          clientInfo: { name: 'lace-agent', version: '0.1.0' },
+          capabilities: {
+            streaming: true,
+            permissions: true,
+            'ent/jobStreaming': state.jobStreaming,
+          },
           config: { approvalMode: 'ask' },
         });
 
@@ -1032,27 +1037,33 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   };
 
   peer.onRequest('initialize', async (params: unknown) => {
-    const parsed = params as
-      | {
-          protocolVersion?: string;
-          capabilities?: { 'ent/jobStreaming'?: 'full' | 'coalesced' | 'none' };
-          config?: {
-            approvalMode?: string;
-            executionMode?: string;
-            providerId?: string;
-            connectionId?: string;
-            modelId?: string;
-            maxBudgetUsd?: number;
-            maxThinkingTokens?: number;
-          };
-        }
-      | undefined;
+    if (state.initialized)
+      throw { code: EntErrorCodes.AlreadyInitialized, message: 'AlreadyInitialized' };
+
+    const parsed = params as Record<string, unknown> | undefined;
+    if (!parsed || typeof parsed !== 'object') throw { code: -32602, message: 'InvalidParams' };
+
+    if (parsed.protocolVersion !== '1.0') throw { code: -32602, message: 'InvalidParams' };
+
+    const clientInfo = parsed.clientInfo as Record<string, unknown> | undefined;
+    if (!clientInfo || typeof clientInfo !== 'object')
+      throw { code: -32602, message: 'InvalidParams' };
+    if (typeof clientInfo.name !== 'string' || clientInfo.name.length === 0)
+      throw { code: -32602, message: 'InvalidParams' };
+    if (typeof clientInfo.version !== 'string' || clientInfo.version.length === 0)
+      throw { code: -32602, message: 'InvalidParams' };
+
+    const capabilities = parsed.capabilities as Record<string, unknown> | undefined;
+    if (!capabilities || typeof capabilities !== 'object')
+      throw { code: -32602, message: 'InvalidParams' };
+
+    const config = (parsed.config as Record<string, unknown> | undefined) ?? undefined;
 
     state.initialized = true;
-    if (parsed?.config?.executionMode === 'plan') state.config.executionMode = 'plan';
-    if (parsed?.config?.executionMode === 'execute') state.config.executionMode = 'execute';
+    if (config?.executionMode === 'plan') state.config.executionMode = 'plan';
+    if (config?.executionMode === 'execute') state.config.executionMode = 'execute';
 
-    const approvalMode = parsed?.config?.approvalMode;
+    const approvalMode = config?.approvalMode;
     if (
       approvalMode === 'ask' ||
       approvalMode === 'approveReads' ||
@@ -1064,15 +1075,13 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       state.config.approvalMode = approvalMode;
     }
 
-    if (typeof parsed?.config?.connectionId === 'string')
-      state.config.connectionId = parsed.config.connectionId;
-    if (typeof parsed?.config?.modelId === 'string') state.config.modelId = parsed.config.modelId;
-    if (typeof parsed?.config?.maxBudgetUsd === 'number')
-      state.config.maxBudgetUsd = parsed.config.maxBudgetUsd;
-    if (typeof parsed?.config?.maxThinkingTokens === 'number')
-      state.config.maxThinkingTokens = parsed.config.maxThinkingTokens;
+    if (typeof config?.connectionId === 'string') state.config.connectionId = config.connectionId;
+    if (typeof config?.modelId === 'string') state.config.modelId = config.modelId;
+    if (typeof config?.maxBudgetUsd === 'number') state.config.maxBudgetUsd = config.maxBudgetUsd;
+    if (typeof config?.maxThinkingTokens === 'number')
+      state.config.maxThinkingTokens = config.maxThinkingTokens;
 
-    const jobStreaming = parsed?.capabilities?.['ent/jobStreaming'];
+    const jobStreaming = capabilities['ent/jobStreaming'];
     if (jobStreaming === 'full' || jobStreaming === 'coalesced' || jobStreaming === 'none') {
       state.jobStreaming = jobStreaming;
     }
@@ -1115,6 +1124,10 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       ? { ...state.config, ...state.activeSession.state.config }
       : state.config;
 
+    const sessionSummary = state.activeSession
+      ? summarizeDurableEvents(state.activeSession.dir)
+      : { messageCount: 0, lastActive: null as string | null };
+
     const pendingPermissions: PermissionRequest[] = [];
     if (state.activeSession) {
       for (const pending of state.activeSession.state.pendingPermissions || []) {
@@ -1141,7 +1154,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       currentSession: state.activeSession
         ? {
             sessionId: state.activeSession.meta.sessionId,
-            messageCount: 0,
+            messageCount: sessionSummary.messageCount,
             tokensUsed: 0,
             costUsd: 0,
             connectionId: effectiveConfig.connectionId,

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
+import { defaultInitializeParams } from './helpers/initialize';
 
 describe('lace-agent provider config (E2E over stdio)', () => {
   let originalLaceDir: string | undefined;
@@ -29,7 +30,7 @@ describe('lace-agent provider config (E2E over stdio)', () => {
   it('can create a connection and rotate credentials', { timeout: 15_000 }, async () => {
     agent = spawnAgentProcess({ laceDir });
     await withTimeout(
-      agent.peer.request('initialize', { protocolVersion: '1.0' }),
+      agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );

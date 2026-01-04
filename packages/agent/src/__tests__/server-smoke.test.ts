@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
+import { defaultInitializeParams } from './helpers/initialize';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -41,7 +42,7 @@ describe('agent rpc server (smoke)', () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
-    const init = await client.request('initialize', { protocolVersion: '1.0' });
+    const init = await client.request('initialize', defaultInitializeParams());
     expect(init).toMatchObject({ protocolVersion: '1.0' });
 
     const ping = await client.request('ent/agent/ping');
@@ -80,7 +81,7 @@ describe('agent rpc server (smoke)', () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
-    await client.request('initialize', { protocolVersion: '1.0' });
+    await client.request('initialize', defaultInitializeParams());
 
     await expect(
       client.request('session/load', { sessionId: 'sess_missing' })
@@ -97,7 +98,7 @@ describe('agent rpc server (smoke)', () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
-    await client.request('initialize', { protocolVersion: '1.0' });
+    await client.request('initialize', defaultInitializeParams());
     await client.request('session/new', { workDir: process.cwd() });
 
     await expect(client.request('ent/job/output', { jobId: 'job_missing' })).rejects.toMatchObject({
@@ -113,7 +114,7 @@ describe('agent rpc server (smoke)', () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
-    await client.request('initialize', { protocolVersion: '1.0' });
+    await client.request('initialize', defaultInitializeParams());
 
     await expect(
       client.request('ent/models/list', { connectionId: 'conn_missing' })

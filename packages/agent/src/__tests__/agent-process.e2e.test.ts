@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
+import { defaultInitializeParams } from './helpers/initialize';
 
 describe('lace-agent process (E2E over stdio)', () => {
   let originalLaceDir: string | undefined;
@@ -29,6 +30,36 @@ describe('lace-agent process (E2E over stdio)', () => {
     rmSync(workDir, { recursive: true, force: true });
   });
 
+  it('rejects initialize without required clientInfo/capabilities', async () => {
+    agent = spawnAgentProcess({ laceDir });
+
+    await expect(
+      withTimeout(
+        agent.peer.request('initialize', { protocolVersion: '1.0' } as any),
+        2_000,
+        'initialize'
+      )
+    ).rejects.toMatchObject({ code: -32602, message: 'InvalidParams' });
+  });
+
+  it('returns AlreadyInitialized for repeated initialize', async () => {
+    agent = spawnAgentProcess({ laceDir });
+
+    await withTimeout(
+      agent.peer.request('initialize', defaultInitializeParams()),
+      2_000,
+      'initialize'
+    );
+
+    await expect(
+      withTimeout(
+        agent.peer.request('initialize', defaultInitializeParams()),
+        2_000,
+        'initialize again'
+      )
+    ).rejects.toMatchObject({ code: 10, message: 'AlreadyInitialized' });
+  });
+
   it(
     'initializes, creates a session, streams updates, and persists durable events',
     { timeout: 15_000 },
@@ -42,7 +73,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       });
 
       await withTimeout(
-        agent.peer.request('initialize', { protocolVersion: '1.0' }),
+        agent.peer.request('initialize', defaultInitializeParams()),
         2_000,
         'initialize'
       );
@@ -115,7 +146,7 @@ describe('lace-agent process (E2E over stdio)', () => {
   it('keeps JSONL session history across agent restarts', { timeout: 15_000 }, async () => {
     agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
     await withTimeout(
-      agent.peer.request('initialize', { protocolVersion: '1.0' }),
+      agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
@@ -141,7 +172,7 @@ describe('lace-agent process (E2E over stdio)', () => {
 
     agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
     await withTimeout(
-      agent.peer.request('initialize', { protocolVersion: '1.0' }),
+      agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize (restart)'
     );
@@ -169,6 +200,33 @@ describe('lace-agent process (E2E over stdio)', () => {
     expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
+  it('reports currentSession.messageCount in ent/agent/status', { timeout: 15_000 }, async () => {
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+
+    await withTimeout(
+      agent.peer.request('initialize', defaultInitializeParams()),
+      2_000,
+      'initialize'
+    );
+    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+    await withTimeout(
+      agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'hi' }],
+      }),
+      10_000,
+      'session/prompt'
+    );
+
+    const status = (await withTimeout(
+      agent.peer.request('ent/agent/status'),
+      2_000,
+      'ent/agent/status'
+    )) as { currentSession?: { messageCount: number } };
+
+    expect(status.currentSession?.messageCount ?? 0).toBeGreaterThan(0);
+  });
+
   it(
     'requests permission before running shell.exec and records a tool_use event',
     { timeout: 15_000 },
@@ -188,10 +246,10 @@ describe('lace-agent process (E2E over stdio)', () => {
       });
 
       await withTimeout(
-        agent.peer.request('initialize', {
-          protocolVersion: '1.0',
-          config: { approvalMode: 'ask' },
-        }),
+        agent.peer.request(
+          'initialize',
+          defaultInitializeParams({ config: { approvalMode: 'ask' } })
+        ),
         2_000,
         'initialize'
       );
@@ -273,10 +331,10 @@ describe('lace-agent process (E2E over stdio)', () => {
       });
 
       await withTimeout(
-        agent.peer.request('initialize', {
-          protocolVersion: '1.0',
-          config: { approvalMode: 'ask' },
-        }),
+        agent.peer.request(
+          'initialize',
+          defaultInitializeParams({ config: { approvalMode: 'ask' } })
+        ),
         2_000,
         'initialize'
       );
@@ -328,7 +386,10 @@ describe('lace-agent process (E2E over stdio)', () => {
     agent = spawnAgentProcess({ laceDir });
 
     await withTimeout(
-      agent.peer.request('initialize', { protocolVersion: '1.0', config: { approvalMode: 'ask' } }),
+      agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
       2_000,
       'initialize'
     );
@@ -364,7 +425,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     });
 
     await withTimeout(
-      agent.peer.request('initialize', { protocolVersion: '1.0' }),
+      agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
@@ -415,7 +476,10 @@ describe('lace-agent process (E2E over stdio)', () => {
     });
 
     await withTimeout(
-      agent.peer.request('initialize', { protocolVersion: '1.0', config: { approvalMode: 'ask' } }),
+      agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
       2_000,
       'initialize'
     );
@@ -483,7 +547,10 @@ describe('lace-agent process (E2E over stdio)', () => {
     agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
     await withTimeout(
-      agent.peer.request('initialize', { protocolVersion: '1.0', config: { approvalMode: 'ask' } }),
+      agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
       2_000,
       'initialize'
     );
@@ -533,10 +600,10 @@ describe('lace-agent process (E2E over stdio)', () => {
       agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
       await withTimeout(
-        agent.peer.request('initialize', {
-          protocolVersion: '1.0',
-          config: { approvalMode: 'ask' },
-        }),
+        agent.peer.request(
+          'initialize',
+          defaultInitializeParams({ config: { approvalMode: 'ask' } })
+        ),
         2_000,
         'initialize'
       );
@@ -566,7 +633,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
       await withTimeout(
-        agent.peer.request('initialize', { protocolVersion: '1.0' }),
+        agent.peer.request('initialize', defaultInitializeParams()),
         2_000,
         'initialize'
       );

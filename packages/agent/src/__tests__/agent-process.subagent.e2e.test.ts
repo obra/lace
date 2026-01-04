@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
+import { defaultInitializeParams } from './helpers/initialize';
 
 describe('lace-agent subagents (E2E over stdio)', () => {
   let originalLaceDir: string | undefined;
@@ -50,10 +51,10 @@ describe('lace-agent subagents (E2E over stdio)', () => {
       agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
       await withTimeout(
-        agent.peer.request('initialize', {
-          protocolVersion: '1.0',
-          config: { approvalMode: 'ask' },
-        }),
+        agent.peer.request(
+          'initialize',
+          defaultInitializeParams({ config: { approvalMode: 'ask' } })
+        ),
         2_000,
         'initialize'
       );
@@ -113,7 +114,10 @@ describe('lace-agent subagents (E2E over stdio)', () => {
     });
 
     await withTimeout(
-      agent.peer.request('initialize', { protocolVersion: '1.0', config: { approvalMode: 'ask' } }),
+      agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
       2_000,
       'initialize'
     );

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
+import { defaultInitializeParams } from './helpers/initialize';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -41,7 +42,7 @@ describe('ent/providers + ent/connections', () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
-    await client.request('initialize', { protocolVersion: '1.0' });
+    await client.request('initialize', defaultInitializeParams());
 
     const providers = (await client.request('ent/providers/list')) as {
       providers: Array<{ providerId: string }>;
