@@ -69,3 +69,4 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
   - Permissions: `tool_use` captured → `session/request_permission` decided → streamed assistant output (`tests/e2e_fake_agent_permission.rs`)
 - Notes:
   - Tests kill the spawned fake agent process explicitly to avoid hanging the test runner.
+  - Shared test helpers live in `packages/tui/tests/common/mod.rs` to keep the e2e tests DRY.

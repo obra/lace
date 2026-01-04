@@ -1,48 +1,10 @@
+mod common;
+
 use lace_tui::app::reducer::{decide_permission, reduce, take_next_permission, AppEvent, Outbound};
 use lace_tui::app::AppState;
 use lace_tui::protocol::{ent, jsonrpc, transport::AgentTransport};
 use serde_json::{json, Value};
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use tempfile::tempdir;
-
-fn sh_quote(s: &str) -> String {
-  let mut out = String::from("'");
-  for ch in s.chars() {
-    if ch == '\'' {
-      out.push_str("'\\''");
-    } else {
-      out.push(ch);
-    }
-  }
-  out.push('\'');
-  out
-}
-
-fn fixture_path(name: &str) -> PathBuf {
-  let here = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-  let p = here
-    .join("../cli/src/__tests__/fixtures")
-    .join(name)
-    .canonicalize()
-    .unwrap();
-  p
-}
-
-fn wait_for_line(transport: &AgentTransport, deadline: Instant) -> String {
-  loop {
-    match transport.try_recv_line() {
-      Ok(line) => return line,
-      Err(std::sync::mpsc::TryRecvError::Empty) => {
-        if Instant::now() > deadline {
-          panic!("timeout waiting for agent output");
-        }
-        std::thread::sleep(Duration::from_millis(5));
-      }
-      Err(std::sync::mpsc::TryRecvError::Disconnected) => panic!("agent output channel disconnected"),
-    }
-  }
-}
 
 fn apply_outbound(transport: &AgentTransport, out: Vec<Outbound>) {
   for m in out {
@@ -58,11 +20,7 @@ fn apply_outbound(transport: &AgentTransport, out: Vec<Outbound>) {
 
 #[test]
 fn e2e_permission_flow_with_fake_agent() {
-  let workdir = tempdir().unwrap();
-  let agent = fixture_path("fake-agent.mjs");
-  let agent_cmd = format!("node {}", sh_quote(agent.to_string_lossy().as_ref()));
-
-  let mut transport = AgentTransport::spawn_shell(&agent_cmd, workdir.path()).unwrap();
+  let (workdir, mut transport) = common::spawn_node_fixture("fake-agent.mjs");
 
   transport
     .send_line(jsonrpc::encode_request(
@@ -105,7 +63,7 @@ fn e2e_permission_flow_with_fake_agent() {
   let mut saw_turn_end = false;
 
   while Instant::now() < deadline {
-    let line = wait_for_line(&transport, deadline);
+    let line = common::wait_for_line(&transport, deadline);
     let inbound = match jsonrpc::parse_inbound(&line) {
       Ok(msg) => msg,
       Err(err) => panic!("failed to parse jsonrpc line: {err}\nline={line}"),
@@ -190,4 +148,3 @@ fn e2e_permission_flow_with_fake_agent() {
   assert_eq!(state.messages[0].text, "ok");
   assert!(!state.messages[0].streaming);
 }
-
