@@ -91,6 +91,14 @@ export async function action({ request, params }: Route.ActionArgs) {
         connectionId: validatedData.providerInstanceId,
         modelId: validatedData.modelId,
         approvalMode: 'ask',
+        mcpServers: Object.entries(project.getMCPServers()).map(([name, config]) => ({
+          name,
+          command: config.command,
+          ...(config.args ? { args: config.args } : {}),
+          ...(config.env ? { env: config.env } : {}),
+          enabled: config.enabled,
+          tools: config.tools,
+        })),
       });
 
     const sessionData = {

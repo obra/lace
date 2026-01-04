@@ -1,15 +1,23 @@
-// ABOUTME: Tests for session MCP server control API for runtime server management
-// ABOUTME: Validates start/stop/restart operations on session's running MCP servers
+// ABOUTME: Integration tests for project session MCP server control API
+// ABOUTME: Validates start/stop/restart via ent/session/configure on supervisor-managed agents
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { action } from '@lace/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
+import { Project, MCPConfigLoader } from '@lace/web/lib/server/lace-imports';
+import path from 'path';
+
+// ✅ ESSENTIAL MOCK - Server-side module compatibility in test environment
+import { vi } from 'vitest';
+vi.mock('server-only', () => ({}));
 
 interface ServerControlResponse {
   message: string;
   serverId: string;
-  status: 'starting' | 'running' | 'stopped' | 'failed';
+  status: string;
 }
 
 interface ErrorResponse {
@@ -17,427 +25,269 @@ interface ErrorResponse {
   details?: unknown;
 }
 
-// Mock project instance
-const mockProject = {
-  getId: vi.fn().mockReturnValue('test-project'),
-  getMCPServer: vi.fn().mockReturnValue({
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-filesystem'],
-    enabled: true,
-    tools: { read_file: 'allow' },
-  }),
-};
+async function createProjectAndSession(workDir: string) {
+  const fixturePath = path.resolve('test-utils/fixtures/mcp-stdio-test-server.cjs');
 
-// Mock session instance
-const mockSession = {
-  id: 'test-session',
-  projectId: 'test-project',
-  getMCPServerManager: vi.fn(),
-};
-
-// Mock MCP server manager
-const mockMCPServerManager = {
-  startServer: vi.fn(),
-  stopServer: vi.fn(),
-  getAllServers: vi.fn().mockReturnValue([
+  MCPConfigLoader.updateServerConfig(
+    'test',
     {
-      id: 'filesystem',
-      status: 'running',
+      command: process.execPath,
+      args: [fixturePath],
+      enabled: false,
+      tools: { echo: 'allow' },
     },
-  ]),
-};
+    workDir
+  );
 
-// Mock session service
-const mockSessionService = {
-  getSession: vi.fn(),
-  setupAgentEventHandlers: vi.fn(),
-  updateSession: vi.fn(),
-  clearActiveSessions: vi.fn(),
-};
+  const project = Project.create('Test Project', workDir);
+  const supervisor = getSupervisor();
+  const created = await supervisor.createWorkspaceSession(workDir);
+  supervisor.updateWorkspaceSession(created.workspaceSessionId, { projectId: project.getId() });
 
-vi.mock('@lace/web/lib/server/lace-imports', () => ({
-  Project: {
-    getById: vi.fn(),
-  },
-}));
-
-vi.mock('@lace/web/lib/server/session-service', () => ({
-  getSessionService: vi.fn(),
-}));
-
-vi.mock('@lace/web/lib/validation/thread-id-validation', () => ({
-  isValidThreadId: vi.fn(),
-}));
+  return { fixturePath, project, supervisor, created };
+}
 
 describe('Session MCP Server Control API', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockSession.getMCPServerManager = vi.fn().mockReturnValue(mockMCPServerManager);
+  const context = setupWebTest();
+
+  afterEach(async () => {
+    await shutdownSupervisorForTests();
   });
 
-  describe('POST /api/projects/:projectId/sessions/:sessionId/mcp/servers/:serverId/control', () => {
-    it('should start MCP server', async () => {
-      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      const { getSessionService } = vi.mocked(await import('@lace/web/lib/server/session-service'));
-      const { isValidThreadId } = vi.mocked(
-        await import('@lace/web/lib/validation/thread-id-validation')
-      );
+  it('starts an MCP server', async () => {
+    const { project, supervisor, created } = await createProjectAndSession(context.tempProjectDir);
 
-      Project.getById = vi.fn().mockReturnValue(mockProject);
-      getSessionService.mockReturnValue(mockSessionService);
-      mockSessionService.getSession.mockResolvedValue(mockSession);
-      isValidThreadId.mockReturnValue(true);
-
-      mockMCPServerManager.startServer.mockResolvedValue(undefined);
-
-      const request = new Request(
-        'http://localhost/api/projects/test-project/sessions/test-session/mcp/servers/filesystem/control',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'start' }),
-        }
-      );
-
-      const response = await action(
-        createActionArgs(request, {
-          projectId: 'test-project',
-          sessionId: 'test-session',
-          serverId: 'filesystem',
-        })
-      );
-      const data = await parseResponse<ServerControlResponse>(response);
-
-      expect(response.status).toBe(200);
-      expect(data.message).toContain('Server start initiated');
-      expect(data.serverId).toBe('filesystem');
-      expect(mockMCPServerManager.startServer).toHaveBeenCalledWith(
-        'filesystem',
-        expect.objectContaining({
-          command: 'npx',
-        })
-      );
-    });
-
-    it('should stop MCP server', async () => {
-      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      const { getSessionService } = vi.mocked(await import('@lace/web/lib/server/session-service'));
-      const { isValidThreadId } = vi.mocked(
-        await import('@lace/web/lib/validation/thread-id-validation')
-      );
-
-      Project.getById = vi.fn().mockReturnValue(mockProject);
-      getSessionService.mockReturnValue(mockSessionService);
-      mockSessionService.getSession.mockResolvedValue(mockSession);
-      isValidThreadId.mockReturnValue(true);
-
-      mockMCPServerManager.stopServer.mockResolvedValue(undefined);
-
-      const request = new Request(
-        'http://localhost/api/projects/test-project/sessions/test-session/mcp/servers/filesystem/control',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'stop' }),
-        }
-      );
-
-      const response = await action(
-        createActionArgs(request, {
-          projectId: 'test-project',
-          sessionId: 'test-session',
-          serverId: 'filesystem',
-        })
-      );
-      const data = await parseResponse<ServerControlResponse>(response);
-
-      expect(response.status).toBe(200);
-      expect(data.message).toContain('Server stop initiated');
-      expect(data.serverId).toBe('filesystem');
-      expect(mockMCPServerManager.stopServer).toHaveBeenCalledWith('filesystem');
-    });
-
-    it('should restart MCP server', async () => {
-      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      const { getSessionService } = vi.mocked(await import('@lace/web/lib/server/session-service'));
-      const { isValidThreadId } = vi.mocked(
-        await import('@lace/web/lib/validation/thread-id-validation')
-      );
-
-      Project.getById = vi.fn().mockReturnValue(mockProject);
-      getSessionService.mockReturnValue(mockSessionService);
-      mockSessionService.getSession.mockResolvedValue(mockSession);
-      isValidThreadId.mockReturnValue(true);
-
-      mockMCPServerManager.stopServer.mockResolvedValue(undefined);
-      mockMCPServerManager.startServer.mockResolvedValue(undefined);
-
-      const request = new Request(
-        'http://localhost/api/projects/test-project/sessions/test-session/mcp/servers/filesystem/control',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'restart' }),
-        }
-      );
-
-      const response = await action(
-        createActionArgs(request, {
-          projectId: 'test-project',
-          sessionId: 'test-session',
-          serverId: 'filesystem',
-        })
-      );
-      const data = await parseResponse<ServerControlResponse>(response);
-
-      expect(response.status).toBe(200);
-      expect(data.message).toContain('Server restart initiated');
-      expect(data.serverId).toBe('filesystem');
-      expect(mockMCPServerManager.stopServer).toHaveBeenCalledWith('filesystem');
-      expect(mockMCPServerManager.startServer).toHaveBeenCalledWith(
-        'filesystem',
-        expect.objectContaining({
-          command: 'npx',
-        })
-      );
-    });
-
-    it('should return 404 when project not found', async () => {
-      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      Project.getById = vi.fn().mockReturnValue(null);
-
-      const request = new Request(
-        'http://localhost/api/projects/nonexistent/sessions/test-session/mcp/servers/filesystem/control',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'start' }),
-        }
-      );
-
-      const response = await action(
-        createActionArgs(request, {
-          projectId: 'nonexistent',
-          sessionId: 'test-session',
-          serverId: 'filesystem',
-        })
-      );
-      const data = await parseResponse<ErrorResponse>(response);
-
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Project not found');
-    });
-
-    it('should return 400 for invalid session ID', async () => {
-      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      const { isValidThreadId } = vi.mocked(
-        await import('@lace/web/lib/validation/thread-id-validation')
-      );
-
-      Project.getById = vi.fn().mockReturnValue(mockProject);
-      isValidThreadId.mockReturnValue(false);
-
-      const request = new Request(
-        'http://localhost/api/projects/test-project/sessions/invalid/mcp/servers/filesystem/control',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'start' }),
-        }
-      );
-
-      const response = await action(
-        createActionArgs(request, {
-          projectId: 'test-project',
-          sessionId: 'invalid',
-          serverId: 'filesystem',
-        })
-      );
-      const data = await parseResponse<ErrorResponse>(response);
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid session ID');
-    });
-
-    it('should return 404 when session not found', async () => {
-      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      const { getSessionService } = vi.mocked(await import('@lace/web/lib/server/session-service'));
-      const { isValidThreadId } = vi.mocked(
-        await import('@lace/web/lib/validation/thread-id-validation')
-      );
-
-      Project.getById = vi.fn().mockReturnValue(mockProject);
-      getSessionService.mockReturnValue(mockSessionService);
-      mockSessionService.getSession.mockResolvedValue(null);
-      isValidThreadId.mockReturnValue(true);
-
-      const request = new Request(
-        'http://localhost/api/projects/test-project/sessions/nonexistent/mcp/servers/filesystem/control',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'start' }),
-        }
-      );
-
-      const response = await action(
-        createActionArgs(request, {
-          projectId: 'test-project',
-          sessionId: 'nonexistent',
-          serverId: 'filesystem',
-        })
-      );
-      const data = await parseResponse<ErrorResponse>(response);
-
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Session not found');
-    });
-
-    it('should return 404 when server config not found', async () => {
-      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      const { getSessionService } = vi.mocked(await import('@lace/web/lib/server/session-service'));
-      const { isValidThreadId } = vi.mocked(
-        await import('@lace/web/lib/validation/thread-id-validation')
-      );
-
-      const projectWithoutServer = {
-        ...mockProject,
-        getMCPServer: vi.fn().mockReturnValue(null),
-      };
-      Project.getById = vi.fn().mockReturnValue(projectWithoutServer);
-      getSessionService.mockReturnValue(mockSessionService);
-      mockSessionService.getSession.mockResolvedValue(mockSession);
-      isValidThreadId.mockReturnValue(true);
-
-      const request = new Request(
-        'http://localhost/api/projects/test-project/sessions/test-session/mcp/servers/nonexistent/control',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'start' }),
-        }
-      );
-
-      const response = await action(
-        createActionArgs(request, {
-          projectId: 'test-project',
-          sessionId: 'test-session',
-          serverId: 'nonexistent',
-        })
-      );
-      const data = await parseResponse<ErrorResponse>(response);
-
-      expect(response.status).toBe(404);
-      expect(data.error).toContain('not found');
-    });
-
-    it('should validate invalid action', async () => {
-      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      const { getSessionService } = vi.mocked(await import('@lace/web/lib/server/session-service'));
-      const { isValidThreadId } = vi.mocked(
-        await import('@lace/web/lib/validation/thread-id-validation')
-      );
-
-      Project.getById = vi.fn().mockReturnValue(mockProject);
-      getSessionService.mockReturnValue(mockSessionService);
-      mockSessionService.getSession.mockResolvedValue(mockSession);
-      isValidThreadId.mockReturnValue(true);
-
-      const request = new Request(
-        'http://localhost/api/projects/test-project/sessions/test-session/mcp/servers/filesystem/control',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'invalid-action' }),
-        }
-      );
-
-      const response = await action(
-        createActionArgs(request, {
-          projectId: 'test-project',
-          sessionId: 'test-session',
-          serverId: 'filesystem',
-        })
-      );
-      const data = await parseResponse<ErrorResponse>(response);
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid request data');
-    });
-
-    it('should handle server control errors', async () => {
-      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      const { getSessionService } = vi.mocked(await import('@lace/web/lib/server/session-service'));
-      const { isValidThreadId } = vi.mocked(
-        await import('@lace/web/lib/validation/thread-id-validation')
-      );
-
-      Project.getById = vi.fn().mockReturnValue(mockProject);
-      getSessionService.mockReturnValue(mockSessionService);
-      mockSessionService.getSession.mockResolvedValue(mockSession);
-      isValidThreadId.mockReturnValue(true);
-
-      mockMCPServerManager.startServer.mockRejectedValue(new Error('Server start failed'));
-
-      const request = new Request(
-        'http://localhost/api/projects/test-project/sessions/test-session/mcp/servers/filesystem/control',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'start' }),
-        }
-      );
-
-      const response = await action(
-        createActionArgs(request, {
-          projectId: 'test-project',
-          sessionId: 'test-session',
-          serverId: 'filesystem',
-        })
-      );
-      const data = await parseResponse<ErrorResponse>(response);
-
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Server control operation failed');
-    });
-
-    it('should validate invalid route parameters', async () => {
-      const request = new Request('http://localhost/api/projects//sessions//mcp/servers//control', {
+    const request = new Request(
+      `http://localhost/api/projects/${project.getId()}/sessions/${created.workspaceSessionId}/mcp/servers/test/control`,
+      {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'start' }),
+      }
+    );
+
+    const response = await action(
+      createActionArgs(request, {
+        projectId: project.getId(),
+        sessionId: created.workspaceSessionId,
+        serverId: 'test',
+      })
+    );
+
+    const data = await parseResponse<ServerControlResponse>(response);
+
+    expect(response.status).toBe(200);
+    expect(data.serverId).toBe('test');
+
+    const status = (await supervisor
+      .getPeer(created.workspaceSessionId)
+      .request('ent/agent/status')) as {
+      mcpServers?: Array<{ name: string; status: string }>;
+    };
+    expect(status.mcpServers?.find((s) => s.name === 'test')?.status).toBe('connected');
+  });
+
+  it('stops an MCP server', async () => {
+    const { project, supervisor, created, fixturePath } = await createProjectAndSession(
+      context.tempProjectDir
+    );
+
+    await supervisor
+      .getPeer(created.workspaceSessionId, created.sessionId)
+      .request('ent/session/configure', {
+        mcpServers: [
+          {
+            name: 'test',
+            command: process.execPath,
+            args: [fixturePath],
+            enabled: true,
+            tools: { echo: 'allow' },
+          },
+        ],
       });
 
-      const response = await action(
-        createActionArgs(request, {
-          projectId: '',
-          sessionId: '',
-          serverId: '',
-        })
-      );
-      const data = await parseResponse<ErrorResponse>(response);
+    const request = new Request(
+      `http://localhost/api/projects/${project.getId()}/sessions/${created.workspaceSessionId}/mcp/servers/test/control`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stop' }),
+      }
+    );
 
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid route parameters');
-    });
+    const response = await action(
+      createActionArgs(request, {
+        projectId: project.getId(),
+        sessionId: created.workspaceSessionId,
+        serverId: 'test',
+      })
+    );
 
-    it('should only allow POST method', async () => {
-      const request = new Request(
-        'http://localhost/api/projects/test-project/sessions/test-session/mcp/servers/filesystem/control',
-        {
-          method: 'GET',
-        }
-      );
+    const data = await parseResponse<ServerControlResponse>(response);
 
-      const response = await action(
-        createActionArgs(request, {
-          projectId: 'test-project',
-          sessionId: 'test-session',
-          serverId: 'filesystem',
-        })
-      );
+    expect(response.status).toBe(200);
+    expect(data.serverId).toBe('test');
 
-      expect(response.status).toBe(405);
-    });
+    const status = (await supervisor
+      .getPeer(created.workspaceSessionId)
+      .request('ent/agent/status')) as {
+      mcpServers?: Array<{ name: string; status: string }>;
+    };
+    expect(status.mcpServers?.find((s) => s.name === 'test')?.status).toBe('disconnected');
+  });
+
+  it('restarts an MCP server', async () => {
+    const { project, supervisor, created, fixturePath } = await createProjectAndSession(
+      context.tempProjectDir
+    );
+
+    await supervisor
+      .getPeer(created.workspaceSessionId, created.sessionId)
+      .request('ent/session/configure', {
+        mcpServers: [
+          {
+            name: 'test',
+            command: process.execPath,
+            args: [fixturePath],
+            enabled: true,
+            tools: { echo: 'allow' },
+          },
+        ],
+      });
+
+    const request = new Request(
+      `http://localhost/api/projects/${project.getId()}/sessions/${created.workspaceSessionId}/mcp/servers/test/control`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restart' }),
+      }
+    );
+
+    const response = await action(
+      createActionArgs(request, {
+        projectId: project.getId(),
+        sessionId: created.workspaceSessionId,
+        serverId: 'test',
+      })
+    );
+
+    const data = await parseResponse<ServerControlResponse>(response);
+
+    expect(response.status).toBe(200);
+    expect(data.serverId).toBe('test');
+
+    const status = (await supervisor
+      .getPeer(created.workspaceSessionId)
+      .request('ent/agent/status')) as {
+      mcpServers?: Array<{ name: string; status: string }>;
+    };
+    expect(status.mcpServers?.find((s) => s.name === 'test')?.status).toBe('connected');
+  });
+
+  it('returns 404 when project not found', async () => {
+    const request = new Request(
+      'http://localhost/api/projects/nonexistent/sessions/ws_00000000-0000-0000-0000-000000000000/mcp/servers/test/control',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      }
+    );
+
+    const response = await action(
+      createActionArgs(request, {
+        projectId: 'nonexistent',
+        sessionId: 'ws_00000000-0000-0000-0000-000000000000',
+        serverId: 'test',
+      })
+    );
+
+    const data = await parseResponse<ErrorResponse>(response);
+
+    expect(response.status).toBe(404);
+    expect(data.error).toBe('Project not found');
+  });
+
+  it('returns 400 for invalid session ID', async () => {
+    const project = Project.create('Test Project', context.tempProjectDir);
+
+    const request = new Request(
+      `http://localhost/api/projects/${project.getId()}/sessions/invalid/mcp/servers/test/control`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      }
+    );
+
+    const response = await action(
+      createActionArgs(request, {
+        projectId: project.getId(),
+        sessionId: 'invalid',
+        serverId: 'test',
+      })
+    );
+
+    const data = await parseResponse<ErrorResponse>(response);
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid session ID');
+  });
+
+  it('returns 404 when session not found', async () => {
+    const project = Project.create('Test Project', context.tempProjectDir);
+    const id = 'ws_00000000-0000-0000-0000-000000000000';
+
+    const request = new Request(
+      `http://localhost/api/projects/${project.getId()}/sessions/${id}/mcp/servers/test/control`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      }
+    );
+
+    const response = await action(
+      createActionArgs(request, {
+        projectId: project.getId(),
+        sessionId: id,
+        serverId: 'test',
+      })
+    );
+
+    const data = await parseResponse<ErrorResponse>(response);
+
+    expect(response.status).toBe(404);
+    expect(data.error).toBe('Session not found');
+  });
+
+  it('returns 404 when server config not found', async () => {
+    const project = Project.create('Test Project', context.tempProjectDir);
+    const supervisor = getSupervisor();
+    const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+    supervisor.updateWorkspaceSession(created.workspaceSessionId, { projectId: project.getId() });
+
+    const request = new Request(
+      `http://localhost/api/projects/${project.getId()}/sessions/${created.workspaceSessionId}/mcp/servers/nope/control`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      }
+    );
+
+    const response = await action(
+      createActionArgs(request, {
+        projectId: project.getId(),
+        sessionId: created.workspaceSessionId,
+        serverId: 'nope',
+      })
+    );
+
+    const data = await parseResponse<ErrorResponse>(response);
+
+    expect(response.status).toBe(404);
+    expect(data.error).toContain("MCP server 'nope' not found");
   });
 });

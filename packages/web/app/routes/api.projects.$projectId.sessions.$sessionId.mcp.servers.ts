@@ -1,11 +1,11 @@
-// ABOUTME: Session MCP server list with runtime status from session's MCPServerManager
-// ABOUTME: Shows which servers are actually running in this session context
+// ABOUTME: Session MCP server list with runtime status from the supervisor-managed agent
+// ABOUTME: Shows which servers are actually running in this workspace session context
 
 import { Project } from '@lace/web/lib/server/lace-imports';
-import { getSessionService } from '@lace/web/lib/server/session-service';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { isValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { z } from 'zod';
 
 const RouteParamsSchema = z.object({
@@ -25,40 +25,56 @@ export async function loader({ params }: { params: unknown; context: unknown; re
       return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Get session (following existing session API pattern)
-    if (!isValidThreadId(sessionId)) {
+    if (!isWorkspaceSessionId(sessionId)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const sessionService = getSessionService();
-    const session = await sessionService.getSession(sessionId);
-    if (!session) {
+    const supervisor = getSupervisor();
+    const workspaceSession = supervisor.getWorkspaceSession(sessionId);
+    if (!workspaceSession || workspaceSession.projectId !== projectId) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Get runtime server status from session's MCPServerManager
-    const mcpManager = (
-      session as { getMCPServerManager: () => unknown }
-    ).getMCPServerManager() as unknown;
-    const runningServers = (
-      mcpManager as { getAllServers: () => unknown[] }
-    ).getAllServers() as unknown[];
+    const status = (await supervisor.getPeer(sessionId).request('ent/agent/status')) as {
+      mcpServers?: Array<{
+        name: string;
+        status: 'connected' | 'connecting' | 'disconnected' | 'error';
+        error?: string;
+        lastConnected?: string;
+      }>;
+    };
+
+    const runtimeById = new Map(
+      (status.mcpServers ?? []).map((s) => [
+        s.name,
+        {
+          status:
+            s.status === 'connected'
+              ? 'running'
+              : s.status === 'connecting'
+                ? 'starting'
+                : s.status === 'error'
+                  ? 'failed'
+                  : 'stopped',
+          lastError: s.error,
+          connectedAt: s.lastConnected,
+        },
+      ])
+    );
 
     // Get project configuration to show intended vs actual status
     const projectMCPServers = project.getMCPServers();
 
     const servers = Object.entries(projectMCPServers).map(([serverId, serverConfig]) => {
-      const runningServer = runningServers.find(
-        (s: unknown) => (s as { id: string }).id === serverId
-      ) as { status?: string; lastError?: string; connectedAt?: string } | undefined;
+      const runtime = runtimeById.get(serverId);
 
       return {
         id: serverId,
         ...serverConfig,
         // Runtime status from session
-        status: runningServer?.status || 'stopped',
-        lastError: runningServer?.lastError,
-        connectedAt: runningServer?.connectedAt,
+        status: runtime?.status || 'stopped',
+        lastError: runtime?.lastError,
+        connectedAt: runtime?.connectedAt,
       };
     });
 
