@@ -46,6 +46,7 @@ pub enum UiAction {
     ToggleMultilineInput,
     SetTheme(crate::app::prefs::Theme),
     SetKeybindMode(crate::app::prefs::KeybindMode),
+    ToggleMarkdownRendering,
     SendInput,
 
     CopySelectedActivity,
@@ -272,6 +273,11 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         }
         UiAction::SetKeybindMode(mode) => {
             state.prefs.keybind_mode = mode;
+            let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
+            Vec::new()
+        }
+        UiAction::ToggleMarkdownRendering => {
+            state.prefs.render_markdown = !state.prefs.render_markdown;
             let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
             Vec::new()
         }
@@ -513,6 +519,9 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                         UiAction::SetKeybindMode(crate::app::prefs::KeybindMode::Vim),
                     );
                 }
+                PaletteCommand::ToggleMarkdownRendering => {
+                    let _ = apply_ui_action(state, UiAction::ToggleMarkdownRendering);
+                }
                 PaletteCommand::CopySelectedActivity => {
                     let _ = apply_ui_action(state, UiAction::CopySelectedActivity);
                 }
@@ -682,6 +691,7 @@ enum PaletteCommand {
     ThemeHighContrast,
     KeybindDefault,
     KeybindVim,
+    ToggleMarkdownRendering,
     CopySelectedActivity,
     CopyLastAssistantMessage,
     CopyToolInput,
@@ -741,6 +751,10 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
         PaletteItem {
             label: "Keybinds: Vim",
             command: PaletteCommand::KeybindVim,
+        },
+        PaletteItem {
+            label: "Toggle Markdown Rendering",
+            command: PaletteCommand::ToggleMarkdownRendering,
         },
         PaletteItem {
             label: "Copy Selected Activity",
@@ -1069,6 +1083,15 @@ mod tests {
         let out = apply_ui_action(&mut state, UiAction::SetKeybindMode(KeybindMode::Vim));
         assert!(out.is_empty());
         assert_eq!(state.prefs.keybind_mode, KeybindMode::Vim);
+    }
+
+    #[test]
+    fn toggle_markdown_updates_preferences() {
+        let mut state = AppState::new_with_paths(None, None);
+        assert!(state.prefs.render_markdown);
+        let out = apply_ui_action(&mut state, UiAction::ToggleMarkdownRendering);
+        assert!(out.is_empty());
+        assert!(!state.prefs.render_markdown);
     }
 
     #[test]

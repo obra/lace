@@ -1,3 +1,5 @@
+mod markdown;
+
 use crate::app::activity;
 use crate::app::config_wizard;
 use crate::app::prefs::{KeybindMode, Theme};
@@ -691,7 +693,7 @@ fn theme_styles(theme: Theme) -> ThemeStyles {
             activity_error: Color::Red,
             dim: Color::Gray,
             code_fg: Color::Black,
-            code_bg: Color::White,
+            code_bg: Color::Gray,
         },
         Theme::HighContrast => ThemeStyles {
             status_fg: Color::Yellow,
@@ -986,8 +988,21 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
             prefix,
             Style::default().fg(prefix_color),
         )]));
-        for l in text.lines() {
-            lines.push(Line::from(l.to_string()));
+        if state.prefs.render_markdown {
+            for l in markdown::render_markdownish_lines(&text) {
+                if l.is_code {
+                    lines.push(Line::from(Span::styled(
+                        l.text,
+                        Style::default().fg(styles.code_fg).bg(styles.code_bg),
+                    )));
+                } else {
+                    lines.push(Line::from(l.text));
+                }
+            }
+        } else {
+            for l in text.lines() {
+                lines.push(Line::from(l.to_string()));
+            }
         }
         lines.push(Line::from(""));
     }
