@@ -121,13 +121,6 @@ describe('Simplified ToolExecutor', () => {
     });
   });
 
-  describe('Session Integration', () => {
-    it('should support session binding', () => {
-      // Session binding is used for temp directories
-      expect(typeof executor.setSession).toBe('function');
-    });
-  });
-
   describe('No Approval Methods', () => {
     it('should not have approval callback methods', () => {
       // Verify approval methods are completely removed

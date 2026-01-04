@@ -17,7 +17,6 @@ import { MCPServerManager } from '@lace/core/mcp/server-manager';
 import type { MCPServerConnection } from '@lace/core/config/mcp-types';
 import { MCPToolAdapter } from '@lace/core/mcp/tool-adapter';
 import { logger } from '@lace/core/utils/logger';
-import type { Session } from '@lace/core/sessions/session';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
@@ -123,12 +122,6 @@ export class ToolExecutor {
   /**
    * Set session reference for callbacks (called during agent creation)
    */
-  setSession(session: Session): void {
-    this.session = session;
-  }
-
-  private session?: Session;
-
   private mcpServerManager?: MCPServerManager;
   private mcpDiscoveryPromise?: Promise<void>;
 

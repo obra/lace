@@ -1,10 +1,8 @@
 // ABOUTME: Shared test setup for core Lace tests
-// ABOUTME: Provides unified setup that handles temp LACE_DIR and persistence automatically
+// ABOUTME: Provides unified setup that handles temp LACE_DIR and workspace cleanup
 
 import { useTempLaceDir, type TempLaceDirContext } from './temp-lace-dir';
-import { resetPersistence } from '@lace/core/persistence/database';
 import { beforeEach, afterEach } from 'vitest';
-import { Session } from '@lace/core/sessions/session';
 import { logger } from '@lace/core/utils/logger';
 
 export interface EnhancedTempLaceDirContext extends TempLaceDirContext {
@@ -24,9 +22,7 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
   const tempLaceDir = useTempLaceDir();
   const cleanupTasks: (() => void | Promise<void>)[] = [];
 
-  // Reset persistence before each test - it will auto-initialize to temp directory on first use
   beforeEach(() => {
-    resetPersistence();
     cleanupTasks.length = 0; // Reset cleanup tasks
   });
 
@@ -40,10 +36,6 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
         console.warn('Cleanup task failed:', error);
       }
     }
-
-    // Close database connections BEFORE cleaning workspaces
-    // This releases file locks on lace.db files in worktrees
-    resetPersistence();
 
     // Clean up workspaces before resetting factory
     const { WorkspaceManagerFactory } = await import('@lace/core/workspace/workspace-manager');
@@ -90,50 +82,4 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
     },
     registerCleanup: (fn: () => void | Promise<void>) => cleanupTasks.push(fn),
   };
-}
-
-/**
- * Clean up a test session including workspace and registry removal.
- * This replaces the Session.destroy() method which was test-only.
- */
-export async function cleanupSession(session: Session): Promise<void> {
-  // Wait for workspace initialization if it's in progress
-  await session.waitForWorkspace();
-
-  // Stop and cleanup all agents
-  const agents = session.getAgents();
-  for (const agent of agents) {
-    agent.stop();
-    agent.removeAllListeners();
-  }
-
-  // Clear agents from session (mimics what destroy() used to do)
-  // Using unknown to avoid unsafe any operations
-  const sessionWithAgents = session as unknown as { _agents: Map<string, unknown> };
-  sessionWithAgents._agents.clear();
-
-  // Clean up task notification listeners
-  session.cleanup();
-
-  // Remove from registry
-  Session.removeFromRegistry(session.getId());
-
-  // Destroy workspace if it exists
-  const workspaceManager = session.getWorkspaceManager();
-  const workspaceInfo = session.getWorkspaceInfo();
-  if (workspaceManager && workspaceInfo) {
-    try {
-      await workspaceManager.destroyWorkspace(workspaceInfo.sessionId);
-      logger.info('Test cleanup: Workspace destroyed for session', { sessionId: session.getId() });
-    } catch (error) {
-      logger.warn('Test cleanup: Failed to destroy workspace', {
-        sessionId: session.getId(),
-        error,
-      });
-    }
-  }
-
-  // Shutdown MCP servers for this session
-  const mcpServerManager = session.getMCPServerManager();
-  await mcpServerManager.shutdown();
 }

@@ -1,31 +1,18 @@
-// ABOUTME: Integration tests for temp directory functionality across all layers
-// ABOUTME: Tests the complete flow from process temp to tool-call directories
+// ABOUTME: Integration tests for ToolExecutor temp directory handling
+// ABOUTME: Verifies per-call toolTempDir creation under a provided toolTempRoot
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { getProcessTempDir, clearProcessTempDirCache } from '@lace/core/config/lace-dir';
-import { Project } from '@lace/core/projects/project';
-import { Session } from '@lace/core/sessions/session';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
+import { z } from 'zod';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 import { Tool } from './tool';
 import { ToolExecutor } from './executor';
-import { z } from 'zod';
-import { existsSync, mkdirSync } from 'fs';
-import { writeFileSync, readFileSync } from 'fs';
-import { join } from 'path';
 import type { ToolContext, ToolResult } from './types';
-import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/core/test-utils/provider-instances';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '@lace/core/test-utils/provider-defaults';
 
-// Test tool for integration testing
 class IntegrationTestTool extends Tool {
   name = 'integration_test_tool';
-  description = 'Tool for testing full temp directory integration';
+  description = 'Tool for testing ToolExecutor temp directories';
   schema = z.object({
     content: z.string(),
   });
@@ -37,177 +24,70 @@ class IntegrationTestTool extends Tool {
     context: ToolContext
   ): Promise<ToolResult> {
     this.capturedContext = context;
-    return Promise.resolve(this.createResult(`Integration test: ${args.content}`));
+    return this.createResult(`Integration test: ${args.content}`);
   }
 
-  public getCapturedContext(): ToolContext | undefined {
+  getCapturedContext(): ToolContext | undefined {
     return this.capturedContext;
   }
 }
 
-describe('Temp Directory Integration', () => {
+describe('ToolExecutor temp directories', () => {
   const tempLaceDirContext = setupCoreTest();
-  let tempProjectDir: string;
   let toolExecutor: ToolExecutor;
   let integrationTool: IntegrationTestTool;
-  let session: Session;
-  let project: Project;
-  let providerInstanceId: string;
+  let toolTempRoot: string;
 
-  beforeEach(async () => {
-    setupTestProviderDefaults();
-
-    // Create provider instance
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Integration Instance',
-      apiKey: 'test-anthropic-key',
-    });
-
-    // Create a separate project directory
-    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
-    mkdirSync(tempProjectDir, { recursive: true });
-
-    // Create real project and session
-    project = Project.create(
-      'Integration Test Project',
-      tempProjectDir,
-      'Project for integration testing',
-      {
-        providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      }
-    );
-
-    session = Session.create({
-      name: 'Integration Test Session',
-      projectId: project.getId(),
-    });
-
+  beforeEach(() => {
     toolExecutor = new ToolExecutor();
     integrationTool = new IntegrationTestTool();
     toolExecutor.registerTool(integrationTool.name, integrationTool);
-    // Mock agent approval for tests - will be applied to agent from session
-    clearProcessTempDirCache();
+
+    toolTempRoot = join(tempLaceDirContext.tempDir, 'tool-temp-root');
+    mkdirSync(toolTempRoot, { recursive: true });
   });
 
-  afterEach(async () => {
-    cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances([providerInstanceId]);
-  });
-
-  it('should create proper directory hierarchy through ToolExecutor', async () => {
+  it('creates a per-call toolTempDir under toolTempRoot', async () => {
     const context: ToolContext = {
       signal: new AbortController().signal,
-      projectId: project.getId(),
-      toolTempRoot: session.getSessionTempDir(),
+      toolTempRoot,
     };
 
     await toolExecutor.execute(
-      {
-        id: 'test-hierarchy',
-        name: integrationTool.name,
-        arguments: { content: 'test' },
-      },
+      { id: 'test-hierarchy', name: integrationTool.name, arguments: { content: 'test' } },
       context
     );
 
-    // Tool should have received proper temp directory context
-    const receivedContext = integrationTool.getCapturedContext();
-    expect(receivedContext).toBeDefined();
-
-    // Verify the hierarchy exists - we can verify the paths contain the expected structure
-    const toolTempDir = receivedContext!.toolTempDir!;
-    const projectTempDir = Project.getProjectTempDir(project.getId());
-    const processTempDir = getProcessTempDir();
-
-    // Verify directory hierarchy
-    expect(toolTempDir).toContain(`session-${session.getId()}`);
-    expect(toolTempDir).toContain(`project-${project.getId()}`);
-    expect(toolTempDir).toContain(projectTempDir);
-    expect(toolTempDir).toContain(processTempDir);
-
-    // Verify all directories exist
-    expect(existsSync(toolTempDir)).toBe(true);
-    expect(existsSync(projectTempDir)).toBe(true);
-    expect(existsSync(processTempDir)).toBe(true);
+    const received = integrationTool.getCapturedContext();
+    expect(received?.toolTempDir).toBeDefined();
+    expect(received!.toolTempDir).toBe(join(toolTempRoot, 'tool-call-test-hierarchy'));
+    expect(existsSync(received!.toolTempDir!)).toBe(true);
   });
 
-  it('should handle file operations through ToolExecutor', async () => {
+  it('is stable across ToolExecutor instances (same root, different call IDs)', async () => {
     const context: ToolContext = {
       signal: new AbortController().signal,
-      projectId: project.getId(),
-      toolTempRoot: session.getSessionTempDir(),
+      toolTempRoot,
     };
 
     await toolExecutor.execute(
-      {
-        id: 'test-file-ops',
-        name: integrationTool.name,
-        arguments: { content: 'test content' },
-      },
+      { id: 'call-1', name: integrationTool.name, arguments: { content: 'one' } },
       context
     );
+    const dir1 = integrationTool.getCapturedContext()!.toolTempDir!;
 
-    const receivedContext = integrationTool.getCapturedContext();
-    const toolTempDir = receivedContext!.toolTempDir!;
-
-    // Write test content to files in the temp directory
-    const stdoutFile = join(toolTempDir, 'stdout.txt');
-    const stderrFile = join(toolTempDir, 'stderr.txt');
-    const combinedFile = join(toolTempDir, 'combined.txt');
-
-    writeFileSync(stdoutFile, 'stdout content');
-    writeFileSync(stderrFile, 'stderr content');
-    writeFileSync(combinedFile, 'combined content');
-
-    // Verify files exist and have correct content
-    expect(readFileSync(stdoutFile, 'utf-8')).toBe('stdout content');
-    expect(readFileSync(stderrFile, 'utf-8')).toBe('stderr content');
-    expect(readFileSync(combinedFile, 'utf-8')).toBe('combined content');
-  });
-
-  it('should maintain stability across ToolExecutor instances', async () => {
-    const context: ToolContext = {
-      signal: new AbortController().signal,
-      projectId: project.getId(),
-      toolTempRoot: session.getSessionTempDir(),
-    };
-
-    // Execute with first ToolExecutor instance
-    await toolExecutor.execute(
-      {
-        id: 'test-stability-1',
-        name: integrationTool.name,
-        arguments: { content: 'test1' },
-      },
-      context
-    );
-    const paths1 = integrationTool.getCapturedContext()!.toolTempDir!;
-
-    // Create new ToolExecutor instance and execute again
     const newToolExecutor = new ToolExecutor();
     const newIntegrationTool = new IntegrationTestTool();
     newToolExecutor.registerTool(newIntegrationTool.name, newIntegrationTool);
-    // Reusing existing agent with approval mocking
 
     await newToolExecutor.execute(
-      {
-        id: 'test-stability-2',
-        name: newIntegrationTool.name,
-        arguments: { content: 'test2' },
-      },
+      { id: 'call-2', name: newIntegrationTool.name, arguments: { content: 'two' } },
       context
     );
-    const paths2 = newIntegrationTool.getCapturedContext()!.toolTempDir!;
+    const dir2 = newIntegrationTool.getCapturedContext()!.toolTempDir!;
 
-    // Session directories should be the same, but tool call directories should be different
-    const sessionDir1 = paths1.substring(0, paths1.lastIndexOf('/tool-call-'));
-    const sessionDir2 = paths2.substring(0, paths2.lastIndexOf('/tool-call-'));
-    expect(sessionDir1).toBe(sessionDir2);
-
-    // Tool call directories should be different (unique tool call IDs)
-    expect(paths1).not.toBe(paths2);
+    expect(dir1).not.toBe(dir2);
+    expect(dir1).toBe(join(toolTempRoot, 'tool-call-call-1'));
+    expect(dir2).toBe(join(toolTempRoot, 'tool-call-call-2'));
   });
 });

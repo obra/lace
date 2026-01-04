@@ -1,51 +1,22 @@
-// ABOUTME: Tests for Project class functionality including CRUD operations and session management
-// ABOUTME: Covers project creation, persistence, updates, and cleanup with proper database isolation
+// ABOUTME: Tests for Project class functionality including CRUD operations
+// ABOUTME: Covers project creation, persistence, updates, and cleanup with proper test isolation
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Project } from './project';
-import { Session } from '@lace/core/sessions/session';
 import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
-import { getPersistence, ProjectData } from '@lace/core/persistence/database';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '@lace/core/test-utils/provider-defaults';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/core/test-utils/provider-instances';
-import { existsSync, mkdirSync } from 'fs';
-import { mkdtempSync } from 'fs';
-import { join } from 'path';
+import { existsSync, mkdirSync, mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
+import { join } from 'path';
 import { getProcessTempDir } from '@lace/core/config/lace-dir';
 
 describe('Project', () => {
   const tempLaceDirContext = setupCoreTest();
-  let providerInstanceId: string;
   let tempProjectDir: string;
 
   beforeEach(async () => {
     // Create a real temp directory for each test
     tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
     mkdirSync(tempProjectDir, { recursive: true });
-
-    setupTestProviderDefaults();
-
-    // Create a real provider instance for testing
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Project Instance',
-      apiKey: 'test-anthropic-key',
-    });
-  });
-
-  afterEach(async () => {
-    cleanupTestProviderDefaults();
-    if (providerInstanceId) {
-      await cleanupTestProviderInstances([providerInstanceId]);
-    }
   });
 
   describe('create', () => {
@@ -57,7 +28,7 @@ describe('Project', () => {
       expect(project).toBeInstanceOf(Project);
       expect(project.getId()).toBeDefined();
 
-      // Verify project was actually saved to database
+      // Verify project was actually saved to the project store
       const retrieved = Project.getById(project.getId());
       expect(retrieved).not.toBeNull();
       expect(retrieved!.getName()).toBe('Test Project');
@@ -120,7 +91,7 @@ describe('Project', () => {
 
   describe('getAll', () => {
     it('should return all projects', () => {
-      // Create real projects in the database
+      // Create real projects in the project store
       const path1 = join(tempLaceDirContext.tempDir, 'project1');
       const path2 = join(tempLaceDirContext.tempDir, 'project2');
       mkdirSync(path1, { recursive: true });
@@ -142,7 +113,7 @@ describe('Project', () => {
     it('should return empty list when no projects exist', () => {
       const projects = Project.getAll();
 
-      // Clean database should have no projects by default
+      // Clean project store should have no projects by default
       expect(projects).toHaveLength(0);
     });
   });
@@ -173,8 +144,6 @@ describe('Project', () => {
 
     beforeEach(() => {
       project = Project.create('Test Project', tempProjectDir, 'A test project', {
-        providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
         key: 'value',
       });
     });
@@ -191,7 +160,6 @@ describe('Project', () => {
           isArchived: false,
           createdAt: expect.any(Date) as Date,
           lastUsedAt: expect.any(Date) as Date,
-          sessionCount: 1, // Auto-created default session
         });
       });
 
@@ -217,8 +185,6 @@ describe('Project', () => {
       it('should return configuration', () => {
         const config = project.getConfiguration();
         expect(config).toEqual({
-          providerInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
           key: 'value',
         });
       });
@@ -302,7 +268,7 @@ describe('Project', () => {
     });
 
     describe('delete', () => {
-      it('should delete project and its sessions', () => {
+      it('should delete project', () => {
         const projectId = project.getId();
 
         // Verify project exists before deletion
@@ -315,263 +281,12 @@ describe('Project', () => {
       });
     });
 
-    describe('session management', () => {
-      describe('getSessions', () => {
-        it('should return default session from auto-creation', () => {
-          const sessions = project.getSessions();
-          expect(sessions).toHaveLength(1); // Auto-created default session
-          expect(sessions[0].name).toBe('Main Session');
-        });
+    describe('updateConfiguration', () => {
+      it('should merge configuration updates', () => {
+        project.updateConfiguration({ newKey: 'newValue' });
 
-        it('should return sessions for the project', () => {
-          // Create a session with provider instance
-          const session = Session.create({
-            name: 'Test Session',
-            projectId: project.getId(),
-            description: 'A test session',
-          });
-
-          const sessions = project.getSessions();
-          expect(sessions).toHaveLength(2); // Auto-created + manually created session
-          expect(sessions.find((s) => s.id === session.getId())).toBeDefined();
-          expect(sessions.find((s) => s.name === 'Test Session')).toBeDefined();
-          expect(sessions.find((s) => s.name === 'Main Session')).toBeDefined(); // Auto-created session
-          expect(sessions.every((s) => s.projectId === project.getId())).toBe(true);
-        });
-
-        it('should not return sessions from other projects', () => {
-          const otherPath = join(tempLaceDirContext.tempDir, 'other-project');
-          mkdirSync(otherPath, { recursive: true });
-          const otherProject = Project.create('Other Project', otherPath, 'Other project', {
-            providerInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
-          });
-
-          // Create sessions in both projects
-          Session.create({
-            name: 'Project 1 Session',
-            projectId: project.getId(),
-          });
-          Session.create({
-            name: 'Project 2 Session',
-            projectId: otherProject.getId(),
-          });
-
-          const sessions = project.getSessions();
-          expect(sessions).toHaveLength(2); // Auto-created + manually created session for this project
-          expect(sessions.find((s) => s.name === 'Project 1 Session')).toBeDefined();
-          expect(sessions.find((s) => s.name === 'Main Session')).toBeDefined(); // Auto-created session
-          expect(sessions.find((s) => s.name === 'Project 2 Session')).toBeUndefined();
-          expect(sessions.every((s) => s.projectId === project.getId())).toBe(true);
-        });
-      });
-
-      describe('createSession', () => {
-        it('should create session with required fields', () => {
-          const session = Session.create({
-            name: 'Test Session',
-            projectId: project.getId(),
-            description: 'A test session',
-            configuration: { key: 'value' },
-          });
-
-          expect(session.getId()).toBeDefined();
-          const sessionData = Session.getSession(session.getId());
-          expect(sessionData?.projectId).toBe(project.getId());
-          expect(sessionData?.name).toBe('Test Session');
-          expect(sessionData?.description).toBe('A test session');
-          expect(sessionData?.configuration).toEqual({
-            key: 'value',
-          });
-          expect(sessionData?.status).toBe('active');
-          expect(sessionData?.createdAt).toBeInstanceOf(Date);
-          expect(sessionData?.updatedAt).toBeInstanceOf(Date);
-        });
-
-        it('should create session with default values', () => {
-          const session = Session.create({
-            name: 'Test Session',
-            projectId: project.getId(),
-          });
-
-          const sessionData = Session.getSession(session.getId());
-          expect(sessionData?.description).toBe('');
-          expect(sessionData?.configuration).toEqual({});
-          expect(sessionData?.status).toBe('active');
-        });
-      });
-
-      describe('getSession', () => {
-        it('should return session when it exists and belongs to project', () => {
-          const createdSession = Session.create({
-            name: 'Test Session',
-            projectId: project.getId(),
-          });
-
-          const session = project.getSession(createdSession.getId());
-          expect(session).not.toBeNull();
-          expect(session!.id).toBe(createdSession.getId());
-          expect(session!.name).toBe('Test Session');
-        });
-
-        it('should return null when session does not exist', () => {
-          const session = project.getSession('non-existent');
-          expect(session).toBeNull();
-        });
-
-        it('should return null when session belongs to different project', () => {
-          const otherPath = join(tempLaceDirContext.tempDir, 'other-project-2');
-          mkdirSync(otherPath, { recursive: true });
-          const otherProject = Project.create('Other Project', otherPath, 'Other project', {
-            providerInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
-          });
-          const otherSession = Session.create({
-            name: 'Other Session',
-            projectId: otherProject.getId(),
-          });
-
-          const session = project.getSession(otherSession.getId());
-          expect(session).toBeNull();
-        });
-      });
-
-      describe('updateSession', () => {
-        let session: ReturnType<typeof Session.create>;
-
-        beforeEach(() => {
-          session = Session.create({
-            name: 'Test Session',
-            projectId: project.getId(),
-            description: 'Original description',
-          });
-        });
-
-        it('should update session successfully', () => {
-          const updatedSession = project.updateSession(session.getId(), {
-            name: 'Updated Session',
-            description: 'Updated description',
-            status: 'completed',
-            configuration: { updated: true },
-          });
-
-          expect(updatedSession).not.toBeNull();
-          expect(updatedSession!.name).toBe('Updated Session');
-          expect(updatedSession!.description).toBe('Updated description');
-          expect(updatedSession!.status).toBe('completed');
-          expect(updatedSession!.configuration).toEqual({ updated: true });
-        });
-
-        it('should return null when session does not exist', () => {
-          const updatedSession = project.updateSession('non-existent', { name: 'Updated' });
-          expect(updatedSession).toBeNull();
-        });
-
-        it('should return null when session belongs to different project', () => {
-          const otherPath = join(tempLaceDirContext.tempDir, 'other-project-3');
-          mkdirSync(otherPath, { recursive: true });
-          const otherProject = Project.create('Other Project', otherPath, 'Other project', {
-            providerInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
-          });
-          const otherSession = Session.create({
-            name: 'Other Session',
-            projectId: otherProject.getId(),
-          });
-
-          const updatedSession = project.updateSession(otherSession.getId(), { name: 'Updated' });
-          expect(updatedSession).toBeNull();
-        });
-
-        it('should update timestamp', async () => {
-          const originalSessionData = Session.getSession(session.getId());
-          const originalUpdatedAt = originalSessionData?.updatedAt;
-
-          // Wait a bit to ensure timestamp difference
-          await new Promise((resolve) => setTimeout(resolve, 10));
-
-          const updatedSession = project.updateSession(session.getId(), {
-            name: 'Updated',
-          });
-          expect(updatedSession!.updatedAt > originalUpdatedAt!).toBe(true);
-        });
-      });
-
-      describe('deleteSession', () => {
-        let session: ReturnType<typeof Session.create>;
-
-        beforeEach(() => {
-          session = Session.create({
-            name: 'Test Session',
-            projectId: project.getId(),
-          });
-        });
-
-        it('should delete session successfully', () => {
-          const result = project.deleteSession(session.getId());
-
-          expect(result).toBe(true);
-          expect(project.getSession(session.getId())).toBeNull();
-        });
-
-        it('should return false when session does not exist', () => {
-          const result = project.deleteSession('non-existent');
-          expect(result).toBe(false);
-        });
-
-        it('should return false when session belongs to different project', () => {
-          const otherPath = join(tempLaceDirContext.tempDir, 'other-project-4');
-          mkdirSync(otherPath, { recursive: true });
-          const otherProject = Project.create('Other Project', otherPath, 'Other project', {
-            providerInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
-          });
-          const otherSession = Session.create({
-            name: 'Other Session',
-            projectId: otherProject.getId(),
-          });
-
-          const result = project.deleteSession(otherSession.getId());
-          expect(result).toBe(false);
-        });
-      });
-
-      describe('getSessionCount', () => {
-        it('should return 1 for auto-created default session', () => {
-          expect(project.getSessionCount()).toBe(1); // Auto-created default session
-        });
-
-        it('should return correct count', () => {
-          Session.create({
-            name: 'Session 1',
-            projectId: project.getId(),
-          });
-          Session.create({
-            name: 'Session 2',
-            projectId: project.getId(),
-          });
-
-          expect(project.getSessionCount()).toBe(3); // 1 auto-created + 2 manual sessions
-        });
-
-        it('should update when sessions are deleted', () => {
-          const session1 = Session.create({
-            name: 'Session 1',
-            projectId: project.getId(),
-          });
-          const session2 = Session.create({
-            name: 'Session 2',
-            projectId: project.getId(),
-          });
-
-          expect(project.getSessionCount()).toBe(3); // 1 auto-created + 2 manual sessions
-
-          project.deleteSession(session1.getId());
-          expect(project.getSessionCount()).toBe(2);
-
-          project.deleteSession(session2.getId());
-          expect(project.getSessionCount()).toBe(1); // Auto-created session remains
-        });
+        const updated = Project.getById(project.getId());
+        expect(updated?.getConfiguration()).toEqual({ key: 'value', newKey: 'newValue' });
       });
     });
   });
@@ -608,68 +323,6 @@ describe('Project', () => {
       const processTempDir = getProcessTempDir();
 
       expect(tempDir).toContain(processTempDir);
-    });
-  });
-
-  describe('Project data caching', () => {
-    it('should cache ProjectData after first load to avoid duplicate database queries', () => {
-      // Arrange: Create project data in database
-      const cachePath = join(tempLaceDirContext.tempDir, 'cache-project');
-      mkdirSync(cachePath, { recursive: true });
-
-      const projectData: ProjectData = {
-        id: 'test-project-cache',
-        name: 'Cached Project',
-        description: 'Test project for caching',
-        workingDirectory: cachePath,
-        configuration: { testSetting: 'value' },
-        isArchived: false,
-        createdAt: new Date(),
-        lastUsedAt: new Date(),
-      };
-
-      const persistence = getPersistence();
-      persistence.saveProject(projectData);
-
-      // Spy on database calls
-      const loadProjectSpy = vi.spyOn(persistence, 'loadProject');
-
-      // Act: Load project and call methods that need ProjectData
-      const project = Project.getById('test-project-cache');
-      expect(project).toBeTruthy();
-
-      const info1 = project!.getInfo();
-      const info2 = project!.getInfo();
-      const name1 = project!.getName();
-      const name2 = project!.getName();
-
-      // Assert: Database should only be called once (in getById)
-      expect(loadProjectSpy).toHaveBeenCalledTimes(1);
-      expect(info1).toEqual(info2);
-      expect(name1).toEqual(name2);
-      expect(name1).toBe('Cached Project');
-    });
-
-    it('should refresh ProjectData from database when explicitly requested', () => {
-      // Create project
-      const originalPath = join(tempLaceDirContext.tempDir, 'original-project');
-      mkdirSync(originalPath, { recursive: true });
-      const project = Project.create('Original Name', originalPath, 'Original description', {});
-
-      // Simulate external update in database
-      const persistence = getPersistence();
-      persistence.updateProject(project.getId(), {
-        name: 'Updated Name',
-        description: 'Updated description',
-      });
-
-      // Cached data should show old values
-      expect(project.getName()).toBe('Original Name');
-
-      // After refresh, should show new values
-      project.refreshFromDatabase();
-      expect(project.getName()).toBe('Updated Name');
-      expect(project.getInfo()?.description).toBe('Updated description');
     });
   });
 

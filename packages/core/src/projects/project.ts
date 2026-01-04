@@ -2,23 +2,28 @@
 // ABOUTME: Provides high-level interface for project CRUD operations and session management
 
 import { randomUUID } from 'crypto';
-import { basename } from 'path';
-import { getPersistence, ProjectData, SessionData } from '@lace/core/persistence/database';
+import { basename, join } from 'path';
 import { logger } from '@lace/core/utils/logger';
-import { Session } from '@lace/core/sessions/session';
-import type { ThreadId } from '@lace/core/threads/types';
-import { existsSync, statSync, accessSync, constants } from 'fs';
-import { ThreadManager } from '@lace/core/threads/thread-manager';
-import type { SessionConfiguration } from '@lace/core/sessions/session-config';
+import { accessSync, constants, existsSync, mkdirSync, statSync } from 'fs';
 import { ProjectEnvironmentManager } from './environment-variables';
+import { ProjectStore, type ProjectRecord } from './project-store';
 import { getProcessTempDir } from '@lace/core/config/lace-dir';
 import { MCPConfigLoader } from '@lace/core/config/mcp-config-loader';
 import type { MCPServerConfig } from '@lace/core/config/mcp-types';
 import { ToolExecutor } from '@lace/core/tools/executor';
 import { ToolCatalog } from '@lace/core/tools/tool-catalog';
 import { MCPServerManager } from '@lace/core/mcp/server-manager';
-import { mkdirSync } from 'fs';
-import { join } from 'path';
+
+type ProjectData = {
+  id: string;
+  name: string;
+  description: string;
+  workingDirectory: string;
+  configuration: Record<string, unknown>;
+  isArchived: boolean;
+  createdAt: Date;
+  lastUsedAt: Date;
+};
 
 export interface ProjectInfo {
   id: string;
@@ -29,6 +34,32 @@ export interface ProjectInfo {
   createdAt: Date;
   lastUsedAt: Date;
   sessionCount?: number;
+}
+
+function projectDataFromRecord(record: ProjectRecord): ProjectData {
+  return {
+    id: record.id,
+    name: record.name,
+    description: record.description,
+    workingDirectory: record.workingDirectory,
+    configuration: record.configuration,
+    isArchived: record.isArchived,
+    createdAt: new Date(record.createdAt),
+    lastUsedAt: new Date(record.lastUsedAt),
+  };
+}
+
+function projectRecordFromData(data: ProjectData): ProjectRecord {
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    workingDirectory: data.workingDirectory,
+    configuration: data.configuration ?? {},
+    isArchived: data.isArchived,
+    createdAt: data.createdAt.toISOString(),
+    lastUsedAt: data.lastUsedAt.toISOString(),
+  };
 }
 
 export class Project {
@@ -80,8 +111,6 @@ export class Project {
       throw new Error(`Project workingDirectory is not writable: ${workingDirectory}`);
     }
 
-    const persistence = getPersistence();
-
     // Auto-generate name from directory if not provided
     const projectName = name.trim() || Project.generateNameFromDirectory(workingDirectory);
 
@@ -96,64 +125,37 @@ export class Project {
       lastUsedAt: new Date(),
     };
 
-    persistence.saveProject(projectData);
-    // Don't close the global persistence - it's managed by the persistence system
+    const store = new ProjectStore();
+    store.upsert(projectRecordFromData(projectData));
 
     logger.info('Project created', { projectId: projectData.id, name, workingDirectory });
 
     // Create the project instance
     const project = new Project(projectData);
 
-    // Auto-create a default session with project configuration
-    try {
-      void Session.create({
-        name: 'Main Session',
-        description: 'Default session for project',
-        projectId: projectData.id,
-        configuration, // Pass project configuration to session
-      });
-
-      logger.debug('Auto-created default session for project', { projectId: projectData.id });
-    } catch (error) {
-      logger.warn('Failed to create default session for project', {
-        projectId: projectData.id,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-
     return project;
   }
 
   static getAll(): ProjectInfo[] {
-    const persistence = getPersistence();
-    const projects = persistence.loadAllProjects();
+    const store = new ProjectStore();
+    const projects = store.loadAll().map(projectDataFromRecord);
 
-    return projects.map((project) => {
-      // Create a temporary Project instance to get session count
-      const projectInstance = new Project(project);
-      return {
-        id: project.id,
-        name: project.name,
-        description: project.description,
-        workingDirectory: project.workingDirectory,
-        isArchived: project.isArchived,
-        createdAt: project.createdAt,
-        lastUsedAt: project.lastUsedAt,
-        sessionCount: projectInstance.getSessionCount(),
-      };
-    });
+    return projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      workingDirectory: project.workingDirectory,
+      isArchived: project.isArchived,
+      createdAt: project.createdAt,
+      lastUsedAt: project.lastUsedAt,
+    }));
   }
 
   static getById(projectId: string): Project | null {
-    const persistence = getPersistence();
-    const projectData = persistence.loadProject(projectId);
-
-    if (!projectData) {
-      return null;
-    }
-
-    // 👈 NEW: Pass projectData to constructor instead of discarding it
-    return new Project(projectData);
+    const store = new ProjectStore();
+    const record = store.load(projectId);
+    if (!record) return null;
+    return new Project(projectDataFromRecord(record));
   }
 
   getId(): string {
@@ -170,7 +172,6 @@ export class Project {
       isArchived: this._projectData.isArchived,
       createdAt: this._projectData.createdAt,
       lastUsedAt: this._projectData.lastUsedAt,
-      sessionCount: this.getSessionCount(),
     };
   }
 
@@ -188,11 +189,10 @@ export class Project {
 
   // Add method to force refresh from database
   refreshFromDatabase(): void {
-    const persistence = getPersistence();
-    const freshData = persistence.loadProject(this._id);
-    if (freshData) {
-      this._projectData = freshData;
-    }
+    const store = new ProjectStore();
+    const record = store.load(this._id);
+    if (!record) return;
+    this._projectData = projectDataFromRecord(record);
   }
 
   getConfiguration(): Record<string, unknown> {
@@ -206,21 +206,20 @@ export class Project {
     configuration?: Record<string, unknown>;
     isArchived?: boolean;
   }): void {
-    const persistence = getPersistence();
-
     // Always update lastUsedAt when project is modified
     const updatesWithTimestamp = {
       ...updates,
       lastUsedAt: new Date(),
     };
 
-    persistence.updateProject(this._id, updatesWithTimestamp);
-
     // 👈 NEW: Update cached data
     this._projectData = {
       ...this._projectData,
       ...updatesWithTimestamp,
     };
+
+    const store = new ProjectStore();
+    store.upsert(projectRecordFromData(this._projectData));
 
     // Update all other Project instances for the same ID to maintain cache consistency
     for (const [registryProjectId, registryProject] of Project._projectRegistry.entries()) {
@@ -235,17 +234,9 @@ export class Project {
     logger.info('Project updated', { projectId: this._id, updates });
   }
 
-  updateConfiguration(updates: Partial<SessionConfiguration>): void {
-    // For now, we'll do basic validation here to avoid circular dependency
-    // In a full implementation, this would use a shared validation schema
-    const validatedConfig = updates as SessionConfiguration;
-
+  updateConfiguration(updates: Record<string, unknown>): void {
     const currentConfig = this.getConfiguration();
-    const newConfig = { ...currentConfig, ...validatedConfig };
-
-    this.updateInfo({
-      configuration: newConfig as Record<string, unknown>,
-    });
+    this.updateInfo({ configuration: { ...currentConfig, ...updates } });
   }
 
   archive(): void {
@@ -259,17 +250,8 @@ export class Project {
   }
 
   delete(): void {
-    const persistence = getPersistence();
-
-    // Delete all sessions in this project first using our deleteSession method
-    const sessionData = persistence.loadSessionsByProject(this._id);
-    for (const sessionInfo of sessionData) {
-      this.deleteSession(sessionInfo.id);
-    }
-
-    // Then delete the project
-    persistence.deleteProject(this._id);
-    // Don't close the global persistence - it's managed by the persistence system
+    const store = new ProjectStore();
+    store.delete(this._id);
 
     // Clean up registry
     Project._projectRegistry.delete(this._id);
@@ -279,84 +261,6 @@ export class Project {
 
   touchLastUsed(): void {
     this.updateInfo({});
-  }
-
-  getSessions(): (SessionData & { agentCount: number })[] {
-    const persistence = getPersistence();
-    const sessionDataList = persistence.loadSessionsByProject(this._id);
-
-    // Use persistence layer directly for agent counts to avoid async complexity
-    return sessionDataList.map((sessionData) => {
-      const agentCount = persistence.getThreadsBySession(sessionData.id).length;
-
-      return {
-        ...sessionData,
-        agentCount,
-      };
-    });
-  }
-
-  getSession(sessionId: string): SessionData | null {
-    const persistence = getPersistence();
-    const session = persistence.loadSession(sessionId);
-
-    // Verify session belongs to this project
-    if (session && session.projectId !== this._id) {
-      return null;
-    }
-
-    return session;
-  }
-
-  updateSession(sessionId: string, updates: Partial<SessionData>): SessionData | null {
-    const persistence = getPersistence();
-
-    // Verify session belongs to this project
-    const existingSession = persistence.loadSession(sessionId);
-    if (!existingSession || existingSession.projectId !== this._id) {
-      return null;
-    }
-
-    // Always update the timestamp
-    const updatesWithTimestamp = {
-      ...updates,
-      updatedAt: new Date(),
-    };
-
-    persistence.updateSession(sessionId, updatesWithTimestamp);
-    logger.info('Session updated', { sessionId, projectId: this._id, updates });
-
-    return persistence.loadSession(sessionId);
-  }
-
-  deleteSession(sessionId: string): boolean {
-    const persistence = getPersistence();
-
-    // Verify session belongs to this project
-    const existingSession = persistence.loadSession(sessionId);
-    if (!existingSession || existingSession.projectId !== this._id) {
-      return false;
-    }
-
-    // Delete all threads in this session first using ThreadManager
-    const threadManager = new ThreadManager();
-    const threads = persistence.getAllThreadsWithMetadata();
-    const sessionThreads = threads.filter((thread) => thread.sessionId === sessionId);
-
-    for (const thread of sessionThreads) {
-      threadManager.deleteThread(thread.id);
-    }
-
-    // Then delete the session
-    persistence.deleteSession(sessionId);
-    logger.info('Session deleted', { sessionId, projectId: this._id });
-
-    return true;
-  }
-
-  getSessionCount(): number {
-    const sessions = this.getSessions();
-    return sessions.length;
   }
 
   // Advanced Feature Managers
@@ -475,9 +379,6 @@ export class Project {
     ).catch((error) => {
       logger.warn(`Tool discovery failed for MCP server ${serverId}:`, error);
     });
-
-    // Notify sessions immediately
-    this.notifySessionsMCPChange(serverId, 'created', serverConfig);
   }
 
   /**
@@ -485,7 +386,6 @@ export class Project {
    */
   updateMCPServer(serverId: string, serverConfig: MCPServerConfig): void {
     MCPConfigLoader.updateServerConfig(serverId, serverConfig, this.getWorkingDirectory());
-    this.notifySessionsMCPChange(serverId, 'updated', serverConfig);
   }
 
   /**
@@ -493,27 +393,6 @@ export class Project {
    */
   deleteMCPServer(serverId: string): void {
     MCPConfigLoader.deleteServerConfig(serverId, this.getWorkingDirectory());
-    this.notifySessionsMCPChange(serverId, 'deleted');
-  }
-
-  private notifySessionsMCPChange(
-    serverId: string,
-    action: 'created' | 'updated' | 'deleted',
-    serverConfig?: MCPServerConfig
-  ): void {
-    // Get session data and look up actual Session instances
-    const sessionDataList = this.getSessions();
-
-    sessionDataList.forEach((sessionData) => {
-      const session = Session.getByIdSync(sessionData.id as ThreadId);
-      if (session) {
-        session.announceMCPConfigChange(serverId, action, serverConfig);
-      } else {
-        logger.warn(
-          `Session ${sessionData.id} not found in registry for MCP config change notification`
-        );
-      }
-    });
   }
 
   private static generateNameFromDirectory(workingDirectory: string): string {

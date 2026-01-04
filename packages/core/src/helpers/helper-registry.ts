@@ -2,10 +2,9 @@
 // ABOUTME: Tracks helper lifecycle and provides lookup/management functionality
 
 import { InfrastructureHelper, InfrastructureHelperOptions } from './infrastructure-helper';
-import { SessionHelper, SessionHelperOptions } from './session-helper';
 import { BaseHelper } from './base-helper';
 
-type HelperType = 'infrastructure' | 'session';
+type HelperType = 'infrastructure';
 
 interface RegistryEntry {
   helper: BaseHelper;
@@ -35,23 +34,6 @@ export class HelperRegistry {
 
     const helper = new InfrastructureHelper(options);
     this.helpers.set(id, { helper, type: 'infrastructure' });
-
-    return helper;
-  }
-
-  /**
-   * Create a session helper and register it
-   * @param id Unique identifier for this helper instance
-   * @param options Configuration for the session helper
-   * @returns The created session helper
-   */
-  createSessionHelper(id: string, options: SessionHelperOptions): SessionHelper {
-    if (this.helpers.has(id)) {
-      throw new Error(`Helper with id "${id}" already exists`);
-    }
-
-    const helper = new SessionHelper(options);
-    this.helpers.set(id, { helper, type: 'session' });
 
     return helper;
   }

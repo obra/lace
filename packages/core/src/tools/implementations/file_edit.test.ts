@@ -1,107 +1,41 @@
 // ABOUTME: Integration tests for file edit tool with file protection
 // ABOUTME: Tests text replacement, validation, and file read protection mechanism
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, rm, mkdir } from 'fs/promises';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { FileEditTool } from './file_edit';
 import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/core/test-utils/provider-instances';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '@lace/core/test-utils/provider-defaults';
-import { Session } from '@lace/core/sessions/session';
-import { Project } from '@lace/core/projects/project';
 import type { ToolContext } from '@lace/core/tools/types';
 
 describe('FileEditTool Integration Tests', () => {
   const tempLaceDirContext = setupCoreTest();
   let tool: FileEditTool;
-  let providerInstanceId: string;
-  let session: Session;
-  let agent: ReturnType<typeof session.getAgent>;
   let context: ToolContext;
-  let tempProjectDir: string;
-  const testDir = join(process.cwd(), 'test-temp-file-edit-schema');
-  const testFile = join(testDir, 'test.txt');
+  let testDir: string;
+  let testFile: string;
+  let hasFileBeenReadImpl: (path: string) => boolean;
 
   beforeEach(async () => {
-    setupTestProviderDefaults();
+    tool = new FileEditTool();
 
-    // Create temp project directory
-    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
-    mkdirSync(tempProjectDir, { recursive: true });
+    testDir = join(tempLaceDirContext.tempDir, 'test-temp-file-edit-schema');
+    testFile = join(testDir, 'test.txt');
+    mkdirSync(testDir, { recursive: true });
 
-    // Create provider instance
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
+    // Default: allow edits unless a test overrides this
+    hasFileBeenReadImpl = () => true;
 
-    // Create project and session
-    const project = Project.create('Test Project', tempProjectDir, 'Test project for file edit', {
-      providerInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
-    });
-
-    session = Session.create({
-      name: 'Test Session',
-      projectId: project.getId(),
-    });
-
-    // Mock agent approval for tests
-    vi.spyOn(session.getAgent(session.getId())! as any, '_checkToolPermission').mockResolvedValue(
-      'granted'
-    );
-
-    // Get the coordinator agent
-    agent = session.getAgent(session.getId())!;
-
-    // Get tools from agent's toolExecutor (so events are properly recorded)
-    tool = agent.toolExecutor.getTool('file_edit') as FileEditTool;
-
-    // For most tests (except file protection tests), mock hasFileBeenRead to return true
-    // This allows us to test FileEditTool functionality without the complexity of event tracking
-    const originalHasFileBeenRead = agent.hasFileBeenRead.bind(agent);
-    agent.hasFileBeenRead = (path: string) => {
-      // Only apply mock for non-protection tests
-      if (
-        path === testFile ||
-        path.includes('test-temp-file-edit-schema') ||
-        path.includes('temp-cwd-edit-test.txt') ||
-        path.includes('temp-rel-edit-test.txt')
-      ) {
-        return true;
-      }
-      return originalHasFileBeenRead(path);
-    };
-
-    // Create context with real agent
+    // Default context: no workingDirectory (exercises fallback-to-cwd path behavior)
     context = {
-      workingDirectory: process.cwd(),
-      threadId: agent.threadId,
-      projectId: session.getProjectId(),
-      toolTempRoot: session.getSessionTempDir(),
-      hasFileBeenRead: (path: string) => agent.hasFileBeenRead(path),
       signal: new AbortController().signal,
+      hasFileBeenRead: (path: string) => hasFileBeenReadImpl(path),
     };
-
-    await mkdir(testDir, { recursive: true });
   });
 
   afterEach(async () => {
     await rm(testDir, { recursive: true, force: true });
-    cleanupTestProviderDefaults();
-    if (providerInstanceId) {
-      await cleanupTestProviderInstances([providerInstanceId]);
-    }
   });
 
   // Helper function to assert successful edits
@@ -119,8 +53,7 @@ describe('FileEditTool Integration Tests', () => {
     it('should require file to be read before editing', async () => {
       await writeFile(testFile, 'original content');
 
-      // Restore original hasFileBeenRead for this test
-      agent!.hasFileBeenRead = () => false;
+      hasFileBeenReadImpl = () => false;
 
       // Try to edit without reading first
       const result = await tool.execute(
@@ -190,9 +123,7 @@ describe('FileEditTool Integration Tests', () => {
       await writeFile(testFile2, 'content2');
 
       // Mock to say only testFile has been read, not testFile2
-      agent!.hasFileBeenRead = (path: string) => {
-        return path === testFile;
-      };
+      hasFileBeenReadImpl = (path: string) => path === testFile;
 
       // Should work for testFile (marked as read)
       await writeFile(testFile, 'content1');

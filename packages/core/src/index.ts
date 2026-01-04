@@ -1,12 +1,7 @@
 // ABOUTME: Main entry point for @lace/core package
 // ABOUTME: Exports key classes and types for external consumption
 
-// Core agent functionality
-export { Agent } from './agents/agent';
-export type { AgentState, AgentInfo } from './agents/agent';
-
-// Thread management
-export { ThreadManager } from './threads/thread-manager';
+// Thread types
 export type {
   ThreadId,
   LaceEvent,
@@ -27,7 +22,6 @@ export { ToolCatalog } from './tools/tool-catalog';
 export type { ToolCall, ToolResult } from './tools/types';
 
 // Session and project management
-export { Session } from './sessions/session';
 export { Project } from './projects/project';
 
 // Configuration

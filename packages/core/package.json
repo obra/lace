@@ -26,7 +26,6 @@
     "@lmstudio/sdk": "^1.2.1",
     "@modelcontextprotocol/sdk": "^1.17.5",
     "@typescript-eslint/utils": "^8.39.1",
-    "better-sqlite3": "^11.10.0",
     "mustache": "^4.2.0",
     "node-fetch": "^3.3.2",
     "ollama": "^0.5.16",
@@ -39,7 +38,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.16.0",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/bun": "^1.2.21",
     "@types/mustache": "^4.2.5",
     "@types/node": "^22.16.0",
@@ -64,10 +62,6 @@
     "./*": {
       "types": "./dist/*.d.ts",
       "import": "./dist/*.js"
-    },
-    "./agents/agent": {
-      "types": "./dist/agents/agent.d.ts",
-      "import": "./dist/agents/agent.js"
     },
     "./threads/types": {
       "types": "./dist/threads/types.d.ts",
@@ -117,21 +111,9 @@
       "types": "./dist/tools/implementations/file_edit.d.ts",
       "import": "./dist/tools/implementations/file_edit.js"
     },
-    "./sessions/session": {
-      "types": "./dist/sessions/session.d.ts",
-      "import": "./dist/sessions/session.js"
-    },
     "./projects/project": {
       "types": "./dist/projects/project.d.ts",
       "import": "./dist/projects/project.js"
-    },
-    "./threads/thread-manager": {
-      "types": "./dist/threads/thread-manager.d.ts",
-      "import": "./dist/threads/thread-manager.js"
-    },
-    "./persistence/database": {
-      "types": "./dist/persistence/database.d.ts",
-      "import": "./dist/persistence/database.js"
     },
     "./config/lace-dir": {
       "types": "./dist/config/lace-dir.d.ts",
@@ -208,10 +190,6 @@
     "./tools/tool-catalog": {
       "types": "./dist/tools/tool-catalog.d.ts",
       "import": "./dist/tools/tool-catalog.js"
-    },
-    "./helpers/session-helper": {
-      "types": "./dist/helpers/session-helper.d.ts",
-      "import": "./dist/helpers/session-helper.js"
     },
     "./helpers/infrastructure-helper": {
       "types": "./dist/helpers/infrastructure-helper.d.ts",

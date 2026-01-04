@@ -126,6 +126,13 @@ export class WorkspaceSessionStore {
     this.save();
   }
 
+  delete(workspaceSessionId: string): boolean {
+    this.loadIfNeeded();
+    const existed = this.recordsById.delete(workspaceSessionId);
+    if (existed) this.save();
+    return existed;
+  }
+
   private loadIfNeeded(): void {
     if (this.loaded) return;
     this.loaded = true;

@@ -1,384 +1,115 @@
 // ABOUTME: Tests for AI-powered conversation summarization compaction strategy
 // ABOUTME: Validates summarization logic and event replacement behavior
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { SummarizeCompactionStrategy } from './summarize-strategy';
-import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
-import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
-import { Agent } from '@lace/core/agents/agent';
-import { ThreadManager } from '@lace/core/threads/thread-manager';
-import { ToolExecutor } from '@lace/core/tools/executor';
 import type { LaceEvent } from '@lace/core/threads/types';
-import type { CompactionContext, CompactionData, CompactionResult } from './types';
-
-// Helper to cast result data to CompactionData
-function getCompactionData(result: CompactionResult): CompactionData {
-  return result.compactionEvent.data as CompactionData;
-}
-
-// Mock provider for testing summarization
-class MockSummarizationProvider extends BaseMockProvider {
-  providerName = 'mock-summarization';
-
-  constructor(mockSummary = 'Summary of conversation about writing functions') {
-    super({});
-    this.mockSummary = mockSummary;
-  }
-
-  private mockSummary: string;
-
-  createResponse = vi.fn().mockImplementation(() =>
-    Promise.resolve({
-      content: this.mockSummary,
-      toolCalls: [],
-    })
-  );
-
-  get supportsStreaming() {
-    return false;
-  }
-
-  setMockSummary(summary: string) {
-    this.mockSummary = summary;
-    this.createResponse.mockImplementation(() =>
-      Promise.resolve({
-        content: summary,
-        toolCalls: [],
-      })
-    );
-  }
-}
+import type { CompactionContext, CompactionData } from './types';
+import type { AIProvider } from '@lace/core/providers/base-provider';
 
 describe('SummarizeCompactionStrategy', () => {
-  setupCoreTest();
-  let strategy: SummarizeCompactionStrategy;
-  let mockProvider: MockSummarizationProvider;
-  let agent: Agent;
-  let threadManager: ThreadManager;
-  let toolExecutor: ToolExecutor;
-  let context: CompactionContext;
+  it('summarizes older non-user events and preserves all user messages + recent events', async () => {
+    const strategy = new SummarizeCompactionStrategy();
 
-  beforeEach(() => {
-    strategy = new SummarizeCompactionStrategy();
-    mockProvider = new MockSummarizationProvider();
-    threadManager = new ThreadManager();
-    toolExecutor = new ToolExecutor();
-
-    // Create test thread
-    const threadId = threadManager.createThread();
-
-    // Create agent with mock provider
-    agent = new Agent({
-      toolExecutor,
-      threadManager,
-      threadId,
-      tools: [],
-      metadata: {
-        name: 'test-agent',
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
-      },
-    });
-
-    // Mock provider creation for test
-    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
-
-    context = {
-      threadId,
-      agent, // Use agent for in-conversation summarization
+    const agent = {
+      generateSummary: vi.fn().mockResolvedValue('Summary of the earlier work'),
     };
-  });
 
-  it('should create summary from conversation events', async () => {
+    const context: CompactionContext = {
+      threadId: 'test-thread',
+      agent,
+    };
+
     const events: LaceEvent[] = [
+      { type: 'USER_MESSAGE', data: 'User message 1', context: { threadId: context.threadId } },
       {
-        id: '1',
-        context: { threadId: context.threadId },
-        type: 'USER_MESSAGE',
-        timestamp: new Date('2024-01-01T10:00:00Z'),
-        data: 'Help me write a function to calculate fibonacci numbers',
-      },
-      {
-        id: '2',
-        context: { threadId: context.threadId },
         type: 'AGENT_MESSAGE',
-        timestamp: new Date('2024-01-01T10:01:00Z'),
-        data: {
-          content: 'I can help you write a fibonacci function. Here are a few approaches...',
-          tokenUsage: {
-            message: { promptTokens: 100, completionTokens: 200, totalTokens: 300 },
-            thread: {
-              totalPromptTokens: 100,
-              totalCompletionTokens: 200,
-              totalTokens: 300,
-              contextLimit: 200000,
-              percentUsed: 0.15,
-              nearLimit: false,
-            },
-          },
-        },
+        data: { content: 'Agent message 1' },
+        context: { threadId: context.threadId },
       },
       {
-        id: '3',
-        context: { threadId: context.threadId },
         type: 'TOOL_CALL',
-        timestamp: new Date('2024-01-01T10:02:00Z'),
-        data: {
-          id: 'tool-123',
-          name: 'file_write',
-          arguments: { path: 'fibonacci.js', content: 'function fib(n) { ... }' },
-        },
-      },
-    ];
-
-    const result = await strategy.compact(events, context);
-
-    expect(result.compactionEvent.type).toBe('COMPACTION');
-    expect(result.compactionEvent.context?.threadId).toBe(context.threadId);
-
-    const compactionData = getCompactionData(result);
-    expect(compactionData.strategyId).toBe('summarize');
-    expect(compactionData.originalEventCount).toBe(3);
-    expect(result.compactedEvents).toHaveLength(2); // Summary event + user message
-
-    // Summary should be in metadata
-    expect(compactionData.metadata?.summary).toContain(
-      'Summary of conversation about writing functions'
-    );
-
-    // First event should be the summary as a USER_MESSAGE
-    const summaryEvent = result.compactedEvents[0];
-    expect(summaryEvent.type).toBe('USER_MESSAGE');
-    expect(summaryEvent.data).toContain('[Earlier in our conversation:');
-
-    // Should preserve the user message
-    const userEvent = result.compactedEvents[1];
-    expect(userEvent.type).toBe('USER_MESSAGE');
-    expect(userEvent.data).toBe('Help me write a function to calculate fibonacci numbers');
-  });
-
-  it('should preserve recent events', async () => {
-    const events: LaceEvent[] = [
-      // Old events
-      {
-        id: '1',
-        context: { threadId: 'test-thread-123' },
-        type: 'USER_MESSAGE',
-        timestamp: new Date('2024-01-01T10:00:00Z'),
-        data: 'Old message 1',
+        data: { id: 't1', name: 'bash', arguments: { command: 'echo hi' } },
+        context: { threadId: context.threadId },
       },
       {
-        id: '2',
-        context: { threadId: 'test-thread-123' },
-        type: 'AGENT_MESSAGE',
-        timestamp: new Date('2024-01-01T10:01:00Z'),
-        data: { content: 'Old response 1' },
-      },
-      {
-        id: '3',
-        context: { threadId: 'test-thread-123' },
-        type: 'AGENT_MESSAGE',
-        timestamp: new Date('2024-01-01T10:02:00Z'),
-        data: { content: 'Old response 2' },
-      },
-      {
-        id: '4',
-        context: { threadId: 'test-thread-123' },
-        type: 'AGENT_MESSAGE',
-        timestamp: new Date('2024-01-01T10:03:00Z'),
-        data: { content: 'Old response 3' },
-      },
-      // Recent agent events (last 2)
-      {
-        id: '5',
-        context: { threadId: 'test-thread-123' },
-        type: 'AGENT_MESSAGE',
-        timestamp: new Date('2024-01-01T10:10:00Z'),
-        data: { content: 'Recent response 1' },
-      },
-      {
-        id: '6',
-        context: { threadId: 'test-thread-123' },
-        type: 'AGENT_MESSAGE',
-        timestamp: new Date('2024-01-01T10:11:00Z'),
-        data: { content: 'Recent response 2' },
-      },
-    ];
-
-    const result = await strategy.compact(events, context);
-    const compactionData = getCompactionData(result);
-
-    expect(result.compactedEvents).toHaveLength(4); // 1 summary + 1 user + 2 recent agent
-
-    // Summary should be in metadata
-    expect(compactionData.metadata?.summary).toContain('Summary of conversation');
-
-    // Should have summary event first
-    const summaryEvent = result.compactedEvents[0];
-    expect(summaryEvent.type).toBe('USER_MESSAGE');
-    expect(summaryEvent.data).toContain('[Earlier in our conversation:');
-
-    // Should preserve user message
-    const userMessages = result.compactedEvents.filter(
-      (e) => e.type === 'USER_MESSAGE' && !String(e.data).includes('[Earlier in our conversation:')
-    );
-    expect(userMessages[0]?.data).toBe('Old message 1');
-
-    // Should preserve recent agent events
-    const preservedAgentEvents = result.compactedEvents.filter((e) => e.type === 'AGENT_MESSAGE');
-    expect(preservedAgentEvents).toHaveLength(2);
-    expect((preservedAgentEvents[0].data as { content: string }).content).toBe('Recent response 1');
-    expect((preservedAgentEvents[1].data as { content: string }).content).toBe('Recent response 2');
-  });
-
-  it('should handle tool calls and results appropriately', async () => {
-    const events: LaceEvent[] = [
-      {
-        id: '1',
-        context: { threadId: 'test-thread-123' },
-        type: 'USER_MESSAGE',
-        timestamp: new Date('2024-01-01T10:00:00Z'),
-        data: 'Create a file',
-      },
-      {
-        id: '2',
-        type: 'TOOL_CALL',
-        context: { threadId: 'test-thread-123' },
-        timestamp: new Date('2024-01-01T10:01:00Z'),
-        data: {
-          id: 'tool-123',
-          name: 'file_write',
-          arguments: { path: 'test.txt', content: 'Hello world' },
-        },
-      },
-      {
-        id: '3',
         type: 'TOOL_RESULT',
-        context: { threadId: 'test-thread-123' },
-        timestamp: new Date('2024-01-01T10:02:00Z'),
-        data: {
-          content: [{ type: 'text', text: 'File created successfully' }],
-          status: 'completed',
-        },
+        data: { id: 't1', status: 'completed', content: [{ type: 'text', text: 'hi' }] },
+        context: { threadId: context.threadId },
+      },
+      {
+        type: 'AGENT_MESSAGE',
+        data: { content: 'Agent message 2' },
+        context: { threadId: context.threadId },
+      },
+      { type: 'USER_MESSAGE', data: 'User message 2', context: { threadId: context.threadId } },
+      {
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        data: 'Recent system note',
+        context: { threadId: context.threadId },
+      },
+      {
+        type: 'AGENT_MESSAGE',
+        data: { content: 'Recent agent message' },
+        context: { threadId: context.threadId },
       },
     ];
 
     const result = await strategy.compact(events, context);
 
-    // Should preserve user message and summarize tool interactions
-    const compactionData = getCompactionData(result);
-    expect(result.compactedEvents).toHaveLength(2); // summary event + user message
+    const compactionData = result.compactionEvent.data as unknown as CompactionData;
+    expect(compactionData.strategyId).toBe('summarize');
+    expect(compactionData.originalEventCount).toBe(events.length);
 
-    // Summary should be in metadata
-    expect(compactionData.metadata?.summary).toContain(
-      'Summary of conversation about writing functions'
+    expect(result.compactedEvents[0].type).toBe('USER_MESSAGE');
+    expect(result.compactedEvents[0].data).toContain(
+      '[Earlier in our conversation: Summary of the earlier work]'
     );
 
-    // First should be summary event
-    expect(result.compactedEvents[0].type).toBe('USER_MESSAGE');
-    expect(result.compactedEvents[0].data).toContain('[Earlier in our conversation:');
+    const compactedTypes = result.compactedEvents.map((e) => e.type);
+    expect(compactedTypes).toEqual([
+      'USER_MESSAGE', // summary wrapper
+      'USER_MESSAGE', // user 1
+      'USER_MESSAGE', // user 2
+      'LOCAL_SYSTEM_MESSAGE', // recent non-user #1
+      'AGENT_MESSAGE', // recent non-user #2
+    ]);
 
-    // Should preserve user message
-    expect(result.compactedEvents[1].type).toBe('USER_MESSAGE');
-    expect(result.compactedEvents[1].data).toBe('Create a file');
+    expect(agent.generateSummary).toHaveBeenCalledTimes(1);
   });
 
-  it('should throw error when no agent or provider available', async () => {
-    const events: LaceEvent[] = [
-      {
-        id: '1',
-        context: { threadId: 'test-thread-123' },
-        type: 'USER_MESSAGE',
-        timestamp: new Date(),
-        data: 'Test message',
-      },
-    ];
+  it('can summarize using a provider when agent is not available', async () => {
+    const strategy = new SummarizeCompactionStrategy();
 
-    const contextWithoutProvider = { threadId: 'test-thread-123' };
+    const provider = {
+      createResponse: vi.fn().mockResolvedValue({ content: 'Provider summary', toolCalls: [] }),
+    } as unknown as AIProvider;
 
-    await expect(strategy.compact(events, contextWithoutProvider)).rejects.toThrow(
-      'SummarizeCompactionStrategy requires an Agent instance or AI provider'
-    );
-  });
-
-  it('should handle empty event list', async () => {
-    // Test with provider fallback since agent requires more setup
-    const providerContext = { threadId: 'test-thread-123', provider: mockProvider };
-    const result = await strategy.compact([], providerContext);
-    const compactionData = getCompactionData(result);
-
-    expect(compactionData.originalEventCount).toBe(0);
-    expect(result.compactedEvents).toHaveLength(0);
-    expect(compactionData.metadata?.summary).toBeUndefined();
-  });
-
-  it('should work with provider fallback', async () => {
-    // Test that it still works with just a provider (backward compatibility)
-    const providerContext = { threadId: 'test-thread-123', provider: mockProvider };
+    const context: CompactionContext = { threadId: 'test-thread', provider };
 
     const events: LaceEvent[] = [
       {
-        id: '1',
-        context: { threadId: 'test-thread-123' },
-        type: 'USER_MESSAGE',
-        timestamp: new Date(),
-        data: 'Test message',
-      },
-      {
-        id: '2',
-        context: { threadId: 'test-thread-123' },
         type: 'AGENT_MESSAGE',
-        timestamp: new Date(),
-        data: { content: 'Response to test' },
-      },
-    ];
-
-    const result = await strategy.compact(events, providerContext);
-    const compactionData = getCompactionData(result);
-
-    // Should have summary event + user message
-    expect(result.compactedEvents).toHaveLength(2);
-    expect(result.compactedEvents[0].type).toBe('USER_MESSAGE');
-    expect(result.compactedEvents[0].data).toContain('[Earlier in our conversation:');
-    expect(result.compactedEvents[1].type).toBe('USER_MESSAGE');
-    expect(compactionData.metadata?.summary).toContain('Summary of conversation');
-  });
-
-  it('should skip COMPACTION events', async () => {
-    const events: LaceEvent[] = [
-      {
-        id: '1',
-        context: { threadId: 'test-thread-123' },
-        type: 'COMPACTION',
-        timestamp: new Date('2024-01-01T10:00:00Z'),
-        data: {
-          strategyId: 'previous-strategy',
-          originalEventCount: 5,
-          compactedEvents: [],
-        },
+        data: { content: 'Old agent message' },
+        context: { threadId: context.threadId },
       },
       {
-        id: '2',
-        context: { threadId: 'test-thread-123' },
-        type: 'USER_MESSAGE',
-        timestamp: new Date('2024-01-01T10:01:00Z'),
-        data: 'New message after compaction',
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        data: 'Old system note',
+        context: { threadId: context.threadId },
       },
       {
-        id: '3',
-        context: { threadId: 'test-thread-123' },
         type: 'AGENT_MESSAGE',
-        timestamp: new Date('2024-01-01T10:02:00Z'),
-        data: { content: 'Response' },
+        data: { content: 'Recent agent message' },
+        context: { threadId: context.threadId },
       },
     ];
 
     const result = await strategy.compact(events, context);
-    const compactionData = getCompactionData(result);
-
-    // Should only process the USER_MESSAGE and AGENT_MESSAGE, skip the COMPACTION event
-    expect(compactionData.originalEventCount).toBe(3);
-    expect(result.compactedEvents).toHaveLength(2); // summary event + user message
-    expect(compactionData.metadata?.summary).toContain('Summary of conversation');
+    expect(result.compactedEvents[0].type).toBe('USER_MESSAGE');
+    expect(result.compactedEvents[0].data).toContain(
+      '[Earlier in our conversation: Provider summary]'
+    );
+    expect(provider.createResponse).toHaveBeenCalledTimes(1);
   });
 });

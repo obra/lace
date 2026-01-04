@@ -1,7 +1,5 @@
 // ABOUTME: Token management module exports
-// ABOUTME: Provides token counting, budgeting, and context analysis utilities
-
-export { ContextAnalyzer } from './context-analyzer';
+// ABOUTME: Provides token counting and context breakdown types
 export type {
   ContextBreakdown,
   CategoryDetail,

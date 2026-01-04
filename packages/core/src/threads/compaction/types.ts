@@ -4,7 +4,10 @@
 import type { LaceEvent } from '@lace/core/threads/types';
 import type { AIProvider } from '@lace/core/providers/base-provider';
 import type { ToolExecutor } from '@lace/core/tools/executor';
-import type { Agent } from '@lace/core/agents/agent';
+
+export interface CompactionAgent {
+  generateSummary(summaryRequest: string, events: LaceEvent[]): Promise<string>;
+}
 
 /**
  * Data structure stored in COMPACTION events
@@ -66,7 +69,7 @@ export interface CompactionContext {
   /** Optional AI provider for strategies that need AI assistance (deprecated - use agent instead) */
   provider?: AIProvider;
   /** Optional Agent instance for in-conversation summarization */
-  agent?: Agent;
+  agent?: CompactionAgent;
   /** Optional tool executor for strategies that need to use tools */
   toolExecutor?: ToolExecutor;
 }

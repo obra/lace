@@ -3,25 +3,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HelperRegistry } from './helper-registry';
 import { InfrastructureHelper } from './infrastructure-helper';
-import { SessionHelper } from './session-helper';
-import type { Agent } from '@lace/core/agents/agent';
 
 // Mock modules
 vi.mock('./infrastructure-helper', () => ({
   InfrastructureHelper: vi.fn(),
 }));
-vi.mock('./session-helper', () => ({
-  SessionHelper: vi.fn(),
-}));
 
 describe('HelperRegistry', () => {
   let registry: HelperRegistry;
-  let mockAgent: Agent;
 
   beforeEach(() => {
     registry = new HelperRegistry();
-    const agentPartial: Partial<Agent> = {};
-    mockAgent = agentPartial as Agent;
     vi.clearAllMocks();
   });
 
@@ -53,34 +45,6 @@ describe('HelperRegistry', () => {
     });
   });
 
-  describe('createSessionHelper', () => {
-    it('should create session helper and track it', () => {
-      const options = {
-        model: 'fast' as const,
-        parentAgent: mockAgent,
-      };
-
-      const helper = registry.createSessionHelper('session-1', options);
-
-      expect(vi.mocked(SessionHelper)).toHaveBeenCalledWith(options);
-      expect(registry.getHelper('session-1')).toBe(helper);
-      expect(registry.getActiveHelperIds()).toContain('session-1');
-    });
-
-    it('should throw if id already exists', () => {
-      const options = {
-        model: 'fast' as const,
-        parentAgent: mockAgent,
-      };
-
-      registry.createSessionHelper('session-1', options);
-
-      expect(() => {
-        registry.createSessionHelper('session-1', options);
-      }).toThrow('Helper with id "session-1" already exists');
-    });
-  });
-
   describe('helper management', () => {
     it('should remove helper when requested', () => {
       const helper = registry.createInfrastructureHelper('test-id', {
@@ -102,25 +66,22 @@ describe('HelperRegistry', () => {
 
     it('should list all active helper ids', () => {
       registry.createInfrastructureHelper('infra-1', { model: 'fast', tools: [] });
-      registry.createSessionHelper('session-1', { model: 'smart', parentAgent: mockAgent });
       registry.createInfrastructureHelper('infra-2', { model: 'smart', tools: ['tool1'] });
 
       const ids = registry.getActiveHelperIds();
-      expect(ids).toEqual(['infra-1', 'session-1', 'infra-2']);
-      expect(ids).toHaveLength(3);
+      expect(ids).toEqual(['infra-1', 'infra-2']);
+      expect(ids).toHaveLength(2);
     });
 
     it('should clear all helpers', () => {
       registry.createInfrastructureHelper('infra-1', { model: 'fast', tools: [] });
-      registry.createSessionHelper('session-1', { model: 'smart', parentAgent: mockAgent });
 
-      expect(registry.getActiveHelperIds()).toHaveLength(2);
+      expect(registry.getActiveHelperIds()).toHaveLength(1);
 
       registry.clearAll();
 
       expect(registry.getActiveHelperIds()).toHaveLength(0);
       expect(registry.getHelper('infra-1')).toBeUndefined();
-      expect(registry.getHelper('session-1')).toBeUndefined();
     });
 
     it('should count active helpers', () => {
@@ -129,11 +90,8 @@ describe('HelperRegistry', () => {
       registry.createInfrastructureHelper('infra-1', { model: 'fast', tools: [] });
       expect(registry.getActiveHelperCount()).toBe(1);
 
-      registry.createSessionHelper('session-1', { model: 'smart', parentAgent: mockAgent });
-      expect(registry.getActiveHelperCount()).toBe(2);
-
       registry.removeHelper('infra-1');
-      expect(registry.getActiveHelperCount()).toBe(1);
+      expect(registry.getActiveHelperCount()).toBe(0);
 
       registry.clearAll();
       expect(registry.getActiveHelperCount()).toBe(0);
@@ -146,26 +104,17 @@ describe('HelperRegistry', () => {
         model: 'fast',
         tools: [],
       });
-      const _sessionHelper = registry.createSessionHelper('session-1', {
-        model: 'smart',
-        parentAgent: mockAgent,
-      });
 
       expect(registry.getHelperType('infra-1')).toBe('infrastructure');
-      expect(registry.getHelperType('session-1')).toBe('session');
       expect(registry.getHelperType('non-existent')).toBeUndefined();
     });
 
     it('should filter helpers by type', () => {
       registry.createInfrastructureHelper('infra-1', { model: 'fast', tools: [] });
       registry.createInfrastructureHelper('infra-2', { model: 'smart', tools: [] });
-      registry.createSessionHelper('session-1', { model: 'fast', parentAgent: mockAgent });
 
       const infraIds = registry.getHelperIdsByType('infrastructure');
       expect(infraIds).toEqual(['infra-1', 'infra-2']);
-
-      const sessionIds = registry.getHelperIdsByType('session');
-      expect(sessionIds).toEqual(['session-1']);
     });
   });
 });

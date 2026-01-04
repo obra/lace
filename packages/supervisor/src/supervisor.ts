@@ -236,6 +236,18 @@ export class Supervisor {
     this.store.update(workspaceSessionId, updates);
   }
 
+  async deleteWorkspaceSession(workspaceSessionId: string): Promise<boolean> {
+    const inMemory = this.sessions.get(workspaceSessionId);
+    if (inMemory) {
+      const agents = Array.from(inMemory.agentsBySessionId.values());
+      await Promise.allSettled(agents.map((a) => a.shutdown()));
+      this.sessions.delete(workspaceSessionId);
+    }
+
+    const existedInStore = this.store.delete(workspaceSessionId);
+    return Boolean(inMemory) || existedInStore;
+  }
+
   upsertAgentSessionMeta(
     workspaceSessionId: string,
     params: {
