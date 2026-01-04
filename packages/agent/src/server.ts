@@ -23,7 +23,7 @@ import {
   type LoadedSession,
   type SessionState,
 } from './storage/session-store';
-import { appendDurableEvent, readDurableEvents } from './storage/event-log';
+import { appendDurableEvent, readDurableEvents, summarizeDurableEvents } from './storage/event-log';
 import type { PermissionRequest, SessionUpdate, ToolInfo, ToolResult } from './protocol/types';
 import { shellExecTool, runShellExec } from './tools/shell-exec';
 import { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
@@ -1703,10 +1703,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const loaded = loadSession(parsed.sessionId);
     state.activeSession = loaded;
+    const summary = summarizeDurableEvents(loaded.dir);
     return {
       sessionId: parsed.sessionId,
-      messageCount: 0,
-      lastActive: loaded.meta.created,
+      messageCount: summary.messageCount,
+      lastActive: summary.lastActive ?? loaded.meta.created,
     };
   });
 

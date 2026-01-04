@@ -11,6 +11,41 @@ export type DurableEvent = {
   data: Record<string, unknown>;
 };
 
+export function summarizeDurableEvents(sessionDir: string): {
+  messageCount: number;
+  lastActive?: string;
+} {
+  const eventsPath = path.join(sessionDir, 'events.jsonl');
+
+  let raw = '';
+  try {
+    raw = fs.readFileSync(eventsPath, 'utf8');
+  } catch {
+    return { messageCount: 0, lastActive: undefined };
+  }
+
+  let messageCount = 0;
+  let lastActive: string | undefined;
+
+  const lines = raw.split('\n');
+  for (const line of lines) {
+    if (!line) continue;
+    try {
+      const parsed = JSON.parse(line) as Partial<DurableEvent>;
+      if (parsed.type === 'prompt' || parsed.type === 'message') {
+        messageCount++;
+      }
+      if (typeof parsed.timestamp === 'string' && parsed.timestamp.length > 0) {
+        if (!lastActive || parsed.timestamp > lastActive) lastActive = parsed.timestamp;
+      }
+    } catch {
+      // Ignore malformed line (e.g. partial write)
+    }
+  }
+
+  return { messageCount, lastActive };
+}
+
 export function appendDurableEvent(
   sessionDir: string,
   state: SessionState,

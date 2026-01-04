@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -83,5 +83,47 @@ describe('storage/session-store', () => {
     const loaded = loadSession('sess_test');
     expect(loaded.meta.sessionId).toBe('sess_test');
     expect(loaded.meta.workDir).toBe('/tmp');
+  });
+
+  it('derives lastActive and messageCount from durable events', () => {
+    const sessionDir = getSessionDir('sess_test');
+    writeSessionMeta(sessionDir, {
+      sessionId: 'sess_test',
+      workDir: '/tmp',
+      created: '2026-01-04T00:00:00Z',
+    });
+    ensureSessionFiles(sessionDir);
+
+    const eventsPath = join(sessionDir, 'events.jsonl');
+    const lines = [
+      {
+        eventSeq: 1,
+        timestamp: '2026-01-04T00:00:01Z',
+        type: 'prompt',
+        data: { content: [{ type: 'text', text: 'hi' }] },
+      },
+      {
+        eventSeq: 2,
+        timestamp: '2026-01-04T00:00:02Z',
+        type: 'message',
+        data: { content: 'hello' },
+      },
+      {
+        eventSeq: 3,
+        timestamp: '2026-01-04T00:00:03Z',
+        type: 'turn_end',
+        data: { stopReason: 'end_turn' },
+      },
+    ];
+    writeFileSync(eventsPath, `${lines.map((l) => JSON.stringify(l)).join('\n')}\n`, 'utf8');
+
+    const sessions = listSessions('/tmp');
+    expect(sessions).toMatchObject([
+      {
+        sessionId: 'sess_test',
+        messageCount: 2,
+        lastActive: '2026-01-04T00:00:03Z',
+      },
+    ]);
   });
 });

@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ensureLaceDir } from '../config/lace-dir';
 import { asSessionId } from '@lace/ent-protocol';
+import { summarizeDurableEvents } from './event-log';
 
 export type SessionMeta = {
   sessionId: string;
@@ -122,11 +123,12 @@ export function listSessions(workDir?: string): Array<{
       try {
         const sessionDir = path.join(sessionsDir, sessionId);
         const meta = readSessionMeta(sessionDir);
+        const summary = summarizeDurableEvents(sessionDir);
         return {
           sessionId: meta.sessionId,
           created: meta.created,
-          lastActive: meta.created,
-          messageCount: 0,
+          lastActive: summary.lastActive ?? meta.created,
+          messageCount: summary.messageCount,
           workDir: meta.workDir,
         };
       } catch {
