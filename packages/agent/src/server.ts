@@ -57,6 +57,8 @@ import type {
 } from '@lace/core/tools/types';
 import type { LaceEvent } from '@lace/core/threads/types';
 import { SummarizeCompactionStrategy } from '@lace/core/threads/compaction/summarize-strategy';
+import { TrimToolResultsStrategy } from '@lace/core/threads/compaction/trim-tool-results-strategy';
+import type { CompactionStrategy } from '@lace/core/threads/compaction/types';
 import { TestAgentProvider } from './runtime/test-provider';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
@@ -524,25 +526,97 @@ function laceEventsFromProviderMessages(
   return events;
 }
 
-async function summarizeDroppedMessagesWithCore(options: {
-  dropped: ProviderMessage[];
-  provider: AIProvider;
-  modelId: string;
-  threadId: string;
-}): Promise<string> {
-  if (options.dropped.length === 0) return '';
+function providerMessagesFromLaceEvents(events: LaceEvent[]): ProviderMessage[] {
+  const messages: ProviderMessage[] = [];
 
-  const pinnedProvider = new ModelPinnedProvider(options.provider, options.modelId);
-  const strategy = new SummarizeCompactionStrategy();
+  for (const event of events) {
+    if (!event || typeof event !== 'object') continue;
+
+    if (event.type === 'SYSTEM_PROMPT' || event.type === 'USER_SYSTEM_PROMPT') {
+      const content = typeof event.data === 'string' ? event.data : '';
+      if (content.trim()) messages.push({ role: 'system', content });
+      continue;
+    }
+
+    if (event.type === 'USER_MESSAGE') {
+      const content = typeof event.data === 'string' ? event.data : '';
+      if (content.trim()) messages.push({ role: 'user', content });
+      continue;
+    }
+
+    if (event.type === 'AGENT_MESSAGE') {
+      const data = event.data as any;
+      const content =
+        typeof data === 'string' ? data : typeof data?.content === 'string' ? data.content : '';
+      messages.push({ role: 'assistant', content });
+      continue;
+    }
+
+    if (event.type === 'TOOL_CALL') {
+      const toolCall = event.data as any;
+      if (!toolCall || typeof toolCall !== 'object') continue;
+
+      if (messages.length === 0 || messages[messages.length - 1]!.role !== 'assistant') {
+        messages.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
+      } else {
+        const last = messages[messages.length - 1]!;
+        last.toolCalls = [...(last.toolCalls || []), toolCall];
+      }
+
+      continue;
+    }
+
+    if (event.type === 'TOOL_RESULT') {
+      const toolResult = event.data as any;
+      if (!toolResult || typeof toolResult !== 'object') continue;
+
+      const last = messages[messages.length - 1];
+      const canAppendToUser =
+        last && last.role === 'user' && last.toolResults && last.toolResults.length > 0;
+      if (canAppendToUser) {
+        last.toolResults!.push(toolResult);
+      } else {
+        messages.push({ role: 'user', content: '', toolResults: [toolResult] });
+      }
+
+      continue;
+    }
+  }
+
+  return messages;
+}
+
+async function compactDroppedMessagesWithCore(options: {
+  strategyId: 'trim-tool-results' | 'summarize';
+  dropped: ProviderMessage[];
+  provider?: AIProvider;
+  modelId?: string;
+  threadId: string;
+}): Promise<{ messages: ProviderMessage[]; summary?: string }> {
+  if (options.dropped.length === 0) return { messages: [] };
+
   const events = laceEventsFromProviderMessages(options.dropped, options.threadId);
 
-  const result = await strategy.compact(events, {
-    threadId: options.threadId,
-    provider: pinnedProvider,
-  });
+  let strategy: CompactionStrategy;
+  let context: any = { threadId: options.threadId };
+  if (options.strategyId === 'trim-tool-results') {
+    strategy = new TrimToolResultsStrategy();
+  } else {
+    strategy = new SummarizeCompactionStrategy();
+    if (!options.provider || !options.modelId) {
+      throw new Error('summarize compaction requires provider + modelId');
+    }
+    context = {
+      threadId: options.threadId,
+      provider: new ModelPinnedProvider(options.provider, options.modelId),
+    };
+  }
 
+  const result = await strategy.compact(events, context);
+  const messages = providerMessagesFromLaceEvents(result.compactedEvents);
   const meta = (result.compactionEvent.data as any)?.metadata;
-  return typeof meta?.summary === 'string' ? meta.summary : '';
+  const summary = typeof meta?.summary === 'string' ? meta.summary : undefined;
+  return { messages, summary };
 }
 
 export type AgentServerState = {
@@ -2020,52 +2094,74 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       const beforeMessages = buildProviderMessagesFromDurableEvents(state.activeSession!.dir);
       const previousTokens = estimateProviderTokens(beforeMessages);
 
-      if (targetTokens !== undefined) {
-        let currentTokens = estimateProviderTokens(
-          preserveRecent > 0 ? beforeMessages.slice(-preserveRecent) : []
-        );
+      const sessionStateForConfig = readSessionState(state.activeSession!.dir);
+      const effectiveConfig = sessionStateForConfig.config
+        ? { ...state.config, ...sessionStateForConfig.config }
+        : state.config;
 
-        while (currentTokens > targetTokens && preserveRecent > 0) {
+      if (targetTokens !== undefined) {
+        while (
+          preserveRecent > 0 &&
+          estimateProviderTokens(beforeMessages.slice(-preserveRecent)) > targetTokens
+        ) {
           preserveRecent -= 1;
-          currentTokens = estimateProviderTokens(
-            preserveRecent > 0 ? beforeMessages.slice(-preserveRecent) : []
-          );
         }
       }
 
-      const preserved = preserveRecent > 0 ? beforeMessages.slice(-preserveRecent) : [];
-      const dropped = beforeMessages.slice(0, beforeMessages.length - preserved.length);
+      const preservedRecentMessages =
+        preserveRecent > 0 ? beforeMessages.slice(-preserveRecent) : [];
+      const dropped = beforeMessages.slice(
+        0,
+        beforeMessages.length - preservedRecentMessages.length
+      );
+
+      let compactedDroppedMessages: ProviderMessage[] = [];
+      let summary: string | undefined;
+
+      if (dropped.length > 0) {
+        if (strategy === 'truncate') {
+          const result = await compactDroppedMessagesWithCore({
+            strategyId: 'trim-tool-results',
+            dropped,
+            threadId: state.activeSession!.meta.sessionId,
+          });
+          compactedDroppedMessages = result.messages;
+        } else {
+          const provider = await createProviderForTurn({
+            connectionId: effectiveConfig.connectionId,
+            modelId: effectiveConfig.modelId,
+          });
+
+          const result = await compactDroppedMessagesWithCore({
+            strategyId: 'summarize',
+            dropped,
+            provider,
+            modelId: effectiveConfig.modelId || 'unknown-model',
+            threadId: state.activeSession!.meta.sessionId,
+          });
+          compactedDroppedMessages = result.messages;
+          summary = result.summary;
+        }
+      }
+
+      const nextProviderMessages: ProviderMessage[] = [
+        ...compactedDroppedMessages,
+        ...preservedRecentMessages,
+      ];
+
+      let removedForBudget = 0;
+      let currentTokens = estimateProviderTokens(nextProviderMessages);
+      if (targetTokens !== undefined) {
+        while (nextProviderMessages.length > 0 && currentTokens > targetTokens) {
+          nextProviderMessages.shift();
+          removedForBudget += 1;
+          currentTokens = estimateProviderTokens(nextProviderMessages);
+        }
+      }
 
       const messagesCompacted = dropped.length;
 
-      let summaryText = '';
-      if ((strategy === 'summarize' || strategy === 'selective') && dropped.length > 0) {
-        const sessionState = readSessionState(state.activeSession!.dir);
-        const effectiveConfig = sessionState.config
-          ? { ...state.config, ...sessionState.config }
-          : state.config;
-
-        const provider = await createProviderForTurn({
-          connectionId: effectiveConfig.connectionId,
-          modelId: effectiveConfig.modelId,
-        });
-
-        summaryText = await summarizeDroppedMessagesWithCore({
-          dropped,
-          provider,
-          modelId: effectiveConfig.modelId || 'unknown-model',
-          threadId: state.activeSession!.meta.sessionId,
-        });
-      }
-
-      const currentTokens = estimateProviderTokens([
-        ...(summaryText.trim().length > 0
-          ? [{ role: 'system', content: summaryText } as const]
-          : []),
-        ...preserved,
-      ]);
-
-      const serializedPreserved = preserved.map((m) => ({
+      const serializedPreserved = nextProviderMessages.map((m) => ({
         role: m.role,
         content: typeof m.content === 'string' ? m.content : '',
         ...(Array.isArray((m as any).toolCalls) ? { toolCalls: (m as any).toolCalls } : {}),
@@ -2080,7 +2176,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           ...(targetTokens !== undefined ? { targetTokens } : {}),
           preserveRecent,
           messagesCompacted,
-          ...(summaryText.trim().length > 0 ? { summary: summaryText } : {}),
           preserved: serializedPreserved,
         },
       });
@@ -2092,8 +2187,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         previousTokens,
         currentTokens,
         messagesCompacted,
-        ...(strategy === 'summarize' && summaryText.trim().length > 0
-          ? { summary: summaryText }
+        ...(strategy === 'summarize' && typeof summary === 'string' && summary.trim().length > 0
+          ? { summary }
           : {}),
       };
     });

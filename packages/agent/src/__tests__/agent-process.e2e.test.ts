@@ -627,7 +627,7 @@ describe('lace-agent process (E2E over stdio)', () => {
   );
 
   it(
-    'supports ent/session/compact and drops prior tool results from provider context',
+    'supports ent/session/compact truncate and trims tool results in provider context',
     { timeout: 15_000 },
     async () => {
       agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
@@ -639,7 +639,11 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
       await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
 
-      writeFileSync(join(workDir, 'hello.txt'), 'hello from disk\n', 'utf8');
+      writeFileSync(
+        join(workDir, 'hello.txt'),
+        ['line1', 'line2', 'line3', 'line4', 'line5', ''].join('\n'),
+        'utf8'
+      );
 
       await withTimeout(
         agent.peer.request('session/prompt', {
@@ -667,7 +671,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       const assistantText = after.content
         .map((b) => (b.type === 'text' ? (b.text ?? '') : ''))
         .join('\n');
-      expect(assistantText).toContain('No tool result found.');
+      expect(assistantText).toContain('[results truncated to save space.]');
     }
   );
 
