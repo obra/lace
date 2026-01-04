@@ -1278,6 +1278,7 @@ const SessionRequestPermissionParamsSchema = z
     sessionId: SessionIdSchema,
     turnId: NonEmptyStringSchema,
     turnSeq: z.number(),
+    requestedAt: IsoTimestampSchema,
     jobId: NonEmptyStringSchema.optional(),
     toolCallId: NonEmptyStringSchema,
     tool: NonEmptyStringSchema,

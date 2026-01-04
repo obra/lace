@@ -14,7 +14,8 @@ export const SessionIdSchema = z
   })
   .refine((value) => !value.endsWith('.'), {
     message: 'sessionId must not end with "."',
-  });
+  })
+  .transform((value) => value as SessionId);
 
 export function isSessionId(value: string): value is SessionId {
   return SessionIdSchema.safeParse(value).success;
