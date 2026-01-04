@@ -216,3 +216,19 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
   - Allowlist is snapshotted/restored when switching sessions in the same run.
 - Tests:
   - `cd packages/tui && cargo test` (see `permission_allowlist_auto_decides_when_matching` and `permission_cancel_picks_deny_if_present`)
+
+### 2026-01-04 — Copy/export + multiline input
+
+- Copy actions:
+  - Copy selected Activity (`y` when Activity focused; also via palette)
+  - Copy last assistant message (palette)
+  - Copy tool input / tool result JSON (palette; based on selected Activity item details)
+  - Clipboard support uses a best-effort command (`pbcopy` / `wl-copy` / `xclip` / `xsel`), with env override `LACE_TUI_CLIPBOARD_CMD`; otherwise falls back to Debug output.
+- Export:
+  - Export transcript (Markdown) to the current `workdir` (palette).
+- Input editor:
+  - Multiline toggle: `Ctrl+E` or palette “Toggle Multiline Input”
+  - In multiline mode: `Enter` inserts newline, `Ctrl+Enter` sends
+  - `PgUp/PgDn` scrolls the focused pane, including multiline input.
+- Tests:
+  - `cd packages/tui && cargo test` (see `app::transcript::*`, `app::clipboard::*`, `multiline_enter_inserts_newline_and_ctrl_enter_sends`)

@@ -42,6 +42,15 @@ pub enum UiAction {
   JumpLastError,
   JumpLastToolUse,
   JumpLastTurnEnd,
+
+  ToggleMultilineInput,
+  SendInput,
+
+  CopySelectedActivity,
+  CopyLastAssistantMessage,
+  CopyToolInput,
+  CopyToolResult,
+  ExportTranscript,
   ToggleChat,
   ToggleActivity,
   ToggleDebug,
@@ -248,33 +257,78 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
 	      crate::app::search::jump_last_turn_end(state);
 	      Vec::new()
 	    }
+	    UiAction::ToggleMultilineInput => {
+	      state.input_multiline = !state.input_multiline;
+	      state.input_scroll = 0;
+	      Vec::new()
+	    }
+	    UiAction::SendInput => send_input(state),
+	    UiAction::CopySelectedActivity => {
+	      let Some(item) = state.activity.get(state.activity_selected) else {
+	        return Vec::new();
+	      };
+	      let mut text = String::new();
+	      text.push_str(&item.summary);
+	      if let Some(details) = &item.details {
+	        text.push_str("\n\n");
+	        text.push_str(
+	          &serde_json::to_string_pretty(details).unwrap_or_else(|_| details.to_string()),
+	        );
+	      }
+	      copy_text_or_fallback(state, "activity", &text);
+	      Vec::new()
+	    }
+	    UiAction::CopyLastAssistantMessage => {
+	      let Some(msg) = state.messages.iter().rev().find(|m| m.role == Role::Assistant) else {
+	        return Vec::new();
+	      };
+	      let text = msg.text.clone();
+	      copy_text_or_fallback(state, "last assistant message", &text);
+	      Vec::new()
+	    }
+	    UiAction::CopyToolInput => {
+	      let Some(item) = state.activity.get(state.activity_selected) else {
+	        return Vec::new();
+	      };
+	      let Some(details) = &item.details else {
+	        return Vec::new();
+	      };
+	      let Some(input) = details.get("input") else {
+	        return Vec::new();
+	      };
+	      let text = serde_json::to_string_pretty(input).unwrap_or_else(|_| input.to_string());
+	      copy_text_or_fallback(state, "tool input", &text);
+	      Vec::new()
+	    }
+	    UiAction::CopyToolResult => {
+	      let Some(item) = state.activity.get(state.activity_selected) else {
+	        return Vec::new();
+	      };
+	      let Some(details) = &item.details else {
+	        return Vec::new();
+	      };
+	      let Some(res) = details.get("result") else {
+	        return Vec::new();
+	      };
+	      let text = serde_json::to_string_pretty(res).unwrap_or_else(|_| res.to_string());
+	      copy_text_or_fallback(state, "tool result", &text);
+	      Vec::new()
+	    }
+	    UiAction::ExportTranscript => {
+	      match crate::app::transcript::export_to_workdir(state) {
+	        Ok(path) => state.push_debug_line(format!("exported transcript: {}", path.to_string_lossy())),
+	        Err(err) => state.push_debug_line(format!("export transcript failed: {err}")),
+	      }
+	      Vec::new()
+	    }
 	    UiAction::Enter => {
-	      let line = state.input_buffer.trim_end().to_string();
-	      state.input_buffer.clear();
-	      state.input_history_index = None;
-
-      if line.is_empty() {
-        return Vec::new();
-      }
-
-      state.input_history.push(line.clone());
-      state.messages.push(ChatMessage {
-        role: Role::User,
-        text: line.clone(),
-        streaming: false,
-        turn_id: None,
-        turn_seq: None,
-      });
-
-      let id = state.next_client_id();
-      state.active_prompt_request_ids.insert(id.clone());
-
-      vec![Outbound::JsonRpcRequest {
-        id,
-        method: "session/prompt".to_string(),
-        params: Some(json!({ "content": [ { "type": "text", "text": line } ] })),
-      }]
-    }
+	      if state.input_multiline {
+	        state.input_buffer.push('\n');
+	        Vec::new()
+	      } else {
+	        send_input(state)
+	      }
+	    }
     UiAction::ToggleChat => {
       state.show_chat = !state.show_chat;
       state.ensure_focus_visible();
@@ -300,7 +354,11 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         Focus::Chat => state.chat_scroll = state.chat_scroll.saturating_sub(1),
         Focus::Activity => state.activity_scroll = state.activity_scroll.saturating_sub(1),
         Focus::Debug => state.debug_scroll = state.debug_scroll.saturating_sub(1),
-        Focus::Input => {}
+        Focus::Input => {
+          if state.input_multiline {
+            state.input_scroll = state.input_scroll.saturating_sub(1);
+          }
+        }
       }
       Vec::new()
     }
@@ -310,7 +368,11 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         Focus::Chat => state.chat_scroll = state.chat_scroll.saturating_add(1),
         Focus::Activity => state.activity_scroll = state.activity_scroll.saturating_add(1),
         Focus::Debug => state.debug_scroll = state.debug_scroll.saturating_add(1),
-        Focus::Input => {}
+        Focus::Input => {
+          if state.input_multiline {
+            state.input_scroll = state.input_scroll.saturating_add(1);
+          }
+        }
       }
       Vec::new()
     }
@@ -399,6 +461,24 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
 	        }
 	        PaletteCommand::Search => {
 	          crate::app::search::open(state);
+	        }
+	        PaletteCommand::ToggleMultilineInput => {
+	          let _ = apply_ui_action(state, UiAction::ToggleMultilineInput);
+	        }
+	        PaletteCommand::CopySelectedActivity => {
+	          let _ = apply_ui_action(state, UiAction::CopySelectedActivity);
+	        }
+	        PaletteCommand::CopyLastAssistantMessage => {
+	          let _ = apply_ui_action(state, UiAction::CopyLastAssistantMessage);
+	        }
+	        PaletteCommand::CopyToolInput => {
+	          let _ = apply_ui_action(state, UiAction::CopyToolInput);
+	        }
+	        PaletteCommand::CopyToolResult => {
+	          let _ = apply_ui_action(state, UiAction::CopyToolResult);
+	        }
+	        PaletteCommand::ExportTranscript => {
+	          let _ = apply_ui_action(state, UiAction::ExportTranscript);
 	        }
 	        PaletteCommand::ToggleChat => {
 	          state.show_chat = !state.show_chat;
@@ -507,12 +587,54 @@ fn should_remember_permission_decision(decision: &str) -> bool {
   d.contains("allow") && d.contains("session")
 }
 
+fn send_input(state: &mut AppState) -> Vec<Outbound> {
+  let line = state.input_buffer.trim_end().to_string();
+  state.input_buffer.clear();
+  state.input_scroll = 0;
+  state.input_history_index = None;
+
+  if line.is_empty() {
+    return Vec::new();
+  }
+
+  state.input_history.push(line.clone());
+  state.messages.push(ChatMessage {
+    role: Role::User,
+    text: line.clone(),
+    streaming: false,
+    turn_id: None,
+    turn_seq: None,
+  });
+
+  let id = state.next_client_id();
+  state.active_prompt_request_ids.insert(id.clone());
+
+  vec![Outbound::JsonRpcRequest {
+    id,
+    method: "session/prompt".to_string(),
+    params: Some(json!({ "content": [ { "type": "text", "text": line } ] })),
+  }]
+}
+
+fn copy_text_or_fallback(state: &mut AppState, label: &str, text: &str) {
+  match crate::app::clipboard::try_copy_to_clipboard(text) {
+    Ok(()) => state.push_debug_line(format!("copied {label} to clipboard")),
+    Err(_) => state.push_debug_line(format!("copy {label}:\n{text}")),
+  }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PaletteCommand {
   NewSession,
   Configure,
   Sessions,
   Search,
+  ToggleMultilineInput,
+  CopySelectedActivity,
+  CopyLastAssistantMessage,
+  CopyToolInput,
+  CopyToolResult,
+  ExportTranscript,
   ToggleChat,
   ToggleActivity,
   ToggleDebug,
@@ -543,6 +665,30 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
 		    PaletteItem {
 		      label: "Search...",
 		      command: PaletteCommand::Search,
+		    },
+		    PaletteItem {
+		      label: "Toggle Multiline Input",
+		      command: PaletteCommand::ToggleMultilineInput,
+		    },
+		    PaletteItem {
+		      label: "Copy Selected Activity",
+		      command: PaletteCommand::CopySelectedActivity,
+		    },
+		    PaletteItem {
+		      label: "Copy Last Assistant Message",
+		      command: PaletteCommand::CopyLastAssistantMessage,
+		    },
+		    PaletteItem {
+		      label: "Copy Tool Input",
+		      command: PaletteCommand::CopyToolInput,
+		    },
+		    PaletteItem {
+		      label: "Copy Tool Result",
+		      command: PaletteCommand::CopyToolResult,
+		    },
+		    PaletteItem {
+		      label: "Export Transcript",
+		      command: PaletteCommand::ExportTranscript,
 		    },
 	    PaletteItem {
 	      label: "Toggle Chat Pane",
@@ -596,12 +742,12 @@ mod tests {
   use crate::app::reducer::{reduce, AppEvent};
 
   #[test]
-  fn enter_sends_prompt_and_adds_user_message() {
-    let mut state = AppState::new();
-    state.next_client_seq = 3;
+	  fn enter_sends_prompt_and_adds_user_message() {
+	    let mut state = AppState::new();
+	    state.next_client_seq = 3;
 
-    state.input_buffer = "hi".to_string();
-    let out = apply_ui_action(&mut state, UiAction::Enter);
+	    state.input_buffer = "hi".to_string();
+	    let out = apply_ui_action(&mut state, UiAction::Enter);
 
     assert_eq!(state.messages.len(), 1);
     assert_eq!(state.messages[0].role, Role::User);
@@ -792,6 +938,22 @@ mod tests {
 	    apply_ui_action(&mut state, UiAction::PaletteChar('q'));
 	    apply_ui_action(&mut state, UiAction::PaletteSubmit);
 	    assert!(state.should_exit);
+	  }
+
+	  #[test]
+	  fn multiline_enter_inserts_newline_and_ctrl_enter_sends() {
+	    let mut state = AppState::new();
+	    state.next_client_seq = 3;
+	    state.input_multiline = true;
+	    state.input_buffer = "a".to_string();
+
+	    let out = apply_ui_action(&mut state, UiAction::Enter);
+	    assert!(out.is_empty());
+	    assert_eq!(state.input_buffer, "a\n");
+
+	    state.input_buffer.push_str("b");
+	    let out = apply_ui_action(&mut state, UiAction::SendInput);
+	    assert_eq!(out.len(), 1);
 	  }
 
   #[test]

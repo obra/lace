@@ -5,6 +5,8 @@ pub mod config_wizard;
 pub mod sessions;
 pub mod storage;
 pub mod search;
+pub mod clipboard;
+pub mod transcript;
 
 use serde_json::Value;
 
@@ -70,6 +72,8 @@ pub struct AppState {
   pub active_prompt_request_ids: std::collections::HashSet<String>,
 
   pub input_buffer: String,
+  pub input_multiline: bool,
+  pub input_scroll: u16,
   pub input_history: Vec<String>,
   pub input_history_index: Option<usize>,
 
@@ -136,6 +140,8 @@ impl AppState {
       active_prompt_request_ids: std::collections::HashSet::new(),
 
       input_buffer: String::new(),
+      input_multiline: false,
+      input_scroll: 0,
       input_history: Vec::new(),
       input_history_index: None,
 

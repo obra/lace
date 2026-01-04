@@ -216,6 +216,10 @@ fn run_loop(
 	                let _ = apply_ui_action(state, UiAction::OpenSearch);
 	                continue;
 	              }
+	              KeyCode::Char('e') => {
+	                let _ = apply_ui_action(state, UiAction::ToggleMultilineInput);
+	                continue;
+	              }
 	              KeyCode::Char('1') => {
 	                let _ = apply_ui_action(state, UiAction::ToggleChat);
 	                continue;
@@ -239,6 +243,8 @@ fn run_loop(
 
 	          let action = match key.code {
 	            KeyCode::Tab => Some(UiAction::FocusNext),
+	            KeyCode::PageUp => Some(UiAction::ScrollUp),
+	            KeyCode::PageDown => Some(UiAction::ScrollDown),
 	            KeyCode::Up => match state.focus {
 	              Focus::Input => Some(UiAction::HistoryPrev),
 	              Focus::Activity => Some(UiAction::ActivityPrev),
@@ -250,6 +256,9 @@ fn run_loop(
 	              _ => Some(UiAction::ScrollDown),
 	            },
 	            KeyCode::Enter => match state.focus {
+	              Focus::Input if state.input_multiline && key.modifiers.contains(KeyModifiers::CONTROL) => {
+	                Some(UiAction::SendInput)
+	              }
 	              Focus::Input => Some(UiAction::Enter),
 	              Focus::Activity => Some(UiAction::ActivityToggleExpanded),
 	              _ => None,
@@ -262,6 +271,11 @@ fn run_loop(
 	              if state.focus == Focus::Activity && !key.modifiers.contains(KeyModifiers::CONTROL) =>
 	            {
 	              Some(UiAction::ActivityJumpToTurn)
+	            }
+	            KeyCode::Char('y')
+	              if state.focus == Focus::Activity && !key.modifiers.contains(KeyModifiers::CONTROL) =>
+	            {
+	              Some(UiAction::CopySelectedActivity)
 	            }
 	            KeyCode::Char('e')
 	              if state.focus != Focus::Input && !key.modifiers.contains(KeyModifiers::CONTROL) =>
@@ -535,9 +549,11 @@ fn handle_session_update(state: &mut AppState, params: &Value) {
 }
 
 fn draw(f: &mut ratatui::Frame, state: &AppState) {
+  let input_height = if state.input_multiline { 7 } else { 3 };
+
   let root = Layout::default()
     .direction(Direction::Vertical)
-    .constraints([Constraint::Length(1), Constraint::Min(1), Constraint::Length(3)])
+    .constraints([Constraint::Length(1), Constraint::Min(1), Constraint::Length(input_height)])
     .split(f.area());
 
   let status = render_status(state);
@@ -907,8 +923,31 @@ fn render_debug(state: &AppState) -> Paragraph<'static> {
 }
 
 fn render_input(state: &AppState) -> Paragraph<'static> {
-  Paragraph::new(format!("> {}", state.input_buffer))
-    .block(focused_block("Input", state.focus == Focus::Input))
+  if state.input_multiline {
+    let mut lines: Vec<Line> = Vec::new();
+    let mut first = true;
+    for l in state.input_buffer.lines() {
+      if first {
+        lines.push(Line::from(format!("> {l}")));
+        first = false;
+      } else {
+        lines.push(Line::from(format!("  {l}")));
+      }
+    }
+    if state.input_buffer.is_empty() {
+      lines.push(Line::from("> "));
+    } else if state.input_buffer.ends_with('\n') {
+      lines.push(Line::from("  "));
+    }
+
+    Paragraph::new(Text::from(lines))
+      .block(focused_block("Input (multiline)", state.focus == Focus::Input))
+      .wrap(Wrap { trim: false })
+      .scroll((state.input_scroll, 0))
+  } else {
+    Paragraph::new(format!("> {}", state.input_buffer))
+      .block(focused_block("Input", state.focus == Focus::Input))
+  }
 }
 
 fn render_permission_modal(state: &AppState) -> Paragraph<'static> {
@@ -1004,13 +1043,17 @@ fn render_help_modal() -> Paragraph<'static> {
     Line::from("Ctrl+C   Quit"),
     Line::from("Ctrl+K   Command palette"),
     Line::from("Ctrl+F   Search"),
+    Line::from("Ctrl+E   Toggle multiline input"),
     Line::from("Ctrl+1   Toggle Chat pane"),
     Line::from("Ctrl+2   Toggle Activity pane"),
     Line::from("Ctrl+3   Toggle Debug pane"),
     Line::from("Tab      Cycle focus"),
     Line::from("Up/Down  Scroll or history (depends on focus)"),
+    Line::from("PgUp/Dn  Scroll focused pane (incl. multiline input)"),
     Line::from("Enter    Toggle expand (Activity)"),
+    Line::from("Ctrl+Enter  Send (multiline input)"),
     Line::from("g        Jump to turn (Activity)"),
+    Line::from("y        Copy selected activity (Activity)"),
     Line::from("e        Jump last error (non-input panes)"),
     Line::from("t        Jump last tool_use (non-input panes)"),
     Line::from("n        Jump last turn_end (non-input panes)"),
