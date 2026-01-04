@@ -1,5 +1,6 @@
 use crate::app::activity;
 use crate::app::config_wizard;
+use crate::app::prefs::{KeybindMode, Theme};
 use crate::app::reducer::{reduce, AppEvent, Outbound};
 use crate::app::sessions;
 use crate::app::ui::{apply_ui_action, palette_labels, UiAction};
@@ -57,6 +58,29 @@ pub fn run_tui(args: Args) -> io::Result<()> {
     );
     terminal.restore()?;
     res
+}
+
+fn remap_key_code(
+    mode: KeybindMode,
+    focus: Focus,
+    code: KeyCode,
+    modifiers: KeyModifiers,
+) -> KeyCode {
+    if mode != KeybindMode::Vim {
+        return code;
+    }
+    if focus == Focus::Input {
+        return code;
+    }
+    if modifiers.contains(KeyModifiers::CONTROL) {
+        return code;
+    }
+
+    match code {
+        KeyCode::Char('j') => KeyCode::Down,
+        KeyCode::Char('k') => KeyCode::Up,
+        _ => code,
+    }
 }
 
 fn run_loop(
@@ -248,7 +272,13 @@ fn run_loop(
                         continue;
                     }
 
-                    let action = match key.code {
+                    let code = remap_key_code(
+                        state.prefs.keybind_mode,
+                        state.focus,
+                        key.code,
+                        key.modifiers,
+                    );
+                    let action = match code {
                         KeyCode::Tab => Some(UiAction::FocusNext),
                         KeyCode::PageUp => Some(UiAction::ScrollUp),
                         KeyCode::PageDown => Some(UiAction::ScrollDown),
@@ -623,7 +653,63 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ThemeStyles {
+    status_fg: Color,
+    status_bg: Color,
+    focused_border: Color,
+    user_prefix: Color,
+    assistant_prefix: Color,
+    activity_selected: Color,
+    activity_error: Color,
+    dim: Color,
+    code_fg: Color,
+    code_bg: Color,
+}
+
+fn theme_styles(theme: Theme) -> ThemeStyles {
+    match theme {
+        Theme::Dark => ThemeStyles {
+            status_fg: Color::White,
+            status_bg: Color::DarkGray,
+            focused_border: Color::Yellow,
+            user_prefix: Color::Green,
+            assistant_prefix: Color::Cyan,
+            activity_selected: Color::Yellow,
+            activity_error: Color::Red,
+            dim: Color::DarkGray,
+            code_fg: Color::White,
+            code_bg: Color::Black,
+        },
+        Theme::Light => ThemeStyles {
+            status_fg: Color::Black,
+            status_bg: Color::White,
+            focused_border: Color::Blue,
+            user_prefix: Color::Blue,
+            assistant_prefix: Color::Magenta,
+            activity_selected: Color::Blue,
+            activity_error: Color::Red,
+            dim: Color::Gray,
+            code_fg: Color::Black,
+            code_bg: Color::White,
+        },
+        Theme::HighContrast => ThemeStyles {
+            status_fg: Color::Yellow,
+            status_bg: Color::Black,
+            focused_border: Color::Yellow,
+            user_prefix: Color::Yellow,
+            assistant_prefix: Color::White,
+            activity_selected: Color::Yellow,
+            activity_error: Color::Red,
+            dim: Color::Gray,
+            code_fg: Color::White,
+            code_bg: Color::Black,
+        },
+    }
+}
+
 fn render_status(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
     let sid = state
         .session_id
         .clone()
@@ -643,7 +729,7 @@ fn render_status(state: &AppState) -> Paragraph<'static> {
     let text = Line::from(vec![
         Span::styled(
             " lace-tui ",
-            Style::default().fg(Color::Black).bg(Color::White),
+            Style::default().fg(styles.status_fg).bg(styles.status_bg),
         ),
         Span::raw(" "),
         Span::raw(format!("sess={sid} ")),
@@ -881,6 +967,7 @@ fn render_main(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout::
 }
 
 fn render_chat(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
     let mut lines: Vec<Line> = Vec::new();
     for m in &state.messages {
         let prefix = match m.role {
@@ -891,9 +978,13 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
         if m.role == Role::Assistant && m.streaming {
             text.push_str("▌");
         }
+        let prefix_color = match m.role {
+            Role::User => styles.user_prefix,
+            Role::Assistant => styles.assistant_prefix,
+        };
         lines.push(Line::from(vec![Span::styled(
             prefix,
-            Style::default().fg(Color::Cyan),
+            Style::default().fg(prefix_color),
         )]));
         for l in text.lines() {
             lines.push(Line::from(l.to_string()));
@@ -902,12 +993,17 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
     }
 
     Paragraph::new(Text::from(lines))
-        .block(focused_block("Chat", state.focus == Focus::Chat))
+        .block(focused_block(
+            "Chat",
+            state.focus == Focus::Chat,
+            state.prefs.theme,
+        ))
         .wrap(Wrap { trim: false })
         .scroll((state.chat_scroll, 0))
 }
 
 fn render_activity(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
     let mut lines: Vec<Line> = Vec::new();
     let total = state.activity.len();
     let start = total.saturating_sub(200);
@@ -918,12 +1014,12 @@ fn render_activity(state: &AppState) -> Paragraph<'static> {
 
         let mut style = Style::default();
         if selected {
-            style = style.fg(Color::Yellow);
+            style = style.fg(styles.activity_selected);
         } else if matches!(
             item.kind,
             activity::ActivityKind::RpcError | activity::ActivityKind::Timeout
         ) {
-            style = style.fg(Color::Red);
+            style = style.fg(styles.activity_error);
         }
 
         lines.push(Line::from(vec![
@@ -938,14 +1034,18 @@ fn render_activity(state: &AppState) -> Paragraph<'static> {
                 for l in pretty.lines() {
                     lines.push(Line::from(Span::styled(
                         format!("    {l}"),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(styles.dim),
                     )));
                 }
             }
         }
     }
     Paragraph::new(Text::from(lines))
-        .block(focused_block("Activity", state.focus == Focus::Activity))
+        .block(focused_block(
+            "Activity",
+            state.focus == Focus::Activity,
+            state.prefs.theme,
+        ))
         .wrap(Wrap { trim: true })
         .scroll((state.activity_scroll, 0))
 }
@@ -956,7 +1056,11 @@ fn render_debug(state: &AppState) -> Paragraph<'static> {
         lines.push(Line::from(l.clone()));
     }
     Paragraph::new(Text::from(lines))
-        .block(focused_block("Debug", state.focus == Focus::Debug))
+        .block(focused_block(
+            "Debug",
+            state.focus == Focus::Debug,
+            state.prefs.theme,
+        ))
         .wrap(Wrap { trim: true })
         .scroll((state.debug_scroll, 0))
 }
@@ -983,16 +1087,21 @@ fn render_input(state: &AppState) -> Paragraph<'static> {
             .block(focused_block(
                 "Input (multiline)",
                 state.focus == Focus::Input,
+                state.prefs.theme,
             ))
             .wrap(Wrap { trim: false })
             .scroll((state.input_scroll, 0))
     } else {
-        Paragraph::new(format!("> {}", state.input_buffer))
-            .block(focused_block("Input", state.focus == Focus::Input))
+        Paragraph::new(format!("> {}", state.input_buffer)).block(focused_block(
+            "Input",
+            state.focus == Focus::Input,
+            state.prefs.theme,
+        ))
     }
 }
 
 fn render_permission_modal(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
     let req = state.active_permission.as_ref().expect("active_permission");
     let mut lines: Vec<Line> = Vec::new();
 
@@ -1022,7 +1131,7 @@ fn render_permission_modal(state: &AppState) -> Paragraph<'static> {
                 for l in pretty.lines() {
                     lines.push(Line::from(Span::styled(
                         format!("  {l}"),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(styles.dim),
                     )));
                 }
             }
@@ -1052,10 +1161,11 @@ fn render_permission_modal(state: &AppState) -> Paragraph<'static> {
         .wrap(Wrap { trim: true })
 }
 
-fn focused_block(title: &'static str, focused: bool) -> Block<'static> {
+fn focused_block(title: &'static str, focused: bool, theme: Theme) -> Block<'static> {
     let base = Block::default().title(title).borders(Borders::ALL);
     if focused {
-        base.border_style(Style::default().fg(Color::Yellow))
+        let styles = theme_styles(theme);
+        base.border_style(Style::default().fg(styles.focused_border))
     } else {
         base
     }
@@ -1212,4 +1322,53 @@ fn sh_quote(s: &str) -> String {
     }
     out.push('\'');
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn vim_jk_remap_only_outside_input() {
+        assert_eq!(
+            remap_key_code(
+                KeybindMode::Vim,
+                Focus::Chat,
+                KeyCode::Char('j'),
+                KeyModifiers::NONE
+            ),
+            KeyCode::Down
+        );
+        assert_eq!(
+            remap_key_code(
+                KeybindMode::Vim,
+                Focus::Chat,
+                KeyCode::Char('k'),
+                KeyModifiers::NONE
+            ),
+            KeyCode::Up
+        );
+        assert_eq!(
+            remap_key_code(
+                KeybindMode::Vim,
+                Focus::Input,
+                KeyCode::Char('j'),
+                KeyModifiers::NONE
+            ),
+            KeyCode::Char('j')
+        );
+    }
+
+    #[test]
+    fn vim_does_not_remap_with_control_modifier() {
+        assert_eq!(
+            remap_key_code(
+                KeybindMode::Vim,
+                Focus::Chat,
+                KeyCode::Char('j'),
+                KeyModifiers::CONTROL
+            ),
+            KeyCode::Char('j')
+        );
+    }
 }

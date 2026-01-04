@@ -44,6 +44,8 @@ pub enum UiAction {
     JumpLastTurnEnd,
 
     ToggleMultilineInput,
+    SetTheme(crate::app::prefs::Theme),
+    SetKeybindMode(crate::app::prefs::KeybindMode),
     SendInput,
 
     CopySelectedActivity,
@@ -263,6 +265,16 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
             Vec::new()
         }
+        UiAction::SetTheme(theme) => {
+            state.prefs.theme = theme;
+            let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
+            Vec::new()
+        }
+        UiAction::SetKeybindMode(mode) => {
+            state.prefs.keybind_mode = mode;
+            let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
+            Vec::new()
+        }
         UiAction::SendInput => send_input(state),
         UiAction::CopySelectedActivity => {
             let Some(item) = state.activity.get(state.activity_selected) else {
@@ -475,6 +487,32 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 PaletteCommand::ToggleMultilineInput => {
                     let _ = apply_ui_action(state, UiAction::ToggleMultilineInput);
                 }
+                PaletteCommand::ThemeDark => {
+                    let _ =
+                        apply_ui_action(state, UiAction::SetTheme(crate::app::prefs::Theme::Dark));
+                }
+                PaletteCommand::ThemeLight => {
+                    let _ =
+                        apply_ui_action(state, UiAction::SetTheme(crate::app::prefs::Theme::Light));
+                }
+                PaletteCommand::ThemeHighContrast => {
+                    let _ = apply_ui_action(
+                        state,
+                        UiAction::SetTheme(crate::app::prefs::Theme::HighContrast),
+                    );
+                }
+                PaletteCommand::KeybindDefault => {
+                    let _ = apply_ui_action(
+                        state,
+                        UiAction::SetKeybindMode(crate::app::prefs::KeybindMode::Default),
+                    );
+                }
+                PaletteCommand::KeybindVim => {
+                    let _ = apply_ui_action(
+                        state,
+                        UiAction::SetKeybindMode(crate::app::prefs::KeybindMode::Vim),
+                    );
+                }
                 PaletteCommand::CopySelectedActivity => {
                     let _ = apply_ui_action(state, UiAction::CopySelectedActivity);
                 }
@@ -639,6 +677,11 @@ enum PaletteCommand {
     Sessions,
     Search,
     ToggleMultilineInput,
+    ThemeDark,
+    ThemeLight,
+    ThemeHighContrast,
+    KeybindDefault,
+    KeybindVim,
     CopySelectedActivity,
     CopyLastAssistantMessage,
     CopyToolInput,
@@ -678,6 +721,26 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
         PaletteItem {
             label: "Toggle Multiline Input",
             command: PaletteCommand::ToggleMultilineInput,
+        },
+        PaletteItem {
+            label: "Theme: Dark",
+            command: PaletteCommand::ThemeDark,
+        },
+        PaletteItem {
+            label: "Theme: Light",
+            command: PaletteCommand::ThemeLight,
+        },
+        PaletteItem {
+            label: "Theme: High Contrast",
+            command: PaletteCommand::ThemeHighContrast,
+        },
+        PaletteItem {
+            label: "Keybinds: Default",
+            command: PaletteCommand::KeybindDefault,
+        },
+        PaletteItem {
+            label: "Keybinds: Vim",
+            command: PaletteCommand::KeybindVim,
         },
         PaletteItem {
             label: "Copy Selected Activity",
@@ -747,6 +810,7 @@ fn chat_start_line_for_message_index(messages: &[ChatMessage], idx: usize) -> u1
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::prefs::{KeybindMode, Theme};
     use crate::app::reducer::{reduce, AppEvent};
 
     #[test]
@@ -990,8 +1054,26 @@ mod tests {
     }
 
     #[test]
+    fn set_theme_updates_preferences() {
+        let mut state = AppState::new_with_paths(None, None);
+        assert_eq!(state.prefs.theme, Theme::Dark);
+        let out = apply_ui_action(&mut state, UiAction::SetTheme(Theme::Light));
+        assert!(out.is_empty());
+        assert_eq!(state.prefs.theme, Theme::Light);
+    }
+
+    #[test]
+    fn set_keybind_mode_updates_preferences() {
+        let mut state = AppState::new_with_paths(None, None);
+        assert_eq!(state.prefs.keybind_mode, KeybindMode::Default);
+        let out = apply_ui_action(&mut state, UiAction::SetKeybindMode(KeybindMode::Vim));
+        assert!(out.is_empty());
+        assert_eq!(state.prefs.keybind_mode, KeybindMode::Vim);
+    }
+
+    #[test]
     fn palette_search_opens_modal() {
-        let mut state = AppState::new();
+        let mut state = AppState::new_with_paths(None, None);
         apply_ui_action(&mut state, UiAction::OpenPalette);
         apply_ui_action(&mut state, UiAction::PaletteChar('s'));
         apply_ui_action(&mut state, UiAction::PaletteChar('e'));
