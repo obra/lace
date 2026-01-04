@@ -537,6 +537,8 @@ This is the core refactor: make `lace-agent` run the actual tool-using agent.
 
 ### Task 7.1: Refactor `@lace/core` Agent to remove ThreadManager/Session coupling (flag day)
 
+**Note (2026-01-04)**: Deferred. The current `@lace/agent` runtime owns the provider/tool loop and durable JSONL history without using `@lace/core`'s `Agent`. After we fully migrate to the new agent package, revisit this task and decide whether the `@lace/core` Agent/ThreadManager/Session stack should be refactored or deleted.
+
 Today `Agent` is tightly coupled:
 - `packages/core/src/agents/agent.ts` imports/uses:
   - `ThreadManager` (`packages/core/src/threads/thread-manager.ts`)
