@@ -1,5 +1,6 @@
 pub mod reducer;
 pub mod ui;
+pub mod activity;
 
 use serde_json::Value;
 
@@ -65,7 +66,9 @@ pub struct AppState {
   pub show_activity: bool,
   pub show_debug: bool,
 
-  pub activity: std::collections::VecDeque<String>,
+  pub activity: std::collections::VecDeque<activity::ActivityItem>,
+  pub activity_selected: usize,
+  pub next_activity_seq: u64,
   pub debug_lines: std::collections::VecDeque<String>,
 
   pub active_permission: Option<PermissionRequest>,
@@ -114,6 +117,8 @@ impl AppState {
       show_debug: false,
 
       activity: std::collections::VecDeque::new(),
+      activity_selected: 0,
+      next_activity_seq: 1,
       debug_lines: std::collections::VecDeque::new(),
 
       active_permission: None,
@@ -154,11 +159,7 @@ impl AppState {
   }
 
   pub fn push_activity_line(&mut self, line: String) {
-    const MAX: usize = 200;
-    if self.activity.len() >= MAX {
-      self.activity.pop_front();
-    }
-    self.activity.push_back(line);
+    activity::push_log_line(self, line);
   }
 
   pub fn push_debug_line(&mut self, line: String) {

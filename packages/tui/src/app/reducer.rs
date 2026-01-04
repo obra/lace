@@ -5,7 +5,25 @@ use serde_json::Value;
 pub enum AppEvent {
   TextDelta { text: String },
   TurnEnd { stop_reason: Option<String> },
-  ToolUse { tool_call_id: String, input: Value },
+  ToolUse {
+    tool_call_id: String,
+    name: Option<String>,
+    kind: Option<String>,
+    status: Option<String>,
+    input: Value,
+    result: Option<Value>,
+    job_id: Option<String>,
+    turn_id: Option<String>,
+    turn_seq: Option<i64>,
+  },
+  JobStarted {
+    job_id: String,
+    job_type: Option<String>,
+  },
+  JobFinished {
+    job_id: String,
+    outcome: Option<String>,
+  },
   PermissionRequested(PermissionRequest),
   PromptDispatched { request_id: String },
   RpcResponse { id: Value },
@@ -31,10 +49,12 @@ pub fn reduce(state: &mut AppState, event: AppEvent) -> Vec<Outbound> {
       end_assistant_stream(state);
       Vec::new()
     }
-    AppEvent::ToolUse { tool_call_id, input } => {
+    AppEvent::ToolUse { tool_call_id, input, .. } => {
       state.tool_inputs_by_tool_call_id.insert(tool_call_id, input);
       Vec::new()
     }
+    AppEvent::JobStarted { .. } => Vec::new(),
+    AppEvent::JobFinished { .. } => Vec::new(),
     AppEvent::PermissionRequested(req) => {
       state.permission_queue.push_back(req);
       Vec::new()
@@ -170,7 +190,14 @@ mod tests {
       &mut state,
       AppEvent::ToolUse {
         tool_call_id: "tool_1".to_string(),
+        name: None,
+        kind: None,
+        status: None,
         input: json!({"command":"echo hi"}),
+        result: None,
+        job_id: None,
+        turn_id: None,
+        turn_seq: None,
       },
     );
     assert_eq!(

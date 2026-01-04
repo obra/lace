@@ -1,5 +1,6 @@
 use crate::app::reducer::{reduce, AppEvent, Outbound};
 use crate::app::ui::{apply_ui_action, palette_labels, UiAction};
+use crate::app::activity;
 use crate::app::AppState;
 use crate::app::{Focus, Role};
 use crate::args::Args;
@@ -144,20 +145,23 @@ fn run_loop(
             continue;
           }
 
-          let action = match key.code {
-            KeyCode::Tab => Some(UiAction::FocusNext),
-            KeyCode::Up => match state.focus {
-              Focus::Input => Some(UiAction::HistoryPrev),
-              _ => Some(UiAction::ScrollUp),
-            },
-            KeyCode::Down => match state.focus {
-              Focus::Input => Some(UiAction::HistoryNext),
-              _ => Some(UiAction::ScrollDown),
-            },
-            KeyCode::Enter => match state.focus {
-              Focus::Input => Some(UiAction::Enter),
-              _ => None,
-            },
+	          let action = match key.code {
+	            KeyCode::Tab => Some(UiAction::FocusNext),
+	            KeyCode::Up => match state.focus {
+	              Focus::Input => Some(UiAction::HistoryPrev),
+	              Focus::Activity => Some(UiAction::ActivityPrev),
+	              _ => Some(UiAction::ScrollUp),
+	            },
+	            KeyCode::Down => match state.focus {
+	              Focus::Input => Some(UiAction::HistoryNext),
+	              Focus::Activity => Some(UiAction::ActivityNext),
+	              _ => Some(UiAction::ScrollDown),
+	            },
+	            KeyCode::Enter => match state.focus {
+	              Focus::Input => Some(UiAction::Enter),
+	              Focus::Activity => Some(UiAction::ActivityToggleExpanded),
+	              _ => None,
+	            },
             KeyCode::Backspace => match state.focus {
               Focus::Input => Some(UiAction::Backspace),
               _ => None,
@@ -201,7 +205,7 @@ fn send_outbound(
         transport
           .send_line(line)
           .map_err(|e| io::Error::new(io::ErrorKind::BrokenPipe, e))?;
-        state.push_activity_line(format!("{method}: sent"));
+        activity::push_rpc_sent(state, method.clone());
         state.mark_request_sent(id, method, now_ms(), timeout_ms);
       }
       Outbound::JsonRpcResponse { id, result } => {
@@ -251,10 +255,14 @@ fn handle_agent_line(transport: &AgentTransport, state: &mut AppState, line: &st
 
       let _ = transport.send_line(jsonrpc::encode_response_result(id, Value::Null));
     }
-    jsonrpc::InboundMessage::Response { id, result, error } => {
-      if let Some(err) = error {
-        state.push_activity_line(format!("error: {}", err.message));
-      }
+	    jsonrpc::InboundMessage::Response { id, result, error } => {
+	      if let Some(err) = error {
+	        activity::push_rpc_error(
+	          state,
+	          err.message.clone(),
+	          Some(serde_json::to_value(err).unwrap_or(Value::Null)),
+	        );
+	      }
       let mut should_refocus = false;
       let mut pending_method: Option<String> = None;
       if let Some(id_str) = id.as_str() {
@@ -300,22 +308,55 @@ fn expire_timeouts(state: &mut AppState, now_ms: u64) {
     }
   }
 
-  for id in expired {
-    if let Some(p) = state.pending_requests.remove(&id) {
-      state.push_activity_line(format!("timeout: {} ({})", id, p.method));
-    }
-  }
-}
+	  for id in expired {
+	    if let Some(p) = state.pending_requests.remove(&id) {
+	      activity::push_timeout(state, id, p.method);
+	    }
+	  }
+	}
 
 fn handle_session_update(state: &mut AppState, params: &Value) {
   let mut saw_turn_end = false;
   for ev in ent::decode_session_update(params) {
     match &ev {
-      AppEvent::ToolUse { tool_call_id, .. } => state.push_activity_line(format!("tool_use {tool_call_id}")),
-      AppEvent::TurnEnd { stop_reason } => state.push_activity_line(format!(
-        "turn_end {}",
-        stop_reason.clone().unwrap_or_else(|| "?".to_string())
-      )),
+      AppEvent::ToolUse {
+        tool_call_id,
+        name,
+        status,
+        input,
+        result,
+        job_id,
+        turn_id,
+        turn_seq,
+        ..
+      } => {
+        activity::upsert_tool_use(
+          state,
+          tool_call_id.clone(),
+          name.clone(),
+          status.clone(),
+          input.clone(),
+          result.clone(),
+          job_id.clone(),
+          turn_id.clone(),
+          *turn_seq,
+        );
+      }
+      AppEvent::JobStarted { job_id, job_type } => {
+        state.push_activity_line(format!(
+          "job_started {} ({job_id})",
+          job_type.clone().unwrap_or_else(|| "?".to_string())
+        ));
+      }
+      AppEvent::JobFinished { job_id, outcome } => {
+        state.push_activity_line(format!(
+          "job_finished {} ({job_id})",
+          outcome.clone().unwrap_or_else(|| "?".to_string())
+        ));
+      }
+      AppEvent::TurnEnd { stop_reason } => {
+        activity::push_turn_end(state, stop_reason.clone());
+      }
       _ => {}
     }
     if matches!(ev, AppEvent::TurnEnd { .. }) {
@@ -434,8 +475,36 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
 
 fn render_activity(state: &AppState) -> Paragraph<'static> {
   let mut lines: Vec<Line> = Vec::new();
-  for l in state.activity.iter().rev().take(200).rev() {
-    lines.push(Line::from(l.clone()));
+  let total = state.activity.len();
+  let start = total.saturating_sub(200);
+  for (idx, item) in state.activity.iter().enumerate().skip(start) {
+    let selected = idx == state.activity_selected && state.focus == Focus::Activity;
+    let sel_marker = if selected { ">" } else { " " };
+    let exp_marker = if item.expanded { "v" } else { " " };
+
+    let mut style = Style::default();
+    if selected {
+      style = style.fg(Color::Yellow);
+    } else if matches!(item.kind, activity::ActivityKind::RpcError | activity::ActivityKind::Timeout) {
+      style = style.fg(Color::Red);
+    }
+
+    lines.push(Line::from(vec![
+      Span::styled(format!("{sel_marker}{exp_marker} "), style),
+      Span::raw(item.summary.clone()),
+    ]));
+
+    if item.expanded {
+      if let Some(details) = &item.details {
+        let pretty = serde_json::to_string_pretty(details).unwrap_or_else(|_| details.to_string());
+        for l in pretty.lines() {
+          lines.push(Line::from(Span::styled(
+            format!("    {l}"),
+            Style::default().fg(Color::DarkGray),
+          )));
+        }
+      }
+    }
   }
   Paragraph::new(Text::from(lines))
     .block(focused_block("Activity", state.focus == Focus::Activity))
@@ -536,9 +605,10 @@ fn render_help_modal() -> Paragraph<'static> {
     Line::from("Ctrl+1   Toggle Chat pane"),
     Line::from("Ctrl+2   Toggle Activity pane"),
     Line::from("Ctrl+3   Toggle Debug pane"),
-    Line::from("Tab      Cycle focus"),
-    Line::from("Up/Down  Scroll or history (depends on focus)"),
-    Line::from("? / F1   Toggle help"),
+	    Line::from("Tab      Cycle focus"),
+	    Line::from("Up/Down  Scroll or history (depends on focus)"),
+	    Line::from("Enter    Toggle expand (Activity)"),
+	    Line::from("? / F1   Toggle help"),
     Line::from(""),
     Line::from("Permission modal: Up/Down select, Enter decide"),
   ];

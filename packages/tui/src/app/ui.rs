@@ -9,6 +9,9 @@ pub enum UiAction {
   Enter,
   HistoryPrev,
   HistoryNext,
+  ActivityPrev,
+  ActivityNext,
+  ActivityToggleExpanded,
   ToggleChat,
   ToggleActivity,
   ToggleDebug,
@@ -66,6 +69,25 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         let next = i + 1;
         state.input_history_index = Some(next);
         state.input_buffer = state.input_history[next].clone();
+      }
+      Vec::new()
+    }
+    UiAction::ActivityPrev => {
+      if !state.activity.is_empty() {
+        state.activity_selected = state.activity_selected.saturating_sub(1);
+      }
+      Vec::new()
+    }
+    UiAction::ActivityNext => {
+      if !state.activity.is_empty() {
+        let max = state.activity.len().saturating_sub(1);
+        state.activity_selected = (state.activity_selected + 1).min(max);
+      }
+      Vec::new()
+    }
+    UiAction::ActivityToggleExpanded => {
+      if let Some(item) = state.activity.get_mut(state.activity_selected) {
+        item.expanded = !item.expanded;
       }
       Vec::new()
     }
@@ -203,7 +225,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
           let id = state.next_client_id();
           state.session_id = None;
           state.messages.clear();
-          state.activity.clear();
+          crate::app::activity::reset_activity(state);
           state.debug_lines.clear();
           out.push(Outbound::JsonRpcRequest {
             id,

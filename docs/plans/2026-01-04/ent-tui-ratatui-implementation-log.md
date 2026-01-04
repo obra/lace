@@ -132,3 +132,17 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
   - sessionId updates only happen when the response corresponds to `session/new` or `session/load`
 - Tests:
   - `cd packages/tui && cargo test`
+
+### 2026-01-04 — Structured activity items (tool_use + errors)
+
+- Replaced Activity “strings” with structured `ActivityItem`:
+  - Added `packages/tui/src/app/activity.rs` with bounded activity queue, upsert-by-`toolCallId`, and detail merging.
+  - Activity pane now renders summaries and supports expand/collapse of pretty-printed JSON details.
+- Improved captured Ent update fields:
+  - `tool_use` now includes `name`, `status`, and optional `result` (still tolerant of missing fields).
+  - `job_started` / `job_finished` decode added (rendered as simple log lines for now).
+- UX:
+  - Activity pane selection + expand toggle: Up/Down selects, Enter toggles expansion.
+  - RPC response errors and timeouts are now structured activity entries (errors expand by default).
+- Tests:
+  - `cd packages/tui && cargo test` (unit + scenario e2e)
