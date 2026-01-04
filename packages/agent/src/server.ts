@@ -46,6 +46,7 @@ import type { CatalogModel } from '@lace/core/providers/catalog/types';
 import { ProviderRegistry } from '@lace/core/providers/registry';
 import type { AIProvider, ProviderMessage } from '@lace/core/providers/base-provider';
 import { ToolExecutor } from '@lace/core/tools/executor';
+import { estimateTokens } from '@lace/core/utils/token-estimation';
 import type { Tool as CoreTool } from '@lace/core/tools/tool';
 import type {
   ToolCall as CoreToolCall,
@@ -320,6 +321,38 @@ function buildProviderMessagesFromDurableEvents(sessionDir: string): ProviderMes
         continue;
       }
 
+      if (type === 'context_compacted') {
+        const summary = typeof (data as any).summary === 'string' ? (data as any).summary : '';
+        const preserved = Array.isArray((data as any).preserved) ? (data as any).preserved : [];
+
+        messages.length = 0;
+        if (summary.trim()) messages.push({ role: 'system', content: summary });
+
+        for (const msg of preserved) {
+          if (!msg || typeof msg !== 'object') continue;
+          const role = (msg as any).role;
+          const content = (msg as any).content;
+          if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
+          if (typeof content !== 'string') continue;
+
+          const toolCalls = Array.isArray((msg as any).toolCalls)
+            ? (msg as any).toolCalls
+            : undefined;
+          const toolResults = Array.isArray((msg as any).toolResults)
+            ? (msg as any).toolResults
+            : undefined;
+
+          messages.push({
+            role,
+            content,
+            ...(toolCalls ? { toolCalls } : {}),
+            ...(toolResults ? { toolResults } : {}),
+          });
+        }
+
+        continue;
+      }
+
       if (type === 'message') {
         const content =
           typeof (data as any).content === 'string'
@@ -369,6 +402,39 @@ function buildProviderMessagesFromDurableEvents(sessionDir: string): ProviderMes
   }
 
   return messages;
+}
+
+function estimateProviderTokens(messages: ProviderMessage[]): number {
+  let total = 0;
+  for (const message of messages) {
+    if (typeof message.content === 'string') total += estimateTokens(message.content);
+    if ((message as any).toolCalls)
+      total += estimateTokens(JSON.stringify((message as any).toolCalls));
+    if ((message as any).toolResults)
+      total += estimateTokens(JSON.stringify((message as any).toolResults));
+  }
+  return total;
+}
+
+function summarizeProviderMessages(
+  messages: ProviderMessage[],
+  options: { maxChars: number }
+): string {
+  const lines: string[] = [];
+  for (const message of messages) {
+    const content = typeof message.content === 'string' ? message.content : '';
+    const collapsed = content.replace(/\s+/g, ' ').trim();
+    const excerpt = collapsed.length > 240 ? `${collapsed.slice(0, 240)}…` : collapsed;
+    if (!excerpt) continue;
+    lines.push(`${message.role}: ${excerpt}`);
+    if (lines.join('\n').length >= options.maxChars) break;
+  }
+  const joined = lines.join('\n');
+  return joined.length > options.maxChars ? joined.slice(0, options.maxChars) : joined;
+}
+
+function systemProviderMessage(content: string): ProviderMessage {
+  return { role: 'system', content };
 }
 
 export type AgentServerState = {
@@ -1027,7 +1093,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         streaming: true,
         multiTurn: true,
         tools: toolInfos,
-        operations: { checkpoint: true, rewind: true, configure: true, compact: false },
+        operations: { checkpoint: true, rewind: true, configure: true, compact: true },
         'ent/contextInjection': true,
         'ent/backgroundJobs': true,
         'ent/fileCheckpointing': true,
@@ -1794,6 +1860,114 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         approvalMode: effectiveAfter.approvalMode,
       },
     };
+  });
+
+  peer.onRequest('ent/session/compact', async (params: unknown) => {
+    assertInitialized(state);
+    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+    if (state.activeTurn) throw { code: 2, message: 'SessionBusy' };
+
+    const parsed = params as
+      | {
+          strategy?: 'summarize' | 'truncate' | 'selective';
+          targetTokens?: number;
+          preserveRecent?: number;
+        }
+      | undefined;
+
+    const strategy =
+      parsed?.strategy === 'summarize' ||
+      parsed?.strategy === 'truncate' ||
+      parsed?.strategy === 'selective'
+        ? parsed.strategy
+        : 'truncate';
+
+    const targetTokens =
+      typeof parsed?.targetTokens === 'number' &&
+      Number.isFinite(parsed.targetTokens) &&
+      parsed.targetTokens > 0
+        ? Math.trunc(parsed.targetTokens)
+        : undefined;
+
+    let preserveRecent =
+      typeof parsed?.preserveRecent === 'number' &&
+      Number.isFinite(parsed.preserveRecent) &&
+      parsed.preserveRecent >= 0
+        ? Math.trunc(parsed.preserveRecent)
+        : 10;
+
+    return await runExclusive(() => {
+      const beforeMessages = buildProviderMessagesFromDurableEvents(state.activeSession!.dir);
+      const previousTokens = estimateProviderTokens(beforeMessages);
+
+      let preserved: ProviderMessage[] = [];
+      let dropped: ProviderMessage[] = [];
+      let summaryText = '';
+
+      const compute = () => {
+        preserved = preserveRecent > 0 ? beforeMessages.slice(-preserveRecent) : [];
+        dropped = beforeMessages.slice(0, beforeMessages.length - preserved.length);
+        summaryText =
+          strategy === 'summarize' || strategy === 'selective'
+            ? summarizeProviderMessages(dropped, { maxChars: 8_000 })
+            : '';
+      };
+
+      compute();
+
+      const summaryMessages = () =>
+        summaryText.trim().length > 0 ? [systemProviderMessage(summaryText)] : [];
+
+      let currentTokens = estimateProviderTokens([...summaryMessages(), ...preserved]);
+
+      if (targetTokens !== undefined) {
+        while (currentTokens > targetTokens && preserveRecent > 0) {
+          preserveRecent -= 1;
+          compute();
+          currentTokens = estimateProviderTokens([...summaryMessages(), ...preserved]);
+        }
+
+        if (currentTokens > targetTokens && summaryText.trim().length > 0) {
+          const preservedTokens = estimateProviderTokens(preserved);
+          const allowedSummaryTokens = Math.max(0, targetTokens - preservedTokens);
+          const allowedChars = allowedSummaryTokens * 4;
+          summaryText = allowedChars > 0 ? summaryText.slice(0, allowedChars) : '';
+          currentTokens = estimateProviderTokens([...summaryMessages(), ...preserved]);
+        }
+      }
+
+      const messagesCompacted = dropped.length;
+
+      const serializedPreserved = preserved.map((m) => ({
+        role: m.role,
+        content: typeof m.content === 'string' ? m.content : '',
+        ...(Array.isArray((m as any).toolCalls) ? { toolCalls: (m as any).toolCalls } : {}),
+        ...(Array.isArray((m as any).toolResults) ? { toolResults: (m as any).toolResults } : {}),
+      }));
+
+      let sessionState = readSessionState(state.activeSession!.dir);
+      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+        type: 'context_compacted',
+        data: {
+          strategy,
+          ...(targetTokens !== undefined ? { targetTokens } : {}),
+          preserveRecent,
+          messagesCompacted,
+          ...(summaryText.trim().length > 0 ? { summary: summaryText } : {}),
+          preserved: serializedPreserved,
+        },
+      });
+      sessionState = nextState;
+      writeSessionState(state.activeSession!.dir, sessionState);
+      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+
+      return {
+        previousTokens,
+        currentTokens,
+        messagesCompacted,
+        ...(summaryText.trim().length > 0 ? { summary: summaryText } : {}),
+      };
+    });
   });
 
   peer.onRequest('ent/session/checkpoint', async (params: unknown) => {

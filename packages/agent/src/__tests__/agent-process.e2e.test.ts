@@ -558,4 +558,49 @@ describe('lace-agent process (E2E over stdio)', () => {
       });
     }
   );
+
+  it(
+    'supports ent/session/compact and drops prior tool results from provider context',
+    { timeout: 15_000 },
+    async () => {
+      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+
+      await withTimeout(
+        agent.peer.request('initialize', { protocolVersion: '1.0' }),
+        2_000,
+        'initialize'
+      );
+      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+      writeFileSync(join(workDir, 'hello.txt'), 'hello from disk\n', 'utf8');
+
+      await withTimeout(
+        agent.peer.request('session/prompt', {
+          content: [{ type: 'text', text: 'read file hello.txt' }],
+        }),
+        10_000,
+        'session/prompt read hello.txt'
+      );
+
+      const compact = (await withTimeout(
+        agent.peer.request('ent/session/compact', { strategy: 'truncate', preserveRecent: 0 }),
+        2_000,
+        'ent/session/compact'
+      )) as { messagesCompacted: number };
+      expect(compact.messagesCompacted).toBeGreaterThan(0);
+
+      const after = (await withTimeout(
+        agent.peer.request('session/prompt', {
+          content: [{ type: 'text', text: 'hello' }],
+        }),
+        10_000,
+        'session/prompt after compact'
+      )) as { content: Array<{ type: string; text?: string }> };
+
+      const assistantText = after.content
+        .map((b) => (b.type === 'text' ? (b.text ?? '') : ''))
+        .join('\n');
+      expect(assistantText).toContain('No tool result found.');
+    }
+  );
 });
