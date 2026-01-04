@@ -1,420 +1,167 @@
-// ABOUTME: Test suite for individual session API endpoints - GET/PATCH/DELETE operations
-// ABOUTME: Tests session ownership validation and proper CRUD operations within project context
+// ABOUTME: Integration tests for project-scoped workspace session API endpoint
+// ABOUTME: Uses supervisor-backed workspace sessions (no SQLite session records)
 
-import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   loader as GET,
-  action as PATCH,
+  action as PATCH_OR_DELETE,
 } from '@lace/web/app/routes/api.projects.$projectId.sessions.$sessionId';
-const DELETE = PATCH; // Both PATCH and DELETE use the same action function
-import { Project } from '@lace/web/lib/server/lace-imports';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 
-// Mock Project
-vi.mock('@lace/web/lib/server/lace-imports', () => ({
-  Project: {
-    getById: vi.fn(),
-  },
-}));
+// ✅ ESSENTIAL MOCK - Server-side module compatibility in test environment
+import { vi } from 'vitest';
+vi.mock('server-only', () => ({}));
 
-describe('Individual session API endpoints', () => {
-  let mockProject: {
-    getSession: MockedFunction<(id: string) => unknown>;
-    updateSession: MockedFunction<(id: string, data: Record<string, unknown>) => unknown>;
-    deleteSession: MockedFunction<(id: string) => boolean>;
-  };
+interface ErrorResponse {
+  error: string;
+  details?: unknown;
+}
 
-  const mockSession = {
-    id: 'session1',
-    projectId: 'project1',
-    name: 'Test Session',
-    description: 'A test session',
-    configuration: { provider: 'anthropic' },
-    status: 'active' as const,
-    createdAt: new Date('2023-01-01'),
-    updatedAt: new Date('2023-01-01'),
-  };
+describe('Project workspace session API', () => {
+  const context = setupWebTest();
 
-  beforeEach(() => {
-    mockProject = {
-      getSession: vi.fn(),
-      updateSession: vi.fn(),
-      deleteSession: vi.fn(),
-    };
-    const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
-    mockedGetById.mockReturnValue(mockProject as unknown as ReturnType<typeof Project.getById>);
+  afterEach(async () => {
+    await shutdownSupervisorForTests();
   });
 
-  describe('GET /api/projects/:projectId/sessions/:sessionId', () => {
-    it('should return session when it exists and belongs to project', async () => {
-      mockProject.getSession.mockReturnValue(mockSession);
-
-      const response = await GET(
-        createLoaderArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
-          projectId: 'project1',
-          sessionId: 'session1',
-        })
-      );
-
-      const data = await parseResponse<{
-        id: string;
-        name: string;
-        projectId: string;
-        description: string;
-        status: string;
-        createdAt: Date;
-      }>(response);
-
-      expect(response.status).toBe(200);
-      expect(data.id).toBe('session1');
-      expect(data.name).toBe('Test Session');
-      expect(data.projectId).toBe('project1');
+  it('GET returns workspace session when it belongs to project', async () => {
+    const project = Project.create('Test Project', context.tempProjectDir);
+    const supervisor = getSupervisor();
+    const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+    supervisor.updateWorkspaceSession(created.workspaceSessionId, {
+      projectId: project.getId(),
+      name: 'Test Session',
     });
 
-    it('should return 404 when project does not exist', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
-      mockedGetById.mockReturnValue(null);
+    const response = await GET(
+      createLoaderArgs(
+        new Request(
+          `http://localhost/api/projects/${project.getId()}/sessions/${created.workspaceSessionId}`
+        ),
+        {
+          projectId: project.getId(),
+          sessionId: created.workspaceSessionId,
+        }
+      )
+    );
 
-      const response = await GET(
-        createLoaderArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
-          projectId: 'project1',
-          sessionId: 'session1',
-        })
-      );
+    const data = await parseResponse<{ id: string; name: string; projectId: string }>(response);
 
-      const data = await parseResponse<{ error: string }>(response);
-
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Project not found');
-    });
-
-    it('should return 404 when session does not exist', async () => {
-      mockProject.getSession.mockReturnValue(null);
-
-      const response = await GET(
-        createLoaderArgs(
-          new Request('http://localhost/api/projects/project1/sessions/nonexistent'),
-          {
-            projectId: 'project1',
-            sessionId: 'nonexistent',
-          }
-        )
-      );
-
-      const data = await parseResponse<{ error: string }>(response);
-
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Session not found in this project');
-    });
-
-    it('should return session metadata without tokenUsage field', async () => {
-      mockProject.getSession.mockReturnValue(mockSession);
-
-      const response = await GET(
-        createLoaderArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
-          projectId: 'project1',
-          sessionId: 'session1',
-        })
-      );
-
-      const data = await parseResponse<{
-        id: string;
-        name: string;
-        projectId: string;
-        description: string;
-        status: string;
-        createdAt: Date;
-      }>(response);
-
-      expect(response.status).toBe(200);
-      expect(data).toBeDefined();
-      expect(data.id).toBe('session1');
-
-      // CRITICAL: Should NOT have tokenUsage field
-      expect('tokenUsage' in data).toBe(false);
-    });
-
-    it('should not access Session.getById or agent internals', async () => {
-      // This test ensures we don't import Session or access agent internals
-      mockProject.getSession.mockReturnValue(mockSession);
-
-      const response = await GET(
-        createLoaderArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
-          projectId: 'project1',
-          sessionId: 'session1',
-        })
-      );
-
-      expect(response.status).toBe(200);
-
-      // Should only use Project.getById and project.getSession
-      expect(Project.getById).toHaveBeenCalledWith('project1');
-      expect(mockProject.getSession).toHaveBeenCalledWith('session1');
-    });
-
-    it('should handle database errors', async () => {
-      mockProject.getSession.mockImplementation(() => {
-        throw new Error('Database error');
-      });
-
-      const response = await GET(
-        createLoaderArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
-          projectId: 'project1',
-          sessionId: 'session1',
-        })
-      );
-
-      const data = await parseResponse<{ error: string }>(response);
-
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Database error');
-    });
+    expect(response.status).toBe(200);
+    expect(data.id).toBe(created.workspaceSessionId);
+    expect(data.name).toBe('Test Session');
+    expect(data.projectId).toBe(project.getId());
   });
 
-  describe('PATCH /api/projects/:projectId/sessions/:sessionId', () => {
-    it('should update session successfully', async () => {
-      const updatedSession = {
-        ...mockSession,
-        name: 'Updated Session',
-        description: 'Updated description',
-        status: 'completed' as const,
-        updatedAt: new Date('2023-01-02'),
-      };
+  it('GET returns 404 when project does not exist', async () => {
+    const request = new Request(
+      'http://localhost/api/projects/nonexistent/sessions/ws_00000000-0000-0000-0000-000000000000'
+    );
+    const response = await GET(
+      createLoaderArgs(request, {
+        projectId: 'nonexistent',
+        sessionId: 'ws_00000000-0000-0000-0000-000000000000',
+      })
+    );
+    const data = await parseResponse<ErrorResponse>(response);
 
-      mockProject.updateSession.mockReturnValue(updatedSession);
-
-      const request = new Request('http://localhost/api/projects/project1/sessions/session1', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          name: 'Updated Session',
-          description: 'Updated description',
-          status: 'completed',
-        }),
-      });
-
-      const response = await PATCH(
-        createActionArgs(request, { projectId: 'project1', sessionId: 'session1' })
-      );
-
-      const data = await parseResponse<{
-        id: string;
-        name: string;
-        projectId: string;
-        description: string;
-        status: string;
-        createdAt: Date;
-      }>(response);
-
-      expect(response.status).toBe(200);
-      expect(data.name).toBe('Updated Session');
-      expect(data.description).toBe('Updated description');
-      expect(data.status).toBe('completed');
-    });
-
-    it('should return 404 when project does not exist', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
-      mockedGetById.mockReturnValue(null);
-
-      const request = new Request('http://localhost/api/projects/project1/sessions/session1', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          name: 'Updated Session',
-        }),
-      });
-
-      const response = await PATCH(
-        createActionArgs(request, { projectId: 'project1', sessionId: 'session1' })
-      );
-
-      const data = await parseResponse<{ error: string }>(response);
-
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Project not found');
-    });
-
-    it('should return 404 when session does not exist', async () => {
-      mockProject.updateSession.mockReturnValue(null);
-
-      const request = new Request('http://localhost/api/projects/project1/sessions/nonexistent', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          name: 'Updated Session',
-        }),
-      });
-
-      const response = await PATCH(
-        createActionArgs(request, { projectId: 'project1', sessionId: 'nonexistent' })
-      );
-
-      const data = await parseResponse<{ error: string }>(response);
-
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Session not found in this project');
-    });
-
-    it('should validate request data', async () => {
-      const request = new Request('http://localhost/api/projects/project1/sessions/session1', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          name: '', // Empty name should fail validation
-        }),
-      });
-
-      const response = await PATCH(
-        createActionArgs(request, { projectId: 'project1', sessionId: 'session1' })
-      );
-
-      const data = await parseResponse<{ error: string; details?: unknown }>(response);
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid request data');
-      expect(data.details).toBeDefined();
-    });
-
-    it('should handle partial updates', async () => {
-      const updatedSession = {
-        ...mockSession,
-        name: 'Partially Updated Session',
-        updatedAt: new Date('2023-01-02'),
-      };
-
-      mockProject.updateSession.mockReturnValue(updatedSession);
-
-      const request = new Request('http://localhost/api/projects/project1/sessions/session1', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          name: 'Partially Updated Session',
-        }),
-      });
-
-      const response = await PATCH(
-        createActionArgs(request, { projectId: 'project1', sessionId: 'session1' })
-      );
-
-      const data = await parseResponse<{
-        id: string;
-        name: string;
-        projectId: string;
-        description: string;
-        status: string;
-        createdAt: Date;
-      }>(response);
-
-      expect(response.status).toBe(200);
-      expect(data.name).toBe('Partially Updated Session');
-      expect(data.description).toBe('A test session'); // Should remain unchanged
-    });
-
-    it('should handle database errors during update', async () => {
-      mockProject.updateSession.mockImplementation(() => {
-        throw new Error('Database error');
-      });
-
-      const request = new Request('http://localhost/api/projects/project1/sessions/session1', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          name: 'Updated Session',
-        }),
-      });
-
-      const response = await PATCH(
-        createActionArgs(request, { projectId: 'project1', sessionId: 'session1' })
-      );
-
-      const data = await parseResponse<{ error: string }>(response);
-
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Database error');
-    });
+    expect(response.status).toBe(404);
+    expect(data.error).toBe('Project not found');
   });
 
-  describe('DELETE /api/projects/:projectId/sessions/:sessionId', () => {
-    it('should delete session successfully', async () => {
-      mockProject.deleteSession.mockReturnValue(true);
+  it('GET returns 400 for invalid session ID', async () => {
+    const project = Project.create('Test Project', context.tempProjectDir);
 
-      const response = await DELETE(
-        createActionArgs(
-          new Request('http://localhost/api/projects/project1/sessions/session1', {
-            method: 'DELETE',
-          }),
-          {
-            projectId: 'project1',
-            sessionId: 'session1',
-          }
-        )
-      );
+    const response = await GET(
+      createLoaderArgs(new Request('http://localhost/api/projects/p/sessions/invalid'), {
+        projectId: project.getId(),
+        sessionId: 'invalid',
+      })
+    );
 
-      const data = await parseResponse<{ success: boolean }>(response);
+    const data = await parseResponse<ErrorResponse>(response);
 
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid session ID');
+  });
+
+  it('GET returns 404 when session not found in project', async () => {
+    const project = Project.create('Test Project', context.tempProjectDir);
+
+    const id = 'ws_00000000-0000-0000-0000-000000000000';
+    const response = await GET(
+      createLoaderArgs(
+        new Request(`http://localhost/api/projects/${project.getId()}/sessions/${id}`),
+        { projectId: project.getId(), sessionId: id }
+      )
+    );
+    const data = await parseResponse<ErrorResponse>(response);
+
+    expect(response.status).toBe(404);
+    expect(data.error).toBe('Session not found in this project');
+  });
+
+  it('PATCH updates workspace session name', async () => {
+    const project = Project.create('Test Project', context.tempProjectDir);
+    const supervisor = getSupervisor();
+    const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+    supervisor.updateWorkspaceSession(created.workspaceSessionId, {
+      projectId: project.getId(),
+      name: 'Old Name',
     });
 
-    it('should return 404 when project does not exist', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
-      mockedGetById.mockReturnValue(null);
+    const request = new Request(
+      `http://localhost/api/projects/${project.getId()}/sessions/${created.workspaceSessionId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ name: 'New Name' }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
-      const response = await DELETE(
-        createActionArgs(
-          new Request('http://localhost/api/projects/project1/sessions/session1', {
-            method: 'DELETE',
-          }),
-          {
-            projectId: 'project1',
-            sessionId: 'session1',
-          }
-        )
-      );
+    const response = await PATCH_OR_DELETE(
+      createActionArgs(request, {
+        projectId: project.getId(),
+        sessionId: created.workspaceSessionId,
+      })
+    );
 
-      const data = await parseResponse<{ error: string }>(response);
+    const data = await parseResponse<{ id: string; name: string }>(response);
 
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Project not found');
+    expect(response.status).toBe(200);
+    expect(data.id).toBe(created.workspaceSessionId);
+    expect(data.name).toBe('New Name');
+  });
+
+  it('DELETE removes workspace session', async () => {
+    const project = Project.create('Test Project', context.tempProjectDir);
+    const supervisor = getSupervisor();
+    const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+    supervisor.updateWorkspaceSession(created.workspaceSessionId, {
+      projectId: project.getId(),
+      name: 'To Delete',
     });
 
-    it('should return 404 when session does not exist', async () => {
-      mockProject.deleteSession.mockReturnValue(false);
+    const request = new Request(
+      `http://localhost/api/projects/${project.getId()}/sessions/${created.workspaceSessionId}`,
+      { method: 'DELETE' }
+    );
 
-      const response = await DELETE(
-        createActionArgs(
-          new Request('http://localhost/api/projects/project1/sessions/nonexistent', {
-            method: 'DELETE',
-          }),
-          {
-            projectId: 'project1',
-            sessionId: 'nonexistent',
-          }
-        )
-      );
+    const response = await PATCH_OR_DELETE(
+      createActionArgs(request, {
+        projectId: project.getId(),
+        sessionId: created.workspaceSessionId,
+      })
+    );
 
-      const data = await parseResponse<{ error: string }>(response);
+    const data = await parseResponse<{ success: boolean }>(response);
 
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Session not found in this project');
-    });
-
-    it('should handle database errors during deletion', async () => {
-      mockProject.deleteSession.mockImplementation(() => {
-        throw new Error('Database error');
-      });
-
-      const response = await DELETE(
-        createActionArgs(
-          new Request('http://localhost/api/projects/project1/sessions/session1', {
-            method: 'DELETE',
-          }),
-          {
-            projectId: 'project1',
-            sessionId: 'session1',
-          }
-        )
-      );
-
-      const data = await parseResponse<{ error: string }>(response);
-
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Database error');
-    });
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(supervisor.getWorkspaceSession(created.workspaceSessionId)).toBeUndefined();
   });
 });

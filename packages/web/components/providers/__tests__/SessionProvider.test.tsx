@@ -10,10 +10,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SessionProvider, useSessionContext } from '@lace/web/components/providers/SessionProvider';
+import { asWorkspaceSessionId } from '@lace/web/types/core';
 import type { SessionInfo, AgentInfo, ThreadId } from '@lace/web/types/core';
 import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
 
-const TEST_SESSION_ID = 'test-session';
+const TEST_SESSION_ID = asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000060');
 
 // Mock the hooks
 vi.mock('@lace/web/hooks/useAgentManagement', () => ({
@@ -38,7 +39,7 @@ const createMockAgent = (overrides?: Partial<AgentInfo>): AgentInfo =>
   });
 
 const createMockSession = (overrides?: Partial<SessionInfo>): SessionInfo => ({
-  id: 'lace_20240101_sess01' as ThreadId,
+  id: TEST_SESSION_ID,
   name: 'Test Session',
   createdAt: new Date('2024-01-01'),
   agents: [

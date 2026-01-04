@@ -57,14 +57,14 @@ describe('Projects API', () => {
         description: 'First project',
         workingDirectory: dir1,
         isArchived: false,
-        sessionCount: 1,
+        sessionCount: 0,
       });
       expect(returnedProject2).toMatchObject({
         name: 'Project 2',
         description: 'Second project',
         workingDirectory: dir2,
         isArchived: false,
-        sessionCount: 1,
+        sessionCount: 0,
       });
     });
 
@@ -111,7 +111,7 @@ describe('Projects API', () => {
         description: 'A new project',
         workingDirectory: newDir,
         isArchived: false,
-        sessionCount: 1,
+        sessionCount: 0,
       });
       expect(data.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
       expect(data.createdAt).toBeTruthy();
@@ -152,7 +152,7 @@ describe('Projects API', () => {
         description: '', // Default empty description
         workingDirectory: minimalDir,
         isArchived: false,
-        sessionCount: 1,
+        sessionCount: 0,
       });
     });
 

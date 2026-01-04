@@ -2,16 +2,12 @@
 // ABOUTME: Uses ~ path aliases to reference main project source
 
 // Business logic classes - should only be used by service layer
-export { Agent } from '@lace/core/agents/agent';
 export { ProviderRegistry } from '@lace/core/providers/registry';
 export { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
 export { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
 export { ToolExecutor } from '@lace/core/tools/executor';
 export { ToolCatalog } from '@lace/core/tools/tool-catalog';
-export { Session } from '@lace/core/sessions/session';
 export { Project } from '@lace/core/projects/project';
-export { ThreadManager } from '@lace/core/threads/thread-manager';
-export { SessionHelper } from '@lace/core/helpers/session-helper';
 export { InfrastructureHelper } from '@lace/core/helpers/infrastructure-helper';
 
 // Provider types

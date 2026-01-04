@@ -10,7 +10,7 @@ import { EventStreamProvider } from '@lace/web/components/providers/EventStreamP
 import { ToolApprovalProvider } from '@lace/web/components/providers/ToolApprovalProvider';
 import { ScrollProvider } from '@lace/web/components/providers/ScrollProvider';
 import { AgentPageContent } from '@lace/web/components/pages/AgentPageContent';
-import type { ThreadId } from '@lace/web/types/core';
+import type { ThreadId, WorkspaceSessionId } from '@lace/web/types/core';
 
 // Define stable callback functions outside component to prevent re-renders
 const noOpCallback = () => {};
@@ -31,11 +31,11 @@ export default function ProjectSessionAgent() {
             selectedAgentId={agentId!}
             onAgentChange={noOpCallback}
           >
-            <ToolApprovalProvider sessionId={sessionId! as ThreadId}>
+            <ToolApprovalProvider sessionId={sessionId! as WorkspaceSessionId}>
               <EventStreamProvider
                 key={agentId}
                 projectId={projectId!}
-                sessionId={sessionId! as ThreadId}
+                sessionId={sessionId! as WorkspaceSessionId}
                 agentId={agentId! as ThreadId}
               >
                 <ScrollProvider>

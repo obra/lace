@@ -9,7 +9,7 @@ import {
   useToolApprovalContext,
 } from '@lace/web/components/providers/ToolApprovalProvider';
 import { api } from '@lace/web/lib/api-client';
-import type { ThreadId } from '@lace/web/types/core';
+import { asWorkspaceSessionId } from '@lace/web/types/core';
 import { ApprovalDecision } from '@lace/web/types/core';
 import type { SessionPendingApproval } from '@lace/web/types/api';
 
@@ -40,7 +40,7 @@ function TestComponent() {
 }
 
 describe('ToolApprovalProvider (Session-Scoped)', () => {
-  const testSessionId = 'lace_20250916_test01' as ThreadId;
+  const testSessionId = asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000070');
 
   beforeEach(() => {
     vi.clearAllMocks();

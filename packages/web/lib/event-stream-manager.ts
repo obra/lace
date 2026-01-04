@@ -3,7 +3,6 @@
 
 // StreamEvent removed - using LaceEvent directly
 import type { LaceEvent, ErrorType, ErrorPhase } from '@lace/web/types/core';
-import type { Session, Agent } from '@lace/web/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
 import { logger } from '@lace/core/utils/logger';
 import { stringify } from '@lace/web/lib/serialization';
@@ -70,77 +69,6 @@ export class EventStreamManager {
   private constructor() {
     this.startKeepAlive();
   }
-
-  // Register a Session to forward its agent events to the stream
-  // Called from SessionService
-  registerSession(session: Session): void {
-    const sessionId = session.getId();
-    const projectId = session.getProjectId();
-
-    // Handle agent errors for existing agents
-    const agents = session.getAgents();
-    for (const agentInfo of agents) {
-      const agent = session.getAgent(agentInfo.threadId);
-      if (agent) {
-        this.registerAgentErrorHandler(agent, agentInfo.threadId, projectId || '', sessionId || '');
-      }
-    }
-  }
-
-  // Extract agent error handler registration into reusable method
-  private registerAgentErrorHandler(
-    agent: Agent,
-    agentThreadId: string,
-    projectId: string,
-    sessionId: string
-  ): void {
-    // Prevent duplicate error listeners on the same Agent instance
-    if (EventStreamManager.registeredAgents.has(agent)) {
-      return;
-    }
-
-    EventStreamManager.registeredAgents.add(agent);
-
-    agent.on('error', (errorEvent: { error: Error; context: Record<string, unknown> }) => {
-      const { error, context } = errorEvent;
-
-      logger.debug(
-        `[EVENT_STREAM] Agent ${agentThreadId} error occurred, broadcasting AGENT_ERROR`
-      );
-
-      this.broadcast({
-        type: 'AGENT_ERROR',
-        timestamp: new Date(),
-        data: {
-          errorType: context.errorType as ErrorType,
-          message: error.message,
-          fullError: error,
-          stack: error.stack,
-          context: {
-            phase: context.phase as ErrorPhase,
-            providerName: context.providerName as string | undefined,
-            providerInstanceId: context.providerInstanceId as string | undefined,
-            modelId: context.modelId as string | undefined,
-            toolName: context.toolName as string | undefined,
-            toolCallId: context.toolCallId as string | undefined,
-            workingDirectory: context.workingDirectory as string | undefined,
-            retryAttempt: context.retryAttempt as number | undefined,
-          },
-          isRetryable: context.isRetryable as boolean,
-          retryCount: context.retryCount as number,
-        },
-        transient: true,
-        context: {
-          projectId,
-          sessionId,
-          threadId: agentThreadId,
-        },
-      });
-    });
-  }
-
-  // WeakSet to track agents that already have error listeners registered
-  private static registeredAgents = new WeakSet<Agent>();
 
   static getInstance(): EventStreamManager {
     if (!global.eventStreamManager) {

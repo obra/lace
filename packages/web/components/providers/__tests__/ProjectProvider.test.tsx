@@ -10,7 +10,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { ProjectProvider, useProjectContext } from '@lace/web/components/providers/ProjectProvider';
-import type { SessionInfo, ThreadId } from '@lace/web/types/core';
+import { asWorkspaceSessionId } from '@lace/web/types/core';
+import type { SessionInfo, WorkspaceSessionId } from '@lace/web/types/core';
 
 // Mock the hooks
 vi.mock('@lace/web/hooks/useSessionManagement', () => ({
@@ -24,8 +25,13 @@ import { useSessionManagement } from '@lace/web/hooks/useSessionManagement';
 const mockUseSessionManagement = vi.mocked(useSessionManagement);
 
 // Test data factories
+const ws1 = asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000001');
+const ws2 = asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000002');
+const ws3 = asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000003');
+const wsIncomp = asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000004');
+
 const createMockSession = (overrides?: Partial<SessionInfo>): SessionInfo => ({
-  id: 'lace_20240101_sess01' as ThreadId,
+  id: ws1,
   name: 'Test Session',
   createdAt: new Date('2024-01-01'),
   agents: [],
@@ -33,9 +39,9 @@ const createMockSession = (overrides?: Partial<SessionInfo>): SessionInfo => ({
 });
 
 const mockSessions: SessionInfo[] = [
-  createMockSession({ id: 'lace_20240101_sess01' as ThreadId, name: 'Session One' }),
-  createMockSession({ id: 'lace_20240101_sess02' as ThreadId, name: 'Session Two' }),
-  createMockSession({ id: 'lace_20240101_sess03' as ThreadId, name: 'Session Three' }),
+  createMockSession({ id: ws1, name: 'Session One' }),
+  createMockSession({ id: ws2, name: 'Session Two' }),
+  createMockSession({ id: ws3, name: 'Session Three' }),
 ];
 
 // Component to test context provision
@@ -62,13 +68,10 @@ function ContextConsumer() {
       <div data-testid="selected-session">{selectedSession || 'none'}</div>
       <div data-testid="found-session">{foundSession?.name || 'none'}</div>
 
-      <button onClick={() => selectSession('lace_20240101_sess02')} data-testid="select-session-2">
+      <button onClick={() => selectSession(ws2)} data-testid="select-session-2">
         Select Session 2
       </button>
-      <button
-        onClick={() => onSessionSelect({ id: 'lace_20240101_sess03' })}
-        data-testid="select-session-3"
-      >
+      <button onClick={() => onSessionSelect({ id: ws3 })} data-testid="select-session-3">
         Select Session 3
       </button>
       <button onClick={() => createSession({ name: 'New Session' })} data-testid="create-session">
@@ -116,7 +119,7 @@ describe('ProjectProvider', () => {
   describe('Context Provision', () => {
     it('provides session context to children', () => {
       render(
-        <ProjectProvider projectId="test-project" selectedSessionId="lace_20240101_sess01">
+        <ProjectProvider projectId="test-project" selectedSessionId={ws1}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -124,7 +127,7 @@ describe('ProjectProvider', () => {
       expect(screen.getByTestId('session-count')).toHaveTextContent('3');
       expect(screen.getByTestId('loading')).toHaveTextContent('false');
       expect(screen.getByTestId('project-config')).toHaveTextContent('none');
-      expect(screen.getByTestId('selected-session')).toHaveTextContent('lace_20240101_sess01');
+      expect(screen.getByTestId('selected-session')).toHaveTextContent(ws1);
       expect(screen.getByTestId('found-session')).toHaveTextContent('Session One');
     });
 
@@ -154,7 +157,7 @@ describe('ProjectProvider', () => {
   describe('Session Data Management', () => {
     it('provides found session data when session is selected', () => {
       render(
-        <ProjectProvider projectId="test-project" selectedSessionId="lace_20240101_sess01">
+        <ProjectProvider projectId="test-project" selectedSessionId={ws1}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -174,7 +177,7 @@ describe('ProjectProvider', () => {
 
     it('provides null found session when selected session not found', () => {
       render(
-        <ProjectProvider projectId="test-project" selectedSessionId="lace_20240101_notfnd">
+        <ProjectProvider projectId="test-project" selectedSessionId="ws_missing">
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -212,7 +215,7 @@ describe('ProjectProvider', () => {
 
       fireEvent.click(screen.getByTestId('select-session-2'));
 
-      expect(mockOnSessionChangeCallback).toHaveBeenCalledWith('lace_20240101_sess02');
+      expect(mockOnSessionChangeCallback).toHaveBeenCalledWith(ws2);
     });
 
     it('calls selectSession when onSessionSelect is called', () => {
@@ -228,7 +231,7 @@ describe('ProjectProvider', () => {
 
       fireEvent.click(screen.getByTestId('select-session-3'));
 
-      expect(mockOnSessionChangeCallback).toHaveBeenCalledWith('lace_20240101_sess03');
+      expect(mockOnSessionChangeCallback).toHaveBeenCalledWith(ws3);
     });
 
     it('calls onSessionChange callback when session selection changes', () => {
@@ -244,7 +247,7 @@ describe('ProjectProvider', () => {
 
       fireEvent.click(screen.getByTestId('select-session-2'));
 
-      expect(mockOnSessionChangeCallback).toHaveBeenCalledWith('lace_20240101_sess02');
+      expect(mockOnSessionChangeCallback).toHaveBeenCalledWith(ws2);
     });
 
     it('handles empty string session selection as null', () => {
@@ -400,7 +403,7 @@ describe('ProjectProvider', () => {
     it('handles sessions with missing optional fields', () => {
       const incompleteSessions = [
         createMockSession({
-          id: 'lace_20240101_incomp' as ThreadId,
+          id: wsIncomp,
           name: 'Incomplete Session',
           agents: undefined,
         }),
@@ -412,7 +415,7 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider projectId="test-project" selectedSessionId="lace_20240101_incomp">
+        <ProjectProvider projectId="test-project" selectedSessionId={wsIncomp}>
           <ContextConsumer />
         </ProjectProvider>
       );

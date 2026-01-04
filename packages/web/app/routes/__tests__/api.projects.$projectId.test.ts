@@ -39,6 +39,14 @@ vi.mock('@lace/web/lib/server/lace-imports', () => ({
   },
 }));
 
+const mockSupervisor = {
+  listWorkspaceSessions: vi.fn().mockReturnValue([]),
+};
+
+vi.mock('@lace/web/lib/server/supervisor-service', () => ({
+  getSupervisor: () => mockSupervisor,
+}));
+
 describe('Individual Project API', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SessionSection } from '@lace/web/components/sidebar/SessionSection';
+import { asWorkspaceSessionId } from '@lace/web/types/core';
 import type { SessionInfo, ThreadId, AgentInfo } from '@lace/web/types/core';
 import {
   createMockSessionContext,
@@ -54,7 +55,7 @@ const createMockAgent = (
   });
 
 const createMockSessionDetails = (agents: AgentInfo[]): SessionInfo => ({
-  id: 'test-session' as ThreadId,
+  id: asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000020'),
   name: 'Test Session',
   createdAt: new Date(),
   agents,

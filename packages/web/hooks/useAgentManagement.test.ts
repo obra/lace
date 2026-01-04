@@ -12,6 +12,7 @@ import {
   vi,
   type MockedFunction,
 } from 'vitest';
+import { asWorkspaceSessionId } from '@lace/web/types/core';
 import type { SessionInfo, ThreadId } from '@lace/web/types/core';
 import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
 import { useAgentManagement } from './useAgentManagement';
@@ -35,8 +36,10 @@ vi.mock('@lace/web/lib/serialization', () => ({
 import { parseResponse } from '@lace/web/lib/serialization';
 const mockParseResponse = vi.mocked(parseResponse);
 
+const testWorkspaceSessionId = asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000030');
+
 const mockSessionWithAgents: SessionInfo = {
-  id: 'session-1' as ThreadId,
+  id: testWorkspaceSessionId,
   name: 'Test Session',
   createdAt: new Date('2024-01-01'),
   agents: [
@@ -81,7 +84,7 @@ describe('useAgentManagement', () => {
     mockFetch.mockResolvedValueOnce(mockResponse);
     mockParseResponse.mockResolvedValueOnce(mockSessionWithAgents);
 
-    const { result } = renderHook(() => useAgentManagement('session-1'));
+    const { result } = renderHook(() => useAgentManagement(testWorkspaceSessionId));
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -89,14 +92,16 @@ describe('useAgentManagement', () => {
 
     expect(result.current.sessionDetails).toEqual(mockSessionWithAgents);
     expect(result.current.loading).toBe(false);
-    expect(mockFetch).toHaveBeenCalledWith('/api/sessions/session-1', { method: 'GET' });
+    expect(mockFetch).toHaveBeenCalledWith(`/api/sessions/${testWorkspaceSessionId}`, {
+      method: 'GET',
+    });
   });
 
   it('clears session details when session is deselected', async () => {
     const { result, rerender } = renderHook(
       (props: { sessionId: string | null }) => useAgentManagement(props.sessionId),
       {
-        initialProps: { sessionId: 'session-1' as string | null },
+        initialProps: { sessionId: testWorkspaceSessionId as string | null },
       }
     );
 
@@ -150,21 +155,21 @@ describe('useAgentManagement', () => {
       .mockResolvedValueOnce({ threadId: 'new-agent' })
       .mockResolvedValueOnce(updatedSession);
 
-    const { result } = renderHook(() => useAgentManagement('session-1'));
+    const { result } = renderHook(() => useAgentManagement(testWorkspaceSessionId));
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     await act(async () => {
-      await result.current.createAgent('session-1', {
+      await result.current.createAgent(testWorkspaceSessionId, {
         name: 'New Agent',
         modelId: 'gpt-4',
         providerInstanceId: 'openai',
       });
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('/api/sessions/session-1/agents', {
+    expect(mockFetch).toHaveBeenCalledWith(`/api/sessions/${testWorkspaceSessionId}/agents`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -189,7 +194,7 @@ describe('useAgentManagement', () => {
     mockFetch.mockResolvedValueOnce(mockResponse);
     mockParseResponse.mockResolvedValueOnce(mockSessionWithAgents);
 
-    const { result } = renderHook(() => useAgentManagement('session-1'));
+    const { result } = renderHook(() => useAgentManagement(testWorkspaceSessionId));
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -213,7 +218,7 @@ describe('useAgentManagement', () => {
     mockFetch.mockResolvedValueOnce(mockResponse);
     mockParseResponse.mockResolvedValueOnce(mockSessionWithAgents);
 
-    const { result } = renderHook(() => useAgentManagement('session-1'));
+    const { result } = renderHook(() => useAgentManagement(testWorkspaceSessionId));
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -232,7 +237,7 @@ describe('useAgentManagement', () => {
     const networkError = new Error('Network error');
     mockFetch.mockRejectedValueOnce(networkError);
 
-    const { result } = renderHook(() => useAgentManagement('session-1'));
+    const { result } = renderHook(() => useAgentManagement(testWorkspaceSessionId));
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -260,14 +265,14 @@ describe('useAgentManagement', () => {
 
     mockParseResponse.mockResolvedValueOnce(mockSessionWithAgents);
 
-    const { result } = renderHook(() => useAgentManagement('session-1'));
+    const { result } = renderHook(() => useAgentManagement(testWorkspaceSessionId));
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     await act(async () => {
-      await result.current.createAgent('session-1', {
+      await result.current.createAgent(testWorkspaceSessionId, {
         name: 'New Agent',
         modelId: 'gpt-4',
         providerInstanceId: 'openai',
@@ -301,14 +306,14 @@ describe('useAgentManagement', () => {
       .mockResolvedValueOnce(mockSessionWithAgents)
       .mockResolvedValueOnce({ error: 'Agent creation failed' });
 
-    const { result } = renderHook(() => useAgentManagement('session-1'));
+    const { result } = renderHook(() => useAgentManagement(testWorkspaceSessionId));
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     await act(async () => {
-      await result.current.createAgent('session-1', {
+      await result.current.createAgent(testWorkspaceSessionId, {
         name: 'New Agent',
         modelId: 'gpt-4',
         providerInstanceId: 'openai',
@@ -333,7 +338,7 @@ describe('useAgentManagement', () => {
     mockFetch.mockResolvedValueOnce(mockSessionResponse).mockRejectedValueOnce(configError);
     mockParseResponse.mockResolvedValueOnce(mockSessionWithAgents);
 
-    const { result } = renderHook(() => useAgentManagement('session-1'));
+    const { result } = renderHook(() => useAgentManagement(testWorkspaceSessionId));
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -366,7 +371,7 @@ describe('useAgentManagement', () => {
     mockFetch.mockResolvedValueOnce(mockSessionResponse).mockRejectedValueOnce(updateError);
     mockParseResponse.mockResolvedValueOnce(mockSessionWithAgents);
 
-    const { result } = renderHook(() => useAgentManagement('session-1'));
+    const { result } = renderHook(() => useAgentManagement(testWorkspaceSessionId));
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));

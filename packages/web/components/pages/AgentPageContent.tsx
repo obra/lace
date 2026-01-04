@@ -18,7 +18,7 @@ import { PermissionModeBadge } from '@lace/web/components/ui/PermissionModeSelec
 import type { PermissionOverrideMode } from '@lace/core/tools/types';
 
 import { useUIContext } from '@lace/web/components/providers/UIProvider';
-import { asThreadId, isAgentSummaryUpdatedData } from '@lace/web/types/core';
+import { asThreadId, asWorkspaceSessionId, isAgentSummaryUpdatedData } from '@lace/web/types/core';
 import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
 import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
 import { useToolApprovalContext } from '@lace/web/components/providers/ToolApprovalProvider';
@@ -103,7 +103,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   // Event handlers
   const handleAgentSelect = useCallback(
     (agentThreadId: string) => {
-      navigateToAgent(projectId, asThreadId(sessionId), asThreadId(agentThreadId));
+      navigateToAgent(projectId, asWorkspaceSessionId(sessionId), asThreadId(agentThreadId));
     },
     [navigateToAgent, projectId, sessionId]
   );
@@ -159,7 +159,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
 
       // Navigate to the new agent
       const newAgentThreadId = (response as { threadId: string }).threadId;
-      navigateToAgent(projectId, asThreadId(sessionId), asThreadId(newAgentThreadId));
+      navigateToAgent(projectId, asWorkspaceSessionId(sessionId), asThreadId(newAgentThreadId));
 
       // Reload session details to show new agent in sidebar
       await reloadSessionDetails();

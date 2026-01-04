@@ -66,21 +66,20 @@ describe('Type Integrity - Current State', () => {
       const { isValidThreadId } = await import('@lace/web/lib/validation/thread-id-validation');
 
       // Valid formats
-      expect(isValidThreadId('lace_20250731_abc123')).toBe(true);
-      expect(isValidThreadId('lace_20250731_abc123.1')).toBe(true);
+      expect(isValidThreadId('sess_123e4567-e89b-12d3-a456-426614174000')).toBe(true);
+      expect(isValidThreadId('550e8400-e29b-41d4-a716-446655440000')).toBe(true);
 
       // Invalid formats
-      expect(isValidThreadId('invalid')).toBe(false);
       expect(isValidThreadId('')).toBe(false);
-      expect(isValidThreadId('lace_invalid_date')).toBe(false);
-      expect(isValidThreadId('550e8400-e29b-41d4-a716-446655440000')).toBe(false); // UUIDs not valid
+      expect(isValidThreadId('a..b')).toBe(false);
+      expect(isValidThreadId('abc.')).toBe(false);
+      expect(isValidThreadId('has space')).toBe(false);
     });
 
     it('should create SessionInfo types correctly', async () => {
-      const { asThreadId } = await import('@lace/web/types/core');
+      const { asWorkspaceSessionId } = await import('@lace/web/types/core');
 
-      // Test SessionInfo creation with proper ThreadId
-      const sessionId = asThreadId('lace_20250731_abc123');
+      const sessionId = asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000080');
       const session: SessionInfo = {
         id: sessionId,
         name: 'Test Session',
@@ -96,7 +95,7 @@ describe('Type Integrity - Current State', () => {
       const { asThreadId } = await import('@lace/web/types/core');
 
       // Test AgentInfo creation with proper ThreadId
-      const agentThreadId = asThreadId('lace_20250731_abc123.1');
+      const agentThreadId = asThreadId('sess_123e4567-e89b-12d3-a456-426614174000');
       const agent: AgentInfo = createMockAgentInfo({
         threadId: agentThreadId,
         name: 'Test Agent',

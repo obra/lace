@@ -1,16 +1,16 @@
-// ABOUTME: Individual session API endpoints - GET/PATCH/DELETE specific session in project
-// ABOUTME: Uses Project class methods for session management with proper validation
+// ABOUTME: Individual session API endpoints - GET/PATCH/DELETE specific workspace session in project
+// ABOUTME: Uses supervisor-backed workspace sessions (no SQLite session records)
 
 import type { Route } from './+types/api.projects.$projectId.sessions.$sessionId';
 import { Project } from '@lace/web/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { z } from 'zod';
 
 const UpdateSessionSchema = z.object({
   name: z.string().min(1).optional(),
-  description: z.string().optional(),
-  configuration: z.record(z.unknown()).optional(),
-  status: z.enum(['active', 'archived', 'completed']).optional(),
 });
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
@@ -18,31 +18,35 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     const { projectId, sessionId } = params as { projectId: string; sessionId: string };
     const project = Project.getById(projectId);
     if (!project) {
-      return createSuperjsonResponse(
-        { error: 'Project not found', code: 'RESOURCE_NOT_FOUND' },
-        { status: 404 }
-      );
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const session = project.getSession(sessionId);
-    if (!session) {
-      return createSuperjsonResponse(
-        {
-          error: 'Session not found in this project',
-          code: 'RESOURCE_NOT_FOUND',
-        },
-        { status: 404 }
-      );
+    if (!isWorkspaceSessionId(sessionId)) {
+      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    return createSuperjsonResponse(session);
+    const supervisor = getSupervisor();
+    const record = supervisor.getWorkspaceSession(sessionId);
+    if (!record || record.projectId !== projectId) {
+      return createErrorResponse('Session not found in this project', 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
+    }
+
+    return createSuperjsonResponse({
+      id: record.workspaceSessionId,
+      name: record.name ?? 'Session',
+      projectId,
+      createdAt: new Date(record.createdAt),
+      agentCount: record.agents.length,
+    });
   } catch (error: unknown) {
-    return createSuperjsonResponse(
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to fetch session',
+      500,
       {
-        error: error instanceof Error ? error.message : 'Failed to fetch session',
         code: 'INTERNAL_SERVER_ERROR',
-      },
-      { status: 500 }
+      }
     );
   }
 }
@@ -56,42 +60,51 @@ export async function action({ request, params }: Route.ActionArgs) {
 
       const project = Project.getById(projectId);
       if (!project) {
-        return createSuperjsonResponse(
-          { error: 'Project not found', code: 'RESOURCE_NOT_FOUND' },
-          { status: 404 }
-        );
+        return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
       }
 
-      const session = project.updateSession(sessionId, validatedData);
-      if (!session) {
-        return createSuperjsonResponse(
-          {
-            error: 'Session not found in this project',
-            code: 'RESOURCE_NOT_FOUND',
-          },
-          { status: 404 }
-        );
+      if (!isWorkspaceSessionId(sessionId)) {
+        return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
       }
 
-      return createSuperjsonResponse(session);
+      const supervisor = getSupervisor();
+      const existing = supervisor.getWorkspaceSession(sessionId);
+      if (!existing || existing.projectId !== projectId) {
+        return createErrorResponse('Session not found in this project', 404, {
+          code: 'RESOURCE_NOT_FOUND',
+        });
+      }
+
+      if (typeof validatedData.name === 'string') {
+        supervisor.updateWorkspaceSession(sessionId, { name: validatedData.name });
+      }
+
+      const record = supervisor.getWorkspaceSession(sessionId);
+      if (!record) {
+        return createErrorResponse('Session not found after update', 500, {
+          code: 'INTERNAL_SERVER_ERROR',
+        });
+      }
+
+      return createSuperjsonResponse({
+        id: record.workspaceSessionId,
+        name: record.name ?? 'Session',
+        projectId,
+        createdAt: new Date(record.createdAt),
+        agentCount: record.agents.length,
+      });
     } catch (error: unknown) {
       if (error instanceof z.ZodError) {
-        return createSuperjsonResponse(
-          {
-            error: 'Invalid request data',
-            code: 'VALIDATION_FAILED',
-            details: error.errors,
-          },
-          { status: 400 }
-        );
+        return createErrorResponse('Invalid request data', 400, {
+          code: 'VALIDATION_FAILED',
+          details: error.errors,
+        });
       }
 
-      return createSuperjsonResponse(
-        {
-          error: error instanceof Error ? error.message : 'Failed to update session',
-          code: 'INTERNAL_SERVER_ERROR',
-        },
-        { status: 500 }
+      return createErrorResponse(
+        error instanceof Error ? error.message : 'Failed to update session',
+        500,
+        { code: 'INTERNAL_SERVER_ERROR' }
       );
     }
   }
@@ -101,34 +114,32 @@ export async function action({ request, params }: Route.ActionArgs) {
       const { projectId, sessionId } = params as { projectId: string; sessionId: string };
       const project = Project.getById(projectId);
       if (!project) {
-        return createSuperjsonResponse(
-          { error: 'Project not found', code: 'RESOURCE_NOT_FOUND' },
-          { status: 404 }
-        );
+        return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
       }
 
-      const success = project.deleteSession(sessionId);
-      if (!success) {
-        return createSuperjsonResponse(
-          {
-            error: 'Session not found in this project',
-            code: 'RESOURCE_NOT_FOUND',
-          },
-          { status: 404 }
-        );
+      if (!isWorkspaceSessionId(sessionId)) {
+        return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
       }
+
+      const supervisor = getSupervisor();
+      const record = supervisor.getWorkspaceSession(sessionId);
+      if (!record || record.projectId !== projectId) {
+        return createErrorResponse('Session not found in this project', 404, {
+          code: 'RESOURCE_NOT_FOUND',
+        });
+      }
+
+      await supervisor.deleteWorkspaceSession(sessionId);
 
       return createSuperjsonResponse({ success: true });
     } catch (error: unknown) {
-      return createSuperjsonResponse(
-        {
-          error: error instanceof Error ? error.message : 'Failed to delete session',
-          code: 'INTERNAL_SERVER_ERROR',
-        },
-        { status: 500 }
+      return createErrorResponse(
+        error instanceof Error ? error.message : 'Failed to delete session',
+        500,
+        { code: 'INTERNAL_SERVER_ERROR' }
       );
     }
   }
 
-  return createSuperjsonResponse({ error: 'Method not allowed' }, { status: 405 });
+  return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
 }

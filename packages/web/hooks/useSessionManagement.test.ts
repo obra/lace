@@ -3,6 +3,7 @@
 
 import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { asWorkspaceSessionId } from '@lace/web/types/core';
 import type { SessionInfo, ThreadId } from '@lace/web/types/core';
 import { useSessionManagement } from './useSessionManagement';
 import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
@@ -21,7 +22,7 @@ const mockParseResponse = vi.mocked(parseResponse);
 
 const mockSessions: SessionInfo[] = [
   {
-    id: 'session-1' as ThreadId,
+    id: asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000050'),
     name: 'Test Session 1',
     createdAt: new Date('2024-01-01'),
     agents: [
@@ -35,7 +36,7 @@ const mockSessions: SessionInfo[] = [
     ],
   },
   {
-    id: 'session-2' as ThreadId,
+    id: asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000051'),
     name: 'Test Session 2',
     createdAt: new Date('2024-01-02'),
     agents: [],

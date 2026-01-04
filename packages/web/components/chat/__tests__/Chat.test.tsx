@@ -13,6 +13,7 @@ import '@testing-library/jest-dom/vitest';
 import { Chat } from '@lace/web/components/chat/Chat';
 import { ScrollProvider } from '@lace/web/components/providers/ScrollProvider';
 import { SettingsProvider } from '@lace/web/components/providers/SettingsProvider';
+import { asWorkspaceSessionId } from '@lace/web/types/core';
 import type { ThreadId, AgentInfo, LaceEvent } from '@lace/web/types/core';
 import { createMockSessionContext } from '@lace/web/__tests__/utils/provider-mocks';
 import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
@@ -119,6 +120,8 @@ const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockApi = vi.mocked(api);
 
 // Test data factories
+const testWorkspaceSessionId = asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000001');
+
 const createMockAgent = (id: string, name: string): AgentInfo =>
   createMockAgentInfo({
     threadId: id as ThreadId,
@@ -209,7 +212,7 @@ describe('Chat', () => {
     mockUseSessionContext.mockReturnValue(
       createMockSessionContext({
         sessionDetails: {
-          id: 'session-1' as ThreadId,
+          id: testWorkspaceSessionId,
           name: 'Test Session',
           createdAt: new Date(),
           agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
@@ -251,7 +254,7 @@ describe('Chat', () => {
       mockUseSessionContext.mockReturnValue(
         createMockSessionContext({
           sessionDetails: {
-            id: 'session-1' as ThreadId,
+            id: testWorkspaceSessionId,
             name: 'Test Session',
             createdAt: new Date(),
             agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
@@ -276,7 +279,7 @@ describe('Chat', () => {
       mockUseSessionContext.mockReturnValue(
         createMockSessionContext({
           sessionDetails: {
-            id: 'session-1' as ThreadId,
+            id: testWorkspaceSessionId,
             name: 'Test Session',
             createdAt: new Date(),
             agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
@@ -300,7 +303,7 @@ describe('Chat', () => {
       mockUseSessionContext.mockReturnValue(
         createMockSessionContext({
           sessionDetails: {
-            id: 'session-1' as ThreadId,
+            id: testWorkspaceSessionId,
             name: 'Test Session',
             createdAt: new Date(),
             agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
@@ -320,7 +323,7 @@ describe('Chat', () => {
       mockUseSessionContext.mockReturnValue(
         createMockSessionContext({
           sessionDetails: {
-            id: 'session-1' as ThreadId,
+            id: testWorkspaceSessionId,
             name: 'Test Session',
             createdAt: new Date(),
             agents: [createMockAgent('agent-1', 'Alice')],
@@ -339,7 +342,7 @@ describe('Chat', () => {
       mockUseSessionContext.mockReturnValue(
         createMockSessionContext({
           sessionDetails: {
-            id: 'session-1' as ThreadId,
+            id: testWorkspaceSessionId,
             name: 'Test Session',
             createdAt: new Date(),
             agents: [createMockAgent('agent-1', 'Alice')],
@@ -364,7 +367,7 @@ describe('Chat', () => {
       mockUseSessionContext.mockReturnValue(
         createMockSessionContext({
           sessionDetails: {
-            id: 'session-1' as ThreadId,
+            id: testWorkspaceSessionId,
             name: 'Test Session',
             createdAt: new Date(),
             agents: [createMockAgent('agent-1', 'Alice')],
@@ -382,7 +385,7 @@ describe('Chat', () => {
       mockUseSessionContext.mockReturnValue(
         createMockSessionContext({
           sessionDetails: {
-            id: 'session-1' as ThreadId,
+            id: testWorkspaceSessionId,
             name: 'Test Session',
             createdAt: new Date(),
             agents: [],
@@ -406,7 +409,7 @@ describe('Chat', () => {
       mockUseSessionContext.mockReturnValue(
         createMockSessionContext({
           sessionDetails: {
-            id: 'session-1' as ThreadId,
+            id: testWorkspaceSessionId,
             name: 'Test Session',
             createdAt: new Date(),
             agents: [createMockAgent('agent-1', 'Alice')],
@@ -424,7 +427,7 @@ describe('Chat', () => {
       mockUseSessionContext.mockReturnValue(
         createMockSessionContext({
           sessionDetails: {
-            id: 'session-1' as ThreadId,
+            id: testWorkspaceSessionId,
             name: 'Test Session',
             createdAt: new Date(),
             agents: [],
@@ -444,7 +447,7 @@ describe('Chat', () => {
       mockUseSessionContext.mockReturnValue(
         createMockSessionContext({
           sessionDetails: {
-            id: 'session-1' as ThreadId,
+            id: testWorkspaceSessionId,
             name: 'Test Session',
             createdAt: new Date(),
             agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
@@ -480,7 +483,7 @@ describe('Chat', () => {
       mockUseSessionContext.mockReturnValue(
         createMockSessionContext({
           sessionDetails: {
-            id: 'session-1' as ThreadId,
+            id: testWorkspaceSessionId,
             name: 'Test Session',
             createdAt: new Date(),
             agents: [],
@@ -541,7 +544,7 @@ describe('Chat', () => {
       mockUseSessionContext.mockReturnValue(
         createMockSessionContext({
           sessionDetails: {
-            id: 'session-1' as ThreadId,
+            id: testWorkspaceSessionId,
             name: 'Test Session',
             createdAt: new Date(),
             agents: [createMockAgent('solo-agent', 'Solo')],

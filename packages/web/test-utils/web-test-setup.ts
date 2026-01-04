@@ -2,7 +2,6 @@
 // ABOUTME: Provides unified setup that handles temp LACE_DIR and persistence automatically
 
 import { useTempLaceDir, type TempLaceDirContext } from '@lace/core/test-utils/temp-lace-dir';
-import { resetPersistence } from '@lace/core/persistence/database';
 import { ProviderRegistry } from '@lace/core/providers/registry';
 import { beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'fs';
@@ -19,8 +18,6 @@ export interface WebTestContext extends TempLaceDirContext {
 /**
  * Complete test setup for web tests - handles temp LACE_DIR and temp project directory
  * Use this instead of manually calling useTempLaceDir() and setupTestPersistence()
- *
- * Persistence automatically initializes to ${LACE_DIR}/lace.db on first use via getPersistence()
  *
  * @returns WebTestContext with tempDir (LACE_DIR) and tempProjectDir (for projects)
  */
@@ -51,7 +48,6 @@ export function setupWebTest(): WebTestContext {
 
   // Reset persistence and provider registry before each test
   beforeEach(async () => {
-    resetPersistence();
     ProviderRegistry.clearInstance();
 
     // Create temp project directory

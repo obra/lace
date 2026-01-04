@@ -13,7 +13,7 @@ import React, {
   useRef,
   type ReactNode,
 } from 'react';
-import type { ThreadId } from '@lace/web/types/core';
+import type { WorkspaceSessionId } from '@lace/web/types/core';
 import type { SessionPendingApproval } from '@lace/web/types/api';
 import { api } from '@lace/web/lib/api-client';
 import { AbortError } from '@lace/web/lib/api-errors';
@@ -37,7 +37,7 @@ const ToolApprovalContext = createContext<ToolApprovalContextType | null>(null);
 
 interface ToolApprovalProviderProps {
   children: ReactNode;
-  sessionId: ThreadId | null;
+  sessionId: WorkspaceSessionId | null;
 }
 
 export function ToolApprovalProvider({ children, sessionId }: ToolApprovalProviderProps) {

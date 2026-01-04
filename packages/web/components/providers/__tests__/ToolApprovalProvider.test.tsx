@@ -13,7 +13,7 @@ import {
   ToolApprovalProvider,
   useToolApprovalContext,
 } from '@lace/web/components/providers/ToolApprovalProvider';
-import type { ThreadId } from '@lace/web/types/core';
+import { asWorkspaceSessionId } from '@lace/web/types/core';
 import type { PendingApproval, SessionPendingApproval } from '@lace/web/types/api';
 import type { ToolApprovalRequestData } from '@lace/web/types/web-events';
 
@@ -129,7 +129,7 @@ function ContextConsumer() {
 }
 
 describe('ToolApprovalProvider', () => {
-  const testSessionId = 'lace_20250916_test01' as ThreadId; // Valid session ID format
+  const testSessionId = asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000010');
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -699,7 +699,7 @@ describe('ToolApprovalProvider', () => {
       vi.clearAllMocks();
 
       // Change session ID
-      const newSessionId = 'lace_20250916_test02' as ThreadId;
+      const newSessionId = asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000011');
       rerender(
         <ToolApprovalProvider sessionId={newSessionId}>
           <ContextConsumer />

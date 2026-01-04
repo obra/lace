@@ -18,6 +18,7 @@ import { parseResponse } from '@lace/web/lib/serialization';
 import type { ProjectInfo } from '@lace/web/types/core';
 import { promises as fs } from 'fs';
 import { join } from 'path';
+import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
@@ -37,10 +38,6 @@ describe('Projects API Integration Tests', () => {
   beforeEach(async () => {
     setupTestProviderDefaults();
 
-    // Force persistence reset to ensure clean database state
-    const { resetPersistence } = await import('@lace/core/persistence/database');
-    resetPersistence();
-
     // Create test provider instance
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
@@ -51,6 +48,7 @@ describe('Projects API Integration Tests', () => {
   });
 
   afterEach(async () => {
+    await shutdownSupervisorForTests();
     cleanupTestProviderDefaults();
     await cleanupTestProviderInstances([providerInstanceId]);
     vi.clearAllMocks();
@@ -70,21 +68,17 @@ describe('Projects API Integration Tests', () => {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
       });
-      Project.create('Project 2', project2Dir, 'Second project', {
+      const project2 = Project.create('Project 2', project2Dir, 'Second project', {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
       });
 
-      // Create sessions in project1 to test session counting
-      const { Session } = await import('@lace/core/sessions/session');
-      Session.create({
-        name: 'Session 1',
-        projectId: project1.getId(),
-      });
-      Session.create({
-        name: 'Session 2',
-        projectId: project1.getId(),
-      });
+      // Create workspace sessions for project1 to test session counting
+      const supervisor = getSupervisor();
+      const ws1 = await supervisor.createWorkspaceSession(project1Dir);
+      const ws2 = await supervisor.createWorkspaceSession(project1Dir);
+      supervisor.updateWorkspaceSession(ws1.workspaceSessionId, { projectId: project1.getId() });
+      supervisor.updateWorkspaceSession(ws2.workspaceSessionId, { projectId: project1.getId() });
 
       const response = await loader(
         createLoaderArgs(new Request('http://localhost/api/projects'), {})
@@ -99,16 +93,17 @@ describe('Projects API Integration Tests', () => {
       const proj2 = data.find((p) => p.name === 'Project 2');
 
       expect(proj1).toBeDefined();
-      expect(proj1!.sessionCount).toBe(3); // 1 auto-created + 2 explicitly created
+      expect(proj1!.sessionCount).toBe(2);
       expect(proj1!.workingDirectory).toBe(project1Dir);
       expect(proj1!.description).toBe('First project');
       expect(proj1!.isArchived).toBe(false);
 
       expect(proj2).toBeDefined();
-      expect(proj2!.sessionCount).toBe(1); // Project.create() auto-creates a default session
+      expect(proj2!.sessionCount).toBe(0);
       expect(proj2!.workingDirectory).toBe(project2Dir);
       expect(proj2!.description).toBe('Second project');
       expect(proj2!.isArchived).toBe(false);
+      expect(proj2!.id).toBe(project2.getId());
     });
 
     it('should return empty projects array when no projects exist', async () => {
@@ -148,7 +143,7 @@ describe('Projects API Integration Tests', () => {
       expect(data.description).toBe('A new project');
       expect(data.workingDirectory).toBe(newProjectDir);
       expect(data.isArchived).toBe(false);
-      expect(data.sessionCount).toBe(1); // Project.create() auto-creates a default session
+      expect(data.sessionCount).toBe(0);
       expect(data.id).toBeDefined();
       expect(data.createdAt).toBeDefined();
       expect(data.lastUsedAt).toBeDefined();

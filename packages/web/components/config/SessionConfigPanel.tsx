@@ -19,7 +19,7 @@ import { useProjectContext } from '@lace/web/components/providers/ProjectProvide
 import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
 import { useURLState } from '@lace/web/hooks/useURLState';
 import { useProviderInstances } from '@lace/web/components/providers/ProviderInstanceProvider';
-import { asThreadId } from '@lace/web/types/core';
+import { asThreadId, asWorkspaceSessionId } from '@lace/web/types/core';
 
 const DEFAULT_CONFIG: SessionConfiguration = {
   // Note: providerInstanceId and modelId should be set by user selection, not defaults
@@ -140,7 +140,7 @@ export function SessionConfigPanel(): React.JSX.Element {
 
       // Navigate to the new session with initial message for pre-filling
       if (sessionData && project) {
-        navigateToSession(project, asThreadId(sessionData.id), {
+        navigateToSession(project, sessionData.id, {
           initialMessage: userInput,
         });
       }
@@ -199,7 +199,7 @@ export function SessionConfigPanel(): React.JSX.Element {
   const handleSessionSelect = useCallback(
     (sessionId: string) => {
       if (project) {
-        navigateToSession(project, asThreadId(sessionId));
+        navigateToSession(project, asWorkspaceSessionId(sessionId));
       }
     },
     [project, navigateToSession]

@@ -14,10 +14,10 @@ vi.mock('server-only', () => ({}));
 import { loader, action } from '@lace/web/app/routes/api.projects.$projectId';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
-import { Session } from '@lace/web/lib/server/lace-imports';
 import type { ProjectInfo } from '@lace/web/types/core';
 import { promises as fs } from 'fs';
 import { join } from 'path';
+import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 
 interface ErrorResponse {
   error: string;
@@ -64,6 +64,7 @@ describe('Individual Project API Integration Tests', () => {
   });
 
   afterEach(async () => {
+    await shutdownSupervisorForTests();
     // Clean up provider instances
     await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
     vi.clearAllMocks();
@@ -81,28 +82,24 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.description).toBe('A test project');
       expect(data.workingDirectory).toBe(testProjectDir);
       expect(data.isArchived).toBe(false);
-      expect(data.sessionCount).toBe(1); // Project.create() auto-creates a default session
+      expect(data.sessionCount).toBe(0);
       expect(data.createdAt).toBeDefined();
       expect(data.lastUsedAt).toBeDefined();
     });
 
     it('should return project with correct session count', async () => {
-      // Add some sessions to the project (they inherit provider config from project)
-      Session.create({
-        name: 'Session 1',
-        projectId: testProject.getId(),
-      });
-      Session.create({
-        name: 'Session 2',
-        projectId: testProject.getId(),
-      });
+      const supervisor = getSupervisor();
+      const ws1 = await supervisor.createWorkspaceSession(testProjectDir);
+      const ws2 = await supervisor.createWorkspaceSession(testProjectDir);
+      supervisor.updateWorkspaceSession(ws1.workspaceSessionId, { projectId: testProject.getId() });
+      supervisor.updateWorkspaceSession(ws2.workspaceSessionId, { projectId: testProject.getId() });
 
       const request = new Request(`http://localhost/api/projects/${testProject.getId()}`);
       const response = await loader(createLoaderArgs(request, { projectId: testProject.getId() }));
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
-      expect(data.sessionCount).toBe(3); // 1 auto-created + 2 explicitly created
+      expect(data.sessionCount).toBe(2);
     });
 
     it('should return 404 when project does not exist', async () => {
@@ -335,23 +332,11 @@ describe('Individual Project API Integration Tests', () => {
     });
 
     it('should delete project with sessions', async () => {
-      // Add sessions to the project
-      Session.create({
-        name: 'Session 1',
-        projectId: testProject.getId(),
-        configuration: {
-          providerInstanceId: anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        },
-      });
-      Session.create({
-        name: 'Session 2',
-        projectId: testProject.getId(),
-        configuration: {
-          providerInstanceId: openaiInstanceId,
-          modelId: 'gpt-4o-mini',
-        },
-      });
+      const supervisor = getSupervisor();
+      const ws1 = await supervisor.createWorkspaceSession(testProjectDir);
+      const ws2 = await supervisor.createWorkspaceSession(testProjectDir);
+      supervisor.updateWorkspaceSession(ws1.workspaceSessionId, { projectId: testProject.getId() });
+      supervisor.updateWorkspaceSession(ws2.workspaceSessionId, { projectId: testProject.getId() });
 
       const projectId = testProject.getId();
       const request = new Request(`http://localhost/api/projects/${projectId}`, {

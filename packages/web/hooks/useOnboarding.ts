@@ -4,7 +4,7 @@
 import { useCallback } from 'react';
 import { useURLState } from '@lace/web/hooks/useURLState';
 import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
-import { asThreadId } from '@lace/web/types/core';
+import { asThreadId, asWorkspaceSessionId } from '@lace/web/types/core';
 
 interface UseOnboardingResult {
   handleOnboardingComplete: (
@@ -31,7 +31,7 @@ export function useOnboarding(
       // Navigate directly to the agent chat
       // Use queueMicrotask to ensure React Router v7 state updates have completed
       queueMicrotask(() => {
-        navigateToAgent(projectId, asThreadId(sessionId), asThreadId(agentId));
+        navigateToAgent(projectId, asWorkspaceSessionId(sessionId), asThreadId(agentId));
       });
 
       // Clear auto-open state

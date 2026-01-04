@@ -104,7 +104,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       // For now, project level has no restrictions (can set any policy)
     }
 
-    project.updateConfiguration(validatedData);
+    project.updateConfiguration(validatedData as Record<string, unknown>);
 
     const configuration = project.getConfiguration();
 

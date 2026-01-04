@@ -4,6 +4,7 @@
 import { Project } from '@lace/web/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId';
 
@@ -39,7 +40,12 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     const projectInfo = project.getInfo();
 
-    return createSuperjsonResponse(projectInfo);
+    const supervisor = getSupervisor();
+    const sessionCount = supervisor
+      .listWorkspaceSessions()
+      .filter((s) => s.projectId === projectId).length;
+
+    return createSuperjsonResponse({ ...projectInfo, sessionCount });
   } catch (error) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to fetch project',
@@ -76,7 +82,12 @@ export async function action({ request, params }: Route.ActionArgs) {
 
         const updatedProjectInfo = project.getInfo();
 
-        return createSuperjsonResponse(updatedProjectInfo);
+        const supervisor = getSupervisor();
+        const sessionCount = supervisor
+          .listWorkspaceSessions()
+          .filter((s) => s.projectId === projectId).length;
+
+        return createSuperjsonResponse({ ...updatedProjectInfo, sessionCount });
       } catch (error) {
         if (error instanceof z.ZodError) {
           return createErrorResponse('Invalid request data', 400, {

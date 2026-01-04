@@ -17,7 +17,7 @@ import { useSessionAPI as useSessionAPIHook } from '@lace/web/hooks/useSessionAP
 import { useAgentAPI as useAgentAPIHook } from '@lace/web/hooks/useAgentAPI';
 import { useToolApprovalContext } from './ToolApprovalProvider';
 import { useSessionContext } from './SessionProvider';
-import type { ThreadId } from '@lace/web/types/core';
+import type { ThreadId, WorkspaceSessionId } from '@lace/web/types/core';
 import type { LaceEvent } from '@lace/core/threads/types';
 import type { StreamConnection } from '@lace/web/types/stream-events';
 import type { PendingApproval } from '@lace/web/types/api';
@@ -69,7 +69,7 @@ const EventStreamContext = createContext<EventStreamContextType | null>(null);
 interface EventStreamProviderProps {
   children: ReactNode;
   projectId: string | null;
-  sessionId: ThreadId | null;
+  sessionId: WorkspaceSessionId | null;
   agentId: ThreadId | null;
   onAgentStateChange?: (agentId: string, fromState: string, toState: string) => void;
 }

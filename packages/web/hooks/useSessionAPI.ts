@@ -3,7 +3,7 @@
 
 import { useState, useCallback } from 'react';
 import { CreateSessionRequest, CreateAgentRequest } from '@lace/web/types/api';
-import type { ThreadId, SessionInfo, AgentInfo } from '@lace/web/types/core';
+import type { WorkspaceSessionId, SessionInfo, AgentInfo } from '@lace/web/types/core';
 import { api } from '@lace/web/lib/api-client';
 
 interface APIState {
@@ -34,24 +34,30 @@ export function useSessionAPI() {
     []
   );
 
-  const getSession = useCallback(async (sessionId: ThreadId): Promise<SessionInfo | null> => {
-    setError(null);
+  const getSession = useCallback(
+    async (sessionId: WorkspaceSessionId): Promise<SessionInfo | null> => {
+      setError(null);
 
-    try {
-      const data = await api.get<SessionInfo>(`/api/sessions/${sessionId}`);
-      return data;
-    } catch (error) {
-      // Handle 404 as null instead of error
-      if (error instanceof Error && error.message.includes('404')) {
+      try {
+        const data = await api.get<SessionInfo>(`/api/sessions/${sessionId}`);
+        return data;
+      } catch (error) {
+        // Handle 404 as null instead of error
+        if (error instanceof Error && error.message.includes('404')) {
+          return null;
+        }
+        setError(error instanceof Error ? error.message : 'Unknown error');
         return null;
       }
-      setError(error instanceof Error ? error.message : 'Unknown error');
-      return null;
-    }
-  }, []);
+    },
+    []
+  );
 
   const spawnAgent = useCallback(
-    async (sessionId: ThreadId, request: CreateAgentRequest): Promise<AgentInfo | null> => {
+    async (
+      sessionId: WorkspaceSessionId,
+      request: CreateAgentRequest
+    ): Promise<AgentInfo | null> => {
       setError(null);
 
       try {
@@ -65,7 +71,7 @@ export function useSessionAPI() {
     []
   );
 
-  const listAgents = useCallback(async (sessionId: ThreadId): Promise<AgentInfo[]> => {
+  const listAgents = useCallback(async (sessionId: WorkspaceSessionId): Promise<AgentInfo[]> => {
     setError(null);
 
     try {

@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSessionAPI } from '@lace/web/hooks/useSessionAPI';
+import { asThreadId, asWorkspaceSessionId } from '@lace/web/types/core';
 import type { ThreadId } from '@lace/web/types/core';
 import { createMockResponse, createMockErrorResponse } from '@lace/web/test-utils/mock-fetch';
 
@@ -13,6 +14,10 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
 describe('useSessionAPI', () => {
+  const testWorkspaceSessionId = asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000040');
+  const testAgentId = asThreadId('sess_agent_0001') as ThreadId;
+  const secondAgentId = asThreadId('sess_agent_0002') as ThreadId;
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch.mockReset();
@@ -21,7 +26,7 @@ describe('useSessionAPI', () => {
   describe('createSession', () => {
     it('should manage loading and success states during session creation', async () => {
       const mockSession = {
-        id: 'lace_20250113_test123' as ThreadId,
+        id: testWorkspaceSessionId,
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
@@ -77,14 +82,14 @@ describe('useSessionAPI', () => {
 
   describe('getSession', () => {
     it('should return session details when found', async () => {
-      const sessionId = 'lace_20250113_test123' as ThreadId;
+      const sessionId = testWorkspaceSessionId;
       const mockSession = {
         id: sessionId,
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [
           {
-            threadId: `${sessionId}.1` as ThreadId,
+            threadId: testAgentId,
             name: 'pm',
             provider: 'anthropic',
             model: 'claude-3-haiku',
@@ -108,7 +113,7 @@ describe('useSessionAPI', () => {
     });
 
     it('should return null for non-existent session', async () => {
-      const sessionId = 'invalid' as ThreadId;
+      const sessionId = testWorkspaceSessionId;
 
       mockFetch.mockResolvedValueOnce(createMockErrorResponse('Session not found'));
 
@@ -127,9 +132,9 @@ describe('useSessionAPI', () => {
 
   describe('spawnAgent', () => {
     it('should spawn agent successfully', async () => {
-      const sessionId = 'lace_20250113_test123' as ThreadId;
+      const sessionId = testWorkspaceSessionId;
       const mockAgent = {
-        threadId: `${sessionId}.1` as ThreadId,
+        threadId: testAgentId,
         name: 'architect',
         provider: 'anthropic',
         model: 'claude-3-opus',
@@ -166,7 +171,7 @@ describe('useSessionAPI', () => {
     });
 
     it('should handle agent spawn errors', async () => {
-      const sessionId = 'lace_20250113_test123' as ThreadId;
+      const sessionId = testWorkspaceSessionId;
 
       mockFetch.mockResolvedValueOnce(createMockErrorResponse('Failed to spawn agent'));
 
@@ -188,10 +193,10 @@ describe('useSessionAPI', () => {
 
   describe('listAgents', () => {
     it('should list agents successfully', async () => {
-      const sessionId = 'lace_20250113_test123' as ThreadId;
+      const sessionId = testWorkspaceSessionId;
       const mockAgents = [
         {
-          threadId: `${sessionId}.1` as ThreadId,
+          threadId: testAgentId,
           name: 'pm',
           provider: 'anthropic',
           model: 'claude-3-haiku',
@@ -199,7 +204,7 @@ describe('useSessionAPI', () => {
           createdAt: new Date().toISOString(),
         },
         {
-          threadId: `${sessionId}.2` as ThreadId,
+          threadId: secondAgentId,
           name: 'architect',
           provider: 'anthropic',
           model: 'claude-3-opus',
@@ -235,7 +240,7 @@ describe('useSessionAPI', () => {
       // Test successful operation clears any previous error
       mockFetch.mockResolvedValueOnce(
         createMockResponse({
-          id: 'lace_20250101_sess01' as ThreadId,
+          id: testWorkspaceSessionId,
           name: 'Test',
           provider: 'anthropic',
           model: 'claude-3-5-haiku-20241022',
@@ -282,7 +287,7 @@ describe('useSessionAPI', () => {
       mockFetch.mockResolvedValueOnce(createMockResponse(mockSession));
 
       await act(async () => {
-        await result.current.getSession('lace_20250113_test123' as ThreadId);
+        await result.current.getSession(testWorkspaceSessionId);
       });
 
       expect(result.current.error).toBe(null);

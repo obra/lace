@@ -2,11 +2,8 @@
 // ABOUTME: Uses superjson to preserve types across API boundaries and SSE
 
 import superjson from 'superjson';
-import type { ThreadId } from '@lace/web/types/core';
-import { isThreadId } from '@lace/web/types/core';
-
-// Import NewAgentSpec type for branded type registration
-type NewAgentSpec = string & { readonly __brand: 'NewAgentSpec' };
+import type { ThreadId, WorkspaceSessionId } from '@lace/web/types/core';
+import { isThreadId, isWorkspaceSessionId } from '@lace/web/types/core';
 
 // Register custom transformers for branded types
 superjson.registerCustom<ThreadId, string>(
@@ -18,14 +15,13 @@ superjson.registerCustom<ThreadId, string>(
   'ThreadId'
 );
 
-superjson.registerCustom<NewAgentSpec, string>(
+superjson.registerCustom<WorkspaceSessionId, string>(
   {
-    isApplicable: (v): v is NewAgentSpec =>
-      typeof v === 'string' && v.startsWith('agent-') && !isThreadId(v),
+    isApplicable: (v): v is WorkspaceSessionId => typeof v === 'string' && isWorkspaceSessionId(v),
     serialize: (v) => v as string,
-    deserialize: (v) => v as NewAgentSpec,
+    deserialize: (v) => v as WorkspaceSessionId,
   },
-  'NewAgentSpec'
+  'WorkspaceSessionId'
 );
 
 // Export the configured superjson instance (parse not exported to encourage parseResponse/parseTyped)
