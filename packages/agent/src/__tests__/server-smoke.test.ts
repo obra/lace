@@ -92,4 +92,20 @@ describe('agent rpc server (smoke)', () => {
     client.close();
     server.close();
   });
+
+  it('returns JobNotFound for ent/job/output of missing job', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', { protocolVersion: '1.0' });
+    await client.request('session/new', { workDir: process.cwd() });
+
+    await expect(client.request('ent/job/output', { jobId: 'job_missing' })).rejects.toMatchObject({
+      code: 8,
+      message: 'JobNotFound',
+    });
+
+    client.close();
+    server.close();
+  });
 });

@@ -1541,7 +1541,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const jobs = deriveJobsForActiveSession();
     const record = jobs.find((j) => j.jobId === jobId);
-    if (!record) throw { code: 1, message: 'JobNotFound' };
+    if (!record) throw { code: 8, message: 'JobNotFound' };
 
     const sessionDir = state.activeSession.dir;
     const outputPath = getJobOutputPath(sessionDir, jobId);
