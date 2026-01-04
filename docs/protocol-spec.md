@@ -405,6 +405,11 @@ Set the agent's execution mode. This controls what tools are available.
 
 Compact conversation history to reduce context usage. State operation, not conversation.
 
+Notes on `strategy`:
+- `truncate`: preserve conversation structure but reduce size by trimming large tool results in older context.
+- `summarize`: preserve recent context verbatim and insert a summary of older non-user events; returns `summary` in the response.
+- `selective`: currently treated the same as `summarize` (reserved for future finer-grained strategies).
+
 ```typescript
 // Request
 {
