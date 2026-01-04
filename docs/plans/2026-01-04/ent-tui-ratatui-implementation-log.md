@@ -58,3 +58,14 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
   - `cd packages/tui && cargo test`
 - Notes:
   - Decoder ignores unknown update types for now (YAGNI); we’ll expand as the UI needs more event types.
+
+### 2026-01-04 — Scenario e2e tests (spawn Node fake agents)
+
+- Added Rust integration tests that spawn the existing Node fixtures under `packages/cli/src/__tests__/fixtures` and assert **state transitions** (no pixel snapshots).
+- Tests:
+  - `cd packages/tui && cargo test`
+- Coverage:
+  - Streaming: `text_delta` + `turn_end` finalize (`tests/e2e_fake_agent_streaming.rs`)
+  - Permissions: `tool_use` captured → `session/request_permission` decided → streamed assistant output (`tests/e2e_fake_agent_permission.rs`)
+- Notes:
+  - Tests kill the spawned fake agent process explicitly to avoid hanging the test runner.
