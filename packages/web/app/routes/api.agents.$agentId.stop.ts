@@ -1,9 +1,8 @@
-// ABOUTME: Stop endpoint for halting agent processing while keeping agent alive
-// ABOUTME: Calls agent.abort() to stop current generation but preserves agent state
+// ABOUTME: Stop endpoint for halting processing in a supervisor-backed agent session
+// ABOUTME: Sends session/cancel to the agent process via supervisor
 
-import { getSessionService } from '@lace/web/lib/server/session-service';
-import { asThreadId } from '@lace/web/types/core';
-import { isValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
+import { SessionIdSchema } from '@lace/ent-protocol';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import type { Route } from './+types/api.agents.$agentId.stop';
@@ -16,54 +15,26 @@ export async function action({ request, params }: Route.ActionArgs) {
   try {
     const { agentId } = params as { agentId: string };
 
-    if (!isValidThreadId(agentId as string)) {
-      return createErrorResponse('Invalid agent ID format', 400, {
-        code: 'VALIDATION_FAILED',
-      });
+    if (!SessionIdSchema.safeParse(agentId).success) {
+      return createErrorResponse('Invalid agent ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const agentThreadId = asThreadId(agentId);
+    const supervisor = getSupervisor();
+    const workspace = supervisor
+      .listWorkspaceSessions()
+      .find((ws) => ws.agents.some((a) => a.sessionId === agentId));
 
-    // Extract sessionId from agentId (agents are child threads like sessionId.1)
-    const sessionIdStr = agentThreadId.split('.')[0];
-    if (!sessionIdStr || !isValidThreadId(sessionIdStr)) {
-      return createErrorResponse('Invalid session ID derived from agent ID', 400, {
-        code: 'VALIDATION_FAILED',
-      });
+    if (!workspace) {
+      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const sessionId = asThreadId(sessionIdStr);
-
-    const sessionService = getSessionService();
-    const session = await sessionService.getSession(sessionId);
-
-    if (!session) {
-      return createErrorResponse('Session not found', 404, {
-        code: 'RESOURCE_NOT_FOUND',
-      });
-    }
-
-    const agent = session.getAgent(agentThreadId);
-
-    if (!agent) {
-      return createErrorResponse('Agent not found', 404, {
-        code: 'RESOURCE_NOT_FOUND',
-      });
-    }
-
-    // Attempt to stop the agent's current processing
-    const stopped = agent.abort();
-
-    // Clear the provider cache to ensure fresh credentials are loaded
-    // This is a temporary workaround for the caching issue
+    supervisor.getPeer(workspace.workspaceSessionId, agentId).notify('session/cancel');
 
     return createSuperjsonResponse({
       success: true,
-      stopped,
-      agentId: agentThreadId,
-      message: stopped
-        ? 'Agent processing stopped successfully'
-        : 'Agent was not currently processing',
+      stopped: true,
+      agentId,
+      message: 'Agent processing stopped successfully',
     });
   } catch (error: unknown) {
     return createErrorResponse(

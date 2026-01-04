@@ -1,11 +1,10 @@
-// ABOUTME: REST API endpoints for individual agent management - GET, PUT for agent updates
-// ABOUTME: Handles agent configuration updates including provider and model changes
+// ABOUTME: REST API endpoints for supervisor-backed agent sessions - GET, PUT for agent updates
+// ABOUTME: Agent IDs are Ent protocol sessionIds; metadata is stored in supervisor workspace session store
 
-import { getSessionService } from '@lace/web/lib/server/session-service';
-import { asThreadId } from '@lace/web/types/core';
-import { isValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { SessionIdSchema } from '@lace/ent-protocol';
 import { z } from 'zod';
 import { ProviderRegistry } from '@lace/web/lib/server/lace-imports';
 import type { Route } from './+types/api.agents.$agentId';
@@ -18,64 +17,58 @@ const AgentUpdateSchema = z
   })
   .refine(
     (data) => {
-      // If either providerInstanceId or modelId is provided, both must be provided
       if (data.providerInstanceId || data.modelId) {
         return data.providerInstanceId && data.modelId;
       }
       return true;
     },
-    {
-      message: 'Both providerInstanceId and modelId must be provided together',
-    }
+    { message: 'Both providerInstanceId and modelId must be provided together' }
   );
+
+function findWorkspaceForAgentSession(agentSessionId: string) {
+  const supervisor = getSupervisor();
+  const record = supervisor
+    .listWorkspaceSessions()
+    .find((ws) => ws.agents.some((a) => a.sessionId === agentSessionId));
+
+  return { supervisor, record };
+}
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
     const { agentId } = params as { agentId: string };
 
-    if (!isValidThreadId(agentId as string)) {
+    if (!SessionIdSchema.safeParse(agentId).success) {
       return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const agentThreadId = asThreadId(agentId);
-
-    // Extract sessionId from agentId (agents are child threads like sessionId.1)
-    const sessionId = asThreadId(agentThreadId.split('.')[0]);
-
-    const sessionService = getSessionService();
-    const session = await sessionService.getSession(sessionId);
-
-    if (!session) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
-    }
-
-    const agent = session.getAgent(agentThreadId);
-
-    if (!agent) {
+    const { record } = findWorkspaceForAgentSession(agentId);
+    if (!record) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const metadata = agent.getThreadMetadata();
-    const tokenUsage = agent.getTokenUsage();
+    const meta = record.agents.find((a) => a.sessionId === agentId);
+    if (!meta) {
+      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+    }
 
-    const agentResponse = {
-      threadId: agent.threadId,
-      name: (metadata?.name as string) || 'Agent ' + agent.threadId,
-      provider: (metadata?.provider as string) || agent.providerName,
-      model: (metadata?.model as string) || (metadata?.modelId as string) || agent.model,
-      providerInstanceId: (metadata?.providerInstanceId as string) || '',
-      modelId: (metadata?.modelId as string) || (metadata?.model as string) || agent.model,
-      status: agent.getCurrentState(),
-      tokenUsage,
-      createdAt: (metadata?.createdAt as Date) || undefined,
-    };
-
-    return createSuperjsonResponse(agentResponse);
+    return createSuperjsonResponse({
+      threadId: meta.sessionId,
+      name: meta.name ?? '',
+      providerInstanceId: meta.connectionId ?? '',
+      modelId: meta.modelId ?? '',
+      persona: '',
+      status: 'idle',
+      tokenUsage: undefined,
+      createdAt: meta.createdAt ? new Date(meta.createdAt) : undefined,
+    });
   } catch (error: unknown) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to fetch agent',
       500,
-      { code: 'INTERNAL_SERVER_ERROR' }
+      {
+        code: 'INTERNAL_SERVER_ERROR',
+      }
     );
   }
 }
@@ -88,7 +81,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   try {
     const { agentId } = params as { agentId: string };
 
-    if (!isValidThreadId(agentId as string)) {
+    if (!SessionIdSchema.safeParse(agentId).success) {
       return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
@@ -99,50 +92,30 @@ export async function action({ request, params }: Route.ActionArgs) {
       validatedData = AgentUpdateSchema.parse(body);
     } catch (zodError) {
       if (zodError instanceof z.ZodError) {
-        const details = zodError.errors.map((e) => ({
-          path: e.path.join('.'),
-          message: e.message,
-          received: body[e.path[0] as keyof typeof body],
-        }));
-        return createErrorResponse(
-          `Validation failed: ${details.map((d) => `${d.path}: ${d.message}`).join(', ')}`,
-          400,
-          {
-            code: 'VALIDATION_FAILED',
-            details: { errors: details, receivedData: body },
-          }
-        );
+        return createErrorResponse('Invalid request data', 400, {
+          code: 'VALIDATION_FAILED',
+          details: zodError.errors,
+        });
       }
       throw zodError;
     }
 
-    const agentThreadId = asThreadId(agentId);
-
-    // Extract sessionId from agentId (agents are child threads like sessionId.1)
-    const sessionId = asThreadId(agentThreadId.split('.')[0]);
-
-    const sessionService = getSessionService();
-    const session = await sessionService.getSession(sessionId);
-
-    if (!session) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
-    }
-
-    const agent = session.getAgent(agentThreadId);
-
-    if (!agent) {
+    const { supervisor, record } = findWorkspaceForAgentSession(agentId);
+    if (!record) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Validate provider instance if provided
+    const meta = record.agents.find((a) => a.sessionId === agentId);
+    if (!meta) {
+      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+    }
+
     if (validatedData.providerInstanceId) {
       const registry = ProviderRegistry.getInstance();
-
       const configuredInstances = await registry.getConfiguredInstances();
       const instance = configuredInstances.find(
         (inst) => inst.id === validatedData.providerInstanceId
       );
-
       if (!instance) {
         return createErrorResponse('Provider instance not found', 400, {
           code: 'VALIDATION_FAILED',
@@ -156,59 +129,38 @@ export async function action({ request, params }: Route.ActionArgs) {
       }
     }
 
-    // Update agent properties via thread metadata
-    const updates: Record<string, unknown> = {};
+    supervisor.upsertAgentSessionMeta(record.workspaceSessionId, {
+      sessionId: agentId,
+      ...(typeof validatedData.name === 'string' ? { name: validatedData.name } : {}),
+      ...(typeof validatedData.providerInstanceId === 'string'
+        ? { connectionId: validatedData.providerInstanceId }
+        : {}),
+      ...(typeof validatedData.modelId === 'string' ? { modelId: validatedData.modelId } : {}),
+    });
 
-    if (validatedData.name !== undefined) {
-      updates.name = validatedData.name;
+    if (validatedData.providerInstanceId && validatedData.modelId) {
+      await supervisor
+        .getPeer(record.workspaceSessionId, agentId)
+        .request('ent/session/configure', {
+          connectionId: validatedData.providerInstanceId,
+          modelId: validatedData.modelId,
+        });
     }
 
-    // Update provider instance and model if provided
-    if (validatedData.providerInstanceId !== undefined) {
-      updates.providerInstanceId = validatedData.providerInstanceId;
-    }
-    if (validatedData.modelId !== undefined) {
-      updates.modelId = validatedData.modelId;
-    }
+    const updated = supervisor.getWorkspaceSession(record.workspaceSessionId);
+    const updatedMeta = updated?.agents.find((a) => a.sessionId === agentId);
 
-    if (Object.keys(updates).length > 0) {
-      agent.updateThreadMetadata(updates);
-
-      // Special case: If this is the session agent (Lace), also update session configuration
-      // The session agent's threadId equals the sessionId
-      if (agentThreadId === sessionId) {
-        const configUpdates: Record<string, unknown> = {};
-        if (validatedData.providerInstanceId !== undefined) {
-          configUpdates.providerInstanceId = validatedData.providerInstanceId;
-        }
-        if (validatedData.modelId !== undefined) {
-          configUpdates.modelId = validatedData.modelId;
-        }
-        if (Object.keys(configUpdates).length > 0) {
-          session.updateConfiguration(configUpdates);
-        }
-      }
-    }
-
-    const metadata = agent.getThreadMetadata();
-    const tokenUsage = agent.getTokenUsage();
-
-    const agentResponse = {
-      threadId: agent.threadId,
-      name: (metadata?.name as string) || 'Agent ' + agent.threadId,
-      provider: (metadata?.provider as string) || agent.providerName,
-      model: (metadata?.model as string) || (metadata?.modelId as string) || agent.model,
-      providerInstanceId: (metadata?.providerInstanceId as string) || '',
-      modelId: (metadata?.modelId as string) || (metadata?.model as string) || agent.model,
-      status: agent.getCurrentState(),
-      tokenUsage,
-      createdAt: (metadata?.createdAt as Date) || undefined,
-    };
-
-    return createSuperjsonResponse(agentResponse);
+    return createSuperjsonResponse({
+      threadId: agentId,
+      name: updatedMeta?.name ?? validatedData.name ?? '',
+      providerInstanceId: updatedMeta?.connectionId ?? validatedData.providerInstanceId ?? '',
+      modelId: updatedMeta?.modelId ?? validatedData.modelId ?? '',
+      persona: '',
+      status: 'idle',
+      tokenUsage: undefined,
+      createdAt: updatedMeta?.createdAt ? new Date(updatedMeta.createdAt) : undefined,
+    });
   } catch (error: unknown) {
-    // Zod errors are now handled above with better messages
-
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to update agent',
       500,

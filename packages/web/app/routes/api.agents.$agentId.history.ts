@@ -1,52 +1,182 @@
-// ABOUTME: API endpoint for loading conversation history for a specific agent
-// ABOUTME: Returns events only for the requested agent, enabling per-agent conversation views
+// ABOUTME: API endpoint for loading conversation history for a supervisor-backed agent session
+// ABOUTME: Converts Ent durable session events into LaceEvent timeline events
 
-import { getSessionService } from '@lace/web/lib/server/session-service';
+import { SessionIdSchema } from '@lace/ent-protocol';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import type { LaceEvent } from '@lace/web/types/core';
-import { asThreadId, isConversationEvent } from '@lace/web/types/core';
-import { isValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import type { Route } from './+types/api.agents.$agentId.history';
 
+type DurableEvent = {
+  eventSeq: number;
+  timestamp: string;
+  type: string;
+  data: Record<string, unknown>;
+};
+
+function toTextContent(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (!Array.isArray(value)) return '';
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return '';
+      const t = (item as { type?: unknown }).type;
+      if (t !== 'text') return '';
+      const text = (item as { text?: unknown }).text;
+      return typeof text === 'string' ? text : '';
+    })
+    .join('');
+}
+
+function toolResultToTextContent(result: unknown): Array<{ type: 'text'; text: string }> {
+  const record = result as { content?: unknown; outcome?: unknown } | undefined;
+  const raw = Array.isArray(record?.content) ? record?.content : [];
+  const items = raw
+    .map((c) => {
+      if (!c || typeof c !== 'object') return null;
+      const type = (c as { type?: unknown }).type;
+      if (type === 'text') {
+        const text = (c as { text?: unknown }).text;
+        return typeof text === 'string' ? text : '';
+      }
+      if (type === 'json') {
+        return JSON.stringify((c as { data?: unknown }).data, null, 2);
+      }
+      if (type === 'error') {
+        const message = (c as { message?: unknown }).message;
+        return typeof message === 'string' ? message : 'Error';
+      }
+      if (type === 'image') {
+        const mediaType = (c as { mediaType?: unknown }).mediaType;
+        return `[image:${typeof mediaType === 'string' ? mediaType : 'unknown'}]`;
+      }
+      return null;
+    })
+    .filter((v): v is string => typeof v === 'string');
+
+  if (items.length === 0) {
+    const outcome = record && typeof record.outcome === 'string' ? record.outcome : 'completed';
+    return [{ type: 'text', text: outcome }];
+  }
+
+  return items.map((text) => ({ type: 'text', text }));
+}
+
+function durableEventsToLaceEvents(agentSessionId: string, events: DurableEvent[]): LaceEvent[] {
+  const out: LaceEvent[] = [];
+
+  for (const e of events) {
+    const timestamp = new Date(e.timestamp);
+    const context = { threadId: agentSessionId };
+
+    if (e.type === 'prompt') {
+      const content = toTextContent(e.data?.content);
+      if (content.trim()) {
+        out.push({
+          id: `ent_${e.eventSeq}_user`,
+          type: 'USER_MESSAGE',
+          timestamp,
+          data: { content },
+          context,
+        } as unknown as LaceEvent);
+      }
+      continue;
+    }
+
+    if (e.type === 'message') {
+      const content = typeof e.data?.content === 'string' ? e.data.content : '';
+      out.push({
+        id: `ent_${e.eventSeq}_assistant`,
+        type: 'AGENT_MESSAGE',
+        timestamp,
+        data: { content },
+        context,
+      } as unknown as LaceEvent);
+      continue;
+    }
+
+    if (e.type === 'context_injected') {
+      const content = toTextContent(e.data?.content);
+      if (content.trim()) {
+        out.push({
+          id: `ent_${e.eventSeq}_system`,
+          type: 'SYSTEM_PROMPT',
+          timestamp,
+          data: content,
+          context,
+        } as unknown as LaceEvent);
+      }
+      continue;
+    }
+
+    if (e.type === 'tool_use') {
+      const toolCallId = typeof e.data.toolCallId === 'string' ? e.data.toolCallId : '';
+      const name = typeof e.data.name === 'string' ? e.data.name : '';
+      const input =
+        e.data.input && typeof e.data.input === 'object' && !Array.isArray(e.data.input)
+          ? (e.data.input as Record<string, unknown>)
+          : {};
+
+      out.push({
+        id: `ent_${e.eventSeq}_tool_call`,
+        type: 'TOOL_CALL',
+        timestamp,
+        data: { id: toolCallId, name, arguments: input },
+        context,
+      } as unknown as LaceEvent);
+
+      if ('result' in e.data && e.data.result) {
+        const outcome = (e.data.result as { outcome?: unknown }).outcome;
+        const status =
+          outcome === 'denied'
+            ? 'denied'
+            : outcome === 'failed' || outcome === 'timeout'
+              ? 'failed'
+              : 'completed';
+
+        out.push({
+          id: `ent_${e.eventSeq}_tool_result`,
+          type: 'TOOL_RESULT',
+          timestamp,
+          data: { id: toolCallId, status, content: toolResultToTextContent(e.data.result) },
+          context,
+        } as unknown as LaceEvent);
+      }
+
+      continue;
+    }
+  }
+
+  return out;
+}
+
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { agentId: agentIdParam } = params as { agentId: string };
+    const { agentId } = params as { agentId: string };
 
-    // Validate agent ID format
-    if (!isValidThreadId(agentIdParam)) {
+    if (!SessionIdSchema.safeParse(agentId).success) {
       return createErrorResponse('Invalid agent ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const agentId = asThreadId(agentIdParam);
-    const sessionService = getSessionService();
+    const supervisor = getSupervisor();
+    const workspace = supervisor
+      .listWorkspaceSessions()
+      .find((ws) => ws.agents.some((a) => a.sessionId === agentId));
 
-    // For coordinator agents, agentId = sessionId
-    // For delegate agents, agentId = sessionId.number
-    let sessionId = agentId;
-    if (agentId.includes('.')) {
-      // Extract session ID from delegate agent ID (e.g., "session.1" -> "session")
-      sessionId = asThreadId(agentId.split('.')[0]!);
-    }
-
-    const session = await sessionService.getSession(sessionId);
-    if (!session) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
-    }
-
-    // Get the specific agent
-    const agent = session.getAgent(agentId);
-    if (!agent) {
+    if (!workspace) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Get ALL events for this agent (including pre-compaction events with visibility flags)
-    // Use getAllEvents instead of getLaceEvents to get complete history with visibility
-    const agentEvents = agent.getAllEvents();
+    const result = (await supervisor
+      .getPeer(workspace.workspaceSessionId, agentId)
+      .request('ent/session/events', {
+        limit: 5000,
+      })) as { events: DurableEvent[] };
 
-    // Filter to only conversation events (persisted and shown in timeline)
-    const events: LaceEvent[] = agentEvents.filter((event): event is LaceEvent =>
-      isConversationEvent(event.type)
+    const events = durableEventsToLaceEvents(
+      agentId,
+      Array.isArray(result.events) ? result.events : []
     );
 
     return createSuperjsonResponse(events, { status: 200 });
