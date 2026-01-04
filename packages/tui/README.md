@@ -1,4 +1,4 @@
-# `lace-tui` (WIP)
+# `lace-tui`
 
 Premium terminal UI for driving Ent-protocol-speaking agents over stdio (NDJSON JSON-RPC).
 
@@ -26,6 +26,16 @@ cd packages/tui
 cargo run -- --workdir "$(pwd)" --agent-cmd "node ../../packages/agent/dist/main.js"
 ```
 
+## Preferences + state
+
+Session aliases are stored at:
+
+- `$LACE_DIR/tui/session-aliases.json`, else
+- `$XDG_STATE_HOME/lace/tui/session-aliases.json`, else
+- `$HOME/.local/state/lace/tui/session-aliases.json`
+
+UI preferences are stored at the same base dir under `tui/preferences.json` (theme, keybind mode, pane visibility, etc).
+
 ## Test
 
 ```bash
@@ -40,14 +50,34 @@ cargo test
 
 ## Keybinds
 
+Global:
 - `Ctrl+C`: quit
 - `Ctrl+K`: command palette
-- `Ctrl+1`: toggle Chat pane
-- `Ctrl+2`: toggle Activity pane
-- `Ctrl+3`: toggle Debug pane
+- `Ctrl+F`: search
+- `Ctrl+1/2/3`: toggle Chat/Activity/Debug panes
 - `Tab`: cycle focus
-- `Up/Down`: scroll (when a pane is focused) or history (when input is focused)
+- `PgUp/PgDn`: scroll focused pane
 - `?` / `F1`: help
+
+Input:
+- `Enter`: send (single-line mode)
+- `Ctrl+E`: toggle multiline
+- multiline: `Enter` newline, `Ctrl+Enter` send
+- `Up/Down`: input history (when input is focused)
+
+Activity pane:
+- `Up/Down`: select item
+- `Enter`: expand/collapse details
+- `g`: jump to related chat turn (best-effort)
+- `y`: copy selected activity (summary + details)
+
+Overlays:
+- Permission: `Up/Down` select, `Enter` decide, `Esc` denies if available
+- Sessions: type to filter, `Up/Down` select, `Enter` load, `r` rename (local alias), `Esc` close
+- Configure/Search: `Up/Down` select, `Enter` confirm, `Esc` close
+
+Vim-ish mode:
+- When `Keybinds: Vim` is enabled (palette), `j/k` behave like `Down/Up` when not focused on input.
 
 Permission modal:
 - `Up/Down` select, `Enter` decide
