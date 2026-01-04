@@ -476,4 +476,86 @@ describe('lace-agent process (E2E over stdio)', () => {
     expect(status.pendingPermissions).toEqual([]);
     expect(status.currentTurn).toBeUndefined();
   });
+
+  it('creates a checkpoint and can rewind files', { timeout: 15_000 }, async () => {
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+
+    agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+
+    await withTimeout(
+      agent.peer.request('initialize', { protocolVersion: '1.0', config: { approvalMode: 'ask' } }),
+      2_000,
+      'initialize'
+    );
+    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+    await withTimeout(
+      agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'write file foo.txt' }],
+      }),
+      10_000,
+      'session/prompt write foo.txt'
+    );
+
+    const original = readFileSync(join(workDir, 'foo.txt'), 'utf8');
+    expect(original).toBe('written by test provider\n');
+
+    const checkpoint = (await withTimeout(
+      agent.peer.request('ent/session/checkpoint', { label: 'first' }),
+      2_000,
+      'ent/session/checkpoint'
+    )) as { checkpointId: string; eventSeq: number; files: string[] };
+
+    expect(checkpoint.checkpointId).toMatch(/^chk_/);
+    expect(checkpoint.eventSeq).toBeGreaterThan(0);
+    expect(checkpoint.files).toContain('foo.txt');
+
+    writeFileSync(join(workDir, 'foo.txt'), 'modified\n', 'utf8');
+    expect(readFileSync(join(workDir, 'foo.txt'), 'utf8')).toBe('modified\n');
+
+    const rewind = (await withTimeout(
+      agent.peer.request('ent/session/rewind', { toEventSeq: checkpoint.eventSeq }),
+      5_000,
+      'ent/session/rewind'
+    )) as { filesRestored: string[]; eventSeq: number };
+
+    expect(rewind.eventSeq).toBe(checkpoint.eventSeq);
+    expect(rewind.filesRestored).toContain('foo.txt');
+    expect(readFileSync(join(workDir, 'foo.txt'), 'utf8')).toBe(original);
+  });
+
+  it(
+    'returns CheckpointNotFound for ent/session/rewind without a checkpoint',
+    { timeout: 15_000 },
+    async () => {
+      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+
+      agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+
+      await withTimeout(
+        agent.peer.request('initialize', {
+          protocolVersion: '1.0',
+          config: { approvalMode: 'ask' },
+        }),
+        2_000,
+        'initialize'
+      );
+      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+      await withTimeout(
+        agent.peer.request('session/prompt', {
+          content: [{ type: 'text', text: 'write file foo.txt' }],
+        }),
+        10_000,
+        'session/prompt write foo.txt'
+      );
+
+      await expect(
+        agent.peer.request('ent/session/rewind', { toEventSeq: 1 })
+      ).rejects.toMatchObject({
+        code: 12,
+        message: 'CheckpointNotFound',
+      });
+    }
+  );
 });

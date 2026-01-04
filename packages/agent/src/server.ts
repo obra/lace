@@ -29,6 +29,15 @@ import {
   type SessionState,
 } from './storage/session-store';
 import { appendDurableEvent, readDurableEvents, summarizeDurableEvents } from './storage/event-log';
+import {
+  writeCheckpoint,
+  findCheckpointByEventSeq,
+  restoreCheckpointFiles,
+} from './storage/checkpoint-store';
+import {
+  deriveCheckpointFilesFromDurableEvents,
+  deriveFilesReadFromDurableEvents,
+} from './storage/files-from-events';
 import type { PermissionRequest, SessionUpdate, ToolInfo, ToolResult } from './protocol/types';
 import { shellExecTool, runShellExec } from './tools/shell-exec';
 import { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
@@ -360,37 +369,6 @@ function buildProviderMessagesFromDurableEvents(sessionDir: string): ProviderMes
   }
 
   return messages;
-}
-
-function deriveFilesReadFromDurableEvents(sessionDir: string, workDir: string): Set<string> {
-  const eventsPath = join(sessionDir, 'events.jsonl');
-  let raw = '';
-  try {
-    raw = readFileSync(eventsPath, 'utf8');
-  } catch {
-    return new Set();
-  }
-
-  const read = new Set<string>();
-  for (const line of raw.split('\n')) {
-    if (!line) continue;
-    try {
-      const parsed = JSON.parse(line) as { type?: string; data?: any };
-      if (parsed.type !== 'tool_use') continue;
-      const data = parsed.data ?? {};
-      if (data.name !== 'file_read') continue;
-      const result = data.result as ToolResult | undefined;
-      if (!result || result.outcome !== 'completed') continue;
-      const input = data.input ?? {};
-      const p = toNonEmptyString(input.path);
-      if (!p) continue;
-      const absolute = isAbsolutePath(p) ? p : resolvePath(workDir, p);
-      read.add(absolute);
-    } catch {
-      // ignore malformed lines
-    }
-  }
-  return read;
 }
 
 export type AgentServerState = {
@@ -1049,9 +1027,10 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         streaming: true,
         multiTurn: true,
         tools: toolInfos,
+        operations: { checkpoint: true, rewind: true, configure: true, compact: false },
         'ent/contextInjection': true,
         'ent/backgroundJobs': true,
-        'ent/fileCheckpointing': false,
+        'ent/fileCheckpointing': true,
         'ent/structuredOutput': false,
         'ent/providers': { list: true, connections: true, models: true },
       },
@@ -1815,6 +1794,79 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         approvalMode: effectiveAfter.approvalMode,
       },
     };
+  });
+
+  peer.onRequest('ent/session/checkpoint', async (params: unknown) => {
+    assertInitialized(state);
+    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+    if (state.activeTurn) throw { code: 2, message: 'SessionBusy' };
+
+    const parsed = params as { label?: string } | undefined;
+    const label = toNonEmptyString(parsed?.label) ?? undefined;
+
+    return await runExclusive(() => {
+      const checkpointId = `chk_${randomUUID()}`;
+
+      let sessionState = readSessionState(state.activeSession!.dir);
+      const { nextState, written } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+        type: 'checkpoint_created',
+        data: { checkpointId, ...(label ? { label } : {}) },
+      });
+      sessionState = nextState;
+      writeSessionState(state.activeSession!.dir, sessionState);
+      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+
+      const workDir = state.activeSession.meta.workDir;
+      const files = deriveCheckpointFilesFromDurableEvents(state.activeSession.dir, workDir);
+      const meta = writeCheckpoint(state.activeSession.dir, {
+        workDir,
+        checkpointId,
+        eventSeq: written.eventSeq,
+        label,
+        files,
+      });
+
+      return { checkpointId: meta.checkpointId, eventSeq: meta.eventSeq, files: meta.files };
+    });
+  });
+
+  peer.onRequest('ent/session/rewind', async (params: unknown) => {
+    assertInitialized(state);
+    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+    if (state.activeTurn) throw { code: 2, message: 'SessionBusy' };
+
+    const parsed = params as { toEventSeq: number };
+    const toEventSeq =
+      typeof parsed?.toEventSeq === 'number' && Number.isFinite(parsed.toEventSeq)
+        ? Math.trunc(parsed.toEventSeq)
+        : null;
+    if (toEventSeq === null || toEventSeq < 0) throw { code: -32602, message: 'InvalidParams' };
+
+    return await runExclusive(() => {
+      const sessionState = readSessionState(state.activeSession!.dir);
+      const currentEventSeq = sessionState.nextEventSeq - 1;
+      if (toEventSeq > currentEventSeq) throw { code: -32602, message: 'InvalidParams' };
+
+      const checkpoint = findCheckpointByEventSeq(state.activeSession!.dir, toEventSeq);
+      if (!checkpoint) {
+        throw { code: EntErrorCodes.CheckpointNotFound, message: 'CheckpointNotFound' };
+      }
+
+      const workDir = state.activeSession!.meta.workDir;
+      const { filesRestored } = restoreCheckpointFiles(state.activeSession!.dir, {
+        workDir,
+        checkpointId: checkpoint.checkpointId,
+      });
+
+      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+        type: 'files_rewound',
+        data: { checkpointId: checkpoint.checkpointId, toEventSeq, filesRestored },
+      });
+      writeSessionState(state.activeSession!.dir, nextState);
+      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+
+      return { filesRestored, eventSeq: toEventSeq };
+    });
   });
 
   peer.onRequest('ent/session/inject', async (params: unknown) => {
