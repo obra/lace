@@ -174,3 +174,18 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
 - For non-Lace agents that don’t implement this method, the “method not found” error is suppressed for this specific request.
 - Tests:
   - `cd packages/tui && cargo test` (see `protocol::ent::tests::extracts_agent_status_config`)
+
+### 2026-01-04 — Session picker + aliases (local)
+
+- Added session management UX:
+  - Palette action: “Sessions...”
+  - Session picker modal supports filtering, loading, and local renaming (alias) via `r`.
+  - `session/list` is used to populate the list (scoped to current `workdir`).
+- Added local alias persistence:
+  - Stored at `$LACE_DIR/tui/session-aliases.json` when `$LACE_DIR` is set.
+  - Otherwise falls back to `$XDG_STATE_HOME/lace/tui/session-aliases.json` or `$HOME/.local/state/lace/tui/session-aliases.json`.
+- Added best-effort “don’t lose place” behavior:
+  - When switching sessions, the TUI snapshots the current session’s chat/activity/debug + scroll positions and restores them if you return to that session during the same run.
+- Tests:
+  - Unit tests in `packages/tui/src/app/sessions.rs`
+  - Scenario e2e: `packages/tui/tests/e2e_sessions_list_load.rs`

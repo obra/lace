@@ -2,6 +2,8 @@ pub mod reducer;
 pub mod ui;
 pub mod activity;
 pub mod config_wizard;
+pub mod sessions;
+pub mod storage;
 
 use serde_json::Value;
 
@@ -53,6 +55,7 @@ pub struct AppState {
   pub workdir: String,
   pub connection_id: Option<String>,
   pub model_id: Option<String>,
+  pub last_activity_ms: Option<u64>,
   pub messages: Vec<ChatMessage>,
   pub tool_inputs_by_tool_call_id: std::collections::HashMap<String, Value>,
   pub permission_queue: std::collections::VecDeque<PermissionRequest>,
@@ -85,11 +88,17 @@ pub struct AppState {
 
   pub help_open: bool,
   pub config_wizard: config_wizard::ConfigWizardState,
+  pub sessions: sessions::SessionsState,
   pub should_exit: bool,
 
   pub next_client_seq: u64,
 
   pub pending_requests: std::collections::HashMap<String, PendingRequest>,
+
+  pub session_aliases: std::collections::HashMap<String, String>,
+  pub aliases_path: Option<std::path::PathBuf>,
+  pub session_snapshots: std::collections::HashMap<String, sessions::SessionSnapshot>,
+  pub session_switch_target: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,11 +110,15 @@ pub struct PendingRequest {
 
 impl AppState {
   pub fn new() -> Self {
+    let aliases_path = storage::default_aliases_path();
+    let session_aliases = sessions::load_aliases(aliases_path.as_deref()).unwrap_or_default();
+
     Self {
       session_id: None,
       workdir: String::new(),
       connection_id: None,
       model_id: None,
+      last_activity_ms: None,
       messages: Vec::new(),
       tool_inputs_by_tool_call_id: std::collections::HashMap::new(),
       permission_queue: std::collections::VecDeque::new(),
@@ -138,11 +151,17 @@ impl AppState {
 
       help_open: false,
       config_wizard: config_wizard::ConfigWizardState::new(),
+      sessions: sessions::SessionsState::new(),
       should_exit: false,
 
       next_client_seq: 1,
 
       pending_requests: std::collections::HashMap::new(),
+
+      session_aliases,
+      aliases_path,
+      session_snapshots: std::collections::HashMap::new(),
+      session_switch_target: None,
     }
   }
 

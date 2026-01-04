@@ -2,6 +2,7 @@ use crate::app::reducer::{reduce, AppEvent, Outbound};
 use crate::app::ui::{apply_ui_action, palette_labels, UiAction};
 use crate::app::activity;
 use crate::app::config_wizard;
+use crate::app::sessions;
 use crate::app::AppState;
 use crate::app::{Focus, Role};
 use crate::args::Args;
@@ -64,9 +65,9 @@ fn run_loop(
   loop {
     expire_timeouts(state, now_ms());
 
-    while let Ok(line) = transport.try_recv_line() {
-      handle_agent_line(transport, state, &line, timeout_ms)?;
-    }
+	    while let Ok(line) = transport.try_recv_line() {
+	      handle_agent_line(transport, state, &line, timeout_ms)?;
+	    }
     state.activate_next_permission_if_needed();
 
     terminal.draw(|f| draw(f, state))?;
@@ -101,6 +102,39 @@ fn run_loop(
 	              KeyCode::Backspace => Some(UiAction::ConfigWizardBackspace),
 	              KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
 	                Some(UiAction::ConfigWizardChar(ch))
+	              }
+	              _ => None,
+	            };
+	            if let Some(action) = action {
+	              let out = apply_ui_action(state, action);
+	              send_outbound(transport, state, out, timeout_ms)?;
+	            }
+	            if state.should_exit {
+	              break;
+	            }
+	            continue;
+	          }
+
+	          if state.sessions.open {
+	            let action = match key.code {
+	              KeyCode::Esc => Some(UiAction::SessionsClose),
+	              KeyCode::Up => Some(UiAction::SessionsPrev),
+	              KeyCode::Down => Some(UiAction::SessionsNext),
+	              KeyCode::Enter => Some(UiAction::SessionsSubmit),
+	              KeyCode::Backspace => {
+	                if state.sessions.renaming {
+	                  Some(UiAction::SessionsRenameBackspace)
+	                } else {
+	                  Some(UiAction::SessionsQueryBackspace)
+	                }
+	              }
+	              KeyCode::Char('r') if !state.sessions.renaming => Some(UiAction::SessionsStartRename),
+	              KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+	                if state.sessions.renaming {
+	                  Some(UiAction::SessionsRenameChar(ch))
+	                } else {
+	                  Some(UiAction::SessionsQueryChar(ch))
+	                }
 	              }
 	              _ => None,
 	            };
@@ -263,6 +297,7 @@ fn handle_agent_line(
   line: &str,
   timeout_ms: u64,
 ) -> io::Result<()> {
+  state.last_activity_ms = Some(now_ms());
   let inbound = match jsonrpc::parse_inbound(line) {
     Ok(m) => m,
     Err(err) => {
@@ -322,14 +357,18 @@ fn handle_agent_line(
 
 	      reduce(state, AppEvent::RpcResponse { id: id.clone() });
 
-	      if matches!(pending_method.as_deref(), Some("session/new" | "session/load")) {
-	        if let Some(session_id) = extract_session_id(&result) {
-	          state.session_id = Some(session_id.clone());
-	          state.push_activity_line(format!("session: active {session_id}"));
-	        }
-	      }
+		      if matches!(pending_method.as_deref(), Some("session/new" | "session/load")) {
+		        if let Some(session_id) = extract_session_id(&result) {
+		          state.session_id = Some(session_id.clone());
+		          state.push_activity_line(format!("session: active {session_id}"));
+		          sessions::on_session_activated(state, &session_id);
+		        }
+		      }
 
 	      if let Some(method) = pending_method.as_deref() {
+	        if method == "session/list" {
+	          sessions::handle_session_list_response(state, &result, error_message);
+	        }
 	        if method == "ent/agent/status" {
 	          let (conn, model) = ent::extract_agent_status_config(&result);
 	          if conn.is_some() {
@@ -470,6 +509,9 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
   } else if state.config_wizard.open {
     let area = centered_rect(80, 70, f.area());
     f.render_widget(render_config_modal(state), area);
+  } else if state.sessions.open {
+    let area = centered_rect(80, 70, f.area());
+    f.render_widget(render_sessions_modal(state), area);
   } else if state.palette_open {
     let area = centered_rect(70, 60, f.area());
     f.render_widget(render_palette_modal(state), area);
@@ -486,15 +528,72 @@ fn render_status(state: &AppState) -> Paragraph<'static> {
     .clone()
     .unwrap_or_else(|| "<unset>".to_string());
   let model = state.model_id.clone().unwrap_or_else(|| "<unset>".to_string());
+  let last = state
+    .last_activity_ms
+    .map(|ms| ms.to_string())
+    .unwrap_or_else(|| "<none>".to_string());
   let text = Line::from(vec![
     Span::styled(" lace-tui ", Style::default().fg(Color::Black).bg(Color::White)),
     Span::raw(" "),
     Span::raw(format!("sess={sid} ")),
     Span::raw(format!("conn={conn} model={model} ")),
+    Span::raw(format!("last={last} ")),
     Span::raw(format!("workdir={} ", state.workdir)),
     Span::raw(" Ctrl+C quit  Ctrl+1/2/3 panes "),
   ]);
   Paragraph::new(text).style(Style::default())
+}
+
+fn render_sessions_modal(state: &AppState) -> Paragraph<'static> {
+  let s = &state.sessions;
+  let mut lines: Vec<Line> = Vec::new();
+
+  lines.push(Line::from("Sessions"));
+  lines.push(Line::from(""));
+
+  if s.loading {
+    lines.push(Line::from("Loading sessions..."));
+  } else if let Some(err) = &s.error {
+    lines.push(Line::from(format!("Error: {err}")));
+  } else {
+    lines.push(Line::from(format!("Filter: {}", s.query)));
+    lines.push(Line::from(""));
+
+    let max = 18usize;
+    let start = s.selected.saturating_sub(max / 2);
+    let end = (start + max).min(s.filtered.len());
+    for sel_idx in start..end {
+      let idx = s.filtered[sel_idx];
+      let selected = sel_idx == s.selected;
+      let marker = if selected { ">" } else { " " };
+      let it = &s.items[idx];
+      let alias = state.session_aliases.get(&it.session_id).cloned().unwrap_or_default();
+      let title = if alias.is_empty() {
+        it.session_id.clone()
+      } else {
+        format!("{alias} ({})", it.session_id)
+      };
+      let work = it.work_dir.clone().unwrap_or_else(|| "?".to_string());
+      let last_active = it.last_active.clone().unwrap_or_else(|| "?".to_string());
+      lines.push(Line::from(format!("{marker} {title}")));
+      lines.push(Line::from(Span::styled(
+        format!("    {work}  lastActive={last_active}"),
+        Style::default().fg(Color::DarkGray),
+      )));
+    }
+
+    if s.renaming {
+      lines.push(Line::from(""));
+      lines.push(Line::from(format!("Rename: {}", s.rename_input)));
+    }
+  }
+
+  lines.push(Line::from(""));
+  lines.push(Line::from("Up/Down select • Enter load • r rename • Esc close"));
+
+  Paragraph::new(Text::from(lines))
+    .block(Block::default().title("Sessions").borders(Borders::ALL))
+    .wrap(Wrap { trim: true })
 }
 
 fn render_config_modal(state: &AppState) -> Paragraph<'static> {

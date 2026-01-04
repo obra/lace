@@ -21,6 +21,17 @@ pub enum UiAction {
   ConfigWizardClose,
   ConfigWizardChar(char),
   ConfigWizardBackspace,
+
+  OpenSessions,
+  SessionsPrev,
+  SessionsNext,
+  SessionsClose,
+  SessionsQueryChar(char),
+  SessionsQueryBackspace,
+  SessionsStartRename,
+  SessionsRenameChar(char),
+  SessionsRenameBackspace,
+  SessionsSubmit,
   ToggleChat,
   ToggleActivity,
   ToggleDebug,
@@ -144,6 +155,51 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
 	    UiAction::ConfigWizardBackspace => {
 	      crate::app::config_wizard::backspace(state);
 	      Vec::new()
+	    }
+	    UiAction::OpenSessions => crate::app::sessions::open_sessions(state),
+	    UiAction::SessionsPrev => {
+	      crate::app::sessions::prev(state);
+	      Vec::new()
+	    }
+	    UiAction::SessionsNext => {
+	      crate::app::sessions::next(state);
+	      Vec::new()
+	    }
+	    UiAction::SessionsClose => {
+	      crate::app::sessions::close_sessions(state);
+	      Vec::new()
+	    }
+	    UiAction::SessionsQueryChar(ch) => {
+	      let mut q = state.sessions.query.clone();
+	      q.push(ch);
+	      crate::app::sessions::update_query(state, q);
+	      Vec::new()
+	    }
+	    UiAction::SessionsQueryBackspace => {
+	      let mut q = state.sessions.query.clone();
+	      q.pop();
+	      crate::app::sessions::update_query(state, q);
+	      Vec::new()
+	    }
+	    UiAction::SessionsStartRename => {
+	      crate::app::sessions::start_rename(state);
+	      Vec::new()
+	    }
+	    UiAction::SessionsRenameChar(ch) => {
+	      crate::app::sessions::rename_char(state, ch);
+	      Vec::new()
+	    }
+	    UiAction::SessionsRenameBackspace => {
+	      crate::app::sessions::rename_backspace(state);
+	      Vec::new()
+	    }
+	    UiAction::SessionsSubmit => {
+	      if state.sessions.renaming {
+	        crate::app::sessions::submit_rename(state);
+	        Vec::new()
+	      } else {
+	        crate::app::sessions::submit_load_selected(state)
+	      }
 	    }
 	    UiAction::Enter => {
 	      let line = state.input_buffer.trim_end().to_string();
@@ -276,26 +332,27 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
       }
       let idx = state.palette_selected.min(items.len() - 1);
       let mut out: Vec<Outbound> = Vec::new();
-	      match items[idx].command {
-	        PaletteCommand::NewSession => {
-	          let id = state.next_client_id();
-	          state.session_id = None;
-	          state.messages.clear();
-	          crate::app::activity::reset_activity(state);
-	          state.debug_lines.clear();
-	          out.push(Outbound::JsonRpcRequest {
-	            id,
-	            method: "session/new".to_string(),
-	            params: Some(json!({ "workDir": state.workdir.clone() })),
-	          });
-	        }
-	        PaletteCommand::Configure => {
-	          out.extend(crate::app::config_wizard::open(state));
-	        }
-	        PaletteCommand::ToggleChat => {
-	          state.show_chat = !state.show_chat;
-	          state.ensure_focus_visible();
-	        }
+		      match items[idx].command {
+		        PaletteCommand::NewSession => {
+		          let id = state.next_client_id();
+		          crate::app::sessions::prepare_for_session_switch(state, None);
+		          state.session_id = None;
+		          out.push(Outbound::JsonRpcRequest {
+		            id,
+		            method: "session/new".to_string(),
+		            params: Some(json!({ "workDir": state.workdir.clone() })),
+		          });
+		        }
+		        PaletteCommand::Configure => {
+		          out.extend(crate::app::config_wizard::open(state));
+		        }
+		        PaletteCommand::Sessions => {
+		          out.extend(crate::app::sessions::open_sessions(state));
+		        }
+		        PaletteCommand::ToggleChat => {
+		          state.show_chat = !state.show_chat;
+		          state.ensure_focus_visible();
+		        }
         PaletteCommand::ToggleActivity => {
           state.show_activity = !state.show_activity;
           state.ensure_focus_visible();
@@ -367,6 +424,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
 enum PaletteCommand {
   NewSession,
   Configure,
+  Sessions,
   ToggleChat,
   ToggleActivity,
   ToggleDebug,
@@ -389,6 +447,10 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
 	    PaletteItem {
 	      label: "Configure...",
 	      command: PaletteCommand::Configure,
+	    },
+	    PaletteItem {
+	      label: "Sessions...",
+	      command: PaletteCommand::Sessions,
 	    },
 	    PaletteItem {
 	      label: "Toggle Chat Pane",
