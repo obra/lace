@@ -602,6 +602,40 @@ Tests:
 Acceptance:
 - Real tool execution works end-to-end in `lace-agent`.
 
+### Task 7.4: Implement `ent/session/compact` using the existing compaction system (port)
+
+We already have a compaction infrastructure in `@lace/core`:
+- `packages/core/src/threads/compaction/types.ts`
+- `packages/core/src/threads/compaction/registry.ts`
+- `packages/core/src/threads/compaction/trim-tool-results-strategy.ts`
+- `packages/core/src/threads/compaction/summarize-strategy.ts`
+
+Re-use/port this into `@lace/agent` so `ent/session/compact` is not a one-off bespoke implementation.
+
+Touch:
+- `packages/agent/src/compaction/*` (new, small)
+- `packages/agent/src/server.ts` (`ent/session/compact` should delegate to strategies)
+
+Tests:
+- Prefer E2E: drive `session/prompt` → `ent/session/compact` → `session/prompt` and assert provider context shrinks without losing essential state.
+
+Acceptance:
+- Supports at least `trim-tool-results` and `summarize`-style compaction, aligned with core behavior.
+
+### Task 7.5: Audit `@lace/agent` for duplicated “from scratch” implementations
+
+Before writing new infrastructure in `@lace/agent`, check for existing implementations in `@lace/core` and port/reuse where appropriate.
+
+Initial audit targets:
+- Compaction (above)
+- Shell execution (`packages/core/src/tools/implementations/bash.ts` vs `packages/agent/src/tools/shell-exec.ts`)
+- Turn loop / token management behavior (`packages/core/src/agents/agent.ts`)
+
+Known duplicates (as of 2026-01-04):
+- `ent/session/compact` in `packages/agent/src/server.ts` is currently an ad-hoc implementation (local summarization + message dropping) and should be replaced by ported strategies.
+- `summarizeProviderMessages()` in `packages/agent/src/server.ts` duplicates core summarization behavior and does not use the provider.
+- `shell.exec` in `packages/agent/src/tools/shell-exec.ts` overlaps with `bash` in core; decide whether to standardize on one implementation and map protocol tool naming accordingly.
+
 ---
 
 ## PR8 — Subagents as jobs (no Tasks)
