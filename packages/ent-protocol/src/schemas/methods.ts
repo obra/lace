@@ -422,6 +422,40 @@ export const EntAgentStatusResponseSchema = z
   })
   .strict();
 
+const EntSessionCompactParamsSchema = z
+  .object({
+    strategy: z.enum(['summarize', 'truncate', 'selective']).optional(),
+    targetTokens: z.number().optional(),
+    preserveRecent: z.number().optional(),
+  })
+  .strict();
+
+const EntSessionCompactResultSchema = z
+  .object({
+    previousTokens: z.number(),
+    currentTokens: z.number(),
+    messagesCompacted: z.number(),
+    summary: z.string().optional(),
+  })
+  .strict();
+
+export const EntSessionCompactRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/compact'),
+    params: EntSessionCompactParamsSchema.optional(),
+  })
+  .strict();
+
+export const EntSessionCompactResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntSessionCompactResultSchema,
+  })
+  .strict();
+
 const EntSessionConfigureParamsSchema = z
   .object({
     connectionId: z.string().optional(),
@@ -462,6 +496,67 @@ export const EntSessionConfigureResponseSchema = z
     jsonrpc: JsonRpcVersionSchema,
     id: JsonRpcIdSchema,
     result: EntSessionConfigureResultSchema,
+  })
+  .strict();
+
+const EntSessionRewindParamsSchema = z
+  .object({
+    toEventSeq: z.number(),
+  })
+  .strict();
+
+const EntSessionRewindResultSchema = z
+  .object({
+    filesRestored: z.array(z.string()),
+    eventSeq: z.number(),
+  })
+  .strict();
+
+export const EntSessionRewindRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/rewind'),
+    params: EntSessionRewindParamsSchema,
+  })
+  .strict();
+
+export const EntSessionRewindResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntSessionRewindResultSchema,
+  })
+  .strict();
+
+const EntSessionCheckpointParamsSchema = z
+  .object({
+    label: z.string().optional(),
+  })
+  .strict();
+
+const EntSessionCheckpointResultSchema = z
+  .object({
+    checkpointId: NonEmptyStringSchema,
+    eventSeq: z.number(),
+    files: z.array(z.string()),
+  })
+  .strict();
+
+export const EntSessionCheckpointRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/checkpoint'),
+    params: EntSessionCheckpointParamsSchema.optional(),
+  })
+  .strict();
+
+export const EntSessionCheckpointResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntSessionCheckpointResultSchema,
   })
   .strict();
 
@@ -1224,7 +1319,10 @@ export const EntProtocolRequestSchema = z.union([
   SessionPromptRequestSchema,
   EntAgentPingRequestSchema,
   EntAgentStatusRequestSchema,
+  EntSessionCompactRequestSchema,
   EntSessionConfigureRequestSchema,
+  EntSessionRewindRequestSchema,
+  EntSessionCheckpointRequestSchema,
   EntSessionEventsRequestSchema,
   EntProvidersListRequestSchema,
   EntConnectionsListRequestSchema,

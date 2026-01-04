@@ -66,6 +66,33 @@ describe('protocol shapes (representative examples)', () => {
         params: { afterEventSeq: 10, limit: 50 },
       })
     ).not.toThrow();
+
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 6,
+        method: 'ent/session/compact',
+        params: { strategy: 'summarize', targetTokens: 1000, preserveRecent: 25 },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 7,
+        method: 'ent/session/rewind',
+        params: { toEventSeq: 123 },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 8,
+        method: 'ent/session/checkpoint',
+        params: { label: 'before-refactor' },
+      })
+    ).not.toThrow();
   });
 
   it('parses representative agent->client notifications', () => {
