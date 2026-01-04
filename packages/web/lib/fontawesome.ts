@@ -10,7 +10,6 @@ config.autoAddCss = false;
 export {
   faSearch,
   faTerminal,
-  faTasks,
   faFolder,
   faFolderOpen,
   faBox,
