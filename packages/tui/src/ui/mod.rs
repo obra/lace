@@ -1,6 +1,7 @@
 use crate::app::reducer::{reduce, AppEvent, Outbound};
 use crate::app::ui::{apply_ui_action, palette_labels, UiAction};
 use crate::app::activity;
+use crate::app::config_wizard;
 use crate::app::AppState;
 use crate::app::{Focus, Role};
 use crate::args::Args;
@@ -56,7 +57,7 @@ fn run_loop(
     expire_timeouts(state, now_ms());
 
     while let Ok(line) = transport.try_recv_line() {
-      handle_agent_line(transport, state, &line);
+      handle_agent_line(transport, state, &line, timeout_ms)?;
     }
     state.activate_next_permission_if_needed();
 
@@ -69,7 +70,7 @@ fn run_loop(
             break;
           }
 
-          if state.active_permission.is_some() {
+	          if state.active_permission.is_some() {
             let action = match key.code {
               KeyCode::Up => Some(UiAction::PermissionPrev),
               KeyCode::Down => Some(UiAction::PermissionNext),
@@ -80,8 +81,30 @@ fn run_loop(
               let out = apply_ui_action(state, action);
               send_outbound(transport, state, out, timeout_ms)?;
             }
-            continue;
-          }
+	            continue;
+	          }
+
+	          if state.config_wizard.open {
+	            let action = match key.code {
+	              KeyCode::Esc => Some(UiAction::ConfigWizardClose),
+	              KeyCode::Up => Some(UiAction::ConfigWizardPrev),
+	              KeyCode::Down => Some(UiAction::ConfigWizardNext),
+	              KeyCode::Enter => Some(UiAction::ConfigWizardSubmit),
+	              KeyCode::Backspace => Some(UiAction::ConfigWizardBackspace),
+	              KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+	                Some(UiAction::ConfigWizardChar(ch))
+	              }
+	              _ => None,
+	            };
+	            if let Some(action) = action {
+	              let out = apply_ui_action(state, action);
+	              send_outbound(transport, state, out, timeout_ms)?;
+	            }
+	            if state.should_exit {
+	              break;
+	            }
+	            continue;
+	          }
 
           if state.help_open {
             match key.code {
@@ -226,12 +249,17 @@ fn send_outbound(
   Ok(())
 }
 
-fn handle_agent_line(transport: &AgentTransport, state: &mut AppState, line: &str) {
+fn handle_agent_line(
+  transport: &AgentTransport,
+  state: &mut AppState,
+  line: &str,
+  timeout_ms: u64,
+) -> io::Result<()> {
   let inbound = match jsonrpc::parse_inbound(line) {
     Ok(m) => m,
     Err(err) => {
       state.push_debug_line(format!("bad jsonrpc: {err}"));
-      return;
+      return Ok(());
     }
   };
 
@@ -242,53 +270,63 @@ fn handle_agent_line(transport: &AgentTransport, state: &mut AppState, line: &st
         handle_session_update(state, &params);
       }
     }
-    jsonrpc::InboundMessage::Request { id, method, params } => {
-      if method == "session/update" {
-        let params = params.unwrap_or(Value::Null);
-        handle_session_update(state, &params);
-        let _ = transport.send_line(jsonrpc::encode_response_result(id, Value::Null));
-        return;
-      }
+	    jsonrpc::InboundMessage::Request { id, method, params } => {
+	      if method == "session/update" {
+	        let params = params.unwrap_or(Value::Null);
+	        handle_session_update(state, &params);
+	        let _ = transport.send_line(jsonrpc::encode_response_result(id, Value::Null));
+	        return Ok(());
+	      }
 
-      if method == "session/request_permission" {
-        let params = params.unwrap_or(Value::Null);
-        let req = ent::decode_permission_request(id, &params);
-        reduce(state, AppEvent::PermissionRequested(req));
-        state.push_activity_line("permission: requested".to_string());
-        return;
-      }
+	      if method == "session/request_permission" {
+	        let params = params.unwrap_or(Value::Null);
+	        let req = ent::decode_permission_request(id, &params);
+	        reduce(state, AppEvent::PermissionRequested(req));
+	        state.push_activity_line("permission: requested".to_string());
+	        return Ok(());
+	      }
 
-      let _ = transport.send_line(jsonrpc::encode_response_result(id, Value::Null));
-    }
+	      let _ = transport.send_line(jsonrpc::encode_response_result(id, Value::Null));
+	    }
 	    jsonrpc::InboundMessage::Response { id, result, error } => {
-	      if let Some(err) = error {
+	      let error_message = error.as_ref().map(|e| e.message.as_str());
+	      if let Some(err) = error.as_ref() {
 	        activity::push_rpc_error(
 	          state,
 	          err.message.clone(),
-	          Some(serde_json::to_value(err).unwrap_or(Value::Null)),
+	          Some(serde_json::to_value(err.clone()).unwrap_or(Value::Null)),
 	        );
 	      }
-      let mut should_refocus = false;
-      let mut pending_method: Option<String> = None;
-      if let Some(id_str) = id.as_str() {
-        should_refocus = state.active_prompt_request_ids.contains(id_str);
-        pending_method = state.take_pending_request(id_str).map(|p| p.method);
-      }
+	      let mut should_refocus = false;
+	      let mut pending_method: Option<String> = None;
+	      if let Some(id_str) = id.as_str() {
+	        should_refocus = state.active_prompt_request_ids.contains(id_str);
+	        pending_method = state.take_pending_request(id_str).map(|p| p.method);
+	      }
 
-      reduce(state, AppEvent::RpcResponse { id: id.clone() });
+	      reduce(state, AppEvent::RpcResponse { id: id.clone() });
 
-      if matches!(pending_method.as_deref(), Some("session/new" | "session/load")) {
-        if let Some(session_id) = extract_session_id(&result) {
-          state.session_id = Some(session_id.clone());
-          state.push_activity_line(format!("session: active {session_id}"));
-        }
-      }
+	      if matches!(pending_method.as_deref(), Some("session/new" | "session/load")) {
+	        if let Some(session_id) = extract_session_id(&result) {
+	          state.session_id = Some(session_id.clone());
+	          state.push_activity_line(format!("session: active {session_id}"));
+	        }
+	      }
 
-      if should_refocus && state.active_permission.is_none() {
-        state.focus = Focus::Input;
-      }
-    }
-  }
+	      if let Some(method) = pending_method.as_deref() {
+	        if state.config_wizard.open && method.starts_with("ent/") {
+	          let out = config_wizard::handle_response(state, method, &result, error_message);
+	          send_outbound(transport, state, out, timeout_ms)?;
+	        }
+	      }
+
+	      if should_refocus && state.active_permission.is_none() {
+	        state.focus = Focus::Input;
+	      }
+	    }
+	  }
+
+  Ok(())
 }
 
 fn extract_session_id(result: &Option<Value>) -> Option<String> {
@@ -404,6 +442,9 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
   if state.active_permission.is_some() {
     let area = centered_rect(80, 70, f.area());
     f.render_widget(render_permission_modal(state), area);
+  } else if state.config_wizard.open {
+    let area = centered_rect(80, 70, f.area());
+    f.render_widget(render_config_modal(state), area);
   } else if state.palette_open {
     let area = centered_rect(70, 60, f.area());
     f.render_widget(render_palette_modal(state), area);
@@ -415,14 +456,137 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
 
 fn render_status(state: &AppState) -> Paragraph<'static> {
   let sid = state.session_id.clone().unwrap_or_else(|| "<none>".to_string());
+  let conn = state
+    .connection_id
+    .clone()
+    .unwrap_or_else(|| "<unset>".to_string());
+  let model = state.model_id.clone().unwrap_or_else(|| "<unset>".to_string());
   let text = Line::from(vec![
     Span::styled(" lace-tui ", Style::default().fg(Color::Black).bg(Color::White)),
     Span::raw(" "),
     Span::raw(format!("sess={sid} ")),
+    Span::raw(format!("conn={conn} model={model} ")),
     Span::raw(format!("workdir={} ", state.workdir)),
     Span::raw(" Ctrl+C quit  Ctrl+1/2/3 panes "),
   ]);
   Paragraph::new(text).style(Style::default())
+}
+
+fn render_config_modal(state: &AppState) -> Paragraph<'static> {
+  let w = &state.config_wizard;
+  let mut lines: Vec<Line> = Vec::new();
+
+  lines.push(Line::from("Configure"));
+  lines.push(Line::from(""));
+
+  match w.step {
+    config_wizard::ConfigWizardStep::LoadingConnections => {
+      lines.push(Line::from("Loading connections..."));
+    }
+    config_wizard::ConfigWizardStep::SelectConnection => {
+      lines.push(Line::from("Select connection:"));
+      for (i, c) in w.connections.iter().enumerate() {
+        let marker = if i == w.selected { ">" } else { " " };
+        let name = c.name.clone().unwrap_or_else(|| c.connection_id.clone());
+        let cred = c
+          .credential_state
+          .clone()
+          .map(|s| format!(" [{s}]"))
+          .unwrap_or_default();
+        lines.push(Line::from(format!("{marker} {}{}", name, cred)));
+      }
+    }
+    config_wizard::ConfigWizardStep::LoadingProviders => {
+      lines.push(Line::from("No connections found; loading providers..."));
+    }
+    config_wizard::ConfigWizardStep::SelectProvider => {
+      lines.push(Line::from("Select provider:"));
+      for (i, p) in w.providers.iter().enumerate() {
+        let marker = if i == w.selected { ">" } else { " " };
+        let name = p
+          .display_name
+          .clone()
+          .unwrap_or_else(|| p.provider_id.clone());
+        lines.push(Line::from(format!("{marker} {name} ({})", p.provider_id)));
+      }
+    }
+    config_wizard::ConfigWizardStep::UpsertingConnection => {
+      lines.push(Line::from("Creating connection..."));
+    }
+    config_wizard::ConfigWizardStep::CheckingCredentials => {
+      lines.push(Line::from("Checking credentials..."));
+    }
+    config_wizard::ConfigWizardStep::EnterCredential => {
+      let idx = w.credential_field_index;
+      if let Some(field) = w.credential_fields.get(idx) {
+        let label = field
+          .label
+          .clone()
+          .unwrap_or_else(|| field.name.clone());
+        let display = if field.secret {
+          "*".repeat(w.credential_input.chars().count())
+        } else {
+          w.credential_input.clone()
+        };
+        lines.push(Line::from(format!("Enter {label}:")));
+        lines.push(Line::from(format!("> {display}")));
+      } else {
+        lines.push(Line::from("Enter credential:"));
+      }
+    }
+    config_wizard::ConfigWizardStep::SubmittingCredentials => {
+      lines.push(Line::from("Submitting credentials..."));
+    }
+    config_wizard::ConfigWizardStep::LoadingModels => {
+      lines.push(Line::from("Loading models..."));
+    }
+    config_wizard::ConfigWizardStep::SelectModel => {
+      lines.push(Line::from("Select model:"));
+      for (i, m) in w.models.iter().enumerate() {
+        let marker = if i == w.selected { ">" } else { " " };
+        lines.push(Line::from(format!("{marker} {m}")));
+      }
+    }
+    config_wizard::ConfigWizardStep::Applying => {
+      lines.push(Line::from("Applying session configuration..."));
+    }
+    config_wizard::ConfigWizardStep::Done => {
+      lines.push(Line::from(format!(
+        "Configured: connectionId={} modelId={}",
+        w.connection_id.clone().unwrap_or_else(|| "?".to_string()),
+        w.model_id.clone().unwrap_or_else(|| "?".to_string())
+      )));
+      lines.push(Line::from(""));
+      lines.push(Line::from("Press Enter or Esc to close"));
+    }
+    config_wizard::ConfigWizardStep::NotSupported => {
+      lines.push(Line::from(
+        w.error_message
+          .clone()
+          .unwrap_or_else(|| "configuration not supported by this agent".to_string()),
+      ));
+      lines.push(Line::from(""));
+      lines.push(Line::from("Press Enter or Esc to close"));
+    }
+    config_wizard::ConfigWizardStep::Error => {
+      lines.push(Line::from("Error:"));
+      lines.push(Line::from(
+        w.error_message
+          .clone()
+          .unwrap_or_else(|| "<unknown>".to_string()),
+      ));
+      lines.push(Line::from(""));
+      lines.push(Line::from("Press Enter or Esc to close"));
+    }
+    config_wizard::ConfigWizardStep::Closed => {}
+  }
+
+  lines.push(Line::from(""));
+  lines.push(Line::from("Up/Down select • Enter confirm • Esc close"));
+
+  Paragraph::new(Text::from(lines))
+    .block(Block::default().title("Configure").borders(Borders::ALL))
+    .wrap(Wrap { trim: true })
 }
 
 fn render_main(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout::Rect) {
@@ -609,11 +773,11 @@ fn render_help_modal() -> Paragraph<'static> {
     Line::from("Ctrl+1   Toggle Chat pane"),
     Line::from("Ctrl+2   Toggle Activity pane"),
     Line::from("Ctrl+3   Toggle Debug pane"),
-	    Line::from("Tab      Cycle focus"),
-	    Line::from("Up/Down  Scroll or history (depends on focus)"),
-	    Line::from("Enter    Toggle expand (Activity)"),
-	    Line::from("g        Jump to turn (Activity)"),
-	    Line::from("? / F1   Toggle help"),
+    Line::from("Tab      Cycle focus"),
+    Line::from("Up/Down  Scroll or history (depends on focus)"),
+    Line::from("Enter    Toggle expand (Activity)"),
+    Line::from("g        Jump to turn (Activity)"),
+    Line::from("? / F1   Toggle help"),
     Line::from(""),
     Line::from("Permission modal: Up/Down select, Enter decide"),
   ];

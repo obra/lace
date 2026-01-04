@@ -1,6 +1,7 @@
 pub mod reducer;
 pub mod ui;
 pub mod activity;
+pub mod config_wizard;
 
 use serde_json::Value;
 
@@ -50,6 +51,8 @@ pub struct PermissionRequest {
 pub struct AppState {
   pub session_id: Option<String>,
   pub workdir: String,
+  pub connection_id: Option<String>,
+  pub model_id: Option<String>,
   pub messages: Vec<ChatMessage>,
   pub tool_inputs_by_tool_call_id: std::collections::HashMap<String, Value>,
   pub permission_queue: std::collections::VecDeque<PermissionRequest>,
@@ -81,6 +84,7 @@ pub struct AppState {
   pub palette_selected: usize,
 
   pub help_open: bool,
+  pub config_wizard: config_wizard::ConfigWizardState,
   pub should_exit: bool,
 
   pub next_client_seq: u64,
@@ -100,6 +104,8 @@ impl AppState {
     Self {
       session_id: None,
       workdir: String::new(),
+      connection_id: None,
+      model_id: None,
       messages: Vec::new(),
       tool_inputs_by_tool_call_id: std::collections::HashMap::new(),
       permission_queue: std::collections::VecDeque::new(),
@@ -131,6 +137,7 @@ impl AppState {
       palette_selected: 0,
 
       help_open: false,
+      config_wizard: config_wizard::ConfigWizardState::new(),
       should_exit: false,
 
       next_client_seq: 1,

@@ -156,3 +156,14 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
 - Added structured entries for `job_started` / `job_finished` updates (Activity kinds).
 - Tests:
   - `cd packages/tui && cargo test` (includes `app::ui::tests::activity_jump_to_turn_sets_chat_focus_and_scroll`)
+
+### 2026-01-04 — Configure wizard (ent/*) + graceful fallback
+
+- Added a first in-TUI provider/model configuration flow:
+  - Palette action: “Configure...”
+  - Wizard steps: list connections → (optionally) create connection → credentials → list models → apply config.
+  - Graceful “method not found” handling shows “configuration not supported” (no crash).
+- Session status bar now shows `conn` + `model` when known.
+- Tests:
+  - Unit tests in `packages/tui/src/app/config_wizard.rs`
+  - Scenario e2e: `packages/tui/tests/e2e_configure_wizard.rs` (drives `fake-agent-configure.mjs`)

@@ -13,6 +13,14 @@ pub enum UiAction {
   ActivityNext,
   ActivityToggleExpanded,
   ActivityJumpToTurn,
+
+  OpenConfigureWizard,
+  ConfigWizardPrev,
+  ConfigWizardNext,
+  ConfigWizardSubmit,
+  ConfigWizardClose,
+  ConfigWizardChar(char),
+  ConfigWizardBackspace,
   ToggleChat,
   ToggleActivity,
   ToggleDebug,
@@ -92,7 +100,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
       }
       Vec::new()
     }
-    UiAction::ActivityJumpToTurn => {
+	    UiAction::ActivityJumpToTurn => {
       let Some(item) = state.activity.get(state.activity_selected) else {
         return Vec::new();
       };
@@ -112,13 +120,35 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
       };
 
       state.focus = crate::app::Focus::Chat;
-      state.chat_scroll = chat_start_line_for_message_index(&state.messages, target_idx);
-      Vec::new()
-    }
-    UiAction::Enter => {
-      let line = state.input_buffer.trim_end().to_string();
-      state.input_buffer.clear();
-      state.input_history_index = None;
+	      state.chat_scroll = chat_start_line_for_message_index(&state.messages, target_idx);
+	      Vec::new()
+	    }
+	    UiAction::OpenConfigureWizard => crate::app::config_wizard::open(state),
+	    UiAction::ConfigWizardPrev => {
+	      crate::app::config_wizard::prev(state);
+	      Vec::new()
+	    }
+	    UiAction::ConfigWizardNext => {
+	      crate::app::config_wizard::next(state);
+	      Vec::new()
+	    }
+	    UiAction::ConfigWizardSubmit => crate::app::config_wizard::submit(state),
+	    UiAction::ConfigWizardClose => {
+	      crate::app::config_wizard::close(state);
+	      Vec::new()
+	    }
+	    UiAction::ConfigWizardChar(ch) => {
+	      crate::app::config_wizard::input_char(state, ch);
+	      Vec::new()
+	    }
+	    UiAction::ConfigWizardBackspace => {
+	      crate::app::config_wizard::backspace(state);
+	      Vec::new()
+	    }
+	    UiAction::Enter => {
+	      let line = state.input_buffer.trim_end().to_string();
+	      state.input_buffer.clear();
+	      state.input_history_index = None;
 
       if line.is_empty() {
         return Vec::new();
@@ -246,23 +276,26 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
       }
       let idx = state.palette_selected.min(items.len() - 1);
       let mut out: Vec<Outbound> = Vec::new();
-      match items[idx].command {
-        PaletteCommand::NewSession => {
-          let id = state.next_client_id();
-          state.session_id = None;
-          state.messages.clear();
-          crate::app::activity::reset_activity(state);
-          state.debug_lines.clear();
-          out.push(Outbound::JsonRpcRequest {
-            id,
-            method: "session/new".to_string(),
-            params: Some(json!({ "workDir": state.workdir.clone() })),
-          });
-        }
-        PaletteCommand::ToggleChat => {
-          state.show_chat = !state.show_chat;
-          state.ensure_focus_visible();
-        }
+	      match items[idx].command {
+	        PaletteCommand::NewSession => {
+	          let id = state.next_client_id();
+	          state.session_id = None;
+	          state.messages.clear();
+	          crate::app::activity::reset_activity(state);
+	          state.debug_lines.clear();
+	          out.push(Outbound::JsonRpcRequest {
+	            id,
+	            method: "session/new".to_string(),
+	            params: Some(json!({ "workDir": state.workdir.clone() })),
+	          });
+	        }
+	        PaletteCommand::Configure => {
+	          out.extend(crate::app::config_wizard::open(state));
+	        }
+	        PaletteCommand::ToggleChat => {
+	          state.show_chat = !state.show_chat;
+	          state.ensure_focus_visible();
+	        }
         PaletteCommand::ToggleActivity => {
           state.show_activity = !state.show_activity;
           state.ensure_focus_visible();
@@ -333,6 +366,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PaletteCommand {
   NewSession,
+  Configure,
   ToggleChat,
   ToggleActivity,
   ToggleDebug,
@@ -347,15 +381,19 @@ struct PaletteItem {
 }
 
 fn palette_items(query: &str) -> Vec<PaletteItem> {
-  let all = [
-    PaletteItem {
-      label: "New Session",
-      command: PaletteCommand::NewSession,
-    },
-    PaletteItem {
-      label: "Toggle Chat Pane",
-      command: PaletteCommand::ToggleChat,
-    },
+	  let all = [
+	    PaletteItem {
+	      label: "New Session",
+	      command: PaletteCommand::NewSession,
+	    },
+	    PaletteItem {
+	      label: "Configure...",
+	      command: PaletteCommand::Configure,
+	    },
+	    PaletteItem {
+	      label: "Toggle Chat Pane",
+	      command: PaletteCommand::ToggleChat,
+	    },
     PaletteItem {
       label: "Toggle Activity Pane",
       command: PaletteCommand::ToggleActivity,
