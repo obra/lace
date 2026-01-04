@@ -280,9 +280,16 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
     logger.info('Removing Apple container', { containerId });
 
     try {
-      // Force remove to handle stuck containers
-      await execFileAsync('container', ['rm', '-f', containerId], { timeout: 30000 });
+      // Prefer a non-force delete. On macOS, forcing delete can trigger an unnecessary stop
+      // request even for already-stopped containers, which is prone to flaky XPC timeouts.
+      await execFileAsync('container', ['delete', containerId], { timeout: 30000 });
     } catch (error: unknown) {
+      try {
+        await execFileAsync('container', ['delete', '--force', containerId], { timeout: 30000 });
+      } catch {
+        // Continue with verification/cleanup below.
+      }
+
       // Container might not exist, check if it's really there
       let containers: Array<{ id: string; status: string }> | null = null;
       try {

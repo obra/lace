@@ -52,7 +52,7 @@ describe.skipIf(process.platform !== 'darwin')('Container Cleanup Validation', (
         });
         // Force remove via container CLI as fallback
         try {
-          await execFileAsync('container', ['rm', '-f', containerId], { timeout: 2000 });
+          await execFileAsync('container', ['delete', '--force', containerId], { timeout: 2000 });
         } catch {
           // Best effort
         }
