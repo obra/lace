@@ -1276,6 +1276,7 @@ type ContentBlock =
 | 11 | BudgetExceeded |
 | 12 | CheckpointNotFound |
 | 13 | StructuredOutputInvalid |
+| 14 | ConnectionNotFound |
 
 ### 10.4 Error Reporting Contract
 

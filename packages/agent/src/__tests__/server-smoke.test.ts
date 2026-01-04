@@ -109,6 +109,23 @@ describe('agent rpc server (smoke)', () => {
     server.close();
   });
 
+  it('returns ConnectionNotFound for ent/models/list of missing connection', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', { protocolVersion: '1.0' });
+
+    await expect(
+      client.request('ent/models/list', { connectionId: 'conn_missing' })
+    ).rejects.toMatchObject({
+      code: 14,
+      message: 'ConnectionNotFound',
+    });
+
+    client.close();
+    server.close();
+  });
+
   it('returns NotInitialized for methods called before initialize', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));

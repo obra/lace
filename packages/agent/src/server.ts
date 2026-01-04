@@ -11,7 +11,12 @@ import {
   closeSync,
 } from 'node:fs';
 import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
-import { createNdjsonStdioTransport, JsonRpcPeer, SessionIdSchema } from '@lace/ent-protocol';
+import {
+  createNdjsonStdioTransport,
+  EntErrorCodes,
+  JsonRpcPeer,
+  SessionIdSchema,
+} from '@lace/ent-protocol';
 import {
   ensureSessionFiles,
   getSessionDir,
@@ -235,7 +240,7 @@ function isTestProviderEnabled(): boolean {
 }
 
 function assertInitialized(state: AgentServerState): void {
-  if (!state.initialized) throw { code: 9, message: 'NotInitialized' };
+  if (!state.initialized) throw { code: EntErrorCodes.NotInitialized, message: 'NotInitialized' };
 }
 
 async function createProviderForTurn(options: {
@@ -1408,7 +1413,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     if (!connectionId) throw new Error('connectionId is required');
 
     const instances = await state.providerInstances.loadInstances();
-    if (!instances.instances[connectionId]) throw { code: 1, message: 'ConnectionNotFound' };
+    if (!instances.instances[connectionId])
+      throw { code: EntErrorCodes.ConnectionNotFound, message: 'ConnectionNotFound' };
 
     const credential = state.providerInstances.loadCredential(connectionId);
     return {
@@ -1425,7 +1431,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     if (!connectionId) throw new Error('connectionId is required');
 
     const instances = await state.providerInstances.loadInstances();
-    if (!instances.instances[connectionId]) throw { code: 1, message: 'ConnectionNotFound' };
+    if (!instances.instances[connectionId])
+      throw { code: EntErrorCodes.ConnectionNotFound, message: 'ConnectionNotFound' };
 
     const credential = state.providerInstances.loadCredential(connectionId);
     const requestedMethod = toNonEmptyString(parsed?.method);
@@ -1448,7 +1455,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     if (!connectionId) throw new Error('connectionId is required');
 
     const instances = await state.providerInstances.loadInstances();
-    if (!instances.instances[connectionId]) throw { code: 1, message: 'ConnectionNotFound' };
+    if (!instances.instances[connectionId])
+      throw { code: EntErrorCodes.ConnectionNotFound, message: 'ConnectionNotFound' };
 
     const values = parsed?.values;
     if (!values || typeof values !== 'object') return { ok: false, error: 'values is required' };
@@ -1472,7 +1480,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     if (!connectionId) throw new Error('connectionId is required');
 
     const instances = await state.providerInstances.loadInstances();
-    if (!instances.instances[connectionId]) throw { code: 1, message: 'ConnectionNotFound' };
+    if (!instances.instances[connectionId])
+      throw { code: EntErrorCodes.ConnectionNotFound, message: 'ConnectionNotFound' };
 
     await state.providerInstances.clearCredential(connectionId);
     return { ok: true };
@@ -1487,7 +1496,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const instances = await state.providerInstances.loadInstances();
     const instance = instances.instances[connectionId];
-    if (!instance) throw { code: 1, message: 'ConnectionNotFound' };
+    if (!instance) throw { code: EntErrorCodes.ConnectionNotFound, message: 'ConnectionNotFound' };
 
     await ensureProviderCatalogLoaded();
     const providerId = instance.catalogProviderId;
@@ -1545,7 +1554,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const jobs = deriveJobsForActiveSession();
     const record = jobs.find((j) => j.jobId === jobId);
-    if (!record) throw { code: 8, message: 'JobNotFound' };
+    if (!record) throw { code: EntErrorCodes.JobNotFound, message: 'JobNotFound' };
 
     const sessionDir = state.activeSession.dir;
     const outputPath = getJobOutputPath(sessionDir, jobId);
