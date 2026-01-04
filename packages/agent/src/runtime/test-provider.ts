@@ -76,7 +76,9 @@ export class TestAgentProvider extends AIProvider {
       const content =
         requested.name === 'file_read'
           ? `Reading ${(requested.args as any).path}...`
-          : `Writing ${(requested.args as any).path}...`;
+          : requested.name === 'delegate'
+            ? `Delegating ${(requested.args as any).prompt}...`
+            : `Writing ${(requested.args as any).path}...`;
       this.emit('token', { token: content });
       this.emit('complete', { response: { content, toolCalls, stopReason: 'tool_use' } });
       this.state.phase = 'final';
@@ -98,7 +100,11 @@ export class TestAgentProvider extends AIProvider {
 
   private extractRequestedTool(
     text: string
-  ): null | { name: 'file_read' | 'file_write'; args: Record<string, unknown> } {
+  ): null | { name: 'delegate' | 'file_read' | 'file_write'; args: Record<string, unknown> } {
+    const delegateMatch = text.match(/delegate\s+(.+)\s*$/i);
+    const delegatePrompt = delegateMatch?.[1]?.trim();
+    if (delegatePrompt) return { name: 'delegate', args: { prompt: delegatePrompt } };
+
     const readPath = this.extractRequestedPath(text);
     if (readPath) return { name: 'file_read', args: { path: readPath } };
 
