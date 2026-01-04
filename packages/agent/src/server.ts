@@ -69,6 +69,7 @@ import type { CompactionStrategy } from '@lace/core/threads/compaction/types';
 import { TestAgentProvider } from './runtime/test-provider';
 import { MCPServerManager } from '@lace/core/mcp/server-manager';
 import type { MCPServerConfig } from '@lace/core/config/mcp-types';
+import { DelegateTool } from './tools/delegate';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
 const JOB_LOG_DIR = 'jobs';
@@ -224,6 +225,7 @@ function toolKindFromName(name: string): ToolInfo['kind'] {
   if (name === 'ripgrep_search') return 'search';
   if (name === 'url_fetch') return 'fetch';
   if (name === 'bash') return 'execute';
+  if (name === 'delegate') return 'execute';
   if (name === 'file_write') return 'edit';
   if (name === 'file_edit') return 'edit';
   return 'other';
@@ -346,6 +348,7 @@ function createToolExecutorForMode(
 } {
   const executor = new ToolExecutor();
   executor.registerAllAvailableTools();
+  executor.registerTools([new DelegateTool()]);
 
   if (mcpServerManager) {
     executor.registerMCPTools(mcpServerManager);
@@ -1051,6 +1054,83 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     return { jobId };
   };
 
+  const startSubagentJob = async (options: {
+    prompt: string;
+    description?: string;
+    parentJobId?: string;
+    turnContext?: { turnId: string; turnSeq: number };
+  }): Promise<{ jobId: string }> => {
+    if (!state.activeSession)
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
+
+    const jobId = `job_${randomUUID()}`;
+    const startedAt = new Date().toISOString();
+    const outputPath = getJobOutputPath(state.activeSession.dir, jobId);
+
+    let resolveCompletion!: () => void;
+    const completion = new Promise<void>((resolve) => {
+      resolveCompletion = resolve;
+    });
+
+    const job: JobState = {
+      jobId,
+      parentJobId: options.parentJobId,
+      type: 'subagent',
+      status: 'running',
+      description: options.description ?? 'Subagent',
+      command: options.prompt,
+      subagentContent: [{ type: 'text', text: options.prompt }],
+      startedAt,
+      originTurnId: options.turnContext?.turnId,
+      originTurnSeq: options.turnContext?.turnSeq,
+      outputPath,
+      finished: false,
+      completion,
+      resolveCompletion,
+    };
+
+    state.jobs.set(jobId, job);
+
+    await runExclusive(() => {
+      let sessionState = readSessionState(state.activeSession!.dir);
+      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+        type: 'job_started',
+        turnId: options.turnContext?.turnId,
+        turnSeq: options.turnContext?.turnSeq,
+        data: {
+          jobId,
+          parentJobId: options.parentJobId,
+          jobType: 'subagent',
+          description: job.description,
+          command: options.prompt,
+        },
+      });
+      sessionState = nextState;
+      writeSessionState(state.activeSession!.dir, sessionState);
+      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+    });
+
+    await emitSessionUpdate(
+      {
+        type: 'job_started',
+        jobId,
+        parentJobId: options.parentJobId,
+        jobType: 'subagent',
+        description: job.description,
+      },
+      options.turnContext
+        ? { turnId: options.turnContext.turnId, turnSeq: options.turnContext.turnSeq }
+        : undefined
+    );
+
+    void runSubagentJobProcess(job);
+    return { jobId };
+  };
+
   const runShellJobProcess = (job: JobState) => {
     void (async () => {
       if (!state.activeSession) return;
@@ -1239,9 +1319,181 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         });
       };
 
+      const childJobIdMap = new Map<string, string>();
+
+      const mapChildJobId = (childJobId: string): string => {
+        const existing = childJobIdMap.get(childJobId);
+        if (existing) return existing;
+        const mapped = `${job.jobId}_${childJobId}`;
+        childJobIdMap.set(childJobId, mapped);
+        return mapped;
+      };
+
+      const ensureForwardedJobRecord = (options: {
+        jobId: string;
+        parentJobId?: string;
+        type: JobType;
+        description?: string;
+      }): JobState => {
+        const existing = state.jobs.get(options.jobId);
+        if (existing) return existing;
+
+        let resolveCompletion!: () => void;
+        const completion = new Promise<void>((resolve) => {
+          resolveCompletion = resolve;
+        });
+
+        const record: JobState = {
+          jobId: options.jobId,
+          parentJobId: options.parentJobId,
+          type: options.type,
+          status: 'running',
+          description: options.description,
+          startedAt: new Date().toISOString(),
+          outputPath: getJobOutputPath(state.activeSession!.dir, options.jobId),
+          finished: false,
+          completion,
+          resolveCompletion,
+        };
+
+        state.jobs.set(options.jobId, record);
+        return record;
+      };
+
       childPeer.onRequest('session/update', async (params) => {
         const p = params as Record<string, unknown>;
         const type = p.type;
+
+        if (type === 'job_started' && typeof p.jobId === 'string') {
+          const mappedJobId = mapChildJobId(p.jobId);
+          const mappedParentJobId =
+            typeof p.parentJobId === 'string' ? mapChildJobId(p.parentJobId) : job.jobId;
+          const jobType = p.jobType === 'subagent' ? 'subagent' : 'shell';
+          const description = typeof p.description === 'string' ? p.description : undefined;
+
+          ensureForwardedJobRecord({
+            jobId: mappedJobId,
+            parentJobId: mappedParentJobId,
+            type: jobType,
+            description,
+          });
+
+          await runExclusive(() => {
+            let sessionState = readSessionState(state.activeSession!.dir);
+            const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+              type: 'job_started',
+              data: {
+                jobId: mappedJobId,
+                parentJobId: mappedParentJobId,
+                jobType,
+                description,
+              },
+            });
+            sessionState = nextState;
+            writeSessionState(state.activeSession!.dir, sessionState);
+            state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+          });
+
+          await emitSessionUpdate({
+            type: 'job_started',
+            jobId: mappedJobId,
+            parentJobId: mappedParentJobId,
+            jobType,
+            description,
+          });
+
+          return undefined;
+        }
+
+        if (type === 'job_finished' && typeof p.jobId === 'string') {
+          const mappedJobId = mapChildJobId(p.jobId);
+          const mappedParentJobId =
+            typeof p.parentJobId === 'string' ? mapChildJobId(p.parentJobId) : job.jobId;
+          const exitCode = typeof p.exitCode === 'number' ? p.exitCode : undefined;
+          const outcome =
+            p.outcome === 'completed' || p.outcome === 'failed' ? p.outcome : 'cancelled';
+
+          const record = ensureForwardedJobRecord({
+            jobId: mappedJobId,
+            parentJobId: mappedParentJobId,
+            type: p.jobType === 'subagent' ? 'subagent' : 'shell',
+          });
+          record.status = outcome;
+          record.finished = true;
+          record.proc = undefined;
+          record.childPeer = undefined;
+          record.childSessionId = undefined;
+          record.childTransportClose = undefined;
+          record.exitCode = exitCode;
+
+          await runExclusive(() => {
+            let sessionState = readSessionState(state.activeSession!.dir);
+            const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+              type: 'job_finished',
+              data: {
+                jobId: mappedJobId,
+                parentJobId: mappedParentJobId,
+                outcome,
+                ...(exitCode !== undefined ? { exitCode } : {}),
+              },
+            });
+            sessionState = nextState;
+            writeSessionState(state.activeSession!.dir, sessionState);
+            state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+          });
+
+          await emitSessionUpdate({
+            type: 'job_finished',
+            jobId: mappedJobId,
+            parentJobId: mappedParentJobId,
+            ...(exitCode !== undefined ? { exitCode } : {}),
+            outcome,
+          });
+
+          record.resolveCompletion();
+          return undefined;
+        }
+
+        if (
+          type === 'job_update' &&
+          typeof p.jobId === 'string' &&
+          p.update &&
+          typeof p.update === 'object'
+        ) {
+          const mappedJobId = mapChildJobId(p.jobId);
+          const mappedParentJobId =
+            typeof p.parentJobId === 'string' ? mapChildJobId(p.parentJobId) : job.jobId;
+
+          const record = ensureForwardedJobRecord({
+            jobId: mappedJobId,
+            parentJobId: mappedParentJobId,
+            type: p.jobType === 'subagent' ? 'subagent' : 'shell',
+          });
+
+          const channel = p.channel === 'stdout' || p.channel === 'stderr' ? p.channel : 'internal';
+          const update = p.update as any;
+
+          if (update.type === 'text_delta' && typeof update.text === 'string') {
+            await runExclusive(() => {
+              appendFileSync(record.outputPath, update.text, { encoding: 'utf8' });
+            });
+          }
+
+          if (update.type === 'tool_use' && typeof update.toolCallId === 'string') {
+            update.toolCallId = `${mappedJobId}:${update.toolCallId}`;
+          }
+
+          await emitSessionUpdate({
+            type: 'job_update',
+            jobId: mappedJobId,
+            parentJobId: mappedParentJobId,
+            jobType: record.type,
+            channel,
+            update,
+          });
+
+          return undefined;
+        }
 
         if (type === 'text_delta' && typeof p.text === 'string') {
           await appendJobOutput(p.text);
@@ -1300,7 +1552,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
         const childToolCallId =
           typeof p.toolCallId === 'string' ? p.toolCallId : `tool_${randomUUID()}`;
-        const namespacedToolCallId = `${job.jobId}:${childToolCallId}`;
+
+        const mappedJobId = typeof p.jobId === 'string' ? mapChildJobId(p.jobId) : job.jobId;
+        const namespacedToolCallId = `${mappedJobId}:${childToolCallId}`;
 
         const turnId =
           typeof p.turnId === 'string' ? p.turnId : (job.originTurnId ?? `turn_${randomUUID()}`);
@@ -1310,7 +1564,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           sessionId: state.activeSession!.meta.sessionId,
           turnId,
           turnSeq,
-          jobId: job.jobId,
+          jobId: mappedJobId,
           toolCallId: namespacedToolCallId,
           tool: typeof p.tool === 'string' ? p.tool : 'unknown',
           kind: typeof p.kind === 'string' ? p.kind : undefined,
@@ -2886,7 +3140,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             }
 
             const tool = toolExecutor.getTool(toolName);
-            if (!tool) {
+            if (!tool && toolName !== 'delegate') {
               const failed: ToolResult = {
                 outcome: 'failed',
                 content: [{ type: 'error', message: `Tool not found: ${toolName}` }],
@@ -3062,20 +3316,88 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
               status: 'running',
             });
 
-            const coreResult = await toolExecutor.execute(
-              { id: toolCallId, name: toolName, arguments: finalInput },
-              {
-                signal: abortController.signal,
-                workingDirectory: workDir,
-                toolTempRoot: join(state.activeSession.dir, 'tool-temp'),
-                hasFileBeenRead: (p) =>
-                  filesRead.has(isAbsolutePath(p) ? p : resolvePath(workDir, p)),
-              }
-            );
+            let coreResult: CoreToolResult;
 
-            if (toolName === 'file_read' && coreResult.status === 'completed') {
-              const p = toNonEmptyString(finalInput.path);
-              if (p) filesRead.add(isAbsolutePath(p) ? p : resolvePath(workDir, p));
+            if (toolName === 'delegate') {
+              const prompt = toNonEmptyString((finalInput as any).prompt);
+              if (!prompt) {
+                coreResult = {
+                  status: 'failed',
+                  content: [{ type: 'text', text: 'delegate.prompt is required' }],
+                };
+              } else {
+                const { jobId } = await startSubagentJob({
+                  prompt,
+                  description: 'Delegate',
+                  turnContext: { turnId, turnSeq: toolTurnSeq },
+                });
+
+                const job = state.jobs.get(jobId);
+                if (job) {
+                  const abortPromise = new Promise<never>((_, reject) => {
+                    abortController.signal.addEventListener(
+                      'abort',
+                      () => reject(new Error('cancelled')),
+                      {
+                        once: true,
+                      }
+                    );
+                  });
+
+                  try {
+                    await Promise.race([job.completion, abortPromise]);
+                  } catch {
+                    job.status = 'cancelled';
+                    await finalizeJob(job);
+                  }
+                }
+
+                let output = '';
+                try {
+                  output = readFileSync(getJobOutputPath(state.activeSession.dir, jobId), 'utf8');
+                } catch {
+                  output = '';
+                }
+
+                const tailLimit = 64 * 1024;
+                const truncated = output.length > tailLimit;
+                const reportText = truncated ? output.slice(-tailLimit) : output;
+
+                const status = job?.status ?? 'failed';
+                coreResult = {
+                  status:
+                    status === 'completed'
+                      ? 'completed'
+                      : status === 'cancelled'
+                        ? 'aborted'
+                        : 'failed',
+                  content: [
+                    {
+                      type: 'text',
+                      text:
+                        `delegate jobId=${jobId}\n\n` +
+                        (reportText.trim().length > 0 ? reportText.trim() : '(no output)') +
+                        (truncated ? '\n\n(truncated)' : ''),
+                    },
+                  ],
+                };
+              }
+            } else {
+              coreResult = await toolExecutor.execute(
+                { id: toolCallId, name: toolName, arguments: finalInput },
+                {
+                  signal: abortController.signal,
+                  workingDirectory: workDir,
+                  toolTempRoot: join(state.activeSession.dir, 'tool-temp'),
+                  hasFileBeenRead: (p) =>
+                    filesRead.has(isAbsolutePath(p) ? p : resolvePath(workDir, p)),
+                }
+              );
+
+              if (toolName === 'file_read' && coreResult.status === 'completed') {
+                const p = toNonEmptyString(finalInput.path);
+                if (p) filesRead.add(isAbsolutePath(p) ? p : resolvePath(workDir, p));
+              }
             }
 
             const protocolResult = protocolToolResultFromCore(coreResult);
