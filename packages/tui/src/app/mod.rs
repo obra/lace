@@ -4,6 +4,7 @@ pub mod activity;
 pub mod config_wizard;
 pub mod sessions;
 pub mod storage;
+pub mod search;
 
 use serde_json::Value;
 
@@ -89,6 +90,7 @@ pub struct AppState {
   pub help_open: bool,
   pub config_wizard: config_wizard::ConfigWizardState,
   pub sessions: sessions::SessionsState,
+  pub search: search::SearchState,
   pub should_exit: bool,
 
   pub next_client_seq: u64,
@@ -152,6 +154,7 @@ impl AppState {
       help_open: false,
       config_wizard: config_wizard::ConfigWizardState::new(),
       sessions: sessions::SessionsState::new(),
+      search: search::SearchState::new(),
       should_exit: false,
 
       next_client_seq: 1,

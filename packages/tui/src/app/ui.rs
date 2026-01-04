@@ -32,6 +32,16 @@ pub enum UiAction {
   SessionsRenameChar(char),
   SessionsRenameBackspace,
   SessionsSubmit,
+
+  OpenSearch,
+  SearchPrev,
+  SearchNext,
+  SearchBackspace,
+  SearchChar(char),
+  SearchSubmit,
+  JumpLastError,
+  JumpLastToolUse,
+  JumpLastTurnEnd,
   ToggleChat,
   ToggleActivity,
   ToggleDebug,
@@ -201,6 +211,42 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
 	        crate::app::sessions::submit_load_selected(state)
 	      }
 	    }
+	    UiAction::OpenSearch => {
+	      crate::app::search::open(state);
+	      Vec::new()
+	    }
+	    UiAction::SearchPrev => {
+	      crate::app::search::prev(state);
+	      Vec::new()
+	    }
+	    UiAction::SearchNext => {
+	      crate::app::search::next(state);
+	      Vec::new()
+	    }
+	    UiAction::SearchBackspace => {
+	      crate::app::search::backspace(state);
+	      Vec::new()
+	    }
+	    UiAction::SearchChar(ch) => {
+	      crate::app::search::input_char(state, ch);
+	      Vec::new()
+	    }
+	    UiAction::SearchSubmit => {
+	      crate::app::search::jump_selected(state);
+	      Vec::new()
+	    }
+	    UiAction::JumpLastError => {
+	      crate::app::search::jump_last_error(state);
+	      Vec::new()
+	    }
+	    UiAction::JumpLastToolUse => {
+	      crate::app::search::jump_last_tool_use(state);
+	      Vec::new()
+	    }
+	    UiAction::JumpLastTurnEnd => {
+	      crate::app::search::jump_last_turn_end(state);
+	      Vec::new()
+	    }
 	    UiAction::Enter => {
 	      let line = state.input_buffer.trim_end().to_string();
 	      state.input_buffer.clear();
@@ -280,6 +326,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
     UiAction::CloseOverlay => {
       state.palette_open = false;
       state.help_open = false;
+      state.search.open = false;
       Vec::new()
     }
     UiAction::ToggleHelp => {
@@ -346,13 +393,16 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
 		        PaletteCommand::Configure => {
 		          out.extend(crate::app::config_wizard::open(state));
 		        }
-		        PaletteCommand::Sessions => {
-		          out.extend(crate::app::sessions::open_sessions(state));
-		        }
-		        PaletteCommand::ToggleChat => {
-		          state.show_chat = !state.show_chat;
-		          state.ensure_focus_visible();
-		        }
+	        PaletteCommand::Sessions => {
+	          out.extend(crate::app::sessions::open_sessions(state));
+	        }
+	        PaletteCommand::Search => {
+	          crate::app::search::open(state);
+	        }
+	        PaletteCommand::ToggleChat => {
+	          state.show_chat = !state.show_chat;
+	          state.ensure_focus_visible();
+	        }
         PaletteCommand::ToggleActivity => {
           state.show_activity = !state.show_activity;
           state.ensure_focus_visible();
@@ -425,6 +475,7 @@ enum PaletteCommand {
   NewSession,
   Configure,
   Sessions,
+  Search,
   ToggleChat,
   ToggleActivity,
   ToggleDebug,
@@ -448,10 +499,14 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
 	      label: "Configure...",
 	      command: PaletteCommand::Configure,
 	    },
-	    PaletteItem {
-	      label: "Sessions...",
-	      command: PaletteCommand::Sessions,
-	    },
+		    PaletteItem {
+		      label: "Sessions...",
+		      command: PaletteCommand::Sessions,
+		    },
+		    PaletteItem {
+		      label: "Search...",
+		      command: PaletteCommand::Search,
+		    },
 	    PaletteItem {
 	      label: "Toggle Chat Pane",
 	      command: PaletteCommand::ToggleChat,
@@ -657,14 +712,14 @@ mod tests {
     assert_eq!(state.focus, Focus::Debug);
   }
 
-  #[test]
-  fn palette_filters_and_submits() {
-    let mut state = AppState::new();
-    apply_ui_action(&mut state, UiAction::OpenPalette);
-    apply_ui_action(&mut state, UiAction::PaletteChar('q'));
-    apply_ui_action(&mut state, UiAction::PaletteSubmit);
-    assert!(state.should_exit);
-  }
+	  #[test]
+	  fn palette_filters_and_submits() {
+	    let mut state = AppState::new();
+	    apply_ui_action(&mut state, UiAction::OpenPalette);
+	    apply_ui_action(&mut state, UiAction::PaletteChar('q'));
+	    apply_ui_action(&mut state, UiAction::PaletteSubmit);
+	    assert!(state.should_exit);
+	  }
 
   #[test]
   fn palette_new_session_emits_request() {
@@ -687,5 +742,21 @@ mod tests {
       }
       _ => panic!("expected request"),
     }
+  }
+
+  #[test]
+  fn palette_search_opens_modal() {
+    let mut state = AppState::new();
+    apply_ui_action(&mut state, UiAction::OpenPalette);
+    apply_ui_action(&mut state, UiAction::PaletteChar('s'));
+    apply_ui_action(&mut state, UiAction::PaletteChar('e'));
+    apply_ui_action(&mut state, UiAction::PaletteChar('a'));
+    apply_ui_action(&mut state, UiAction::PaletteChar('r'));
+    apply_ui_action(&mut state, UiAction::PaletteChar('c'));
+    apply_ui_action(&mut state, UiAction::PaletteChar('h'));
+
+    let out = apply_ui_action(&mut state, UiAction::PaletteSubmit);
+    assert!(out.is_empty());
+    assert!(state.search.open);
   }
 }

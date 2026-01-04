@@ -189,3 +189,17 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
 - Tests:
   - Unit tests in `packages/tui/src/app/sessions.rs`
   - Scenario e2e: `packages/tui/tests/e2e_sessions_list_load.rs`
+
+### 2026-01-04 — Search + jump navigation
+
+- Added search modal:
+  - Palette action: “Search...” and keybind `Ctrl+F`.
+  - Searches chat text, activity summaries/details, and debug lines.
+  - Results are selectable; Enter jumps focus/scroll/selection to the target.
+- Added quick jumps:
+  - `e` → last error/timeout in Activity
+  - `t` → last tool_use in Activity
+  - `n` → last turn_end in Activity
+- Tests:
+  - Unit tests in `packages/tui/src/app/search.rs`
+  - UI test: `app::ui::tests::palette_search_opens_modal`

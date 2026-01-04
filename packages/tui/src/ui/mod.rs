@@ -148,6 +148,28 @@ fn run_loop(
 	            continue;
 	          }
 
+	          if state.search.open {
+	            let action = match key.code {
+	              KeyCode::Esc => Some(UiAction::CloseOverlay),
+	              KeyCode::Up => Some(UiAction::SearchPrev),
+	              KeyCode::Down => Some(UiAction::SearchNext),
+	              KeyCode::Enter => Some(UiAction::SearchSubmit),
+	              KeyCode::Backspace => Some(UiAction::SearchBackspace),
+	              KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+	                Some(UiAction::SearchChar(ch))
+	              }
+	              _ => None,
+	            };
+	            if let Some(action) = action {
+	              let out = apply_ui_action(state, action);
+	              send_outbound(transport, state, out, timeout_ms)?;
+	            }
+	            if state.should_exit {
+	              break;
+	            }
+	            continue;
+	          }
+
           if state.help_open {
             match key.code {
               KeyCode::Esc | KeyCode::F(1) | KeyCode::Char('?') => {
@@ -183,16 +205,20 @@ fn run_loop(
             continue;
           }
 
-          if key.modifiers.contains(KeyModifiers::CONTROL) {
-            match key.code {
-              KeyCode::Char('k') => {
-                let _ = apply_ui_action(state, UiAction::OpenPalette);
-                continue;
-              }
-              KeyCode::Char('1') => {
-                let _ = apply_ui_action(state, UiAction::ToggleChat);
-                continue;
-              }
+	          if key.modifiers.contains(KeyModifiers::CONTROL) {
+	            match key.code {
+	              KeyCode::Char('k') => {
+	                let _ = apply_ui_action(state, UiAction::OpenPalette);
+	                continue;
+	              }
+	              KeyCode::Char('f') => {
+	                let _ = apply_ui_action(state, UiAction::OpenSearch);
+	                continue;
+	              }
+	              KeyCode::Char('1') => {
+	                let _ = apply_ui_action(state, UiAction::ToggleChat);
+	                continue;
+	              }
               KeyCode::Char('2') => {
                 let _ = apply_ui_action(state, UiAction::ToggleActivity);
                 continue;
@@ -235,6 +261,21 @@ fn run_loop(
 	              if state.focus == Focus::Activity && !key.modifiers.contains(KeyModifiers::CONTROL) =>
 	            {
 	              Some(UiAction::ActivityJumpToTurn)
+	            }
+	            KeyCode::Char('e')
+	              if state.focus != Focus::Input && !key.modifiers.contains(KeyModifiers::CONTROL) =>
+	            {
+	              Some(UiAction::JumpLastError)
+	            }
+	            KeyCode::Char('t')
+	              if state.focus != Focus::Input && !key.modifiers.contains(KeyModifiers::CONTROL) =>
+	            {
+	              Some(UiAction::JumpLastToolUse)
+	            }
+	            KeyCode::Char('n')
+	              if state.focus != Focus::Input && !key.modifiers.contains(KeyModifiers::CONTROL) =>
+	            {
+	              Some(UiAction::JumpLastTurnEnd)
 	            }
 	            KeyCode::Char(ch)
 	              if state.focus == Focus::Input && !key.modifiers.contains(KeyModifiers::CONTROL) =>
@@ -512,6 +553,9 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
   } else if state.sessions.open {
     let area = centered_rect(80, 70, f.area());
     f.render_widget(render_sessions_modal(state), area);
+  } else if state.search.open {
+    let area = centered_rect(80, 70, f.area());
+    f.render_widget(render_search_modal(state), area);
   } else if state.palette_open {
     let area = centered_rect(70, 60, f.area());
     f.render_widget(render_palette_modal(state), area);
@@ -593,6 +637,35 @@ fn render_sessions_modal(state: &AppState) -> Paragraph<'static> {
 
   Paragraph::new(Text::from(lines))
     .block(Block::default().title("Sessions").borders(Borders::ALL))
+    .wrap(Wrap { trim: true })
+}
+
+fn render_search_modal(state: &AppState) -> Paragraph<'static> {
+  let s = &state.search;
+  let mut lines: Vec<Line> = Vec::new();
+
+  lines.push(Line::from("Search"));
+  lines.push(Line::from(""));
+  lines.push(Line::from(format!("> {}", s.query)));
+  lines.push(Line::from(""));
+
+  if s.results.is_empty() && !s.query.trim().is_empty() {
+    lines.push(Line::from("(no matches)"));
+  } else {
+    let max = 18usize;
+    let start = s.selected.saturating_sub(max / 2);
+    let end = (start + max).min(s.results.len());
+    for idx in start..end {
+      let marker = if idx == s.selected { ">" } else { " " };
+      lines.push(Line::from(format!("{marker} {}", s.results[idx].label)));
+    }
+  }
+
+  lines.push(Line::from(""));
+  lines.push(Line::from("Up/Down select • Enter jump • Esc close"));
+
+  Paragraph::new(Text::from(lines))
+    .block(Block::default().title("Search").borders(Borders::ALL))
     .wrap(Wrap { trim: true })
 }
 
@@ -894,6 +967,7 @@ fn render_help_modal() -> Paragraph<'static> {
     Line::from(""),
     Line::from("Ctrl+C   Quit"),
     Line::from("Ctrl+K   Command palette"),
+    Line::from("Ctrl+F   Search"),
     Line::from("Ctrl+1   Toggle Chat pane"),
     Line::from("Ctrl+2   Toggle Activity pane"),
     Line::from("Ctrl+3   Toggle Debug pane"),
@@ -901,6 +975,9 @@ fn render_help_modal() -> Paragraph<'static> {
     Line::from("Up/Down  Scroll or history (depends on focus)"),
     Line::from("Enter    Toggle expand (Activity)"),
     Line::from("g        Jump to turn (Activity)"),
+    Line::from("e        Jump last error (non-input panes)"),
+    Line::from("t        Jump last tool_use (non-input panes)"),
+    Line::from("n        Jump last turn_end (non-input panes)"),
     Line::from("? / F1   Toggle help"),
     Line::from(""),
     Line::from("Permission modal: Up/Down select, Enter decide"),
