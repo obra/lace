@@ -3,7 +3,7 @@
 
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
-import { SessionIdSchema } from '@lace/ent-protocol';
+import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
@@ -21,7 +21,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   try {
     const { agentId } = params as { agentId: string };
 
-    if (!SessionIdSchema.safeParse(agentId).success) {
+    if (!isAgentSessionId(agentId)) {
       return createErrorResponse('Invalid agent ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 

@@ -18,7 +18,7 @@ import mime from 'mime-types';
 import { createSuccessResponse, createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { logger } from '@lace/core/utils/logger';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
-import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-session-id-validation';
+import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
 import {
   GetSessionFileRequestSchema,
   type SessionFileContentResponse,
@@ -59,13 +59,12 @@ export async function loader({ request: _request, params }: LoaderArgs) {
     }
     const { path: requestedPath } = parseResult.data;
 
-    const parsedSessionId = WorkspaceSessionIdSchema.safeParse(sessionId);
-    if (!parsedSessionId.success) {
+    if (!isWorkspaceSessionId(sessionId)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'INVALID_REQUEST' });
     }
 
     const supervisor = getSupervisor();
-    const record = supervisor.getWorkspaceSession(parsedSessionId.data);
+    const record = supervisor.getWorkspaceSession(sessionId);
     if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'SESSION_NOT_FOUND' });
     }

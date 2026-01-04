@@ -3,14 +3,14 @@
 
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { SessionIdSchema } from '@lace/ent-protocol';
+import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { getSupervisor, listPendingPermissions } from '@lace/web/lib/server/supervisor-service';
 import type { Route } from './+types/api.threads.$threadId.approvals.pending';
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
     const { threadId: threadIdParam } = params as { threadId: string };
-    if (!SessionIdSchema.safeParse(threadIdParam).success) {
+    if (!isAgentSessionId(threadIdParam)) {
       return createErrorResponse('Invalid thread ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 

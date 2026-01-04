@@ -1,7 +1,7 @@
 // ABOUTME: API endpoint for loading conversation history for a supervisor-backed agent session
 // ABOUTME: Converts Ent durable session events into LaceEvent timeline events
 
-import { SessionIdSchema } from '@lace/ent-protocol';
+import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import type { LaceEvent } from '@lace/web/types/core';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
@@ -155,7 +155,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
     const { agentId } = params as { agentId: string };
 
-    if (!SessionIdSchema.safeParse(agentId).success) {
+    if (!isAgentSessionId(agentId)) {
       return createErrorResponse('Invalid agent ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 

@@ -4,7 +4,7 @@
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
-import { SessionIdSchema } from '@lace/ent-protocol';
+import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { z } from 'zod';
 import { ProviderRegistry } from '@lace/web/lib/server/lace-imports';
 import type { Route } from './+types/api.agents.$agentId';
@@ -38,7 +38,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
     const { agentId } = params as { agentId: string };
 
-    if (!SessionIdSchema.safeParse(agentId).success) {
+    if (!isAgentSessionId(agentId)) {
       return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
@@ -81,7 +81,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   try {
     const { agentId } = params as { agentId: string };
 
-    if (!SessionIdSchema.safeParse(agentId).success) {
+    if (!isAgentSessionId(agentId)) {
       return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });
     }
 

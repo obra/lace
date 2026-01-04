@@ -5,7 +5,7 @@ import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { logger } from '@lace/core/utils/logger';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
-import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-session-id-validation';
+import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
 import type { WorkspaceInfo } from '@lace/core/workspace/workspace-container-manager';
 
 interface LoaderParams {
@@ -20,13 +20,12 @@ export async function loader({ params }: { params: LoaderParams }) {
   }
 
   try {
-    const parsed = WorkspaceSessionIdSchema.safeParse(sessionId);
-    if (!parsed.success) {
+    if (!isWorkspaceSessionId(sessionId)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const supervisor = getSupervisor();
-    const record = supervisor.getWorkspaceSession(parsed.data);
+    const record = supervisor.getWorkspaceSession(sessionId);
     if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }

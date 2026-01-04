@@ -4,19 +4,18 @@
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { getSupervisor, listPendingPermissions } from '@lace/web/lib/server/supervisor-service';
-import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-session-id-validation';
+import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
 import type { SessionPendingApproval } from '@lace/web/types/api';
 import type { Route } from './+types/api.sessions.$sessionId.approvals.pending';
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
     const { sessionId: sessionIdParam } = params as { sessionId: string };
-    const parsed = WorkspaceSessionIdSchema.safeParse(sessionIdParam);
-    if (!parsed.success) {
+    if (!isWorkspaceSessionId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const workspaceSessionId = parsed.data;
+    const workspaceSessionId = sessionIdParam;
     const supervisor = getSupervisor();
     const record = supervisor.getWorkspaceSession(workspaceSessionId);
     if (!record) {

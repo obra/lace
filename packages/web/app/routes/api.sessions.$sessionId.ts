@@ -4,7 +4,7 @@
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-session-id-validation';
+import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { z } from 'zod';
 import type { Route } from './+types/api.sessions.$sessionId';
 
@@ -24,12 +24,11 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
     const { sessionId: sessionIdParam } = params as { sessionId: string };
 
-    const parsed = WorkspaceSessionIdSchema.safeParse(sessionIdParam);
-    if (!parsed.success) {
+    if (!isWorkspaceSessionId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const workspaceSessionId = parsed.data;
+    const workspaceSessionId = sessionIdParam;
 
     const supervisor = getSupervisor();
     const record = supervisor.getWorkspaceSession(workspaceSessionId);
@@ -112,12 +111,11 @@ export async function action({ request, params }: Route.ActionArgs) {
   try {
     const { sessionId: sessionIdParam } = params as { sessionId: string };
 
-    const parsed = WorkspaceSessionIdSchema.safeParse(sessionIdParam);
-    if (!parsed.success) {
+    if (!isWorkspaceSessionId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const workspaceSessionId = parsed.data;
+    const workspaceSessionId = sessionIdParam;
 
     const supervisor = getSupervisor();
     const existing = supervisor.getWorkspaceSession(workspaceSessionId);

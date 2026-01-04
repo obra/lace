@@ -9,7 +9,7 @@ import {
   listPendingPermissions,
   resolvePendingPermission,
 } from '@lace/web/lib/server/supervisor-service';
-import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-session-id-validation';
+import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
 import type { Route } from './+types/api.sessions.$sessionId.approvals.$toolCallId';
 
 // Validation schemas
@@ -36,11 +36,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     const { sessionId, toolCallId } = paramsResult.data;
-    const parsedWorkspaceId = WorkspaceSessionIdSchema.safeParse(sessionId);
-    if (!parsedWorkspaceId.success) {
+    if (!isWorkspaceSessionId(sessionId)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
-    const workspaceSessionId = parsedWorkspaceId.data;
+    const workspaceSessionId = sessionId;
 
     // Validate request body
     const body = (await request.json()) as unknown;

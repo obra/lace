@@ -9,7 +9,7 @@ import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { logger } from '@lace/core/utils/logger';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
-import { SessionIdSchema } from '@lace/ent-protocol';
+import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import type { Route } from './+types/api.threads.$threadId.message';
 
 // Type guard for unknown error values
@@ -33,7 +33,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const { threadId: threadIdParam } = params;
 
     // Supervisor-backed "threadId" is an agent protocol sessionId (opaque string)
-    if (!SessionIdSchema.safeParse(threadIdParam).success) {
+    if (!isAgentSessionId(threadIdParam)) {
       return createErrorResponse('Invalid thread ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 

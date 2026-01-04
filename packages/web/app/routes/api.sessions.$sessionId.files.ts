@@ -6,7 +6,7 @@ import { promises as fs, constants as fsConstants } from 'fs';
 import { join, resolve, relative, basename } from 'path';
 import { createSuccessResponse, createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
-import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-session-id-validation';
+import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
 import {
   ListSessionDirectoryRequestSchema,
   type SessionDirectoryResponse,
@@ -30,13 +30,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
     const { sessionId } = params;
 
-    const parsedSessionId = WorkspaceSessionIdSchema.safeParse(sessionId);
-    if (!parsedSessionId.success) {
+    if (!isWorkspaceSessionId(sessionId)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'INVALID_REQUEST' });
     }
 
     const supervisor = getSupervisor();
-    const record = supervisor.getWorkspaceSession(parsedSessionId.data);
+    const record = supervisor.getWorkspaceSession(sessionId);
     if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'SESSION_NOT_FOUND' });
     }

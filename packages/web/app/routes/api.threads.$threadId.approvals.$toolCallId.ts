@@ -4,7 +4,7 @@
 import { z } from 'zod';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { SessionIdSchema } from '@lace/ent-protocol';
+import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import {
   getSupervisor,
   listPendingPermissions,
@@ -44,7 +44,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const { threadId, toolCallId: encodedToolCallId } = paramsResult.data;
 
-    if (!SessionIdSchema.safeParse(threadId).success) {
+    if (!isAgentSessionId(threadId)) {
       return createErrorResponse('Invalid thread ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 

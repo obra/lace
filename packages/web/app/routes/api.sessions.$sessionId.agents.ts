@@ -3,7 +3,7 @@
 
 import { CreateAgentRequest } from '@lace/web/types/api';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
-import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-session-id-validation';
+import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
@@ -35,13 +35,13 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
     const { sessionId: sessionIdParam } = params as { sessionId: string };
 
-    const parsed = WorkspaceSessionIdSchema.safeParse(sessionIdParam);
-    if (!parsed.success) {
+    if (!isWorkspaceSessionId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
+    const workspaceSessionId = sessionIdParam;
 
     const supervisor = getSupervisor();
-    const record = supervisor.getWorkspaceSession(parsed.data);
+    const record = supervisor.getWorkspaceSession(workspaceSessionId);
     if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
@@ -72,11 +72,10 @@ export async function action({ request, params }: Route.ActionArgs) {
   try {
     const { sessionId: sessionIdParam } = params as { sessionId: string };
 
-    const parsed = WorkspaceSessionIdSchema.safeParse(sessionIdParam);
-    if (!parsed.success) {
+    if (!isWorkspaceSessionId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
-    const workspaceSessionId = parsed.data;
+    const workspaceSessionId = sessionIdParam;
 
     // Parse and validate request body
     const bodyData: unknown = await request.json();

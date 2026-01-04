@@ -1,7 +1,7 @@
 // ABOUTME: Stop endpoint for halting processing in a supervisor-backed agent session
 // ABOUTME: Sends session/cancel to the agent process via supervisor
 
-import { SessionIdSchema } from '@lace/ent-protocol';
+import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
@@ -15,7 +15,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   try {
     const { agentId } = params as { agentId: string };
 
-    if (!SessionIdSchema.safeParse(agentId).success) {
+    if (!isAgentSessionId(agentId)) {
       return createErrorResponse('Invalid agent ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 
