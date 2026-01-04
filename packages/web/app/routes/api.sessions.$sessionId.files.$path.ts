@@ -84,7 +84,7 @@ export async function loader({ request: _request, params }: LoaderArgs) {
 
     try {
       realWorkingDir = await fs.realpath(workingDirectory);
-      const tempFilePath = resolve(workingDirectory, requestedPath);
+      const tempFilePath = resolve(realWorkingDir, requestedPath);
       realFilePath = await fs.realpath(tempFilePath);
     } catch (error) {
       if (
@@ -94,7 +94,7 @@ export async function loader({ request: _request, params }: LoaderArgs) {
       ) {
         // File doesn't exist, but we still need to check if it would be inside working dir
         realWorkingDir = await fs.realpath(workingDirectory);
-        const tempFilePath = resolve(workingDirectory, requestedPath);
+        const tempFilePath = resolve(realWorkingDir, requestedPath);
         const relativePath = relative(realWorkingDir, tempFilePath);
         if (relativePath.startsWith('..')) {
           return createErrorResponse('Path access denied', 403, { code: 'PATH_ACCESS_DENIED' });

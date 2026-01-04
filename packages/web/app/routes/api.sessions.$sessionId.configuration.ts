@@ -8,15 +8,18 @@ import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
 import type { Route } from './+types/api.sessions.$sessionId.configuration';
 
-const ConfigurationSchema = z.object({
-  providerInstanceId: z.string().optional(),
-  modelId: z.string().optional(),
-  runtimeOverrides: z
-    .object({
-      permissionMode: z.enum(['normal', 'yolo', 'read-only']).optional(),
-    })
-    .optional(),
-});
+const ConfigurationSchema = z
+  .object({
+    providerInstanceId: z.string().optional(),
+    modelId: z.string().optional(),
+    runtimeOverrides: z
+      .object({
+        permissionMode: z.enum(['normal', 'yolo', 'read-only']).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
