@@ -41,7 +41,11 @@ import {
 import type { PermissionRequest, SessionUpdate, ToolInfo, ToolResult } from './protocol/types';
 import { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
 import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
-import type { CatalogModel } from '@lace/core/providers/catalog/types';
+import {
+  ProviderInstanceSchema,
+  type CatalogModel,
+  type ProviderInstance,
+} from '@lace/core/providers/catalog/types';
 import { ProviderRegistry } from '@lace/core/providers/registry';
 import {
   AIProvider,
@@ -63,6 +67,14 @@ import { TestAgentProvider } from './runtime/test-provider';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
 const JOB_LOG_DIR = 'jobs';
+
+function throwInvalidParams(reason?: string): never {
+  throw {
+    code: -32602,
+    message: 'InvalidParams',
+    data: { category: 'protocol', ...(reason ? { reason } : {}) },
+  };
+}
 
 function toNonEmptyString(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -88,7 +100,7 @@ function getEndpointFromConfig(config: Record<string, unknown>): string | undefi
     // Require absolute URL, consistent with core ProviderInstanceSchema
     new URL(endpoint);
   } catch {
-    throw new Error('endpoint must be a valid absolute URL');
+    throwInvalidParams('endpoint must be a valid absolute URL');
   }
 
   return endpoint;
@@ -98,9 +110,46 @@ function assertConfigHasNoCredentials(config: Record<string, unknown>): void {
   const forbiddenKeys = ['apiKey', 'api_key', 'token', 'accessToken', 'authorization'];
   for (const key of forbiddenKeys) {
     if (Object.prototype.hasOwnProperty.call(config, key)) {
-      throw new Error(`Connection config MUST NOT include credentials (${key})`);
+      throwInvalidParams(`Connection config MUST NOT include credentials (${key})`);
     }
   }
+}
+
+function parseProviderInstanceOverridesFromConnectionConfig(options: {
+  displayName: string;
+  catalogProviderId: string;
+  config: Record<string, unknown>;
+}): Partial<Pick<ProviderInstance, 'endpoint' | 'timeout' | 'retryPolicy' | 'modelConfig'>> {
+  const endpoint = getEndpointFromConfig(options.config);
+
+  const timeoutInput = (options.config as any).timeout;
+  const timeout = timeoutInput === undefined ? undefined : toPositiveInt(timeoutInput);
+  if (timeoutInput !== undefined && timeout === null) {
+    throwInvalidParams('timeout must be a positive integer');
+  }
+
+  const retryPolicy = toNonEmptyString((options.config as any).retryPolicy) ?? undefined;
+  const modelConfigInput = (options.config as any).modelConfig;
+
+  const parsed = ProviderInstanceSchema.safeParse({
+    displayName: options.displayName,
+    catalogProviderId: options.catalogProviderId,
+    ...(endpoint ? { endpoint } : {}),
+    ...(timeout !== undefined ? { timeout } : {}),
+    ...(retryPolicy ? { retryPolicy } : {}),
+    ...(modelConfigInput !== undefined ? { modelConfig: modelConfigInput } : {}),
+  });
+
+  if (!parsed.success) {
+    throwInvalidParams(parsed.error.issues[0]?.message ?? 'Invalid connection config');
+  }
+
+  return {
+    ...(parsed.data.endpoint ? { endpoint: parsed.data.endpoint } : {}),
+    ...(parsed.data.timeout !== undefined ? { timeout: parsed.data.timeout } : {}),
+    ...(parsed.data.retryPolicy ? { retryPolicy: parsed.data.retryPolicy } : {}),
+    ...(parsed.data.modelConfig ? { modelConfig: parsed.data.modelConfig } : {}),
+  };
 }
 
 function mapCatalogModelToModelInfo(model: CatalogModel, providerId: string) {
@@ -1511,10 +1560,10 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     };
 
     const name = toNonEmptyString(parsed?.connection?.name);
-    if (!name) throw new Error('connection.name is required');
+    if (!name) throwInvalidParams('connection.name is required');
 
     const config = parsed?.connection?.config;
-    if (!config || typeof config !== 'object') throw new Error('connection.config is required');
+    if (!config || typeof config !== 'object') throwInvalidParams('connection.config is required');
     assertConfigHasNoCredentials(config);
 
     const requestedConnectionId = toNonEmptyString(parsed?.connection?.connectionId);
@@ -1532,61 +1581,38 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         parsed.providerId.length > 0 &&
         parsed.providerId !== existing.catalogProviderId
       ) {
-        throw new Error('connectionId is already paired to a different providerId');
+        throwInvalidParams('connectionId is already paired to a different providerId');
       }
 
-      const endpoint = getEndpointFromConfig(config);
-      const timeoutInput = (config as any).timeout;
-      const timeout = timeoutInput === undefined ? undefined : toPositiveInt(timeoutInput);
-      if (timeoutInput !== undefined && timeout === null)
-        throw new Error('timeout must be a positive integer');
-      const retryPolicy = typeof config.retryPolicy === 'string' ? config.retryPolicy : undefined;
-      const modelConfigInput = (config as any).modelConfig;
-      const modelConfig =
-        modelConfigInput === undefined
-          ? undefined
-          : typeof modelConfigInput === 'object' && modelConfigInput
-            ? modelConfigInput
-            : null;
-      if (modelConfigInput !== undefined && modelConfig === null)
-        throw new Error('modelConfig must be an object');
+      const overrides = parseProviderInstanceOverridesFromConnectionConfig({
+        displayName: name,
+        catalogProviderId: existing.catalogProviderId,
+        config,
+      });
 
       await state.providerInstances.updateInstance(connectionId, {
         displayName: name,
-        ...(endpoint ? { endpoint } : {}),
-        ...(timeout ? { timeout } : {}),
-        ...(retryPolicy ? { retryPolicy } : {}),
-        ...(modelConfig ? { modelConfig: modelConfig as any } : {}),
+        ...overrides,
       });
 
       return { connectionId, providerId: existing.catalogProviderId, created: false };
     }
 
     const providerId = toNonEmptyString(parsed?.providerId);
-    if (!providerId) throw new Error('providerId is required when creating a new connection');
+    if (!providerId) throwInvalidParams('providerId is required when creating a new connection');
 
     await ensureProviderCatalogLoaded();
     const catalogProvider = state.providerCatalog.getProvider(providerId);
-    if (!catalogProvider) throw new Error(`Unknown providerId: ${providerId}`);
+    if (!catalogProvider) throwInvalidParams(`Unknown providerId: ${providerId}`);
     if (!SUPPORTED_PROVIDER_TYPES.has(catalogProvider.type.toLowerCase())) {
-      throw new Error(`Provider is not supported by this agent: ${providerId}`);
+      throwInvalidParams(`Provider is not supported by this agent: ${providerId}`);
     }
 
-    const endpoint = getEndpointFromConfig(config);
-    const timeoutInput = (config as any).timeout;
-    const timeout = timeoutInput === undefined ? undefined : toPositiveInt(timeoutInput);
-    if (timeoutInput !== undefined && timeout === null)
-      throw new Error('timeout must be a positive integer');
-    const retryPolicy = typeof config.retryPolicy === 'string' ? config.retryPolicy : undefined;
-    const modelConfigInput = (config as any).modelConfig;
-    const modelConfig =
-      modelConfigInput === undefined
-        ? undefined
-        : typeof modelConfigInput === 'object' && modelConfigInput
-          ? modelConfigInput
-          : null;
-    if (modelConfigInput !== undefined && modelConfig === null)
-      throw new Error('modelConfig must be an object');
+    const overrides = parseProviderInstanceOverridesFromConnectionConfig({
+      displayName: name,
+      catalogProviderId: providerId,
+      config,
+    });
 
     await state.providerInstances.saveInstances({
       ...instances,
@@ -1595,10 +1621,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         [connectionId]: {
           displayName: name,
           catalogProviderId: providerId,
-          ...(endpoint ? { endpoint } : {}),
-          ...(timeout ? { timeout } : {}),
-          ...(retryPolicy ? { retryPolicy } : {}),
-          ...(modelConfig ? { modelConfig: modelConfig as any } : {}),
+          ...overrides,
         },
       },
     });
@@ -1611,7 +1634,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const parsed = params as { connectionId: string };
     const connectionId = toNonEmptyString(parsed?.connectionId);
-    if (!connectionId) throw new Error('connectionId is required');
+    if (!connectionId) throwInvalidParams('connectionId is required');
 
     await state.providerInstances.deleteInstance(connectionId);
     return { ok: true };
@@ -1622,7 +1645,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const parsed = params as { connectionId: string; modelId?: string };
     const connectionId = toNonEmptyString(parsed?.connectionId);
-    if (!connectionId) throw new Error('connectionId is required');
+    if (!connectionId) throwInvalidParams('connectionId is required');
 
     const instances = await state.providerInstances.loadInstances();
     const instance = instances.instances[connectionId];
@@ -1649,7 +1672,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const parsed = params as { connectionId: string };
     const connectionId = toNonEmptyString(parsed?.connectionId);
-    if (!connectionId) throw new Error('connectionId is required');
+    if (!connectionId) throwInvalidParams('connectionId is required');
 
     const instances = await state.providerInstances.loadInstances();
     if (!instances.instances[connectionId])
@@ -1667,7 +1690,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const parsed = params as { connectionId: string; method?: string };
     const connectionId = toNonEmptyString(parsed?.connectionId);
-    if (!connectionId) throw new Error('connectionId is required');
+    if (!connectionId) throwInvalidParams('connectionId is required');
 
     const instances = await state.providerInstances.loadInstances();
     if (!instances.instances[connectionId])
@@ -1691,7 +1714,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const parsed = params as { connectionId: string; values: Record<string, string> };
     const connectionId = toNonEmptyString(parsed?.connectionId);
-    if (!connectionId) throw new Error('connectionId is required');
+    if (!connectionId) throwInvalidParams('connectionId is required');
 
     const instances = await state.providerInstances.loadInstances();
     if (!instances.instances[connectionId])
@@ -1716,7 +1739,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const parsed = params as { connectionId: string };
     const connectionId = toNonEmptyString(parsed?.connectionId);
-    if (!connectionId) throw new Error('connectionId is required');
+    if (!connectionId) throwInvalidParams('connectionId is required');
 
     const instances = await state.providerInstances.loadInstances();
     if (!instances.instances[connectionId])
@@ -1731,7 +1754,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const parsed = params as { connectionId: string };
     const connectionId = toNonEmptyString(parsed?.connectionId);
-    if (!connectionId) throw new Error('connectionId is required');
+    if (!connectionId) throwInvalidParams('connectionId is required');
 
     const instances = await state.providerInstances.loadInstances();
     const instance = instances.instances[connectionId];
@@ -1740,7 +1763,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     await ensureProviderCatalogLoaded();
     const providerId = instance.catalogProviderId;
     const provider = state.providerCatalog.getProvider(providerId);
-    if (!provider) throw new Error(`Unknown providerId: ${providerId}`);
+    if (!provider) throwInvalidParams(`Unknown providerId: ${providerId}`);
 
     const models = provider.models.map((m) => mapCatalogModelToModelInfo(m, providerId));
     return { providerId, connectionId, models };
@@ -1776,7 +1799,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     };
 
     const jobId = toNonEmptyString(parsed?.jobId);
-    if (!jobId) throw new Error('jobId is required');
+    if (!jobId) throwInvalidParams('jobId is required');
 
     const block = !!parsed.block;
     const timeout = typeof parsed.timeout === 'number' && parsed.timeout > 0 ? parsed.timeout : 0;
@@ -1857,7 +1880,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const parsed = params as { jobId: string };
     const jobId = toNonEmptyString(parsed?.jobId);
-    if (!jobId) throw new Error('jobId is required');
+    if (!jobId) throwInvalidParams('jobId is required');
 
     const job = state.jobs.get(jobId);
     if (!job || job.status !== 'running') return { success: false };
@@ -1904,7 +1927,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     if (state.activeSession) throw { code: 2, message: 'SessionBusy' };
 
     const parsed = params as { workDir: string; persona?: string; systemPrompt?: unknown };
-    if (!parsed?.workDir) throw new Error('workDir is required');
+    if (!parsed?.workDir) throwInvalidParams('workDir is required');
 
     const sessionId = `sess_${randomUUID()}`;
     const created = new Date().toISOString();
@@ -1943,11 +1966,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     assertInitialized(state);
 
     const parsed = params as { sessionId: string; fork?: boolean };
-    if (!parsed?.sessionId) throw new Error('sessionId is required');
+    if (!parsed?.sessionId) throwInvalidParams('sessionId is required');
     if (!isSessionId(parsed.sessionId)) {
       throw { code: -32602, message: 'InvalidParams' };
     }
-    if (parsed.fork) throw new Error('fork not implemented');
+    if (parsed.fork) throwInvalidParams('fork not implemented');
 
     if (state.activeSession && state.activeSession.meta.sessionId !== parsed.sessionId) {
       throw { code: 2, message: 'SessionBusy' };

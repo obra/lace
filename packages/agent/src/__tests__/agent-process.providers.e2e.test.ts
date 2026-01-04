@@ -84,4 +84,45 @@ describe('lace-agent provider config (E2E over stdio)', () => {
     )) as { state: string };
     expect(status.state).toBe('ready');
   });
+
+  it('rejects ent/connections/upsert with invalid config', { timeout: 15_000 }, async () => {
+    agent = spawnAgentProcess({ laceDir });
+    await withTimeout(
+      agent.peer.request('initialize', defaultInitializeParams()),
+      2_000,
+      'initialize'
+    );
+
+    const providers = (await withTimeout(
+      agent.peer.request('ent/providers/list'),
+      2_000,
+      'ent/providers/list'
+    )) as { providers: Array<{ providerId: string }> };
+
+    expect(providers.providers.length).toBeGreaterThan(0);
+    const providerId =
+      providers.providers.find((p) => p.providerId === 'openai')?.providerId ??
+      providers.providers[0].providerId;
+
+    await expect(
+      agent.peer.request('ent/connections/upsert', {
+        providerId,
+        connection: { name: 'Bad Connection', config: { apiKey: 'sk-should-not-be-here' } },
+      })
+    ).rejects.toMatchObject({ code: -32602, message: 'InvalidParams' });
+
+    await expect(
+      agent.peer.request('ent/connections/upsert', {
+        providerId,
+        connection: { name: 'Bad Connection', config: { endpoint: 'not-a-url' } },
+      })
+    ).rejects.toMatchObject({ code: -32602, message: 'InvalidParams' });
+
+    await expect(
+      agent.peer.request('ent/connections/upsert', {
+        providerId,
+        connection: { name: 'Bad Connection', config: { modelConfig: 'nope' } },
+      })
+    ).rejects.toMatchObject({ code: -32602, message: 'InvalidParams' });
+  });
 });
