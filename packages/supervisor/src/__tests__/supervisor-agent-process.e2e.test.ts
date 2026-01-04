@@ -5,6 +5,15 @@ import { join } from 'node:path';
 import { SupervisorAgentProcess } from '../supervisor-agent-process';
 import { Supervisor } from '../supervisor';
 
+function defaultInitializeParams(config?: Record<string, unknown>): Record<string, unknown> {
+  return {
+    protocolVersion: '1.0',
+    clientInfo: { name: 'lace-supervisor-test', version: '0.0.0' },
+    capabilities: { streaming: true, permissions: true, 'ent/jobStreaming': 'full' },
+    ...(config ? { config } : {}),
+  };
+}
+
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -53,10 +62,7 @@ describe('SupervisorAgentProcess (E2E)', () => {
     });
 
     await withTimeout(
-      supervisor.peer.request('initialize', {
-        protocolVersion: '1.0',
-        config: { approvalMode: 'ask' },
-      }),
+      supervisor.peer.request('initialize', defaultInitializeParams({ approvalMode: 'ask' })),
       2_000,
       'initialize'
     );
@@ -146,10 +152,9 @@ describe('Supervisor (E2E)', () => {
       'prompt (b)'
     );
 
-    expect(permissionRequests.map((r) => r.workspaceSessionId).sort()).toEqual([
-      a.workspaceSessionId,
-      b.workspaceSessionId,
-    ]);
+    expect(permissionRequests.map((r) => r.workspaceSessionId).sort()).toEqual(
+      [a.workspaceSessionId, b.workspaceSessionId].sort()
+    );
 
     await withTimeout(
       new Promise<void>((resolve) => {

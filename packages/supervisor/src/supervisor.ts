@@ -3,6 +3,15 @@ import { isSessionId } from '@lace/ent-protocol';
 import { SupervisorAgentProcess, type PermissionDecision } from './supervisor-agent-process';
 import { WorkspaceSessionStore, type WorkspaceSessionRecord } from './workspace-session-store';
 
+function supervisorInitializeParams(config?: Record<string, unknown>): Record<string, unknown> {
+  return {
+    protocolVersion: '1.0',
+    clientInfo: { name: 'lace-supervisor', version: '0.1.0' },
+    capabilities: { streaming: true, permissions: true, 'ent/jobStreaming': 'full' },
+    ...(config ? { config } : {}),
+  };
+}
+
 export type WorkspaceSessionHandle = {
   workspaceSessionId: string;
   sessionId: string;
@@ -86,10 +95,7 @@ export class Supervisor {
       },
     });
 
-    await agent.peer.request('initialize', {
-      protocolVersion: '1.0',
-      config: { approvalMode: 'ask' },
-    });
+    await agent.peer.request('initialize', supervisorInitializeParams({ approvalMode: 'ask' }));
 
     const created = (await agent.peer.request('session/new', { workDir })) as { sessionId: string };
     activeSessionId = created.sessionId;
@@ -120,10 +126,7 @@ export class Supervisor {
       },
     });
 
-    await agent.peer.request('initialize', {
-      protocolVersion: '1.0',
-      config: { approvalMode: 'ask' },
-    });
+    await agent.peer.request('initialize', supervisorInitializeParams({ approvalMode: 'ask' }));
 
     await agent.peer.request('session/load', { sessionId });
 
