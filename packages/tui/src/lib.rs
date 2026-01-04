@@ -1,4 +1,5 @@
 pub mod args;
+pub mod app;
 pub mod protocol;
 
 use std::io;

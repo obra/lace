@@ -33,3 +33,18 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
   - `cd packages/tui && cargo test` (includes a `cat` round-trip test)
 - Notes:
   - This is intentionally low-level; higher-level JSON-RPC request tracking comes later.
+
+### 2026-01-04 — Core state + reducer (headless-testable)
+
+- Added a minimal `AppState` + reducer for:
+  - streaming assistant text via `text_delta`
+  - ending streams via `turn_end` (or prompt response fallback)
+  - capturing `tool_use` inputs by `toolCallId`
+  - queuing and deciding `session/request_permission`
+- Files:
+  - `packages/tui/src/app/mod.rs`
+  - `packages/tui/src/app/reducer.rs`
+- Tests:
+  - `cd packages/tui && cargo test`
+- Notes:
+  - This is intentionally UI-agnostic so we can build reliable e2e tests without pixel snapshots.
