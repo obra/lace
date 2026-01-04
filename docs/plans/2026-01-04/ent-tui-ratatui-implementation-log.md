@@ -284,3 +284,15 @@ Observed:
 - Configure wizard completed and status bar updated to `conn=openai-openai model=gpt-4.1`.
 - Prompt streamed into a single coalesced assistant message and finalized on `turn_end`.
 - `Ctrl+C` exited and restored the terminal (alternate screen was left cleanly).
+
+### 2026-01-04 — Bugfix: provider config errors + modal rendering
+
+- Problem observed:
+  - Prompting before configuring provider/model caused a JSON-RPC error (`Missing provider configuration: connectionId and modelId are required`) and the agent’s stack trace could corrupt the TUI.
+  - Modal overlays could show bleed-through from the underlying screen.
+- Fixes:
+  - Agent stderr is captured and routed into the Debug pane (`agent stderr: ...`) instead of writing directly to the terminal.
+  - When `session/prompt` fails with “missing provider configuration” and no `conn/model` are set, the TUI auto-opens “Configure…” (best-effort; still degrades gracefully for non-Lace agents).
+  - Modal overlays render a `Clear` over their rectangle before drawing to avoid background bleed-through.
+- Tests:
+  - `cd packages/tui && cargo test` (includes `captures_child_stderr_lines`, `overlays_clear_their_rect_to_avoid_bleedthrough`, `auto_opens_config_wizard_when_prompt_requires_provider_config`)
