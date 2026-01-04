@@ -49,6 +49,7 @@ export function readDurableEvents(
   }
 
   const events: DurableEvent[] = [];
+  let hasMore = false;
   const lines = raw.split('\n');
   for (const line of lines) {
     if (!line) continue;
@@ -57,13 +58,17 @@ export function readDurableEvents(
       if (typeof parsed.eventSeq !== 'number') continue;
       if (parsed.eventSeq <= after) continue;
       if (typeFilter && !typeFilter.has(parsed.type)) continue;
-      events.push(parsed);
-      if (events.length >= limit) break;
+      if (events.length < limit) {
+        events.push(parsed);
+        continue;
+      }
+
+      hasMore = true;
+      break;
     } catch {
       // Ignore malformed line (e.g. partial write)
     }
   }
 
-  const hasMore = events.length >= limit && lines.length > 0;
   return { events, hasMore };
 }
