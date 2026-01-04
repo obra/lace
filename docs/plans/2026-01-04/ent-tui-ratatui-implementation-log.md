@@ -90,3 +90,16 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
   - pane visibility toggles (chat/activity/debug)
 - Tests:
   - `cd packages/tui && cargo test`
+
+### 2026-01-04 — First interactive TUI loop (ratatui)
+
+- Implemented a first interactive UI loop with:
+  - spawn agent, bootstrap session, then enter a ratatui render loop
+  - chat pane, activity pane, debug pane (toggleable)
+  - input line editor + history + Enter sends `session/prompt`
+- Files:
+  - `packages/tui/src/ui/mod.rs`
+- Tests:
+  - `cd packages/tui && cargo test` (unit + scenario e2e)
+- Notes:
+  - Permissions are now handled interactively via a modal (Up/Down/Enter) instead of auto-deciding.

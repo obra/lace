@@ -1,5 +1,5 @@
 use crate::app::{AppState, ChatMessage, Role};
-use crate::app::reducer::Outbound;
+use crate::app::reducer::{decide_permission, Outbound};
 use serde_json::json;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -12,6 +12,10 @@ pub enum UiAction {
   ToggleChat,
   ToggleActivity,
   ToggleDebug,
+
+  PermissionPrev,
+  PermissionNext,
+  PermissionSubmit,
 }
 
 pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> {
@@ -90,6 +94,52 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
       state.show_debug = !state.show_debug;
       Vec::new()
     }
+    UiAction::PermissionPrev => {
+      if let Some(req) = &state.active_permission {
+        if req.options.is_empty() {
+          return Vec::new();
+        }
+        state.active_permission_selected = state.active_permission_selected.saturating_sub(1);
+      }
+      Vec::new()
+    }
+    UiAction::PermissionNext => {
+      if let Some(req) = &state.active_permission {
+        if req.options.is_empty() {
+          return Vec::new();
+        }
+        let max = req.options.len() - 1;
+        state.active_permission_selected = (state.active_permission_selected + 1).min(max);
+      }
+      Vec::new()
+    }
+    UiAction::PermissionSubmit => {
+      let Some(req) = state.active_permission.take() else {
+        return Vec::new();
+      };
+
+      let decision = req
+        .options
+        .get(state.active_permission_selected)
+        .map(|o| o.option_id.clone())
+        .unwrap_or_default();
+
+      if decision.is_empty() {
+        state.push_debug_line("permission: no options available".to_string());
+        return Vec::new();
+      }
+
+      match decide_permission(req, &decision) {
+        Ok(out) => {
+          state.activate_next_permission_if_needed();
+          out
+        }
+        Err(err) => {
+          state.push_debug_line(err);
+          Vec::new()
+        }
+      }
+    }
   }
 }
 
@@ -146,5 +196,45 @@ mod tests {
     apply_ui_action(&mut state, UiAction::HistoryNext);
     assert_eq!(state.input_buffer, "");
   }
-}
 
+  #[test]
+  fn permission_submit_sends_response() {
+    use crate::app::{PermissionOption, PermissionRequest};
+    use serde_json::json;
+
+    let mut state = AppState::new();
+    state.active_permission = Some(PermissionRequest {
+      id: json!("a_1"),
+      tool: Some("shell.exec".to_string()),
+      kind: Some("execute".to_string()),
+      resource: Some("echo hi".to_string()),
+      tool_call_id: Some("tool_1".to_string()),
+      turn_id: None,
+      turn_seq: None,
+      job_id: None,
+      options: vec![
+        PermissionOption {
+          option_id: "allow".to_string(),
+          label: "Allow".to_string(),
+        },
+        PermissionOption {
+          option_id: "deny".to_string(),
+          label: "Deny".to_string(),
+        },
+      ],
+    });
+    state.active_permission_selected = 1;
+
+    let out = apply_ui_action(&mut state, UiAction::PermissionSubmit);
+    assert_eq!(out.len(), 1);
+    assert!(state.active_permission.is_none());
+
+    match &out[0] {
+      Outbound::JsonRpcResponse { id, result } => {
+        assert_eq!(id, &json!("a_1"));
+        assert_eq!(result, &json!({"decision":"deny"}));
+      }
+      _ => panic!("expected response"),
+    }
+  }
+}

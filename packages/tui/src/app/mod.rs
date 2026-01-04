@@ -55,6 +55,9 @@ pub struct AppState {
   pub activity: std::collections::VecDeque<String>,
   pub debug_lines: std::collections::VecDeque<String>,
 
+  pub active_permission: Option<PermissionRequest>,
+  pub active_permission_selected: usize,
+
   pub next_client_seq: u64,
 }
 
@@ -78,6 +81,9 @@ impl AppState {
 
       activity: std::collections::VecDeque::new(),
       debug_lines: std::collections::VecDeque::new(),
+
+      active_permission: None,
+      active_permission_selected: 0,
 
       next_client_seq: 1,
     }
@@ -103,5 +109,15 @@ impl AppState {
       self.debug_lines.pop_front();
     }
     self.debug_lines.push_back(line);
+  }
+
+  pub fn activate_next_permission_if_needed(&mut self) {
+    if self.active_permission.is_some() {
+      return;
+    }
+    if let Some(next) = self.permission_queue.pop_front() {
+      self.active_permission = Some(next);
+      self.active_permission_selected = 0;
+    }
   }
 }
