@@ -1,5 +1,5 @@
 import type { JsonRpcPeer } from '@lace/ent-protocol';
-import { SessionIdSchema } from '@lace/ent-protocol';
+import { isSessionId } from '@lace/ent-protocol';
 import { SupervisorAgentProcess, type PermissionDecision } from './supervisor-agent-process';
 import { WorkspaceSessionStore, type WorkspaceSessionRecord } from './workspace-session-store';
 
@@ -163,7 +163,7 @@ export class Supervisor {
   }
 
   async attachWorkspaceSession(sessionId: string): Promise<WorkspaceSessionHandle> {
-    if (!SessionIdSchema.safeParse(sessionId).success) {
+    if (!isSessionId(sessionId)) {
       throw new Error('Invalid sessionId');
     }
 

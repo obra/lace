@@ -5,7 +5,7 @@ import { Supervisor } from '@lace/supervisor';
 import { ensureLaceDir } from '@lace/web/lib/server/lace-imports';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import type { LaceEvent } from '@lace/web/types/core';
-import { SessionIdSchema } from '@lace/ent-protocol';
+import { isSessionId } from '@lace/ent-protocol';
 
 declare global {
   var laceWebSupervisor: Supervisor | undefined;
@@ -212,7 +212,7 @@ export function getSupervisor(): Supervisor {
         },
       });
 
-      if (!agentSessionId || !SessionIdSchema.safeParse(agentSessionId).success) {
+      if (!agentSessionId || !isSessionId(agentSessionId)) {
         return { decision: 'deny' };
       }
 
@@ -262,7 +262,7 @@ export function getSupervisor(): Supervisor {
 }
 
 export function isAgentSessionId(value: string): boolean {
-  return SessionIdSchema.safeParse(value).success;
+  return isSessionId(value);
 }
 
 export function listPendingPermissions(workspaceSessionId: string): Array<{
