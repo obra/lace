@@ -2846,6 +2846,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 kind,
                 resource: toolName,
                 options,
+                requestedAt: pending.requestedAt,
               });
 
               const abortPromise = new Promise<never>((_, reject) => {
@@ -3210,6 +3211,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             kind,
             resource: command,
             options,
+            requestedAt: pending.requestedAt,
           });
 
           pending.requestId = String(requestId);
