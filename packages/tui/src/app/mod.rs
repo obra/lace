@@ -71,6 +71,13 @@ pub struct AppState {
   pub active_permission: Option<PermissionRequest>,
   pub active_permission_selected: usize,
 
+  pub palette_open: bool,
+  pub palette_query: String,
+  pub palette_selected: usize,
+
+  pub help_open: bool,
+  pub should_exit: bool,
+
   pub next_client_seq: u64,
 }
 
@@ -102,6 +109,13 @@ impl AppState {
 
       active_permission: None,
       active_permission_selected: 0,
+
+      palette_open: false,
+      palette_query: String::new(),
+      palette_selected: 0,
+
+      help_open: false,
+      should_exit: false,
 
       next_client_seq: 1,
     }

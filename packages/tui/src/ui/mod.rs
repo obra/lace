@@ -1,5 +1,5 @@
 use crate::app::reducer::{reduce, AppEvent, Outbound};
-use crate::app::ui::{apply_ui_action, UiAction};
+use crate::app::ui::{apply_ui_action, palette_labels, UiAction};
 use crate::app::AppState;
 use crate::app::{Focus, Role};
 use crate::args::Args;
@@ -78,8 +78,47 @@ fn run_loop(
             continue;
           }
 
+          if state.help_open {
+            match key.code {
+              KeyCode::Esc | KeyCode::F(1) | KeyCode::Char('?') => {
+                let _ = apply_ui_action(state, UiAction::ToggleHelp);
+              }
+              _ => {}
+            }
+            if state.should_exit {
+              break;
+            }
+            continue;
+          }
+
+          if state.palette_open {
+            let action = match key.code {
+              KeyCode::Esc => Some(UiAction::CloseOverlay),
+              KeyCode::Enter => Some(UiAction::PaletteSubmit),
+              KeyCode::Up => Some(UiAction::PalettePrev),
+              KeyCode::Down => Some(UiAction::PaletteNext),
+              KeyCode::Backspace => Some(UiAction::PaletteBackspace),
+              KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                Some(UiAction::PaletteChar(ch))
+              }
+              _ => None,
+            };
+            if let Some(action) = action {
+              let out = apply_ui_action(state, action);
+              send_outbound(transport, state, out)?;
+            }
+            if state.should_exit {
+              break;
+            }
+            continue;
+          }
+
           if key.modifiers.contains(KeyModifiers::CONTROL) {
             match key.code {
+              KeyCode::Char('k') => {
+                let _ = apply_ui_action(state, UiAction::OpenPalette);
+                continue;
+              }
               KeyCode::Char('1') => {
                 let _ = apply_ui_action(state, UiAction::ToggleChat);
                 continue;
@@ -94,6 +133,11 @@ fn run_loop(
               }
               _ => {}
             }
+          }
+
+          if key.code == KeyCode::F(1) || key.code == KeyCode::Char('?') {
+            let _ = apply_ui_action(state, UiAction::ToggleHelp);
+            continue;
           }
 
           let action = match key.code {
@@ -125,6 +169,10 @@ fn run_loop(
           if let Some(action) = action {
             let out = apply_ui_action(state, action);
             send_outbound(transport, state, out)?;
+          }
+
+          if state.should_exit {
+            break;
           }
         }
         Event::Resize(_, _) => {}
@@ -265,6 +313,12 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
   if state.active_permission.is_some() {
     let area = centered_rect(80, 70, f.area());
     f.render_widget(render_permission_modal(state), area);
+  } else if state.palette_open {
+    let area = centered_rect(70, 60, f.area());
+    f.render_widget(render_palette_modal(state), area);
+  } else if state.help_open {
+    let area = centered_rect(70, 70, f.area());
+    f.render_widget(render_help_modal(), area);
   }
 }
 
@@ -400,6 +454,52 @@ fn focused_block(title: &'static str, focused: bool) -> Block<'static> {
   } else {
     base
   }
+}
+
+fn render_palette_modal(state: &AppState) -> Paragraph<'static> {
+  let mut lines: Vec<Line> = Vec::new();
+  lines.push(Line::from("Command Palette"));
+  lines.push(Line::from(format!("> {}", state.palette_query)));
+  lines.push(Line::from(""));
+
+  let items = palette_labels(&state.palette_query);
+  if items.is_empty() {
+    lines.push(Line::from("(no matches)"));
+  } else {
+    let idx = state.palette_selected.min(items.len() - 1);
+    for (i, label) in items.iter().enumerate() {
+      let marker = if i == idx { ">" } else { " " };
+      lines.push(Line::from(format!("{marker} {label}")));
+    }
+  }
+
+  lines.push(Line::from(""));
+  lines.push(Line::from("Esc to close"));
+
+  Paragraph::new(Text::from(lines))
+    .block(Block::default().title("Palette").borders(Borders::ALL))
+    .wrap(Wrap { trim: true })
+}
+
+fn render_help_modal() -> Paragraph<'static> {
+  let lines = vec![
+    Line::from("Help"),
+    Line::from(""),
+    Line::from("Ctrl+C   Quit"),
+    Line::from("Ctrl+K   Command palette"),
+    Line::from("Ctrl+1   Toggle Chat pane"),
+    Line::from("Ctrl+2   Toggle Activity pane"),
+    Line::from("Ctrl+3   Toggle Debug pane"),
+    Line::from("Tab      Cycle focus"),
+    Line::from("Up/Down  Scroll or history (depends on focus)"),
+    Line::from("? / F1   Toggle help"),
+    Line::from(""),
+    Line::from("Permission modal: Up/Down select, Enter decide"),
+  ];
+
+  Paragraph::new(Text::from(lines))
+    .block(Block::default().title("Help").borders(Borders::ALL))
+    .wrap(Wrap { trim: true })
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: ratatui::layout::Rect) -> ratatui::layout::Rect {

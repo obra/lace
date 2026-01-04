@@ -112,3 +112,11 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
   - Up/Down navigate input history when Input is focused
 - Tests:
   - `cd packages/tui && cargo test` (see `app::ui::tests::focus_cycle_skips_hidden_panes`)
+
+### 2026-01-04 — Command palette + help
+
+- Added:
+  - Command palette (`Ctrl+K`) with a small set of actions (toggle panes, focus input, quit)
+  - Help overlay (`?` or `F1`)
+- Tests:
+  - `cd packages/tui && cargo test` (see `app::ui::tests::palette_filters_and_submits`)

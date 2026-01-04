@@ -16,6 +16,15 @@ pub enum UiAction {
   ScrollUp,
   ScrollDown,
 
+  OpenPalette,
+  CloseOverlay,
+  ToggleHelp,
+  PaletteChar(char),
+  PaletteBackspace,
+  PalettePrev,
+  PaletteNext,
+  PaletteSubmit,
+
   PermissionPrev,
   PermissionNext,
   PermissionSubmit,
@@ -124,6 +133,93 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
       }
       Vec::new()
     }
+    UiAction::OpenPalette => {
+      if state.active_permission.is_some() {
+        return Vec::new();
+      }
+      state.palette_open = true;
+      state.help_open = false;
+      state.palette_query.clear();
+      state.palette_selected = 0;
+      Vec::new()
+    }
+    UiAction::CloseOverlay => {
+      state.palette_open = false;
+      state.help_open = false;
+      Vec::new()
+    }
+    UiAction::ToggleHelp => {
+      if state.active_permission.is_some() {
+        return Vec::new();
+      }
+      state.help_open = !state.help_open;
+      if state.help_open {
+        state.palette_open = false;
+      }
+      Vec::new()
+    }
+    UiAction::PaletteChar(ch) => {
+      if !state.palette_open {
+        return Vec::new();
+      }
+      state.palette_query.push(ch);
+      state.palette_selected = 0;
+      Vec::new()
+    }
+    UiAction::PaletteBackspace => {
+      if !state.palette_open {
+        return Vec::new();
+      }
+      state.palette_query.pop();
+      state.palette_selected = 0;
+      Vec::new()
+    }
+    UiAction::PalettePrev => {
+      if !state.palette_open {
+        return Vec::new();
+      }
+      state.palette_selected = state.palette_selected.saturating_sub(1);
+      Vec::new()
+    }
+    UiAction::PaletteNext => {
+      if !state.palette_open {
+        return Vec::new();
+      }
+      state.palette_selected = state.palette_selected.saturating_add(1);
+      Vec::new()
+    }
+    UiAction::PaletteSubmit => {
+      if !state.palette_open {
+        return Vec::new();
+      }
+      let items = palette_items(&state.palette_query);
+      if items.is_empty() {
+        return Vec::new();
+      }
+      let idx = state.palette_selected.min(items.len() - 1);
+      match items[idx].command {
+        PaletteCommand::ToggleChat => {
+          state.show_chat = !state.show_chat;
+          state.ensure_focus_visible();
+        }
+        PaletteCommand::ToggleActivity => {
+          state.show_activity = !state.show_activity;
+          state.ensure_focus_visible();
+        }
+        PaletteCommand::ToggleDebug => {
+          state.show_debug = !state.show_debug;
+          state.ensure_focus_visible();
+        }
+        PaletteCommand::FocusInput => {
+          state.focus = crate::app::Focus::Input;
+        }
+        PaletteCommand::Quit => {
+          state.should_exit = true;
+        }
+      }
+      state.palette_open = false;
+      Vec::new()
+    }
     UiAction::PermissionPrev => {
       if let Some(req) = &state.active_permission {
         if req.options.is_empty() {
@@ -171,6 +267,59 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
       }
     }
   }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PaletteCommand {
+  ToggleChat,
+  ToggleActivity,
+  ToggleDebug,
+  FocusInput,
+  Quit,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PaletteItem {
+  label: &'static str,
+  command: PaletteCommand,
+}
+
+fn palette_items(query: &str) -> Vec<PaletteItem> {
+  let all = [
+    PaletteItem {
+      label: "Toggle Chat Pane",
+      command: PaletteCommand::ToggleChat,
+    },
+    PaletteItem {
+      label: "Toggle Activity Pane",
+      command: PaletteCommand::ToggleActivity,
+    },
+    PaletteItem {
+      label: "Toggle Debug Pane",
+      command: PaletteCommand::ToggleDebug,
+    },
+    PaletteItem {
+      label: "Focus Input",
+      command: PaletteCommand::FocusInput,
+    },
+    PaletteItem {
+      label: "Quit",
+      command: PaletteCommand::Quit,
+    },
+  ];
+
+  let q = query.trim().to_lowercase();
+  if q.is_empty() {
+    return all.to_vec();
+  }
+  all
+    .into_iter()
+    .filter(|i| i.label.to_lowercase().contains(&q))
+    .collect()
+}
+
+pub fn palette_labels(query: &str) -> Vec<&'static str> {
+  palette_items(query).into_iter().map(|i| i.label).collect()
 }
 
 #[cfg(test)]
@@ -287,5 +436,14 @@ mod tests {
 
     apply_ui_action(&mut state, UiAction::FocusNext);
     assert_eq!(state.focus, Focus::Debug);
+  }
+
+  #[test]
+  fn palette_filters_and_submits() {
+    let mut state = AppState::new();
+    apply_ui_action(&mut state, UiAction::OpenPalette);
+    apply_ui_action(&mut state, UiAction::PaletteChar('q'));
+    apply_ui_action(&mut state, UiAction::PaletteSubmit);
+    assert!(state.should_exit);
   }
 }
