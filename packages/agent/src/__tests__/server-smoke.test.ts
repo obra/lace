@@ -75,4 +75,21 @@ describe('agent rpc server (smoke)', () => {
     client.close();
     server.close();
   });
+
+  it('returns SessionNotFound for session/load of missing session', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', { protocolVersion: '1.0' });
+
+    await expect(
+      client.request('session/load', { sessionId: 'sess_missing' })
+    ).rejects.toMatchObject({
+      code: 1,
+      message: 'SessionNotFound',
+    });
+
+    client.close();
+    server.close();
+  });
 });

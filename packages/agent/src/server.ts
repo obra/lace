@@ -1701,7 +1701,15 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       throw { code: 2, message: 'SessionBusy' };
     }
 
-    const loaded = loadSession(parsed.sessionId);
+    let loaded: LoadedSession;
+    try {
+      loaded = loadSession(parsed.sessionId);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Session not found') {
+        throw { code: 1, message: 'SessionNotFound' };
+      }
+      throw error;
+    }
     state.activeSession = loaded;
     const summary = summarizeDurableEvents(loaded.dir);
     return {
