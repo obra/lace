@@ -296,3 +296,14 @@ Observed:
   - Modal overlays render a `Clear` over their rectangle before drawing to avoid background bleed-through.
 - Tests:
   - `cd packages/tui && cargo test` (includes `captures_child_stderr_lines`, `overlays_clear_their_rect_to_avoid_bleedthrough`, `auto_opens_config_wizard_when_prompt_requires_provider_config`)
+
+### 2026-01-04 — Bugfix: chat autoscroll
+
+- Problem observed:
+  - Chat “history” didn’t naturally follow the latest messages; you could end up typing while the viewport stayed on older content.
+- Fix:
+  - Chat now auto-scrolls to the bottom by default.
+  - Scrolling up disables follow-mode; scrolling back down to the bottom re-enables it.
+  - Sending a prompt re-enables follow-mode (so you see the response).
+- Tests:
+  - `cd packages/tui && cargo test` (includes `chat_autoscroll_follows_bottom_until_user_scrolls_up`)
