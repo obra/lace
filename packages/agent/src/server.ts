@@ -13,6 +13,7 @@ import {
 import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
 import {
   createNdjsonStdioTransport,
+  AcpErrorCodes,
   EntErrorCodes,
   isSessionId,
   JsonRpcPeer,
@@ -872,7 +873,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     parentJobId?: string;
     turnContext?: { turnId: string; turnSeq: number };
   }): Promise<{ jobId: string }> => {
-    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+    if (!state.activeSession)
+      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
 
     const jobId = `job_${randomUUID()}`;
     const startedAt = new Date().toISOString();
@@ -1771,7 +1773,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('ent/job/list', async (_params: unknown) => {
     assertInitialized(state);
-    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+    if (!state.activeSession)
+      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
 
     const jobs = deriveJobsForActiveSession().map((j) => ({
       jobId: j.jobId,
@@ -1788,7 +1791,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('ent/job/output', async (params: unknown) => {
     assertInitialized(state);
-    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+    if (!state.activeSession)
+      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
 
     const parsed = params as {
       jobId: string;
@@ -1876,7 +1880,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('ent/job/kill', async (params: unknown) => {
     assertInitialized(state);
-    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+    if (!state.activeSession)
+      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
 
     const parsed = params as { jobId: string };
     const jobId = toNonEmptyString(parsed?.jobId);
@@ -1924,7 +1929,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('session/new', async (params: unknown) => {
     assertInitialized(state);
-    if (state.activeSession) throw { code: 2, message: 'SessionBusy' };
+    if (state.activeSession) throw { code: AcpErrorCodes.SessionBusy, message: 'SessionBusy' };
 
     const parsed = params as { workDir: string; persona?: string; systemPrompt?: unknown };
     if (!parsed?.workDir) throwInvalidParams('workDir is required');
@@ -1973,7 +1978,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     if (parsed.fork) throwInvalidParams('fork not implemented');
 
     if (state.activeSession && state.activeSession.meta.sessionId !== parsed.sessionId) {
-      throw { code: 2, message: 'SessionBusy' };
+      throw { code: AcpErrorCodes.SessionBusy, message: 'SessionBusy' };
     }
 
     let loaded: LoadedSession;
@@ -1981,7 +1986,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       loaded = loadSession(parsed.sessionId);
     } catch (error) {
       if (error instanceof Error && error.message === 'Session not found') {
-        throw { code: 1, message: 'SessionNotFound' };
+        throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
       }
       throw error;
     }
@@ -1996,7 +2001,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('ent/session/configure', async (params: unknown) => {
     assertInitialized(state);
-    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+    if (!state.activeSession)
+      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
 
     const parsed = params as Partial<{
       connectionId: string;
@@ -2081,8 +2087,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('ent/session/compact', async (params: unknown) => {
     assertInitialized(state);
-    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
-    if (state.activeTurn) throw { code: 2, message: 'SessionBusy' };
+    if (!state.activeSession)
+      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
+    if (state.activeTurn) throw { code: AcpErrorCodes.SessionBusy, message: 'SessionBusy' };
 
     const parsed = params as
       | {
@@ -2219,8 +2226,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('ent/session/checkpoint', async (params: unknown) => {
     assertInitialized(state);
-    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
-    if (state.activeTurn) throw { code: 2, message: 'SessionBusy' };
+    if (!state.activeSession)
+      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
+    if (state.activeTurn) throw { code: AcpErrorCodes.SessionBusy, message: 'SessionBusy' };
 
     const parsed = params as { label?: string } | undefined;
     const label = toNonEmptyString(parsed?.label) ?? undefined;
@@ -2253,8 +2261,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('ent/session/rewind', async (params: unknown) => {
     assertInitialized(state);
-    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
-    if (state.activeTurn) throw { code: 2, message: 'SessionBusy' };
+    if (!state.activeSession)
+      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
+    if (state.activeTurn) throw { code: AcpErrorCodes.SessionBusy, message: 'SessionBusy' };
 
     const parsed = params as { toEventSeq: number };
     const toEventSeq =
@@ -2292,7 +2301,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('ent/session/inject', async (params: unknown) => {
     assertInitialized(state);
-    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+    if (!state.activeSession)
+      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
 
     const parsed = params as { content: unknown[]; priority: 'immediate' | 'normal' | 'deferred' };
     const priority =
@@ -2332,7 +2342,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('ent/session/events', async (params: unknown) => {
     assertInitialized(state);
-    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
+    if (!state.activeSession)
+      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
 
     const parsed = params as
       | { afterEventSeq?: number; limit?: number; types?: string[] }
@@ -2364,8 +2375,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('session/prompt', async (params: unknown) => {
     assertInitialized(state);
-    if (!state.activeSession) throw { code: 1, message: 'SessionNotFound' };
-    if (state.activeTurn) throw { code: 2, message: 'SessionBusy' };
+    if (!state.activeSession)
+      throw { code: AcpErrorCodes.SessionNotFound, message: 'SessionNotFound' };
+    if (state.activeTurn) throw { code: AcpErrorCodes.SessionBusy, message: 'SessionBusy' };
 
     const effectiveConfig = state.activeSession.state.config
       ? { ...state.config, ...state.activeSession.state.config }

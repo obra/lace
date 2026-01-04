@@ -3,7 +3,12 @@ import { PassThrough } from 'node:stream';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
+import {
+  AcpErrorCodes,
+  createNdjsonStdioTransport,
+  EntErrorCodes,
+  JsonRpcPeer,
+} from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
 import { defaultInitializeParams } from './helpers/initialize';
 
@@ -86,7 +91,7 @@ describe('agent rpc server (smoke)', () => {
     await expect(
       client.request('session/load', { sessionId: 'sess_missing' })
     ).rejects.toMatchObject({
-      code: 1,
+      code: AcpErrorCodes.SessionNotFound,
       message: 'SessionNotFound',
     });
 
@@ -102,7 +107,7 @@ describe('agent rpc server (smoke)', () => {
     await client.request('session/new', { workDir: process.cwd() });
 
     await expect(client.request('ent/job/output', { jobId: 'job_missing' })).rejects.toMatchObject({
-      code: 8,
+      code: EntErrorCodes.JobNotFound,
       message: 'JobNotFound',
     });
 
@@ -119,7 +124,7 @@ describe('agent rpc server (smoke)', () => {
     await expect(
       client.request('ent/models/list', { connectionId: 'conn_missing' })
     ).rejects.toMatchObject({
-      code: 14,
+      code: EntErrorCodes.ConnectionNotFound,
       message: 'ConnectionNotFound',
     });
 
@@ -132,7 +137,7 @@ describe('agent rpc server (smoke)', () => {
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
     await expect(client.request('ent/agent/ping')).rejects.toMatchObject({
-      code: 9,
+      code: EntErrorCodes.NotInitialized,
       message: 'NotInitialized',
     });
 

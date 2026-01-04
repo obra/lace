@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { EntErrorCodes } from '@lace/ent-protocol';
 import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
 import { defaultInitializeParams } from './helpers/initialize';
 
@@ -57,7 +58,10 @@ describe('lace-agent process (E2E over stdio)', () => {
         2_000,
         'initialize again'
       )
-    ).rejects.toMatchObject({ code: 10, message: 'AlreadyInitialized' });
+    ).rejects.toMatchObject({
+      code: EntErrorCodes.AlreadyInitialized,
+      message: 'AlreadyInitialized',
+    });
   });
 
   it(
@@ -620,7 +624,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       await expect(
         agent.peer.request('ent/session/rewind', { toEventSeq: 1 })
       ).rejects.toMatchObject({
-        code: 12,
+        code: EntErrorCodes.CheckpointNotFound,
         message: 'CheckpointNotFound',
       });
     }
