@@ -181,6 +181,18 @@
       "types": "./dist/threads/compaction/types.d.ts",
       "import": "./dist/threads/compaction/types.js"
     },
+    "./threads/compaction/registry": {
+      "types": "./dist/threads/compaction/registry.d.ts",
+      "import": "./dist/threads/compaction/registry.js"
+    },
+    "./threads/compaction/trim-tool-results-strategy": {
+      "types": "./dist/threads/compaction/trim-tool-results-strategy.d.ts",
+      "import": "./dist/threads/compaction/trim-tool-results-strategy.js"
+    },
+    "./threads/compaction/summarize-strategy": {
+      "types": "./dist/threads/compaction/summarize-strategy.d.ts",
+      "import": "./dist/threads/compaction/summarize-strategy.js"
+    },
     "./tools/implementations/url_fetch": {
       "types": "./dist/tools/implementations/url_fetch.d.ts",
       "import": "./dist/tools/implementations/url_fetch.js"

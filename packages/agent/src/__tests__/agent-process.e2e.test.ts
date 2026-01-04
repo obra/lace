@@ -670,4 +670,38 @@ describe('lace-agent process (E2E over stdio)', () => {
       expect(assistantText).toContain('No tool result found.');
     }
   );
+
+  it(
+    'supports ent/session/compact summarize and returns summary text',
+    { timeout: 15_000 },
+    async () => {
+      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+
+      await withTimeout(
+        agent.peer.request('initialize', defaultInitializeParams()),
+        2_000,
+        'initialize'
+      );
+      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+      writeFileSync(join(workDir, 'hello.txt'), 'hello from disk\n', 'utf8');
+
+      await withTimeout(
+        agent.peer.request('session/prompt', {
+          content: [{ type: 'text', text: 'read file hello.txt' }],
+        }),
+        10_000,
+        'session/prompt read hello.txt'
+      );
+
+      const compact = (await withTimeout(
+        agent.peer.request('ent/session/compact', { strategy: 'summarize', preserveRecent: 0 }),
+        10_000,
+        'ent/session/compact summarize'
+      )) as { messagesCompacted: number; summary?: string };
+
+      expect(compact.messagesCompacted).toBeGreaterThan(0);
+      expect(compact.summary).toContain('Summary of conversation (test provider).');
+    }
+  );
 });

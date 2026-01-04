@@ -59,6 +59,13 @@ export class TestAgentProvider extends AIProvider {
       .reverse()
       .find((m) => m.role === 'user' && typeof m.content === 'string')?.content;
 
+    if (lastUserText?.includes('Conversation Compaction Required')) {
+      const content = 'Summary of conversation (test provider).';
+      this.emit('token', { token: content });
+      this.emit('complete', { response: { content, toolCalls: [], stopReason: 'stop' } });
+      return { content, toolCalls: [], stopReason: 'stop' };
+    }
+
     const requested = this.extractRequestedTool(lastUserText ?? '');
 
     if (this.state.phase === 'needs_tool' && requested) {
