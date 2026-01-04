@@ -17,8 +17,8 @@ import { resolve, relative } from 'path';
 import mime from 'mime-types';
 import { createSuccessResponse, createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { logger } from '@lace/core/utils/logger';
-import { SessionService } from '@lace/web/lib/server/session-service';
-import { asThreadId } from '@lace/web/types/core';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-session-id-validation';
 import {
   GetSessionFileRequestSchema,
   type SessionFileContentResponse,
@@ -59,15 +59,18 @@ export async function loader({ request: _request, params }: LoaderArgs) {
     }
     const { path: requestedPath } = parseResult.data;
 
-    // Get session and working directory
-    const sessionService = new SessionService();
-    const session = await sessionService.getSession(asThreadId(sessionId));
+    const parsedSessionId = WorkspaceSessionIdSchema.safeParse(sessionId);
+    if (!parsedSessionId.success) {
+      return createErrorResponse('Invalid session ID', 400, { code: 'INVALID_REQUEST' });
+    }
 
-    if (!session) {
+    const supervisor = getSupervisor();
+    const record = supervisor.getWorkspaceSession(parsedSessionId.data);
+    if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'SESSION_NOT_FOUND' });
     }
 
-    const workingDirectory = session.getWorkingDirectory();
+    const workingDirectory = record.workDir;
 
     if (!workingDirectory) {
       return createErrorResponse('Session has no working directory configured', 400, {

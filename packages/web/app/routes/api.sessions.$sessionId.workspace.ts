@@ -1,11 +1,12 @@
 // ABOUTME: API endpoint for session workspace information
 // ABOUTME: Returns workspace mode and detailed workspace info
 
-import { Session } from '@lace/web/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { asThreadId } from '@lace/web/types/core';
 import { logger } from '@lace/core/utils/logger';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { WorkspaceSessionIdSchema } from '@lace/web/lib/validation/workspace-session-id-validation';
+import type { WorkspaceInfo } from '@lace/core/workspace/workspace-container-manager';
 
 interface LoaderParams {
   sessionId?: string;
@@ -19,32 +20,26 @@ export async function loader({ params }: { params: LoaderParams }) {
   }
 
   try {
-    // Validate session ID format before using asThreadId
-    let threadId;
-    try {
-      threadId = asThreadId(sessionId);
-    } catch {
-      // Invalid format is treated as "not found" rather than error
+    const parsed = WorkspaceSessionIdSchema.safeParse(sessionId);
+    if (!parsed.success) {
+      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
+    }
+
+    const supervisor = getSupervisor();
+    const record = supervisor.getWorkspaceSession(parsed.data);
+    if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const session = await Session.getById(threadId);
-    if (!session) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
-    }
+    const info: WorkspaceInfo = {
+      sessionId: record.workspaceSessionId,
+      projectDir: record.workDir,
+      clonePath: record.workDir,
+      containerId: '',
+      state: 'running',
+    };
 
-    // Wait for workspace initialization if in progress
-    await session.waitForWorkspace();
-
-    // Get workspace mode from effective configuration
-    const config = session.getEffectiveConfiguration();
-    // Default to 'worktree' (matches DEFAULT_WORKSPACE_MODE in core)
-    const mode = (config.workspaceMode as 'container' | 'worktree' | 'local') || 'worktree';
-
-    // Get workspace info (may be undefined if not initialized)
-    const info = session.getWorkspaceInfo();
-
-    return createSuperjsonResponse({ mode, info: info || null });
+    return createSuperjsonResponse({ mode: 'local', info });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('Failed to fetch workspace info', { error, sessionId, errorMessage });
