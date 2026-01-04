@@ -162,15 +162,20 @@ fn run_loop(
 	              Focus::Activity => Some(UiAction::ActivityToggleExpanded),
 	              _ => None,
 	            },
-            KeyCode::Backspace => match state.focus {
-              Focus::Input => Some(UiAction::Backspace),
-              _ => None,
-            },
-            KeyCode::Char(ch)
-              if state.focus == Focus::Input && !key.modifiers.contains(KeyModifiers::CONTROL) =>
-            {
-              Some(UiAction::InputChar(ch))
-            }
+	            KeyCode::Backspace => match state.focus {
+	              Focus::Input => Some(UiAction::Backspace),
+	              _ => None,
+	            },
+	            KeyCode::Char('g')
+	              if state.focus == Focus::Activity && !key.modifiers.contains(KeyModifiers::CONTROL) =>
+	            {
+	              Some(UiAction::ActivityJumpToTurn)
+	            }
+	            KeyCode::Char(ch)
+	              if state.focus == Focus::Input && !key.modifiers.contains(KeyModifiers::CONTROL) =>
+	            {
+	              Some(UiAction::InputChar(ch))
+	            }
             _ => None,
           };
 
@@ -343,19 +348,18 @@ fn handle_session_update(state: &mut AppState, params: &Value) {
         );
       }
       AppEvent::JobStarted { job_id, job_type } => {
-        state.push_activity_line(format!(
-          "job_started {} ({job_id})",
-          job_type.clone().unwrap_or_else(|| "?".to_string())
-        ));
+        activity::push_job_started(state, job_id.clone(), job_type.clone());
       }
       AppEvent::JobFinished { job_id, outcome } => {
-        state.push_activity_line(format!(
-          "job_finished {} ({job_id})",
-          outcome.clone().unwrap_or_else(|| "?".to_string())
-        ));
+        activity::push_job_finished(state, job_id.clone(), outcome.clone());
       }
-      AppEvent::TurnEnd { stop_reason } => {
-        activity::push_turn_end(state, stop_reason.clone());
+      AppEvent::TurnEnd {
+        stop_reason,
+        turn_id,
+        turn_seq,
+        ..
+      } => {
+        activity::push_turn_end(state, stop_reason.clone(), turn_id.clone(), *turn_seq);
       }
       _ => {}
     }
@@ -608,6 +612,7 @@ fn render_help_modal() -> Paragraph<'static> {
 	    Line::from("Tab      Cycle focus"),
 	    Line::from("Up/Down  Scroll or history (depends on focus)"),
 	    Line::from("Enter    Toggle expand (Activity)"),
+	    Line::from("g        Jump to turn (Activity)"),
 	    Line::from("? / F1   Toggle help"),
     Line::from(""),
     Line::from("Permission modal: Up/Down select, Enter decide"),

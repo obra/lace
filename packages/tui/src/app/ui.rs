@@ -12,6 +12,7 @@ pub enum UiAction {
   ActivityPrev,
   ActivityNext,
   ActivityToggleExpanded,
+  ActivityJumpToTurn,
   ToggleChat,
   ToggleActivity,
   ToggleDebug,
@@ -91,6 +92,29 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
       }
       Vec::new()
     }
+    UiAction::ActivityJumpToTurn => {
+      let Some(item) = state.activity.get(state.activity_selected) else {
+        return Vec::new();
+      };
+
+      let target_turn_id = item.turn_id.as_deref();
+      let target_turn_seq = item.turn_seq;
+      let Some(target_idx) = state.messages.iter().position(|m| {
+        if m.role != Role::Assistant {
+          return false;
+        }
+        if let Some(tid) = target_turn_id {
+          return m.turn_id.as_deref() == Some(tid);
+        }
+        m.turn_seq.is_some() && m.turn_seq == target_turn_seq
+      }) else {
+        return Vec::new();
+      };
+
+      state.focus = crate::app::Focus::Chat;
+      state.chat_scroll = chat_start_line_for_message_index(&state.messages, target_idx);
+      Vec::new()
+    }
     UiAction::Enter => {
       let line = state.input_buffer.trim_end().to_string();
       state.input_buffer.clear();
@@ -105,6 +129,8 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         role: Role::User,
         text: line.clone(),
         streaming: false,
+        turn_id: None,
+        turn_seq: None,
       });
 
       let id = state.next_client_id();
@@ -362,6 +388,16 @@ pub fn palette_labels(query: &str) -> Vec<&'static str> {
   palette_items(query).into_iter().map(|i| i.label).collect()
 }
 
+fn chat_start_line_for_message_index(messages: &[ChatMessage], idx: usize) -> u16 {
+  let mut lines: u64 = 0;
+  for m in messages.iter().take(idx) {
+    lines += 1; // prefix
+    lines += m.text.lines().count() as u64;
+    lines += 1; // blank line after message
+  }
+  lines.min(u16::MAX as u64) as u16
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -393,9 +429,52 @@ mod tests {
       &mut state,
       AppEvent::TextDelta {
         text: "ok".to_string(),
+        turn_id: Some("turn_1".to_string()),
+        turn_seq: Some(1),
       },
     );
     assert_eq!(state.messages.len(), 2);
+  }
+
+  #[test]
+  fn activity_jump_to_turn_sets_chat_focus_and_scroll() {
+    use crate::app::activity::{upsert_tool_use, ActivityKind};
+    use serde_json::json;
+
+    let mut state = AppState::new();
+    state.messages.push(ChatMessage {
+      role: Role::User,
+      text: "hi".to_string(),
+      streaming: false,
+      turn_id: None,
+      turn_seq: None,
+    });
+    state.messages.push(ChatMessage {
+      role: Role::Assistant,
+      text: "Hello".to_string(),
+      streaming: false,
+      turn_id: Some("turn_2".to_string()),
+      turn_seq: Some(2),
+    });
+
+    upsert_tool_use(
+      &mut state,
+      "tool_1".to_string(),
+      Some("shell.exec".to_string()),
+      Some("awaiting_permission".to_string()),
+      json!({"command":"echo hi"}),
+      None,
+      None,
+      Some("turn_2".to_string()),
+      Some(2),
+    );
+    assert_eq!(state.activity.len(), 1);
+    assert_eq!(state.activity[0].kind, ActivityKind::ToolUse);
+    state.activity_selected = 0;
+
+    apply_ui_action(&mut state, UiAction::ActivityJumpToTurn);
+    assert_eq!(state.focus, crate::app::Focus::Chat);
+    assert_eq!(state.chat_scroll, 3);
   }
 
   #[test]

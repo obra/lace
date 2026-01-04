@@ -23,6 +23,8 @@ fn decode_session_update_inner(params: &Value, out: &mut Vec<AppEvent>, job_id: 
       if let Some(text) = obj.get("text").and_then(|v| v.as_str()) {
         out.push(AppEvent::TextDelta {
           text: text.to_string(),
+          turn_id,
+          turn_seq,
         });
       }
     }
@@ -32,7 +34,11 @@ fn decode_session_update_inner(params: &Value, out: &mut Vec<AppEvent>, job_id: 
         .and_then(|d| d.get("stopReason"))
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
-      out.push(AppEvent::TurnEnd { stop_reason });
+      out.push(AppEvent::TurnEnd {
+        stop_reason,
+        turn_id,
+        turn_seq,
+      });
     }
     "tool_use" => {
       let tool_call_id = obj.get("toolCallId").and_then(|v| v.as_str());
@@ -150,12 +156,23 @@ mod tests {
   #[test]
   fn decodes_text_delta_and_turn_end() {
     let events = decode_session_update(&json!({"type":"text_delta","text":"hi"}));
-    assert_eq!(events, vec![AppEvent::TextDelta { text: "hi".to_string() }]);
+    assert_eq!(
+      events,
+      vec![AppEvent::TextDelta {
+        text: "hi".to_string(),
+        turn_id: None,
+        turn_seq: None,
+      }]
+    );
 
     let events = decode_session_update(&json!({"type":"turn_end","data":{"stopReason":"end_turn"}}));
     assert_eq!(
       events,
-      vec![AppEvent::TurnEnd { stop_reason: Some("end_turn".to_string()) }]
+      vec![AppEvent::TurnEnd {
+        stop_reason: Some("end_turn".to_string()),
+        turn_id: None,
+        turn_seq: None,
+      }]
     );
   }
 
@@ -188,7 +205,14 @@ mod tests {
       "jobId":"job_1",
       "update": {"type":"text_delta","text":"ok"}
     }));
-    assert_eq!(events, vec![AppEvent::TextDelta { text: "ok".to_string() }]);
+    assert_eq!(
+      events,
+      vec![AppEvent::TextDelta {
+        text: "ok".to_string(),
+        turn_id: None,
+        turn_seq: None,
+      }]
+    );
   }
 
   #[test]

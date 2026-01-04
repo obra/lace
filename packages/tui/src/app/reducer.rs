@@ -3,8 +3,16 @@ use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppEvent {
-  TextDelta { text: String },
-  TurnEnd { stop_reason: Option<String> },
+  TextDelta {
+    text: String,
+    turn_id: Option<String>,
+    turn_seq: Option<i64>,
+  },
+  TurnEnd {
+    stop_reason: Option<String>,
+    turn_id: Option<String>,
+    turn_seq: Option<i64>,
+  },
   ToolUse {
     tool_call_id: String,
     name: Option<String>,
@@ -41,8 +49,8 @@ pub enum Outbound {
 
 pub fn reduce(state: &mut AppState, event: AppEvent) -> Vec<Outbound> {
   match event {
-    AppEvent::TextDelta { text } => {
-      append_assistant_text(state, &text);
+    AppEvent::TextDelta { text, turn_id, turn_seq } => {
+      append_assistant_text(state, &text, turn_id.as_deref(), turn_seq);
       Vec::new()
     }
     AppEvent::TurnEnd { .. } => {
@@ -96,14 +104,21 @@ pub fn decide_permission(
   Ok(vec![Outbound::JsonRpcResponse { id: request.id, result }])
 }
 
-fn append_assistant_text(state: &mut AppState, text: &str) {
+fn append_assistant_text(state: &mut AppState, text: &str, turn_id: Option<&str>, turn_seq: Option<i64>) {
   match state.messages.last_mut() {
     Some(ChatMessage {
       role: Role::Assistant,
       streaming: true,
       ..
     }) => {
-      state.messages.last_mut().unwrap().text.push_str(text);
+      let last = state.messages.last_mut().unwrap();
+      last.text.push_str(text);
+      if last.turn_id.is_none() {
+        last.turn_id = turn_id.map(|s| s.to_string());
+      }
+      if last.turn_seq.is_none() {
+        last.turn_seq = turn_seq;
+      }
     }
     Some(ChatMessage {
       role: Role::Assistant,
@@ -116,6 +131,8 @@ fn append_assistant_text(state: &mut AppState, text: &str) {
         role: Role::Assistant,
         text: text.to_string(),
         streaming: true,
+        turn_id: turn_id.map(|s| s.to_string()),
+        turn_seq,
       });
     }
   }
@@ -143,12 +160,16 @@ mod tests {
       &mut state,
       AppEvent::TextDelta {
         text: "Hello".to_string(),
+        turn_id: Some("turn_1".to_string()),
+        turn_seq: Some(1),
       },
     );
     reduce(
       &mut state,
       AppEvent::TextDelta {
         text: " world".to_string(),
+        turn_id: Some("turn_1".to_string()),
+        turn_seq: Some(1),
       },
     );
 
@@ -158,6 +179,8 @@ mod tests {
         role: Role::Assistant,
         text: "Hello world".to_string(),
         streaming: true,
+        turn_id: Some("turn_1".to_string()),
+        turn_seq: Some(1),
       }]
     );
   }
@@ -170,12 +193,16 @@ mod tests {
       &mut state,
       AppEvent::TextDelta {
         text: "ok".to_string(),
+        turn_id: Some("turn_1".to_string()),
+        turn_seq: Some(1),
       },
     );
     reduce(
       &mut state,
       AppEvent::TurnEnd {
         stop_reason: Some("end_turn".to_string()),
+        turn_id: Some("turn_1".to_string()),
+        turn_seq: Some(1),
       },
     );
 
@@ -258,6 +285,8 @@ mod tests {
       &mut state,
       AppEvent::TextDelta {
         text: "ok".to_string(),
+        turn_id: Some("turn_1".to_string()),
+        turn_seq: Some(1),
       },
     );
 

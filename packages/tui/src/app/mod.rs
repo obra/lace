@@ -23,6 +23,8 @@ pub struct ChatMessage {
   pub role: Role,
   pub text: String,
   pub streaming: bool,
+  pub turn_id: Option<String>,
+  pub turn_seq: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

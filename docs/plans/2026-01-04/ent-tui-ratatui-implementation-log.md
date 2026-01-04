@@ -146,3 +146,13 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
   - RPC response errors and timeouts are now structured activity entries (errors expand by default).
 - Tests:
   - `cd packages/tui && cargo test` (unit + scenario e2e)
+
+### 2026-01-04 — Activity jump-to-turn (best-effort)
+
+- Added turn metadata capture:
+  - `text_delta` and `turn_end` updates now carry `turnId`/`turnSeq` into `ChatMessage` (assistant messages only).
+- Added Activity → Chat navigation:
+  - When an Activity item has `turnId`/`turnSeq`, `g` jumps focus to Chat and scrolls to the matching assistant message.
+- Added structured entries for `job_started` / `job_finished` updates (Activity kinds).
+- Tests:
+  - `cd packages/tui && cargo test` (includes `app::ui::tests::activity_jump_to_turn_sets_chat_focus_and_scroll`)

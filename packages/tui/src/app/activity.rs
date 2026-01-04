@@ -102,7 +102,49 @@ pub fn push_timeout(state: &mut AppState, id: String, method: String) {
   );
 }
 
-pub fn push_turn_end(state: &mut AppState, stop_reason: Option<String>) {
+pub fn push_job_started(state: &mut AppState, job_id: String, job_type: Option<String>) {
+  let seq = next_seq(state);
+  push_item(
+    state,
+    ActivityItem {
+      seq,
+      kind: ActivityKind::JobStarted,
+      summary: format!(
+        "job_started {} ({job_id})",
+        job_type.unwrap_or_else(|| "?".to_string())
+      ),
+      expanded: false,
+      details: None,
+      tool_call_id: None,
+      job_id: Some(job_id),
+      turn_id: None,
+      turn_seq: None,
+    },
+  );
+}
+
+pub fn push_job_finished(state: &mut AppState, job_id: String, outcome: Option<String>) {
+  let seq = next_seq(state);
+  push_item(
+    state,
+    ActivityItem {
+      seq,
+      kind: ActivityKind::JobFinished,
+      summary: format!(
+        "job_finished {} ({job_id})",
+        outcome.unwrap_or_else(|| "?".to_string())
+      ),
+      expanded: false,
+      details: None,
+      tool_call_id: None,
+      job_id: Some(job_id),
+      turn_id: None,
+      turn_seq: None,
+    },
+  );
+}
+
+pub fn push_turn_end(state: &mut AppState, stop_reason: Option<String>, turn_id: Option<String>, turn_seq: Option<i64>) {
   let seq = next_seq(state);
   push_item(
     state,
@@ -114,8 +156,8 @@ pub fn push_turn_end(state: &mut AppState, stop_reason: Option<String>) {
       details: None,
       tool_call_id: None,
       job_id: None,
-      turn_id: None,
-      turn_seq: None,
+      turn_id,
+      turn_seq,
     },
   );
 }
