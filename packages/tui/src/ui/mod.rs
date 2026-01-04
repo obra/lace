@@ -21,7 +21,7 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
+use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 use ratatui::Terminal;
 use serde_json::Value;
 use std::io;
@@ -480,6 +480,15 @@ fn handle_agent_line(
                 }
             }
 
+            let out = maybe_open_config_wizard_for_prompt_error(
+                state,
+                pending_method.as_deref(),
+                error_message,
+            );
+            if !out.is_empty() {
+                send_outbound(transport, state, out, timeout_ms)?;
+            }
+
             reduce(state, AppEvent::RpcResponse { id: id.clone() });
 
             if matches!(
@@ -519,6 +528,37 @@ fn handle_agent_line(
     }
 
     Ok(())
+}
+
+fn maybe_open_config_wizard_for_prompt_error(
+    state: &mut AppState,
+    pending_method: Option<&str>,
+    error_message: Option<&str>,
+) -> Vec<Outbound> {
+    if pending_method != Some("session/prompt") {
+        return Vec::new();
+    }
+    let Some(err) = error_message else {
+        return Vec::new();
+    };
+    if !is_missing_provider_configuration_error(err) {
+        return Vec::new();
+    }
+    if state.connection_id.is_some() && state.model_id.is_some() {
+        return Vec::new();
+    }
+    if state.config_wizard.open {
+        return Vec::new();
+    }
+
+    state.push_activity_line("configure: required".to_string());
+    config_wizard::open(state)
+}
+
+fn is_missing_provider_configuration_error(message: &str) -> bool {
+    let m = message.to_lowercase();
+    m.contains("missing provider configuration")
+        || m.contains("connectionid and modelid are required")
 }
 
 fn extract_session_id(result: &Option<Value>) -> Option<String> {
@@ -639,21 +679,27 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
 
     if state.active_permission.is_some() {
         let area = centered_rect(80, 70, f.area());
+        f.render_widget(Clear, area);
         f.render_widget(render_permission_modal(state), area);
     } else if state.config_wizard.open {
         let area = centered_rect(80, 70, f.area());
+        f.render_widget(Clear, area);
         f.render_widget(render_config_modal(state), area);
     } else if state.sessions.open {
         let area = centered_rect(80, 70, f.area());
+        f.render_widget(Clear, area);
         f.render_widget(render_sessions_modal(state), area);
     } else if state.search.open {
         let area = centered_rect(80, 70, f.area());
+        f.render_widget(Clear, area);
         f.render_widget(render_search_modal(state), area);
     } else if state.palette_open {
         let area = centered_rect(70, 60, f.area());
+        f.render_widget(Clear, area);
         f.render_widget(render_palette_modal(state), area);
     } else if state.help_open {
         let area = centered_rect(70, 70, f.area());
+        f.render_widget(Clear, area);
         f.render_widget(render_help_modal(), area);
     }
 }
@@ -1345,6 +1391,8 @@ fn sh_quote(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
 
     #[test]
     fn vim_jk_remap_only_outside_input() {
@@ -1388,5 +1436,55 @@ mod tests {
             ),
             KeyCode::Char('j')
         );
+    }
+
+    #[test]
+    fn overlays_clear_their_rect_to_avoid_bleedthrough() {
+        let mut state = AppState::new_with_paths(None, None);
+        state.prefs.show_activity = false;
+        state.prefs.show_debug = false;
+        state.palette_open = true;
+        state.messages.push(crate::app::ChatMessage {
+            role: Role::Assistant,
+            text: "X".repeat(200),
+            streaming: false,
+            turn_id: None,
+            turn_seq: None,
+        });
+
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|f| draw(f, &state)).unwrap();
+
+        let overlay = centered_rect(70, 60, ratatui::layout::Rect::new(0, 0, 80, 24));
+        let x = overlay.x + 2;
+        let y = overlay.y + overlay.height.saturating_sub(3);
+        let cell = terminal.backend().buffer().cell((x, y)).unwrap();
+        assert_ne!(cell.symbol(), "X");
+    }
+
+    #[test]
+    fn auto_opens_config_wizard_when_prompt_requires_provider_config() {
+        let mut state = AppState::new_with_paths(None, None);
+        assert!(state.connection_id.is_none());
+        assert!(state.model_id.is_none());
+        assert!(!state.config_wizard.open);
+
+        let out = maybe_open_config_wizard_for_prompt_error(
+            &mut state,
+            Some("session/prompt"),
+            Some("Missing provider configuration: connectionId and modelId are required"),
+        );
+
+        assert!(state.config_wizard.open);
+        assert_eq!(
+            state.config_wizard.step,
+            config_wizard::ConfigWizardStep::LoadingConnections
+        );
+        assert_eq!(out.len(), 1);
+        match &out[0] {
+            Outbound::JsonRpcRequest { method, .. } => assert_eq!(method, "ent/connections/list"),
+            _ => panic!("expected request"),
+        }
     }
 }
