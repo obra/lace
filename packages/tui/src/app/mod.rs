@@ -50,6 +50,13 @@ pub struct PermissionRequest {
   pub options: Vec<PermissionOption>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PermissionAllowKey {
+  pub tool: String,
+  pub kind: String,
+  pub resource: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppState {
   pub session_id: Option<String>,
@@ -96,6 +103,8 @@ pub struct AppState {
   pub next_client_seq: u64,
 
   pub pending_requests: std::collections::HashMap<String, PendingRequest>,
+
+  pub permission_allowlist: std::collections::HashMap<PermissionAllowKey, String>,
 
   pub session_aliases: std::collections::HashMap<String, String>,
   pub aliases_path: Option<std::path::PathBuf>,
@@ -160,6 +169,8 @@ impl AppState {
       next_client_seq: 1,
 
       pending_requests: std::collections::HashMap::new(),
+
+      permission_allowlist: std::collections::HashMap::new(),
 
       session_aliases,
       aliases_path,

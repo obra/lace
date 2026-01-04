@@ -61,6 +61,7 @@ pub enum UiAction {
   PermissionPrev,
   PermissionNext,
   PermissionSubmit,
+  PermissionCancel,
 }
 
 pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> {
@@ -456,6 +457,23 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         return Vec::new();
       }
 
+      if should_remember_permission_decision(&decision) {
+        if let Some(key) = crate::app::reducer::permission_allow_key(&req) {
+          state.permission_allowlist.insert(key, decision.clone());
+        }
+      }
+
+      if let Some(tool_call_id) = req.tool_call_id.clone() {
+        crate::app::activity::attach_permission_details(
+          state,
+          tool_call_id,
+          req.tool.clone(),
+          req.kind.clone(),
+          req.resource.clone(),
+          Some(decision.clone()),
+        );
+      }
+
       match decide_permission(req, &decision) {
         Ok(out) => {
           state.activate_next_permission_if_needed();
@@ -467,7 +485,26 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         }
       }
     }
+    UiAction::PermissionCancel => {
+      let Some(req) = state.active_permission.clone() else {
+        return Vec::new();
+      };
+      let Some((idx, _)) = req
+        .options
+        .iter()
+        .enumerate()
+        .find(|(_, o)| o.option_id.to_lowercase().contains("deny")) else {
+        return Vec::new();
+      };
+      state.active_permission_selected = idx;
+      apply_ui_action(state, UiAction::PermissionSubmit)
+    }
   }
+}
+
+fn should_remember_permission_decision(decision: &str) -> bool {
+  let d = decision.to_lowercase();
+  d.contains("allow") && d.contains("session")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -687,6 +724,42 @@ mod tests {
         assert_eq!(id, &json!("a_1"));
         assert_eq!(result, &json!({"decision":"deny"}));
       }
+      _ => panic!("expected response"),
+    }
+  }
+
+  #[test]
+  fn permission_cancel_picks_deny_if_present() {
+    use crate::app::{PermissionOption, PermissionRequest};
+    use serde_json::json;
+
+    let mut state = AppState::new();
+    state.active_permission = Some(PermissionRequest {
+      id: json!("a_1"),
+      tool: Some("shell.exec".to_string()),
+      kind: Some("execute".to_string()),
+      resource: Some("echo hi".to_string()),
+      tool_call_id: Some("tool_1".to_string()),
+      turn_id: None,
+      turn_seq: None,
+      job_id: None,
+      options: vec![
+        PermissionOption {
+          option_id: "allow".to_string(),
+          label: "Allow".to_string(),
+        },
+        PermissionOption {
+          option_id: "deny".to_string(),
+          label: "Deny".to_string(),
+        },
+      ],
+    });
+    state.active_permission_selected = 0;
+
+    let out = apply_ui_action(&mut state, UiAction::PermissionCancel);
+    assert_eq!(out.len(), 1);
+    match &out[0] {
+      Outbound::JsonRpcResponse { result, .. } => assert_eq!(result, &json!({"decision":"deny"})),
       _ => panic!("expected response"),
     }
   }

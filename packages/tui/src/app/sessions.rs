@@ -32,6 +32,7 @@ pub struct SessionSnapshot {
   pub chat_scroll: u16,
   pub activity_scroll: u16,
   pub debug_scroll: u16,
+  pub permission_allowlist: std::collections::HashMap<crate::app::PermissionAllowKey, String>,
 }
 
 impl SessionsState {
@@ -194,6 +195,7 @@ pub fn prepare_for_session_switch(state: &mut AppState, target_session_id: Optio
         chat_scroll: state.chat_scroll,
         activity_scroll: state.activity_scroll,
         debug_scroll: state.debug_scroll,
+        permission_allowlist: state.permission_allowlist.clone(),
       },
     );
   }
@@ -205,6 +207,7 @@ pub fn prepare_for_session_switch(state: &mut AppState, target_session_id: Optio
   state.chat_scroll = 0;
   state.activity_scroll = 0;
   state.debug_scroll = 0;
+  state.permission_allowlist.clear();
 }
 
 pub fn on_session_activated(state: &mut AppState, session_id: &str) {
@@ -215,6 +218,7 @@ pub fn on_session_activated(state: &mut AppState, session_id: &str) {
     state.chat_scroll = snapshot.chat_scroll;
     state.activity_scroll = snapshot.activity_scroll;
     state.debug_scroll = snapshot.debug_scroll;
+    state.permission_allowlist = snapshot.permission_allowlist;
   }
   state.session_switch_target = None;
 }

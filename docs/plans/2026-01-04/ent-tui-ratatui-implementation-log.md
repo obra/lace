@@ -203,3 +203,16 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
 - Tests:
   - Unit tests in `packages/tui/src/app/search.rs`
   - UI test: `app::ui::tests::palette_search_opens_modal`
+
+### 2026-01-04 — Permission UX improvements
+
+- Permission modal now shows full request details:
+  - tool/kind/resource, `turnId`, `turnSeq`, `jobId`, `toolCallId`
+  - tool input pretty-printed JSON when available
+- Keyboard behavior:
+  - `Esc` denies if a deny option is present.
+- In-memory “allow for session”:
+  - If the chosen `optionId` looks like “allow for session”, it’s remembered in-memory (keyed by tool/kind/resource) and auto-applied for future matching permission requests in the same session.
+  - Allowlist is snapshotted/restored when switching sessions in the same run.
+- Tests:
+  - `cd packages/tui && cargo test` (see `permission_allowlist_auto_decides_when_matching` and `permission_cancel_picks_deny_if_present`)

@@ -80,16 +80,17 @@ fn run_loop(
           }
 
 	          if state.active_permission.is_some() {
-            let action = match key.code {
-              KeyCode::Up => Some(UiAction::PermissionPrev),
-              KeyCode::Down => Some(UiAction::PermissionNext),
-              KeyCode::Enter => Some(UiAction::PermissionSubmit),
-              _ => None,
-            };
-            if let Some(action) = action {
-              let out = apply_ui_action(state, action);
-              send_outbound(transport, state, out, timeout_ms)?;
-            }
+	            let action = match key.code {
+	              KeyCode::Up => Some(UiAction::PermissionPrev),
+	              KeyCode::Down => Some(UiAction::PermissionNext),
+	              KeyCode::Enter => Some(UiAction::PermissionSubmit),
+	              KeyCode::Esc => Some(UiAction::PermissionCancel),
+	              _ => None,
+	            };
+	            if let Some(action) = action {
+	              let out = apply_ui_action(state, action);
+	              send_outbound(transport, state, out, timeout_ms)?;
+	            }
 	            continue;
 	          }
 
@@ -365,8 +366,25 @@ fn handle_agent_line(
 	      if method == "session/request_permission" {
 	        let params = params.unwrap_or(Value::Null);
 	        let req = ent::decode_permission_request(id, &params);
-	        reduce(state, AppEvent::PermissionRequested(req));
-	        state.push_activity_line("permission: requested".to_string());
+
+	        if let Some(tool_call_id) = req.tool_call_id.clone() {
+	          activity::attach_permission_details(
+	            state,
+	            tool_call_id,
+	            req.tool.clone(),
+	            req.kind.clone(),
+	            req.resource.clone(),
+	            None,
+	          );
+	        }
+
+	        let out = reduce(state, AppEvent::PermissionRequested(req));
+	        if out.is_empty() {
+	          state.push_activity_line("permission: requested".to_string());
+	        } else {
+	          state.push_activity_line("permission: auto-decided".to_string());
+	          send_outbound(transport, state, out, timeout_ms)?;
+	        }
 	        return Ok(());
 	      }
 
@@ -904,10 +922,28 @@ fn render_permission_modal(state: &AppState) -> Paragraph<'static> {
     req.kind.clone().unwrap_or_else(|| "?".to_string()),
     req.resource.clone().unwrap_or_else(|| "?".to_string())
   )));
+  if let Some(turn_id) = &req.turn_id {
+    lines.push(Line::from(format!("turnId={turn_id}")));
+  }
+  if let Some(turn_seq) = req.turn_seq {
+    lines.push(Line::from(format!("turnSeq={turn_seq}")));
+  }
+  if let Some(job_id) = &req.job_id {
+    lines.push(Line::from(format!("jobId={job_id}")));
+  }
   if let Some(tool_call_id) = &req.tool_call_id {
     lines.push(Line::from(format!("toolCallId={tool_call_id}")));
     match state.tool_inputs_by_tool_call_id.get(tool_call_id) {
-      Some(input) => lines.push(Line::from(format!("input={}", input))),
+      Some(input) => {
+        lines.push(Line::from("input:"));
+        let pretty = serde_json::to_string_pretty(input).unwrap_or_else(|_| input.to_string());
+        for l in pretty.lines() {
+          lines.push(Line::from(Span::styled(
+            format!("  {l}"),
+            Style::default().fg(Color::DarkGray),
+          )));
+        }
+      }
       None => lines.push(Line::from("input=<unavailable>")),
     }
   }
@@ -920,7 +956,7 @@ fn render_permission_modal(state: &AppState) -> Paragraph<'static> {
   }
 
   lines.push(Line::from(""));
-  lines.push(Line::from("Use Up/Down and Enter"));
+  lines.push(Line::from("Use Up/Down, Enter; Esc denies if available"));
 
   Paragraph::new(Text::from(lines))
     .block(Block::default().title("Permission").borders(Borders::ALL))

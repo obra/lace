@@ -1,4 +1,4 @@
-use crate::app::{AppState, ChatMessage, PermissionRequest, Role};
+use crate::app::{AppState, ChatMessage, PermissionAllowKey, PermissionRequest, Role};
 use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,6 +64,12 @@ pub fn reduce(state: &mut AppState, event: AppEvent) -> Vec<Outbound> {
     AppEvent::JobStarted { .. } => Vec::new(),
     AppEvent::JobFinished { .. } => Vec::new(),
     AppEvent::PermissionRequested(req) => {
+      if let Some(decision) = auto_permission_decision(state, &req) {
+        if let Ok(out) = decide_permission(req.clone(), &decision) {
+          return out;
+        }
+      }
+
       state.permission_queue.push_back(req);
       Vec::new()
     }
@@ -80,6 +86,24 @@ pub fn reduce(state: &mut AppState, event: AppEvent) -> Vec<Outbound> {
       Vec::new()
     }
   }
+}
+
+fn auto_permission_decision(state: &AppState, req: &PermissionRequest) -> Option<String> {
+  let key = permission_allow_key(req)?;
+  let decision = state.permission_allowlist.get(&key)?;
+  if req.options.iter().any(|o| o.option_id == *decision) {
+    Some(decision.clone())
+  } else {
+    None
+  }
+}
+
+pub fn permission_allow_key(req: &PermissionRequest) -> Option<PermissionAllowKey> {
+  Some(PermissionAllowKey {
+    tool: req.tool.clone()?,
+    kind: req.kind.clone()?,
+    resource: req.resource.clone()?,
+  })
 }
 
 pub fn take_next_permission(state: &mut AppState) -> Option<PermissionRequest> {
@@ -298,5 +322,49 @@ mod tests {
     );
 
     assert!(!state.messages[0].streaming);
+  }
+
+  #[test]
+  fn permission_allowlist_auto_decides_when_matching() {
+    let mut state = AppState::new();
+    state.permission_allowlist.insert(
+      PermissionAllowKey {
+        tool: "shell.exec".to_string(),
+        kind: "execute".to_string(),
+        resource: "echo hi".to_string(),
+      },
+      "allow_session".to_string(),
+    );
+
+    let req = PermissionRequest {
+      id: json!("a_1"),
+      tool: Some("shell.exec".to_string()),
+      kind: Some("execute".to_string()),
+      resource: Some("echo hi".to_string()),
+      tool_call_id: Some("tool_1".to_string()),
+      turn_id: None,
+      turn_seq: None,
+      job_id: None,
+      options: vec![
+        PermissionOption {
+          option_id: "allow_session".to_string(),
+          label: "Allow for session".to_string(),
+        },
+        PermissionOption {
+          option_id: "deny".to_string(),
+          label: "Deny".to_string(),
+        },
+      ],
+    };
+
+    let out = reduce(&mut state, AppEvent::PermissionRequested(req));
+    assert_eq!(
+      out,
+      vec![Outbound::JsonRpcResponse {
+        id: json!("a_1"),
+        result: json!({"decision":"allow_session"}),
+      }]
+    );
+    assert!(state.permission_queue.is_empty());
   }
 }
