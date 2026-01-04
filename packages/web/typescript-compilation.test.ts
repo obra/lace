@@ -3,7 +3,8 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { execSync } from 'child_process';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
 
 const packageRoot = process.env.npm_package_json
   ? dirname(process.env.npm_package_json)
@@ -40,15 +41,35 @@ function execOrThrow(command: string): void {
 }
 
 describe.sequential('Web Package TypeScript Compilation', () => {
-  beforeAll(() => {
+  async function ensureTypegenOutputs(): Promise<void> {
     execOrThrow('npm run typegen');
+
+    const expectedTypeFiles = [
+      join(packageRoot, '.react-router/types/app/routes/+types/_index.ts'),
+      join(packageRoot, '.react-router/types/app/routes/+types/docs.ts'),
+      join(packageRoot, '.react-router/types/app/routes/+types/play.ts'),
+    ];
+
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      if (expectedTypeFiles.every((p) => existsSync(p))) return;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+
+    expect(expectedTypeFiles.filter((p) => !existsSync(p))).toEqual([]);
+  }
+
+  beforeAll(async () => {
+    await ensureTypegenOutputs();
   }, 130000);
 
-  it('should pass TypeScript type checking', () => {
-    expect(() => execOrThrow('npx tsc --noEmit')).not.toThrow();
+  it('should pass TypeScript type checking', async () => {
+    await ensureTypegenOutputs();
+    execOrThrow('npx tsc --noEmit');
   }, 130000);
 
-  it('should pass eslint linting', () => {
-    expect(() => execOrThrow('npx eslint --max-warnings 0')).not.toThrow();
+  it('should pass eslint linting', async () => {
+    await ensureTypegenOutputs();
+    execOrThrow('npx eslint --max-warnings 0');
   }, 130000);
 });
