@@ -12,6 +12,14 @@ vi.mock('server-only', () => ({}));
 
 type DurableEvent = { type: string; data: Record<string, unknown> };
 
+type TextBlock = { type: 'text'; text: string };
+
+function isTextBlock(block: unknown): block is TextBlock {
+  if (!block || typeof block !== 'object') return false;
+  const record = block as Record<string, unknown>;
+  return record.type === 'text' && typeof record.text === 'string';
+}
+
 async function waitForEvent(params: {
   getEvents: () => Promise<DurableEvent[]>;
   predicate: (e: DurableEvent) => boolean;
@@ -77,10 +85,10 @@ describe('Agent Message Endpoint (supervisor-backed)', () => {
     });
 
     const content = Array.isArray(promptEvent.data?.content)
-      ? (promptEvent.data.content as any[])
+      ? (promptEvent.data.content as unknown[])
       : [];
     const text = content
-      .filter((b) => b?.type === 'text' && typeof b.text === 'string')
+      .filter(isTextBlock)
       .map((b) => b.text)
       .join('\n');
 

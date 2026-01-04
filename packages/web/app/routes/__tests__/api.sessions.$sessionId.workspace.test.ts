@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the supervisor-backed workspace information API endpoint
 // ABOUTME: Workspace sessions always report local mode for now
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { loader } from '@lace/web/app/routes/api.sessions.$sessionId.workspace';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { createLoaderArgs } from '@lace/web/test-utils/route-test-helpers';
