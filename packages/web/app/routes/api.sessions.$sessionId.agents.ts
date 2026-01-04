@@ -145,7 +145,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const systemPrompt = await promptManager.generateSystemPrompt(persona);
     if (systemPrompt.trim()) {
       try {
-        await peer.request('ent/session/inject', {
+        peer.notify('ent/session/inject', {
           content: [{ type: 'text', text: systemPrompt }],
           priority: 'immediate',
         });
