@@ -44,6 +44,14 @@ function handleRequest(msg) {
         type: 'text_delta',
         text: ' world!',
       });
+      notify('session/update', {
+        sessionId,
+        streamSeq: 3,
+        turnId,
+        turnSeq: 3,
+        type: 'turn_end',
+        data: { stopReason: 'end_turn' },
+      });
       respond(id, {
         turnId,
         stopReason: 'end_turn',
@@ -69,4 +77,3 @@ rl.on('line', (line) => {
     handleRequest(msg);
   }
 });
-

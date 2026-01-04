@@ -165,33 +165,21 @@ async function main(): Promise<void> {
   const interactive = process.stdin.isTTY && process.stdout.isTTY;
   let shuttingDown = false;
 
-  const TEXT_STREAM_IDLE_MS = 250;
   let textStreamActive = false;
   let textStreamAtLineStart = true;
-  let textStreamIdleTimer: NodeJS.Timeout | null = null;
 
   const pendingPermissions: PendingPermission[] = [];
   let activePermission: PendingPermission | undefined;
 
   let pendingQuestionResolve: ((line: string) => void) | null = null;
 
-  const clearTextStreamIdleTimer = () => {
-    if (!textStreamIdleTimer) return;
-    clearTimeout(textStreamIdleTimer);
-    textStreamIdleTimer = null;
-  };
-
-  const scheduleTextStreamIdle = () => {
-    clearTextStreamIdleTimer();
-    textStreamIdleTimer = setTimeout(() => {
-      textStreamActive = false;
-      if (!textStreamAtLineStart) {
-        process.stdout.write('\n');
-        textStreamAtLineStart = true;
-      }
-      promptShown = false;
-      showPrompt();
-    }, TEXT_STREAM_IDLE_MS);
+  const endTextStream = () => {
+    if (!textStreamActive) return;
+    if (!textStreamAtLineStart) process.stdout.write('\n');
+    textStreamActive = false;
+    textStreamAtLineStart = true;
+    promptShown = false;
+    showPrompt();
   };
 
   const showPrompt = () => {
@@ -203,12 +191,10 @@ async function main(): Promise<void> {
   };
 
   const printBlock = (lines: string[]) => {
-    clearTextStreamIdleTimer();
     if (promptShown || (textStreamActive && !textStreamAtLineStart)) process.stdout.write('\n');
     promptShown = false;
     textStreamAtLineStart = true;
     for (const line of lines) process.stdout.write(`${line}\n`);
-    if (textStreamActive) scheduleTextStreamIdle();
     showPrompt();
   };
 
@@ -290,13 +276,11 @@ async function main(): Promise<void> {
     if (p.type === 'job_update') captureToolUse((p as any).update);
 
     const writeTextDelta = (text: string) => {
-      clearTextStreamIdleTimer();
       if (promptShown) process.stdout.write('\n');
       promptShown = false;
       textStreamActive = true;
       process.stdout.write(text);
       textStreamAtLineStart = text.endsWith('\n');
-      scheduleTextStreamIdle();
     };
 
     if (p.type === 'text_delta' && typeof (p as any).text === 'string') {
@@ -310,6 +294,15 @@ async function main(): Promise<void> {
         writeTextDelta(inner.text);
         return undefined;
       }
+      if (inner?.type === 'turn_end') {
+        endTextStream();
+        return undefined;
+      }
+    }
+
+    if (p.type === 'turn_end') {
+      endTextStream();
+      return undefined;
     }
 
     const summary = (() => {
@@ -579,15 +572,18 @@ async function main(): Promise<void> {
       'session/prompt'
     );
 
-    void promise.catch((err) => {
-      if (shuttingDown) return;
-      const d = describeError(err);
-      if (d.message === 'Closed') return;
-      printLine(`error: ${d.message}`);
-      if (d.isMissingProviderConfig) {
-        printLine('Hint: run :configure');
-      }
-    });
+    void promise
+      .then(() => endTextStream())
+      .catch((err) => {
+        if (shuttingDown) return;
+        endTextStream();
+        const d = describeError(err);
+        if (d.message === 'Closed') return;
+        printLine(`error: ${d.message}`);
+        if (d.isMissingProviderConfig) {
+          printLine('Hint: run :configure');
+        }
+      });
   };
 
   const handleReplLine = async (line: string) => {

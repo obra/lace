@@ -52,6 +52,14 @@ function handleRequest(msg) {
       type: 'text_delta',
       text: 'ok',
     });
+    notify('session/update', {
+      sessionId: 'sess_test',
+      streamSeq: 2,
+      turnId: 'turn_test',
+      turnSeq: 2,
+      type: 'turn_end',
+      data: { stopReason: 'end_turn' },
+    });
     respond(id, {
       turnId: 'turn_test',
       stopReason: 'end_turn',
@@ -128,4 +136,3 @@ rl.on('line', (line) => {
   }
   if (msg && msg.method && msg.id !== undefined) handleRequest(msg);
 });
-

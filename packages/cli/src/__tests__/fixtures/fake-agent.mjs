@@ -124,6 +124,15 @@ function handleResponse(msg) {
     text: 'ok',
   });
 
+  notify('session/update', {
+    sessionId: pendingPermission.sessionId,
+    streamSeq: 3,
+    turnId: pendingPermission.turnId,
+    turnSeq: 3,
+    type: 'turn_end',
+    data: { stopReason: 'end_turn' },
+  });
+
   respond(pendingPermission.promptRequestId, {
     turnId: pendingPermission.turnId,
     stopReason: 'end_turn',
@@ -150,4 +159,3 @@ rl.on('line', (line) => {
     handleResponse(msg);
   }
 });
-
