@@ -143,7 +143,7 @@ describe('Agent sendMessage Queue Option', () => {
     });
 
     it('should queue message with metadata', async () => {
-      const metadata = { priority: 'high' as const, taskId: 'task-123' };
+      const metadata = { priority: 'high' as const, source: 'user_input' as const };
 
       await agent.sendMessage('urgent message', {
         queue: true,

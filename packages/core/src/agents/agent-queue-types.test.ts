@@ -34,36 +34,26 @@ describe('QueuedMessage', () => {
       timestamp: new Date(),
     };
 
-    const taskMessage: QueuedMessage = {
-      id: '3',
-      type: 'task_notification',
-      content: 'task message',
-      timestamp: new Date(),
-    };
-
     expect(userMessage.type).toBe('user');
     expect(systemMessage.type).toBe('system');
-    expect(taskMessage.type).toBe('task_notification');
   });
 
   it('should support optional metadata', () => {
     const messageWithMetadata: QueuedMessage = {
       id: 'test-id',
-      type: 'task_notification',
-      content: 'task assigned',
+      type: 'system',
+      content: 'system notification',
       timestamp: new Date(),
       metadata: {
-        taskId: 'task-123',
         fromAgent: 'agent-456',
         priority: 'high',
-        source: 'task_system',
+        source: 'agent_message',
       },
     };
 
-    expect(messageWithMetadata.metadata?.taskId).toBe('task-123');
     expect(messageWithMetadata.metadata?.fromAgent).toBe('agent-456');
     expect(messageWithMetadata.metadata?.priority).toBe('high');
-    expect(messageWithMetadata.metadata?.source).toBe('task_system');
+    expect(messageWithMetadata.metadata?.source).toBe('agent_message');
   });
 
   it('should work without metadata', () => {

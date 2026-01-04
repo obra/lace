@@ -105,18 +105,17 @@ describe('Agent getQueueContents', () => {
   it('should preserve all message metadata', () => {
     const metadata = {
       priority: 'high' as const,
-      taskId: 'task-123',
       fromAgent: 'coordinator',
-      source: 'task_system' as const,
+      source: 'agent_message' as const,
     };
 
-    agent.queueMessage('high priority message', 'task_notification', metadata);
+    agent.queueMessage('high priority message', 'system', metadata);
 
     const contents = agent.getQueueContents();
 
     expect(contents).toHaveLength(1);
     expect(contents[0].content).toBe('high priority message');
-    expect(contents[0].type).toBe('task_notification');
+    expect(contents[0].type).toBe('system');
     expect(contents[0].metadata).toEqual(metadata);
     expect(contents[0].id).toBeTruthy();
     expect(contents[0].timestamp).toBeInstanceOf(Date);

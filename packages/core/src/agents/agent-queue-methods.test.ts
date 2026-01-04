@@ -60,18 +60,17 @@ describe('Agent Queue Methods', () => {
     });
 
     it('should queue message with specified type', () => {
-      const messageId = agent.queueMessage('task message', 'task_notification');
+      const messageId = agent.queueMessage('system message', 'system');
 
       expect(messageId).toBeTruthy();
     });
 
     it('should queue message with metadata', () => {
       const metadata = {
-        taskId: 'task-123',
         priority: 'high' as const,
       };
 
-      const messageId = agent.queueMessage('urgent task', 'task_notification', metadata);
+      const messageId = agent.queueMessage('urgent message', 'user', metadata);
 
       expect(messageId).toBeTruthy();
     });
@@ -122,7 +121,7 @@ describe('Agent Queue Methods', () => {
     beforeEach(() => {
       agent.queueMessage('message 1');
       agent.queueMessage('message 2', 'system');
-      agent.queueMessage('message 3', 'task_notification');
+      agent.queueMessage('message 3', 'system');
     });
 
     it('should clear all messages when no filter provided', () => {

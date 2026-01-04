@@ -125,8 +125,8 @@ describe('Agent Queue End-to-End Scenarios', () => {
     });
   });
 
-  describe('Scenario 2: Task notifications during busy periods', () => {
-    it('should queue task notifications while agent is processing', async () => {
+  describe('Scenario 2: System notifications during busy periods', () => {
+    it('should queue system notifications while agent is processing', async () => {
       const queuedEvents: { id: string; queueLength: number }[] = [];
       agent.on('message_queued', (data) => queuedEvents.push(data));
 
@@ -138,23 +138,23 @@ describe('Agent Queue End-to-End Scenarios', () => {
 
       // Verify we can successfully queue messages while agent is busy
 
-      // Send task notifications
-      await agent.sendMessage('Task assignment notification', {
+      // Send system notifications
+      await agent.sendMessage('System notification', {
         queue: true,
-        metadata: { source: 'task_system', taskId: 'task-1' },
+        metadata: { source: 'agent_message' },
       });
 
-      await agent.sendMessage('Task completion notification', {
+      await agent.sendMessage('System notification (2)', {
         queue: true,
-        metadata: { source: 'task_system', taskId: 'task-2' },
+        metadata: { source: 'agent_message' },
       });
 
-      // Verify task notifications were queued
+      // Verify system notifications were queued
       expect(queuedEvents).toHaveLength(2);
       expect(queuedEvents[0].queueLength).toBe(1);
       expect(queuedEvents[1].queueLength).toBe(2);
 
-      // Verify queue has task notifications
+      // Verify queue has queued messages
       const stats = agent.getQueueStats();
       expect(stats.queueLength).toBe(2);
 

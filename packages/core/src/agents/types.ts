@@ -3,14 +3,13 @@
 
 export interface QueuedMessage {
   id: string;
-  type: 'user' | 'system' | 'task_notification';
+  type: 'user' | 'system';
   content: string;
   timestamp: Date;
   metadata?: {
-    taskId?: string;
     fromAgent?: string;
     priority?: 'normal' | 'high';
-    source?: 'task_system' | 'user_input' | 'agent_message';
+    source?: 'user_input' | 'agent_message';
   };
 }
 
