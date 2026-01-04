@@ -8,6 +8,7 @@ use std::thread;
 pub struct AgentTransport {
     pub child: Child,
     inbound_rx: mpsc::Receiver<String>,
+    stderr_rx: mpsc::Receiver<String>,
     outbound_tx: mpsc::Sender<String>,
 }
 
@@ -36,6 +37,7 @@ impl AgentTransport {
             .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "failed to take child stdin"))?;
 
         let (inbound_tx, inbound_rx) = mpsc::channel::<String>();
+        let (stderr_tx, stderr_rx) = mpsc::channel::<String>();
         let (outbound_tx, outbound_rx) = mpsc::channel::<String>();
 
         thread::spawn(move || {
@@ -69,8 +71,15 @@ impl AgentTransport {
                 match reader.read_line(&mut line) {
                     Ok(0) => break,
                     Ok(_) => {
-                        let _ = io::stderr().write_all(line.as_bytes());
-                        let _ = io::stderr().flush();
+                        while line.ends_with('\n') || line.ends_with('\r') {
+                            line.pop();
+                            if line.ends_with('\r') {
+                                line.pop();
+                            }
+                        }
+                        if stderr_tx.send(line.clone()).is_err() {
+                            break;
+                        }
                     }
                     Err(_) => break,
                 }
@@ -94,6 +103,7 @@ impl AgentTransport {
         Ok(Self {
             child,
             inbound_rx,
+            stderr_rx,
             outbound_tx,
         })
     }
@@ -109,6 +119,14 @@ impl AgentTransport {
     pub fn recv_line(&self) -> Result<String, mpsc::RecvError> {
         self.inbound_rx.recv()
     }
+
+    pub fn try_recv_stderr_line(&self) -> Result<String, mpsc::TryRecvError> {
+        self.stderr_rx.try_recv()
+    }
+
+    pub fn recv_stderr_line(&self) -> Result<String, mpsc::RecvError> {
+        self.stderr_rx.recv()
+    }
 }
 
 #[cfg(test)]
@@ -123,5 +141,17 @@ mod tests {
         transport.send_line("hello".to_string()).unwrap();
         let line = transport.recv_line().unwrap();
         assert_eq!(line, "hello");
+    }
+
+    #[test]
+    fn captures_child_stderr_lines() {
+        let dir = std::env::current_dir().unwrap();
+        let transport = AgentTransport::spawn_shell("echo err 1>&2; echo out", &dir).unwrap();
+
+        let out = transport.recv_line().unwrap();
+        assert_eq!(out, "out");
+
+        let err = transport.recv_stderr_line().unwrap();
+        assert_eq!(err, "err");
     }
 }

@@ -97,6 +97,9 @@ fn run_loop(
         while let Ok(line) = transport.try_recv_line() {
             handle_agent_line(transport, state, &line, timeout_ms)?;
         }
+        while let Ok(line) = transport.try_recv_stderr_line() {
+            state.push_debug_line(format!("agent stderr: {line}"));
+        }
         state.activate_next_permission_if_needed();
 
         terminal.draw(|f| draw(f, state))?;
