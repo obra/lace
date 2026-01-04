@@ -118,7 +118,7 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
 ### 2026-01-04 — Command palette + help
 
 - Added:
-  - Command palette (`Ctrl+K`) with a small set of actions (toggle panes, focus input, quit)
+  - Command palette (`Ctrl+K`) with a small set of actions (toggle panes, focus input, new session, quit)
   - Help overlay (`?` or `F1`)
 - Tests:
   - `cd packages/tui && cargo test` (see `app::ui::tests::palette_filters_and_submits`)

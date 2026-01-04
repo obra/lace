@@ -197,7 +197,20 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         return Vec::new();
       }
       let idx = state.palette_selected.min(items.len() - 1);
+      let mut out: Vec<Outbound> = Vec::new();
       match items[idx].command {
+        PaletteCommand::NewSession => {
+          let id = state.next_client_id();
+          state.session_id = None;
+          state.messages.clear();
+          state.activity.clear();
+          state.debug_lines.clear();
+          out.push(Outbound::JsonRpcRequest {
+            id,
+            method: "session/new".to_string(),
+            params: Some(json!({ "workDir": state.workdir.clone() })),
+          });
+        }
         PaletteCommand::ToggleChat => {
           state.show_chat = !state.show_chat;
           state.ensure_focus_visible();
@@ -218,7 +231,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         }
       }
       state.palette_open = false;
-      Vec::new()
+      out
     }
     UiAction::PermissionPrev => {
       if let Some(req) = &state.active_permission {
@@ -271,6 +284,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PaletteCommand {
+  NewSession,
   ToggleChat,
   ToggleActivity,
   ToggleDebug,
@@ -286,6 +300,10 @@ struct PaletteItem {
 
 fn palette_items(query: &str) -> Vec<PaletteItem> {
   let all = [
+    PaletteItem {
+      label: "New Session",
+      command: PaletteCommand::NewSession,
+    },
     PaletteItem {
       label: "Toggle Chat Pane",
       command: PaletteCommand::ToggleChat,
@@ -445,5 +463,28 @@ mod tests {
     apply_ui_action(&mut state, UiAction::PaletteChar('q'));
     apply_ui_action(&mut state, UiAction::PaletteSubmit);
     assert!(state.should_exit);
+  }
+
+  #[test]
+  fn palette_new_session_emits_request() {
+    let mut state = AppState::new();
+    state.workdir = "/tmp".to_string();
+    state.next_client_seq = 10;
+
+    apply_ui_action(&mut state, UiAction::OpenPalette);
+    apply_ui_action(&mut state, UiAction::PaletteChar('n'));
+    apply_ui_action(&mut state, UiAction::PaletteChar('e'));
+    apply_ui_action(&mut state, UiAction::PaletteChar('w'));
+    let out = apply_ui_action(&mut state, UiAction::PaletteSubmit);
+
+    assert_eq!(out.len(), 1);
+    match &out[0] {
+      Outbound::JsonRpcRequest { id, method, params } => {
+        assert_eq!(id, "c_10");
+        assert_eq!(method, "session/new");
+        assert!(params.is_some());
+      }
+      _ => panic!("expected request"),
+    }
   }
 }

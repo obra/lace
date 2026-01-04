@@ -245,7 +245,7 @@ fn handle_agent_line(transport: &AgentTransport, state: &mut AppState, line: &st
 
       let _ = transport.send_line(jsonrpc::encode_response_result(id, Value::Null));
     }
-    jsonrpc::InboundMessage::Response { id, result: _, error } => {
+    jsonrpc::InboundMessage::Response { id, result, error } => {
       if let Some(err) = error {
         state.push_activity_line(format!("error: {}", err.message));
       }
@@ -254,11 +254,21 @@ fn handle_agent_line(transport: &AgentTransport, state: &mut AppState, line: &st
         .map(|s| state.active_prompt_request_ids.contains(s))
         .unwrap_or(false);
       reduce(state, AppEvent::RpcResponse { id });
+      if let Some(session_id) = extract_session_id(&result) {
+        state.session_id = Some(session_id.clone());
+        state.push_activity_line(format!("new session {session_id}"));
+      }
       if should_refocus && state.active_permission.is_none() {
         state.focus = Focus::Input;
       }
     }
   }
+}
+
+fn extract_session_id(result: &Option<Value>) -> Option<String> {
+  let Some(result) = result else { return None };
+  let obj = result.as_object()?;
+  obj.get("sessionId")?.as_str().map(|s| s.to_string())
 }
 
 fn handle_session_update(state: &mut AppState, params: &Value) {
