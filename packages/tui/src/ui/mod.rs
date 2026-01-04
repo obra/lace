@@ -41,6 +41,14 @@ pub fn run_tui(args: Args) -> io::Result<()> {
   state.next_client_seq = 3;
   state.push_activity_line(format!("timeout-ms={}", args.timeout_ms));
 
+  // Best-effort: populate conn/model in the status bar when supported by the agent.
+  let status_req = vec![Outbound::JsonRpcRequest {
+    id: state.next_client_id(),
+    method: "ent/agent/status".to_string(),
+    params: Some(serde_json::json!({})),
+  }];
+  send_outbound(&transport, &mut state, status_req, args.timeout_ms)?;
+
   let mut terminal = TerminalGuard::init()?;
   let res = run_loop(&mut terminal.terminal, &transport, &mut state, args.timeout_ms);
   terminal.restore()?;
@@ -289,19 +297,27 @@ fn handle_agent_line(
 	      let _ = transport.send_line(jsonrpc::encode_response_result(id, Value::Null));
 	    }
 	    jsonrpc::InboundMessage::Response { id, result, error } => {
-	      let error_message = error.as_ref().map(|e| e.message.as_str());
-	      if let Some(err) = error.as_ref() {
-	        activity::push_rpc_error(
-	          state,
-	          err.message.clone(),
-	          Some(serde_json::to_value(err.clone()).unwrap_or(Value::Null)),
-	        );
-	      }
 	      let mut should_refocus = false;
 	      let mut pending_method: Option<String> = None;
 	      if let Some(id_str) = id.as_str() {
 	        should_refocus = state.active_prompt_request_ids.contains(id_str);
 	        pending_method = state.take_pending_request(id_str).map(|p| p.method);
+	      }
+
+	      let error_message = error.as_ref().map(|e| e.message.as_str());
+	      let suppress_method_not_found = matches!(pending_method.as_deref(), Some("ent/agent/status"))
+	        && error_message
+	          .unwrap_or("")
+	          .to_lowercase()
+	          .contains("method not found");
+	      if let Some(err) = error.as_ref() {
+	        if !suppress_method_not_found {
+	          activity::push_rpc_error(
+	            state,
+	            err.message.clone(),
+	            Some(serde_json::to_value(err.clone()).unwrap_or(Value::Null)),
+	          );
+	        }
 	      }
 
 	      reduce(state, AppEvent::RpcResponse { id: id.clone() });
@@ -314,6 +330,15 @@ fn handle_agent_line(
 	      }
 
 	      if let Some(method) = pending_method.as_deref() {
+	        if method == "ent/agent/status" {
+	          let (conn, model) = ent::extract_agent_status_config(&result);
+	          if conn.is_some() {
+	            state.connection_id = conn;
+	          }
+	          if model.is_some() {
+	            state.model_id = model;
+	          }
+	        }
 	        if state.config_wizard.open && method.starts_with("ent/") {
 	          let out = config_wizard::handle_response(state, method, &result, error_message);
 	          send_outbound(transport, state, out, timeout_ms)?;

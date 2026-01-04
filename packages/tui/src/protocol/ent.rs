@@ -148,6 +148,22 @@ pub fn decode_permission_request(id: Value, params: &Value) -> PermissionRequest
   }
 }
 
+pub fn extract_agent_status_config(result: &Option<Value>) -> (Option<String>, Option<String>) {
+  let Some(Value::Object(obj)) = result else { return (None, None) };
+  let Some(Value::Object(current)) = obj.get("currentSession") else { return (None, None) };
+
+  let connection_id = current
+    .get("connectionId")
+    .and_then(|v| v.as_str())
+    .map(|s| s.to_string());
+  let model_id = current
+    .get("modelId")
+    .and_then(|v| v.as_str())
+    .map(|s| s.to_string());
+
+  (connection_id, model_id)
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -234,5 +250,18 @@ mod tests {
     assert_eq!(req.tool.as_deref(), Some("shell.exec"));
     assert_eq!(req.options.len(), 2);
     assert_eq!(req.options[0].option_id, "allow");
+  }
+
+  #[test]
+  fn extracts_agent_status_config() {
+    let (conn, model) = extract_agent_status_config(&Some(json!({
+      "currentSession": { "connectionId":"openai-openai", "modelId":"gpt-4.1" }
+    })));
+    assert_eq!(conn.as_deref(), Some("openai-openai"));
+    assert_eq!(model.as_deref(), Some("gpt-4.1"));
+
+    let (conn, model) = extract_agent_status_config(&Some(json!({})));
+    assert!(conn.is_none());
+    assert!(model.is_none());
   }
 }

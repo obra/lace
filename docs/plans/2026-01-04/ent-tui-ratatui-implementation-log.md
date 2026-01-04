@@ -167,3 +167,10 @@ Jesse: this is a running log of what was done, why, and how it was tested. Keep 
 - Tests:
   - Unit tests in `packages/tui/src/app/config_wizard.rs`
   - Scenario e2e: `packages/tui/tests/e2e_configure_wizard.rs` (drives `fake-agent-configure.mjs`)
+
+### 2026-01-04 — Status bar config from ent/agent/status (best-effort)
+
+- On startup, the TUI now sends `ent/agent/status` (if supported) and updates the status bar `conn=` / `model=` fields from `currentSession`.
+- For non-Lace agents that don’t implement this method, the “method not found” error is suppressed for this specific request.
+- Tests:
+  - `cd packages/tui && cargo test` (see `protocol::ent::tests::extracts_agent_status_config`)
