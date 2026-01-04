@@ -15,6 +15,7 @@ import {
   createNdjsonStdioTransport,
   AcpErrorCodes,
   EntErrorCodes,
+  McpServerConfigSchema,
   isSessionId,
   JsonRpcPeer,
 } from '@lace/ent-protocol';
@@ -59,12 +60,15 @@ import type { Tool as CoreTool } from '@lace/core/tools/tool';
 import type {
   ToolCall as CoreToolCall,
   ToolResult as CoreToolResult,
+  ToolPolicy,
 } from '@lace/core/tools/types';
 import type { LaceEvent } from '@lace/core/threads/types';
 import { SummarizeCompactionStrategy } from '@lace/core/threads/compaction/summarize-strategy';
 import { TrimToolResultsStrategy } from '@lace/core/threads/compaction/trim-tool-results-strategy';
 import type { CompactionStrategy } from '@lace/core/threads/compaction/types';
 import { TestAgentProvider } from './runtime/test-provider';
+import { MCPServerManager } from '@lace/core/mcp/server-manager';
+import type { MCPServerConfig } from '@lace/core/config/mcp-types';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
 const JOB_LOG_DIR = 'jobs';
@@ -328,12 +332,19 @@ async function createProviderForTurn(options: {
   return await registry.createProviderFromInstanceAndModel(connectionId, modelId);
 }
 
-function createToolExecutorForMode(executionMode: 'plan' | 'execute'): {
+function createToolExecutorForMode(
+  executionMode: 'plan' | 'execute',
+  mcpServerManager?: MCPServerManager
+): {
   executor: ToolExecutor;
   toolsForProvider: CoreTool[];
 } {
   const executor = new ToolExecutor();
   executor.registerAllAvailableTools();
+
+  if (mcpServerManager) {
+    executor.registerMCPTools(mcpServerManager);
+  }
 
   const allTools = executor.getAllTools();
   const toolsForProvider =
@@ -345,6 +356,96 @@ function createToolExecutorForMode(executionMode: 'plan' | 'execute'): {
       : allTools;
 
   return { executor, toolsForProvider };
+}
+
+function arraysShallowEqual(a?: string[], b?: string[]): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function recordsShallowEqual(a?: Record<string, string>, b?: Record<string, string>): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
+}
+
+function mcpServerConfigEquivalent(a: MCPServerConfig, b: MCPServerConfig): boolean {
+  return (
+    a.command === b.command &&
+    arraysShallowEqual(a.args, b.args) &&
+    recordsShallowEqual(a.env, b.env) &&
+    a.enabled === b.enabled &&
+    recordsShallowEqual(a.tools as Record<string, string>, b.tools as Record<string, string>)
+  );
+}
+
+async function reconcileMcpServersForActiveSession(state: AgentServerState): Promise<void> {
+  if (!state.activeSession) return;
+
+  const configured = state.activeSession.state.config?.mcpServers;
+  const parsed = Array.isArray(configured)
+    ? McpServerConfigSchema.array().safeParse(configured)
+    : { success: true as const, data: [] as Array<any> };
+
+  if (!parsed.success) {
+    console.warn('Invalid mcpServers config in session state; leaving servers unchanged', {
+      error: parsed.error,
+    });
+    return;
+  }
+
+  const mcpServers = parsed.data;
+  const desired = new Map<string, MCPServerConfig>();
+
+  for (const server of mcpServers) {
+    const enabled = typeof server.enabled === 'boolean' ? server.enabled : true;
+    const tools: Record<string, ToolPolicy> =
+      server.tools && typeof server.tools === 'object' ? server.tools : {};
+
+    desired.set(server.name, {
+      command: server.command,
+      ...(Array.isArray(server.args) ? { args: server.args } : {}),
+      ...(server.env && typeof server.env === 'object' ? { env: server.env } : {}),
+      enabled,
+      tools,
+    });
+  }
+
+  for (const existing of state.mcpServerManager.getAllServers()) {
+    if (!desired.has(existing.id)) {
+      await state.mcpServerManager.stopServer(existing.id);
+    }
+  }
+
+  for (const [serverId, config] of desired) {
+    const existing = state.mcpServerManager.getServer(serverId);
+    const needsRestart = existing ? !mcpServerConfigEquivalent(existing.config, config) : false;
+
+    if (needsRestart) {
+      await state.mcpServerManager.stopServer(serverId);
+    }
+
+    if (!config.enabled) {
+      await state.mcpServerManager.stopServer(serverId);
+      continue;
+    }
+
+    await state.mcpServerManager.startServer(serverId, {
+      ...config,
+      cwd: state.activeSession.meta.workDir,
+    });
+  }
 }
 
 function buildProviderMessagesFromDurableEvents(sessionDir: string): ProviderMessage[] {
@@ -695,6 +796,7 @@ export type AgentServerState = {
   providerCatalog: ProviderCatalogManager;
   providerCatalogLoaded: boolean;
   providerInstances: ProviderInstanceManager;
+  mcpServerManager: MCPServerManager;
   jobs: Map<string, JobState>;
   sessionMutex: Promise<void>;
   jobStreaming: 'full' | 'coalesced' | 'none';
@@ -709,6 +811,7 @@ export function createAgentServerState(): AgentServerState {
     providerCatalog: new ProviderCatalogManager(),
     providerCatalogLoaded: false,
     providerInstances: new ProviderInstanceManager(),
+    mcpServerManager: new MCPServerManager(),
     jobs: new Map(),
     sessionMutex: Promise.resolve(),
     jobStreaming: 'full',
@@ -1317,7 +1420,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       state.jobStreaming = jobStreaming;
     }
 
-    const { toolsForProvider } = createToolExecutorForMode('execute');
+    const { toolsForProvider } = createToolExecutorForMode('execute', state.mcpServerManager);
     const toolInfos: ToolInfo[] = [];
     const seenToolNames = new Set<string>();
     for (const tool of toolsForProvider) {
@@ -1380,9 +1483,27 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       }
     }
 
+    const mcpServers = state.mcpServerManager.getAllServers().map((server) => {
+      const status =
+        server.status === 'running'
+          ? 'connected'
+          : server.status === 'starting'
+            ? 'connecting'
+            : server.status === 'failed'
+              ? 'error'
+              : 'disconnected';
+
+      return {
+        name: server.id,
+        status,
+        ...(server.lastError ? { error: server.lastError } : {}),
+        ...(server.connectedAt ? { lastConnected: server.connectedAt.toISOString() } : {}),
+      };
+    });
+
     return {
       models: [],
-      mcpServers: [],
+      mcpServers,
       currentSession: state.activeSession
         ? {
             sessionId: state.activeSession.meta.sessionId,
@@ -1954,6 +2075,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     ensureSessionFiles(sessionDir);
 
     state.activeSession = loadSession(sessionId);
+    await reconcileMcpServersForActiveSession(state);
 
     return { sessionId, created };
   });
@@ -1991,6 +2113,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       throw error;
     }
     state.activeSession = loaded;
+    await reconcileMcpServersForActiveSession(state);
     const summary = summarizeDurableEvents(loaded.dir);
     return {
       sessionId: parsed.sessionId,
@@ -2009,6 +2132,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       modelId: string;
       maxThinkingTokens: number;
       maxBudgetUsd: number;
+      mcpServers: unknown;
       approvalMode:
         | 'ask'
         | 'approveReads'
@@ -2067,11 +2191,53 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       applied.push('approvalMode');
     }
 
+    if (parsed.mcpServers !== undefined) {
+      const mcpParsed = McpServerConfigSchema.array().safeParse(parsed.mcpServers);
+      if (!mcpParsed.success) {
+        throwInvalidParams('mcpServers is invalid');
+      }
+
+      for (const server of mcpParsed.data) {
+        if (server.transport && server.transport !== 'stdio') {
+          throwInvalidParams(`Unsupported MCP transport for ${server.name}: ${server.transport}`);
+        }
+      }
+
+      const existing = Array.isArray((currentConfig as any).mcpServers)
+        ? McpServerConfigSchema.array().safeParse((currentConfig as any).mcpServers)
+        : { success: true as const, data: [] as Array<any> };
+      const existingServers = existing.success ? existing.data : [];
+
+      const incomingByName = new Map(mcpParsed.data.map((s) => [s.name, s]));
+      const merged: any[] = [];
+      const seen = new Set<string>();
+
+      for (const oldServer of existingServers) {
+        const incoming = incomingByName.get(oldServer.name);
+        if (incoming) {
+          merged.push({ ...oldServer, ...incoming });
+          seen.add(oldServer.name);
+        } else {
+          merged.push(oldServer);
+          seen.add(oldServer.name);
+        }
+      }
+
+      for (const server of mcpParsed.data) {
+        if (seen.has(server.name)) continue;
+        merged.push(server);
+      }
+
+      (nextConfig as any).mcpServers = merged;
+      applied.push('mcpServers');
+    }
+
     const nextState = { ...currentState, config: nextConfig };
     writeSessionState(state.activeSession.dir, nextState);
     state.activeSession = loadSession(state.activeSession.meta.sessionId);
 
     const effectiveAfter = { ...state.config, ...(state.activeSession.state.config || {}) };
+    await reconcileMcpServersForActiveSession(state);
 
     return {
       applied,
@@ -2455,7 +2621,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           : 10;
 
       const { executor: toolExecutor, toolsForProvider } = createToolExecutorForMode(
-        effectiveConfig.executionMode
+        effectiveConfig.executionMode,
+        state.mcpServerManager
       );
 
       const provider = await createProviderForTurn({
@@ -2994,7 +3161,10 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           },
         });
       } else {
-        const { executor: toolExecutor } = createToolExecutorForMode('execute');
+        const { executor: toolExecutor } = createToolExecutorForMode(
+          'execute',
+          state.mcpServerManager
+        );
         let finalInput = toolInput;
 
         if (requiresPermission) {

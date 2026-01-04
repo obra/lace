@@ -6,11 +6,15 @@ const transport = createNdjsonStdioTransport({ readable: process.stdin, writable
 const peer = new JsonRpcPeer(transport, { idPrefix: 'a_' });
 registerAgentRpcMethods(peer, state);
 
-const shutdown = () => {
+let shuttingDown = false;
+const shutdown = async () => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   peer.close();
+  await state.mcpServerManager.shutdown();
   process.exit(0);
 };
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
-process.stdin.on('end', shutdown);
+process.on('SIGINT', () => void shutdown());
+process.on('SIGTERM', () => void shutdown());
+process.stdin.on('end', () => void shutdown());

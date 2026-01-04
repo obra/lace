@@ -26,6 +26,15 @@ export type SessionState = {
     modelId?: string;
     maxBudgetUsd?: number;
     maxThinkingTokens?: number;
+    mcpServers?: Array<{
+      name: string;
+      command: string;
+      args?: string[];
+      env?: Record<string, string>;
+      transport?: 'stdio' | 'sse' | 'http';
+      enabled?: boolean;
+      tools?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
+    }>;
   };
   pendingPermissions?: Array<{
     toolCallId: string;
