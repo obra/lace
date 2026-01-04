@@ -24,6 +24,23 @@ describe('createNdjsonStdioTransport', () => {
     expect(received[1]).toMatchObject({ jsonrpc: '2.0', id: 1, method: 'initialize' });
   });
 
+  it('ignores non-JSON lines and messages missing jsonrpc: \"2.0\"', () => {
+    const readable = new PassThrough();
+    const writable = new PassThrough();
+
+    const transport = createNdjsonStdioTransport({ readable, writable });
+
+    const received: unknown[] = [];
+    transport.onMessage((msg) => received.push(msg));
+
+    readable.write('not json\n');
+    readable.write('{"id":1,"method":"initialize","params":{}}\n');
+    readable.write('{"jsonrpc":"2.0","method":"session/update","params":{"ok":true}}\n');
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({ jsonrpc: '2.0', method: 'session/update' });
+  });
+
   it('writes JSON-RPC messages as single-line NDJSON', async () => {
     const readable = new PassThrough();
     const writable = new PassThrough();
