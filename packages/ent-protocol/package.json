@@ -13,6 +13,9 @@
     "build": "tsc && tsc-alias -p tsconfig.json -f -fe .js",
     "build:clean": "rm -rf dist && npm run build",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --ignore-path ../../.prettierignore --write \"src/**/*.{ts,js,json}\" \"**/*.{json,md,yml,yaml}\"",
     "test": "vitest run",
     "test:watch": "vitest"
   },

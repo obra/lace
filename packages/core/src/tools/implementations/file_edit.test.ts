@@ -2,7 +2,7 @@
 // ABOUTME: Tests text replacement, validation, and file read protection mechanism
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { writeFile, rm, mkdir } from 'fs/promises';
+import { writeFile, rm } from 'fs/promises';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { FileEditTool } from './file_edit';
