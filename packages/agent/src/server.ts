@@ -72,6 +72,7 @@ import { TestAgentProvider } from './runtime/test-provider';
 import { MCPServerManager } from './mcp/server-manager';
 import type { MCPServerConfig } from '@lace/agent/config/mcp-types';
 import { compactDroppedMessagesWithCore } from './compaction/compact-dropped-messages';
+import { WorkspaceManagerFactory } from './workspace/workspace-manager';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
 const JOB_LOG_DIR = 'jobs';
@@ -4068,6 +4069,55 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       stopReason: 'end_turn',
       content: [{ type: 'text', text: 'hello' }],
       usage: { inputTokens: 0, outputTokens: 0 },
+    };
+  });
+
+  peer.onRequest('ent/workspace/info', async (params: unknown) => {
+    assertInitialized(state);
+    const parsed = params as { sessionId?: string };
+    const sessionId = toNonEmptyString(parsed?.sessionId);
+    if (!sessionId) throwInvalidParams('sessionId is required');
+
+    const workspaceManager = WorkspaceManagerFactory.get();
+    const workspace = await workspaceManager.inspectWorkspace(sessionId);
+    if (!workspace) {
+      throw {
+        code: -32603,
+        message: 'WorkspaceNotFound',
+        data: { category: 'workspace', sessionId },
+      };
+    }
+
+    return {
+      sessionId: workspace.sessionId,
+      projectDir: workspace.projectDir,
+      clonePath: workspace.clonePath,
+      containerId: workspace.containerId,
+      state: workspace.state,
+      containerMountPath: workspace.containerMountPath,
+      branchName: workspace.branchName,
+    };
+  });
+
+  peer.onRequest('ent/workspace/create', async (params: unknown) => {
+    assertInitialized(state);
+    const parsed = params as { projectDir?: string; sessionId?: string };
+    const projectDir = toNonEmptyString(parsed?.projectDir);
+    const sessionId = toNonEmptyString(parsed?.sessionId);
+    if (!projectDir) throwInvalidParams('projectDir is required');
+    if (!sessionId) throwInvalidParams('sessionId is required');
+
+    const workspaceManager = WorkspaceManagerFactory.get();
+    const workspace = await workspaceManager.createWorkspace(projectDir, sessionId);
+
+    return {
+      sessionId: workspace.sessionId,
+      projectDir: workspace.projectDir,
+      clonePath: workspace.clonePath,
+      containerId: workspace.containerId,
+      state: workspace.state,
+      containerMountPath: workspace.containerMountPath,
+      branchName: workspace.branchName,
     };
   });
 }

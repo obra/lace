@@ -1302,6 +1302,79 @@ export const EntJobInjectNotificationSchema = z
   })
   .strict();
 
+// ent/workspace/info - Get workspace information
+const EntWorkspaceInfoParamsSchema = z
+  .object({
+    sessionId: SessionIdSchema,
+  })
+  .strict();
+
+const EntWorkspaceInfoResultSchema = z
+  .object({
+    sessionId: SessionIdSchema,
+    projectDir: NonEmptyStringSchema,
+    clonePath: NonEmptyStringSchema,
+    containerId: NonEmptyStringSchema,
+    state: NonEmptyStringSchema,
+    containerMountPath: NonEmptyStringSchema.optional(),
+    branchName: NonEmptyStringSchema.optional(),
+  })
+  .strict();
+
+export const EntWorkspaceInfoRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/workspace/info'),
+    params: EntWorkspaceInfoParamsSchema,
+  })
+  .strict();
+
+export const EntWorkspaceInfoResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntWorkspaceInfoResultSchema,
+  })
+  .strict();
+
+// ent/workspace/create - Create a workspace container
+const EntWorkspaceCreateParamsSchema = z
+  .object({
+    projectDir: NonEmptyStringSchema,
+    sessionId: SessionIdSchema,
+  })
+  .strict();
+
+const EntWorkspaceCreateResultSchema = z
+  .object({
+    sessionId: SessionIdSchema,
+    projectDir: NonEmptyStringSchema,
+    clonePath: NonEmptyStringSchema,
+    containerId: NonEmptyStringSchema,
+    state: NonEmptyStringSchema,
+    containerMountPath: NonEmptyStringSchema.optional(),
+    branchName: NonEmptyStringSchema.optional(),
+  })
+  .strict();
+
+export const EntWorkspaceCreateRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/workspace/create'),
+    params: EntWorkspaceCreateParamsSchema,
+  })
+  .strict();
+
+export const EntWorkspaceCreateResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntWorkspaceCreateResultSchema,
+  })
+  .strict();
+
 const SessionUpdateTextDeltaSchema = z
   .object({
     type: z.literal('text_delta'),
@@ -1541,6 +1614,8 @@ export const EntProtocolRequestSchema = z.union([
   EntJobListRequestSchema,
   EntJobOutputRequestSchema,
   EntJobKillRequestSchema,
+  EntWorkspaceInfoRequestSchema,
+  EntWorkspaceCreateRequestSchema,
   SessionRequestPermissionRequestSchema,
 ]);
 
