@@ -1,0 +1,1270 @@
+// ABOUTME: Unit tests for OpenAIProvider class
+// ABOUTME: Tests streaming vs non-streaming responses, configuration, and error handling
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { OpenAIProvider } from './openai-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolResult, ToolContext } from '@lace/core/tools/types';
+import { z } from 'zod';
+import { StreamingEvents } from './types';
+
+// Mock external OpenAI SDK to avoid real API calls during tests
+// Tests focus on provider logic, not OpenAI API implementation
+const mockCreate = vi.fn();
+
+vi.mock('openai', () => {
+  return {
+    default: class MockOpenAI {
+      chat = {
+        completions: {
+          create: mockCreate,
+        },
+      };
+    },
+  };
+});
+
+// Mock logger to prevent test output noise and control log verification
+vi.mock('../../utils/logger.js', () => ({
+  logger: {
+    debug: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+describe('OpenAIProvider', () => {
+  let provider: OpenAIProvider;
+  let mockTool: Tool;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    provider = new OpenAIProvider({
+      apiKey: 'test-key',
+    });
+    provider.setSystemPrompt('Test system prompt');
+
+    class TestTool extends Tool {
+      name = 'test_tool';
+      description = 'A test tool';
+      schema = z.object({
+        action: z.string().describe('Action to perform'),
+      });
+
+      protected async executeValidated(
+        args: { action: string },
+        _context: ToolContext
+      ): Promise<ToolResult> {
+        return await Promise.resolve(this.createResult(`Executed action: ${args.action}`));
+      }
+    }
+
+    mockTool = new TestTool();
+  });
+
+  afterEach(() => {
+    provider.removeAllListeners();
+  });
+
+  describe('basic properties', () => {
+    it('should have correct provider name', () => {
+      expect(provider.providerName).toBe('openai');
+    });
+
+    // defaultModel removed - providers are now model-agnostic
+
+    it('should support streaming', () => {
+      expect(provider.supportsStreaming).toBe(true);
+    });
+
+    it('should expose system prompt', () => {
+      expect(provider.systemPrompt).toBe('Test system prompt');
+    });
+  });
+
+  describe('non-streaming responses', () => {
+    beforeEach(() => {
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: 'Test response',
+              tool_calls: undefined,
+            },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      });
+    });
+
+    it('should create non-streaming response correctly', async () => {
+      const messages = [{ role: 'user' as const, content: 'Hello' }];
+
+      const response = await provider.createResponse(messages, [mockTool], 'gpt-4o');
+
+      expect(response.content).toBe('Test response');
+      expect(response.toolCalls).toEqual([]);
+      expect(mockCreate).toHaveBeenCalled();
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        model: string;
+        max_completion_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+      expect(callArgs.model).toBe('gpt-4o');
+      expect(callArgs.max_completion_tokens).toBe(16384);
+      expect(callArgs.messages[0]).toEqual({ role: 'system', content: 'Test system prompt' });
+      expect(callArgs.messages[1]).toEqual({ role: 'user', content: 'Hello' });
+      expect(callArgs.tools).toEqual([
+        {
+          type: 'function',
+          function: {
+            name: 'test_tool',
+            description: 'A test tool',
+            parameters: mockTool.inputSchema,
+          },
+        },
+      ]);
+    });
+
+    it('should handle tool calls in response', async () => {
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: 'Using tool',
+              tool_calls: [
+                {
+                  id: 'call_123',
+                  function: {
+                    name: 'test_tool',
+                    arguments: JSON.stringify({ action: 'test' }),
+                  },
+                },
+              ],
+            },
+            finish_reason: 'tool_calls',
+          },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      });
+
+      const messages = [{ role: 'user' as const, content: 'Use tool' }];
+      const response = await provider.createResponse(messages, [mockTool], 'gpt-4o');
+
+      expect(response.content).toBe('Using tool');
+      expect(response.toolCalls).toEqual([
+        {
+          id: 'call_123',
+          name: 'test_tool',
+          arguments: { action: 'test' },
+        },
+      ]);
+    });
+
+    it('should handle system messages correctly', async () => {
+      const messages = [
+        { role: 'system' as const, content: 'Override system message' },
+        { role: 'user' as const, content: 'User message' },
+        { role: 'assistant' as const, content: 'Assistant message' },
+      ];
+
+      await provider.createResponse(messages, [], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        model: string;
+        max_completion_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+      expect(callArgs.messages[0]).toEqual({ role: 'system', content: 'Override system message' });
+      expect(callArgs.messages[1]).toEqual({ role: 'user', content: 'User message' });
+      expect(callArgs.messages[2]).toEqual({ role: 'assistant', content: 'Assistant message' });
+    });
+
+    it('should handle empty message content', async () => {
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: null,
+            },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      const messages = [{ role: 'user' as const, content: 'Test' }];
+      const response = await provider.createResponse(messages, [], 'gpt-4o');
+
+      expect(response.content).toBe('');
+    });
+
+    it('should throw error if no message in response', async () => {
+      mockCreate.mockResolvedValue({
+        choices: [{}],
+        usage: {},
+      });
+
+      const messages = [{ role: 'user' as const, content: 'Test' }];
+
+      await expect(provider.createResponse(messages, [], 'gpt-4o')).rejects.toThrow(
+        'No message in OpenAI response'
+      );
+    });
+  });
+
+  describe('streaming responses', () => {
+    interface MockStream {
+      [Symbol.asyncIterator]: ReturnType<typeof vi.fn>;
+    }
+    let mockStream: MockStream;
+
+    beforeEach(() => {
+      mockStream = {
+        [Symbol.asyncIterator]: vi.fn(),
+      };
+      mockCreate.mockReturnValue(mockStream);
+    });
+
+    it('should fall back to non-streaming when organization verification required', async () => {
+      // Mock streaming to throw verification error with proper OpenAI error structure
+      const verificationError = Object.assign(
+        new Error(
+          '400 Your organization must be verified to stream this model. Please go to: https://platform.openai.com/settings/organization/general'
+        ),
+        {
+          status: 400,
+          type: 'invalid_request_error',
+          code: 'unsupported_value',
+          param: 'stream',
+        }
+      );
+
+      // First call (streaming) throws error, second call (non-streaming) succeeds
+      mockCreate.mockRejectedValueOnce(verificationError).mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: 'Non-streaming response',
+              tool_calls: undefined,
+            },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      });
+
+      const messages = [{ role: 'user' as const, content: 'Test' }];
+      const response = await provider.createStreamingResponse(messages, [], 'gpt-4o');
+
+      // Should successfully return with non-streaming response
+      expect(response.content).toBe('Non-streaming response');
+      expect(response.stopReason).toBe('stop');
+
+      // Should have called create twice: once for streaming (failed), once for non-streaming (succeeded)
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+
+      // First call should have stream: true
+      expect(mockCreate.mock.calls[0][0]).toMatchObject({ stream: true });
+
+      // Second call should have stream: false (fallback to non-streaming)
+      expect(mockCreate.mock.calls[1][0]).toMatchObject({ stream: false });
+    });
+
+    it('should create streaming response correctly', async () => {
+      const chunks = [
+        {
+          choices: [
+            {
+              delta: { content: 'Hello ' },
+              finish_reason: null,
+            },
+          ],
+        },
+        {
+          choices: [
+            {
+              delta: { content: 'world!' },
+              finish_reason: null,
+            },
+          ],
+        },
+        {
+          choices: [
+            {
+              delta: {},
+              finish_reason: 'stop',
+            },
+          ],
+          usage: { prompt_tokens: 15, completion_tokens: 8, total_tokens: 23 },
+        },
+      ];
+
+      mockStream[Symbol.asyncIterator].mockReturnValue(
+        {
+          async *[Symbol.asyncIterator]() {
+            for (const chunk of chunks) {
+              yield await Promise.resolve(chunk);
+            }
+          },
+        }[Symbol.asyncIterator]()
+      );
+
+      const messages = [{ role: 'user' as const, content: 'Stream this' }];
+      const response = await provider.createStreamingResponse(messages, [mockTool], 'gpt-4o');
+
+      expect(response.content).toBe('Hello world!');
+      expect(response.toolCalls).toEqual([]);
+      expect(response.stopReason).toBe('stop');
+      expect(response.usage).toEqual({
+        promptTokens: 15,
+        completionTokens: 8,
+        totalTokens: 23,
+      });
+    });
+
+    it('should emit token events during streaming', async () => {
+      const tokenEvents: string[] = [];
+      provider.on('token', ({ token }: { token: string }) => {
+        tokenEvents.push(token);
+      });
+
+      const chunks = [
+        {
+          choices: [
+            {
+              delta: { content: 'Token ' },
+            },
+          ],
+        },
+        {
+          choices: [
+            {
+              delta: { content: 'stream ' },
+            },
+          ],
+        },
+        {
+          choices: [
+            {
+              delta: { content: 'test' },
+              finish_reason: 'stop',
+            },
+          ],
+        },
+      ];
+
+      mockStream[Symbol.asyncIterator].mockReturnValue(
+        {
+          async *[Symbol.asyncIterator]() {
+            for (const chunk of chunks) {
+              yield await Promise.resolve(chunk);
+            }
+          },
+        }[Symbol.asyncIterator]()
+      );
+
+      const messages = [{ role: 'user' as const, content: 'Stream tokens' }];
+      await provider.createStreamingResponse(messages, [], 'gpt-4o');
+
+      expect(tokenEvents).toEqual(['Token ', 'stream ', 'test']);
+    });
+
+    it('should emit complete event when streaming finishes', async () => {
+      const completeEvents: StreamingEvents['complete'][] = [];
+      provider.on('complete', (data: StreamingEvents['complete']) => {
+        completeEvents.push(data);
+      });
+
+      const chunks = [
+        {
+          choices: [
+            {
+              delta: { content: 'Final content' },
+              finish_reason: 'stop',
+            },
+          ],
+        },
+      ];
+
+      mockStream[Symbol.asyncIterator].mockReturnValue(
+        {
+          async *[Symbol.asyncIterator]() {
+            for (const chunk of chunks) {
+              yield await Promise.resolve(chunk);
+            }
+          },
+        }[Symbol.asyncIterator]()
+      );
+
+      const messages = [{ role: 'user' as const, content: 'Complete test' }];
+      await provider.createStreamingResponse(messages, [], 'gpt-4o');
+
+      expect(completeEvents).toHaveLength(1);
+      expect(completeEvents[0].response.content).toBe('Final content');
+    });
+
+    it('should handle streaming errors', async () => {
+      const errorEvents: Error[] = [];
+      provider.on('error', ({ error }: StreamingEvents['error']) => {
+        errorEvents.push(error);
+      });
+
+      const streamError = new Error('Stream failed');
+      mockStream[Symbol.asyncIterator].mockReturnValue(
+        {
+          *[Symbol.asyncIterator]() {
+            // Yield a valid chunk to satisfy ESLint, but immediately throw after
+            yield { choices: [{ delta: {} }] };
+            throw streamError;
+          },
+        }[Symbol.asyncIterator]()
+      );
+
+      const messages = [{ role: 'user' as const, content: 'Error test' }];
+
+      await expect(provider.createStreamingResponse(messages, [], 'gpt-4o')).rejects.toThrow(
+        'Stream failed'
+      );
+
+      // Provider no longer emits error events (handled at agent level to prevent duplicates)
+    });
+
+    it('should handle tool calls in streaming response', async () => {
+      const chunks = [
+        {
+          choices: [
+            {
+              delta: {
+                content: 'Using tool via stream',
+                tool_calls: [
+                  {
+                    index: 0,
+                    id: 'stream_call_456',
+                    function: {
+                      name: 'test_tool',
+                      arguments: '{"action":',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    index: 0,
+                    function: {
+                      arguments: '"stream_action"}',
+                    },
+                  },
+                ],
+              },
+              finish_reason: 'tool_calls',
+            },
+          ],
+        },
+      ];
+
+      mockStream[Symbol.asyncIterator].mockReturnValue(
+        {
+          async *[Symbol.asyncIterator]() {
+            for (const chunk of chunks) {
+              yield await Promise.resolve(chunk);
+            }
+          },
+        }[Symbol.asyncIterator]()
+      );
+
+      const messages = [{ role: 'user' as const, content: 'Stream with tools' }];
+      const response = await provider.createStreamingResponse(messages, [mockTool], 'gpt-4o');
+
+      expect(response.content).toBe('Using tool via stream');
+      expect(response.toolCalls).toEqual([
+        {
+          id: 'stream_call_456',
+          name: 'test_tool',
+          arguments: { action: 'stream_action' },
+        },
+      ]);
+    });
+  });
+
+  describe('configuration handling', () => {
+    it('should use model passed as parameter', async () => {
+      const customProvider = new OpenAIProvider({
+        apiKey: 'test-key',
+      });
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Custom model response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await customProvider.createResponse([{ role: 'user', content: 'Test' }], [], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        model: string;
+        max_completion_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+      expect(callArgs.model).toBe('gpt-4o');
+    });
+
+    it('should use fallback system prompt when none provided', async () => {
+      const noSystemProvider = new OpenAIProvider({
+        apiKey: 'test-key',
+      });
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Fallback response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await noSystemProvider.createResponse([{ role: 'user', content: 'Test' }], [], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        model: string;
+        max_completion_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+      expect(callArgs.messages[0]).toEqual({
+        role: 'system',
+        content: 'You are a helpful assistant.',
+      });
+    });
+  });
+
+  describe('stop reason normalization', () => {
+    it('should normalize stop reasons correctly', async () => {
+      const testCases = [
+        { openai: 'length', expected: 'max_tokens' },
+        { openai: 'stop', expected: 'stop' },
+        { openai: 'tool_calls', expected: 'tool_use' },
+        { openai: 'content_filter', expected: 'stop' },
+        { openai: 'unknown_reason', expected: 'stop' },
+        { openai: null, expected: undefined },
+      ];
+
+      for (const { openai, expected } of testCases) {
+        mockCreate.mockResolvedValue({
+          choices: [
+            {
+              message: { content: 'Test' },
+              finish_reason: openai,
+            },
+          ],
+          usage: {},
+        });
+
+        const response = await provider.createResponse(
+          [{ role: 'user', content: 'Test' }],
+          [],
+          'gpt-4o-mini'
+        );
+        expect(response.stopReason).toBe(expected);
+      }
+    });
+  });
+
+  describe('error handling', () => {
+    it('should handle non-streaming errors', async () => {
+      const providerError = new Error('API Error');
+      mockCreate.mockRejectedValue(providerError);
+
+      const messages = [{ role: 'user' as const, content: 'Error test' }];
+
+      await expect(provider.createResponse(messages, [], 'gpt-4o')).rejects.toThrow('API Error');
+    });
+
+    it('should handle streaming setup errors', async () => {
+      const streamError = new Error('Stream setup failed');
+
+      // Add one-time, typed error listener to prevent unhandled error events
+      provider.once('error', (_evt: StreamingEvents['error']) => {
+        // intentionally no-op
+      });
+
+      mockCreate.mockImplementation(() => {
+        throw streamError;
+      });
+
+      const messages = [{ role: 'user' as const, content: 'Stream error test' }];
+
+      await expect(provider.createStreamingResponse(messages, [], 'gpt-4o')).rejects.toThrow(
+        'Stream setup failed'
+      );
+    });
+  });
+
+  describe('tool name sanitization', () => {
+    it('should sanitize tool names with forward slashes (e.g., MCP tools)', async () => {
+      class MCPStyleTool extends Tool {
+        name = 'filesystem/read_file';
+        description = 'MCP tool with slash in name';
+        schema = z.object({
+          path: z.string(),
+        });
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('read file');
+        }
+      }
+
+      const mcpTool = new MCPStyleTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [mcpTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string; description: string } }>;
+      };
+
+      // Tool name should be sanitized to replace / with _
+      expect(callArgs.tools).toBeDefined();
+      expect(callArgs.tools).toHaveLength(1);
+      expect(callArgs.tools![0].function.name).toBe('filesystem_read_file');
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+    });
+
+    it('should sanitize tool names with multiple invalid characters', async () => {
+      class ComplexTool extends Tool {
+        name = 'server:name/tool.action';
+        description = 'Tool with multiple invalid chars';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const complexTool = new ComplexTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [complexTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // All invalid characters should be replaced with underscores
+      expect(callArgs.tools).toBeDefined();
+      expect(callArgs.tools![0].function.name).toBe('server_name_tool_action');
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+    });
+
+    it('should not modify already valid tool names', async () => {
+      class ValidTool extends Tool {
+        name = 'valid_tool-name123';
+        description = 'Valid tool name';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const validTool = new ValidTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [validTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Valid name should remain unchanged
+      expect(callArgs.tools![0].function.name).toBe('valid_tool-name123');
+    });
+
+    it('should map sanitized tool names back to original in responses', async () => {
+      class MCPStyleTool extends Tool {
+        name = 'filesystem/read_file';
+        description = 'MCP tool with slash in name';
+        schema = z.object({
+          path: z.string(),
+        });
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('read file');
+        }
+      }
+
+      const mcpTool = new MCPStyleTool();
+
+      // OpenAI returns the sanitized name in tool_calls
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: 'Reading file',
+              tool_calls: [
+                {
+                  id: 'call_123',
+                  function: {
+                    name: 'filesystem_read_file', // Sanitized name
+                    arguments: JSON.stringify({ path: '/test.txt' }),
+                  },
+                },
+              ],
+            },
+            finish_reason: 'tool_calls',
+          },
+        ],
+        usage: {},
+      });
+
+      const response = await provider.createResponse(
+        [{ role: 'user', content: 'Read file' }],
+        [mcpTool],
+        'gpt-4o'
+      );
+
+      // Response should contain the original tool name, not sanitized
+      expect(response.toolCalls).toHaveLength(1);
+      expect(response.toolCalls[0].name).toBe('filesystem/read_file');
+      expect(response.toolCalls[0].arguments).toEqual({ path: '/test.txt' });
+    });
+
+    it('should handle tool name collisions by appending numeric suffix', async () => {
+      class Tool1 extends Tool {
+        name = 'server/action';
+        description = 'Tool 1';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool1');
+        }
+      }
+
+      class Tool2 extends Tool {
+        name = 'server:action'; // Sanitizes to same name as Tool1
+        description = 'Tool 2';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool2');
+        }
+      }
+
+      const tool1 = new Tool1();
+      const tool2 = new Tool2();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [tool1, tool2], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // First tool should get base name, second should get suffix
+      expect(callArgs.tools).toBeDefined();
+      expect(callArgs.tools).toHaveLength(2);
+      expect(callArgs.tools![0].function.name).toBe('server_action');
+      expect(callArgs.tools![1].function.name).toBe('server_action_2');
+      // Both should match OpenAI pattern
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+      expect(callArgs.tools![1].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+    });
+
+    it('should handle concurrent requests with different tool sets without interference', async () => {
+      class ToolA extends Tool {
+        name = 'mcp/tool_a';
+        description = 'Tool A';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('a');
+        }
+      }
+
+      class ToolB extends Tool {
+        name = 'mcp/tool_b';
+        description = 'Tool B';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('b');
+        }
+      }
+
+      const toolA = new ToolA();
+      const toolB = new ToolB();
+
+      // Simulate concurrent requests with different tools
+      mockCreate
+        .mockResolvedValueOnce({
+          choices: [
+            {
+              message: {
+                content: 'Using tool A',
+                tool_calls: [
+                  {
+                    id: 'call_a',
+                    function: {
+                      name: 'mcp_tool_a',
+                      arguments: JSON.stringify({}),
+                    },
+                  },
+                ],
+              },
+              finish_reason: 'tool_calls',
+            },
+          ],
+          usage: {},
+        })
+        .mockResolvedValueOnce({
+          choices: [
+            {
+              message: {
+                content: 'Using tool B',
+                tool_calls: [
+                  {
+                    id: 'call_b',
+                    function: {
+                      name: 'mcp_tool_b',
+                      arguments: JSON.stringify({}),
+                    },
+                  },
+                ],
+              },
+              finish_reason: 'tool_calls',
+            },
+          ],
+          usage: {},
+        });
+
+      // Fire both requests concurrently
+      const [response1, response2] = await Promise.all([
+        provider.createResponse([{ role: 'user', content: 'Use A' }], [toolA], 'gpt-4o'),
+        provider.createResponse([{ role: 'user', content: 'Use B' }], [toolB], 'gpt-4o'),
+      ]);
+
+      // Each response should correctly map back to its original tool name
+      expect(response1.toolCalls[0].name).toBe('mcp/tool_a');
+      expect(response2.toolCalls[0].name).toBe('mcp/tool_b');
+    });
+
+    it('should handle triple collision with unique suffixes', async () => {
+      class Tool1 extends Tool {
+        name = 'server/action';
+        description = 'Tool 1';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool1');
+        }
+      }
+
+      class Tool2 extends Tool {
+        name = 'server:action'; // → server_action_2
+        description = 'Tool 2';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool2');
+        }
+      }
+
+      class Tool3 extends Tool {
+        name = 'server.action'; // → server_action_3
+        description = 'Tool 3';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool3');
+        }
+      }
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse(
+        [{ role: 'user', content: 'Test' }],
+        [new Tool1(), new Tool2(), new Tool3()],
+        'gpt-4o'
+      );
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Verify all three tools get unique sanitized names
+      expect(callArgs.tools).toHaveLength(3);
+      expect(callArgs.tools![0].function.name).toBe('server_action');
+      expect(callArgs.tools![1].function.name).toBe('server_action_2');
+      expect(callArgs.tools![2].function.name).toBe('server_action_3');
+    });
+
+    it('should enforce 64-character limit on tool names', async () => {
+      class LongNameTool extends Tool {
+        // 80 character tool name (exceeds 64 char limit)
+        name = 'very_long_tool_name_that_exceeds_the_maximum_allowed_length_of_sixty_four_chars';
+        description = 'Tool with very long name';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const longTool = new LongNameTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [longTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Tool name should be truncated to 64 chars max
+      expect(callArgs.tools![0].function.name.length).toBeLessThanOrEqual(64);
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+    });
+
+    it('should handle long tool names with collisions', async () => {
+      // Two 80-char names that both truncate to the same 60 chars
+      class LongTool1 extends Tool {
+        name = 'very_long_tool_name_that_exceeds_maximum_length_and_will_be_truncated_1';
+        description = 'Long tool 1';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool1');
+        }
+      }
+
+      class LongTool2 extends Tool {
+        name = 'very_long_tool_name_that_exceeds_maximum_length_and_will_be_truncated_2';
+        description = 'Long tool 2';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool2');
+        }
+      }
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse(
+        [{ role: 'user', content: 'Test' }],
+        [new LongTool1(), new LongTool2()],
+        'gpt-4o'
+      );
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Both tools should have unique names within 64 char limit
+      expect(callArgs.tools).toHaveLength(2);
+      expect(callArgs.tools![0].function.name.length).toBeLessThanOrEqual(64);
+      expect(callArgs.tools![1].function.name.length).toBeLessThanOrEqual(64);
+      expect(callArgs.tools![0].function.name).not.toBe(callArgs.tools![1].function.name);
+    });
+
+    it('should handle duplicate tool instances with same original name', async () => {
+      class DuplicateTool extends Tool {
+        name = 'server/action';
+        description = 'Duplicate tool';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      // Two instances of the exact same tool
+      const tool1 = new DuplicateTool();
+      const tool2 = new DuplicateTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [tool1, tool2], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Should get different sanitized names even with identical original names
+      expect(callArgs.tools).toHaveLength(2);
+      expect(callArgs.tools![0].function.name).toBe('server_action');
+      expect(callArgs.tools![1].function.name).toBe('server_action_2');
+    });
+
+    it('should reject empty/underscore-only tool names', async () => {
+      class EmptyNameTool extends Tool {
+        name = '///'; // Sanitizes to '___' → collapsed to '_' → rejected
+        description = 'Tool with only special chars';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const emptyTool = new EmptyNameTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      // Should throw error for invalid tool name
+      await expect(
+        provider.createResponse([{ role: 'user', content: 'Test' }], [emptyTool], 'gpt-4o')
+      ).rejects.toThrow('invalid - sanitizes to empty or underscore-only');
+    });
+
+    it('should handle unicode characters in tool names', async () => {
+      class UnicodeTool extends Tool {
+        name = 'tool/数据库/read';
+        description = 'Tool with unicode';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const unicodeTool = new UnicodeTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [unicodeTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Unicode should be stripped, leaving only valid chars
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+      // Unicode chars become underscores, then collapsed: 'tool/数据库/read' → 'tool_read'
+      expect(callArgs.tools![0].function.name).toBe('tool_read');
+    });
+  });
+
+  describe('token counting', () => {
+    it('should count tokens using tiktoken for known models', async () => {
+      const messages = [
+        { role: 'user' as const, content: 'Hello, how are you?' },
+        { role: 'assistant' as const, content: 'I am doing well, thank you!' },
+      ];
+
+      const tokenCount = await provider.countTokens(messages, [], 'gpt-4o');
+
+      expect(tokenCount).toBeGreaterThan(0);
+      expect(typeof tokenCount).toBe('number');
+    });
+
+    it('should return null if no model is provided', async () => {
+      const messages = [{ role: 'user' as const, content: 'Hello' }];
+
+      const tokenCount = await provider.countTokens(messages, []);
+
+      expect(tokenCount).toBeNull();
+    });
+
+    it('should handle token counting with tools', async () => {
+      const messages = [{ role: 'user' as const, content: 'Use the test tool' }];
+
+      const tokenCount = await provider.countTokens(messages, [mockTool], 'gpt-4o');
+
+      expect(tokenCount).toBeGreaterThan(0);
+      expect(typeof tokenCount).toBe('number');
+    });
+
+    it('should not double-count system messages', async () => {
+      const messagesWithSystem = [
+        { role: 'system' as const, content: 'You are a helpful assistant.' },
+        { role: 'user' as const, content: 'Hello' },
+      ];
+
+      const messagesWithoutSystem = [{ role: 'user' as const, content: 'Hello' }];
+
+      const tokensWithSystem = await provider.countTokens(messagesWithSystem, [], 'gpt-4o');
+      const tokensWithoutSystem = await provider.countTokens(messagesWithoutSystem, [], 'gpt-4o');
+
+      expect(tokensWithSystem).toBeGreaterThan(0);
+      expect(tokensWithoutSystem).toBeGreaterThan(0);
+      // The difference should be minimal since system prompt is added in both cases
+      expect(Math.abs((tokensWithSystem ?? 0) - (tokensWithoutSystem ?? 0))).toBeLessThan(10);
+    });
+
+    it('should provide fallback estimation for streaming response without usage data', async () => {
+      const mockStream = {
+        [Symbol.asyncIterator]: vi.fn(),
+      };
+
+      const chunks = [
+        {
+          choices: [
+            {
+              delta: {
+                content: 'Streaming response',
+              },
+              finish_reason: null,
+            },
+          ],
+          // No usage field in chunks
+        },
+        {
+          choices: [
+            {
+              delta: {},
+              finish_reason: 'stop',
+            },
+          ],
+          // No usage field at end either
+        },
+      ];
+
+      mockStream[Symbol.asyncIterator].mockReturnValue(
+        {
+          async *[Symbol.asyncIterator]() {
+            for (const chunk of chunks) {
+              yield await Promise.resolve(chunk);
+            }
+          },
+        }[Symbol.asyncIterator]()
+      );
+
+      mockCreate.mockReturnValue(mockStream);
+
+      const messages = [{ role: 'user' as const, content: 'Stream test' }];
+      const response = await provider.createStreamingResponse(messages, [], 'gpt-4o');
+
+      // Should still have usage data from estimation
+      expect(response.usage).toBeDefined();
+      expect(response.usage?.totalTokens).toBeGreaterThan(0);
+      expect(response.usage?.promptTokens).toBeGreaterThan(0);
+      expect(response.usage?.completionTokens).toBeGreaterThan(0);
+    });
+
+    it('should provide fallback token estimation when response has no usage data', async () => {
+      // Mock response without usage data (like OpenAI-compatible endpoints)
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: 'Response without usage data',
+              tool_calls: undefined,
+            },
+            finish_reason: 'stop',
+          },
+        ],
+        // No usage field - this triggers fallback estimation
+      });
+
+      const messages = [{ role: 'user' as const, content: 'Test message' }];
+      const response = await provider.createResponse(messages, [], 'gpt-4o');
+
+      // Should still have usage data from estimation
+      expect(response.usage).toBeDefined();
+      expect(response.usage?.totalTokens).toBeGreaterThan(0);
+      expect(response.usage?.promptTokens).toBeGreaterThan(0);
+      expect(response.usage?.completionTokens).toBeGreaterThan(0);
+    });
+  });
+});

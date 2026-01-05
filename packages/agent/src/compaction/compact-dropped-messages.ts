@@ -2,7 +2,7 @@ import {
   AIProvider,
   type ConversationState,
   type ProviderMessage,
-} from '@lace/core/providers/base-provider';
+} from '../providers/base-provider';
 import type { Tool as CoreTool } from '@lace/core/tools/tool';
 import type { LaceEvent } from '@lace/core/threads/types';
 import type { CompactionStrategy } from '@lace/core/threads/compaction/types';

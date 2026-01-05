@@ -2,7 +2,7 @@ import {
   AIProvider,
   type ProviderMessage,
   type ProviderResponse,
-} from '@lace/core/providers/base-provider';
+} from '../providers/base-provider';
 import type { Tool } from '@lace/core/tools/tool';
 import type { ToolCall, ToolResult } from '@lace/core/tools/types';
 

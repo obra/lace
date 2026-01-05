@@ -14,7 +14,7 @@
   },
   "scripts": {
     "prebuild": "cd ../.. && npm run build --workspace=packages/core && npm run build --workspace=packages/ent-protocol",
-    "build": "tsc && tsc-alias -p tsconfig.json -f -fe .js",
+    "build": "tsc && tsc-alias -p tsconfig.json -f -fe .js && cp -r src/providers/catalog/data dist/providers/catalog/ 2>/dev/null || true",
     "build:clean": "rm -rf dist && npm run build",
     "pretest": "cd ../.. && npm run build --workspace=packages/core && npm run build --workspace=packages/ent-protocol && npm run build --workspace=packages/agent",
     "typecheck": "tsc --noEmit",

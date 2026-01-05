@@ -49,15 +49,15 @@ import {
   derivePendingPermissionsFromDurableEvents,
   type PendingPermissionRecord,
 } from './storage/permissions-from-events';
-import { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
-import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
+import { ProviderCatalogManager } from './providers/catalog/manager';
+import { ProviderInstanceManager } from './providers/instance/manager';
 import {
   ProviderInstanceSchema,
   type CatalogModel,
   type ProviderInstance,
-} from '@lace/core/providers/catalog/types';
-import { ProviderRegistry } from '@lace/core/providers/registry';
-import { AIProvider, type ProviderMessage } from '@lace/core/providers/base-provider';
+} from './providers/catalog/types';
+import { ProviderRegistry } from './providers/registry';
+import { AIProvider, type ProviderMessage } from './providers/base-provider';
 import { ToolExecutor } from './tools/executor';
 import { estimateTokens } from '@lace/core/utils/token-estimation';
 import type { Tool } from './tools/tool';
