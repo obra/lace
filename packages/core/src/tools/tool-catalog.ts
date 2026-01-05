@@ -4,7 +4,7 @@
 import { MCPServerManager } from '@lace/core/mcp/server-manager';
 import { MCPConfigLoader } from '@lace/core/config/mcp-config-loader';
 import { logger } from '@lace/core/utils/logger';
-import type { Project } from '@lace/core/projects/project';
+import type { Project } from '@lace/agent/projects/project';
 import type { MCPServerConfig, DiscoveredTool } from '@lace/core/config/mcp-types';
 
 /**

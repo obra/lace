@@ -3,7 +3,7 @@
 
 import { ToolResult, ToolContext, ToolCall, PermissionOverrideMode } from './types';
 import { Tool } from './tool';
-import { ProjectEnvironmentManager } from '@lace/core/projects/environment-variables';
+import { ProjectEnvironmentManager } from '@lace/agent/projects/environment-variables';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { BashTool } from './implementations/bash';

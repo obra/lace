@@ -64,7 +64,7 @@ export type { ProviderInfo, ProviderResponse, ModelInfo } from '@lace/core/provi
 
 export { ApprovalDecision } from '@lace/core/tools/types';
 
-export type { ProjectInfo } from '@lace/core/projects/project';
+export type { ProjectInfo } from '@lace/agent/projects/project';
 
 export interface SessionInfo {
   id: WorkspaceSessionId;

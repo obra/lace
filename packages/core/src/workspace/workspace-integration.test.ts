@@ -2,7 +2,7 @@
 // ABOUTME: Verifies BashTool and File tools work with workspace execution
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Project } from '@lace/core/projects/project';
+import { Project } from '@lace/agent/projects/project';
 import { BashTool } from '@lace/core/tools/implementations/bash';
 import { FileReadTool } from '@lace/core/tools/implementations/file_read';
 import { FileWriteTool } from '@lace/core/tools/implementations/file_write';

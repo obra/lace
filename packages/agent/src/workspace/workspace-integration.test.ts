@@ -2,15 +2,15 @@
 // ABOUTME: Verifies BashTool and File tools work with workspace execution
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Project } from '@lace/core/projects/project';
-import { BashTool } from '@lace/core/tools/implementations/bash';
-import { FileReadTool } from '@lace/core/tools/implementations/file_read';
-import { FileWriteTool } from '@lace/core/tools/implementations/file_write';
+import { Project } from '@lace/agent/projects/project';
+import { BashTool } from '@lace/agent/tools/implementations/bash';
+import { FileReadTool } from '@lace/agent/tools/implementations/file_read';
+import { FileWriteTool } from '@lace/agent/tools/implementations/file_write';
 import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import type { ToolContext } from '@lace/core/tools/types';
+import type { ToolContext } from '@lace/agent/tools/types';
 import { WorkspaceManagerFactory } from './workspace-manager';
 
 describe('Workspace Integration', () => {

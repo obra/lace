@@ -7,7 +7,7 @@ export { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
 export { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
 export { ToolExecutor } from '@lace/core/tools/executor';
 export { ToolCatalog } from '@lace/core/tools/tool-catalog';
-export { Project } from '@lace/core/projects/project';
+export { Project } from '@lace/agent/projects/project';
 export { InfrastructureHelper } from '@lace/agent/helpers/infrastructure-helper';
 
 // Provider types
