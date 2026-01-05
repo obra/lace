@@ -1,4 +1,4 @@
-use crate::protocol::jsonrpc;
+use crate::protocol::{ent, jsonrpc};
 use crate::protocol::transport::AgentTransport;
 use serde_json::{json, Value};
 use std::io;
@@ -14,7 +14,7 @@ pub fn bootstrap_session(
         .send_line(jsonrpc::encode_request(
             json!("c_1"),
             "initialize",
-            Some(json!({ "protocolVersion": "1.0" })),
+            Some(ent::initialize_params()),
         ))
         .map_err(|e| io::Error::new(io::ErrorKind::BrokenPipe, e))?;
 

@@ -27,7 +27,7 @@ fn e2e_permission_flow_with_fake_agent() {
         .send_line(jsonrpc::encode_request(
             json!("c_1"),
             "initialize",
-            Some(json!({"protocolVersion":"1.0"})),
+            Some(ent::initialize_params()),
         ))
         .unwrap();
 

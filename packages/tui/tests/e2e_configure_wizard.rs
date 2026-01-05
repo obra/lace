@@ -3,7 +3,7 @@ mod common;
 use lace_tui::app::config_wizard;
 use lace_tui::app::reducer::Outbound;
 use lace_tui::app::AppState;
-use lace_tui::protocol::{jsonrpc, transport::AgentTransport};
+use lace_tui::protocol::{ent, jsonrpc, transport::AgentTransport};
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
 
@@ -32,7 +32,7 @@ fn e2e_configure_wizard_against_fake_agent() {
         .send_line(jsonrpc::encode_request(
             json!("c_1"),
             "initialize",
-            Some(json!({"protocolVersion":"1.0"})),
+            Some(ent::initialize_params()),
         ))
         .unwrap();
 

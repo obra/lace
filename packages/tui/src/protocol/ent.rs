@@ -1,6 +1,15 @@
 use crate::app::reducer::AppEvent;
 use crate::app::{PermissionOption, PermissionRequest};
+use serde_json::json;
 use serde_json::Value;
+
+pub fn initialize_params() -> Value {
+    json!({
+        "protocolVersion": "1.0",
+        "clientInfo": { "name": env!("CARGO_PKG_NAME"), "version": env!("CARGO_PKG_VERSION") },
+        "capabilities": { "streaming": true, "permissions": true, "ent/jobStreaming": "coalesced" }
+    })
+}
 
 pub fn decode_session_update(params: &Value) -> Vec<AppEvent> {
     let mut out = Vec::new();
