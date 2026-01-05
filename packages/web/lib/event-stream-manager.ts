@@ -4,7 +4,7 @@
 // StreamEvent removed - using LaceEvent directly
 import type { LaceEvent, ErrorType, ErrorPhase } from '@lace/web/types/core';
 import { randomUUID } from 'crypto';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 import { stringify } from '@lace/web/lib/serialization';
 
 // Interface for AGENT_ERROR event data

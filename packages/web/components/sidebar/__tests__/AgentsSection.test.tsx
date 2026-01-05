@@ -14,11 +14,11 @@ import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '@lace/core/test-utils/provider-defaults';
+} from '@lace/agent/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@lace/core/test-utils/provider-instances';
+} from '@lace/agent/test-utils/provider-instances';
 
 // Mock external dependencies only (following testing docs)
 vi.mock('server-only', () => ({}));

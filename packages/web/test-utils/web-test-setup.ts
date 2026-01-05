@@ -1,8 +1,8 @@
 // ABOUTME: Shared test setup for web package tests
 // ABOUTME: Provides unified setup that handles temp LACE_DIR and persistence automatically
 
-import { useTempLaceDir, type TempLaceDirContext } from '@lace/core/test-utils/temp-lace-dir';
-import { ProviderRegistry } from '@lace/core/providers/registry';
+import { useTempLaceDir, type TempLaceDirContext } from '@lace/agent/test-utils/temp-lace-dir';
+import { ProviderRegistry } from '@lace/agent/providers/registry';
 import { beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'fs';
 import { join } from 'path';

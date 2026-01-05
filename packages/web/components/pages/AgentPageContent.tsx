@@ -15,7 +15,7 @@ import { ToolApprovalModal } from '@lace/web/components/modals/ToolApprovalModal
 import { SessionEditModal } from '@lace/web/components/config/SessionEditModal';
 import { AgentCreateChatPopup } from '@lace/web/components/modals/AgentCreateChatPopup';
 import { PermissionModeBadge } from '@lace/web/components/ui/PermissionModeSelector';
-import type { PermissionOverrideMode } from '@lace/core/tools/types';
+import type { PermissionOverrideMode } from '@lace/agent/tools/types';
 
 import { useUIContext } from '@lace/web/components/providers/UIProvider';
 import { asThreadId, asWorkspaceSessionId, isAgentSummaryUpdatedData } from '@lace/web/types/core';

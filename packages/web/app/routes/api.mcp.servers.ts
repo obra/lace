@@ -4,7 +4,7 @@
 import { MCPConfigLoader, ToolCatalog } from '@lace/web/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 import { z } from 'zod';
 import type { MCPServerConfig } from '@lace/web/types/core';
 

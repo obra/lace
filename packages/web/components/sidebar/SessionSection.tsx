@@ -16,7 +16,7 @@ import { useSessionContext } from '@lace/web/components/providers/SessionProvide
 import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
 import { useURLState } from '@lace/web/hooks/useURLState';
 import { api } from '@lace/web/lib/api-client';
-import type { PermissionOverrideMode } from '@lace/core/tools/types';
+import type { PermissionOverrideMode } from '@lace/agent/tools/types';
 
 interface SessionSectionProps {
   isMobile?: boolean;

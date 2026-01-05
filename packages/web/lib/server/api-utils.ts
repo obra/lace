@@ -2,7 +2,7 @@
 // ABOUTME: Provides validation, serialization, and common patterns for RESTful endpoints
 
 import { z } from 'zod';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 
 // Route parameter validation schemas

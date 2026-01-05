@@ -18,7 +18,7 @@ import { useAgentAPI as useAgentAPIHook } from '@lace/web/hooks/useAgentAPI';
 import { useToolApprovalContext } from './ToolApprovalProvider';
 import { useSessionContext } from './SessionProvider';
 import type { ThreadId, WorkspaceSessionId } from '@lace/web/types/core';
-import type { LaceEvent } from '@lace/core/threads/types';
+import type { LaceEvent } from '@lace/agent/threads/types';
 import type { StreamConnection } from '@lace/web/types/stream-events';
 import type { PendingApproval } from '@lace/web/types/api';
 

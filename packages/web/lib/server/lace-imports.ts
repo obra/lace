@@ -34,15 +34,15 @@ export { OpenRouterDynamicProvider } from '@lace/agent/providers/openrouter/dyna
 // Tool implementations from agent
 export { FileReadTool } from '@lace/agent/tools/implementations/file_read';
 
-// Test utilities - still in core (not yet moved to agent)
+// Test utilities from agent
 export {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@lace/core/test-utils/provider-instances';
+} from '@lace/agent/test-utils/provider-instances';
 export {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '@lace/core/test-utils/provider-defaults';
+} from '@lace/agent/test-utils/provider-defaults';
 // TestProvider is in agent
 export { TestProvider } from '@lace/agent/test-utils/test-provider';
 // Tool types from agent

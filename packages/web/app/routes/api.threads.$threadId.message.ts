@@ -7,7 +7,7 @@ import { MessageResponse } from '@lace/web/types/api';
 import { MessageRequestSchema } from '@lace/web/lib/validation/schemas';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import type { Route } from './+types/api.threads.$threadId.message';

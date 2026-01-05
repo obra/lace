@@ -5,7 +5,7 @@ import type { Route } from './+types/api.provider.instances.$instanceId.refresh'
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { ProviderRegistry, OpenRouterDynamicProvider } from '@lace/web/lib/server/lace-imports';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 
 export async function action({ params, request }: Route.ActionArgs) {
   try {

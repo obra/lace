@@ -15,7 +15,7 @@ vi.mock('open', () => ({
 }));
 
 // Mock the logger
-vi.mock('@lace/core/utils/logger', () => ({
+vi.mock('@lace/agent/utils/logger', () => ({
   logger: {
     error: vi.fn(),
     warn: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock('@lace/core/utils/logger', () => ({
 const open = await import('open');
 const mockOpen = vi.mocked(open.default);
 
-const { logger } = await import('@lace/core/utils/logger');
+const { logger } = await import('@lace/agent/utils/logger');
 const mockLogger = vi.mocked(logger);
 
 // Inline the isInteractive function for testing
