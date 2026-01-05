@@ -25,8 +25,8 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const supervisor = getSupervisor();
-    const record = supervisor.getWorkspaceSession(sessionId);
+    const supervisor = await getSupervisor();
+    const record = await supervisor.getWorkspaceSession(sessionId);
     if (!record || record.projectId !== projectId) {
       return createErrorResponse('Session not found in this project', 404, {
         code: 'RESOURCE_NOT_FOUND',
@@ -67,8 +67,8 @@ export async function action({ request, params }: Route.ActionArgs) {
         return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
       }
 
-      const supervisor = getSupervisor();
-      const existing = supervisor.getWorkspaceSession(sessionId);
+      const supervisor = await getSupervisor();
+      const existing = await supervisor.getWorkspaceSession(sessionId);
       if (!existing || existing.projectId !== projectId) {
         return createErrorResponse('Session not found in this project', 404, {
           code: 'RESOURCE_NOT_FOUND',
@@ -76,10 +76,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       }
 
       if (typeof validatedData.name === 'string') {
-        supervisor.updateWorkspaceSession(sessionId, { name: validatedData.name });
+        await supervisor.updateWorkspaceSession(sessionId, { name: validatedData.name });
       }
 
-      const record = supervisor.getWorkspaceSession(sessionId);
+      const record = await supervisor.getWorkspaceSession(sessionId);
       if (!record) {
         return createErrorResponse('Session not found after update', 500, {
           code: 'INTERNAL_SERVER_ERROR',
@@ -121,8 +121,8 @@ export async function action({ request, params }: Route.ActionArgs) {
         return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
       }
 
-      const supervisor = getSupervisor();
-      const record = supervisor.getWorkspaceSession(sessionId);
+      const supervisor = await getSupervisor();
+      const record = await supervisor.getWorkspaceSession(sessionId);
       if (!record || record.projectId !== projectId) {
         return createErrorResponse('Session not found in this project', 404, {
           code: 'RESOURCE_NOT_FOUND',

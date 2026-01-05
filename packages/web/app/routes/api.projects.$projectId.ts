@@ -40,10 +40,10 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     const projectInfo = project.getInfo();
 
-    const supervisor = getSupervisor();
-    const sessionCount = supervisor
-      .listWorkspaceSessions()
-      .filter((s) => s.projectId === projectId).length;
+    const supervisor = await getSupervisor();
+    const sessionCount = (await supervisor.listWorkspaceSessions()).filter(
+      (s) => s.projectId === projectId
+    ).length;
 
     return createSuperjsonResponse({ ...projectInfo, sessionCount });
   } catch (error) {
@@ -82,10 +82,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 
         const updatedProjectInfo = project.getInfo();
 
-        const supervisor = getSupervisor();
-        const sessionCount = supervisor
-          .listWorkspaceSessions()
-          .filter((s) => s.projectId === projectId).length;
+        const supervisor = await getSupervisor();
+        const sessionCount = (await supervisor.listWorkspaceSessions()).filter(
+          (s) => s.projectId === projectId
+        ).length;
 
         return createSuperjsonResponse({ ...updatedProjectInfo, sessionCount });
       } catch (error) {

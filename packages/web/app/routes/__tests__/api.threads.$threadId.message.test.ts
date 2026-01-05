@@ -171,7 +171,7 @@ describe('Thread Messaging API', () => {
   });
 
   it('should not duplicate user messages in the database', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const promptSpy = vi.spyOn(supervisor, 'promptSession');
 
     const request = new Request('http://localhost/api/threads/test/message', {

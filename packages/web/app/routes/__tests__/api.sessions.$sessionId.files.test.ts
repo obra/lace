@@ -28,7 +28,7 @@ describe('/api/sessions/[sessionId]/files', () => {
     await fs.writeFile(join(testDir, 'README.md'), '# Test Project');
     await fs.writeFile(join(testDir, 'src', 'index.ts'), 'console.log("hello");');
 
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(testDir);
     workspaceSessionId = created.workspaceSessionId;
   });

@@ -40,9 +40,11 @@ async function createProjectAndSession(workDir: string) {
   );
 
   const project = Project.create('Test Project', workDir);
-  const supervisor = getSupervisor();
+  const supervisor = await getSupervisor();
   const created = await supervisor.createWorkspaceSession(workDir);
-  supervisor.updateWorkspaceSession(created.workspaceSessionId, { projectId: project.getId() });
+  await supervisor.updateWorkspaceSession(created.workspaceSessionId, {
+    projectId: project.getId(),
+  });
 
   return { fixturePath, project, supervisor, created };
 }
@@ -79,9 +81,11 @@ describe('Session MCP Server Control API', () => {
     expect(response.status).toBe(200);
     expect(data.serverId).toBe('test');
 
-    const status = (await supervisor
-      .getPeer(created.workspaceSessionId)
-      .request('ent/agent/status')) as {
+    const status = (await supervisor.agentRequest({
+      workspaceSessionId: created.workspaceSessionId,
+      method: 'ent/agent/status',
+      requestParams: {},
+    })) as {
       mcpServers?: Array<{ name: string; status: string }>;
     };
     expect(status.mcpServers?.find((s) => s.name === 'test')?.status).toBe('connected');
@@ -92,9 +96,11 @@ describe('Session MCP Server Control API', () => {
       context.tempProjectDir
     );
 
-    await supervisor
-      .getPeer(created.workspaceSessionId, created.sessionId)
-      .request('ent/session/configure', {
+    await supervisor.agentRequest({
+      workspaceSessionId: created.workspaceSessionId,
+      sessionId: created.sessionId,
+      method: 'ent/session/configure',
+      requestParams: {
         mcpServers: [
           {
             name: 'test',
@@ -104,7 +110,8 @@ describe('Session MCP Server Control API', () => {
             tools: { echo: 'allow' },
           },
         ],
-      });
+      },
+    });
 
     const request = new Request(
       `http://localhost/api/projects/${project.getId()}/sessions/${created.workspaceSessionId}/mcp/servers/test/control`,
@@ -128,9 +135,11 @@ describe('Session MCP Server Control API', () => {
     expect(response.status).toBe(200);
     expect(data.serverId).toBe('test');
 
-    const status = (await supervisor
-      .getPeer(created.workspaceSessionId)
-      .request('ent/agent/status')) as {
+    const status = (await supervisor.agentRequest({
+      workspaceSessionId: created.workspaceSessionId,
+      method: 'ent/agent/status',
+      requestParams: {},
+    })) as {
       mcpServers?: Array<{ name: string; status: string }>;
     };
     expect(status.mcpServers?.find((s) => s.name === 'test')?.status).toBe('disconnected');
@@ -141,9 +150,11 @@ describe('Session MCP Server Control API', () => {
       context.tempProjectDir
     );
 
-    await supervisor
-      .getPeer(created.workspaceSessionId, created.sessionId)
-      .request('ent/session/configure', {
+    await supervisor.agentRequest({
+      workspaceSessionId: created.workspaceSessionId,
+      sessionId: created.sessionId,
+      method: 'ent/session/configure',
+      requestParams: {
         mcpServers: [
           {
             name: 'test',
@@ -153,7 +164,8 @@ describe('Session MCP Server Control API', () => {
             tools: { echo: 'allow' },
           },
         ],
-      });
+      },
+    });
 
     const request = new Request(
       `http://localhost/api/projects/${project.getId()}/sessions/${created.workspaceSessionId}/mcp/servers/test/control`,
@@ -177,9 +189,11 @@ describe('Session MCP Server Control API', () => {
     expect(response.status).toBe(200);
     expect(data.serverId).toBe('test');
 
-    const status = (await supervisor
-      .getPeer(created.workspaceSessionId)
-      .request('ent/agent/status')) as {
+    const status = (await supervisor.agentRequest({
+      workspaceSessionId: created.workspaceSessionId,
+      method: 'ent/agent/status',
+      requestParams: {},
+    })) as {
       mcpServers?: Array<{ name: string; status: string }>;
     };
     expect(status.mcpServers?.find((s) => s.name === 'test')?.status).toBe('connected');
@@ -264,9 +278,11 @@ describe('Session MCP Server Control API', () => {
 
   it('returns 404 when server config not found', async () => {
     const project = Project.create('Test Project', context.tempProjectDir);
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
-    supervisor.updateWorkspaceSession(created.workspaceSessionId, { projectId: project.getId() });
+    await supervisor.updateWorkspaceSession(created.workspaceSessionId, {
+      projectId: project.getId(),
+    });
 
     const request = new Request(
       `http://localhost/api/projects/${project.getId()}/sessions/${created.workspaceSessionId}/mcp/servers/nope/control`,

@@ -53,15 +53,15 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const { decision } = bodyResult.data;
 
-    const supervisor = getSupervisor();
-    const record = supervisor.getWorkspaceSession(workspaceSessionId);
+    const supervisor = await getSupervisor();
+    const record = await supervisor.getWorkspaceSession(workspaceSessionId);
     if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const mappedDecision = decision === 'deny' ? 'deny' : 'allow';
     const decodedToolCallId = decodeURIComponent(toolCallId);
-    const matches = listPendingPermissions(workspaceSessionId).filter(
+    const matches = (await listPendingPermissions(workspaceSessionId)).filter(
       (p) => p.toolCallId === decodedToolCallId
     );
 
@@ -73,9 +73,8 @@ export async function action({ request, params }: Route.ActionArgs) {
       return createErrorResponse('Tool call is ambiguous', 409, { code: 'VALIDATION_FAILED' });
     }
 
-    const resolved = resolvePendingPermission({
+    const resolved = await resolvePendingPermission({
       workspaceSessionId,
-      agentSessionId: matches[0]!.agentSessionId,
       toolCallId: decodedToolCallId,
       decision: mappedDecision,
     });

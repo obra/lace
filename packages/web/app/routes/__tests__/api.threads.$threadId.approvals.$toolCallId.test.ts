@@ -46,7 +46,12 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     });
 
     mockListPendingPermissions.mockReturnValue([
-      { toolCallId, agentSessionId: threadId, params: {}, requestedAt: new Date() },
+      {
+        toolCallId,
+        agentSessionId: threadId,
+        request: { tool: 'bash' },
+        requestedAt: new Date().toISOString(),
+      },
     ]);
 
     mockResolvePendingPermission.mockReturnValue(true);
@@ -64,7 +69,6 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     expect(response.status).toBe(200);
     expect(mockResolvePendingPermission).toHaveBeenCalledWith({
       workspaceSessionId: 'ws_1',
-      agentSessionId: threadId,
       toolCallId,
       decision: 'allow',
     });
@@ -81,7 +85,12 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     });
 
     mockListPendingPermissions.mockReturnValue([
-      { toolCallId, agentSessionId: threadId, params: {}, requestedAt: new Date() },
+      {
+        toolCallId,
+        agentSessionId: threadId,
+        request: { tool: 'bash' },
+        requestedAt: new Date().toISOString(),
+      },
     ]);
 
     mockResolvePendingPermission.mockReturnValue(true);
@@ -99,7 +108,6 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     expect(response.status).toBe(200);
     expect(mockResolvePendingPermission).toHaveBeenCalledWith({
       workspaceSessionId: 'ws_1',
-      agentSessionId: threadId,
       toolCallId,
       decision: 'deny',
     });

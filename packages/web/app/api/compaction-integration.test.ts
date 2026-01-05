@@ -47,7 +47,7 @@ describe('Supervisor-backed agent compaction/token usage (not supported)', () =>
   });
 
   it('does not expose tokenUsage even after agent activity', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
     const messageRequest = new Request(
@@ -63,11 +63,13 @@ describe('Supervisor-backed agent compaction/token usage (not supported)', () =>
     );
     expect(messageResponse.status).toBe(202);
 
-    const peer = supervisor.getPeer(created.workspaceSessionId, created.sessionId);
     const getEvents = async (): Promise<DurableEvent[]> => {
-      const result = (await peer.request('ent/session/events', { limit: 200 })) as {
-        events: DurableEvent[];
-      };
+      const result = (await supervisor.agentRequest({
+        workspaceSessionId: created.workspaceSessionId,
+        sessionId: created.sessionId,
+        method: 'ent/session/events',
+        requestParams: { limit: 200 },
+      })) as { events: DurableEvent[] };
       return result.events;
     };
 

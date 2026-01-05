@@ -23,7 +23,7 @@ describe('Session Configuration API - Tool Permissions (unsupported)', () => {
   });
 
   it('GET does not include tool policy structures', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
     const request = new Request(
@@ -41,7 +41,7 @@ describe('Session Configuration API - Tool Permissions (unsupported)', () => {
   });
 
   it('PUT rejects toolPolicies updates', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
     const request = new Request(

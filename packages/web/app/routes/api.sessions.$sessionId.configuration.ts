@@ -30,8 +30,8 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     }
 
     const workspaceSessionId = sessionIdParam;
-    const supervisor = getSupervisor();
-    const record = supervisor.getWorkspaceSession(workspaceSessionId);
+    const supervisor = await getSupervisor();
+    const record = await supervisor.getWorkspaceSession(workspaceSessionId);
     if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
@@ -73,8 +73,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = ConfigurationSchema.parse(body);
 
-    const supervisor = getSupervisor();
-    const record = supervisor.getWorkspaceSession(workspaceSessionId);
+    const supervisor = await getSupervisor();
+    const record = await supervisor.getWorkspaceSession(workspaceSessionId);
     if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
@@ -94,7 +94,7 @@ export async function action({ request, params }: Route.ActionArgs) {
           ? 'approveReads'
           : 'ask';
 
-    supervisor.upsertAgentSessionMeta(workspaceSessionId, {
+    await supervisor.upsertAgentSessionMeta(workspaceSessionId, {
       sessionId: coordinator.sessionId,
       ...(typeof validatedData.providerInstanceId === 'string'
         ? { connectionId: validatedData.providerInstanceId }
@@ -102,15 +102,18 @@ export async function action({ request, params }: Route.ActionArgs) {
       ...(typeof validatedData.modelId === 'string' ? { modelId: validatedData.modelId } : {}),
     });
 
-    await supervisor
-      .getPeer(workspaceSessionId, coordinator.sessionId)
-      .request('ent/session/configure', {
+    await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: coordinator.sessionId,
+      method: 'ent/session/configure',
+      requestParams: {
         ...(typeof validatedData.providerInstanceId === 'string'
           ? { connectionId: validatedData.providerInstanceId }
           : {}),
         ...(typeof validatedData.modelId === 'string' ? { modelId: validatedData.modelId } : {}),
         approvalMode,
-      });
+      },
+    });
 
     return createSuperjsonResponse({
       configuration: {

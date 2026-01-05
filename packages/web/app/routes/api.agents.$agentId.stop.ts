@@ -19,16 +19,20 @@ export async function action({ request, params }: Route.ActionArgs) {
       return createErrorResponse('Invalid agent ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const supervisor = getSupervisor();
-    const workspace = supervisor
-      .listWorkspaceSessions()
-      .find((ws) => ws.agents.some((a) => a.sessionId === agentId));
+    const supervisor = await getSupervisor();
+    const workspace = (await supervisor.listWorkspaceSessions()).find((ws) =>
+      ws.agents.some((a) => a.sessionId === agentId)
+    );
 
     if (!workspace) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    supervisor.getPeer(workspace.workspaceSessionId, agentId).notify('session/cancel');
+    await supervisor.agentNotify({
+      workspaceSessionId: workspace.workspaceSessionId,
+      sessionId: agentId,
+      method: 'session/cancel',
+    });
 
     return createSuperjsonResponse({
       success: true,

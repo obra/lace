@@ -25,11 +25,11 @@ const AgentUpdateSchema = z
     { message: 'Both providerInstanceId and modelId must be provided together' }
   );
 
-function findWorkspaceForAgentSession(agentSessionId: string) {
-  const supervisor = getSupervisor();
-  const record = supervisor
-    .listWorkspaceSessions()
-    .find((ws) => ws.agents.some((a) => a.sessionId === agentSessionId));
+async function findWorkspaceForAgentSession(agentSessionId: string) {
+  const supervisor = await getSupervisor();
+  const record = (await supervisor.listWorkspaceSessions()).find((ws) =>
+    ws.agents.some((a) => a.sessionId === agentSessionId)
+  );
 
   return { supervisor, record };
 }
@@ -42,7 +42,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const { record } = findWorkspaceForAgentSession(agentId);
+    const { record } = await findWorkspaceForAgentSession(agentId);
     if (!record) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
@@ -100,7 +100,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       throw zodError;
     }
 
-    const { supervisor, record } = findWorkspaceForAgentSession(agentId);
+    const { supervisor, record } = await findWorkspaceForAgentSession(agentId);
     if (!record) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
@@ -129,7 +129,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       }
     }
 
-    supervisor.upsertAgentSessionMeta(record.workspaceSessionId, {
+    await supervisor.upsertAgentSessionMeta(record.workspaceSessionId, {
       sessionId: agentId,
       ...(typeof validatedData.name === 'string' ? { name: validatedData.name } : {}),
       ...(typeof validatedData.providerInstanceId === 'string'
@@ -139,15 +139,18 @@ export async function action({ request, params }: Route.ActionArgs) {
     });
 
     if (validatedData.providerInstanceId && validatedData.modelId) {
-      await supervisor
-        .getPeer(record.workspaceSessionId, agentId)
-        .request('ent/session/configure', {
+      await supervisor.agentRequest({
+        workspaceSessionId: record.workspaceSessionId,
+        sessionId: agentId,
+        method: 'ent/session/configure',
+        requestParams: {
           connectionId: validatedData.providerInstanceId,
           modelId: validatedData.modelId,
-        });
+        },
+      });
     }
 
-    const updated = supervisor.getWorkspaceSession(record.workspaceSessionId);
+    const updated = await supervisor.getWorkspaceSession(record.workspaceSessionId);
     const updatedMeta = updated?.agents.find((a) => a.sessionId === agentId);
 
     return createSuperjsonResponse({

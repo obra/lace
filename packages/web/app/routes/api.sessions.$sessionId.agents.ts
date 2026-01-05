@@ -40,8 +40,8 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     }
     const workspaceSessionId = sessionIdParam;
 
-    const supervisor = getSupervisor();
-    const record = supervisor.getWorkspaceSession(workspaceSessionId);
+    const supervisor = await getSupervisor();
+    const record = await supervisor.getWorkspaceSession(workspaceSessionId);
     if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
@@ -86,9 +86,9 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const body: CreateAgentRequest = bodyData;
 
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
 
-    const ws = supervisor.getWorkspaceSession(workspaceSessionId);
+    const ws = await supervisor.getWorkspaceSession(workspaceSessionId);
     if (!ws) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
@@ -111,19 +111,22 @@ export async function action({ request, params }: Route.ActionArgs) {
       );
     }
 
-    supervisor.upsertAgentSessionMeta(workspaceSessionId, {
+    await supervisor.upsertAgentSessionMeta(workspaceSessionId, {
       sessionId: created.sessionId,
       name: agentName,
       connectionId: body.providerInstanceId,
       modelId: body.modelId,
     });
 
-    const peer = supervisor.getPeer(workspaceSessionId, created.sessionId);
-
-    await peer.request('ent/session/configure', {
-      connectionId: body.providerInstanceId,
-      modelId: body.modelId,
-      approvalMode: 'ask',
+    await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: created.sessionId,
+      method: 'ent/session/configure',
+      requestParams: {
+        connectionId: body.providerInstanceId,
+        modelId: body.modelId,
+        approvalMode: 'ask',
+      },
     });
 
     const requestedPersona = typeof body.persona === 'string' ? body.persona.trim() : '';
@@ -145,9 +148,14 @@ export async function action({ request, params }: Route.ActionArgs) {
     const systemPrompt = await promptManager.generateSystemPrompt(persona);
     if (systemPrompt.trim()) {
       try {
-        peer.notify('ent/session/inject', {
-          content: [{ type: 'text', text: systemPrompt }],
-          priority: 'immediate',
+        await supervisor.agentNotify({
+          workspaceSessionId,
+          sessionId: created.sessionId,
+          method: 'ent/session/inject',
+          notifyParams: {
+            content: [{ type: 'text', text: systemPrompt }],
+            priority: 'immediate',
+          },
         });
       } catch (error) {
         console.error('Failed to inject persona prompt:', error);

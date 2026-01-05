@@ -29,11 +29,11 @@ describe('Agent API', () => {
   });
 
   it('GET /api/agents/:agentId returns agent details when found', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
     const spawned = await supervisor.createAgentSession(created.workspaceSessionId);
 
-    supervisor.upsertAgentSessionMeta(created.workspaceSessionId, {
+    await supervisor.upsertAgentSessionMeta(created.workspaceSessionId, {
       sessionId: spawned.sessionId,
       name: 'Test Agent',
       connectionId: 'conn_test',
@@ -87,7 +87,7 @@ describe('Agent API', () => {
     });
 
     try {
-      const supervisor = getSupervisor();
+      const supervisor = await getSupervisor();
       const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
       const spawned = await supervisor.createAgentSession(created.workspaceSessionId);
 
@@ -115,9 +115,12 @@ describe('Agent API', () => {
       expect(data.providerInstanceId).toBe(providerInstanceId);
       expect(data.modelId).toBe('claude-3-5-haiku-20241022');
 
-      const status = (await supervisor
-        .getPeer(created.workspaceSessionId, spawned.sessionId)
-        .request('ent/agent/status', {})) as {
+      const status = (await supervisor.agentRequest({
+        workspaceSessionId: created.workspaceSessionId,
+        sessionId: spawned.sessionId,
+        method: 'ent/agent/status',
+        requestParams: {},
+      })) as {
         currentSession?: { connectionId?: string; modelId?: string };
       };
 

@@ -144,11 +144,12 @@ async function getInjectedText(
   workspaceSessionId: string,
   agentSessionId: string
 ): Promise<string> {
-  const supervisor = getSupervisor();
-  const peer = supervisor.getPeer(workspaceSessionId, agentSessionId);
-
-  const result = (await peer.request('ent/session/events', {
-    types: ['context_injected'],
+  const supervisor = await getSupervisor();
+  const result = (await supervisor.agentRequest({
+    workspaceSessionId,
+    sessionId: agentSessionId,
+    method: 'ent/session/events',
+    requestParams: { types: ['context_injected'] },
   })) as { events: Array<{ type: string; data: Record<string, unknown> }>; hasMore: boolean };
 
   const injected = result.events.find((e) => e.type === 'context_injected');

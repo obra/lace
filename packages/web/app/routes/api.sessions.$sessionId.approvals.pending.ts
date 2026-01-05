@@ -16,19 +16,19 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     }
 
     const workspaceSessionId = sessionIdParam;
-    const supervisor = getSupervisor();
-    const record = supervisor.getWorkspaceSession(workspaceSessionId);
+    const supervisor = await getSupervisor();
+    const record = await supervisor.getWorkspaceSession(workspaceSessionId);
     if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const pending = listPendingPermissions(workspaceSessionId);
+    const pending = await listPendingPermissions(workspaceSessionId);
     const approvals: SessionPendingApproval[] = pending.map((p) => {
       const toolName =
         typeof p.toolCall?.name === 'string'
           ? p.toolCall.name
-          : typeof p.params.tool === 'string'
-            ? p.params.tool
+          : typeof p.request.tool === 'string'
+            ? p.request.tool
             : '';
       const toolCall = {
         name: toolName,
@@ -38,7 +38,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       return {
         toolCallId: p.toolCallId,
         toolCall,
-        requestedAt: p.requestedAt,
+        requestedAt: new Date(p.requestedAt),
         requestData: {
           requestId: p.toolCallId,
           toolName: toolCall.name,

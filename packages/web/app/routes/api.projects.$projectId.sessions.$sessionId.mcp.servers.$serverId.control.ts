@@ -63,8 +63,8 @@ export async function action({
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const supervisor = getSupervisor();
-    const workspaceSession = supervisor.getWorkspaceSession(sessionId);
+    const supervisor = await getSupervisor();
+    const workspaceSession = await supervisor.getWorkspaceSession(sessionId);
     if (!workspaceSession || workspaceSession.projectId !== projectId) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
@@ -75,23 +75,25 @@ export async function action({
       return createErrorResponse(`MCP server '${serverId}' not found`, 404);
     }
 
-    const peer = supervisor.getPeer(sessionId);
-
     try {
       // Perform the requested action
       switch (action) {
         case 'start':
-          await peer.request('ent/session/configure', {
-            mcpServers: [
-              {
-                name: serverId,
-                command: serverConfig.command,
-                ...(serverConfig.args ? { args: serverConfig.args } : {}),
-                ...(serverConfig.env ? { env: serverConfig.env } : {}),
-                enabled: true,
-                tools: serverConfig.tools,
-              },
-            ],
+          await supervisor.agentRequest({
+            workspaceSessionId: sessionId,
+            method: 'ent/session/configure',
+            requestParams: {
+              mcpServers: [
+                {
+                  name: serverId,
+                  command: serverConfig.command,
+                  ...(serverConfig.args ? { args: serverConfig.args } : {}),
+                  ...(serverConfig.env ? { env: serverConfig.env } : {}),
+                  enabled: true,
+                  tools: serverConfig.tools,
+                },
+              ],
+            },
           });
           return createSuperjsonResponse({
             message: `Server start initiated for '${serverId}'`,
@@ -100,17 +102,21 @@ export async function action({
           });
 
         case 'stop':
-          await peer.request('ent/session/configure', {
-            mcpServers: [
-              {
-                name: serverId,
-                command: serverConfig.command,
-                ...(serverConfig.args ? { args: serverConfig.args } : {}),
-                ...(serverConfig.env ? { env: serverConfig.env } : {}),
-                enabled: false,
-                tools: serverConfig.tools,
-              },
-            ],
+          await supervisor.agentRequest({
+            workspaceSessionId: sessionId,
+            method: 'ent/session/configure',
+            requestParams: {
+              mcpServers: [
+                {
+                  name: serverId,
+                  command: serverConfig.command,
+                  ...(serverConfig.args ? { args: serverConfig.args } : {}),
+                  ...(serverConfig.env ? { env: serverConfig.env } : {}),
+                  enabled: false,
+                  tools: serverConfig.tools,
+                },
+              ],
+            },
           });
           return createSuperjsonResponse({
             message: `Server stop initiated for '${serverId}'`,
@@ -120,29 +126,37 @@ export async function action({
 
         case 'restart':
           // Stop then start
-          await peer.request('ent/session/configure', {
-            mcpServers: [
-              {
-                name: serverId,
-                command: serverConfig.command,
-                ...(serverConfig.args ? { args: serverConfig.args } : {}),
-                ...(serverConfig.env ? { env: serverConfig.env } : {}),
-                enabled: false,
-                tools: serverConfig.tools,
-              },
-            ],
+          await supervisor.agentRequest({
+            workspaceSessionId: sessionId,
+            method: 'ent/session/configure',
+            requestParams: {
+              mcpServers: [
+                {
+                  name: serverId,
+                  command: serverConfig.command,
+                  ...(serverConfig.args ? { args: serverConfig.args } : {}),
+                  ...(serverConfig.env ? { env: serverConfig.env } : {}),
+                  enabled: false,
+                  tools: serverConfig.tools,
+                },
+              ],
+            },
           });
-          await peer.request('ent/session/configure', {
-            mcpServers: [
-              {
-                name: serverId,
-                command: serverConfig.command,
-                ...(serverConfig.args ? { args: serverConfig.args } : {}),
-                ...(serverConfig.env ? { env: serverConfig.env } : {}),
-                enabled: true,
-                tools: serverConfig.tools,
-              },
-            ],
+          await supervisor.agentRequest({
+            workspaceSessionId: sessionId,
+            method: 'ent/session/configure',
+            requestParams: {
+              mcpServers: [
+                {
+                  name: serverId,
+                  command: serverConfig.command,
+                  ...(serverConfig.args ? { args: serverConfig.args } : {}),
+                  ...(serverConfig.env ? { env: serverConfig.env } : {}),
+                  enabled: true,
+                  tools: serverConfig.tools,
+                },
+              ],
+            },
           });
           return createSuperjsonResponse({
             message: `Server restart initiated for '${serverId}'`,

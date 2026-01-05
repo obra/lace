@@ -45,10 +45,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       });
     }
 
-    const supervisor = getSupervisor();
-    const workspace = supervisor
-      .listWorkspaceSessions()
-      .find((ws) => ws.agents.some((a) => a.sessionId === agentId));
+    const supervisor = await getSupervisor();
+    const workspace = (await supervisor.listWorkspaceSessions()).find((ws) =>
+      ws.agents.some((a) => a.sessionId === agentId)
+    );
 
     if (!workspace) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });

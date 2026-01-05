@@ -14,29 +14,29 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       return createErrorResponse('Invalid thread ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const supervisor = getSupervisor();
-    const workspace = supervisor
-      .listWorkspaceSessions()
-      .find((ws) => ws.agents.some((a) => a.sessionId === threadIdParam));
+    const supervisor = await getSupervisor();
+    const workspace = (await supervisor.listWorkspaceSessions()).find((ws) =>
+      ws.agents.some((a) => a.sessionId === threadIdParam)
+    );
     if (!workspace) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const pending = listPendingPermissions(workspace.workspaceSessionId)
+    const pending = (await listPendingPermissions(workspace.workspaceSessionId))
       .filter((p) => p.agentSessionId === threadIdParam)
       .map((p) => {
         const toolName =
           typeof p.toolCall?.name === 'string'
             ? p.toolCall.name
-            : typeof p.params.tool === 'string'
-              ? p.params.tool
+            : typeof p.request.tool === 'string'
+              ? p.request.tool
               : '';
         const toolCall = { name: toolName, arguments: p.toolCall?.arguments ?? {} };
 
         return {
           toolCallId: p.toolCallId,
           toolCall,
-          requestedAt: p.requestedAt,
+          requestedAt: new Date(p.requestedAt),
           requestData: {
             requestId: p.toolCallId,
             toolName: toolCall.name,

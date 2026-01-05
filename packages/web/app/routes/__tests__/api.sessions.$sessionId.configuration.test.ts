@@ -36,9 +36,9 @@ describe('Session Configuration API', () => {
   });
 
   it('GET /api/sessions/:sessionId/configuration returns coordinator config', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
-    supervisor.upsertAgentSessionMeta(created.workspaceSessionId, {
+    await supervisor.upsertAgentSessionMeta(created.workspaceSessionId, {
       sessionId: created.sessionId,
       connectionId: 'conn_test',
       modelId: 'model_test',
@@ -78,7 +78,7 @@ describe('Session Configuration API', () => {
   });
 
   it('PUT /api/sessions/:sessionId/configuration updates coordinator config', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
     const request = new Request(
@@ -140,7 +140,7 @@ describe('Session Configuration API', () => {
   });
 
   it('PUT /api/sessions/:sessionId/configuration validates configuration data', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
     const request = new Request(

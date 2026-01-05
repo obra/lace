@@ -24,8 +24,8 @@ export async function loader({ params }: { params: LoaderParams }) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const supervisor = getSupervisor();
-    const record = supervisor.getWorkspaceSession(sessionId);
+    const supervisor = await getSupervisor();
+    const record = await supervisor.getWorkspaceSession(sessionId);
     if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }

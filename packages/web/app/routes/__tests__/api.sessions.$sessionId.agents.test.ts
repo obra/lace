@@ -437,8 +437,8 @@ describe('Agent Spawning API E2E Tests', () => {
       expect(spawnResponse.status).toBe(201);
 
       const spawned = await parseResponse<ApiAgent>(spawnResponse);
-      const supervisor = getSupervisor();
-      const record = supervisor.getWorkspaceSession(workspaceSessionId);
+      const supervisor = await getSupervisor();
+      const record = await supervisor.getWorkspaceSession(workspaceSessionId);
       expect(record).toBeDefined();
       expect(record!.agents.some((a) => a.sessionId === spawned.threadId)).toBe(true);
     });

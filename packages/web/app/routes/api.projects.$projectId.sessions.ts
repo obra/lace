@@ -28,9 +28,8 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const supervisor = getSupervisor();
-    const sessions = supervisor
-      .listWorkspaceSessions()
+    const supervisor = await getSupervisor();
+    const sessions = (await supervisor.listWorkspaceSessions())
       .filter((s) => s.projectId === projectId)
       .map((s) => ({
         id: s.workspaceSessionId,
@@ -75,19 +74,24 @@ export async function action({ request, params }: Route.ActionArgs) {
       sessionName = 'New Session';
     }
 
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(project.getWorkingDirectory());
-    supervisor.updateWorkspaceSession(created.workspaceSessionId, { projectId, name: sessionName });
-    supervisor.upsertAgentSessionMeta(created.workspaceSessionId, {
+    await supervisor.updateWorkspaceSession(created.workspaceSessionId, {
+      projectId,
+      name: sessionName,
+    });
+    await supervisor.upsertAgentSessionMeta(created.workspaceSessionId, {
       sessionId: created.sessionId,
       name: 'coordinator',
       connectionId: validatedData.providerInstanceId,
       modelId: validatedData.modelId,
     });
 
-    await supervisor
-      .getPeer(created.workspaceSessionId, created.sessionId)
-      .request('ent/session/configure', {
+    await supervisor.agentRequest({
+      workspaceSessionId: created.workspaceSessionId,
+      sessionId: created.sessionId,
+      method: 'ent/session/configure',
+      requestParams: {
         connectionId: validatedData.providerInstanceId,
         modelId: validatedData.modelId,
         approvalMode: 'ask',
@@ -99,7 +103,8 @@ export async function action({ request, params }: Route.ActionArgs) {
           enabled: config.enabled,
           tools: config.tools,
         })),
-      });
+      },
+    });
 
     const sessionData = {
       id: created.workspaceSessionId,
@@ -177,8 +182,8 @@ async function spawnSessionNamingHelper(
       modelId: fallbackModel.modelId,
     });
 
-    const supervisor = getSupervisor();
-    supervisor.updateWorkspaceSession(workspaceSessionId, { name: generatedName });
+    const supervisor = await getSupervisor();
+    await supervisor.updateWorkspaceSession(workspaceSessionId, { name: generatedName });
 
     // Emit SESSION_UPDATED event via SSE
     const eventManager = EventStreamManager.getInstance();

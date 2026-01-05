@@ -30,9 +30,9 @@ describe('Project workspace session API', () => {
 
   it('GET returns workspace session when it belongs to project', async () => {
     const project = Project.create('Test Project', context.tempProjectDir);
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
-    supervisor.updateWorkspaceSession(created.workspaceSessionId, {
+    await supervisor.updateWorkspaceSession(created.workspaceSessionId, {
       projectId: project.getId(),
       name: 'Test Session',
     });
@@ -107,9 +107,9 @@ describe('Project workspace session API', () => {
 
   it('PATCH updates workspace session name', async () => {
     const project = Project.create('Test Project', context.tempProjectDir);
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
-    supervisor.updateWorkspaceSession(created.workspaceSessionId, {
+    await supervisor.updateWorkspaceSession(created.workspaceSessionId, {
       projectId: project.getId(),
       name: 'Old Name',
     });
@@ -139,9 +139,9 @@ describe('Project workspace session API', () => {
 
   it('DELETE removes workspace session', async () => {
     const project = Project.create('Test Project', context.tempProjectDir);
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
-    supervisor.updateWorkspaceSession(created.workspaceSessionId, {
+    await supervisor.updateWorkspaceSession(created.workspaceSessionId, {
       projectId: project.getId(),
       name: 'To Delete',
     });
@@ -162,6 +162,6 @@ describe('Project workspace session API', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(supervisor.getWorkspaceSession(created.workspaceSessionId)).toBeUndefined();
+    expect(await supervisor.getWorkspaceSession(created.workspaceSessionId)).toBeUndefined();
   });
 });

@@ -46,15 +46,15 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
         toolCallId: 'call_a',
         agentSessionId: threadId,
         toolCall: { name: 'file_write', arguments: { path: 'a.txt' } },
-        params: {},
-        requestedAt: new Date('2025-01-24T12:00:00.000Z'),
+        request: { tool: 'file_write' },
+        requestedAt: '2025-01-24T12:00:00.000Z',
       },
       {
         toolCallId: 'call_b',
         agentSessionId: 'agent_2',
         toolCall: { name: 'file_write', arguments: { path: 'b.txt' } },
-        params: {},
-        requestedAt: new Date('2025-01-24T12:01:00.000Z'),
+        request: { tool: 'file_write' },
+        requestedAt: '2025-01-24T12:01:00.000Z',
       },
     ]);
 

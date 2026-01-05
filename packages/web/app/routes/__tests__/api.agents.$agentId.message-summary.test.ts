@@ -50,7 +50,7 @@ describe('Agent Message Endpoint (supervisor-backed)', () => {
   });
 
   it('records a prompt durable event when user sends message', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
     const request = new Request(`http://localhost:3000/api/agents/${created.sessionId}/message`, {
@@ -70,11 +70,13 @@ describe('Agent Message Endpoint (supervisor-backed)', () => {
 
     expect(response.status).toBe(202);
 
-    const peer = supervisor.getPeer(created.workspaceSessionId, created.sessionId);
     const getEvents = async (): Promise<DurableEvent[]> => {
-      const result = (await peer.request('ent/session/events', { limit: 200 })) as {
-        events: DurableEvent[];
-      };
+      const result = (await supervisor.agentRequest({
+        workspaceSessionId: created.workspaceSessionId,
+        sessionId: created.sessionId,
+        method: 'ent/session/events',
+        requestParams: { limit: 200 },
+      })) as { events: DurableEvent[] };
       return result.events;
     };
 

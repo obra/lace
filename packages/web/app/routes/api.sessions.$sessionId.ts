@@ -30,8 +30,8 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     const workspaceSessionId = sessionIdParam;
 
-    const supervisor = getSupervisor();
-    const record = supervisor.getWorkspaceSession(workspaceSessionId);
+    const supervisor = await getSupervisor();
+    const record = await supervisor.getWorkspaceSession(workspaceSessionId);
 
     if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
@@ -40,9 +40,12 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     const agentsWithStatus = await Promise.all(
       record.agents.map(async (agent) => {
         try {
-          const status = (await supervisor
-            .getPeer(workspaceSessionId, agent.sessionId)
-            .request('ent/agent/status', {})) as unknown;
+          const status = (await supervisor.agentRequest({
+            workspaceSessionId,
+            sessionId: agent.sessionId,
+            method: 'ent/agent/status',
+            requestParams: {},
+          })) as unknown;
 
           const statusRecord = status as {
             currentTurn?: { status?: string } | undefined;
@@ -117,8 +120,8 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const workspaceSessionId = sessionIdParam;
 
-    const supervisor = getSupervisor();
-    const existing = supervisor.getWorkspaceSession(workspaceSessionId);
+    const supervisor = await getSupervisor();
+    const existing = await supervisor.getWorkspaceSession(workspaceSessionId);
     if (!existing) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
@@ -136,11 +139,11 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const updates = bodyResult.data;
 
-    supervisor.updateWorkspaceSession(workspaceSessionId, {
+    await supervisor.updateWorkspaceSession(workspaceSessionId, {
       ...(typeof updates.name === 'string' ? { name: updates.name } : {}),
     });
 
-    const record = supervisor.getWorkspaceSession(workspaceSessionId);
+    const record = await supervisor.getWorkspaceSession(workspaceSessionId);
     if (!record) {
       return createErrorResponse('Session not found after update', 500, {
         code: 'INTERNAL_SERVER_ERROR',

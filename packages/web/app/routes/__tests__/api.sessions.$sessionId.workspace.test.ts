@@ -51,7 +51,7 @@ describe('GET /api/sessions/:sessionId/workspace', () => {
   });
 
   it('returns workspace info for a workspace session', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
     const request = new Request(

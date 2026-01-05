@@ -18,10 +18,10 @@ const CreateProjectSchema = z.object({
 export async function loader({ request: _request }: Route.LoaderArgs) {
   try {
     const projects = Project.getAll();
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const sessionCounts = new Map<string, number>();
 
-    for (const session of supervisor.listWorkspaceSessions()) {
+    for (const session of await supervisor.listWorkspaceSessions()) {
       if (!session.projectId) continue;
       sessionCounts.set(session.projectId, (sessionCounts.get(session.projectId) ?? 0) + 1);
     }

@@ -71,15 +71,15 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const { decision } = bodyResult.data;
 
-    const supervisor = getSupervisor();
-    const workspace = supervisor
-      .listWorkspaceSessions()
-      .find((ws) => ws.agents.some((a) => a.sessionId === threadId));
+    const supervisor = await getSupervisor();
+    const workspace = (await supervisor.listWorkspaceSessions()).find((ws) =>
+      ws.agents.some((a) => a.sessionId === threadId)
+    );
     if (!workspace) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const pending = listPendingPermissions(workspace.workspaceSessionId).find(
+    const pending = (await listPendingPermissions(workspace.workspaceSessionId)).find(
       (p) => p.toolCallId === toolCallId
     );
     if (!pending || pending.agentSessionId !== threadId) {
@@ -87,9 +87,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     const mappedDecision = decision === 'deny' ? 'deny' : 'allow';
-    const resolved = resolvePendingPermission({
+    const resolved = await resolvePendingPermission({
       workspaceSessionId: workspace.workspaceSessionId,
-      agentSessionId: threadId,
       toolCallId,
       decision: mappedDecision,
     });

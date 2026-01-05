@@ -29,13 +29,17 @@ export async function loader({ params }: { params: unknown; context: unknown; re
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const supervisor = getSupervisor();
-    const workspaceSession = supervisor.getWorkspaceSession(sessionId);
+    const supervisor = await getSupervisor();
+    const workspaceSession = await supervisor.getWorkspaceSession(sessionId);
     if (!workspaceSession || workspaceSession.projectId !== projectId) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const status = (await supervisor.getPeer(sessionId).request('ent/agent/status')) as {
+    const status = (await supervisor.agentRequest({
+      workspaceSessionId: sessionId,
+      method: 'ent/agent/status',
+      requestParams: {},
+    })) as {
       mcpServers?: Array<{
         name: string;
         status: 'connected' | 'connecting' | 'disconnected' | 'error';

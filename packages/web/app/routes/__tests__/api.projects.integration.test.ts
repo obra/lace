@@ -74,11 +74,15 @@ describe('Projects API Integration Tests', () => {
       });
 
       // Create workspace sessions for project1 to test session counting
-      const supervisor = getSupervisor();
+      const supervisor = await getSupervisor();
       const ws1 = await supervisor.createWorkspaceSession(project1Dir);
       const ws2 = await supervisor.createWorkspaceSession(project1Dir);
-      supervisor.updateWorkspaceSession(ws1.workspaceSessionId, { projectId: project1.getId() });
-      supervisor.updateWorkspaceSession(ws2.workspaceSessionId, { projectId: project1.getId() });
+      await supervisor.updateWorkspaceSession(ws1.workspaceSessionId, {
+        projectId: project1.getId(),
+      });
+      await supervisor.updateWorkspaceSession(ws2.workspaceSessionId, {
+        projectId: project1.getId(),
+      });
 
       const response = await loader(
         createLoaderArgs(new Request('http://localhost/api/projects'), {})

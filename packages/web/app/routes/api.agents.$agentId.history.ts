@@ -159,20 +159,23 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       return createErrorResponse('Invalid agent ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const supervisor = getSupervisor();
-    const workspace = supervisor
-      .listWorkspaceSessions()
-      .find((ws) => ws.agents.some((a) => a.sessionId === agentId));
+    const supervisor = await getSupervisor();
+    const workspace = (await supervisor.listWorkspaceSessions()).find((ws) =>
+      ws.agents.some((a) => a.sessionId === agentId)
+    );
 
     if (!workspace) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const result = (await supervisor
-      .getPeer(workspace.workspaceSessionId, agentId)
-      .request('ent/session/events', {
+    const result = (await supervisor.agentRequest({
+      workspaceSessionId: workspace.workspaceSessionId,
+      sessionId: agentId,
+      method: 'ent/session/events',
+      requestParams: {
         limit: 5000,
-      })) as { events: DurableEvent[] };
+      },
+    })) as { events: DurableEvent[] };
 
     const events = durableEventsToLaceEvents(
       agentId,

@@ -20,12 +20,12 @@ describe('Session Detail API Route', () => {
   });
 
   it('GET /api/sessions/:sessionId returns session details with agents', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
-    supervisor.updateWorkspaceSession(created.workspaceSessionId, { name: 'Test Session' });
+    await supervisor.updateWorkspaceSession(created.workspaceSessionId, { name: 'Test Session' });
 
     const spawned = await supervisor.createAgentSession(created.workspaceSessionId);
-    supervisor.upsertAgentSessionMeta(created.workspaceSessionId, {
+    await supervisor.upsertAgentSessionMeta(created.workspaceSessionId, {
       sessionId: spawned.sessionId,
       name: 'Agent-1',
     });
@@ -71,9 +71,9 @@ describe('Session Detail API Route', () => {
   });
 
   it('PATCH /api/sessions/:sessionId updates session name', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
-    supervisor.updateWorkspaceSession(created.workspaceSessionId, { name: 'Before' });
+    await supervisor.updateWorkspaceSession(created.workspaceSessionId, { name: 'Before' });
 
     const request = new Request(`http://localhost/api/sessions/${created.workspaceSessionId}`, {
       method: 'PATCH',
@@ -90,7 +90,7 @@ describe('Session Detail API Route', () => {
     expect(data.id).toBe(created.workspaceSessionId);
     expect(data.name).toBe('After');
 
-    const reloaded = supervisor.getWorkspaceSession(created.workspaceSessionId);
+    const reloaded = await supervisor.getWorkspaceSession(created.workspaceSessionId);
     expect(reloaded?.name).toBe('After');
   });
 });

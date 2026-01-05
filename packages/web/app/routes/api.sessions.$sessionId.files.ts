@@ -34,8 +34,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       return createErrorResponse('Invalid session ID', 400, { code: 'INVALID_REQUEST' });
     }
 
-    const supervisor = getSupervisor();
-    const record = supervisor.getWorkspaceSession(sessionId);
+    const supervisor = await getSupervisor();
+    const record = await supervisor.getWorkspaceSession(sessionId);
     if (!record) {
       return createErrorResponse('Session not found', 404, { code: 'SESSION_NOT_FOUND' });
     }

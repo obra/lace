@@ -23,7 +23,7 @@ describe('Supervisor-backed agent token usage (not supported)', () => {
   });
 
   it('GET /api/agents/:agentId returns tokenUsage as undefined', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
     const request = new Request(`http://localhost:3000/api/agents/${created.sessionId}`);
@@ -35,7 +35,7 @@ describe('Supervisor-backed agent token usage (not supported)', () => {
   });
 
   it('GET /api/agents/:agentId/context returns 501 NOT_SUPPORTED', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
     const request = new Request(`http://localhost:3000/api/agents/${created.sessionId}/context`);

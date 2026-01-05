@@ -35,7 +35,7 @@ describe('/api/sessions/:sessionId/files/:path', () => {
     const binaryData = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
     await fs.writeFile(join(testDir, 'image.png'), binaryData);
 
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(testDir);
     workspaceSessionId = created.workspaceSessionId;
   });

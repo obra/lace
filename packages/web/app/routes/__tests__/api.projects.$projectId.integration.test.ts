@@ -88,11 +88,15 @@ describe('Individual Project API Integration Tests', () => {
     });
 
     it('should return project with correct session count', async () => {
-      const supervisor = getSupervisor();
+      const supervisor = await getSupervisor();
       const ws1 = await supervisor.createWorkspaceSession(testProjectDir);
       const ws2 = await supervisor.createWorkspaceSession(testProjectDir);
-      supervisor.updateWorkspaceSession(ws1.workspaceSessionId, { projectId: testProject.getId() });
-      supervisor.updateWorkspaceSession(ws2.workspaceSessionId, { projectId: testProject.getId() });
+      await supervisor.updateWorkspaceSession(ws1.workspaceSessionId, {
+        projectId: testProject.getId(),
+      });
+      await supervisor.updateWorkspaceSession(ws2.workspaceSessionId, {
+        projectId: testProject.getId(),
+      });
 
       const request = new Request(`http://localhost/api/projects/${testProject.getId()}`);
       const response = await loader(createLoaderArgs(request, { projectId: testProject.getId() }));
@@ -332,11 +336,15 @@ describe('Individual Project API Integration Tests', () => {
     });
 
     it('should delete project with sessions', async () => {
-      const supervisor = getSupervisor();
+      const supervisor = await getSupervisor();
       const ws1 = await supervisor.createWorkspaceSession(testProjectDir);
       const ws2 = await supervisor.createWorkspaceSession(testProjectDir);
-      supervisor.updateWorkspaceSession(ws1.workspaceSessionId, { projectId: testProject.getId() });
-      supervisor.updateWorkspaceSession(ws2.workspaceSessionId, { projectId: testProject.getId() });
+      await supervisor.updateWorkspaceSession(ws1.workspaceSessionId, {
+        projectId: testProject.getId(),
+      });
+      await supervisor.updateWorkspaceSession(ws2.workspaceSessionId, {
+        projectId: testProject.getId(),
+      });
 
       const projectId = testProject.getId();
       const request = new Request(`http://localhost/api/projects/${projectId}`, {

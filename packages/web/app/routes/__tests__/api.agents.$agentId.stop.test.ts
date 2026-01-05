@@ -20,7 +20,7 @@ describe('/api/agents/[agentId]/stop', () => {
   });
 
   it('stops an agent session', async () => {
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
     const request = new Request(`http://localhost/api/agents/${created.sessionId}/stop`, {

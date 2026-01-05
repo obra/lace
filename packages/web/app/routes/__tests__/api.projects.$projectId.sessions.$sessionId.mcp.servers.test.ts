@@ -68,13 +68,17 @@ describe('Session MCP Server Status API', () => {
 
     const project = Project.create('Test Project', context.tempProjectDir);
 
-    const supervisor = getSupervisor();
+    const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
-    supervisor.updateWorkspaceSession(created.workspaceSessionId, { projectId: project.getId() });
+    await supervisor.updateWorkspaceSession(created.workspaceSessionId, {
+      projectId: project.getId(),
+    });
 
-    await supervisor
-      .getPeer(created.workspaceSessionId, created.sessionId)
-      .request('ent/session/configure', {
+    await supervisor.agentRequest({
+      workspaceSessionId: created.workspaceSessionId,
+      sessionId: created.sessionId,
+      method: 'ent/session/configure',
+      requestParams: {
         mcpServers: Object.entries(project.getMCPServers()).map(([name, config]) => ({
           name,
           command: config.command,
@@ -83,7 +87,8 @@ describe('Session MCP Server Status API', () => {
           enabled: config.enabled,
           tools: config.tools,
         })),
-      });
+      },
+    });
 
     const request = new Request(
       `http://localhost/api/projects/${project.getId()}/sessions/${created.workspaceSessionId}/mcp/servers`
