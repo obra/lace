@@ -18,6 +18,7 @@ export const EntErrorCodes = {
   CheckpointNotFound: 12,
   StructuredOutputInvalid: 13,
   ConnectionNotFound: 14,
+  McpServerNotFound: 15,
 } as const;
 
 export type EntErrorCode = (typeof EntErrorCodes)[keyof typeof EntErrorCodes];

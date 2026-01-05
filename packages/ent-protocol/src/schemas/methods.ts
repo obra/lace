@@ -1115,6 +1115,177 @@ export const EntToolsListResponseSchema = z
   })
   .strict();
 
+// ent/mcp/servers/list - List configured MCP servers
+const EntMcpServersListResultSchema = z
+  .object({
+    servers: z.array(
+      z
+        .object({
+          serverId: NonEmptyStringSchema,
+          name: NonEmptyStringSchema,
+          command: NonEmptyStringSchema,
+          args: z.array(z.string()).optional(),
+          enabled: z.boolean(),
+          status: z.enum(['stopped', 'starting', 'running', 'failed']),
+          lastError: z.string().optional(),
+          connectedAt: IsoTimestampSchema.optional(),
+          toolCount: z.number().optional(),
+        })
+        .strict()
+    ),
+  })
+  .strict();
+
+export const EntMcpServersListRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/mcp/servers/list'),
+    params: EmptyParamsSchema.optional(),
+  })
+  .strict();
+
+export const EntMcpServersListResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntMcpServersListResultSchema,
+  })
+  .strict();
+
+// ent/mcp/servers/upsert - Add or update an MCP server config
+const EntMcpServersUpsertParamsSchema = z
+  .object({
+    serverId: NonEmptyStringSchema.optional(),
+    name: NonEmptyStringSchema,
+    command: NonEmptyStringSchema,
+    args: z.array(z.string()).optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    enabled: z.boolean().optional(),
+    tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
+  })
+  .strict();
+
+const EntMcpServersUpsertResultSchema = z
+  .object({
+    serverId: NonEmptyStringSchema,
+    created: z.boolean(),
+  })
+  .strict();
+
+export const EntMcpServersUpsertRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/mcp/servers/upsert'),
+    params: EntMcpServersUpsertParamsSchema,
+  })
+  .strict();
+
+export const EntMcpServersUpsertResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntMcpServersUpsertResultSchema,
+  })
+  .strict();
+
+// ent/mcp/servers/delete - Remove an MCP server config
+const EntMcpServersDeleteParamsSchema = z
+  .object({
+    serverId: NonEmptyStringSchema,
+  })
+  .strict();
+
+export const EntMcpServersDeleteRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/mcp/servers/delete'),
+    params: EntMcpServersDeleteParamsSchema,
+  })
+  .strict();
+
+export const EntMcpServersDeleteResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: OkTrueResultSchema,
+  })
+  .strict();
+
+// ent/mcp/servers/test - Test an MCP server connection
+const EntMcpServersTestParamsSchema = z
+  .object({
+    serverId: NonEmptyStringSchema,
+  })
+  .strict();
+
+const EntMcpServersTestResultSchema = z
+  .object({
+    ok: z.boolean(),
+    error: z.string().optional(),
+    latencyMs: z.number().optional(),
+    toolCount: z.number().optional(),
+  })
+  .strict();
+
+export const EntMcpServersTestRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/mcp/servers/test'),
+    params: EntMcpServersTestParamsSchema,
+  })
+  .strict();
+
+export const EntMcpServersTestResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntMcpServersTestResultSchema,
+  })
+  .strict();
+
+// ent/mcp/tools/list - List tools from a specific MCP server
+const EntMcpToolsListParamsSchema = z
+  .object({
+    serverId: NonEmptyStringSchema,
+  })
+  .strict();
+
+const EntMcpToolsListResultSchema = z
+  .object({
+    serverId: NonEmptyStringSchema,
+    tools: z.array(
+      z
+        .object({
+          name: NonEmptyStringSchema,
+          description: z.string().optional(),
+          inputSchema: z.record(z.string(), z.unknown()).optional(),
+        })
+        .strict()
+    ),
+  })
+  .strict();
+
+export const EntMcpToolsListRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/mcp/tools/list'),
+    params: EntMcpToolsListParamsSchema,
+  })
+  .strict();
+
+export const EntMcpToolsListResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntMcpToolsListResultSchema,
+  })
+  .strict();
+
 const EntJobInjectParamsSchema = z
   .object({
     jobId: NonEmptyStringSchema,
@@ -1362,6 +1533,11 @@ export const EntProtocolRequestSchema = z.union([
   EntModelsListRequestSchema,
   EntModelsRefreshRequestSchema,
   EntToolsListRequestSchema,
+  EntMcpServersListRequestSchema,
+  EntMcpServersUpsertRequestSchema,
+  EntMcpServersDeleteRequestSchema,
+  EntMcpServersTestRequestSchema,
+  EntMcpToolsListRequestSchema,
   EntJobListRequestSchema,
   EntJobOutputRequestSchema,
   EntJobKillRequestSchema,

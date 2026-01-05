@@ -93,6 +93,56 @@ describe('protocol shapes (representative examples)', () => {
         params: { label: 'before-refactor' },
       })
     ).not.toThrow();
+
+    // MCP server management methods
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 9,
+        method: 'ent/mcp/servers/list',
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 10,
+        method: 'ent/mcp/servers/upsert',
+        params: {
+          name: 'test-server',
+          command: 'node',
+          args: ['server.js'],
+          enabled: true,
+        },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 11,
+        method: 'ent/mcp/servers/delete',
+        params: { serverId: 'test-server' },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 12,
+        method: 'ent/mcp/servers/test',
+        params: { serverId: 'test-server' },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 13,
+        method: 'ent/mcp/tools/list',
+        params: { serverId: 'test-server' },
+      })
+    ).not.toThrow();
   });
 
   it('parses representative agent->client notifications', () => {
