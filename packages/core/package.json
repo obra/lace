@@ -111,6 +111,10 @@
       "types": "./dist/tools/implementations/file_edit.d.ts",
       "import": "./dist/tools/implementations/file_edit.js"
     },
+    "./tools/implementations/delegate": {
+      "types": "./dist/tools/implementations/delegate.d.ts",
+      "import": "./dist/tools/implementations/delegate.js"
+    },
     "./projects/project": {
       "types": "./dist/projects/project.d.ts",
       "import": "./dist/projects/project.js"

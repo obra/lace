@@ -65,7 +65,6 @@ import type {
 import { TestAgentProvider } from './runtime/test-provider';
 import { MCPServerManager } from '@lace/core/mcp/server-manager';
 import type { MCPServerConfig } from '@lace/core/config/mcp-types';
-import { DelegateTool } from './tools/delegate';
 import { compactDroppedMessagesWithCore } from './compaction/compact-dropped-messages';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
@@ -345,7 +344,6 @@ function createToolExecutorForMode(
 } {
   const executor = new ToolExecutor();
   executor.registerAllAvailableTools();
-  executor.registerTools([new DelegateTool()]);
 
   if (mcpServerManager) {
     executor.registerMCPTools(mcpServerManager);

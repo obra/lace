@@ -1,19 +1,31 @@
+// ABOUTME: Delegate tool schema stub for subagent execution
+// ABOUTME: Executed by lace-agent runtime (not via ToolExecutor)
+
 import { z } from 'zod';
 import { Tool } from '@lace/core/tools/tool';
-import type { ToolContext, ToolResult } from '@lace/core/tools/types';
+import { NonEmptyString } from '@lace/core/tools/schemas/common';
+import type { ToolAnnotations, ToolContext, ToolResult } from '@lace/core/tools/types';
+
+const delegateSchema = z
+  .object({
+    prompt: NonEmptyString,
+  })
+  .strict();
 
 export class DelegateTool extends Tool {
   name = 'delegate';
   description =
     'Spawn a background subagent job and return its report (streamed job updates are available via ent/job/*).';
-  schema = z
-    .object({
-      prompt: z.string().min(1),
-    })
-    .strict();
+  schema = delegateSchema;
+  annotations: ToolAnnotations = {
+    title: 'Delegate',
+    destructiveHint: true,
+    openWorldHint: true,
+    readOnlySafe: false,
+  };
 
   protected async executeValidated(
-    _args: ReturnType<this['schema']['parse']>,
+    _args: z.infer<typeof delegateSchema>,
     _context: ToolContext
   ): Promise<ToolResult> {
     return {

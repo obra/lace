@@ -13,6 +13,7 @@ import { FileEditTool } from '@lace/core/tools/implementations/file_edit';
 import { RipgrepSearchTool } from '@lace/core/tools/implementations/ripgrep_search';
 import { FileFindTool } from '@lace/core/tools/implementations/file_find';
 import { UrlFetchTool } from '@lace/core/tools/implementations/url_fetch';
+import { DelegateTool } from '@lace/core/tools/implementations/delegate';
 import { MCPServerManager } from '@lace/core/mcp/server-manager';
 import type { MCPServerConnection } from '@lace/core/config/mcp-types';
 import { MCPToolAdapter } from '@lace/core/mcp/tool-adapter';
@@ -227,6 +228,7 @@ export class ToolExecutor {
       new RipgrepSearchTool(),
       new FileFindTool(),
       new UrlFetchTool(),
+      new DelegateTool(),
     ];
 
     this.registerTools(tools);
