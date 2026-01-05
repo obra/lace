@@ -10,7 +10,7 @@ import { setupCoreTest } from '@lace/agent/test-utils/core-test-setup';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
-// Compute source packages/core directory relative to this test file
+// Compute source packages/agent directory relative to this test file
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const SOURCE_PACKAGES_DIR = resolve(__dirname, '../..');
@@ -44,7 +44,7 @@ describe('Workspace Cleanup Validation', () => {
     }
   });
 
-  it('should NOT create .git directory in source packages/core', async () => {
+  it('should NOT create .git directory in source packages/agent', async () => {
     // Verify source directory has no .git before test
     const gitDirBefore = join(SOURCE_PACKAGES_DIR, '.git');
     const hadGitBefore = existsSync(gitDirBefore);

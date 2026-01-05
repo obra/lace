@@ -10,7 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "baseUrl": "./packages/core/src",
+    "baseUrl": "./packages/agent/src",
     "paths": {
       "~/*": ["./*"]
     }

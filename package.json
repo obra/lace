@@ -13,7 +13,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace=packages/core && npm run build --workspace=packages/web",
+    "build": "npm run build --workspace=packages/agent && npm run build --workspace=packages/web",
     "build:standalone": "bun scripts/build-macos-app.ts",
     "prebuild:standalone:clean": "rm -rf build packages/web/build",
     "build:standalone:clean": "bun scripts/build-macos-app.ts",
@@ -24,18 +24,18 @@
     "build:macos:dmg": "bun scripts/build-macos-app.ts --target bun-darwin-arm64 --name Lace --dmg",
     "build:macos:dmg:signed": "bun scripts/build-macos-app.ts --target bun-darwin-arm64 --name Lace --dmg --sign",
     "dev": "npm run dev --workspace=packages/web",
-    "typecheck": "npm run typecheck --workspace=packages/core && npm run typecheck --workspace=packages/web && npm run typecheck --workspace=packages/agent && npm run typecheck --workspace=packages/supervisor && npm run typecheck --workspace=packages/ent-protocol",
-    "lint": "npm run lint --workspace=packages/core && npm run lint --workspace=packages/web && npm run lint --workspace=packages/agent && npm run lint --workspace=packages/supervisor && npm run lint --workspace=packages/ent-protocol",
-    "lint:fix": "npm run lint:fix --workspace=packages/core && npm run lint:fix --workspace=packages/web && npm run lint:fix --workspace=packages/agent && npm run lint:fix --workspace=packages/supervisor && npm run lint:fix --workspace=packages/ent-protocol",
+    "typecheck": "npm run typecheck --workspace=packages/web && npm run typecheck --workspace=packages/agent && npm run typecheck --workspace=packages/supervisor && npm run typecheck --workspace=packages/ent-protocol",
+    "lint": "npm run lint --workspace=packages/web && npm run lint --workspace=packages/agent && npm run lint --workspace=packages/supervisor && npm run lint --workspace=packages/ent-protocol",
+    "lint:fix": "npm run lint:fix --workspace=packages/web && npm run lint:fix --workspace=packages/agent && npm run lint:fix --workspace=packages/supervisor && npm run lint:fix --workspace=packages/ent-protocol",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css,scss,html,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css,scss,html,yml,yaml}\"",
     "knip": "npx knip --isolate-workspaces",
     "knip:ci": "npx knip --isolate-workspaces --reporter json > knip-report.json || true",
     "prepare": "husky",
-    "test": "npm run test --workspace=packages/core && npm run test --workspace=packages/web && npm run test --workspace=packages/agent && npm run test --workspace=packages/supervisor && npm run test --workspace=packages/ent-protocol",
+    "test": "npm run test --workspace=packages/web && npm run test --workspace=packages/agent && npm run test --workspace=packages/supervisor && npm run test --workspace=packages/ent-protocol",
     "test:run": "npm -ws --if-present run test:run",
-    "test:watch": "npm run test:watch --workspace=packages/core",
-    "test:coverage": "npm run test:coverage --workspace=packages/core && npm run test:coverage --workspace=packages/web",
+    "test:watch": "npm run test:watch --workspace=packages/agent",
+    "test:coverage": "npm run test:coverage --workspace=packages/agent && npm run test:coverage --workspace=packages/web",
     "update-catalogs": "npx tsx scripts/update-provider-catalogs.ts"
   },
   "dependencies": {

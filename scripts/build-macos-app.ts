@@ -357,7 +357,7 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   console.log('✅ Dependencies installed\n');
 
   // Clean previous builds using proper tooling
-  runPackageTarget('packages/core', 'build:clean', 'Cleaning core package');
+  runPackageTarget('packages/agent', 'build:clean', 'Cleaning agent package');
   console.log('🔨 Cleaning web and build directories...');
   execSync('bun run prebuild:standalone:clean', { stdio: 'inherit' });
   console.log('✅ Web and build directories cleaned\n');

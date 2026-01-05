@@ -151,7 +151,7 @@ export class OpenAIProvider extends AIProvider {
     const originalReadFileSync = fs.readFileSync;
 
     // Patch fs only during tiktoken import
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Required for fs patching with dynamic types
+
     const patchedReadFileSync = function (this: any, path: any, options?: any) {
       if (typeof path === 'string' && path.includes('tiktoken_bg.wasm')) {
         return wasmBuffer;
@@ -636,11 +636,8 @@ export class OpenAIProvider extends AIProvider {
     // Transform tools to Responses API format (flatter structure, not nested in 'function')
     const responsesTools: ResponseTool[] = openaiTools.map((tool) => ({
       type: 'function' as const,
-      // @ts-expect-error OpenAI SDK type union doesn't properly narrow tool.function on ChatCompletionCustomTool
       name: tool.function.name,
-      // @ts-expect-error OpenAI SDK type union doesn't properly narrow tool.function on ChatCompletionCustomTool
       description: tool.function.description,
-      // @ts-expect-error OpenAI SDK type union doesn't properly narrow tool.function on ChatCompletionCustomTool
       parameters: (tool.function.parameters as Record<string, unknown>) || null,
       // Note: strict mode disabled because our tool schemas have optional parameters
       // With strict: true, ALL properties must be in required array
@@ -818,7 +815,6 @@ export class OpenAIProvider extends AIProvider {
 
         const toolCalls: ToolCall[] =
           choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) =>
-            // @ts-expect-error OpenAI SDK type union doesn't properly narrow ChatCompletionMessageCustomToolCall
             this.parseToolCall(toolCall, toolNameMapping)
           ) || [];
 

@@ -157,7 +157,7 @@ function updateTsConfig(tsConfigPath: string, oldPrefix: string, newPrefix: stri
   delete tsConfig.compilerOptions.paths[`${oldPrefix}*`];
 
   // Add new path mapping
-  const srcPath = tsConfigPath.includes('packages/core')
+  const srcPath = tsConfigPath.includes('packages/agent')
     ? ['src/*']
     : tsConfigPath.includes('packages/web')
       ? ['./*']
@@ -174,14 +174,14 @@ function main(): void {
 
   const rootDir = path.resolve(__dirname, '..');
 
-  // Migrate packages/core
-  migratePackage(path.join(rootDir, 'packages/core'), '~/', '@lace/core/', 'core');
+  // Migrate packages/agent
+  migratePackage(path.join(rootDir, 'packages/agent'), '~/', '@lace/agent/', 'agent');
 
   // Migrate packages/web
   migratePackage(path.join(rootDir, 'packages/web'), '@/', '@lace/web/', 'web');
 
   // Update tsconfig files
-  updateTsConfig(path.join(rootDir, 'packages/core/tsconfig.json'), '~/', '@lace/core/');
+  updateTsConfig(path.join(rootDir, 'packages/agent/tsconfig.json'), '~/', '@lace/agent/');
 
   updateTsConfig(path.join(rootDir, 'packages/web/tsconfig.json'), '@/', '@lace/web/');
 

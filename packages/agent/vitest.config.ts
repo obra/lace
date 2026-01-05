@@ -9,7 +9,6 @@ export default defineConfig({
     alias: {
       '@lace/agent': resolve(__dirname, 'src'),
       '@lace/ent-protocol': resolve(__dirname, '../ent-protocol/src'),
-      '@lace/core': resolve(__dirname, '../core/src'),
     },
   },
   test: {

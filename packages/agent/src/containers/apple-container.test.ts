@@ -100,7 +100,7 @@ describe('AppleContainerRuntime', () => {
       createdContainers.push(containerId);
 
       // Created state
-      let info = await runtime.inspect(containerId);
+      const info = await runtime.inspect(containerId);
       expect(info.state).toBe('created');
 
       // Skip start/stop for unit tests (requires real sandbox-exec)

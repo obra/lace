@@ -76,10 +76,7 @@ describe('MCPServerManager', () => {
       cwd: '/test/dir',
     });
 
-    expect(Client).toHaveBeenCalledWith(
-      { name: 'lace', version: '1.0.0' },
-      { capabilities: { tools: {} } }
-    );
+    expect(Client).toHaveBeenCalledWith({ name: 'lace', version: '1.0.0' }, { capabilities: {} });
 
     const server = manager.getServer('test');
     expect(server?.status).toBe('running');

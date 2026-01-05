@@ -15,7 +15,10 @@ class TempDirProbeTool extends Tool {
   description = 'Asserts that ToolExecutor provided toolTempDir';
   schema = z.object({});
 
-  protected async executeValidated(_args: {}, context: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(
+    _args: Record<string, never>,
+    context: ToolContext
+  ): Promise<ToolResult> {
     const toolTempDir = this.getToolTempDir(context);
     return this.createResult(toolTempDir);
   }

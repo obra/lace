@@ -60,11 +60,11 @@ function generateAllImports() {
   console.log('📁 Scanning for files to embed...');
 
   // Scan for JSON catalogs
-  const jsonFiles = scanForFiles('packages/core/src/providers/catalog/data', '.json', 'catalog');
+  const jsonFiles = scanForFiles('packages/agent/src/providers/catalog/data', '.json', 'catalog');
   console.log(`📋 Found ${jsonFiles.length} catalog files`);
 
   // Scan for MD personas
-  const mdFiles = scanForFiles('packages/core/config/agent-personas', '.md', 'persona');
+  const mdFiles = scanForFiles('packages/agent/config/agent-personas', '.md', 'persona');
   console.log(`📄 Found ${mdFiles.length} persona files`);
 
   // Scan for client assets

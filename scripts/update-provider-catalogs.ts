@@ -18,7 +18,7 @@ const CATWALK_API_URL =
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const LOCAL_DATA_DIR =
-  process.env.LOCAL_DATA_DIR ?? resolve(__dirname, '../packages/core/src/providers/catalog/data');
+  process.env.LOCAL_DATA_DIR ?? resolve(__dirname, '../packages/agent/src/providers/catalog/data');
 
 // Providers to exclude from syncing (if any)
 const EXCLUDED_PROVIDERS: string[] = [

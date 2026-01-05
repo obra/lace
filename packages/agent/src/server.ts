@@ -60,8 +60,7 @@ import { ProviderRegistry } from './providers/registry';
 import { AIProvider, type ProviderMessage } from './providers/base-provider';
 import { ToolExecutor } from './tools/executor';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
-import type { Tool } from './tools/tool';
-// CoreTool alias for backwards compatibility
+// CoreTool alias for backwards compatibility with provider interface
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type {
   ToolCall as CoreToolCall,

@@ -38,10 +38,7 @@ export class MCPServerManager extends EventEmitter {
       });
 
       // Create MCP client
-      const client = new Client(
-        { name: 'lace', version: '1.0.0' },
-        { capabilities: { tools: {} } }
-      );
+      const client = new Client({ name: 'lace', version: '1.0.0' }, { capabilities: {} });
 
       // Store references before connecting
       connection.transport = transport;
