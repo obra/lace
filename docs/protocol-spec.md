@@ -1230,6 +1230,8 @@ Agent requests permission to execute a tool. This is a **request** (has `id`), n
 
 **Idempotency**: If the client sends duplicate responses for the same `toolCallId`, the agent ignores all but the first. This prevents race conditions from network retries or UI double-clicks.
 
+**Durable identity**: `toolCallId` is the durable identifier for a permission prompt/tool execution. The JSON-RPC `id` / `PermissionRequest.requestId` is an ephemeral transport request id and may change if the agent reissues the permission prompt after a restart or reconnect.
+
 **Durability**: The agent MUST persist permission requests and permission decisions in its session's durable event log (`events.jsonl`). Pending permissions are derived by scanning for `permission_requested` events that do not yet have a matching `permission_decided`/`permission_cancelled`. After an agent restart, the agent MUST reissue permission prompts for any pending `toolCallId`s so the client receives a fresh JSON-RPC `id` to respond to.
 
 ---

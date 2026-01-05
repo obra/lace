@@ -18,7 +18,12 @@ import {
   McpServerConfigSchema,
   isSessionId,
   JsonRpcPeer,
+  SessionUpdateNotificationSchema,
+  type PermissionRequest,
+  type ToolInfo,
+  type ToolResult,
 } from '@lace/ent-protocol';
+import type { z } from 'zod';
 import {
   ensureSessionFiles,
   getSessionDir,
@@ -44,7 +49,6 @@ import {
   derivePendingPermissionsFromDurableEvents,
   type PendingPermissionRecord,
 } from './storage/permissions-from-events';
-import type { PermissionRequest, SessionUpdate, ToolInfo, ToolResult } from './protocol/types';
 import { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
 import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
 import {
@@ -73,6 +77,10 @@ import { compactDroppedMessagesWithCore } from './compaction/compact-dropped-mes
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
 const JOB_LOG_DIR = 'jobs';
+
+type SessionUpdateParams = z.infer<typeof SessionUpdateNotificationSchema>['params'];
+type DistributiveOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never;
+type SessionUpdate = DistributiveOmit<SessionUpdateParams, 'sessionId' | 'streamSeq'>;
 
 function throwInvalidParams(reason?: string): never {
   throw {
