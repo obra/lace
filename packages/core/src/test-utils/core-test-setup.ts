@@ -38,7 +38,7 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
     }
 
     // Clean up workspaces before resetting factory
-    const { WorkspaceManagerFactory } = await import('@lace/core/workspace/workspace-manager');
+    const { WorkspaceManagerFactory } = await import('@lace/agent/workspace/workspace-manager');
     try {
       // Only clean up worktree mode (default) - it's fast and reliable
       // Container mode tests should handle their own cleanup

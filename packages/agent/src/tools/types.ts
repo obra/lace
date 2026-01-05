@@ -2,7 +2,7 @@
 // ABOUTME: Model-agnostic tool definitions compatible with multiple AI SDKs and MCP
 
 import type { CombinedTokenUsage } from '@lace/core/token-management/types';
-import type { IWorkspaceManager } from '@lace/core/workspace/workspace-manager';
+import type { IWorkspaceManager } from '@lace/agent/workspace/workspace-manager';
 
 export interface ToolContext {
   // Execution control - required for cancellation

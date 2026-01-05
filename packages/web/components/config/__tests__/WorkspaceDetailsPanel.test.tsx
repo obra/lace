@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { WorkspaceDetailsPanel } from '@lace/web/components/config/WorkspaceDetailsPanel';
-import type { WorkspaceInfo } from '@lace/core/workspace/workspace-container-manager';
+import type { WorkspaceInfo } from '@lace/agent/workspace/workspace-container-manager';
 
 describe('WorkspaceDetailsPanel', () => {
   const baseContainerInfo: WorkspaceInfo = {

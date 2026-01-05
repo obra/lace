@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '@lace/web/lib/api-client';
-import type { WorkspaceInfo } from '@lace/core/workspace/workspace-container-manager';
+import type { WorkspaceInfo } from '@lace/agent/workspace/workspace-container-manager';
 
 export interface WorkspaceDetails {
   mode: 'container' | 'worktree' | 'local';

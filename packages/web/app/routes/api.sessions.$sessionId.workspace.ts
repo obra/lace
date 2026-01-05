@@ -6,7 +6,7 @@ import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { logger } from '@lace/core/utils/logger';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
-import type { WorkspaceInfo } from '@lace/core/workspace/workspace-container-manager';
+import type { WorkspaceInfo } from '@lace/agent/workspace/workspace-container-manager';
 
 interface LoaderParams {
   sessionId?: string;
