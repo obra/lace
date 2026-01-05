@@ -1064,6 +1064,232 @@ Refresh model catalog from upstream provider.
 
 **Note**: Only available if `ent/providers.catalogRefresh` is `true`.
 
+### 6.25 `ent/tools/list`
+
+List all available tools provided by the agent.
+
+```typescript
+// Request
+{
+  method: "ent/tools/list"
+}
+
+// Response
+{
+  result: {
+    tools: ToolInfo[]
+  }
+}
+```
+
+### 6.26 `ent/personas/list`
+
+List available agent personas for configuration.
+
+```typescript
+// Request
+{
+  method: "ent/personas/list"
+}
+
+// Response
+{
+  result: {
+    personas: PersonaInfo[]
+  }
+}
+```
+
+**PersonaInfo interface**:
+```typescript
+interface PersonaInfo {
+  id: string;
+  name: string;
+  description?: string;
+  tags?: string[];
+}
+```
+
+### 6.27 `ent/mcp/servers/list`
+
+List configured MCP servers.
+
+```typescript
+// Request
+{
+  method: "ent/mcp/servers/list"
+}
+
+// Response
+{
+  result: {
+    servers: [{
+      serverId: string,
+      name: string,
+      command: string,
+      args?: string[],
+      enabled: boolean,
+      status: "stopped" | "starting" | "running" | "failed",
+      lastError?: string,
+      connectedAt?: string,  // ISO 8601
+      toolCount?: number
+    }]
+  }
+}
+```
+
+### 6.28 `ent/mcp/servers/upsert`
+
+Add or update an MCP server configuration.
+
+```typescript
+// Request
+{
+  method: "ent/mcp/servers/upsert",
+  params: {
+    serverId?: string,      // Omit to create new; provide to update existing
+    name: string,
+    command: string,
+    args?: string[],
+    env?: Record<string, string>,
+    enabled?: boolean,
+    tools?: Record<string, "allow" | "ask" | "deny" | "disable">
+  }
+}
+
+// Response
+{
+  result: {
+    serverId: string,
+    created: boolean
+  }
+}
+```
+
+### 6.29 `ent/mcp/servers/delete`
+
+Delete an MCP server configuration.
+
+```typescript
+// Request
+{
+  method: "ent/mcp/servers/delete",
+  params: {
+    serverId: string
+  }
+}
+
+// Response
+{
+  result: { ok: true }
+}
+```
+
+### 6.30 `ent/mcp/servers/test`
+
+Test connectivity and availability of an MCP server.
+
+```typescript
+// Request
+{
+  method: "ent/mcp/servers/test",
+  params: {
+    serverId: string
+  }
+}
+
+// Response
+{
+  result: {
+    ok: boolean,
+    error?: string,
+    latencyMs?: number,
+    toolCount?: number
+  }
+}
+```
+
+### 6.31 `ent/mcp/tools/list`
+
+List tools available from a specific MCP server.
+
+```typescript
+// Request
+{
+  method: "ent/mcp/tools/list",
+  params: {
+    serverId: string
+  }
+}
+
+// Response
+{
+  result: {
+    serverId: string,
+    tools: [{
+      name: string,
+      description?: string,
+      inputSchema?: Record<string, unknown>
+    }]
+  }
+}
+```
+
+### 6.32 `ent/workspace/info`
+
+Get workspace information for a session.
+
+```typescript
+// Request
+{
+  method: "ent/workspace/info",
+  params: {
+    sessionId: string
+  }
+}
+
+// Response
+{
+  result: {
+    sessionId: string,
+    projectDir: string,
+    clonePath: string,
+    containerId: string,
+    state: string,
+    containerMountPath?: string,
+    branchName?: string
+  }
+}
+```
+
+### 6.33 `ent/workspace/create`
+
+Create a workspace container for a session.
+
+```typescript
+// Request
+{
+  method: "ent/workspace/create",
+  params: {
+    projectDir: string,
+    sessionId: string
+  }
+}
+
+// Response
+{
+  result: {
+    sessionId: string,
+    projectDir: string,
+    clonePath: string,
+    containerId: string,
+    state: string,
+    containerMountPath?: string,
+    branchName?: string
+  }
+}
+```
+
 ---
 
 ## 7. Methods: Agent → Client
@@ -1522,6 +1748,15 @@ interface ConnectionInfo {
 | `ent/connections/*` | 🔧 Extension | Connection management |
 | `ent/connections/credentials/*` | 🔧 Extension | Connection-scoped auth |
 | `ent/models/*` | 🔧 Extension | Connection-scoped catalog |
+| `ent/tools/list` | 🔧 Extension | Tool discovery |
+| `ent/personas/list` | 🔧 Extension | Persona discovery |
+| `ent/mcp/servers/list` | 🔧 Extension | MCP server management |
+| `ent/mcp/servers/upsert` | 🔧 Extension | MCP server management |
+| `ent/mcp/servers/delete` | 🔧 Extension | MCP server management |
+| `ent/mcp/servers/test` | 🔧 Extension | MCP connectivity testing |
+| `ent/mcp/tools/list` | 🔧 Extension | MCP tool discovery |
+| `ent/workspace/info` | 🔧 Extension | Workspace management |
+| `ent/workspace/create` | 🔧 Extension | Workspace creation |
 | `fs/*` | ❌ Not implemented | Agent-centric |
 | `terminal/*` | ❌ Not implemented | Agent-centric |
 

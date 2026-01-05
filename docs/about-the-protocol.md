@@ -290,7 +290,42 @@ This "subagents as jobs" model means subagents are not first-class protocol peer
 
 ---
 
-## 12. Structured Output
+## 12. Discovery and Configuration Methods
+
+The protocol includes several discovery methods that expose the agent's capabilities and configuration options:
+
+### Tool Discovery
+
+`ent/tools/list` allows clients to query all available tools. This complements the tool list in `initialize` capabilities but provides a queryable interface.
+
+### Persona Discovery
+
+`ent/personas/list` lists available agent personas that can be used to configure the agent's behavior and expertise focus.
+
+### MCP Server Management
+
+A suite of MCP-specific methods support dynamic server configuration:
+
+- `ent/mcp/servers/list` - List configured MCP servers with their status and health
+- `ent/mcp/servers/upsert` - Add or update MCP server configurations dynamically
+- `ent/mcp/servers/delete` - Remove MCP server configurations
+- `ent/mcp/servers/test` - Validate connectivity and latency for a server
+- `ent/mcp/tools/list` - Discover tools available from a specific MCP server
+
+This enables runtime configuration of MCP servers without requiring session restart.
+
+### Workspace Management
+
+Workspace methods support containerized or isolated execution contexts:
+
+- `ent/workspace/info` - Query workspace state and configuration for a session
+- `ent/workspace/create` - Create or initialize a workspace for a session
+
+These support agents that work in sandboxed or containerized environments.
+
+---
+
+## 13. Structured Output
 
 `session/prompt` supports an `outputFormat` parameter for JSON schema validation. The agent's response is validated against the schema and returned in `structuredOutput`.
 
@@ -298,7 +333,7 @@ This is essential for tool-use patterns where the client needs machine-readable 
 
 ---
 
-## 13. Tool Results
+## 14. Tool Results
 
 ### Why Not Just Strings?
 
@@ -322,7 +357,7 @@ This allows:
 
 ---
 
-## 14. Error Code Design
+## 15. Error Code Design
 
 We extend JSON-RPC standard errors with application-specific codes:
 
@@ -336,7 +371,7 @@ Each error includes structured `data` for programmatic handling.
 
 ---
 
-## 15. Future Considerations
+## 16. Future Considerations
 
 ### ACP Evolution
 
@@ -354,7 +389,7 @@ The `protocolVersion` field in `initialize` allows gradual evolution. Clients an
 
 ---
 
-## 16. References
+## 17. References
 
 - [Protocol Specification](protocol-spec.md) - The full protocol spec
 - [ACP Evaluation](../research/acp-evaluation.md) - Detailed ACP comparison
