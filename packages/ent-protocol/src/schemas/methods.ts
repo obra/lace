@@ -1239,7 +1239,7 @@ const SessionUpdateJobUpdateSchema = z
   })
   .strict();
 
-const SessionUpdateInnerSchema = z.discriminatedUnion('type', [
+const _SessionUpdateInnerSchema = z.discriminatedUnion('type', [
   SessionUpdateTextDeltaSchema,
   SessionUpdateThinkingSchema,
   SessionUpdateUsageSchema,

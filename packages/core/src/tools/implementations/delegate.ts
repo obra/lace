@@ -24,11 +24,11 @@ export class DelegateTool extends Tool {
     readOnlySafe: false,
   };
 
-  protected async executeValidated(
+  protected executeValidated(
     _args: z.infer<typeof delegateSchema>,
     _context: ToolContext
   ): Promise<ToolResult> {
-    return {
+    return Promise.resolve({
       status: 'failed',
       content: [
         {
@@ -36,6 +36,6 @@ export class DelegateTool extends Tool {
           text: 'delegate is executed by the lace-agent runtime (should not be executed via ToolExecutor).',
         },
       ],
-    };
+    });
   }
 }

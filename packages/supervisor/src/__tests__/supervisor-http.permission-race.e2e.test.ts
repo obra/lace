@@ -27,7 +27,6 @@ async function waitFor<T>(
   options: { timeoutMs: number; intervalMs: number; label: string }
 ): Promise<T> {
   const deadline = Date.now() + options.timeoutMs;
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const value = await get();
     if (value !== null) return value;

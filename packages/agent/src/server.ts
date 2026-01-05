@@ -57,11 +57,7 @@ import {
   type ProviderInstance,
 } from '@lace/core/providers/catalog/types';
 import { ProviderRegistry } from '@lace/core/providers/registry';
-import {
-  AIProvider,
-  type ConversationState,
-  type ProviderMessage,
-} from '@lace/core/providers/base-provider';
+import { AIProvider, type ProviderMessage } from '@lace/core/providers/base-provider';
 import { ToolExecutor } from '@lace/core/tools/executor';
 import { estimateTokens } from '@lace/core/utils/token-estimation';
 import type { Tool as CoreTool } from '@lace/core/tools/tool';
@@ -927,7 +923,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     }
   };
 
-  const startShellJob = async (options: {
+  const _startShellJob = async (options: {
     command: string;
     description?: string;
     parentJobId?: string;
@@ -2652,12 +2648,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         ...preservedRecentMessages,
       ];
 
-      let removedForBudget = 0;
+      let _removedForBudget = 0;
       let currentTokens = estimateProviderTokens(nextProviderMessages);
       if (targetTokens !== undefined) {
         while (nextProviderMessages.length > 0 && currentTokens > targetTokens) {
           nextProviderMessages.shift();
-          removedForBudget += 1;
+          _removedForBudget += 1;
           currentTokens = estimateProviderTokens(nextProviderMessages);
         }
       }

@@ -24,7 +24,7 @@ describe('createNdjsonStdioTransport', () => {
     expect(received[1]).toMatchObject({ jsonrpc: '2.0', id: 1, method: 'initialize' });
   });
 
-  it('ignores non-JSON lines and messages missing jsonrpc: \"2.0\"', () => {
+  it('ignores non-JSON lines and messages missing jsonrpc: "2.0"', () => {
     const readable = new PassThrough();
     const writable = new PassThrough();
 

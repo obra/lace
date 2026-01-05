@@ -163,7 +163,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
         'session/prompt'
       );
 
-      await withTimeout(
+      const { outerJobId, innerJobId } = await withTimeout(
         new Promise<{ outerJobId: string; innerJobId: string }>((resolve) => {
           const interval = setInterval(() => {
             const subagents = started.filter((s) => s.jobType === 'subagent');
@@ -185,6 +185,8 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
         10_000,
         'nested job completion'
       );
+
+      expect(outerJobId).not.toBe(innerJobId);
     }
   );
 });

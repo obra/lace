@@ -128,6 +128,7 @@ export class Supervisor {
     workspaceSessionId: string,
     workDir: string
   ): Promise<{ agent: SupervisorAgentProcess; sessionId: SessionId; pid: number }> {
+    // eslint-disable-next-line prefer-const -- assigned after session/new so early agent updates are ignored
     let activeSessionId: SessionId | undefined;
 
     const agent = new SupervisorAgentProcess({
@@ -169,7 +170,7 @@ export class Supervisor {
     workspaceSessionId: string,
     sessionId: SessionId
   ): Promise<{ agent: SupervisorAgentProcess; workDir: string; pid: number }> {
-    let activeSessionId: SessionId | undefined = sessionId;
+    const activeSessionId: SessionId = sessionId;
 
     const agent = new SupervisorAgentProcess({
       laceDir: this.laceDir,
