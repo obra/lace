@@ -3,7 +3,7 @@
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { join, resolve as resolvePath } from 'node:path';
 import {
   SupervisorClient,
   type PendingPermission,
@@ -89,17 +89,6 @@ function updateToLaceEvents(params: {
     const events: LaceEvent[] = [];
 
     if (status === 'pending' || status === 'awaiting_permission') {
-      if (toolCallId && name && agentSessionId) {
-        const key = permissionKey(agentSessionId, toolCallId);
-        global.laceWebPendingToolCalls?.set(key, {
-          workspaceSessionId,
-          agentSessionId,
-          toolCallId,
-          toolCall: { name, arguments: input },
-          createdAt: Date.now(),
-        });
-      }
-
       events.push({
         type: 'TOOL_CALL',
         timestamp: new Date(),
@@ -180,14 +169,21 @@ function isProcessAlive(pid: number): boolean {
 }
 
 function resolveSupervisorMainPath(): string {
-  const mainUrl = new URL('../../../supervisor/dist/main.js', import.meta.url);
-  const mainPath = fileURLToPath(mainUrl);
-  if (!existsSync(mainPath)) {
-    throw new Error(
-      'Could not resolve lace supervisor entrypoint (packages/supervisor/dist/main.js)'
-    );
+  const bases = [
+    process.cwd(),
+    resolvePath(process.cwd(), '..'),
+    resolvePath(process.cwd(), '../..'),
+    resolvePath(process.cwd(), '../../..'),
+  ];
+
+  for (const base of bases) {
+    const mainPath = join(base, 'packages', 'supervisor', 'dist', 'main.js');
+    if (existsSync(mainPath)) return mainPath;
   }
-  return mainPath;
+
+  throw new Error(
+    'Could not resolve lace supervisor entrypoint (packages/supervisor/dist/main.js)'
+  );
 }
 
 async function sleep(ms: number): Promise<void> {
