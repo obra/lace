@@ -42,7 +42,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     // Create a test project
-    const { Project } = await import('@lace/core/projects/project');
+    const { Project } = await import('@lace/agent/projects/project');
     const testDir = join(context.tempProjectDir, 'sessions-test');
     await fs.mkdir(testDir, { recursive: true });
 

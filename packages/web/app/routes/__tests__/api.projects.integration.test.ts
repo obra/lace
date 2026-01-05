@@ -57,7 +57,7 @@ describe('Projects API Integration Tests', () => {
   describe('GET /api/projects', () => {
     it('should return all projects with session counts', async () => {
       // Create some test projects directly using the real Project class
-      const { Project } = await import('@lace/core/projects/project');
+      const { Project } = await import('@lace/agent/projects/project');
 
       const project1Dir = join(context.tempProjectDir, 'project1');
       const project2Dir = join(context.tempProjectDir, 'project2');
@@ -153,7 +153,7 @@ describe('Projects API Integration Tests', () => {
       expect(data.lastUsedAt).toBeDefined();
 
       // Verify the project was actually created in the database
-      const { Project } = await import('@lace/core/projects/project');
+      const { Project } = await import('@lace/agent/projects/project');
       const createdProject = Project.getById(data.id);
       expect(createdProject).not.toBeNull();
       expect(createdProject!.getName()).toBe('New Project');
@@ -186,7 +186,7 @@ describe('Projects API Integration Tests', () => {
       expect(data.id).toBeDefined();
 
       // Verify the project was actually created in the database
-      const { Project } = await import('@lace/core/projects/project');
+      const { Project } = await import('@lace/agent/projects/project');
       const createdProject = Project.getById(data.id);
       expect(createdProject).not.toBeNull();
       expect(createdProject!.getName()).toBe('Minimal Project');
