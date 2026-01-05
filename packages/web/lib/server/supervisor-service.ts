@@ -1,9 +1,9 @@
 // ABOUTME: Web-facing supervisor client singleton
 // ABOUTME: Spawns (if needed) a supervisor server process and bridges its updates into EventStreamManager SSE broadcasts
 
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve as resolvePath } from 'node:path';
+import { createRequire } from 'node:module';
 import {
   SupervisorClient,
   type PendingPermission,
@@ -16,7 +16,7 @@ import type { LaceEvent } from '@lace/web/types/core';
 
 declare global {
   var laceWebSupervisorClient: SupervisorClient | undefined;
-  var laceWebSupervisorProc: ChildProcessWithoutNullStreams | undefined;
+  var laceWebSupervisorProc: ChildProcess | undefined;
   var laceWebSupervisorEventBridge: Promise<void> | undefined;
   var laceWebSupervisorEventBridgeAbort: AbortController | undefined;
 }
@@ -168,22 +168,14 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
+const require = createRequire(import.meta.url);
+
 function resolveSupervisorMainPath(): string {
-  const bases = [
-    process.cwd(),
-    resolvePath(process.cwd(), '..'),
-    resolvePath(process.cwd(), '../..'),
-    resolvePath(process.cwd(), '../../..'),
-  ];
-
-  for (const base of bases) {
-    const mainPath = join(base, 'packages', 'supervisor', 'dist', 'main.js');
-    if (existsSync(mainPath)) return mainPath;
+  try {
+    return require.resolve('@lace/supervisor/dist/main.js');
+  } catch {
+    throw new Error('Could not resolve lace supervisor entrypoint (@lace/supervisor/dist/main.js)');
   }
-
-  throw new Error(
-    'Could not resolve lace supervisor entrypoint (packages/supervisor/dist/main.js)'
-  );
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -231,16 +223,14 @@ async function ensureSupervisorServer(laceDir: string): Promise<SupervisorEndpoi
 
   if (!global.laceWebSupervisorProc) {
     const mainPath = resolveSupervisorMainPath();
-    global.laceWebSupervisorProc = spawn(
-      process.execPath,
-      [mainPath, '--host', '127.0.0.1', '--port', '0'],
-      {
-        env: { ...process.env, LACE_DIR: laceDir },
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }
-    );
+    const proc = spawn(process.execPath, [mainPath, '--host', '127.0.0.1', '--port', '0'], {
+      env: { ...process.env, LACE_DIR: laceDir },
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
 
-    global.laceWebSupervisorProc.stderr.on('data', (d) => {
+    global.laceWebSupervisorProc = proc;
+
+    proc.stderr?.on('data', (d) => {
       const text = String(d);
       if (text.trim()) console.error(text.trim());
     });
