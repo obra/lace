@@ -6,7 +6,7 @@ import { CatalogCacheManager } from './cache-manager';
 import { ModelFilterService } from './filter-service';
 import type { ModelConfig, CatalogProvider, CatalogModel } from '../catalog/types';
 import type { OpenRouterModel } from './types';
-import { getLaceDir } from '@lace/core/config/lace-dir';
+import { getLaceDir } from '@lace/agent/config/lace-dir';
 import { convertPricing } from './utils';
 
 export class OpenRouterDynamicProvider {

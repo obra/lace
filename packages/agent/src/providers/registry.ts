@@ -12,7 +12,7 @@ import { ProviderInstanceManager } from './instance/manager';
 import type { CatalogProvider, CatalogModel, ModelConfig } from './catalog/types';
 import { OpenRouterDynamicProvider } from './openrouter/dynamic-provider';
 import { OpenAIDynamicProvider } from './openai/dynamic-provider';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 
 /**
  * Expand environment variables in provider configuration values

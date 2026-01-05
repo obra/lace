@@ -15,9 +15,9 @@ import { FileFindTool } from './implementations/file_find';
 import { UrlFetchTool } from './implementations/url_fetch';
 import { DelegateTool } from './implementations/delegate';
 import { MCPServerManager } from '../mcp/server-manager';
-import type { MCPServerConnection } from '@lace/core/config/mcp-types';
+import type { MCPServerConnection } from '@lace/agent/config/mcp-types';
 import { MCPToolAdapter } from '../mcp/tool-adapter';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();

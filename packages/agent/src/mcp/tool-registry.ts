@@ -5,8 +5,8 @@ import { EventEmitter } from 'events';
 import { Tool } from '@lace/core/tools/tool';
 import { MCPToolAdapter } from './tool-adapter';
 import { MCPServerManager } from './server-manager';
-import { logger } from '@lace/core/utils/logger';
-import type { MCPConfig } from '@lace/core/config/mcp-types';
+import { logger } from '@lace/agent/utils/logger';
+import type { MCPConfig } from '@lace/agent/config/mcp-types';
 import type { ToolPolicy } from '@lace/core/tools/types';
 
 export class MCPToolRegistry extends EventEmitter {

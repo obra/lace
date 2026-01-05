@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import { getLaceFilePath, ensureLaceDir } from './lace-dir';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 
 /**
  * Manages user settings stored in ~/.lace/user-settings.json

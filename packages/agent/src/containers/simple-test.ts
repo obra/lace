@@ -2,7 +2,7 @@
 // ABOUTME: Can be run directly with `npx tsx src/containers/simple-test.ts` for debugging
 
 import { AppleContainerRuntime } from './apple-container';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 
 async function test() {
   const runtime = new AppleContainerRuntime();

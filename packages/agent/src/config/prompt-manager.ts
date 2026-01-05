@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { TemplateEngine } from './template-engine';
-import { resolveResourcePath } from '@lace/core/utils/resource-resolver';
+import { resolveResourcePath } from '@lace/agent/utils/resource-resolver';
 import {
   VariableProviderManager,
   SystemVariableProvider,
@@ -15,7 +15,7 @@ import {
 } from './variable-providers';
 import { getLaceDir } from './lace-dir';
 import { personaRegistry } from './persona-registry';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 
 interface PromptManagerOptions {
   tools?: Array<{ name: string; description: string }>;

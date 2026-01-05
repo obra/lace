@@ -8,7 +8,7 @@ import {
   ExecResult,
 } from '@lace/agent/containers/types';
 import { WorktreeManager } from './worktree-manager';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 import type { IWorkspaceManager } from './workspace-manager';
 import { join } from 'path';
 

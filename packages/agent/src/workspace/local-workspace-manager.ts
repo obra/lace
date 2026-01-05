@@ -2,7 +2,7 @@
 // ABOUTME: Provides same interface as WorkspaceContainerManager for null-container mode
 
 import { ExecOptions, ExecResult } from '@lace/agent/containers/types';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 import { exec, execFile, ExecFileOptions } from 'child_process';
 import { promisify } from 'util';
 import type { WorkspaceInfo } from './workspace-container-manager';

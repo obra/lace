@@ -5,7 +5,7 @@ import { EventEmitter } from 'events';
 import { ToolResult, ToolCall } from '@lace/core/tools/types';
 import { Tool } from '@lace/core/tools/tool';
 import type { CatalogProvider } from './catalog/types';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 
 export interface ProviderConfig {
   maxTokens?: number;

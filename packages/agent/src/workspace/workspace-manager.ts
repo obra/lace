@@ -6,7 +6,7 @@ import { WorkspaceContainerManager, WorkspaceInfo } from './workspace-container-
 import { LocalWorkspaceManager } from './local-workspace-manager';
 import { WorktreeWorkspaceManager } from './worktree-workspace-manager';
 import { AppleContainerRuntime } from '@lace/agent/containers/apple-container';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 
 /**
  * Common interface for all workspace managers.

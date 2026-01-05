@@ -12,8 +12,8 @@ import {
 } from './base-provider';
 import { ToolCall } from '@lace/core/tools/types';
 import { Tool } from '@lace/core/tools/tool';
-import { logger } from '@lace/core/utils/logger';
-import { logProviderRequest, logProviderResponse } from '@lace/core/utils/provider-logging';
+import { logger } from '@lace/agent/utils/logger';
+import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
 
 // Interface for LMStudio model objects
 interface LMStudioModel {

@@ -3,8 +3,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { getLaceDir } from '@lace/core/config/lace-dir';
-import { getEnvVar } from '@lace/core/config/env-loader';
+import { getLaceDir } from '@lace/agent/config/lace-dir';
+import { getEnvVar } from '@lace/agent/config/env-loader';
 import {
   ProviderInstancesConfig,
   ProviderInstancesConfigSchema,

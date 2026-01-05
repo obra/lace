@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 
 export interface BashOutput {
   command: string;

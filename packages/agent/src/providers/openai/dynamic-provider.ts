@@ -4,10 +4,10 @@
 import { OpenAIClient } from './client';
 import type { CatalogProvider, CatalogModel } from '../catalog/types';
 import type { OpenAIModel } from './types';
-import { getLaceDir } from '@lace/core/config/lace-dir';
+import { getLaceDir } from '@lace/agent/config/lace-dir';
 import * as path from 'path';
 import * as fs from 'fs';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 
 interface CachedCatalog {
   _meta: {

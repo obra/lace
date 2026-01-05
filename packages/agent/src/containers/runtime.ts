@@ -10,7 +10,7 @@ import {
   ContainerState,
   ContainerNotFoundError,
 } from './types';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 import { join } from 'path';
 
 export abstract class BaseContainerRuntime implements ContainerRuntime {

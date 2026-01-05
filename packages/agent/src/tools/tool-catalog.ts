@@ -2,10 +2,10 @@
 // ABOUTME: Provides async discovery caching and fast tool enumeration without expensive ToolExecutor creation
 
 import { MCPServerManager } from '../mcp/server-manager';
-import { MCPConfigLoader } from '@lace/core/config/mcp-config-loader';
-import { logger } from '@lace/core/utils/logger';
+import { MCPConfigLoader } from '@lace/agent/config/mcp-config-loader';
+import { logger } from '@lace/agent/utils/logger';
 import type { Project } from '@lace/core/projects/project';
-import type { MCPServerConfig, DiscoveredTool } from '@lace/core/config/mcp-types';
+import type { MCPServerConfig, DiscoveredTool } from '@lace/agent/config/mcp-types';
 
 /**
  * Tool Discovery & Enumeration

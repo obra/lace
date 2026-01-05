@@ -59,7 +59,7 @@ import {
 import { ProviderRegistry } from './providers/registry';
 import { AIProvider, type ProviderMessage } from './providers/base-provider';
 import { ToolExecutor } from './tools/executor';
-import { estimateTokens } from '@lace/core/utils/token-estimation';
+import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import type { Tool } from './tools/tool';
 // CoreTool for provider compatibility - providers still live in core and expect core Tool type
 import type { Tool as CoreTool } from '@lace/core/tools/tool';
@@ -70,7 +70,7 @@ import type {
 } from './tools/types';
 import { TestAgentProvider } from './runtime/test-provider';
 import { MCPServerManager } from './mcp/server-manager';
-import type { MCPServerConfig } from '@lace/core/config/mcp-types';
+import type { MCPServerConfig } from '@lace/agent/config/mcp-types';
 import { compactDroppedMessagesWithCore } from './compaction/compact-dropped-messages';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);

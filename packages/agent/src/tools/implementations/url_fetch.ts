@@ -9,7 +9,7 @@ import { existsSync } from 'fs';
 import TurndownService from 'turndown';
 import { Tool } from '../tool';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 
 // Constants for configuration and validation
 const INLINE_CONTENT_LIMIT = 32 * 1024; // 32KB

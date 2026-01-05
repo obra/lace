@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { ContainerConfig } from './types';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 
 const execFileAsync = promisify(execFile);
 

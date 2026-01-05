@@ -10,7 +10,7 @@ import {
   ContainerError,
   ContainerExecError,
 } from './types';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { v4 as uuidv4 } from 'uuid';

@@ -33,5 +33,23 @@
     "typescript": "^5.6.0",
     "tsc-alias": "^1.8.16",
     "vitest": "^3.2.4"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js"
+    },
+    "./utils/logger": {
+      "types": "./dist/utils/logger.d.ts",
+      "import": "./dist/utils/logger.js"
+    },
+    "./utils/traffic-logger": {
+      "types": "./dist/utils/traffic-logger.d.ts",
+      "import": "./dist/utils/traffic-logger.js"
+    }
   }
 }

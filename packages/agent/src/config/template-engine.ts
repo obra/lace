@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { spawnSync } from 'child_process';
 import mustache from 'mustache';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 
 export interface TemplateContext {
   [key: string]: unknown;

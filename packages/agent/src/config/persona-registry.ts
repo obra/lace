@@ -4,8 +4,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { getLaceDir } from './lace-dir';
-import { scanEmbeddedFiles, resolveResourcePath } from '@lace/core/utils/resource-resolver';
-import { logger } from '@lace/core/utils/logger';
+import { scanEmbeddedFiles, resolveResourcePath } from '@lace/agent/utils/resource-resolver';
+import { logger } from '@lace/agent/utils/logger';
 
 export interface PersonaInfo {
   name: string;

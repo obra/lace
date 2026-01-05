@@ -11,7 +11,7 @@ import type {
   ToolAnnotations,
   ToolResultStatus,
 } from './types';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 
 export abstract class Tool {
   abstract name: string;

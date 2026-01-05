@@ -5,7 +5,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync, renameSync } from '
 import { join, dirname } from 'path';
 import { z } from 'zod';
 import { getLaceDir } from './lace-dir';
-import { logger } from '@lace/core/utils/logger';
+import { logger } from '@lace/agent/utils/logger';
 import type { MCPConfig, MCPServerConfig } from './mcp-types';
 
 // Zod schemas for validation

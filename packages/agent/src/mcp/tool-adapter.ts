@@ -5,7 +5,7 @@ import { z, ZodType } from 'zod';
 import { Tool } from '@lace/core/tools/tool';
 import type { ToolResult, ToolContext, ContentBlock } from '@lace/core/tools/types';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { MCPTool } from '@lace/core/config/mcp-types';
+import type { MCPTool } from '@lace/agent/config/mcp-types';
 
 /**
  * Converts MCP JSON Schema to Zod schema
