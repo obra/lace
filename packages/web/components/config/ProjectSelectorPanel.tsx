@@ -314,8 +314,17 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
       const projectId = createdProject.id;
 
       // Step 2: Create a session for the new project
+      const { providerInstanceId, modelId } = projectData.configuration;
+      if (!providerInstanceId || !modelId) {
+        throw new Error(
+          'Cannot create session: No provider/model configured. Please select a model in the project creation wizard.'
+        );
+      }
+
       const newSession = await createSessionForProject(projectId, {
         name: 'New Session',
+        providerInstanceId,
+        modelId,
         configuration: projectData.configuration,
       });
 

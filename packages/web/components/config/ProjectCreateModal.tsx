@@ -84,13 +84,16 @@ export function ProjectCreateModal({
         }
       }
 
-      // Fallback to first available provider
+      // Fallback to first available provider (only if it has models)
       const firstProvider = availableProviders[0];
-      setCreateConfig((prev) => ({
-        ...prev,
-        providerInstanceId: firstProvider.instanceId,
-        modelId: firstProvider.models[0]?.id || '',
-      }));
+      const firstModelId = firstProvider.models[0]?.id;
+      if (firstModelId) {
+        setCreateConfig((prev) => ({
+          ...prev,
+          providerInstanceId: firstProvider.instanceId,
+          modelId: firstModelId,
+        }));
+      }
     }
   }, [availableProviders, createConfig.providerInstanceId, settings.defaultModels]);
 
@@ -364,7 +367,9 @@ export function ProjectCreateModal({
                         !createName ||
                         !createName.trim() ||
                         !createWorkingDirectory ||
-                        !createWorkingDirectory.trim()
+                        !createWorkingDirectory.trim() ||
+                        !createConfig.providerInstanceId ||
+                        !createConfig.modelId
                       }
                       data-testid="create-project-submit"
                     >
