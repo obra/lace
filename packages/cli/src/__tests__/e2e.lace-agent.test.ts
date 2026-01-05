@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'node:path';
@@ -16,6 +17,36 @@ async function waitFor(predicate: () => boolean, timeoutMs: number): Promise<voi
   throw new Error('timeout');
 }
 
+function readOpenAiKeyFromRepoEnv(): string | undefined {
+  const envPath = resolve(__dirname, '../../../../.env');
+  if (!existsSync(envPath)) return undefined;
+
+  const raw = readFileSync(envPath, 'utf8');
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const idx = trimmed.indexOf('=');
+    if (idx < 0) continue;
+    const key = trimmed.slice(0, idx).trim();
+    if (key !== 'OPENAI_API_KEY') continue;
+    let value = trimmed.slice(idx + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (value.length > 0) return value;
+  }
+  return undefined;
+}
+
+const runOpenAiE2e = process.env.RUN_OPENAI_E2E === '1';
+const openAiApiKey = runOpenAiE2e
+  ? (process.env.OPENAI_API_KEY ?? readOpenAiKeyFromRepoEnv())
+  : undefined;
+const maybeIt = openAiApiKey ? it : it.skip;
+
 function spawnCli(options: { workDir: string; laceDir: string }): {
   proc: ReturnType<typeof spawn>;
   lines: string[];
@@ -30,13 +61,18 @@ function spawnCli(options: { workDir: string; laceDir: string }): {
       '--workdir',
       options.workDir,
       '--timeout-ms',
-      '15000',
+      '60000',
       '--agent-cmd',
       `${process.execPath} ${agentMain}`,
     ],
     {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, NO_COLOR: '1', LACE_DIR: options.laceDir },
+      env: {
+        ...process.env,
+        NO_COLOR: '1',
+        LACE_DIR: options.laceDir,
+        ...(openAiApiKey ? { OPENAI_API_KEY: openAiApiKey } : {}),
+      },
     }
   );
 
@@ -56,8 +92,23 @@ function spawnCli(options: { workDir: string; laceDir: string }): {
   return { proc, lines };
 }
 
+function findJsonLine(lines: string[], predicate: (obj: any) => boolean): any | undefined {
+  for (const line of lines) {
+    if (!line.startsWith('{') || !line.endsWith('}')) continue;
+    try {
+      const parsed = JSON.parse(line);
+      if (predicate(parsed)) return parsed;
+    } catch {
+      // ignore
+    }
+  }
+  return undefined;
+}
+
 describe('cli e2e (lace-agent)', () => {
-  it('runs a permissioned run: command', async () => {
+  maybeIt('runs a permissioned run: command', async () => {
+    if (!openAiApiKey) throw new Error('missing OPENAI_API_KEY');
+
     const base = await mkdtemp(resolve(tmpdir(), 'lace-cli-agent-test-'));
     const laceDir = resolve(base, 'lace-dir');
     const workDir = resolve(base, 'workdir');
@@ -66,18 +117,105 @@ describe('cli e2e (lace-agent)', () => {
 
     const { proc, lines } = spawnCli({ workDir, laceDir });
 
-    await waitFor(() => lines.some((l) => l.startsWith('new session ')), 15_000);
+    await waitFor(() => lines.some((l) => l.startsWith('new session ')), 20_000);
 
-    proc.stdin.write('run: echo hi\n');
+    proc.stdin.write(':raw {"method":"ent/providers/list","params":{}}\n');
+    await waitFor(() => lines.some((l) => l.includes('"providers"')), 20_000);
 
-    await waitFor(() => lines.some((l) => l === 'permission request:'), 15_000);
-    await waitFor(() => lines.some((l) => l.includes('input: {"command":"echo hi"}')), 15_000);
+    const providersRes = findJsonLine(lines, (obj) => Array.isArray(obj?.providers));
+    expect(providersRes).toBeTruthy();
+    const providers = providersRes.providers as Array<{ providerId: string; displayName: string }>;
+
+    const openAiProvider = providers.find(
+      (p) =>
+        typeof p.providerId === 'string' &&
+        (p.providerId.toLowerCase().includes('openai') ||
+          p.displayName.toLowerCase().includes('openai'))
+    );
+    expect(openAiProvider).toBeTruthy();
+
+    proc.stdin.write(
+      `:raw ${JSON.stringify({
+        method: 'ent/connections/upsert',
+        params: {
+          providerId: openAiProvider!.providerId,
+          connection: { name: 'test', config: {} },
+        },
+      })}\n`
+    );
+
+    await waitFor(() => lines.some((l) => l.includes('"connectionId"')), 20_000);
+    const upsertRes = findJsonLine(
+      lines,
+      (obj) => typeof obj?.connectionId === 'string' && typeof obj?.providerId === 'string'
+    );
+    expect(upsertRes).toBeTruthy();
+    const connectionId = upsertRes.connectionId as string;
+
+    proc.stdin.write(
+      `:raw ${JSON.stringify({
+        method: 'ent/connections/credentials/submit',
+        params: { connectionId, values: { apiKey: openAiApiKey } },
+      })}\n`
+    );
+
+    await waitFor(() => !!findJsonLine(lines, (obj) => obj?.ok === true), 20_000);
+
+    proc.stdin.write(
+      `:raw ${JSON.stringify({
+        method: 'ent/connections/test',
+        params: { connectionId },
+      })}\n`
+    );
+
+    await waitFor(() => !!findJsonLine(lines, (obj) => obj?.ok === true), 30_000);
+
+    proc.stdin.write(
+      `:raw ${JSON.stringify({
+        method: 'ent/models/list',
+        params: { connectionId },
+      })}\n`
+    );
+
+    await waitFor(() => lines.some((l) => l.includes('"models"')), 30_000);
+    const modelsRes = findJsonLine(
+      lines,
+      (obj) => Array.isArray(obj?.models) && obj?.connectionId === connectionId
+    );
+    expect(modelsRes).toBeTruthy();
+    const models = modelsRes.models as Array<{ modelId: string }>;
+    expect(models.length).toBeGreaterThan(0);
+    const modelId = models[0]!.modelId;
+
+    proc.stdin.write(
+      `:raw ${JSON.stringify({
+        method: 'ent/session/configure',
+        params: { connectionId, modelId, approvalMode: 'ask' },
+      })}\n`
+    );
+
+    await waitFor(
+      () =>
+        !!findJsonLine(
+          lines,
+          (obj) =>
+            obj?.result?.config?.connectionId === connectionId && obj?.result?.config?.modelId
+        ),
+      20_000
+    );
+
+    proc.stdin.write(
+      ':prompt Use the shell.exec tool exactly once to run the command `echo hi`. Do not do anything else.\n'
+    );
+
+    await waitFor(() => lines.some((l) => l === 'permission request:'), 60_000);
+    await waitFor(() => lines.some((l) => l.includes('input: {"command":"echo hi"}')), 60_000);
 
     proc.stdin.write('allow\n');
 
     await waitFor(
       () => lines.some((l) => l.startsWith('tool_use completed shell.exec (tool_')),
-      15_000
+      60_000
     );
 
     proc.stdin.write(':exit\n');

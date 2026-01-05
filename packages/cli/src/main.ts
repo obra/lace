@@ -348,7 +348,11 @@ async function main(): Promise<void> {
     });
   });
 
-  const initializeParams: Record<string, unknown> = { protocolVersion: '1.0' };
+  const initializeParams: Record<string, unknown> = {
+    protocolVersion: '1.0',
+    clientInfo: { name: 'lace-cli', version: '0.1.0' },
+    capabilities: { streaming: true, permissions: true, 'ent/jobStreaming': 'coalesced' },
+  };
   if (args.approvalMode) initializeParams.config = { approvalMode: args.approvalMode };
   await withTimeout(
     conn.peer.request('initialize', initializeParams),
