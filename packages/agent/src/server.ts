@@ -2152,6 +2152,40 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     return { providerId, connectionId, models };
   });
 
+  peer.onRequest('ent/models/refresh', async (params: unknown) => {
+    assertInitialized(state);
+
+    const parsed = params as { connectionId: string };
+    const connectionId = toNonEmptyString(parsed?.connectionId);
+    if (!connectionId) throwInvalidParams('connectionId is required');
+
+    const instances = await state.providerInstances.loadInstances();
+    const instance = instances.instances[connectionId];
+    if (!instance)
+      throw {
+        code: EntErrorCodes.ConnectionNotFound,
+        message: 'ConnectionNotFound',
+        data: { category: 'provider' },
+      };
+
+    await ensureProviderCatalogLoaded();
+    const providerId = instance.catalogProviderId;
+    const provider = state.providerCatalog.getProvider(providerId);
+    if (!provider)
+      throw {
+        code: EntErrorCodes.ProviderError,
+        message: 'Provider not found',
+        data: { category: 'provider' },
+      };
+
+    // Refresh the model catalog (currently a no-op for static catalogs)
+    return {
+      connectionId,
+      refreshedAt: new Date().toISOString(),
+      ok: true,
+    };
+  });
+
   peer.onRequest('ent/tools/list', async (_params: unknown) => {
     assertInitialized(state);
 
