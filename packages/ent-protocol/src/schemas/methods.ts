@@ -11,6 +11,7 @@ import {
   NonEmptyStringSchema,
   PermissionOptionSchema,
   PermissionRequestSchema,
+  PersonaInfoSchema,
   ProviderInfoSchema,
   SandboxConfigSchema,
   ToolInfoSchema,
@@ -1115,6 +1116,30 @@ export const EntToolsListResponseSchema = z
   })
   .strict();
 
+// ent/personas/list - List available personas
+const EntPersonasListResultSchema = z
+  .object({
+    personas: z.array(PersonaInfoSchema),
+  })
+  .strict();
+
+export const EntPersonasListRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/personas/list'),
+    params: EmptyParamsSchema.optional(),
+  })
+  .strict();
+
+export const EntPersonasListResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntPersonasListResultSchema,
+  })
+  .strict();
+
 // ent/mcp/servers/list - List configured MCP servers
 const EntMcpServersListResultSchema = z
   .object({
@@ -1606,6 +1631,7 @@ export const EntProtocolRequestSchema = z.union([
   EntModelsListRequestSchema,
   EntModelsRefreshRequestSchema,
   EntToolsListRequestSchema,
+  EntPersonasListRequestSchema,
   EntMcpServersListRequestSchema,
   EntMcpServersUpsertRequestSchema,
   EntMcpServersDeleteRequestSchema,

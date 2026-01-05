@@ -208,3 +208,12 @@ export const ConnectionInfoSchema = z
   })
   .strict();
 export type ConnectionInfo = z.infer<typeof ConnectionInfoSchema>;
+
+export const PersonaInfoSchema = z
+  .object({
+    name: NonEmptyStringSchema,
+    isUserDefined: z.boolean(),
+    path: NonEmptyStringSchema,
+  })
+  .strict();
+export type PersonaInfo = z.infer<typeof PersonaInfoSchema>;

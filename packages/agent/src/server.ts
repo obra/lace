@@ -73,6 +73,7 @@ import { MCPServerManager } from './mcp/server-manager';
 import type { MCPServerConfig } from '@lace/agent/config/mcp-types';
 import { compactDroppedMessagesWithCore } from './compaction/compact-dropped-messages';
 import { WorkspaceManagerFactory } from './workspace/workspace-manager';
+import { personaRegistry } from './config/persona-registry';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
 const JOB_LOG_DIR = 'jobs';
@@ -2169,6 +2170,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     }
 
     return { tools };
+  });
+
+  peer.onRequest('ent/personas/list', async (_params: unknown) => {
+    const personas = personaRegistry.listAvailablePersonas();
+    return { personas };
   });
 
   // MCP Server Management Handlers
