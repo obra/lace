@@ -307,12 +307,14 @@ describe('lace-agent process (E2E over stdio)', () => {
       expect(durable.events.map((e) => e.type)).toEqual([
         'prompt',
         'turn_start',
+        'permission_requested',
+        'permission_decided',
         'tool_use',
         'message',
         'turn_end',
       ]);
 
-      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5]);
+      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     }
   );
 
@@ -383,6 +385,175 @@ describe('lace-agent process (E2E over stdio)', () => {
 
       expect(existsSync(join(workDir, 'out.txt'))).toBe(true);
       expect(readFileSync(join(workDir, 'out.txt'), 'utf8')).toContain('written by test provider');
+    }
+  );
+
+  it(
+    'reissues pending permission prompts after agent restart (derived from events.jsonl)',
+    { timeout: 25_000 },
+    async () => {
+      agent = spawnAgentProcess({ laceDir });
+
+      let sawPermissionRequest = false;
+      agent.peer.onRequest('session/request_permission', async () => {
+        sawPermissionRequest = true;
+        return await new Promise(() => undefined);
+      });
+
+      await withTimeout(
+        agent.peer.request(
+          'initialize',
+          defaultInitializeParams({ config: { approvalMode: 'ask' } })
+        ),
+        2_000,
+        'initialize'
+      );
+
+      const created = (await withTimeout(
+        agent.peer.request('session/new', { workDir }),
+        2_000,
+        'session/new'
+      )) as { sessionId: string };
+
+      const promptPromise = agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'run: echo pending' }],
+      });
+
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          const interval = setInterval(() => {
+            if (sawPermissionRequest) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 10);
+        }),
+        5_000,
+        'permission request received'
+      );
+
+      const beforeCrash = (await withTimeout(
+        agent.peer.request('ent/agent/status'),
+        2_000,
+        'ent/agent/status (before crash)'
+      )) as { pendingPermissions: Array<{ requestId: string; toolCallId: string }> };
+
+      expect(beforeCrash.pendingPermissions).toHaveLength(1);
+      const [{ requestId: requestIdBefore, toolCallId }] = beforeCrash.pendingPermissions;
+      expect(requestIdBefore).toEqual(expect.any(String));
+      expect(toolCallId).toEqual(expect.any(String));
+
+      const stateRaw = readFileSync(
+        join(laceDir, 'agent-sessions', created.sessionId, 'state.json'),
+        'utf8'
+      );
+      expect((JSON.parse(stateRaw) as any).pendingPermissions).toBeUndefined();
+
+      const eventsRaw = readFileSync(
+        join(laceDir, 'agent-sessions', created.sessionId, 'events.jsonl'),
+        'utf8'
+      );
+      expect(eventsRaw).toContain('"permission_requested"');
+      expect(eventsRaw).not.toContain('"permission_decided"');
+
+      agent.proc.kill('SIGKILL');
+      await withTimeout(
+        new Promise<void>((resolve) => agent!.proc.once('exit', () => resolve())),
+        2_000,
+        'agent process exit'
+      );
+      agent.peer.close();
+      agent = undefined;
+
+      await expect(
+        withTimeout(promptPromise as Promise<unknown>, 2_000, 'prompt crashed')
+      ).rejects.toBeDefined();
+
+      agent = spawnAgentProcess({ laceDir });
+
+      const reissued: Array<Record<string, unknown>> = [];
+      let resolveReissue:
+        | ((value: { decision: string; updatedInput?: Record<string, unknown> }) => void)
+        | undefined;
+      agent.peer.onRequest('session/request_permission', async (params) => {
+        reissued.push(params as Record<string, unknown>);
+        return await new Promise((resolve) => {
+          resolveReissue = resolve as any;
+        });
+      });
+
+      await withTimeout(
+        agent.peer.request(
+          'initialize',
+          defaultInitializeParams({ config: { approvalMode: 'ask' } })
+        ),
+        2_000,
+        'initialize (restart)'
+      );
+      await withTimeout(
+        agent.peer.request('session/load', { sessionId: created.sessionId }),
+        2_000,
+        'session/load (restart)'
+      );
+
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          const interval = setInterval(() => {
+            if (reissued.length > 0) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 10);
+        }),
+        5_000,
+        'permission request reissued'
+      );
+
+      expect(reissued[0]).toMatchObject({ toolCallId });
+
+      const afterRestart = (await withTimeout(
+        agent.peer.request('ent/agent/status'),
+        2_000,
+        'ent/agent/status (after restart)'
+      )) as { pendingPermissions: Array<{ requestId: string; toolCallId: string }> };
+
+      expect(afterRestart.pendingPermissions).toHaveLength(1);
+      expect(afterRestart.pendingPermissions[0]?.toolCallId).toBe(toolCallId);
+      expect(afterRestart.pendingPermissions[0]?.requestId).toEqual(expect.any(String));
+
+      resolveReissue?.({ decision: 'deny' });
+
+      await withTimeout(
+        new Promise<void>((resolve, reject) => {
+          const interval = setInterval(() => {
+            void agent!.peer
+              .request('ent/agent/status')
+              .then((status) => {
+                const p = status as { pendingPermissions?: unknown[] };
+                if ((p.pendingPermissions ?? []).length === 0) {
+                  clearInterval(interval);
+                  resolve();
+                }
+              })
+              .catch((err) => {
+                clearInterval(interval);
+                reject(err);
+              });
+          }, 25);
+        }),
+        5_000,
+        'pending permissions cleared after decision'
+      );
+
+      const durable = (await withTimeout(
+        agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+        2_000,
+        'ent/session/events (after restart)'
+      )) as { events: Array<{ type: string }> };
+
+      expect(durable.events.map((e) => e.type)).toEqual(
+        expect.arrayContaining(['permission_requested', 'permission_decided'])
+      );
     }
   );
 

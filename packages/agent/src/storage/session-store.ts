@@ -36,19 +36,6 @@ export type SessionState = {
       tools?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
     }>;
   };
-  pendingPermissions?: Array<{
-    toolCallId: string;
-    requestId?: string;
-    turnId: string;
-    turnSeq: number;
-    jobId?: string;
-    tool: string;
-    kind?: string;
-    resource: string;
-    options: Array<{ optionId: string; label: string }>;
-    requestedAt: string;
-    input: Record<string, unknown>;
-  }>;
 };
 
 export type LoadedSession = {
@@ -91,10 +78,9 @@ export function readSessionState(sessionDir: string): SessionState {
       nextEventSeq: typeof parsed.nextEventSeq === 'number' ? parsed.nextEventSeq : 1,
       nextStreamSeq: typeof parsed.nextStreamSeq === 'number' ? parsed.nextStreamSeq : 1,
       config: typeof parsed.config === 'object' && parsed.config ? parsed.config : undefined,
-      pendingPermissions: Array.isArray(parsed.pendingPermissions) ? parsed.pendingPermissions : [],
     };
   } catch {
-    return { nextEventSeq: 1, nextStreamSeq: 1, pendingPermissions: [] };
+    return { nextEventSeq: 1, nextStreamSeq: 1 };
   }
 }
 

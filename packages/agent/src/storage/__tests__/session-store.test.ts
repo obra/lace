@@ -37,23 +37,11 @@ describe('storage/session-store', () => {
   it('defaults state when missing, and persists state.json', () => {
     const sessionDir = getSessionDir('sess_test');
     const initial = readSessionState(sessionDir);
-    expect(initial).toEqual({ nextEventSeq: 1, nextStreamSeq: 1, pendingPermissions: [] });
+    expect(initial).toEqual({ nextEventSeq: 1, nextStreamSeq: 1 });
 
     writeSessionState(sessionDir, {
       nextEventSeq: 7,
       nextStreamSeq: 9,
-      pendingPermissions: [
-        {
-          toolCallId: 'tool_1',
-          turnId: 'turn_1',
-          turnSeq: 1,
-          tool: 'file_write',
-          resource: 'file:/tmp/out.txt',
-          options: [{ optionId: 'allow', label: 'Allow' }],
-          requestedAt: '2026-01-04T00:00:00Z',
-          input: { path: 'out.txt' },
-        },
-      ],
       config: { approvalMode: 'ask' },
     });
 
@@ -61,7 +49,6 @@ describe('storage/session-store', () => {
     expect(roundTrip.nextEventSeq).toBe(7);
     expect(roundTrip.nextStreamSeq).toBe(9);
     expect(roundTrip.config).toMatchObject({ approvalMode: 'ask' });
-    expect(roundTrip.pendingPermissions?.[0]).toMatchObject({ tool: 'file_write' });
   });
 
   it('writes meta, ensures events.jsonl, lists and loads sessions', () => {

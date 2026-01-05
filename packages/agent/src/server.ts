@@ -40,6 +40,10 @@ import {
   deriveCheckpointFilesFromDurableEvents,
   deriveFilesReadFromDurableEvents,
 } from './storage/files-from-events';
+import {
+  derivePendingPermissionsFromDurableEvents,
+  type PendingPermissionRecord,
+} from './storage/permissions-from-events';
 import type { PermissionRequest, SessionUpdate, ToolInfo, ToolResult } from './protocol/types';
 import { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
 import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
@@ -183,6 +187,7 @@ type JobState = {
   exitCode?: number;
   outputPath: string;
   proc?: ChildProcess;
+  permissionAbortController?: AbortController;
   childPeer?: JsonRpcPeer;
   childSessionId?: string;
   childTransportClose?: () => void;
@@ -605,6 +610,15 @@ export type AgentServerState = {
   providerInstances: ProviderInstanceManager;
   mcpServerManager: MCPServerManager;
   jobs: Map<string, JobState>;
+  pendingPermissionRequests: Map<
+    string,
+    {
+      requestId: string;
+      rpcId: unknown;
+      record: PendingPermissionRecord;
+      result: Promise<unknown>;
+    }
+  >;
   sessionMutex: Promise<void>;
   jobStreaming: 'full' | 'coalesced' | 'none';
 };
@@ -620,6 +634,7 @@ export function createAgentServerState(): AgentServerState {
     providerInstances: new ProviderInstanceManager(),
     mcpServerManager: new MCPServerManager(),
     jobs: new Map(),
+    pendingPermissionRequests: new Map(),
     sessionMutex: Promise.resolve(),
     jobStreaming: 'full',
   };
@@ -725,9 +740,46 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     resource: string;
     options: Array<{ optionId: string; label: string }>;
     input: Record<string, unknown>;
+    signal?: AbortSignal;
   }): Promise<{ decision?: string; updatedInput?: Record<string, unknown> }> => {
     const requestedAt = new Date().toISOString();
-    const { requestId, result } = peer.requestWithId('session/request_permission', {
+
+    const record: PendingPermissionRecord = {
+      toolCallId: request.toolCallId,
+      turnId: request.turnId,
+      turnSeq: request.turnSeq,
+      jobId: request.jobId,
+      tool: request.tool,
+      kind: request.kind,
+      resource: request.resource,
+      options: request.options,
+      requestedAt,
+      input: request.input,
+    };
+
+    await runExclusive(() => {
+      let sessionState = readSessionState(state.activeSession!.dir);
+      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+        type: 'permission_requested',
+        turnId: request.turnId,
+        data: {
+          toolCallId: request.toolCallId,
+          turnSeq: request.turnSeq,
+          ...(request.jobId ? { jobId: request.jobId } : {}),
+          tool: request.tool,
+          ...(request.kind ? { kind: request.kind } : {}),
+          resource: request.resource,
+          options: request.options,
+          requestedAt,
+          input: request.input,
+        },
+      });
+      sessionState = nextState;
+      writeSessionState(state.activeSession!.dir, sessionState);
+      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+    });
+
+    const { requestId: rpcId, result } = peer.requestWithId('session/request_permission', {
       sessionId: request.sessionId,
       turnId: request.turnId,
       turnSeq: request.turnSeq,
@@ -740,41 +792,131 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       toolCallId: request.toolCallId,
     });
 
-    await runExclusive(() => {
-      const next = readSessionState(state.activeSession!.dir);
-      next.pendingPermissions = next.pendingPermissions ?? [];
-      next.pendingPermissions.push({
-        requestId: String(requestId),
-        toolCallId: request.toolCallId,
-        turnId: request.turnId,
-        turnSeq: request.turnSeq,
-        jobId: request.jobId,
-        tool: request.tool,
-        kind: request.kind,
-        resource: request.resource,
-        options: request.options,
-        requestedAt,
-        input: request.input,
+    state.pendingPermissionRequests.set(request.toolCallId, {
+      requestId: String(rpcId),
+      rpcId,
+      record,
+      result,
+    });
+
+    const abortPromise = request.signal
+      ? new Promise<never>((_, reject) => {
+          request.signal!.addEventListener('abort', () => reject(new Error('cancelled')), {
+            once: true,
+          });
+        })
+      : null;
+
+    let response: any;
+    try {
+      response = abortPromise ? await Promise.race([result, abortPromise]) : await result;
+    } catch {
+      peer.abandonRequest(rpcId);
+      state.pendingPermissionRequests.delete(request.toolCallId);
+
+      await runExclusive(() => {
+        let sessionState = readSessionState(state.activeSession!.dir);
+        const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+          type: 'permission_cancelled',
+          turnId: request.turnId,
+          data: { toolCallId: request.toolCallId, turnSeq: request.turnSeq, reason: 'cancelled' },
+        });
+        sessionState = nextState;
+        writeSessionState(state.activeSession!.dir, sessionState);
+        state.activeSession = loadSession(state.activeSession!.meta.sessionId);
       });
-      writeSessionState(state.activeSession!.dir, next);
-      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-    });
 
-    const decision = (await result) as {
-      decision?: string;
-      updatedInput?: Record<string, unknown>;
-    };
+      throw new Error('cancelled');
+    }
+
+    const decision = toNonEmptyString(response?.decision) ?? undefined;
+    const updatedInput =
+      response?.updatedInput && typeof response.updatedInput === 'object'
+        ? (response.updatedInput as Record<string, unknown>)
+        : undefined;
+
+    state.pendingPermissionRequests.delete(request.toolCallId);
 
     await runExclusive(() => {
-      const next = readSessionState(state.activeSession!.dir);
-      next.pendingPermissions = (next.pendingPermissions ?? []).filter(
-        (p) => p.toolCallId !== request.toolCallId
-      );
-      writeSessionState(state.activeSession!.dir, next);
+      let sessionState = readSessionState(state.activeSession!.dir);
+      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+        type: 'permission_decided',
+        turnId: request.turnId,
+        data: {
+          toolCallId: request.toolCallId,
+          turnSeq: request.turnSeq,
+          ...(decision ? { decision } : {}),
+          ...(updatedInput ? { updatedInput } : {}),
+        },
+      });
+      sessionState = nextState;
+      writeSessionState(state.activeSession!.dir, sessionState);
       state.activeSession = loadSession(state.activeSession!.meta.sessionId);
     });
 
-    return decision;
+    return { ...(decision ? { decision } : {}), ...(updatedInput ? { updatedInput } : {}) };
+  };
+
+  const reissuePendingPermissionRequests = async (): Promise<void> => {
+    if (!state.activeSession) return;
+
+    const sessionId = state.activeSession.meta.sessionId;
+    const pending = derivePendingPermissionsFromDurableEvents(state.activeSession.dir);
+    for (const record of pending) {
+      if (state.pendingPermissionRequests.has(record.toolCallId)) continue;
+
+      const { requestId: rpcId, result } = peer.requestWithId('session/request_permission', {
+        sessionId,
+        turnId: record.turnId,
+        turnSeq: record.turnSeq,
+        ...(record.jobId ? { jobId: record.jobId } : {}),
+        toolCallId: record.toolCallId,
+        tool: record.tool,
+        kind: record.kind,
+        resource: record.resource,
+        options: record.options,
+        requestedAt: record.requestedAt,
+      });
+
+      state.pendingPermissionRequests.set(record.toolCallId, {
+        requestId: String(rpcId),
+        rpcId,
+        record,
+        result,
+      });
+
+      void (async () => {
+        try {
+          const response = (await result) as any;
+          const decision = toNonEmptyString(response?.decision) ?? undefined;
+          const updatedInput =
+            response?.updatedInput && typeof response.updatedInput === 'object'
+              ? (response.updatedInput as Record<string, unknown>)
+              : undefined;
+
+          state.pendingPermissionRequests.delete(record.toolCallId);
+
+          await runExclusive(() => {
+            let sessionState = readSessionState(state.activeSession!.dir);
+            const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+              type: 'permission_decided',
+              turnId: record.turnId,
+              data: {
+                toolCallId: record.toolCallId,
+                turnSeq: record.turnSeq,
+                ...(decision ? { decision } : {}),
+                ...(updatedInput ? { updatedInput } : {}),
+              },
+            });
+            sessionState = nextState;
+            writeSessionState(state.activeSession!.dir, sessionState);
+            state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+          });
+        } catch {
+          state.pendingPermissionRequests.delete(record.toolCallId);
+        }
+      })();
+    }
   };
 
   const startShellJob = async (options: {
@@ -955,6 +1097,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         const toolInput = { command: job.command ?? '' } as Record<string, unknown>;
         const permissionTurnId = job.originTurnId ?? `turn_${randomUUID()}`;
         const permissionTurnSeq = job.originTurnSeq ?? 0;
+        job.permissionAbortController = new AbortController();
 
         await emitSessionUpdate({
           type: 'job_update',
@@ -972,21 +1115,31 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           },
         });
 
-        const decision = await requestPermissionFromClient({
-          sessionId: state.activeSession.meta.sessionId,
-          turnId: permissionTurnId,
-          turnSeq: permissionTurnSeq,
-          jobId: job.jobId,
-          toolCallId,
-          tool: toolName,
-          kind,
-          resource: String(job.command ?? ''),
-          options: [
-            { optionId: 'allow', label: 'Allow' },
-            { optionId: 'deny', label: 'Deny' },
-          ],
-          input: toolInput,
-        });
+        let decision: { decision?: string; updatedInput?: Record<string, unknown> };
+        try {
+          decision = await requestPermissionFromClient({
+            sessionId: state.activeSession.meta.sessionId,
+            turnId: permissionTurnId,
+            turnSeq: permissionTurnSeq,
+            jobId: job.jobId,
+            toolCallId,
+            tool: toolName,
+            kind,
+            resource: String(job.command ?? ''),
+            options: [
+              { optionId: 'allow', label: 'Allow' },
+              { optionId: 'deny', label: 'Deny' },
+            ],
+            input: toolInput,
+            signal: job.permissionAbortController.signal,
+          });
+        } catch {
+          job.permissionAbortController = undefined;
+          job.status = 'cancelled';
+          await finalizeJob(job);
+          return;
+        }
+        job.permissionAbortController = undefined;
 
         if (job.finished || job.status === 'cancelled') {
           return;
@@ -1533,20 +1686,27 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const pendingPermissions: PermissionRequest[] = [];
     if (state.activeSession) {
-      for (const pending of state.activeSession.state.pendingPermissions || []) {
-        if (!pending.requestId) continue;
+      const sessionId = state.activeSession.meta.sessionId;
+      const pendingRecords = derivePendingPermissionsFromDurableEvents(state.activeSession.dir);
+      if (pendingRecords.some((p) => !state.pendingPermissionRequests.has(p.toolCallId))) {
+        await reissuePendingPermissionRequests();
+      }
+
+      for (const record of pendingRecords) {
+        const issued = state.pendingPermissionRequests.get(record.toolCallId);
+        if (!issued) continue;
         pendingPermissions.push({
-          requestId: pending.requestId,
-          toolCallId: pending.toolCallId,
-          sessionId: state.activeSession.meta.sessionId,
-          turnId: pending.turnId,
-          turnSeq: pending.turnSeq,
-          jobId: pending.jobId,
-          tool: pending.tool,
-          kind: pending.kind,
-          resource: pending.resource,
-          options: pending.options,
-          requestedAt: pending.requestedAt,
+          requestId: issued.requestId,
+          toolCallId: record.toolCallId,
+          sessionId,
+          turnId: record.turnId,
+          turnSeq: record.turnSeq,
+          jobId: record.jobId,
+          tool: record.tool,
+          kind: record.kind,
+          resource: record.resource,
+          options: record.options,
+          requestedAt: record.requestedAt,
         });
       }
     }
@@ -2125,6 +2285,10 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     }
 
     // Job is awaiting permission or otherwise not yet started; finalize immediately.
+    if (job.permissionAbortController) {
+      job.permissionAbortController.abort();
+      job.permissionAbortController = undefined;
+    }
     await finalizeJob(job);
 
     return { success: true };
@@ -2233,6 +2397,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     }
     state.activeSession = loaded;
     await reconcileMcpServersForActiveSession(state);
+    await reissuePendingPermissionRequests();
     const summary = summarizeDurableEvents(loaded.dir);
     return {
       sessionId: parsed.sessionId,
@@ -2696,10 +2861,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       return undefined;
     }
 
-    const sessionState = readSessionState(state.activeSession.dir);
-    sessionState.pendingPermissions = [];
-    writeSessionState(state.activeSession.dir, sessionState);
-    state.activeSession = loadSession(state.activeSession.meta.sessionId);
     return undefined;
   });
 
@@ -2985,62 +3146,24 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 status: 'awaiting_permission',
               });
 
-              const requestedAt = new Date().toISOString();
-              const { requestId, result } = peer.requestWithId('session/request_permission', {
-                sessionId: state.activeSession.meta.sessionId,
-                turnId,
-                turnSeq: toolTurnSeq,
-                toolCallId,
-                tool: toolName,
-                kind,
-                resource: toolName,
-                options,
-                requestedAt,
-              });
+              let permissionResponse:
+                | { decision?: string; updatedInput?: Record<string, unknown> }
+                | undefined;
 
-              await runExclusive(() => {
-                const next = readSessionState(state.activeSession!.dir);
-                next.pendingPermissions = next.pendingPermissions ?? [];
-                next.pendingPermissions.push({
-                  requestId: String(requestId),
-                  toolCallId,
+              try {
+                permissionResponse = await requestPermissionFromClient({
+                  sessionId: state.activeSession.meta.sessionId,
                   turnId,
                   turnSeq: toolTurnSeq,
+                  toolCallId,
                   tool: toolName,
                   kind,
                   resource: toolName,
                   options,
-                  requestedAt,
                   input: toolInput,
+                  signal: abortController.signal,
                 });
-                writeSessionState(state.activeSession!.dir, next);
-                state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-              });
-
-              const abortPromise = new Promise<never>((_, reject) => {
-                abortController.signal.addEventListener(
-                  'abort',
-                  () => reject(new Error('cancelled')),
-                  {
-                    once: true,
-                  }
-                );
-              });
-
-              let permissionResponse: any;
-              try {
-                permissionResponse = await Promise.race([result, abortPromise]);
               } catch {
-                peer.abandonRequest(requestId);
-                await runExclusive(() => {
-                  const next = readSessionState(state.activeSession!.dir);
-                  next.pendingPermissions = (next.pendingPermissions ?? []).filter(
-                    (p) => p.toolCallId !== toolCallId
-                  );
-                  writeSessionState(state.activeSession!.dir, next);
-                  state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-                });
-
                 const cancelled: ToolResult = {
                   outcome: 'cancelled',
                   content: [{ type: 'error', message: 'Cancelled' }],
@@ -3065,21 +3188,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 continue;
               }
 
-              await runExclusive(() => {
-                const next = readSessionState(state.activeSession!.dir);
-                next.pendingPermissions = (next.pendingPermissions ?? []).filter(
-                  (p) => p.toolCallId !== toolCallId
-                );
-                writeSessionState(state.activeSession!.dir, next);
-                state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-              });
+              state.activeTurn = { turnId, startedAt, status: 'running', abortController };
 
               const decision = toNonEmptyString(permissionResponse?.decision);
-              if (
-                permissionResponse?.updatedInput &&
-                typeof permissionResponse.updatedInput === 'object'
-              ) {
-                finalInput = permissionResponse.updatedInput as Record<string, unknown>;
+              if (permissionResponse?.updatedInput) {
+                finalInput = permissionResponse.updatedInput;
               }
 
               if (decision === 'deny') {
@@ -3427,59 +3540,23 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             status: 'awaiting_permission',
           });
 
-          const requestedAt = new Date().toISOString();
-          const { requestId, result } = peer.requestWithId('session/request_permission', {
-            sessionId: state.activeSession.meta.sessionId,
-            turnId,
-            turnSeq: 1,
-            toolCallId,
-            tool: toolName,
-            kind,
-            resource: command,
-            options,
-            requestedAt,
-          });
-
-          await runExclusive(() => {
-            const next = readSessionState(state.activeSession!.dir);
-            next.pendingPermissions = next.pendingPermissions ?? [];
-            next.pendingPermissions.push({
-              requestId: String(requestId),
-              toolCallId,
+          let permissionResponse:
+            | { decision?: string; updatedInput?: Record<string, unknown> }
+            | undefined;
+          try {
+            permissionResponse = await requestPermissionFromClient({
+              sessionId: state.activeSession.meta.sessionId,
               turnId,
               turnSeq: 1,
+              toolCallId,
               tool: toolName,
               kind,
               resource: command,
               options,
-              requestedAt,
               input: toolInput,
+              signal: abortController.signal,
             });
-            writeSessionState(state.activeSession!.dir, next);
-            state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-          });
-
-          const abortPromise = new Promise<never>((_, reject) => {
-            abortController.signal.addEventListener('abort', () => reject(new Error('cancelled')), {
-              once: true,
-            });
-          });
-
-          let permissionResponse: any;
-          try {
-            permissionResponse = await Promise.race([result, abortPromise]);
           } catch {
-            peer.abandonRequest(requestId);
-
-            await runExclusive(() => {
-              const next = readSessionState(state.activeSession!.dir);
-              next.pendingPermissions = (next.pendingPermissions ?? []).filter(
-                (p) => p.toolCallId !== toolCallId
-              );
-              writeSessionState(state.activeSession!.dir, next);
-              state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-            });
-
             const cancelled: ToolResult = {
               outcome: 'cancelled',
               content: [{ type: 'error', message: 'Cancelled' }],
@@ -3517,14 +3594,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             };
           }
 
-          await runExclusive(() => {
-            const next = readSessionState(state.activeSession!.dir);
-            next.pendingPermissions = (next.pendingPermissions ?? []).filter(
-              (p) => p.toolCallId !== toolCallId
-            );
-            writeSessionState(state.activeSession!.dir, next);
-            state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-          });
           state.activeTurn = { turnId, startedAt, status: 'running', abortController };
 
           const decision = permissionResponse?.decision;
