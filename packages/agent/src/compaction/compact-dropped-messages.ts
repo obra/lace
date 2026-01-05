@@ -5,8 +5,8 @@ import {
 } from '../providers/base-provider';
 import type { Tool as CoreTool } from '@lace/core/tools/tool';
 import type { LaceEvent } from '@lace/core/threads/types';
-import type { CompactionStrategy } from '@lace/core/threads/compaction/types';
-import { registerDefaultStrategies } from '@lace/core/threads/compaction/registry';
+import type { CompactionStrategy } from './types';
+import { registerDefaultStrategies } from './registry';
 
 class ModelPinnedProvider extends AIProvider {
   constructor(
