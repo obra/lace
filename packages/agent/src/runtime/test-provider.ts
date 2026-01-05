@@ -50,6 +50,35 @@ function getRetryConfig(): { initialDelayMs: number; maxDelayMs: number } | null
   return { initialDelayMs, maxDelayMs };
 }
 
+/**
+ * Streaming delay configuration for abort testing.
+ * - LACE_TEST_PROVIDER_STREAM_DELAY_MS: Delay before emitting tokens (default: 0)
+ */
+function getStreamingDelayMs(): number {
+  const delayStr = process.env.LACE_TEST_PROVIDER_STREAM_DELAY_MS;
+  if (!delayStr) return 0;
+  const delay = parseInt(delayStr, 10);
+  return isNaN(delay) || delay < 0 ? 0 : delay;
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error('aborted'));
+      return;
+    }
+    const timeout = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timeout);
+        reject(new Error('aborted'));
+      },
+      { once: true }
+    );
+  });
+}
+
 // Track call count across provider instances within same process
 // This is necessary because the agent may create new provider instances per turn
 let globalCallCount = 0;
@@ -134,6 +163,17 @@ export class TestAgentProvider extends AIProvider {
             }
 
             throw error;
+          }
+        }
+
+        // Apply streaming delay if configured (for abort testing)
+        const streamingDelayMs = getStreamingDelayMs();
+        if (streamingDelayMs > 0) {
+          try {
+            await sleep(streamingDelayMs, signal);
+          } catch {
+            // Aborted during delay
+            return { content: '', toolCalls: [], stopReason: 'error' };
           }
         }
 
