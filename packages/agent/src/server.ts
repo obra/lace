@@ -58,14 +58,16 @@ import {
 } from '@lace/core/providers/catalog/types';
 import { ProviderRegistry } from '@lace/core/providers/registry';
 import { AIProvider, type ProviderMessage } from '@lace/core/providers/base-provider';
-import { ToolExecutor } from '@lace/core/tools/executor';
+import { ToolExecutor } from './tools/executor';
 import { estimateTokens } from '@lace/core/utils/token-estimation';
+import type { Tool } from './tools/tool';
+// CoreTool for provider compatibility - providers still live in core and expect core Tool type
 import type { Tool as CoreTool } from '@lace/core/tools/tool';
 import type {
   ToolCall as CoreToolCall,
   ToolResult as CoreToolResult,
   ToolPolicy,
-} from '@lace/core/tools/types';
+} from './tools/types';
 import { TestAgentProvider } from './runtime/test-provider';
 import { MCPServerManager } from '@lace/core/mcp/server-manager';
 import type { MCPServerConfig } from '@lace/core/config/mcp-types';
@@ -242,7 +244,7 @@ function protocolToolInfoForCoreTool(tool: CoreTool): ToolInfo {
     name: tool.name,
     description: tool.description,
     kind,
-    inputSchema: tool.inputSchema as any,
+    inputSchema: tool.inputSchema as Record<string, unknown>,
     requiresPermission: kind !== 'read' && kind !== 'search',
   };
 }
@@ -359,13 +361,16 @@ function createToolExecutorForMode(
   }
 
   const allTools = executor.getAllTools();
-  const toolsForProvider =
+  const filteredTools =
     executionMode === 'plan'
       ? allTools.filter((t) => {
           const kind = toolKindFromName(t.name);
           return kind === 'read' || kind === 'search';
         })
       : allTools;
+
+  // Cast to CoreTool[] for provider compatibility - providers still use core Tool type
+  const toolsForProvider = filteredTools as unknown as CoreTool[];
 
   return { executor, toolsForProvider };
 }
