@@ -1287,6 +1287,10 @@ type ContentBlock =
 | 12 | CheckpointNotFound |
 | 13 | StructuredOutputInvalid |
 | 14 | ConnectionNotFound |
+| 11 | BudgetExceeded |
+| 12 | CheckpointNotFound |
+| 13 | StructuredOutputInvalid |
+| 14 | ConnectionNotFound |
 
 ### 10.4 Error Reporting Contract
 
