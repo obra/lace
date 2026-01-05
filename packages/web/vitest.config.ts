@@ -19,7 +19,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@lace/web': path.resolve(__dirname, './'),
-      '@lace/core': path.resolve(__dirname, '../../packages/core/src'),
     },
   },
 });

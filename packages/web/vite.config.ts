@@ -38,9 +38,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '~': resolve(__dirname, '../core/src'),
       '@': resolve(__dirname, '.'),
-      '@lace/core': resolve(__dirname, '../core/src'),
     },
   },
   ssr: { noExternal: ['react-router'] },

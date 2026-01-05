@@ -6,9 +6,6 @@
       "./.react-router/types"
     ],
     "paths": {
-      "@lace/core/*": [
-        "../../packages/core/src/*"
-      ],
       "./+types/*": [
         "./.react-router/types/app/routes/+types/*"
       ],
