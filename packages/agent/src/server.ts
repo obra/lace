@@ -3288,6 +3288,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     await writeAndAdvance({ type: 'prompt', data: { content: parsed.content } });
     await writeAndAdvance({ type: 'turn_start', data: {} });
+    await emitSessionUpdate({ type: 'turn_start' }, { turnId, turnSeq: 0 });
 
     const emitUpdate = async (turnSeq: number, update: SessionUpdate) => {
       await emitSessionUpdate(update, { turnId, turnSeq });
@@ -3295,15 +3296,24 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     if (abortController.signal.aborted) {
       await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
-      state.activeSession = loadSession(state.activeSession.meta.sessionId);
-      state.activeTurn = null;
-
-      return {
+      const result = {
         turnId,
-        stopReason: 'cancelled',
-        content: [],
+        stopReason: 'cancelled' as const,
+        content: [] as { type: 'text'; text: string }[],
         usage: { inputTokens: 0, outputTokens: 0 },
       };
+      await emitSessionUpdate(
+        {
+          type: 'turn_end',
+          stopReason: result.stopReason,
+          content: result.content,
+          usage: result.usage,
+        },
+        { turnId, turnSeq: 1 }
+      );
+      state.activeSession = loadSession(state.activeSession.meta.sessionId);
+      state.activeTurn = null;
+      return result;
     }
 
     const promptText = (parsed.content as any[])
@@ -3745,16 +3755,27 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       }
 
       await writeAndAdvance({ type: 'turn_end', data: { stopReason } });
-      state.activeSession = loadSession(state.activeSession.meta.sessionId);
-      state.activeTurn = null;
-
-      return {
+      const result = {
         turnId,
         stopReason,
         content:
-          finalAssistantContent.length > 0 ? [{ type: 'text', text: finalAssistantContent }] : [],
+          finalAssistantContent.length > 0
+            ? [{ type: 'text' as const, text: finalAssistantContent }]
+            : ([] as { type: 'text'; text: string }[]),
         usage: { inputTokens: 0, outputTokens: 0 },
       };
+      await emitSessionUpdate(
+        {
+          type: 'turn_end',
+          stopReason: result.stopReason,
+          content: result.content,
+          usage: result.usage,
+        },
+        { turnId, turnSeq: streamTurnSeq }
+      );
+      state.activeSession = loadSession(state.activeSession.meta.sessionId);
+      state.activeTurn = null;
+      return result;
     }
 
     const deferredJobs: JobState[] = [];
@@ -3962,15 +3983,24 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
               },
             });
             await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
-            state.activeSession = loadSession(state.activeSession.meta.sessionId);
-            state.activeTurn = null;
-
-            return {
+            const result = {
               turnId,
-              stopReason: 'cancelled',
-              content: [],
+              stopReason: 'cancelled' as const,
+              content: [] as { type: 'text'; text: string }[],
               usage: { inputTokens: 0, outputTokens: 0 },
             };
+            await emitSessionUpdate(
+              {
+                type: 'turn_end',
+                stopReason: result.stopReason,
+                content: result.content,
+                usage: result.usage,
+              },
+              { turnId, turnSeq: nextJobTurnSeq }
+            );
+            state.activeSession = loadSession(state.activeSession.meta.sessionId);
+            state.activeTurn = null;
+            return result;
           }
 
           state.activeTurn = { turnId, startedAt, status: 'running', abortController };
@@ -4076,15 +4106,24 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
           if (terminalStatus === 'cancelled') {
             await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
-            state.activeSession = loadSession(state.activeSession.meta.sessionId);
-            state.activeTurn = null;
-
-            return {
+            const result = {
               turnId,
-              stopReason: 'cancelled',
-              content: [],
+              stopReason: 'cancelled' as const,
+              content: [] as { type: 'text'; text: string }[],
               usage: { inputTokens: 0, outputTokens: 0 },
             };
+            await emitSessionUpdate(
+              {
+                type: 'turn_end',
+                stopReason: result.stopReason,
+                content: result.content,
+                usage: result.usage,
+              },
+              { turnId, turnSeq: nextJobTurnSeq }
+            );
+            state.activeSession = loadSession(state.activeSession.meta.sessionId);
+            state.activeTurn = null;
+            return result;
           }
         }
       }
@@ -4095,6 +4134,21 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       data: { content: [{ type: 'text', text: 'hello' }] },
     });
     await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'end_turn' } });
+    const result = {
+      turnId,
+      stopReason: 'end_turn' as const,
+      content: [{ type: 'text' as const, text: 'hello' }],
+      usage: { inputTokens: 0, outputTokens: 0 },
+    };
+    await emitSessionUpdate(
+      {
+        type: 'turn_end',
+        stopReason: result.stopReason,
+        content: result.content,
+        usage: result.usage,
+      },
+      { turnId, turnSeq: nextJobTurnSeq }
+    );
     state.activeSession = loadSession(state.activeSession.meta.sessionId);
     state.activeTurn = null;
 
@@ -4103,12 +4157,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       if (job.type === 'subagent') runSubagentJobProcess(job);
     }
 
-    return {
-      turnId,
-      stopReason: 'end_turn',
-      content: [{ type: 'text', text: 'hello' }],
-      usage: { inputTokens: 0, outputTokens: 0 },
-    };
+    return result;
   });
 
   peer.onRequest('ent/workspace/info', async (params: unknown) => {

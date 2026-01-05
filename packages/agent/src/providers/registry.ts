@@ -304,6 +304,9 @@ export class ProviderRegistry {
       throw new Error(`Catalog provider not found: ${instance.catalogProviderId}`);
     }
 
+    // Fetch dynamic catalog for this specific instance to ensure we have latest models
+    const instanceCatalog = await this.getCatalogForInstance(instanceId);
+
     // Build provider config from instance and credentials
     // Priority: instance.endpoint > catalog.api_endpoint (with env expansion) > provider default
     const trimmedInstance = (instance.endpoint ?? '').trim();
@@ -314,7 +317,8 @@ export class ProviderRegistry {
       ...(credentials.additionalAuth || {}),
       ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
-      catalogProvider, // Pass catalog data to provider
+      // Pass instance catalog (with dynamic models) so provider can look up model metadata
+      catalogProvider: instanceCatalog ?? catalogProvider,
     };
 
     // Create provider using the existing createProvider method
@@ -369,7 +373,8 @@ export class ProviderRegistry {
       ...(credentials.additionalAuth || {}),
       ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
-      catalogProvider, // Pass catalog data to provider
+      // Pass instance catalog (with dynamic models) so provider can look up model metadata
+      catalogProvider: catalog ?? catalogProvider,
     };
 
     // Create provider using the existing createProvider method

@@ -58,7 +58,13 @@ function processStreamingTokens(events: LaceEvent[]): LaceEvent[] {
   const streamingMessages = new Map<string, { content: string; timestamp: Date }>();
 
   for (const event of events) {
-    if (event.type === 'AGENT_TOKEN') {
+    if (event.type === 'USER_MESSAGE') {
+      // New user message starts a new turn - clear any pending streaming for this thread
+      // This prevents tokens from different turns being combined
+      const threadId = event.context?.threadId || '';
+      streamingMessages.delete(threadId);
+      processed.push(event);
+    } else if (event.type === 'AGENT_TOKEN') {
       // Accumulate tokens by threadId
       const key = event.context?.threadId || '';
       const existing = streamingMessages.get(key);

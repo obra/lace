@@ -659,7 +659,15 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
         return asJson(res, 400, { error: 'Invalid JSON' });
       }
 
-      const message = error instanceof Error ? error.message : 'Internal error';
+      // Handle JSON-RPC error objects (from peer.request rejections)
+      // These have { code, message } but are not Error instances
+      const errorObj = error as { message?: string; code?: number };
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof errorObj?.message === 'string'
+            ? errorObj.message
+            : 'Internal error';
       return asJson(res, 500, { error: message });
     }
   });

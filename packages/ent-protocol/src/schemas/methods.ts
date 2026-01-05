@@ -1501,6 +1501,21 @@ const SessionUpdateJobFinishedSchema = z
   })
   .strict();
 
+const SessionUpdateTurnStartSchema = z
+  .object({
+    type: z.literal('turn_start'),
+  })
+  .strict();
+
+const SessionUpdateTurnEndSchema = z
+  .object({
+    type: z.literal('turn_end'),
+    stopReason: z.enum(['end_turn', 'max_tokens', 'max_turns', 'cancelled', 'budget_exceeded']),
+    content: z.array(ContentBlockSchema),
+    usage: UsageInfoSchema,
+  })
+  .strict();
+
 const SessionUpdateBaseParamsSchema = z
   .object({
     sessionId: SessionIdSchema,
@@ -1519,6 +1534,8 @@ const SessionUpdateInnerNonJobSchema = z.discriminatedUnion('type', [
   SessionUpdateContextInjectedSchema,
   SessionUpdatePlanSchema,
   SessionUpdateToolUseSchema,
+  SessionUpdateTurnStartSchema,
+  SessionUpdateTurnEndSchema,
 ]);
 
 const SessionUpdateJobUpdateSchema = z
@@ -1543,6 +1560,8 @@ const _SessionUpdateInnerSchema = z.discriminatedUnion('type', [
   SessionUpdateJobStartedSchema,
   SessionUpdateJobFinishedSchema,
   SessionUpdateJobUpdateSchema,
+  SessionUpdateTurnStartSchema,
+  SessionUpdateTurnEndSchema,
 ]);
 
 const SessionUpdateParamsSchema = z.discriminatedUnion('type', [
@@ -1556,6 +1575,8 @@ const SessionUpdateParamsSchema = z.discriminatedUnion('type', [
   SessionUpdateBaseParamsSchema.merge(SessionUpdateJobStartedSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateJobFinishedSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateJobUpdateSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateTurnStartSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateTurnEndSchema),
 ]);
 
 export const SessionUpdateNotificationSchema = z
