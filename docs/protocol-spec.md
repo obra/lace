@@ -343,7 +343,7 @@ Cancels the current operation.
 
 **Cancellation semantics**:
 - If a turn is running, it stops and returns with `stopReason: "cancelled"`.
-- If a tool is `awaiting_permission`, the pending permission request is **invalidated**. The agent MUST emit a `tool_use` update with `status: "cancelled"` and discard the pending request from `ent/agent/status.pendingPermissions`. Clients MUST dismiss any approval UI for that `toolCallId`.
+- If a tool is `awaiting_permission`, the pending permission request is **invalidated**. The agent MUST emit a `tool_use` update with `status: "cancelled"`, append a durable `permission_cancelled` event, and discard the pending request from `ent/agent/status.pendingPermissions`. Clients MUST dismiss any approval UI for that `toolCallId` (or treat it as stale if a new permission request is later reissued).
 - If no turn is in progress, the notification is silently ignored.
 
 ### 5.6 `session/set_mode`
@@ -713,7 +713,7 @@ Also returns pending permission requests, enabling protocol clients (e.g., super
       startedAt: string  // ISO 8601
     },
 
-    // Pending permission requests (for reconnection)
+    // Pending permission requests (derived from durable permission events)
     pendingPermissions: PermissionRequest[],
 
     limits: {
@@ -729,7 +729,7 @@ Also returns pending permission requests, enabling protocol clients (e.g., super
 
 Fetch session event history. Used by protocol clients (e.g., supervisors) that need to reconstruct conversation state after reconnection or process restart.
 
-**Durable events only**: This method returns finalized events, not streaming deltas. For example, instead of individual `text_delta` updates, it returns complete `message` events with full text. This provides a stable history format suitable for persistence and replay.
+**Durable events only**: This method returns durable events, not streaming deltas. For example, instead of individual `text_delta` updates, it returns complete `message` events with full text. This provides a stable history format suitable for persistence and replay. Durable events may represent ongoing state (e.g., a `permission_requested` that has not yet been decided).
 
 ```typescript
 // Request
@@ -766,6 +766,9 @@ Fetch session event history. Used by protocol clients (e.g., supervisors) that n
 - `prompt`: User prompt submitted (full content)
 - `message`: Agent message (full text, not deltas)
 - `tool_use`: Tool execution (complete with result)
+- `permission_requested`: Permission prompt issued for a tool call (includes tool input needed to resume)
+- `permission_decided`: Permission decision received (includes decision + optional updatedInput)
+- `permission_cancelled`: Permission request invalidated (cancel/timeout)
 - `error`: Error occurred
 - `turn_start`: Turn began
 - `turn_end`: Turn completed (with stop reason)
@@ -1227,7 +1230,7 @@ Agent requests permission to execute a tool. This is a **request** (has `id`), n
 
 **Idempotency**: If the client sends duplicate responses for the same `toolCallId`, the agent ignores all but the first. This prevents race conditions from network retries or UI double-clicks.
 
-**Durability**: The agent MUST persist pending permission requests in its own session log. After an agent restart, it reconstructs pending requests from this log and exposes them via `ent/agent/status.pendingPermissions`. The `ent/session/events` API returns only finalized events (completed tool uses with results), not pending permission requests—use `ent/agent/status` for current pending state.
+**Durability**: The agent MUST persist permission requests and permission decisions in its session's durable event log (`events.jsonl`). Pending permissions are derived by scanning for `permission_requested` events that do not yet have a matching `permission_decided`/`permission_cancelled`. After an agent restart, the agent MUST reissue permission prompts for any pending `toolCallId`s so the client receives a fresh JSON-RPC `id` to respond to.
 
 ---
 
@@ -1440,7 +1443,7 @@ interface McpServerStatus {
 ```typescript
 // Pending permission request (for reconnection scenarios)
 interface PermissionRequest {
-  requestId: string;       // JSON-RPC request ID
+  requestId: string;       // JSON-RPC request ID for the currently-issued prompt (may change if reissued)
   toolCallId: string;      // MUST be globally unique across session + jobs
   sessionId: string;
   turnId: string;          // SHOULD be UUID

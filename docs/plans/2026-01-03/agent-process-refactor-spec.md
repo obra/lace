@@ -182,7 +182,7 @@ Recommended layout (exact file names can vary, but semantics must match):
 ```
 <laceDir>/agent-sessions/<sessionId>/
   events.jsonl        # durable event stream (ent/session/events)
-  state.json          # small persisted counters + pending approvals
+  state.json          # small persisted counters + config (NOT source-of-truth for permissions)
   jobs/
     <jobId>.log       # optional output spool (for ent/job/output offsets/tail)
     <jobId>.json      # optional job metadata (status, parentJobId, etc.)
@@ -205,13 +205,12 @@ Requirements:
 - `ent/session/events` must page by `afterEventSeq` and return stable ordering.
 - Events must not contain secrets (credential material, tokens, etc.).
 
-### Pending approvals (`state.json`)
+### Permission durability
 
 Requirements:
-- Must persist enough info to:
-  - reconstruct approval UI after supervisor reconnect
-  - resume paused tool execution after agent restart
-- Must store `pendingPermissions` in a format matching protocol `PermissionRequest[]`.
+- Permission requests and permission decisions MUST be written to `events.jsonl` (e.g. `permission_requested`, `permission_decided`, `permission_cancelled`).
+- `ent/agent/status.pendingPermissions` MUST be derived from durable events (not stored as source-of-truth in `state.json`).
+- On agent restart, pending permission prompts MUST be reissued to the client (new JSON-RPC request ids) so the client can respond.
 
 ### Job output spooling
 
@@ -249,7 +248,7 @@ Tool execution must:
   - Emit `tool_use` with `status: "awaiting_permission"`.
   - Send `session/request_permission` request.
   - Pause execution until response/cancel/timeout.
-- Persist pending approvals so that after restart `ent/agent/status.pendingPermissions` is correct.
+- Persist permission requests/decisions as durable events so that after restart `ent/agent/status.pendingPermissions` is correct.
 
 Cancellation:
 - `session/cancel` must:
@@ -418,4 +417,3 @@ Because we are doing a flag-day cutover:
 - Implementation tasks: `docs/plans/2026-01-03/agent-process-refactor.md`
 - Protocol contract: `docs/protocol-spec.md`
 - Protocol rationale: `docs/about-the-protocol.md`
-
