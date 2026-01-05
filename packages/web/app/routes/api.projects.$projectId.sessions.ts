@@ -110,6 +110,16 @@ export async function action({ request, params }: Route.ActionArgs) {
       id: created.workspaceSessionId,
       name: sessionName,
       createdAt: new Date(),
+      // Include coordinator agent for navigation (matches AgentInfo interface)
+      agents: [
+        {
+          threadId: created.sessionId,
+          name: 'coordinator',
+          providerInstanceId: validatedData.providerInstanceId,
+          modelId: validatedData.modelId,
+          status: 'idle' as const,
+        },
+      ],
     };
 
     // If we have initialMessage, spawn background helper to generate better name

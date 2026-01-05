@@ -333,7 +333,12 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
       }
 
       const sessionId = newSession.id;
-      const coordinatorAgentId = sessionId; // coordinator has same threadId
+      // Get coordinator agent ID from the created session's agents array
+      const coordinatorAgent = newSession.agents?.[0];
+      if (!coordinatorAgent) {
+        throw new Error('Failed to get coordinator agent from new session');
+      }
+      const coordinatorAgentId = coordinatorAgent.threadId;
 
       // Complete onboarding and navigate to agent
       await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);

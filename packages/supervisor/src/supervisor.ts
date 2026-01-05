@@ -107,6 +107,11 @@ export class Supervisor {
     return found;
   }
 
+  private async ensureActive(workspaceSessionId: string): Promise<void> {
+    if (this.sessions.has(workspaceSessionId)) return;
+    await this.activateWorkspaceSession(workspaceSessionId);
+  }
+
   private requireAgent(workspaceSessionId: string, sessionId?: string) {
     const ws = this.requireWorkspace(workspaceSessionId);
     const resolvedSessionId = sessionId
@@ -268,7 +273,53 @@ export class Supervisor {
     };
   }
 
+  async activateWorkspaceSession(workspaceSessionId: string): Promise<WorkspaceSessionHandle> {
+    // If already active, return existing handle
+    const existing = this.sessions.get(workspaceSessionId);
+    if (existing && existing.primarySessionId) {
+      const primaryAgent = existing.agentsBySessionId.get(existing.primarySessionId);
+      return {
+        workspaceSessionId,
+        sessionId: existing.primarySessionId,
+        workDir: existing.workDir,
+        pid: primaryAgent?.proc.pid ?? -1,
+      };
+    }
+
+    // Look up in persistent store
+    const record = this.store.get(workspaceSessionId);
+    if (!record) {
+      throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
+    }
+
+    if (record.agents.length === 0) {
+      throw new Error(`Workspace session has no agents: ${workspaceSessionId}`);
+    }
+
+    // Get primary agent (first agent in list)
+    const primaryAgentMeta = record.agents[0]!;
+    const primarySessionId = primaryAgentMeta.sessionId as SessionId;
+
+    // Spawn agent process and load the session
+    const loaded = await this.spawnLoadedAgentSession(workspaceSessionId, primarySessionId);
+
+    // Add to in-memory sessions map
+    this.sessions.set(workspaceSessionId, {
+      workDir: loaded.workDir,
+      primarySessionId,
+      agentsBySessionId: new Map([[primarySessionId, loaded.agent]]),
+    });
+
+    return {
+      workspaceSessionId,
+      sessionId: primarySessionId,
+      workDir: loaded.workDir,
+      pid: loaded.pid,
+    };
+  }
+
   async createAgentSession(workspaceSessionId: string): Promise<AgentSessionHandle> {
+    await this.ensureActive(workspaceSessionId);
     const ws = this.requireWorkspace(workspaceSessionId);
 
     const created = await this.spawnNewAgentSession(workspaceSessionId, ws.workDir);
@@ -280,7 +331,8 @@ export class Supervisor {
     return { sessionId: created.sessionId, pid: created.pid };
   }
 
-  getPeer(workspaceSessionId: string, sessionId?: string): JsonRpcPeer {
+  async getPeer(workspaceSessionId: string, sessionId?: string): Promise<JsonRpcPeer> {
+    await this.ensureActive(workspaceSessionId);
     return this.requireAgent(workspaceSessionId, sessionId).agent.peer;
   }
 
@@ -290,7 +342,7 @@ export class Supervisor {
   ): Promise<SessionPromptResult> {
     this.store.touch(workspaceSessionId);
     return await requestEnt(
-      this.getPeer(workspaceSessionId),
+      await this.getPeer(workspaceSessionId),
       'session/prompt',
       SessionPromptRequestSchema.shape.params,
       SessionPromptResponseSchema.shape.result,
@@ -305,7 +357,7 @@ export class Supervisor {
   ): Promise<SessionPromptResult> {
     this.store.touch(workspaceSessionId);
     return await requestEnt(
-      this.getPeer(workspaceSessionId, sessionId),
+      await this.getPeer(workspaceSessionId, sessionId),
       'session/prompt',
       SessionPromptRequestSchema.shape.params,
       SessionPromptResponseSchema.shape.result,
@@ -361,7 +413,7 @@ export class Supervisor {
     }>;
   }> {
     return await requestEnt(
-      this.getPeer(workspaceSessionId),
+      await this.getPeer(workspaceSessionId),
       'ent/providers/list',
       EntProvidersListRequestSchema.shape.params,
       EntProvidersListResponseSchema.shape.result,
@@ -382,7 +434,7 @@ export class Supervisor {
     }>;
   }> {
     return await requestEnt(
-      this.getPeer(workspaceSessionId),
+      await this.getPeer(workspaceSessionId),
       'ent/connections/list',
       EntConnectionsListRequestSchema.shape.params,
       EntConnectionsListResponseSchema.shape.result,
@@ -398,7 +450,7 @@ export class Supervisor {
     }
   ): Promise<{ connectionId: string; providerId: string; created: boolean }> {
     return await requestEnt(
-      this.getPeer(workspaceSessionId),
+      await this.getPeer(workspaceSessionId),
       'ent/connections/upsert',
       EntConnectionsUpsertRequestSchema.shape.params,
       EntConnectionsUpsertResponseSchema.shape.result,
@@ -411,7 +463,7 @@ export class Supervisor {
     params: { connectionId: string }
   ): Promise<{ ok: true }> {
     return await requestEnt(
-      this.getPeer(workspaceSessionId),
+      await this.getPeer(workspaceSessionId),
       'ent/connections/delete',
       EntConnectionsDeleteRequestSchema.shape.params,
       EntConnectionsDeleteResponseSchema.shape.result,
@@ -424,7 +476,7 @@ export class Supervisor {
     params: { connectionId: string }
   ): Promise<{ connectionId: string; state: string; accountLabel?: string; expiresAt?: string }> {
     return await requestEnt(
-      this.getPeer(workspaceSessionId),
+      await this.getPeer(workspaceSessionId),
       'ent/connections/credentials/status',
       EntConnectionsCredentialsStatusRequestSchema.shape.params,
       EntConnectionsCredentialsStatusResponseSchema.shape.result,
@@ -437,7 +489,7 @@ export class Supervisor {
     params: { connectionId: string; method?: 'api_key' | 'device_code' | 'browser' | 'token' }
   ): Promise<unknown> {
     return await requestEnt(
-      this.getPeer(workspaceSessionId),
+      await this.getPeer(workspaceSessionId),
       'ent/connections/credentials/start',
       EntConnectionsCredentialsStartRequestSchema.shape.params,
       EntConnectionsCredentialsStartResponseSchema.shape.result,
@@ -450,7 +502,7 @@ export class Supervisor {
     params: { connectionId: string; values: Record<string, string> }
   ): Promise<{ ok: boolean; error?: string }> {
     return await requestEnt(
-      this.getPeer(workspaceSessionId),
+      await this.getPeer(workspaceSessionId),
       'ent/connections/credentials/submit',
       EntConnectionsCredentialsSubmitRequestSchema.shape.params,
       EntConnectionsCredentialsSubmitResponseSchema.shape.result,
@@ -463,7 +515,7 @@ export class Supervisor {
     params: { connectionId: string }
   ): Promise<{ ok: true }> {
     return await requestEnt(
-      this.getPeer(workspaceSessionId),
+      await this.getPeer(workspaceSessionId),
       'ent/connections/credentials/clear',
       EntConnectionsCredentialsClearRequestSchema.shape.params,
       EntConnectionsCredentialsClearResponseSchema.shape.result,
@@ -476,7 +528,7 @@ export class Supervisor {
     params: { connectionId: string }
   ): Promise<{ providerId: string; connectionId: string; models: Array<{ modelId: string }> }> {
     return await requestEnt(
-      this.getPeer(workspaceSessionId),
+      await this.getPeer(workspaceSessionId),
       'ent/models/list',
       EntModelsListRequestSchema.shape.params,
       EntModelsListResponseSchema.shape.result,
@@ -496,7 +548,7 @@ export class Supervisor {
     }>;
   }> {
     return await requestEnt(
-      this.getPeer(workspaceSessionId),
+      await this.getPeer(workspaceSessionId),
       'ent/job/list',
       EntJobListRequestSchema.shape.params,
       EntJobListResponseSchema.shape.result,
@@ -515,7 +567,7 @@ export class Supervisor {
     }
   ): Promise<unknown> {
     return await requestEnt(
-      this.getPeer(workspaceSessionId),
+      await this.getPeer(workspaceSessionId),
       'ent/job/output',
       EntJobOutputRequestSchema.shape.params,
       EntJobOutputResponseSchema.shape.result,
@@ -528,7 +580,7 @@ export class Supervisor {
     params: { jobId: string }
   ): Promise<{ success: boolean }> {
     return await requestEnt(
-      this.getPeer(workspaceSessionId),
+      await this.getPeer(workspaceSessionId),
       'ent/job/kill',
       EntJobKillRequestSchema.shape.params,
       EntJobKillResponseSchema.shape.result,
@@ -536,8 +588,9 @@ export class Supervisor {
     );
   }
 
-  cancel(workspaceSessionId: string): void {
-    this.getPeer(workspaceSessionId).notify('session/cancel');
+  async cancel(workspaceSessionId: string): Promise<void> {
+    const peer = await this.getPeer(workspaceSessionId);
+    peer.notify('session/cancel');
   }
 
   async shutdownWorkspaceSession(workspaceSessionId: string): Promise<void> {

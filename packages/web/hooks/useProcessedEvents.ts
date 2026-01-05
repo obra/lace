@@ -92,8 +92,10 @@ function processStreamingTokens(events: LaceEvent[]): LaceEvent[] {
 
   // Add remaining streaming messages as AGENT_STREAMING events
   for (const [threadId, { content, timestamp }] of streamingMessages.entries()) {
+    // Use stable ID based on threadId only - content changes shouldn't create new events
+    // This ensures React treats streaming updates as updates to the same element
     const streamingEvent: LaceEvent = {
-      id: `streaming_${timestamp.getTime()}_${threadId}_${content.slice(0, 10).replace(/\s/g, '_')}`,
+      id: `streaming_${threadId}`,
       type: 'AGENT_STREAMING',
       timestamp: timestamp,
       data: { content },

@@ -71,10 +71,10 @@ function updateToLaceEvents(params: {
   if (type === 'text_delta' && typeof update.text === 'string') {
     return [
       {
-        type: 'AGENT_STREAMING',
+        type: 'AGENT_TOKEN',
         timestamp: new Date(),
         transient: true,
-        data: { content: update.text },
+        data: { token: update.text },
         context: baseContext,
       },
     ];

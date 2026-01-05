@@ -584,7 +584,7 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
           }
 
           const parsedParams = handler.paramsSchema.parse(body.params ?? {});
-          const peer = supervisor.getPeer(workspaceSessionId, body.sessionId);
+          const peer = await supervisor.getPeer(workspaceSessionId, body.sessionId);
           const result = await peer.request(body.method, parsedParams);
           return asJson(res, 200, { result: handler.resultSchema.parse(result) });
         }
@@ -597,7 +597,7 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
           }
 
           const parsedParams = handler.paramsSchema.parse(body.params ?? {});
-          const peer = supervisor.getPeer(workspaceSessionId, body.sessionId);
+          const peer = await supervisor.getPeer(workspaceSessionId, body.sessionId);
           peer.notify(body.method, parsedParams);
           return asJson(res, 200, { ok: true });
         }

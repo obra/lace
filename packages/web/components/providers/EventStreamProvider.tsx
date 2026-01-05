@@ -95,7 +95,36 @@ export function EventStreamProvider({
 
   // API hooks
   const sessionAPI = useSessionAPIHook();
-  const agentAPI = useAgentAPIHook();
+  const agentAPIBase = useAgentAPIHook();
+
+  // Wrap sendMessage to add optimistic USER_MESSAGE events
+  const sendMessageWithOptimisticUpdate = useCallback(
+    async (agentIdArg: ThreadId, message: string): Promise<boolean> => {
+      // Add optimistic USER_MESSAGE before sending
+      // USER_MESSAGE has data: string (not { content: string })
+      const optimisticEvent: LaceEvent = {
+        id: `user_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        type: 'USER_MESSAGE',
+        timestamp: new Date(),
+        data: message,
+        context: { threadId: agentIdArg },
+      };
+      addAgentEvent(optimisticEvent);
+
+      // Send to server
+      return agentAPIBase.sendMessage(agentIdArg, message);
+    },
+    [addAgentEvent, agentAPIBase]
+  );
+
+  const agentAPI = useMemo(
+    () => ({
+      sendMessage: sendMessageWithOptimisticUpdate,
+      stopAgent: agentAPIBase.stopAgent,
+      error: agentAPIBase.error,
+    }),
+    [sendMessageWithOptimisticUpdate, agentAPIBase.stopAgent, agentAPIBase.error]
+  );
 
   // Streaming content now handled by useProcessedEvents hook
 
@@ -270,8 +299,8 @@ export function EventStreamProvider({
       compactionState,
 
       agentAPI: {
-        sendMessage: agentAPI.sendMessage,
-        stopAgent: agentAPI.stopAgent,
+        sendMessage: sendMessageWithOptimisticUpdate,
+        stopAgent: agentAPIBase.stopAgent,
       },
 
       onAgentStateChange: handleAgentStateChangeCallback,
@@ -285,8 +314,8 @@ export function EventStreamProvider({
       loadingHistory,
       addAgentEvent,
       compactionState,
-      agentAPI.sendMessage,
-      agentAPI.stopAgent,
+      sendMessageWithOptimisticUpdate,
+      agentAPIBase.stopAgent,
       handleAgentStateChangeCallback,
     ]
   );

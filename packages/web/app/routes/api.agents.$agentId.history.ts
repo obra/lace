@@ -73,13 +73,14 @@ function durableEventsToLaceEvents(agentSessionId: string, events: DurableEvent[
     if (e.type === 'prompt') {
       const content = toTextContent(e.data?.content);
       if (content.trim()) {
+        // USER_MESSAGE data is a string, not { content: string }
         out.push({
           id: `ent_${e.eventSeq}_user`,
           type: 'USER_MESSAGE',
           timestamp,
-          data: { content },
+          data: content,
           context,
-        } as unknown as LaceEvent);
+        } as LaceEvent);
       }
       continue;
     }
