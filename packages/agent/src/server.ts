@@ -2538,11 +2538,13 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     return {
       applied,
       config: {
+        executionMode: effectiveAfter.executionMode,
         connectionId: effectiveAfter.connectionId,
         modelId: effectiveAfter.modelId,
         maxThinkingTokens: effectiveAfter.maxThinkingTokens,
         maxBudgetUsd: effectiveAfter.maxBudgetUsd,
         approvalMode: effectiveAfter.approvalMode,
+        mcpServers: (state.activeSession.state.config as any)?.mcpServers,
       },
     };
   });

@@ -465,6 +465,7 @@ Dynamic configuration changes. Covers Claude SDK's `setModel()`, `setMaxThinking
     // Runtime settings
     maxThinkingTokens?: number,
     maxBudgetUsd?: number,
+    mcpServers?: McpServerConfig[],
     approvalMode?: "ask" | "approveReads" | "approveEdits" | "approve" | "deny" | "dangerouslySkipPermissions"
     // ask: Prompt for everything (default)
     // approveReads: Auto-approve reads/search, prompt for writes
