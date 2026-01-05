@@ -2,27 +2,12 @@
 // ABOUTME: Uses superjson to preserve types across API boundaries and SSE
 
 import superjson from 'superjson';
-import type { ThreadId, WorkspaceSessionId } from '@lace/web/types/core';
-import { isThreadId, isWorkspaceSessionId } from '@lace/web/types/core';
 
-// Register custom transformers for branded types
-superjson.registerCustom<ThreadId, string>(
-  {
-    isApplicable: (v): v is ThreadId => typeof v === 'string' && isThreadId(v),
-    serialize: (v) => v as string,
-    deserialize: (v) => v as ThreadId,
-  },
-  'ThreadId'
-);
-
-superjson.registerCustom<WorkspaceSessionId, string>(
-  {
-    isApplicable: (v): v is WorkspaceSessionId => typeof v === 'string' && isWorkspaceSessionId(v),
-    serialize: (v) => v as string,
-    deserialize: (v) => v as WorkspaceSessionId,
-  },
-  'WorkspaceSessionId'
-);
+// NOTE: We intentionally do NOT register custom transformers for ThreadId or
+// WorkspaceSessionId. These are branded string types for compile-time safety only.
+// At runtime they're just strings - superjson handles them fine without transformers.
+// Registering transformers caused bugs where arbitrary strings (like streaming tokens)
+// matched the loose regex and got incorrectly marked as session IDs.
 
 // Export the configured superjson instance (parse not exported to encourage parseResponse/parseTyped)
 export const { serialize, deserialize, stringify } = superjson;
