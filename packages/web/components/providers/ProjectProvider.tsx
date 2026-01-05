@@ -40,6 +40,17 @@ export interface ProjectContextType {
     modelId?: string;
     configuration?: Record<string, unknown>;
   }) => Promise<SessionInfo | null>;
+  createSessionForProject: (
+    projectId: string,
+    sessionData: {
+      name?: string;
+      initialMessage?: string;
+      description?: string;
+      providerInstanceId?: string;
+      modelId?: string;
+      configuration?: Record<string, unknown>;
+    }
+  ) => Promise<SessionInfo | null>;
   loadProjectConfig: () => Promise<void>;
   reloadSessions: () => Promise<void>;
   loadSessionConfiguration: (sessionId: string) => Promise<Record<string, unknown>>;
@@ -85,6 +96,7 @@ export function ProjectProvider({
     loading,
     projectConfig,
     createSession,
+    createSessionForProject,
     loadProjectConfig,
     reloadSessions,
     loadSessionConfiguration,
@@ -178,6 +190,7 @@ export function ProjectProvider({
 
       // Data operations (passed through)
       createSession,
+      createSessionForProject,
       loadProjectConfig,
       reloadSessions,
       loadSessionConfiguration,
@@ -198,6 +211,7 @@ export function ProjectProvider({
       selectSession,
       onSessionSelect,
       createSession,
+      createSessionForProject,
       loadProjectConfig,
       reloadSessions,
       loadSessionConfiguration,

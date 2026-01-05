@@ -65,7 +65,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     loadProjectConfiguration,
     reloadProjects,
   } = useProjectsContext();
-  const { enableAgentAutoSelection, loadSessionsForProject } = useProjectContext();
+  const { enableAgentAutoSelection, createSessionForProject } = useProjectContext();
   const { autoOpenCreateProject, setAutoOpenCreateProject } = useUIContext();
   const { handleOnboardingComplete } = useOnboarding(
     setAutoOpenCreateProject,
@@ -313,25 +313,24 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
       const createdProject = await createProject(projectData);
       const projectId = createdProject.id;
 
-      // Step 2: Navigate directly to chat - modal stays open until page changes
-      const sessionsData = await loadSessionsForProject(projectId);
+      // Step 2: Create a session for the new project
+      const newSession = await createSessionForProject(projectId, {
+        name: 'New Session',
+        configuration: projectData.configuration,
+      });
 
-      const sessionId = sessionsData[0]?.id;
-      if (sessionId) {
-        const coordinatorAgentId = sessionId; // coordinator has same threadId
-
-        // Complete onboarding and navigate to agent
-        await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);
-
-        // Don't reset state here - let page navigation handle component unmount
-        return;
+      if (!newSession) {
+        throw new Error('Failed to create session for new project');
       }
 
-      // Only reset modal state if navigation workflow failed
-      setIsCreatingProject(false);
-      setShowCreateProject(false);
-      setAutoOpenCreateProject(false);
-      throw new Error('Failed to complete project creation workflow');
+      const sessionId = newSession.id;
+      const coordinatorAgentId = sessionId; // coordinator has same threadId
+
+      // Complete onboarding and navigate to agent
+      await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);
+
+      // Don't reset state here - let page navigation handle component unmount
+      return;
     } catch (error) {
       console.error('Project create error:', error);
       // Only close modal on error

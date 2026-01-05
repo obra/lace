@@ -102,6 +102,7 @@ describe('ProjectProvider', () => {
     loading: false,
     projectConfig: null,
     createSession: mockCreateSession,
+    createSessionForProject: vi.fn(),
     loadProjectConfig: mockLoadProjectConfig,
     reloadSessions: mockReloadSessions,
     loadSessionConfiguration: vi.fn(),

@@ -17,6 +17,17 @@ interface UseSessionManagementResult {
     modelId?: string;
     configuration?: Record<string, unknown>;
   }) => Promise<SessionInfo | null>;
+  createSessionForProject: (
+    projectId: string,
+    sessionData: {
+      name?: string;
+      initialMessage?: string;
+      description?: string;
+      providerInstanceId?: string;
+      modelId?: string;
+      configuration?: Record<string, unknown>;
+    }
+  ) => Promise<SessionInfo | null>;
   loadProjectConfig: () => Promise<void>;
   reloadSessions: () => Promise<void>;
   loadSessionConfiguration: (sessionId: string) => Promise<Record<string, unknown>>;
@@ -181,6 +192,33 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
     []
   );
 
+  // Create a session for any project (not just the one the hook is bound to)
+  const createSessionForProject = useCallback(
+    async (
+      targetProjectId: string,
+      sessionData: {
+        name?: string;
+        initialMessage?: string;
+        description?: string;
+        providerInstanceId?: string;
+        modelId?: string;
+        configuration?: Record<string, unknown>;
+      }
+    ): Promise<SessionInfo | null> => {
+      try {
+        const newSession = await api.post<SessionInfo>(
+          `/api/projects/${targetProjectId}/sessions`,
+          sessionData
+        );
+        return newSession;
+      } catch (error) {
+        console.error('Failed to create session for project:', error);
+        throw error;
+      }
+    },
+    []
+  );
+
   // Load sessions when project changes
   useEffect(() => {
     void loadSessions();
@@ -204,6 +242,7 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
     loading,
     projectConfig,
     createSession,
+    createSessionForProject,
     loadProjectConfig,
     reloadSessions: loadSessions,
     loadSessionConfiguration,

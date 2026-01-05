@@ -30,6 +30,7 @@ export function createMockProjectContext(
 
     // Data operations
     createSession: vi.fn(),
+    createSessionForProject: vi.fn(),
     loadProjectConfig: vi.fn(),
     reloadSessions: vi.fn(),
     loadSessionConfiguration: vi.fn(),
