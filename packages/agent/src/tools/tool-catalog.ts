@@ -1,7 +1,7 @@
 // ABOUTME: Tool Discovery & Enumeration system for fast configuration APIs
 // ABOUTME: Provides async discovery caching and fast tool enumeration without expensive ToolExecutor creation
 
-import { MCPServerManager } from '@lace/core/mcp/server-manager';
+import { MCPServerManager } from '../mcp/server-manager';
 import { MCPConfigLoader } from '@lace/core/config/mcp-config-loader';
 import { logger } from '@lace/core/utils/logger';
 import type { Project } from '@lace/core/projects/project';

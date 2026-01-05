@@ -14,9 +14,9 @@ import { RipgrepSearchTool } from './implementations/ripgrep_search';
 import { FileFindTool } from './implementations/file_find';
 import { UrlFetchTool } from './implementations/url_fetch';
 import { DelegateTool } from './implementations/delegate';
-import { MCPServerManager } from '@lace/core/mcp/server-manager';
+import { MCPServerManager } from '../mcp/server-manager';
 import type { MCPServerConnection } from '@lace/core/config/mcp-types';
-import { MCPToolAdapter } from '@lace/core/mcp/tool-adapter';
+import { MCPToolAdapter } from '../mcp/tool-adapter';
 import { logger } from '@lace/core/utils/logger';
 
 export class ToolExecutor {

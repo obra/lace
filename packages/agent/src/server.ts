@@ -69,7 +69,7 @@ import type {
   ToolPolicy,
 } from './tools/types';
 import { TestAgentProvider } from './runtime/test-provider';
-import { MCPServerManager } from '@lace/core/mcp/server-manager';
+import { MCPServerManager } from './mcp/server-manager';
 import type { MCPServerConfig } from '@lace/core/config/mcp-types';
 import { compactDroppedMessagesWithCore } from './compaction/compact-dropped-messages';
 

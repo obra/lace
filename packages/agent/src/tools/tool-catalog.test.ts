@@ -21,7 +21,7 @@ const mockClient = {
   listTools: vi.fn(),
 };
 
-vi.mock('@lace/core/mcp/server-manager', () => ({
+vi.mock('../mcp/server-manager', () => ({
   MCPServerManager: vi.fn(() => mockServerManager),
 }));
 
