@@ -11,8 +11,68 @@ type TestProviderState = {
   nextToolCallId: number;
 };
 
+/**
+ * Error injection configuration read from environment variables.
+ * - LACE_TEST_PROVIDER_FAIL_COUNT: Number of calls to fail before succeeding
+ * - LACE_TEST_PROVIDER_ERROR_STATUS: HTTP status code to simulate (429, 500, 400, etc.)
+ */
+function getErrorInjectionConfig(): { failCount: number; errorStatus: number } | null {
+  const failCountStr = process.env.LACE_TEST_PROVIDER_FAIL_COUNT;
+  const errorStatusStr = process.env.LACE_TEST_PROVIDER_ERROR_STATUS;
+
+  if (!failCountStr) return null;
+
+  const failCount = parseInt(failCountStr, 10);
+  const errorStatus = errorStatusStr ? parseInt(errorStatusStr, 10) : 500;
+
+  if (isNaN(failCount) || failCount < 0) return null;
+  if (isNaN(errorStatus)) return null;
+
+  return { failCount, errorStatus };
+}
+
+/**
+ * Retry configuration read from environment variables for faster test execution.
+ * - LACE_TEST_PROVIDER_RETRY_DELAY_MS: Initial retry delay in milliseconds (default: 1000)
+ * - LACE_TEST_PROVIDER_MAX_DELAY_MS: Maximum retry delay in milliseconds (default: 30000)
+ */
+function getRetryConfig(): { initialDelayMs: number; maxDelayMs: number } | null {
+  const initialDelayStr = process.env.LACE_TEST_PROVIDER_RETRY_DELAY_MS;
+  const maxDelayStr = process.env.LACE_TEST_PROVIDER_MAX_DELAY_MS;
+
+  if (!initialDelayStr && !maxDelayStr) return null;
+
+  const initialDelayMs = initialDelayStr ? parseInt(initialDelayStr, 10) : 1000;
+  const maxDelayMs = maxDelayStr ? parseInt(maxDelayStr, 10) : 30000;
+
+  if (isNaN(initialDelayMs) || isNaN(maxDelayMs)) return null;
+
+  return { initialDelayMs, maxDelayMs };
+}
+
+// Track call count across provider instances within same process
+// This is necessary because the agent may create new provider instances per turn
+let globalCallCount = 0;
+
+export function resetTestProviderCallCount(): void {
+  globalCallCount = 0;
+}
+
+export function getTestProviderCallCount(): number {
+  return globalCallCount;
+}
+
 export class TestAgentProvider extends AIProvider {
   private state: TestProviderState = { phase: 'needs_tool', nextToolCallId: 1 };
+
+  constructor() {
+    super();
+    // Apply test retry configuration if set via environment variables
+    const retryConfig = getRetryConfig();
+    if (retryConfig) {
+      this.RETRY_CONFIG = retryConfig;
+    }
+  }
 
   get providerName(): string {
     return 'test';
@@ -55,41 +115,66 @@ export class TestAgentProvider extends AIProvider {
       return { content: '', toolCalls: [], stopReason: 'error' };
     }
 
-    const lastUserText = [...messages]
-      .reverse()
-      .find((m) => m.role === 'user' && typeof m.content === 'string')?.content;
+    // Wrap in withRetry to test retry behavior, matching how real providers work
+    return this.withRetry(
+      async () => {
+        // Check for error injection before processing
+        const errorConfig = getErrorInjectionConfig();
+        if (errorConfig) {
+          globalCallCount++;
+          if (globalCallCount <= errorConfig.failCount) {
+            const error = new Error(
+              `Test provider simulated error (status ${errorConfig.errorStatus})`
+            ) as Error & { status: number; code?: string };
+            error.status = errorConfig.errorStatus;
 
-    if (lastUserText?.includes('Conversation Compaction Required')) {
-      const content = 'Summary of conversation (test provider).';
-      this.emit('token', { token: content });
-      this.emit('complete', { response: { content, toolCalls: [], stopReason: 'stop' } });
-      return { content, toolCalls: [], stopReason: 'stop' };
-    }
+            // Add code for rate limit errors to help retry logic identify them
+            if (errorConfig.errorStatus === 429) {
+              error.code = 'rate_limit_exceeded';
+            }
 
-    const requested = this.extractRequestedTool(lastUserText ?? '');
+            throw error;
+          }
+        }
 
-    if (this.state.phase === 'needs_tool' && requested) {
-      const toolCallId = `test_tool_${this.state.nextToolCallId++}`;
-      const toolCalls: ToolCall[] = [
-        { id: toolCallId, name: requested.name, arguments: requested.args },
-      ];
-      const content =
-        requested.name === 'file_read'
-          ? `Reading ${(requested.args as any).path}...`
-          : requested.name === 'delegate'
-            ? `Delegating ${(requested.args as any).prompt}...`
-            : `Writing ${(requested.args as any).path}...`;
-      this.emit('token', { token: content });
-      this.emit('complete', { response: { content, toolCalls, stopReason: 'tool_use' } });
-      this.state.phase = 'final';
-      return { content, toolCalls, stopReason: 'tool_use' };
-    }
+        const lastUserText = [...messages]
+          .reverse()
+          .find((m) => m.role === 'user' && typeof m.content === 'string')?.content;
 
-    const toolResultText = this.extractLatestToolResultText(messages);
-    const content = toolResultText ? `Result:\n${toolResultText}` : 'No tool result found.';
-    this.emit('token', { token: content });
-    this.emit('complete', { response: { content, toolCalls: [], stopReason: 'stop' } });
-    return { content, toolCalls: [], stopReason: 'stop' };
+        if (lastUserText?.includes('Conversation Compaction Required')) {
+          const content = 'Summary of conversation (test provider).';
+          this.emit('token', { token: content });
+          this.emit('complete', { response: { content, toolCalls: [], stopReason: 'stop' } });
+          return { content, toolCalls: [], stopReason: 'stop' };
+        }
+
+        const requested = this.extractRequestedTool(lastUserText ?? '');
+
+        if (this.state.phase === 'needs_tool' && requested) {
+          const toolCallId = `test_tool_${this.state.nextToolCallId++}`;
+          const toolCalls: ToolCall[] = [
+            { id: toolCallId, name: requested.name, arguments: requested.args },
+          ];
+          const content =
+            requested.name === 'file_read'
+              ? `Reading ${(requested.args as any).path}...`
+              : requested.name === 'delegate'
+                ? `Delegating ${(requested.args as any).prompt}...`
+                : `Writing ${(requested.args as any).path}...`;
+          this.emit('token', { token: content });
+          this.emit('complete', { response: { content, toolCalls, stopReason: 'tool_use' } });
+          this.state.phase = 'final';
+          return { content, toolCalls, stopReason: 'tool_use' };
+        }
+
+        const toolResultText = this.extractLatestToolResultText(messages);
+        const content = toolResultText ? `Result:\n${toolResultText}` : 'No tool result found.';
+        this.emit('token', { token: content });
+        this.emit('complete', { response: { content, toolCalls: [], stopReason: 'stop' } });
+        return { content, toolCalls: [], stopReason: 'stop' };
+      },
+      { signal }
+    );
   }
 
   private extractRequestedPath(text: string): string | null {
