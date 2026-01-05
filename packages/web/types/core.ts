@@ -1,7 +1,7 @@
 // ABOUTME: Unified core type imports for web package
 // ABOUTME: Single source of truth for all core types, replaces multiple import files
 
-// Re-export all core types that web package needs
+// LaceEvent and related types from core (they have branded type dependencies)
 export type {
   LaceEventType,
   LaceEvent,
@@ -15,10 +15,12 @@ export type {
 
 export { isAgentSummaryUpdatedData } from '@lace/core/threads/types';
 
-export type { CombinedTokenUsage, ThreadTokenUsage } from '@lace/agent/token-management/types';
+// Token usage types from ent-protocol
+export type { CombinedTokenUsage, ThreadTokenUsage } from '@lace/ent-protocol';
 
-export type { ToolCall, ToolResult, ToolAnnotations, ToolPolicy } from '@lace/core/tools/types';
-
+// Tool types - use ent-protocol for simple types, core for some
+export type { ToolCall, ToolAnnotations, ToolPolicy } from '@lace/ent-protocol';
+export type { ToolResult } from '@lace/core/tools/types';
 export type { FileEditDiffContext } from '@lace/core/tools/implementations/file_edit';
 
 import {
@@ -60,11 +62,13 @@ export interface AgentInfo {
   createdAt?: Date;
 }
 
+// Provider types from core (they match core's internal structure)
 export type { ProviderInfo, ProviderResponse, ModelInfo } from '@lace/core/providers/base-provider';
 
 export { ApprovalDecision } from '@lace/core/tools/types';
 
-export type { ProjectInfo } from '@lace/agent/projects/project';
+// Project and workspace types from ent-protocol
+export type { ProjectInfo, WorkspaceInfo } from '@lace/ent-protocol';
 
 export interface SessionInfo {
   id: WorkspaceSessionId;
@@ -75,13 +79,13 @@ export interface SessionInfo {
   agentCount?: number;
 }
 
+// MCP types from core (matching internal structure)
 export type { MCPServerConfig, DiscoveredTool, MCPConfig } from '@lace/core/config/mcp-types';
 
-export type { CompactionData } from '@lace/core/threads/compaction/types';
+// Compaction and persona types from ent-protocol
+export type { CompactionData, PersonaInfo } from '@lace/ent-protocol';
 
-export type { PersonaInfo } from '@lace/core/config/persona-registry';
-
-// Re-export utility functions
+// Re-export utility functions from core
 export {
   EVENT_TYPES,
   isTransientEventType,
