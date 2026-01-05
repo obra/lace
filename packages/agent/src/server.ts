@@ -2872,6 +2872,52 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     return undefined;
   });
 
+  peer.onRequest('session/set_mode', async (params: unknown) => {
+    assertInitialized(state);
+    if (!state.activeSession)
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
+    if (state.activeTurn)
+      throw {
+        code: AcpErrorCodes.SessionBusy,
+        message: 'SessionBusy',
+        data: { category: 'session' },
+      };
+
+    const parsed = params as { mode?: unknown } | undefined;
+    const mode: 'plan' | 'execute' =
+      parsed?.mode === 'plan'
+        ? 'plan'
+        : parsed?.mode === 'execute'
+          ? 'execute'
+          : throwInvalidParams('mode must be "plan" or "execute"');
+
+    return await runExclusive(() => {
+      if (!state.activeSession)
+        throw {
+          code: AcpErrorCodes.SessionNotFound,
+          message: 'SessionNotFound',
+          data: { category: 'session' },
+        };
+
+      const currentState = readSessionState(state.activeSession.dir);
+      const currentConfig = currentState.config || {};
+      const effectiveBefore = { ...state.config, ...currentConfig };
+      const previousMode =
+        effectiveBefore.executionMode === 'plan' ? ('plan' as const) : ('execute' as const);
+
+      const nextState = { ...currentState, config: { ...currentConfig, executionMode: mode } };
+      writeSessionState(state.activeSession.dir, nextState);
+      state.activeSession = { ...state.activeSession, state: nextState };
+      state.config.executionMode = mode;
+
+      return { mode, previousMode };
+    });
+  });
+
   peer.onRequest('session/prompt', async (params: unknown) => {
     assertInitialized(state);
     if (!state.activeSession)

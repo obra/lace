@@ -37,6 +37,8 @@ import {
   SessionCancelNotificationSchema,
   SessionPromptRequestSchema,
   SessionPromptResponseSchema,
+  SessionSetModeRequestSchema,
+  SessionSetModeResponseSchema,
 } from '@lace/ent-protocol';
 import { Supervisor } from '../supervisor';
 import type {
@@ -134,6 +136,11 @@ const agentMethodHandlers: Record<string, AgentMethodHandler> = {
   'session/cancel': {
     kind: 'notify',
     paramsSchema: SessionCancelNotificationSchema.shape.params.optional(),
+  },
+  'session/set_mode': {
+    kind: 'request',
+    paramsSchema: SessionSetModeRequestSchema.shape.params,
+    resultSchema: SessionSetModeResponseSchema.shape.result,
   },
   'ent/session/configure': {
     kind: 'request',
