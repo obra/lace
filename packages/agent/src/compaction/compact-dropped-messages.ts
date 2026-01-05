@@ -3,8 +3,8 @@ import {
   type ConversationState,
   type ProviderMessage,
 } from '../providers/base-provider';
-import type { Tool as CoreTool } from '@lace/core/tools/tool';
-import type { LaceEvent } from '@lace/core/threads/types';
+import type { Tool as CoreTool } from '@lace/agent/tools/tool';
+import type { LaceEvent } from '@lace/agent/threads/types';
 import type { CompactionStrategy } from './types';
 import { registerDefaultStrategies } from './registry';
 

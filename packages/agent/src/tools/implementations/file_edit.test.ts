@@ -6,8 +6,8 @@ import { writeFile, rm } from 'fs/promises';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { FileEditTool } from './file_edit';
-import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
-import type { ToolContext } from '@lace/core/tools/types';
+import { setupCoreTest } from '@lace/agent/test-utils/core-test-setup';
+import type { ToolContext } from '@lace/agent/tools/types';
 
 describe('FileEditTool Integration Tests', () => {
   const tempLaceDirContext = setupCoreTest();

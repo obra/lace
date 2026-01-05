@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { z } from 'zod';
-import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { setupCoreTest } from '@lace/agent/test-utils/core-test-setup';
 import { Tool } from './tool';
 import { ToolExecutor } from './executor';
 import type { ToolContext, ToolResult } from './types';

@@ -6,7 +6,7 @@ import { Project } from '@lace/agent/projects/project';
 import { BashTool } from '@lace/agent/tools/implementations/bash';
 import { FileReadTool } from '@lace/agent/tools/implementations/file_read';
 import { FileWriteTool } from '@lace/agent/tools/implementations/file_write';
-import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { setupCoreTest } from '@lace/agent/test-utils/core-test-setup';
 import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';

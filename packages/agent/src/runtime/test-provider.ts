@@ -3,8 +3,8 @@ import {
   type ProviderMessage,
   type ProviderResponse,
 } from '../providers/base-provider';
-import type { Tool } from '@lace/core/tools/tool';
-import type { ToolCall, ToolResult } from '@lace/core/tools/types';
+import type { Tool } from '@lace/agent/tools/tool';
+import type { ToolCall, ToolResult } from '@lace/agent/tools/types';
 
 type TestProviderState = {
   phase: 'needs_tool' | 'final';

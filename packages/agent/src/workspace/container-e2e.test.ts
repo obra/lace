@@ -2,15 +2,15 @@
 // ABOUTME: Creates a git repo workspace and verifies isolated execution and cleanup
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { BashTool } from '@lace/core/tools/implementations/bash';
-import { FileReadTool } from '@lace/core/tools/implementations/file_read';
-import { FileWriteTool } from '@lace/core/tools/implementations/file_write';
-import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { BashTool } from '@lace/agent/tools/implementations/bash';
+import { FileReadTool } from '@lace/agent/tools/implementations/file_read';
+import { FileWriteTool } from '@lace/agent/tools/implementations/file_write';
+import { setupCoreTest } from '@lace/agent/test-utils/core-test-setup';
 import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import type { ToolContext } from '@lace/core/tools/types';
+import type { ToolContext } from '@lace/agent/tools/types';
 import { WorkspaceManagerFactory } from './workspace-manager';
 
 function listContainers(): Array<{ id?: string; name?: string; configuration?: { id?: string } }> {

@@ -2,14 +2,14 @@
 // ABOUTME: Bypasses user approval with programmatic tool whitelist for trusted operations
 
 import { BaseHelper } from './base-helper';
-import { UserSettingsManager } from '@lace/core/config/user-settings';
-import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
-import { parseProviderModel } from '@lace/core/providers/provider-utils';
-import { ToolExecutor } from '@lace/core/tools/executor';
-import { Tool } from '@lace/core/tools/tool';
-import { ToolCall, ToolResult, ToolContext, createErrorResult } from '@lace/core/tools/types';
-import type { AIProvider } from '@lace/core/providers/base-provider';
-import { logger } from '@lace/core/utils/logger';
+import { UserSettingsManager } from '@lace/agent/config/user-settings';
+import { ProviderInstanceManager } from '@lace/agent/providers/instance/manager';
+import { parseProviderModel } from '@lace/agent/providers/provider-utils';
+import { ToolExecutor } from '@lace/agent/tools/executor';
+import { Tool } from '@lace/agent/tools/tool';
+import { ToolCall, ToolResult, ToolContext, createErrorResult } from '@lace/agent/tools/types';
+import type { AIProvider } from '@lace/agent/providers/base-provider';
+import { logger } from '@lace/agent/utils/logger';
 
 export interface InfrastructureHelperOptions {
   /** Model tier to use - 'fast' or 'smart' */

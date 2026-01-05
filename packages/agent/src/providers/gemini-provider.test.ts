@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GeminiProvider } from './gemini-provider';
 import { ProviderMessage } from './base-provider';
-import { Tool } from '@lace/core/tools/tool';
+import { Tool } from '@lace/agent/tools/tool';
 
 // Mock the Google GenAI SDK
 const mockGenerateContent = vi.fn();

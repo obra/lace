@@ -1,7 +1,7 @@
 // ABOUTME: Core interfaces for the compaction event system
 // ABOUTME: Defines strategy pattern and event types for conversation compaction
 
-import type { LaceEvent } from '@lace/core/threads/types';
+import type { LaceEvent } from '@lace/agent/threads/types';
 import type { AIProvider } from '@lace/agent/providers/base-provider';
 import type { ToolExecutor } from '@lace/agent/tools/executor';
 

@@ -12,7 +12,7 @@ import { ProviderCatalogManager } from './catalog/manager';
 // import { Session } from '~/sessions/session';
 // import { Project } from '~/projects/project';
 // import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { setupCoreTest } from '@lace/agent/test-utils/core-test-setup';
 import type { ProviderInstancesConfig, CatalogProvider } from './catalog/types';
 
 // Mock OpenAI-compatible server factory

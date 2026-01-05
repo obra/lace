@@ -3,8 +3,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ToolExecutor } from './executor';
-import { FileReadTool } from '@lace/core/tools/implementations/file_read';
-import { createMockToolContext } from '@lace/core/test-utils/mock-session';
+import { FileReadTool } from '@lace/agent/tools/implementations/file_read';
+import { createMockToolContext } from '@lace/agent/test-utils/mock-session';
 
 describe('ToolContext working directory', () => {
   let executor: ToolExecutor;

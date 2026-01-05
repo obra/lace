@@ -3,8 +3,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ProviderMessage, ProviderResponse } from './base-provider';
-import { Tool } from '@lace/core/tools/tool';
-import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
+import { Tool } from '@lace/agent/tools/tool';
+import { BaseMockProvider } from '@lace/agent/test-utils/base-mock-provider';
 
 // Mock implementation for testing
 class TestProvider extends BaseMockProvider {

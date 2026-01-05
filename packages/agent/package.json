@@ -13,10 +13,10 @@
     "node": ">=20.18.3"
   },
   "scripts": {
-    "prebuild": "cd ../.. && npm run build --workspace=packages/core && npm run build --workspace=packages/ent-protocol",
+    "prebuild": "cd ../.. && npm run build --workspace=packages/ent-protocol",
     "build": "tsc && tsc-alias -p tsconfig.json -f -fe .js && cp -r src/providers/catalog/data dist/providers/catalog/ 2>/dev/null || true",
     "build:clean": "rm -rf dist && npm run build",
-    "pretest": "cd ../.. && npm run build --workspace=packages/core && npm run build --workspace=packages/ent-protocol && npm run build --workspace=packages/agent",
+    "pretest": "cd ../.. && npm run build --workspace=packages/ent-protocol && npm run build --workspace=packages/agent",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
@@ -25,7 +25,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@lace/core": "file:../core",
     "@lace/ent-protocol": "file:../ent-protocol"
   },
   "devDependencies": {

@@ -17,4 +17,4 @@ export type {
   StdioClientTransport,
 } from '@lace/agent/config/mcp-types';
 
-export type { ToolPolicy } from '@lace/core/tools/types';
+export type { ToolPolicy } from '@lace/agent/tools/types';

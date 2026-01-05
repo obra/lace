@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ToolExecutor } from './executor';
-import { FileReadTool } from '@lace/core/tools/implementations/file_read';
+import { FileReadTool } from '@lace/agent/tools/implementations/file_read';
 import type { ToolCall, ToolContext } from './types';
 
 describe('Simplified ToolExecutor', () => {

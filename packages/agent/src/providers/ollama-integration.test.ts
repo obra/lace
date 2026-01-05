@@ -3,9 +3,9 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { OllamaProvider } from './ollama-provider';
-import { Tool } from '@lace/core/tools/tool';
-import { ToolContext, ToolResult } from '@lace/core/tools/types';
-import { checkProviderAvailability } from '@lace/core/test-utils/provider-test-helpers';
+import { Tool } from '@lace/agent/tools/tool';
+import { ToolContext, ToolResult } from '@lace/agent/tools/types';
+import { checkProviderAvailability } from '@lace/agent/test-utils/provider-test-helpers';
 import { z } from 'zod';
 
 // Mock tool for testing without side effects

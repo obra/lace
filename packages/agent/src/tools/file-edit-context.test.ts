@@ -2,9 +2,9 @@
 // ABOUTME: Verifies that diff context is properly extracted and included in metadata
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { FileEditTool } from '@lace/core/tools/implementations/file_edit';
-import type { FileEditDiffContext } from '@lace/core/tools/implementations/file_edit';
-import type { ToolContext } from '@lace/core/tools/types';
+import { FileEditTool } from '@lace/agent/tools/implementations/file_edit';
+import type { FileEditDiffContext } from '@lace/agent/tools/implementations/file_edit';
+import type { ToolContext } from '@lace/agent/tools/types';
 import { promises as fs } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';

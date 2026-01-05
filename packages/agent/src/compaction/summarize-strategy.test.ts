@@ -3,7 +3,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { SummarizeCompactionStrategy } from './summarize-strategy';
-import type { LaceEvent } from '@lace/core/threads/types';
+import type { LaceEvent } from '@lace/agent/threads/types';
 import type { CompactionContext, CompactionData } from './types';
 import type { AIProvider } from '@lace/agent/providers/base-provider';
 

@@ -5,8 +5,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, readFile, rm, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { FileEditTool } from '@lace/core/tools/implementations/file_edit';
-import type { ToolContext } from '@lace/core/tools/types';
+import { FileEditTool } from '@lace/agent/tools/implementations/file_edit';
+import type { ToolContext } from '@lace/agent/tools/types';
 
 describe('FileEditTool actual file modification', () => {
   let tool: FileEditTool;

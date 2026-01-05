@@ -2,13 +2,13 @@
 // ABOUTME: Extended by InfrastructureHelper and SessionHelper for specific use cases
 
 import { HelperResult } from './types';
-import { ToolCall, ToolResult } from '@lace/core/tools/types';
-import { Tool } from '@lace/core/tools/tool';
-import { ToolExecutor } from '@lace/core/tools/executor';
-import { AIProvider, ProviderMessage } from '@lace/core/providers/base-provider';
-import { CombinedTokenUsage } from '@lace/core/token-management/types';
-import { logger } from '@lace/core/utils/logger';
-import { loadPromptConfig } from '@lace/core/config/prompts';
+import { ToolCall, ToolResult } from '@lace/agent/tools/types';
+import { Tool } from '@lace/agent/tools/tool';
+import { ToolExecutor } from '@lace/agent/tools/executor';
+import { AIProvider, ProviderMessage } from '@lace/agent/providers/base-provider';
+import { CombinedTokenUsage } from '@lace/agent/token-management/types';
+import { logger } from '@lace/agent/utils/logger';
+import { loadPromptConfig } from '@lace/agent/config/prompts';
 
 /**
  * Base class for helper agents

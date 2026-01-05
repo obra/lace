@@ -2,7 +2,7 @@
 // ABOUTME: Converts generic tool call format to provider-specific native formats
 
 import { ProviderMessage } from './base-provider';
-import { ToolCall } from '@lace/core/tools/types';
+import { ToolCall } from '@lace/agent/tools/types';
 import Anthropic from '@anthropic-ai/sdk';
 import type { Content, Part } from '@google/genai';
 

@@ -1,7 +1,7 @@
 // ABOUTME: AI-powered conversation summarization compaction strategy
 // ABOUTME: Uses AI to create concise summaries of older conversation parts while preserving recent context
 
-import type { LaceEvent } from '@lace/core/threads/types';
+import type { LaceEvent } from '@lace/agent/threads/types';
 import type { CompactionStrategy, CompactionContext, CompactionResult } from './types';
 
 export class SummarizeCompactionStrategy implements CompactionStrategy {

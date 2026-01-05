@@ -29,7 +29,7 @@ class TestTool extends Tool {
 
   protected async executeValidated(
     _args: z.infer<typeof this.schema>,
-    _context: import('@lace/core/tools/types').ToolContext
+    _context: import('@lace/agent/tools/types').ToolContext
   ): Promise<ToolResult> {
     return await Promise.resolve({
       content: [{ type: 'text', text: 'test' }],
@@ -48,7 +48,7 @@ class SimpleTool extends Tool {
 
   protected async executeValidated(
     _args: z.infer<typeof this.schema>,
-    _context: import('@lace/core/tools/types').ToolContext
+    _context: import('@lace/agent/tools/types').ToolContext
   ): Promise<ToolResult> {
     return await Promise.resolve({
       content: [{ type: 'text', text: 'simple' }],

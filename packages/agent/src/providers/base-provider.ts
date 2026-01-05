@@ -2,8 +2,8 @@
 // ABOUTME: Defines the common interface and provides base functionality for providers
 
 import { EventEmitter } from 'events';
-import { ToolResult, ToolCall } from '@lace/core/tools/types';
-import { Tool } from '@lace/core/tools/tool';
+import { ToolResult, ToolCall } from '@lace/agent/tools/types';
+import { Tool } from '@lace/agent/tools/tool';
 import type { CatalogProvider } from './catalog/types';
 import { logger } from '@lace/agent/utils/logger';
 

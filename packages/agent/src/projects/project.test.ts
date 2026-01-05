@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Project } from './project';
-import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { setupCoreTest } from '@lace/agent/test-utils/core-test-setup';
 import { existsSync, mkdirSync, mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -404,7 +404,7 @@ describe('Project', () => {
         .spyOn(ToolCatalog, 'discoverAndCacheTools')
         .mockImplementation(async (serverId, config, projectDir) => {
           // Simulate the immediate config save that the real method does
-          const { MCPConfigLoader } = await import('@lace/core/config/mcp-config-loader');
+          const { MCPConfigLoader } = await import('@lace/agent/config/mcp-config-loader');
           const pendingConfig = {
             ...config,
             discoveryStatus: 'discovering' as const,

@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, rmSync } from 'fs';
 import { join, resolve, dirname } from 'path';
 import { tmpdir } from 'os';
 import { WorktreeWorkspaceManager } from './worktree-workspace-manager';
-import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { setupCoreTest } from '@lace/agent/test-utils/core-test-setup';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 

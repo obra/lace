@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TrimToolResultsStrategy } from './trim-tool-results-strategy';
-import type { LaceEvent } from '@lace/core/threads/types';
+import type { LaceEvent } from '@lace/agent/threads/types';
 import type { CompactionContext, CompactionData } from './types';
 import type { ToolResult } from '@lace/agent/tools/types';
 

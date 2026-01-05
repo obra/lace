@@ -4,8 +4,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { AIProvider } from './base-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderInfo } from './base-provider';
-import { ToolCall } from '@lace/core/tools/types';
-import { Tool } from '@lace/core/tools/tool';
+import { ToolCall } from '@lace/agent/tools/types';
+import { Tool } from '@lace/agent/tools/tool';
 import { logger } from '@lace/agent/utils/logger';
 import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
 import { convertToAnthropicFormat } from './format-converters';

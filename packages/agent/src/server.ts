@@ -61,8 +61,8 @@ import { AIProvider, type ProviderMessage } from './providers/base-provider';
 import { ToolExecutor } from './tools/executor';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import type { Tool } from './tools/tool';
-// CoreTool for provider compatibility - providers still live in core and expect core Tool type
-import type { Tool as CoreTool } from '@lace/core/tools/tool';
+// CoreTool alias for backwards compatibility
+import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type {
   ToolCall as CoreToolCall,
   ToolResult as CoreToolResult,

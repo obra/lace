@@ -1,7 +1,7 @@
 // ABOUTME: Compaction strategy that truncates tool results to save token space
 // ABOUTME: Preserves conversation flow while reducing tool output size
 
-import type { LaceEvent } from '@lace/core/threads/types';
+import type { LaceEvent } from '@lace/agent/threads/types';
 import type { CompactionStrategy, CompactionContext, CompactionResult } from './types';
 import type { ToolResult, ContentBlock } from '@lace/agent/tools/types';
 

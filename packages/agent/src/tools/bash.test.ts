@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { BashTool, type BashOutput } from '@lace/core/tools/implementations/bash';
+import { BashTool, type BashOutput } from '@lace/agent/tools/implementations/bash';
 import type { ToolContext } from './types';
 
 describe('BashTool', () => {

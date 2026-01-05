@@ -3,8 +3,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AnthropicProvider } from './anthropic-provider';
-import { Tool } from '@lace/core/tools/tool';
-import { ToolResult, ToolContext } from '@lace/core/tools/types';
+import { Tool } from '@lace/agent/tools/tool';
+import { ToolResult, ToolContext } from '@lace/agent/tools/types';
 import { z } from 'zod';
 import type Anthropic from '@anthropic-ai/sdk';
 import { StreamingEvents } from './types';

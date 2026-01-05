@@ -2,12 +2,12 @@
 // ABOUTME: Uses MCP SDK's listTools() method and provides unified interface to ToolExecutor
 
 import { EventEmitter } from 'events';
-import { Tool } from '@lace/core/tools/tool';
+import { Tool } from '@lace/agent/tools/tool';
 import { MCPToolAdapter } from './tool-adapter';
 import { MCPServerManager } from './server-manager';
 import { logger } from '@lace/agent/utils/logger';
 import type { MCPConfig } from '@lace/agent/config/mcp-types';
-import type { ToolPolicy } from '@lace/core/tools/types';
+import type { ToolPolicy } from '@lace/agent/tools/types';
 
 export class MCPToolRegistry extends EventEmitter {
   private toolsByServer = new Map<string, Tool[]>();

@@ -3,10 +3,10 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { LMStudioProvider } from './lmstudio-provider';
-import { Tool } from '@lace/core/tools/tool';
-import { ToolResult, ToolContext } from '@lace/core/tools/types';
-import { checkProviderAvailability } from '@lace/core/test-utils/provider-test-helpers';
-import { withSuppressedStdio } from '@lace/core/test-utils/stdio-suppressor';
+import { Tool } from '@lace/agent/tools/tool';
+import { ToolResult, ToolContext } from '@lace/agent/tools/types';
+import { checkProviderAvailability } from '@lace/agent/test-utils/provider-test-helpers';
+import { withSuppressedStdio } from '@lace/agent/test-utils/stdio-suppressor';
 import { z } from 'zod';
 
 // Mock tool for testing without side effects

@@ -3,8 +3,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LMStudioProvider } from './lmstudio-provider';
-import { Tool } from '@lace/core/tools/tool';
-import { ToolResult, ToolContext } from '@lace/core/tools/types';
+import { Tool } from '@lace/agent/tools/tool';
+import { ToolResult, ToolContext } from '@lace/agent/tools/types';
 import { z } from 'zod';
 
 // Mock external LMStudio SDK to avoid dependency on LMStudio being installed/running locally
