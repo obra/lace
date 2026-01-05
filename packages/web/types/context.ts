@@ -6,4 +6,4 @@ export type {
   CategoryDetail,
   MessageCategoryDetail,
   ItemDetail,
-} from '@lace/core/token-management';
+} from '@lace/agent/token-management';

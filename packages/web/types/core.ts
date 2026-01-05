@@ -15,7 +15,7 @@ export type {
 
 export { isAgentSummaryUpdatedData } from '@lace/core/threads/types';
 
-export type { CombinedTokenUsage, ThreadTokenUsage } from '@lace/core/token-management/types';
+export type { CombinedTokenUsage, ThreadTokenUsage } from '@lace/agent/token-management/types';
 
 export type { ToolCall, ToolResult, ToolAnnotations, ToolPolicy } from '@lace/core/tools/types';
 
