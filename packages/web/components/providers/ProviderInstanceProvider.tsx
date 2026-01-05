@@ -117,7 +117,14 @@ interface ProviderInstanceContextValue {
   getInstanceWithTestResult: (instanceId: string) => ProviderInstanceWithTestResult | undefined;
 }
 
-const ProviderInstanceContext = createContext<ProviderInstanceContextValue | null>(null);
+// Store context in global to survive Vite HMR reloads
+declare global {
+  // eslint-disable-next-line no-var -- var required for globalThis augmentation
+  var __laceProviderInstanceContext: React.Context<ProviderInstanceContextValue | null> | undefined;
+}
+
+const ProviderInstanceContext = (globalThis.__laceProviderInstanceContext ??=
+  createContext<ProviderInstanceContextValue | null>(null));
 
 interface ProviderInstanceProviderProps {
   children: React.ReactNode;

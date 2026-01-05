@@ -57,7 +57,16 @@ interface SettingsContextType {
   setDebugPanelEnabled: (enabled: boolean) => void;
 }
 
-const SettingsContext = createContext<SettingsContextType | null>(null);
+// Store context in global to survive Vite HMR reloads
+// Without this, hot-reloading creates a new context object while child components
+// still reference the old one, causing "must be used within Provider" errors
+declare global {
+  // eslint-disable-next-line no-var -- var required for globalThis augmentation
+  var __laceSettingsContext: React.Context<SettingsContextType | null> | undefined;
+}
+
+const SettingsContext = (globalThis.__laceSettingsContext ??=
+  createContext<SettingsContextType | null>(null));
 
 // Legacy theme hook for backward compatibility
 export function useTheme() {

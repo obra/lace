@@ -500,7 +500,18 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
         res.write('\n');
 
         sseClients.add(res);
+
+        // Send heartbeat every 30s to prevent client body timeout
+        const heartbeat = setInterval(() => {
+          try {
+            res.write(': heartbeat\n\n');
+          } catch {
+            clearInterval(heartbeat);
+          }
+        }, 30_000);
+
         req.on('close', () => {
+          clearInterval(heartbeat);
           sseClients.delete(res);
         });
         return;

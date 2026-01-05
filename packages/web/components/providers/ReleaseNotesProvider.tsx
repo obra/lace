@@ -12,7 +12,14 @@ interface ReleaseNotesContextType {
   isReleaseNotesAvailable: boolean;
 }
 
-const ReleaseNotesContext = createContext<ReleaseNotesContextType | null>(null);
+// Store context in global to survive Vite HMR reloads
+declare global {
+  // eslint-disable-next-line no-var -- var required for globalThis augmentation
+  var __laceReleaseNotesContext: React.Context<ReleaseNotesContextType | null> | undefined;
+}
+
+const ReleaseNotesContext = (globalThis.__laceReleaseNotesContext ??=
+  createContext<ReleaseNotesContextType | null>(null));
 
 export function useReleaseNotesContext() {
   const context = useContext(ReleaseNotesContext);
