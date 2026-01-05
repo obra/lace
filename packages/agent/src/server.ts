@@ -2150,6 +2150,26 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     return { providerId, connectionId, models };
   });
 
+  peer.onRequest('ent/tools/list', async (_params: unknown) => {
+    assertInitialized(state);
+
+    const { toolsForProvider } = createToolExecutorForMode(
+      state.config.executionMode,
+      state.mcpServerManager
+    );
+
+    const seenToolNames = new Set<string>();
+    const tools: ToolInfo[] = [];
+    for (const tool of toolsForProvider) {
+      const info = protocolToolInfoForCoreTool(tool);
+      if (seenToolNames.has(info.name)) continue;
+      seenToolNames.add(info.name);
+      tools.push(info);
+    }
+
+    return { tools };
+  });
+
   peer.onRequest('ent/job/list', async (_params: unknown) => {
     assertInitialized(state);
     if (!state.activeSession)

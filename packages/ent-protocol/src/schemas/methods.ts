@@ -1091,6 +1091,30 @@ export const EntJobKillResponseSchema = z
   })
   .strict();
 
+// ent/tools/list - List available tools
+const EntToolsListResultSchema = z
+  .object({
+    tools: z.array(ToolInfoSchema),
+  })
+  .strict();
+
+export const EntToolsListRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/tools/list'),
+    params: EmptyParamsSchema.optional(),
+  })
+  .strict();
+
+export const EntToolsListResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntToolsListResultSchema,
+  })
+  .strict();
+
 const EntJobInjectParamsSchema = z
   .object({
     jobId: NonEmptyStringSchema,
@@ -1337,6 +1361,7 @@ export const EntProtocolRequestSchema = z.union([
   EntConnectionsCredentialsClearRequestSchema,
   EntModelsListRequestSchema,
   EntModelsRefreshRequestSchema,
+  EntToolsListRequestSchema,
   EntJobListRequestSchema,
   EntJobOutputRequestSchema,
   EntJobKillRequestSchema,
