@@ -1738,7 +1738,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const sessionSummary = state.activeSession
       ? summarizeDurableEvents(state.activeSession.dir)
-      : { messageCount: 0, turnCount: 0, lastActive: null as string | null };
+      : { messageCount: 0, turnCount: 0, lastActive: undefined };
 
     // Get session cost and token usage from persisted state
     const sessionCostUsd = state.activeSession?.state.sessionCostUsd ?? 0;

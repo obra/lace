@@ -1,3 +1,6 @@
+// ABOUTME: Durable event persistence layer for session events
+// ABOUTME: Handles reading, writing, and summarizing events from events.jsonl files
+
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SessionState } from './session-store';
