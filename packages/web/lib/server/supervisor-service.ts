@@ -1,10 +1,10 @@
 // ABOUTME: Web-facing supervisor client singleton
-// ABOUTME: Spawns (if needed) a supervisor server process and bridges its updates into EventStreamManager SSE broadcasts
+// ABOUTME: Runs supervisor in-process and bridges updates into EventStreamManager SSE broadcasts
 
-import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import {
+  agentMethodHandlers,
+  PendingPermissionsTracker,
+  Supervisor,
   SupervisorClient,
   type PendingPermission,
   type SupervisorServerEvent,
@@ -20,9 +20,8 @@ import type {
 
 declare global {
   var laceWebSupervisorClient: SupervisorClient | undefined;
-  var laceWebSupervisorProc: ChildProcess | undefined;
-  var laceWebSupervisorEventBridge: Promise<void> | undefined;
-  var laceWebSupervisorEventBridgeAbort: AbortController | undefined;
+  var laceWebSupervisor: Supervisor | undefined;
+  var laceWebPendingPermissions: PendingPermissionsTracker | undefined;
 }
 
 /**
@@ -66,121 +65,6 @@ function createPermissionRequestEvent(params: {
   };
 }
 
-type SupervisorEndpoint = {
-  baseUrl: string;
-  host: string;
-  port: number;
-  pid: number;
-  startedAt: string;
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function endpointFilePath(laceDir: string): string {
-  return `${laceDir}/supervisor/endpoint.json`;
-}
-
-function readSupervisorEndpoint(laceDir: string): SupervisorEndpoint | null {
-  const path = endpointFilePath(laceDir);
-  if (!existsSync(path)) return null;
-
-  try {
-    const raw = readFileSync(path, 'utf8');
-    const parsed = JSON.parse(raw) as unknown;
-    if (!isRecord(parsed)) return null;
-    if (typeof parsed.baseUrl !== 'string') return null;
-    if (typeof parsed.host !== 'string') return null;
-    if (typeof parsed.port !== 'number') return null;
-    if (typeof parsed.pid !== 'number') return null;
-    if (typeof parsed.startedAt !== 'string') return null;
-    return parsed as SupervisorEndpoint;
-  } catch {
-    return null;
-  }
-}
-
-function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-const require = createRequire(import.meta.url);
-
-function resolveSupervisorMainPath(): string {
-  try {
-    return require.resolve('@lace/supervisor/dist/main.js');
-  } catch {
-    throw new Error('Could not resolve lace supervisor entrypoint (@lace/supervisor/dist/main.js)');
-  }
-}
-
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function waitForSupervisorReady(params: {
-  laceDir: string;
-  timeoutMs: number;
-}): Promise<SupervisorEndpoint> {
-  const deadline = Date.now() + params.timeoutMs;
-  while (Date.now() < deadline) {
-    const endpoint = readSupervisorEndpoint(params.laceDir);
-    if (!endpoint) {
-      await sleep(50);
-      continue;
-    }
-
-    const client = new SupervisorClient({ baseUrl: endpoint.baseUrl });
-    try {
-      await client.health();
-      return endpoint;
-    } catch {
-      await sleep(50);
-    }
-  }
-  throw new Error('Timed out waiting for supervisor server');
-}
-
-async function ensureSupervisorServer(laceDir: string): Promise<SupervisorEndpoint> {
-  const existing = readSupervisorEndpoint(laceDir);
-  if (existing && isProcessAlive(existing.pid)) {
-    const client = new SupervisorClient({ baseUrl: existing.baseUrl });
-    try {
-      await client.health();
-      return existing;
-    } catch {
-      // fall through
-    }
-  }
-
-  if (global.laceWebSupervisorProc && global.laceWebSupervisorProc.exitCode !== null) {
-    global.laceWebSupervisorProc = undefined;
-  }
-
-  if (!global.laceWebSupervisorProc) {
-    const mainPath = resolveSupervisorMainPath();
-    const proc = spawn(process.execPath, [mainPath, '--host', '127.0.0.1', '--port', '0'], {
-      env: { ...process.env, LACE_DIR: laceDir },
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
-
-    global.laceWebSupervisorProc = proc;
-
-    proc.stderr?.on('data', (d) => {
-      const text = String(d);
-      if (text.trim()) console.error(text.trim());
-    });
-  }
-
-  return await waitForSupervisorReady({ laceDir, timeoutMs: 10_000 });
-}
-
 function bridgeEventToWeb(event: SupervisorServerEvent, params: { supervisorProjectId?: string }) {
   const manager = EventStreamManager.getInstance();
 
@@ -205,37 +89,194 @@ function bridgeEventToWeb(event: SupervisorServerEvent, params: { supervisorProj
   }
 }
 
-async function startEventBridge(client: SupervisorClient): Promise<void> {
-  if (global.laceWebSupervisorEventBridge) return;
+class InProcessSupervisorClient extends SupervisorClient {
+  private readonly supervisor: Supervisor;
+  private readonly pendingPermissions: PendingPermissionsTracker;
 
-  const abort = new AbortController();
-  global.laceWebSupervisorEventBridgeAbort = abort;
-  global.laceWebSupervisorEventBridge = (async () => {
-    while (!abort.signal.aborted) {
-      try {
-        await client.subscribeEvents({
-          signal: abort.signal,
-          onEvent: async (event) => {
-            bridgeEventToWeb(event, { supervisorProjectId: event.projectId });
-          },
-        });
-      } catch (err) {
-        if (abort.signal.aborted) return;
-        console.error('Supervisor event bridge error:', err);
-        await sleep(200);
-      }
+  constructor(params: { supervisor: Supervisor; pendingPermissions: PendingPermissionsTracker }) {
+    super({ baseUrl: 'http://127.0.0.1/in-process' });
+    this.supervisor = params.supervisor;
+    this.pendingPermissions = params.pendingPermissions;
+  }
+
+  override async health(): Promise<{ ok: true }> {
+    return { ok: true };
+  }
+
+  override async shutdown(): Promise<void> {
+    this.pendingPermissions.shutdown();
+    await this.supervisor.shutdown();
+  }
+
+  override async listWorkspaceSessions() {
+    return this.supervisor.listWorkspaceSessions();
+  }
+
+  override async getWorkspaceSession(workspaceSessionId: string) {
+    return this.supervisor.getWorkspaceSession(workspaceSessionId);
+  }
+
+  override async createWorkspaceSession(workDir: string) {
+    return await this.supervisor.createWorkspaceSession(workDir);
+  }
+
+  override async attachWorkspaceSession(sessionId: string) {
+    return await this.supervisor.attachWorkspaceSession(sessionId);
+  }
+
+  override async updateWorkspaceSession(
+    workspaceSessionId: string,
+    updates: { projectId?: string; name?: string }
+  ) {
+    this.supervisor.updateWorkspaceSession(workspaceSessionId, updates);
+    const record = this.supervisor.getWorkspaceSession(workspaceSessionId);
+    if (!record) throw new Error('Session not found');
+    return record;
+  }
+
+  override async deleteWorkspaceSession(workspaceSessionId: string) {
+    const ok = await this.supervisor.deleteWorkspaceSession(workspaceSessionId);
+    this.pendingPermissions.clearWorkspace(workspaceSessionId);
+    return { ok };
+  }
+
+  override async createAgentSession(workspaceSessionId: string) {
+    return await this.supervisor.createAgentSession(workspaceSessionId);
+  }
+
+  override async upsertAgentSessionMeta(
+    workspaceSessionId: string,
+    params: { sessionId: string; name?: string; connectionId?: string; modelId?: string }
+  ) {
+    this.supervisor.upsertAgentSessionMeta(workspaceSessionId, params);
+  }
+
+  override async prompt(workspaceSessionId: string, content: unknown) {
+    return await this.supervisor.prompt(workspaceSessionId, content as never);
+  }
+
+  override async promptSession(workspaceSessionId: string, sessionId: string, content: unknown) {
+    return await this.supervisor.promptSession(workspaceSessionId, sessionId, content as never);
+  }
+
+  override async agentRequest(params: {
+    workspaceSessionId: string;
+    sessionId?: string;
+    method: string;
+    requestParams?: unknown;
+  }) {
+    const handler = agentMethodHandlers[params.method];
+    if (!handler || handler.kind !== 'request') {
+      throw new Error(`Unsupported request method: ${params.method}`);
     }
-  })();
+
+    const parsedParams = handler.paramsSchema.parse(params.requestParams ?? {}) as unknown;
+    const peer = await this.supervisor.getPeer(params.workspaceSessionId, params.sessionId);
+    const result = await peer.request(params.method, parsedParams);
+    return handler.resultSchema.parse(result) as unknown;
+  }
+
+  override async agentNotify(params: {
+    workspaceSessionId: string;
+    sessionId?: string;
+    method: string;
+    notifyParams?: unknown;
+  }) {
+    const handler = agentMethodHandlers[params.method];
+    if (!handler || handler.kind !== 'notify') {
+      throw new Error(`Unsupported notify method: ${params.method}`);
+    }
+
+    const parsedParams = handler.paramsSchema.parse(params.notifyParams ?? {}) as unknown;
+    const peer = await this.supervisor.getPeer(params.workspaceSessionId, params.sessionId);
+    peer.notify(params.method, parsedParams);
+  }
+
+  override async listPendingPermissions(workspaceSessionId: string): Promise<PendingPermission[]> {
+    return this.pendingPermissions.listPendingPermissions(workspaceSessionId);
+  }
+
+  override async resolvePendingPermission(params: {
+    workspaceSessionId: string;
+    toolCallId: string;
+    decision: 'allow' | 'deny';
+    updatedInput?: Record<string, unknown>;
+  }): Promise<boolean> {
+    const resolved = this.pendingPermissions.resolvePendingPermission(params);
+    if (!resolved.ok) {
+      if (resolved.error === 'ambiguous') throw new Error('Tool call is ambiguous');
+      return false;
+    }
+    return true;
+  }
+}
+
+function ensureInProcessSupervisor(): {
+  supervisor: Supervisor;
+  pendingPermissions: PendingPermissionsTracker;
+} {
+  if (global.laceWebSupervisor && global.laceWebPendingPermissions) {
+    return {
+      supervisor: global.laceWebSupervisor,
+      pendingPermissions: global.laceWebPendingPermissions,
+    };
+  }
+
+  const laceDir = ensureLaceDir();
+  const pendingPermissions = new PendingPermissionsTracker();
+  const supervisor = new Supervisor({
+    laceDir,
+    onSessionUpdate: (workspaceSessionId, update) => {
+      pendingPermissions.onSessionUpdate(workspaceSessionId, update);
+
+      const projectId = supervisor.getWorkspaceSession(workspaceSessionId)?.projectId;
+      bridgeEventToWeb(
+        {
+          type: 'session_update',
+          workspaceSessionId,
+          ...(projectId ? { projectId } : {}),
+          update,
+        },
+        { supervisorProjectId: projectId }
+      );
+    },
+    onPermissionRequest: async (workspaceSessionId, params) => {
+      const projectId = supervisor.getWorkspaceSession(workspaceSessionId)?.projectId;
+      const { toolCall, waitForDecision } = pendingPermissions.startPermissionRequest(
+        workspaceSessionId,
+        params
+      );
+
+      bridgeEventToWeb(
+        {
+          type: 'permission_request',
+          workspaceSessionId,
+          ...(projectId ? { projectId } : {}),
+          request: params,
+          ...(toolCall ? { toolCall } : {}),
+          requestedAt: new Date().toISOString(),
+        },
+        { supervisorProjectId: projectId }
+      );
+
+      return await waitForDecision;
+    },
+  });
+
+  global.laceWebSupervisor = supervisor;
+  global.laceWebPendingPermissions = pendingPermissions;
+
+  return { supervisor, pendingPermissions };
 }
 
 export async function getSupervisor(): Promise<SupervisorClient> {
   if (global.laceWebSupervisorClient) return global.laceWebSupervisorClient;
 
-  const laceDir = ensureLaceDir();
-  const endpoint = await ensureSupervisorServer(laceDir);
-  global.laceWebSupervisorClient = new SupervisorClient({ baseUrl: endpoint.baseUrl });
-
-  await startEventBridge(global.laceWebSupervisorClient);
+  const { supervisor, pendingPermissions } = ensureInProcessSupervisor();
+  global.laceWebSupervisorClient = new InProcessSupervisorClient({
+    supervisor,
+    pendingPermissions,
+  });
   return global.laceWebSupervisorClient;
 }
 
@@ -257,26 +298,31 @@ export async function resolvePendingPermission(params: {
 }
 
 export async function shutdownSupervisorForTests(): Promise<void> {
-  global.laceWebSupervisorEventBridgeAbort?.abort();
-  global.laceWebSupervisorEventBridgeAbort = undefined;
-  global.laceWebSupervisorEventBridge = undefined;
-
   const client = global.laceWebSupervisorClient;
   global.laceWebSupervisorClient = undefined;
 
-  const proc = global.laceWebSupervisorProc;
-  global.laceWebSupervisorProc = undefined;
+  const supervisor = global.laceWebSupervisor;
+  global.laceWebSupervisor = undefined;
+
+  const pendingPermissions = global.laceWebPendingPermissions;
+  global.laceWebPendingPermissions = undefined;
+
+  pendingPermissions?.shutdown();
 
   if (client) {
     try {
       await client.shutdown();
+      return;
     } catch {
-      // ignore
+      // fall through
     }
   }
 
-  if (proc && proc.exitCode === null) {
-    proc.kill('SIGTERM');
-    await new Promise<void>((resolve) => proc.once('exit', () => resolve()));
+  if (supervisor) {
+    try {
+      await supervisor.shutdown();
+    } catch {
+      // ignore
+    }
   }
 }
