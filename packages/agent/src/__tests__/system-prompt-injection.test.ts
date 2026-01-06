@@ -1,0 +1,155 @@
+// ABOUTME: E2E test for system prompt injection on session/new
+// Verifies that calling session/new writes a context_injected durable event with the system prompt
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
+import { defaultInitializeParams } from './helpers/initialize';
+
+describe('system prompt injection on session/new', () => {
+  let originalLaceDir: string | undefined;
+  let laceDir: string;
+  let workDir: string;
+  let agent: SpawnedAgent | undefined;
+
+  beforeEach(() => {
+    originalLaceDir = process.env.LACE_DIR;
+    laceDir = mkdtempSync(join(tmpdir(), 'lace-agent-sysprompt-'));
+    workDir = mkdtempSync(join(tmpdir(), 'lace-agent-sysprompt-wd-'));
+  });
+
+  afterEach(async () => {
+    if (agent) {
+      await agent.shutdown();
+      agent = undefined;
+    }
+
+    if (originalLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = originalLaceDir;
+
+    rmSync(laceDir, { recursive: true, force: true });
+    rmSync(workDir, { recursive: true, force: true });
+  });
+
+  it('writes a context_injected durable event with system prompt on session/new', async () => {
+    agent = spawnAgentProcess({ laceDir });
+
+    await withTimeout(
+      agent.peer.request('initialize', defaultInitializeParams()),
+      2_000,
+      'initialize'
+    );
+
+    const created = (await withTimeout(
+      agent.peer.request('session/new', { workDir }),
+      2_000,
+      'session/new'
+    )) as { sessionId: string };
+
+    expect(created.sessionId).toMatch(/^sess_/);
+
+    // Read the events.jsonl file directly from the session directory
+    const sessionDir = join(laceDir, 'agent-sessions', created.sessionId);
+    const eventsPath = join(sessionDir, 'events.jsonl');
+
+    expect(existsSync(eventsPath)).toBe(true);
+
+    const eventsRaw = readFileSync(eventsPath, 'utf8');
+    const eventLines = eventsRaw.trim().split('\n').filter(Boolean);
+
+    expect(eventLines.length).toBeGreaterThan(0);
+
+    // Parse first event - should be context_injected with system prompt
+    const firstEvent = JSON.parse(eventLines[0]) as {
+      type: string;
+      eventSeq: number;
+      data: {
+        content: Array<{ type: string; text: string }>;
+        priority: string;
+      };
+    };
+
+    expect(firstEvent.type).toBe('context_injected');
+    expect(firstEvent.eventSeq).toBe(1);
+    expect(firstEvent.data.priority).toBe('normal');
+    expect(firstEvent.data.content).toBeInstanceOf(Array);
+    expect(firstEvent.data.content.length).toBeGreaterThan(0);
+    expect(firstEvent.data.content[0].type).toBe('text');
+
+    // System prompt should contain persona-related content (Lace is the default persona)
+    const systemPromptText = firstEvent.data.content[0].text;
+    expect(systemPromptText.length).toBeGreaterThan(100); // Should be a substantial prompt
+    expect(systemPromptText).toContain('Lace'); // Default persona name should appear
+  });
+
+  it('writes a context_injected event with custom persona when provided', async () => {
+    agent = spawnAgentProcess({ laceDir });
+
+    await withTimeout(
+      agent.peer.request('initialize', defaultInitializeParams()),
+      2_000,
+      'initialize'
+    );
+
+    // Create session with explicit persona parameter
+    const created = (await withTimeout(
+      agent.peer.request('session/new', { workDir, persona: 'lace' }),
+      2_000,
+      'session/new with persona'
+    )) as { sessionId: string };
+
+    expect(created.sessionId).toMatch(/^sess_/);
+
+    const sessionDir = join(laceDir, 'agent-sessions', created.sessionId);
+    const eventsPath = join(sessionDir, 'events.jsonl');
+
+    expect(existsSync(eventsPath)).toBe(true);
+
+    const eventsRaw = readFileSync(eventsPath, 'utf8');
+    const eventLines = eventsRaw.trim().split('\n').filter(Boolean);
+
+    const firstEvent = JSON.parse(eventLines[0]) as {
+      type: string;
+      data: {
+        content: Array<{ type: string; text: string }>;
+      };
+    };
+
+    expect(firstEvent.type).toBe('context_injected');
+    expect(firstEvent.data.content[0].text).toContain('Lace');
+  });
+
+  it('context_injected event is returned via ent/session/events endpoint', async () => {
+    agent = spawnAgentProcess({ laceDir });
+
+    await withTimeout(
+      agent.peer.request('initialize', defaultInitializeParams()),
+      2_000,
+      'initialize'
+    );
+
+    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+    // Query events via the protocol endpoint
+    const durable = (await withTimeout(
+      agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+      2_000,
+      'ent/session/events'
+    )) as {
+      events: Array<{
+        eventSeq: number;
+        type: string;
+        data: { content: Array<{ type: string; text: string }>; priority: string };
+      }>;
+      hasMore: boolean;
+    };
+
+    expect(durable.events.length).toBeGreaterThan(0);
+    expect(durable.events[0].type).toBe('context_injected');
+    expect(durable.events[0].eventSeq).toBe(1);
+    expect(durable.events[0].data.priority).toBe('normal');
+    expect(durable.events[0].data.content[0].text).toContain('Lace');
+  });
+});
