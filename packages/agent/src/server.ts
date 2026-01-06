@@ -468,7 +468,8 @@ async function reconcileMcpServersForActiveSession(state: AgentServerState): Pro
   }
 }
 
-function buildProviderMessagesFromDurableEvents(sessionDir: string): ProviderMessage[] {
+// Exported for testing - converts durable events to provider messages
+export function buildProviderMessagesFromDurableEvents(sessionDir: string): ProviderMessage[] {
   const eventsPath = join(sessionDir, 'events.jsonl');
   let raw = '';
   try {

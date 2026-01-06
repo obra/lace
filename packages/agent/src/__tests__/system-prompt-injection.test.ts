@@ -1,12 +1,14 @@
 // ABOUTME: E2E test for system prompt injection on session/new
 // Verifies that calling session/new writes a context_injected durable event with the system prompt
+// Also includes unit tests for buildProviderMessagesFromDurableEvents conversion
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
 import { defaultInitializeParams } from './helpers/initialize';
+import { buildProviderMessagesFromDurableEvents } from '@lace/agent/server';
 
 describe('system prompt injection on session/new', () => {
   let originalLaceDir: string | undefined;
@@ -151,5 +153,129 @@ describe('system prompt injection on session/new', () => {
     expect(durable.events[0].eventSeq).toBe(1);
     expect(durable.events[0].data.priority).toBe('normal');
     expect(durable.events[0].data.content[0].text).toContain('Lace');
+  });
+});
+
+describe('buildProviderMessagesFromDurableEvents', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'lace-agent-provider-msg-'));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('converts context_injected event to provider message with role system', () => {
+    // Create a mock events.jsonl with a context_injected event
+    const contextInjectedEvent = {
+      type: 'context_injected',
+      eventSeq: 1,
+      timestamp: new Date().toISOString(),
+      data: {
+        content: [{ type: 'text', text: 'You are Lace, a helpful AI assistant.' }],
+        priority: 'normal',
+      },
+    };
+
+    writeFileSync(join(tempDir, 'events.jsonl'), JSON.stringify(contextInjectedEvent) + '\n');
+
+    const messages = buildProviderMessagesFromDurableEvents(tempDir);
+
+    expect(messages.length).toBe(1);
+    expect(messages[0]).toEqual({
+      role: 'system',
+      content: 'You are Lace, a helpful AI assistant.',
+    });
+  });
+
+  it('converts context_injected with multi-block content to single system message', () => {
+    const contextInjectedEvent = {
+      type: 'context_injected',
+      eventSeq: 1,
+      timestamp: new Date().toISOString(),
+      data: {
+        content: [
+          { type: 'text', text: 'You are Lace.' },
+          { type: 'text', text: 'You help with coding.' },
+        ],
+        priority: 'normal',
+      },
+    };
+
+    writeFileSync(join(tempDir, 'events.jsonl'), JSON.stringify(contextInjectedEvent) + '\n');
+
+    const messages = buildProviderMessagesFromDurableEvents(tempDir);
+
+    expect(messages.length).toBe(1);
+    expect(messages[0].role).toBe('system');
+    expect(messages[0].content).toContain('You are Lace.');
+    expect(messages[0].content).toContain('You help with coding.');
+  });
+
+  it('places system message before user message in correct order', () => {
+    const events = [
+      {
+        type: 'context_injected',
+        eventSeq: 1,
+        timestamp: new Date().toISOString(),
+        data: {
+          content: [{ type: 'text', text: 'System prompt content' }],
+          priority: 'normal',
+        },
+      },
+      {
+        type: 'prompt',
+        eventSeq: 2,
+        timestamp: new Date().toISOString(),
+        turnId: 'turn_1',
+        turnSeq: 0,
+        data: {
+          content: [{ type: 'text', text: 'Hello, how are you?' }],
+        },
+      },
+    ];
+
+    writeFileSync(
+      join(tempDir, 'events.jsonl'),
+      events.map((e) => JSON.stringify(e)).join('\n') + '\n'
+    );
+
+    const messages = buildProviderMessagesFromDurableEvents(tempDir);
+
+    expect(messages.length).toBe(2);
+    expect(messages[0]).toEqual({
+      role: 'system',
+      content: 'System prompt content',
+    });
+    expect(messages[1]).toEqual({
+      role: 'user',
+      content: 'Hello, how are you?',
+    });
+  });
+
+  it('ignores context_injected with empty content', () => {
+    const contextInjectedEvent = {
+      type: 'context_injected',
+      eventSeq: 1,
+      timestamp: new Date().toISOString(),
+      data: {
+        content: [{ type: 'text', text: '   ' }], // whitespace only
+        priority: 'normal',
+      },
+    };
+
+    writeFileSync(join(tempDir, 'events.jsonl'), JSON.stringify(contextInjectedEvent) + '\n');
+
+    const messages = buildProviderMessagesFromDurableEvents(tempDir);
+
+    expect(messages.length).toBe(0);
+  });
+
+  it('returns empty array when events.jsonl does not exist', () => {
+    const messages = buildProviderMessagesFromDurableEvents(tempDir);
+
+    expect(messages).toEqual([]);
   });
 });
