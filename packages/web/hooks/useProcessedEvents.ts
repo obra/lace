@@ -169,7 +169,11 @@ function filterEventsByAgent(
 
   return events.filter((event) => {
     // Always show user messages and system messages
-    if (event.type === 'USER_MESSAGE' || event.type === 'LOCAL_SYSTEM_MESSAGE') {
+    if (
+      event.type === 'USER_MESSAGE' ||
+      event.type === 'USER_MESSAGE_SENT' ||
+      event.type === 'LOCAL_SYSTEM_MESSAGE'
+    ) {
       return true;
     }
 
@@ -183,7 +187,7 @@ function processStreamingTokens(events: InternalTimelineEvent[]): InternalTimeli
   const streamingMessages = new Map<string, { content: string; timestamp: Date }>();
 
   for (const event of events) {
-    if (event.type === 'USER_MESSAGE') {
+    if (event.type === 'USER_MESSAGE' || event.type === 'USER_MESSAGE_SENT') {
       // New user message starts a new turn - clear any pending streaming for this thread
       // This prevents tokens from different turns being combined
       const threadId = event.context?.threadId || '';
