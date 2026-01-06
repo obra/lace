@@ -19,9 +19,6 @@ import {
 } from '@lace/web/hooks/useProcessedEvents';
 import TimelineEntryErrorBoundary from './TimelineEntryErrorBoundary';
 
-// Placeholder for when currentAgent is not available - use valid thread ID format
-const STREAMING_THREAD_ID = asThreadId('lace_19700101_stream');
-
 interface TimelineViewProps {
   events: AppEvent[];
   agents?: AgentInfo[];
