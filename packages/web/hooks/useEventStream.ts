@@ -1,10 +1,14 @@
-// ABOUTME: New useEventStream hook using EventStreamFirehose singleton
-// ABOUTME: Maintains same API as original but uses shared EventSource connection
+// ABOUTME: Event stream hook using SSE store singleton
+// ABOUTME: Supports both legacy LaceEvent and new AppEvent (protocol/web) types
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useSSEStore } from '@lace/web/lib/sse-store';
 import type { LaceEvent, AgentErrorData } from '@lace/web/types/core';
 import type { SessionPendingApproval } from '@lace/web/types/api';
+import type { AppEvent } from '@lace/web/types/app-events';
+import type { ProtocolEvent } from '@lace/web/types/protocol-events';
+import type { WebEvent } from '@lace/web/types/web-events';
+import { isProtocolEvent, isPermissionRequestEvent, isWebEvent } from '@lace/web/types/app-events';
 
 // Runtime type guard for AgentErrorData
 function isAgentErrorData(value: unknown): value is AgentErrorData {
@@ -60,7 +64,7 @@ interface GlobalEvent {
 }
 
 interface EventHandlers {
-  // Session events
+  // Session events (legacy LaceEvent)
   onSessionEvent?: (event: LaceEvent) => void;
   onUserMessage?: (event: LaceEvent) => void;
   onAgentMessage?: (event: LaceEvent) => void;
@@ -105,6 +109,40 @@ interface EventHandlers {
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Error) => void;
+
+  // NEW: Protocol event handlers (AppEvent system)
+  onAppEvent?: (event: AppEvent) => void;
+  onProtocolTextDelta?: (data: { text: string; agentSessionId: string; streamSeq: number }) => void;
+  onProtocolThinking?: (data: { text: string; agentSessionId: string }) => void;
+  onProtocolToolUse?: (data: {
+    toolCallId: string;
+    name: string;
+    input: unknown;
+    status: string;
+    result?: unknown;
+  }) => void;
+  onProtocolTurnStart?: (data: { turnId: string; agentSessionId: string }) => void;
+  onProtocolTurnEnd?: (data: {
+    turnId: string;
+    content: unknown[];
+    agentSessionId: string;
+  }) => void;
+  onProtocolError?: (data: { code: string; message: string; phase?: string }) => void;
+  onProtocolUsage?: (data: { inputTokens: number; outputTokens: number }) => void;
+  onProtocolPermissionRequest?: (data: {
+    toolCallId: string;
+    tool: string;
+    resource: string;
+    options: Array<{ optionId: string; label: string }>;
+  }) => void;
+
+  // NEW: Web event handlers
+  onWebUserMessage?: (data: { content: string; agentSessionId: string }) => void;
+  onWebAgentStateChange?: (data: {
+    agentSessionId: string;
+    previousState: string;
+    newState: string;
+  }) => void;
 }
 
 export interface UseEventStreamOptions extends EventHandlers {
@@ -166,101 +204,233 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
   useEffect(() => {
     const store = useSSEStore.getState();
 
-    // Pass current options directly to avoid stale closure - handlers are resolved at call-time
-    subscriptionIdRef.current = store.subscribe(filter, (event) => {
-      // Get fresh handlers at the moment the event arrives
-      const currentOptions = optionsRef.current;
+    // Handle LaceEvent (legacy) callback
+    const handleLaceEvent = (event: LaceEvent, currentOptions: UseEventStreamOptions) => {
+      setLastEvent(event);
 
-      try {
-        setLastEvent(event);
+      // Call general handler first
+      currentOptions.onSessionEvent?.(event);
 
-        // Call general handler first
-        currentOptions.onSessionEvent?.(event);
-
-        // Route to specific handlers based on event type
-        switch (event.type) {
-          case 'USER_MESSAGE':
-            currentOptions.onUserMessage?.(event);
-            break;
-          case 'AGENT_MESSAGE':
-            currentOptions.onAgentMessage?.(event);
-            break;
-          case 'AGENT_TOKEN':
-            currentOptions.onAgentToken?.(event);
-            break;
-          case 'TOOL_CALL':
-            currentOptions.onToolCall?.(event);
-            break;
-          case 'TOOL_RESULT':
-            currentOptions.onToolResult?.(event);
-            break;
-          case 'LOCAL_SYSTEM_MESSAGE':
-            currentOptions.onSystemMessage?.(event);
-            break;
-          case 'AGENT_STATE_CHANGE':
-            if (event.data && typeof event.data === 'object') {
-              const data = event.data as { agentId: string; from: string; to: string };
-              if (data.agentId && data.from !== undefined && data.to !== undefined) {
-                currentOptions.onAgentStateChange?.(data.agentId, data.from, data.to);
-              }
+      // Route to specific handlers based on event type
+      switch (event.type) {
+        case 'USER_MESSAGE':
+          currentOptions.onUserMessage?.(event);
+          break;
+        case 'AGENT_MESSAGE':
+          currentOptions.onAgentMessage?.(event);
+          break;
+        case 'AGENT_TOKEN':
+          currentOptions.onAgentToken?.(event);
+          break;
+        case 'TOOL_CALL':
+          currentOptions.onToolCall?.(event);
+          break;
+        case 'TOOL_RESULT':
+          currentOptions.onToolResult?.(event);
+          break;
+        case 'LOCAL_SYSTEM_MESSAGE':
+          currentOptions.onSystemMessage?.(event);
+          break;
+        case 'AGENT_STATE_CHANGE':
+          if (event.data && typeof event.data === 'object') {
+            const data = event.data as { agentId: string; from: string; to: string };
+            if (data.agentId && data.from !== undefined && data.to !== undefined) {
+              currentOptions.onAgentStateChange?.(data.agentId, data.from, data.to);
             }
-            break;
-          case 'TOOL_APPROVAL_REQUEST':
-            {
-              const approvalData = event.data as { toolCallId: string };
-              currentOptions.onApprovalRequest?.({
-                toolCallId: approvalData.toolCallId,
-                requestedAt: event.timestamp || new Date(),
-                agentId: event.context?.threadId || 'unknown',
-                // Note: toolCall and requestData will be populated by the ToolApprovalProvider
-                // when it fetches the full approval data from the API
-              } as SessionPendingApproval);
+          }
+          break;
+        case 'TOOL_APPROVAL_REQUEST':
+          {
+            const approvalData = event.data as { toolCallId: string };
+            currentOptions.onApprovalRequest?.({
+              toolCallId: approvalData.toolCallId,
+              requestedAt: event.timestamp || new Date(),
+              agentId: event.context?.threadId || 'unknown',
+            } as SessionPendingApproval);
+          }
+          break;
+        case 'TOOL_APPROVAL_RESPONSE':
+          {
+            const responseData = event.data as { toolCallId: string };
+            currentOptions.onApprovalResponse?.(responseData.toolCallId);
+          }
+          break;
+        case 'COMPACTION_START':
+          currentOptions.onCompactionStart?.(event);
+          break;
+        case 'COMPACTION_COMPLETE':
+          currentOptions.onCompactionComplete?.(event);
+          break;
+        case 'EVENT_UPDATED':
+          currentOptions.onEventUpdated?.(event);
+          break;
+        case 'AGENT_ERROR':
+          currentOptions.onAgentError?.(event);
+          if (currentOptions.treatAgentErrorAsGeneric !== false) {
+            if (isAgentErrorData(event.data)) {
+              currentOptions.onError?.(new Error(event.data.message || 'Unknown agent error'));
+            } else {
+              currentOptions.onError?.(new Error('Malformed agent error event'));
             }
-            break;
-          case 'TOOL_APPROVAL_RESPONSE':
-            {
-              const responseData = event.data as { toolCallId: string };
-              currentOptions.onApprovalResponse?.(responseData.toolCallId);
-            }
-            break;
-          case 'COMPACTION_START':
-            currentOptions.onCompactionStart?.(event);
-            break;
-          case 'COMPACTION_COMPLETE':
-            currentOptions.onCompactionComplete?.(event);
-            break;
-          case 'EVENT_UPDATED':
-            currentOptions.onEventUpdated?.(event);
-            break;
-          // Add error event handling
-          case 'AGENT_ERROR':
-            currentOptions.onAgentError?.(event);
-            // Only call onError if treatAgentErrorAsGeneric is not disabled
-            if (currentOptions.treatAgentErrorAsGeneric !== false) {
-              if (isAgentErrorData(event.data)) {
-                currentOptions.onError?.(new Error(event.data.message || 'Unknown agent error'));
-              } else {
-                currentOptions.onError?.(new Error('Malformed agent error event'));
-              }
-            }
-            break;
-          case 'SESSION_INFO':
-            currentOptions.onSessionInfo?.(event);
-            break;
-          case 'AGENT_SPAWNED':
-            {
-              // Agent spawned event - reload session to get updated agents list
-              const agentEvent = event.data as AgentEvent;
-              currentOptions.onAgentSpawned?.(agentEvent);
-              currentOptions.onAgentEvent?.(agentEvent);
-            }
-            break;
-          // Add other event type cases as needed
-        }
-      } catch (error) {
-        console.error('[useEventStream] Error in event handler:', error);
+          }
+          break;
+        case 'SESSION_INFO':
+          currentOptions.onSessionInfo?.(event);
+          break;
+        case 'AGENT_SPAWNED':
+          {
+            const agentEvent = event.data as AgentEvent;
+            currentOptions.onAgentSpawned?.(agentEvent);
+            currentOptions.onAgentEvent?.(agentEvent);
+          }
+          break;
       }
-    });
+    };
+
+    // Handle ProtocolEvent (new) callback
+    const handleProtocolEvent = (event: ProtocolEvent, currentOptions: UseEventStreamOptions) => {
+      const { update, agentSessionId } = event;
+
+      switch (update.type) {
+        case 'text_delta':
+          currentOptions.onProtocolTextDelta?.({
+            text: (update as { text?: string }).text || '',
+            agentSessionId,
+            streamSeq: update.streamSeq,
+          });
+          break;
+        case 'thinking':
+          currentOptions.onProtocolThinking?.({
+            text: (update as { text?: string }).text || '',
+            agentSessionId,
+          });
+          break;
+        case 'tool_use':
+          {
+            const toolUpdate = update as {
+              toolCallId?: string;
+              name?: string;
+              input?: unknown;
+              status?: string;
+              result?: unknown;
+            };
+            currentOptions.onProtocolToolUse?.({
+              toolCallId: toolUpdate.toolCallId || '',
+              name: toolUpdate.name || '',
+              input: toolUpdate.input,
+              status: toolUpdate.status || '',
+              result: toolUpdate.result,
+            });
+          }
+          break;
+        case 'turn_start':
+          currentOptions.onProtocolTurnStart?.({
+            turnId: (update as { turnId?: string }).turnId || '',
+            agentSessionId,
+          });
+          break;
+        case 'turn_end':
+          currentOptions.onProtocolTurnEnd?.({
+            turnId: (update as { turnId?: string }).turnId || '',
+            content: (update as { content?: unknown[] }).content || [],
+            agentSessionId,
+          });
+          break;
+        case 'error':
+          {
+            const errorUpdate = update as {
+              code?: string;
+              message?: string;
+              phase?: string;
+            };
+            currentOptions.onProtocolError?.({
+              code: errorUpdate.code || 'UNKNOWN',
+              message: errorUpdate.message || 'Unknown error',
+              phase: errorUpdate.phase,
+            });
+          }
+          break;
+        case 'usage':
+          {
+            const usageUpdate = update as {
+              inputTokens?: number;
+              outputTokens?: number;
+            };
+            currentOptions.onProtocolUsage?.({
+              inputTokens: usageUpdate.inputTokens || 0,
+              outputTokens: usageUpdate.outputTokens || 0,
+            });
+          }
+          break;
+      }
+    };
+
+    // Handle WebEvent callback
+    const handleWebEvent = (event: WebEvent, currentOptions: UseEventStreamOptions) => {
+      switch (event.type) {
+        case 'USER_MESSAGE_SENT':
+          {
+            const data = event.data as { content: string; agentSessionId: string };
+            currentOptions.onWebUserMessage?.({
+              content: data.content,
+              agentSessionId: data.agentSessionId,
+            });
+          }
+          break;
+        case 'AGENT_STATE_CHANGE':
+          {
+            const data = event.data as {
+              agentSessionId: string;
+              previousState: string;
+              newState: string;
+            };
+            currentOptions.onWebAgentStateChange?.({
+              agentSessionId: data.agentSessionId,
+              previousState: data.previousState,
+              newState: data.newState,
+            });
+          }
+          break;
+      }
+    };
+
+    // Subscribe with dual callback for LaceEvent and AppEvent
+    subscriptionIdRef.current = store.subscribe(
+      filter,
+      // Legacy LaceEvent callback
+      (event: LaceEvent) => {
+        const currentOptions = optionsRef.current;
+        try {
+          handleLaceEvent(event, currentOptions);
+        } catch (error) {
+          console.error('[useEventStream] Error in LaceEvent handler:', error);
+        }
+      },
+      // New AppEvent callback
+      (event: AppEvent) => {
+        const currentOptions = optionsRef.current;
+        try {
+          // Call generic AppEvent handler
+          currentOptions.onAppEvent?.(event);
+
+          // Route to specific handlers based on event type
+          if (isProtocolEvent(event)) {
+            handleProtocolEvent(event, currentOptions);
+          } else if (isPermissionRequestEvent(event)) {
+            currentOptions.onProtocolPermissionRequest?.({
+              toolCallId: event.request.toolCallId,
+              tool: event.request.tool,
+              resource: event.request.resource,
+              options: event.request.options,
+            });
+          } else if (isWebEvent(event)) {
+            handleWebEvent(event, currentOptions);
+          }
+        } catch (error) {
+          console.error('[useEventStream] Error in AppEvent handler:', error);
+        }
+      }
+    );
 
     return () => {
       if (subscriptionIdRef.current) {
