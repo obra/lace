@@ -591,7 +591,7 @@ export class Supervisor {
 
   async cancel(workspaceSessionId: string): Promise<void> {
     const peer = await this.getPeer(workspaceSessionId);
-    peer.notify('session/cancel');
+    peer.notify('$/cancel_request', { requestId: 'supervisor_cancel' });
   }
 
   async shutdownWorkspaceSession(workspaceSessionId: string): Promise<void> {

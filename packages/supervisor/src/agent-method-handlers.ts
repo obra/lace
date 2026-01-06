@@ -85,10 +85,6 @@ export const agentMethodHandlers: Record<string, AgentMethodHandler> = {
     kind: 'notify',
     paramsSchema: CancelRequestNotificationSchema.shape.params,
   },
-  'session/cancel': {
-    kind: 'notify',
-    paramsSchema: z.object({}).strict(),
-  },
   'session/set_mode': {
     kind: 'request',
     paramsSchema: SessionSetModeRequestSchema.shape.params,
