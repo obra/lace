@@ -131,24 +131,17 @@ export const JsonRpcCancelledErrorSchema = z
 The existing error schema needs to recognize `-32800` as a valid cancellation
 error code.
 
-### 4. Deprecate `session/cancel`
+### 4. Remove `session/cancel`
 
-Keep `session/cancel` for backward compatibility initially, but mark it as
-deprecated. Per the RFD: "it is possible that `session/cancel` could be replaced
-by the more generic `$/cancel_request` in future versions of the protocol."
+**Decision**: Remove `session/cancel` entirely in favor of `$/cancel_request`. No backward compatibility needed (pre-1.0).
 
-Options:
-
-- **Option A**: Keep both, document `$/cancel_request` as preferred
-- **Option B**: Remove `session/cancel` immediately (breaking change)
-- **Recommendation**: Option A - keep both during transition
+Clients that want to cancel a session's current operation should send `$/cancel_request` with the request ID of the `session/prompt` call.
 
 ### 5. Update Notification Union
 
 ```typescript
 export const EntProtocolNotificationSchema = z.union([
-  SessionCancelNotificationSchema, // Keep for backward compat
-  CancelRequestNotificationSchema, // Add new ACP-aligned cancellation
+  CancelRequestNotificationSchema, // Replace session/cancel with this
   EntSessionInjectNotificationSchema,
   EntJobInjectNotificationSchema,
   SessionUpdateNotificationSchema,
@@ -161,10 +154,22 @@ The supervisor/agent needs to:
 
 1. Track in-flight request IDs
 2. Handle `$/cancel_request` by looking up the request ID
-3. Cascade cancellation to nested operations
+3. **Auto-cascade**: When a `session/prompt` is cancelled, automatically send `$/cancel_request` for all pending `session/request_permission` calls
 4. Return either:
-   - Error response with code `-32800`
+   - Error response with code `-32800` (for user-initiated cancellation via `$/cancel_request`)
    - Valid response with `stopReason: 'cancelled'`
+
+### 7. Internal Cancellation Error Codes
+
+**Decision**: Internal cancellations (timeouts, resource constraints) should use different error codes, NOT `-32800`.
+
+Error code mapping:
+- `-32800`: User-initiated cancellation via `$/cancel_request`
+- `11` (BudgetExceeded): Budget limit reached
+- Timeout-specific errors: Use appropriate error codes (not -32800)
+- Resource constraints: Use appropriate error codes (not -32800)
+
+This keeps `-32800` semantically clean: "user cancelled the request".
 
 ## Zod Schema Changes Summary
 
@@ -206,44 +211,53 @@ export const CancelledErrorSchema = z
    the union
 2. **Error handling**: Ensure `-32800` is recognized in error response parsing
 
-### Schemas to Deprecate (but keep)
+### Schemas to Remove
 
-1. **`SessionCancelNotificationSchema`**: Mark as deprecated, keep for backward
-   compatibility
+1. **`SessionCancelNotificationSchema`**: Delete entirely - replaced by `CancelRequestNotificationSchema`
 
-## Migration Path
+## Implementation Plan
 
-### Phase 1: Add Support
+### 1. Remove Old, Add New
 
-1. Add `CancelRequestNotificationSchema`
-2. Add `JSONRPC_ERROR_CANCELLED` constant
-3. Update notification union
-4. Implement handler that supports both old and new methods
+1. Remove `SessionCancelNotificationSchema` from schemas
+2. Add `CancelRequestNotificationSchema`
+3. Add `JSONRPC_ERROR_CANCELLED = -32800` constant
+4. Update `EntProtocolNotificationSchema` union (remove session/cancel, add $/cancel_request)
 
-### Phase 2: Update Clients
+### 2. Implement Request Tracking
 
-1. Update TUI client to send `$/cancel_request` instead of `session/cancel`
-2. Test that agents handle both notification types
+Agent/supervisor must track in-flight requests by ID to enable cancellation.
 
-### Phase 3: Deprecation
+### 3. Implement Auto-Cascade
 
-1. Log warning when `session/cancel` is received
-2. Document migration in changelog
-3. Eventually remove `session/cancel` in major version
+When `session/prompt` request is cancelled:
+1. Send `$/cancel_request` for all pending `session/request_permission` requests
+2. Send `$/cancel_request` for any other nested requests
+3. Clean up resources
+4. Respond to original prompt with error `-32800` or `stopReason: 'cancelled'`
 
-## Open Questions
+### 4. Update TUI Client
 
-1. **Session cancel semantics**: Should `session/cancel` remain as a
-   session-level cancellation (cancels all requests in session) while
-   `$/cancel_request` targets individual requests? The RFD suggests they can
-   coexist with different semantics.
+Change from `session/cancel` to `$/cancel_request` with prompt request ID.
 
-2. **Cascading behavior**: When a prompt is cancelled, should we automatically
-   send `$/cancel_request` for any pending permission requests? The RFD
-   mermaid diagram shows this pattern.
+### 5. Clarify Internal Cancellation Error Codes
 
-3. **Internal cancellation**: The RFD mentions internal cancellation (agent-side
-   timeout, resource constraints). Should we use `-32800` for these cases too?
+Document that `-32800` is ONLY for user-initiated `$/cancel_request`. Internal cancellations use:
+- `11` (BudgetExceeded)
+- Other appropriate error codes
+- NOT `-32800`
+
+## Decisions Made
+
+1. **session/cancel removed**: Replace entirely with `$/cancel_request`. No backward compatibility.
+
+2. **Auto-cascade**: YES - automatically send `$/cancel_request` for pending permission requests when prompt cancelled (per RFD mermaid diagram pattern).
+
+3. **Internal cancellation error codes**: NO - do NOT use `-32800` for internal cancellations. Use appropriate error codes:
+   - Budget exceeded: `11` (BudgetExceeded)
+   - Timeouts: Appropriate timeout error
+   - Resource constraints: Appropriate error
+   - Keep `-32800` semantically clean for user-initiated cancellation only
 
 ## References
 
