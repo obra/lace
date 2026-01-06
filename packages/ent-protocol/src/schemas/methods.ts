@@ -203,7 +203,6 @@ const SessionLoadParamsSchema = z
 const SessionLoadResultSchema = z
   .object({
     sessionId: SessionIdSchema,
-    forkedFrom: SessionIdSchema.optional(),
     messageCount: z.number(),
     updatedAt: IsoTimestampSchema,
   })
