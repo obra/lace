@@ -154,6 +154,91 @@ describe('system prompt injection on session/new', () => {
     expect(durable.events[0].data.priority).toBe('normal');
     expect(durable.events[0].data.content[0].text).toContain('Lace');
   });
+
+  it('injects user instructions from instructions.md as second context_injected event', async () => {
+    // Create instructions.md with custom user instructions in the LACE_DIR
+    const userInstructions = 'Custom user instruction: always be helpful and concise';
+    writeFileSync(join(laceDir, 'instructions.md'), userInstructions);
+
+    agent = spawnAgentProcess({ laceDir });
+
+    await withTimeout(
+      agent.peer.request('initialize', defaultInitializeParams()),
+      2_000,
+      'initialize'
+    );
+
+    const created = (await withTimeout(
+      agent.peer.request('session/new', { workDir }),
+      2_000,
+      'session/new'
+    )) as { sessionId: string };
+
+    expect(created.sessionId).toMatch(/^sess_/);
+
+    // Read the events.jsonl file directly from the session directory
+    const sessionDir = join(laceDir, 'agent-sessions', created.sessionId);
+    const eventsPath = join(sessionDir, 'events.jsonl');
+
+    expect(existsSync(eventsPath)).toBe(true);
+
+    const eventsRaw = readFileSync(eventsPath, 'utf8');
+    const eventLines = eventsRaw.trim().split('\n').filter(Boolean);
+
+    // Should have at least 2 events: system prompt + user instructions
+    expect(eventLines.length).toBeGreaterThanOrEqual(2);
+
+    // First event should be system prompt with "Lace"
+    const firstEvent = JSON.parse(eventLines[0]) as {
+      type: string;
+      eventSeq: number;
+      data: { content: Array<{ type: string; text: string }>; priority: string };
+    };
+    expect(firstEvent.type).toBe('context_injected');
+    expect(firstEvent.eventSeq).toBe(1);
+    expect(firstEvent.data.content[0].text).toContain('Lace');
+
+    // Second event should be user instructions
+    const secondEvent = JSON.parse(eventLines[1]) as {
+      type: string;
+      eventSeq: number;
+      data: { content: Array<{ type: string; text: string }>; priority: string };
+    };
+    expect(secondEvent.type).toBe('context_injected');
+    expect(secondEvent.eventSeq).toBe(2);
+    expect(secondEvent.data.priority).toBe('normal');
+    expect(secondEvent.data.content[0].text).toContain('Custom user instruction');
+  });
+
+  it('does not inject user instructions event when instructions.md is empty', async () => {
+    // Create empty instructions.md
+    writeFileSync(join(laceDir, 'instructions.md'), '   '); // whitespace only
+
+    agent = spawnAgentProcess({ laceDir });
+
+    await withTimeout(
+      agent.peer.request('initialize', defaultInitializeParams()),
+      2_000,
+      'initialize'
+    );
+
+    const created = (await withTimeout(
+      agent.peer.request('session/new', { workDir }),
+      2_000,
+      'session/new'
+    )) as { sessionId: string };
+
+    const sessionDir = join(laceDir, 'agent-sessions', created.sessionId);
+    const eventsPath = join(sessionDir, 'events.jsonl');
+
+    const eventsRaw = readFileSync(eventsPath, 'utf8');
+    const eventLines = eventsRaw.trim().split('\n').filter(Boolean);
+
+    // Should only have 1 event (system prompt), no user instructions event
+    expect(eventLines.length).toBe(1);
+    expect(JSON.parse(eventLines[0]).type).toBe('context_injected');
+    expect(JSON.parse(eventLines[0]).data.content[0].text).toContain('Lace');
+  });
 });
 
 describe('buildProviderMessagesFromDurableEvents', () => {

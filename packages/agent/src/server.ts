@@ -2697,6 +2697,20 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
     sessionState = nextState;
     writeSessionState(sessionDir, sessionState);
+
+    // Also inject user instructions if present
+    if (promptConfig.userInstructions.trim()) {
+      const { nextState: userInstrState } = appendDurableEvent(sessionDir, sessionState, {
+        type: 'context_injected',
+        data: {
+          content: [{ type: 'text', text: promptConfig.userInstructions }],
+          priority: 'normal',
+        },
+      });
+      sessionState = userInstrState;
+      writeSessionState(sessionDir, sessionState);
+    }
+
     state.activeSession = { ...state.activeSession, state: sessionState };
 
     return { sessionId, created };
