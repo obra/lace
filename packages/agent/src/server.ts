@@ -74,6 +74,7 @@ import type { MCPServerConfig } from '@lace/agent/config/mcp-types';
 import { compactDroppedMessagesWithCore } from './compaction/compact-dropped-messages';
 import { WorkspaceManagerFactory } from './workspace/workspace-manager';
 import { personaRegistry } from './config/persona-registry';
+import { loadPromptConfig } from './config/prompts';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
 const JOB_LOG_DIR = 'jobs';
@@ -2684,6 +2685,18 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     state.activeSession = loadSession(sessionId);
     await reconcileMcpServersForActiveSession(state);
+
+    // Inject system prompt as context_injected event
+    const persona = toNonEmptyString(parsed.persona) ?? 'lace';
+    const promptConfig = await loadPromptConfig({ persona });
+    let sessionState: SessionState = readSessionState(sessionDir);
+    const { nextState } = appendDurableEvent(sessionDir, sessionState, {
+      type: 'context_injected',
+      data: { content: [{ type: 'text', text: promptConfig.systemPrompt }], priority: 'normal' },
+    });
+    sessionState = nextState;
+    writeSessionState(sessionDir, sessionState);
+    state.activeSession = { ...state.activeSession, state: sessionState };
 
     return { sessionId, created };
   });
