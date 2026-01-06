@@ -269,15 +269,14 @@ interface SlashCommand {
 }
 ```
 
-### 5.3 `session/load` (ACP-compatible + extensions)
+### 5.3 `session/load` (ACP-compatible)
 
 ```typescript
 // Request
 {
   method: "session/load",
   params: {
-    sessionId: string,
-    fork?: boolean     // Create branch, preserve original
+    sessionId: string
   }
 }
 
@@ -285,9 +284,8 @@ interface SlashCommand {
 {
   result: {
     sessionId: string,
-    forkedFrom?: string,
     messageCount: number,
-    lastActive: string
+    updatedAt: string   // ISO 8601
   }
 }
 ```
@@ -331,20 +329,26 @@ interface SlashCommand {
 
 **Durable event guarantee**: A successful `session/prompt` response implies that corresponding durable events (`turn_start`, `message`, `tool_use`, `turn_end`) have been written and can be fetched via `ent/session/events` with stable ordering. The `turnId` in the response matches the `turnId` in those events.
 
-### 5.5 `session/cancel` (ACP-compatible, notification)
+### 5.5 `$/cancel_request` (ACP-compatible, notification)
 
-Cancels the current operation.
+Cancels a request or ongoing operation.
 
 ```typescript
 {
-  method: "session/cancel"
+  jsonrpc: "2.0",
+  method: "$/cancel_request",
+  params: {
+    requestId: string | number   // JSON-RPC ID to cancel
+  }
 }
 ```
 
 **Cancellation semantics**:
-- If a turn is running, it stops and returns with `stopReason: "cancelled"`.
-- If a tool is `awaiting_permission`, the pending permission request is **invalidated**. The agent MUST emit a `tool_use` update with `status: "cancelled"`, append a durable `permission_cancelled` event, and discard the pending request from `ent/agent/status.pendingPermissions`. Clients MUST dismiss any approval UI for that `toolCallId` (or treat it as stale if a new permission request is later reissued).
-- If no turn is in progress, the notification is silently ignored.
+- If a turn is running (matching `requestId`), it stops and returns with `stopReason: "cancelled"` and error code `-32800`.
+- If a tool is `awaiting_permission` under the request being cancelled, the pending permission request is **invalidated**. The agent MUST emit a `tool_use` update with `status: "cancelled"`, append a durable `permission_cancelled` event, and discard the pending request from `ent/agent/status.pendingPermissions`. Clients MUST dismiss any approval UI for that `toolCallId` (or treat it as stale if a new permission request is later reissued).
+- If no request or turn is in progress, the notification is silently ignored.
+
+**Error code**: Returns `-32800` (RequestCancelled) when responding to the cancelled request.
 
 ### 5.6 `session/set_mode`
 
@@ -379,7 +383,8 @@ Set the agent's execution mode. This controls what tools are available.
 {
   method: "session/list",
   params: {
-    workDir?: string
+    cwd?: string,           // Filter by working directory (renamed from workDir)
+    cursor?: string         // Pagination cursor (opaque)
   }
 }
 
@@ -388,14 +393,50 @@ Set the agent's execution mode. This controls what tools are available.
   result: {
     sessions: [{
       sessionId: string,
-      created: string,
-      lastActive: string,
-      messageCount: number,
-      workDir: string
-    }]
+      cwd: string,          // Working directory (renamed from workDir)
+      updatedAt: string,    // ISO 8601 (renamed from lastActive)
+      title?: string,       // Optional session title
+      created: string,      // ISO 8601 (Ent extension)
+      messageCount: number, // (Ent extension)
+      _meta?: Record<string, unknown>  // Additional metadata
+    }],
+    nextCursor?: string     // Pagination cursor for next batch (opaque)
   }
 }
 ```
+
+**Field renames**: This method has been updated to align with ACP RFD:
+- `workDir` → `cwd` (both parameter and response field)
+- `lastActive` → `updatedAt` (response field)
+- Added `title`, `_meta`, `cursor`, `nextCursor` for pagination and metadata
+
+### 5.8 `session/fork` (ACP draft RFD)
+
+Create a new session by forking an existing session. The forked session preserves the conversation history of the original.
+
+```typescript
+// Request
+{
+  method: "session/fork",
+  params: {
+    sessionId: string,                    // Session to fork from
+    cwd?: string,                         // Override working directory
+    mcpServers?: McpServerConfig[]        // Override MCP servers
+  }
+}
+
+// Response
+{
+  result: {
+    sessionId: string,                    // New session ID
+    forkedFrom: string,                   // Original session ID
+    messageCount: number,                 // Messages inherited from original
+    updatedAt: string                     // ISO 8601 (creation time)
+  }
+}
+```
+
+**Behavior**: Creates a new independent session with a copy of the original's conversation history. Further changes to either session are independent. The original session is unchanged.
 
 ---
 
@@ -1377,6 +1418,76 @@ Stream updates during turn processing. All updates include correlation IDs for o
 // Context injected
 { type: "context_injected", priority: string, messageCount: number }
 
+// Session info (metadata update)
+{
+  type: "session_info",
+  title?: string,
+  updatedAt?: string,       // ISO 8601
+  _meta?: Record<string, unknown>
+}
+
+// Context window utilization
+{
+  type: "context_window",
+  used: number,             // Tokens used
+  size: number              // Total context window
+}
+
+// Compaction lifecycle
+{
+  type: "compaction_start",
+  auto: boolean,
+  strategy?: "summarize" | "truncate" | "selective"
+}
+
+{
+  type: "compaction_complete",
+  success: boolean,
+  previousTokens?: number,
+  currentTokens?: number,
+  messagesCompacted?: number,
+  summary?: string,
+  error?: string
+}
+
+// Error notification
+{
+  type: "error",
+  errorType: "provider_failure" | "tool_execution" | "processing_error" | "timeout",
+  message: string,
+  isRetryable: boolean,
+  context: {
+    phase: "provider_response" | "tool_execution" | "conversation_processing" | "initialization",
+    providerName?: string,
+    modelId?: string,
+    toolName?: string,
+    toolCallId?: string
+  }
+}
+
+// MCP configuration change
+{
+  type: "mcp_config_changed",
+  serverId: string,
+  action: "created" | "updated" | "deleted",
+  serverConfig?: {
+    name: string,
+    command: string,
+    args?: string[],
+    enabled: boolean
+  }
+}
+
+// MCP server status update
+{
+  type: "mcp_server_status",
+  serverId: string,
+  name: string,
+  status: "stopped" | "starting" | "running" | "failed",
+  error?: string,
+  toolCount?: number
+}
+
 // Job lifecycle (top-level only, not valid as inner update types)
 { type: "job_started", jobId: string, parentJobId?: string, jobType: "shell" | "subagent", description?: string }
 { type: "job_finished", jobId: string, parentJobId?: string, exitCode?: number, outcome: "completed" | "failed" | "cancelled" }
@@ -1501,6 +1612,7 @@ type ContentBlock =
 | 4 | ToolNotFound |
 | 5 | MaxTurnsExceeded |
 | 6 | Cancelled |
+| -32800 | RequestCancelled (per-request cancellation via `$/cancel_request`) |
 
 ### 10.3 Ent Extensions
 
@@ -1730,9 +1842,10 @@ interface ConnectionInfo {
 | `session/new` | ✅ Compatible | |
 | `session/load` | ✅ Compatible | |
 | `session/prompt` | ✅ Compatible | Extended params |
-| `session/cancel` | ✅ Compatible | |
+| `$/cancel_request` | ✅ Compatible | Per-request cancellation |
 | `session/set_mode` | 🔸 Shape compatible | Ent-native mode values |
-| `session/list` | ✅ ACP Draft | |
+| `session/list` | ✅ ACP Draft | Updated field names (cwd, updatedAt) |
+| `session/fork` | ✅ ACP Draft | New method for session forking |
 | `session/update` | 🔸 Shape compatible | Ent-native type names |
 | `session/request_permission` | ✅ Compatible | |
 | `ent/session/compact` | 🔧 Extension | |

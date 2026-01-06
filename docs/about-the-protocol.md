@@ -4,7 +4,27 @@ Design decisions, rationale, and context for the Ent protocol specification.
 
 ---
 
-## 1. Why Not Just Use ACP?
+## 1. ACP RFD Alignment
+
+Ent is actively aligned with the [Agent Client Protocol](https://agentclientprotocol.com) RFD (Request for Discussion) process. The following features are implemented per ACP draft RFDs:
+
+### ACP Alignments
+
+| Feature | ACP RFD | Ent Implementation |
+|---------|---------|-------------------|
+| **session/list** | ACP Draft RFD | Field renames: `workDir` → `cwd`, `lastActive` → `updatedAt`. Added pagination (`cursor`, `nextCursor`) and metadata (`title`, `_meta`). |
+| **session/fork** | ACP Draft RFD | Dedicated method for session forking with optional `cwd` and `mcpServers` overrides. |
+| **$/cancel_request** | ACP Standard | Per-request cancellation with `-32800` error code. Replaces earlier `session/cancel` approach. |
+
+### Intentional Divergences
+
+**camelCase vs snake_case**: The Ent protocol uses `camelCase` for field names (`sessionId`, `toolCallId`) to align with JSON/JavaScript conventions, while some ACP RFDs use `snake_case`. This is an intentional design choice to match the broader protocol naming (inherited from Anthropic API conventions). Adapters converting between Ent and ACP can normalize this at transport boundaries.
+
+**Event type names**: `session/update` notification uses Ent-native event type names (`text_delta`, `tool_use`) rather than ACP names. This allows cleaner client-side event handling and avoids translation layers. An adapter layer would be needed for ACP-compatible clients.
+
+---
+
+## 2. Why Not Just Use ACP?
 
 We evaluated the [Agent Client Protocol](https://agentclientprotocol.com) (ACP) as a potential standard. See [acp-evaluation.md](../research/acp-evaluation.md) for the full analysis.
 
