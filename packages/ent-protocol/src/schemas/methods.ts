@@ -46,8 +46,13 @@ const AgentCapabilitiesSchema = z
   .object({
     streaming: z.boolean(),
     multiTurn: z.boolean(),
-    sessionResume: z.boolean().optional(),
-    sessionFork: z.boolean().optional(),
+    session: z
+      .object({
+        fork: z.object({}).optional(),
+        resume: z.object({}).optional(),
+      })
+      .strict()
+      .optional(),
     modes: z.array(NonEmptyStringSchema).optional(),
     tools: z.array(ToolInfoSchema),
     operations: z
@@ -191,7 +196,6 @@ export const SessionNewResponseSchema = z
 const SessionLoadParamsSchema = z
   .object({
     sessionId: SessionIdSchema,
-    fork: z.boolean().optional(),
   })
   .strict();
 
@@ -219,6 +223,40 @@ export const SessionLoadResponseSchema = z
     jsonrpc: JsonRpcVersionSchema,
     id: JsonRpcIdSchema,
     result: SessionLoadResultSchema,
+  })
+  .strict();
+
+export const SessionForkParamsSchema = z
+  .object({
+    sessionId: SessionIdSchema,
+    cwd: NonEmptyStringSchema.optional(),
+    mcpServers: z.array(McpServerConfigSchema).optional(),
+  })
+  .strict();
+
+export const SessionForkResultSchema = z
+  .object({
+    sessionId: SessionIdSchema,
+    forkedFrom: SessionIdSchema,
+    messageCount: z.number(),
+    updatedAt: IsoTimestampSchema,
+  })
+  .strict();
+
+export const SessionForkRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('session/fork'),
+    params: SessionForkParamsSchema,
+  })
+  .strict();
+
+export const SessionForkResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: SessionForkResultSchema,
   })
   .strict();
 
@@ -346,11 +384,17 @@ export const SessionPromptResponseSchema = z
   })
   .strict();
 
-export const SessionCancelNotificationSchema = z
+const CancelRequestParamsSchema = z
+  .object({
+    requestId: JsonRpcIdSchema,
+  })
+  .strict();
+
+export const CancelRequestNotificationSchema = z
   .object({
     jsonrpc: JsonRpcVersionSchema,
-    method: z.literal('session/cancel'),
-    params: EmptyParamsSchema.optional(),
+    method: z.literal('$/cancel_request'),
+    params: CancelRequestParamsSchema,
   })
   .strict();
 
@@ -1735,6 +1779,7 @@ export const EntProtocolRequestSchema = z.union([
   InitializeRequestSchema,
   SessionNewRequestSchema,
   SessionLoadRequestSchema,
+  SessionForkRequestSchema,
   SessionListRequestSchema,
   SessionSetModeRequestSchema,
   SessionPromptRequestSchema,
@@ -1772,7 +1817,7 @@ export const EntProtocolRequestSchema = z.union([
 ]);
 
 export const EntProtocolNotificationSchema = z.union([
-  SessionCancelNotificationSchema,
+  CancelRequestNotificationSchema,
   EntSessionInjectNotificationSchema,
   EntJobInjectNotificationSchema,
   SessionUpdateNotificationSchema,

@@ -19,6 +19,7 @@ import {
   isSessionId,
   JsonRpcPeer,
   SessionUpdateNotificationSchema,
+  SessionForkParamsSchema,
   type PermissionRequest,
   type ToolInfo,
   type ToolResult,
@@ -1667,6 +1668,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       capabilities: {
         streaming: true,
         multiTurn: true,
+        session: { fork: {}, resume: {} },
         tools: toolInfos,
         operations: { checkpoint: true, rewind: true, configure: true, compact: true },
         'ent/contextInjection': true,
@@ -2700,12 +2702,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   peer.onRequest('session/load', async (params: unknown) => {
     assertInitialized(state);
 
-    const parsed = params as { sessionId: string; fork?: boolean };
+    const parsed = params as { sessionId: string };
     if (!parsed?.sessionId) throwInvalidParams('sessionId is required');
     if (!isSessionId(parsed.sessionId)) {
       throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
     }
-    if (parsed.fork) throwInvalidParams('fork not implemented');
 
     if (state.activeSession && state.activeSession.meta.sessionId !== parsed.sessionId) {
       throw {
@@ -2737,6 +2738,69 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       sessionId: parsed.sessionId,
       messageCount: summary.messageCount,
       updatedAt: summary.lastActive ?? loaded.meta.created,
+    };
+  });
+
+  peer.onRequest('session/fork', async (params: unknown) => {
+    assertInitialized(state);
+
+    const parsed = SessionForkParamsSchema.parse(params);
+
+    // Load the source session
+    let sourceSession: LoadedSession;
+    try {
+      sourceSession = loadSession(parsed.sessionId);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Session not found') {
+        throw {
+          code: AcpErrorCodes.SessionNotFound,
+          message: 'SessionNotFound',
+          data: { category: 'session' },
+        };
+      }
+      throw error;
+    }
+
+    // Create new forked session
+    const forkedSessionId = `sess_${randomUUID()}`;
+    const created = new Date().toISOString();
+    const forkedCwd = parsed.cwd ?? sourceSession.meta.workDir;
+
+    const forkedSessionDir = getSessionDir(forkedSessionId);
+    writeSessionMeta(forkedSessionDir, { sessionId: forkedSessionId, workDir: forkedCwd, created });
+
+    // Copy state from source session with optional MCP server overrides
+    const forkedState: SessionState = {
+      nextEventSeq: sourceSession.state.nextEventSeq,
+      nextStreamSeq: sourceSession.state.nextStreamSeq,
+      config: {
+        ...sourceSession.state.config,
+      },
+    };
+
+    // Apply MCP server overrides if provided
+    if (parsed.mcpServers) {
+      forkedState.config = forkedState.config ?? {};
+      forkedState.config.mcpServers = parsed.mcpServers;
+    }
+
+    writeSessionState(forkedSessionDir, forkedState);
+    ensureSessionFiles(forkedSessionDir);
+
+    // Copy all events from source session to forked session
+    const { events: sourceEvents } = readDurableEvents(sourceSession.dir, {});
+    const forkedEventsPath = join(forkedSessionDir, 'events.jsonl');
+    for (const event of sourceEvents) {
+      appendFileSync(forkedEventsPath, JSON.stringify(event) + '\n', { encoding: 'utf8' });
+    }
+
+    // Return fork result with forkedFrom field
+    const summary = summarizeDurableEvents(forkedSessionDir);
+    return {
+      sessionId: forkedSessionId,
+      forkedFrom: parsed.sessionId,
+      messageCount: summary.messageCount,
+      updatedAt: summary.lastActive ?? created,
     };
   });
 
