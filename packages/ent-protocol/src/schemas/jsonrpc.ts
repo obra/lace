@@ -4,6 +4,9 @@ export const JsonRpcVersionSchema = z.literal('2.0');
 
 export const JsonRpcIdSchema = z.union([z.string(), z.number(), z.null()]);
 
+// Error codes
+export const JSONRPC_ERROR_CANCELLED = -32800 as const;
+
 export const JsonRpcErrorObjectSchema = z
   .object({
     code: z.number(),

@@ -3252,13 +3252,17 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     return result;
   });
 
-  peer.onRequest('session/cancel', async (_params: unknown) => {
+  peer.onRequest('$/cancel_request', async (params: unknown) => {
     assertInitialized(state);
-    if (!state.activeSession) return undefined;
 
+    // Auto-cascade: send $/cancel_request for all pending permission requests
+    for (const [, permission] of state.pendingPermissionRequests) {
+      peer.notify('$/cancel_request', { requestId: permission.rpcId });
+    }
+
+    // Abort the active turn if one is running
     if (state.activeTurn) {
       state.activeTurn.abortController.abort();
-      return undefined;
     }
 
     return undefined;

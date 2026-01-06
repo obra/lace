@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import {
+  CancelRequestNotificationSchema,
   EntAgentStatusRequestSchema,
   EntAgentStatusResponseSchema,
   EntConnectionsCredentialsClearRequestSchema,
@@ -63,7 +64,6 @@ import {
   EntWorkspaceCreateResponseSchema,
   EntWorkspaceInfoRequestSchema,
   EntWorkspaceInfoResponseSchema,
-  SessionCancelNotificationSchema,
   SessionPromptRequestSchema,
   SessionPromptResponseSchema,
   SessionSetModeRequestSchema,
@@ -162,9 +162,9 @@ const agentMethodHandlers: Record<string, AgentMethodHandler> = {
     paramsSchema: SessionPromptRequestSchema.shape.params,
     resultSchema: SessionPromptResponseSchema.shape.result,
   },
-  'session/cancel': {
+  '$/cancel_request': {
     kind: 'notify',
-    paramsSchema: SessionCancelNotificationSchema.shape.params.optional(),
+    paramsSchema: CancelRequestNotificationSchema.shape.params,
   },
   'session/set_mode': {
     kind: 'request',
