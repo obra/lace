@@ -130,7 +130,7 @@ export function ProjectProvider({
   // Subscribe to session and agent events to refresh session list in real-time
   useEventStream({
     projectId: projectId || undefined,
-    onSessionUpdated: useCallback(() => {
+    onSessionInfo: useCallback(() => {
       // Reload sessions to get the updated session name in the list
       scheduleReload();
     }, [scheduleReload]),

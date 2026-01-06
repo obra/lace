@@ -109,7 +109,7 @@ export function SessionProvider({
       },
       [reloadSessionDetails]
     ),
-    onSessionUpdated: useCallback(() => {
+    onSessionInfo: useCallback(() => {
       // Reload session details when session name changes
       void reloadSessionDetails();
     }, [reloadSessionDetails]),

@@ -81,7 +81,7 @@ interface EventHandlers {
   onProjectDeleted?: (event: ProjectEvent) => void;
 
   // Session events
-  onSessionUpdated?: (event: LaceEvent) => void;
+  onSessionInfo?: (event: LaceEvent) => void;
 
   // Agent events
   onAgentEvent?: (event: AgentEvent) => void;
@@ -244,8 +244,8 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
               }
             }
             break;
-          case 'SESSION_UPDATED':
-            currentOptions.onSessionUpdated?.(event);
+          case 'SESSION_INFO':
+            currentOptions.onSessionInfo?.(event);
             break;
           case 'AGENT_SPAWNED':
             {
