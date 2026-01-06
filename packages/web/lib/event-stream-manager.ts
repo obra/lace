@@ -1,32 +1,12 @@
 // ABOUTME: Event stream manager for real-time client notifications
 // ABOUTME: Manages global event distribution with client-side filtering
 
-// StreamEvent removed - using LaceEvent directly
-import type { LaceEvent, ErrorType, ErrorPhase } from '@lace/web/types/core';
 import type { AppEvent } from '@lace/web/types/app-events';
+import type { WebEvent } from '@lace/web/types/web-events';
 import { isProtocolEvent, isPermissionRequestEvent, isWebEvent } from '@lace/web/types/app-events';
 import { randomUUID } from 'crypto';
 import { logger } from '@lace/agent/utils/logger';
 import { stringify } from '@lace/web/lib/serialization';
-
-// Interface for AGENT_ERROR event data
-interface AgentErrorEventData {
-  errorType: ErrorType;
-  message: string;
-  stack?: string;
-  context: {
-    phase: ErrorPhase;
-    providerName?: string;
-    providerInstanceId?: string;
-    modelId?: string;
-    toolName?: string;
-    toolCallId?: string;
-    workingDirectory?: string;
-    retryAttempt?: number;
-  };
-  isRetryable: boolean;
-  retryCount: number;
-}
 
 // Type guard for errors with code property (Web Streams API errors)
 function hasErrorCode(error: unknown): error is Error & { code: string } {
@@ -46,9 +26,8 @@ interface ClientConnection {
   subscription: {
     projects?: string[];
     sessions?: string[];
-    threads?: string[];
+    threads?: string[]; // agent session IDs
     global?: boolean;
-    // eventTypes removed - LaceEvent handles all types
   };
   lastEventId?: string;
   connectedAt: Date;
@@ -127,18 +106,15 @@ export class EventStreamManager {
       this.startKeepAlive();
     }
 
-    // Send connection confirmation as LaceEvent
+    // Send connection confirmation as WebEvent
     try {
-      this.sendToConnection(connection, {
+      const readyEvent: WebEvent = {
         id: this.generateEventId(),
         timestamp: new Date(),
         type: 'LOCAL_SYSTEM_MESSAGE',
-        data: 'Ready!',
-        transient: true,
-        context: {
-          systemMessage: true,
-        },
-      });
+        data: { content: 'Ready!' },
+      };
+      this.sendToConnection(connection, readyEvent);
     } catch (error) {
       // Connection failed immediately - remove it
       logger.debug(`[EVENT_STREAM] Connection ${connectionId} failed on initial send`, error);
@@ -179,67 +155,8 @@ export class EventStreamManager {
     }
   }
 
-  // Broadcast event to all matching connections
-  broadcast(event: LaceEvent): void {
-    // Ensure event has required fields
-    const fullEvent: LaceEvent = {
-      ...event,
-      id: event.id || this.generateEventId(),
-      timestamp: event.timestamp || new Date(),
-    };
-
-    // Optional: Add debug logging for error events
-    if (fullEvent.type === 'AGENT_ERROR') {
-      // Runtime guard for safe error data access
-      const data = fullEvent.data;
-      if (
-        data &&
-        typeof data === 'object' &&
-        'errorType' in data &&
-        'context' in data &&
-        'isRetryable' in data &&
-        data.context &&
-        typeof data.context === 'object' &&
-        'phase' in data.context
-      ) {
-        const errorData = data as AgentErrorEventData;
-        logger.debug('[EVENT_STREAM] Broadcasting agent error event', {
-          contextThreadId: fullEvent.context?.threadId,
-          errorType: errorData.errorType,
-          phase: errorData.context.phase,
-          isRetryable: errorData.isRetryable,
-        });
-      } else {
-        logger.debug('[EVENT_STREAM] Broadcasting agent error event with invalid data shape', {
-          contextThreadId: fullEvent.context?.threadId,
-          rawData: data,
-        });
-      }
-    }
-
-    const deadConnections: string[] = [];
-
-    for (const [connectionId, connection] of this.connections) {
-      if (this.shouldSendToConnection(connection, fullEvent)) {
-        try {
-          this.sendToConnection(connection, fullEvent);
-        } catch (error) {
-          logger.debug(`[EVENT_STREAM] Failed to send to connection ${connectionId}:`, error);
-          deadConnections.push(connectionId);
-        }
-      }
-    }
-
-    // Clean up dead connections
-    for (const connectionId of deadConnections) {
-      this.removeConnection(connectionId);
-    }
-  }
-
-  /**
-   * Broadcast AppEvent (protocol events) to all matching connections
-   */
-  broadcastAppEvent(event: AppEvent): void {
+  // Broadcast AppEvent to all matching connections
+  broadcast(event: AppEvent): void {
     // Ensure event has required fields
     const fullEvent: AppEvent = {
       ...event,
@@ -262,14 +179,11 @@ export class EventStreamManager {
     const deadConnections: string[] = [];
 
     for (const [connectionId, connection] of this.connections) {
-      if (this.shouldSendAppEventToConnection(connection, fullEvent)) {
+      if (this.shouldSendToConnection(connection, fullEvent)) {
         try {
-          this.sendAppEventToConnection(connection, fullEvent);
+          this.sendToConnection(connection, fullEvent);
         } catch (error) {
-          logger.debug(
-            `[EVENT_STREAM] Failed to send AppEvent to connection ${connectionId}:`,
-            error
-          );
+          logger.debug(`[EVENT_STREAM] Failed to send event to connection ${connectionId}:`, error);
           deadConnections.push(connectionId);
         }
       }
@@ -282,40 +196,7 @@ export class EventStreamManager {
   }
 
   // Check if event should be sent to connection based on subscription
-  private shouldSendToConnection(connection: ClientConnection, event: LaceEvent): boolean {
-    const { subscription } = connection;
-
-    // Thread filtering - use context.threadId instead of top-level threadId
-    if (subscription.threads && subscription.threads.length > 0) {
-      const eventThreadId = event.context?.threadId;
-      if (!eventThreadId || !subscription.threads.includes(eventThreadId)) {
-        return false;
-      }
-    }
-
-    // Project filtering via context
-    if (subscription.projects && subscription.projects.length > 0) {
-      if (!event.context?.projectId || !subscription.projects.includes(event.context.projectId)) {
-        return false;
-      }
-    }
-
-    // Session filtering via context
-    if (subscription.sessions && subscription.sessions.length > 0) {
-      if (!event.context?.sessionId || !subscription.sessions.includes(event.context.sessionId)) {
-        return false;
-      }
-    }
-
-    // Event type filtering removed - LaceEvent handles all types
-    // Currently all connections receive all events (global subscription)
-    return true;
-  }
-
-  /**
-   * Check if AppEvent should be sent to connection based on subscription
-   */
-  private shouldSendAppEventToConnection(connection: ClientConnection, event: AppEvent): boolean {
+  private shouldSendToConnection(connection: ClientConnection, event: AppEvent): boolean {
     const { subscription } = connection;
 
     // Extract context from AppEvent based on type
@@ -361,11 +242,8 @@ export class EventStreamManager {
     return true;
   }
 
-  /**
-   * Send AppEvent (protocol event) to specific connection
-   */
-  private sendAppEventToConnection(connection: ClientConnection, event: AppEvent): void {
-    // AppEvents use the same SSE format as LaceEvents
+  // Send AppEvent to specific connection
+  private sendToConnection(connection: ClientConnection, event: AppEvent): void {
     const eventData = `id: ${event.id}\ndata: ${stringify(event)}\n\n`;
     const chunk = this.encoder.encode(eventData);
 
@@ -374,54 +252,9 @@ export class EventStreamManager {
       connection.lastEventId = event.id;
       connection.lastSendAt = Date.now();
     } catch (error) {
-      logger.debug(`[EVENT_STREAM] Failed to send AppEvent to connection ${connection.id}`, {
-        eventId: event.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      class ControllerClosedError extends Error {
-        public readonly cause?: unknown;
-
-        constructor(message: string, cause?: unknown) {
-          super(message);
-          this.name = 'ControllerClosedError';
-          this.cause = cause;
-        }
-      }
-      throw new ControllerClosedError('Controller is closed', error);
-    }
-  }
-
-  // Send event to specific connection
-  private sendToConnection(connection: ClientConnection, event: LaceEvent): void {
-    const eventData = `id: ${event.id}\ndata: ${stringify(event)}\n\n`;
-    const chunk = this.encoder.encode(eventData);
-
-    // Trace logging for individual sends
-    //logger.debug('[EVENT_STREAM] Sending event to connection', {
-    //  connectionId: connection.id,
-    //  eventId: event.id,
-    //  eventType: event.type,
-    //  payloadSize: chunk.length,
-    //  connectedAt: connection.connectedAt,
-    //  subscription: {
-    //    projects: connection.subscription.projects?.length || 0,
-    //    sessions: connection.subscription.sessions?.length || 0,
-    //    threads: connection.subscription.threads?.length || 0,
-    //    global: connection.subscription.global,
-    //  },
-    //});
-
-    try {
-      connection.controller.enqueue(chunk);
-      connection.lastEventId = event.id;
-      connection.lastSendAt = Date.now();
-    } catch (error) {
-      // Any error during enqueue indicates a dead connection
       logger.debug(`[EVENT_STREAM] Failed to send event to connection ${connection.id}`, {
         eventId: event.id,
         error: error instanceof Error ? error.message : String(error),
-        connectionAge: Date.now() - connection.connectedAt.getTime(),
       });
 
       class ControllerClosedError extends Error {

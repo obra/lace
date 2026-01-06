@@ -132,7 +132,6 @@ const createMockAgent = (id: string, name: string): AgentInfo =>
     status: 'idle',
   });
 
-// FLAG-DAY: Create WebEvent instead of LaceEvent
 const createMockEvent = (id: string): WebEvent => ({
   id,
   type: 'USER_MESSAGE_SENT',

@@ -12,7 +12,6 @@ import {
 } from '@lace/supervisor';
 import { ensureLaceDir } from '@lace/web/lib/server/lace-imports';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
-import type { LaceEvent } from '@lace/web/types/core';
 import type {
   ProtocolEvent,
   PermissionRequestEvent,
@@ -24,113 +23,6 @@ declare global {
   var laceWebSupervisorProc: ChildProcess | undefined;
   var laceWebSupervisorEventBridge: Promise<void> | undefined;
   var laceWebSupervisorEventBridgeAbort: AbortController | undefined;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-type ToolResultContentItem =
-  | { type: 'text'; text: string }
-  | { type: 'json'; data: unknown }
-  | { type: 'image'; data: string; mediaType?: string }
-  | { type: 'error'; message: string; code?: string };
-
-function isToolResultContentItem(value: unknown): value is ToolResultContentItem {
-  if (!isRecord(value)) return false;
-
-  if (value.type === 'text') return typeof value.text === 'string';
-  if (value.type === 'json') return 'data' in value && value.data !== undefined;
-  if (value.type === 'image') return typeof value.data === 'string';
-  if (value.type === 'error') return typeof value.message === 'string';
-
-  return false;
-}
-
-function toToolResultContent(
-  content: ToolResultContentItem[]
-): Array<{ type: 'text'; text: string }> {
-  return content.map((c) => {
-    if (c.type === 'text') return { type: 'text', text: c.text };
-    if (c.type === 'json') return { type: 'text', text: JSON.stringify(c.data, null, 2) };
-    if (c.type === 'image') return { type: 'text', text: `[image:${c.mediaType ?? 'unknown'}]` };
-    return { type: 'text', text: c.message };
-  });
-}
-
-function updateToLaceEvents(params: {
-  workspaceSessionId: string;
-  projectId?: string;
-  agentSessionId?: string;
-  update: SupervisorSessionUpdate;
-}): LaceEvent[] {
-  const { workspaceSessionId, projectId, agentSessionId, update } = params;
-  const type = update.type;
-
-  const baseContext: LaceEvent['context'] = {
-    sessionId: workspaceSessionId,
-    ...(projectId ? { projectId } : {}),
-    ...(agentSessionId ? { threadId: agentSessionId } : {}),
-  };
-
-  if (type === 'text_delta' && typeof update.text === 'string') {
-    return [
-      {
-        type: 'AGENT_TOKEN',
-        timestamp: new Date(),
-        transient: true,
-        data: { token: update.text },
-        context: baseContext,
-      },
-    ];
-  }
-
-  if (type === 'tool_use') {
-    const toolCallId = typeof update.toolCallId === 'string' ? update.toolCallId : '';
-    const name = typeof update.name === 'string' ? update.name : '';
-    const input = isRecord(update.input) ? update.input : {};
-    const status = typeof update.status === 'string' ? update.status : '';
-
-    const events: LaceEvent[] = [];
-
-    if (status === 'pending' || status === 'awaiting_permission') {
-      events.push({
-        type: 'TOOL_CALL',
-        timestamp: new Date(),
-        data: { id: toolCallId, name, arguments: input },
-        context: baseContext,
-      });
-    }
-
-    if (
-      (status === 'completed' ||
-        status === 'failed' ||
-        status === 'denied' ||
-        status === 'timeout' ||
-        status === 'cancelled') &&
-      update.result &&
-      isRecord(update.result)
-    ) {
-      const result = update.result;
-      const rawContent: unknown[] = Array.isArray(result.content) ? result.content : [];
-      const content = rawContent.filter(isToolResultContentItem);
-
-      events.push({
-        type: 'TOOL_RESULT',
-        timestamp: new Date(),
-        data: {
-          id: toolCallId,
-          status: status === 'completed' ? 'completed' : status === 'denied' ? 'denied' : 'failed',
-          content: toToolResultContent(content),
-        },
-        context: baseContext,
-      });
-    }
-
-    return events;
-  }
-
-  return [];
 }
 
 /**
@@ -181,6 +73,10 @@ type SupervisorEndpoint = {
   pid: number;
   startedAt: string;
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 function endpointFilePath(laceDir: string): string {
   return `${laceDir}/supervisor/endpoint.json`;
@@ -289,48 +185,23 @@ function bridgeEventToWeb(event: SupervisorServerEvent, params: { supervisorProj
   const manager = EventStreamManager.getInstance();
 
   if (event.type === 'session_update') {
-    // Emit protocol event (new format)
     const protocolEvent = createProtocolEvent({
       workspaceSessionId: event.workspaceSessionId,
       projectId: params.supervisorProjectId,
       agentSessionId: event.update.sessionId,
       update: event.update,
     });
-    manager.broadcastAppEvent(protocolEvent);
-
-    // Also emit legacy LaceEvent for backward compatibility during migration
-    const legacyEvents = updateToLaceEvents({
-      workspaceSessionId: event.workspaceSessionId,
-      projectId: params.supervisorProjectId,
-      agentSessionId: event.update.sessionId,
-      update: event.update,
-    });
-    for (const e of legacyEvents) {
-      manager.broadcast(e);
-    }
+    manager.broadcast(protocolEvent);
     return;
   }
 
   if (event.type === 'permission_request') {
-    // Emit protocol event (new format)
     const permissionEvent = createPermissionRequestEvent({
       workspaceSessionId: event.workspaceSessionId,
       projectId: params.supervisorProjectId,
       request: event,
     });
-    manager.broadcastAppEvent(permissionEvent);
-
-    // Also emit legacy LaceEvent for backward compatibility during migration
-    manager.broadcast({
-      type: 'TOOL_APPROVAL_REQUEST',
-      timestamp: new Date(event.requestedAt),
-      data: { toolCallId: event.request.toolCallId },
-      context: {
-        sessionId: event.workspaceSessionId,
-        ...(params.supervisorProjectId ? { projectId: params.supervisorProjectId } : {}),
-        ...(event.request.sessionId ? { threadId: event.request.sessionId } : {}),
-      },
-    });
+    manager.broadcast(permissionEvent);
   }
 }
 

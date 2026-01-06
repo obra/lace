@@ -336,7 +336,7 @@ describe('useAgentEvents', () => {
     expect(result.current.events[0]).toEqual(toolUseEvent);
   });
 
-  it('should accept only AppEvent types (no LaceEvent support)', async () => {
+  it('should accept only AppEvent types', async () => {
     // This test verifies the hook only works with AppEvent union
     // (ProtocolEvent | PermissionRequestEvent | WebEvent)
     const { result } = renderHook(() => useAgentEvents(mockAgentId, true));

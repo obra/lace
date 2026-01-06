@@ -1,6 +1,5 @@
 // ABOUTME: Real-time SSE event stream monitor for debugging
 // ABOUTME: Shows live events with truncated payloads and connection status
-// FLAG-DAY: Uses AppEvent (ProtocolEvent | PermissionRequestEvent | WebEvent)
 
 'use client';
 

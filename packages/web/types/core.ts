@@ -2,16 +2,15 @@
 // ABOUTME: Single source of truth for all shared types, replaces multiple import files
 // ABOUTME: Wire protocol types from @lace/ent-protocol, runtime event types from @lace/agent
 
-// Runtime event types from agent (LaceEvent system)
+// Runtime event helper types from agent
+// ErrorType and ErrorPhase are kept as they're general-purpose error types
 export type {
-  LaceEventType,
-  LaceEvent,
   AgentMessageData,
   AgentStateChangeData,
   AgentSummaryUpdatedData,
+  AgentErrorData,
   ErrorType,
   ErrorPhase,
-  AgentErrorData,
 } from '@lace/agent/threads/types';
 
 export { isAgentSummaryUpdatedData } from '@lace/agent/threads/types';
@@ -93,13 +92,5 @@ export type { DiscoveredTool, MCPConfig } from '@lace/ent-protocol';
 
 // Compaction and persona types from ent-protocol
 export type { CompactionData, PersonaInfo } from '@lace/ent-protocol';
-
-// Re-export utility functions from agent (runtime event helpers)
-export {
-  EVENT_TYPES,
-  isTransientEventType,
-  isInternalWorkflowEvent,
-  isConversationEvent,
-} from '@lace/agent/threads/types';
 
 export { asWorkspaceSessionId, isWorkspaceSessionId };

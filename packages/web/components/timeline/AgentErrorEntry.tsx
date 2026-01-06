@@ -1,14 +1,15 @@
 // ABOUTME: Timeline entry component for AGENT_ERROR events
 // ABOUTME: Renders error messages with proper styling and context
+// FLAG-DAY: Uses ProcessedEvent - no LaceEvent
 
 'use client';
 
 import React from 'react';
-import type { LaceEvent } from '@lace/web/types/core';
+import type { ProcessedEvent } from '@lace/web/hooks/useProcessedEvents';
 import { Alert } from '@lace/web/components/ui/Alert';
 
 interface AgentErrorEntryProps {
-  event: LaceEvent;
+  event: ProcessedEvent;
 }
 
 interface AgentErrorData {
@@ -40,14 +41,16 @@ function isAgentErrorData(obj: unknown): obj is AgentErrorData {
 }
 
 export function AgentErrorEntry({ event }: AgentErrorEntryProps) {
-  if (!isAgentErrorData(event.data)) {
+  // Access data from ProcessedEvent - need to handle different event shapes
+  const eventData = 'data' in event ? event.data : undefined;
+  if (!isAgentErrorData(eventData)) {
     // Malformed AGENT_ERROR event - return safe fallback
     return (
       <Alert variant="error" title="Error" description="Malformed error event data" style="soft" />
     );
   }
 
-  const errorData = event.data;
+  const errorData = eventData;
 
   const title =
     errorData.errorType.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()) + ' Error';

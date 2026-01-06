@@ -1,11 +1,27 @@
 // ABOUTME: Hook for processing AppEvents for timeline display
 // ABOUTME: Handles filtering, token aggregation, tool call/result pairing, and protocol events
-// FLAG-DAY: Only uses AppEvent - no LaceEvent
 
 import { useMemo } from 'react';
-import type { LaceEvent, ThreadId, ToolCall, ToolResult } from '@lace/web/types/core';
+import type { ThreadId, ToolCall, ToolResult } from '@lace/web/types/core';
 import type { AppEvent, ProtocolEvent } from '@lace/web/types/app-events';
 import { isProtocolEvent, isWebEvent } from '@lace/web/types/app-events';
+
+// Internal event type for timeline processing
+// This is a simplified version that only contains what we need for UI rendering
+interface InternalTimelineEvent {
+  id: string;
+  timestamp: Date;
+  type: string;
+  data: unknown;
+  transient?: boolean;
+  visibleToModel?: boolean;
+  context?: {
+    threadId?: ThreadId;
+    projectId?: string;
+    sessionId?: string;
+    taskId?: string;
+  };
+}
 import type {
   TextDeltaUpdate,
   ToolUseUpdate,
@@ -13,7 +29,7 @@ import type {
   ThinkingUpdate,
 } from '@lace/web/types/protocol-events';
 
-interface ProcessedToolEvent extends Omit<LaceEvent, 'type' | 'data'> {
+interface ProcessedToolEvent extends Omit<InternalTimelineEvent, 'type' | 'data'> {
   type: 'TOOL_AGGREGATED';
   data: {
     call: ToolCall;
@@ -71,7 +87,7 @@ interface ProcessedProtocolThinkingEvent {
 }
 
 export type ProcessedEvent =
-  | LaceEvent
+  | InternalTimelineEvent
   | ProcessedToolEvent
   | ProcessedProtocolTextEvent
   | ProcessedProtocolToolEvent
@@ -90,7 +106,7 @@ export function getProcessedEventAgentId(event: ProcessedEvent): string | undefi
       return data.agentSessionId;
     }
   }
-  // LaceEvent and ProcessedToolEvent have context.threadId
+  // InternalTimelineEvent and ProcessedToolEvent have context.threadId
   if ('context' in event && event.context && typeof event.context === 'object') {
     const context = event.context as { threadId?: string };
     if (context.threadId) {
@@ -105,34 +121,34 @@ const MAX_STREAMING_MESSAGES = 100;
 export function useProcessedEvents(events: AppEvent[], selectedAgent?: ThreadId): ProcessedEvent[] {
   return useMemo(() => {
     // 1. Separate protocol events from web events
-    // FLAG-DAY: LaceEvent removed - now web events are converted to LaceEvent-like format internally
+    // Web events are converted to InternalTimelineEvent for processing
     const webEvents = events.filter((e) => isWebEvent(e));
     const protocolEvents = events.filter((e) => isProtocolEvent(e)) as ProtocolEvent[];
 
-    // Convert web events to LaceEvent-like format for internal processing
-    const laceEvents: LaceEvent[] = webEvents
+    // Convert web events to InternalTimelineEvent format for processing
+    const timelineEvents: InternalTimelineEvent[] = webEvents
       .map((e) => {
-        if (!isWebEvent(e)) return null as unknown as LaceEvent;
+        if (!isWebEvent(e)) return null as unknown as InternalTimelineEvent;
         return {
           id: e.id,
           timestamp: e.timestamp,
-          type: e.type as LaceEvent['type'],
+          type: e.type,
           data: e.data,
           context: { threadId: e.agentSessionId as ThreadId },
-        } as LaceEvent;
+        };
       })
       .filter(Boolean);
 
-    // 2. Process legacy LaceEvents
-    const filtered = filterEventsByAgent(laceEvents, selectedAgent);
+    // 2. Process internal timeline events
+    const filtered = filterEventsByAgent(timelineEvents, selectedAgent);
     const afterStreaming = processStreamingTokens(filtered);
-    const processedLaceEvents = processToolCallAggregation(afterStreaming);
+    const processedTimelineEvents = processToolCallAggregation(afterStreaming);
 
     // 3. Process protocol events
     const processedProtocolEvents = processProtocolEvents(protocolEvents);
 
     // 4. Merge both event streams and sort by timestamp
-    const allEvents = [...processedLaceEvents, ...processedProtocolEvents];
+    const allEvents = [...processedTimelineEvents, ...processedProtocolEvents];
     if (allEvents.length <= 1) return allEvents;
 
     return allEvents.sort((a, b) => {
@@ -143,7 +159,10 @@ export function useProcessedEvents(events: AppEvent[], selectedAgent?: ThreadId)
   }, [events, selectedAgent]);
 }
 
-function filterEventsByAgent(events: LaceEvent[], selectedAgent?: ThreadId): LaceEvent[] {
+function filterEventsByAgent(
+  events: InternalTimelineEvent[],
+  selectedAgent?: ThreadId
+): InternalTimelineEvent[] {
   if (!selectedAgent) {
     return events;
   }
@@ -159,8 +178,8 @@ function filterEventsByAgent(events: LaceEvent[], selectedAgent?: ThreadId): Lac
   });
 }
 
-function processStreamingTokens(events: LaceEvent[]): LaceEvent[] {
-  const processed: LaceEvent[] = [];
+function processStreamingTokens(events: InternalTimelineEvent[]): InternalTimelineEvent[] {
+  const processed: InternalTimelineEvent[] = [];
   const streamingMessages = new Map<string, { content: string; timestamp: Date }>();
 
   for (const event of events) {
@@ -174,13 +193,14 @@ function processStreamingTokens(events: LaceEvent[]): LaceEvent[] {
       // Accumulate tokens by threadId
       const key = event.context?.threadId || '';
       const existing = streamingMessages.get(key);
+      const tokenData = event.data as { token: string };
 
       if (existing) {
-        existing.content += event.data.token;
+        existing.content += tokenData.token;
         existing.timestamp = event.timestamp || new Date();
       } else {
         streamingMessages.set(key, {
-          content: event.data.token,
+          content: tokenData.token,
           timestamp: event.timestamp || new Date(),
         });
       }
@@ -206,7 +226,7 @@ function processStreamingTokens(events: LaceEvent[]): LaceEvent[] {
   for (const [threadId, { content, timestamp }] of streamingMessages.entries()) {
     // Use stable ID based on threadId only - content changes shouldn't create new events
     // This ensures React treats streaming updates as updates to the same element
-    const streamingEvent: LaceEvent = {
+    const streamingEvent: InternalTimelineEvent = {
       id: `streaming_${threadId}`,
       type: 'AGENT_STREAMING',
       timestamp: timestamp,
@@ -227,16 +247,20 @@ function processStreamingTokens(events: LaceEvent[]): LaceEvent[] {
   });
 }
 
-function processToolCallAggregation(events: LaceEvent[]): ProcessedEvent[] {
+function processToolCallAggregation(events: InternalTimelineEvent[]): ProcessedEvent[] {
   const processed: ProcessedEvent[] = [];
-  const pendingToolCalls = new Map<string, { call: LaceEvent; result?: LaceEvent }>();
+  const pendingToolCalls = new Map<
+    string,
+    { call: InternalTimelineEvent; result?: InternalTimelineEvent }
+  >();
   let toolCallCounter = 0;
 
   for (const event of events) {
     if (event.type === 'TOOL_CALL') {
       // Extract tool call ID from the event data
+      const toolData = event.data as ToolCall;
       const toolCallId =
-        event.data.id || `${event.context?.threadId}-${event.timestamp}-${toolCallCounter++}`;
+        toolData.id || `${event.context?.threadId}-${event.timestamp}-${toolCallCounter++}`;
       pendingToolCalls.set(toolCallId, { call: event });
     } else if (event.type === 'TOOL_RESULT') {
       // Find matching tool call by ID - ToolResult has an id field
@@ -275,14 +299,15 @@ function processToolCallAggregation(events: LaceEvent[]): ProcessedEvent[] {
   for (const { call, result } of pendingToolCalls.values()) {
     if (call.type !== 'TOOL_CALL') continue;
 
-    const callData = call.data;
+    const callData = call.data as ToolCall;
+    const resultData = result?.type === 'TOOL_RESULT' ? (result.data as ToolResult) : undefined;
     const aggregatedEvent: ProcessedToolEvent = {
       id: call.id,
       timestamp: call.timestamp,
       type: 'TOOL_AGGREGATED',
       data: {
         call: callData,
-        result: result?.type === 'TOOL_RESULT' ? result.data : undefined,
+        result: resultData,
         toolName: callData.name || 'unknown',
         toolId: callData.id,
         arguments: callData.arguments,

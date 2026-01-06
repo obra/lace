@@ -134,21 +134,21 @@ describe('Type Integrity - Current State', () => {
     });
   });
 
-  describe('Event type imports', () => {
-    it('should import EVENT_TYPES from core', async () => {
-      const { EVENT_TYPES } = await import('@lace/web/types/core');
+  describe('AppEvent type imports', () => {
+    it('should import AppEvent type guards', async () => {
+      const { isProtocolEvent, isWebEvent, isPermissionRequestEvent } = await import(
+        '@lace/web/types/app-events'
+      );
 
-      expect(EVENT_TYPES).toContain('USER_MESSAGE');
-      expect(EVENT_TYPES).toContain('AGENT_MESSAGE');
-      expect(EVENT_TYPES).toContain('TOOL_CALL');
-      expect(EVENT_TYPES).toContain('TOOL_RESULT');
+      expect(typeof isProtocolEvent).toBe('function');
+      expect(typeof isWebEvent).toBe('function');
+      expect(typeof isPermissionRequestEvent).toBe('function');
     });
 
-    it('should import LaceEventType from core', async () => {
+    it('should import ThreadId utilities from core', async () => {
       const coreModule = await import('@lace/web/types/core');
-      // LaceEventType is a type, not a value, so we just check the module exists
-      expect(coreModule).toBeDefined();
-      expect(coreModule.EVENT_TYPES).toBeDefined(); // This is a value export
+      expect(coreModule.isThreadId).toBeDefined();
+      expect(coreModule.asThreadId).toBeDefined();
     });
   });
 

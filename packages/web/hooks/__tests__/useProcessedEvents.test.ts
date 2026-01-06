@@ -1,5 +1,4 @@
 // ABOUTME: Tests for useProcessedEvents hook with AppEvent support
-// ABOUTME: FLAG-DAY: Only AppEvent (ProtocolEvent | WebEvent), no LaceEvent
 
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
@@ -13,7 +12,7 @@ describe('useProcessedEvents', () => {
   const mockAgentSessionId = 'agent_123' as SessionId;
 
   describe('WebEvent handling', () => {
-    it('should convert USER_MESSAGE_SENT events to LaceEvent-like format', () => {
+    it('should convert USER_MESSAGE_SENT events to InternalTimelineEvent format', () => {
       const events: AppEvent[] = [
         {
           id: 'evt_1',

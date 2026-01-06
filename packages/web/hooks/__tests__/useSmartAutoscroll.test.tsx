@@ -5,7 +5,6 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { useSmartAutoscroll, useTimelineAutoscroll } from '@lace/web/hooks/useSmartAutoscroll';
 import { ScrollProvider } from '@lace/web/components/providers/ScrollProvider';
-import type { LaceEvent } from '@lace/web/types/core';
 import React from 'react';
 
 // Mock scroll behavior
@@ -114,17 +113,18 @@ describe('useTimelineAutoscroll', () => {
   });
 
   it('should handle streaming content updates', async () => {
-    const mockEvents: LaceEvent[] = [
+    // Use plain objects since hook takes unknown[]
+    const mockEvents = [
       {
-        type: 'USER_MESSAGE',
-        data: 'Hello',
+        id: 'evt_1',
+        type: 'USER_MESSAGE_SENT',
+        data: { content: 'Hello' },
         timestamp: new Date(),
-        context: { threadId: 'test-thread' },
       },
     ];
 
     const { result, rerender } = renderHook(
-      ({ events }: { events: LaceEvent[] }) =>
+      ({ events }: { events: unknown[] }) =>
         useTimelineAutoscroll(events, false, undefined, { scrollDelay: 0 }),
       {
         wrapper,
@@ -139,13 +139,13 @@ describe('useTimelineAutoscroll', () => {
     });
 
     // Start streaming by adding AGENT_STREAMING event
-    const eventsWithStreaming: LaceEvent[] = [
+    const eventsWithStreaming = [
       ...mockEvents,
       {
+        id: 'evt_2',
         type: 'AGENT_STREAMING',
         data: { content: 'Streaming...' },
         timestamp: new Date(),
-        context: { threadId: 'test-thread' },
       },
     ];
     act(() => {

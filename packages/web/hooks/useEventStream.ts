@@ -1,5 +1,5 @@
 // ABOUTME: Event stream hook using SSE store singleton
-// ABOUTME: Uses AppEvent (ProtocolEvent | PermissionRequestEvent | WebEvent) - FLAG-DAY: no LaceEvent
+// ABOUTME: Uses AppEvent (ProtocolEvent | PermissionRequestEvent | WebEvent)
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useSSEStore } from '@lace/web/lib/sse-store';
@@ -45,7 +45,7 @@ interface ProjectEvent {
   timestamp: Date;
 }
 
-// FLAG-DAY: Updated to match WebEvent AgentSpawnedEvent.data shape
+// Matches WebEvent AgentSpawnedEvent.data shape
 export interface AgentEvent {
   agentSessionId: string;
   parentSessionId?: string;
@@ -64,7 +64,7 @@ interface GlobalEvent {
 }
 
 interface EventHandlers {
-  // Session events - FLAG-DAY: all handlers now use AppEvent
+  // Session events
   onSessionEvent?: (event: AppEvent) => void;
   onUserMessage?: (event: AppEvent) => void;
   onAgentMessage?: (event: AppEvent) => void;
@@ -93,7 +93,7 @@ interface EventHandlers {
   onAgentStarted?: (event: AgentEvent) => void;
   onAgentStopped?: (event: AgentEvent) => void;
 
-  // Compaction events - FLAG-DAY: now AppEvent (ProtocolEvent with compaction_start/complete)
+  // Compaction events (ProtocolEvent with compaction_start/complete)
   onCompactionStart?: (event: AppEvent) => void;
   onCompactionComplete?: (event: AppEvent) => void;
   onEventUpdated?: (event: AppEvent) => void;
@@ -311,7 +311,6 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
       }
     };
 
-    // FLAG-DAY: Subscribe with single AppEvent callback
     subscriptionIdRef.current = store.subscribe(filter, (event: AppEvent) => {
       const currentOptions = optionsRef.current;
       try {
@@ -407,7 +406,6 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
               break;
             case 'AGENT_SPAWNED':
               {
-                // FLAG-DAY: WebEvent data shape matches new AgentEvent interface
                 const data = event.data as {
                   agentSessionId: string;
                   parentSessionId?: string;

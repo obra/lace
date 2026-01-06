@@ -1,6 +1,5 @@
 // ABOUTME: Hook for agent token usage tracking without polling
 // ABOUTME: Loads token data from agent API + real-time updates from SSE events
-// FLAG-DAY: Uses AppEvent (ProtocolEvent with usage/context_window types)
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSessionEvents } from '@lace/web/components/providers/EventStreamProvider';

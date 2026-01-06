@@ -1,5 +1,5 @@
 // ABOUTME: Timeline view component that renders ProcessedEvents
-// ABOUTME: Works with unified AppEvent system (FLAG-DAY: no LaceEvent)
+// ABOUTME: Works with unified AppEvent system
 
 'use client';
 

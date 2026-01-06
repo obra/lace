@@ -1,5 +1,4 @@
 // ABOUTME: Tests for useEventStream hook with AppEvent support
-// ABOUTME: FLAG-DAY: Only AppEvent (ProtocolEvent | WebEvent), no LaceEvent
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
@@ -46,7 +45,6 @@ describe('useEventStream', () => {
 
   /**
    * Helper to get the AppEvent callback (single callback passed to subscribe)
-   * FLAG-DAY: Only one callback now - no separate LaceEvent callback
    */
   function getAppEventCallback(): (event: AppEvent) => void {
     return mockSubscribe.mock.calls[0][1];

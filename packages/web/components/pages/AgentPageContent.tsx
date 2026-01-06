@@ -188,7 +188,6 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
     }
 
     // Look for the most recent AGENT_SUMMARY_UPDATED event for this agent
-    // FLAG-DAY: Only WebEvent format - no LaceEvent fallback
     let foundSummary = false;
     for (let i = agentEvents.events.length - 1; i >= 0; i--) {
       const event = agentEvents.events[i];

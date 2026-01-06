@@ -1,5 +1,5 @@
 // ABOUTME: Event stream types for real-time notifications
-// ABOUTME: Supports both legacy LaceEvent and new AppEvent types during migration
+// ABOUTME: Uses AppEvent (ProtocolEvent | PermissionRequestEvent | WebEvent)
 
 import type { AppEvent } from '@lace/web/types/app-events';
 import type { ProtocolEvent, PermissionRequestEvent } from '@lace/web/types/protocol-events';

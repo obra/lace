@@ -1,6 +1,5 @@
 // ABOUTME: Zustand store for managing single SSE connection across entire app
 // ABOUTME: Replaces EventStreamFirehose singleton with proper React state management
-// FLAG-DAY: Only uses AppEvent (ProtocolEvent | PermissionRequestEvent | WebEvent)
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
@@ -48,7 +47,7 @@ interface SSEState {
 }
 
 interface SSEActions {
-  // Subscription management - FLAG-DAY: only AppEvent callback
+  // Subscription management
   subscribe: (filter: EventFilter, callback: (event: AppEvent) => void) => string;
   unsubscribe: (subscriptionId: string) => void;
 
@@ -148,7 +147,7 @@ const sseStore = create<SSEState & SSEActions>()(
       reconnectAttempts: 0,
       disconnectTimeout: null,
 
-      // Subscribe to filtered events - FLAG-DAY: only AppEvent callback
+      // Subscribe to filtered events
       subscribe: (filter, callback) => {
         const subscriptionId = generateSubscriptionId();
         const subscription: EventSubscription = {
@@ -244,7 +243,6 @@ const sseStore = create<SSEState & SSEActions>()(
 
         eventSource.onmessage = (event) => {
           try {
-            // FLAG-DAY: All events are now AppEvent
             const appEvent = parseTyped<AppEvent>(event.data as string);
 
             // Route to subscribers directly - no caching
