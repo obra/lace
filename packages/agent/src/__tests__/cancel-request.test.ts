@@ -1,12 +1,13 @@
+// ABOUTME: Tests for $/cancel_request notification - verifies ACP-compliant cancellation
+// ABOUTME: Ensures session/cancel is removed and -32800 error code is defined
+
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { PassThrough } from 'node:stream';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  AcpErrorCodes,
   createNdjsonStdioTransport,
-  EntErrorCodes,
   JsonRpcPeer,
   JSONRPC_ERROR_CANCELLED,
 } from '@lace/ent-protocol';

@@ -1,3 +1,6 @@
+// ABOUTME: Tests for session/fork protocol method - verifies schema validation
+// ABOUTME: for session forking per ACP RFD specification
+
 import { describe, expect, it } from 'vitest';
 import {
   SessionForkRequestSchema,
