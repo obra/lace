@@ -201,14 +201,6 @@ export function EventStreamProvider({
     [addAgentEvent]
   );
 
-  // Agent message handler
-  const stableAddAgentEventMessage = useCallback(
-    (event: AppEvent) => {
-      addAgentEvent(event);
-    },
-    [addAgentEvent]
-  );
-
   // Memoize threadIds to prevent unnecessary re-subscriptions
   const threadIds = useMemo(() => {
     return agentId ? [agentId] : undefined;
@@ -217,6 +209,9 @@ export function EventStreamProvider({
   // Create a single stable event handler to ensure consistent references
   const stableAddAgentEvent = useCallback(
     (event: AppEvent) => {
+      if ('type' in event && event.type === 'TOOL_APPROVAL_RESPONSE') {
+        return;
+      }
       addAgentEvent(event);
     },
     [addAgentEvent]
@@ -235,14 +230,8 @@ export function EventStreamProvider({
         console.error('Event stream error:', error);
       },
       onAgentError: handleAgentError,
-      // Agent event handlers - use single stable handler to prevent stale closures
-      onUserMessage: stableAddAgentEventMessage,
-      onAgentMessage: stableAddAgentEventMessage,
+      onAppEvent: stableAddAgentEvent,
       onAgentToken: handleAgentToken,
-      onToolCall: stableAddAgentEvent,
-      onToolResult: stableAddAgentEvent,
-      // Session events (includes protocol and web events)
-      onSessionEvent: stableAddAgentEvent, // Handles all session-level events
       // Agent state changes
       onAgentStateChange: handleAgentStateChangeCallback,
       // Tool approval requests
@@ -261,7 +250,6 @@ export function EventStreamProvider({
     sessionId,
     threadIds,
     stableAddAgentEvent,
-    stableAddAgentEventMessage,
     handleAgentToken,
     handleAgentStateChangeCallback,
     handleApprovalRequest,

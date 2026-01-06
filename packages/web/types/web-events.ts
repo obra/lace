@@ -119,7 +119,6 @@ export type WebEventType =
   | 'PROJECT_UPDATED'
   | 'PROJECT_DELETED'
   | 'SESSION_CREATED'
-  | 'SESSION_UPDATED'
   | 'SESSION_DELETED'
   | 'SESSION_INFO'
   | 'TASK_CREATED'
@@ -219,14 +218,6 @@ export interface SessionCreatedEvent extends WebEventBase {
   };
 }
 
-export interface SessionUpdatedEvent extends WebEventBase {
-  type: 'SESSION_UPDATED';
-  data: {
-    sessionId: string;
-    changes: Record<string, unknown>;
-  };
-}
-
 export interface SessionDeletedEvent extends WebEventBase {
   type: 'SESSION_DELETED';
   data: {
@@ -316,7 +307,6 @@ export type WebEvent =
   | ProjectUpdatedEvent
   | ProjectDeletedEvent
   | SessionCreatedEvent
-  | SessionUpdatedEvent
   | SessionDeletedEvent
   | SessionInfoEvent
   | TaskCreatedEvent

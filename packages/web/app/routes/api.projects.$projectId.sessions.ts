@@ -169,7 +169,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 /**
- * Spawn background helper to generate session name and emit SESSION_UPDATED event
+ * Spawn background helper to generate session name and emit SESSION_INFO event
  */
 async function spawnSessionNamingHelper(
   workspaceSessionId: string,

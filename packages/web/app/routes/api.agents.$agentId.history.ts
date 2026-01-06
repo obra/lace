@@ -30,8 +30,14 @@ function toTextContent(value: unknown): string {
     .join('');
 }
 
-function durableEventsToAppEvents(agentSessionId: SessionId, events: DurableEvent[]): AppEvent[] {
+function durableEventsToAppEvents(params: {
+  agentSessionId: SessionId;
+  workspaceSessionId: string;
+  projectId?: string;
+  events: DurableEvent[];
+}): AppEvent[] {
   const out: AppEvent[] = [];
+  const { agentSessionId, workspaceSessionId, projectId, events } = params;
 
   for (const e of events) {
     const timestamp = new Date(e.timestamp);
@@ -45,7 +51,8 @@ function durableEventsToAppEvents(agentSessionId: SessionId, events: DurableEven
           timestamp,
           data: content,
           agentSessionId,
-          workspaceSessionId: 'unknown',
+          workspaceSessionId,
+          ...(typeof projectId === 'string' ? { projectId } : {}),
         } as AppEvent);
       }
       continue;
@@ -59,7 +66,8 @@ function durableEventsToAppEvents(agentSessionId: SessionId, events: DurableEven
         timestamp,
         data: { content, agentSessionId },
         agentSessionId,
-        workspaceSessionId: 'unknown',
+        workspaceSessionId,
+        ...(typeof projectId === 'string' ? { projectId } : {}),
       } as AppEvent);
       continue;
     }
@@ -73,7 +81,8 @@ function durableEventsToAppEvents(agentSessionId: SessionId, events: DurableEven
           timestamp,
           data: { content, agentSessionId },
           agentSessionId,
-          workspaceSessionId: 'unknown',
+          workspaceSessionId,
+          ...(typeof projectId === 'string' ? { projectId } : {}),
         } as AppEvent);
       }
       continue;
@@ -129,7 +138,8 @@ function durableEventsToAppEvents(agentSessionId: SessionId, events: DurableEven
         id: `ent_${e.eventSeq}_tool`,
         timestamp,
         update: toolUseUpdate,
-        workspaceSessionId: 'unknown',
+        workspaceSessionId,
+        ...(typeof projectId === 'string' ? { projectId } : {}),
         agentSessionId,
       };
 
@@ -167,10 +177,12 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       },
     })) as { events: DurableEvent[] };
 
-    const events = durableEventsToAppEvents(
-      asAgentSessionId(agentId),
-      Array.isArray(result.events) ? result.events : []
-    );
+    const events = durableEventsToAppEvents({
+      agentSessionId: asAgentSessionId(agentId),
+      workspaceSessionId: workspace.workspaceSessionId,
+      ...(typeof workspace.projectId === 'string' ? { projectId: workspace.projectId } : {}),
+      events: Array.isArray(result.events) ? result.events : [],
+    });
 
     return createSuperjsonResponse(events, { status: 200 });
   } catch (error: unknown) {

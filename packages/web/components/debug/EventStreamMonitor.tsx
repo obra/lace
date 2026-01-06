@@ -60,7 +60,7 @@ export function EventStreamMonitor({ maxEvents = 1000 }: EventStreamMonitorProps
 
   // Use shared EventStream instead of direct EventSource
   useEventStream({
-    onSessionEvent: (event) => {
+    onAppEvent: (event) => {
       // Check pause state via ref (no dependency on isPaused state)
       if (pauseRef.current) return;
 
