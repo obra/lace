@@ -13,6 +13,11 @@ import {
 import { ensureLaceDir } from '@lace/web/lib/server/lace-imports';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import type { LaceEvent } from '@lace/web/types/core';
+import type {
+  ProtocolEvent,
+  PermissionRequestEvent,
+  SessionUpdate,
+} from '@lace/web/types/protocol-events';
 
 declare global {
   var laceWebSupervisorClient: SupervisorClient | undefined;
@@ -128,6 +133,47 @@ function updateToLaceEvents(params: {
   return [];
 }
 
+/**
+ * Create a ProtocolEvent wrapper from a supervisor session update.
+ * This preserves the raw protocol update data without translation.
+ */
+function createProtocolEvent(params: {
+  workspaceSessionId: string;
+  projectId?: string;
+  agentSessionId: string;
+  update: SupervisorSessionUpdate;
+}): ProtocolEvent {
+  const { workspaceSessionId, projectId, agentSessionId, update } = params;
+
+  return {
+    id: `evt_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    timestamp: new Date(),
+    update: update as SessionUpdate, // SupervisorSessionUpdate matches SessionUpdate shape
+    workspaceSessionId,
+    projectId,
+    agentSessionId,
+  };
+}
+
+/**
+ * Create a PermissionRequestEvent wrapper from a supervisor permission request.
+ */
+function createPermissionRequestEvent(params: {
+  workspaceSessionId: string;
+  projectId?: string;
+  request: SupervisorServerEvent & { type: 'permission_request' };
+}): PermissionRequestEvent {
+  const { workspaceSessionId, projectId, request } = params;
+
+  return {
+    id: `evt_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    timestamp: new Date(),
+    request: request.request,
+    workspaceSessionId,
+    projectId,
+  };
+}
+
 type SupervisorEndpoint = {
   baseUrl: string;
   host: string;
@@ -240,22 +286,41 @@ async function ensureSupervisorServer(laceDir: string): Promise<SupervisorEndpoi
 }
 
 function bridgeEventToWeb(event: SupervisorServerEvent, params: { supervisorProjectId?: string }) {
+  const manager = EventStreamManager.getInstance();
+
   if (event.type === 'session_update') {
-    const events = updateToLaceEvents({
+    // Emit protocol event (new format)
+    const protocolEvent = createProtocolEvent({
       workspaceSessionId: event.workspaceSessionId,
       projectId: params.supervisorProjectId,
       agentSessionId: event.update.sessionId,
       update: event.update,
     });
+    manager.broadcastAppEvent(protocolEvent);
 
-    if (events.length === 0) return;
-    const manager = EventStreamManager.getInstance();
-    for (const e of events) manager.broadcast(e);
+    // Also emit legacy LaceEvent for backward compatibility during migration
+    const legacyEvents = updateToLaceEvents({
+      workspaceSessionId: event.workspaceSessionId,
+      projectId: params.supervisorProjectId,
+      agentSessionId: event.update.sessionId,
+      update: event.update,
+    });
+    for (const e of legacyEvents) {
+      manager.broadcast(e);
+    }
     return;
   }
 
   if (event.type === 'permission_request') {
-    const manager = EventStreamManager.getInstance();
+    // Emit protocol event (new format)
+    const permissionEvent = createPermissionRequestEvent({
+      workspaceSessionId: event.workspaceSessionId,
+      projectId: params.supervisorProjectId,
+      request: event,
+    });
+    manager.broadcastAppEvent(permissionEvent);
+
+    // Also emit legacy LaceEvent for backward compatibility during migration
     manager.broadcast({
       type: 'TOOL_APPROVAL_REQUEST',
       timestamp: new Date(event.requestedAt),

@@ -3,6 +3,7 @@
 
 // StreamEvent removed - using LaceEvent directly
 import type { LaceEvent, ErrorType, ErrorPhase } from '@lace/web/types/core';
+import type { AppEvent } from '@lace/web/types/app-events';
 import { randomUUID } from 'crypto';
 import { logger } from '@lace/agent/utils/logger';
 import { stringify } from '@lace/web/lib/serialization';
@@ -232,6 +233,20 @@ export class EventStreamManager {
     for (const connectionId of deadConnections) {
       this.removeConnection(connectionId);
     }
+  }
+
+  // Broadcast AppEvent (protocol events) to all matching connections
+  // TODO: This is a stub implementation for Phase 2 of protocol events migration.
+  // Task 3.1 will implement full AppEvent handling with proper filtering.
+  // For now, we just log and drop protocol events since no consumers exist yet.
+  broadcastAppEvent(event: AppEvent): void {
+    // Protocol events will be consumed in Phase 3+ of the migration
+    // For now, we silently drop them since no UI components consume protocol events yet
+    logger.debug('[EVENT_STREAM] Protocol event received (not yet consumed by UI)', {
+      eventId: event.id,
+      timestamp: event.timestamp,
+      workspaceSessionId: event.workspaceSessionId,
+    });
   }
 
   // Check if event should be sent to connection based on subscription
