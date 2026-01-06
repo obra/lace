@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { action as POST } from '@lace/web/app/routes/api.threads.$threadId.approvals.$toolCallId';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import { testSessionId, testWorkspaceSessionId } from '@lace/web/test-utils/test-ids';
 
 vi.mock('server-only', () => ({}));
 
@@ -36,12 +37,13 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   });
 
   it('should resolve an approval (allow_once -> allow)', async () => {
-    const threadId = 'agent_1';
+    const threadId = testSessionId(1);
     const toolCallId = 'call_123';
+    const wsId = testWorkspaceSessionId(1);
 
     mockGetSupervisor.mockReturnValue({
       listWorkspaceSessions: () => [
-        { workspaceSessionId: 'ws_1', agents: [{ sessionId: threadId }] },
+        { workspaceSessionId: wsId, agents: [{ sessionId: threadId }] },
       ],
     });
 
@@ -68,19 +70,20 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const response = await POST(createActionArgs(request, { threadId, toolCallId }));
     expect(response.status).toBe(200);
     expect(mockResolvePendingPermission).toHaveBeenCalledWith({
-      workspaceSessionId: 'ws_1',
+      workspaceSessionId: wsId,
       toolCallId,
       decision: 'allow',
     });
   });
 
   it('should resolve an approval (deny -> deny)', async () => {
-    const threadId = 'agent_1';
+    const threadId = testSessionId(1);
     const toolCallId = 'call_123';
+    const wsId = testWorkspaceSessionId(1);
 
     mockGetSupervisor.mockReturnValue({
       listWorkspaceSessions: () => [
-        { workspaceSessionId: 'ws_1', agents: [{ sessionId: threadId }] },
+        { workspaceSessionId: wsId, agents: [{ sessionId: threadId }] },
       ],
     });
 
@@ -107,14 +110,14 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const response = await POST(createActionArgs(request, { threadId, toolCallId }));
     expect(response.status).toBe(200);
     expect(mockResolvePendingPermission).toHaveBeenCalledWith({
-      workspaceSessionId: 'ws_1',
+      workspaceSessionId: wsId,
       toolCallId,
       decision: 'deny',
     });
   });
 
   it('should return 404 if agent session not found', async () => {
-    const threadId = 'agent_1';
+    const threadId = testSessionId(1);
     const toolCallId = 'call_123';
 
     mockGetSupervisor.mockReturnValue({
@@ -137,12 +140,13 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   });
 
   it('should return 404 if tool call not found', async () => {
-    const threadId = 'agent_1';
+    const threadId = testSessionId(1);
     const toolCallId = 'call_123';
+    const wsId = testWorkspaceSessionId(1);
 
     mockGetSupervisor.mockReturnValue({
       listWorkspaceSessions: () => [
-        { workspaceSessionId: 'ws_1', agents: [{ sessionId: threadId }] },
+        { workspaceSessionId: wsId, agents: [{ sessionId: threadId }] },
       ],
     });
 
@@ -162,7 +166,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   });
 
   it('should return error for invalid JSON', async () => {
-    const threadId = 'agent_1';
+    const threadId = testSessionId(1);
     const toolCallId = 'call_123';
 
     const request = new Request(
@@ -179,7 +183,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   });
 
   it('should return error for missing decision', async () => {
-    const threadId = 'agent_1';
+    const threadId = testSessionId(1);
     const toolCallId = 'call_123';
 
     const request = new Request(

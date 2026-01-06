@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import type { SessionInfo, AgentInfo } from '@lace/web/types/core';
 import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
+import { testSessionId } from '@lace/web/test-utils/test-ids';
 
 // Test that all key types can be imported from current paths
 describe('Type Integrity - Current State', () => {
@@ -13,7 +14,7 @@ describe('Type Integrity - Current State', () => {
       expect(coreTypes.asThreadId).toBeDefined(); // asThreadId is a function, not ThreadId type
 
       // But we can test that the type exists by using it
-      const testId = 'lace_20250731_abc123';
+      const testId = testSessionId(1);
       const threadIdTyped: string = testId; // ThreadId is just a string type
       expect(threadIdTyped).toBe(testId);
     });
@@ -21,7 +22,7 @@ describe('Type Integrity - Current State', () => {
     it('should import ThreadId from @/types/core', async () => {
       const { asThreadId, isThreadId } = await import('@lace/web/types/core');
 
-      const testId = 'lace_20250731_abc123';
+      const testId = testSessionId(1);
       expect(isThreadId(testId)).toBe(true);
 
       const threadId = asThreadId(testId);
@@ -31,7 +32,7 @@ describe('Type Integrity - Current State', () => {
     it('should import ThreadId from @/lib/validation/schemas', async () => {
       const { ThreadIdSchema } = await import('@lace/web/lib/validation/schemas');
 
-      const testId = 'lace_20250731_abc123';
+      const testId = testSessionId(1);
       const result = ThreadIdSchema.safeParse(testId);
       expect(result.success).toBe(true);
     });
@@ -65,15 +66,15 @@ describe('Type Integrity - Current State', () => {
     it('should validate ThreadId correctly', async () => {
       const { isValidThreadId } = await import('@lace/web/lib/validation/thread-id-validation');
 
-      // Valid formats
+      // Valid formats - only sess_<uuid> now
       expect(isValidThreadId('sess_123e4567-e89b-12d3-a456-426614174000')).toBe(true);
-      expect(isValidThreadId('550e8400-e29b-41d4-a716-446655440000')).toBe(true);
 
       // Invalid formats
       expect(isValidThreadId('')).toBe(false);
       expect(isValidThreadId('a..b')).toBe(false);
       expect(isValidThreadId('abc.')).toBe(false);
       expect(isValidThreadId('has space')).toBe(false);
+      expect(isValidThreadId('550e8400-e29b-41d4-a716-446655440000')).toBe(false); // bare UUID no longer valid
     });
 
     it('should create SessionInfo types correctly', async () => {
@@ -114,7 +115,7 @@ describe('Type Integrity - Current State', () => {
       const { asThreadId: asThreadIdCore } = await import('@lace/web/types/core');
       const { asValidThreadId } = await import('@lace/web/lib/validation/thread-id-validation');
 
-      const testId = 'lace_20250731_abc123';
+      const testId = testSessionId(1);
       const coreThreadId = asThreadIdCore(testId);
       const validatedThreadId = asValidThreadId(testId);
 

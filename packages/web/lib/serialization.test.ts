@@ -4,13 +4,14 @@
 import { describe, it, expect } from 'vitest';
 import { serialize, deserialize } from './serialization';
 import type { ThreadId } from '@lace/web/types/core';
+import { testSessionId } from '@lace/web/test-utils/test-ids';
 
 // Define NewAgentSpec locally for testing (it's defined in serialization.ts)
 type NewAgentSpec = string & { readonly __brand: 'NewAgentSpec' };
 
 describe('Serialization', () => {
   it('should preserve ThreadId branded types', () => {
-    const threadId = 'lace_20250801_abc123' as ThreadId;
+    const threadId = testSessionId(1) as ThreadId;
     const serialized = serialize(threadId);
     const deserialized = deserialize<ThreadId>(serialized);
 
@@ -38,7 +39,7 @@ describe('Serialization', () => {
 
   it('should handle complex objects with multiple branded types', () => {
     const complexObject = {
-      sessionId: 'lace_20250801_abc123' as ThreadId,
+      sessionId: testSessionId(1) as ThreadId,
       assignedTo: 'agent-claude-3-5' as NewAgentSpec,
       createdAt: new Date('2025-08-01T12:00:00Z'),
       metadata: { key: 'value' },

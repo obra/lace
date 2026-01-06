@@ -119,7 +119,6 @@ interface ProviderInstanceContextValue {
 
 // Store context in global to survive Vite HMR reloads
 declare global {
-  // eslint-disable-next-line no-var -- var required for globalThis augmentation
   var __laceProviderInstanceContext: React.Context<ProviderInstanceContextValue | null> | undefined;
 }
 

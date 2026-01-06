@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loader as GET } from '@lace/web/app/routes/api.threads.$threadId.approvals.pending';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createLoaderArgs } from '@lace/web/test-utils/route-test-helpers';
+import { testSessionId, testWorkspaceSessionId } from '@lace/web/test-utils/test-ids';
 
 vi.mock('server-only', () => ({}));
 
@@ -33,11 +34,16 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
   });
 
   it('should return pending approvals for the requested agent session', async () => {
-    const threadId = 'agent_1';
+    const threadId = testSessionId(1);
+    const otherAgentId = testSessionId(2);
+    const wsId = testWorkspaceSessionId(1);
 
     mockGetSupervisor.mockReturnValue({
       listWorkspaceSessions: () => [
-        { workspaceSessionId: 'ws_1', agents: [{ sessionId: threadId }, { sessionId: 'agent_2' }] },
+        {
+          workspaceSessionId: wsId,
+          agents: [{ sessionId: threadId }, { sessionId: otherAgentId }],
+        },
       ],
     });
 
@@ -51,7 +57,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
       },
       {
         toolCallId: 'call_b',
-        agentSessionId: 'agent_2',
+        agentSessionId: otherAgentId,
         toolCall: { name: 'file_write', arguments: { path: 'b.txt' } },
         request: { tool: 'file_write' },
         requestedAt: '2025-01-24T12:01:00.000Z',
@@ -68,11 +74,12 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
   });
 
   it('should return empty array when no pending approvals exist for the agent', async () => {
-    const threadId = 'agent_1';
+    const threadId = testSessionId(1);
+    const wsId = testWorkspaceSessionId(1);
 
     mockGetSupervisor.mockReturnValue({
       listWorkspaceSessions: () => [
-        { workspaceSessionId: 'ws_1', agents: [{ sessionId: threadId }] },
+        { workspaceSessionId: wsId, agents: [{ sessionId: threadId }] },
       ],
     });
 
@@ -87,7 +94,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
   });
 
   it('should return 404 if agent session is not found in any workspace session', async () => {
-    const threadId = 'agent_1';
+    const threadId = testSessionId(1);
 
     mockGetSupervisor.mockReturnValue({
       listWorkspaceSessions: () => [],
@@ -109,11 +116,12 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
   });
 
   it('should return 500 when pending approval query fails', async () => {
-    const threadId = 'agent_1';
+    const threadId = testSessionId(1);
+    const wsId = testWorkspaceSessionId(1);
 
     mockGetSupervisor.mockReturnValue({
       listWorkspaceSessions: () => [
-        { workspaceSessionId: 'ws_1', agents: [{ sessionId: threadId }] },
+        { workspaceSessionId: wsId, agents: [{ sessionId: threadId }] },
       ],
     });
 

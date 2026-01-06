@@ -5,12 +5,13 @@ import { describe, it, expect } from 'vitest';
 import type { AgentWithTokenUsage } from './api';
 import { asThreadId } from '@lace/web/types/core';
 import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
+import { testSessionId } from '@lace/web/test-utils/test-ids';
 
 describe('API Type Definitions', () => {
   it('should include tokenUsage in AgentWithTokenUsage', () => {
     const agent: AgentWithTokenUsage = {
       ...createMockAgentInfo({
-        threadId: asThreadId('lace_20241122_abc123.1'),
+        threadId: asThreadId(testSessionId(1)),
         name: 'Test Agent',
         providerInstanceId: 'test-provider',
         modelId: 'claude-3-sonnet',

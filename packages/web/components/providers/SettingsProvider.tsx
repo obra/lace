@@ -61,7 +61,6 @@ interface SettingsContextType {
 // Without this, hot-reloading creates a new context object while child components
 // still reference the old one, causing "must be used within Provider" errors
 declare global {
-  // eslint-disable-next-line no-var -- var required for globalThis augmentation
   var __laceSettingsContext: React.Context<SettingsContextType | null> | undefined;
 }
 

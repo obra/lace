@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import type { LaceEvent } from '@lace/web/types/core';
 import { EVENT_TYPES, isTransientEventType, asThreadId } from '@lace/web/types/core';
+import { testSessionId } from '@lace/web/test-utils/test-ids';
 
 describe('Event Types', () => {
   it('should export core EVENT_TYPES', () => {
@@ -30,7 +31,7 @@ describe('Event Types', () => {
       type: 'USER_MESSAGE',
       timestamp: new Date(),
       data: 'Hello', // USER_MESSAGE data is a string
-      context: { threadId: asThreadId('lace_20250731_test01') },
+      context: { threadId: asThreadId(testSessionId(1)) },
     };
 
     expect(event.type).toBe('USER_MESSAGE');

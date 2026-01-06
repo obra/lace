@@ -7,10 +7,15 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, act } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { AgentPageContent } from '@lace/web/components/pages/AgentPageContent';
 import { asThreadId } from '@lace/web/types/core';
+import { testSessionId, testWorkspaceSessionId } from '@lace/web/test-utils/test-ids';
+
+// Valid test IDs
+const SESSION_ID = testWorkspaceSessionId(1);
+const AGENT_ID = testSessionId(1);
 
 // Mock the providers
 vi.mock('@lace/web/components/providers/UIProvider', () => ({
@@ -35,8 +40,8 @@ vi.mock('@lace/web/components/providers/ProjectsProvider', () => ({
 vi.mock('@lace/web/components/providers/ProjectProvider', () => ({
   useProjectContext: () => ({
     currentSession: {
-      id: 'lace_20250101_sess01',
-      threadId: asThreadId('lace_20250101_sess01'),
+      id: SESSION_ID,
+      threadId: asThreadId(AGENT_ID),
       name: 'Test Session',
     },
     sessions: [],
@@ -63,7 +68,7 @@ vi.mock('@lace/web/components/providers/EventStreamProvider', () => ({
 vi.mock('@lace/web/components/providers/SessionProvider', () => ({
   useSessionContext: () => ({
     currentAgent: {
-      id: asThreadId('lace_20250101_agent1'),
+      id: asThreadId(AGENT_ID),
       name: 'Test Agent',
       state: 'idle',
     },
@@ -162,8 +167,8 @@ vi.mock('@lace/web/components/config/SessionEditModal', () => ({
 // Test props
 const defaultProps = {
   projectId: 'test-project',
-  sessionId: 'lace_20250101_sess01',
-  agentId: 'lace_20250101_agent1',
+  sessionId: SESSION_ID,
+  agentId: AGENT_ID,
 };
 
 describe('AgentPageContent agent state handling', () => {

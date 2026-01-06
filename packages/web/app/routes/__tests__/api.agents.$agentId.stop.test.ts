@@ -7,6 +7,7 @@ import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
+import { testSessionId } from '@lace/web/test-utils/test-ids';
 
 // ✅ ESSENTIAL MOCK - Server-side module compatibility in test environment
 import { vi } from 'vitest';
@@ -48,8 +49,12 @@ describe('/api/agents/[agentId]/stop', () => {
   });
 
   it('returns 404 for unknown agent', async () => {
-    const request = new Request('http://localhost/api/agents/nonexistent/stop', { method: 'POST' });
-    const response = await action(createActionArgs(request, { agentId: 'nonexistent' }));
+    // Use a valid format but non-existent ID
+    const nonExistentId = testSessionId(99999);
+    const request = new Request(`http://localhost/api/agents/${nonExistentId}/stop`, {
+      method: 'POST',
+    });
+    const response = await action(createActionArgs(request, { agentId: nonExistentId }));
 
     expect(response.status).toBe(404);
     const data = await parseResponse<{ error: string; code: string }>(response);

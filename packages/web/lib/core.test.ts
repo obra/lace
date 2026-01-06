@@ -4,10 +4,11 @@
 import { describe, it, expect } from 'vitest';
 import type { ThreadId } from '@lace/web/types/core';
 import { isThreadId, asThreadId, EVENT_TYPES, ApprovalDecision } from '@lace/web/types/core';
+import { testSessionId } from '@lace/web/test-utils/test-ids';
 
 describe('Core Type Imports', () => {
   it('should export ThreadId type correctly', () => {
-    const validId = 'lace_20250731_abc123';
+    const validId = testSessionId(1);
     expect(isThreadId(validId)).toBe(true);
 
     const threadId: ThreadId = asThreadId(validId);

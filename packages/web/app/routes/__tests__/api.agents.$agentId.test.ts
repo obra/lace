@@ -16,6 +16,8 @@ import {
 import { vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
+import { testSessionId } from '@lace/web/test-utils/test-ids';
+
 interface ErrorResponse {
   error: string;
   details?: unknown;
@@ -68,8 +70,10 @@ describe('Agent API', () => {
   });
 
   it('GET /api/agents/:agentId returns 404 when agent not found', async () => {
-    const request = new Request('http://localhost/api/agents/nonexistent');
-    const response = await loader(createLoaderArgs(request, { agentId: 'nonexistent' }));
+    // Use a valid format but non-existent ID
+    const nonExistentId = testSessionId(99999);
+    const request = new Request(`http://localhost/api/agents/${nonExistentId}`);
+    const response = await loader(createLoaderArgs(request, { agentId: nonExistentId }));
     const data = await parseResponse<ErrorResponse>(response);
 
     expect(response.status).toBe(404);

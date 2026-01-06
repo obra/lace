@@ -19,6 +19,7 @@ import { parseResponse } from '@lace/web/lib/serialization';
 import { action as createWorkspaceSession } from '@lace/web/app/routes/api.projects.$projectId.sessions';
 import { action as spawnAgent } from '@lace/web/app/routes/api.sessions.$sessionId.agents';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { testSessionId } from '@lace/web/test-utils/test-ids';
 
 // Console capture for verifying error output
 let consoleLogs: string[] = [];
@@ -141,7 +142,9 @@ describe('Thread Messaging API', () => {
       body: JSON.stringify({ message: 'Hello!' }),
     });
 
-    const response = await POST(createActionArgs(request, { threadId: 'unknown_session' }));
+    // Use a valid format but non-existent session ID
+    const nonExistentId = testSessionId(99999);
+    const response = await POST(createActionArgs(request, { threadId: nonExistentId }));
 
     expect(response.status).toBe(404);
   });
