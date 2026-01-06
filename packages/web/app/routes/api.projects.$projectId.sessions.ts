@@ -195,12 +195,13 @@ async function spawnSessionNamingHelper(
     const supervisor = await getSupervisor();
     await supervisor.updateWorkspaceSession(workspaceSessionId, { name: generatedName });
 
-    // Emit SESSION_UPDATED event via SSE
+    // Emit SESSION_INFO event via SSE
     const eventManager = EventStreamManager.getInstance();
     eventManager.broadcast({
-      type: 'SESSION_UPDATED',
+      type: 'SESSION_INFO',
       data: {
-        name: generatedName,
+        title: generatedName,
+        updatedAt: new Date(),
       },
       context: {
         sessionId: workspaceSessionId,
