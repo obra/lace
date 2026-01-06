@@ -1,9 +1,9 @@
 // ABOUTME: API endpoint for loading conversation history for a supervisor-backed agent session
-// ABOUTME: Converts Ent durable session events into LaceEvent timeline events
+// ABOUTME: Converts Ent durable session events into AppEvent timeline events
 
 import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
-import type { LaceEvent } from '@lace/web/types/core';
+import type { AppEvent } from '@lace/web/types/app-events';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import type { Route } from './+types/api.agents.$agentId.history';
@@ -63,24 +63,23 @@ function toolResultToTextContent(result: unknown): Array<{ type: 'text'; text: s
   return items.map((text) => ({ type: 'text', text }));
 }
 
-function durableEventsToLaceEvents(agentSessionId: string, events: DurableEvent[]): LaceEvent[] {
-  const out: LaceEvent[] = [];
+function durableEventsToAppEvents(agentSessionId: string, events: DurableEvent[]): AppEvent[] {
+  const out: AppEvent[] = [];
 
   for (const e of events) {
     const timestamp = new Date(e.timestamp);
-    const context = { threadId: agentSessionId };
 
     if (e.type === 'prompt') {
       const content = toTextContent(e.data?.content);
       if (content.trim()) {
-        // USER_MESSAGE data is a string, not { content: string }
         out.push({
           id: `ent_${e.eventSeq}_user`,
-          type: 'USER_MESSAGE',
+          type: 'USER_MESSAGE_SENT',
           timestamp,
-          data: content,
-          context,
-        } as LaceEvent);
+          data: { content, agentSessionId },
+          agentSessionId,
+          workspaceSessionId: 'unknown',
+        } as AppEvent);
       }
       continue;
     }
@@ -89,11 +88,12 @@ function durableEventsToLaceEvents(agentSessionId: string, events: DurableEvent[
       const content = typeof e.data?.content === 'string' ? e.data.content : '';
       out.push({
         id: `ent_${e.eventSeq}_assistant`,
-        type: 'AGENT_MESSAGE',
+        type: 'LOCAL_SYSTEM_MESSAGE',
         timestamp,
-        data: { content },
-        context,
-      } as unknown as LaceEvent);
+        data: { content, agentSessionId },
+        agentSessionId,
+        workspaceSessionId: 'unknown',
+      } as AppEvent);
       continue;
     }
 
@@ -102,11 +102,12 @@ function durableEventsToLaceEvents(agentSessionId: string, events: DurableEvent[
       if (content.trim()) {
         out.push({
           id: `ent_${e.eventSeq}_system`,
-          type: 'SYSTEM_PROMPT',
+          type: 'LOCAL_SYSTEM_MESSAGE',
           timestamp,
-          data: content,
-          context,
-        } as unknown as LaceEvent);
+          data: { content, agentSessionId },
+          agentSessionId,
+          workspaceSessionId: 'unknown',
+        } as AppEvent);
       }
       continue;
     }
@@ -121,11 +122,12 @@ function durableEventsToLaceEvents(agentSessionId: string, events: DurableEvent[
 
       out.push({
         id: `ent_${e.eventSeq}_tool_call`,
-        type: 'TOOL_CALL',
+        type: 'SYSTEM_NOTIFICATION',
         timestamp,
-        data: { id: toolCallId, name, arguments: input },
-        context,
-      } as unknown as LaceEvent);
+        data: { message: `Tool call: ${name}`, level: 'info' as const },
+        agentSessionId,
+        workspaceSessionId: 'unknown',
+      } as AppEvent);
 
       if ('result' in e.data && e.data.result) {
         const outcome = (e.data.result as { outcome?: unknown }).outcome;
@@ -136,13 +138,18 @@ function durableEventsToLaceEvents(agentSessionId: string, events: DurableEvent[
               ? 'failed'
               : 'completed';
 
+        const resultContent = toolResultToTextContent(e.data.result)
+          .map((item) => item.text)
+          .join('\n');
+
         out.push({
           id: `ent_${e.eventSeq}_tool_result`,
-          type: 'TOOL_RESULT',
+          type: 'SYSTEM_NOTIFICATION',
           timestamp,
-          data: { id: toolCallId, status, content: toolResultToTextContent(e.data.result) },
-          context,
-        } as unknown as LaceEvent);
+          data: { message: `Tool result (${status}): ${resultContent}`, level: 'info' as const },
+          agentSessionId,
+          workspaceSessionId: 'unknown',
+        } as AppEvent);
       }
 
       continue;
@@ -178,7 +185,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       },
     })) as { events: DurableEvent[] };
 
-    const events = durableEventsToLaceEvents(
+    const events = durableEventsToAppEvents(
       agentId,
       Array.isArray(result.events) ? result.events : []
     );

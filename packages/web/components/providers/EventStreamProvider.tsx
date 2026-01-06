@@ -17,23 +17,23 @@ import { useSessionAPI as useSessionAPIHook } from '@lace/web/hooks/useSessionAP
 import { useAgentAPI as useAgentAPIHook } from '@lace/web/hooks/useAgentAPI';
 import { useToolApprovalContext } from './ToolApprovalProvider';
 import { useSessionContext } from './SessionProvider';
-import type { ThreadId, WorkspaceSessionId } from '@lace/web/types/core';
-import type { LaceEvent } from '@lace/agent/threads/types';
+import type { ThreadId, WorkspaceSessionId, LaceEvent } from '@lace/web/types/core';
+import type { AppEvent } from '@lace/web/types/app-events';
 import type { StreamConnection } from '@lace/web/types/stream-events';
 import type { PendingApproval } from '@lace/web/types/api';
 
 // Types for the context
 interface EventStreamConnection {
   connection: StreamConnection;
-  lastEvent?: LaceEvent;
+  lastEvent?: LaceEvent | AppEvent;
   close: () => void;
   reconnect: () => void;
 }
 
 interface AgentEventsState {
-  events: LaceEvent[];
+  events: Array<LaceEvent | AppEvent>;
   loadingHistory: boolean;
-  addAgentEvent: (event: LaceEvent) => void;
+  addAgentEvent: (event: LaceEvent | AppEvent) => void;
 }
 
 interface AgentAPIActions {
@@ -101,13 +101,13 @@ export function EventStreamProvider({
   const sendMessageWithOptimisticUpdate = useCallback(
     async (agentIdArg: ThreadId, message: string): Promise<boolean> => {
       // Add optimistic USER_MESSAGE before sending
-      // USER_MESSAGE has data: string (not { content: string })
-      const optimisticEvent: LaceEvent = {
+      const optimisticEvent: AppEvent = {
         id: `user_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        type: 'USER_MESSAGE',
+        type: 'USER_MESSAGE_SENT',
         timestamp: new Date(),
-        data: message,
-        context: { threadId: agentIdArg },
+        data: { content: message, agentSessionId: agentIdArg },
+        agentSessionId: agentIdArg,
+        workspaceSessionId: 'unknown',
       };
       addAgentEvent(optimisticEvent);
 
@@ -151,7 +151,7 @@ export function EventStreamProvider({
 
   // Agent token handler - forward events to useProcessedEvents for token aggregation
   const handleAgentToken = useCallback(
-    (event: LaceEvent) => {
+    (event: LaceEvent | AppEvent) => {
       // Forward AGENT_TOKEN events so useProcessedEvents can aggregate them
       addAgentEvent(event);
     },
@@ -180,22 +180,32 @@ export function EventStreamProvider({
 
   // EVENT_UPDATED handler
   const handleEventUpdated = useCallback(
-    (event: LaceEvent) => {
+    (event: LaceEvent | AppEvent) => {
+      // Handle EVENT_UPDATED for AppEvent
       if (
+        'type' in event &&
+        event.type === 'EVENT_UPDATED' &&
         event.data &&
-        typeof event.data === 'object' &&
-        'eventId' in event.data &&
-        'visibleToModel' in event.data
+        typeof event.data === 'object'
       ) {
-        const updateData = event.data as { eventId: string; visibleToModel: boolean };
-        updateEventVisibility(updateData.eventId, updateData.visibleToModel);
+        const updateData = event.data as { eventId?: string; changes?: Record<string, unknown> };
+        if (updateData.eventId && 'visibleToModel' in updateData) {
+          updateEventVisibility(updateData.eventId, updateData.visibleToModel as boolean);
+        }
+      }
+      // Handle EVENT_UPDATED for LaceEvent
+      if ('context' in event && event.data && typeof event.data === 'object') {
+        const laceData = event.data as { eventId?: string; visibleToModel?: boolean };
+        if ('eventId' in event.data && 'visibleToModel' in event.data) {
+          updateEventVisibility(laceData.eventId as string, laceData.visibleToModel as boolean);
+        }
       }
     },
     [updateEventVisibility]
   );
 
   const handleAgentError = useCallback(
-    (event: LaceEvent) => {
+    (event: LaceEvent | AppEvent) => {
       // Add AGENT_ERROR event directly to timeline - don't convert to AGENT_MESSAGE
       // The UI should handle AGENT_ERROR events natively
       addAgentEvent(event);
@@ -205,7 +215,7 @@ export function EventStreamProvider({
 
   // Agent message handler
   const stableAddAgentEventMessage = useCallback(
-    (event: LaceEvent) => {
+    (event: LaceEvent | AppEvent) => {
       addAgentEvent(event);
     },
     [addAgentEvent]
@@ -218,7 +228,7 @@ export function EventStreamProvider({
 
   // Create a single stable event handler to ensure consistent references
   const stableAddAgentEvent = useCallback(
-    (event: LaceEvent) => {
+    (event: LaceEvent | AppEvent) => {
       addAgentEvent(event);
     },
     [addAgentEvent]
