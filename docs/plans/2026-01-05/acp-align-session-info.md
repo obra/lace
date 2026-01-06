@@ -193,54 +193,40 @@ export interface SessionInfoData {
 
 ## 5. Required Changes
 
-### Phase 1: Add New Type (Backward Compatible)
+### 1. Update Protocol Schemas
 
-1. **Add protocol schema** for `SessionUpdateSessionInfoSchema`
-2. **Add internal type** `SessionInfoData` alongside existing `SessionUpdatedData`
-3. **Add new event type** `SESSION_INFO` to `EVENT_TYPES` array
-4. **Add to transient list** in `isTransientEventType()`
+1. **Add `SessionUpdateSessionInfoSchema`** to `packages/ent-protocol/src/schemas/methods.ts`
+2. **Add to discriminated unions** (`SessionUpdateInnerNonJobSchema`, etc.)
 
-### Phase 2: Migrate Emission Points
+### 2. Update Internal Types
+
+1. **Replace `SessionUpdatedData`** with `SessionInfoData` in `packages/agent/src/threads/types.ts`
+2. **Rename event type**: `SESSION_UPDATED` → `SESSION_INFO` in `EVENT_TYPES` array
+3. **Update transient list** in `isTransientEventType()`
+
+### 3. Update Emission Points
 
 1. **Update session naming route** (`api.projects.$projectId.sessions.ts`)
    - Change `type: 'SESSION_UPDATED'` to `type: 'SESSION_INFO'`
-   - Change `data: { name: generatedName }` to `data: { title: generatedName }`
+   - Change `data: { name: generatedName }` to `data: { title: generatedName, updatedAt: new Date() }`
 
-2. **Add `updatedAt` field** to emissions where appropriate
-
-### Phase 3: Migrate Consumption Points
+### 4. Update Consumption Points
 
 1. **Update `useEventStream.ts`**
    - Rename handler from `onSessionUpdated` to `onSessionInfo`
    - Update case statement from `SESSION_UPDATED` to `SESSION_INFO`
+2. **Update components** using the handler
 
-2. **Update any components** using `onSessionUpdated` callback
+### 5. Update Protocol Documentation
 
-### Phase 4: Remove Old Type (Breaking)
-
-1. **Remove `SESSION_UPDATED`** from `EVENT_TYPES` array
-2. **Remove `SessionUpdatedData`** interface
-3. **Remove old case** from `useEventStream.ts`
+1. **Update `docs/protocol-spec.md`**: Add `session_info` to session/update types
+2. **Update `docs/about-the-protocol.md`**: Document alignment with ACP RFD
 
 ---
 
-## 6. Migration Path for Consumers
+## 6. Breaking Change - No Backward Compatibility
 
-During the transition period (Phase 1-3), both types will coexist:
-
-```typescript
-// useEventStream.ts - temporary dual support
-case 'SESSION_UPDATED':
-  // Legacy support
-  currentOptions.onSessionUpdated?.(event);
-  currentOptions.onSessionInfo?.(event); // Forward to new handler
-  break;
-case 'SESSION_INFO':
-  currentOptions.onSessionInfo?.(event);
-  break;
-```
-
-This allows gradual migration of consumers before Phase 4 cleanup.
+**Decision**: Make all changes in one shot. No phased migration or dual support needed (pre-1.0).
 
 ---
 
@@ -309,14 +295,6 @@ The ACP RFD for `session_info_update` is still a draft. If the final ACP spec ch
 - Reduces future migration effort
 - Demonstrates ACP alignment intent
 - Provides better extensibility than current implementation
-
-### Backward Compatibility
-
-Phase 1-3 maintain backward compatibility. Only Phase 4 is breaking. This allows:
-
-- Existing clients to continue working during migration
-- Gradual consumer updates
-- Testing of new format before removing old
 
 ### No Database Migration Needed
 

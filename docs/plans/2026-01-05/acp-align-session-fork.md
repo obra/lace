@@ -118,16 +118,6 @@ session: z.object({
 }).strict().optional(),
 ```
 
-Or, to maintain backward compatibility during transition:
-```typescript
-// Keep sessionFork for backward compat, add ACP-style
-sessionFork: z.boolean().optional(),  // DEPRECATED
-session: z.object({
-  fork: z.object({
-    // Reserved for future: messageId support
-  }).strict().optional(),
-}).strict().optional(),
-```
 
 ### 2. Add session/fork Method
 
@@ -161,23 +151,11 @@ export const SessionForkResponseSchema = z.object({
 }).strict();
 ```
 
-### 3. Deprecate session/load fork Option
+### 3. Remove session/load fork Option
 
-Keep `fork` in `SessionLoadParamsSchema` for backward compatibility but mark
-deprecated. The error message should guide users to `session/fork`:
+**Decision**: Remove `fork` parameter from `SessionLoadParamsSchema` entirely. No backward compatibility.
 
-```typescript
-if (parsed.fork) {
-  throw {
-    code: -32602,
-    message: 'InvalidParams',
-    data: {
-      category: 'protocol',
-      detail: 'fork option deprecated, use session/fork method instead'
-    }
-  };
-}
-```
+Clients must use the dedicated `session/fork` method.
 
 ### 4. Update Agent Capabilities Response
 
@@ -189,9 +167,6 @@ capabilities: {
     fork: {},
     resume: {},
   },
-  // Keep for backward compat:
-  sessionFork: true,
-  sessionResume: true,
   // ...
 }
 ```
@@ -231,7 +206,7 @@ peer.onRequest('session/fork', async (params: unknown) => {
 |----------------|-------------------|-------|
 | `sessionFork: z.boolean().optional()` | `session.fork: z.object({}).optional()` | Nested object for extensibility |
 | `sessionResume: z.boolean().optional()` | `session.resume: z.object({}).optional()` | Consistent with fork |
-| `SessionLoadParams.fork` | Remove or deprecate | Use session/fork method |
+| `SessionLoadParams.fork` | Remove entirely | Use session/fork method |
 | N/A | `SessionForkParamsSchema` | New method params |
 | N/A | `SessionForkResultSchema` | New method result |
 | N/A | `SessionForkRequestSchema` | New request schema |
@@ -244,19 +219,18 @@ peer.onRequest('session/fork', async (params: unknown) => {
 3. Update `AgentCapabilitiesSchema` with nested session object
 4. Implement `session/fork` handler in agent server
 5. Update capabilities response to include `session.fork`
-6. Add deprecation warning to `session/load` fork option
+6. Remove `fork` parameter from `session/load`
 7. Update tests
+
+### 7. Update Protocol Documentation
+
+1. **Update `docs/protocol-spec.md`**: Add `session/fork` method, update capabilities schema
+2. **Update `docs/about-the-protocol.md`**: Document alignment with ACP RFD
 
 ## Open Questions
 
-1. **Backward Compatibility**: Should we maintain both `sessionFork: boolean`
-   and `session.fork: {}` during a transition period?
+1. **Resume Alignment**: The ACP likely has a similar pattern for `session/resume`. Should we align that at the same time?
 
-2. **Resume Alignment**: The ACP likely has a similar pattern for
-   `session/resume`. Should we align that at the same time?
+2. **MCP Server Semantics**: When forking with new `mcpServers`, should they replace or merge with the original session's servers?
 
-3. **MCP Server Semantics**: When forking with new `mcpServers`, should they
-   replace or merge with the original session's servers?
-
-4. **Checkpoint Forking**: The ACP reserves the fork object for future
-   `messageId` support. Should we add a placeholder schema for this now?
+3. **Checkpoint Forking**: The ACP reserves the fork object for future `messageId` support. Should we add a placeholder schema for this now?

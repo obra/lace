@@ -199,19 +199,13 @@ peer.notify('session/update', {
 
 In the turn completion handler, emit context window status after usage.
 
-### Phase 2: Align Usage Field Naming (Medium Priority)
+### Phase 2: Keep camelCase (Medium Priority)
 
-**Decision needed:** Do we follow ACP's `snake_case` or keep Ent's `camelCase`?
+**Decision**: Keep Ent's `camelCase` for usage fields. The Ent protocol is already an extension of ACP. Document the field mapping in protocol docs.
 
-**Recommendation:** Keep `camelCase` for Ent-specific extensions. The Ent protocol is already an extension of ACP. Document the mapping.
+No migration needed - this is intentional divergence.
 
-If we decide to align:
-
-1. Add snake_case aliases: `input_tokens`, `output_tokens`, etc.
-2. Deprecate camelCase over time
-3. Update all consumers
-
-### Phase 3: Make totalTokens Required (Low Priority)
+### Phase 3: Make totalTokens Required (Medium Priority)
 
 Change in `UsageInfoSchema`:
 
@@ -291,7 +285,8 @@ export type SessionUpdateContextWindow = z.infer<typeof SessionUpdateContextWind
 2. **Agent emission** - Emit after compaction and turns
 3. **Supervisor forwarding** - Ensure notification reaches clients
 4. **Client handling** - Update UI to show context utilization
-5. **Documentation** - Update protocol docs
+5. **Update `docs/protocol-spec.md`** - Add `context_window` to session/update types, document field mapping (camelCase vs snake_case)
+6. **Update `docs/about-the-protocol.md`** - Document alignment with ACP usage RFD
 
 ---
 

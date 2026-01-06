@@ -172,17 +172,14 @@ const SessionListResultSchema = z
 
 ### Breaking Changes
 
-This is a **breaking change** to the Ent protocol:
-- Field renames: `workDir` -> `cwd`, `lastActive` -> `updatedAt`
-- Clients using the old field names will break
+Field renames: `workDir` → `cwd`, `lastActive` → `updatedAt`. Make all changes at once (pre-1.0, no backward compat).
 
-### Migration Strategy
-
-Since Ent is pre-1.0, we can make breaking changes without deprecation period:
 1. Update schema in `packages/ent-protocol/src/schemas/methods.ts`
 2. Update all handler implementations
 3. Update all client code
 4. Update tests
+5. **Update `docs/protocol-spec.md`**: Update session/list method signature
+6. **Update `docs/about-the-protocol.md`**: Document ACP alignment
 
 ### Capability Advertisement
 
