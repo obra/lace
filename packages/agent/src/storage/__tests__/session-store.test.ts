@@ -13,6 +13,7 @@ import {
 } from '../session-store';
 
 describe('storage/session-store', () => {
+  const sessionId = 'sess_00000000-0000-0000-0000-000000000001';
   let originalLaceDir: string | undefined;
   let tempDir: string;
 
@@ -29,13 +30,13 @@ describe('storage/session-store', () => {
   });
 
   it('creates predictable session paths under lace dir', () => {
-    const dir = getSessionDir('sess_test');
-    expect(dir).toBe(join(tempDir, 'agent-sessions', 'sess_test'));
+    const dir = getSessionDir(sessionId);
+    expect(dir).toBe(join(tempDir, 'agent-sessions', sessionId));
     expect(existsSync(join(tempDir, 'agent-sessions'))).toBe(true);
   });
 
   it('defaults state when missing, and persists state.json', () => {
-    const sessionDir = getSessionDir('sess_test');
+    const sessionDir = getSessionDir(sessionId);
     const initial = readSessionState(sessionDir);
     expect(initial).toEqual({ nextEventSeq: 1, nextStreamSeq: 1 });
 
@@ -52,9 +53,9 @@ describe('storage/session-store', () => {
   });
 
   it('writes meta, ensures events.jsonl, lists and loads sessions', () => {
-    const sessionDir = getSessionDir('sess_test');
+    const sessionDir = getSessionDir(sessionId);
     writeSessionMeta(sessionDir, {
-      sessionId: 'sess_test',
+      sessionId,
       workDir: '/tmp',
       created: '2026-01-04T00:00:00Z',
     });
@@ -65,17 +66,17 @@ describe('storage/session-store', () => {
     expect(readFileSync(join(sessionDir, 'events.jsonl'), 'utf8')).toBe('');
 
     const sessions = listSessions('/tmp');
-    expect(sessions).toMatchObject([{ sessionId: 'sess_test', workDir: '/tmp' }]);
+    expect(sessions).toMatchObject([{ sessionId, cwd: '/tmp' }]);
 
-    const loaded = loadSession('sess_test');
-    expect(loaded.meta.sessionId).toBe('sess_test');
+    const loaded = loadSession(sessionId);
+    expect(loaded.meta.sessionId).toBe(sessionId);
     expect(loaded.meta.workDir).toBe('/tmp');
   });
 
   it('derives lastActive and messageCount from durable events', () => {
-    const sessionDir = getSessionDir('sess_test');
+    const sessionDir = getSessionDir(sessionId);
     writeSessionMeta(sessionDir, {
-      sessionId: 'sess_test',
+      sessionId,
       workDir: '/tmp',
       created: '2026-01-04T00:00:00Z',
     });
@@ -107,9 +108,9 @@ describe('storage/session-store', () => {
     const sessions = listSessions('/tmp');
     expect(sessions).toMatchObject([
       {
-        sessionId: 'sess_test',
+        sessionId,
         messageCount: 2,
-        lastActive: '2026-01-04T00:00:03Z',
+        updatedAt: '2026-01-04T00:00:03Z',
       },
     ]);
   });

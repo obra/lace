@@ -50,12 +50,12 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
     if (relativePath === 'data') {
       return path.resolve(
         projectRoot.replace('file://', ''),
-        'packages/core/src/providers/catalog/data'
+        'packages/agent/src/providers/catalog/data'
       );
     } else if (relativePath === 'agent-personas') {
       return path.resolve(
         projectRoot.replace('file://', ''),
-        'packages/core/config/agent-personas'
+        'packages/agent/config/agent-personas'
       );
     } else {
       throw new Error(
@@ -65,6 +65,19 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
   } else if (process.env.NODE_ENV === 'production') {
     // In production (standalone), resolve relative to the working directory
     // The standalone structure is: standalone/src/... so we need to find the equivalent path
+
+    // Monorepo production runs (e.g. `NODE_ENV=production tsx server-custom.ts`) may execute with a
+    // non-root cwd, but resources still live in the repo tree. Prefer resolving from the repo root.
+    const packagesIndex = moduleDir.indexOf('/packages/');
+    if (packagesIndex !== -1) {
+      const repoRoot = moduleDir.substring(0, packagesIndex);
+      if (relativePath === 'data') {
+        return path.resolve(repoRoot, 'packages/agent/src/providers/catalog/data');
+      }
+      if (relativePath === 'agent-personas') {
+        return path.resolve(repoRoot, 'packages/agent/config/agent-personas');
+      }
+    }
 
     // Convert the development module path to its standalone equivalent
     // Find the src/ directory in the module path to determine the relative path from src/
@@ -89,7 +102,7 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
 
     // Special case for agent-personas which moved from src/config/ to config/
     if (relativePath === 'agent-personas') {
-      return path.resolve(process.cwd(), 'packages/core/config/agent-personas');
+      return path.resolve(process.cwd(), 'packages/agent/config/agent-personas');
     }
 
     // Combine with the relative path and resolve from current working directory

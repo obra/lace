@@ -661,7 +661,7 @@ describe('lace-agent process (E2E over stdio)', () => {
 
     await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
 
-    const promptPromise = agent.peer.request('session/prompt', {
+    const { requestId, result: promptPromise } = agent.peer.requestWithId('session/prompt', {
       content: [{ type: 'text', text: 'run: echo will-not-run' }],
     });
 
@@ -678,13 +678,9 @@ describe('lace-agent process (E2E over stdio)', () => {
       'permission request received'
     );
 
-    agent.peer.notify('session/cancel');
+    agent.peer.notify('$/cancel_request', { requestId });
 
-    const cancelled = (await withTimeout(
-      promptPromise as Promise<unknown>,
-      5_000,
-      'prompt cancelled'
-    )) as {
+    const cancelled = (await withTimeout(promptPromise, 5_000, 'prompt cancelled')) as {
       stopReason: string;
     };
     expect(cancelled.stopReason).toBe('cancelled');
