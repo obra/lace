@@ -282,8 +282,9 @@ describe('Supervisor (E2E)', () => {
       });
 
       const attached = await supervisor.attachWorkspaceSession(created.sessionId);
+      const peer = await supervisor.getPeer(attached.workspaceSessionId);
       const events = (await withTimeout(
-        supervisor.getPeer(attached.workspaceSessionId).request('ent/session/events', {
+        peer.request('ent/session/events', {
           afterEventSeq: 0,
           limit: 100,
         }),
