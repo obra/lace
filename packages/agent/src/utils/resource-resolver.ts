@@ -50,12 +50,12 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
     if (relativePath === 'data') {
       return path.resolve(
         projectRoot.replace('file://', ''),
-        'packages/core/src/providers/catalog/data'
+        'packages/agent/src/providers/catalog/data'
       );
     } else if (relativePath === 'agent-personas') {
       return path.resolve(
         projectRoot.replace('file://', ''),
-        'packages/core/config/agent-personas'
+        'packages/agent/config/agent-personas'
       );
     } else {
       throw new Error(
@@ -68,9 +68,9 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
 
     // Convert the development module path to its standalone equivalent
     // Find the src/ directory in the module path to determine the relative path from src/
-    // Handle both monorepo structure (packages/core/src/) and original structure (src/)
-    let srcIndex = moduleDir.indexOf('/packages/core/src/');
-    let srcPrefix = 'packages/core/src';
+    // Handle both monorepo structure (packages/agent/src/) and original structure (src/)
+    let srcIndex = moduleDir.indexOf('/packages/agent/src/');
+    let srcPrefix = 'packages/agent/src';
 
     if (srcIndex === -1) {
       srcIndex = moduleDir.indexOf('/src/');
@@ -79,7 +79,7 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
 
     if (srcIndex === -1) {
       throw new Error(
-        `Unable to resolve resource path: module ${importMetaUrl} is not in src/ or packages/core/src/ directory`
+        `Unable to resolve resource path: module ${importMetaUrl} is not in src/ or packages/agent/src/ directory`
       );
     }
 
@@ -89,7 +89,7 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
 
     // Special case for agent-personas which moved from src/config/ to config/
     if (relativePath === 'agent-personas') {
-      return path.resolve(process.cwd(), 'packages/core/config/agent-personas');
+      return path.resolve(process.cwd(), 'packages/agent/config/agent-personas');
     }
 
     // Combine with the relative path and resolve from current working directory
@@ -98,8 +98,8 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
     // In development, use the standard module-relative resolution
     const currentDir = path.dirname(fileURLToPath(importMetaUrl));
 
-    // Special case for agent-personas which is at packages/core/config/agent-personas
-    // but called from packages/core/src/ modules
+    // Special case for agent-personas which is at packages/agent/config/agent-personas
+    // but called from packages/agent/src/ modules
     if (relativePath === 'agent-personas') {
       return path.resolve(currentDir, '../../config/agent-personas');
     }
