@@ -270,12 +270,11 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
   async remove(containerId: string): Promise<void> {
     await this.readyPromise; // Wait for system to be ready
 
-    const info = this.inspect(containerId);
+    this.inspect(containerId); // Verify container exists in our records
 
-    // Stop if running (with shorter timeout for cleanup)
-    if (info.state === 'running') {
-      await this.stop(containerId, 5000);
-    }
+    // Always attempt to stop before removal, regardless of cached state.
+    // This avoids race conditions where state cache says "stopped" but container is still running.
+    await this.stop(containerId, 5000);
 
     logger.info('Removing Apple container', { containerId });
 

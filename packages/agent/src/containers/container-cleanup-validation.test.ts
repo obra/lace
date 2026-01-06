@@ -1,7 +1,7 @@
 // ABOUTME: Validation test for container cleanup behavior
 // ABOUTME: Ensures containers are fully removed after test completion
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import { AppleContainerRuntime } from './apple-container';
 import { mkdirSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
@@ -32,10 +32,14 @@ describe.skipIf(process.platform !== 'darwin')('Container Cleanup Validation', (
   let testDir: string;
   let createdContainers: string[] = [];
 
-  beforeEach(() => {
+  // Share runtime instance across tests - it's stateless and ensureSystemStarted() adds overhead
+  beforeAll(() => {
     runtime = new AppleContainerRuntime();
     testDir = join(tmpdir(), `container-cleanup-validation-${uuidv4()}`);
     mkdirSync(testDir, { recursive: true });
+  });
+
+  beforeEach(() => {
     createdContainers = [];
   });
 
@@ -43,7 +47,8 @@ describe.skipIf(process.platform !== 'darwin')('Container Cleanup Validation', (
     // Clean up all created containers
     for (const containerId of createdContainers) {
       try {
-        await runtime.stop(containerId, 3000);
+        // Use shorter timeout (1000ms) since we force-remove anyway if this fails
+        await runtime.stop(containerId, 1000);
         await runtime.remove(containerId);
       } catch (error) {
         logger.warn('Cleanup: Failed to remove container', {
@@ -58,14 +63,18 @@ describe.skipIf(process.platform !== 'darwin')('Container Cleanup Validation', (
         }
       }
     }
+  }, 20000); // Generous timeout for cleanup
 
-    // Clean up test directory
+  afterAll(() => {
+    // Clean up test directory after all tests
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
-  }, 20000); // Generous timeout for cleanup
+  });
 
-  it('should fully remove container after stop and remove', async () => {
+  // Combined test: verifies stop, double-stop handling, and remove in a single container lifecycle
+  // This saves ~6 seconds by avoiding a redundant container start/stop cycle
+  it('should stop running container, handle already-stopped state, and fully remove', async () => {
     const config: ContainerConfig = {
       id: 'cleanup-validation-test',
       workingDirectory: '/workspace',
@@ -89,9 +98,14 @@ describe.skipIf(process.platform !== 'darwin')('Container Cleanup Validation', (
     // Verify container is running
     expect(await containerExists(containerId)).toBe(true);
 
-    // Stop and remove
+    // Stop the running container
     await runtime.stop(containerId, 5000);
-    await runtime.remove(containerId);
+
+    // Verify stop is idempotent - stopping again should not throw
+    await expect(runtime.stop(containerId, 5000)).resolves.not.toThrow();
+
+    // Remove should work on an already-stopped container
+    await expect(runtime.remove(containerId)).resolves.not.toThrow();
 
     // Verify container is completely gone from system
     expect(await containerExists(containerId)).toBe(false);
@@ -99,33 +113,6 @@ describe.skipIf(process.platform !== 'darwin')('Container Cleanup Validation', (
     // Remove from tracking since we cleaned it successfully
     createdContainers = createdContainers.filter((id) => id !== containerId);
   }, 30000); // Longer timeout for container operations
-
-  it('should handle cleanup even if container is already stopped', async () => {
-    const config: ContainerConfig = {
-      id: 'cleanup-stopped-test',
-      workingDirectory: '/workspace',
-      mounts: [
-        {
-          source: testDir,
-          target: '/workspace',
-        },
-      ],
-    };
-
-    const containerId = runtime.create(config);
-    createdContainers.push(containerId);
-
-    await runtime.start(containerId);
-    await runtime.stop(containerId, 5000);
-
-    // Container is already stopped - remove should still work
-    await expect(runtime.remove(containerId)).resolves.not.toThrow();
-
-    // Verify fully removed
-    expect(await containerExists(containerId)).toBe(false);
-
-    createdContainers = createdContainers.filter((id) => id !== containerId);
-  }, 30000);
 
   it('should handle cleanup when container fails to start', async () => {
     // Create container but don't start it

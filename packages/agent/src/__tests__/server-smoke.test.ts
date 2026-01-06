@@ -64,7 +64,10 @@ describe('agent rpc server (smoke)', () => {
       sessions: [
         {
           sessionId: created.sessionId,
-          workDir: process.cwd(),
+          cwd: process.cwd(),
+          created: expect.any(String),
+          updatedAt: expect.any(String),
+          messageCount: expect.any(Number),
         },
       ],
     });
@@ -89,7 +92,7 @@ describe('agent rpc server (smoke)', () => {
     await client.request('initialize', defaultInitializeParams());
 
     await expect(
-      client.request('session/load', { sessionId: 'sess_missing' })
+      client.request('session/load', { sessionId: 'sess_00000000-0000-0000-0000-000000000000' })
     ).rejects.toMatchObject({
       code: AcpErrorCodes.SessionNotFound,
       message: 'SessionNotFound',

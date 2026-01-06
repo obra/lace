@@ -1,7 +1,7 @@
 // ABOUTME: Integration tests for the complete containerized workspace system
 // ABOUTME: Tests the full workflow of cloning, containerizing, and executing code
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from 'vitest';
 import { WorkspaceContainerManager } from './workspace-container-manager';
 import { AppleContainerRuntime } from '@lace/agent/containers/apple-container';
 import { setupCoreTest } from '@lace/agent/test-utils/core-test-setup';
@@ -16,8 +16,14 @@ describe.skipIf(process.platform !== 'darwin')('Workspace Integration Tests', ()
   let manager: WorkspaceContainerManager;
   let testDir: string;
   let projectDir: string;
+  // Share runtime across all tests - it's stateless
+  let sharedRuntime: AppleContainerRuntime;
 
-  beforeEach(() => {
+  beforeAll(() => {
+    // Create shared runtime once for all tests
+    sharedRuntime = new AppleContainerRuntime();
+
+    // Create git repo once - tests only clone from it, never modify the source
     testDir = join(tmpdir(), `workspace-integration-${uuidv4()}`);
     projectDir = join(testDir, 'test-project');
     mkdirSync(projectDir, { recursive: true });
@@ -78,190 +84,163 @@ if __name__ == '__main__':
     writeFileSync(join(projectDir, '.gitignore'), '*.pyc\n__pycache__/\noutput.txt\nresult.json');
     execSync('git add .', { cwd: projectDir });
     execSync('git commit -m "Add gitignore"', { cwd: projectDir });
+  });
 
-    // Create manager with real runtime
-    manager = new WorkspaceContainerManager(new AppleContainerRuntime());
+  beforeEach(() => {
+    // Create fresh manager per test (manager is stateful with workspace tracking)
+    manager = new WorkspaceContainerManager(sharedRuntime);
   });
 
   afterEach(async () => {
-    // Clean up all workspaces
+    // Clean up all workspaces created during this test
     const workspaces = await manager.listWorkspaces();
-    for (const workspace of workspaces) {
-      await manager.destroyWorkspace(workspace.sessionId);
-    }
+    await Promise.all(workspaces.map((workspace) => manager.destroyWorkspace(workspace.sessionId)));
+  }, 30000); // Increase timeout for cleanup
 
-    // Clean up test directory - clones are in isolated LACE_DIR and will be cleaned up automatically
+  afterAll(() => {
+    // Clean up shared test directory
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
-  }, 30000); // Increase timeout for cleanup
+  });
 
-  it('should complete full workflow: clone, containerize, execute, modify, and cleanup', async () => {
-    const sessionId = 'integration-test-1';
+  it('should handle concurrent workspaces with isolation and full workflow', async () => {
+    const sessionIds = ['workspace-1', 'workspace-2', 'workspace-3'];
 
-    // Step 1: Create workspace
-    const workspace = await manager.createWorkspace(projectDir, sessionId);
+    // Phase 1: Concurrent creation (from test 2)
+    const workspaces = await Promise.all(
+      sessionIds.map((id) => manager.createWorkspace(projectDir, id))
+    );
 
-    expect(workspace.sessionId).toBe(sessionId);
-    expect(workspace.state).toBe('running');
-    expect(existsSync(workspace.clonePath)).toBe(true);
+    // Assert all have correct sessionIds, state 'running', clonePaths exist (from test 1)
+    for (let i = 0; i < workspaces.length; i++) {
+      expect(workspaces[i].sessionId).toBe(sessionIds[i]);
+      expect(workspaces[i].state).toBe('running');
+      expect(existsSync(workspaces[i].clonePath)).toBe(true);
+    }
 
-    // Step 2: Verify files are present
-    const result1 = await manager.executeInWorkspace(sessionId, {
-      command: ['ls', '-la', '/workspace'],
+    // Phase 2: List workspaces (from test 2)
+    expect(await manager.listWorkspaces()).toHaveLength(3);
+
+    // Phase 3: Parallel execution - indexed echo + isolation files
+    const [echoResults, _writeResults] = await Promise.all([
+      // Execute indexed echo commands in all workspaces (from test 2)
+      Promise.all(
+        sessionIds.map((sessionId, index) =>
+          manager.executeInWorkspace(sessionId, {
+            command: ['sh', '-c', `echo "Container ${index + 1}"`],
+          })
+        )
+      ),
+      // Create isolation files in workspace-1 and workspace-2 (from test 3)
+      Promise.all([
+        manager.executeInWorkspace('workspace-1', {
+          command: ['sh', '-c', 'echo "Session 1 data" > /workspace/session1.txt'],
+        }),
+        manager.executeInWorkspace('workspace-2', {
+          command: ['sh', '-c', 'echo "Session 2 data" > /workspace/session2.txt'],
+        }),
+      ]),
+    ]);
+
+    // Verify echo results (from test 2)
+    echoResults.forEach((result, index) => {
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.trim()).toBe(`Container ${index + 1}`);
     });
 
-    expect(result1.exitCode).toBe(0);
-    expect(result1.stdout).toContain('app.py');
-    expect(result1.stdout).toContain('process_data.py');
-    expect(result1.stdout).toContain('README.md');
-    expect(result1.stdout).toContain('.gitignore');
+    // Phase 4: Verify isolation (from test 3)
+    const [w1Read, w1Check, w2Read, w2Check] = await Promise.all([
+      // Workspace-1: can read its own file
+      manager.executeInWorkspace('workspace-1', {
+        command: ['cat', '/workspace/session1.txt'],
+      }),
+      // Workspace-1: cannot see workspace-2's file
+      manager.executeInWorkspace('workspace-1', {
+        command: ['ls', '/workspace/session2.txt'],
+      }),
+      // Workspace-2: can read its own file
+      manager.executeInWorkspace('workspace-2', {
+        command: ['cat', '/workspace/session2.txt'],
+      }),
+      // Workspace-2: cannot see workspace-1's file
+      manager.executeInWorkspace('workspace-2', {
+        command: ['ls', '/workspace/session1.txt'],
+      }),
+    ]);
 
-    // Step 3: Execute shell script instead of Python (containers may not have Python)
-    const result2 = await manager.executeInWorkspace(sessionId, {
+    expect(w1Read.exitCode).toBe(0);
+    expect(w1Read.stdout.trim()).toBe('Session 1 data');
+    expect(w1Check.exitCode).not.toBe(0); // File shouldn't exist
+
+    expect(w2Read.exitCode).toBe(0);
+    expect(w2Read.stdout.trim()).toBe('Session 2 data');
+    expect(w2Check.exitCode).not.toBe(0); // File shouldn't exist
+
+    // Phase 5: Full workflow on workspace-3 (from test 1)
+    // - ls shows original files (app.py, process_data.py, README.md, .gitignore)
+    const lsResult = await manager.executeInWorkspace('workspace-3', {
+      command: ['ls', '-la', '/workspace'],
+    });
+    expect(lsResult.exitCode).toBe(0);
+    expect(lsResult.stdout).toContain('app.py');
+    expect(lsResult.stdout).toContain('process_data.py');
+    expect(lsResult.stdout).toContain('README.md');
+    expect(lsResult.stdout).toContain('.gitignore');
+
+    // - Environment variable and complex shell script test (from test 1)
+    const envResult = await manager.executeInWorkspace('workspace-3', {
       command: [
         'sh',
         '-c',
         'echo "Working directory: $(pwd)" && echo "Session ID: $SESSION_ID" && echo "Hello from containerized workspace!" > output.txt && echo "Output file created"',
       ],
-      environment: { SESSION_ID: sessionId },
+      environment: { SESSION_ID: 'workspace-3' },
     });
+    expect(envResult.exitCode).toBe(0);
+    expect(envResult.stdout).toContain('Working directory: /workspace');
+    expect(envResult.stdout).toContain('Session ID: workspace-3');
+    expect(envResult.stdout).toContain('Output file created');
 
-    expect(result2.exitCode).toBe(0);
-    expect(result2.stdout).toContain('Working directory: /workspace');
-    expect(result2.stdout).toContain(`Session ID: ${sessionId}`);
-    expect(result2.stdout).toContain('Output file created');
-
-    // Step 4: Verify file was created in container
-    const result3 = await manager.executeInWorkspace(sessionId, {
+    // - Verify file was created in container (from test 1)
+    const catResult = await manager.executeInWorkspace('workspace-3', {
       command: ['cat', '/workspace/output.txt'],
     });
+    expect(catResult.exitCode).toBe(0);
+    expect(catResult.stdout.trim()).toBe('Hello from containerized workspace!');
 
-    expect(result3.exitCode).toBe(0);
-    expect(result3.stdout.trim()).toBe('Hello from containerized workspace!');
+    // - File creation in container + host visibility (from test 1)
+    const hostPath = join(workspaces[2].clonePath, 'output.txt');
+    expect(existsSync(hostPath)).toBe(true);
+    expect(readFileSync(hostPath, 'utf-8').trim()).toBe('Hello from containerized workspace!');
 
-    // Step 5: File should also exist in the clone on host
-    const outputPath = join(workspace.clonePath, 'output.txt');
-    expect(existsSync(outputPath)).toBe(true);
-    expect(readFileSync(outputPath, 'utf-8').trim()).toBe('Hello from containerized workspace!');
-
-    // Step 6: Create JSON output with shell commands instead of Python
-    const result4 = await manager.executeInWorkspace(sessionId, {
+    // - JSON output test (from test 1)
+    const jsonResult = await manager.executeInWorkspace('workspace-3', {
       command: [
         'sh',
         '-c',
         'echo \'{"status":"processed","container":true}\' > result.json && cat result.json',
       ],
     });
-
-    expect(result4.exitCode).toBe(0);
-    const jsonOutput = JSON.parse(result4.stdout.trim());
+    expect(jsonResult.exitCode).toBe(0);
+    const jsonOutput = JSON.parse(jsonResult.stdout.trim()) as {
+      status: string;
+      container: boolean;
+    };
     expect(jsonOutput).toEqual({ status: 'processed', container: true });
 
-    // Step 7: Path translation
-    const hostPath = join(workspace.clonePath, 'data', 'file.txt');
-    const containerPath = manager.translateToContainer(sessionId, hostPath);
-    expect(containerPath).toBe('/workspace/data/file.txt');
+    // Phase 6: Destroy one workspace, verify cleanup (from test 1)
+    const workspace1Clone = workspaces[0].clonePath;
+    await manager.destroyWorkspace('workspace-1');
+    expect(await manager.inspectWorkspace('workspace-1')).toBeNull();
+    expect(existsSync(workspace1Clone)).toBe(false);
+    expect(await manager.listWorkspaces()).toHaveLength(2);
 
-    const translatedBack = manager.translateToHost(sessionId, containerPath);
-    expect(translatedBack).toBe(hostPath);
-
-    // Step 8: Cleanup
-    await manager.destroyWorkspace(sessionId);
-
-    // Workspace should be gone
-    const info = await manager.inspectWorkspace(sessionId);
-    expect(info).toBeNull();
-
-    // Clone should be removed
-    expect(existsSync(workspace.clonePath)).toBe(false);
-  }, 60000); // 60 second timeout for integration test
-
-  it('should handle multiple concurrent workspaces', async () => {
-    const sessionIds = ['concurrent-1', 'concurrent-2', 'concurrent-3'];
-    const workspaces = [];
-
-    // Create multiple workspaces in parallel
-    const createPromises = sessionIds.map((sessionId) =>
-      manager.createWorkspace(projectDir, sessionId)
-    );
-    const createdWorkspaces = await Promise.all(createPromises);
-
-    for (const workspace of createdWorkspaces) {
-      expect(workspace.state).toBe('running');
-      workspaces.push(workspace);
-    }
-
-    // Execute commands in parallel across all workspaces
-    const execPromises = sessionIds.map((sessionId, index) =>
-      manager.executeInWorkspace(sessionId, {
-        command: ['sh', '-c', `echo "Container ${index + 1}"`],
-      })
-    );
-
-    const results = await Promise.all(execPromises);
-
-    results.forEach((result, index) => {
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout.trim()).toBe(`Container ${index + 1}`);
-    });
-
-    // List all workspaces
-    const allWorkspaces = await manager.listWorkspaces();
-    expect(allWorkspaces).toHaveLength(3);
-
-    // Clean up in parallel
-    const destroyPromises = sessionIds.map((sessionId) => manager.destroyWorkspace(sessionId));
-    await Promise.all(destroyPromises);
-
-    // Verify all cleaned up
-    const remainingWorkspaces = await manager.listWorkspaces();
-    expect(remainingWorkspaces).toHaveLength(0);
-  }, 60000);
-
-  it('should isolate workspaces from each other', async () => {
-    const session1 = 'isolated-1';
-    const session2 = 'isolated-2';
-
-    // Create two workspaces
-    const _workspace1 = await manager.createWorkspace(projectDir, session1);
-    const _workspace2 = await manager.createWorkspace(projectDir, session2);
-
-    // Create different files in each workspace
-    await manager.executeInWorkspace(session1, {
-      command: ['sh', '-c', 'echo "Session 1 data" > /workspace/session1.txt'],
-    });
-
-    await manager.executeInWorkspace(session2, {
-      command: ['sh', '-c', 'echo "Session 2 data" > /workspace/session2.txt'],
-    });
-
-    // Verify isolation - session1 file exists only in workspace1
-    const result1 = await manager.executeInWorkspace(session1, {
-      command: ['cat', '/workspace/session1.txt'],
-    });
-    expect(result1.exitCode).toBe(0);
-    expect(result1.stdout.trim()).toBe('Session 1 data');
-
-    const result2 = await manager.executeInWorkspace(session1, {
-      command: ['ls', '/workspace/session2.txt'],
-    });
-    expect(result2.exitCode).not.toBe(0); // File shouldn't exist
-
-    // Verify isolation - session2 file exists only in workspace2
-    const result3 = await manager.executeInWorkspace(session2, {
-      command: ['cat', '/workspace/session2.txt'],
-    });
-    expect(result3.exitCode).toBe(0);
-    expect(result3.stdout.trim()).toBe('Session 2 data');
-
-    const result4 = await manager.executeInWorkspace(session2, {
-      command: ['ls', '/workspace/session1.txt'],
-    });
-    expect(result4.exitCode).not.toBe(0); // File shouldn't exist
-
-    // Clean up
-    await manager.destroyWorkspace(session1);
-    await manager.destroyWorkspace(session2);
+    // Phase 7: Destroy remaining, verify full cleanup (from test 2)
+    await Promise.all([
+      manager.destroyWorkspace('workspace-2'),
+      manager.destroyWorkspace('workspace-3'),
+    ]);
+    expect(await manager.listWorkspaces()).toHaveLength(0);
   }, 60000);
 });

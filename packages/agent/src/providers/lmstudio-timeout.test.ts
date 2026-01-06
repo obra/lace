@@ -1,57 +1,29 @@
 // ABOUTME: Test for LMStudio connection timeout handling
 // ABOUTME: Ensures LMStudio provider doesn't hang indefinitely when server is unavailable
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 import { LMStudioProvider } from './lmstudio-provider';
 
-// Console capture for verifying error output
-let consoleLogs: string[] = [];
-let originalConsoleError: typeof console.error;
-let originalStderrWrite: typeof process.stderr.write;
-let originalStdoutWrite: typeof process.stdout.write;
+// Spies for capturing expected error output from the LMStudio SDK's LoggerInterface
+// The SDK uses console.{info,warn,error} by default for logging WebSocket errors
+let consoleInfoSpy: MockInstance<typeof console.info>;
+let consoleWarnSpy: MockInstance<typeof console.warn>;
+let consoleErrorSpy: MockInstance<typeof console.error>;
 
 describe('LMStudio Provider Timeout Handling', () => {
   beforeEach(() => {
-    consoleLogs = [];
-    originalConsoleError = console.error;
-    originalStderrWrite = process.stderr.write;
-    originalStdoutWrite = process.stdout.write;
-
-    // Mock console.error to capture logs for test verification
-    console.error = (...args: unknown[]) => {
-      consoleLogs.push(args.map((arg) => String(arg)).join(' '));
-    };
-
-    // Mock both stderr and stdout to suppress underlying library error output during tests
-    const suppressWebSocketOutput = (chunk: unknown) => {
-      const str = String(chunk);
-      return !(
-        str.includes('WebSocket') ||
-        str.includes('LMStudioClient') ||
-        str.includes('ECONNREFUSED') ||
-        str.includes('connect ECONNREFUSED')
-      );
-    };
-
-    process.stderr.write = vi.fn((chunk: unknown) => {
-      if (suppressWebSocketOutput(chunk)) {
-        return originalStderrWrite.call(process.stderr, chunk as string);
-      }
-      return true; // Swallow WebSocket-related output
-    });
-
-    process.stdout.write = vi.fn((chunk: unknown) => {
-      if (suppressWebSocketOutput(chunk)) {
-        return originalStdoutWrite.call(process.stdout, chunk as string);
-      }
-      return true; // Swallow WebSocket-related output
-    });
+    // Mock all console methods used by LMStudio SDK's LoggerInterface
+    // The SDK logs WebSocket connection errors when server is unavailable
+    // Since this test expects connection failure, we capture/suppress this expected output
+    consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    console.error = originalConsoleError;
-    process.stderr.write = originalStderrWrite;
-    process.stdout.write = originalStdoutWrite;
+    consoleInfoSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
   });
 
   it('should timeout quickly when LMStudio server is unavailable', async () => {
@@ -72,11 +44,25 @@ describe('LMStudio Provider Timeout Handling', () => {
     expect(result.connected).toBe(false);
     expect(result.error).toBeDefined();
 
-    // Verify that error was logged to console (if any - some providers may not log)
-    if (consoleLogs.length > 0) {
-      const errorLog = consoleLogs.join(' ').toLowerCase();
-      expect(errorLog).toMatch(/error|timeout|connection|failed|econnrefused/);
-    }
-    // The main test is that it fails quickly, console logging is secondary
+    // Verify the expected error output was captured by our console spies
+    // The LMStudio SDK logs WebSocket errors when connection is refused
+    const allConsoleCalls = [
+      ...consoleInfoSpy.mock.calls,
+      ...consoleWarnSpy.mock.calls,
+      ...consoleErrorSpy.mock.calls,
+    ];
+
+    const hasExpectedError = allConsoleCalls.some((call) => {
+      const output = call.map(String).join(' ');
+      return (
+        output.includes('WebSocket') ||
+        output.includes('ECONNREFUSED') ||
+        output.includes('LMStudioClient')
+      );
+    });
+
+    // It's expected that the LMStudio SDK will log connection errors
+    // This validates our spies captured them (preventing console noise)
+    expect(hasExpectedError).toBe(true);
   }, 10000); // 10 second test timeout
 });

@@ -1,8 +1,10 @@
 // ABOUTME: Tests for WorkspaceContainerManager that manages containerized session workspaces
 // ABOUTME: Integrates CloneManager with AppleContainerRuntime for isolated development environments
+// ABOUTME: Optimized for performance by sharing containers across non-destructive tests
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { WorkspaceContainerManager } from './workspace-container-manager';
+import type { WorkspaceInfo } from './workspace-container-manager';
 import { AppleContainerRuntime } from '@lace/agent/containers/apple-container';
 import { setupCoreTest } from '@lace/agent/test-utils/core-test-setup';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
@@ -13,13 +15,13 @@ import { execSync } from 'child_process';
 
 describe('WorkspaceContainerManager', () => {
   const _testContext = setupCoreTest();
-  let manager: WorkspaceContainerManager;
-  let testDir: string;
-  let projectDir: string;
 
-  beforeEach(() => {
-    testDir = join(tmpdir(), `workspace-manager-test-${uuidv4()}`);
-    projectDir = join(testDir, 'test-project');
+  /**
+   * Helper to create a test project directory with git repo
+   */
+  function createTestProject(): { testDir: string; projectDir: string } {
+    const testDir = join(tmpdir(), `workspace-manager-test-${uuidv4()}`);
+    const projectDir = join(testDir, 'test-project');
     mkdirSync(projectDir, { recursive: true });
 
     // Initialize a git repo in projectDir
@@ -39,206 +41,224 @@ describe('WorkspaceContainerManager', () => {
     execSync('git add .', { cwd: projectDir });
     execSync('git commit -m "Initial commit"', { cwd: projectDir });
 
-    // Create manager instance
-    manager = new WorkspaceContainerManager(new AppleContainerRuntime());
-  });
+    return { testDir, projectDir };
+  }
 
-  afterEach(async () => {
-    // Clean up all workspaces
-    const workspaces = await manager.listWorkspaces();
-    for (const workspace of workspaces) {
-      await manager.destroyWorkspace(workspace.sessionId);
-    }
+  /**
+   * Tests that can share a single container (non-destructive, read-only operations)
+   */
+  describe('with shared workspace', () => {
+    let manager: WorkspaceContainerManager;
+    let testDir: string;
+    let projectDir: string;
+    let sharedWorkspace: WorkspaceInfo;
+    const sharedSessionId = 'shared-test-session';
 
-    // Clean up test directory - clones are in isolated LACE_DIR and will be cleaned up automatically
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
-    }
-  }, 30000);
+    beforeAll(async () => {
+      const project = createTestProject();
+      testDir = project.testDir;
+      projectDir = project.projectDir;
 
-  describe('createWorkspace', () => {
-    it('should create a containerized workspace with cloned repository', async () => {
-      const sessionId = 'test-session-1';
+      manager = new WorkspaceContainerManager(new AppleContainerRuntime());
+      sharedWorkspace = await manager.createWorkspace(projectDir, sharedSessionId);
+    }, 30000);
 
-      const workspace = await manager.createWorkspace(projectDir, sessionId);
+    afterAll(async () => {
+      await manager.destroyWorkspace(sharedSessionId);
+      if (existsSync(testDir)) {
+        rmSync(testDir, { recursive: true, force: true });
+      }
+    }, 30000);
 
-      expect(workspace).toEqual({
-        sessionId,
-        projectDir,
-        containerMountPath: '/workspace',
-        clonePath: expect.stringContaining('/worktrees'),
-        branchName: `lace/session/${sessionId}`,
-        containerId: expect.stringContaining(sessionId),
-        state: 'running',
+    describe('createWorkspace', () => {
+      it('should create a containerized workspace with cloned repository', () => {
+        // Verify the shared workspace was created correctly
+        expect(sharedWorkspace).toEqual({
+          sessionId: sharedSessionId,
+          projectDir,
+          containerMountPath: '/workspace',
+          clonePath: expect.stringContaining('/worktrees'),
+          branchName: `lace/session/${sharedSessionId}`,
+          containerId: expect.stringContaining(sharedSessionId),
+          state: 'running',
+        });
+
+        // Verify clone was created
+        expect(existsSync(sharedWorkspace.clonePath)).toBe(true);
       });
-
-      // Verify clone was created
-      expect(existsSync(workspace.clonePath)).toBe(true);
-
-      // Verify container is running
-      const info = await manager.inspectWorkspace(sessionId);
-      expect(info?.state).toBe('running');
     });
 
-    it('should mount the cloned repository in the container', async () => {
-      const sessionId = 'test-session-2';
+    describe('inspectWorkspace', () => {
+      it('should return workspace info', async () => {
+        const info = await manager.inspectWorkspace(sharedSessionId);
 
-      const _workspace = await manager.createWorkspace(projectDir, sessionId);
+        expect(info).toEqual({
+          sessionId: sharedSessionId,
+          projectDir,
+          containerMountPath: '/workspace',
+          clonePath: sharedWorkspace.clonePath,
+          branchName: sharedWorkspace.branchName,
+          containerId: sharedWorkspace.containerId,
+          state: 'running',
+        });
+      });
+    });
 
-      // Execute command in container to verify mount
-      const result = await manager.executeInWorkspace(sessionId, {
+    describe('executeInWorkspace', () => {
+      it('should execute commands in the container', async () => {
+        const result = await manager.executeInWorkspace(sharedSessionId, {
+          command: ['echo', 'Hello from container'],
+        });
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout.trim()).toBe('Hello from container');
+      });
+
+      it('should handle environment variables', async () => {
+        const result = await manager.executeInWorkspace(sharedSessionId, {
+          command: ['sh', '-c', 'echo $TEST_VAR'],
+          environment: { TEST_VAR: 'test_value' },
+        });
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout.trim()).toBe('test_value');
+      });
+    });
+
+    describe('translatePath', () => {
+      it('should translate host paths to container paths', () => {
+        const hostPath = join(sharedWorkspace.clonePath, 'src', 'index.js');
+        const containerPath = manager.translateToContainer(sharedSessionId, hostPath);
+
+        expect(containerPath).toBe('/workspace/src/index.js');
+      });
+
+      it('should translate container paths to host paths', () => {
+        const containerPath = '/workspace/src/index.js';
+        const hostPath = manager.translateToHost(sharedSessionId, containerPath);
+
+        expect(hostPath).toBe(join(sharedWorkspace.clonePath, 'src', 'index.js'));
+      });
+    });
+  });
+
+  /**
+   * Tests that need no container (test error handling for non-existent workspaces)
+   */
+  describe('without workspace', () => {
+    let manager: WorkspaceContainerManager;
+
+    beforeEach(() => {
+      manager = new WorkspaceContainerManager(new AppleContainerRuntime());
+    });
+
+    describe('destroyWorkspace', () => {
+      it('should not throw if workspace does not exist', async () => {
+        await expect(manager.destroyWorkspace('non-existent')).resolves.not.toThrow();
+      });
+    });
+
+    describe('inspectWorkspace', () => {
+      it('should return null for non-existent workspace', async () => {
+        const info = await manager.inspectWorkspace('non-existent');
+        expect(info).toBeNull();
+      });
+    });
+
+    describe('executeInWorkspace', () => {
+      it('should throw if workspace does not exist', async () => {
+        await expect(
+          manager.executeInWorkspace('non-existent', { command: ['echo', 'test'] })
+        ).rejects.toThrow('Workspace not found');
+      });
+    });
+
+    describe('listWorkspaces', () => {
+      it('should return empty array when no workspaces exist', async () => {
+        const workspaces = await manager.listWorkspaces();
+        expect(workspaces).toEqual([]);
+      });
+    });
+
+    describe('translatePath', () => {
+      it('should return original path if workspace not found', () => {
+        const path = '/some/path';
+        expect(manager.translateToContainer('non-existent', path)).toBe(path);
+        expect(manager.translateToHost('non-existent', path)).toBe(path);
+      });
+    });
+  });
+
+  /**
+   * Tests that must have their own container (destructive or special setup)
+   * Uses a single container to test full lifecycle: create, mount, duplicate, list, destroy
+   * Reduced from 2 containers to 1 (saving ~6-8s)
+   */
+  describe('with dedicated workspace', () => {
+    let manager: WorkspaceContainerManager;
+    let testDir: string;
+    let projectDir: string;
+
+    beforeEach(() => {
+      const project = createTestProject();
+      testDir = project.testDir;
+      projectDir = project.projectDir;
+      manager = new WorkspaceContainerManager(new AppleContainerRuntime());
+    });
+
+    afterEach(async () => {
+      // Clean up test directory (workspace cleanup happens within the test)
+      if (existsSync(testDir)) {
+        rmSync(testDir, { recursive: true, force: true });
+      }
+    }, 30000);
+
+    it('should mount, list, and destroy workspaces correctly', async () => {
+      // This comprehensive test covers full workspace lifecycle with a SINGLE container:
+      // 1. Create workspace
+      // 2. Verify mount works (execute ls /workspace)
+      // 3. Duplicate handling (calling createWorkspace again returns same workspace)
+      // 4. List workspaces (should see 1)
+      // 5. Destroy workspace and verify clone is gone
+      // 6. List again to verify empty
+      // Total: 1 container lifecycle instead of 2
+
+      // Step 1: Create workspace
+      const workspace = await manager.createWorkspace(projectDir, 'lifecycle-test');
+      expect(workspace.sessionId).toBe('lifecycle-test');
+      expect(workspace.state).toBe('running');
+
+      // Step 2: Verify mount works (execute ls /workspace)
+      const lsResult = await manager.executeInWorkspace('lifecycle-test', {
         command: ['ls', '/workspace'],
       });
+      expect(lsResult.exitCode).toBe(0);
+      expect(lsResult.stdout).toContain('package.json');
+      expect(lsResult.stdout).toContain('index.js');
 
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain('package.json');
-      expect(result.stdout).toContain('index.js');
-    });
+      // Step 3: Verify duplicate handling (call createWorkspace again)
+      const workspaceDuplicate = await manager.createWorkspace(projectDir, 'lifecycle-test');
+      expect(workspaceDuplicate.sessionId).toBe(workspace.sessionId);
+      expect(workspaceDuplicate.clonePath).toBe(workspace.clonePath);
+      expect(workspaceDuplicate.containerId).toBe(workspace.containerId);
 
-    it('should return existing workspace if session already has one', async () => {
-      const sessionId = 'test-session-duplicate';
+      // Step 4: List all workspaces (should see 1)
+      const workspacesBeforeDestroy = await manager.listWorkspaces();
+      expect(workspacesBeforeDestroy).toHaveLength(1);
+      expect(workspacesBeforeDestroy[0].sessionId).toBe('lifecycle-test');
 
-      const workspace1 = await manager.createWorkspace(projectDir, sessionId);
-      const workspace2 = await manager.createWorkspace(projectDir, sessionId);
-
-      // Should return the same workspace
-      expect(workspace2.sessionId).toBe(workspace1.sessionId);
-      expect(workspace2.clonePath).toBe(workspace1.clonePath);
-      expect(workspace2.containerId).toBe(workspace1.containerId);
-    });
-  });
-
-  describe('destroyWorkspace', () => {
-    it('should remove container and clone', async () => {
-      const sessionId = 'test-destroy';
-
-      const workspace = await manager.createWorkspace(projectDir, sessionId);
+      // Step 5: Destroy workspace, verify clone is gone
       expect(existsSync(workspace.clonePath)).toBe(true);
-
-      await manager.destroyWorkspace(sessionId);
-
-      // Clone should be removed
+      await manager.destroyWorkspace('lifecycle-test');
       expect(existsSync(workspace.clonePath)).toBe(false);
 
-      // Container should be removed
-      const info = await manager.inspectWorkspace(sessionId);
-      expect(info).toBeNull();
-    });
+      // Verify container is also removed
+      const destroyedInfo = await manager.inspectWorkspace('lifecycle-test');
+      expect(destroyedInfo).toBeNull();
 
-    it('should not throw if workspace does not exist', async () => {
-      await expect(manager.destroyWorkspace('non-existent')).resolves.not.toThrow();
-    });
-  });
-
-  describe('executeInWorkspace', () => {
-    it('should execute commands in the container', async () => {
-      const sessionId = 'test-exec';
-
-      await manager.createWorkspace(projectDir, sessionId);
-
-      // Use a simple echo command that should work in any container
-      const result = await manager.executeInWorkspace(sessionId, {
-        command: ['echo', 'Hello from container'],
-      });
-
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout.trim()).toBe('Hello from container');
-    });
-
-    it('should handle environment variables', async () => {
-      const sessionId = 'test-env';
-
-      await manager.createWorkspace(projectDir, sessionId);
-
-      const result = await manager.executeInWorkspace(sessionId, {
-        command: ['sh', '-c', 'echo $TEST_VAR'],
-        environment: { TEST_VAR: 'test_value' },
-      });
-
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout.trim()).toBe('test_value');
-    });
-
-    it('should throw if workspace does not exist', async () => {
-      await expect(
-        manager.executeInWorkspace('non-existent', { command: ['echo', 'test'] })
-      ).rejects.toThrow('Workspace not found');
-    });
-  });
-
-  describe('inspectWorkspace', () => {
-    it('should return workspace info', async () => {
-      const sessionId = 'test-inspect';
-
-      const workspace = await manager.createWorkspace(projectDir, sessionId);
-
-      const info = await manager.inspectWorkspace(sessionId);
-
-      expect(info).toEqual({
-        sessionId,
-        projectDir,
-        containerMountPath: '/workspace',
-        clonePath: workspace.clonePath,
-        branchName: workspace.branchName,
-        containerId: workspace.containerId,
-        state: 'running',
-      });
-    });
-
-    it('should return null for non-existent workspace', async () => {
-      const info = await manager.inspectWorkspace('non-existent');
-      expect(info).toBeNull();
-    });
-  });
-
-  describe('listWorkspaces', () => {
-    it('should list all active workspaces', async () => {
-      const sessionIds = ['session-1', 'session-2', 'session-3'];
-
-      for (const sessionId of sessionIds) {
-        await manager.createWorkspace(projectDir, sessionId);
-      }
-
-      const workspaces = await manager.listWorkspaces();
-
-      expect(workspaces).toHaveLength(3);
-      const ids = workspaces.map((w) => w.sessionId).sort();
-      expect(ids).toEqual(sessionIds.sort());
-    });
-
-    it('should return empty array when no workspaces exist', async () => {
-      const workspaces = await manager.listWorkspaces();
-      expect(workspaces).toEqual([]);
-    });
-  });
-
-  describe('translatePath', () => {
-    it('should translate host paths to container paths', async () => {
-      const sessionId = 'test-translate';
-
-      const workspace = await manager.createWorkspace(projectDir, sessionId);
-
-      const hostPath = join(workspace.clonePath, 'src', 'index.js');
-      const containerPath = manager.translateToContainer(sessionId, hostPath);
-
-      expect(containerPath).toBe('/workspace/src/index.js');
-    });
-
-    it('should translate container paths to host paths', async () => {
-      const sessionId = 'test-translate-2';
-
-      const workspace = await manager.createWorkspace(projectDir, sessionId);
-
-      const containerPath = '/workspace/src/index.js';
-      const hostPath = manager.translateToHost(sessionId, containerPath);
-
-      expect(hostPath).toBe(join(workspace.clonePath, 'src', 'index.js'));
-    });
-
-    it('should return original path if workspace not found', () => {
-      const path = '/some/path';
-      expect(manager.translateToContainer('non-existent', path)).toBe(path);
-      expect(manager.translateToHost('non-existent', path)).toBe(path);
+      // Step 6: List again (should be empty)
+      const workspacesAfterDestroy = await manager.listWorkspaces();
+      expect(workspacesAfterDestroy).toHaveLength(0);
     });
   });
 });
