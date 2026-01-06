@@ -127,7 +127,9 @@ describe('lace-agent process (E2E over stdio)', () => {
       )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
 
       expect(durable.hasMore).toBe(false);
+      // context_injected is added on session creation with the system prompt
       expect(durable.events.map((e) => e.type)).toEqual([
+        'context_injected',
         'prompt',
         'turn_start',
         'message',
@@ -135,7 +137,7 @@ describe('lace-agent process (E2E over stdio)', () => {
         'message',
         'turn_end',
       ]);
-      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6]);
+      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7]);
 
       const list = (await withTimeout(
         agent.peer.request('session/list', { workDir }),
@@ -193,7 +195,9 @@ describe('lace-agent process (E2E over stdio)', () => {
       'ent/session/events (restart)'
     )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
 
+    // context_injected is added on session creation with the system prompt
     expect(durable.events.map((e) => e.type)).toEqual([
+      'context_injected',
       'prompt',
       'turn_start',
       'message',
@@ -201,7 +205,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       'message',
       'turn_end',
     ]);
-    expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 
   it('reports currentSession.messageCount in ent/agent/status', { timeout: 15_000 }, async () => {
@@ -304,7 +308,9 @@ describe('lace-agent process (E2E over stdio)', () => {
         'ent/session/events'
       )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
 
+      // context_injected is added on session creation with the system prompt
       expect(durable.events.map((e) => e.type)).toEqual([
+        'context_injected',
         'prompt',
         'turn_start',
         'permission_requested',
@@ -314,7 +320,7 @@ describe('lace-agent process (E2E over stdio)', () => {
         'turn_end',
       ]);
 
-      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     }
   );
 
