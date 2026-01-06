@@ -4,19 +4,31 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import type { LaceEvent } from '@lace/web/types/core';
+import type { AppEvent } from '@lace/web/types/app-events';
+import {
+  isProtocolEvent,
+  isWebEvent,
+  getAgentSessionId,
+  getWorkspaceSessionId,
+} from '@lace/web/types/app-events';
 import { parseTyped } from '@lace/web/lib/serialization';
 
 interface EventFilter {
   threadIds?: string[];
   sessionIds?: string[];
   projectIds?: string[];
-  eventTypes?: string[];
+  eventTypes?: string[]; // LaceEvent types
+  // Protocol event type filtering
+  protocolEventTypes?: string[]; // e.g., ['text_delta', 'tool_use']
+  // Web event type filtering
+  webEventTypes?: string[]; // e.g., ['USER_MESSAGE_SENT']
 }
 
 interface EventSubscription {
   id: string;
   filter: EventFilter;
   callback: (event: LaceEvent) => void;
+  appEventCallback?: (event: AppEvent) => void; // New: separate callback for AppEvents
   createdAt: Date;
 }
 
@@ -39,7 +51,11 @@ interface SSEState {
 
 interface SSEActions {
   // Subscription management
-  subscribe: (filter: EventFilter, callback: (event: LaceEvent) => void) => string;
+  subscribe: (
+    filter: EventFilter,
+    callback: (event: LaceEvent) => void,
+    appEventCallback?: (event: AppEvent) => void
+  ) => string;
   unsubscribe: (subscriptionId: string) => void;
 
   // Connection management
@@ -56,7 +72,7 @@ interface SSEActions {
   };
 }
 
-// Helper function to check if event matches filter
+// Helper function to check if LaceEvent matches filter
 function eventMatchesFilter(event: LaceEvent, filter: EventFilter): boolean {
   // Empty filter matches everything
   if (
@@ -98,6 +114,70 @@ function eventMatchesFilter(event: LaceEvent, filter: EventFilter): boolean {
   return true;
 }
 
+/**
+ * Check if AppEvent matches filter
+ */
+function appEventMatchesFilter(event: AppEvent, filter: EventFilter): boolean {
+  // Empty filter matches everything
+  if (
+    !filter.threadIds?.length &&
+    !filter.sessionIds?.length &&
+    !filter.projectIds?.length &&
+    !filter.protocolEventTypes?.length &&
+    !filter.webEventTypes?.length
+  ) {
+    return true;
+  }
+
+  // Extract context from event
+  const eventThreadId = getAgentSessionId(event);
+  const eventSessionId = getWorkspaceSessionId(event);
+  const eventProjectId = 'projectId' in event ? event.projectId : undefined;
+
+  // Thread ID filter (agent session)
+  if (filter.threadIds?.length) {
+    if (!eventThreadId || !filter.threadIds.includes(eventThreadId)) {
+      return false;
+    }
+  }
+
+  // Session ID filter (workspace session)
+  if (filter.sessionIds?.length) {
+    if (!eventSessionId || !filter.sessionIds.includes(eventSessionId)) {
+      return false;
+    }
+  }
+
+  // Project ID filter
+  if (filter.projectIds?.length) {
+    if (!eventProjectId || !filter.projectIds.includes(eventProjectId)) {
+      return false;
+    }
+  }
+
+  // Protocol event type filter
+  if (filter.protocolEventTypes?.length) {
+    if (!isProtocolEvent(event)) {
+      return false;
+    }
+    if (!filter.protocolEventTypes.includes(event.update.type)) {
+      return false;
+    }
+  }
+
+  // Web event type filter
+  if (filter.webEventTypes?.length) {
+    if (!isWebEvent(event)) {
+      return false;
+    }
+    if (!filter.webEventTypes.includes(event.type)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 // Generate unique subscription IDs
 function generateSubscriptionId(): string {
   return `sub_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
@@ -117,12 +197,13 @@ const sseStore = create<SSEState & SSEActions>()(
       disconnectTimeout: null,
 
       // Subscribe to filtered events
-      subscribe: (filter, callback) => {
+      subscribe: (filter, callback, appEventCallback) => {
         const subscriptionId = generateSubscriptionId();
         const subscription: EventSubscription = {
           id: subscriptionId,
           filter,
           callback,
+          appEventCallback, // Add this
           createdAt: new Date(),
         };
 
@@ -212,14 +293,32 @@ const sseStore = create<SSEState & SSEActions>()(
 
         eventSource.onmessage = (event) => {
           try {
-            const laceEvent = parseTyped<LaceEvent>(event.data as string);
+            const rawEvent = parseTyped<LaceEvent | AppEvent>(event.data as string);
 
             // Route to subscribers directly - no caching
             const { subscriptions } = get();
             subscriptions.forEach((subscription) => {
               try {
-                if (eventMatchesFilter(laceEvent, subscription.filter)) {
-                  subscription.callback(laceEvent);
+                // Check if it's an AppEvent (has 'update' or 'request' or web 'type' without LaceEvent structure)
+                if (
+                  'update' in rawEvent ||
+                  'request' in rawEvent ||
+                  ('workspaceSessionId' in rawEvent && !('context' in rawEvent))
+                ) {
+                  // It's an AppEvent
+                  const appEvent = rawEvent as AppEvent;
+                  if (
+                    subscription.appEventCallback &&
+                    appEventMatchesFilter(appEvent, subscription.filter)
+                  ) {
+                    subscription.appEventCallback(appEvent);
+                  }
+                } else {
+                  // It's a LaceEvent
+                  const laceEvent = rawEvent as LaceEvent;
+                  if (eventMatchesFilter(laceEvent, subscription.filter)) {
+                    subscription.callback(laceEvent);
+                  }
                 }
               } catch (error) {
                 console.error(`[SSE-STORE] Error in subscription ${subscription.id}:`, error);
