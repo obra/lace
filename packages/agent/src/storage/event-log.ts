@@ -13,6 +13,7 @@ export type DurableEvent = {
 
 export function summarizeDurableEvents(sessionDir: string): {
   messageCount: number;
+  turnCount: number;
   lastActive?: string;
 } {
   const eventsPath = path.join(sessionDir, 'events.jsonl');
@@ -21,10 +22,11 @@ export function summarizeDurableEvents(sessionDir: string): {
   try {
     raw = fs.readFileSync(eventsPath, 'utf8');
   } catch {
-    return { messageCount: 0, lastActive: undefined };
+    return { messageCount: 0, turnCount: 0, lastActive: undefined };
   }
 
   let messageCount = 0;
+  let turnCount = 0;
   let lastActive: string | undefined;
 
   const lines = raw.split('\n');
@@ -35,6 +37,9 @@ export function summarizeDurableEvents(sessionDir: string): {
       if (parsed.type === 'prompt' || parsed.type === 'message') {
         messageCount++;
       }
+      if (parsed.type === 'turn_start') {
+        turnCount++;
+      }
       if (typeof parsed.timestamp === 'string' && parsed.timestamp.length > 0) {
         if (!lastActive || parsed.timestamp > lastActive) lastActive = parsed.timestamp;
       }
@@ -43,7 +48,7 @@ export function summarizeDurableEvents(sessionDir: string): {
     }
   }
 
-  return { messageCount, lastActive };
+  return { messageCount, turnCount, lastActive };
 }
 
 export function appendDurableEvent(

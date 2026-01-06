@@ -1738,10 +1738,15 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     const sessionSummary = state.activeSession
       ? summarizeDurableEvents(state.activeSession.dir)
-      : { messageCount: 0, lastActive: null as string | null };
+      : { messageCount: 0, turnCount: 0, lastActive: null as string | null };
 
-    // Get session cost from persisted state
+    // Get session cost and token usage from persisted state
     const sessionCostUsd = state.activeSession?.state.sessionCostUsd ?? 0;
+    const tokenUsage = state.activeSession?.state.tokenUsage ?? {
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+    };
+    const tokensUsed = tokenUsage.totalInputTokens + tokenUsage.totalOutputTokens;
 
     const pendingPermissions: PermissionRequest[] = [];
     if (state.activeSession) {
@@ -1795,8 +1800,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         ? {
             sessionId: state.activeSession.meta.sessionId,
             messageCount: sessionSummary.messageCount,
-            tokensUsed: 0,
-            costUsd: 0,
+            turnCount: sessionSummary.turnCount,
+            tokensUsed,
+            costUsd: sessionCostUsd,
             connectionId: effectiveConfig.connectionId,
             modelId: effectiveConfig.modelId,
           }
