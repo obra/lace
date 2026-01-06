@@ -186,26 +186,21 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const sseManager = EventStreamManager.getInstance();
     sseManager.broadcast({
-      type: 'AGENT_SPAWNED',
+      id: crypto.randomUUID(),
       timestamp: new Date(),
+      type: 'AGENT_SPAWNED',
       data: {
-        type: 'agent:spawned',
-        agentThreadId: agentResponse.threadId,
+        agentSessionId: agentResponse.threadId,
         providerInstanceId: body.providerInstanceId,
         modelId: body.modelId,
         context: {
           actor: 'human',
           isHuman: true,
         },
-        timestamp: new Date(),
       },
+      workspaceSessionId,
+      agentSessionId: agentResponse.threadId,
       transient: true,
-      context: {
-        sessionId: workspaceSessionId,
-        projectId: undefined,
-        taskId: undefined,
-        threadId: agentResponse.threadId,
-      },
     });
 
     return createSuperjsonResponse(agentResponse, {

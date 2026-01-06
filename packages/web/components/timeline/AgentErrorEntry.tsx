@@ -1,6 +1,5 @@
 // ABOUTME: Timeline entry component for AGENT_ERROR events
 // ABOUTME: Renders error messages with proper styling and context
-// FLAG-DAY: Uses ProcessedEvent - no LaceEvent
 
 'use client';
 

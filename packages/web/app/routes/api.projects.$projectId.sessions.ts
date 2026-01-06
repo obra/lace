@@ -198,15 +198,15 @@ async function spawnSessionNamingHelper(
     // Emit SESSION_INFO event via SSE
     const eventManager = EventStreamManager.getInstance();
     eventManager.broadcast({
+      id: crypto.randomUUID(),
+      timestamp: new Date(),
       type: 'SESSION_INFO',
       data: {
         title: generatedName,
         updatedAt: new Date(),
       },
-      context: {
-        sessionId: workspaceSessionId,
-        projectId,
-      },
+      workspaceSessionId,
+      projectId,
       transient: true,
     });
   } catch (error) {

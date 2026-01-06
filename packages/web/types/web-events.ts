@@ -121,6 +121,7 @@ export type WebEventType =
   | 'SESSION_CREATED'
   | 'SESSION_UPDATED'
   | 'SESSION_DELETED'
+  | 'SESSION_INFO'
   | 'TASK_CREATED'
   | 'TASK_UPDATED'
   | 'TASK_DELETED'
@@ -140,6 +141,8 @@ export interface WebEventBase {
   workspaceSessionId?: string;
   projectId?: string;
   agentSessionId?: string;
+  /** Indicates events that shouldn't be persisted (like streaming updates) */
+  transient?: boolean;
 }
 
 /** User sent a message to an agent */
@@ -168,6 +171,12 @@ export interface AgentSpawnedEvent extends WebEventBase {
     agentSessionId: string;
     parentSessionId?: string;
     taskId?: string;
+    providerInstanceId?: string;
+    modelId?: string;
+    context?: {
+      actor?: string;
+      isHuman?: boolean;
+    };
   };
 }
 
@@ -225,6 +234,15 @@ export interface SessionDeletedEvent extends WebEventBase {
   type: 'SESSION_DELETED';
   data: {
     sessionId: string;
+  };
+}
+
+/** Session info update (title, metadata) - transient event for real-time updates */
+export interface SessionInfoEvent extends WebEventBase {
+  type: 'SESSION_INFO';
+  data: {
+    title: string;
+    updatedAt: Date;
   };
 }
 
@@ -303,6 +321,7 @@ export type WebEvent =
   | SessionCreatedEvent
   | SessionUpdatedEvent
   | SessionDeletedEvent
+  | SessionInfoEvent
   | TaskCreatedEvent
   | TaskUpdatedEvent
   | TaskDeletedEvent
