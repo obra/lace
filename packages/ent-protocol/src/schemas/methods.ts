@@ -513,6 +513,16 @@ const EntSessionConfigureParamsSchema = z
     modelId: z.string().optional(),
     maxThinkingTokens: z.number().optional(),
     maxBudgetUsd: z.number().optional(),
+    /**
+     * Arbitrary environment variables to expose to the agent runtime for this session.
+     * Keys/values must be strings to keep the transport simple and avoid leaking objects.
+     */
+    environment: z.record(z.string(), z.string()).optional(),
+    /**
+     * Working directory to use for this session. Supervisor remains responsible for sandboxing
+     * and validating the path; the agent should treat it as an opaque string.
+     */
+    cwd: z.string().optional(),
     mcpServers: z.array(McpServerConfigSchema).optional(),
     approvalMode: z
       .enum([
