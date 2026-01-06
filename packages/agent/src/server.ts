@@ -3340,262 +3340,162 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     state.activeTurn = { turnId, startedAt, status: 'running', abortController };
 
-    let durableTurnSeq = 0;
-    const writeAndAdvance = async (event: { type: string; data: Record<string, unknown> }) => {
-      await runExclusive(() => {
-        if (!state.activeSession) return;
-        let sessionState: SessionState = readSessionState(state.activeSession.dir);
-        const { nextState } = appendDurableEvent(state.activeSession.dir, sessionState, {
-          type: event.type,
-          data: event.data,
-          turnId,
-          turnSeq: durableTurnSeq++,
+    try {
+      let durableTurnSeq = 0;
+      const writeAndAdvance = async (event: { type: string; data: Record<string, unknown> }) => {
+        await runExclusive(() => {
+          if (!state.activeSession) return;
+          let sessionState: SessionState = readSessionState(state.activeSession.dir);
+          const { nextState } = appendDurableEvent(state.activeSession.dir, sessionState, {
+            type: event.type,
+            data: event.data,
+            turnId,
+            turnSeq: durableTurnSeq++,
+          });
+          sessionState = nextState;
+          writeSessionState(state.activeSession.dir, sessionState);
+          state.activeSession = { ...state.activeSession, state: sessionState };
         });
-        sessionState = nextState;
-        writeSessionState(state.activeSession.dir, sessionState);
-        state.activeSession = { ...state.activeSession, state: sessionState };
-      });
-    };
-
-    await writeAndAdvance({ type: 'prompt', data: { content: parsed.content } });
-    await writeAndAdvance({ type: 'turn_start', data: {} });
-    await emitSessionUpdate({ type: 'turn_start' }, { turnId, turnSeq: 0 });
-
-    const emitUpdate = async (turnSeq: number, update: SessionUpdate) => {
-      await emitSessionUpdate(update, { turnId, turnSeq });
-    };
-
-    if (abortController.signal.aborted) {
-      await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
-      const result = {
-        turnId,
-        stopReason: 'cancelled' as const,
-        content: [] as { type: 'text'; text: string }[],
-        usage: { inputTokens: 0, outputTokens: 0 },
       };
-      await emitSessionUpdate(
-        {
-          type: 'turn_end',
-          stopReason: result.stopReason,
-          content: result.content,
-          usage: result.usage,
-        },
-        { turnId, turnSeq: 1 }
-      );
-      state.activeSession = loadSession(state.activeSession.meta.sessionId);
-      state.activeTurn = null;
-      return result;
-    }
 
-    const promptText = (parsed.content as any[])
-      .filter((b) => b?.type === 'text' && typeof b.text === 'string')
-      .map((b) => b.text)
-      .join('\n');
+      await writeAndAdvance({ type: 'prompt', data: { content: parsed.content } });
+      await writeAndAdvance({ type: 'turn_start', data: {} });
+      await emitSessionUpdate({ type: 'turn_start' }, { turnId, turnSeq: 0 });
 
-    const runMatch = promptText.match(/^\s*run:\s*(.+)\s*$/m);
-    const command = runMatch?.[1]?.trim();
+      const emitUpdate = async (turnSeq: number, update: SessionUpdate) => {
+        await emitSessionUpdate(update, { turnId, turnSeq });
+      };
 
-    const jobMatch = promptText.match(/^\s*job:\s*(.+)\s*$/m);
-    const jobCommand = jobMatch?.[1]?.trim();
+      if (abortController.signal.aborted) {
+        await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
+        const result = {
+          turnId,
+          stopReason: 'cancelled' as const,
+          content: [] as { type: 'text'; text: string }[],
+          usage: { inputTokens: 0, outputTokens: 0 },
+        };
+        await emitSessionUpdate(
+          {
+            type: 'turn_end',
+            stopReason: result.stopReason,
+            content: result.content,
+            usage: result.usage,
+          },
+          { turnId, turnSeq: 1 }
+        );
+        state.activeSession = loadSession(state.activeSession.meta.sessionId);
+        state.activeTurn = null;
+        return result;
+      }
 
-    const subagentMatch = promptText.match(/^\s*subagent:\s*(.+)\s*$/m);
-    const subagentText = subagentMatch?.[1]?.trim();
+      const promptText = (parsed.content as any[])
+        .filter((b) => b?.type === 'text' && typeof b.text === 'string')
+        .map((b) => b.text)
+        .join('\n');
 
-    const workDir = state.activeSession.meta.workDir;
-    const filesRead = deriveFilesReadFromDurableEvents(state.activeSession.dir, workDir);
+      const runMatch = promptText.match(/^\s*run:\s*(.+)\s*$/m);
+      const command = runMatch?.[1]?.trim();
 
-    if (!command && !jobCommand && !subagentText) {
-      const maxTurns =
-        typeof (params as any)?.maxTurns === 'number' && Number.isFinite((params as any).maxTurns)
-          ? Math.max(1, Math.trunc((params as any).maxTurns))
-          : 10;
+      const jobMatch = promptText.match(/^\s*job:\s*(.+)\s*$/m);
+      const jobCommand = jobMatch?.[1]?.trim();
 
-      const { executor: toolExecutor, toolsForProvider } = createToolExecutorForMode(
-        effectiveConfig.executionMode,
-        state.mcpServerManager
-      );
+      const subagentMatch = promptText.match(/^\s*subagent:\s*(.+)\s*$/m);
+      const subagentText = subagentMatch?.[1]?.trim();
 
-      const provider = await createProviderForTurn({
-        connectionId: effectiveConfig.connectionId,
-        modelId: effectiveConfig.modelId,
-      });
+      const workDir = state.activeSession.meta.workDir;
+      const filesRead = deriveFilesReadFromDurableEvents(state.activeSession.dir, workDir);
 
-      let providerMessages = buildProviderMessagesFromDurableEvents(state.activeSession.dir);
-      let finalAssistantContent = '';
-      let stopReason: 'end_turn' | 'max_tokens' | 'max_turns' | 'cancelled' | 'budget_exceeded' =
-        'end_turn';
+      if (!command && !jobCommand && !subagentText) {
+        const maxTurns =
+          typeof (params as any)?.maxTurns === 'number' && Number.isFinite((params as any).maxTurns)
+            ? Math.max(1, Math.trunc((params as any).maxTurns))
+            : 10;
 
-      let streamTurnSeq = 0;
+        const { executor: toolExecutor, toolsForProvider } = createToolExecutorForMode(
+          effectiveConfig.executionMode,
+          state.mcpServerManager
+        );
 
-      let completedTurns = 0;
+        const provider = await createProviderForTurn({
+          connectionId: effectiveConfig.connectionId,
+          modelId: effectiveConfig.modelId,
+        });
 
-      try {
-        for (; completedTurns < maxTurns; completedTurns++) {
-          const messageTurnSeq = streamTurnSeq++;
-          let streamedAny = false;
+        let providerMessages = buildProviderMessagesFromDurableEvents(state.activeSession.dir);
+        let finalAssistantContent = '';
+        let stopReason: 'end_turn' | 'max_tokens' | 'max_turns' | 'cancelled' | 'budget_exceeded' =
+          'end_turn';
 
-          const onToken = (payload: { token?: string }) => {
-            if (abortController.signal.aborted) return;
-            if (!payload?.token) return;
-            streamedAny = true;
-            void emitUpdate(messageTurnSeq, { type: 'text_delta', text: payload.token });
-          };
+        let streamTurnSeq = 0;
 
-          provider.on('token', onToken);
-          const response = await provider.createStreamingResponse(
-            providerMessages,
-            toolsForProvider,
-            effectiveConfig.modelId || 'unknown-model',
-            abortController.signal
-          );
-          provider.off('token', onToken);
+        let completedTurns = 0;
 
-          if (abortController.signal.aborted) {
-            stopReason = 'cancelled';
-            break;
-          }
+        try {
+          for (; completedTurns < maxTurns; completedTurns++) {
+            const messageTurnSeq = streamTurnSeq++;
+            let streamedAny = false;
 
-          const assistantText = typeof response.content === 'string' ? response.content : '';
-          finalAssistantContent = assistantText;
+            const onToken = (payload: { token?: string }) => {
+              if (abortController.signal.aborted) return;
+              if (!payload?.token) return;
+              streamedAny = true;
+              void emitUpdate(messageTurnSeq, { type: 'text_delta', text: payload.token });
+            };
 
-          if (!streamedAny && assistantText.length > 0) {
-            await emitUpdate(messageTurnSeq, { type: 'text_delta', text: assistantText });
-          }
+            provider.on('token', onToken);
+            const response = await provider.createStreamingResponse(
+              providerMessages,
+              toolsForProvider,
+              effectiveConfig.modelId || 'unknown-model',
+              abortController.signal
+            );
+            provider.off('token', onToken);
 
-          await writeAndAdvance({ type: 'message', data: { content: assistantText } });
-
-          const toolCalls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
-          if (toolCalls.length === 0) {
-            stopReason = response.stopReason === 'max_tokens' ? 'max_tokens' : 'end_turn';
-            break;
-          }
-
-          providerMessages = [
-            ...providerMessages,
-            {
-              role: 'assistant',
-              content: assistantText,
-              toolCalls: toolCalls.map((tc) => ({
-                id: tc.id,
-                name: tc.name,
-                arguments: tc.arguments,
-              })),
-            },
-          ];
-
-          let shouldContinue = true;
-
-          for (const toolCall of toolCalls) {
-            const toolCallId = toNonEmptyString(toolCall.id) ?? `tool_${randomUUID()}`;
-            const toolName = toNonEmptyString(toolCall.name) ?? '';
-            const toolInput =
-              typeof toolCall.arguments === 'object' && toolCall.arguments
-                ? (toolCall.arguments as Record<string, unknown>)
-                : {};
-
-            const toolTurnSeq = streamTurnSeq++;
-            const kind = toolKindFromName(toolName);
-
-            await emitUpdate(toolTurnSeq, {
-              type: 'tool_use',
-              toolCallId,
-              name: toolName,
-              kind,
-              input: toolInput,
-              status: 'pending',
-            });
-
-            if (effectiveConfig.approvalMode === 'deny') {
-              const denied: ToolResult = {
-                outcome: 'denied',
-                content: [{ type: 'error', message: 'Denied by policy' }],
-              };
-
-              await emitUpdate(toolTurnSeq, {
-                type: 'tool_use',
-                toolCallId,
-                name: toolName,
-                kind,
-                input: toolInput,
-                status: 'denied',
-                result: denied,
-              });
-
-              await writeAndAdvance({
-                type: 'tool_use',
-                data: { toolCallId, name: toolName, kind, input: toolInput, result: denied },
-              });
-
-              shouldContinue = false;
-              continue;
+            if (abortController.signal.aborted) {
+              stopReason = 'cancelled';
+              break;
             }
 
-            if (effectiveConfig.executionMode === 'plan' && kind !== 'read' && kind !== 'search') {
-              const denied: ToolResult = {
-                outcome: 'denied',
-                content: [{ type: 'error', message: 'Tool denied in plan mode' }],
-              };
+            const assistantText = typeof response.content === 'string' ? response.content : '';
+            finalAssistantContent = assistantText;
 
-              await emitUpdate(toolTurnSeq, {
-                type: 'tool_use',
-                toolCallId,
-                name: toolName,
-                kind,
-                input: toolInput,
-                status: 'denied',
-                result: denied,
-              });
-
-              await writeAndAdvance({
-                type: 'tool_use',
-                data: { toolCallId, name: toolName, kind, input: toolInput, result: denied },
-              });
-
-              shouldContinue = false;
-              continue;
+            if (!streamedAny && assistantText.length > 0) {
+              await emitUpdate(messageTurnSeq, { type: 'text_delta', text: assistantText });
             }
 
-            const tool = toolExecutor.getTool(toolName);
-            if (!tool && toolName !== 'delegate') {
-              const failed: ToolResult = {
-                outcome: 'failed',
-                content: [{ type: 'error', message: `Tool not found: ${toolName}` }],
-              };
+            await writeAndAdvance({ type: 'message', data: { content: assistantText } });
 
-              await emitUpdate(toolTurnSeq, {
-                type: 'tool_use',
-                toolCallId,
-                name: toolName,
-                kind,
-                input: toolInput,
-                status: 'failed',
-                result: failed,
-              });
-
-              await writeAndAdvance({
-                type: 'tool_use',
-                data: { toolCallId, name: toolName, kind, input: toolInput, result: failed },
-              });
-
-              shouldContinue = false;
-              continue;
+            const toolCalls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
+            if (toolCalls.length === 0) {
+              stopReason = response.stopReason === 'max_tokens' ? 'max_tokens' : 'end_turn';
+              break;
             }
 
-            let finalInput = toolInput;
+            providerMessages = [
+              ...providerMessages,
+              {
+                role: 'assistant',
+                content: assistantText,
+                toolCalls: toolCalls.map((tc) => ({
+                  id: tc.id,
+                  name: tc.name,
+                  arguments: tc.arguments,
+                })),
+              },
+            ];
 
-            const needsPermission = shouldAskPermission(effectiveConfig.approvalMode, kind);
-            if (needsPermission) {
-              state.activeTurn = {
-                turnId,
-                startedAt,
-                status: 'awaiting_permission',
-                abortController,
-              };
+            let shouldContinue = true;
 
-              const options = [
-                { optionId: 'allow', label: 'Allow' },
-                { optionId: 'deny', label: 'Deny' },
-              ];
+            for (const toolCall of toolCalls) {
+              const toolCallId = toNonEmptyString(toolCall.id) ?? `tool_${randomUUID()}`;
+              const toolName = toNonEmptyString(toolCall.name) ?? '';
+              const toolInput =
+                typeof toolCall.arguments === 'object' && toolCall.arguments
+                  ? (toolCall.arguments as Record<string, unknown>)
+                  : {};
+
+              const toolTurnSeq = streamTurnSeq++;
+              const kind = toolKindFromName(toolName);
 
               await emitUpdate(toolTurnSeq, {
                 type: 'tool_use',
@@ -3603,62 +3503,13 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 name: toolName,
                 kind,
                 input: toolInput,
-                status: 'awaiting_permission',
+                status: 'pending',
               });
 
-              let permissionResponse:
-                | { decision?: string; updatedInput?: Record<string, unknown> }
-                | undefined;
-
-              try {
-                permissionResponse = await requestPermissionFromClient({
-                  sessionId: state.activeSession.meta.sessionId,
-                  turnId,
-                  turnSeq: toolTurnSeq,
-                  toolCallId,
-                  tool: toolName,
-                  kind,
-                  resource: toolName,
-                  options,
-                  input: toolInput,
-                  signal: abortController.signal,
-                });
-              } catch {
-                const cancelled: ToolResult = {
-                  outcome: 'cancelled',
-                  content: [{ type: 'error', message: 'Cancelled' }],
-                };
-
-                await emitUpdate(toolTurnSeq, {
-                  type: 'tool_use',
-                  toolCallId,
-                  name: toolName,
-                  kind,
-                  input: toolInput,
-                  status: 'cancelled',
-                  result: cancelled,
-                });
-
-                await writeAndAdvance({
-                  type: 'tool_use',
-                  data: { toolCallId, name: toolName, kind, input: toolInput, result: cancelled },
-                });
-
-                shouldContinue = false;
-                continue;
-              }
-
-              state.activeTurn = { turnId, startedAt, status: 'running', abortController };
-
-              const decision = toNonEmptyString(permissionResponse?.decision);
-              if (permissionResponse?.updatedInput) {
-                finalInput = permissionResponse.updatedInput;
-              }
-
-              if (decision === 'deny') {
+              if (effectiveConfig.approvalMode === 'deny') {
                 const denied: ToolResult = {
                   outcome: 'denied',
-                  content: [{ type: 'error', message: 'Denied by user' }],
+                  content: [{ type: 'error', message: 'Denied by policy' }],
                 };
 
                 await emitUpdate(toolTurnSeq, {
@@ -3679,9 +3530,615 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 shouldContinue = false;
                 continue;
               }
+
+              if (
+                effectiveConfig.executionMode === 'plan' &&
+                kind !== 'read' &&
+                kind !== 'search'
+              ) {
+                const denied: ToolResult = {
+                  outcome: 'denied',
+                  content: [{ type: 'error', message: 'Tool denied in plan mode' }],
+                };
+
+                await emitUpdate(toolTurnSeq, {
+                  type: 'tool_use',
+                  toolCallId,
+                  name: toolName,
+                  kind,
+                  input: toolInput,
+                  status: 'denied',
+                  result: denied,
+                });
+
+                await writeAndAdvance({
+                  type: 'tool_use',
+                  data: { toolCallId, name: toolName, kind, input: toolInput, result: denied },
+                });
+
+                shouldContinue = false;
+                continue;
+              }
+
+              const tool = toolExecutor.getTool(toolName);
+              if (!tool && toolName !== 'delegate') {
+                const failed: ToolResult = {
+                  outcome: 'failed',
+                  content: [{ type: 'error', message: `Tool not found: ${toolName}` }],
+                };
+
+                await emitUpdate(toolTurnSeq, {
+                  type: 'tool_use',
+                  toolCallId,
+                  name: toolName,
+                  kind,
+                  input: toolInput,
+                  status: 'failed',
+                  result: failed,
+                });
+
+                await writeAndAdvance({
+                  type: 'tool_use',
+                  data: { toolCallId, name: toolName, kind, input: toolInput, result: failed },
+                });
+
+                shouldContinue = false;
+                continue;
+              }
+
+              let finalInput = toolInput;
+
+              const needsPermission = shouldAskPermission(effectiveConfig.approvalMode, kind);
+              if (needsPermission) {
+                state.activeTurn = {
+                  turnId,
+                  startedAt,
+                  status: 'awaiting_permission',
+                  abortController,
+                };
+
+                const options = [
+                  { optionId: 'allow', label: 'Allow' },
+                  { optionId: 'deny', label: 'Deny' },
+                ];
+
+                await emitUpdate(toolTurnSeq, {
+                  type: 'tool_use',
+                  toolCallId,
+                  name: toolName,
+                  kind,
+                  input: toolInput,
+                  status: 'awaiting_permission',
+                });
+
+                let permissionResponse:
+                  | { decision?: string; updatedInput?: Record<string, unknown> }
+                  | undefined;
+
+                try {
+                  permissionResponse = await requestPermissionFromClient({
+                    sessionId: state.activeSession.meta.sessionId,
+                    turnId,
+                    turnSeq: toolTurnSeq,
+                    toolCallId,
+                    tool: toolName,
+                    kind,
+                    resource: toolName,
+                    options,
+                    input: toolInput,
+                    signal: abortController.signal,
+                  });
+                } catch {
+                  const cancelled: ToolResult = {
+                    outcome: 'cancelled',
+                    content: [{ type: 'error', message: 'Cancelled' }],
+                  };
+
+                  await emitUpdate(toolTurnSeq, {
+                    type: 'tool_use',
+                    toolCallId,
+                    name: toolName,
+                    kind,
+                    input: toolInput,
+                    status: 'cancelled',
+                    result: cancelled,
+                  });
+
+                  await writeAndAdvance({
+                    type: 'tool_use',
+                    data: { toolCallId, name: toolName, kind, input: toolInput, result: cancelled },
+                  });
+
+                  shouldContinue = false;
+                  continue;
+                }
+
+                state.activeTurn = { turnId, startedAt, status: 'running', abortController };
+
+                const decision = toNonEmptyString(permissionResponse?.decision);
+                if (permissionResponse?.updatedInput) {
+                  finalInput = permissionResponse.updatedInput;
+                }
+
+                if (decision === 'deny') {
+                  const denied: ToolResult = {
+                    outcome: 'denied',
+                    content: [{ type: 'error', message: 'Denied by user' }],
+                  };
+
+                  await emitUpdate(toolTurnSeq, {
+                    type: 'tool_use',
+                    toolCallId,
+                    name: toolName,
+                    kind,
+                    input: toolInput,
+                    status: 'denied',
+                    result: denied,
+                  });
+
+                  await writeAndAdvance({
+                    type: 'tool_use',
+                    data: { toolCallId, name: toolName, kind, input: toolInput, result: denied },
+                  });
+
+                  shouldContinue = false;
+                  continue;
+                }
+              }
+
+              await emitUpdate(toolTurnSeq, {
+                type: 'tool_use',
+                toolCallId,
+                name: toolName,
+                kind,
+                input: finalInput,
+                status: 'running',
+              });
+
+              let coreResult: CoreToolResult;
+
+              if (toolName === 'delegate') {
+                const prompt = toNonEmptyString((finalInput as any).prompt);
+                if (!prompt) {
+                  coreResult = {
+                    status: 'failed',
+                    content: [{ type: 'text', text: 'delegate.prompt is required' }],
+                  };
+                } else {
+                  const { jobId } = await startSubagentJob({
+                    prompt,
+                    description: 'Delegate',
+                    turnContext: { turnId, turnSeq: toolTurnSeq },
+                  });
+
+                  const job = state.jobs.get(jobId);
+                  if (job) {
+                    const abortPromise = new Promise<never>((_, reject) => {
+                      abortController.signal.addEventListener(
+                        'abort',
+                        () => reject(new Error('cancelled')),
+                        {
+                          once: true,
+                        }
+                      );
+                    });
+
+                    try {
+                      await Promise.race([job.completion, abortPromise]);
+                    } catch {
+                      job.status = 'cancelled';
+                      await finalizeJob(job);
+                    }
+                  }
+
+                  let output = '';
+                  try {
+                    output = readFileSync(getJobOutputPath(state.activeSession.dir, jobId), 'utf8');
+                  } catch {
+                    output = '';
+                  }
+
+                  const tailLimit = 64 * 1024;
+                  const truncated = output.length > tailLimit;
+                  const reportText = truncated ? output.slice(-tailLimit) : output;
+
+                  const status = job?.status ?? 'failed';
+                  coreResult = {
+                    status:
+                      status === 'completed'
+                        ? 'completed'
+                        : status === 'cancelled'
+                          ? 'aborted'
+                          : 'failed',
+                    content: [
+                      {
+                        type: 'text',
+                        text:
+                          `delegate jobId=${jobId}\n\n` +
+                          (reportText.trim().length > 0 ? reportText.trim() : '(no output)') +
+                          (truncated ? '\n\n(truncated)' : ''),
+                      },
+                    ],
+                  };
+                }
+              } else {
+                coreResult = await toolExecutor.execute(
+                  { id: toolCallId, name: toolName, arguments: finalInput },
+                  {
+                    signal: abortController.signal,
+                    workingDirectory: workDir,
+                    toolTempRoot: join(state.activeSession.dir, 'tool-temp'),
+                    hasFileBeenRead: (p) =>
+                      filesRead.has(isAbsolutePath(p) ? p : resolvePath(workDir, p)),
+                  }
+                );
+
+                if (toolName === 'file_read' && coreResult.status === 'completed') {
+                  const p = toNonEmptyString(finalInput.path);
+                  if (p) filesRead.add(isAbsolutePath(p) ? p : resolvePath(workDir, p));
+                }
+              }
+
+              const protocolResult = protocolToolResultFromCore(coreResult);
+              const terminalStatus =
+                protocolResult.outcome === 'completed'
+                  ? 'completed'
+                  : protocolResult.outcome === 'denied'
+                    ? 'denied'
+                    : protocolResult.outcome === 'cancelled'
+                      ? 'cancelled'
+                      : 'failed';
+
+              await emitUpdate(toolTurnSeq, {
+                type: 'tool_use',
+                toolCallId,
+                name: toolName,
+                kind,
+                input: finalInput,
+                status: terminalStatus,
+                result: protocolResult,
+              });
+
+              await writeAndAdvance({
+                type: 'tool_use',
+                data: {
+                  toolCallId,
+                  name: toolName,
+                  kind,
+                  input: finalInput,
+                  result: protocolResult,
+                },
+              });
+
+              providerMessages = [
+                ...providerMessages,
+                { role: 'user', content: '', toolResults: [coreResult] },
+              ];
+
+              if (coreResult.status !== 'completed') {
+                shouldContinue = false;
+              }
             }
 
-            await emitUpdate(toolTurnSeq, {
+            if (!shouldContinue) {
+              break;
+            }
+          }
+
+          if (abortController.signal.aborted) {
+            stopReason = 'cancelled';
+          }
+        } finally {
+          provider.cleanup();
+        }
+
+        if (stopReason === 'end_turn' && completedTurns >= maxTurns) {
+          stopReason = 'max_turns';
+        }
+
+        await writeAndAdvance({ type: 'turn_end', data: { stopReason } });
+        const result = {
+          turnId,
+          stopReason,
+          content:
+            finalAssistantContent.length > 0
+              ? [{ type: 'text' as const, text: finalAssistantContent }]
+              : ([] as { type: 'text'; text: string }[]),
+          usage: { inputTokens: 0, outputTokens: 0 },
+        };
+        await emitSessionUpdate(
+          {
+            type: 'turn_end',
+            stopReason: result.stopReason,
+            content: result.content,
+            usage: result.usage,
+          },
+          { turnId, turnSeq: streamTurnSeq }
+        );
+        state.activeSession = loadSession(state.activeSession.meta.sessionId);
+        state.activeTurn = null;
+        return result;
+      }
+
+      const deferredJobs: JobState[] = [];
+      let nextJobTurnSeq = 1;
+
+      if (jobCommand && effectiveConfig.executionMode === 'execute') {
+        const jobId = `job_${randomUUID()}`;
+        const startedAt = new Date().toISOString();
+        const outputPath = getJobOutputPath(state.activeSession.dir, jobId);
+
+        let resolveCompletion!: () => void;
+        const completion = new Promise<void>((resolve) => {
+          resolveCompletion = resolve;
+        });
+
+        const job: JobState = {
+          jobId,
+          type: 'shell',
+          status: 'running',
+          description: 'Background shell job',
+          command: jobCommand,
+          startedAt,
+          originTurnId: turnId,
+          originTurnSeq: nextJobTurnSeq,
+          outputPath,
+          finished: false,
+          completion,
+          resolveCompletion,
+        };
+
+        state.jobs.set(jobId, job);
+
+        await writeAndAdvance({
+          type: 'job_started',
+          data: { jobId, jobType: 'shell', description: job.description, command: jobCommand },
+        });
+
+        await emitUpdate(nextJobTurnSeq++, {
+          type: 'job_started',
+          jobId,
+          jobType: 'shell',
+          description: job.description,
+        });
+
+        deferredJobs.push(job);
+      }
+
+      if (subagentText && effectiveConfig.executionMode === 'execute') {
+        const jobId = `job_${randomUUID()}`;
+        const startedAt = new Date().toISOString();
+        const outputPath = getJobOutputPath(state.activeSession.dir, jobId);
+
+        let resolveCompletion!: () => void;
+        const completion = new Promise<void>((resolve) => {
+          resolveCompletion = resolve;
+        });
+
+        const job: JobState = {
+          jobId,
+          type: 'subagent',
+          status: 'running',
+          description: 'Subagent',
+          command: subagentText,
+          subagentContent: [{ type: 'text', text: subagentText }],
+          startedAt,
+          originTurnId: turnId,
+          originTurnSeq: nextJobTurnSeq,
+          outputPath,
+          finished: false,
+          completion,
+          resolveCompletion,
+        };
+
+        state.jobs.set(jobId, job);
+
+        await writeAndAdvance({
+          type: 'job_started',
+          data: {
+            jobId,
+            jobType: 'subagent',
+            description: job.description,
+            command: subagentText,
+          },
+        });
+
+        await emitUpdate(nextJobTurnSeq++, {
+          type: 'job_started',
+          jobId,
+          jobType: 'subagent',
+          description: job.description,
+        });
+
+        deferredJobs.push(job);
+      }
+
+      if (command && effectiveConfig.executionMode === 'execute') {
+        const toolCallId = `tool_${randomUUID()}`;
+        const toolName = 'bash';
+        const kind = toolKindFromName(toolName);
+        const toolInput = { command } as Record<string, unknown>;
+        let shouldExecuteTool = true;
+
+        await emitUpdate(1, {
+          type: 'tool_use',
+          toolCallId,
+          name: toolName,
+          kind,
+          input: toolInput,
+          status: 'pending',
+        });
+
+        const requiresPermission = shouldAskPermission(effectiveConfig.approvalMode, kind);
+
+        if (effectiveConfig.approvalMode === 'deny') {
+          const denied: ToolResult = {
+            outcome: 'denied',
+            content: [{ type: 'error', message: 'Denied by policy' }],
+          };
+
+          shouldExecuteTool = false;
+          await emitUpdate(1, {
+            type: 'tool_use',
+            toolCallId,
+            name: toolName,
+            kind,
+            input: toolInput,
+            status: 'denied',
+            result: denied,
+          });
+
+          await writeAndAdvance({
+            type: 'tool_use',
+            data: {
+              toolCallId,
+              name: toolName,
+              kind,
+              input: toolInput,
+              result: denied,
+            },
+          });
+        } else {
+          const { executor: toolExecutor } = createToolExecutorForMode(
+            'execute',
+            state.mcpServerManager
+          );
+          let finalInput = toolInput;
+
+          if (requiresPermission) {
+            state.activeTurn = {
+              turnId,
+              startedAt,
+              status: 'awaiting_permission',
+              abortController,
+            };
+
+            const options = [
+              { optionId: 'allow', label: 'Allow' },
+              { optionId: 'deny', label: 'Deny' },
+            ];
+
+            await emitUpdate(1, {
+              type: 'tool_use',
+              toolCallId,
+              name: toolName,
+              kind,
+              input: toolInput,
+              status: 'awaiting_permission',
+            });
+
+            let permissionResponse:
+              | { decision?: string; updatedInput?: Record<string, unknown> }
+              | undefined;
+            try {
+              permissionResponse = await requestPermissionFromClient({
+                sessionId: state.activeSession.meta.sessionId,
+                turnId,
+                turnSeq: 1,
+                toolCallId,
+                tool: toolName,
+                kind,
+                resource: command,
+                options,
+                input: toolInput,
+                signal: abortController.signal,
+              });
+            } catch {
+              const cancelled: ToolResult = {
+                outcome: 'cancelled',
+                content: [{ type: 'error', message: 'Cancelled' }],
+              };
+
+              await emitUpdate(1, {
+                type: 'tool_use',
+                toolCallId,
+                name: toolName,
+                kind,
+                input: toolInput,
+                status: 'cancelled',
+                result: cancelled,
+              });
+
+              await writeAndAdvance({
+                type: 'tool_use',
+                data: {
+                  toolCallId,
+                  name: toolName,
+                  kind,
+                  input: toolInput,
+                  result: cancelled,
+                },
+              });
+              await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
+              const result = {
+                turnId,
+                stopReason: 'cancelled' as const,
+                content: [] as { type: 'text'; text: string }[],
+                usage: { inputTokens: 0, outputTokens: 0 },
+              };
+              await emitSessionUpdate(
+                {
+                  type: 'turn_end',
+                  stopReason: result.stopReason,
+                  content: result.content,
+                  usage: result.usage,
+                },
+                { turnId, turnSeq: nextJobTurnSeq }
+              );
+              state.activeSession = loadSession(state.activeSession.meta.sessionId);
+              state.activeTurn = null;
+              return result;
+            }
+
+            state.activeTurn = { turnId, startedAt, status: 'running', abortController };
+
+            const decision = permissionResponse?.decision;
+            if (decision === 'deny') {
+              const denied: ToolResult = {
+                outcome: 'denied',
+                content: [{ type: 'error', message: 'Denied' }],
+              };
+
+              shouldExecuteTool = false;
+              await emitUpdate(1, {
+                type: 'tool_use',
+                toolCallId,
+                name: toolName,
+                kind,
+                input: toolInput,
+                status: 'denied',
+                result: denied,
+              });
+
+              await writeAndAdvance({
+                type: 'tool_use',
+                data: {
+                  toolCallId,
+                  name: toolName,
+                  kind,
+                  input: toolInput,
+                  result: denied,
+                },
+              });
+            } else {
+              if (
+                permissionResponse?.updatedInput &&
+                typeof permissionResponse.updatedInput === 'object'
+              ) {
+                finalInput = permissionResponse.updatedInput as Record<string, unknown>;
+              }
+
+              await emitUpdate(1, {
+                type: 'tool_use',
+                toolCallId,
+                name: toolName,
+                kind,
+                input: finalInput,
+                status: 'running',
+              });
+            }
+          } else {
+            await emitUpdate(1, {
               type: 'tool_use',
               toolCallId,
               name: toolName,
@@ -3689,150 +4146,85 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
               input: finalInput,
               status: 'running',
             });
+          }
 
-            let coreResult: CoreToolResult;
-
-            if (toolName === 'delegate') {
-              const prompt = toNonEmptyString((finalInput as any).prompt);
-              if (!prompt) {
-                coreResult = {
-                  status: 'failed',
-                  content: [{ type: 'text', text: 'delegate.prompt is required' }],
-                };
-              } else {
-                const { jobId } = await startSubagentJob({
-                  prompt,
-                  description: 'Delegate',
-                  turnContext: { turnId, turnSeq: toolTurnSeq },
-                });
-
-                const job = state.jobs.get(jobId);
-                if (job) {
-                  const abortPromise = new Promise<never>((_, reject) => {
-                    abortController.signal.addEventListener(
-                      'abort',
-                      () => reject(new Error('cancelled')),
-                      {
-                        once: true,
-                      }
-                    );
-                  });
-
-                  try {
-                    await Promise.race([job.completion, abortPromise]);
-                  } catch {
-                    job.status = 'cancelled';
-                    await finalizeJob(job);
-                  }
-                }
-
-                let output = '';
-                try {
-                  output = readFileSync(getJobOutputPath(state.activeSession.dir, jobId), 'utf8');
-                } catch {
-                  output = '';
-                }
-
-                const tailLimit = 64 * 1024;
-                const truncated = output.length > tailLimit;
-                const reportText = truncated ? output.slice(-tailLimit) : output;
-
-                const status = job?.status ?? 'failed';
-                coreResult = {
-                  status:
-                    status === 'completed'
-                      ? 'completed'
-                      : status === 'cancelled'
-                        ? 'aborted'
-                        : 'failed',
-                  content: [
-                    {
-                      type: 'text',
-                      text:
-                        `delegate jobId=${jobId}\n\n` +
-                        (reportText.trim().length > 0 ? reportText.trim() : '(no output)') +
-                        (truncated ? '\n\n(truncated)' : ''),
-                    },
-                  ],
-                };
+          if (shouldExecuteTool && !abortController.signal.aborted) {
+            const coreResult = await toolExecutor.execute(
+              { id: toolCallId, name: toolName, arguments: finalInput },
+              {
+                signal: abortController.signal,
+                workingDirectory: workDir,
+                toolTempRoot: join(state.activeSession.dir, 'tool-temp'),
+                hasFileBeenRead: (p) =>
+                  filesRead.has(isAbsolutePath(p) ? p : resolvePath(workDir, p)),
               }
-            } else {
-              coreResult = await toolExecutor.execute(
-                { id: toolCallId, name: toolName, arguments: finalInput },
-                {
-                  signal: abortController.signal,
-                  workingDirectory: workDir,
-                  toolTempRoot: join(state.activeSession.dir, 'tool-temp'),
-                  hasFileBeenRead: (p) =>
-                    filesRead.has(isAbsolutePath(p) ? p : resolvePath(workDir, p)),
-                }
-              );
+            );
 
-              if (toolName === 'file_read' && coreResult.status === 'completed') {
-                const p = toNonEmptyString(finalInput.path);
-                if (p) filesRead.add(isAbsolutePath(p) ? p : resolvePath(workDir, p));
-              }
-            }
-
-            const protocolResult = protocolToolResultFromCore(coreResult);
+            const result = protocolToolResultFromCore(coreResult);
             const terminalStatus =
-              protocolResult.outcome === 'completed'
+              result.outcome === 'completed'
                 ? 'completed'
-                : protocolResult.outcome === 'denied'
+                : result.outcome === 'denied'
                   ? 'denied'
-                  : protocolResult.outcome === 'cancelled'
+                  : result.outcome === 'cancelled'
                     ? 'cancelled'
                     : 'failed';
 
-            await emitUpdate(toolTurnSeq, {
+            await emitUpdate(1, {
               type: 'tool_use',
               toolCallId,
               name: toolName,
               kind,
               input: finalInput,
               status: terminalStatus,
-              result: protocolResult,
+              result,
             });
 
             await writeAndAdvance({
               type: 'tool_use',
-              data: { toolCallId, name: toolName, kind, input: finalInput, result: protocolResult },
+              data: {
+                toolCallId,
+                name: toolName,
+                kind,
+                input: finalInput,
+                result,
+              },
             });
 
-            providerMessages = [
-              ...providerMessages,
-              { role: 'user', content: '', toolResults: [coreResult] },
-            ];
-
-            if (coreResult.status !== 'completed') {
-              shouldContinue = false;
+            if (terminalStatus === 'cancelled') {
+              await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
+              const result = {
+                turnId,
+                stopReason: 'cancelled' as const,
+                content: [] as { type: 'text'; text: string }[],
+                usage: { inputTokens: 0, outputTokens: 0 },
+              };
+              await emitSessionUpdate(
+                {
+                  type: 'turn_end',
+                  stopReason: result.stopReason,
+                  content: result.content,
+                  usage: result.usage,
+                },
+                { turnId, turnSeq: nextJobTurnSeq }
+              );
+              state.activeSession = loadSession(state.activeSession.meta.sessionId);
+              state.activeTurn = null;
+              return result;
             }
           }
-
-          if (!shouldContinue) {
-            break;
-          }
         }
-
-        if (abortController.signal.aborted) {
-          stopReason = 'cancelled';
-        }
-      } finally {
-        provider.cleanup();
       }
 
-      if (stopReason === 'end_turn' && completedTurns >= maxTurns) {
-        stopReason = 'max_turns';
-      }
-
-      await writeAndAdvance({ type: 'turn_end', data: { stopReason } });
+      await writeAndAdvance({
+        type: 'message',
+        data: { content: [{ type: 'text', text: 'hello' }] },
+      });
+      await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'end_turn' } });
       const result = {
         turnId,
-        stopReason,
-        content:
-          finalAssistantContent.length > 0
-            ? [{ type: 'text' as const, text: finalAssistantContent }]
-            : ([] as { type: 'text'; text: string }[]),
+        stopReason: 'end_turn' as const,
+        content: [{ type: 'text' as const, text: 'hello' }],
         usage: { inputTokens: 0, outputTokens: 0 },
       };
       await emitSessionUpdate(
@@ -3842,393 +4234,21 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           content: result.content,
           usage: result.usage,
         },
-        { turnId, turnSeq: streamTurnSeq }
+        { turnId, turnSeq: nextJobTurnSeq }
       );
       state.activeSession = loadSession(state.activeSession.meta.sessionId);
       state.activeTurn = null;
-      return result;
-    }
 
-    const deferredJobs: JobState[] = [];
-    let nextJobTurnSeq = 1;
-
-    if (jobCommand && effectiveConfig.executionMode === 'execute') {
-      const jobId = `job_${randomUUID()}`;
-      const startedAt = new Date().toISOString();
-      const outputPath = getJobOutputPath(state.activeSession.dir, jobId);
-
-      let resolveCompletion!: () => void;
-      const completion = new Promise<void>((resolve) => {
-        resolveCompletion = resolve;
-      });
-
-      const job: JobState = {
-        jobId,
-        type: 'shell',
-        status: 'running',
-        description: 'Background shell job',
-        command: jobCommand,
-        startedAt,
-        originTurnId: turnId,
-        originTurnSeq: nextJobTurnSeq,
-        outputPath,
-        finished: false,
-        completion,
-        resolveCompletion,
-      };
-
-      state.jobs.set(jobId, job);
-
-      await writeAndAdvance({
-        type: 'job_started',
-        data: { jobId, jobType: 'shell', description: job.description, command: jobCommand },
-      });
-
-      await emitUpdate(nextJobTurnSeq++, {
-        type: 'job_started',
-        jobId,
-        jobType: 'shell',
-        description: job.description,
-      });
-
-      deferredJobs.push(job);
-    }
-
-    if (subagentText && effectiveConfig.executionMode === 'execute') {
-      const jobId = `job_${randomUUID()}`;
-      const startedAt = new Date().toISOString();
-      const outputPath = getJobOutputPath(state.activeSession.dir, jobId);
-
-      let resolveCompletion!: () => void;
-      const completion = new Promise<void>((resolve) => {
-        resolveCompletion = resolve;
-      });
-
-      const job: JobState = {
-        jobId,
-        type: 'subagent',
-        status: 'running',
-        description: 'Subagent',
-        command: subagentText,
-        subagentContent: [{ type: 'text', text: subagentText }],
-        startedAt,
-        originTurnId: turnId,
-        originTurnSeq: nextJobTurnSeq,
-        outputPath,
-        finished: false,
-        completion,
-        resolveCompletion,
-      };
-
-      state.jobs.set(jobId, job);
-
-      await writeAndAdvance({
-        type: 'job_started',
-        data: {
-          jobId,
-          jobType: 'subagent',
-          description: job.description,
-          command: subagentText,
-        },
-      });
-
-      await emitUpdate(nextJobTurnSeq++, {
-        type: 'job_started',
-        jobId,
-        jobType: 'subagent',
-        description: job.description,
-      });
-
-      deferredJobs.push(job);
-    }
-
-    if (command && effectiveConfig.executionMode === 'execute') {
-      const toolCallId = `tool_${randomUUID()}`;
-      const toolName = 'bash';
-      const kind = toolKindFromName(toolName);
-      const toolInput = { command } as Record<string, unknown>;
-      let shouldExecuteTool = true;
-
-      await emitUpdate(1, {
-        type: 'tool_use',
-        toolCallId,
-        name: toolName,
-        kind,
-        input: toolInput,
-        status: 'pending',
-      });
-
-      const requiresPermission = shouldAskPermission(effectiveConfig.approvalMode, kind);
-
-      if (effectiveConfig.approvalMode === 'deny') {
-        const denied: ToolResult = {
-          outcome: 'denied',
-          content: [{ type: 'error', message: 'Denied by policy' }],
-        };
-
-        shouldExecuteTool = false;
-        await emitUpdate(1, {
-          type: 'tool_use',
-          toolCallId,
-          name: toolName,
-          kind,
-          input: toolInput,
-          status: 'denied',
-          result: denied,
-        });
-
-        await writeAndAdvance({
-          type: 'tool_use',
-          data: {
-            toolCallId,
-            name: toolName,
-            kind,
-            input: toolInput,
-            result: denied,
-          },
-        });
-      } else {
-        const { executor: toolExecutor } = createToolExecutorForMode(
-          'execute',
-          state.mcpServerManager
-        );
-        let finalInput = toolInput;
-
-        if (requiresPermission) {
-          state.activeTurn = { turnId, startedAt, status: 'awaiting_permission', abortController };
-
-          const options = [
-            { optionId: 'allow', label: 'Allow' },
-            { optionId: 'deny', label: 'Deny' },
-          ];
-
-          await emitUpdate(1, {
-            type: 'tool_use',
-            toolCallId,
-            name: toolName,
-            kind,
-            input: toolInput,
-            status: 'awaiting_permission',
-          });
-
-          let permissionResponse:
-            | { decision?: string; updatedInput?: Record<string, unknown> }
-            | undefined;
-          try {
-            permissionResponse = await requestPermissionFromClient({
-              sessionId: state.activeSession.meta.sessionId,
-              turnId,
-              turnSeq: 1,
-              toolCallId,
-              tool: toolName,
-              kind,
-              resource: command,
-              options,
-              input: toolInput,
-              signal: abortController.signal,
-            });
-          } catch {
-            const cancelled: ToolResult = {
-              outcome: 'cancelled',
-              content: [{ type: 'error', message: 'Cancelled' }],
-            };
-
-            await emitUpdate(1, {
-              type: 'tool_use',
-              toolCallId,
-              name: toolName,
-              kind,
-              input: toolInput,
-              status: 'cancelled',
-              result: cancelled,
-            });
-
-            await writeAndAdvance({
-              type: 'tool_use',
-              data: {
-                toolCallId,
-                name: toolName,
-                kind,
-                input: toolInput,
-                result: cancelled,
-              },
-            });
-            await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
-            const result = {
-              turnId,
-              stopReason: 'cancelled' as const,
-              content: [] as { type: 'text'; text: string }[],
-              usage: { inputTokens: 0, outputTokens: 0 },
-            };
-            await emitSessionUpdate(
-              {
-                type: 'turn_end',
-                stopReason: result.stopReason,
-                content: result.content,
-                usage: result.usage,
-              },
-              { turnId, turnSeq: nextJobTurnSeq }
-            );
-            state.activeSession = loadSession(state.activeSession.meta.sessionId);
-            state.activeTurn = null;
-            return result;
-          }
-
-          state.activeTurn = { turnId, startedAt, status: 'running', abortController };
-
-          const decision = permissionResponse?.decision;
-          if (decision === 'deny') {
-            const denied: ToolResult = {
-              outcome: 'denied',
-              content: [{ type: 'error', message: 'Denied' }],
-            };
-
-            shouldExecuteTool = false;
-            await emitUpdate(1, {
-              type: 'tool_use',
-              toolCallId,
-              name: toolName,
-              kind,
-              input: toolInput,
-              status: 'denied',
-              result: denied,
-            });
-
-            await writeAndAdvance({
-              type: 'tool_use',
-              data: {
-                toolCallId,
-                name: toolName,
-                kind,
-                input: toolInput,
-                result: denied,
-              },
-            });
-          } else {
-            if (
-              permissionResponse?.updatedInput &&
-              typeof permissionResponse.updatedInput === 'object'
-            ) {
-              finalInput = permissionResponse.updatedInput as Record<string, unknown>;
-            }
-
-            await emitUpdate(1, {
-              type: 'tool_use',
-              toolCallId,
-              name: toolName,
-              kind,
-              input: finalInput,
-              status: 'running',
-            });
-          }
-        } else {
-          await emitUpdate(1, {
-            type: 'tool_use',
-            toolCallId,
-            name: toolName,
-            kind,
-            input: finalInput,
-            status: 'running',
-          });
-        }
-
-        if (shouldExecuteTool && !abortController.signal.aborted) {
-          const coreResult = await toolExecutor.execute(
-            { id: toolCallId, name: toolName, arguments: finalInput },
-            {
-              signal: abortController.signal,
-              workingDirectory: workDir,
-              toolTempRoot: join(state.activeSession.dir, 'tool-temp'),
-              hasFileBeenRead: (p) =>
-                filesRead.has(isAbsolutePath(p) ? p : resolvePath(workDir, p)),
-            }
-          );
-
-          const result = protocolToolResultFromCore(coreResult);
-          const terminalStatus =
-            result.outcome === 'completed'
-              ? 'completed'
-              : result.outcome === 'denied'
-                ? 'denied'
-                : result.outcome === 'cancelled'
-                  ? 'cancelled'
-                  : 'failed';
-
-          await emitUpdate(1, {
-            type: 'tool_use',
-            toolCallId,
-            name: toolName,
-            kind,
-            input: finalInput,
-            status: terminalStatus,
-            result,
-          });
-
-          await writeAndAdvance({
-            type: 'tool_use',
-            data: {
-              toolCallId,
-              name: toolName,
-              kind,
-              input: finalInput,
-              result,
-            },
-          });
-
-          if (terminalStatus === 'cancelled') {
-            await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'cancelled' } });
-            const result = {
-              turnId,
-              stopReason: 'cancelled' as const,
-              content: [] as { type: 'text'; text: string }[],
-              usage: { inputTokens: 0, outputTokens: 0 },
-            };
-            await emitSessionUpdate(
-              {
-                type: 'turn_end',
-                stopReason: result.stopReason,
-                content: result.content,
-                usage: result.usage,
-              },
-              { turnId, turnSeq: nextJobTurnSeq }
-            );
-            state.activeSession = loadSession(state.activeSession.meta.sessionId);
-            state.activeTurn = null;
-            return result;
-          }
-        }
+      for (const job of deferredJobs) {
+        if (job.type === 'shell') runShellJobProcess(job);
+        if (job.type === 'subagent') runSubagentJobProcess(job);
       }
+
+      return result;
+    } finally {
+      // Ensure activeTurn is cleared even if an exception is thrown
+      state.activeTurn = null;
     }
-
-    await writeAndAdvance({
-      type: 'message',
-      data: { content: [{ type: 'text', text: 'hello' }] },
-    });
-    await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'end_turn' } });
-    const result = {
-      turnId,
-      stopReason: 'end_turn' as const,
-      content: [{ type: 'text' as const, text: 'hello' }],
-      usage: { inputTokens: 0, outputTokens: 0 },
-    };
-    await emitSessionUpdate(
-      {
-        type: 'turn_end',
-        stopReason: result.stopReason,
-        content: result.content,
-        usage: result.usage,
-      },
-      { turnId, turnSeq: nextJobTurnSeq }
-    );
-    state.activeSession = loadSession(state.activeSession.meta.sessionId);
-    state.activeTurn = null;
-
-    for (const job of deferredJobs) {
-      if (job.type === 'shell') runShellJobProcess(job);
-      if (job.type === 'subagent') runSubagentJobProcess(job);
-    }
-
-    return result;
   });
 
   peer.onRequest('ent/workspace/info', async (params: unknown) => {
