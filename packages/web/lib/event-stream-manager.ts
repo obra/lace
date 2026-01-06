@@ -4,6 +4,7 @@
 // StreamEvent removed - using LaceEvent directly
 import type { LaceEvent, ErrorType, ErrorPhase } from '@lace/web/types/core';
 import type { AppEvent } from '@lace/web/types/app-events';
+import { isProtocolEvent, isPermissionRequestEvent, isWebEvent } from '@lace/web/types/app-events';
 import { randomUUID } from 'crypto';
 import { logger } from '@lace/agent/utils/logger';
 import { stringify } from '@lace/web/lib/serialization';
@@ -235,18 +236,49 @@ export class EventStreamManager {
     }
   }
 
-  // Broadcast AppEvent (protocol events) to all matching connections
-  // TODO: This is a stub implementation for Phase 2 of protocol events migration.
-  // Task 3.1 will implement full AppEvent handling with proper filtering.
-  // For now, we just log and drop protocol events since no consumers exist yet.
+  /**
+   * Broadcast AppEvent (protocol events) to all matching connections
+   */
   broadcastAppEvent(event: AppEvent): void {
-    // Protocol events will be consumed in Phase 3+ of the migration
-    // For now, we silently drop them since no UI components consume protocol events yet
-    logger.debug('[EVENT_STREAM] Protocol event received (not yet consumed by UI)', {
-      eventId: event.id,
-      timestamp: event.timestamp,
-      workspaceSessionId: event.workspaceSessionId,
+    // Ensure event has required fields
+    const fullEvent: AppEvent = {
+      ...event,
+      id: event.id || this.generateEventId(),
+      timestamp: event.timestamp || new Date(),
+    };
+
+    logger.debug('[EVENT_STREAM] Broadcasting AppEvent', {
+      eventId: fullEvent.id,
+      workspaceSessionId: fullEvent.workspaceSessionId,
+      eventType: isProtocolEvent(fullEvent)
+        ? fullEvent.update.type
+        : isPermissionRequestEvent(fullEvent)
+          ? 'permission_request'
+          : isWebEvent(fullEvent)
+            ? fullEvent.type
+            : 'unknown',
     });
+
+    const deadConnections: string[] = [];
+
+    for (const [connectionId, connection] of this.connections) {
+      if (this.shouldSendAppEventToConnection(connection, fullEvent)) {
+        try {
+          this.sendAppEventToConnection(connection, fullEvent);
+        } catch (error) {
+          logger.debug(
+            `[EVENT_STREAM] Failed to send AppEvent to connection ${connectionId}:`,
+            error
+          );
+          deadConnections.push(connectionId);
+        }
+      }
+    }
+
+    // Clean up dead connections
+    for (const connectionId of deadConnections) {
+      this.removeConnection(connectionId);
+    }
   }
 
   // Check if event should be sent to connection based on subscription
@@ -278,6 +310,86 @@ export class EventStreamManager {
     // Event type filtering removed - LaceEvent handles all types
     // Currently all connections receive all events (global subscription)
     return true;
+  }
+
+  /**
+   * Check if AppEvent should be sent to connection based on subscription
+   */
+  private shouldSendAppEventToConnection(connection: ClientConnection, event: AppEvent): boolean {
+    const { subscription } = connection;
+
+    // Extract context from AppEvent based on type
+    let eventProjectId: string | undefined;
+    let eventSessionId: string | undefined; // workspace session
+    let eventThreadId: string | undefined; // agent session
+
+    if (isProtocolEvent(event)) {
+      eventProjectId = event.projectId;
+      eventSessionId = event.workspaceSessionId;
+      eventThreadId = event.agentSessionId;
+    } else if (isPermissionRequestEvent(event)) {
+      eventProjectId = event.projectId;
+      eventSessionId = event.workspaceSessionId;
+      eventThreadId = event.request.sessionId;
+    } else if (isWebEvent(event)) {
+      eventProjectId = event.projectId;
+      eventSessionId = event.workspaceSessionId;
+      eventThreadId = event.agentSessionId;
+    }
+
+    // Thread/agent session filtering
+    if (subscription.threads && subscription.threads.length > 0) {
+      if (!eventThreadId || !subscription.threads.includes(eventThreadId)) {
+        return false;
+      }
+    }
+
+    // Project filtering
+    if (subscription.projects && subscription.projects.length > 0) {
+      if (!eventProjectId || !subscription.projects.includes(eventProjectId)) {
+        return false;
+      }
+    }
+
+    // Session (workspace) filtering
+    if (subscription.sessions && subscription.sessions.length > 0) {
+      if (!eventSessionId || !subscription.sessions.includes(eventSessionId)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Send AppEvent (protocol event) to specific connection
+   */
+  private sendAppEventToConnection(connection: ClientConnection, event: AppEvent): void {
+    // AppEvents use the same SSE format as LaceEvents
+    const eventData = `id: ${event.id}\ndata: ${stringify(event)}\n\n`;
+    const chunk = this.encoder.encode(eventData);
+
+    try {
+      connection.controller.enqueue(chunk);
+      connection.lastEventId = event.id;
+      connection.lastSendAt = Date.now();
+    } catch (error) {
+      logger.debug(`[EVENT_STREAM] Failed to send AppEvent to connection ${connection.id}`, {
+        eventId: event.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      class ControllerClosedError extends Error {
+        public readonly cause?: unknown;
+
+        constructor(message: string, cause?: unknown) {
+          super(message);
+          this.name = 'ControllerClosedError';
+          this.cause = cause;
+        }
+      }
+      throw new ControllerClosedError('Controller is closed', error);
+    }
   }
 
   // Send event to specific connection
