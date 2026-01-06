@@ -94,6 +94,16 @@ export function getTestProviderCallCount(): number {
 export class TestAgentProvider extends AIProvider {
   private state: TestProviderState = { phase: 'needs_tool', nextToolCallId: 1 };
 
+  /**
+   * Get mock pricing for the test provider.
+   * Use pricing that makes test budget scenarios work:
+   * - 100 input tokens + 50 output tokens = 150 tokens (from mockUsage)
+   * - At $10/1M input and $20/1M output: cost = 0.001 + 0.001 = $0.002 per turn
+   */
+  static getPricing(): { costPer1mIn: number; costPer1mOut: number } {
+    return { costPer1mIn: 10.0, costPer1mOut: 20.0 };
+  }
+
   constructor() {
     super();
     // Apply test retry configuration if set via environment variables
@@ -181,11 +191,19 @@ export class TestAgentProvider extends AIProvider {
           .reverse()
           .find((m) => m.role === 'user' && typeof m.content === 'string')?.content;
 
+        // Generate mock token usage based on message length
+        // Use fixed values for predictable cost calculations in tests
+        const mockUsage = {
+          promptTokens: 100, // Fixed input tokens for predictability
+          completionTokens: 50, // Fixed output tokens for predictability
+          totalTokens: 150,
+        };
+
         if (lastUserText?.includes('Conversation Compaction Required')) {
           const content = 'Summary of conversation (test provider).';
           this.emit('token', { token: content });
           this.emit('complete', { response: { content, toolCalls: [], stopReason: 'stop' } });
-          return { content, toolCalls: [], stopReason: 'stop' };
+          return { content, toolCalls: [], stopReason: 'stop', usage: mockUsage };
         }
 
         const requested = this.extractRequestedTool(lastUserText ?? '');
@@ -204,14 +222,14 @@ export class TestAgentProvider extends AIProvider {
           this.emit('token', { token: content });
           this.emit('complete', { response: { content, toolCalls, stopReason: 'tool_use' } });
           this.state.phase = 'final';
-          return { content, toolCalls, stopReason: 'tool_use' };
+          return { content, toolCalls, stopReason: 'tool_use', usage: mockUsage };
         }
 
         const toolResultText = this.extractLatestToolResultText(messages);
         const content = toolResultText ? `Result:\n${toolResultText}` : 'No tool result found.';
         this.emit('token', { token: content });
         this.emit('complete', { response: { content, toolCalls: [], stopReason: 'stop' } });
-        return { content, toolCalls: [], stopReason: 'stop' };
+        return { content, toolCalls: [], stopReason: 'stop', usage: mockUsage };
       },
       { signal }
     );

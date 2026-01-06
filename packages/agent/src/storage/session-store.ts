@@ -13,6 +13,13 @@ export type SessionMeta = {
 export type SessionState = {
   nextEventSeq: number;
   nextStreamSeq: number;
+  /** Accumulated token usage cost in USD for this session */
+  sessionCostUsd?: number;
+  /** Token usage tracking */
+  tokenUsage?: {
+    totalInputTokens: number;
+    totalOutputTokens: number;
+  };
   config?: {
     executionMode?: 'plan' | 'execute';
     approvalMode?:
@@ -77,6 +84,14 @@ export function readSessionState(sessionDir: string): SessionState {
     return {
       nextEventSeq: typeof parsed.nextEventSeq === 'number' ? parsed.nextEventSeq : 1,
       nextStreamSeq: typeof parsed.nextStreamSeq === 'number' ? parsed.nextStreamSeq : 1,
+      sessionCostUsd: typeof parsed.sessionCostUsd === 'number' ? parsed.sessionCostUsd : undefined,
+      tokenUsage:
+        typeof parsed.tokenUsage === 'object' && parsed.tokenUsage
+          ? {
+              totalInputTokens: parsed.tokenUsage.totalInputTokens ?? 0,
+              totalOutputTokens: parsed.tokenUsage.totalOutputTokens ?? 0,
+            }
+          : undefined,
       config: typeof parsed.config === 'object' && parsed.config ? parsed.config : undefined,
     };
   } catch {

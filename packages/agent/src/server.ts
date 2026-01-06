@@ -349,6 +349,48 @@ async function createProviderForTurn(options: {
   return await registry.createProviderFromInstanceAndModel(connectionId, modelId);
 }
 
+/**
+ * Get model pricing from the catalog.
+ * Returns pricing per million tokens (input and output) or null if unavailable.
+ * For test provider, returns mock pricing for testing budget enforcement.
+ */
+async function getModelPricing(
+  state: AgentServerState,
+  connectionId?: string,
+  modelId?: string
+): Promise<{ costPer1mIn: number; costPer1mOut: number } | null> {
+  // Test provider: get pricing from the provider itself
+  if (isTestProviderEnabled()) {
+    return TestAgentProvider.getPricing();
+  }
+
+  if (!connectionId || !modelId) return null;
+
+  try {
+    const instances = await state.providerInstances.loadInstances();
+    const instance = instances.instances[connectionId];
+    if (!instance) return null;
+
+    const catalogProvider = state.providerCatalog.getProvider(instance.catalogProviderId);
+    if (!catalogProvider) return null;
+
+    const model = catalogProvider.models.find((m) => m.id === modelId);
+    if (!model) return null;
+
+    // Model pricing is optional - some models may not have pricing data
+    if (model.cost_per_1m_in === undefined || model.cost_per_1m_out === undefined) {
+      return null;
+    }
+
+    return {
+      costPer1mIn: model.cost_per_1m_in,
+      costPer1mOut: model.cost_per_1m_out,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function createToolExecutorForMode(
   executionMode: 'plan' | 'execute',
   mcpServerManager?: MCPServerManager
@@ -1698,6 +1740,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       ? summarizeDurableEvents(state.activeSession.dir)
       : { messageCount: 0, lastActive: null as string | null };
 
+    // Get session cost from persisted state
+    const sessionCostUsd = state.activeSession?.state.sessionCostUsd ?? 0;
+
     const pendingPermissions: PermissionRequest[] = [];
     if (state.activeSession) {
       const sessionId = state.activeSession.meta.sessionId;
@@ -1766,7 +1811,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       pendingPermissions,
       limits: {
         maxBudgetUsd: effectiveConfig.maxBudgetUsd,
-        budgetUsedUsd: 0,
+        budgetUsedUsd: sessionCostUsd,
       },
     };
   });
@@ -3460,6 +3505,21 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           modelId: effectiveConfig.modelId,
         });
 
+        // Get model pricing for cost calculation
+        const modelPricing = await getModelPricing(
+          state,
+          effectiveConfig.connectionId,
+          effectiveConfig.modelId
+        );
+
+        // Track token usage across the turn
+        let totalInputTokens = 0;
+        let totalOutputTokens = 0;
+
+        // Load existing session cost (for accumulation)
+        const currentSessionState = readSessionState(state.activeSession.dir);
+        let sessionCostUsd = currentSessionState.sessionCostUsd ?? 0;
+
         let providerMessages = buildProviderMessagesFromDurableEvents(state.activeSession.dir);
         let finalAssistantContent = '';
         let stopReason: 'end_turn' | 'max_tokens' | 'max_turns' | 'cancelled' | 'budget_exceeded' =
@@ -3493,6 +3553,32 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             if (abortController.signal.aborted) {
               stopReason = 'cancelled';
               break;
+            }
+
+            // Track token usage from this response
+            if (response.usage) {
+              totalInputTokens += response.usage.promptTokens ?? 0;
+              totalOutputTokens += response.usage.completionTokens ?? 0;
+
+              // Calculate cost for this response if pricing is available
+              if (modelPricing) {
+                const inputCost =
+                  ((response.usage.promptTokens ?? 0) / 1_000_000) * modelPricing.costPer1mIn;
+                const outputCost =
+                  ((response.usage.completionTokens ?? 0) / 1_000_000) * modelPricing.costPer1mOut;
+                sessionCostUsd += inputCost + outputCost;
+              }
+            }
+
+            // Check budget before continuing (complete current turn, don't start new one)
+            // Budget enforcement only applies if maxBudgetUsd is set and > 0
+            if (
+              effectiveConfig.maxBudgetUsd &&
+              effectiveConfig.maxBudgetUsd > 0 &&
+              sessionCostUsd > effectiveConfig.maxBudgetUsd
+            ) {
+              stopReason = 'budget_exceeded';
+              // Don't break immediately - let this turn complete, but don't start more
             }
 
             const assistantText = typeof response.content === 'string' ? response.content : '';
@@ -3862,6 +3948,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             if (!shouldContinue) {
               break;
             }
+
+            // Stop the agentic loop if budget exceeded (after completing current turn)
+            if (stopReason === 'budget_exceeded') {
+              break;
+            }
           }
 
           if (abortController.signal.aborted) {
@@ -3870,6 +3961,23 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         } finally {
           provider.cleanup();
         }
+
+        // Save accumulated cost and token usage to session state
+        await runExclusive(() => {
+          if (!state.activeSession) return;
+          const sessionState = readSessionState(state.activeSession.dir);
+          const updatedState: SessionState = {
+            ...sessionState,
+            sessionCostUsd,
+            tokenUsage: {
+              totalInputTokens: (sessionState.tokenUsage?.totalInputTokens ?? 0) + totalInputTokens,
+              totalOutputTokens:
+                (sessionState.tokenUsage?.totalOutputTokens ?? 0) + totalOutputTokens,
+            },
+          };
+          writeSessionState(state.activeSession.dir, updatedState);
+          state.activeSession = { ...state.activeSession, state: updatedState };
+        });
 
         if (stopReason === 'end_turn' && completedTurns >= maxTurns) {
           stopReason = 'max_turns';
@@ -3883,7 +3991,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             finalAssistantContent.length > 0
               ? [{ type: 'text' as const, text: finalAssistantContent }]
               : ([] as { type: 'text'; text: string }[]),
-          usage: { inputTokens: 0, outputTokens: 0 },
+          usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
         };
         await emitSessionUpdate(
           {
