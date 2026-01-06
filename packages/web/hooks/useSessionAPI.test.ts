@@ -7,6 +7,7 @@ import { useSessionAPI } from '@lace/web/hooks/useSessionAPI';
 import { asThreadId, asWorkspaceSessionId } from '@lace/web/types/core';
 import type { ThreadId } from '@lace/web/types/core';
 import { createMockResponse, createMockErrorResponse } from '@lace/web/test-utils/mock-fetch';
+import { testSessionId, testWorkspaceSessionId } from '@lace/web/test-utils/test-ids';
 
 // ✅ ESSENTIAL MOCK - Mock fetch to avoid network calls in tests
 // Tests focus on hook state management behavior, not API implementation
@@ -14,9 +15,9 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
 describe('useSessionAPI', () => {
-  const testWorkspaceSessionId = asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000040');
-  const testAgentId = asThreadId('sess_agent_0001') as ThreadId;
-  const secondAgentId = asThreadId('sess_agent_0002') as ThreadId;
+  const wsSessionId = asWorkspaceSessionId(testWorkspaceSessionId(40));
+  const testAgentId = asThreadId(testSessionId(1)) as ThreadId;
+  const secondAgentId = asThreadId(testSessionId(2)) as ThreadId;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -26,7 +27,7 @@ describe('useSessionAPI', () => {
   describe('createSession', () => {
     it('should manage loading and success states during session creation', async () => {
       const mockSession = {
-        id: testWorkspaceSessionId,
+        id: wsSessionId,
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
@@ -82,7 +83,7 @@ describe('useSessionAPI', () => {
 
   describe('getSession', () => {
     it('should return session details when found', async () => {
-      const sessionId = testWorkspaceSessionId;
+      const sessionId = wsSessionId;
       const mockSession = {
         id: sessionId,
         name: 'Test Session',
@@ -113,7 +114,7 @@ describe('useSessionAPI', () => {
     });
 
     it('should return null for non-existent session', async () => {
-      const sessionId = testWorkspaceSessionId;
+      const sessionId = wsSessionId;
 
       mockFetch.mockResolvedValueOnce(createMockErrorResponse('Session not found'));
 
@@ -132,7 +133,7 @@ describe('useSessionAPI', () => {
 
   describe('spawnAgent', () => {
     it('should spawn agent successfully', async () => {
-      const sessionId = testWorkspaceSessionId;
+      const sessionId = wsSessionId;
       const mockAgent = {
         threadId: testAgentId,
         name: 'architect',
@@ -171,7 +172,7 @@ describe('useSessionAPI', () => {
     });
 
     it('should handle agent spawn errors', async () => {
-      const sessionId = testWorkspaceSessionId;
+      const sessionId = wsSessionId;
 
       mockFetch.mockResolvedValueOnce(createMockErrorResponse('Failed to spawn agent'));
 
@@ -193,7 +194,7 @@ describe('useSessionAPI', () => {
 
   describe('listAgents', () => {
     it('should list agents successfully', async () => {
-      const sessionId = testWorkspaceSessionId;
+      const sessionId = wsSessionId;
       const mockAgents = [
         {
           threadId: testAgentId,
@@ -240,7 +241,7 @@ describe('useSessionAPI', () => {
       // Test successful operation clears any previous error
       mockFetch.mockResolvedValueOnce(
         createMockResponse({
-          id: testWorkspaceSessionId,
+          id: wsSessionId,
           name: 'Test',
           provider: 'anthropic',
           model: 'claude-3-5-haiku-20241022',
@@ -287,7 +288,7 @@ describe('useSessionAPI', () => {
       mockFetch.mockResolvedValueOnce(createMockResponse(mockSession));
 
       await act(async () => {
-        await result.current.getSession(testWorkspaceSessionId);
+        await result.current.getSession(wsSessionId);
       });
 
       expect(result.current.error).toBe(null);

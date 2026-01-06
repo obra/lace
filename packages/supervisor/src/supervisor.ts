@@ -221,7 +221,8 @@ export class Supervisor {
       throw new Error(`Session not found: ${sessionId}`);
     }
 
-    return { agent, workDir: meta.workDir, pid: agent.proc.pid ?? -1 };
+    // ACP-aligned: protocol uses cwd instead of workDir
+    return { agent, workDir: meta.cwd, pid: agent.proc.pid ?? -1 };
   }
 
   async createWorkspaceSession(workDir: string): Promise<WorkspaceSessionHandle> {

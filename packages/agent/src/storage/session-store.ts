@@ -100,12 +100,13 @@ export function ensureSessionFiles(sessionDir: string): void {
   }
 }
 
-export function listSessions(workDir?: string): Array<{
+// ACP-aligned: workDir→cwd, lastActive→updatedAt
+export function listSessions(cwd?: string): Array<{
   sessionId: string;
+  cwd: string;
   created: string;
-  lastActive: string;
+  updatedAt: string;
   messageCount: number;
-  workDir: string;
 }> {
   const sessionsDir = agentSessionsDir();
   const sessionIds = fs
@@ -121,17 +122,17 @@ export function listSessions(workDir?: string): Array<{
         const summary = summarizeDurableEvents(sessionDir);
         return {
           sessionId: meta.sessionId,
+          cwd: meta.workDir, // ACP field name
           created: meta.created,
-          lastActive: summary.lastActive ?? meta.created,
+          updatedAt: summary.lastActive ?? meta.created, // ACP field name
           messageCount: summary.messageCount,
-          workDir: meta.workDir,
         };
       } catch {
         return null;
       }
     })
     .filter((s): s is NonNullable<typeof s> => !!s)
-    .filter((s) => (workDir ? s.workDir === workDir : true));
+    .filter((s) => (cwd ? s.cwd === cwd : true));
 }
 
 export function loadSession(sessionId: string): LoadedSession {

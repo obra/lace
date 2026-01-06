@@ -195,12 +195,13 @@ const SessionLoadParamsSchema = z
   })
   .strict();
 
+// ACP-aligned: lastActive renamed to updatedAt
 const SessionLoadResultSchema = z
   .object({
     sessionId: SessionIdSchema,
     forkedFrom: SessionIdSchema.optional(),
     messageCount: z.number(),
-    lastActive: IsoTimestampSchema,
+    updatedAt: IsoTimestampSchema,
   })
   .strict();
 
@@ -221,25 +222,31 @@ export const SessionLoadResponseSchema = z
   })
   .strict();
 
+// ACP-aligned: workDir renamed to cwd, added cursor for pagination
 const SessionListParamsSchema = z
   .object({
-    workDir: NonEmptyStringSchema.optional(),
+    cwd: NonEmptyStringSchema.optional(),
+    cursor: NonEmptyStringSchema.optional(),
   })
   .strict();
 
+// ACP-aligned: workDir→cwd, lastActive→updatedAt, added title/_meta/nextCursor
 const SessionListResultSchema = z
   .object({
     sessions: z.array(
       z
         .object({
           sessionId: SessionIdSchema,
-          created: IsoTimestampSchema,
-          lastActive: IsoTimestampSchema,
-          messageCount: z.number(),
-          workDir: NonEmptyStringSchema,
+          cwd: NonEmptyStringSchema,
+          title: z.string().optional(),
+          updatedAt: IsoTimestampSchema,
+          created: IsoTimestampSchema, // Ent extension
+          messageCount: z.number(), // Ent extension
+          _meta: z.record(z.string(), z.unknown()).optional(),
         })
         .strict()
     ),
+    nextCursor: NonEmptyStringSchema.optional(),
   })
   .strict();
 

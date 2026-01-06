@@ -2686,13 +2686,15 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     return { sessionId, created };
   });
 
+  // ACP-aligned: cwd instead of workDir
   peer.onRequest('session/list', async (params: unknown) => {
     assertInitialized(state);
 
-    const parsed = params as { workDir?: string } | undefined;
-    const workDirFilter = parsed?.workDir;
+    const parsed = params as { cwd?: string; cursor?: string } | undefined;
+    const cwdFilter = parsed?.cwd;
+    // Note: cursor/pagination not yet implemented
 
-    return { sessions: listSessions(workDirFilter) };
+    return { sessions: listSessions(cwdFilter) };
   });
 
   peer.onRequest('session/load', async (params: unknown) => {
@@ -2730,10 +2732,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     await reconcileMcpServersForActiveSession(state);
     await reissuePendingPermissionRequests();
     const summary = summarizeDurableEvents(loaded.dir);
+    // ACP-aligned: lastActive renamed to updatedAt
     return {
       sessionId: parsed.sessionId,
       messageCount: summary.messageCount,
-      lastActive: summary.lastActive ?? loaded.meta.created,
+      updatedAt: summary.lastActive ?? loaded.meta.created,
     };
   });
 
