@@ -1516,6 +1516,83 @@ const SessionUpdateTurnEndSchema = z
   })
   .strict();
 
+// MCP Configuration Changed - notifies when MCP servers are added/removed/updated
+const SessionUpdateMcpConfigChangedSchema = z
+  .object({
+    type: z.literal('mcp_config_changed'),
+    operation: z.enum(['added', 'removed', 'updated']),
+    serverId: z.string(),
+    serverName: z.string().optional(),
+  })
+  .strict();
+export type SessionUpdateMcpConfigChanged = z.infer<typeof SessionUpdateMcpConfigChangedSchema>;
+
+// MCP Server Status - notifies of MCP server connection state changes
+const SessionUpdateMcpServerStatusSchema = z
+  .object({
+    type: z.literal('mcp_server_status'),
+    serverId: z.string(),
+    status: z.enum(['connecting', 'connected', 'disconnected', 'error']),
+    error: z.string().optional(),
+  })
+  .strict();
+export type SessionUpdateMcpServerStatus = z.infer<typeof SessionUpdateMcpServerStatusSchema>;
+
+// Session Info - ACP-aligned session_info_update for session metadata
+const SessionUpdateSessionInfoSchema = z
+  .object({
+    type: z.literal('session_info'),
+    title: NonEmptyStringSchema.optional(),
+    updatedAt: IsoTimestampSchema.optional(),
+    _meta: z.record(z.unknown()).optional(),
+  })
+  .strict();
+export type SessionUpdateSessionInfo = z.infer<typeof SessionUpdateSessionInfoSchema>;
+
+// Compaction Start - notifies when context compaction begins
+const SessionUpdateCompactionStartSchema = z
+  .object({
+    type: z.literal('compaction_start'),
+    strategy: z.string(),
+    targetTokens: z.number().optional(),
+  })
+  .strict();
+export type SessionUpdateCompactionStart = z.infer<typeof SessionUpdateCompactionStartSchema>;
+
+// Compaction Complete - notifies when context compaction finishes
+const SessionUpdateCompactionCompleteSchema = z
+  .object({
+    type: z.literal('compaction_complete'),
+    strategy: z.string(),
+    messagesCompacted: z.number(),
+    tokensReclaimed: z.number().optional(),
+  })
+  .strict();
+export type SessionUpdateCompactionComplete = z.infer<typeof SessionUpdateCompactionCompleteSchema>;
+
+// Context Window - ACP-aligned usage_update for context window status
+const SessionUpdateContextWindowSchema = z
+  .object({
+    type: z.literal('context_window'),
+    used: z.number(),
+    size: z.number(),
+    percentage: z.number().optional(),
+  })
+  .strict();
+export type SessionUpdateContextWindow = z.infer<typeof SessionUpdateContextWindowSchema>;
+
+// Error Notification - notifies of agent errors
+const SessionUpdateErrorSchema = z
+  .object({
+    type: z.literal('error'),
+    code: z.string(),
+    message: z.string(),
+    phase: z.enum(['initialization', 'tool_execution', 'generation', 'unknown']).optional(),
+    details: z.record(z.unknown()).optional(),
+  })
+  .strict();
+export type SessionUpdateError = z.infer<typeof SessionUpdateErrorSchema>;
+
 const SessionUpdateBaseParamsSchema = z
   .object({
     sessionId: SessionIdSchema,
@@ -1536,6 +1613,13 @@ const SessionUpdateInnerNonJobSchema = z.discriminatedUnion('type', [
   SessionUpdateToolUseSchema,
   SessionUpdateTurnStartSchema,
   SessionUpdateTurnEndSchema,
+  SessionUpdateMcpConfigChangedSchema,
+  SessionUpdateMcpServerStatusSchema,
+  SessionUpdateSessionInfoSchema,
+  SessionUpdateCompactionStartSchema,
+  SessionUpdateCompactionCompleteSchema,
+  SessionUpdateContextWindowSchema,
+  SessionUpdateErrorSchema,
 ]);
 
 const SessionUpdateJobUpdateSchema = z
@@ -1562,6 +1646,13 @@ const _SessionUpdateInnerSchema = z.discriminatedUnion('type', [
   SessionUpdateJobUpdateSchema,
   SessionUpdateTurnStartSchema,
   SessionUpdateTurnEndSchema,
+  SessionUpdateMcpConfigChangedSchema,
+  SessionUpdateMcpServerStatusSchema,
+  SessionUpdateSessionInfoSchema,
+  SessionUpdateCompactionStartSchema,
+  SessionUpdateCompactionCompleteSchema,
+  SessionUpdateContextWindowSchema,
+  SessionUpdateErrorSchema,
 ]);
 
 const SessionUpdateParamsSchema = z.discriminatedUnion('type', [
@@ -1577,6 +1668,13 @@ const SessionUpdateParamsSchema = z.discriminatedUnion('type', [
   SessionUpdateBaseParamsSchema.merge(SessionUpdateJobUpdateSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateTurnStartSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateTurnEndSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateMcpConfigChangedSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateMcpServerStatusSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateSessionInfoSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateCompactionStartSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateCompactionCompleteSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateContextWindowSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateErrorSchema),
 ]);
 
 export const SessionUpdateNotificationSchema = z

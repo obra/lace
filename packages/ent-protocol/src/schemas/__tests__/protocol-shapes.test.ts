@@ -162,7 +162,7 @@ describe('protocol shapes (representative examples)', () => {
         jsonrpc: '2.0',
         method: 'session/update',
         params: {
-          sessionId: 'sess_test',
+          sessionId: 'sess_00000000-0000-0000-0000-000000000001',
           streamSeq: 1,
           turnId: 'turn_1',
           turnSeq: 1,
@@ -206,7 +206,7 @@ describe('protocol shapes (representative examples)', () => {
         jsonrpc: '2.0',
         id: 'c_2',
         result: {
-          sessionId: 'sess_test',
+          sessionId: 'sess_00000000-0000-0000-0000-000000000001',
           created: '2026-01-04T00:00:00Z',
         },
       })
