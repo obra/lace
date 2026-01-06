@@ -239,6 +239,73 @@ describe('system prompt injection on session/new', () => {
     expect(JSON.parse(eventLines[0]).type).toBe('context_injected');
     expect(JSON.parse(eventLines[0]).data.content[0].text).toContain('Lace');
   });
+
+  it('system prompt contains the session working directory', async () => {
+    agent = spawnAgentProcess({ laceDir });
+
+    await withTimeout(
+      agent.peer.request('initialize', defaultInitializeParams()),
+      2_000,
+      'initialize'
+    );
+
+    // Create session with a specific working directory
+    const created = (await withTimeout(
+      agent.peer.request('session/new', { workDir }),
+      2_000,
+      'session/new'
+    )) as { sessionId: string };
+
+    // Read the system prompt from the context_injected event
+    const sessionDir = join(laceDir, 'agent-sessions', created.sessionId);
+    const eventsPath = join(sessionDir, 'events.jsonl');
+
+    const eventsRaw = readFileSync(eventsPath, 'utf8');
+    const eventLines = eventsRaw.trim().split('\n').filter(Boolean);
+
+    const firstEvent = JSON.parse(eventLines[0]) as {
+      type: string;
+      data: { content: Array<{ type: string; text: string }> };
+    };
+
+    // The system prompt should contain the working directory we passed
+    // The template uses {{{project.cwd}}} which should be populated with workDir
+    const systemPromptText = firstEvent.data.content[0].text;
+    expect(systemPromptText).toContain(workDir);
+  });
+
+  it('system prompt contains dynamic tool descriptions', async () => {
+    agent = spawnAgentProcess({ laceDir });
+
+    await withTimeout(
+      agent.peer.request('initialize', defaultInitializeParams()),
+      2_000,
+      'initialize'
+    );
+
+    const created = (await withTimeout(
+      agent.peer.request('session/new', { workDir }),
+      2_000,
+      'session/new'
+    )) as { sessionId: string };
+
+    const sessionDir = join(laceDir, 'agent-sessions', created.sessionId);
+    const eventsPath = join(sessionDir, 'events.jsonl');
+
+    const eventsRaw = readFileSync(eventsPath, 'utf8');
+    const eventLines = eventsRaw.trim().split('\n').filter(Boolean);
+
+    const firstEvent = JSON.parse(eventLines[0]) as {
+      type: string;
+      data: { content: Array<{ type: string; text: string }> };
+    };
+
+    // The system prompt should contain dynamically generated tool descriptions
+    // The template uses {{#tools}}...{{/tools}} to list available tools
+    // This text comes from the bash tool's description, not the static template
+    const systemPromptText = firstEvent.data.content[0].text;
+    expect(systemPromptText).toContain('Execute shell commands in isolated bash processes');
+  });
 });
 
 describe('buildProviderMessagesFromDurableEvents', () => {

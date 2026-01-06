@@ -2689,7 +2689,18 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     // Inject system prompt as context_injected event
     const persona = toNonEmptyString(parsed.persona) ?? 'lace';
-    const promptConfig = await loadPromptConfig({ persona });
+
+    // Get available tools for system prompt context
+    const { toolsForProvider } = createToolExecutorForMode(
+      state.config.executionMode,
+      state.mcpServerManager
+    );
+    const tools = toolsForProvider.map((t) => ({ name: t.name, description: t.description }));
+
+    // Create session context for working directory
+    const sessionContext = { getWorkingDirectory: () => parsed.workDir };
+
+    const promptConfig = await loadPromptConfig({ persona, tools, session: sessionContext });
     let sessionState: SessionState = readSessionState(sessionDir);
     const { nextState } = appendDurableEvent(sessionDir, sessionState, {
       type: 'context_injected',
