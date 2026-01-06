@@ -1,5 +1,5 @@
 // ABOUTME: E2E tests for agent abort handling during various operation phases.
-// ABOUTME: Validates that session/cancel works reliably during streaming, tool execution, and permission waits.
+// ABOUTME: Validates that $/cancel_request works reliably during streaming, tool execution, and permission waits.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -64,7 +64,7 @@ describe('agent abort reliability (E2E)', () => {
 
     // Wait a bit for the turn to start, then cancel
     await new Promise((resolve) => setTimeout(resolve, 200));
-    agent.peer.notify('session/cancel');
+    agent.peer.notify('$/cancel_request', { requestId: 'cancel-turn' });
 
     // Turn should end with cancelled status
     const result = (await withTimeout(promptPromise as Promise<unknown>, 10_000, 'prompt')) as {
@@ -145,7 +145,7 @@ describe('agent abort reliability (E2E)', () => {
     );
 
     // Cancel during tool execution
-    agent.peer.notify('session/cancel');
+    agent.peer.notify('$/cancel_request', { requestId: 'cancel-turn' });
 
     // Turn should end with cancelled status
     const result = (await withTimeout(promptPromise as Promise<unknown>, 10_000, 'prompt')) as {
@@ -220,7 +220,7 @@ describe('agent abort reliability (E2E)', () => {
     );
 
     // Send cancel instead of approval
-    agent.peer.notify('session/cancel');
+    agent.peer.notify('$/cancel_request', { requestId: 'cancel-turn' });
 
     // Turn should end with cancelled status
     const result = (await withTimeout(promptPromise as Promise<unknown>, 5_000, 'prompt')) as {
@@ -269,7 +269,7 @@ describe('agent abort reliability (E2E)', () => {
     expect(beforeStatus.currentTurn).toBeUndefined();
 
     // Send cancel when idle - should be a no-op
-    agent.peer.notify('session/cancel');
+    agent.peer.notify('$/cancel_request', { requestId: 'cancel-turn' });
 
     // Give it a moment to process
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -327,7 +327,7 @@ describe('agent abort reliability (E2E)', () => {
     });
 
     await new Promise((resolve) => setTimeout(resolve, 200));
-    agent.peer.notify('session/cancel');
+    agent.peer.notify('$/cancel_request', { requestId: 'cancel-turn' });
 
     const firstResult = (await withTimeout(
       firstPromptPromise as Promise<unknown>,

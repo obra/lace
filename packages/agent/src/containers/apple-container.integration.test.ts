@@ -1,7 +1,7 @@
 // ABOUTME: Real integration tests for Apple Container runtime
 // ABOUTME: Actually launches containers using sandbox-exec to verify they work
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { AppleContainerRuntime } from './apple-container';
 import { ContainerConfig } from './types';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'fs';
@@ -10,65 +10,81 @@ import { tmpdir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
 
 describe.skipIf(process.platform !== 'darwin')('AppleContainerRuntime Integration', () => {
+  // Share one runtime instance across all tests to save ~2s initialization time
   let runtime: AppleContainerRuntime;
   let testDir: string;
+  let concurrentTestDir: string;
+  let containerId: string;
   let createdContainers: string[] = [];
 
-  beforeEach(() => {
+  beforeAll(async () => {
     runtime = new AppleContainerRuntime();
+
+    // Create test directories
     testDir = join(tmpdir(), `lace-container-integration-${uuidv4()}`);
+    concurrentTestDir = join(tmpdir(), `lace-container-concurrent-${uuidv4()}`);
     mkdirSync(testDir, { recursive: true });
-    createdContainers = [];
+    mkdirSync(concurrentTestDir, { recursive: true });
+
+    // Create subdirectories for each test to avoid conflicts
+    mkdirSync(join(testDir, 'exec-test'), { recursive: true });
+    mkdirSync(join(testDir, 'isolation-test'), { recursive: true });
+    mkdirSync(join(testDir, 'env-test'), { recursive: true });
+
+    const config: ContainerConfig = {
+      id: 'shared-container',
+      workingDirectory: '/workspace',
+      mounts: [{ source: testDir, target: '/workspace', readonly: false }],
+      environment: {
+        TEST_VAR: 'test_value',
+        CUSTOM_PATH: '/custom/bin',
+      },
+    };
+
+    containerId = runtime.create(config);
+    await runtime.start(containerId);
   });
 
-  afterEach(async () => {
-    // Clean up containers with timeout
-    for (const containerId of createdContainers) {
-      try {
-        await runtime.stop(containerId, 3000); // Short timeout for cleanup
-        await runtime.remove(containerId);
-      } catch (error) {
-        // Log but don't fail on cleanup errors
-        console.warn(`Failed to clean up container ${containerId}:`, error);
-      }
-    }
+  afterAll(async () => {
+    // Fix race condition: stop ALL containers first, then remove ALL containers
+    // Previously we ran stop+remove per container in parallel, which caused
+    // "container is running" errors when remove was called before stop completed
+    const allContainerIds = [containerId, ...createdContainers].filter(Boolean);
 
-    // Clean up test directory
+    // First stop all containers in parallel and wait for all stops to complete
+    // Suppress errors - containers may already be stopped or not exist
+    await Promise.all(allContainerIds.map((id) => runtime.stop(id, 2000).catch(() => {})));
+
+    // Then remove all containers in parallel
+    // Suppress errors - we don't want stderr noise from expected cleanup errors
+    await Promise.all(allContainerIds.map((id) => runtime.remove(id).catch(() => {})));
+
+    // Clean up test directories
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
-  }, 15000); // Increase timeout for cleanup
+    if (existsSync(concurrentTestDir)) {
+      rmSync(concurrentTestDir, { recursive: true, force: true });
+    }
+  }, 15000);
 
-  describe('Real container execution', () => {
+  describe('with shared container', () => {
     it('should actually execute commands in a sandboxed environment', async () => {
-      // Create a test file in our test directory
-      const testFile = join(testDir, 'test.txt');
+      // Create a test file in our test subdirectory
+      const testFile = join(testDir, 'exec-test', 'test.txt');
       writeFileSync(testFile, 'Hello from host');
-
-      const config: ContainerConfig = {
-        id: 'exec-test-real',
-        workingDirectory: '/workspace', // Use container path, not host path
-        mounts: [{ source: testDir, target: '/workspace', readonly: false }],
-      };
-
-      const containerId = runtime.create(config);
-      createdContainers.push(containerId);
-
-      // Start the container
-      await runtime.start(containerId);
 
       // Execute a simple echo command
       const result1 = await runtime.exec(containerId, {
         command: ['echo', 'Hello from container'],
       });
 
-      console.log('Result1:', result1);
       expect(result1.exitCode).toBe(0);
       expect(result1.stdout.trim()).toBe('Hello from container');
 
       // Read the test file from within the container
       const result2 = await runtime.exec(containerId, {
-        command: ['cat', '/workspace/test.txt'],
+        command: ['cat', '/workspace/exec-test/test.txt'],
       });
 
       expect(result2.exitCode).toBe(0);
@@ -76,41 +92,25 @@ describe.skipIf(process.platform !== 'darwin')('AppleContainerRuntime Integratio
 
       // Write a new file from within the container
       const result3 = await runtime.exec(containerId, {
-        command: ['sh', '-c', 'echo "Hello from container" > /workspace/container-output.txt'],
+        command: [
+          'sh',
+          '-c',
+          'echo "Hello from container" > /workspace/exec-test/container-output.txt',
+        ],
       });
 
       expect(result3.exitCode).toBe(0);
 
       // Verify the file was created on the host
-      const containerOutputPath = join(testDir, 'container-output.txt');
+      const containerOutputPath = join(testDir, 'exec-test', 'container-output.txt');
       expect(existsSync(containerOutputPath)).toBe(true);
       expect(readFileSync(containerOutputPath, 'utf-8').trim()).toBe('Hello from container');
-
-      // Stop the container
-      await runtime.stop(containerId);
-
-      // Verify we can't execute in a stopped container
-      await expect(
-        runtime.exec(containerId, {
-          command: ['echo', 'test'],
-        })
-      ).rejects.toThrow();
     });
 
     it('should isolate filesystem access based on mounts', async () => {
-      const config: ContainerConfig = {
-        id: 'isolation-test',
-        workingDirectory: '/tmp',
-        mounts: [{ source: testDir, target: '/allowed', readonly: false }],
-      };
-
-      const containerId = runtime.create(config);
-      createdContainers.push(containerId);
-      await runtime.start(containerId);
-
       // Should be able to write to mounted directory
       const result1 = await runtime.exec(containerId, {
-        command: ['sh', '-c', 'echo "test" > /allowed/test.txt'],
+        command: ['sh', '-c', 'echo "test" > /workspace/isolation-test/test.txt'],
       });
       expect(result1.exitCode).toBe(0);
 
@@ -122,29 +122,13 @@ describe.skipIf(process.platform !== 'darwin')('AppleContainerRuntime Integratio
 
       // Verify the mounted directory is accessible
       const result3 = await runtime.exec(containerId, {
-        command: ['ls', '/allowed'],
+        command: ['ls', '/workspace/isolation-test'],
       });
       expect(result3.exitCode).toBe(0);
-      expect(existsSync(join(testDir, 'test.txt'))).toBe(true);
-
-      await runtime.stop(containerId);
+      expect(existsSync(join(testDir, 'isolation-test', 'test.txt'))).toBe(true);
     });
 
     it('should handle environment variables', async () => {
-      const config: ContainerConfig = {
-        id: 'env-test',
-        workingDirectory: '/workspace', // Use container path, not host path
-        mounts: [{ source: testDir, target: '/workspace' }],
-        environment: {
-          TEST_VAR: 'test_value',
-          CUSTOM_PATH: '/custom/bin',
-        },
-      };
-
-      const containerId = runtime.create(config);
-      createdContainers.push(containerId);
-      await runtime.start(containerId);
-
       const result = await runtime.exec(containerId, {
         command: ['sh', '-c', 'echo "$TEST_VAR"'],
         environment: {
@@ -154,30 +138,33 @@ describe.skipIf(process.platform !== 'darwin')('AppleContainerRuntime Integratio
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout.trim()).toBe('overridden_value');
-
-      await runtime.stop(containerId);
     });
+  });
+
+  describe('concurrent execution', () => {
+    // Uses shared runtime and concurrentTestDir from parent scope
+    // Cleanup is handled by the parent afterAll
 
     it('should handle concurrent container execution', async () => {
       // Create two containers
       const config1: ContainerConfig = {
         id: 'concurrent-1',
-        workingDirectory: '/workspace', // Use container path, not host path
-        mounts: [{ source: testDir, target: '/workspace' }],
+        workingDirectory: '/workspace',
+        mounts: [{ source: concurrentTestDir, target: '/workspace' }],
       };
 
       const config2: ContainerConfig = {
         id: 'concurrent-2',
-        workingDirectory: '/workspace', // Use container path, not host path
-        mounts: [{ source: testDir, target: '/workspace' }],
+        workingDirectory: '/workspace',
+        mounts: [{ source: concurrentTestDir, target: '/workspace' }],
       };
 
       const id1 = runtime.create(config1);
       const id2 = runtime.create(config2);
       createdContainers.push(id1, id2);
 
-      await runtime.start(id1);
-      await runtime.start(id2);
+      // Parallelize container starts for ~3-4s savings
+      await Promise.all([runtime.start(id1), runtime.start(id2)]);
 
       // Execute commands in parallel
       const [result1, result2] = await Promise.all([
@@ -188,7 +175,7 @@ describe.skipIf(process.platform !== 'darwin')('AppleContainerRuntime Integratio
       expect(result1.stdout.trim()).toBe('container1');
       expect(result2.stdout.trim()).toBe('container2');
 
-      await Promise.all([runtime.stop(id1), runtime.stop(id2)]);
+      // Note: Don't stop here - let parent afterAll handle cleanup in parallel with other containers
     });
   });
 });

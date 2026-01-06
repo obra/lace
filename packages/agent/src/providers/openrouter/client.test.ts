@@ -82,6 +82,7 @@ describe('OpenRouterClient', () => {
   describe('with live API (integration)', () => {
     it.skipIf(!process.env.TEST_LIVE_API)(
       'should fetch real data from OpenRouter API',
+      { timeout: 10000 },
       async () => {
         // This test actually hits the API
         vi.restoreAllMocks(); // Use real fetch
@@ -92,8 +93,7 @@ describe('OpenRouterClient', () => {
         expect(result.data.length).toBeGreaterThan(100);
         expect(result.data[0]).toHaveProperty('id');
         expect(result.data[0]).toHaveProperty('pricing');
-      },
-      { timeout: 10000 }
+      }
     );
   });
 });

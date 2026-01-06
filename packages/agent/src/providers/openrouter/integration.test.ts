@@ -70,6 +70,7 @@ describe('OpenRouter Integration', () => {
 
   it.skipIf(!process.env.OPENROUTER_TEST_KEY)(
     'should handle real API integration',
+    { timeout: 15000 }, // Longer timeout for real API
     async () => {
       const apiKey = process.env.OPENROUTER_TEST_KEY!;
 
@@ -117,8 +118,7 @@ describe('OpenRouter Integration', () => {
         expect(model.cost_per_1m_in).toBeLessThanOrEqual(10);
         expect(model.context_window).toBeGreaterThanOrEqual(32000);
       });
-    },
-    { timeout: 15000 } // Longer timeout for real API
+    }
   );
 
   it('should handle cache persistence across provider instances', async () => {

@@ -40,7 +40,15 @@ export class JsonRpcPeer {
     this.transport = transport;
     this.idPrefix = options.idPrefix;
 
-    this.server = new JSONRPCServer();
+    // Use a no-op error listener: JSONRPCErrorException is the expected way to
+    // signal protocol-level errors, so the default console.error logging is noise.
+    // Truly unexpected errors (non-JSONRPCErrorException) are already re-thrown
+    // in onRequest() and will surface through normal error handling.
+    this.server = new JSONRPCServer({
+      errorListener: () => {
+        // Intentionally empty - see comment above
+      },
+    });
     this.client = new JSONRPCClient((payload) => {
       this.transport.send(payload as any);
       return Promise.resolve();

@@ -678,7 +678,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       'permission request received'
     );
 
-    agent.peer.notify('session/cancel');
+    agent.peer.notify('$/cancel_request', { requestId: 'cancel-turn' });
 
     const cancelled = (await withTimeout(
       promptPromise as Promise<unknown>,
