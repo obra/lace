@@ -37,7 +37,8 @@ export const EVENT_TYPES = [
   // System events (transient)
   'SYSTEM_NOTIFICATION',
   // Session events (transient)
-  'SESSION_UPDATED',
+  'SESSION_INFO',
+  'CONTEXT_WINDOW',
   // Error events (transient)
   'AGENT_ERROR',
   // Event visibility updates (transient)
@@ -70,7 +71,8 @@ export function isTransientEventType(type: LaceEventType): boolean {
     // System events
     'SYSTEM_NOTIFICATION',
     // Session events
-    'SESSION_UPDATED',
+    'SESSION_INFO',
+    'CONTEXT_WINDOW',
     // Error events
     'AGENT_ERROR',
     // Event visibility updates
@@ -273,8 +275,15 @@ interface SystemNotificationData {
 }
 
 // Session event data
-export interface SessionUpdatedData {
-  name: string;
+export interface SessionInfoData {
+  title: string;
+  updatedAt?: Date;
+  _meta?: Record<string, unknown>;
+}
+
+export interface ContextWindowData {
+  used: number;
+  size: number;
 }
 
 // MCP event data types
@@ -441,8 +450,12 @@ export type LaceEvent =
       data: SystemNotificationData;
     })
   | (BaseLaceEvent & {
-      type: 'SESSION_UPDATED';
-      data: SessionUpdatedData;
+      type: 'SESSION_INFO';
+      data: SessionInfoData;
+    })
+  | (BaseLaceEvent & {
+      type: 'CONTEXT_WINDOW';
+      data: ContextWindowData;
     })
   | (BaseLaceEvent & {
       type: 'AGENT_ERROR';
