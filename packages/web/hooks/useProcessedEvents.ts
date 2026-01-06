@@ -1,8 +1,17 @@
-// ABOUTME: Hook for processing LaceEvents for timeline display
-// ABOUTME: Handles filtering, token aggregation, and tool call/result pairing
+// ABOUTME: Hook for processing LaceEvents and AppEvents for timeline display
+// ABOUTME: Handles filtering, token aggregation, tool call/result pairing, and protocol events
 
 import { useMemo } from 'react';
 import type { LaceEvent, ThreadId, ToolCall, ToolResult } from '@lace/web/types/core';
+import type { AppEvent, ProtocolEvent } from '@lace/web/types/app-events';
+import { isProtocolEvent } from '@lace/web/types/app-events';
+import type {
+  TextDeltaUpdate,
+  ToolUseUpdate,
+  ErrorUpdate,
+  ThinkingUpdate,
+  SessionUpdate,
+} from '@lace/web/types/protocol-events';
 
 interface ProcessedToolEvent extends Omit<LaceEvent, 'type' | 'data'> {
   type: 'TOOL_AGGREGATED';
@@ -15,25 +24,88 @@ interface ProcessedToolEvent extends Omit<LaceEvent, 'type' | 'data'> {
   };
 }
 
-export type ProcessedEvent = LaceEvent | ProcessedToolEvent;
+interface ProcessedProtocolTextEvent {
+  id: string;
+  timestamp: Date;
+  type: 'PROTOCOL_TEXT';
+  data: {
+    content: string;
+    agentSessionId: string;
+  };
+}
+
+interface ProcessedProtocolToolEvent {
+  id: string;
+  timestamp: Date;
+  type: 'PROTOCOL_TOOL';
+  data: {
+    name: string;
+    toolCallId: string;
+    input?: unknown;
+    status: 'pending' | 'completed';
+    result?: unknown;
+    agentSessionId: string;
+  };
+}
+
+interface ProcessedProtocolErrorEvent {
+  id: string;
+  timestamp: Date;
+  type: 'PROTOCOL_ERROR';
+  data: {
+    code: string;
+    message: string;
+    phase?: string;
+    agentSessionId: string;
+  };
+}
+
+interface ProcessedProtocolThinkingEvent {
+  id: string;
+  timestamp: Date;
+  type: 'PROTOCOL_THINKING';
+  data: {
+    text: string;
+    agentSessionId: string;
+  };
+}
+
+export type ProcessedEvent =
+  | LaceEvent
+  | ProcessedToolEvent
+  | ProcessedProtocolTextEvent
+  | ProcessedProtocolToolEvent
+  | ProcessedProtocolErrorEvent
+  | ProcessedProtocolThinkingEvent;
 
 const MAX_STREAMING_MESSAGES = 100;
 
 export function useProcessedEvents(
-  events: LaceEvent[],
+  events: Array<LaceEvent | AppEvent>,
   selectedAgent?: ThreadId
 ): ProcessedEvent[] {
   return useMemo(() => {
-    // 1. Filter events by selected agent
-    const filtered = filterEventsByAgent(events, selectedAgent);
+    // 1. Separate protocol events from legacy lace events
+    const laceEvents = events.filter((e) => !isProtocolEvent(e)) as LaceEvent[];
+    const protocolEvents = events.filter((e) => isProtocolEvent(e)) as ProtocolEvent[];
 
-    // 2. Process streaming tokens (merge AGENT_TOKEN into AGENT_STREAMING)
+    // 2. Process legacy LaceEvents
+    const filtered = filterEventsByAgent(laceEvents, selectedAgent);
     const afterStreaming = processStreamingTokens(filtered);
+    const processedLaceEvents = processToolCallAggregation(afterStreaming);
 
-    // 3. Process tool call aggregation (merge TOOL_CALL and TOOL_RESULT)
-    const processed = processToolCallAggregation(afterStreaming);
+    // 3. Process protocol events
+    const processedProtocolEvents = processProtocolEvents(protocolEvents);
 
-    return processed;
+    // 4. Merge both event streams and sort by timestamp
+    const allEvents = [...processedLaceEvents, ...processedProtocolEvents];
+    if (allEvents.length <= 1) return allEvents;
+
+    return allEvents.sort((a, b) => {
+      const aTime = (a.timestamp || new Date()).getTime();
+      const bTime = (b.timestamp || new Date()).getTime();
+      return aTime - bTime;
+    });
   }, [events, selectedAgent]);
 }
 
@@ -198,4 +270,111 @@ function processToolCallAggregation(events: LaceEvent[]): ProcessedEvent[] {
     const bTime = (b.timestamp || new Date()).getTime();
     return aTime - bTime;
   });
+}
+
+function processProtocolEvents(events: ProtocolEvent[]): ProcessedEvent[] {
+  const processed: ProcessedEvent[] = [];
+  const textDeltaMap = new Map<string, { content: string; latestId: string; timestamp: Date }>();
+  const toolUseMap = new Map<string, { pending?: ProtocolEvent; completed?: ProtocolEvent }>();
+
+  for (const event of events) {
+    const { update, id, timestamp, agentSessionId } = event;
+
+    if (update.type === 'text_delta') {
+      const textDelta = update as TextDeltaUpdate;
+      const key = agentSessionId;
+      const existing = textDeltaMap.get(key);
+
+      if (existing) {
+        existing.content += textDelta.text;
+        existing.latestId = id;
+        existing.timestamp = timestamp;
+      } else {
+        textDeltaMap.set(key, {
+          content: textDelta.text,
+          latestId: id,
+          timestamp,
+        });
+      }
+    } else if (update.type === 'tool_use') {
+      const toolUse = update as ToolUseUpdate;
+      const key = toolUse.toolCallId;
+      const existing = toolUseMap.get(key) ?? {};
+
+      if (toolUse.status === 'pending') {
+        existing.pending = event;
+      } else if (toolUse.status === 'completed') {
+        existing.completed = event;
+      }
+
+      toolUseMap.set(key, existing);
+    } else if (update.type === 'error') {
+      const errorUpdate = update as ErrorUpdate;
+      const errorEvent: ProcessedProtocolErrorEvent = {
+        id,
+        timestamp,
+        type: 'PROTOCOL_ERROR',
+        data: {
+          code: errorUpdate.code,
+          message: errorUpdate.message,
+          phase: errorUpdate.phase,
+          agentSessionId,
+        },
+      };
+      processed.push(errorEvent);
+    } else if (update.type === 'thinking') {
+      const thinkingUpdate = update as ThinkingUpdate;
+      const thinkingEvent: ProcessedProtocolThinkingEvent = {
+        id,
+        timestamp,
+        type: 'PROTOCOL_THINKING',
+        data: {
+          text: thinkingUpdate.text,
+          agentSessionId,
+        },
+      };
+      processed.push(thinkingEvent);
+    }
+  }
+
+  // Convert aggregated text deltas to events
+  for (const [agentSessionId, { content, latestId, timestamp }] of textDeltaMap) {
+    const textEvent: ProcessedProtocolTextEvent = {
+      id: latestId,
+      timestamp,
+      type: 'PROTOCOL_TEXT',
+      data: {
+        content,
+        agentSessionId,
+      },
+    };
+    processed.push(textEvent);
+  }
+
+  // Convert aggregated tool uses to events
+  for (const [toolCallId, { pending, completed }] of toolUseMap) {
+    const sourceEvent = completed ?? pending;
+    if (!sourceEvent) continue;
+
+    const toolUpdate = sourceEvent.update as ToolUseUpdate;
+    const pendingUpdate = pending?.update as ToolUseUpdate | undefined;
+    const completedUpdate = completed?.update as ToolUseUpdate | undefined;
+
+    const toolEvent: ProcessedProtocolToolEvent = {
+      id: sourceEvent.id,
+      timestamp: sourceEvent.timestamp,
+      type: 'PROTOCOL_TOOL',
+      data: {
+        name: toolUpdate.name ?? 'unknown',
+        toolCallId,
+        input: pendingUpdate?.input,
+        status: completed ? 'completed' : 'pending',
+        result: completedUpdate?.result,
+        agentSessionId: sourceEvent.agentSessionId,
+      },
+    };
+    processed.push(toolEvent);
+  }
+
+  return processed;
 }
