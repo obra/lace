@@ -10,7 +10,6 @@ import type {
   ToolUseUpdate,
   ErrorUpdate,
   ThinkingUpdate,
-  SessionUpdate,
 } from '@lace/web/types/protocol-events';
 
 interface ProcessedToolEvent extends Omit<LaceEvent, 'type' | 'data'> {

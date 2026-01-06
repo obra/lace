@@ -5,6 +5,10 @@
 import type { ProtocolEvent, PermissionRequestEvent } from './protocol-events';
 import type { WebEvent } from './web-events';
 
+// Re-export for convenience
+export type { ProtocolEvent, PermissionRequestEvent } from './protocol-events';
+export type { WebEvent } from './web-events';
+
 /**
  * Union type for all events that the web application handles.
  * Combines protocol events from supervisor with web-internal events.

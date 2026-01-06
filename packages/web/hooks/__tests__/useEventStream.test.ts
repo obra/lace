@@ -3,7 +3,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useEventStream } from '../useEventStream';
+import { useEventStream } from '@lace/web/hooks/useEventStream';
 import type { ProtocolEvent, WebEvent } from '@lace/web/types/app-events';
 import type { LaceEvent } from '@lace/web/types/core';
 
