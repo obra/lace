@@ -114,11 +114,11 @@ describe('useTimelineAutoscroll', () => {
 
   it('should handle streaming content updates', async () => {
     // Use plain objects since hook takes unknown[]
-    const mockEvents = [
+    const mockEvents: unknown[] = [
       {
         id: 'evt_1',
-        type: 'USER_MESSAGE_SENT',
-        data: { content: 'Hello' },
+        type: 'USER_MESSAGE',
+        data: 'Hello',
         timestamp: new Date(),
       },
     ];
@@ -139,7 +139,7 @@ describe('useTimelineAutoscroll', () => {
     });
 
     // Start streaming by adding AGENT_STREAMING event
-    const eventsWithStreaming = [
+    const eventsWithStreaming: unknown[] = [
       ...mockEvents,
       {
         id: 'evt_2',

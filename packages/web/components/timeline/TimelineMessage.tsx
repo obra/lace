@@ -33,15 +33,6 @@ function getEventDataContent(event: ProcessedEvent): string {
   return '';
 }
 
-function getUserMessageSentContent(event: ProcessedEvent): string {
-  if (event.type !== 'USER_MESSAGE_SENT') return '';
-  if ('data' in event && event.data && typeof event.data === 'object') {
-    const data = event.data as { content?: unknown };
-    return typeof data.content === 'string' ? data.content : '';
-  }
-  return '';
-}
-
 type ProtocolToolEventData = {
   name: string;
   toolCallId: string;
@@ -277,7 +268,6 @@ export function TimelineMessage({
 
   switch (event.type) {
     case 'USER_MESSAGE':
-    case 'USER_MESSAGE_SENT':
       return (
         <div className={`${isGrouped && !isFirstInGroup ? 'mt-0.5' : isGrouped ? 'mt-2' : 'mt-3'}`}>
           {/* Only show header for first message in group */}
@@ -292,14 +282,7 @@ export function TimelineMessage({
               </div>
               <div className="flex-1">
                 <div className="bg-neutral-700/20 rounded-lg px-3 py-2">
-                  <MessageText
-                    content={
-                      event.type === 'USER_MESSAGE_SENT'
-                        ? getUserMessageSentContent(event)
-                        : getEventDataAsString(event)
-                    }
-                    className="!leading-normal"
-                  />
+                  <MessageText content={getEventDataAsString(event)} className="!leading-normal" />
                 </div>
               </div>
             </div>
@@ -308,14 +291,7 @@ export function TimelineMessage({
             <div
               className={`ml-11 bg-neutral-700/20 rounded-lg px-3 py-2 ${isLastInGroup ? 'mb-1' : ''} transition-opacity duration-200 ${visibilityClasses}`}
             >
-              <MessageText
-                content={
-                  event.type === 'USER_MESSAGE_SENT'
-                    ? getUserMessageSentContent(event)
-                    : getEventDataAsString(event)
-                }
-                className="!leading-normal"
-              />
+              <MessageText content={getEventDataAsString(event)} className="!leading-normal" />
             </div>
           )}
           {!isVisibleToModel && (

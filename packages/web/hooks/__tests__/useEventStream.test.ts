@@ -237,7 +237,7 @@ describe('useEventStream', () => {
   });
 
   describe('Web Event handling', () => {
-    it('should route USER_MESSAGE_SENT web events to onWebUserMessage handler', async () => {
+    it('should route USER_MESSAGE web events to onWebUserMessage handler', async () => {
       const onWebUserMessage = vi.fn();
 
       renderHook(() =>
@@ -252,11 +252,8 @@ describe('useEventStream', () => {
       const webEvent: WebEvent = {
         id: 'evt_1',
         timestamp: new Date(),
-        type: 'USER_MESSAGE_SENT',
-        data: {
-          content: 'Test message',
-          agentSessionId: mockAgentSessionId,
-        },
+        type: 'USER_MESSAGE',
+        data: 'Test message',
         workspaceSessionId: 'sess_123',
         agentSessionId: mockAgentSessionId,
       };
@@ -271,7 +268,7 @@ describe('useEventStream', () => {
       });
     });
 
-    it('should route USER_MESSAGE_SENT to legacy onUserMessage handler', async () => {
+    it('should route USER_MESSAGE to legacy onUserMessage handler', async () => {
       const onUserMessage = vi.fn();
 
       renderHook(() =>
@@ -286,11 +283,8 @@ describe('useEventStream', () => {
       const webEvent: WebEvent = {
         id: 'evt_1',
         timestamp: new Date(),
-        type: 'USER_MESSAGE_SENT',
-        data: {
-          content: 'Test message',
-          agentSessionId: mockAgentSessionId,
-        },
+        type: 'USER_MESSAGE',
+        data: 'Test message',
         workspaceSessionId: 'sess_123',
         agentSessionId: mockAgentSessionId,
       };
@@ -351,11 +345,8 @@ describe('useEventStream', () => {
       const webEvent: WebEvent = {
         id: 'evt_1',
         timestamp: new Date(),
-        type: 'USER_MESSAGE_SENT',
-        data: {
-          content: 'Test',
-          agentSessionId: mockAgentSessionId,
-        },
+        type: 'USER_MESSAGE',
+        data: 'Test',
         workspaceSessionId: 'sess_123',
         agentSessionId: mockAgentSessionId,
       };

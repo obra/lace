@@ -111,7 +111,7 @@ export interface AgentErrorLogEntry {
  * Web-internal event type identifiers
  */
 export type WebEventType =
-  | 'USER_MESSAGE_SENT'
+  | 'USER_MESSAGE'
   | 'AGENT_STATE_CHANGE'
   | 'AGENT_SPAWNED'
   | 'AGENT_SUMMARY_UPDATED'
@@ -146,12 +146,9 @@ export interface WebEventBase {
 }
 
 /** User sent a message to an agent */
-export interface UserMessageSentEvent extends WebEventBase {
-  type: 'USER_MESSAGE_SENT';
-  data: {
-    content: string;
-    agentSessionId: string;
-  };
+export interface UserMessageEvent extends WebEventBase {
+  type: 'USER_MESSAGE';
+  data: string;
 }
 
 /** Agent state changed (idle, thinking, streaming, etc.) */
@@ -311,7 +308,7 @@ export interface ToolApprovalResponseEvent extends WebEventBase {
  * Discriminated union of all web event types
  */
 export type WebEvent =
-  | UserMessageSentEvent
+  | UserMessageEvent
   | AgentStateChangeEvent
   | AgentSpawnedEvent
   | AgentSummaryUpdatedEvent

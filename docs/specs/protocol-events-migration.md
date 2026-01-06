@@ -341,7 +341,7 @@ function bridgeEventToWeb(event: SupervisorServerEvent) {
 
 3. **Web-Internal Events**:
    - Define `WebEvent` type for web-generated events:
-     - `USER_MESSAGE_SENT`
+     - `USER_MESSAGE`
      - `AGENT_STATE_CHANGE`
      - `AGENT_SPAWNED`
      - `PROJECT_CREATED/UPDATED/DELETED`
@@ -351,7 +351,7 @@ function bridgeEventToWeb(event: SupervisorServerEvent) {
 ```typescript
 // packages/web/types/web-events.ts
 export type WebEventType =
-  | 'USER_MESSAGE_SENT'
+  | 'USER_MESSAGE'
   | 'AGENT_STATE_CHANGE'
   | 'AGENT_SPAWNED'
   | 'PROJECT_CREATED'

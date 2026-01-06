@@ -12,13 +12,13 @@ describe('useProcessedEvents', () => {
   const mockAgentSessionId = 'agent_123' as SessionId;
 
   describe('WebEvent handling', () => {
-    it('should convert USER_MESSAGE_SENT events to InternalTimelineEvent format', () => {
+    it('should convert USER_MESSAGE events to InternalTimelineEvent format', () => {
       const events: AppEvent[] = [
         {
           id: 'evt_1',
-          type: 'USER_MESSAGE_SENT',
+          type: 'USER_MESSAGE',
           timestamp: new Date('2024-01-01T10:00:00Z'),
-          data: { content: 'Hello', agentSessionId: mockAgentSessionId },
+          data: 'Hello',
           workspaceSessionId: 'sess_123',
           agentSessionId: mockAgentSessionId,
         } as WebEvent,
@@ -27,7 +27,7 @@ describe('useProcessedEvents', () => {
       const { result } = renderHook(() => useProcessedEvents(events));
 
       expect(result.current).toHaveLength(1);
-      expect(result.current[0].type).toBe('USER_MESSAGE_SENT');
+      expect(result.current[0].type).toBe('USER_MESSAGE');
     });
   });
 
@@ -218,9 +218,9 @@ describe('useProcessedEvents', () => {
     it('should process both WebEvent and ProtocolEvent in the same stream', () => {
       const webEvent: WebEvent = {
         id: 'evt_1',
-        type: 'USER_MESSAGE_SENT',
+        type: 'USER_MESSAGE',
         timestamp: new Date('2024-01-01T10:00:00Z'),
-        data: { content: 'Hello', agentSessionId: mockAgentSessionId },
+        data: 'Hello',
         workspaceSessionId: 'sess_123',
         agentSessionId: mockAgentSessionId,
       };
@@ -243,16 +243,16 @@ describe('useProcessedEvents', () => {
       const { result } = renderHook(() => useProcessedEvents(events));
 
       expect(result.current).toHaveLength(2);
-      expect(result.current[0].type).toBe('USER_MESSAGE_SENT');
+      expect(result.current[0].type).toBe('USER_MESSAGE');
       expect(result.current[1].type).toBe('PROTOCOL_TEXT');
     });
 
     it('should sort events by timestamp', () => {
       const laterEvent: WebEvent = {
         id: 'evt_1',
-        type: 'USER_MESSAGE_SENT',
+        type: 'USER_MESSAGE',
         timestamp: new Date('2024-01-01T10:00:02Z'),
-        data: { content: 'Second', agentSessionId: mockAgentSessionId },
+        data: 'Second',
         workspaceSessionId: 'sess_123',
         agentSessionId: mockAgentSessionId,
       };
@@ -278,7 +278,7 @@ describe('useProcessedEvents', () => {
       expect(result.current).toHaveLength(2);
       // Should be sorted chronologically
       expect(result.current[0].type).toBe('PROTOCOL_TEXT');
-      expect(result.current[1].type).toBe('USER_MESSAGE_SENT');
+      expect(result.current[1].type).toBe('USER_MESSAGE');
     });
   });
 });

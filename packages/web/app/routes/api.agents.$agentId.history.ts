@@ -41,9 +41,9 @@ function durableEventsToAppEvents(agentSessionId: SessionId, events: DurableEven
       if (content.trim()) {
         out.push({
           id: `ent_${e.eventSeq}_user`,
-          type: 'USER_MESSAGE_SENT',
+          type: 'USER_MESSAGE',
           timestamp,
-          data: { content, agentSessionId },
+          data: content,
           agentSessionId,
           workspaceSessionId: 'unknown',
         } as AppEvent);

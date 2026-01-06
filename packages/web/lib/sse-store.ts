@@ -19,7 +19,7 @@ interface EventFilter {
   // Protocol event type filtering
   protocolEventTypes?: string[]; // e.g., ['text_delta', 'tool_use']
   // Web event type filtering
-  webEventTypes?: string[]; // e.g., ['USER_MESSAGE_SENT']
+  webEventTypes?: string[]; // e.g., ['USER_MESSAGE']
 }
 
 interface EventSubscription {

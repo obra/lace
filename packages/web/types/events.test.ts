@@ -59,13 +59,13 @@ describe('AppEvent Types', () => {
       const event: WebEvent = {
         id: 'evt_3',
         timestamp: new Date(),
-        type: 'USER_MESSAGE_SENT',
-        data: { content: 'Hello', agentSessionId: mockAgentSessionId },
+        type: 'USER_MESSAGE',
+        data: 'Hello',
         workspaceSessionId: mockWorkspaceSessionId,
         agentSessionId: mockAgentSessionId,
       };
 
-      expect(event.type).toBe('USER_MESSAGE_SENT');
+      expect(event.type).toBe('USER_MESSAGE');
       expect(isWebEvent(event)).toBe(true);
       expect(isProtocolEvent(event)).toBe(false);
     });

@@ -285,12 +285,11 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
     // Handle WebEvent callback
     const handleWebEvent = (event: WebEvent, currentOptions: UseEventStreamOptions) => {
       switch (event.type) {
-        case 'USER_MESSAGE_SENT':
+        case 'USER_MESSAGE':
           {
-            const data = event.data as { content: string; agentSessionId: string };
             currentOptions.onWebUserMessage?.({
-              content: data.content,
-              agentSessionId: data.agentSessionId,
+              content: typeof event.data === 'string' ? event.data : '',
+              agentSessionId: event.agentSessionId || 'unknown',
             });
           }
           break;
@@ -375,7 +374,7 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
 
           // Route web events to legacy-named handlers
           switch (event.type) {
-            case 'USER_MESSAGE_SENT':
+            case 'USER_MESSAGE':
               currentOptions.onUserMessage?.(event);
               break;
             case 'LOCAL_SYSTEM_MESSAGE':

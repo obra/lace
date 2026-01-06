@@ -37,8 +37,8 @@ describe('useAgentEvents', () => {
     const base: WebEvent = {
       id: 'web_event_1',
       timestamp: new Date('2024-01-01T10:00:00Z'),
-      type: 'USER_MESSAGE_SENT',
-      data: { content: 'hello', agentSessionId: mockAgentId },
+      type: 'USER_MESSAGE',
+      data: 'hello',
       agentSessionId: mockAgentId,
       workspaceSessionId: 'ws_123',
     } as WebEvent;

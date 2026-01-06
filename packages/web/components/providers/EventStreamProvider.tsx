@@ -104,18 +104,18 @@ export function EventStreamProvider({
       // Add optimistic USER_MESSAGE before sending
       const optimisticEvent: AppEvent = {
         id: `user_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        type: 'USER_MESSAGE_SENT',
+        type: 'USER_MESSAGE',
         timestamp: new Date(),
-        data: { content: message, agentSessionId: agentIdArg },
+        data: message,
         agentSessionId: agentIdArg,
-        workspaceSessionId: 'unknown',
+        workspaceSessionId: sessionId ?? undefined,
       };
       addAgentEvent(optimisticEvent);
 
       // Send to server
       return agentAPIBase.sendMessage(agentIdArg, message);
     },
-    [addAgentEvent, agentAPIBase]
+    [addAgentEvent, agentAPIBase, sessionId]
   );
 
   const agentAPI = useMemo(

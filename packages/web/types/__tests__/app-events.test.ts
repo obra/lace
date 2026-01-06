@@ -61,11 +61,8 @@ describe('App Event Type Guards', () => {
     const event: WebEvent = {
       id: 'evt_789',
       timestamp: new Date(),
-      type: 'USER_MESSAGE_SENT',
-      data: {
-        content: 'test',
-        agentSessionId: 'sess_123',
-      },
+      type: 'USER_MESSAGE',
+      data: 'test',
       workspaceSessionId: 'ws_123',
     };
 
@@ -108,13 +105,13 @@ describe('App Event Type Guards', () => {
     const webEvent: WebEvent = {
       id: 'evt_2',
       timestamp: new Date(),
-      type: 'USER_MESSAGE_SENT',
-      data: { content: 'hello', agentSessionId: 'sess_1' },
+      type: 'USER_MESSAGE',
+      data: 'hello',
       workspaceSessionId: 'ws_1',
     };
 
     expect(getEventType(protocolEvent)).toBe('protocol:text_delta');
-    expect(getEventType(webEvent)).toBe('web:USER_MESSAGE_SENT');
+    expect(getEventType(webEvent)).toBe('web:USER_MESSAGE');
   });
 
   it('should get agent session ID from any event type', () => {
@@ -130,8 +127,8 @@ describe('App Event Type Guards', () => {
     const webEvent: WebEvent = {
       id: 'evt_2',
       timestamp: new Date(),
-      type: 'USER_MESSAGE_SENT',
-      data: { content: 'hello', agentSessionId: 'sess_web' },
+      type: 'USER_MESSAGE',
+      data: 'hello',
       workspaceSessionId: 'ws_1',
       agentSessionId: 'sess_web',
     };
@@ -153,8 +150,8 @@ describe('App Event Type Guards', () => {
     const webEvent: WebEvent = {
       id: 'evt_2',
       timestamp: new Date(),
-      type: 'USER_MESSAGE_SENT',
-      data: { content: 'hello', agentSessionId: 'sess_1' },
+      type: 'USER_MESSAGE',
+      data: 'hello',
       workspaceSessionId: 'ws_web',
     };
 

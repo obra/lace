@@ -134,9 +134,9 @@ const createMockAgent = (id: string, name: string): AgentInfo =>
 
 const createMockEvent = (id: string): WebEvent => ({
   id,
-  type: 'USER_MESSAGE_SENT',
+  type: 'USER_MESSAGE',
   timestamp: new Date(),
-  data: { content: 'Test message', agentSessionId: 'test-thread' },
+  data: 'Test message',
   agentSessionId: 'test-thread',
 });
 

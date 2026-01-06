@@ -4,27 +4,24 @@
 import { describe, it, expect } from 'vitest';
 import type {
   WebEvent,
-  UserMessageSentEvent,
+  UserMessageEvent,
   AgentStateChangeEvent,
   AgentSpawnedEvent,
 } from '@lace/web/types/web-events';
 
 describe('Web Internal Event Types', () => {
-  it('should create UserMessageSentEvent', () => {
-    const event: UserMessageSentEvent = {
+  it('should create UserMessageEvent', () => {
+    const event: UserMessageEvent = {
       id: 'evt_123',
       timestamp: new Date(),
-      type: 'USER_MESSAGE_SENT',
-      data: {
-        content: 'Hello',
-        agentSessionId: 'sess_123',
-      },
+      type: 'USER_MESSAGE',
+      data: 'Hello',
       workspaceSessionId: 'ws_123',
       agentSessionId: 'sess_123',
     };
 
-    expect(event.type).toBe('USER_MESSAGE_SENT');
-    expect(event.data.content).toBe('Hello');
+    expect(event.type).toBe('USER_MESSAGE');
+    expect(event.data).toBe('Hello');
   });
 
   it('should create AgentStateChangeEvent', () => {
