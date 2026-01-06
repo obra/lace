@@ -1,21 +1,28 @@
 // ABOUTME: Real-time SSE event stream monitor for debugging
 // ABOUTME: Shows live events with truncated payloads and connection status
+// FLAG-DAY: Uses AppEvent (ProtocolEvent | PermissionRequestEvent | WebEvent)
 
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircle, faTrash, faPause, faPlay, faFilter } from '@lace/web/lib/fontawesome';
-import { parseTyped } from '@lace/web/lib/serialization';
 import { useEventStream } from '@lace/web/hooks/useEventStream';
 import { useSSEStore } from '@lace/web/lib/sse-store';
-import type { LaceEvent } from '@lace/web/types/core';
+import type { AppEvent } from '@lace/web/types/app-events';
+import {
+  isProtocolEvent,
+  isWebEvent,
+  isPermissionRequestEvent,
+  getAgentSessionId,
+  getEventType,
+} from '@lace/web/types/app-events';
 interface EventStreamMonitorProps {
   maxEvents?: number;
 }
 
 export function EventStreamMonitor({ maxEvents = 1000 }: EventStreamMonitorProps) {
-  const [events, setEvents] = useState<LaceEvent[]>([]);
+  const [events, setEvents] = useState<AppEvent[]>([]);
   const [isPaused, setIsPaused] = useState(false);
   const [hideTokenEvents, setHideTokenEvents] = useState(true); // Hide noisy token events by default
   const eventsEndRef = useRef<HTMLDivElement>(null);
@@ -35,9 +42,14 @@ export function EventStreamMonitor({ maxEvents = 1000 }: EventStreamMonitorProps
     pauseRef.current = isPaused;
   }, [isPaused]);
 
-  // Filter events for display
+  // Filter events for display - exclude text_delta events (token streaming) if hideTokenEvents is enabled
   const filteredEvents = hideTokenEvents
-    ? events.filter((event) => event.type !== 'AGENT_TOKEN')
+    ? events.filter((event) => {
+        if (isProtocolEvent(event)) {
+          return event.update.type !== 'text_delta';
+        }
+        return true;
+      })
     : events;
 
   // Scroll to bottom when new events arrive (only if not paused)
@@ -96,11 +108,30 @@ export function EventStreamMonitor({ maxEvents = 1000 }: EventStreamMonitorProps
 
   const getEventTypeColor = (type?: string) => {
     if (!type) return 'text-base-content';
-    if (type.includes('TASK')) return 'text-info';
-    if (type.includes('AGENT')) return 'text-primary';
-    if (type.includes('ERROR')) return 'text-error';
-    if (type.includes('TOOL')) return 'text-warning';
+    if (type.includes('TASK') || type.includes('task')) return 'text-info';
+    if (type.includes('AGENT') || type.includes('agent')) return 'text-primary';
+    if (type.includes('ERROR') || type.includes('error')) return 'text-error';
+    if (type.includes('TOOL') || type.includes('tool')) return 'text-warning';
     return 'text-base-content';
+  };
+
+  // Helper to get display type for an event
+  const getDisplayType = (event: AppEvent): string => {
+    if (isProtocolEvent(event)) {
+      return `protocol:${event.update.type}`;
+    }
+    if (isWebEvent(event)) {
+      return event.type;
+    }
+    if (isPermissionRequestEvent(event)) {
+      return 'permission_request';
+    }
+    return 'UNKNOWN';
+  };
+
+  // Helper to get agent/session ID for display
+  const getDisplaySessionId = (event: AppEvent): string => {
+    return getAgentSessionId(event) || 'none';
   };
 
   return (
@@ -147,43 +178,50 @@ export function EventStreamMonitor({ maxEvents = 1000 }: EventStreamMonitorProps
                 : 'Waiting for events...'}
           </div>
         ) : (
-          filteredEvents.map((event, index) => (
-            <div
-              key={event.id || index}
-              className="border-b border-base-content/10 pb-1 mb-1 last:border-b-0"
-            >
-              <div className="flex items-center justify-between">
-                <span className={`font-medium ${getEventTypeColor(event.type)}`}>
-                  {event.type || 'UNKNOWN_TYPE'}
-                </span>
-                <span className="text-base-content/50 text-xs">
-                  {event.timestamp
-                    ? new Date(event.timestamp).toLocaleTimeString()
-                    : 'No timestamp'}
-                </span>
-              </div>
+          filteredEvents.map((event, index) => {
+            const displayType = getDisplayType(event);
+            const sessionId = getDisplaySessionId(event);
+            const workspaceId =
+              isProtocolEvent(event) || isWebEvent(event) || isPermissionRequestEvent(event)
+                ? event.workspaceSessionId
+                : undefined;
 
-              <div className="text-base-content/70 text-xs">
-                Thread: {event.context?.threadId || 'none'}
-                {event.context?.sessionId && (
-                  <span className="ml-2">Session: {event.context.sessionId}</span>
-                )}
-              </div>
+            return (
+              <div
+                key={event.id || index}
+                className="border-b border-base-content/10 pb-1 mb-1 last:border-b-0"
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`font-medium ${getEventTypeColor(displayType)}`}>
+                    {displayType}
+                  </span>
+                  <span className="text-base-content/50 text-xs">
+                    {event.timestamp
+                      ? new Date(event.timestamp).toLocaleTimeString()
+                      : 'No timestamp'}
+                  </span>
+                </div>
 
-              {/* Collapsible full event data */}
-              <div className="collapse collapse-arrow mt-1">
-                <input type="checkbox" />
-                <div className="collapse-title text-xs p-0 min-h-0">
-                  <span className="text-base-content/60">Show full data</span>
+                <div className="text-base-content/70 text-xs">
+                  Agent: {sessionId}
+                  {workspaceId && <span className="ml-2">Workspace: {workspaceId}</span>}
                 </div>
-                <div className="collapse-content text-xs p-0">
-                  <pre className="text-base-content/50 text-xs mt-1 whitespace-pre-wrap break-words font-mono">
-                    {JSON.stringify(event, null, 2)}
-                  </pre>
+
+                {/* Collapsible full event data */}
+                <div className="collapse collapse-arrow mt-1">
+                  <input type="checkbox" />
+                  <div className="collapse-title text-xs p-0 min-h-0">
+                    <span className="text-base-content/60">Show full data</span>
+                  </div>
+                  <div className="collapse-content text-xs p-0">
+                    <pre className="text-base-content/50 text-xs mt-1 whitespace-pre-wrap break-words font-mono">
+                      {JSON.stringify(event, null, 2)}
+                    </pre>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
         <div ref={eventsEndRef} />
       </div>

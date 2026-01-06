@@ -1,10 +1,12 @@
 // ABOUTME: Hook for agent token usage tracking without polling
 // ABOUTME: Loads token data from agent API + real-time updates from SSE events
+// FLAG-DAY: Uses AppEvent (ProtocolEvent with usage/context_window types)
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSessionEvents } from '@lace/web/components/providers/EventStreamProvider';
-import type { ThreadId, CombinedTokenUsage, ThreadTokenUsage } from '@lace/web/types/core';
-import type { LaceEvent } from '@lace/web/types/core';
+import type { ThreadId, ThreadTokenUsage } from '@lace/web/types/core';
+import type { AppEvent } from '@lace/web/types/app-events';
+import { isProtocolEvent, getAgentSessionId } from '@lace/web/types/app-events';
 import type { AgentWithTokenUsage } from '@lace/web/types/api';
 import { api } from '@lace/web/lib/api-client';
 import { AbortError } from '@lace/web/lib/api-errors';
@@ -63,79 +65,72 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
     }
   }, [agentId]);
 
-  // Extract token usage from event data
-  const extractTokenUsageFromEvent = useCallback((tokenUsageData: CombinedTokenUsage) => {
-    // Extract context window usage (try new format first, fallback to old)
-    const contextData =
-      tokenUsageData?.context || (tokenUsageData as unknown as Record<string, unknown>)?.thread;
-
-    if (!contextData || typeof contextData !== 'object') {
-      return null;
-    }
-
-    const ctx = contextData as unknown as Record<string, unknown>;
-
-    const currentTokens =
-      typeof ctx.totalPromptTokens === 'number'
-        ? ctx.totalPromptTokens
-        : typeof ctx.currentTokens === 'number'
-          ? ctx.currentTokens
-          : 0;
-
-    const contextLimit =
-      typeof ctx.contextLimit === 'number'
-        ? ctx.contextLimit
-        : typeof ctx.limit === 'number'
-          ? ctx.limit
-          : 0;
-
-    return {
-      totalPromptTokens: currentTokens,
-      totalCompletionTokens: 0, // Not separately tracked
-      totalTokens: currentTokens,
-      contextLimit,
-      percentUsed: typeof ctx.percentUsed === 'number' ? ctx.percentUsed : 0,
-      nearLimit: !!ctx.nearLimit,
-    };
-  }, []);
-
-  // Listen for AGENT_MESSAGE and TOKEN_USAGE_UPDATE events
+  // Listen for protocol events with usage/context_window data
   const handleTokenUpdate = useCallback(
-    (event: LaceEvent) => {
+    (event: AppEvent) => {
       // Skip events not for this agent
-      if (event.context?.threadId !== agentId) {
+      const eventAgentId = getAgentSessionId(event);
+      if (eventAgentId !== agentId) {
         return;
       }
 
-      // Both AGENT_MESSAGE and TOKEN_USAGE_UPDATE can contain token usage
-      if (
-        (event.type === 'AGENT_MESSAGE' || event.type === 'TOKEN_USAGE_UPDATE') &&
-        event.data &&
-        typeof event.data === 'object' &&
-        'tokenUsage' in event.data
-      ) {
-        const tokenUsageData = (event.data as { tokenUsage: CombinedTokenUsage }).tokenUsage;
-        const extracted = extractTokenUsageFromEvent(tokenUsageData);
+      // Handle ProtocolEvent with usage type
+      if (isProtocolEvent(event) && event.update.type === 'usage') {
+        const usageUpdate = event.update as {
+          inputTokens?: number;
+          outputTokens?: number;
+          cacheRead?: number;
+          cacheWrite?: number;
+        };
+        setTokenUsage((prev) => ({
+          totalPromptTokens: (prev?.totalPromptTokens || 0) + (usageUpdate.inputTokens || 0),
+          totalCompletionTokens:
+            (prev?.totalCompletionTokens || 0) + (usageUpdate.outputTokens || 0),
+          totalTokens:
+            (prev?.totalTokens || 0) +
+            (usageUpdate.inputTokens || 0) +
+            (usageUpdate.outputTokens || 0),
+          contextLimit: prev?.contextLimit || 0,
+          percentUsed: prev?.percentUsed || 0,
+          nearLimit: prev?.nearLimit || false,
+        }));
+        return;
+      }
 
-        if (extracted) {
-          setTokenUsage(extracted);
-        }
+      // Handle ProtocolEvent with context_window type
+      if (isProtocolEvent(event) && event.update.type === 'context_window') {
+        const contextUpdate = event.update as {
+          currentTokens?: number;
+          limit?: number;
+          percentUsed?: number;
+          nearLimit?: boolean;
+        };
+        setTokenUsage((prev) => ({
+          totalPromptTokens: contextUpdate.currentTokens ?? prev?.totalPromptTokens ?? 0,
+          totalCompletionTokens: prev?.totalCompletionTokens || 0,
+          totalTokens: contextUpdate.currentTokens ?? prev?.totalTokens ?? 0,
+          contextLimit: contextUpdate.limit ?? prev?.contextLimit ?? 0,
+          percentUsed: contextUpdate.percentUsed ?? prev?.percentUsed ?? 0,
+          nearLimit: contextUpdate.nearLimit ?? prev?.nearLimit ?? false,
+        }));
       }
     },
-    [agentId, extractTokenUsageFromEvent]
+    [agentId]
   );
 
   // Use shared event stream context for real-time updates
   const { events } = useSessionEvents();
 
-  // Find latest token-relevant event (AGENT_MESSAGE or TOKEN_USAGE_UPDATE) with O(1) reverse scan
+  // Find latest token-relevant event (usage or context_window ProtocolEvent) with O(1) reverse scan
   const latestTokenEvent = useMemo(() => {
     // Reverse scan to find the latest event with token data for this agent
     for (let i = events.length - 1; i >= 0; i--) {
       const event = events[i];
+      const eventAgentId = getAgentSessionId(event);
       if (
-        event.context?.threadId === agentId &&
-        (event.type === 'AGENT_MESSAGE' || event.type === 'TOKEN_USAGE_UPDATE')
+        eventAgentId === agentId &&
+        isProtocolEvent(event) &&
+        (event.update.type === 'usage' || event.update.type === 'context_window')
       ) {
         return event;
       }

@@ -6,7 +6,7 @@ import type { ProtocolEvent, PermissionRequestEvent } from './protocol-events';
 import type { WebEvent } from './web-events';
 
 // Re-export for convenience
-export type { ProtocolEvent, PermissionRequestEvent } from './protocol-events';
+export type { ProtocolEvent, PermissionRequestEvent, ToolUseUpdate } from './protocol-events';
 export type { WebEvent } from './web-events';
 
 /**

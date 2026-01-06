@@ -1,24 +1,29 @@
-// ABOUTME: Timeline view component that renders LaceEvents directly
-// ABOUTME: Replaces TimelineView to work with unified event system
+// ABOUTME: Timeline view component that renders ProcessedEvents
+// ABOUTME: Works with unified AppEvent system (FLAG-DAY: no LaceEvent)
 
 'use client';
 
 import React, { useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import type { LaceEvent, AgentInfo, ThreadId } from '@lace/web/types/core';
+import type { AgentInfo, ThreadId } from '@lace/web/types/core';
+import type { AppEvent } from '@lace/web/types/app-events';
 import type { CompactionState } from '@lace/web/components/providers/EventStreamProvider';
 import { asThreadId, isThreadId } from '@lace/web/types/core';
 import { TimelineMessageWithDetails } from './TimelineMessageWithDetails';
 import { TypingIndicator } from './TypingIndicator';
 import { CompactionIndicator } from './CompactionIndicator';
-import { useProcessedEvents, type ProcessedEvent } from '@lace/web/hooks/useProcessedEvents';
+import {
+  useProcessedEvents,
+  getProcessedEventAgentId,
+  type ProcessedEvent,
+} from '@lace/web/hooks/useProcessedEvents';
 import TimelineEntryErrorBoundary from './TimelineEntryErrorBoundary';
 
 // Placeholder for when currentAgent is not available - use valid thread ID format
 const STREAMING_THREAD_ID = asThreadId('lace_19700101_stream');
 
 interface TimelineViewProps {
-  events: LaceEvent[];
+  events: AppEvent[];
   agents?: AgentInfo[];
   isTyping: boolean;
   currentAgent?: string;
@@ -79,24 +84,28 @@ export function TimelineView({
                 index < processedEvents.length - 1 ? processedEvents[index + 1] : null;
 
               // Group messages from same sender that are close in time and type
+              const eventAgentId = getProcessedEventAgentId(event);
+              const prevAgentId = prevEvent ? getProcessedEventAgentId(prevEvent) : undefined;
+              const nextAgentId = nextEvent ? getProcessedEventAgentId(nextEvent) : undefined;
+
               const shouldGroupWithPrevious =
                 prevEvent &&
                 prevEvent.type === event.type &&
-                prevEvent.context?.threadId === event.context?.threadId &&
+                prevAgentId === eventAgentId &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(event.type) &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(prevEvent.type);
 
               const shouldGroupWithNext =
                 nextEvent &&
                 nextEvent.type === event.type &&
-                nextEvent.context?.threadId === event.context?.threadId &&
+                nextAgentId === eventAgentId &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(event.type) &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(nextEvent.type);
 
               // Generate unique key for React
               const eventKey =
                 event.id ||
-                `${instanceId.current}-${event.context?.threadId}-${event.type}-${
+                `${instanceId.current}-${eventAgentId}-${event.type}-${
                   event.timestamp instanceof Date ? event.timestamp.getTime() : event.timestamp
                 }-${index}-${JSON.stringify(event.data).slice(0, 50)}`;
 

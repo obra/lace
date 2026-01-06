@@ -1,10 +1,11 @@
-// ABOUTME: Hook for processing LaceEvents and AppEvents for timeline display
+// ABOUTME: Hook for processing AppEvents for timeline display
 // ABOUTME: Handles filtering, token aggregation, tool call/result pairing, and protocol events
+// FLAG-DAY: Only uses AppEvent - no LaceEvent
 
 import { useMemo } from 'react';
 import type { LaceEvent, ThreadId, ToolCall, ToolResult } from '@lace/web/types/core';
 import type { AppEvent, ProtocolEvent } from '@lace/web/types/app-events';
-import { isProtocolEvent } from '@lace/web/types/app-events';
+import { isProtocolEvent, isWebEvent } from '@lace/web/types/app-events';
 import type {
   TextDeltaUpdate,
   ToolUseUpdate,
@@ -77,16 +78,50 @@ export type ProcessedEvent =
   | ProcessedProtocolErrorEvent
   | ProcessedProtocolThinkingEvent;
 
+/**
+ * Helper to extract agent session ID from any ProcessedEvent type.
+ * Returns undefined if the event doesn't have an agent session ID.
+ */
+export function getProcessedEventAgentId(event: ProcessedEvent): string | undefined {
+  // Protocol-processed events have agentSessionId in data
+  if ('data' in event && event.data && typeof event.data === 'object') {
+    const data = event.data as { agentSessionId?: string };
+    if (data.agentSessionId) {
+      return data.agentSessionId;
+    }
+  }
+  // LaceEvent and ProcessedToolEvent have context.threadId
+  if ('context' in event && event.context && typeof event.context === 'object') {
+    const context = event.context as { threadId?: string };
+    if (context.threadId) {
+      return context.threadId;
+    }
+  }
+  return undefined;
+}
+
 const MAX_STREAMING_MESSAGES = 100;
 
-export function useProcessedEvents(
-  events: Array<LaceEvent | AppEvent>,
-  selectedAgent?: ThreadId
-): ProcessedEvent[] {
+export function useProcessedEvents(events: AppEvent[], selectedAgent?: ThreadId): ProcessedEvent[] {
   return useMemo(() => {
-    // 1. Separate protocol events from legacy lace events
-    const laceEvents = events.filter((e) => !isProtocolEvent(e)) as LaceEvent[];
+    // 1. Separate protocol events from web events
+    // FLAG-DAY: LaceEvent removed - now web events are converted to LaceEvent-like format internally
+    const webEvents = events.filter((e) => isWebEvent(e));
     const protocolEvents = events.filter((e) => isProtocolEvent(e)) as ProtocolEvent[];
+
+    // Convert web events to LaceEvent-like format for internal processing
+    const laceEvents: LaceEvent[] = webEvents
+      .map((e) => {
+        if (!isWebEvent(e)) return null as unknown as LaceEvent;
+        return {
+          id: e.id,
+          timestamp: e.timestamp,
+          type: e.type as LaceEvent['type'],
+          data: e.data,
+          context: { threadId: e.agentSessionId as ThreadId },
+        } as LaceEvent;
+      })
+      .filter(Boolean);
 
     // 2. Process legacy LaceEvents
     const filtered = filterEventsByAgent(laceEvents, selectedAgent);

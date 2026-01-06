@@ -1,17 +1,23 @@
 // ABOUTME: Event stream hook using SSE store singleton
-// ABOUTME: Supports both legacy LaceEvent and new AppEvent (protocol/web) types
+// ABOUTME: Uses AppEvent (ProtocolEvent | PermissionRequestEvent | WebEvent) - FLAG-DAY: no LaceEvent
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useSSEStore } from '@lace/web/lib/sse-store';
-import type { LaceEvent, AgentErrorData } from '@lace/web/types/core';
 import type { SessionPendingApproval } from '@lace/web/types/api';
 import type { AppEvent } from '@lace/web/types/app-events';
 import type { ProtocolEvent } from '@lace/web/types/protocol-events';
 import type { WebEvent } from '@lace/web/types/web-events';
 import { isProtocolEvent, isPermissionRequestEvent, isWebEvent } from '@lace/web/types/app-events';
 
-// Runtime type guard for AgentErrorData
-function isAgentErrorData(value: unknown): value is AgentErrorData {
+// Runtime type guard for error data in protocol events
+interface AgentErrorDataShape {
+  errorType: string;
+  message: string;
+  context: Record<string, unknown>;
+  isRetryable: boolean;
+}
+
+function _isAgentErrorData(value: unknown): value is AgentErrorDataShape {
   return (
     value !== null &&
     typeof value === 'object' &&
@@ -39,17 +45,11 @@ interface ProjectEvent {
   timestamp: Date;
 }
 
+// FLAG-DAY: Updated to match WebEvent AgentSpawnedEvent.data shape
 export interface AgentEvent {
-  type: 'agent:spawned' | 'agent:started' | 'agent:stopped';
+  agentSessionId: string;
+  parentSessionId?: string;
   taskId?: string;
-  agentThreadId: string;
-  providerInstanceId: string;
-  modelId: string;
-  context: {
-    actor: string;
-    isHuman: boolean;
-  };
-  timestamp: Date;
 }
 
 interface GlobalEvent {
@@ -64,14 +64,14 @@ interface GlobalEvent {
 }
 
 interface EventHandlers {
-  // Session events (legacy LaceEvent)
-  onSessionEvent?: (event: LaceEvent) => void;
-  onUserMessage?: (event: LaceEvent) => void;
-  onAgentMessage?: (event: LaceEvent) => void;
-  onAgentToken?: (event: LaceEvent) => void;
-  onToolCall?: (event: LaceEvent) => void;
-  onToolResult?: (event: LaceEvent) => void;
-  onSystemMessage?: (event: LaceEvent) => void;
+  // Session events - FLAG-DAY: all handlers now use AppEvent
+  onSessionEvent?: (event: AppEvent) => void;
+  onUserMessage?: (event: AppEvent) => void;
+  onAgentMessage?: (event: AppEvent) => void;
+  onAgentToken?: (event: AppEvent) => void;
+  onToolCall?: (event: AppEvent) => void;
+  onToolResult?: (event: AppEvent) => void;
+  onSystemMessage?: (event: AppEvent) => void;
   onAgentStateChange?: (agentId: string, from: string, to: string) => void;
 
   // Approval events
@@ -85,7 +85,7 @@ interface EventHandlers {
   onProjectDeleted?: (event: ProjectEvent) => void;
 
   // Session events
-  onSessionInfo?: (event: LaceEvent) => void;
+  onSessionInfo?: (event: AppEvent) => void;
 
   // Agent events
   onAgentEvent?: (event: AgentEvent) => void;
@@ -93,24 +93,24 @@ interface EventHandlers {
   onAgentStarted?: (event: AgentEvent) => void;
   onAgentStopped?: (event: AgentEvent) => void;
 
-  // Compaction events
-  onCompactionStart?: (event: LaceEvent) => void;
-  onCompactionComplete?: (event: LaceEvent) => void;
-  onEventUpdated?: (event: LaceEvent) => void;
+  // Compaction events - FLAG-DAY: now AppEvent (ProtocolEvent with compaction_start/complete)
+  onCompactionStart?: (event: AppEvent) => void;
+  onCompactionComplete?: (event: AppEvent) => void;
+  onEventUpdated?: (event: AppEvent) => void;
 
   // Global events
   onGlobalEvent?: (event: GlobalEvent) => void;
   onSystemNotification?: (event: GlobalEvent) => void;
 
   // Error event handlers
-  onAgentError?: (event: LaceEvent) => void;
+  onAgentError?: (event: AppEvent) => void;
 
-  // Connection events (deprecated but kept for compatibility)
+  // Connection events
   onConnect?: () => void;
   onDisconnect?: () => void;
-  onError?: (error: Error) => void;
+  onError?: (error: unknown) => void;
 
-  // NEW: Protocol event handlers (AppEvent system)
+  // Protocol event handlers (AppEvent system)
   onAppEvent?: (event: AppEvent) => void;
   onProtocolTextDelta?: (data: { text: string; agentSessionId: string; streamSeq: number }) => void;
   onProtocolThinking?: (data: { text: string; agentSessionId: string }) => void;
@@ -136,7 +136,7 @@ interface EventHandlers {
     options: Array<{ optionId: string; label: string }>;
   }) => void;
 
-  // NEW: Web event handlers
+  // Web event handlers
   onWebUserMessage?: (data: { content: string; agentSessionId: string }) => void;
   onWebAgentStateChange?: (data: {
     agentSessionId: string;
@@ -166,13 +166,13 @@ export interface UseEventStreamResult {
     maxReconnectAttempts: number;
     lastEventId?: string;
   };
-  lastEvent?: LaceEvent;
+  lastEvent?: AppEvent;
   close: () => void;
   reconnect: () => void;
 }
 
 export function useEventStream(options: UseEventStreamOptions): UseEventStreamResult {
-  const [lastEvent, setLastEvent] = useState<LaceEvent>();
+  const [lastEvent, setLastEvent] = useState<AppEvent>();
   const subscriptionIdRef = useRef<string | null>(null);
   const optionsRef = useRef(options);
 
@@ -204,90 +204,7 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
   useEffect(() => {
     const store = useSSEStore.getState();
 
-    // Handle LaceEvent (legacy) callback
-    const handleLaceEvent = (event: LaceEvent, currentOptions: UseEventStreamOptions) => {
-      setLastEvent(event);
-
-      // Call general handler first
-      currentOptions.onSessionEvent?.(event);
-
-      // Route to specific handlers based on event type
-      switch (event.type) {
-        case 'USER_MESSAGE':
-          currentOptions.onUserMessage?.(event);
-          break;
-        case 'AGENT_MESSAGE':
-          currentOptions.onAgentMessage?.(event);
-          break;
-        case 'AGENT_TOKEN':
-          currentOptions.onAgentToken?.(event);
-          break;
-        case 'TOOL_CALL':
-          currentOptions.onToolCall?.(event);
-          break;
-        case 'TOOL_RESULT':
-          currentOptions.onToolResult?.(event);
-          break;
-        case 'LOCAL_SYSTEM_MESSAGE':
-          currentOptions.onSystemMessage?.(event);
-          break;
-        case 'AGENT_STATE_CHANGE':
-          if (event.data && typeof event.data === 'object') {
-            const data = event.data as { agentId: string; from: string; to: string };
-            if (data.agentId && data.from !== undefined && data.to !== undefined) {
-              currentOptions.onAgentStateChange?.(data.agentId, data.from, data.to);
-            }
-          }
-          break;
-        case 'TOOL_APPROVAL_REQUEST':
-          {
-            const approvalData = event.data as { toolCallId: string };
-            currentOptions.onApprovalRequest?.({
-              toolCallId: approvalData.toolCallId,
-              requestedAt: event.timestamp || new Date(),
-              agentId: event.context?.threadId || 'unknown',
-            } as SessionPendingApproval);
-          }
-          break;
-        case 'TOOL_APPROVAL_RESPONSE':
-          {
-            const responseData = event.data as { toolCallId: string };
-            currentOptions.onApprovalResponse?.(responseData.toolCallId);
-          }
-          break;
-        case 'COMPACTION_START':
-          currentOptions.onCompactionStart?.(event);
-          break;
-        case 'COMPACTION_COMPLETE':
-          currentOptions.onCompactionComplete?.(event);
-          break;
-        case 'EVENT_UPDATED':
-          currentOptions.onEventUpdated?.(event);
-          break;
-        case 'AGENT_ERROR':
-          currentOptions.onAgentError?.(event);
-          if (currentOptions.treatAgentErrorAsGeneric !== false) {
-            if (isAgentErrorData(event.data)) {
-              currentOptions.onError?.(new Error(event.data.message || 'Unknown agent error'));
-            } else {
-              currentOptions.onError?.(new Error('Malformed agent error event'));
-            }
-          }
-          break;
-        case 'SESSION_INFO':
-          currentOptions.onSessionInfo?.(event);
-          break;
-        case 'AGENT_SPAWNED':
-          {
-            const agentEvent = event.data as AgentEvent;
-            currentOptions.onAgentSpawned?.(agentEvent);
-            currentOptions.onAgentEvent?.(agentEvent);
-          }
-          break;
-      }
-    };
-
-    // Handle ProtocolEvent (new) callback
+    // Handle ProtocolEvent callback
     const handleProtocolEvent = (event: ProtocolEvent, currentOptions: UseEventStreamOptions) => {
       const { update, agentSessionId } = event;
 
@@ -394,43 +311,118 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
       }
     };
 
-    // Subscribe with dual callback for LaceEvent and AppEvent
-    subscriptionIdRef.current = store.subscribe(
-      filter,
-      // Legacy LaceEvent callback
-      (event: LaceEvent) => {
-        const currentOptions = optionsRef.current;
-        try {
-          handleLaceEvent(event, currentOptions);
-        } catch (error) {
-          console.error('[useEventStream] Error in LaceEvent handler:', error);
-        }
-      },
-      // New AppEvent callback
-      (event: AppEvent) => {
-        const currentOptions = optionsRef.current;
-        try {
-          // Call generic AppEvent handler
-          currentOptions.onAppEvent?.(event);
+    // FLAG-DAY: Subscribe with single AppEvent callback
+    subscriptionIdRef.current = store.subscribe(filter, (event: AppEvent) => {
+      const currentOptions = optionsRef.current;
+      try {
+        setLastEvent(event);
 
-          // Route to specific handlers based on event type
-          if (isProtocolEvent(event)) {
-            handleProtocolEvent(event, currentOptions);
-          } else if (isPermissionRequestEvent(event)) {
-            currentOptions.onProtocolPermissionRequest?.({
-              toolCallId: event.request.toolCallId,
-              tool: event.request.tool,
-              resource: event.request.resource,
-              options: event.request.options,
-            });
-          } else if (isWebEvent(event)) {
-            handleWebEvent(event, currentOptions);
+        // Call generic AppEvent handler
+        currentOptions.onAppEvent?.(event);
+
+        // Also call legacy onSessionEvent handler for compatibility
+        currentOptions.onSessionEvent?.(event);
+
+        // Route to specific handlers based on event type
+        if (isProtocolEvent(event)) {
+          handleProtocolEvent(event, currentOptions);
+
+          // Route protocol events to legacy-named handlers where applicable
+          switch (event.update.type) {
+            case 'text_delta':
+              currentOptions.onAgentToken?.(event);
+              break;
+            case 'tool_use':
+              {
+                const toolUpdate = event.update as { status?: string };
+                if (toolUpdate.status === 'pending') {
+                  currentOptions.onToolCall?.(event);
+                } else {
+                  currentOptions.onToolResult?.(event);
+                }
+              }
+              break;
+            case 'compaction_start':
+              currentOptions.onCompactionStart?.(event);
+              break;
+            case 'compaction_complete':
+              currentOptions.onCompactionComplete?.(event);
+              break;
+            case 'error':
+              currentOptions.onAgentError?.(event);
+              if (currentOptions.treatAgentErrorAsGeneric !== false) {
+                const errorUpdate = event.update as { message?: string };
+                currentOptions.onError?.(new Error(errorUpdate.message || 'Unknown agent error'));
+              }
+              break;
+            case 'session_info':
+              currentOptions.onSessionInfo?.(event);
+              break;
           }
-        } catch (error) {
-          console.error('[useEventStream] Error in AppEvent handler:', error);
+        } else if (isPermissionRequestEvent(event)) {
+          currentOptions.onProtocolPermissionRequest?.({
+            toolCallId: event.request.toolCallId,
+            tool: event.request.tool,
+            resource: event.request.resource,
+            options: event.request.options,
+          });
+          currentOptions.onApprovalRequest?.({
+            toolCallId: event.request.toolCallId,
+            requestedAt: event.timestamp,
+            agentId: event.request.sessionId || 'unknown',
+          } as SessionPendingApproval);
+        } else if (isWebEvent(event)) {
+          handleWebEvent(event, currentOptions);
+
+          // Route web events to legacy-named handlers
+          switch (event.type) {
+            case 'USER_MESSAGE_SENT':
+              currentOptions.onUserMessage?.(event);
+              break;
+            case 'LOCAL_SYSTEM_MESSAGE':
+              currentOptions.onSystemMessage?.(event);
+              break;
+            case 'AGENT_STATE_CHANGE':
+              {
+                const data = event.data as {
+                  agentSessionId: string;
+                  previousState: string;
+                  newState: string;
+                };
+                currentOptions.onAgentStateChange?.(
+                  data.agentSessionId,
+                  data.previousState,
+                  data.newState
+                );
+              }
+              break;
+            case 'EVENT_UPDATED':
+              currentOptions.onEventUpdated?.(event);
+              break;
+            case 'TOOL_APPROVAL_RESPONSE':
+              {
+                const data = event.data as { requestId: string };
+                currentOptions.onApprovalResponse?.(data.requestId);
+              }
+              break;
+            case 'AGENT_SPAWNED':
+              {
+                // FLAG-DAY: WebEvent data shape matches new AgentEvent interface
+                const data = event.data as {
+                  agentSessionId: string;
+                  parentSessionId?: string;
+                  taskId?: string;
+                };
+                currentOptions.onAgentSpawned?.(data);
+                currentOptions.onAgentEvent?.(data);
+              }
+              break;
+          }
         }
+      } catch (error) {
+        console.error('[useEventStream] Error in AppEvent handler:', error);
       }
-    );
+    });
 
     return () => {
       if (subscriptionIdRef.current) {

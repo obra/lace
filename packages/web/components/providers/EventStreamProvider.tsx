@@ -17,23 +17,24 @@ import { useSessionAPI as useSessionAPIHook } from '@lace/web/hooks/useSessionAP
 import { useAgentAPI as useAgentAPIHook } from '@lace/web/hooks/useAgentAPI';
 import { useToolApprovalContext } from './ToolApprovalProvider';
 import { useSessionContext } from './SessionProvider';
-import type { ThreadId, WorkspaceSessionId, LaceEvent } from '@lace/web/types/core';
+import type { ThreadId, WorkspaceSessionId } from '@lace/web/types/core';
 import type { AppEvent } from '@lace/web/types/app-events';
+import { isWebEvent, isProtocolEvent } from '@lace/web/types/app-events';
 import type { StreamConnection } from '@lace/web/types/stream-events';
 import type { PendingApproval } from '@lace/web/types/api';
 
 // Types for the context
 interface EventStreamConnection {
   connection: StreamConnection;
-  lastEvent?: LaceEvent | AppEvent;
+  lastEvent?: AppEvent;
   close: () => void;
   reconnect: () => void;
 }
 
 interface AgentEventsState {
-  events: Array<LaceEvent | AppEvent>;
+  events: AppEvent[];
   loadingHistory: boolean;
-  addAgentEvent: (event: LaceEvent | AppEvent) => void;
+  addAgentEvent: (event: AppEvent) => void;
 }
 
 interface AgentAPIActions {
@@ -151,26 +152,25 @@ export function EventStreamProvider({
 
   // Agent token handler - forward events to useProcessedEvents for token aggregation
   const handleAgentToken = useCallback(
-    (event: LaceEvent | AppEvent) => {
+    (event: AppEvent) => {
       // Forward AGENT_TOKEN events so useProcessedEvents can aggregate them
       addAgentEvent(event);
     },
     [addAgentEvent]
   );
 
-  // Compaction event handlers
-  const handleCompactionStart = useCallback((event: LaceEvent) => {
-    if (event.data && typeof event.data === 'object' && 'auto' in event.data) {
-      const compactionData = event.data as { auto: boolean };
+  // Compaction event handlers - compaction is ONLY from ProtocolEvents (compaction_start/compaction_complete)
+  const handleCompactionStart = useCallback((event: AppEvent) => {
+    if (isProtocolEvent(event) && event.update.type === 'compaction_start') {
       setCompactionState({
         isCompacting: true,
-        isAuto: compactionData.auto,
-        compactingAgentId: event.context?.threadId,
+        isAuto: false,
+        compactingAgentId: event.agentSessionId,
       });
     }
   }, []);
 
-  const handleCompactionComplete = useCallback((event: LaceEvent) => {
+  const handleCompactionComplete = useCallback((_event: AppEvent) => {
     setCompactionState({
       isCompacting: false,
       isAuto: false,
@@ -180,24 +180,12 @@ export function EventStreamProvider({
 
   // EVENT_UPDATED handler
   const handleEventUpdated = useCallback(
-    (event: LaceEvent | AppEvent) => {
-      // Handle EVENT_UPDATED for AppEvent
-      if (
-        'type' in event &&
-        event.type === 'EVENT_UPDATED' &&
-        event.data &&
-        typeof event.data === 'object'
-      ) {
-        const updateData = event.data as { eventId?: string; changes?: Record<string, unknown> };
-        if (updateData.eventId && 'visibleToModel' in updateData) {
-          updateEventVisibility(updateData.eventId, updateData.visibleToModel as boolean);
-        }
-      }
-      // Handle EVENT_UPDATED for LaceEvent
-      if ('context' in event && event.data && typeof event.data === 'object') {
-        const laceData = event.data as { eventId?: string; visibleToModel?: boolean };
-        if ('eventId' in event.data && 'visibleToModel' in event.data) {
-          updateEventVisibility(laceData.eventId as string, laceData.visibleToModel as boolean);
+    (event: AppEvent) => {
+      // Handle EVENT_UPDATED WebEvent
+      if (isWebEvent(event) && event.type === 'EVENT_UPDATED') {
+        const updateData = event.data as { eventId?: string; visibleToModel?: boolean } | undefined;
+        if (updateData?.eventId && typeof updateData.visibleToModel === 'boolean') {
+          updateEventVisibility(updateData.eventId, updateData.visibleToModel);
         }
       }
     },
@@ -205,7 +193,7 @@ export function EventStreamProvider({
   );
 
   const handleAgentError = useCallback(
-    (event: LaceEvent | AppEvent) => {
+    (event: AppEvent) => {
       // Add AGENT_ERROR event directly to timeline - don't convert to AGENT_MESSAGE
       // The UI should handle AGENT_ERROR events natively
       addAgentEvent(event);
@@ -215,7 +203,7 @@ export function EventStreamProvider({
 
   // Agent message handler
   const stableAddAgentEventMessage = useCallback(
-    (event: LaceEvent | AppEvent) => {
+    (event: AppEvent) => {
       addAgentEvent(event);
     },
     [addAgentEvent]
@@ -228,7 +216,7 @@ export function EventStreamProvider({
 
   // Create a single stable event handler to ensure consistent references
   const stableAddAgentEvent = useCallback(
-    (event: LaceEvent | AppEvent) => {
+    (event: AppEvent) => {
       addAgentEvent(event);
     },
     [addAgentEvent]
@@ -253,8 +241,8 @@ export function EventStreamProvider({
       onAgentToken: handleAgentToken,
       onToolCall: stableAddAgentEvent,
       onToolResult: stableAddAgentEvent,
-      // Session events (includes all LaceEvent types like AGENT_SUMMARY_UPDATED)
-      onSessionEvent: stableAddAgentEvent, // Handles all session-level events including agent summaries
+      // Session events (includes protocol and web events)
+      onSessionEvent: stableAddAgentEvent, // Handles all session-level events
       // Agent state changes
       onAgentStateChange: handleAgentStateChangeCallback,
       // Tool approval requests

@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAgentEvents } from '@lace/web/hooks/useAgentEvents';
 import type { AppEvent, ProtocolEvent, WebEvent } from '@lace/web/types/app-events';
 import { api } from '@lace/web/lib/api-client';
+import type { SessionId } from '@lace/ent-protocol';
 
 // Mock the API client
 vi.mock('@lace/web/lib/api-client', () => ({
@@ -15,7 +16,8 @@ vi.mock('@lace/web/lib/api-client', () => ({
 }));
 
 describe('useAgentEvents', () => {
-  const mockAgentId = 'agent_test_123';
+  // Use branded SessionId for type safety (cast is safe in tests)
+  const mockAgentId = 'agent_test_123' as SessionId;
 
   const createMockProtocolEvent = (overrides?: Partial<ProtocolEvent>): ProtocolEvent => ({
     id: 'proto_event_1',
@@ -23,7 +25,8 @@ describe('useAgentEvents', () => {
     update: {
       type: 'text_delta',
       sessionId: mockAgentId,
-      delta: 'test',
+      streamSeq: 1,
+      text: 'test',
     } as ProtocolEvent['update'],
     agentSessionId: mockAgentId,
     workspaceSessionId: 'ws_123',
@@ -173,11 +176,15 @@ describe('useAgentEvents', () => {
   it('should update event visibility for EVENT_UPDATED', async () => {
     const { result } = renderHook(() => useAgentEvents(mockAgentId, true));
 
-    const event = createMockWebEvent({
+    // Create EVENT_UPDATED WebEvent with proper type assertion
+    const event: WebEvent = {
       id: 'web_1',
+      timestamp: new Date(),
       type: 'EVENT_UPDATED',
       data: { eventId: 'target_1', changes: {} },
-    } as any);
+      agentSessionId: mockAgentId,
+      workspaceSessionId: 'ws_123',
+    } as WebEvent;
 
     act(() => {
       result.current.addAgentEvent(event);
@@ -227,9 +234,12 @@ describe('useAgentEvents', () => {
   });
 
   it('should clear events when agentId becomes null', async () => {
-    const { result, rerender } = renderHook(({ agentId }) => useAgentEvents(agentId), {
-      initialProps: { agentId: mockAgentId },
-    });
+    const { result, rerender } = renderHook(
+      ({ agentId }: { agentId: SessionId | null }) => useAgentEvents(agentId),
+      {
+        initialProps: { agentId: mockAgentId as SessionId | null },
+      }
+    );
 
     const event = createMockProtocolEvent();
 
@@ -289,5 +299,59 @@ describe('useAgentEvents', () => {
 
     const { result: result2 } = renderHook(() => useAgentEvents(mockAgentId, true));
     expect(result2.current.connected).toBe(true);
+  });
+
+  it('should handle tool_use ProtocolEvent properly', async () => {
+    const toolUseEvent: ProtocolEvent = {
+      id: 'ent_1_tool',
+      timestamp: new Date('2024-01-01T10:00:00Z'),
+      update: {
+        sessionId: mockAgentId,
+        streamSeq: 1,
+        turnId: 'historical',
+        turnSeq: 0,
+        type: 'tool_use',
+        toolCallId: 'tool_call_123',
+        name: 'read_file',
+        input: { path: '/some/file.txt' },
+        status: 'completed',
+        result: {
+          outcome: 'completed',
+          content: [{ type: 'text', text: 'file content' }],
+        },
+      } as ProtocolEvent['update'],
+      agentSessionId: mockAgentId,
+      workspaceSessionId: 'ws_123',
+    };
+
+    vi.mocked(api.get).mockResolvedValue([toolUseEvent]);
+
+    const { result } = renderHook(() => useAgentEvents(mockAgentId));
+
+    await waitFor(() => {
+      expect(result.current.loadingHistory).toBe(false);
+    });
+
+    expect(result.current.events).toHaveLength(1);
+    expect(result.current.events[0]).toEqual(toolUseEvent);
+  });
+
+  it('should accept only AppEvent types (no LaceEvent support)', async () => {
+    // This test verifies the hook only works with AppEvent union
+    // (ProtocolEvent | PermissionRequestEvent | WebEvent)
+    const { result } = renderHook(() => useAgentEvents(mockAgentId, true));
+
+    const protocolEvent = createMockProtocolEvent({ id: 'proto_1' });
+    const webEvent = createMockWebEvent({ id: 'web_1' });
+
+    act(() => {
+      result.current.addAgentEvent(protocolEvent);
+      result.current.addAgentEvent(webEvent);
+    });
+
+    expect(result.current.events).toHaveLength(2);
+    // Verify both event types are properly stored
+    expect(result.current.events.map((e) => e.id)).toContain('proto_1');
+    expect(result.current.events.map((e) => e.id)).toContain('web_1');
   });
 });

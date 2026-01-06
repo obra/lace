@@ -14,7 +14,8 @@ import { Chat } from '@lace/web/components/chat/Chat';
 import { ScrollProvider } from '@lace/web/components/providers/ScrollProvider';
 import { SettingsProvider } from '@lace/web/components/providers/SettingsProvider';
 import { asWorkspaceSessionId } from '@lace/web/types/core';
-import type { ThreadId, AgentInfo, LaceEvent } from '@lace/web/types/core';
+import type { ThreadId, AgentInfo } from '@lace/web/types/core';
+import type { AppEvent, WebEvent } from '@lace/web/types/app-events';
 import { createMockSessionContext } from '@lace/web/__tests__/utils/provider-mocks';
 import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
 
@@ -27,7 +28,7 @@ const mockTimelineView = vi.hoisted(() => {
     currentAgent,
     selectedAgent,
   }: {
-    events: LaceEvent[];
+    events: AppEvent[];
     agents: AgentInfo[] | undefined;
     isTyping: boolean;
     currentAgent: string;
@@ -131,12 +132,13 @@ const createMockAgent = (id: string, name: string): AgentInfo =>
     status: 'idle',
   });
 
-const createMockEvent = (id: string): LaceEvent => ({
+// FLAG-DAY: Create WebEvent instead of LaceEvent
+const createMockEvent = (id: string): WebEvent => ({
   id,
-  type: 'USER_MESSAGE',
+  type: 'USER_MESSAGE_SENT',
   timestamp: new Date(),
-  data: 'Test message',
-  context: { threadId: 'test-thread' as ThreadId },
+  data: { content: 'Test message', agentSessionId: 'test-thread' },
+  agentSessionId: 'test-thread',
 });
 
 describe('Chat', () => {

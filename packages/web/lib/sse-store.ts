@@ -1,9 +1,9 @@
 // ABOUTME: Zustand store for managing single SSE connection across entire app
 // ABOUTME: Replaces EventStreamFirehose singleton with proper React state management
+// FLAG-DAY: Only uses AppEvent (ProtocolEvent | PermissionRequestEvent | WebEvent)
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { LaceEvent } from '@lace/web/types/core';
 import type { AppEvent } from '@lace/web/types/app-events';
 import {
   isProtocolEvent,
@@ -17,7 +17,6 @@ interface EventFilter {
   threadIds?: string[];
   sessionIds?: string[];
   projectIds?: string[];
-  eventTypes?: string[]; // LaceEvent types
   // Protocol event type filtering
   protocolEventTypes?: string[]; // e.g., ['text_delta', 'tool_use']
   // Web event type filtering
@@ -27,8 +26,7 @@ interface EventFilter {
 interface EventSubscription {
   id: string;
   filter: EventFilter;
-  callback: (event: LaceEvent) => void;
-  appEventCallback?: (event: AppEvent) => void; // New: separate callback for AppEvents
+  callback: (event: AppEvent) => void;
   createdAt: Date;
 }
 
@@ -50,12 +48,8 @@ interface SSEState {
 }
 
 interface SSEActions {
-  // Subscription management
-  subscribe: (
-    filter: EventFilter,
-    callback: (event: LaceEvent) => void,
-    appEventCallback?: (event: AppEvent) => void
-  ) => string;
+  // Subscription management - FLAG-DAY: only AppEvent callback
+  subscribe: (filter: EventFilter, callback: (event: AppEvent) => void) => string;
   unsubscribe: (subscriptionId: string) => void;
 
   // Connection management
@@ -70,48 +64,6 @@ interface SSEActions {
     connectionUrl: string | null;
     connectedAt: Date | null;
   };
-}
-
-// Helper function to check if LaceEvent matches filter
-function eventMatchesFilter(event: LaceEvent, filter: EventFilter): boolean {
-  // Empty filter matches everything
-  if (
-    !filter.threadIds?.length &&
-    !filter.sessionIds?.length &&
-    !filter.projectIds?.length &&
-    !filter.eventTypes?.length
-  ) {
-    return true;
-  }
-
-  // Check thread ID filter
-  if (filter.threadIds?.length) {
-    const eventThreadId = event.context?.threadId;
-    if (!eventThreadId || !filter.threadIds.includes(eventThreadId)) {
-      return false;
-    }
-  }
-
-  // Check session ID filter
-  if (filter.sessionIds?.length) {
-    if (!event.context?.sessionId || !filter.sessionIds.includes(event.context.sessionId)) {
-      return false;
-    }
-  }
-
-  // Check project ID filter
-  if (filter.projectIds?.length) {
-    if (!event.context?.projectId || !filter.projectIds.includes(event.context.projectId)) {
-      return false;
-    }
-  }
-
-  // Check event type filter
-  if (filter.eventTypes?.length && !filter.eventTypes.includes(event.type)) {
-    return false;
-  }
-
-  return true;
 }
 
 /**
@@ -196,14 +148,13 @@ const sseStore = create<SSEState & SSEActions>()(
       reconnectAttempts: 0,
       disconnectTimeout: null,
 
-      // Subscribe to filtered events
-      subscribe: (filter, callback, appEventCallback) => {
+      // Subscribe to filtered events - FLAG-DAY: only AppEvent callback
+      subscribe: (filter, callback) => {
         const subscriptionId = generateSubscriptionId();
         const subscription: EventSubscription = {
           id: subscriptionId,
           filter,
           callback,
-          appEventCallback, // Add this
           createdAt: new Date(),
         };
 
@@ -293,32 +244,15 @@ const sseStore = create<SSEState & SSEActions>()(
 
         eventSource.onmessage = (event) => {
           try {
-            const rawEvent = parseTyped<LaceEvent | AppEvent>(event.data as string);
+            // FLAG-DAY: All events are now AppEvent
+            const appEvent = parseTyped<AppEvent>(event.data as string);
 
             // Route to subscribers directly - no caching
             const { subscriptions } = get();
             subscriptions.forEach((subscription) => {
               try {
-                // Check if it's an AppEvent (has 'update' or 'request' or web 'type' without LaceEvent structure)
-                if (
-                  'update' in rawEvent ||
-                  'request' in rawEvent ||
-                  ('workspaceSessionId' in rawEvent && !('context' in rawEvent))
-                ) {
-                  // It's an AppEvent
-                  const appEvent = rawEvent as AppEvent;
-                  if (
-                    subscription.appEventCallback &&
-                    appEventMatchesFilter(appEvent, subscription.filter)
-                  ) {
-                    subscription.appEventCallback(appEvent);
-                  }
-                } else {
-                  // It's a LaceEvent
-                  const laceEvent = rawEvent as LaceEvent;
-                  if (eventMatchesFilter(laceEvent, subscription.filter)) {
-                    subscription.callback(laceEvent);
-                  }
+                if (appEventMatchesFilter(appEvent, subscription.filter)) {
+                  subscription.callback(appEvent);
                 }
               } catch (error) {
                 console.error(`[SSE-STORE] Error in subscription ${subscription.id}:`, error);

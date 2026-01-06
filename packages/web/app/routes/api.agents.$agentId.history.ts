@@ -1,12 +1,13 @@
 // ABOUTME: API endpoint for loading conversation history for a supervisor-backed agent session
 // ABOUTME: Converts Ent durable session events into AppEvent timeline events
 
-import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
+import { isAgentSessionId, asAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
-import type { AppEvent } from '@lace/web/types/app-events';
+import type { AppEvent, ProtocolEvent, ToolUseUpdate } from '@lace/web/types/app-events';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import type { Route } from './+types/api.agents.$agentId.history';
+import type { SessionId } from '@lace/ent-protocol';
 
 type DurableEvent = {
   eventSeq: number;
@@ -29,41 +30,7 @@ function toTextContent(value: unknown): string {
     .join('');
 }
 
-function toolResultToTextContent(result: unknown): Array<{ type: 'text'; text: string }> {
-  const record = result as { content?: unknown; outcome?: unknown } | undefined;
-  const raw = Array.isArray(record?.content) ? record?.content : [];
-  const items = raw
-    .map((c) => {
-      if (!c || typeof c !== 'object') return null;
-      const type = (c as { type?: unknown }).type;
-      if (type === 'text') {
-        const text = (c as { text?: unknown }).text;
-        return typeof text === 'string' ? text : '';
-      }
-      if (type === 'json') {
-        return JSON.stringify((c as { data?: unknown }).data, null, 2);
-      }
-      if (type === 'error') {
-        const message = (c as { message?: unknown }).message;
-        return typeof message === 'string' ? message : 'Error';
-      }
-      if (type === 'image') {
-        const mediaType = (c as { mediaType?: unknown }).mediaType;
-        return `[image:${typeof mediaType === 'string' ? mediaType : 'unknown'}]`;
-      }
-      return null;
-    })
-    .filter((v): v is string => typeof v === 'string');
-
-  if (items.length === 0) {
-    const outcome = record && typeof record.outcome === 'string' ? record.outcome : 'completed';
-    return [{ type: 'text', text: outcome }];
-  }
-
-  return items.map((text) => ({ type: 'text', text }));
-}
-
-function durableEventsToAppEvents(agentSessionId: string, events: DurableEvent[]): AppEvent[] {
+function durableEventsToAppEvents(agentSessionId: SessionId, events: DurableEvent[]): AppEvent[] {
   const out: AppEvent[] = [];
 
   for (const e of events) {
@@ -120,38 +87,53 @@ function durableEventsToAppEvents(agentSessionId: string, events: DurableEvent[]
           ? (e.data.input as Record<string, unknown>)
           : {};
 
-      out.push({
-        id: `ent_${e.eventSeq}_tool_call`,
-        type: 'SYSTEM_NOTIFICATION',
-        timestamp,
-        data: { message: `Tool call: ${name}`, level: 'info' as const },
-        agentSessionId,
-        workspaceSessionId: 'unknown',
-      } as AppEvent);
-
-      if ('result' in e.data && e.data.result) {
+      // Determine status based on whether we have a result
+      const hasResult = 'result' in e.data && e.data.result;
+      let status: ToolUseUpdate['status'] = 'pending';
+      if (hasResult) {
         const outcome = (e.data.result as { outcome?: unknown }).outcome;
-        const status =
-          outcome === 'denied'
-            ? 'denied'
-            : outcome === 'failed' || outcome === 'timeout'
-              ? 'failed'
-              : 'completed';
-
-        const resultContent = toolResultToTextContent(e.data.result)
-          .map((item) => item.text)
-          .join('\n');
-
-        out.push({
-          id: `ent_${e.eventSeq}_tool_result`,
-          type: 'SYSTEM_NOTIFICATION',
-          timestamp,
-          data: { message: `Tool result (${status}): ${resultContent}`, level: 'info' as const },
-          agentSessionId,
-          workspaceSessionId: 'unknown',
-        } as AppEvent);
+        if (outcome === 'denied') {
+          status = 'denied';
+        } else if (outcome === 'failed') {
+          status = 'failed';
+        } else if (outcome === 'timeout') {
+          status = 'timeout';
+        } else if (outcome === 'cancelled') {
+          status = 'cancelled';
+        } else {
+          status = 'completed';
+        }
       }
 
+      // Build the tool_use update with proper typing
+      const toolUseUpdate: ToolUseUpdate & {
+        sessionId: string;
+        streamSeq: number;
+        turnId: string;
+        turnSeq: number;
+      } = {
+        sessionId: agentSessionId,
+        streamSeq: e.eventSeq,
+        turnId: 'historical',
+        turnSeq: 0,
+        type: 'tool_use',
+        toolCallId,
+        name,
+        input,
+        status,
+        ...(hasResult ? { result: e.data.result as ToolUseUpdate['result'] } : {}),
+      };
+
+      // Build proper ProtocolEvent with tool_use update
+      const toolEvent: ProtocolEvent = {
+        id: `ent_${e.eventSeq}_tool`,
+        timestamp,
+        update: toolUseUpdate,
+        workspaceSessionId: 'unknown',
+        agentSessionId,
+      };
+
+      out.push(toolEvent);
       continue;
     }
   }
@@ -186,7 +168,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     })) as { events: DurableEvent[] };
 
     const events = durableEventsToAppEvents(
-      agentId,
+      asAgentSessionId(agentId),
       Array.isArray(result.events) ? result.events : []
     );
 

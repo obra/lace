@@ -18,7 +18,8 @@ import { PermissionModeBadge } from '@lace/web/components/ui/PermissionModeSelec
 import type { PermissionOverrideMode } from '@lace/agent/tools/types';
 
 import { useUIContext } from '@lace/web/components/providers/UIProvider';
-import { asThreadId, asWorkspaceSessionId, isAgentSummaryUpdatedData } from '@lace/web/types/core';
+import { asThreadId, asWorkspaceSessionId } from '@lace/web/types/core';
+import { isWebEvent } from '@lace/web/types/app-events';
 import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
 import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
 import { useToolApprovalContext } from '@lace/web/components/providers/ToolApprovalProvider';
@@ -187,17 +188,17 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
     }
 
     // Look for the most recent AGENT_SUMMARY_UPDATED event for this agent
+    // FLAG-DAY: Only WebEvent format - no LaceEvent fallback
     let foundSummary = false;
     for (let i = agentEvents.events.length - 1; i >= 0; i--) {
       const event = agentEvents.events[i];
-      if (
-        event.type === 'AGENT_SUMMARY_UPDATED' &&
-        isAgentSummaryUpdatedData(event.data) &&
-        event.data.agentThreadId === agentId
-      ) {
-        setAgentSummary(event.data.summary);
-        foundSummary = true;
-        break; // Only use the most recent summary
+      if (isWebEvent(event) && event.type === 'AGENT_SUMMARY_UPDATED') {
+        const data = event.data as { agentSessionId: string; summary: string };
+        if (data.agentSessionId === agentId) {
+          setAgentSummary(data.summary);
+          foundSummary = true;
+          break; // Only use the most recent summary
+        }
       }
     }
 

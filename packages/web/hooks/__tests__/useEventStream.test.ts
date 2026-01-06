@@ -1,11 +1,11 @@
 // ABOUTME: Tests for useEventStream hook with AppEvent support
-// ABOUTME: Verifies both legacy LaceEvent and new protocol event handling
+// ABOUTME: FLAG-DAY: Only AppEvent (ProtocolEvent | WebEvent), no LaceEvent
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useEventStream } from '@lace/web/hooks/useEventStream';
-import type { ProtocolEvent, WebEvent } from '@lace/web/types/app-events';
-import type { LaceEvent } from '@lace/web/types/core';
+import type { ProtocolEvent, WebEvent, AppEvent } from '@lace/web/types/app-events';
+import type { SessionId } from '@lace/ent-protocol';
 
 // Mock the SSE store
 const mockSubscribe = vi.fn();
@@ -25,6 +25,10 @@ vi.mock('@lace/web/lib/sse-store', () => ({
 }));
 
 describe('useEventStream', () => {
+  // Use branded SessionId for type safety (cast is safe in tests)
+  const mockSessionId = 'sess_123' as SessionId;
+  const mockAgentSessionId = 'agent_123' as SessionId;
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockSubscribe.mockReturnValue('sub_123');
@@ -41,102 +45,12 @@ describe('useEventStream', () => {
   });
 
   /**
-   * Helper to get the LaceEvent callback (first callback passed to subscribe)
+   * Helper to get the AppEvent callback (single callback passed to subscribe)
+   * FLAG-DAY: Only one callback now - no separate LaceEvent callback
    */
-  function getLaceEventCallback() {
+  function getAppEventCallback(): (event: AppEvent) => void {
     return mockSubscribe.mock.calls[0][1];
   }
-
-  /**
-   * Helper to get the AppEvent callback (second callback passed to subscribe)
-   */
-  function getAppEventCallback() {
-    return mockSubscribe.mock.calls[0][2];
-  }
-
-  describe('Legacy LaceEvent handling', () => {
-    it('should route USER_MESSAGE events to onUserMessage handler', async () => {
-      const onUserMessage = vi.fn();
-
-      renderHook(() =>
-        useEventStream({
-          sessionId: 'sess_123',
-          onUserMessage,
-        })
-      );
-
-      const laceCallback = getLaceEventCallback();
-
-      const laceEvent: LaceEvent = {
-        id: 'evt_1',
-        type: 'USER_MESSAGE',
-        timestamp: new Date(),
-        data: { content: 'Hello' },
-        context: { sessionId: 'sess_123' },
-      };
-
-      act(() => {
-        laceCallback(laceEvent);
-      });
-
-      expect(onUserMessage).toHaveBeenCalledWith(laceEvent);
-    });
-
-    it('should route AGENT_TOKEN events to onAgentToken handler', async () => {
-      const onAgentToken = vi.fn();
-
-      renderHook(() =>
-        useEventStream({
-          sessionId: 'sess_123',
-          onAgentToken,
-        })
-      );
-
-      const laceCallback = getLaceEventCallback();
-
-      const laceEvent: LaceEvent = {
-        id: 'evt_1',
-        type: 'AGENT_TOKEN',
-        timestamp: new Date(),
-        transient: true,
-        data: { token: 'Hello' },
-        context: { sessionId: 'sess_123' },
-      };
-
-      act(() => {
-        laceCallback(laceEvent);
-      });
-
-      expect(onAgentToken).toHaveBeenCalledWith(laceEvent);
-    });
-
-    it('should route TOOL_CALL events to onToolCall handler', async () => {
-      const onToolCall = vi.fn();
-
-      renderHook(() =>
-        useEventStream({
-          sessionId: 'sess_123',
-          onToolCall,
-        })
-      );
-
-      const laceCallback = getLaceEventCallback();
-
-      const laceEvent: LaceEvent = {
-        id: 'evt_1',
-        type: 'TOOL_CALL',
-        timestamp: new Date(),
-        data: { id: 'call_1', name: 'bash', arguments: { command: 'ls' } },
-        context: { sessionId: 'sess_123' },
-      };
-
-      act(() => {
-        laceCallback(laceEvent);
-      });
-
-      expect(onToolCall).toHaveBeenCalledWith(laceEvent);
-    });
-  });
 
   describe('Protocol Event handling', () => {
     it('should route text_delta protocol events to onProtocolTextDelta handler', async () => {
@@ -149,28 +63,28 @@ describe('useEventStream', () => {
         })
       );
 
-      const appCallback = getAppEventCallback();
+      const callback = getAppEventCallback();
 
       const protocolEvent: ProtocolEvent = {
         id: 'evt_1',
         timestamp: new Date(),
         update: {
-          sessionId: 'agent_123',
+          sessionId: mockSessionId,
           streamSeq: 1,
           type: 'text_delta',
           text: 'Hello world',
         },
         workspaceSessionId: 'sess_123',
-        agentSessionId: 'agent_123',
+        agentSessionId: mockAgentSessionId,
       };
 
       act(() => {
-        appCallback(protocolEvent);
+        callback(protocolEvent);
       });
 
       expect(onProtocolTextDelta).toHaveBeenCalledWith({
         text: 'Hello world',
-        agentSessionId: 'agent_123',
+        agentSessionId: mockAgentSessionId,
         streamSeq: 1,
       });
     });
@@ -185,13 +99,13 @@ describe('useEventStream', () => {
         })
       );
 
-      const appCallback = getAppEventCallback();
+      const callback = getAppEventCallback();
 
       const protocolEvent: ProtocolEvent = {
         id: 'evt_1',
         timestamp: new Date(),
         update: {
-          sessionId: 'agent_123',
+          sessionId: mockSessionId,
           streamSeq: 1,
           turnId: 'turn_1',
           turnSeq: 0,
@@ -202,11 +116,11 @@ describe('useEventStream', () => {
           status: 'pending',
         },
         workspaceSessionId: 'sess_123',
-        agentSessionId: 'agent_123',
+        agentSessionId: mockAgentSessionId,
       };
 
       act(() => {
-        appCallback(protocolEvent);
+        callback(protocolEvent);
       });
 
       expect(onProtocolToolUse).toHaveBeenCalledWith({
@@ -228,31 +142,31 @@ describe('useEventStream', () => {
         })
       );
 
-      const appCallback = getAppEventCallback();
+      const callback = getAppEventCallback();
 
       const protocolEvent: ProtocolEvent = {
         id: 'evt_1',
         timestamp: new Date(),
         update: {
-          sessionId: 'agent_123',
+          sessionId: mockSessionId,
           streamSeq: 1,
           type: 'error',
           code: 'TOOL_ERROR',
           message: 'Tool execution failed',
-          phase: 'execution',
+          phase: 'tool_execution',
         },
         workspaceSessionId: 'sess_123',
-        agentSessionId: 'agent_123',
+        agentSessionId: mockAgentSessionId,
       };
 
       act(() => {
-        appCallback(protocolEvent);
+        callback(protocolEvent);
       });
 
       expect(onProtocolError).toHaveBeenCalledWith({
         code: 'TOOL_ERROR',
         message: 'Tool execution failed',
-        phase: 'execution',
+        phase: 'tool_execution',
       });
     });
 
@@ -266,29 +180,61 @@ describe('useEventStream', () => {
         })
       );
 
-      const appCallback = getAppEventCallback();
+      const callback = getAppEventCallback();
 
       const protocolEvent: ProtocolEvent = {
         id: 'evt_1',
         timestamp: new Date(),
         update: {
-          sessionId: 'agent_123',
+          sessionId: mockSessionId,
           streamSeq: 1,
           type: 'turn_start',
           turnId: 'turn_1',
         },
         workspaceSessionId: 'sess_123',
-        agentSessionId: 'agent_123',
+        agentSessionId: mockAgentSessionId,
       };
 
       act(() => {
-        appCallback(protocolEvent);
+        callback(protocolEvent);
       });
 
       expect(onProtocolTurnStart).toHaveBeenCalledWith({
         turnId: 'turn_1',
-        agentSessionId: 'agent_123',
+        agentSessionId: mockAgentSessionId,
       });
+    });
+
+    it('should route text_delta to onAgentToken for legacy compatibility', async () => {
+      const onAgentToken = vi.fn();
+
+      renderHook(() =>
+        useEventStream({
+          sessionId: 'sess_123',
+          onAgentToken,
+        })
+      );
+
+      const callback = getAppEventCallback();
+
+      const protocolEvent: ProtocolEvent = {
+        id: 'evt_1',
+        timestamp: new Date(),
+        update: {
+          sessionId: mockSessionId,
+          streamSeq: 1,
+          type: 'text_delta',
+          text: 'Hello',
+        },
+        workspaceSessionId: 'sess_123',
+        agentSessionId: mockAgentSessionId,
+      };
+
+      act(() => {
+        callback(protocolEvent);
+      });
+
+      expect(onAgentToken).toHaveBeenCalledWith(protocolEvent);
     });
   });
 
@@ -303,7 +249,7 @@ describe('useEventStream', () => {
         })
       );
 
-      const appCallback = getAppEventCallback();
+      const callback = getAppEventCallback();
 
       const webEvent: WebEvent = {
         id: 'evt_1',
@@ -311,20 +257,51 @@ describe('useEventStream', () => {
         type: 'USER_MESSAGE_SENT',
         data: {
           content: 'Test message',
-          agentSessionId: 'agent_123',
+          agentSessionId: mockAgentSessionId,
         },
         workspaceSessionId: 'sess_123',
-        agentSessionId: 'agent_123',
+        agentSessionId: mockAgentSessionId,
       };
 
       act(() => {
-        appCallback(webEvent);
+        callback(webEvent);
       });
 
       expect(onWebUserMessage).toHaveBeenCalledWith({
         content: 'Test message',
-        agentSessionId: 'agent_123',
+        agentSessionId: mockAgentSessionId,
       });
+    });
+
+    it('should route USER_MESSAGE_SENT to legacy onUserMessage handler', async () => {
+      const onUserMessage = vi.fn();
+
+      renderHook(() =>
+        useEventStream({
+          sessionId: 'sess_123',
+          onUserMessage,
+        })
+      );
+
+      const callback = getAppEventCallback();
+
+      const webEvent: WebEvent = {
+        id: 'evt_1',
+        timestamp: new Date(),
+        type: 'USER_MESSAGE_SENT',
+        data: {
+          content: 'Test message',
+          agentSessionId: mockAgentSessionId,
+        },
+        workspaceSessionId: 'sess_123',
+        agentSessionId: mockAgentSessionId,
+      };
+
+      act(() => {
+        callback(webEvent);
+      });
+
+      expect(onUserMessage).toHaveBeenCalledWith(webEvent);
     });
   });
 
@@ -339,26 +316,57 @@ describe('useEventStream', () => {
         })
       );
 
-      const appCallback = getAppEventCallback();
+      const callback = getAppEventCallback();
 
       const protocolEvent: ProtocolEvent = {
         id: 'evt_1',
         timestamp: new Date(),
         update: {
-          sessionId: 'agent_123',
+          sessionId: mockSessionId,
           streamSeq: 1,
           type: 'text_delta',
           text: 'Hello',
         },
         workspaceSessionId: 'sess_123',
-        agentSessionId: 'agent_123',
+        agentSessionId: mockAgentSessionId,
       };
 
       act(() => {
-        appCallback(protocolEvent);
+        callback(protocolEvent);
       });
 
       expect(onAppEvent).toHaveBeenCalledWith(protocolEvent);
+    });
+
+    it('should call onSessionEvent for legacy compatibility', async () => {
+      const onSessionEvent = vi.fn();
+
+      renderHook(() =>
+        useEventStream({
+          sessionId: 'sess_123',
+          onSessionEvent,
+        })
+      );
+
+      const callback = getAppEventCallback();
+
+      const webEvent: WebEvent = {
+        id: 'evt_1',
+        timestamp: new Date(),
+        type: 'USER_MESSAGE_SENT',
+        data: {
+          content: 'Test',
+          agentSessionId: mockAgentSessionId,
+        },
+        workspaceSessionId: 'sess_123',
+        agentSessionId: mockAgentSessionId,
+      };
+
+      act(() => {
+        callback(webEvent);
+      });
+
+      expect(onSessionEvent).toHaveBeenCalledWith(webEvent);
     });
   });
 

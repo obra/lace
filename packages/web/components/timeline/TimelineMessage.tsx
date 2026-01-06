@@ -1,11 +1,11 @@
-// ABOUTME: Timeline message component that renders LaceEvent directly
-// ABOUTME: Replaces TimelineMessage to work with unified event system
+// ABOUTME: Timeline message component that renders ProcessedEvent
+// ABOUTME: Works with unified AppEvent system (FLAG-DAY: no LaceEvent)
 
 'use client';
 
 import React from 'react';
-import type { LaceEvent, AgentInfo } from '@lace/web/types/core';
-import type { ProcessedEvent } from '@lace/web/hooks/useProcessedEvents';
+import type { AgentInfo } from '@lace/web/types/core';
+import { getProcessedEventAgentId, type ProcessedEvent } from '@lace/web/hooks/useProcessedEvents';
 import { MessageHeader, MessageText } from '@lace/web/components/ui';
 import { ToolCallDisplay } from '@lace/web/components/ui/ToolCallDisplay';
 import { Alert } from '@lace/web/components/ui/Alert';
@@ -28,6 +28,14 @@ function getAgentName(threadId: string, agents?: AgentInfo[]): string {
   return agent?.name || 'Assistant';
 }
 
+// Helper to check if event has visibleToModel property
+function getEventVisibility(event: ProcessedEvent): boolean {
+  if ('visibleToModel' in event) {
+    return (event as { visibleToModel?: boolean }).visibleToModel !== false;
+  }
+  return true; // Default to visible
+}
+
 export function TimelineMessage({
   event,
   agents,
@@ -36,10 +44,11 @@ export function TimelineMessage({
   isLastInGroup = true,
 }: TimelineMessageProps) {
   const timestamp = event.timestamp || new Date();
-  const agentName = getAgentName(event.context?.threadId || '', agents);
+  const agentId = getProcessedEventAgentId(event) || '';
+  const agentName = getAgentName(agentId, agents);
 
   // Check if event is visible to model (undefined/true = visible, false = not visible)
-  const isVisibleToModel = event.visibleToModel !== false;
+  const isVisibleToModel = getEventVisibility(event);
 
   // Base classes for visibility styling
   const visibilityClasses = isVisibleToModel ? '' : 'opacity-40';
