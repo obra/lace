@@ -3940,9 +3940,19 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 { role: 'user', content: '', toolResults: [coreResult] },
               ];
 
-              if (coreResult.status !== 'completed') {
+              // Determine if the turn should continue based on tool result status:
+              // - 'completed': success, continue turn
+              // - 'failed': recoverable error, pass error back to model, continue turn
+              // - 'denied'/'aborted': fatal error, stop turn immediately
+              // - 'pending': waiting for permission, stop turn
+              if (
+                coreResult.status === 'denied' ||
+                coreResult.status === 'aborted' ||
+                coreResult.status === 'pending'
+              ) {
                 shouldContinue = false;
               }
+              // Note: 'failed' status is recoverable - error is passed to model via toolResults above
             }
 
             if (!shouldContinue) {

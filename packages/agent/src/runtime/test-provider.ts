@@ -7,8 +7,9 @@ import type { Tool } from '@lace/agent/tools/tool';
 import type { ToolCall, ToolResult } from '@lace/agent/tools/types';
 
 type TestProviderState = {
-  phase: 'needs_tool' | 'final';
+  phase: 'needs_tool' | 'awaiting_retry' | 'final';
   nextToolCallId: number;
+  sawErrorInToolResult: boolean; // Track if we saw an error to trigger retry
 };
 
 /**
@@ -61,6 +62,15 @@ function getStreamingDelayMs(): number {
   return isNaN(delay) || delay < 0 ? 0 : delay;
 }
 
+/**
+ * Tool error retry configuration for testing error recovery.
+ * - LACE_TEST_PROVIDER_RETRY_ON_ERROR: When set to '1', provider will retry file_read
+ *   with a fallback file after seeing an error in the tool result.
+ */
+function isRetryOnErrorEnabled(): boolean {
+  return process.env.LACE_TEST_PROVIDER_RETRY_ON_ERROR === '1';
+}
+
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -92,7 +102,11 @@ export function getTestProviderCallCount(): number {
 }
 
 export class TestAgentProvider extends AIProvider {
-  private state: TestProviderState = { phase: 'needs_tool', nextToolCallId: 1 };
+  private state: TestProviderState = {
+    phase: 'needs_tool',
+    nextToolCallId: 1,
+    sawErrorInToolResult: false,
+  };
 
   /**
    * Get mock pricing for the test provider.
@@ -215,17 +229,34 @@ export class TestAgentProvider extends AIProvider {
           ];
           const content =
             requested.name === 'file_read'
-              ? `Reading ${(requested.args as any).path}...`
+              ? `Reading ${(requested.args as Record<string, unknown>).path as string}...`
               : requested.name === 'delegate'
-                ? `Delegating ${(requested.args as any).prompt}...`
-                : `Writing ${(requested.args as any).path}...`;
+                ? `Delegating ${(requested.args as Record<string, unknown>).prompt as string}...`
+                : `Writing ${(requested.args as Record<string, unknown>).path as string}...`;
           this.emit('token', { token: content });
           this.emit('complete', { response: { content, toolCalls, stopReason: 'tool_use' } });
-          this.state.phase = 'final';
+          // If retry-on-error is enabled, transition to awaiting_retry so we can retry on failure
+          this.state.phase = isRetryOnErrorEnabled() ? 'awaiting_retry' : 'final';
           return { content, toolCalls, stopReason: 'tool_use', usage: mockUsage };
         }
 
-        const toolResultText = this.extractLatestToolResultText(messages);
+        // Check for tool result (both success and failure)
+        const toolResultInfo = this.extractLatestToolResultInfo(messages);
+
+        // If we're in awaiting_retry phase and the last tool result was an error, retry with fallback.txt
+        if (this.state.phase === 'awaiting_retry' && toolResultInfo?.isError) {
+          const toolCallId = `test_tool_${this.state.nextToolCallId++}`;
+          const toolCalls: ToolCall[] = [
+            { id: toolCallId, name: 'file_read', arguments: { path: 'fallback.txt' } },
+          ];
+          const content = `Previous file not found. Retrying with fallback.txt...`;
+          this.emit('token', { token: content });
+          this.emit('complete', { response: { content, toolCalls, stopReason: 'tool_use' } });
+          this.state.phase = 'final'; // Don't retry again
+          return { content, toolCalls, stopReason: 'tool_use', usage: mockUsage };
+        }
+
+        const toolResultText = toolResultInfo?.text ?? null;
         const content = toolResultText ? `Result:\n${toolResultText}` : 'No tool result found.';
         this.emit('token', { token: content });
         this.emit('complete', { response: { content, toolCalls: [], stopReason: 'stop' } });
@@ -263,7 +294,9 @@ export class TestAgentProvider extends AIProvider {
     return null;
   }
 
-  private extractLatestToolResultText(messages: ProviderMessage[]): string | null {
+  private extractLatestToolResultInfo(
+    messages: ProviderMessage[]
+  ): { text: string; isError: boolean } | null {
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
       if (msg.role !== 'user') continue;
@@ -274,7 +307,12 @@ export class TestAgentProvider extends AIProvider {
         .map((c) => (c.type === 'text' ? (c.text ?? '') : ''))
         .filter((t) => t.length > 0)
         .join('\n');
-      return content.length > 0 ? content : null;
+      if (content.length > 0) {
+        // Check if the tool result indicates an error (status is not 'completed')
+        const isError = last.status !== 'completed';
+        return { text: content, isError };
+      }
+      return null;
     }
     return null;
   }
