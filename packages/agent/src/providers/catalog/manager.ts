@@ -78,6 +78,7 @@ export class ProviderCatalogManager {
   }
 
   async loadCatalogs(): Promise<void> {
+    const previous = new Map(this.catalogCache);
     this.catalogCache.clear();
     this.modelGating.clear();
 
@@ -93,6 +94,14 @@ export class ProviderCatalogManager {
     }
 
     await this.loadModelGating();
+
+    // Safety: if nothing was loaded, keep previous cache to avoid wiping providers
+    if (this.catalogCache.size === 0 && previous.size > 0) {
+      this.catalogCache = previous;
+      logger.warn('catalog.load.fallback_previous_cache', {
+        reason: 'no catalogs found; retained previous cache',
+      });
+    }
   }
 
   private async loadCatalogDirectory(dirPath: string): Promise<void> {
