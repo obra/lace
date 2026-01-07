@@ -61,6 +61,23 @@ pub enum UiAction {
     ScrollUp,
     ScrollDown,
 
+    OpenEnvEditor,
+    EnvChar(char),
+    EnvBackspace,
+    EnvSaveEntry,
+    EnvDelete,
+    EnvPrev,
+    EnvNext,
+    EnvApply,
+    CloseEnvEditor,
+
+    OpenModelsPanel,
+    ModelsPrev,
+    ModelsNext,
+    ModelsToggle,
+    ModelsRefresh,
+    CloseModelsPanel,
+
     OpenPalette,
     CloseOverlay,
     ToggleHelp,
@@ -373,6 +390,55 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
             Vec::new()
         }
+        UiAction::OpenEnvEditor => {
+            crate::app::config_panels::open_env_editor(state);
+            Vec::new()
+        }
+        UiAction::EnvChar(ch) => {
+            crate::app::config_panels::env_input_char(state, ch);
+            Vec::new()
+        }
+        UiAction::EnvBackspace => {
+            crate::app::config_panels::env_input_backspace(state);
+            Vec::new()
+        }
+        UiAction::EnvSaveEntry => {
+            crate::app::config_panels::env_save_entry(state);
+            Vec::new()
+        }
+        UiAction::EnvDelete => {
+            crate::app::config_panels::env_delete_selected(state);
+            Vec::new()
+        }
+        UiAction::EnvPrev => {
+            crate::app::config_panels::env_prev(state);
+            Vec::new()
+        }
+        UiAction::EnvNext => {
+            crate::app::config_panels::env_next(state);
+            Vec::new()
+        }
+        UiAction::EnvApply => crate::app::config_panels::env_apply(state),
+        UiAction::CloseEnvEditor => {
+            crate::app::config_panels::close_env_editor(state);
+            Vec::new()
+        }
+        UiAction::OpenModelsPanel => crate::app::config_panels::open_models_panel(state),
+        UiAction::ModelsPrev => {
+            state.models_panel.selected = state.models_panel.selected.saturating_sub(1);
+            Vec::new()
+        }
+        UiAction::ModelsNext => {
+            let max = state.models_panel.models.len().saturating_sub(1);
+            state.models_panel.selected = (state.models_panel.selected + 1).min(max);
+            Vec::new()
+        }
+        UiAction::ModelsToggle => crate::app::config_panels::toggle_selected_model(state),
+        UiAction::ModelsRefresh => crate::app::config_panels::refresh_provider_catalog(state),
+        UiAction::CloseModelsPanel => {
+            crate::app::config_panels::close_models_panel(state);
+            Vec::new()
+        }
         UiAction::FocusNext => {
             state.focus_next();
             Vec::new()
@@ -558,6 +624,13 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 PaletteCommand::ToggleDebug => {
                     let _ = apply_ui_action(state, UiAction::ToggleDebug);
                 }
+                PaletteCommand::OpenEnvEditorCmd => {
+                    let _ = apply_ui_action(state, UiAction::OpenEnvEditor);
+                }
+                PaletteCommand::OpenModelsPanelCmd => {
+                    let out_models = apply_ui_action(state, UiAction::OpenModelsPanel);
+                    out.extend(out_models);
+                }
                 PaletteCommand::FocusInput => {
                     state.focus = crate::app::Focus::Input;
                 }
@@ -714,6 +787,8 @@ enum PaletteCommand {
     ToggleActivity,
     ToggleDebug,
     FocusInput,
+    OpenEnvEditorCmd,
+    OpenModelsPanelCmd,
     Quit,
 }
 
@@ -800,6 +875,14 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
         PaletteItem {
             label: "Toggle Debug Pane",
             command: PaletteCommand::ToggleDebug,
+        },
+        PaletteItem {
+            label: "Environment...",
+            command: PaletteCommand::OpenEnvEditorCmd,
+        },
+        PaletteItem {
+            label: "Models...",
+            command: PaletteCommand::OpenModelsPanelCmd,
         },
         PaletteItem {
             label: "Focus Input",

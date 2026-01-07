@@ -1103,10 +1103,14 @@ List available models for a connection. Model catalogs are connection-scoped bec
   result: {
     providerId: string,
     connectionId: string,
-    models: ModelInfo[]
+    models: ModelInfo[]  // includes disabled?: boolean when gated off
   }
 }
 ```
+
+`ModelInfo.disabled?: boolean` — true when the model is currently disabled by provider-level gating
+(`ent/models/disable` or an `enabled` allow-list). Clients may still display disabled models to
+re-enable them.
 
 ### 6.25 `ent/models/refresh` (optional)
 
@@ -1751,6 +1755,11 @@ interface ModelInfo {
   maxOutput: number;
   supportsThinking?: boolean;
   supportsImages?: boolean;
+  /**
+   * true when provider-level model gating has disabled this model.
+   * Omitted or false means enabled/available.
+   */
+  disabled?: boolean;
 }
 ```
 

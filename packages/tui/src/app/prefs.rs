@@ -39,6 +39,7 @@ pub struct Preferences {
     pub input_multiline: bool,
     pub last_connection_id: Option<String>,
     pub last_model_id: Option<String>,
+    pub environment: Option<std::collections::BTreeMap<String, String>>,
 }
 
 impl Default for Preferences {
@@ -53,6 +54,7 @@ impl Default for Preferences {
             input_multiline: false,
             last_connection_id: None,
             last_model_id: None,
+            environment: None,
         }
     }
 }
@@ -104,6 +106,11 @@ mod tests {
             input_multiline: true,
             last_connection_id: Some("openai-openai".to_string()),
             last_model_id: Some("gpt-4.1".to_string()),
+            environment: Some(
+                [("A".to_string(), "1".to_string())]
+                    .into_iter()
+                    .collect::<std::collections::BTreeMap<_, _>>(),
+            ),
         };
         save(Some(&path), &prefs).unwrap();
         let loaded = load(Some(&path)).unwrap();

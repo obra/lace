@@ -1,5 +1,6 @@
 pub mod activity;
 pub mod clipboard;
+pub mod config_panels;
 pub mod config_wizard;
 pub mod prefs;
 pub mod reducer;
@@ -9,6 +10,7 @@ pub mod storage;
 pub mod transcript;
 pub mod ui;
 
+use crate::app::config_panels::{EnvEditorState, ModelsPanelState};
 use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,6 +116,13 @@ pub struct AppState {
     pub prefs_path: Option<std::path::PathBuf>,
     pub session_snapshots: std::collections::HashMap<String, sessions::SessionSnapshot>,
     pub session_switch_target: Option<String>,
+
+    // Simple, single-agent config state
+    pub environment: std::collections::BTreeMap<String, String>,
+    pub tools: Vec<String>,
+    pub tools_open: bool,
+    pub env_editor: EnvEditorState,
+    pub models_panel: ModelsPanelState,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -136,6 +145,11 @@ impl AppState {
     ) -> Self {
         let session_aliases = sessions::load_aliases(aliases_path.as_deref()).unwrap_or_default();
         let prefs = prefs::load(prefs_path.as_deref()).unwrap_or_default();
+
+        let environment = prefs
+            .environment
+            .clone()
+            .unwrap_or_else(std::collections::BTreeMap::new);
 
         Self {
             session_id: None,
@@ -186,10 +200,16 @@ impl AppState {
 
             session_aliases,
             aliases_path,
-            prefs,
+            prefs: prefs.clone(),
             prefs_path,
             session_snapshots: std::collections::HashMap::new(),
             session_switch_target: None,
+
+            environment,
+            tools: Vec::new(),
+            tools_open: false,
+            env_editor: EnvEditorState::default(),
+            models_panel: ModelsPanelState::default(),
         }
     }
 

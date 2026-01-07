@@ -2239,8 +2239,21 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const provider = state.providerCatalog.getProvider(providerId);
     if (!provider) throwInvalidParams(`Unknown providerId: ${providerId}`);
 
-    const gatedModels = state.providerCatalog.applyModelGating(providerId, provider.models);
-    const models = gatedModels.map((m) => mapCatalogModelToModelInfo(m, providerId));
+    const gating = state.providerCatalog.getModelGating(providerId);
+    const enabledSet =
+      gating.enabled && gating.enabled.length > 0 ? new Set(gating.enabled) : undefined;
+    const disabledSet = new Set(gating.disabled ?? []);
+
+    const models = provider.models.map((m) => {
+      const info = mapCatalogModelToModelInfo(m, providerId) as any;
+      const isDisabled =
+        (enabledSet && !enabledSet.has(m.id)) || (disabledSet.size > 0 && disabledSet.has(m.id));
+      if (isDisabled) {
+        info.disabled = true;
+      }
+      return info;
+    });
+
     return { providerId, connectionId, models };
   });
 

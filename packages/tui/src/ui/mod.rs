@@ -51,6 +51,12 @@ pub fn run_tui(args: Args) -> io::Result<()> {
     }];
     send_outbound(&transport, &mut state, status_req, args.timeout_ms)?;
 
+    // Auto-apply last used connection/model/environment when none active yet.
+    let auto = crate::app::config_panels::maybe_autoconfigure_from_prefs(&mut state);
+    if !auto.is_empty() {
+        send_outbound(&transport, &mut state, auto, args.timeout_ms)?;
+    }
+
     let mut terminal = TerminalGuard::init()?;
     let res = run_loop(
         &mut terminal.terminal,
@@ -125,6 +131,43 @@ fn run_loop(
                             KeyCode::Down => Some(UiAction::PermissionNext),
                             KeyCode::Enter => Some(UiAction::PermissionSubmit),
                             KeyCode::Esc => Some(UiAction::PermissionCancel),
+                            _ => None,
+                        };
+                        if let Some(action) = action {
+                            let out = apply_ui_action(state, action);
+                            send_outbound(transport, state, out, timeout_ms)?;
+                        }
+                        continue;
+                    }
+
+                    if state.env_editor.open {
+                        let action = match key.code {
+                            KeyCode::Esc => Some(UiAction::CloseEnvEditor),
+                            KeyCode::Up => Some(UiAction::EnvPrev),
+                            KeyCode::Down => Some(UiAction::EnvNext),
+                            KeyCode::Enter => Some(UiAction::EnvSaveEntry),
+                            KeyCode::Backspace => Some(UiAction::EnvBackspace),
+                            KeyCode::Char('d') => Some(UiAction::EnvDelete),
+                            KeyCode::Char('s') => Some(UiAction::EnvApply),
+                            KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                Some(UiAction::EnvChar(ch))
+                            }
+                            _ => None,
+                        };
+                        if let Some(action) = action {
+                            let out = apply_ui_action(state, action);
+                            send_outbound(transport, state, out, timeout_ms)?;
+                        }
+                        continue;
+                    }
+
+                    if state.models_panel.open {
+                        let action = match key.code {
+                            KeyCode::Esc => Some(UiAction::CloseModelsPanel),
+                            KeyCode::Up => Some(UiAction::ModelsPrev),
+                            KeyCode::Down => Some(UiAction::ModelsNext),
+                            KeyCode::Char('r') => Some(UiAction::ModelsRefresh),
+                            KeyCode::Enter => Some(UiAction::ModelsToggle),
                             _ => None,
                         };
                         if let Some(action) = action {
@@ -525,6 +568,20 @@ fn handle_agent_line(
                     let out = config_wizard::handle_response(state, method, &result, error_message);
                     send_outbound(transport, state, out, timeout_ms)?;
                 }
+                if method == "ent/models/list" && state.models_panel.open {
+                    crate::app::config_panels::handle_models_list(state, &result);
+                }
+                if (method == "ent/models/enable" || method == "ent/models/disable")
+                    && state.models_panel.open
+                {
+                    crate::app::config_panels::apply_model_toggle_result(state, &result);
+                    let out = crate::app::config_panels::request_models_list(state);
+                    send_outbound(transport, state, out, timeout_ms)?;
+                }
+                if method == "ent/providers/refresh" && state.models_panel.open {
+                    let out = crate::app::config_panels::request_models_list(state);
+                    send_outbound(transport, state, out, timeout_ms)?;
+                }
             }
 
             if should_refocus && state.active_permission.is_none() {
@@ -687,6 +744,14 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
         let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
         f.render_widget(render_permission_modal(state), area);
+    } else if state.env_editor.open {
+        let area = centered_rect(80, 70, f.area());
+        f.render_widget(Clear, area);
+        f.render_widget(render_env_modal(state), area);
+    } else if state.models_panel.open {
+        let area = centered_rect(80, 70, f.area());
+        f.render_widget(Clear, area);
+        f.render_widget(render_models_modal(state), area);
     } else if state.config_wizard.open {
         let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
@@ -994,6 +1059,73 @@ fn render_config_modal(state: &AppState) -> Paragraph<'static> {
 
     Paragraph::new(Text::from(lines))
         .block(Block::default().title("Configure").borders(Borders::ALL))
+        .wrap(Wrap { trim: true })
+}
+
+fn render_env_modal(state: &AppState) -> Paragraph<'static> {
+    let mut lines: Vec<Line> = Vec::new();
+    lines.push(Line::from("Environment (KEY=VALUE)"));
+    lines.push(Line::from(""));
+
+    for (idx, (k, v)) in state.environment.iter().enumerate() {
+        let marker = if idx == state.env_editor.selected {
+            ">"
+        } else {
+            " "
+        };
+        lines.push(Line::from(format!("{marker} {k}={v}")));
+    }
+    if state.environment.is_empty() {
+        lines.push(Line::from("No variables set"));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(format!("Input: {}", state.env_editor.input)));
+    if let Some(err) = &state.env_editor.error {
+        lines.push(Line::from(format!("Error: {err}")));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(
+        "Enter add/update • d delete • s apply • Esc close",
+    ));
+
+    Paragraph::new(Text::from(lines))
+        .block(Block::default().title("Environment").borders(Borders::ALL))
+        .wrap(Wrap { trim: true })
+}
+
+fn render_models_modal(state: &AppState) -> Paragraph<'static> {
+    let mut lines: Vec<Line> = Vec::new();
+    lines.push(Line::from(
+        "Models (Enter toggle enable/disable, r refresh)",
+    ));
+    lines.push(Line::from(""));
+
+    if let Some(err) = &state.models_panel.error {
+        lines.push(Line::from(format!("Error: {err}")));
+    } else if state.models_panel.loading {
+        lines.push(Line::from("Loading models..."));
+    } else {
+        for (i, m) in state.models_panel.models.iter().enumerate() {
+            let marker = if i == state.models_panel.selected {
+                ">"
+            } else {
+                " "
+            };
+            let status = if m.disabled {
+                "[disabled]"
+            } else {
+                "[enabled]"
+            };
+            lines.push(Line::from(format!("{marker} {} {}", m.name, status)));
+        }
+        if state.models_panel.models.is_empty() {
+            lines.push(Line::from("No models found"));
+        }
+    }
+
+    Paragraph::new(Text::from(lines))
+        .block(Block::default().title("Models").borders(Borders::ALL))
         .wrap(Wrap { trim: true })
 }
 

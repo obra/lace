@@ -81,10 +81,10 @@ describe('ent/models enable/disable (provider-global gating)', () => {
       agent.peer.request('ent/models/list', { connectionId: instances[0] }),
       2_000,
       'ent/models/list after disable'
-    )) as { models: Array<{ modelId: string }> };
-    const idsAfterDisable = afterDisable.models.map((m) => m.modelId);
-    expect(idsAfterDisable).toContain(MODEL_A);
-    expect(idsAfterDisable).not.toContain(MODEL_B);
+    )) as { models: Array<{ modelId: string; disabled?: boolean }> };
+    const modelB = afterDisable.models.find((m) => m.modelId === MODEL_B);
+    expect(modelB).toBeDefined();
+    expect(modelB?.disabled).toBe(true);
 
     const enabled = (await withTimeout(
       agent.peer.request('ent/models/enable', { providerId: PROVIDER_ID, modelIds: [MODEL_B] }),
@@ -97,8 +97,8 @@ describe('ent/models enable/disable (provider-global gating)', () => {
       agent.peer.request('ent/models/list', { connectionId: instances[0] }),
       2_000,
       'ent/models/list after enable'
-    )) as { models: Array<{ modelId: string }> };
-    const idsAfterEnable = afterEnable.models.map((m) => m.modelId);
-    expect(idsAfterEnable).toEqual(expect.arrayContaining([MODEL_A, MODEL_B]));
+    )) as { models: Array<{ modelId: string; disabled?: boolean }> };
+    const modelBAfter = afterEnable.models.find((m) => m.modelId === MODEL_B);
+    expect(modelBAfter?.disabled).not.toBe(true);
   });
 });

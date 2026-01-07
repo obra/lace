@@ -60,6 +60,11 @@ export const ModelInfoSchema = z
     maxOutput: z.number(),
     supportsThinking: z.boolean().optional(),
     supportsImages: z.boolean().optional(),
+    /**
+     * Indicates the model is currently disabled via provider-level gating.
+     * Absent or false means enabled.
+     */
+    disabled: z.boolean().optional(),
   })
   .strict();
 export type ModelInfo = z.infer<typeof ModelInfoSchema>;

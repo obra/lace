@@ -1,5 +1,5 @@
-use crate::protocol::{ent, jsonrpc};
 use crate::protocol::transport::AgentTransport;
+use crate::protocol::{ent, jsonrpc};
 use serde_json::{json, Value};
 use std::io;
 use std::path::Path;

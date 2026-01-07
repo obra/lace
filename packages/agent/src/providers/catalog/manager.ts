@@ -142,11 +142,6 @@ export class ProviderCatalogManager {
     this.catalogCache.set(provider.id, provider);
   }
 
-  getModelGating(providerId: string): { enabled?: string[]; disabled?: string[] } {
-    const gating = this.modelGating.get(providerId);
-    return gating ? { ...gating } : {};
-  }
-
   async setModelGating(
     providerId: string,
     gating: { enabled?: string[]; disabled?: string[] }
@@ -173,6 +168,14 @@ export class ProviderCatalogManager {
     }
 
     return models;
+  }
+
+  getModelGating(providerId: string): { enabled?: string[]; disabled?: string[] } {
+    const gating = this.modelGating.get(providerId);
+    return {
+      enabled: gating?.enabled ? [...gating.enabled] : undefined,
+      disabled: gating?.disabled ? [...gating.disabled] : undefined,
+    };
   }
 
   private async directoryExists(dirPath: string): Promise<boolean> {
