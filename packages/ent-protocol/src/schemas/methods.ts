@@ -429,6 +429,7 @@ const EntAgentStatusResultSchema = z
       .object({
         sessionId: SessionIdSchema,
         messageCount: z.number(),
+        turnCount: z.number(),
         tokensUsed: z.number(),
         costUsd: z.number(),
         providerId: z.string().optional(),
