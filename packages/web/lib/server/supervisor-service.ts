@@ -64,6 +64,8 @@ function maybeBroadcastAgentStateChange(params: {
   const next = deriveAgentStateFromSessionUpdate(params.update);
   if (!next) return;
 
+  const forceBroadcast = params.update.type === 'turn_end';
+
   const states =
     global.laceWebAgentStates ?? (global.laceWebAgentStates = new Map<string, AgentState>());
   const key = agentStateKey({
@@ -72,7 +74,7 @@ function maybeBroadcastAgentStateChange(params: {
   });
 
   const prev = states.get(key) ?? 'idle';
-  if (prev === next) return;
+  if (!forceBroadcast && prev === next) return;
   states.set(key, next);
 
   const manager = EventStreamManager.getInstance();
