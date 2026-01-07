@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 import { parseResponse } from '@lace/web/lib/serialization';
+import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import {
   cleanupTestProviderInstances,
   createTestProviderInstance,
@@ -29,12 +30,15 @@ describe('/api/agents/:agentId/history', () => {
   let project: Project;
   let workspaceSessionId: string;
   let agentId: string;
+  let originalTestProviderEnv: string | undefined;
 
   beforeEach(async () => {
+    originalTestProviderEnv = process.env.LACE_AGENT_TEST_PROVIDER;
     process.env = {
       ...process.env,
       ANTHROPIC_KEY: 'test-key',
       LACE_DB_PATH: ':memory:',
+      LACE_AGENT_TEST_PROVIDER: '1',
     };
 
     providerInstanceId = await createTestProviderInstance({
@@ -95,6 +99,11 @@ describe('/api/agents/:agentId/history', () => {
 
   afterEach(async () => {
     await cleanupTestProviderInstances([providerInstanceId]);
+    if (originalTestProviderEnv === undefined) {
+      delete process.env.LACE_AGENT_TEST_PROVIDER;
+    } else {
+      process.env.LACE_AGENT_TEST_PROVIDER = originalTestProviderEnv;
+    }
     vi.clearAllMocks();
   });
 
@@ -110,4 +119,41 @@ describe('/api/agents/:agentId/history', () => {
     expect(typeof promptEvent?.data).toBe('string');
     expect((promptEvent?.data as string).trim().length).toBeGreaterThan(0);
   });
+
+  it('returns assistant replies as AGENT_MESSAGE (not LOCAL_SYSTEM_MESSAGE)', async () => {
+    const supervisor = await getSupervisor();
+
+    await supervisor.promptSession(workspaceSessionId, agentId, [
+      { type: 'text', text: 'tell me a story' },
+    ]);
+
+    const start = Date.now();
+    let assistantDurable: { eventSeq: number; data: Record<string, unknown> } | undefined;
+    while (Date.now() - start < 5000) {
+      const result = (await supervisor.agentRequest({
+        workspaceSessionId,
+        sessionId: agentId,
+        method: 'ent/session/events',
+        requestParams: { limit: 5000 },
+      })) as { events: Array<{ eventSeq: number; type: string; data: Record<string, unknown> }> };
+
+      assistantDurable = result.events.find((e) => e.type === 'message');
+      if (assistantDurable) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+
+    expect(assistantDurable).toBeTruthy();
+
+    const req = new Request(`http://localhost/api/agents/${agentId}/history`, { method: 'GET' });
+    const res = await getHistory(createActionArgs(req, { agentId }));
+    expect(res.status).toBe(200);
+    const events = await parseResponse<Array<{ id?: string; type?: string; data?: unknown }>>(res);
+
+    const assistantId = `ent_${assistantDurable!.eventSeq}_assistant`;
+    const assistantEvent = events.find((e) => e.id === assistantId);
+    expect(assistantEvent?.type).toBe('AGENT_MESSAGE');
+    expect((assistantEvent?.data as { content?: unknown } | undefined)?.content).toBeTypeOf(
+      'string'
+    );
+  }, 15000);
 });

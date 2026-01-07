@@ -64,9 +64,9 @@ function durableEventsToAppEvents(params: {
       const content = typeof e.data?.content === 'string' ? e.data.content : '';
       out.push({
         id: `ent_${e.eventSeq}_assistant`,
-        type: 'LOCAL_SYSTEM_MESSAGE',
+        type: 'AGENT_MESSAGE',
         timestamp,
-        data: { content, agentSessionId },
+        data: { content },
         agentSessionId,
         workspaceSessionId,
         ...(typeof projectId === 'string' ? { projectId } : {}),

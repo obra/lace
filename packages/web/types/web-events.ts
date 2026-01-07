@@ -114,6 +114,7 @@ export type WebEventType =
   | 'USER_MESSAGE'
   | 'SYSTEM_PROMPT'
   | 'USER_SYSTEM_PROMPT'
+  | 'AGENT_MESSAGE'
   | 'AGENT_STATE_CHANGE'
   | 'AGENT_SPAWNED'
   | 'AGENT_SUMMARY_UPDATED'
@@ -162,6 +163,12 @@ export interface SystemPromptEvent extends WebEventBase {
 export interface UserSystemPromptEvent extends WebEventBase {
   type: 'USER_SYSTEM_PROMPT';
   data: string;
+}
+
+/** Final assistant message content (loaded from history) */
+export interface AgentMessageEvent extends WebEventBase {
+  type: 'AGENT_MESSAGE';
+  data: { content: string };
 }
 
 /** Agent state changed (idle, thinking, streaming, etc.) */
@@ -316,6 +323,7 @@ export type WebEvent =
   | UserMessageEvent
   | SystemPromptEvent
   | UserSystemPromptEvent
+  | AgentMessageEvent
   | AgentStateChangeEvent
   | AgentSpawnedEvent
   | AgentSummaryUpdatedEvent
