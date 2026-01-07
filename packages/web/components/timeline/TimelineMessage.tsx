@@ -8,7 +8,7 @@ import type { AgentInfo, CompactionData, ToolCall, ToolResult } from '@lace/web/
 import { getProcessedEventAgentId, type ProcessedEvent } from '@lace/web/hooks/useProcessedEvents';
 import { MessageHeader, MessageText } from '@lace/web/components/ui';
 import { ToolCallDisplay } from '@lace/web/components/ui/ToolCallDisplay';
-import { Alert } from '@lace/web/components/ui/Alert';
+import { Alert, type AlertVariant } from '@lace/web/components/ui/Alert';
 import { SystemPromptEntry } from '@lace/web/components/timeline/SystemPromptEntry';
 import { UserSystemPromptEntry } from '@lace/web/components/timeline/UserSystemPromptEntry';
 import { CompactionEntry } from '@lace/web/components/timeline/CompactionEntry';
@@ -78,12 +78,21 @@ function getCompactionCompleteData(event: ProcessedEvent): CompactionCompleteDat
 
 interface SystemNotificationData {
   severity?: string;
+  level?: string;
   message?: string;
 }
 
 function getSystemNotificationData(event: ProcessedEvent): SystemNotificationData {
   if ('data' in event && event.data && typeof event.data === 'object') {
-    return event.data as SystemNotificationData;
+    const raw = event.data as Record<string, unknown>;
+    const message = typeof raw.message === 'string' ? raw.message : undefined;
+    const severity =
+      typeof raw.severity === 'string'
+        ? raw.severity
+        : typeof raw.level === 'string'
+          ? raw.level
+          : undefined;
+    return { message, severity };
   }
   return {};
 }
@@ -285,7 +294,13 @@ export function TimelineMessage({
     case 'SYSTEM_NOTIFICATION': {
       const snData = getSystemNotificationData(event);
       const severity = snData.severity || 'info';
-      const variant = severity as 'info' | 'warning' | 'error';
+      const variant: AlertVariant =
+        severity === 'info' ||
+        severity === 'warning' ||
+        severity === 'error' ||
+        severity === 'success'
+          ? severity
+          : 'info';
 
       return (
         <div className="flex justify-center">

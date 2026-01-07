@@ -61,7 +61,7 @@ function durableEventsToAppEvents(params: {
     }
 
     if (e.type === 'message') {
-      const content = typeof e.data?.content === 'string' ? e.data.content : '';
+      const content = toTextContent(e.data?.content);
       out.push({
         id: `ent_${e.eventSeq}_assistant`,
         type: 'AGENT_MESSAGE',

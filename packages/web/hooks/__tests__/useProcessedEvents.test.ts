@@ -45,7 +45,7 @@ describe('useProcessedEvents', () => {
           id: 'evt_notification',
           type: 'SYSTEM_NOTIFICATION',
           timestamp: new Date('2024-01-01T09:59:30Z'),
-          data: { message: 'Hello', severity: 'info' },
+          data: { message: 'Hello', level: 'info' },
           workspaceSessionId: mockWorkspaceSessionId,
           // No agentSessionId on purpose (session-level event)
         } as unknown as WebEvent,

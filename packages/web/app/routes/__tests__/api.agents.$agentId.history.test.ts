@@ -156,4 +156,43 @@ describe('/api/agents/:agentId/history', () => {
       'string'
     );
   }, 15000);
+
+  it('extracts assistant message text from array content blocks', async () => {
+    const supervisor = await getSupervisor();
+
+    await supervisor.promptSession(workspaceSessionId, agentId, [
+      { type: 'text', text: 'job: echo hi' },
+    ]);
+
+    const start = Date.now();
+    let assistantDurable: { eventSeq: number; data: Record<string, unknown> } | undefined;
+    while (Date.now() - start < 5000) {
+      const result = (await supervisor.agentRequest({
+        workspaceSessionId,
+        sessionId: agentId,
+        method: 'ent/session/events',
+        requestParams: { limit: 5000 },
+      })) as { events: Array<{ eventSeq: number; type: string; data: Record<string, unknown> }> };
+
+      assistantDurable = result.events.find((e) => {
+        if (e.type !== 'message') return false;
+        const content = e.data?.content;
+        return Array.isArray(content);
+      });
+      if (assistantDurable) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+
+    expect(assistantDurable).toBeTruthy();
+
+    const req = new Request(`http://localhost/api/agents/${agentId}/history`, { method: 'GET' });
+    const res = await getHistory(createActionArgs(req, { agentId }));
+    expect(res.status).toBe(200);
+    const events = await parseResponse<Array<{ id?: string; type?: string; data?: unknown }>>(res);
+
+    const assistantId = `ent_${assistantDurable!.eventSeq}_assistant`;
+    const assistantEvent = events.find((e) => e.id === assistantId);
+    expect(assistantEvent?.type).toBe('AGENT_MESSAGE');
+    expect((assistantEvent?.data as { content?: unknown } | undefined)?.content).toBe('hello');
+  }, 15000);
 });
