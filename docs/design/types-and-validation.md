@@ -141,61 +141,69 @@ import type { Session, Agent, MessageRequest } from '@lace/web/types/web';
 
 ### Event Types (`@/types/events`)
 
-**Location**: `packages/web/types/events.ts`  
-**Purpose**: All event-related types consolidated in one place
+**Location**: `packages/web/types/app-events.ts`, `packages/web/types/protocol-events.ts`, `packages/web/types/web-events.ts`  
+**Purpose**: Unified event model for web (protocol + web-internal)
 
 **Event Classification**:
 
 ```typescript
-// Persisted events (stored in database)
-export { EVENT_TYPES, type EventType } from '@lace/web/lib/core';
+// Protocol events (from supervisor via ent-protocol schemas)
+export interface ProtocolEvent {
+  id: string;
+  timestamp: Date;
+  update: SessionUpdate; // discriminated union, update.type === 'text_delta' | 'tool_use' | ...
+  workspaceSessionId: string;
+  projectId?: string;
+  agentSessionId: string;
+}
 
-// UI-only events (ephemeral, not persisted)
-export const UI_EVENT_TYPES = [
-  'TOOL_APPROVAL_REQUEST',
-  'AGENT_TOKEN',
-  'AGENT_STREAMING',
-] as const;
+export interface PermissionRequestEvent {
+  id: string;
+  timestamp: Date;
+  request: PermissionRequest;
+  workspaceSessionId: string;
+  projectId?: string;
+}
 
-// Combined type for SSE streaming
-export type SessionEventType = EventType | UIEventType;
+// Web-internal events (optimistic UI + local UX)
+export type WebEvent = {
+  id: string;
+  timestamp: Date;
+  type: 'USER_MESSAGE' | 'AGENT_STATE_CHANGE' | 'LOCAL_SYSTEM_MESSAGE' | ...;
+  data: unknown;
+  workspaceSessionId?: string;
+  projectId?: string;
+  agentSessionId?: string;
+};
+
+// Combined type for SSE streaming + UI consumption
+export type AppEvent = ProtocolEvent | PermissionRequestEvent | WebEvent;
 ```
 
 **Discriminated Union Pattern**:
 
 ```typescript
-export type SessionEvent =
-  | {
-      type: 'USER_MESSAGE';
-      threadId: ThreadId;
-      timestamp: Date;
-      data: UserMessageEventData;
-    }
-  | {
-      type: 'AGENT_MESSAGE';
-      threadId: ThreadId;
-      timestamp: Date;
-      data: AgentMessageEventData;
-    }
-  | {
-      type: 'TOOL_CALL';
-      threadId: ThreadId;
-      timestamp: Date;
-      data: ToolCallEventData;
-    }
-  | {
-      type: 'AGENT_TOKEN';
-      threadId: ThreadId;
-      timestamp: Date;
-      data: { token: string };
-    };
+if (isProtocolEvent(event)) {
+  switch (event.update.type) {
+    case 'text_delta':
+    case 'tool_use':
+    case 'turn_end':
+      // ...
+  }
+} else if (isWebEvent(event)) {
+  switch (event.type) {
+    case 'USER_MESSAGE':
+    case 'AGENT_STATE_CHANGE':
+      // ...
+  }
+}
 ```
 
 **Usage**: Import for all event handling
 
 ```typescript
-import type { SessionEvent, SessionEventType } from '@lace/web/types/events';
-import { getAllEventTypes, isPersistedEvent } from '@lace/web/types/events';
+import type { AppEvent } from '@lace/web/types/app-events';
+import { isProtocolEvent, isWebEvent, isPermissionRequestEvent } from '@lace/web/types/app-events';
 ```
 
 ### Server-Only Classes (`@/lib/server/lace-imports`)
