@@ -96,15 +96,23 @@ async function waitFor(
 describe('event stream agent state', () => {
   const context = setupWebTest();
   let originalTestProviderEnv: string | undefined;
+  let originalStreamingDelayEnv: string | undefined;
 
   beforeEach(() => {
     originalTestProviderEnv = process.env.LACE_AGENT_TEST_PROVIDER;
     process.env.LACE_AGENT_TEST_PROVIDER = '1';
+
+    originalStreamingDelayEnv = process.env.LACE_TEST_PROVIDER_STREAM_DELAY_MS;
+    delete process.env.LACE_TEST_PROVIDER_STREAM_DELAY_MS;
   });
 
   afterEach(async () => {
     if (originalTestProviderEnv === undefined) delete process.env.LACE_AGENT_TEST_PROVIDER;
     else process.env.LACE_AGENT_TEST_PROVIDER = originalTestProviderEnv;
+
+    if (originalStreamingDelayEnv === undefined)
+      delete process.env.LACE_TEST_PROVIDER_STREAM_DELAY_MS;
+    else process.env.LACE_TEST_PROVIDER_STREAM_DELAY_MS = originalStreamingDelayEnv;
 
     await shutdownSupervisorForTests();
   });
@@ -173,6 +181,96 @@ describe('event stream agent state', () => {
           (e) => isProtocolEvent(e) && e.update.type === 'turn_end'
         );
         expect(protocolTurnEnd).toBe(true);
+      } finally {
+        collector.stop();
+      }
+    }
+  );
+
+  it(
+    'returns to idle when a turn is cancelled (no stuck streaming state)',
+    { timeout: 20_000 },
+    async () => {
+      process.env.LACE_TEST_PROVIDER_STREAM_DELAY_MS = '250';
+
+      const supervisor = await getSupervisor();
+      const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+
+      const collector = createSseCollector({
+        sessions: [created.workspaceSessionId],
+        threads: [created.sessionId],
+      });
+
+      try {
+        const promptPromise = supervisor.promptSession(
+          created.workspaceSessionId,
+          created.sessionId,
+          [{ type: 'text', text: 'hi' }]
+        );
+
+        await waitFor(
+          () =>
+            collector.events.some(
+              (e) =>
+                isProtocolEvent(e) &&
+                e.agentSessionId === created.sessionId &&
+                e.update.type === 'turn_start'
+            ),
+          { timeoutMs: 5_000, intervalMs: 25, label: 'turn_start' }
+        );
+
+        await supervisor.agentNotify({
+          workspaceSessionId: created.workspaceSessionId,
+          sessionId: created.sessionId,
+          method: '$/cancel_request',
+          notifyParams: { requestId: 'test_cancel' },
+        });
+
+        const result = (await promptPromise) as { stopReason?: unknown };
+        expect(result.stopReason).toBe('cancelled');
+
+        await waitFor(
+          () =>
+            collector.events.some(
+              (e) =>
+                isProtocolEvent(e) &&
+                e.agentSessionId === created.sessionId &&
+                e.update.type === 'turn_end' &&
+                (e.update.stopReason === 'cancelled' || e.update.stopReason === undefined)
+            ),
+          { timeoutMs: 5_000, intervalMs: 25, label: 'turn_end(cancelled)' }
+        );
+
+        await waitFor(
+          () =>
+            collector.events.some(
+              (e) =>
+                isAgentStateChangeEvent(e) &&
+                (e.agentSessionId === created.sessionId ||
+                  e.data.agentSessionId === created.sessionId) &&
+                e.data.newState === 'idle'
+            ),
+          { timeoutMs: 5_000, intervalMs: 25, label: 'agent idle state' }
+        );
+
+        const stateEvents = collector.events.filter(
+          (e): e is AgentStateChangeEvent =>
+            isAgentStateChangeEvent(e) &&
+            (e.agentSessionId === created.sessionId || e.data.agentSessionId === created.sessionId)
+        );
+
+        const idleStateEventSeq = (() => {
+          for (let i = stateEvents.length - 1; i >= 0; i--) {
+            if (stateEvents[i]?.data.newState === 'idle') return i;
+          }
+          return -1;
+        })();
+        expect(idleStateEventSeq).toBeGreaterThanOrEqual(0);
+
+        const lateStreaming = stateEvents
+          .slice(idleStateEventSeq + 1)
+          .some((e) => e.data.newState === 'streaming');
+        expect(lateStreaming).toBe(false);
       } finally {
         collector.stop();
       }
