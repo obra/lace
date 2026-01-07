@@ -112,10 +112,10 @@ export function mockAnthropicForE2E(): void {
             'Manual compaction command received. Processing conversation compaction with progress indicators.';
         } else if (userMessage.includes('Test message for SSE events')) {
           responseText =
-            'Response for SSE event testing with multiple event types including AGENT_TOKEN and routing verification.';
+            'Response for SSE event testing with protocol text_delta updates and routing verification.';
         } else if (userMessage.includes('Can you read a file for me?')) {
           responseText =
-            'File reading request generates TOOL_CALL and TOOL_RESULT events along with AGENT_MESSAGE events for comprehensive testing.';
+            'File reading request generates tool_use updates along with assistant message streaming for comprehensive testing.';
         } else if (userMessage.includes('Help me understand the project structure')) {
           responseText =
             'Project structure analysis involves multiple SSE event types and demonstrates complex event filtering and routing capabilities.';

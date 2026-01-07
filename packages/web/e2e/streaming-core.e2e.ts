@@ -21,20 +21,6 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Define expected streaming event types (from streaming-minimal)
-interface StreamingEvent {
-  type:
-    | 'USER_MESSAGE'
-    | 'AGENT_MESSAGE'
-    | 'AGENT_TOKEN'
-    | 'AGENT_STATE_CHANGE'
-    | 'SYSTEM_MESSAGE'
-    | 'TOOL_CALL'
-    | 'TOOL_RESULT';
-  data: unknown;
-  timestamp: number;
-}
-
 test.describe('Core Streaming Functionality', () => {
   let testEnv: TestEnvironment;
 
@@ -49,25 +35,13 @@ test.describe('Core Streaming Functionality', () => {
     }
   });
 
-  // From streaming-basic: Token-by-token streaming with AGENT_TOKEN events
-  test('streams response token-by-token with AGENT_TOKEN events', async ({ page }) => {
+  // From streaming-basic: Token-by-token streaming (protocol text_delta updates)
+  test('streams response token-by-token with protocol streaming', async ({ page }) => {
     await setupAnthropicProvider(page);
     const projectPath = path.join(testEnv.tempDir, 'token-streaming-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
     await createProject(page, 'Token Streaming Test', projectPath);
     await getMessageInput(page);
-
-    // Monitor AGENT_TOKEN events via console logs
-    const sseEvents: string[] = [];
-    let agentTokenCount = 0;
-
-    page.on('console', (msg) => {
-      const text = msg.text();
-      if (text.includes('[FIREHOSE]') && text.includes('AGENT_TOKEN')) {
-        agentTokenCount++;
-        sseEvents.push(text);
-      }
-    });
 
     // Send message to trigger streaming
     const userMessage = 'Please tell me a story';
@@ -106,8 +80,7 @@ test.describe('Core Streaming Functionality', () => {
     const responseVisible = await finalResponse.isVisible().catch(() => false);
 
     // At least one streaming verification should pass
-    const streamingWorking =
-      streamingDetected || responseVisible || agentTokenCount > 0 || streamingStarted;
+    const streamingWorking = streamingDetected || responseVisible || streamingStarted;
     expect(streamingWorking).toBeTruthy();
 
     // Verify interface returns to ready state
@@ -178,20 +151,6 @@ test.describe('Core Streaming Functionality', () => {
     await createProject(page, 'Streaming Performance Test', projectPath);
     await getMessageInput(page);
 
-    // Track timing metrics
-    const performanceMetrics: { event: string; timestamp: number }[] = [];
-
-    // Monitor console for streaming events
-    page.on('console', (msg) => {
-      const text = msg.text();
-      if (text.includes('AGENT_TOKEN') || text.includes('streaming')) {
-        performanceMetrics.push({
-          event: text,
-          timestamp: Date.now(),
-        });
-      }
-    });
-
     const startTime = Date.now();
 
     // Send message and track response timing
@@ -225,13 +184,6 @@ test.describe('Core Streaming Functionality', () => {
       totalDuration,
       messageProcessingTime,
       streamingResponseTime,
-      totalStreamingEvents: performanceMetrics.length,
-      averageEventInterval:
-        performanceMetrics.length > 1
-          ? (performanceMetrics[performanceMetrics.length - 1].timestamp -
-              performanceMetrics[0].timestamp) /
-            performanceMetrics.length
-          : null,
     };
 
     // Verify reasonable performance (should complete within 10 seconds)
@@ -246,93 +198,13 @@ test.describe('Core Streaming Functionality', () => {
     expect(interfaceState.isStreaming).toBeFalsy();
   });
 
-  // From streaming-minimal: Event monitoring with structured interface
-  test('captures streaming events with structured monitoring', async ({ page }) => {
-    await setupAnthropicProvider(page);
-    const projectPath = path.join(testEnv.tempDir, 'event-monitoring-project');
-    await fs.promises.mkdir(projectPath, { recursive: true });
-    await createProject(page, 'Event Monitoring Test', projectPath);
-    await getMessageInput(page);
-
-    // Monitor streaming events with structured interface
-    const streamingEvents: StreamingEvent[] = [];
-
-    page.on('console', (message) => {
-      const text = message.text();
-      try {
-        if (text.includes('STREAMING_EVENT:')) {
-          const eventData = JSON.parse(text.replace('STREAMING_EVENT:', '')) as {
-            type: string;
-            data: unknown;
-          };
-          streamingEvents.push({
-            type: eventData.type as StreamingEvent['type'],
-            data: eventData.data,
-            timestamp: Date.now(),
-          });
-        }
-      } catch {
-        // Not a streaming event - ignore
-      }
-    });
-
-    // Send a message to trigger streaming
-    const testMessage = 'Test message to trigger streaming events';
-    await sendMessage(page, testMessage);
-    await verifyMessageVisible(page, testMessage);
-
-    // Wait for AI response (which should trigger streaming events)
-    await expect(
-      page.getByText("I'm a helpful AI assistant. How can I help you today?")
-    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
-
-    // Analyze captured streaming events
-    const streamingAnalysis = {
-      totalEvents: streamingEvents.length,
-      eventTypes: [...new Set(streamingEvents.map((e) => e.type))],
-      userMessageEvents: streamingEvents.filter((e) => e.type === 'USER_MESSAGE').length,
-      agentMessageEvents: streamingEvents.filter((e) => e.type === 'AGENT_MESSAGE').length,
-      tokenEvents: streamingEvents.filter((e) => e.type === 'AGENT_TOKEN').length,
-      stateChangeEvents: streamingEvents.filter((e) => e.type === 'AGENT_STATE_CHANGE').length,
-      hasStreamingSupport: streamingEvents.length > 0,
-    };
-
-    // Test passes if we can document streaming event capabilities
-    expect(true).toBeTruthy(); // Always passes - documents current streaming events
-
-    if (streamingAnalysis.hasStreamingSupport) {
-      expect(streamingAnalysis.totalEvents).toBeGreaterThan(0);
-    }
-  });
-
-  // From streaming-minimal: Event ordering and consistency
-  test('verifies streaming event order and consistency', async ({ page }) => {
+  // From streaming-minimal: Multiple-message ordering and consistency
+  test('preserves message order across multiple sends', async ({ page }) => {
     await setupAnthropicProvider(page);
     const projectPath = path.join(testEnv.tempDir, 'event-ordering-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
     await createProject(page, 'Event Ordering Test', projectPath);
     await getMessageInput(page);
-
-    // Monitor event sequencing
-    const eventSequence: { type: string; timestamp: number }[] = [];
-
-    page.on('console', (message) => {
-      const text = message.text();
-      if (
-        text.includes('USER_MESSAGE') ||
-        text.includes('AGENT_MESSAGE') ||
-        text.includes('AGENT_TOKEN')
-      ) {
-        eventSequence.push({
-          type: text.includes('USER_MESSAGE')
-            ? 'USER'
-            : text.includes('AGENT_TOKEN')
-              ? 'TOKEN'
-              : 'AGENT',
-          timestamp: Date.now(),
-        });
-      }
-    });
 
     // Send multiple messages to test event ordering
     const messages = ['First test message', 'Second test message'];
@@ -343,26 +215,15 @@ test.describe('Core Streaming Functionality', () => {
       await page.waitForTimeout(TIMEOUTS.QUICK / 5); // Shorter wait between messages
     }
 
-    // Wait for all responses
-    await page.waitForTimeout(TIMEOUTS.STANDARD);
-
-    const orderingAnalysis = {
-      totalEventsCaptured: eventSequence.length,
-      userEvents: eventSequence.filter((e) => e.type === 'USER').length,
-      agentEvents: eventSequence.filter((e) => e.type === 'AGENT').length,
-      tokenEvents: eventSequence.filter((e) => e.type === 'TOKEN').length,
-      messagesSent: messages.length,
-      hasProperOrdering: eventSequence.length > 0,
-    };
-
-    // Test documents current event ordering behavior
-    expect(orderingAnalysis.messagesSent).toBe(messages.length);
-
-    if (orderingAnalysis.hasProperOrdering) {
-      expect(orderingAnalysis.totalEventsCaptured).toBeGreaterThan(0);
-    } else {
-      expect(true).toBeTruthy(); // Documents current event system
-    }
+    // Wait for at least one assistant response to appear
+    await waitForStreamingStop(page, TIMEOUTS.EXTENDED);
+    const assistantResponseVisible = await page
+      .locator('[data-testid="conversation-inner"]')
+      .getByText('This', { exact: false })
+      .first()
+      .isVisible()
+      .catch(() => false);
+    expect(assistantResponseVisible).toBeTruthy();
   });
 
   // From message-streaming: Immediate message display

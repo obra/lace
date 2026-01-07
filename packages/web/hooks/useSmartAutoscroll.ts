@@ -130,14 +130,12 @@ export function useTimelineAutoscroll(
 
   // Detect streaming content from events
   const hasStreamingContent = useMemo(() => {
-    return events.some((e) => {
-      return (
-        typeof e === 'object' &&
-        e !== null &&
-        'type' in e &&
-        (e as { type: unknown }).type === 'AGENT_STREAMING'
-      );
-    });
+    const last = events.length > 0 ? events[events.length - 1] : undefined;
+    if (!last || typeof last !== 'object' || last === null) return false;
+    if (!('update' in last)) return false;
+    const update = (last as { update?: unknown }).update;
+    if (!update || typeof update !== 'object') return false;
+    return (update as { type?: unknown }).type === 'text_delta';
   }, [events]);
 
   // Handle typing indicator and streaming content

@@ -15,9 +15,9 @@ core streaming functionality is working correctly.
 - Event parsing and routing
 - Multiple concurrent operations (5/5 successful operations)
 
-### 2. **AGENT_TOKEN Streaming Tests** ✅ IMPLEMENTED
+### 2. **Protocol `text_delta` Streaming Tests** ✅ IMPLEMENTED
 
-- Real-time token-by-token generation monitoring
+- Real-time streaming via `protocol:text_delta` updates
 - Progressive response building
 - MSW handlers with ReadableStream simulation
 - Token timing and delay verification
@@ -32,14 +32,13 @@ core streaming functionality is working correctly.
 
 Tests for all SSE event types:
 
-- USER_MESSAGE
-- AGENT_MESSAGE
-- AGENT_TOKEN (token-by-token streaming)
-- TOOL_CALL / TOOL_RESULT
-- AGENT_STATE_CHANGE (agent_thinking_start/complete)
-- COMPACTION_START / COMPACTION_COMPLETE
-- LOCAL_SYSTEM_MESSAGE
-- TOOL_APPROVAL_REQUEST
+- `web:USER_MESSAGE`
+- `protocol:text_delta` (streaming)
+- `protocol:tool_use` (tools + results)
+- `web:AGENT_STATE_CHANGE` (busy/idle)
+- `protocol:compaction_start` / `protocol:compaction_complete`
+- `web:LOCAL_SYSTEM_MESSAGE`
+- `protocol:permission_request` (tool approvals)
 
 ### 5. **Error Recovery and Reliability** ✅ IMPLEMENTED
 
@@ -65,13 +64,7 @@ Tests for all SSE event types:
 
 ### SSE Event Detection
 
-```
-[FIREHOSE] Connecting to event stream...
-[FIREHOSE] Creating EventSource for: /api/events/stream
-[FIREHOSE] Parsed: LOCAL_SYSTEM_MESSAGE system
-[FIREHOSE] Routing LOCAL_SYSTEM_MESSAGE to 2 subscriptions
-[FIREHOSE] Event routed to 0 subscriptions
-```
+Use the in-app `EventStreamMonitor` debug UI to inspect live SSE traffic (including `protocol:text_delta`).
 
 ## Test Architecture
 
@@ -125,10 +118,10 @@ Tests for all SSE event types:
 
 The comprehensive test suite confirms that:
 
-1. ✅ USER_MESSAGE events are captured and processed
-2. ✅ AGENT_MESSAGE events flow through the system
-3. ✅ AGENT_TOKEN events enable real-time token streaming
-4. ✅ AGENT_STATE changes are properly tracked and distributed
+1. ✅ `web:USER_MESSAGE` events are captured and processed
+2. ✅ Assistant messages are built from `protocol:text_delta` + `protocol:turn_end`
+3. ✅ `protocol:text_delta` enables real-time streaming
+4. ✅ `web:AGENT_STATE_CHANGE` updates are tracked and distributed
 
 **The streaming events system is robust and functioning as designed.**
 

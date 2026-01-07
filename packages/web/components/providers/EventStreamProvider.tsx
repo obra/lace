@@ -150,15 +150,6 @@ export function EventStreamProvider({
     [updateAgentState, onAgentStateChange]
   );
 
-  // Agent token handler - forward events to useProcessedEvents for token aggregation
-  const handleAgentToken = useCallback(
-    (event: AppEvent) => {
-      // Forward AGENT_TOKEN events so useProcessedEvents can aggregate them
-      addAgentEvent(event);
-    },
-    [addAgentEvent]
-  );
-
   // Compaction event handlers - compaction is ONLY from ProtocolEvents (compaction_start/compaction_complete)
   const handleCompactionStart = useCallback((event: AppEvent) => {
     if (isProtocolEvent(event) && event.update.type === 'compaction_start') {
@@ -231,7 +222,6 @@ export function EventStreamProvider({
       },
       onAgentError: handleAgentError,
       onAppEvent: stableAddAgentEvent,
-      onAgentToken: handleAgentToken,
       // Agent state changes
       onAgentStateChange: handleAgentStateChangeCallback,
       // Tool approval requests
@@ -250,7 +240,6 @@ export function EventStreamProvider({
     sessionId,
     threadIds,
     stableAddAgentEvent,
-    handleAgentToken,
     handleAgentStateChangeCallback,
     handleApprovalRequest,
     handleApprovalResponse,

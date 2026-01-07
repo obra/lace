@@ -138,14 +138,15 @@ describe('useTimelineAutoscroll', () => {
       writable: true,
     });
 
-    // Start streaming by adding AGENT_STREAMING event
+    // Start streaming by adding a protocol text_delta update
     const eventsWithStreaming: unknown[] = [
       ...mockEvents,
       {
         id: 'evt_2',
-        type: 'AGENT_STREAMING',
-        data: { content: 'Streaming...' },
         timestamp: new Date(),
+        agentSessionId: 'agent_1',
+        workspaceSessionId: 'sess_test',
+        update: { sessionId: 'agent_1', streamSeq: 2, type: 'text_delta', text: 'Streaming...' },
       },
     ];
     act(() => {

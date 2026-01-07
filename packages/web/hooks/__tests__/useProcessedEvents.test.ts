@@ -8,8 +8,8 @@ import type { SessionId } from '@lace/ent-protocol';
 
 describe('useProcessedEvents', () => {
   // Use branded SessionId for type safety (cast is safe in tests)
-  const mockSessionId = 'sess_123' as SessionId;
-  const mockAgentSessionId = 'agent_123' as SessionId;
+  const mockWorkspaceSessionId = 'ws_00000000-0000-0000-0000-000000000000';
+  const mockAgentSessionId = 'sess_00000000-0000-0000-0000-000000000000' as SessionId;
 
   describe('WebEvent handling', () => {
     it('should convert USER_MESSAGE events to InternalTimelineEvent format', () => {
@@ -19,7 +19,7 @@ describe('useProcessedEvents', () => {
           type: 'USER_MESSAGE',
           timestamp: new Date('2024-01-01T10:00:00Z'),
           data: 'Hello',
-          workspaceSessionId: 'sess_123',
+          workspaceSessionId: mockWorkspaceSessionId,
           agentSessionId: mockAgentSessionId,
         } as WebEvent,
       ];
@@ -32,18 +32,18 @@ describe('useProcessedEvents', () => {
   });
 
   describe('Protocol Event handling', () => {
-    it('should process text_delta protocol events into PROTOCOL_TEXT', () => {
+    it('should process text_delta protocol events into AGENT_MESSAGE', () => {
       const events: AppEvent[] = [
         {
           id: 'evt_1',
           timestamp: new Date('2024-01-01T10:00:00Z'),
           update: {
-            sessionId: mockSessionId,
+            sessionId: mockAgentSessionId,
             streamSeq: 1,
             type: 'text_delta',
             text: 'Hello world',
           },
-          workspaceSessionId: 'sess_123',
+          workspaceSessionId: mockWorkspaceSessionId,
           agentSessionId: mockAgentSessionId,
         } as ProtocolEvent,
       ];
@@ -51,7 +51,8 @@ describe('useProcessedEvents', () => {
       const { result } = renderHook(() => useProcessedEvents(events));
 
       expect(result.current).toHaveLength(1);
-      expect(result.current[0].type).toBe('PROTOCOL_TEXT');
+      expect(result.current[0].type).toBe('AGENT_MESSAGE');
+      expect((result.current[0].data as { content: string }).content).toBe('Hello world');
     });
 
     it('should aggregate multiple text_delta events by agent session', () => {
@@ -60,24 +61,24 @@ describe('useProcessedEvents', () => {
           id: 'evt_1',
           timestamp: new Date('2024-01-01T10:00:00Z'),
           update: {
-            sessionId: mockSessionId,
+            sessionId: mockAgentSessionId,
             streamSeq: 1,
             type: 'text_delta',
             text: 'Hello ',
           },
-          workspaceSessionId: 'sess_123',
+          workspaceSessionId: mockWorkspaceSessionId,
           agentSessionId: mockAgentSessionId,
         } as ProtocolEvent,
         {
           id: 'evt_2',
           timestamp: new Date('2024-01-01T10:00:01Z'),
           update: {
-            sessionId: mockSessionId,
+            sessionId: mockAgentSessionId,
             streamSeq: 2,
             type: 'text_delta',
             text: 'world',
           },
-          workspaceSessionId: 'sess_123',
+          workspaceSessionId: mockWorkspaceSessionId,
           agentSessionId: mockAgentSessionId,
         } as ProtocolEvent,
       ];
@@ -85,17 +86,17 @@ describe('useProcessedEvents', () => {
       const { result } = renderHook(() => useProcessedEvents(events));
 
       expect(result.current).toHaveLength(1);
-      expect(result.current[0].type).toBe('PROTOCOL_TEXT');
+      expect(result.current[0].type).toBe('AGENT_MESSAGE');
       expect((result.current[0].data as { content: string }).content).toBe('Hello world');
     });
 
-    it('should process tool_use protocol events into PROTOCOL_TOOL', () => {
+    it('should process tool_use protocol events into TOOL_AGGREGATED', () => {
       const events: AppEvent[] = [
         {
           id: 'evt_1',
           timestamp: new Date('2024-01-01T10:00:00Z'),
           update: {
-            sessionId: mockSessionId,
+            sessionId: mockAgentSessionId,
             streamSeq: 1,
             turnId: 'turn_1',
             turnSeq: 0,
@@ -105,7 +106,7 @@ describe('useProcessedEvents', () => {
             input: { command: 'ls' },
             status: 'pending',
           },
-          workspaceSessionId: 'sess_123',
+          workspaceSessionId: mockWorkspaceSessionId,
           agentSessionId: mockAgentSessionId,
         } as ProtocolEvent,
       ];
@@ -113,8 +114,8 @@ describe('useProcessedEvents', () => {
       const { result } = renderHook(() => useProcessedEvents(events));
 
       expect(result.current).toHaveLength(1);
-      expect(result.current[0].type).toBe('PROTOCOL_TOOL');
-      expect((result.current[0].data as { name: string }).name).toBe('bash');
+      expect(result.current[0].type).toBe('TOOL_AGGREGATED');
+      expect((result.current[0].data as { toolName: string }).toolName).toBe('bash');
     });
 
     it('should aggregate tool_use pending and completed events', () => {
@@ -123,7 +124,7 @@ describe('useProcessedEvents', () => {
           id: 'evt_1',
           timestamp: new Date('2024-01-01T10:00:00Z'),
           update: {
-            sessionId: mockSessionId,
+            sessionId: mockAgentSessionId,
             streamSeq: 1,
             turnId: 'turn_1',
             turnSeq: 0,
@@ -133,14 +134,14 @@ describe('useProcessedEvents', () => {
             input: { command: 'ls' },
             status: 'pending',
           },
-          workspaceSessionId: 'sess_123',
+          workspaceSessionId: mockWorkspaceSessionId,
           agentSessionId: mockAgentSessionId,
         } as ProtocolEvent,
         {
           id: 'evt_2',
           timestamp: new Date('2024-01-01T10:00:02Z'),
           update: {
-            sessionId: mockSessionId,
+            sessionId: mockAgentSessionId,
             streamSeq: 2,
             turnId: 'turn_1',
             turnSeq: 1,
@@ -155,7 +156,7 @@ describe('useProcessedEvents', () => {
               meta: {},
             },
           },
-          workspaceSessionId: 'sess_123',
+          workspaceSessionId: mockWorkspaceSessionId,
           agentSessionId: mockAgentSessionId,
         } as ProtocolEvent,
       ];
@@ -163,24 +164,27 @@ describe('useProcessedEvents', () => {
       const { result } = renderHook(() => useProcessedEvents(events));
 
       expect(result.current).toHaveLength(1);
-      expect(result.current[0].type).toBe('PROTOCOL_TOOL');
-      expect((result.current[0].data as { status: string }).status).toBe('completed');
+      expect(result.current[0].type).toBe('TOOL_AGGREGATED');
+      expect(
+        ((result.current[0].data as { result?: { status?: string } }).result as { status?: string })
+          ?.status
+      ).toBe('completed');
     });
 
-    it('should process error protocol events into PROTOCOL_ERROR', () => {
+    it('should process error protocol events into AGENT_ERROR', () => {
       const events: AppEvent[] = [
         {
           id: 'evt_1',
           timestamp: new Date('2024-01-01T10:00:00Z'),
           update: {
-            sessionId: mockSessionId,
+            sessionId: mockAgentSessionId,
             streamSeq: 1,
             type: 'error',
             code: 'TOOL_ERROR',
             message: 'Tool execution failed',
             phase: 'tool_execution',
           },
-          workspaceSessionId: 'sess_123',
+          workspaceSessionId: mockWorkspaceSessionId,
           agentSessionId: mockAgentSessionId,
         } as ProtocolEvent,
       ];
@@ -188,29 +192,28 @@ describe('useProcessedEvents', () => {
       const { result } = renderHook(() => useProcessedEvents(events));
 
       expect(result.current).toHaveLength(1);
-      expect(result.current[0].type).toBe('PROTOCOL_ERROR');
+      expect(result.current[0].type).toBe('AGENT_ERROR');
     });
 
-    it('should process thinking protocol events into PROTOCOL_THINKING', () => {
+    it('should ignore thinking protocol events for timeline display', () => {
       const events: AppEvent[] = [
         {
           id: 'evt_1',
           timestamp: new Date('2024-01-01T10:00:00Z'),
           update: {
-            sessionId: mockSessionId,
+            sessionId: mockAgentSessionId,
             streamSeq: 1,
             type: 'thinking',
             text: 'Let me think about this...',
           },
-          workspaceSessionId: 'sess_123',
+          workspaceSessionId: mockWorkspaceSessionId,
           agentSessionId: mockAgentSessionId,
         } as ProtocolEvent,
       ];
 
       const { result } = renderHook(() => useProcessedEvents(events));
 
-      expect(result.current).toHaveLength(1);
-      expect(result.current[0].type).toBe('PROTOCOL_THINKING');
+      expect(result.current).toHaveLength(0);
     });
   });
 
@@ -221,7 +224,7 @@ describe('useProcessedEvents', () => {
         type: 'USER_MESSAGE',
         timestamp: new Date('2024-01-01T10:00:00Z'),
         data: 'Hello',
-        workspaceSessionId: 'sess_123',
+        workspaceSessionId: mockWorkspaceSessionId,
         agentSessionId: mockAgentSessionId,
       };
 
@@ -229,12 +232,12 @@ describe('useProcessedEvents', () => {
         id: 'evt_2',
         timestamp: new Date('2024-01-01T10:00:01Z'),
         update: {
-          sessionId: mockSessionId,
+          sessionId: mockAgentSessionId,
           streamSeq: 1,
           type: 'text_delta',
           text: 'Hello back!',
         },
-        workspaceSessionId: 'sess_123',
+        workspaceSessionId: mockWorkspaceSessionId,
         agentSessionId: mockAgentSessionId,
       };
 
@@ -244,7 +247,7 @@ describe('useProcessedEvents', () => {
 
       expect(result.current).toHaveLength(2);
       expect(result.current[0].type).toBe('USER_MESSAGE');
-      expect(result.current[1].type).toBe('PROTOCOL_TEXT');
+      expect(result.current[1].type).toBe('AGENT_MESSAGE');
     });
 
     it('should sort events by timestamp', () => {
@@ -253,7 +256,7 @@ describe('useProcessedEvents', () => {
         type: 'USER_MESSAGE',
         timestamp: new Date('2024-01-01T10:00:02Z'),
         data: 'Second',
-        workspaceSessionId: 'sess_123',
+        workspaceSessionId: mockWorkspaceSessionId,
         agentSessionId: mockAgentSessionId,
       };
 
@@ -261,12 +264,12 @@ describe('useProcessedEvents', () => {
         id: 'evt_2',
         timestamp: new Date('2024-01-01T10:00:00Z'),
         update: {
-          sessionId: mockSessionId,
+          sessionId: mockAgentSessionId,
           streamSeq: 1,
           type: 'text_delta',
           text: 'First',
         },
-        workspaceSessionId: 'sess_123',
+        workspaceSessionId: mockWorkspaceSessionId,
         agentSessionId: mockAgentSessionId,
       };
 
@@ -277,7 +280,7 @@ describe('useProcessedEvents', () => {
 
       expect(result.current).toHaveLength(2);
       // Should be sorted chronologically
-      expect(result.current[0].type).toBe('PROTOCOL_TEXT');
+      expect(result.current[0].type).toBe('AGENT_MESSAGE');
       expect(result.current[1].type).toBe('USER_MESSAGE');
     });
   });
