@@ -5,6 +5,7 @@ import { renderHook } from '@testing-library/react';
 import { useProcessedEvents } from '@lace/web/hooks/useProcessedEvents';
 import type { AppEvent, ProtocolEvent, WebEvent } from '@lace/web/types/app-events';
 import type { SessionId } from '@lace/ent-protocol';
+import type { ThreadId } from '@lace/web/types/core';
 
 describe('useProcessedEvents', () => {
   // Use branded SessionId for type safety (cast is safe in tests)
@@ -28,6 +29,33 @@ describe('useProcessedEvents', () => {
 
       expect(result.current).toHaveLength(1);
       expect(result.current[0].type).toBe('USER_MESSAGE');
+    });
+
+    it('should always show system prompt and notifications even when filtering by selected agent', () => {
+      const events: AppEvent[] = [
+        {
+          id: 'evt_prompt',
+          type: 'SYSTEM_PROMPT',
+          timestamp: new Date('2024-01-01T09:59:00Z'),
+          data: 'System prompt content',
+          workspaceSessionId: mockWorkspaceSessionId,
+          // No agentSessionId on purpose (session-level event)
+        } as unknown as WebEvent,
+        {
+          id: 'evt_notification',
+          type: 'SYSTEM_NOTIFICATION',
+          timestamp: new Date('2024-01-01T09:59:30Z'),
+          data: { message: 'Hello', severity: 'info' },
+          workspaceSessionId: mockWorkspaceSessionId,
+          // No agentSessionId on purpose (session-level event)
+        } as unknown as WebEvent,
+      ];
+
+      const { result } = renderHook(() =>
+        useProcessedEvents(events, mockAgentSessionId as unknown as ThreadId)
+      );
+
+      expect(result.current.map((e) => e.type)).toEqual(['SYSTEM_PROMPT', 'SYSTEM_NOTIFICATION']);
     });
   });
 

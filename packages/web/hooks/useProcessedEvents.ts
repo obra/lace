@@ -73,12 +73,23 @@ export function useProcessedEvents(events: AppEvent[], selectedAgent?: ThreadId)
     const timelineEvents: InternalTimelineEvent[] = webEvents
       .map((e) => {
         if (!isWebEvent(e)) return null as unknown as InternalTimelineEvent;
+        const threadId =
+          typeof e.agentSessionId === 'string'
+            ? (e.agentSessionId as ThreadId)
+            : (() => {
+                const data = e.data as unknown;
+                if (!data || typeof data !== 'object') return undefined;
+                const context = (data as { context?: unknown }).context;
+                if (!context || typeof context !== 'object') return undefined;
+                const candidate = (context as { threadId?: unknown }).threadId;
+                return typeof candidate === 'string' ? (candidate as ThreadId) : undefined;
+              })();
         return {
           id: e.id,
           timestamp: e.timestamp,
           type: e.type as InternalTimelineEvent['type'],
           data: e.data,
-          context: { threadId: e.agentSessionId as ThreadId },
+          ...(threadId ? { context: { threadId } } : {}),
         };
       })
       .filter(Boolean);
@@ -107,7 +118,13 @@ function filterEventsByAgent(events: ProcessedEvent[], selectedAgent?: ThreadId)
 
   return events.filter((event) => {
     // Always show user messages and system messages
-    if (event.type === 'USER_MESSAGE' || event.type === 'LOCAL_SYSTEM_MESSAGE') {
+    if (
+      event.type === 'USER_MESSAGE' ||
+      event.type === 'LOCAL_SYSTEM_MESSAGE' ||
+      event.type === 'SYSTEM_NOTIFICATION' ||
+      event.type === 'SYSTEM_PROMPT' ||
+      event.type === 'USER_SYSTEM_PROMPT'
+    ) {
       return true;
     }
 
