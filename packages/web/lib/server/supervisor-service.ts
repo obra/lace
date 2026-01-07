@@ -17,11 +17,80 @@ import type {
   PermissionRequestEvent,
   SessionUpdate,
 } from '@lace/web/types/protocol-events';
+import type { WebEvent } from '@lace/web/types/web-events';
+import type { AgentState } from '@lace/web/types/core';
 
 declare global {
   var laceWebSupervisorClient: SupervisorClient | undefined;
   var laceWebSupervisor: Supervisor | undefined;
   var laceWebPendingPermissions: PendingPermissionsTracker | undefined;
+  var laceWebAgentStates: Map<string, AgentState> | undefined;
+}
+
+function agentStateKey(params: { workspaceSessionId: string; agentSessionId: string }): string {
+  return `${params.workspaceSessionId}:${params.agentSessionId}`;
+}
+
+function deriveAgentStateFromSessionUpdate(update: SupervisorSessionUpdate): AgentState | null {
+  switch (update.type) {
+    case 'turn_start':
+      return 'thinking';
+    case 'text_delta':
+      return 'streaming';
+    case 'tool_use': {
+      const status = (update as { status?: unknown }).status;
+      if (status === 'pending' || status === 'running' || status === 'awaiting_permission') {
+        return 'tool_execution';
+      }
+      return 'thinking';
+    }
+    case 'job_started':
+      return 'tool_execution';
+    case 'job_finished':
+      return 'thinking';
+    case 'turn_end':
+      return 'idle';
+    default:
+      return null;
+  }
+}
+
+function maybeBroadcastAgentStateChange(params: {
+  workspaceSessionId: string;
+  projectId?: string;
+  agentSessionId: string;
+  update: SupervisorSessionUpdate;
+}) {
+  const next = deriveAgentStateFromSessionUpdate(params.update);
+  if (!next) return;
+
+  const states =
+    global.laceWebAgentStates ?? (global.laceWebAgentStates = new Map<string, AgentState>());
+  const key = agentStateKey({
+    workspaceSessionId: params.workspaceSessionId,
+    agentSessionId: params.agentSessionId,
+  });
+
+  const prev = states.get(key) ?? 'idle';
+  if (prev === next) return;
+  states.set(key, next);
+
+  const manager = EventStreamManager.getInstance();
+  const evt: WebEvent = {
+    id: `evt_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    timestamp: new Date(),
+    type: 'AGENT_STATE_CHANGE',
+    data: {
+      agentSessionId: params.agentSessionId,
+      previousState: prev,
+      newState: next,
+    },
+    workspaceSessionId: params.workspaceSessionId,
+    ...(params.projectId ? { projectId: params.projectId } : {}),
+    agentSessionId: params.agentSessionId,
+    transient: true,
+  };
+  manager.broadcast(evt);
 }
 
 /**
@@ -69,6 +138,12 @@ function bridgeEventToWeb(event: SupervisorServerEvent, params: { supervisorProj
   const manager = EventStreamManager.getInstance();
 
   if (event.type === 'session_update') {
+    maybeBroadcastAgentStateChange({
+      workspaceSessionId: event.workspaceSessionId,
+      projectId: params.supervisorProjectId,
+      agentSessionId: event.update.sessionId,
+      update: event.update,
+    });
     const protocolEvent = createProtocolEvent({
       workspaceSessionId: event.workspaceSessionId,
       projectId: params.supervisorProjectId,
