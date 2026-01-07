@@ -207,8 +207,16 @@ pub fn request_models_list(state: &mut AppState) -> Vec<Outbound> {
     ]
 }
 
-pub fn handle_models_list(state: &mut AppState, result: &Option<serde_json::Value>) {
+pub fn handle_models_list(
+    state: &mut AppState,
+    result: &Option<serde_json::Value>,
+    error_message: Option<&str>,
+) {
     state.models_panel.loading = false;
+    if let Some(err) = error_message {
+        state.models_panel.error = Some(err.to_string());
+        return;
+    }
     let Some(obj) = result.as_ref().and_then(|v| v.as_object()) else {
         state.models_panel.error = Some("Invalid models response".to_string());
         return;
@@ -221,6 +229,7 @@ pub fn handle_models_list(state: &mut AppState, result: &Option<serde_json::Valu
         .get("connectionId")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
+    state.models_panel.error = None;
     let models = obj
         .get("models")
         .and_then(|v| v.as_array())

@@ -573,14 +573,19 @@ fn handle_agent_line(
                     send_outbound(transport, state, out, timeout_ms)?;
                 }
                 if method == "ent/models/list" && state.models_panel.open {
-                    crate::app::config_panels::handle_models_list(state, &result);
+                    crate::app::config_panels::handle_models_list(state, &result, error_message);
                 }
                 if (method == "ent/models/enable" || method == "ent/models/disable")
                     && state.models_panel.open
                 {
-                    crate::app::config_panels::apply_model_toggle_result(state, &result);
-                    let out = crate::app::config_panels::request_models_list(state);
-                    send_outbound(transport, state, out, timeout_ms)?;
+                    if error_message.is_some() {
+                        state.models_panel.error = error_message.map(|s| s.to_string());
+                        state.models_panel.loading = false;
+                    } else {
+                        crate::app::config_panels::apply_model_toggle_result(state, &result);
+                        let out = crate::app::config_panels::request_models_list(state);
+                        send_outbound(transport, state, out, timeout_ms)?;
+                    }
                 }
                 if method == "ent/providers/refresh" && state.models_panel.open {
                     let out = crate::app::config_panels::request_models_list(state);
