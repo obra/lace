@@ -1388,9 +1388,15 @@ fn render_palette_modal(state: &AppState) -> Paragraph<'static> {
         lines.push(Line::from("(no matches)"));
     } else {
         let idx = state.palette_selected.min(items.len() - 1);
-        for (i, label) in items.iter().enumerate() {
+        let window = 12usize;
+        let start = idx.saturating_sub(window / 2);
+        let end = (start + window).min(items.len());
+        for i in start..end {
             let marker = if i == idx { ">" } else { " " };
-            lines.push(Line::from(format!("{marker} {label}")));
+            lines.push(Line::from(format!("{marker} {}", items[i])));
+        }
+        if end < items.len() {
+            lines.push(Line::from(format!("... (+{} more)", items.len() - end)));
         }
     }
 

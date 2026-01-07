@@ -58,10 +58,17 @@ pub fn maybe_autoconfigure_from_prefs(state: &mut AppState) -> Vec<Outbound> {
     if state.connection_id.is_some() {
         return Vec::new();
     }
-    let Some(conn) = state.prefs.last_connection_id.clone() else {
+    let Some(conn) = state
+        .prefs
+        .last_connection_id
+        .clone()
+        .filter(|s| !s.is_empty())
+    else {
         return Vec::new();
     };
-    let model = state.prefs.last_model_id.clone();
+    let Some(model) = state.prefs.last_model_id.clone().filter(|s| !s.is_empty()) else {
+        return Vec::new();
+    };
     let id = state.next_client_id();
     vec![Outbound::JsonRpcRequest {
         id,
