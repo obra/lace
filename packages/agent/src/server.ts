@@ -3252,7 +3252,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     return result;
   });
 
-  peer.onRequest('$/cancel_request', async (params: unknown) => {
+  peer.onRequest('$/cancel_request', async (_params: unknown) => {
     assertInitialized(state);
 
     // Auto-cascade: send $/cancel_request for all pending permission requests
@@ -3433,12 +3433,19 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         for (; completedTurns < maxTurns; completedTurns++) {
           const messageTurnSeq = streamTurnSeq++;
           let streamedAny = false;
+          let tokenQueue: Promise<void> = Promise.resolve();
 
           const onToken = (payload: { token?: string }) => {
             if (abortController.signal.aborted) return;
             if (!payload?.token) return;
             streamedAny = true;
-            void emitUpdate(messageTurnSeq, { type: 'text_delta', text: payload.token });
+            const token = payload.token;
+            tokenQueue = tokenQueue
+              .then(async () => {
+                if (abortController.signal.aborted) return;
+                await emitUpdate(messageTurnSeq, { type: 'text_delta', text: token });
+              })
+              .catch(() => undefined);
           };
 
           provider.on('token', onToken);
@@ -3449,6 +3456,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             abortController.signal
           );
           provider.off('token', onToken);
+          await tokenQueue;
 
           if (abortController.signal.aborted) {
             stopReason = 'cancelled';
