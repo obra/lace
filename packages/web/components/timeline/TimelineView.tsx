@@ -19,9 +19,6 @@ import {
 } from '@lace/web/hooks/useProcessedEvents';
 import TimelineEntryErrorBoundary from './TimelineEntryErrorBoundary';
 
-// Placeholder for when currentAgent is not available - use valid thread ID format
-const STREAMING_THREAD_ID = asThreadId('lace_19700101_stream');
-
 interface TimelineViewProps {
   events: AppEvent[];
   agents?: AgentInfo[];
@@ -92,15 +89,15 @@ export function TimelineView({
                 prevEvent &&
                 prevEvent.type === event.type &&
                 prevAgentId === eventAgentId &&
-                ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(event.type) &&
-                ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(prevEvent.type);
+                ['USER_MESSAGE', 'AGENT_MESSAGE'].includes(event.type) &&
+                ['USER_MESSAGE', 'AGENT_MESSAGE'].includes(prevEvent.type);
 
               const shouldGroupWithNext =
                 nextEvent &&
                 nextEvent.type === event.type &&
                 nextAgentId === eventAgentId &&
-                ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(event.type) &&
-                ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(nextEvent.type);
+                ['USER_MESSAGE', 'AGENT_MESSAGE'].includes(event.type) &&
+                ['USER_MESSAGE', 'AGENT_MESSAGE'].includes(nextEvent.type);
 
               // Generate unique key for React
               const eventKey =
@@ -142,7 +139,9 @@ export function TimelineView({
               isThreadId(currentAgent) &&
               !processedEvents.some(
                 (e) =>
-                  e.type === 'AGENT_STREAMING' && e.context?.threadId === asThreadId(currentAgent)
+                  e.type === 'AGENT_MESSAGE' &&
+                  e.transient === true &&
+                  e.context?.threadId === asThreadId(currentAgent)
               ) && (
                 <motion.div
                   key="typing"

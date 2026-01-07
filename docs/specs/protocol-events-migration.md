@@ -3,13 +3,15 @@
 **Goal**: Make protocol events THE internal event system for the web package. LaceEvent stays in the agent package as its internal representation.
 
 **Date**: 2026-01-05
-**Status**: Specification (Not Yet Implemented)
+**Status**: Implemented (web consumes protocol events directly)
 
 ---
 
 ## Executive Summary
 
-Currently, the web package receives protocol events from the supervisor, translates them to LaceEvent format, then consumes LaceEvent throughout the UI. This creates an unnecessary translation layer and couples the web package to agent internals.
+Previously, the web package received protocol events from the supervisor, translated them to LaceEvent format, then consumed LaceEvent throughout the UI. This created an unnecessary translation layer and coupled the web package to agent internals.
+
+**Current State**: Web consumes protocol events directly via `AppEvent = ProtocolEvent | PermissionRequestEvent | WebEvent` and derives a stable timeline model in `useProcessedEvents`.
 
 **Target State**: Web package consumes protocol event types DIRECTLY. LaceEvent remains agent-internal only.
 
@@ -22,9 +24,9 @@ Currently, the web package receives protocol events from the supervisor, transla
 ```
 Supervisor → protocol events (text_delta, tool_use, etc.)
     ↓
-supervisor-service.ts (translation layer)
+packages/web/types/* (ProtocolEvent wrappers)
     ↓
-LaceEvent (AGENT_TOKEN, TOOL_CALL, etc.) ← Web components consume this
+AppEvent (ProtocolEvent | PermissionRequestEvent | WebEvent) ← Web components consume this
 ```
 
 ### Key Components
@@ -42,16 +44,15 @@ LaceEvent (AGENT_TOKEN, TOOL_CALL, etc.) ← Web components consume this
 
 3. **LaceEvent** (`@lace/agent`)
    - Internal agent representation
-   - Types: `USER_MESSAGE`, `AGENT_MESSAGE`, `AGENT_TOKEN`, `TOOL_CALL`, `TOOL_RESULT`, etc.
+   - Types: conversation events, transient streaming events, and workflow events (agent-internal only)
    - Location: `packages/agent/src/threads/types.ts`
    - **36 total event types** including transient and persisted
 
-4. **Translation Layer** (`packages/web/lib/server/supervisor-service.ts`)
-   - Function: `updateToLaceEvents()` - converts protocol events to LaceEvent[]
-   - Only translates 2 protocol event types:
-     - `text_delta` → `AGENT_TOKEN`
-     - `tool_use` (with status) → `TOOL_CALL` + `TOOL_RESULT`
-   - All other protocol events are currently IGNORED
+4. **Web Event Model** (`packages/web/types`)
+   - Protocol wrappers: `packages/web/types/protocol-events.ts`
+   - Web events: `packages/web/types/web-events.ts`
+   - Unified union + type guards: `packages/web/types/app-events.ts`
+   - Timeline derived model: `packages/web/hooks/useProcessedEvents.ts`
 
 ### Web Package LaceEvent Usage
 
@@ -70,54 +71,27 @@ LaceEvent (AGENT_TOKEN, TOOL_CALL, etc.) ← Web components consume this
 
 ---
 
-## Protocol Event Types → LaceEvent Mapping
+## Protocol Update Types → Timeline Mapping
 
-### Direct Protocol Equivalents
+### Timeline model
 
-| Protocol Event | LaceEvent | Notes |
+| Protocol Update | Timeline entry | Notes |
 |----------------|-----------|-------|
-| `text_delta` | `AGENT_TOKEN` | ✅ Currently translated |
-| `thinking` | N/A | **GAP**: No LaceEvent equivalent |
-| `usage` | `TOKEN_USAGE_UPDATE` | Similar but different structure |
-| `tool_use` (pending/awaiting_permission) | `TOOL_CALL` | ✅ Currently translated |
-| `tool_use` (completed/failed/denied) | `TOOL_RESULT` | ✅ Currently translated |
-| `turn_start` | N/A | **GAP**: No LaceEvent equivalent |
-| `turn_end` | N/A | **GAP**: Could map to `AGENT_MESSAGE` |
-| `error` | `AGENT_ERROR` | Similar structure, needs mapping |
-| `session_info` | `SESSION_INFO` | Direct equivalent |
-| `context_window` | `CONTEXT_WINDOW` | Direct equivalent |
-| `compaction_start` | `COMPACTION_START` | Direct equivalent |
-| `compaction_complete` | `COMPACTION_COMPLETE` | Direct equivalent |
-| `mcp_config_changed` | `MCP_CONFIG_CHANGED` | Direct equivalent |
-| `mcp_server_status` | `MCP_SERVER_STATUS_CHANGED` | Direct equivalent |
-| `mode_change` | N/A | **GAP**: No LaceEvent equivalent |
-| `context_injected` | N/A | **GAP**: No LaceEvent equivalent |
-| `plan` | N/A | **GAP**: No LaceEvent equivalent |
-| `job_started` | N/A | **GAP**: Job system not in LaceEvent |
-| `job_finished` | N/A | **GAP**: Job system not in LaceEvent |
-| `job_update` | N/A | **GAP**: Job system not in LaceEvent |
+| `text_delta` | transient `AGENT_MESSAGE` | Aggregated by `(agentSessionId, turnId)` with derived id fallback |
+| `turn_end` | final `AGENT_MESSAGE` | Finalizes content for a turn |
+| `tool_use` | `TOOL_AGGREGATED` | Includes tool call + result; permission request attached in metadata |
+| `error` | `AGENT_ERROR` | Rendered via `AgentErrorEntry` |
 
-### LaceEvent Types WITHOUT Protocol Equivalents
+### Web-internal events (non-protocol)
 
-These are agent-internal or web-synthetic events:
+These are web-generated and not part of the protocol event stream:
 
-| LaceEvent | Source | Keep/Remove |
+| WebEvent | Source | Notes |
 |-----------|--------|-------------|
-| `USER_MESSAGE` | User input via API | **KEEP** - Generated by web |
-| `AGENT_MESSAGE` | Synthesized from `turn_end` | **TRANSFORM** - Use `turn_end` directly |
-| `AGENT_STREAMING` | Synthesized from `AGENT_TOKEN` | **KEEP** - Web-side processing |
-| `AGENT_STATE_CHANGE` | Web-side agent lifecycle | **KEEP** - Web-internal |
-| `TOOL_APPROVAL_REQUEST` | From `permission_request` | **MAP** - Protocol equivalent exists |
-| `TOOL_APPROVAL_RESPONSE` | Web-generated | **KEEP** - Web-internal |
-| `LOCAL_SYSTEM_MESSAGE` | Web-generated | **KEEP** - Web-internal |
-| `SYSTEM_PROMPT` | Agent-internal | **REMOVE** - Not needed in web |
-| `USER_SYSTEM_PROMPT` | Agent-internal | **REMOVE** - Not needed in web |
-| `COMPACTION` | Agent-internal | **REMOVE** - Not needed in web |
-| `AGENT_SPAWNED` | Web-side lifecycle | **KEEP** - Web-internal |
-| `AGENT_SUMMARY_UPDATED` | Web-side | **KEEP** - Web-internal |
-| `PROJECT_CREATED/UPDATED/DELETED` | Web-side | **KEEP** - Web-internal |
-| `SYSTEM_NOTIFICATION` | Web-side | **KEEP** - Web-internal |
-| `EVENT_UPDATED` | Web-side | **KEEP** - Web-internal |
+| `USER_MESSAGE` | Optimistic send | Not the durable protocol record; used for instant UX |
+| `AGENT_STATE_CHANGE` | Supervisor/web | Drives busy/typing state |
+| `LOCAL_SYSTEM_MESSAGE` | Web | Connection + UX messaging |
+| `TOOL_APPROVAL_RESPONSE` | Web | User decision (paired with durable protocol permission flow) |
 
 ---
 
@@ -174,7 +148,7 @@ These are agent-internal or web-synthetic events:
 {
   id?: string,
   timestamp?: Date,
-  type: "AGENT_TOKEN" | "TOOL_CALL" | ...,
+  type: string,
   data: any,  // Type-specific data
   transient?: boolean,
   visibleToModel?: boolean,
@@ -341,7 +315,7 @@ function bridgeEventToWeb(event: SupervisorServerEvent) {
 
 3. **Web-Internal Events**:
    - Define `WebEvent` type for web-generated events:
-     - `USER_MESSAGE_SENT`
+     - `USER_MESSAGE`
      - `AGENT_STATE_CHANGE`
      - `AGENT_SPAWNED`
      - `PROJECT_CREATED/UPDATED/DELETED`
@@ -351,7 +325,7 @@ function bridgeEventToWeb(event: SupervisorServerEvent) {
 ```typescript
 // packages/web/types/web-events.ts
 export type WebEventType =
-  | 'USER_MESSAGE_SENT'
+  | 'USER_MESSAGE'
   | 'AGENT_STATE_CHANGE'
   | 'AGENT_SPAWNED'
   | 'PROJECT_CREATED'
@@ -398,8 +372,8 @@ switch (event.type) {
   case 'USER_MESSAGE':
     onUserMessage?.(event);
     break;
-  case 'AGENT_TOKEN':
-    onAgentToken?.(event);
+  case 'AGENT_MESSAGE':
+    onAgentMessage?.(event);
     break;
 }
 ```

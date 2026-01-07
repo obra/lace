@@ -111,7 +111,10 @@ export interface AgentErrorLogEntry {
  * Web-internal event type identifiers
  */
 export type WebEventType =
-  | 'USER_MESSAGE_SENT'
+  | 'USER_MESSAGE'
+  | 'SYSTEM_PROMPT'
+  | 'USER_SYSTEM_PROMPT'
+  | 'AGENT_MESSAGE'
   | 'AGENT_STATE_CHANGE'
   | 'AGENT_SPAWNED'
   | 'AGENT_SUMMARY_UPDATED'
@@ -119,7 +122,6 @@ export type WebEventType =
   | 'PROJECT_UPDATED'
   | 'PROJECT_DELETED'
   | 'SESSION_CREATED'
-  | 'SESSION_UPDATED'
   | 'SESSION_DELETED'
   | 'SESSION_INFO'
   | 'TASK_CREATED'
@@ -146,12 +148,27 @@ export interface WebEventBase {
 }
 
 /** User sent a message to an agent */
-export interface UserMessageSentEvent extends WebEventBase {
-  type: 'USER_MESSAGE_SENT';
-  data: {
-    content: string;
-    agentSessionId: string;
-  };
+export interface UserMessageEvent extends WebEventBase {
+  type: 'USER_MESSAGE';
+  data: string;
+}
+
+/** System prompt content (typically persona + context disclaimer) */
+export interface SystemPromptEvent extends WebEventBase {
+  type: 'SYSTEM_PROMPT';
+  data: string;
+}
+
+/** User system prompt content (rare; separate from normal USER_MESSAGE) */
+export interface UserSystemPromptEvent extends WebEventBase {
+  type: 'USER_SYSTEM_PROMPT';
+  data: string;
+}
+
+/** Final assistant message content (loaded from history) */
+export interface AgentMessageEvent extends WebEventBase {
+  type: 'AGENT_MESSAGE';
+  data: { content: string };
 }
 
 /** Agent state changed (idle, thinking, streaming, etc.) */
@@ -219,14 +236,6 @@ export interface SessionCreatedEvent extends WebEventBase {
   data: {
     sessionId: string;
     projectId: string;
-  };
-}
-
-export interface SessionUpdatedEvent extends WebEventBase {
-  type: 'SESSION_UPDATED';
-  data: {
-    sessionId: string;
-    changes: Record<string, unknown>;
   };
 }
 
@@ -311,7 +320,10 @@ export interface ToolApprovalResponseEvent extends WebEventBase {
  * Discriminated union of all web event types
  */
 export type WebEvent =
-  | UserMessageSentEvent
+  | UserMessageEvent
+  | SystemPromptEvent
+  | UserSystemPromptEvent
+  | AgentMessageEvent
   | AgentStateChangeEvent
   | AgentSpawnedEvent
   | AgentSummaryUpdatedEvent
@@ -319,7 +331,6 @@ export type WebEvent =
   | ProjectUpdatedEvent
   | ProjectDeletedEvent
   | SessionCreatedEvent
-  | SessionUpdatedEvent
   | SessionDeletedEvent
   | SessionInfoEvent
   | TaskCreatedEvent

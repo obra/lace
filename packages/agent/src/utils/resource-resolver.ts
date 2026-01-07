@@ -66,6 +66,19 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
     // In production (standalone), resolve relative to the working directory
     // The standalone structure is: standalone/src/... so we need to find the equivalent path
 
+    // Monorepo production runs (e.g. `NODE_ENV=production tsx server-custom.ts`) may execute with a
+    // non-root cwd, but resources still live in the repo tree. Prefer resolving from the repo root.
+    const packagesIndex = moduleDir.indexOf('/packages/');
+    if (packagesIndex !== -1) {
+      const repoRoot = moduleDir.substring(0, packagesIndex);
+      if (relativePath === 'data') {
+        return path.resolve(repoRoot, 'packages/agent/src/providers/catalog/data');
+      }
+      if (relativePath === 'agent-personas') {
+        return path.resolve(repoRoot, 'packages/agent/config/agent-personas');
+      }
+    }
+
     // Convert the development module path to its standalone equivalent
     // Find the src/ directory in the module path to determine the relative path from src/
     // Handle both monorepo structure (packages/agent/src/) and original structure (src/)

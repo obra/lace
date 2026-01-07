@@ -50,7 +50,7 @@ describe('LaceApp thinking indicator logic', () => {
     const setSendingMessage = vi.fn();
     const events = [
       { type: 'USER_MESSAGE', timestamp: new Date() },
-      { type: 'TOOL_CALL', timestamp: new Date() },
+      { type: 'TOOL_AGGREGATED', timestamp: new Date() },
     ];
 
     renderHook(() => useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage));

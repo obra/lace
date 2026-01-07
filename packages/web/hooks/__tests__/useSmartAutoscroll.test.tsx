@@ -114,11 +114,11 @@ describe('useTimelineAutoscroll', () => {
 
   it('should handle streaming content updates', async () => {
     // Use plain objects since hook takes unknown[]
-    const mockEvents = [
+    const mockEvents: unknown[] = [
       {
         id: 'evt_1',
-        type: 'USER_MESSAGE_SENT',
-        data: { content: 'Hello' },
+        type: 'USER_MESSAGE',
+        data: 'Hello',
         timestamp: new Date(),
       },
     ];
@@ -138,14 +138,15 @@ describe('useTimelineAutoscroll', () => {
       writable: true,
     });
 
-    // Start streaming by adding AGENT_STREAMING event
-    const eventsWithStreaming = [
+    // Start streaming by adding a protocol text_delta update
+    const eventsWithStreaming: unknown[] = [
       ...mockEvents,
       {
         id: 'evt_2',
-        type: 'AGENT_STREAMING',
-        data: { content: 'Streaming...' },
         timestamp: new Date(),
+        agentSessionId: 'agent_1',
+        workspaceSessionId: 'sess_test',
+        update: { sessionId: 'agent_1', streamSeq: 2, type: 'text_delta', text: 'Streaming...' },
       },
     ];
     act(() => {

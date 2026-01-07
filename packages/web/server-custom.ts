@@ -5,6 +5,9 @@ import './instrument.server.mjs';
 import '@lace/web/lib/server/data-dir-init';
 import { parseArgs } from 'util';
 import type express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { ServerBuild } from 'react-router';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -90,45 +93,62 @@ async function startLaceServer() {
   app.use(compression.default());
   app.disable('x-powered-by');
 
-  console.error('Starting development server with Vite middleware');
+  const serverRootDir = path.dirname(fileURLToPath(import.meta.url));
+  const clientBuildDir = path.join(serverRootDir, 'build', 'client');
 
-  // Development mode - use Vite middleware
-  const vite = await import('vite');
-  const hmrPort = await findAvailablePort(port + 1000, false, hostname);
-  const viteDevServer = await vite.createServer({
-    server: {
-      middlewareMode: true,
-      hmr: {
-        port: hmrPort,
+  if (DEVELOPMENT) {
+    console.error('Starting development server with Vite middleware');
+
+    // Development mode - use Vite middleware
+    const vite = await import('vite');
+    const hmrPort = await findAvailablePort(port + 1000, false, hostname);
+    const viteDevServer = await vite.createServer({
+      server: {
+        middlewareMode: true,
+        hmr: {
+          port: hmrPort,
+        },
       },
-    },
-  });
+    });
 
-  app.use(viteDevServer.middlewares);
-  app.use(async (req, res, next) => {
-    try {
-      const source = await viteDevServer.ssrLoadModule('./server/app.ts');
-      if (
-        source &&
-        typeof source === 'object' &&
-        'app' in source &&
-        typeof source.app === 'function'
-      ) {
-        const appHandler = source.app as (
-          req: express.Request,
-          res: express.Response,
-          next: express.NextFunction
-        ) => Promise<void>;
-        return await appHandler(req, res, next);
+    app.use(viteDevServer.middlewares);
+    app.use(async (req, res, next) => {
+      try {
+        const source = await viteDevServer.ssrLoadModule('./server/app.ts');
+        if (
+          source &&
+          typeof source === 'object' &&
+          'app' in source &&
+          typeof source.app === 'function'
+        ) {
+          const appHandler = source.app as (
+            req: express.Request,
+            res: express.Response,
+            next: express.NextFunction
+          ) => Promise<void>;
+          return await appHandler(req, res, next);
+        }
+        throw new Error('Invalid SSR module structure');
+      } catch (error) {
+        if (typeof error === 'object' && error instanceof Error) {
+          viteDevServer.ssrFixStacktrace(error);
+        }
+        next(error);
       }
-      throw new Error('Invalid SSR module structure');
-    } catch (error) {
-      if (typeof error === 'object' && error instanceof Error) {
-        viteDevServer.ssrFixStacktrace(error);
-      }
-      next(error);
-    }
-  });
+    });
+  } else {
+    const { createRequestHandler } = await import('@react-router/express');
+
+    app.use(express.default.static(clientBuildDir));
+    app.use(
+      createRequestHandler({
+        build: async () => (await import('./build/server/index.js')) as unknown as ServerBuild,
+        getLoadContext() {
+          return {};
+        },
+      })
+    );
+  }
 
   // Clean error handler for 404s and other errors
   app.use(
@@ -146,6 +166,9 @@ async function startLaceServer() {
         res.status(404).send('Not Found');
       } else {
         console.error(`${status}: ${req.method} ${req.url} - ${error.message || 'Unknown error'}`);
+        if (err instanceof Error && err.stack) {
+          console.error(err.stack);
+        }
         res.status(status).send(error.message || 'Internal Server Error');
       }
     }

@@ -70,6 +70,9 @@ All Ent-specific methods use the `ent/` prefix:
 - `ent/session/compact`
 - `ent/session/inject`
 - `ent/job/list`
+- `ent/session/configure` supports **env** and **cwd** to let the supervisor push per-session
+  environment variables and working directory without touching agent config on disk.
+- Provider management extensions (see below) add catalog refresh and model enable/disable flows.
 
 This keeps the namespace clean and makes it obvious which parts are standard ACP vs our extensions.
 
@@ -92,6 +95,14 @@ This keeps the namespace clean and makes it obvious which parts are standard ACP
 To work with multiple sessions concurrently, spawn multiple agent processes. The supervisor (client) manages the process pool.
 
 `session/list` queries available sessions on disk but doesn't load them. To work with a different session, spawn a new process.
+
+### Session-level Environment and CWD
+
+- **env**: Use `ent/session/configure` to set a per-session map of string env vars.
+  The agent merges these on top of its base env for tool execution and subprocesses.
+- **cwd**: Use `ent/session/configure` to request a working directory for the session.
+  The supervisor is responsible for validating/sandboxing the path before sending it;
+  the agent treats it as opaque and uses it for spawned processes and tools.
 
 ---
 

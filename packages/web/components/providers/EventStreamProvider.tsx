@@ -104,18 +104,18 @@ export function EventStreamProvider({
       // Add optimistic USER_MESSAGE before sending
       const optimisticEvent: AppEvent = {
         id: `user_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        type: 'USER_MESSAGE_SENT',
+        type: 'USER_MESSAGE',
         timestamp: new Date(),
-        data: { content: message, agentSessionId: agentIdArg },
+        data: message,
         agentSessionId: agentIdArg,
-        workspaceSessionId: 'unknown',
+        workspaceSessionId: sessionId ?? undefined,
       };
       addAgentEvent(optimisticEvent);
 
       // Send to server
       return agentAPIBase.sendMessage(agentIdArg, message);
     },
-    [addAgentEvent, agentAPIBase]
+    [addAgentEvent, agentAPIBase, sessionId]
   );
 
   const agentAPI = useMemo(
@@ -148,15 +148,6 @@ export function EventStreamProvider({
       }
     },
     [updateAgentState, onAgentStateChange]
-  );
-
-  // Agent token handler - forward events to useProcessedEvents for token aggregation
-  const handleAgentToken = useCallback(
-    (event: AppEvent) => {
-      // Forward AGENT_TOKEN events so useProcessedEvents can aggregate them
-      addAgentEvent(event);
-    },
-    [addAgentEvent]
   );
 
   // Compaction event handlers - compaction is ONLY from ProtocolEvents (compaction_start/compaction_complete)
@@ -201,14 +192,6 @@ export function EventStreamProvider({
     [addAgentEvent]
   );
 
-  // Agent message handler
-  const stableAddAgentEventMessage = useCallback(
-    (event: AppEvent) => {
-      addAgentEvent(event);
-    },
-    [addAgentEvent]
-  );
-
   // Memoize threadIds to prevent unnecessary re-subscriptions
   const threadIds = useMemo(() => {
     return agentId ? [agentId] : undefined;
@@ -217,6 +200,9 @@ export function EventStreamProvider({
   // Create a single stable event handler to ensure consistent references
   const stableAddAgentEvent = useCallback(
     (event: AppEvent) => {
+      if ('type' in event && event.type === 'TOOL_APPROVAL_RESPONSE') {
+        return;
+      }
       addAgentEvent(event);
     },
     [addAgentEvent]
@@ -235,14 +221,7 @@ export function EventStreamProvider({
         console.error('Event stream error:', error);
       },
       onAgentError: handleAgentError,
-      // Agent event handlers - use single stable handler to prevent stale closures
-      onUserMessage: stableAddAgentEventMessage,
-      onAgentMessage: stableAddAgentEventMessage,
-      onAgentToken: handleAgentToken,
-      onToolCall: stableAddAgentEvent,
-      onToolResult: stableAddAgentEvent,
-      // Session events (includes protocol and web events)
-      onSessionEvent: stableAddAgentEvent, // Handles all session-level events
+      onAppEvent: stableAddAgentEvent,
       // Agent state changes
       onAgentStateChange: handleAgentStateChangeCallback,
       // Tool approval requests
@@ -261,8 +240,6 @@ export function EventStreamProvider({
     sessionId,
     threadIds,
     stableAddAgentEvent,
-    stableAddAgentEventMessage,
-    handleAgentToken,
     handleAgentStateChangeCallback,
     handleApprovalRequest,
     handleApprovalResponse,

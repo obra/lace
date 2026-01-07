@@ -3,15 +3,32 @@
 
 import { useMemo } from 'react';
 import type { ThreadId, ToolCall, ToolResult } from '@lace/web/types/core';
-import type { AppEvent, ProtocolEvent } from '@lace/web/types/app-events';
-import { isProtocolEvent, isWebEvent } from '@lace/web/types/app-events';
+import type { AppEvent, PermissionRequestEvent, ProtocolEvent } from '@lace/web/types/app-events';
+import { isPermissionRequestEvent, isProtocolEvent, isWebEvent } from '@lace/web/types/app-events';
+import type { WebEventType } from '@lace/web/types/web-events';
+import type {
+  ErrorUpdate,
+  PermissionRequest,
+  TextDeltaUpdate,
+  ToolUseUpdate,
+  TurnEndUpdate,
+  TurnStartUpdate,
+} from '@lace/web/types/protocol-events';
 
 // Internal event type for timeline processing
 // This is a simplified version that only contains what we need for UI rendering
 interface InternalTimelineEvent {
   id: string;
   timestamp: Date;
-  type: string;
+  type:
+    | WebEventType
+    | 'AGENT_MESSAGE'
+    | 'AGENT_ERROR'
+    | 'SYSTEM_PROMPT'
+    | 'USER_SYSTEM_PROMPT'
+    | 'COMPACTION'
+    | 'COMPACTION_START'
+    | 'COMPACTION_COMPLETE';
   data: unknown;
   transient?: boolean;
   visibleToModel?: boolean;
@@ -22,12 +39,6 @@ interface InternalTimelineEvent {
     taskId?: string;
   };
 }
-import type {
-  TextDeltaUpdate,
-  ToolUseUpdate,
-  ErrorUpdate,
-  ThinkingUpdate,
-} from '@lace/web/types/protocol-events';
 
 interface ProcessedToolEvent extends Omit<InternalTimelineEvent, 'type' | 'data'> {
   type: 'TOOL_AGGREGATED';
@@ -40,136 +51,80 @@ interface ProcessedToolEvent extends Omit<InternalTimelineEvent, 'type' | 'data'
   };
 }
 
-interface ProcessedProtocolTextEvent {
-  id: string;
-  timestamp: Date;
-  type: 'PROTOCOL_TEXT';
-  data: {
-    content: string;
-    agentSessionId: string;
-  };
-}
-
-interface ProcessedProtocolToolEvent {
-  id: string;
-  timestamp: Date;
-  type: 'PROTOCOL_TOOL';
-  data: {
-    name: string;
-    toolCallId: string;
-    input?: unknown;
-    status: 'pending' | 'completed';
-    result?: unknown;
-    agentSessionId: string;
-  };
-}
-
-interface ProcessedProtocolErrorEvent {
-  id: string;
-  timestamp: Date;
-  type: 'PROTOCOL_ERROR';
-  data: {
-    code: string;
-    message: string;
-    phase?: string;
-    agentSessionId: string;
-  };
-}
-
-interface ProcessedProtocolThinkingEvent {
-  id: string;
-  timestamp: Date;
-  type: 'PROTOCOL_THINKING';
-  data: {
-    text: string;
-    agentSessionId: string;
-  };
-}
-
-export type ProcessedEvent =
-  | InternalTimelineEvent
-  | ProcessedToolEvent
-  | ProcessedProtocolTextEvent
-  | ProcessedProtocolToolEvent
-  | ProcessedProtocolErrorEvent
-  | ProcessedProtocolThinkingEvent;
+export type ProcessedEvent = InternalTimelineEvent | ProcessedToolEvent;
 
 /**
  * Helper to extract agent session ID from any ProcessedEvent type.
  * Returns undefined if the event doesn't have an agent session ID.
  */
 export function getProcessedEventAgentId(event: ProcessedEvent): string | undefined {
-  // Protocol-processed events have agentSessionId in data
-  if ('data' in event && event.data && typeof event.data === 'object') {
-    const data = event.data as { agentSessionId?: string };
-    if (data.agentSessionId) {
-      return data.agentSessionId;
-    }
-  }
-  // InternalTimelineEvent and ProcessedToolEvent have context.threadId
-  if ('context' in event && event.context && typeof event.context === 'object') {
-    const context = event.context as { threadId?: string };
-    if (context.threadId) {
-      return context.threadId;
-    }
-  }
-  return undefined;
+  return event.context?.threadId;
 }
-
-const MAX_STREAMING_MESSAGES = 100;
 
 export function useProcessedEvents(events: AppEvent[], selectedAgent?: ThreadId): ProcessedEvent[] {
   return useMemo(() => {
     // 1. Separate protocol events from web events
     // Web events are converted to InternalTimelineEvent for processing
-    const webEvents = events.filter((e) => isWebEvent(e));
-    const protocolEvents = events.filter((e) => isProtocolEvent(e)) as ProtocolEvent[];
+    const webEvents = events.filter(isWebEvent);
+    const protocolEvents = events.filter(isProtocolEvent);
+    const permissionEvents = events.filter(isPermissionRequestEvent);
 
     // Convert web events to InternalTimelineEvent format for processing
     const timelineEvents: InternalTimelineEvent[] = webEvents
       .map((e) => {
         if (!isWebEvent(e)) return null as unknown as InternalTimelineEvent;
+        const threadId =
+          typeof e.agentSessionId === 'string'
+            ? (e.agentSessionId as ThreadId)
+            : (() => {
+                const data = e.data as unknown;
+                if (!data || typeof data !== 'object') return undefined;
+                const context = (data as { context?: unknown }).context;
+                if (!context || typeof context !== 'object') return undefined;
+                const candidate = (context as { threadId?: unknown }).threadId;
+                return typeof candidate === 'string' ? (candidate as ThreadId) : undefined;
+              })();
         return {
           id: e.id,
           timestamp: e.timestamp,
-          type: e.type,
+          type: e.type as InternalTimelineEvent['type'],
           data: e.data,
-          context: { threadId: e.agentSessionId as ThreadId },
+          ...(threadId ? { context: { threadId } } : {}),
         };
       })
       .filter(Boolean);
 
-    // 2. Process internal timeline events
-    const filtered = filterEventsByAgent(timelineEvents, selectedAgent);
-    const afterStreaming = processStreamingTokens(filtered);
-    const processedTimelineEvents = processToolCallAggregation(afterStreaming);
+    // 2. Process protocol events into the same timeline model
+    const processedProtocolEvents = processProtocolEvents(protocolEvents, permissionEvents);
 
-    // 3. Process protocol events
-    const processedProtocolEvents = processProtocolEvents(protocolEvents);
-
-    // 4. Merge both event streams and sort by timestamp
-    const allEvents = [...processedTimelineEvents, ...processedProtocolEvents];
+    // 3. Merge both event streams and sort by timestamp
+    const allEvents = [...timelineEvents, ...processedProtocolEvents];
     if (allEvents.length <= 1) return allEvents;
 
-    return allEvents.sort((a, b) => {
+    const sorted = allEvents.sort((a, b) => {
       const aTime = (a.timestamp || new Date()).getTime();
       const bTime = (b.timestamp || new Date()).getTime();
       return aTime - bTime;
     });
+
+    return filterEventsByAgent(sorted, selectedAgent);
   }, [events, selectedAgent]);
 }
 
-function filterEventsByAgent(
-  events: InternalTimelineEvent[],
-  selectedAgent?: ThreadId
-): InternalTimelineEvent[] {
+function filterEventsByAgent(events: ProcessedEvent[], selectedAgent?: ThreadId): ProcessedEvent[] {
   if (!selectedAgent) {
     return events;
   }
 
   return events.filter((event) => {
     // Always show user messages and system messages
-    if (event.type === 'USER_MESSAGE' || event.type === 'LOCAL_SYSTEM_MESSAGE') {
+    if (
+      event.type === 'USER_MESSAGE' ||
+      event.type === 'LOCAL_SYSTEM_MESSAGE' ||
+      event.type === 'SYSTEM_NOTIFICATION' ||
+      event.type === 'SYSTEM_PROMPT' ||
+      event.type === 'USER_SYSTEM_PROMPT'
+    ) {
       return true;
     }
 
@@ -178,261 +133,304 @@ function filterEventsByAgent(
   });
 }
 
-function processStreamingTokens(events: InternalTimelineEvent[]): InternalTimelineEvent[] {
-  const processed: InternalTimelineEvent[] = [];
-  const streamingMessages = new Map<string, { content: string; timestamp: Date }>();
+function toDisplayText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
 
-  for (const event of events) {
-    if (event.type === 'USER_MESSAGE') {
-      // New user message starts a new turn - clear any pending streaming for this thread
-      // This prevents tokens from different turns being combined
-      const threadId = event.context?.threadId || '';
-      streamingMessages.delete(threadId);
-      processed.push(event);
-    } else if (event.type === 'AGENT_TOKEN') {
-      // Accumulate tokens by threadId
-      const key = event.context?.threadId || '';
-      const existing = streamingMessages.get(key);
-      const tokenData = event.data as { token: string };
+function toAppToolResultForToolUse(params: {
+  toolCallId: string;
+  status: ToolUseUpdate['status'];
+  wireResult?: ToolUseUpdate['result'];
+  permissionRequest?: PermissionRequest;
+}): ToolResult {
+  const baseMetadata: Record<string, unknown> = {
+    toolCallId: params.toolCallId,
+    ...(params.permissionRequest ? { permissionRequest: params.permissionRequest } : {}),
+  };
 
-      if (existing) {
-        existing.content += tokenData.token;
-        existing.timestamp = event.timestamp || new Date();
-      } else {
-        streamingMessages.set(key, {
-          content: tokenData.token,
-          timestamp: event.timestamp || new Date(),
+  if (params.status === 'awaiting_permission') {
+    return {
+      id: params.toolCallId,
+      status: 'pending',
+      content: [{ type: 'text', text: 'Awaiting permission…' }],
+      metadata: baseMetadata,
+    };
+  }
+
+  if (params.status === 'pending' || params.status === 'running') {
+    return {
+      id: params.toolCallId,
+      status: 'pending',
+      content: [
+        { type: 'text', text: params.status === 'running' ? 'Running tool…' : 'Starting…' },
+      ],
+      metadata: baseMetadata,
+    };
+  }
+
+  if (!params.wireResult) {
+    const status: ToolResult['status'] =
+      params.status === 'denied'
+        ? 'denied'
+        : params.status === 'cancelled'
+          ? 'aborted'
+          : params.status === 'failed' || params.status === 'timeout'
+            ? 'failed'
+            : 'completed';
+
+    return {
+      id: params.toolCallId,
+      status,
+      content: [{ type: 'text', text: 'Tool completed (no output).' }],
+      metadata: baseMetadata,
+    };
+  }
+
+  const outcome = params.wireResult.outcome;
+  const status: ToolResult['status'] =
+    outcome === 'completed'
+      ? 'completed'
+      : outcome === 'denied'
+        ? 'denied'
+        : outcome === 'cancelled'
+          ? 'aborted'
+          : outcome === 'failed' || outcome === 'timeout'
+            ? 'failed'
+            : 'completed';
+
+  const blocks: ToolResult['content'] = [];
+  for (const item of params.wireResult.content) {
+    if (!item || typeof item !== 'object') continue;
+    if (item.type === 'text') {
+      blocks.push({ type: 'text', text: item.text });
+    } else if (item.type === 'json') {
+      blocks.push({ type: 'text', text: toDisplayText(item.data) });
+    } else if (item.type === 'error') {
+      const prefix = item.code ? `${item.code}: ` : '';
+      blocks.push({ type: 'text', text: `${prefix}${item.message}`.trim() });
+    } else if (item.type === 'image') {
+      blocks.push({ type: 'image', data: item.data });
+    }
+  }
+
+  if (blocks.length === 0) {
+    blocks.push({ type: 'text', text: 'Tool completed (no output).' });
+  }
+
+  const metadata: Record<string, unknown> = {
+    ...baseMetadata,
+    ...(params.wireResult.meta ?? {}),
+    ...(outcome === 'timeout' ? { outcome: 'timeout' } : {}),
+  };
+
+  return {
+    id: params.toolCallId,
+    status,
+    content: blocks,
+    ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+  };
+}
+
+function textFromTurnEndContent(content: TurnEndUpdate['content']): string {
+  const parts: string[] = [];
+  for (const block of content) {
+    if (!block || typeof block !== 'object') continue;
+    if (block.type === 'text') {
+      parts.push(block.text);
+    } else if (block.type === 'tool_result') {
+      parts.push(block.content);
+    }
+  }
+  return parts.join('');
+}
+
+function processProtocolEvents(
+  events: ProtocolEvent[],
+  permissionEvents: PermissionRequestEvent[]
+): ProcessedEvent[] {
+  const processed: ProcessedEvent[] = [];
+
+  const permissionByToolCallId = new Map<string, PermissionRequest>();
+  for (const evt of permissionEvents) {
+    permissionByToolCallId.set(evt.request.toolCallId, evt.request);
+  }
+
+  const currentTurnIdByAgent = new Map<string, string>();
+  const derivedTurnIdByAgent = new Map<string, string>();
+
+  const assistantByTurnKey = new Map<
+    string,
+    { id: string; timestamp: Date; content: string; transient: boolean; threadId: ThreadId }
+  >();
+
+  const toolByCallId = new Map<
+    string,
+    {
+      id: string;
+      timestamp: Date;
+      call: ToolCall;
+      result?: ToolResult;
+      toolName: string;
+      toolId?: string;
+      arguments?: unknown;
+      context: InternalTimelineEvent['context'];
+    }
+  >();
+
+  const sorted = [...events].sort((a, b) => {
+    const aSeq = (a.update as { streamSeq?: number }).streamSeq ?? 0;
+    const bSeq = (b.update as { streamSeq?: number }).streamSeq ?? 0;
+    return aSeq - bSeq;
+  });
+
+  for (const event of sorted) {
+    const { update, id, timestamp, agentSessionId } = event;
+    const threadId = agentSessionId as ThreadId;
+
+    if (update.type === 'turn_start') {
+      const turnStart = update as TurnStartUpdate;
+      if (turnStart.turnId) {
+        currentTurnIdByAgent.set(agentSessionId, turnStart.turnId);
+        derivedTurnIdByAgent.delete(agentSessionId);
+      }
+      continue;
+    }
+
+    if (update.type === 'turn_end') {
+      const turnEnd = update as TurnEndUpdate;
+      const effectiveTurnId =
+        turnEnd.turnId ??
+        currentTurnIdByAgent.get(agentSessionId) ??
+        derivedTurnIdByAgent.get(agentSessionId);
+      if (effectiveTurnId) {
+        const key = `${agentSessionId}:${effectiveTurnId}`;
+        const existing = assistantByTurnKey.get(key);
+        const turnText = textFromTurnEndContent(turnEnd.content);
+        const stableId = existing?.id ?? `turn_${agentSessionId}_${effectiveTurnId}`;
+
+        assistantByTurnKey.set(key, {
+          id: stableId,
+          timestamp: existing?.timestamp ?? timestamp,
+          content: turnText || existing?.content || '',
+          transient: false,
+          threadId,
         });
       }
 
-      // Prevent unbounded growth
-      if (streamingMessages.size > MAX_STREAMING_MESSAGES) {
-        const oldestKey = streamingMessages.keys().next().value;
-        if (oldestKey) {
-          streamingMessages.delete(oldestKey);
-        }
-      }
-    } else if (event.type === 'AGENT_MESSAGE') {
-      // Complete message received, remove streaming version if exists
-      streamingMessages.delete(event.context?.threadId || '');
-      processed.push(event);
-    } else {
-      // Regular event, keep as-is
-      processed.push(event);
+      currentTurnIdByAgent.delete(agentSessionId);
+      derivedTurnIdByAgent.delete(agentSessionId);
+      continue;
     }
-  }
-
-  // Add remaining streaming messages as AGENT_STREAMING events
-  for (const [threadId, { content, timestamp }] of streamingMessages.entries()) {
-    // Use stable ID based on threadId only - content changes shouldn't create new events
-    // This ensures React treats streaming updates as updates to the same element
-    const streamingEvent: InternalTimelineEvent = {
-      id: `streaming_${threadId}`,
-      type: 'AGENT_STREAMING',
-      timestamp: timestamp,
-      data: { content },
-      transient: true,
-      context: { threadId: threadId as ThreadId },
-    };
-    processed.push(streamingEvent);
-  }
-
-  // Sort by timestamp to maintain chronological order
-  if (processed.length <= 1) return processed;
-
-  return processed.sort((a, b) => {
-    const aTime = (a.timestamp || new Date()).getTime();
-    const bTime = (b.timestamp || new Date()).getTime();
-    return aTime - bTime;
-  });
-}
-
-function processToolCallAggregation(events: InternalTimelineEvent[]): ProcessedEvent[] {
-  const processed: ProcessedEvent[] = [];
-  const pendingToolCalls = new Map<
-    string,
-    { call: InternalTimelineEvent; result?: InternalTimelineEvent }
-  >();
-  let toolCallCounter = 0;
-
-  for (const event of events) {
-    if (event.type === 'TOOL_CALL') {
-      // Extract tool call ID from the event data
-      const toolData = event.data as ToolCall;
-      const toolCallId =
-        toolData.id || `${event.context?.threadId}-${event.timestamp}-${toolCallCounter++}`;
-      pendingToolCalls.set(toolCallId, { call: event });
-    } else if (event.type === 'TOOL_RESULT') {
-      // Find matching tool call by ID - ToolResult has an id field
-      const toolResult = event.data as ToolResult;
-      const toolCallId = toolResult.id;
-
-      let matchingCall = toolCallId ? pendingToolCalls.get(toolCallId) : null;
-
-      // If no exact match, find the oldest tool call without a result on the same thread
-      if (!matchingCall) {
-        const threadCalls = Array.from(pendingToolCalls.entries())
-          .filter(
-            ([_, data]) => data.call.context?.threadId === event.context?.threadId && !data.result
-          )
-          .sort(([_, a], [__, b]) => {
-            const aTime = (a.call.timestamp || new Date()).getTime();
-            const bTime = (b.call.timestamp || new Date()).getTime();
-            return aTime - bTime; // Oldest first (FIFO matching)
-          });
-
-        if (threadCalls.length > 0) {
-          const [callId, callData] = threadCalls[0];
-          matchingCall = callData;
-          pendingToolCalls.set(callId, { ...callData, result: event });
-        }
-      } else if (toolCallId) {
-        pendingToolCalls.set(toolCallId, { ...matchingCall, result: event });
-      }
-    } else {
-      // Non-tool event, add as-is
-      processed.push(event);
-    }
-  }
-
-  // Add aggregated tool calls to processed events
-  for (const { call, result } of pendingToolCalls.values()) {
-    if (call.type !== 'TOOL_CALL') continue;
-
-    const callData = call.data as ToolCall;
-    const resultData = result?.type === 'TOOL_RESULT' ? (result.data as ToolResult) : undefined;
-    const aggregatedEvent: ProcessedToolEvent = {
-      id: call.id,
-      timestamp: call.timestamp,
-      type: 'TOOL_AGGREGATED',
-      data: {
-        call: callData,
-        result: resultData,
-        toolName: callData.name || 'unknown',
-        toolId: callData.id,
-        arguments: callData.arguments,
-      },
-      transient: call.transient,
-      context: call.context,
-      // Preserve visibleToModel from either the call or result (use call's value if both exist)
-      visibleToModel: call.visibleToModel ?? result?.visibleToModel,
-    };
-
-    processed.push(aggregatedEvent);
-  }
-
-  // Sort by timestamp to maintain chronological order
-  if (processed.length <= 1) return processed;
-
-  return processed.sort((a, b) => {
-    const aTime = (a.timestamp || new Date()).getTime();
-    const bTime = (b.timestamp || new Date()).getTime();
-    return aTime - bTime;
-  });
-}
-
-function processProtocolEvents(events: ProtocolEvent[]): ProcessedEvent[] {
-  const processed: ProcessedEvent[] = [];
-  const textDeltaMap = new Map<string, { content: string; latestId: string; timestamp: Date }>();
-  const toolUseMap = new Map<string, { pending?: ProtocolEvent; completed?: ProtocolEvent }>();
-
-  for (const event of events) {
-    const { update, id, timestamp, agentSessionId } = event;
 
     if (update.type === 'text_delta') {
       const textDelta = update as TextDeltaUpdate;
-      const key = agentSessionId;
-      const existing = textDeltaMap.get(key);
+      let effectiveTurnId = textDelta.turnId ?? currentTurnIdByAgent.get(agentSessionId);
 
-      if (existing) {
-        existing.content += textDelta.text;
-        existing.latestId = id;
-        existing.timestamp = timestamp;
-      } else {
-        textDeltaMap.set(key, {
-          content: textDelta.text,
-          latestId: id,
-          timestamp,
-        });
+      if (!effectiveTurnId) {
+        effectiveTurnId = derivedTurnIdByAgent.get(agentSessionId);
       }
-    } else if (update.type === 'tool_use') {
+
+      if (!effectiveTurnId) {
+        const streamSeq = (textDelta as { streamSeq?: number }).streamSeq ?? 0;
+        effectiveTurnId = `derived_${agentSessionId}_${streamSeq}`;
+        derivedTurnIdByAgent.set(agentSessionId, effectiveTurnId);
+      }
+
+      const key = `${agentSessionId}:${effectiveTurnId}`;
+      const existing = assistantByTurnKey.get(key);
+      const stableId = existing?.id ?? `turn_${agentSessionId}_${effectiveTurnId}`;
+
+      assistantByTurnKey.set(key, {
+        id: stableId,
+        timestamp: existing?.timestamp ?? timestamp,
+        content: (existing?.content ?? '') + textDelta.text,
+        transient: true,
+        threadId,
+      });
+      continue;
+    }
+
+    if (update.type === 'tool_use') {
       const toolUse = update as ToolUseUpdate;
       const key = toolUse.toolCallId;
-      const existing = toolUseMap.get(key) ?? {};
+      const existing = toolByCallId.get(key);
+      const permissionRequest = permissionByToolCallId.get(key);
 
-      if (toolUse.status === 'pending') {
-        existing.pending = event;
-      } else if (toolUse.status === 'completed') {
-        existing.completed = event;
-      }
+      const call: ToolCall = {
+        id: key,
+        name: toolUse.name,
+        arguments: toolUse.input,
+      };
 
-      toolUseMap.set(key, existing);
-    } else if (update.type === 'error') {
+      const result = toAppToolResultForToolUse({
+        toolCallId: key,
+        status: toolUse.status,
+        wireResult: toolUse.result,
+        permissionRequest,
+      });
+
+      toolByCallId.set(key, {
+        id: existing?.id ?? `tool_${key}`,
+        timestamp: existing?.timestamp ?? timestamp,
+        call,
+        result,
+        toolName: toolUse.name,
+        toolId: key,
+        arguments: toolUse.input,
+        context: { threadId },
+      });
+      continue;
+    }
+
+    if (update.type === 'error') {
       const errorUpdate = update as ErrorUpdate;
-      const errorEvent: ProcessedProtocolErrorEvent = {
+      const errorEvent: InternalTimelineEvent = {
         id,
         timestamp,
-        type: 'PROTOCOL_ERROR',
+        type: 'AGENT_ERROR',
         data: {
-          code: errorUpdate.code,
+          errorType: errorUpdate.code,
           message: errorUpdate.message,
-          phase: errorUpdate.phase,
-          agentSessionId,
+          isRetryable: false,
+          context: { phase: errorUpdate.phase ?? 'unknown' },
         },
+        context: { threadId },
       };
       processed.push(errorEvent);
-    } else if (update.type === 'thinking') {
-      const thinkingUpdate = update as ThinkingUpdate;
-      const thinkingEvent: ProcessedProtocolThinkingEvent = {
-        id,
-        timestamp,
-        type: 'PROTOCOL_THINKING',
-        data: {
-          text: thinkingUpdate.text,
-          agentSessionId,
-        },
-      };
-      processed.push(thinkingEvent);
+      continue;
     }
   }
 
-  // Convert aggregated text deltas to events
-  for (const [agentSessionId, { content, latestId, timestamp }] of textDeltaMap) {
-    const textEvent: ProcessedProtocolTextEvent = {
-      id: latestId,
+  for (const { id, timestamp, content, transient, threadId } of assistantByTurnKey.values()) {
+    processed.push({
+      id,
       timestamp,
-      type: 'PROTOCOL_TEXT',
-      data: {
-        content,
-        agentSessionId,
-      },
-    };
-    processed.push(textEvent);
+      type: 'AGENT_MESSAGE',
+      data: { content },
+      transient,
+      context: { threadId },
+    });
   }
 
-  // Convert aggregated tool uses to events
-  for (const [toolCallId, { pending, completed }] of toolUseMap) {
-    const sourceEvent = completed ?? pending;
-    if (!sourceEvent) continue;
-
-    const toolUpdate = sourceEvent.update as ToolUseUpdate;
-    const pendingUpdate = pending?.update as ToolUseUpdate | undefined;
-    const completedUpdate = completed?.update as ToolUseUpdate | undefined;
-
-    const toolEvent: ProcessedProtocolToolEvent = {
-      id: sourceEvent.id,
-      timestamp: sourceEvent.timestamp,
-      type: 'PROTOCOL_TOOL',
+  for (const tool of toolByCallId.values()) {
+    processed.push({
+      id: tool.id,
+      timestamp: tool.timestamp,
+      type: 'TOOL_AGGREGATED',
       data: {
-        name: toolUpdate.name ?? 'unknown',
-        toolCallId,
-        input: pendingUpdate?.input,
-        status: completed ? 'completed' : 'pending',
-        result: completedUpdate?.result,
-        agentSessionId: sourceEvent.agentSessionId,
+        call: tool.call,
+        result: tool.result,
+        toolName: tool.toolName,
+        toolId: tool.toolId,
+        arguments: tool.arguments,
       },
-    };
-    processed.push(toolEvent);
+      context: tool.context,
+    });
   }
 
   return processed;

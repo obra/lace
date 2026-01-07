@@ -50,7 +50,7 @@ describe('$/cancel_request notification', () => {
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
     await client.request('initialize', defaultInitializeParams());
-    const created = await client.request('session/new', { workDir: process.cwd() });
+    await client.request('session/new', { workDir: process.cwd() });
 
     // Send a $/cancel_request notification (notifications don't expect a response)
     client.notify('$/cancel_request', { requestId: 'test-request-123' });

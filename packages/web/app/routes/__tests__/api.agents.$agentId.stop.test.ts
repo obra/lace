@@ -1,5 +1,5 @@
 // ABOUTME: Integration tests for the supervisor-backed agent stop endpoint
-// ABOUTME: Verifies session/cancel is routed through supervisor
+// ABOUTME: Verifies $/cancel_request is routed through supervisor
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { action } from '@lace/web/app/routes/api.agents.$agentId.stop';

@@ -12,6 +12,8 @@ import type { SessionId } from '@lace/ent-protocol';
 type DurableEvent = {
   eventSeq: number;
   timestamp: string;
+  turnId?: string;
+  turnSeq?: number;
   type: string;
   data: Record<string, unknown>;
 };
@@ -30,8 +32,14 @@ function toTextContent(value: unknown): string {
     .join('');
 }
 
-function durableEventsToAppEvents(agentSessionId: SessionId, events: DurableEvent[]): AppEvent[] {
+function durableEventsToAppEvents(params: {
+  agentSessionId: SessionId;
+  workspaceSessionId: string;
+  projectId?: string;
+  events: DurableEvent[];
+}): AppEvent[] {
   const out: AppEvent[] = [];
+  const { agentSessionId, workspaceSessionId, projectId, events } = params;
 
   for (const e of events) {
     const timestamp = new Date(e.timestamp);
@@ -41,25 +49,27 @@ function durableEventsToAppEvents(agentSessionId: SessionId, events: DurableEven
       if (content.trim()) {
         out.push({
           id: `ent_${e.eventSeq}_user`,
-          type: 'USER_MESSAGE_SENT',
+          type: 'USER_MESSAGE',
           timestamp,
-          data: { content, agentSessionId },
+          data: content,
           agentSessionId,
-          workspaceSessionId: 'unknown',
+          workspaceSessionId,
+          ...(typeof projectId === 'string' ? { projectId } : {}),
         } as AppEvent);
       }
       continue;
     }
 
     if (e.type === 'message') {
-      const content = typeof e.data?.content === 'string' ? e.data.content : '';
+      const content = toTextContent(e.data?.content);
       out.push({
         id: `ent_${e.eventSeq}_assistant`,
-        type: 'LOCAL_SYSTEM_MESSAGE',
+        type: 'AGENT_MESSAGE',
         timestamp,
-        data: { content, agentSessionId },
+        data: { content },
         agentSessionId,
-        workspaceSessionId: 'unknown',
+        workspaceSessionId,
+        ...(typeof projectId === 'string' ? { projectId } : {}),
       } as AppEvent);
       continue;
     }
@@ -69,11 +79,12 @@ function durableEventsToAppEvents(agentSessionId: SessionId, events: DurableEven
       if (content.trim()) {
         out.push({
           id: `ent_${e.eventSeq}_system`,
-          type: 'LOCAL_SYSTEM_MESSAGE',
+          type: 'SYSTEM_PROMPT',
           timestamp,
-          data: { content, agentSessionId },
+          data: content,
           agentSessionId,
-          workspaceSessionId: 'unknown',
+          workspaceSessionId,
+          ...(typeof projectId === 'string' ? { projectId } : {}),
         } as AppEvent);
       }
       continue;
@@ -129,7 +140,8 @@ function durableEventsToAppEvents(agentSessionId: SessionId, events: DurableEven
         id: `ent_${e.eventSeq}_tool`,
         timestamp,
         update: toolUseUpdate,
-        workspaceSessionId: 'unknown',
+        workspaceSessionId,
+        ...(typeof projectId === 'string' ? { projectId } : {}),
         agentSessionId,
       };
 
@@ -167,10 +179,12 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       },
     })) as { events: DurableEvent[] };
 
-    const events = durableEventsToAppEvents(
-      asAgentSessionId(agentId),
-      Array.isArray(result.events) ? result.events : []
-    );
+    const events = durableEventsToAppEvents({
+      agentSessionId: asAgentSessionId(agentId),
+      workspaceSessionId: workspace.workspaceSessionId,
+      ...(typeof workspace.projectId === 'string' ? { projectId: workspace.projectId } : {}),
+      events: Array.isArray(result.events) ? result.events : [],
+    });
 
     return createSuperjsonResponse(events, { status: 200 });
   } catch (error: unknown) {

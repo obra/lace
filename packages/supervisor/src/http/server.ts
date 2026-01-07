@@ -2,79 +2,11 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
-import {
-  CancelRequestNotificationSchema,
-  EntAgentStatusRequestSchema,
-  EntAgentStatusResponseSchema,
-  EntConnectionsCredentialsClearRequestSchema,
-  EntConnectionsCredentialsClearResponseSchema,
-  EntConnectionsCredentialsStartRequestSchema,
-  EntConnectionsCredentialsStartResponseSchema,
-  EntConnectionsCredentialsStatusRequestSchema,
-  EntConnectionsCredentialsStatusResponseSchema,
-  EntConnectionsCredentialsSubmitRequestSchema,
-  EntConnectionsCredentialsSubmitResponseSchema,
-  EntConnectionsDeleteRequestSchema,
-  EntConnectionsDeleteResponseSchema,
-  EntConnectionsListRequestSchema,
-  EntConnectionsListResponseSchema,
-  EntConnectionsTestRequestSchema,
-  EntConnectionsTestResponseSchema,
-  EntConnectionsUpsertRequestSchema,
-  EntConnectionsUpsertResponseSchema,
-  EntJobInjectNotificationSchema,
-  EntJobKillRequestSchema,
-  EntJobKillResponseSchema,
-  EntJobListRequestSchema,
-  EntJobListResponseSchema,
-  EntJobOutputRequestSchema,
-  EntJobOutputResponseSchema,
-  EntMcpServersDeleteRequestSchema,
-  EntMcpServersDeleteResponseSchema,
-  EntMcpServersListRequestSchema,
-  EntMcpServersListResponseSchema,
-  EntMcpServersTestRequestSchema,
-  EntMcpServersTestResponseSchema,
-  EntMcpServersUpsertRequestSchema,
-  EntMcpServersUpsertResponseSchema,
-  EntMcpToolsListRequestSchema,
-  EntMcpToolsListResponseSchema,
-  EntModelsListRequestSchema,
-  EntModelsListResponseSchema,
-  EntModelsRefreshRequestSchema,
-  EntModelsRefreshResponseSchema,
-  EntPersonasListRequestSchema,
-  EntPersonasListResponseSchema,
-  EntProvidersListRequestSchema,
-  EntProvidersListResponseSchema,
-  EntSessionCheckpointRequestSchema,
-  EntSessionCheckpointResponseSchema,
-  EntSessionCompactRequestSchema,
-  EntSessionCompactResponseSchema,
-  EntSessionConfigureRequestSchema,
-  EntSessionConfigureResponseSchema,
-  EntSessionEventsRequestSchema,
-  EntSessionEventsResponseSchema,
-  EntSessionInjectNotificationSchema,
-  EntSessionRewindRequestSchema,
-  EntSessionRewindResponseSchema,
-  EntToolsListRequestSchema,
-  EntToolsListResponseSchema,
-  EntWorkspaceCreateRequestSchema,
-  EntWorkspaceCreateResponseSchema,
-  EntWorkspaceInfoRequestSchema,
-  EntWorkspaceInfoResponseSchema,
-  SessionPromptRequestSchema,
-  SessionPromptResponseSchema,
-  SessionSetModeRequestSchema,
-  SessionSetModeResponseSchema,
-} from '@lace/ent-protocol';
+import { SessionPromptRequestSchema } from '@lace/ent-protocol';
+import { agentMethodHandlers } from '../agent-method-handlers';
+import { PendingPermissionsTracker } from '../pending-permissions-tracker';
 import { Supervisor } from '../supervisor';
-import type {
-  PendingPermission,
-  SupervisorPermissionRequest,
-  SupervisorServerEvent,
-} from './types';
+import type { SupervisorServerEvent } from './types';
 
 type SupervisorServerOptions = {
   laceDir: string;
@@ -148,188 +80,6 @@ const ResolvePermissionSchema = z
   })
   .strict();
 
-type AgentMethodHandler =
-  | {
-      kind: 'request';
-      paramsSchema: z.ZodTypeAny;
-      resultSchema: z.ZodTypeAny;
-    }
-  | { kind: 'notify'; paramsSchema: z.ZodTypeAny };
-
-const agentMethodHandlers: Record<string, AgentMethodHandler> = {
-  'session/prompt': {
-    kind: 'request',
-    paramsSchema: SessionPromptRequestSchema.shape.params,
-    resultSchema: SessionPromptResponseSchema.shape.result,
-  },
-  '$/cancel_request': {
-    kind: 'notify',
-    paramsSchema: CancelRequestNotificationSchema.shape.params,
-  },
-  'session/set_mode': {
-    kind: 'request',
-    paramsSchema: SessionSetModeRequestSchema.shape.params,
-    resultSchema: SessionSetModeResponseSchema.shape.result,
-  },
-  'ent/session/configure': {
-    kind: 'request',
-    paramsSchema: EntSessionConfigureRequestSchema.shape.params,
-    resultSchema: EntSessionConfigureResponseSchema.shape.result,
-  },
-  'ent/session/inject': {
-    kind: 'notify',
-    paramsSchema: EntSessionInjectNotificationSchema.shape.params,
-  },
-  'ent/agent/status': {
-    kind: 'request',
-    paramsSchema: EntAgentStatusRequestSchema.shape.params.optional(),
-    resultSchema: EntAgentStatusResponseSchema.shape.result,
-  },
-  'ent/session/events': {
-    kind: 'request',
-    paramsSchema: EntSessionEventsRequestSchema.shape.params.optional(),
-    resultSchema: EntSessionEventsResponseSchema.shape.result,
-  },
-  'ent/session/checkpoint': {
-    kind: 'request',
-    paramsSchema: EntSessionCheckpointRequestSchema.shape.params,
-    resultSchema: EntSessionCheckpointResponseSchema.shape.result,
-  },
-  'ent/session/compact': {
-    kind: 'request',
-    paramsSchema: EntSessionCompactRequestSchema.shape.params,
-    resultSchema: EntSessionCompactResponseSchema.shape.result,
-  },
-  'ent/session/rewind': {
-    kind: 'request',
-    paramsSchema: EntSessionRewindRequestSchema.shape.params,
-    resultSchema: EntSessionRewindResponseSchema.shape.result,
-  },
-  'ent/providers/list': {
-    kind: 'request',
-    paramsSchema: EntProvidersListRequestSchema.shape.params,
-    resultSchema: EntProvidersListResponseSchema.shape.result,
-  },
-  'ent/connections/list': {
-    kind: 'request',
-    paramsSchema: EntConnectionsListRequestSchema.shape.params,
-    resultSchema: EntConnectionsListResponseSchema.shape.result,
-  },
-  'ent/connections/upsert': {
-    kind: 'request',
-    paramsSchema: EntConnectionsUpsertRequestSchema.shape.params,
-    resultSchema: EntConnectionsUpsertResponseSchema.shape.result,
-  },
-  'ent/connections/delete': {
-    kind: 'request',
-    paramsSchema: EntConnectionsDeleteRequestSchema.shape.params,
-    resultSchema: EntConnectionsDeleteResponseSchema.shape.result,
-  },
-  'ent/connections/credentials/status': {
-    kind: 'request',
-    paramsSchema: EntConnectionsCredentialsStatusRequestSchema.shape.params,
-    resultSchema: EntConnectionsCredentialsStatusResponseSchema.shape.result,
-  },
-  'ent/connections/credentials/start': {
-    kind: 'request',
-    paramsSchema: EntConnectionsCredentialsStartRequestSchema.shape.params,
-    resultSchema: EntConnectionsCredentialsStartResponseSchema.shape.result,
-  },
-  'ent/connections/credentials/submit': {
-    kind: 'request',
-    paramsSchema: EntConnectionsCredentialsSubmitRequestSchema.shape.params,
-    resultSchema: EntConnectionsCredentialsSubmitResponseSchema.shape.result,
-  },
-  'ent/connections/credentials/clear': {
-    kind: 'request',
-    paramsSchema: EntConnectionsCredentialsClearRequestSchema.shape.params,
-    resultSchema: EntConnectionsCredentialsClearResponseSchema.shape.result,
-  },
-  'ent/connections/test': {
-    kind: 'request',
-    paramsSchema: EntConnectionsTestRequestSchema.shape.params,
-    resultSchema: EntConnectionsTestResponseSchema.shape.result,
-  },
-  'ent/job/inject': {
-    kind: 'notify',
-    paramsSchema: EntJobInjectNotificationSchema.shape.params,
-  },
-  'ent/models/list': {
-    kind: 'request',
-    paramsSchema: EntModelsListRequestSchema.shape.params,
-    resultSchema: EntModelsListResponseSchema.shape.result,
-  },
-  'ent/job/list': {
-    kind: 'request',
-    paramsSchema: EntJobListRequestSchema.shape.params,
-    resultSchema: EntJobListResponseSchema.shape.result,
-  },
-  'ent/job/output': {
-    kind: 'request',
-    paramsSchema: EntJobOutputRequestSchema.shape.params,
-    resultSchema: EntJobOutputResponseSchema.shape.result,
-  },
-  'ent/job/kill': {
-    kind: 'request',
-    paramsSchema: EntJobKillRequestSchema.shape.params,
-    resultSchema: EntJobKillResponseSchema.shape.result,
-  },
-  'ent/tools/list': {
-    kind: 'request',
-    paramsSchema: EntToolsListRequestSchema.shape.params.optional(),
-    resultSchema: EntToolsListResponseSchema.shape.result,
-  },
-  'ent/personas/list': {
-    kind: 'request',
-    paramsSchema: EntPersonasListRequestSchema.shape.params.optional(),
-    resultSchema: EntPersonasListResponseSchema.shape.result,
-  },
-  'ent/models/refresh': {
-    kind: 'request',
-    paramsSchema: EntModelsRefreshRequestSchema.shape.params,
-    resultSchema: EntModelsRefreshResponseSchema.shape.result,
-  },
-  'ent/mcp/servers/list': {
-    kind: 'request',
-    paramsSchema: EntMcpServersListRequestSchema.shape.params.optional(),
-    resultSchema: EntMcpServersListResponseSchema.shape.result,
-  },
-  'ent/mcp/servers/upsert': {
-    kind: 'request',
-    paramsSchema: EntMcpServersUpsertRequestSchema.shape.params,
-    resultSchema: EntMcpServersUpsertResponseSchema.shape.result,
-  },
-  'ent/mcp/servers/delete': {
-    kind: 'request',
-    paramsSchema: EntMcpServersDeleteRequestSchema.shape.params,
-    resultSchema: EntMcpServersDeleteResponseSchema.shape.result,
-  },
-  'ent/mcp/servers/test': {
-    kind: 'request',
-    paramsSchema: EntMcpServersTestRequestSchema.shape.params,
-    resultSchema: EntMcpServersTestResponseSchema.shape.result,
-  },
-  'ent/mcp/tools/list': {
-    kind: 'request',
-    paramsSchema: EntMcpToolsListRequestSchema.shape.params,
-    resultSchema: EntMcpToolsListResponseSchema.shape.result,
-  },
-  'ent/workspace/info': {
-    kind: 'request',
-    paramsSchema: EntWorkspaceInfoRequestSchema.shape.params,
-    resultSchema: EntWorkspaceInfoResponseSchema.shape.result,
-  },
-  'ent/workspace/create': {
-    kind: 'request',
-    paramsSchema: EntWorkspaceCreateRequestSchema.shape.params,
-    resultSchema: EntWorkspaceCreateResponseSchema.shape.result,
-  },
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 function asJson(res: ServerResponse, status: number, body: unknown) {
   const payload = JSON.stringify(body);
   res.statusCode = status;
@@ -383,41 +133,13 @@ function writeEndpointFile(params: {
   );
 }
 
-function permissionKey(agentSessionId: string, toolCallId: string): string {
-  return `${agentSessionId}:${toolCallId}`;
-}
-
 export function createSupervisorServer(options: SupervisorServerOptions): SupervisorServerHandle {
   const host = options.host ?? '127.0.0.1';
   const port = options.port ?? 0;
   const endpointPath = options.endpointFilePath ?? endpointFileDefault(options.laceDir);
 
   const sseClients = new Set<ServerResponse>();
-  const pendingToolCalls = new Map<
-    string,
-    {
-      workspaceSessionId: string;
-      agentSessionId: string;
-      toolCallId: string;
-      toolCall: { name: string; arguments: Record<string, unknown> };
-      createdAt: number;
-    }
-  >();
-  const pendingPermissions = new Map<
-    string,
-    {
-      workspaceSessionId: string;
-      agentSessionId: string;
-      toolCallId: string;
-      toolCall?: { name: string; arguments: Record<string, unknown> };
-      request: SupervisorPermissionRequest;
-      requestedAt: number;
-      resolve: (decision: {
-        decision: 'allow' | 'deny';
-        updatedInput?: Record<string, unknown>;
-      }) => void;
-    }
-  >();
+  const pendingPermissions = new PendingPermissionsTracker();
 
   function broadcast(event: SupervisorServerEvent) {
     for (const client of sseClients) {
@@ -433,28 +155,7 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
     laceDir: options.laceDir,
     onSessionUpdate: (workspaceSessionId, update) => {
       const projectId = supervisor.getWorkspaceSession(workspaceSessionId)?.projectId;
-      if (update.type === 'tool_use') {
-        const toolCallId = typeof update.toolCallId === 'string' ? update.toolCallId : '';
-        const name = typeof update.name === 'string' ? update.name : '';
-        const input = isRecord(update.input) ? update.input : {};
-        const status = typeof update.status === 'string' ? update.status : '';
-
-        if (
-          toolCallId &&
-          name &&
-          update.sessionId &&
-          (status === 'pending' || status === 'awaiting_permission')
-        ) {
-          const key = permissionKey(update.sessionId, toolCallId);
-          pendingToolCalls.set(key, {
-            workspaceSessionId,
-            agentSessionId: update.sessionId,
-            toolCallId,
-            toolCall: { name, arguments: input },
-            createdAt: Date.now(),
-          });
-        }
-      }
+      pendingPermissions.onSessionUpdate(workspaceSessionId, update);
 
       broadcast({
         type: 'session_update',
@@ -464,22 +165,11 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
       });
     },
     onPermissionRequest: async (workspaceSessionId, params) => {
-      const timeoutMs = 5 * 60 * 1000;
       const projectId = supervisor.getWorkspaceSession(workspaceSessionId)?.projectId;
-
-      const agentSessionId = params.sessionId;
-      const toolCallId = params.toolCallId;
-      const key = permissionKey(agentSessionId, toolCallId);
-
-      const toolCallFromUpdates = pendingToolCalls.get(key);
-      const toolCall =
-        toolCallFromUpdates &&
-        toolCallFromUpdates.workspaceSessionId === workspaceSessionId &&
-        toolCallFromUpdates.agentSessionId === agentSessionId
-          ? toolCallFromUpdates.toolCall
-          : undefined;
-
-      pendingToolCalls.delete(key);
+      const { toolCall, waitForDecision } = pendingPermissions.startPermissionRequest(
+        workspaceSessionId,
+        params
+      );
 
       broadcast({
         type: 'permission_request',
@@ -490,28 +180,7 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
         requestedAt: new Date().toISOString(),
       });
 
-      return await new Promise<{
-        decision: 'allow' | 'deny';
-        updatedInput?: Record<string, unknown>;
-      }>((resolve) => {
-        pendingPermissions.set(key, {
-          workspaceSessionId,
-          agentSessionId,
-          toolCallId,
-          ...(toolCall ? { toolCall } : {}),
-          request: params,
-          requestedAt: Date.now(),
-          resolve,
-        });
-
-        setTimeout(() => {
-          const still = pendingPermissions.get(key);
-          if (!still) return;
-          pendingPermissions.delete(key);
-          pendingToolCalls.delete(key);
-          still.resolve({ decision: 'deny' });
-        }, timeoutMs);
-      });
+      return await waitForDecision;
     },
   });
 
@@ -647,19 +316,7 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
         }
 
         if (method === 'GET' && rest === 'pending-permissions') {
-          const out: PendingPermission[] = Array.from(pendingPermissions.values())
-            .filter((p) => p.workspaceSessionId === workspaceSessionId)
-            .map((p) => ({
-              workspaceSessionId: p.workspaceSessionId,
-              agentSessionId: p.agentSessionId,
-              toolCallId: p.toolCallId,
-              ...(p.toolCall ? { toolCall: p.toolCall } : {}),
-              request: p.request,
-              requestedAt: new Date(p.requestedAt).toISOString(),
-            }));
-
-          out.sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
-          return asJson(res, 200, out);
+          return asJson(res, 200, pendingPermissions.listPendingPermissions(workspaceSessionId));
         }
 
         if (
@@ -671,23 +328,19 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
           const toolCallId = decodeURIComponent(restParts[1]);
           const body = ResolvePermissionSchema.parse(await readJson(req));
 
-          const candidates = Array.from(pendingPermissions.values()).filter(
-            (p) => p.workspaceSessionId === workspaceSessionId && p.toolCallId === toolCallId
-          );
-
-          if (candidates.length === 0) return asJson(res, 404, { ok: false });
-          if (candidates.length > 1)
-            return asJson(res, 409, { ok: false, error: 'Tool call is ambiguous' });
-
-          const found = candidates[0]!;
-          const key = permissionKey(found.agentSessionId, found.toolCallId);
-          pendingPermissions.delete(key);
-          pendingToolCalls.delete(key);
-
-          found.resolve({
+          const resolved = pendingPermissions.resolvePendingPermission({
+            workspaceSessionId,
+            toolCallId,
             decision: body.decision,
             ...(body.updatedInput ? { updatedInput: body.updatedInput } : {}),
           });
+
+          if (!resolved.ok) {
+            if (resolved.error === 'ambiguous') {
+              return asJson(res, 409, { ok: false, error: 'Tool call is ambiguous' });
+            }
+            return asJson(res, 404, { ok: false });
+          }
 
           return asJson(res, 200, { ok: true });
         }
@@ -741,6 +394,7 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
         }
       }
       sseClients.clear();
+      pendingPermissions.shutdown();
       await supervisor.shutdown();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },

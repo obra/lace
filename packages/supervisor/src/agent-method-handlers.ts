@@ -1,0 +1,246 @@
+import { z } from 'zod';
+import {
+  CancelRequestNotificationSchema,
+  EntAgentStatusRequestSchema,
+  EntAgentStatusResponseSchema,
+  EntConnectionsCredentialsClearRequestSchema,
+  EntConnectionsCredentialsClearResponseSchema,
+  EntConnectionsCredentialsStartRequestSchema,
+  EntConnectionsCredentialsStartResponseSchema,
+  EntConnectionsCredentialsStatusRequestSchema,
+  EntConnectionsCredentialsStatusResponseSchema,
+  EntConnectionsCredentialsSubmitRequestSchema,
+  EntConnectionsCredentialsSubmitResponseSchema,
+  EntConnectionsDeleteRequestSchema,
+  EntConnectionsDeleteResponseSchema,
+  EntConnectionsListRequestSchema,
+  EntConnectionsListResponseSchema,
+  EntConnectionsTestRequestSchema,
+  EntConnectionsTestResponseSchema,
+  EntConnectionsUpsertRequestSchema,
+  EntConnectionsUpsertResponseSchema,
+  EntJobInjectNotificationSchema,
+  EntJobKillRequestSchema,
+  EntJobKillResponseSchema,
+  EntJobListRequestSchema,
+  EntJobListResponseSchema,
+  EntJobOutputRequestSchema,
+  EntJobOutputResponseSchema,
+  EntMcpServersDeleteRequestSchema,
+  EntMcpServersDeleteResponseSchema,
+  EntMcpServersListRequestSchema,
+  EntMcpServersListResponseSchema,
+  EntMcpServersTestRequestSchema,
+  EntMcpServersTestResponseSchema,
+  EntMcpServersUpsertRequestSchema,
+  EntMcpServersUpsertResponseSchema,
+  EntMcpToolsListRequestSchema,
+  EntMcpToolsListResponseSchema,
+  EntModelsListRequestSchema,
+  EntModelsListResponseSchema,
+  EntModelsRefreshRequestSchema,
+  EntModelsRefreshResponseSchema,
+  EntPersonasListRequestSchema,
+  EntPersonasListResponseSchema,
+  EntProvidersListRequestSchema,
+  EntProvidersListResponseSchema,
+  EntSessionCheckpointRequestSchema,
+  EntSessionCheckpointResponseSchema,
+  EntSessionCompactRequestSchema,
+  EntSessionCompactResponseSchema,
+  EntSessionConfigureRequestSchema,
+  EntSessionConfigureResponseSchema,
+  EntSessionEventsRequestSchema,
+  EntSessionEventsResponseSchema,
+  EntSessionInjectNotificationSchema,
+  EntSessionRewindRequestSchema,
+  EntSessionRewindResponseSchema,
+  EntToolsListRequestSchema,
+  EntToolsListResponseSchema,
+  EntWorkspaceCreateRequestSchema,
+  EntWorkspaceCreateResponseSchema,
+  EntWorkspaceInfoRequestSchema,
+  EntWorkspaceInfoResponseSchema,
+  SessionPromptRequestSchema,
+  SessionPromptResponseSchema,
+  SessionSetModeRequestSchema,
+  SessionSetModeResponseSchema,
+} from '@lace/ent-protocol';
+
+export type AgentMethodHandler =
+  | {
+      kind: 'request';
+      paramsSchema: z.ZodTypeAny;
+      resultSchema: z.ZodTypeAny;
+    }
+  | { kind: 'notify'; paramsSchema: z.ZodTypeAny };
+
+export const agentMethodHandlers: Record<string, AgentMethodHandler> = {
+  'session/prompt': {
+    kind: 'request',
+    paramsSchema: SessionPromptRequestSchema.shape.params,
+    resultSchema: SessionPromptResponseSchema.shape.result,
+  },
+  '$/cancel_request': {
+    kind: 'notify',
+    paramsSchema: CancelRequestNotificationSchema.shape.params,
+  },
+  'session/set_mode': {
+    kind: 'request',
+    paramsSchema: SessionSetModeRequestSchema.shape.params,
+    resultSchema: SessionSetModeResponseSchema.shape.result,
+  },
+  'ent/session/configure': {
+    kind: 'request',
+    paramsSchema: EntSessionConfigureRequestSchema.shape.params,
+    resultSchema: EntSessionConfigureResponseSchema.shape.result,
+  },
+  'ent/session/inject': {
+    kind: 'notify',
+    paramsSchema: EntSessionInjectNotificationSchema.shape.params,
+  },
+  'ent/agent/status': {
+    kind: 'request',
+    paramsSchema: EntAgentStatusRequestSchema.shape.params.optional(),
+    resultSchema: EntAgentStatusResponseSchema.shape.result,
+  },
+  'ent/session/events': {
+    kind: 'request',
+    paramsSchema: EntSessionEventsRequestSchema.shape.params.optional(),
+    resultSchema: EntSessionEventsResponseSchema.shape.result,
+  },
+  'ent/session/checkpoint': {
+    kind: 'request',
+    paramsSchema: EntSessionCheckpointRequestSchema.shape.params,
+    resultSchema: EntSessionCheckpointResponseSchema.shape.result,
+  },
+  'ent/session/compact': {
+    kind: 'request',
+    paramsSchema: EntSessionCompactRequestSchema.shape.params,
+    resultSchema: EntSessionCompactResponseSchema.shape.result,
+  },
+  'ent/session/rewind': {
+    kind: 'request',
+    paramsSchema: EntSessionRewindRequestSchema.shape.params,
+    resultSchema: EntSessionRewindResponseSchema.shape.result,
+  },
+  'ent/providers/list': {
+    kind: 'request',
+    paramsSchema: EntProvidersListRequestSchema.shape.params,
+    resultSchema: EntProvidersListResponseSchema.shape.result,
+  },
+  'ent/connections/list': {
+    kind: 'request',
+    paramsSchema: EntConnectionsListRequestSchema.shape.params,
+    resultSchema: EntConnectionsListResponseSchema.shape.result,
+  },
+  'ent/connections/upsert': {
+    kind: 'request',
+    paramsSchema: EntConnectionsUpsertRequestSchema.shape.params,
+    resultSchema: EntConnectionsUpsertResponseSchema.shape.result,
+  },
+  'ent/connections/delete': {
+    kind: 'request',
+    paramsSchema: EntConnectionsDeleteRequestSchema.shape.params,
+    resultSchema: EntConnectionsDeleteResponseSchema.shape.result,
+  },
+  'ent/connections/credentials/status': {
+    kind: 'request',
+    paramsSchema: EntConnectionsCredentialsStatusRequestSchema.shape.params,
+    resultSchema: EntConnectionsCredentialsStatusResponseSchema.shape.result,
+  },
+  'ent/connections/credentials/start': {
+    kind: 'request',
+    paramsSchema: EntConnectionsCredentialsStartRequestSchema.shape.params,
+    resultSchema: EntConnectionsCredentialsStartResponseSchema.shape.result,
+  },
+  'ent/connections/credentials/submit': {
+    kind: 'request',
+    paramsSchema: EntConnectionsCredentialsSubmitRequestSchema.shape.params,
+    resultSchema: EntConnectionsCredentialsSubmitResponseSchema.shape.result,
+  },
+  'ent/connections/credentials/clear': {
+    kind: 'request',
+    paramsSchema: EntConnectionsCredentialsClearRequestSchema.shape.params,
+    resultSchema: EntConnectionsCredentialsClearResponseSchema.shape.result,
+  },
+  'ent/connections/test': {
+    kind: 'request',
+    paramsSchema: EntConnectionsTestRequestSchema.shape.params,
+    resultSchema: EntConnectionsTestResponseSchema.shape.result,
+  },
+  'ent/job/inject': {
+    kind: 'notify',
+    paramsSchema: EntJobInjectNotificationSchema.shape.params,
+  },
+  'ent/models/list': {
+    kind: 'request',
+    paramsSchema: EntModelsListRequestSchema.shape.params,
+    resultSchema: EntModelsListResponseSchema.shape.result,
+  },
+  'ent/job/list': {
+    kind: 'request',
+    paramsSchema: EntJobListRequestSchema.shape.params,
+    resultSchema: EntJobListResponseSchema.shape.result,
+  },
+  'ent/job/output': {
+    kind: 'request',
+    paramsSchema: EntJobOutputRequestSchema.shape.params,
+    resultSchema: EntJobOutputResponseSchema.shape.result,
+  },
+  'ent/job/kill': {
+    kind: 'request',
+    paramsSchema: EntJobKillRequestSchema.shape.params,
+    resultSchema: EntJobKillResponseSchema.shape.result,
+  },
+  'ent/tools/list': {
+    kind: 'request',
+    paramsSchema: EntToolsListRequestSchema.shape.params.optional(),
+    resultSchema: EntToolsListResponseSchema.shape.result,
+  },
+  'ent/personas/list': {
+    kind: 'request',
+    paramsSchema: EntPersonasListRequestSchema.shape.params.optional(),
+    resultSchema: EntPersonasListResponseSchema.shape.result,
+  },
+  'ent/models/refresh': {
+    kind: 'request',
+    paramsSchema: EntModelsRefreshRequestSchema.shape.params,
+    resultSchema: EntModelsRefreshResponseSchema.shape.result,
+  },
+  'ent/mcp/servers/list': {
+    kind: 'request',
+    paramsSchema: EntMcpServersListRequestSchema.shape.params.optional(),
+    resultSchema: EntMcpServersListResponseSchema.shape.result,
+  },
+  'ent/mcp/servers/upsert': {
+    kind: 'request',
+    paramsSchema: EntMcpServersUpsertRequestSchema.shape.params,
+    resultSchema: EntMcpServersUpsertResponseSchema.shape.result,
+  },
+  'ent/mcp/servers/delete': {
+    kind: 'request',
+    paramsSchema: EntMcpServersDeleteRequestSchema.shape.params,
+    resultSchema: EntMcpServersDeleteResponseSchema.shape.result,
+  },
+  'ent/mcp/servers/test': {
+    kind: 'request',
+    paramsSchema: EntMcpServersTestRequestSchema.shape.params,
+    resultSchema: EntMcpServersTestResponseSchema.shape.result,
+  },
+  'ent/mcp/tools/list': {
+    kind: 'request',
+    paramsSchema: EntMcpToolsListRequestSchema.shape.params,
+    resultSchema: EntMcpToolsListResponseSchema.shape.result,
+  },
+  'ent/workspace/info': {
+    kind: 'request',
+    paramsSchema: EntWorkspaceInfoRequestSchema.shape.params,
+    resultSchema: EntWorkspaceInfoResponseSchema.shape.result,
+  },
+  'ent/workspace/create': {
+    kind: 'request',
+    paramsSchema: EntWorkspaceCreateRequestSchema.shape.params,
+    resultSchema: EntWorkspaceCreateResponseSchema.shape.result,
+  },
+};

@@ -58,16 +58,16 @@ describe('agent abort reliability (E2E)', () => {
     await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
 
     // Start a prompt (will be delayed by streaming delay)
-    const promptPromise = agent.peer.request('session/prompt', {
+    const { requestId, result: promptPromise } = agent.peer.requestWithId('session/prompt', {
       content: [{ type: 'text', text: 'hello' }],
     });
 
     // Wait a bit for the turn to start, then cancel
     await new Promise((resolve) => setTimeout(resolve, 200));
-    agent.peer.notify('$/cancel_request', { requestId: 'cancel-turn' });
+    agent.peer.notify('$/cancel_request', { requestId });
 
     // Turn should end with cancelled status
-    const result = (await withTimeout(promptPromise as Promise<unknown>, 10_000, 'prompt')) as {
+    const result = (await withTimeout(promptPromise, 10_000, 'prompt')) as {
       stopReason: string;
       turnId: string;
     };
@@ -127,7 +127,7 @@ describe('agent abort reliability (E2E)', () => {
     await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
 
     // Start a prompt that will run a slow bash command
-    const promptPromise = agent.peer.request('session/prompt', {
+    const { requestId, result: promptPromise } = agent.peer.requestWithId('session/prompt', {
       content: [{ type: 'text', text: 'run: sleep 10' }],
     });
 
@@ -150,10 +150,10 @@ describe('agent abort reliability (E2E)', () => {
     );
 
     // Cancel during tool execution
-    agent.peer.notify('$/cancel_request', { requestId: 'cancel-turn' });
+    agent.peer.notify('$/cancel_request', { requestId });
 
     // Turn should end with cancelled status
-    const result = (await withTimeout(promptPromise as Promise<unknown>, 10_000, 'prompt')) as {
+    const result = (await withTimeout(promptPromise, 10_000, 'prompt')) as {
       stopReason: string;
     };
 
@@ -206,7 +206,7 @@ describe('agent abort reliability (E2E)', () => {
     await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
 
     // Start a prompt that requires permission
-    const promptPromise = agent.peer.request('session/prompt', {
+    const { requestId, result: promptPromise } = agent.peer.requestWithId('session/prompt', {
       content: [{ type: 'text', text: 'run: echo test' }],
     });
 
@@ -225,10 +225,10 @@ describe('agent abort reliability (E2E)', () => {
     );
 
     // Send cancel instead of approval
-    agent.peer.notify('$/cancel_request', { requestId: 'cancel-turn' });
+    agent.peer.notify('$/cancel_request', { requestId });
 
     // Turn should end with cancelled status
-    const result = (await withTimeout(promptPromise as Promise<unknown>, 5_000, 'prompt')) as {
+    const result = (await withTimeout(promptPromise, 5_000, 'prompt')) as {
       stopReason: string;
     };
 
@@ -327,18 +327,17 @@ describe('agent abort reliability (E2E)', () => {
     await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
 
     // First turn - abort it
-    const firstPromptPromise = agent.peer.request('session/prompt', {
+    const { requestId, result: firstPromptPromise } = agent.peer.requestWithId('session/prompt', {
       content: [{ type: 'text', text: 'first message' }],
     });
 
     await new Promise((resolve) => setTimeout(resolve, 200));
-    agent.peer.notify('$/cancel_request', { requestId: 'cancel-turn' });
+    agent.peer.notify('$/cancel_request', { requestId });
 
-    const firstResult = (await withTimeout(
-      firstPromptPromise as Promise<unknown>,
-      10_000,
-      'first prompt'
-    )) as { stopReason: string; turnId: string };
+    const firstResult = (await withTimeout(firstPromptPromise, 10_000, 'first prompt')) as {
+      stopReason: string;
+      turnId: string;
+    };
 
     expect(firstResult.stopReason).toBe('cancelled');
     const firstTurnId = firstResult.turnId;

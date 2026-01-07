@@ -8,12 +8,11 @@ import type { AgentInfo, CompactionData, ToolCall, ToolResult } from '@lace/web/
 import { getProcessedEventAgentId, type ProcessedEvent } from '@lace/web/hooks/useProcessedEvents';
 import { MessageHeader, MessageText } from '@lace/web/components/ui';
 import { ToolCallDisplay } from '@lace/web/components/ui/ToolCallDisplay';
-import { Alert } from '@lace/web/components/ui/Alert';
+import { Alert, type AlertVariant } from '@lace/web/components/ui/Alert';
 import { SystemPromptEntry } from '@lace/web/components/timeline/SystemPromptEntry';
 import { UserSystemPromptEntry } from '@lace/web/components/timeline/UserSystemPromptEntry';
 import { CompactionEntry } from '@lace/web/components/timeline/CompactionEntry';
 import { AgentErrorEntry } from '@lace/web/components/timeline/AgentErrorEntry';
-import { formatTime } from '@lace/web/lib/format';
 
 // Type-safe data accessors for ProcessedEvent
 // Since ProcessedEvent includes InternalTimelineEvent with unknown data,
@@ -55,36 +54,6 @@ function getCompactionData(event: ProcessedEvent): CompactionData | null {
   return null;
 }
 
-interface ToolCallEventData {
-  name: string;
-  arguments?: unknown;
-}
-
-function getToolCallEventData(event: ProcessedEvent): ToolCallEventData {
-  if ('data' in event && event.data && typeof event.data === 'object') {
-    const data = event.data as ToolCallEventData;
-    return { name: data.name || 'unknown', arguments: data.arguments };
-  }
-  return { name: 'unknown' };
-}
-
-interface ToolResultEventData {
-  content?: Array<{ text?: string }>;
-}
-
-function getToolResultText(event: ProcessedEvent): string {
-  if ('data' in event) {
-    if (typeof event.data === 'string') return event.data;
-    if (event.data && typeof event.data === 'object') {
-      const data = event.data as ToolResultEventData;
-      if (Array.isArray(data.content)) {
-        return data.content.map((block) => block?.text ?? '').join('');
-      }
-    }
-  }
-  return 'No result';
-}
-
 interface CompactionStartData {
   auto?: boolean;
 }
@@ -109,12 +78,21 @@ function getCompactionCompleteData(event: ProcessedEvent): CompactionCompleteDat
 
 interface SystemNotificationData {
   severity?: string;
+  level?: string;
   message?: string;
 }
 
 function getSystemNotificationData(event: ProcessedEvent): SystemNotificationData {
   if ('data' in event && event.data && typeof event.data === 'object') {
-    return event.data as SystemNotificationData;
+    const raw = event.data as Record<string, unknown>;
+    const message = typeof raw.message === 'string' ? raw.message : undefined;
+    const severity =
+      typeof raw.severity === 'string'
+        ? raw.severity
+        : typeof raw.level === 'string'
+          ? raw.level
+          : undefined;
+    return { message, severity };
   }
   return {};
 }
@@ -215,19 +193,6 @@ export function TimelineMessage({
         </div>
       );
 
-    case 'AGENT_STREAMING':
-      return (
-        <div className={`${isGrouped && !isFirstInGroup ? 'mt-0.5' : isGrouped ? 'mt-2' : 'mt-3'}`}>
-          {/* Only show header for first message in group */}
-          {isFirstInGroup && (
-            <MessageHeader name={agentName} timestamp={timestamp} role="assistant" />
-          )}
-          <div className={`ml-11 ${isLastInGroup ? 'mb-1' : ''}`}>
-            <MessageText content={getEventDataContent(event)} className="!leading-normal" />
-          </div>
-        </div>
-      );
-
     case 'TOOL_AGGREGATED': {
       // Use enhanced display for aggregated tools
       const toolData = getToolAggregatedData(event);
@@ -252,59 +217,6 @@ export function TimelineMessage({
         </div>
       );
     }
-
-    case 'TOOL_CALL': {
-      // Standalone tool call (not aggregated)
-      const tcData = getToolCallEventData(event);
-      return (
-        <div className={`flex gap-3 transition-opacity duration-200 ${visibilityClasses}`}>
-          <div className="flex-shrink-0">
-            <div className="w-8 h-8 rounded-md bg-info/20 text-info flex items-center justify-center text-sm">
-              <div className="w-3 h-3 bg-info rounded"></div>
-            </div>
-          </div>
-          <div className="flex-1 min-w-0">
-            <MessageHeader name="Tool" timestamp={timestamp} />
-            <div className="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300">
-              <div className="text-base-content/80 mb-2 font-mono">$ {tcData.name}</div>
-              <div className="text-base-content/60 text-xs whitespace-pre-wrap font-mono">
-                {JSON.stringify(tcData.arguments, null, 2)}
-              </div>
-            </div>
-            {!isVisibleToModel && (
-              <div className="ml-11 -mt-2">
-                <span className="badge badge-ghost badge-xs opacity-60">Compacted</span>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    case 'TOOL_RESULT':
-      // Standalone tool result (not aggregated)
-      return (
-        <div className={`flex gap-3 transition-opacity duration-200 ${visibilityClasses}`}>
-          <div className="flex-shrink-0">
-            <div className="w-8 h-8 rounded-md bg-green-100 text-green-700 flex items-center justify-center text-sm">
-              ✓
-            </div>
-          </div>
-          <div className="flex-1 min-w-0">
-            <MessageHeader name="Tool Result" timestamp={timestamp} />
-            <div className="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300">
-              <div className="text-base-content/60 text-xs whitespace-pre-wrap font-mono">
-                {getToolResultText(event)}
-              </div>
-            </div>
-            {!isVisibleToModel && (
-              <div className="ml-11 -mt-2">
-                <span className="badge badge-ghost badge-xs opacity-60">Compacted</span>
-              </div>
-            )}
-          </div>
-        </div>
-      );
 
     case 'LOCAL_SYSTEM_MESSAGE':
       return (
@@ -382,7 +294,13 @@ export function TimelineMessage({
     case 'SYSTEM_NOTIFICATION': {
       const snData = getSystemNotificationData(event);
       const severity = snData.severity || 'info';
-      const variant = severity as 'info' | 'warning' | 'error';
+      const variant: AlertVariant =
+        severity === 'info' ||
+        severity === 'warning' ||
+        severity === 'error' ||
+        severity === 'success'
+          ? severity
+          : 'info';
 
       return (
         <div className="flex justify-center">
@@ -392,9 +310,7 @@ export function TimelineMessage({
     }
 
     // These are handled elsewhere or not displayed
-    case 'AGENT_TOKEN':
     case 'AGENT_STATE_CHANGE':
-    case 'TOOL_APPROVAL_REQUEST':
     case 'TOOL_APPROVAL_RESPONSE':
     case 'AGENT_SPAWNED':
     case 'AGENT_SUMMARY_UPDATED':

@@ -146,6 +146,13 @@ interface ClientCapabilities {
   "ent/contextInjection"?: boolean;  // Supports session/inject
   "ent/backgroundJobs"?: boolean;    // Supports job/* methods
   "ent/jobStreaming"?: "full" | "coalesced" | "none";  // Job output verbosity preference
+  "ent/providers"?: {                // Provider/config management via agent (not web direct access)
+    list: boolean;                  // ent/providers/list
+    connections: boolean;           // ent/connections/*
+    models: boolean;                // ent/models/*
+    catalogRefresh?: boolean;       // ent/providers/refresh
+    modelGating?: boolean;          // ent/models/enable, ent/models/disable
+  };
 }
 ```
 
@@ -181,13 +188,12 @@ interface AgentCapabilities {
   "ent/backgroundJobs": boolean;
   "ent/fileCheckpointing": boolean;
   "ent/structuredOutput": boolean;
-
-  // Provider/connection configuration capabilities (optional)
-  "ent/providers"?: {
-    list: boolean;            // supports ent/providers/list
-    connections: boolean;     // supports ent/connections/*
-    models: boolean;          // supports ent/models/*
-    catalogRefresh?: boolean; // supports ent/models/refresh (optional)
+  "ent/providers"?: {               // Provider/config management the agent exposes
+    list: boolean;                  // ent/providers/list
+    connections: boolean;           // ent/connections/*
+    models: boolean;                // ent/models/*
+    catalogRefresh?: boolean;       // ent/providers/refresh
+    modelGating?: boolean;          // ent/models/enable, ent/models/disable
   };
 }
 
@@ -221,6 +227,8 @@ interface SlashCommand {
       providerId?: string,         // Provider family (opaque string, e.g., "anthropic", "openai", "claude-code-wrapper")
       connectionId?: string,       // Configured connection (preferred; implies providerId)
       modelId?: string,            // Model identifier (opaque string)
+      environment?: Record<string, string>, // Per-session env overlay (strings only)
+      cwd?: string,                // Requested working directory (validated by supervisor)
       executionMode?: string,      // "plan" | "execute" (default: "execute")
       approvalMode?: string,       // "ask" | "approveReads" | "approveEdits" | "approve" | "deny" | "dangerouslySkipPermissions"
       mcpServers?: McpServerConfig[],
@@ -506,6 +514,8 @@ Dynamic configuration changes. Covers Claude SDK's `setModel()`, `setMaxThinking
     // Runtime settings
     maxThinkingTokens?: number,
     maxBudgetUsd?: number,
+    environment?: Record<string, string>, // Session-scoped env overlay (strings only, not persisted)
+    cwd?: string,                         // Requested working directory (supervisor validates/sandboxes)
     mcpServers?: McpServerConfig[],
     approvalMode?: "ask" | "approveReads" | "approveEdits" | "approve" | "deny" | "dangerouslySkipPermissions"
     // ask: Prompt for everything (default)
@@ -525,6 +535,10 @@ Dynamic configuration changes. Covers Claude SDK's `setModel()`, `setMaxThinking
   }
 }
 ```
+
+**Notes**
+- Env overlays are applied in-memory for this session and MUST NOT be written to disk by the agent.
+- `cwd` is treated as opaque by the agent; the supervisor is responsible for validating/sandboxing paths before sending.
 
 ### 6.4 `ent/session/rewind`
 
@@ -837,6 +851,8 @@ This section defines how agents expose provider families and configured connecti
 
 **Wrapper guidance**: Agents wrapping single-provider runtimes (e.g., Claude Code, Codex) should expose one `providerId`, one `connectionId`, and set `ProviderInfo.supportsConnections: false`. Credentials may use `{ kind: "ready" }` for ambient auth or implement device_code/browser flows.
 
+**Isolation requirement**: The web tier/supervisor MUST NOT read or write agent provider config files directly. All catalog refreshes, connection CRUD, and model visibility changes MUST flow through the Ent methods below.
+
 ### 6.14 `ent/providers/list`
 
 List available provider families supported by this agent runtime.
@@ -860,7 +876,23 @@ List available provider families supported by this agent runtime.
 - Lace-like agents may return multiple providers.
 - Clients MUST feature-detect via `ent/providers` capability before calling.
 
-### 6.15 `ent/connections/list`
+### 6.15 `ent/providers/refresh` (extension)
+
+Refresh provider catalog metadata (e.g., remote catalogs). Replaces any web-server direct reads of agent catalogs.
+
+```typescript
+// Request
+{ method: "ent/providers/refresh", params?: { providerId?: string } }
+
+// Response
+{ result: { ok: boolean; refreshedAt: string; error?: string } }
+```
+
+- `providerId` optional: omitted = refresh all providers.
+- Idempotent; agents may serve cached results when nothing changed.
+- Capability gate: `AgentCapabilities["ent/providers"].catalogRefresh` MUST be true.
+
+### 6.16 `ent/connections/list`
 
 List configured connections, optionally filtered by provider.
 
@@ -881,7 +913,7 @@ List configured connections, optionally filtered by provider.
 }
 ```
 
-### 6.16 `ent/connections/upsert`
+### 6.17 `ent/connections/upsert`
 
 Create or update a connection. When creating, `providerId` is required. When updating, only `connectionId` is needed.
 
@@ -911,7 +943,7 @@ Create or update a connection. When creating, `providerId` is required. When upd
 
 **Security requirement**: The `config` object MUST NOT contain credentials. Use `ent/connections/credentials/*` methods to manage credentials separately.
 
-### 6.17 `ent/connections/delete`
+### 6.18 `ent/connections/delete`
 
 Delete a configured connection.
 
@@ -930,7 +962,7 @@ Delete a configured connection.
 }
 ```
 
-### 6.18 `ent/connections/test`
+### 6.19 `ent/connections/test`
 
 Test connectivity for a connection.
 
@@ -954,7 +986,7 @@ Test connectivity for a connection.
 }
 ```
 
-### 6.19 `ent/connections/credentials/status`
+### 6.20 `ent/connections/credentials/status`
 
 Get credential status for a connection.
 
@@ -978,7 +1010,7 @@ Get credential status for a connection.
 }
 ```
 
-### 6.20 `ent/connections/credentials/start`
+### 6.21 `ent/connections/credentials/start`
 
 Begin an interactive credential/login flow for a connection. Supports credential rotation for existing connections.
 
@@ -1015,7 +1047,7 @@ Begin an interactive credential/login flow for a connection. Supports credential
 - Implementations MAY ignore `method` and choose the best available flow.
 - This method supports credential rotation: calling it on a connection with existing credentials initiates a new credential flow that replaces the old credentials on successful completion.
 
-### 6.21 `ent/connections/credentials/submit`
+### 6.22 `ent/connections/credentials/submit`
 
 Submit credentials or flow completion information.
 
@@ -1037,7 +1069,7 @@ Submit credentials or flow completion information.
 
 **Security requirement**: Agents MUST NOT emit secrets in `session/update` streams, `ent/session/events`, or error messages. Secrets MUST be redacted.
 
-### 6.22 `ent/connections/credentials/clear` (optional)
+### 6.23 `ent/connections/credentials/clear` (optional)
 
 Clear credentials for a connection without deleting the connection itself.
 
@@ -1056,7 +1088,7 @@ Clear credentials for a connection without deleting the connection itself.
 }
 ```
 
-### 6.23 `ent/models/list`
+### 6.24 `ent/models/list`
 
 List available models for a connection. Model catalogs are connection-scoped because available models can vary by endpoint and credentials (especially for OpenAI-compatible providers).
 
@@ -1079,7 +1111,7 @@ List available models for a connection. Model catalogs are connection-scoped bec
 }
 ```
 
-### 6.24 `ent/models/refresh` (optional)
+### 6.25 `ent/models/refresh` (optional)
 
 Refresh model catalog from upstream provider.
 
@@ -1105,7 +1137,31 @@ Refresh model catalog from upstream provider.
 
 **Note**: Only available if `ent/providers.catalogRefresh` is `true`.
 
-### 6.25 `ent/tools/list`
+### 6.26 `ent/models/enable` / `ent/models/disable` (extension)
+
+Toggle model availability for a specific connection. UI must call these; the web tier MUST NOT mutate agent disk config directly.
+
+```typescript
+// Request
+{ method: "ent/models/enable", params: { connectionId: string, modelIds: string[] } }
+{ method: "ent/models/disable", params: { connectionId: string, modelIds: string[] } }
+
+// Response
+{
+  result: {
+    connectionId: string;
+    enabled: string[];   // models now enabled
+    disabled: string[];  // models now disabled
+  }
+}
+```
+
+Rules:
+- Idempotent; enabling an already-enabled model is a no-op.
+- Unknown `modelIds` SHOULD error.
+- Effective state is session/config scoped; agents must not request web to write disk config.
+
+### 6.27 `ent/tools/list`
 
 List all available tools provided by the agent.
 
@@ -1123,7 +1179,7 @@ List all available tools provided by the agent.
 }
 ```
 
-### 6.26 `ent/personas/list`
+### 6.28 `ent/personas/list`
 
 List available agent personas for configuration.
 
@@ -1151,7 +1207,7 @@ interface PersonaInfo {
 }
 ```
 
-### 6.27 `ent/mcp/servers/list`
+### 6.29 `ent/mcp/servers/list`
 
 List configured MCP servers.
 
@@ -1179,7 +1235,7 @@ List configured MCP servers.
 }
 ```
 
-### 6.28 `ent/mcp/servers/upsert`
+### 6.30 `ent/mcp/servers/upsert`
 
 Add or update an MCP server configuration.
 
@@ -1207,7 +1263,7 @@ Add or update an MCP server configuration.
 }
 ```
 
-### 6.29 `ent/mcp/servers/delete`
+### 6.31 `ent/mcp/servers/delete`
 
 Delete an MCP server configuration.
 
@@ -1226,7 +1282,7 @@ Delete an MCP server configuration.
 }
 ```
 
-### 6.30 `ent/mcp/servers/test`
+### 6.32 `ent/mcp/servers/test`
 
 Test connectivity and availability of an MCP server.
 
@@ -1250,7 +1306,7 @@ Test connectivity and availability of an MCP server.
 }
 ```
 
-### 6.31 `ent/mcp/tools/list`
+### 6.33 `ent/mcp/tools/list`
 
 List tools available from a specific MCP server.
 
@@ -1276,7 +1332,7 @@ List tools available from a specific MCP server.
 }
 ```
 
-### 6.32 `ent/workspace/info`
+### 6.34 `ent/workspace/info`
 
 Get workspace information for a session.
 
@@ -1303,7 +1359,7 @@ Get workspace information for a session.
 }
 ```
 
-### 6.33 `ent/workspace/create`
+### 6.35 `ent/workspace/create`
 
 Create a workspace container for a session.
 

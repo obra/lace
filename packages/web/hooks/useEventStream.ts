@@ -64,14 +64,10 @@ interface GlobalEvent {
 }
 
 interface EventHandlers {
-  // Session events
-  onSessionEvent?: (event: AppEvent) => void;
-  onUserMessage?: (event: AppEvent) => void;
   onAgentMessage?: (event: AppEvent) => void;
   onAgentToken?: (event: AppEvent) => void;
   onToolCall?: (event: AppEvent) => void;
   onToolResult?: (event: AppEvent) => void;
-  onSystemMessage?: (event: AppEvent) => void;
   onAgentStateChange?: (agentId: string, from: string, to: string) => void;
 
   // Approval events
@@ -88,7 +84,6 @@ interface EventHandlers {
   onSessionInfo?: (event: AppEvent) => void;
 
   // Agent events
-  onAgentEvent?: (event: AgentEvent) => void;
   onAgentSpawned?: (event: AgentEvent) => void;
   onAgentStarted?: (event: AgentEvent) => void;
   onAgentStopped?: (event: AgentEvent) => void;
@@ -153,10 +148,6 @@ export interface UseEventStreamOptions extends EventHandlers {
 
   // Prevents calling onError for AGENT_ERROR events to avoid duplicate handling
   treatAgentErrorAsGeneric?: boolean;
-
-  // These are now ignored but kept for API compatibility
-  autoReconnect?: boolean;
-  reconnectInterval?: number;
 }
 
 export interface UseEventStreamResult {
@@ -285,12 +276,11 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
     // Handle WebEvent callback
     const handleWebEvent = (event: WebEvent, currentOptions: UseEventStreamOptions) => {
       switch (event.type) {
-        case 'USER_MESSAGE_SENT':
+        case 'USER_MESSAGE':
           {
-            const data = event.data as { content: string; agentSessionId: string };
             currentOptions.onWebUserMessage?.({
-              content: data.content,
-              agentSessionId: data.agentSessionId,
+              content: typeof event.data === 'string' ? event.data : '',
+              agentSessionId: event.agentSessionId || 'unknown',
             });
           }
           break;
@@ -318,9 +308,6 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
 
         // Call generic AppEvent handler
         currentOptions.onAppEvent?.(event);
-
-        // Also call legacy onSessionEvent handler for compatibility
-        currentOptions.onSessionEvent?.(event);
 
         // Route to specific handlers based on event type
         if (isProtocolEvent(event)) {
@@ -373,14 +360,7 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
         } else if (isWebEvent(event)) {
           handleWebEvent(event, currentOptions);
 
-          // Route web events to legacy-named handlers
           switch (event.type) {
-            case 'USER_MESSAGE_SENT':
-              currentOptions.onUserMessage?.(event);
-              break;
-            case 'LOCAL_SYSTEM_MESSAGE':
-              currentOptions.onSystemMessage?.(event);
-              break;
             case 'AGENT_STATE_CHANGE':
               {
                 const data = event.data as {
@@ -412,7 +392,6 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
                   taskId?: string;
                 };
                 currentOptions.onAgentSpawned?.(data);
-                currentOptions.onAgentEvent?.(data);
               }
               break;
           }
