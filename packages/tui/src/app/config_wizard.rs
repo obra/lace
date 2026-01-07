@@ -488,12 +488,20 @@ fn on_credentials_submit(state: &mut AppState, result: &Option<Value>) -> Vec<Ou
 
 fn request_models_list(state: &mut AppState, connection_id: String) -> Vec<Outbound> {
     state.config_wizard.step = ConfigWizardStep::LoadingModels;
-    let id = state.next_client_id();
-    vec![Outbound::JsonRpcRequest {
-        id,
-        method: "ent/models/list".to_string(),
-        params: Some(json!({ "connectionId": connection_id })),
-    }]
+    let refresh_id = state.next_client_id();
+    let list_id = state.next_client_id();
+    vec![
+        Outbound::JsonRpcRequest {
+            id: refresh_id,
+            method: "ent/providers/refresh".to_string(),
+            params: Some(json!({})),
+        },
+        Outbound::JsonRpcRequest {
+            id: list_id,
+            method: "ent/models/list".to_string(),
+            params: Some(json!({ "connectionId": connection_id })),
+        },
+    ]
 }
 
 fn on_models_list(state: &mut AppState, result: &Option<Value>) -> Vec<Outbound> {

@@ -321,7 +321,11 @@ fn run_loop(
                         }
                     }
 
-                    if key.code == KeyCode::F(1) || key.code == KeyCode::Char('?') {
+                    if key.code == KeyCode::F(1)
+                        || (key.code == KeyCode::Char('?')
+                            && state.focus == crate::app::Focus::Input
+                            && state.input_buffer.is_empty())
+                    {
                         let _ = apply_ui_action(state, UiAction::ToggleHelp);
                         continue;
                     }
