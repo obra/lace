@@ -293,12 +293,13 @@ describe('Supervisor (E2E)', () => {
       )) as { events: Array<{ type: string; eventSeq: number }>; hasMore: boolean };
 
       expect(events.events.map((e) => e.type)).toEqual([
+        'context_injected',
         'prompt',
         'turn_start',
         'message',
         'turn_end',
       ]);
-      expect(events.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4]);
+      expect(events.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5]);
     } finally {
       if (originalTestProvider === undefined) delete process.env.LACE_AGENT_TEST_PROVIDER;
       else process.env.LACE_AGENT_TEST_PROVIDER = originalTestProvider;
