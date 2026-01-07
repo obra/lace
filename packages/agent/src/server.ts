@@ -653,6 +653,7 @@ export type AgentServerState = {
     modelId?: string;
     maxBudgetUsd?: number;
     maxThinkingTokens?: number;
+    environment?: Record<string, string>;
   };
   activeTurn: null | {
     turnId: string;
@@ -1690,6 +1691,13 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     if (typeof config?.maxBudgetUsd === 'number') state.config.maxBudgetUsd = config.maxBudgetUsd;
     if (typeof config?.maxThinkingTokens === 'number')
       state.config.maxThinkingTokens = config.maxThinkingTokens;
+    if (config?.environment && typeof config.environment === 'object') {
+      const envObj: Record<string, string> = {};
+      for (const [k, v] of Object.entries(config.environment)) {
+        if (typeof v === 'string') envObj[k] = v;
+      }
+      state.config.environment = Object.keys(envObj).length > 0 ? envObj : undefined;
+    }
 
     const jobStreaming = capabilities['ent/jobStreaming'];
     if (jobStreaming === 'full' || jobStreaming === 'coalesced' || jobStreaming === 'none') {
@@ -1719,7 +1727,13 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         'ent/backgroundJobs': true,
         'ent/fileCheckpointing': true,
         'ent/structuredOutput': false,
-        'ent/providers': { list: true, connections: true, models: true },
+        'ent/providers': {
+          list: true,
+          connections: true,
+          models: true,
+          catalogRefresh: true,
+          modelGating: true,
+        },
       },
     };
   });
@@ -1936,10 +1950,33 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         providerId: p.id,
         displayName: p.name,
         supportsConnections: true,
-        supportsCatalogRefresh: false,
+        supportsCatalogRefresh: true,
       }));
 
     return { providers };
+  });
+
+  peer.onRequest('ent/providers/refresh', async (params: unknown) => {
+    assertInitialized(state);
+
+    const parsed = params as { providerId?: string } | undefined;
+    const providerId = parsed?.providerId;
+
+    await state.providerCatalog.loadCatalogs();
+    state.providerCatalogLoaded = true;
+
+    if (providerId) {
+      const provider = state.providerCatalog.getProvider(providerId);
+      if (!provider) {
+        return {
+          ok: false,
+          refreshedAt: new Date().toISOString(),
+          error: `Unknown providerId: ${providerId}`,
+        };
+      }
+    }
+
+    return { ok: true, refreshedAt: new Date().toISOString() };
   });
 
   peer.onRequest('ent/connections/list', async (params: unknown) => {
@@ -2202,7 +2239,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const provider = state.providerCatalog.getProvider(providerId);
     if (!provider) throwInvalidParams(`Unknown providerId: ${providerId}`);
 
-    const models = provider.models.map((m) => mapCatalogModelToModelInfo(m, providerId));
+    const gatedModels = state.providerCatalog.applyModelGating(providerId, provider.models);
+    const models = gatedModels.map((m) => mapCatalogModelToModelInfo(m, providerId));
     return { providerId, connectionId, models };
   });
 
@@ -2238,6 +2276,80 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       refreshedAt: new Date().toISOString(),
       ok: true,
     };
+  });
+
+  const updateModelGating = async (
+    providerId: string,
+    modelIds: string[],
+    action: 'enable' | 'disable'
+  ) => {
+    await ensureProviderCatalogLoaded();
+    const provider = state.providerCatalog.getProvider(providerId);
+    if (!provider) throwInvalidParams(`Unknown providerId: ${providerId}`);
+
+    const providerModels = new Set(provider.models.map((m) => m.id));
+    for (const id of modelIds) {
+      if (!providerModels.has(id)) throwInvalidParams(`Unknown modelId for provider: ${id}`);
+    }
+
+    const gating = state.providerCatalog.getModelGating(providerId);
+    const enabled = new Set(gating.enabled ?? []);
+    const disabled = new Set(gating.disabled ?? []);
+
+    if (action === 'enable') {
+      for (const id of modelIds) {
+        enabled.add(id);
+        disabled.delete(id);
+      }
+    } else {
+      for (const id of modelIds) {
+        disabled.add(id);
+        enabled.delete(id);
+      }
+    }
+
+    const enabledArr = Array.from(enabled).sort();
+    const disabledArr = Array.from(disabled).sort();
+    await state.providerCatalog.setModelGating(providerId, {
+      enabled: enabledArr,
+      disabled: disabledArr,
+    });
+
+    return { providerId, enabled: enabledArr, disabled: disabledArr };
+  };
+
+  peer.onRequest('ent/models/enable', async (params: unknown) => {
+    assertInitialized(state);
+    const parsed = params as { providerId?: string; modelIds?: unknown };
+    const providerId = toNonEmptyString(parsed.providerId);
+    if (!providerId) throwInvalidParams('providerId is required');
+    if (!Array.isArray(parsed.modelIds) || parsed.modelIds.length === 0)
+      throwInvalidParams('modelIds must be a non-empty array of strings');
+    const modelIds: string[] = [];
+    for (const id of parsed.modelIds) {
+      const v = toNonEmptyString(id);
+      if (!v) throwInvalidParams('modelIds must be strings');
+      modelIds.push(v);
+    }
+
+    return await updateModelGating(providerId, modelIds, 'enable');
+  });
+
+  peer.onRequest('ent/models/disable', async (params: unknown) => {
+    assertInitialized(state);
+    const parsed = params as { providerId?: string; modelIds?: unknown };
+    const providerId = toNonEmptyString(parsed.providerId);
+    if (!providerId) throwInvalidParams('providerId is required');
+    if (!Array.isArray(parsed.modelIds) || parsed.modelIds.length === 0)
+      throwInvalidParams('modelIds must be a non-empty array of strings');
+    const modelIds: string[] = [];
+    for (const id of parsed.modelIds) {
+      const v = toNonEmptyString(id);
+      if (!v) throwInvalidParams('modelIds must be strings');
+      modelIds.push(v);
+    }
+
+    return await updateModelGating(providerId, modelIds, 'disable');
   });
 
   peer.onRequest('ent/tools/list', async (_params: unknown) => {
@@ -2909,6 +3021,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       maxThinkingTokens: number;
       maxBudgetUsd: number;
       mcpServers: unknown;
+      environment: Record<string, string>;
       approvalMode:
         | 'ask'
         | 'approveReads'
@@ -2965,6 +3078,28 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     ) {
       nextConfig.approvalMode = parsed.approvalMode;
       applied.push('approvalMode');
+    }
+
+    if (parsed.environment !== undefined) {
+      if (
+        !parsed.environment ||
+        typeof parsed.environment !== 'object' ||
+        Array.isArray(parsed.environment)
+      ) {
+        throwInvalidParams('environment must be an object of string:string');
+      }
+      const envObj: Record<string, string> = {};
+      for (const [k, v] of Object.entries(parsed.environment as Record<string, unknown>)) {
+        if (typeof v !== 'string') throwInvalidParams('environment values must be strings');
+        envObj[k] = v;
+      }
+
+      const currentEnv =
+        (currentConfig as { environment?: Record<string, string> })?.environment || undefined;
+      if (!recordsShallowEqual(envObj, currentEnv)) {
+        nextConfig.environment = envObj;
+        applied.push('environment');
+      }
     }
 
     if (parsed.mcpServers !== undefined) {
@@ -3024,6 +3159,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         maxThinkingTokens: effectiveAfter.maxThinkingTokens,
         maxBudgetUsd: effectiveAfter.maxBudgetUsd,
         approvalMode: effectiveAfter.approvalMode,
+        environment: (state.activeSession.state.config as any)?.environment,
         mcpServers: (state.activeSession.state.config as any)?.mcpServers,
       },
     };
@@ -3501,6 +3637,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             ? Math.max(1, Math.trunc((params as any).maxTurns))
             : 10;
 
+        const envOverlay =
+          effectiveConfig.environment && typeof effectiveConfig.environment === 'object'
+            ? (effectiveConfig.environment as Record<string, string>)
+            : undefined;
+
         const { executor: toolExecutor, toolsForProvider } = createToolExecutorForMode(
           effectiveConfig.executionMode,
           state.mcpServerManager
@@ -3907,6 +4048,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                     signal: abortController.signal,
                     workingDirectory: workDir,
                     toolTempRoot: join(state.activeSession.dir, 'tool-temp'),
+                    processEnv: envOverlay,
                     hasFileBeenRead: (p) =>
                       filesRead.has(isAbsolutePath(p) ? p : resolvePath(workDir, p)),
                   }
@@ -4320,12 +4462,18 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           }
 
           if (shouldExecuteTool && !abortController.signal.aborted) {
+            const envOverlay =
+              effectiveConfig.environment && typeof effectiveConfig.environment === 'object'
+                ? (effectiveConfig.environment as Record<string, string>)
+                : undefined;
+
             const coreResult = await toolExecutor.execute(
               { id: toolCallId, name: toolName, arguments: finalInput },
               {
                 signal: abortController.signal,
                 workingDirectory: workDir,
                 toolTempRoot: join(state.activeSession.dir, 'tool-temp'),
+                processEnv: envOverlay,
                 hasFileBeenRead: (p) =>
                   filesRead.has(isAbsolutePath(p) ? p : resolvePath(workDir, p)),
               }

@@ -33,6 +33,7 @@ export type SessionState = {
     modelId?: string;
     maxBudgetUsd?: number;
     maxThinkingTokens?: number;
+    environment?: Record<string, string>;
     mcpServers?: Array<{
       name: string;
       command: string;

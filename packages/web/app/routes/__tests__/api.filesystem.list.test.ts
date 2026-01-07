@@ -114,8 +114,11 @@ describe('/api/filesystem/list', () => {
   });
 
   it('should handle file path as invalid directory', async () => {
-    // Create a temporary file inside home directory to ensure it exists and is accessible
-    const tempFilePath = join(homedir(), `test-file-${Date.now()}.txt`);
+    // Create a temporary file inside a writable subdirectory of the project (still under home)
+    const baseDir = join(process.cwd(), '.fs-list-tests');
+    await fs.mkdir(baseDir, { recursive: true });
+    const tempDir = await fs.mkdtemp(join(baseDir, 'fs-list-test-'));
+    const tempFilePath = join(tempDir, `test-file-${Date.now()}.txt`);
 
     try {
       await fs.writeFile(tempFilePath, 'test content');

@@ -75,6 +75,7 @@ const AgentCapabilitiesSchema = z
         connections: z.boolean(),
         models: z.boolean(),
         catalogRefresh: z.boolean().optional(),
+        modelGating: z.boolean().optional(),
       })
       .strict()
       .optional(),
@@ -1040,6 +1041,87 @@ export const EntModelsRefreshResponseSchema = z
   })
   .strict();
 
+const EntProvidersRefreshParamsSchema = z
+  .object({
+    providerId: z.string().optional(),
+  })
+  .strict()
+  .optional();
+
+const EntProvidersRefreshResultSchema = z
+  .object({
+    ok: z.boolean(),
+    refreshedAt: IsoTimestampSchema,
+    error: z.string().optional(),
+  })
+  .strict();
+
+export const EntProvidersRefreshRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/providers/refresh'),
+    params: EntProvidersRefreshParamsSchema,
+  })
+  .strict();
+
+export const EntProvidersRefreshResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntProvidersRefreshResultSchema,
+  })
+  .strict();
+
+const EntModelsToggleParamsSchema = z
+  .object({
+    providerId: NonEmptyStringSchema,
+    modelIds: z.array(NonEmptyStringSchema).min(1),
+  })
+  .strict();
+
+const EntModelsToggleResultSchema = z
+  .object({
+    providerId: NonEmptyStringSchema,
+    enabled: z.array(NonEmptyStringSchema),
+    disabled: z.array(NonEmptyStringSchema),
+  })
+  .strict();
+
+export const EntModelsEnableRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/models/enable'),
+    params: EntModelsToggleParamsSchema,
+  })
+  .strict();
+
+export const EntModelsEnableResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntModelsToggleResultSchema,
+  })
+  .strict();
+
+export const EntModelsDisableRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/models/disable'),
+    params: EntModelsToggleParamsSchema,
+  })
+  .strict();
+
+export const EntModelsDisableResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntModelsToggleResultSchema,
+  })
+  .strict();
+
 const EntJobListResultSchema = z
   .object({
     jobs: z.array(
@@ -1811,6 +1893,9 @@ export const EntProtocolRequestSchema = z.union([
   EntConnectionsCredentialsClearRequestSchema,
   EntModelsListRequestSchema,
   EntModelsRefreshRequestSchema,
+  EntModelsEnableRequestSchema,
+  EntModelsDisableRequestSchema,
+  EntProvidersRefreshRequestSchema,
   EntToolsListRequestSchema,
   EntPersonasListRequestSchema,
   EntMcpServersListRequestSchema,

@@ -578,14 +578,21 @@ describe('lace-agent process (E2E over stdio)', () => {
     await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
 
     const configured = (await withTimeout(
-      agent.peer.request('ent/session/configure', { approvalMode: 'approve', maxBudgetUsd: 1.25 }),
+      agent.peer.request('ent/session/configure', {
+        approvalMode: 'approve',
+        maxBudgetUsd: 1.25,
+        environment: { TEST_KEY: 'test-value' },
+      }),
       2_000,
       'ent/session/configure'
     )) as { applied: string[]; config: Record<string, unknown> };
 
-    expect(configured.applied).toEqual(expect.arrayContaining(['approvalMode', 'maxBudgetUsd']));
+    expect(configured.applied).toEqual(
+      expect.arrayContaining(['approvalMode', 'maxBudgetUsd', 'environment'])
+    );
     expect(configured.config.approvalMode).toBe('approve');
     expect(configured.config.maxBudgetUsd).toBe(1.25);
+    expect((configured.config as any).environment).toMatchObject({ TEST_KEY: 'test-value' });
 
     const status = (await withTimeout(
       agent.peer.request('ent/agent/status'),

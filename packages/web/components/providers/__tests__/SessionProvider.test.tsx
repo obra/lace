@@ -14,6 +14,8 @@ import { asWorkspaceSessionId } from '@lace/web/types/core';
 import type { SessionInfo, AgentInfo, ThreadId } from '@lace/web/types/core';
 import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
 import { testSessionId } from '@lace/web/test-utils/test-ids';
+import type { UseEventStreamResult } from '@lace/web/hooks/useEventStream';
+import type { UseWorkspaceDetailsReturn } from '@lace/web/hooks/useWorkspaceDetails';
 
 const TEST_SESSION_ID = asWorkspaceSessionId('ws_00000000-0000-0000-0000-000000000060');
 
@@ -28,12 +30,22 @@ const NOT_FOUND_AGENT_ID = testSessionId(999);
 vi.mock('@lace/web/hooks/useAgentManagement', () => ({
   useAgentManagement: vi.fn(),
 }));
+vi.mock('@lace/web/hooks/useEventStream', () => ({
+  useEventStream: vi.fn(),
+}));
+vi.mock('@lace/web/hooks/useWorkspaceDetails', () => ({
+  useWorkspaceDetails: vi.fn(),
+}));
 
 // SessionProvider now uses selectedAgentId prop instead of hash router
 
 import { useAgentManagement } from '@lace/web/hooks/useAgentManagement';
+import { useEventStream } from '@lace/web/hooks/useEventStream';
+import { useWorkspaceDetails } from '@lace/web/hooks/useWorkspaceDetails';
 
 const mockUseAgentManagement = vi.mocked(useAgentManagement);
+const mockUseEventStream = vi.mocked(useEventStream);
+const mockUseWorkspaceDetails = vi.mocked(useWorkspaceDetails);
 
 // Test data factories
 const createMockAgent = (overrides?: Partial<AgentInfo>): AgentInfo =>
@@ -59,6 +71,24 @@ const createMockSession = (overrides?: Partial<SessionInfo>): SessionInfo => ({
 });
 
 const mockSessionDetails = createMockSession();
+const defaultEventStream: UseEventStreamResult = {
+  connection: {
+    connected: false,
+    reconnectAttempts: 0,
+    maxReconnectAttempts: 0,
+  },
+  lastEvent: undefined,
+  close: vi.fn(),
+  reconnect: vi.fn(),
+};
+
+const defaultWorkspaceDetails: UseWorkspaceDetailsReturn = {
+  workspaceMode: null,
+  workspaceInfo: null,
+  loading: false,
+  error: null,
+  reload: vi.fn(),
+};
 
 // Component to test context provision
 function ContextConsumer() {
@@ -133,6 +163,8 @@ describe('SessionProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseAgentManagement.mockReturnValue(defaultAgentManagement);
+    mockUseEventStream.mockReturnValue(defaultEventStream);
+    mockUseWorkspaceDetails.mockReturnValue(defaultWorkspaceDetails);
   });
 
   describe('Context Provision', () => {

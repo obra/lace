@@ -228,7 +228,6 @@ interface SlashCommand {
       connectionId?: string,       // Configured connection (preferred; implies providerId)
       modelId?: string,            // Model identifier (opaque string)
       environment?: Record<string, string>, // Per-session env overlay (strings only)
-      cwd?: string,                // Requested working directory (validated by supervisor)
       executionMode?: string,      // "plan" | "execute" (default: "execute")
       approvalMode?: string,       // "ask" | "approveReads" | "approveEdits" | "approve" | "deny" | "dangerouslySkipPermissions"
       mcpServers?: McpServerConfig[],
@@ -515,7 +514,6 @@ Dynamic configuration changes. Covers Claude SDK's `setModel()`, `setMaxThinking
     maxThinkingTokens?: number,
     maxBudgetUsd?: number,
     environment?: Record<string, string>, // Session-scoped env overlay (strings only, not persisted)
-    cwd?: string,                         // Requested working directory (supervisor validates/sandboxes)
     mcpServers?: McpServerConfig[],
     approvalMode?: "ask" | "approveReads" | "approveEdits" | "approve" | "deny" | "dangerouslySkipPermissions"
     // ask: Prompt for everything (default)
@@ -538,7 +536,6 @@ Dynamic configuration changes. Covers Claude SDK's `setModel()`, `setMaxThinking
 
 **Notes**
 - Env overlays are applied in-memory for this session and MUST NOT be written to disk by the agent.
-- `cwd` is treated as opaque by the agent; the supervisor is responsible for validating/sandboxing paths before sending.
 
 ### 6.4 `ent/session/rewind`
 
@@ -1139,17 +1136,17 @@ Refresh model catalog from upstream provider.
 
 ### 6.26 `ent/models/enable` / `ent/models/disable` (extension)
 
-Toggle model availability for a specific connection. UI must call these; the web tier MUST NOT mutate agent disk config directly.
+Toggle model availability for a specific provider. UI must call these; the web tier MUST NOT mutate agent disk config directly.
 
 ```typescript
 // Request
-{ method: "ent/models/enable", params: { connectionId: string, modelIds: string[] } }
-{ method: "ent/models/disable", params: { connectionId: string, modelIds: string[] } }
+{ method: "ent/models/enable", params: { providerId: string, modelIds: string[] } }
+{ method: "ent/models/disable", params: { providerId: string, modelIds: string[] } }
 
 // Response
 {
   result: {
-    connectionId: string;
+    providerId: string;
     enabled: string[];   // models now enabled
     disabled: string[];  // models now disabled
   }
@@ -1159,7 +1156,7 @@ Toggle model availability for a specific connection. UI must call these; the web
 Rules:
 - Idempotent; enabling an already-enabled model is a no-op.
 - Unknown `modelIds` SHOULD error.
-- Effective state is session/config scoped; agents must not request web to write disk config.
+- State is provider-global and persisted by the agent (not session-scoped, not web-written).
 
 ### 6.27 `ent/tools/list`
 

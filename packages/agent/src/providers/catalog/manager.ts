@@ -69,13 +69,17 @@ async function loadBuiltinProviderCatalogs(): Promise<CatalogProvider[]> {
 export class ProviderCatalogManager {
   private userCatalogDir: string;
   private catalogCache: Map<string, CatalogProvider> = new Map();
+  private modelGatingFile: string;
+  private modelGating = new Map<string, { enabled?: string[]; disabled?: string[] }>();
 
   constructor() {
     this.userCatalogDir = path.join(getLaceDir(), 'user-catalog');
+    this.modelGatingFile = path.join(getLaceDir(), 'provider-model-gating.json');
   }
 
   async loadCatalogs(): Promise<void> {
     this.catalogCache.clear();
+    this.modelGating.clear();
 
     // Load builtin catalogs from filesystem
     const builtinCatalogs = await loadBuiltinProviderCatalogs();
@@ -87,6 +91,8 @@ export class ProviderCatalogManager {
     if (await this.directoryExists(this.userCatalogDir)) {
       await this.loadCatalogDirectory(this.userCatalogDir);
     }
+
+    await this.loadModelGating();
   }
 
   private async loadCatalogDirectory(dirPath: string): Promise<void> {
@@ -136,6 +142,39 @@ export class ProviderCatalogManager {
     this.catalogCache.set(provider.id, provider);
   }
 
+  getModelGating(providerId: string): { enabled?: string[]; disabled?: string[] } {
+    const gating = this.modelGating.get(providerId);
+    return gating ? { ...gating } : {};
+  }
+
+  async setModelGating(
+    providerId: string,
+    gating: { enabled?: string[]; disabled?: string[] }
+  ): Promise<void> {
+    const unique = (arr?: string[]) =>
+      arr ? Array.from(new Set(arr.filter((s) => s && s.trim().length > 0))) : undefined;
+
+    const normalized = {
+      enabled: unique(gating.enabled),
+      disabled: unique(gating.disabled),
+    };
+
+    this.modelGating.set(providerId, normalized);
+    await this.saveModelGating();
+  }
+
+  applyModelGating(providerId: string, models: CatalogModel[]): CatalogModel[] {
+    const gating = this.modelGating.get(providerId);
+    if (!gating) return models;
+
+    if (gating.disabled && gating.disabled.length > 0) {
+      const block = new Set(gating.disabled);
+      return models.filter((m) => !block.has(m.id));
+    }
+
+    return models;
+  }
+
   private async directoryExists(dirPath: string): Promise<boolean> {
     try {
       const stat = await fs.promises.stat(dirPath);
@@ -143,5 +182,35 @@ export class ProviderCatalogManager {
     } catch {
       return false;
     }
+  }
+
+  private async loadModelGating(): Promise<void> {
+    try {
+      const content = await fs.promises.readFile(this.modelGatingFile, 'utf8');
+      const parsed = JSON.parse(content) as Record<
+        string,
+        { enabled?: string[]; disabled?: string[] }
+      >;
+      for (const [providerId, gating] of Object.entries(parsed)) {
+        this.modelGating.set(providerId, {
+          enabled: Array.isArray(gating.enabled) ? gating.enabled : undefined,
+          disabled: Array.isArray(gating.disabled) ? gating.disabled : undefined,
+        });
+      }
+    } catch {
+      // ignore missing/invalid file
+    }
+  }
+
+  private async saveModelGating(): Promise<void> {
+    const obj: Record<string, { enabled?: string[]; disabled?: string[] }> = {};
+    for (const [providerId, gating] of this.modelGating.entries()) {
+      obj[providerId] = {};
+      if (gating.enabled && gating.enabled.length > 0) obj[providerId].enabled = gating.enabled;
+      if (gating.disabled && gating.disabled.length > 0) obj[providerId].disabled = gating.disabled;
+    }
+
+    await fs.promises.mkdir(path.dirname(this.modelGatingFile), { recursive: true });
+    await fs.promises.writeFile(this.modelGatingFile, JSON.stringify(obj, null, 2), 'utf8');
   }
 }
