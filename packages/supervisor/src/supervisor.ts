@@ -71,6 +71,10 @@ export type AgentSessionHandle = {
   pid: number;
 };
 
+export type CreateAgentSessionOptions = {
+  persona?: string;
+};
+
 export type SupervisorOptions = {
   laceDir: string;
   onSessionUpdate?: (workspaceSessionId: string, update: SessionUpdateParams) => void;
@@ -131,7 +135,8 @@ export class Supervisor {
 
   private async spawnNewAgentSession(
     workspaceSessionId: string,
-    workDir: string
+    workDir: string,
+    options?: CreateAgentSessionOptions
   ): Promise<{ agent: SupervisorAgentProcess; sessionId: SessionId; pid: number }> {
     // eslint-disable-next-line prefer-const -- assigned after session/new so early agent updates are ignored
     let activeSessionId: SessionId | undefined;
@@ -164,7 +169,7 @@ export class Supervisor {
       'session/new',
       SessionNewRequestSchema.shape.params,
       SessionNewResponseSchema.shape.result,
-      { workDir }
+      { workDir, ...(options?.persona ? { persona: options.persona } : {}) }
     );
     activeSessionId = created.sessionId;
 
@@ -319,11 +324,14 @@ export class Supervisor {
     };
   }
 
-  async createAgentSession(workspaceSessionId: string): Promise<AgentSessionHandle> {
+  async createAgentSession(
+    workspaceSessionId: string,
+    options?: CreateAgentSessionOptions
+  ): Promise<AgentSessionHandle> {
     await this.ensureActive(workspaceSessionId);
     const ws = this.requireWorkspace(workspaceSessionId);
 
-    const created = await this.spawnNewAgentSession(workspaceSessionId, ws.workDir);
+    const created = await this.spawnNewAgentSession(workspaceSessionId, ws.workDir, options);
     ws.agentsBySessionId.set(created.sessionId, created.agent);
 
     if (!ws.primarySessionId) ws.primarySessionId = created.sessionId;

@@ -39,7 +39,7 @@ const WorkspaceSessionUpdateSchema = z
   })
   .strict();
 
-const CreateAgentSessionSchema = z.object({}).strict();
+const CreateAgentSessionSchema = z.object({ persona: z.string().optional() }).strict();
 
 const UpsertAgentMetaSchema = z
   .object({
@@ -270,8 +270,10 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
         }
 
         if (method === 'POST' && rest === 'agent-sessions') {
-          CreateAgentSessionSchema.parse(await readJson(req));
-          const created = await supervisor.createAgentSession(workspaceSessionId);
+          const body = CreateAgentSessionSchema.parse(await readJson(req));
+          const created = await supervisor.createAgentSession(workspaceSessionId, {
+            ...(body.persona ? { persona: body.persona } : {}),
+          });
           return asJson(res, 201, created);
         }
 

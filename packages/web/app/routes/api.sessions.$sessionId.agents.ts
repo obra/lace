@@ -7,7 +7,7 @@ import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-valida
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
-import { PromptManager, personaRegistry } from '@lace/web/lib/server/lace-imports';
+import { personaRegistry } from '@lace/web/lib/server/lace-imports';
 import type { Route } from './+types/api.sessions.$sessionId.agents';
 
 // Type guard for unknown error values
@@ -97,10 +97,21 @@ export async function action({ request, params }: Route.ActionArgs) {
     const requestedName = typeof body.name === 'string' ? body.name.trim() : '';
     const agentName = requestedName || `Agent-${nextAgentIndex}`;
 
+    const requestedPersona = typeof body.persona === 'string' ? body.persona.trim() : '';
+    const persona = requestedPersona || 'lace';
+
+    try {
+      personaRegistry.validatePersona(persona);
+    } catch (error) {
+      return createErrorResponse(error instanceof Error ? error.message : 'Invalid persona', 400, {
+        code: 'VALIDATION_FAILED',
+      });
+    }
+
     // Spawn agent process (agent protocol session) and configure it
     let created;
     try {
-      created = await supervisor.createAgentSession(workspaceSessionId);
+      created = await supervisor.createAgentSession(workspaceSessionId, { persona });
     } catch (error) {
       // Log full error for server debugging while keeping client response sanitized
       console.error('Failed to spawn agent:', error);
@@ -128,39 +139,6 @@ export async function action({ request, params }: Route.ActionArgs) {
         approvalMode: 'ask',
       },
     });
-
-    const requestedPersona = typeof body.persona === 'string' ? body.persona.trim() : '';
-    const persona = requestedPersona || 'lace';
-
-    try {
-      personaRegistry.validatePersona(persona);
-    } catch (error) {
-      return createErrorResponse(error instanceof Error ? error.message : 'Invalid persona', 400, {
-        code: 'VALIDATION_FAILED',
-      });
-    }
-
-    const promptManager = new PromptManager({
-      session: { getWorkingDirectory: () => ws.workDir },
-      project: { getWorkingDirectory: () => ws.workDir },
-    });
-
-    const systemPrompt = await promptManager.generateSystemPrompt(persona);
-    if (systemPrompt.trim()) {
-      try {
-        await supervisor.agentNotify({
-          workspaceSessionId,
-          sessionId: created.sessionId,
-          method: 'ent/session/inject',
-          notifyParams: {
-            content: [{ type: 'text', text: systemPrompt }],
-            priority: 'immediate',
-          },
-        });
-      } catch (error) {
-        console.error('Failed to inject persona prompt:', error);
-      }
-    }
 
     const initialMessage =
       typeof body.initialMessage === 'string' ? body.initialMessage.trim() : '';

@@ -1,4 +1,8 @@
-import type { AgentSessionHandle, WorkspaceSessionHandle } from '../supervisor';
+import type {
+  AgentSessionHandle,
+  CreateAgentSessionOptions,
+  WorkspaceSessionHandle,
+} from '../supervisor';
 import type { WorkspaceSessionRecord } from '../workspace-session-store';
 import type { PendingPermission, SupervisorServerEvent } from './types';
 
@@ -98,7 +102,10 @@ export class SupervisorClient {
     );
   }
 
-  async createAgentSession(workspaceSessionId: string): Promise<AgentSessionHandle> {
+  async createAgentSession(
+    workspaceSessionId: string,
+    options?: CreateAgentSessionOptions
+  ): Promise<AgentSessionHandle> {
     return await fetchJson(
       asUrl(
         this.baseUrl,
@@ -107,7 +114,9 @@ export class SupervisorClient {
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          ...(options?.persona ? { persona: options.persona } : {}),
+        }),
       }
     );
   }
