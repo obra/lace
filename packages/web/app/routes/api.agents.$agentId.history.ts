@@ -12,6 +12,8 @@ import type { SessionId } from '@lace/ent-protocol';
 type DurableEvent = {
   eventSeq: number;
   timestamp: string;
+  turnId?: string;
+  turnSeq?: number;
   type: string;
   data: Record<string, unknown>;
 };
@@ -77,9 +79,9 @@ function durableEventsToAppEvents(params: {
       if (content.trim()) {
         out.push({
           id: `ent_${e.eventSeq}_system`,
-          type: 'LOCAL_SYSTEM_MESSAGE',
+          type: 'SYSTEM_PROMPT',
           timestamp,
-          data: { content, agentSessionId },
+          data: content,
           agentSessionId,
           workspaceSessionId,
           ...(typeof projectId === 'string' ? { projectId } : {}),

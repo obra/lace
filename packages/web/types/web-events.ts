@@ -112,6 +112,8 @@ export interface AgentErrorLogEntry {
  */
 export type WebEventType =
   | 'USER_MESSAGE'
+  | 'SYSTEM_PROMPT'
+  | 'USER_SYSTEM_PROMPT'
   | 'AGENT_STATE_CHANGE'
   | 'AGENT_SPAWNED'
   | 'AGENT_SUMMARY_UPDATED'
@@ -147,6 +149,18 @@ export interface WebEventBase {
 /** User sent a message to an agent */
 export interface UserMessageEvent extends WebEventBase {
   type: 'USER_MESSAGE';
+  data: string;
+}
+
+/** System prompt content (typically persona + context disclaimer) */
+export interface SystemPromptEvent extends WebEventBase {
+  type: 'SYSTEM_PROMPT';
+  data: string;
+}
+
+/** User system prompt content (rare; separate from normal USER_MESSAGE) */
+export interface UserSystemPromptEvent extends WebEventBase {
+  type: 'USER_SYSTEM_PROMPT';
   data: string;
 }
 
@@ -300,6 +314,8 @@ export interface ToolApprovalResponseEvent extends WebEventBase {
  */
 export type WebEvent =
   | UserMessageEvent
+  | SystemPromptEvent
+  | UserSystemPromptEvent
   | AgentStateChangeEvent
   | AgentSpawnedEvent
   | AgentSummaryUpdatedEvent
