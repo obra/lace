@@ -11,14 +11,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { AgentsSection } from '@lace/web/components/sidebar/AgentsSection';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '@lace/agent/test-utils/provider-defaults';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/agent/test-utils/provider-instances';
 
 // Mock external dependencies only (following testing docs)
 vi.mock('server-only', () => ({}));
@@ -88,30 +80,18 @@ vi.mock('@lace/web/components/providers/SessionProvider', () => ({
 
 describe('AgentsSection', () => {
   const _tempLaceDir = setupWebTest(); // Following testing docs pattern
-  let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestProviderDefaults();
-
     // Set up environment following testing docs
     process.env = {
       ...process.env,
       LACE_DB_PATH: ':memory:',
     };
 
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
-
     vi.clearAllMocks();
   });
 
   afterEach(async () => {
-    cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances([providerInstanceId]);
     vi.clearAllMocks();
   });
 

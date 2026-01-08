@@ -1,19 +1,6 @@
 // ABOUTME: Unified type imports for web package
 // ABOUTME: Single source of truth for all shared types, replaces multiple import files
-// ABOUTME: Wire protocol types from @lace/ent-protocol, runtime event types from @lace/agent
-
-// Runtime event helper types from agent
-// ErrorType and ErrorPhase are kept as they're general-purpose error types
-export type {
-  AgentMessageData,
-  AgentStateChangeData,
-  AgentSummaryUpdatedData,
-  AgentErrorData,
-  ErrorType,
-  ErrorPhase,
-} from '@lace/agent/threads/types';
-
-export { isAgentSummaryUpdatedData } from '@lace/agent/threads/types';
+// ABOUTME: Wire protocol types from @lace/ent-protocol
 
 // Token usage types from ent-protocol (wire protocol)
 export type { CombinedTokenUsage, ThreadTokenUsage } from '@lace/ent-protocol';
@@ -52,6 +39,13 @@ export function asThreadId(value: string): ThreadId {
 }
 
 export type AgentState = 'idle' | 'thinking' | 'streaming' | 'tool_execution';
+
+export type ErrorType = 'provider_failure' | 'tool_execution' | 'processing_error' | 'timeout';
+export type ErrorPhase =
+  | 'provider_response'
+  | 'tool_execution'
+  | 'conversation_processing'
+  | 'initialization';
 
 export interface AgentInfo {
   threadId: AgentSessionId;
