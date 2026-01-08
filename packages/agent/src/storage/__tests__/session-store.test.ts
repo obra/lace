@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -35,6 +35,27 @@ describe('storage/session-store', () => {
     const dir = getSessionDir(TEST_SESSION_ID);
     expect(dir).toBe(join(tempDir, 'agent-sessions', TEST_SESSION_ID));
     expect(existsSync(join(tempDir, 'agent-sessions'))).toBe(true);
+  });
+
+  it('falls back to XDG_STATE_HOME when LACE_DIR is not writable', () => {
+    const xdg = mkdtempSync(join(tmpdir(), 'lace-session-xdg-'));
+    const originalXdg = process.env.XDG_STATE_HOME;
+    process.env.XDG_STATE_HOME = xdg;
+
+    // Make LACE_DIR effectively read-only so mkdir(agent-sessions) fails.
+    chmodSync(tempDir, 0o500);
+
+    try {
+      const dir = getSessionDir(TEST_SESSION_ID);
+      expect(dir).toBe(join(xdg, 'lace', 'agent-sessions', TEST_SESSION_ID));
+      expect(existsSync(join(xdg, 'lace', 'agent-sessions'))).toBe(true);
+    } finally {
+      // restore so afterEach can remove tempDir
+      chmodSync(tempDir, 0o700);
+      if (originalXdg === undefined) delete process.env.XDG_STATE_HOME;
+      else process.env.XDG_STATE_HOME = originalXdg;
+      rmSync(xdg, { recursive: true, force: true });
+    }
   });
 
   it('defaults state when missing, and persists state.json', () => {

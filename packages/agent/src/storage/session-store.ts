@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ensureLaceDir } from '../config/lace-dir';
+import * as os from 'node:os';
+import { getLaceDir } from '../config/lace-dir';
 import { asSessionId } from '@lace/ent-protocol';
 import { summarizeDurableEvents } from './event-log';
 
@@ -53,10 +54,38 @@ export type LoadedSession = {
 };
 
 function agentSessionsDir(): string {
-  const laceDir = ensureLaceDir();
-  const sessionsDir = path.join(laceDir, 'agent-sessions');
-  fs.mkdirSync(sessionsDir, { recursive: true });
-  return sessionsDir;
+  const override = process.env.LACE_SESSION_DIR?.trim();
+  const candidates: string[] = [];
+
+  if (override) {
+    candidates.push(override);
+  } else {
+    candidates.push(path.join(getLaceDir(), 'agent-sessions'));
+
+    const xdg = process.env.XDG_STATE_HOME?.trim();
+    if (xdg) candidates.push(path.join(xdg, 'lace', 'agent-sessions'));
+
+    const home = process.env.HOME?.trim();
+    if (home) candidates.push(path.join(home, '.local', 'state', 'lace', 'agent-sessions'));
+
+    candidates.push(path.join(os.tmpdir(), 'lace', 'agent-sessions'));
+  }
+
+  let lastError: unknown = undefined;
+  for (const sessionsDir of candidates) {
+    try {
+      fs.mkdirSync(sessionsDir, { recursive: true, mode: 0o700 });
+      return sessionsDir;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  const msg = lastError instanceof Error ? lastError.message : String(lastError);
+  const e: any = new Error(`Session storage unavailable: ${msg}`);
+  e.code = 'SessionStorageUnavailable';
+  e.path = candidates[0];
+  throw e;
 }
 
 export function getSessionDir(sessionId: string): string {

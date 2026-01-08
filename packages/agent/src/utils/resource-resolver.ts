@@ -66,12 +66,33 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
     // In production (standalone), resolve relative to the working directory
     // The standalone structure is: standalone/src/... so we need to find the equivalent path
 
+    // First, prefer paths relative to the compiled module location (dist/)
+    const modulePath = fileURLToPath(importMetaUrl);
+    const moduleDirPath = path.dirname(modulePath);
+    const moduleParent = path.dirname(moduleDirPath);
+    if (relativePath === 'data') {
+      const candidates = [
+        path.resolve(moduleDirPath, 'providers/catalog/data'), // dist/providers/catalog/data
+        path.resolve(moduleDirPath, '../providers/catalog/data'), // ../providers (rare)
+        path.resolve(moduleParent, 'src/providers/catalog/data'), // fallback to src near dist
+      ];
+      for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) return candidate;
+      }
+    }
+    if (relativePath === 'agent-personas') {
+      const candidate = path.resolve(moduleDirPath, 'agent-personas');
+      if (fs.existsSync(candidate)) return candidate;
+    }
+
     // Monorepo production runs (e.g. `NODE_ENV=production tsx server-custom.ts`) may execute with a
     // non-root cwd, but resources still live in the repo tree. Prefer resolving from the repo root.
     const packagesIndex = moduleDir.indexOf('/packages/');
     if (packagesIndex !== -1) {
       const repoRoot = moduleDir.substring(0, packagesIndex);
       if (relativePath === 'data') {
+        const distPath = path.resolve(repoRoot, 'packages/agent/dist/providers/catalog/data');
+        if (fs.existsSync(distPath)) return distPath;
         return path.resolve(repoRoot, 'packages/agent/src/providers/catalog/data');
       }
       if (relativePath === 'agent-personas') {

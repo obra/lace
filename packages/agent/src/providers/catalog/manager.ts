@@ -44,25 +44,38 @@ async function loadBuiltinProviderCatalogs(): Promise<CatalogProvider[]> {
     }
   }
 
-  // Original working filesystem approach (Node.js/test/development)
-  const catalogDir = resolveDataDirectory(import.meta.url);
+  // Filesystem approach (Node.js/test/production)
+  const candidateDirs: string[] = [];
+  candidateDirs.push(resolveDataDirectory(import.meta.url));
 
-  try {
-    const files = await fs.promises.readdir(catalogDir);
+  const moduleDir = path.dirname(new URL(import.meta.url).pathname);
+  candidateDirs.push(path.resolve(moduleDir, 'providers/catalog/data'));
+  candidateDirs.push(path.resolve(moduleDir, '../providers/catalog/data'));
+  candidateDirs.push(path.resolve(moduleDir, '../src/providers/catalog/data'));
 
-    for (const file of files.filter((f) => f.endsWith('.json'))) {
-      try {
-        const filePath = path.join(catalogDir, file);
-        const provider = await readProviderCatalog(filePath);
-        catalogs.push(provider);
-      } catch (error) {
-        logger.warn('catalog.load.builtin_failed', { file, error: String(error) });
+  const seen = new Set<string>();
+  logger.info('catalog.load.candidates', { dirs: candidateDirs });
+  for (const catalogDir of candidateDirs) {
+    if (!seen.add(catalogDir)) continue;
+    try {
+      const files = await fs.promises.readdir(catalogDir);
+
+      for (const file of files.filter((f) => f.endsWith('.json'))) {
+        try {
+          const filePath = path.join(catalogDir, file);
+          const provider = await readProviderCatalog(filePath);
+          catalogs.push(provider);
+        } catch (error) {
+          logger.warn('catalog.load.builtin_failed', { file, error: String(error) });
+        }
       }
+      if (catalogs.length > 0) break;
+    } catch (error) {
+      logger.warn('catalog.load.read_dir_failed', { dir: catalogDir, error: String(error) });
     }
-  } catch (error) {
-    logger.warn('catalog.load.read_dir_failed', { dir: catalogDir, error: String(error) });
   }
 
+  logger.info('catalog.load.complete', { count: catalogs.length, mode: 'filesystem' });
   return catalogs;
 }
 
@@ -71,6 +84,7 @@ export class ProviderCatalogManager {
   private catalogCache: Map<string, CatalogProvider> = new Map();
   private modelGatingFile: string;
   private modelGating = new Map<string, { enabled?: string[]; disabled?: string[] }>();
+  private loadPromise: Promise<void> | null = null;
 
   constructor() {
     this.userCatalogDir = path.join(getLaceDir(), 'user-catalog');
@@ -78,30 +92,53 @@ export class ProviderCatalogManager {
   }
 
   async loadCatalogs(): Promise<void> {
-    const previous = new Map(this.catalogCache);
-    this.catalogCache.clear();
-    this.modelGating.clear();
+    if (this.loadPromise) {
+      await this.loadPromise;
+      return;
+    }
+
+    this.loadPromise = this.doLoadCatalogs().finally(() => {
+      this.loadPromise = null;
+    });
+    await this.loadPromise;
+  }
+
+  private async doLoadCatalogs(): Promise<void> {
+    const previousCache = this.catalogCache;
+    const previousGating = this.modelGating;
+
+    const nextCache = new Map<string, CatalogProvider>();
+    const nextGating = new Map<string, { enabled?: string[]; disabled?: string[] }>();
 
     // Load builtin catalogs from filesystem
     const builtinCatalogs = await loadBuiltinProviderCatalogs();
     for (const provider of builtinCatalogs) {
-      this.catalogCache.set(provider.id, provider);
+      nextCache.set(provider.id, provider);
     }
 
     // Load user catalog extensions (override shipped if same ID)
     if (await this.directoryExists(this.userCatalogDir)) {
-      await this.loadCatalogDirectory(this.userCatalogDir);
+      await this.loadCatalogDirectoryInto(nextCache, this.userCatalogDir);
     }
 
-    await this.loadModelGating();
+    await this.loadModelGatingInto(nextGating);
 
     // Safety: if nothing was loaded, keep previous cache to avoid wiping providers
-    if (this.catalogCache.size === 0 && previous.size > 0) {
-      this.catalogCache = previous;
+    if (nextCache.size === 0 && previousCache.size > 0) {
+      this.catalogCache = previousCache;
+      this.modelGating = previousGating;
       logger.warn('catalog.load.fallback_previous_cache', {
         reason: 'no catalogs found; retained previous cache',
       });
+      return;
     }
+
+    if (nextCache.size === 0) {
+      throw new Error('No provider catalogs could be loaded');
+    }
+
+    this.catalogCache = nextCache;
+    this.modelGating = nextGating;
   }
 
   private async loadCatalogDirectory(dirPath: string): Promise<void> {
@@ -121,6 +158,28 @@ export class ProviderCatalogManager {
       }
     } catch (_error) {
       // Directory doesn't exist or can't be read, just continue
+    }
+  }
+
+  private async loadCatalogDirectoryInto(
+    cache: Map<string, CatalogProvider>,
+    dirPath: string
+  ): Promise<void> {
+    try {
+      const files = await fs.promises.readdir(dirPath);
+
+      for (const file of files) {
+        if (!file.endsWith('.json')) continue;
+        try {
+          const filePath = path.join(dirPath, file);
+          const provider = await readProviderCatalog(filePath);
+          cache.set(provider.id, provider);
+        } catch (_error) {
+          logger.warn('catalog.load.user_failed', { dir: dirPath, file, error: String(_error) });
+        }
+      }
+    } catch {
+      // ignore
     }
   }
 
@@ -211,6 +270,26 @@ export class ProviderCatalogManager {
       }
     } catch {
       // ignore missing/invalid file
+    }
+  }
+
+  private async loadModelGatingInto(
+    target: Map<string, { enabled?: string[]; disabled?: string[] }>
+  ): Promise<void> {
+    try {
+      const content = await fs.promises.readFile(this.modelGatingFile, 'utf8');
+      const parsed = JSON.parse(content) as Record<
+        string,
+        { enabled?: string[]; disabled?: string[] }
+      >;
+      for (const [providerId, gating] of Object.entries(parsed)) {
+        target.set(providerId, {
+          enabled: Array.isArray(gating.enabled) ? gating.enabled : undefined,
+          disabled: Array.isArray(gating.disabled) ? gating.disabled : undefined,
+        });
+      }
+    } catch {
+      // ignore
     }
   }
 

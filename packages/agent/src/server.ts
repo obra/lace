@@ -75,6 +75,7 @@ import { compactDroppedMessagesWithCore } from './compaction/compact-dropped-mes
 import { WorkspaceManagerFactory } from './workspace/workspace-manager';
 import { personaRegistry } from './config/persona-registry';
 import { loadPromptConfig } from './config/prompts';
+import { logger } from './utils/logger';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
 const JOB_LOG_DIR = 'jobs';
@@ -342,7 +343,9 @@ async function createProviderForTurn(options: {
   const connectionId = toNonEmptyString(options.connectionId);
   const modelId = toNonEmptyString(options.modelId);
   if (!connectionId || !modelId) {
-    throw new Error('Missing provider configuration: connectionId and modelId are required');
+    throwInvalidParams(
+      'connectionId and modelId are required before prompting; call ent/session/configure'
+    );
   }
 
   const registry = ProviderRegistry.getInstance();
@@ -1837,9 +1840,23 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   });
 
   const ensureProviderCatalogLoaded = async () => {
-    if (!state.providerCatalogLoaded) {
+    if (state.providerCatalogLoaded) return;
+    try {
       await state.providerCatalog.loadCatalogs();
+      if (state.providerCatalog.getAvailableProviders().length === 0) {
+        throw new Error('provider catalog empty after load');
+      }
       state.providerCatalogLoaded = true;
+    } catch (error) {
+      logger.error('catalog.load.failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      state.providerCatalogLoaded = false;
+      throw {
+        code: EntErrorCodes.ProviderError,
+        message: 'Provider catalog unavailable',
+        data: { category: 'provider', reason: 'CatalogLoadFailed' },
+      };
     }
   };
 
@@ -1986,10 +2003,23 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const providerIdFilter = typeof parsed?.providerId === 'string' ? parsed.providerId : undefined;
 
     const instances = await state.providerInstances.loadInstances();
+    await ensureProviderCatalogLoaded();
+    const knownProviders = new Set(state.providerCatalog.getAvailableProviders().map((p) => p.id));
+
     const connections = Object.entries(instances.instances)
       .filter(([_id, inst]) =>
         providerIdFilter ? inst.catalogProviderId === providerIdFilter : true
       )
+      .filter(([_id, inst]) => {
+        const ok = knownProviders.has(inst.catalogProviderId);
+        if (!ok) {
+          logger.warn('connections.list.skipping_unknown_provider', {
+            connectionId: _id,
+            providerId: inst.catalogProviderId,
+          });
+        }
+        return ok;
+      })
       .map(([connectionId, inst]) => {
         const credential = state.providerInstances.loadCredential(connectionId);
         const credentialState = credential?.apiKey ? 'ready' : 'missing';
@@ -2844,21 +2874,35 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const sessionId = `sess_${randomUUID()}`;
     const created = new Date().toISOString();
 
-    const sessionDir = getSessionDir(sessionId);
-    writeSessionMeta(sessionDir, { sessionId, workDir: parsed.workDir, created });
-    writeSessionState(sessionDir, {
-      nextEventSeq: 1,
-      nextStreamSeq: 1,
-      config: {
-        executionMode: state.config.executionMode,
-        approvalMode: state.config.approvalMode,
-        connectionId: state.config.connectionId,
-        modelId: state.config.modelId,
-        maxBudgetUsd: state.config.maxBudgetUsd,
-        maxThinkingTokens: state.config.maxThinkingTokens,
-      },
-    });
-    ensureSessionFiles(sessionDir);
+    let sessionDir: string;
+    try {
+      sessionDir = getSessionDir(sessionId);
+      writeSessionMeta(sessionDir, { sessionId, workDir: parsed.workDir, created });
+      writeSessionState(sessionDir, {
+        nextEventSeq: 1,
+        nextStreamSeq: 1,
+        config: {
+          executionMode: state.config.executionMode,
+          approvalMode: state.config.approvalMode,
+          connectionId: state.config.connectionId,
+          modelId: state.config.modelId,
+          maxBudgetUsd: state.config.maxBudgetUsd,
+          maxThinkingTokens: state.config.maxThinkingTokens,
+        },
+      });
+      ensureSessionFiles(sessionDir);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error('session.new.storage_unavailable', {
+        error: message,
+        ...((err as any)?.path ? { path: (err as any).path } : {}),
+      });
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionStorageUnavailable',
+        data: { category: 'session', reason: 'SessionStorageUnavailable', detail: message },
+      };
+    }
 
     state.activeSession = loadSession(sessionId);
     await reconcileMcpServersForActiveSession(state);
@@ -3079,18 +3123,24 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       applied.push('maxBudgetUsd');
     }
 
-    if (
-      parsed.approvalMode &&
-      parsed.approvalMode !== effectiveBefore.approvalMode &&
-      (parsed.approvalMode === 'ask' ||
-        parsed.approvalMode === 'approveReads' ||
-        parsed.approvalMode === 'approveEdits' ||
-        parsed.approvalMode === 'approve' ||
-        parsed.approvalMode === 'deny' ||
-        parsed.approvalMode === 'dangerouslySkipPermissions')
-    ) {
-      nextConfig.approvalMode = parsed.approvalMode;
-      applied.push('approvalMode');
+    if (parsed.approvalMode !== undefined) {
+      const allowed = new Set([
+        'ask',
+        'approveReads',
+        'approveEdits',
+        'approve',
+        'deny',
+        'dangerouslySkipPermissions',
+      ]);
+      if (!allowed.has(parsed.approvalMode)) {
+        throwInvalidParams(
+          'approvalMode must be one of ask|approveReads|approveEdits|approve|deny|dangerouslySkipPermissions'
+        );
+      }
+      if (parsed.approvalMode !== effectiveBefore.approvalMode) {
+        nextConfig.approvalMode = parsed.approvalMode;
+        applied.push('approvalMode');
+      }
     }
 
     if (parsed.environment !== undefined) {
@@ -3200,6 +3250,15 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           preserveRecent?: number;
         }
       | undefined;
+
+    if (
+      parsed?.strategy &&
+      parsed.strategy !== 'summarize' &&
+      parsed.strategy !== 'truncate' &&
+      parsed.strategy !== 'selective'
+    ) {
+      throwInvalidParams('strategy must be summarize|truncate|selective');
+    }
 
     const strategy =
       parsed?.strategy === 'summarize' ||
@@ -3572,7 +3631,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       ? { ...state.config, ...state.activeSession.state.config }
       : state.config;
 
-    const parsed = params as { content: unknown[] };
+    const parsed = params as { content: unknown[]; outputFormat?: unknown };
     const turnId = `turn_${randomUUID()}`;
     const startedAt = new Date().toISOString();
     const abortController = new AbortController();
@@ -3643,6 +3702,19 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
       const workDir = state.activeSession.meta.workDir;
       const filesRead = deriveFilesReadFromDurableEvents(state.activeSession.dir, workDir);
+
+      if (parsed.outputFormat !== undefined) {
+        const of = parsed.outputFormat as any;
+        if (
+          !of ||
+          typeof of !== 'object' ||
+          of.type !== 'json_schema' ||
+          typeof of.schema !== 'object' ||
+          of.schema === null
+        ) {
+          throwInvalidParams('outputFormat must be { type: "json_schema", schema: object }');
+        }
+      }
 
       if (!command && !jobCommand && !subagentText) {
         const maxTurns =
