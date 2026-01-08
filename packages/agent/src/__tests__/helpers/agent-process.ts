@@ -24,7 +24,14 @@ export function spawnAgentProcess(options: {
 
   const proc = spawn(process.execPath, [agentMainPath], {
     cwd: agentCwd,
-    env: { ...process.env, LACE_DIR: options.laceDir, ...(options.env || {}) },
+    env: {
+      ...process.env,
+      LACE_DIR: options.laceDir,
+      // Keep agent-process tests deterministic by default. Specific tests can opt-in
+      // to dynamic catalogs by overriding this env var.
+      LACE_DISABLE_DYNAMIC_CATALOGS: '1',
+      ...(options.env || {}),
+    },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 

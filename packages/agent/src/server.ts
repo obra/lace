@@ -2266,8 +2266,13 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     await ensureProviderCatalogLoaded();
     const providerId = instance.catalogProviderId;
-    const provider = state.providerCatalog.getProvider(providerId);
+    let provider = state.providerCatalog.getProvider(providerId);
     if (!provider) throwInvalidParams(`Unknown providerId: ${providerId}`);
+
+    // Prefer per-connection dynamic catalogs when available (e.g. OpenAI, OpenRouter).
+    const registry = ProviderRegistry.getInstance();
+    const instanceCatalog = await registry.getCatalogForInstance(connectionId);
+    if (instanceCatalog) provider = instanceCatalog;
 
     const gating = state.providerCatalog.getModelGating(providerId);
     const enabledSet =
@@ -2312,6 +2317,17 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         message: 'Provider not found',
         data: { category: 'provider' },
       };
+
+    // Prefer per-connection dynamic refresh when available.
+    const registry = ProviderRegistry.getInstance();
+    const refreshed = await registry.getCatalogForInstance(connectionId, true);
+    if (refreshed) {
+      return {
+        connectionId,
+        refreshedAt: new Date().toISOString(),
+        ok: true,
+      };
+    }
 
     // Refresh the model catalog (currently a no-op for static catalogs)
     return {

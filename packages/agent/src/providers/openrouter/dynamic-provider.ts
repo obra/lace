@@ -63,9 +63,11 @@ export class OpenRouterDynamicProvider {
 
   async getCatalogWithConfig(
     apiKey: string | undefined,
-    config: ModelConfig
+    config: ModelConfig,
+    forceRefresh = false
   ): Promise<CatalogProvider> {
-    const catalog = await this.getCatalog(apiKey);
+    const catalog =
+      forceRefresh && apiKey ? await this.refreshCatalog(apiKey) : await this.getCatalog(apiKey);
 
     // Apply filters - need to convert back to OpenRouter format for filtering
     const openRouterModels = this.convertToOpenRouterModels(catalog.models);

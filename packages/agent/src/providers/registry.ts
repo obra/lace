@@ -128,6 +128,10 @@ export class ProviderRegistry {
       return null;
     }
 
+    if (process.env.LACE_DISABLE_DYNAMIC_CATALOGS === '1') {
+      return this.catalogManager.getProvider(instance.catalogProviderId);
+    }
+
     const credential = this.instanceManager.loadCredential(instanceId);
     if (!credential?.apiKey) {
       return null;
@@ -162,7 +166,7 @@ export class ProviderRegistry {
 
       try {
         logger.debug('Fetching dynamic catalog for OpenRouter instance', { instanceId });
-        return await provider.getCatalogWithConfig(credential.apiKey, config);
+        return await provider.getCatalogWithConfig(credential.apiKey, config, forceRefresh);
       } catch (error) {
         logger.warn('Failed to fetch OpenRouter dynamic catalog for instance, using static', {
           instanceId,
