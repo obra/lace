@@ -740,6 +740,19 @@ describe('Ent protocol contract (selected coverage)', () => {
     });
   });
 
+  it('accepts $/cancel_request notification', async () => {
+    agent = spawnAgentProcess({ laceDir });
+    await withTimeout(agent.peer.request('initialize', defaultInitializeParams()), 2_000, 'init');
+    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+    agent.peer.notify('$/cancel_request', { requestId: 'c_1' });
+
+    const ping = (await withTimeout(agent.peer.request('ent/agent/ping'), 2_000, 'agent/ping')) as {
+      ok: boolean;
+    };
+    expect(ping.ok).toBe(true);
+  });
+
   it('supports credentials status and session list/load/fork/set_mode', async () => {
     agent = spawnAgentProcess({ laceDir });
     await withTimeout(agent.peer.request('initialize', defaultInitializeParams()), 2_000, 'init');

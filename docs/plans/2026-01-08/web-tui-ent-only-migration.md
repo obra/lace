@@ -200,48 +200,52 @@ Goal: `packages/agent/src/__tests__/ent-protocol.spec.ts` covers every method in
 
 Coverage checklist (must be exhaustive):
 
-- [ ] `initialize`
-- [ ] `session/new`
-- [ ] `session/load`
-- [ ] `session/prompt`
-- [ ] `session/stop`
-- [ ] `session/delete`
-- [ ] `ent/agent/ping`
-- [ ] `ent/agent/status`
-- [ ] `ent/session/compact`
-- [ ] `ent/session/configure`
-- [ ] `ent/session/rewind`
-- [ ] `ent/session/checkpoint`
-- [ ] `ent/session/inject`
-- [ ] `ent/session/events`
-- [ ] `ent/providers/list`
-- [ ] `ent/providers/catalog`
-- [ ] `ent/providers/refresh`
-- [ ] `ent/connections/list`
-- [ ] `ent/connections/upsert`
-- [ ] `ent/connections/delete`
-- [ ] `ent/connections/test`
-- [ ] `ent/connections/credentials/status`
-- [ ] `ent/connections/credentials/start`
-- [ ] `ent/connections/credentials/submit`
-- [ ] `ent/connections/credentials/clear`
-- [ ] `ent/models/list`
-- [ ] `ent/models/refresh`
-- [ ] `ent/models/enable`
-- [ ] `ent/models/disable`
-- [ ] `ent/job/list`
-- [ ] `ent/job/output`
-- [ ] `ent/job/kill`
-- [ ] `ent/job/inject`
-- [ ] `ent/tools/list`
-- [ ] `ent/personas/list`
-- [ ] `ent/mcp/servers/list`
-- [ ] `ent/mcp/servers/upsert`
-- [ ] `ent/mcp/servers/delete`
-- [ ] `ent/mcp/servers/test`
-- [ ] `ent/mcp/tools/list`
-- [ ] `ent/workspace/info`
-- [ ] `ent/workspace/create`
+- [x] `initialize`
+- [x] `$/cancel_request`
+- [x] `session/new`
+- [x] `session/load`
+- [x] `session/list`
+- [x] `session/fork`
+- [x] `session/set_mode`
+- [x] `session/prompt`
+- [x] `session/update`
+- [x] `session/request_permission`
+- [x] `ent/agent/ping`
+- [x] `ent/agent/status`
+- [x] `ent/session/compact`
+- [x] `ent/session/configure`
+- [x] `ent/session/rewind`
+- [x] `ent/session/checkpoint`
+- [x] `ent/session/inject`
+- [x] `ent/session/events`
+- [x] `ent/providers/list`
+- [x] `ent/providers/catalog`
+- [x] `ent/providers/refresh`
+- [x] `ent/connections/list`
+- [x] `ent/connections/upsert`
+- [x] `ent/connections/delete`
+- [x] `ent/connections/test`
+- [x] `ent/connections/credentials/status`
+- [x] `ent/connections/credentials/start`
+- [x] `ent/connections/credentials/submit`
+- [x] `ent/connections/credentials/clear`
+- [x] `ent/models/list`
+- [x] `ent/models/refresh`
+- [x] `ent/models/enable`
+- [x] `ent/models/disable`
+- [x] `ent/job/list`
+- [x] `ent/job/output`
+- [x] `ent/job/kill`
+- [x] `ent/job/inject`
+- [x] `ent/tools/list`
+- [x] `ent/personas/list`
+- [x] `ent/mcp/servers/list`
+- [x] `ent/mcp/servers/upsert`
+- [x] `ent/mcp/servers/delete`
+- [x] `ent/mcp/servers/test`
+- [x] `ent/mcp/tools/list`
+- [x] `ent/workspace/info`
+- [x] `ent/workspace/create`
 
 Constraints:
 
@@ -329,5 +333,5 @@ Parity checklist:
 - [ ] Provider/model/credentials management: web + TUI are ENT-only.
 - [ ] Web runtime has no `@lace/agent/*` imports and no runtime use of `@lace/web/lib/server/lace-imports`.
 - [ ] TUI has no repo-layout coupling to spawn the agent and no `@lace/agent/*` imports.
-- [ ] Agent ENT conformance suite is exhaustive (every method covered with success + key negative cases).
+- [x] Agent ENT conformance suite is exhaustive (every method covered with success + key negative cases).
 - [ ] `npm test` (root) passes.
