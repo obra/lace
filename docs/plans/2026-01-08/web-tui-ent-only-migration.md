@@ -126,149 +126,208 @@ TODO
 
 ## Status (as of 2026-01-08)
 
-Completed
-- Spec/schemas updated for `ModelInfo.disabledState` and `ent/providers/catalog`.
-- Agent implements `ent/providers/catalog`; supervisor forwards it.
-- `ent/models/list` returns `disabled` + `disabledState`.
-- Web provider-management routes are ENT-backed:
-  - `GET /api/provider/catalog` → `ent/providers/catalog`
-  - Instances CRUD/credentials/model refresh/config → `ent/connections/*` + `ent/models/*`
+This section is a living checklist. If it’s checked, it’s done and validated. If it’s unchecked, it’s still work.
 
-Audit findings (remaining agent-library usage in web)
-- Runtime: `packages/web/app/routes/api.projects.$projectId.sessions.ts` uses `ProviderRegistry` to create an ad-hoc provider for session naming (should be moved to ENT to fully decouple).
-- Runtime: many routes still import `@lace/agent/*` via `packages/web/lib/server/lace-imports.ts` for non-provider features (projects, personas, tools, MCP config, user settings).
-- Client: avoid importing `packages/web/lib/server/lace-imports.ts` into React components; keep provider UI types local (started for provider UI).
+### ✅ Completed (validated)
 
-## Audit: Remaining Agent-Library Reach-Ins (packages/web)
+- [x] Protocol docs updated for provider/model management (`docs/about-the-protocol.md`, `docs/protocol-spec.md`, `docs/protocol-conformance.md`).
+- [x] Protocol schema updated for `ModelInfo.disabledState` and `ent/providers/catalog` (`packages/ent-protocol`).
+- [x] Agent implements `ent/providers/catalog`; `ent/models/list` includes `disabled` + `disabledState` (agent + supervisor).
+- [x] Web provider management is ENT-only (instances CRUD, credentials, refresh, model enable/disable); web does not read/write agent provider config files directly.
+- [x] Web persona catalog + persona validation are ENT-only (`ent/personas/list`).
+- [x] Web tool policy UI uses `ToolPolicy` from `@lace/ent-protocol` (no agent type import).
+- [x] Web session naming no longer depends on `ProviderRegistry` (generated via ENT `session/prompt`).
+- [x] Web local logger (`packages/web/lib/logger.ts`) replaces agent logger usage; logging is gated by env var truthiness.
+- [x] Test stability: `npm test` (repo root) passes; web Vitest output is reduced to avoid `vitest-worker` `onTaskUpdate` timeouts.
 
-This is the exhaustive inventory as of 2026-01-08 (generated from `rg @lace/agent packages/web` and `rg lace-imports packages/web`).
+### 🔎 Current “reach-ins” (generated from ripgrep)
 
-### A) Direct `@lace/agent/*` imports (runtime)
+Direct `@lace/agent/*` imports in web (as of 2026-01-08):
 
-- `packages/web/lib/event-stream-manager.ts`: imports `@lace/agent/utils/logger`.
-  - TODO: replace with a web-local logger (or a supervisor logger) so web does not depend on agent internals.
-- `packages/web/lib/server/api-utils.ts`: imports `@lace/agent/utils/logger`.
-  - TODO: same as above.
-- `packages/web/lib/server/supervisor-service.ts`: imports `@lace/agent/utils/logger`.
-  - TODO: same as above.
-- `packages/web/app/routes/api.sessions.$sessionId.files.$path.ts`: imports `@lace/agent/utils/logger`.
-  - TODO: same as above.
-- `packages/web/app/routes/api.sessions.$sessionId.workspace.ts`: imports `@lace/agent/utils/logger`.
-  - TODO: same as above.
-- `packages/web/app/routes/api.threads.$threadId.message.ts`: imports `@lace/agent/utils/logger`.
-  - TODO: same as above.
-- `packages/web/app/routes/api.tunnel.ts`: imports `@lace/agent/utils/logger`.
-  - TODO: same as above.
-- `packages/web/app/routes/api.mcp.servers.ts`: imports `@lace/agent/utils/logger`.
-  - TODO: same as above.
+- `packages/web/test-utils/web-test-setup.ts` (`@lace/agent/test-utils/temp-lace-dir`, `@lace/agent/providers/registry`)
+- `packages/web/types/core.ts` (`@lace/agent/threads/types`)
+- `packages/web/app/routes/__tests__/api.projects.integration.test.ts` (dynamic `@lace/agent/projects/project`)
+- `packages/web/app/routes/__tests__/api.projects.$projectId.sessions.test.ts` (dynamic `@lace/agent/projects/project`)
+- `packages/web/components/sidebar/__tests__/AgentsSection.test.tsx` (agent provider test utils)
+- `packages/web/components/sidebar/__tests__/SidebarContent-agent-creation.test.tsx` (agent provider test utils)
+- `packages/web/lib/server/lace-imports.ts` (re-exports many `@lace/agent/*`)
 
-### B) Direct `@lace/agent/*` imports (client + shared types)
+Runtime imports of `@lace/web/lib/server/lace-imports` (as of 2026-01-08):
 
-- `packages/web/lib/tool-policy-resolver.ts`: imports `ToolPolicy` type from `@lace/agent/tools/types`.
-  - TODO: migrate these types to `@lace/ent-protocol` (preferred) or duplicate the minimal type shapes in `packages/web/types/`.
-- `packages/web/components/ui/ToolPolicyToggle.tsx`: imports `ToolPolicy` type from `@lace/agent/tools/types`.
-  - TODO: same as above.
-- `packages/web/components/pages/AgentPageContent.tsx`: imports `PermissionOverrideMode` type from `@lace/agent/tools/types`.
-  - TODO: migrate to `@lace/ent-protocol` or duplicate minimal types in web.
-- `packages/web/components/ui/PermissionModeSelector.tsx`: imports `PermissionOverrideMode` type from `@lace/agent/tools/types`.
-  - TODO: same as above.
-- `packages/web/components/sidebar/SessionSection.tsx`: imports `PermissionOverrideMode` type from `@lace/agent/tools/types`.
-  - TODO: same as above.
-- `packages/web/types/core.ts`: imports runtime event types from `@lace/agent/threads/types`.
-  - TODO: define these event payload types in the protocol (`@lace/ent-protocol`) if they are part of the wire contract, or duplicate the minimal shapes in web.
+- `packages/web/lib/server/data-dir-init.ts`
+- `packages/web/lib/server/supervisor-service.ts`
+- `packages/web/app/routes/api.projects.ts`
+- `packages/web/app/routes/api.projects.$projectId.ts`
+- `packages/web/app/routes/api.projects.$projectId.environment.ts`
+- `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.ts`
+- `packages/web/app/routes/api.projects.$projectId.configuration.ts`
+- `packages/web/app/routes/api.projects.$projectId.mcp.servers.ts`
+- `packages/web/app/routes/api.projects.$projectId.mcp.servers.$serverId.ts`
+- `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.ts`
+- `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control.ts`
+- `packages/web/app/routes/api.mcp.servers.ts`
+- `packages/web/app/routes/api.mcp.servers.$serverId.ts`
+- `packages/web/app/routes/api.settings.ts`
 
-### C) Direct `@lace/agent/*` imports (tests)
+TUI reach-in (repo-layout coupling; must be removed):
 
-- `packages/web/server.test.ts`: mocks/imports `@lace/agent/utils/logger`.
-  - TODO: once web stops importing agent logger, remove this test mocking dependency.
-- `packages/web/test-utils/web-test-setup.ts`: imports `@lace/agent/test-utils/temp-lace-dir` and `ProviderRegistry`.
-  - TODO: replace with a web-owned temp lace-dir helper (or supervisor-owned helper) and remove `ProviderRegistry` usage.
-- `packages/web/components/sidebar/__tests__/AgentsSection.test.tsx`: imports agent provider test-utils.
-  - TODO: replace with test fixtures driven through ENT (preferred) or move these test utilities into a test-only shared package that is not `packages/agent`.
-- `packages/web/components/sidebar/__tests__/SidebarContent-agent-creation.test.tsx`: imports agent provider test-utils.
-  - TODO: same as above.
-- `packages/web/app/routes/__tests__/api.projects.integration.test.ts`: dynamically imports `@lace/agent/projects/project`.
-  - TODO: replace with a web-owned Project implementation or ENT-driven project management (see section E below).
-- `packages/web/app/routes/__tests__/api.projects.$projectId.sessions.test.ts`: dynamically imports `@lace/agent/projects/project`.
-  - TODO: same as above.
+- `packages/tui/src/ui/mod.rs` references `../agent/dist/main.js` (hardcoded relative path).
 
-### D) Indirect dependencies via `@lace/web/lib/server/lace-imports` (runtime + tests)
+### 🧭 Remaining work checklist (to fully complete this plan)
 
-`packages/web/lib/server/lace-imports.ts` re-exports agent internals. Every importer below is “reaching into agent” even though it’s not a direct `@lace/agent/*` import.
+#### A) “Definition of Done” checks (run repeatedly)
 
-Files importing `@lace/web/lib/server/lace-imports`:
-- `packages/web/lib/server/data-dir-init.ts`: `ensureLaceDir`.
-  - TODO: move `ensureLaceDir` into supervisor (preferred) or into a web-local helper so web does not depend on agent config code.
-- `packages/web/lib/server/supervisor-service.ts`: `ensureLaceDir`.
-  - TODO: same as above.
-- `packages/web/app/routes/api.projects.ts`: `Project`.
-  - TODO: see section E.
-- `packages/web/app/routes/api.projects.$projectId.ts`: `Project`.
-  - TODO: see section E.
-- `packages/web/app/routes/api.projects.$projectId.environment.ts`: `Project`.
-  - TODO: see section E.
-- `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.ts`: `Project`.
-  - TODO: see section E.
-- `packages/web/app/routes/api.projects.$projectId.mcp.servers.ts`: `Project`.
-  - TODO: see section E + MCP management note below.
-- `packages/web/app/routes/api.projects.$projectId.mcp.servers.$serverId.ts`: `Project`.
-  - TODO: see section E + MCP management note below.
-- `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.ts`: `Project`.
-  - TODO: see section E + MCP management note below.
-- `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control.ts`: `Project`.
-  - TODO: see section E + MCP management note below.
-- `packages/web/app/routes/api.projects.$projectId.configuration.ts`: `Project`, `ToolCatalog`.
-  - TODO: `ToolCatalog` should become ENT-driven (`ent/tools/list`) and project config should be moved out of agent (see section E).
-- `packages/web/app/routes/api.projects.$projectId.sessions.ts`: `Project`, `ProviderRegistry`.
-  - TODO: remove `ProviderRegistry` by doing session naming via ENT:
-    - create a helper agent session (already exists)
-    - configure it via `ent/session/configure`
-    - call `session/prompt` to generate a title
-    - update workspace session name via supervisor
-- `packages/web/app/routes/api.settings.ts`: `UserSettingsManager`.
-  - TODO: needs ENT methods for user settings OR relocate settings storage into supervisor/web (decision needed).
-- `packages/web/app/routes/api.mcp.servers.ts`: `MCPConfigLoader`, `ToolCatalog`.
-  - TODO: needs ENT methods for MCP server config management OR relocate MCP config management out of agent (decision needed).
-- `packages/web/app/routes/api.mcp.servers.$serverId.ts`: `MCPConfigLoader`.
-  - TODO: same as above.
-- `packages/web/app/routes/api.sessions.$sessionId.agents.ts`: `personaRegistry`.
-  - TODO: replace with `ent/personas/list` and remove registry access.
-- `packages/web/app/routes/api.persona.catalog.ts`: `personaRegistry`, `PersonaInfo`.
-  - TODO: replace with `ent/personas/list` and a web-local type derived from the protocol schema.
+- [ ] `rg -n "@lace/agent" packages/web` returns **0 runtime hits** (tests may remain temporarily only if explicitly allowed).
+- [ ] `rg -n "@lace/web/lib/server/lace-imports" packages/web` returns **0 runtime hits** (tests may remain temporarily only if explicitly allowed).
+- [ ] `rg -n "@lace/agent" packages/tui` returns **0 hits**.
+- [ ] TUI has **no** repo-relative path assumptions to spawn the agent (`../agent/dist/*` etc.).
+- [ ] Provider/model/credentials management remains ENT-only (web + TUI).
 
-Test-only importers of `@lace/web/lib/server/lace-imports` (should be cleaned up after runtime paths are migrated):
-- `packages/web/app/routes/__tests__/session-approval-api.integration.test.ts`
-- `packages/web/app/routes/__tests__/api.threads.$threadId.message.test.ts`
-- `packages/web/app/routes/__tests__/api.agents.$agentId.history.test.ts`
-- `packages/web/app/routes/__tests__/api.sessions.$sessionId.agents-message-flow.test.ts`
-- `packages/web/app/routes/__tests__/api.sessions.$sessionId.agents-persona-prompts.test.ts`
-- `packages/web/app/routes/__tests__/api.sessions.$sessionId.agents-persona.test.ts`
-- `packages/web/app/routes/__tests__/api.sessions.$sessionId.agents.test.ts`
-- `packages/web/app/routes/__tests__/api.projects.$projectId.integration.test.ts`
-- `packages/web/app/routes/__tests__/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control.test.ts`
-- `packages/web/app/routes/__tests__/api.projects.$projectId.sessions.$sessionId.mcp.servers.test.ts`
-- `packages/web/app/routes/__tests__/api.projects.$projectId.sessions.$sessionId.test.ts`
-- `packages/web/app/routes/__tests__/api.projects.$projectId.sessions.test.ts`
-- `packages/web/app/routes/__tests__/api.projects.integration.test.ts`
-- `packages/web/app/routes/api.settings.test.ts`
-- `packages/web/lib/server/__tests__/session-naming-helper.test.ts`
+#### B) Protocol spec + behavior confirmations (docs + schemas)
 
-### E) Decisions / Protocol Gaps (required before full “no agent libs”)
+- [ ] Add/confirm a glossary in docs:
+  - [ ] `providerId` = catalog provider type (e.g. `openai`)
+  - [ ] `connectionId` = user-managed provider instance id
+- [ ] Confirm and document semantics:
+  - [ ] `ent/models/enable` + `ent/models/disable` are **global-per-connection** (persisted), not session-scoped.
+  - [ ] `ent/models/list` always includes `disabled` + `disabledState`.
+  - [ ] `ent/providers/refresh` and `ent/models/refresh` timing guarantees (what “refresh” means; whether it’s async; what to poll).
+  - [ ] `ent/providers/catalog` is the single source of truth for the catalog provider list + metadata.
 
-These are architectural decisions we should make together (do not implement without alignment):
+#### C) Agent ENT conformance suite (exhaustive; best practices + implementation test)
 
-- Projects/workspaces config currently uses `Project` (agent library). Options:
-  1) Move project management out of `packages/agent` into a shared non-agent package (so web can own it without reaching into agent).
-  2) Make projects/workspaces fully agent-owned and expose project CRUD/config via ENT (new methods).
-- MCP config + user settings are currently read via agent config managers (`MCPConfigLoader`, `UserSettingsManager`). Options:
-  1) Make them agent-owned and expose via ENT (new methods).
-  2) Move them to supervisor/web-owned storage in a non-agent package.
-- Tool policies/types are currently defined in agent. Options:
-  1) Promote types and tool-policy-related schemas into `@lace/ent-protocol`.
-  2) Duplicate minimal types in `packages/web` until the protocol owns them.
+Goal: `packages/agent/src/__tests__/ent-protocol.spec.ts` covers every method in `packages/ent-protocol/src/schemas/methods.ts` with success + key negative cases.
 
-### Definition of Done (web-side “no agent libs”)
+Coverage checklist (must be exhaustive):
 
-- `rg -n \"@lace/agent\" packages/web` has **zero** runtime hits (tests may be allowed temporarily if we explicitly decide so).
-- `rg -n \"@lace/web/lib/server/lace-imports\" packages/web` is either empty or restricted to test-only helpers that are not agent internals.
-- Provider/model/credentials management remains ENT-only (already done).
+- [ ] `initialize`
+- [ ] `session/new`
+- [ ] `session/load`
+- [ ] `session/prompt`
+- [ ] `session/stop`
+- [ ] `session/delete`
+- [ ] `ent/agent/ping`
+- [ ] `ent/agent/status`
+- [ ] `ent/session/compact`
+- [ ] `ent/session/configure`
+- [ ] `ent/session/rewind`
+- [ ] `ent/session/checkpoint`
+- [ ] `ent/session/inject`
+- [ ] `ent/session/events`
+- [ ] `ent/providers/list`
+- [ ] `ent/providers/catalog`
+- [ ] `ent/providers/refresh`
+- [ ] `ent/connections/list`
+- [ ] `ent/connections/upsert`
+- [ ] `ent/connections/delete`
+- [ ] `ent/connections/test`
+- [ ] `ent/connections/credentials/status`
+- [ ] `ent/connections/credentials/start`
+- [ ] `ent/connections/credentials/submit`
+- [ ] `ent/connections/credentials/clear`
+- [ ] `ent/models/list`
+- [ ] `ent/models/refresh`
+- [ ] `ent/models/enable`
+- [ ] `ent/models/disable`
+- [ ] `ent/job/list`
+- [ ] `ent/job/output`
+- [ ] `ent/job/kill`
+- [ ] `ent/job/inject`
+- [ ] `ent/tools/list`
+- [ ] `ent/personas/list`
+- [ ] `ent/mcp/servers/list`
+- [ ] `ent/mcp/servers/upsert`
+- [ ] `ent/mcp/servers/delete`
+- [ ] `ent/mcp/servers/test`
+- [ ] `ent/mcp/tools/list`
+- [ ] `ent/workspace/info`
+- [ ] `ent/workspace/create`
+
+Constraints:
+
+- [ ] No real provider credentials required; deterministic behavior only.
+- [ ] Tests validate schemas for both params and results (strict round-trip).
+- [ ] Key negative cases covered (InvalidParams / NotFound / permission denied) where applicable.
+
+#### D) Web: remove remaining agent library usage (beyond provider management)
+
+Direct `@lace/agent/*` imports to remove:
+
+- [ ] `packages/web/types/core.ts`: remove dependency on `@lace/agent/threads/types` (promote wire-relevant event types to `@lace/ent-protocol` or duplicate minimal shapes in web).
+- [ ] `packages/web/test-utils/web-test-setup.ts`: remove `@lace/agent/test-utils/temp-lace-dir` and `ProviderRegistry` usage.
+- [ ] `packages/web/components/sidebar/__tests__/AgentsSection.test.tsx`: remove agent provider test utils (use ENT-driven fixtures or move to a non-agent test package).
+- [ ] `packages/web/components/sidebar/__tests__/SidebarContent-agent-creation.test.tsx`: same as above.
+- [ ] `packages/web/app/routes/__tests__/api.projects.integration.test.ts`: remove dynamic `@lace/agent/projects/project` (blocked by project ownership decision below).
+- [ ] `packages/web/app/routes/__tests__/api.projects.$projectId.sessions.test.ts`: same as above.
+
+Runtime imports of `@lace/web/lib/server/lace-imports` to remove (blocked by decisions below):
+
+- [ ] Replace `ensureLaceDir` usage with supervisor/web-owned initialization:
+  - [ ] `packages/web/lib/server/data-dir-init.ts`
+  - [ ] `packages/web/lib/server/supervisor-service.ts`
+- [ ] Replace agent `Project` usage (projects/workspaces decision):
+  - [ ] `packages/web/app/routes/api.projects.ts`
+  - [ ] `packages/web/app/routes/api.projects.$projectId.ts`
+  - [ ] `packages/web/app/routes/api.projects.$projectId.environment.ts`
+  - [ ] `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.ts`
+  - [ ] `packages/web/app/routes/api.projects.$projectId.configuration.ts`
+  - [ ] `packages/web/app/routes/api.projects.$projectId.mcp.servers.ts`
+  - [ ] `packages/web/app/routes/api.projects.$projectId.mcp.servers.$serverId.ts`
+  - [ ] `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.ts`
+  - [ ] `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control.ts`
+- [ ] Replace agent settings/MCP config loaders (ownership decision):
+  - [ ] `packages/web/app/routes/api.settings.ts`
+  - [ ] `packages/web/app/routes/api.mcp.servers.ts`
+  - [ ] `packages/web/app/routes/api.mcp.servers.$serverId.ts`
+- [ ] Cleanup `packages/web/lib/server/lace-imports.ts` after runtime is migrated (prefer delete).
+
+#### E) TUI: web-parity provider management (single-agent) + ENT-only
+
+Hard-rule fix first:
+
+- [ ] `packages/tui/src/ui/mod.rs`: remove hardcoded `../agent/dist/main.js` default agent path (no repo-layout coupling).
+
+Parity checklist:
+
+- [ ] Provider catalog view uses `ent/providers/catalog` (not only `ent/providers/list`).
+- [ ] Connection CRUD:
+  - [ ] list (`ent/connections/list`)
+  - [ ] create/update (`ent/connections/upsert`)
+  - [ ] delete (`ent/connections/delete`)
+- [ ] Credentials:
+  - [ ] status (`ent/connections/credentials/status`)
+  - [ ] start (`ent/connections/credentials/start`)
+  - [ ] submit (`ent/connections/credentials/submit`)
+  - [ ] clear (`ent/connections/credentials/clear`)
+- [ ] Models:
+  - [ ] list (`ent/models/list`) shows `disabled` + `disabledState`
+  - [ ] enable/disable (`ent/models/enable`, `ent/models/disable`)
+  - [ ] refresh (`ent/models/refresh` and/or `ent/providers/refresh`) wired without tight loops/spam
+  - [ ] selection (`ent/session/configure`) works from both “Configure” and “Models…” screens
+- [ ] Persistence:
+  - [ ] last-used `connectionId` + `modelId` restored automatically (agent-owned preferred; otherwise TUI config as fallback only if agent can’t)
+- [ ] UX parity:
+  - [ ] command palette scrolls
+  - [ ] `?` help only triggers when input is exactly `?`
+- [ ] Diagnostics:
+  - [ ] TUI writes a redacted ENT protocol log + agent stderr log to disk and shows the file path in the UI.
+
+### Decisions required (do not implement without alignment)
+
+- [ ] Projects/workspaces ownership:
+  - [ ] Option A: move Project/workspace logic out of `packages/agent` into a shared non-agent package
+  - [ ] Option B: make projects/workspaces agent-owned and expose CRUD/config over ENT
+- [ ] MCP config ownership:
+  - [ ] Option A: agent-owned, ENT-managed
+  - [ ] Option B: supervisor/web-owned storage in a non-agent package
+- [ ] User settings ownership:
+  - [ ] Option A: agent-owned, ENT-managed
+  - [ ] Option B: supervisor/web-owned storage in a non-agent package
+
+### Definition of Done
+
+- [ ] Provider/model/credentials management: web + TUI are ENT-only.
+- [ ] Web runtime has no `@lace/agent/*` imports and no runtime use of `@lace/web/lib/server/lace-imports`.
+- [ ] TUI has no repo-layout coupling to spawn the agent and no `@lace/agent/*` imports.
+- [ ] Agent ENT conformance suite is exhaustive (every method covered with success + key negative cases).
+- [ ] `npm test` (root) passes.
