@@ -2,6 +2,7 @@ mod markdown;
 
 use crate::app::activity;
 use crate::app::config_wizard;
+use crate::app::connections;
 use crate::app::prefs::{KeybindMode, Theme};
 use crate::app::reducer::{reduce, AppEvent, Outbound};
 use crate::app::sessions;
@@ -184,6 +185,49 @@ fn run_loop(
                         if let Some(action) = action {
                             let out = apply_ui_action(state, action);
                             send_outbound(transport, state, out, timeout_ms)?;
+                        }
+                        continue;
+                    }
+
+                    if state.connections.open {
+                        let action = match key.code {
+                            KeyCode::Esc => {
+                                if state.connections.confirm_delete {
+                                    Some(UiAction::ConnectionsCancelDelete)
+                                } else {
+                                    Some(UiAction::ConnectionsClose)
+                                }
+                            }
+                            KeyCode::Up => Some(UiAction::ConnectionsPrev),
+                            KeyCode::Down => Some(UiAction::ConnectionsNext),
+                            KeyCode::Enter => Some(UiAction::ConnectionsSubmit),
+                            KeyCode::Char('r') => Some(UiAction::ConnectionsRefresh),
+                            KeyCode::Char('e') => Some(UiAction::ConnectionsStartRename),
+                            KeyCode::Char('d') => Some(UiAction::ConnectionsBeginDelete),
+                            KeyCode::Char('t') => Some(UiAction::ConnectionsTest),
+                            KeyCode::Char('c') => {
+                                connections::close_connections(state);
+                                let out = config_wizard::open(state);
+                                send_outbound(transport, state, out, timeout_ms)?;
+                                continue;
+                            }
+                            KeyCode::Backspace if state.connections.renaming => {
+                                Some(UiAction::ConnectionsRenameBackspace)
+                            }
+                            KeyCode::Char(ch)
+                                if state.connections.renaming
+                                    && !key.modifiers.contains(KeyModifiers::CONTROL) =>
+                            {
+                                Some(UiAction::ConnectionsRenameChar(ch))
+                            }
+                            _ => None,
+                        };
+                        if let Some(action) = action {
+                            let out = apply_ui_action(state, action);
+                            send_outbound(transport, state, out, timeout_ms)?;
+                        }
+                        if state.should_exit {
+                            break;
                         }
                         continue;
                     }
@@ -603,7 +647,10 @@ fn handle_agent_line(
                 }
                 if method == "ent/connections/list" {
                     clear_invalid_active_connection_from_list(state, &result);
-                    if !state.config_wizard.open {
+                    if state.connections.open {
+                        connections::handle_list_response(state, &result, error_message);
+                    }
+                    if !state.config_wizard.open && !state.connections.open {
                         let auto = crate::app::config_panels::maybe_autoconfigure_from_connections(
                             state,
                             &result,
@@ -616,6 +663,17 @@ fn handle_agent_line(
                             send_outbound(transport, state, out, timeout_ms)?;
                         }
                     }
+                }
+                if method == "ent/connections/test" && state.connections.open {
+                    connections::handle_test_response(state, &result, error_message);
+                }
+                if method == "ent/connections/delete" && state.connections.open {
+                    let out = connections::handle_delete_response(state, error_message);
+                    send_outbound(transport, state, out, timeout_ms)?;
+                }
+                if method == "ent/connections/upsert" && state.connections.open {
+                    let out = connections::handle_upsert_response(state, error_message);
+                    send_outbound(transport, state, out, timeout_ms)?;
                 }
                 if state.config_wizard.open && method.starts_with("ent/") {
                     let out = config_wizard::handle_response(state, method, &result, error_message);
@@ -827,6 +885,10 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
         let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
         f.render_widget(render_models_modal(state), area);
+    } else if state.connections.open {
+        let area = centered_rect(80, 70, f.area());
+        f.render_widget(Clear, area);
+        f.render_widget(render_connections_modal(state), area);
     } else if state.config_wizard.open {
         let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
@@ -1205,6 +1267,74 @@ fn render_models_modal(state: &AppState) -> Paragraph<'static> {
 
     Paragraph::new(Text::from(lines))
         .block(Block::default().title("Models").borders(Borders::ALL))
+        .wrap(Wrap { trim: true })
+}
+
+fn render_connections_modal(state: &AppState) -> Paragraph<'static> {
+    let mut lines: Vec<Line> = Vec::new();
+    lines.push(Line::from("Connections"));
+    lines.push(Line::from(""));
+
+    if let Some(err) = &state.connections.error {
+        lines.push(Line::from(format!("Error: {err}")));
+        lines.push(Line::from(""));
+    }
+
+    if state.connections.loading {
+        lines.push(Line::from("Loading connections..."));
+    } else if state.connections.items.is_empty() {
+        lines.push(Line::from("No connections"));
+    } else {
+        let max = 18usize;
+        let start = state.connections.selected.saturating_sub(max / 2);
+        let end = (start + max).min(state.connections.items.len());
+        for i in start..end {
+            let marker = if i == state.connections.selected { ">" } else { " " };
+            let it = &state.connections.items[i];
+            let cred = it
+                .credential_state
+                .clone()
+                .unwrap_or_else(|| "unknown".to_string());
+            let endpoint_str = it
+                .endpoint
+                .clone()
+                .filter(|s| !s.is_empty())
+                .map(|s| format!(" • {s}"))
+                .unwrap_or_default();
+            let test = state.connections.last_test.get(&it.connection_id);
+            let test_str = match test {
+                None => String::new(),
+                Some(t) if t.ok => t
+                    .latency_ms
+                    .map(|ms| format!(" • ok {ms}ms"))
+                    .unwrap_or_else(|| " • ok".to_string()),
+                Some(t) => format!(
+                    " • error {}",
+                    t.error.clone().unwrap_or_else(|| "?".to_string())
+                ),
+            };
+
+            lines.push(Line::from(format!(
+                "{marker} {} ({}) [{cred}]{endpoint_str}{test_str}",
+                it.name, it.provider_id
+            )));
+        }
+    }
+
+    lines.push(Line::from(""));
+    if state.connections.confirm_delete {
+        lines.push(Line::from("Delete selected connection? Enter confirm • Esc cancel"));
+    } else if state.connections.renaming {
+        lines.push(Line::from(format!("Rename: {}", state.connections.rename_input)));
+        lines.push(Line::from("Enter save • Esc close"));
+    } else {
+        lines.push(Line::from(
+            "Up/Down select • Enter configure • c create • r refresh • e rename • d delete • t test • Esc close",
+        ));
+    }
+
+    Paragraph::new(Text::from(lines))
+        .block(Block::default().title("Connections").borders(Borders::ALL))
         .wrap(Wrap { trim: true })
 }
 

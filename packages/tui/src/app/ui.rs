@@ -78,6 +78,19 @@ pub enum UiAction {
     ModelsRefresh,
     CloseModelsPanel,
 
+    OpenConnections,
+    ConnectionsPrev,
+    ConnectionsNext,
+    ConnectionsRefresh,
+    ConnectionsStartRename,
+    ConnectionsRenameBackspace,
+    ConnectionsRenameChar(char),
+    ConnectionsSubmit,
+    ConnectionsBeginDelete,
+    ConnectionsCancelDelete,
+    ConnectionsTest,
+    ConnectionsClose,
+
     OpenPalette,
     CloseOverlay,
     ToggleHelp,
@@ -439,6 +452,50 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             crate::app::config_panels::close_models_panel(state);
             Vec::new()
         }
+        UiAction::OpenConnections => crate::app::connections::open_connections(state),
+        UiAction::ConnectionsPrev => {
+            crate::app::connections::prev(state);
+            Vec::new()
+        }
+        UiAction::ConnectionsNext => {
+            crate::app::connections::next(state);
+            Vec::new()
+        }
+        UiAction::ConnectionsRefresh => crate::app::connections::request_list(state),
+        UiAction::ConnectionsStartRename => {
+            crate::app::connections::start_rename(state);
+            Vec::new()
+        }
+        UiAction::ConnectionsRenameBackspace => {
+            crate::app::connections::rename_backspace(state);
+            Vec::new()
+        }
+        UiAction::ConnectionsRenameChar(ch) => {
+            crate::app::connections::rename_char(state, ch);
+            Vec::new()
+        }
+        UiAction::ConnectionsBeginDelete => {
+            crate::app::connections::begin_delete_selected(state);
+            Vec::new()
+        }
+        UiAction::ConnectionsCancelDelete => {
+            crate::app::connections::cancel_delete(state);
+            Vec::new()
+        }
+        UiAction::ConnectionsTest => crate::app::connections::request_test_selected(state),
+        UiAction::ConnectionsSubmit => {
+            if state.connections.confirm_delete {
+                crate::app::connections::confirm_delete_selected(state)
+            } else if state.connections.renaming {
+                crate::app::connections::submit_rename(state)
+            } else {
+                crate::app::config_wizard::open_for_connection(state)
+            }
+        }
+        UiAction::ConnectionsClose => {
+            crate::app::connections::close_connections(state);
+            Vec::new()
+        }
         UiAction::FocusNext => {
             state.focus_next();
             Vec::new()
@@ -633,6 +690,10 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                     let out_models = apply_ui_action(state, UiAction::OpenModelsPanel);
                     out.extend(out_models);
                 }
+                PaletteCommand::OpenConnectionsCmd => {
+                    let out_connections = apply_ui_action(state, UiAction::OpenConnections);
+                    out.extend(out_connections);
+                }
                 PaletteCommand::FocusInput => {
                     state.focus = crate::app::Focus::Input;
                 }
@@ -791,6 +852,7 @@ enum PaletteCommand {
     FocusInput,
     OpenEnvEditorCmd,
     OpenModelsPanelCmd,
+    OpenConnectionsCmd,
     Quit,
 }
 
@@ -885,6 +947,10 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
         PaletteItem {
             label: "Models...",
             command: PaletteCommand::OpenModelsPanelCmd,
+        },
+        PaletteItem {
+            label: "Connections...",
+            command: PaletteCommand::OpenConnectionsCmd,
         },
         PaletteItem {
             label: "Focus Input",

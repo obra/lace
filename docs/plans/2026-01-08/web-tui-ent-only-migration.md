@@ -268,15 +268,15 @@ Hard-rule fix first:
 
 Parity checklist:
 
-- [ ] Provider catalog view uses `ent/providers/catalog` (not only `ent/providers/list`).
-- [ ] Connection CRUD:
-  - [ ] list (`ent/connections/list`)
-  - [ ] create/update (`ent/connections/upsert`)
-  - [ ] delete (`ent/connections/delete`)
+- [x] Provider catalog selection uses `ent/providers/catalog` (not only `ent/providers/list`).
+- [x] Connection CRUD:
+  - [x] list (`ent/connections/list`)
+  - [x] create/update (`ent/connections/upsert`)
+  - [x] delete (`ent/connections/delete`)
 - [ ] Credentials:
   - [ ] status (`ent/connections/credentials/status`)
-  - [ ] start (`ent/connections/credentials/start`)
-  - [ ] submit (`ent/connections/credentials/submit`)
+  - [x] start (`ent/connections/credentials/start`)
+  - [x] submit (`ent/connections/credentials/submit`)
   - [ ] clear (`ent/connections/credentials/clear`)
 - [ ] Models:
   - [ ] list (`ent/models/list`) shows `disabled` + `disabledState`

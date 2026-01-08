@@ -1,5 +1,6 @@
 pub mod activity;
 pub mod clipboard;
+pub mod connections;
 pub mod config_panels;
 pub mod config_wizard;
 pub mod prefs;
@@ -11,6 +12,7 @@ pub mod transcript;
 pub mod ui;
 
 use crate::app::config_panels::{EnvEditorState, ModelsPanelState};
+use crate::app::connections::ConnectionsState;
 use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,6 +102,7 @@ pub struct AppState {
 
     pub help_open: bool,
     pub config_wizard: config_wizard::ConfigWizardState,
+    pub connections: ConnectionsState,
     pub sessions: sessions::SessionsState,
     pub search: search::SearchState,
     pub should_exit: bool,
@@ -189,6 +192,7 @@ impl AppState {
 
             help_open: false,
             config_wizard: config_wizard::ConfigWizardState::new(),
+            connections: ConnectionsState::new(),
             sessions: sessions::SessionsState::new(),
             search: search::SearchState::new(),
             should_exit: false,

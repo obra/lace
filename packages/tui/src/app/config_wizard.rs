@@ -17,6 +17,7 @@ pub struct ConfigWizardState {
     pub credential_input: String,
     pub credential_values: std::collections::BTreeMap<String, String>,
     pub error_message: Option<String>,
+    pub forced_connection_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,6 +82,7 @@ impl ConfigWizardState {
             credential_input: String::new(),
             credential_values: std::collections::BTreeMap::new(),
             error_message: None,
+            forced_connection_id: None,
         }
     }
 }
@@ -101,6 +103,48 @@ pub fn open(state: &mut AppState) -> Vec<Outbound> {
     state.config_wizard.credential_input.clear();
     state.config_wizard.credential_values.clear();
     state.config_wizard.error_message = None;
+    state.config_wizard.forced_connection_id = None;
+
+    let id = state.next_client_id();
+    vec![Outbound::JsonRpcRequest {
+        id,
+        method: "ent/connections/list".to_string(),
+        params: Some(json!({})),
+    }]
+}
+
+pub fn open_for_connection(state: &mut AppState) -> Vec<Outbound> {
+    let idx = state
+        .connections
+        .selected
+        .min(state.connections.items.len().saturating_sub(1));
+    let Some(it) = state.connections.items.get(idx) else {
+        return Vec::new();
+    };
+
+    state.connections.open = false;
+    state.connections.loading = false;
+    state.connections.error = None;
+    state.connections.renaming = false;
+    state.connections.rename_input.clear();
+    state.connections.confirm_delete = false;
+
+    state.palette_open = false;
+    state.help_open = false;
+    state.config_wizard.open = true;
+    state.config_wizard.step = ConfigWizardStep::LoadingConnections;
+    state.config_wizard.selected = 0;
+    state.config_wizard.connections.clear();
+    state.config_wizard.providers.clear();
+    state.config_wizard.models.clear();
+    state.config_wizard.connection_id = None;
+    state.config_wizard.model_id = None;
+    state.config_wizard.credential_fields.clear();
+    state.config_wizard.credential_field_index = 0;
+    state.config_wizard.credential_input.clear();
+    state.config_wizard.credential_values.clear();
+    state.config_wizard.error_message = None;
+    state.config_wizard.forced_connection_id = Some(it.connection_id.clone());
 
     let id = state.next_client_id();
     vec![Outbound::JsonRpcRequest {
@@ -115,6 +159,7 @@ pub fn close(state: &mut AppState) {
     state.config_wizard.step = ConfigWizardStep::Closed;
     state.config_wizard.error_message = None;
     state.config_wizard.credential_input.clear();
+    state.config_wizard.forced_connection_id = None;
 }
 
 pub fn prev(state: &mut AppState) {
@@ -179,7 +224,7 @@ pub fn handle_response(
 
     match method {
         "ent/connections/list" => on_connections_list(state, result),
-        "ent/providers/list" => on_providers_list(state, result),
+        "ent/providers/catalog" => on_providers_catalog(state, result),
         "ent/connections/upsert" => on_connections_upsert(state, result),
         "ent/connections/credentials/start" => on_credentials_start(state, result),
         "ent/connections/credentials/submit" => on_credentials_submit(state, result),
@@ -228,6 +273,20 @@ fn on_connections_list(state: &mut AppState, result: &Option<Value>) -> Vec<Outb
         }
     }
 
+    if let Some(forced) = state.config_wizard.forced_connection_id.clone() {
+        if let Some(pos) = state
+            .config_wizard
+            .connections
+            .iter()
+            .position(|c| c.connection_id == forced)
+        {
+            state.config_wizard.selected = pos;
+            state.config_wizard.forced_connection_id = None;
+            return submit_connection(state);
+        }
+        state.config_wizard.forced_connection_id = None;
+    }
+
     let ready: Vec<&ConnectionItem> = state
         .config_wizard
         .connections
@@ -255,7 +314,7 @@ fn on_connections_list(state: &mut AppState, result: &Option<Value>) -> Vec<Outb
         let id = state.next_client_id();
         return vec![Outbound::JsonRpcRequest {
             id,
-            method: "ent/providers/list".to_string(),
+            method: "ent/providers/catalog".to_string(),
             params: Some(json!({})),
         }];
     }
@@ -286,7 +345,7 @@ fn submit_connection(state: &mut AppState) -> Vec<Outbound> {
         let id = state.next_client_id();
         return vec![Outbound::JsonRpcRequest {
             id,
-            method: "ent/providers/list".to_string(),
+            method: "ent/providers/catalog".to_string(),
             params: Some(json!({})),
         }];
     }
@@ -301,17 +360,17 @@ fn submit_connection(state: &mut AppState) -> Vec<Outbound> {
     }]
 }
 
-fn on_providers_list(state: &mut AppState, result: &Option<Value>) -> Vec<Outbound> {
+fn on_providers_catalog(state: &mut AppState, result: &Option<Value>) -> Vec<Outbound> {
     let mut providers: Vec<ProviderItem> = Vec::new();
     if let Some(Value::Object(obj)) = result {
         if let Some(Value::Array(arr)) = obj.get("providers") {
             for p in arr {
                 let Some(pobj) = p.as_object() else { continue };
-                let Some(provider_id) = pobj.get("providerId").and_then(|v| v.as_str()) else {
+                let Some(provider_id) = pobj.get("id").and_then(|v| v.as_str()) else {
                     continue;
                 };
                 let display_name = pobj
-                    .get("displayName")
+                    .get("name")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
                 providers.push(ProviderItem {
@@ -696,7 +755,7 @@ mod tests {
         assert_eq!(state.config_wizard.step, ConfigWizardStep::LoadingProviders);
         assert_eq!(out.len(), 1);
         match &out[0] {
-            Outbound::JsonRpcRequest { method, .. } => assert_eq!(method, "ent/providers/list"),
+            Outbound::JsonRpcRequest { method, .. } => assert_eq!(method, "ent/providers/catalog"),
             _ => panic!("expected request"),
         }
     }
