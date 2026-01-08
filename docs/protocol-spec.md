@@ -1222,10 +1222,9 @@ List available agent personas for configuration.
 **PersonaInfo interface**:
 ```typescript
 interface PersonaInfo {
-  id: string;
   name: string;
-  description?: string;
-  tags?: string[];
+  isUserDefined: boolean;
+  path: string;
 }
 ```
 
