@@ -535,7 +535,9 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             if !state.palette_open {
                 return Vec::new();
             }
-            state.palette_selected = state.palette_selected.saturating_add(1);
+            let items = palette_items(&state.palette_query);
+            let max = items.len().saturating_sub(1);
+            state.palette_selected = (state.palette_selected.saturating_add(1)).min(max);
             Vec::new()
         }
         UiAction::PaletteSubmit => {

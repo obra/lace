@@ -215,6 +215,7 @@ fn on_connections_list(state: &mut AppState, result: &Option<Value>) -> Vec<Outb
         }
     }
 
+    let has_existing = !connections.is_empty();
     state.config_wizard.connections = connections;
     if let Some(last) = &state.prefs.last_connection_id {
         if let Some(pos) = state
@@ -259,6 +260,14 @@ fn on_connections_list(state: &mut AppState, result: &Option<Value>) -> Vec<Outb
         }];
     }
 
+    if has_existing {
+        state.config_wizard.connections.push(ConnectionItem {
+            connection_id: "__new__".to_string(),
+            name: Some("➕ Add connection".to_string()),
+            credential_state: None,
+        });
+    }
+
     state.config_wizard.step = ConfigWizardStep::SelectConnection;
     Vec::new()
 }
@@ -272,6 +281,15 @@ fn submit_connection(state: &mut AppState) -> Vec<Outbound> {
         return Vec::new();
     };
     let connection_id = conn.connection_id.clone();
+    if connection_id == "__new__" {
+        state.config_wizard.step = ConfigWizardStep::LoadingProviders;
+        let id = state.next_client_id();
+        return vec![Outbound::JsonRpcRequest {
+            id,
+            method: "ent/providers/list".to_string(),
+            params: Some(json!({})),
+        }];
+    }
     state.config_wizard.connection_id = Some(connection_id.clone());
     state.config_wizard.step = ConfigWizardStep::CheckingCredentials;
 

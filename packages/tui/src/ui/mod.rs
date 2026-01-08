@@ -269,7 +269,7 @@ fn run_loop(
 
                     if state.help_open {
                         match key.code {
-                            KeyCode::Esc | KeyCode::F(1) | KeyCode::Char('?') => {
+                            KeyCode::Esc | KeyCode::F(1) => {
                                 let _ = apply_ui_action(state, UiAction::ToggleHelp);
                             }
                             _ => {}
@@ -332,11 +332,7 @@ fn run_loop(
                         }
                     }
 
-                    if key.code == KeyCode::F(1)
-                        || (key.code == KeyCode::Char('?')
-                            && state.focus == crate::app::Focus::Input
-                            && state.input_buffer.is_empty())
-                    {
+                    if key.code == KeyCode::F(1) {
                         let _ = apply_ui_action(state, UiAction::ToggleHelp);
                         continue;
                     }
@@ -1490,7 +1486,7 @@ fn render_help_modal() -> Paragraph<'static> {
         Line::from("e        Jump last error (non-input panes)"),
         Line::from("t        Jump last tool_use (non-input panes)"),
         Line::from("n        Jump last turn_end (non-input panes)"),
-        Line::from("? / F1   Toggle help"),
+        Line::from("F1       Toggle help"),
         Line::from(""),
         Line::from("Permission modal: Up/Down select, Enter decide"),
     ];
