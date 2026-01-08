@@ -21,7 +21,7 @@
     "lint:fix": "eslint --fix",
     "format": "prettier --ignore-path ../../.prettierignore --write \"**/*.{ts,tsx,js,jsx,json,md,css,scss,html,yml,yaml}\"",
     "pretest": "cd ../.. && npm run build --workspace=packages/ent-protocol && npm run build --workspace=packages/agent && npm run build --workspace=packages/supervisor",
-    "test": "vitest run",
+    "test": "vitest run --silent",
     "test:run": "npm run test",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

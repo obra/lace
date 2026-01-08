@@ -9,6 +9,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: './test-setup.ts',
+    reporters: [['default', { summary: false }]],
     testTimeout: 30000,
     hookTimeout: 20000,
     poolOptions: {
