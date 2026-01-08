@@ -44,6 +44,11 @@ pub fn run_tui(args: Args) -> io::Result<()> {
     state.next_client_seq = 3;
     state.push_activity_line(format!("timeout-ms={}", args.timeout_ms));
 
+    if let Some(lace_dir) = resolve_lace_dir_for_logs() {
+        state.push_debug_line(format!("{lace_dir}/tui-ent-protocol.log"));
+        state.push_debug_line(format!("{lace_dir}/tui-agent-stderr.log"));
+    }
+
     // Probe catalogs early; surface missing providers immediately in Debug/Activity
     let probe_id = state.next_client_id();
     let probe_req = Outbound::JsonRpcRequest {
@@ -1772,6 +1777,12 @@ fn resolve_workdir(workdir: Option<&str>) -> io::Result<PathBuf> {
         return Ok(PathBuf::from(wd));
     }
     std::env::current_dir()
+}
+
+fn resolve_lace_dir_for_logs() -> Option<String> {
+    std::env::var("LACE_DIR")
+        .ok()
+        .or_else(|| std::env::var("HOME").ok().map(|h| format!("{h}/.lace")))
 }
 
 fn default_agent_cmd() -> Option<String> {
