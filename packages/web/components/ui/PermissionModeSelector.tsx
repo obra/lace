@@ -4,7 +4,7 @@
 'use client';
 
 import React, { memo } from 'react';
-import type { PermissionOverrideMode } from '@lace/agent/tools/types';
+import type { PermissionOverrideMode } from '@lace/web/types/permissions';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShield, faRocket, faEye } from '@fortawesome/free-solid-svg-icons';
 

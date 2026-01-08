@@ -7,8 +7,9 @@ import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-valida
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
-import { personaRegistry } from '@lace/web/lib/server/lace-imports';
+import { getProviderManagementAgent } from '@lace/web/lib/server/supervisor-service';
 import type { Route } from './+types/api.sessions.$sessionId.agents';
+import type { PersonaInfo } from '@lace/ent-protocol';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -100,12 +101,20 @@ export async function action({ request, params }: Route.ActionArgs) {
     const requestedPersona = typeof body.persona === 'string' ? body.persona.trim() : '';
     const persona = requestedPersona || 'lace';
 
-    try {
-      personaRegistry.validatePersona(persona);
-    } catch (error) {
-      return createErrorResponse(error instanceof Error ? error.message : 'Invalid persona', 400, {
-        code: 'VALIDATION_FAILED',
+    // Validate persona against agent-advertised list (ENT-only; no web reach-in to agent registries).
+    {
+      const mgmt = await getProviderManagementAgent();
+      const personaRes = await supervisor.agentRequest({
+        workspaceSessionId: mgmt.workspaceSessionId,
+        sessionId: mgmt.agentSessionId,
+        method: 'ent/personas/list',
+        requestParams: {},
       });
+      const personas = (personaRes as { personas?: PersonaInfo[] }).personas ?? [];
+      const ok = personas.some((p) => p.name === persona);
+      if (!ok) {
+        return createErrorResponse('Invalid persona', 400, { code: 'VALIDATION_FAILED' });
+      }
     }
 
     // Spawn agent process (agent protocol session) and configure it

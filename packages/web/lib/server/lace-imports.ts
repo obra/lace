@@ -39,13 +39,9 @@ export {
 } from '@lace/agent/test-utils/provider-defaults';
 // TestProvider is in agent
 export { TestProvider } from '@lace/agent/test-utils/test-provider';
-// Tool types from agent
-export { ApprovalPendingError, ApprovalDecision } from '@lace/agent/tools/types';
 
 // Database and configuration from agent
 export { ensureLaceDir } from '@lace/agent/config/lace-dir';
 export { UserSettingsManager } from '@lace/agent/config/user-settings';
 export { MCPConfigLoader } from '@lace/agent/config/mcp-config-loader';
 export { PromptManager } from '@lace/agent/config/prompt-manager';
-export { personaRegistry } from '@lace/agent/config/persona-registry';
-export type { PersonaInfo } from '@lace/agent/config/persona-registry';

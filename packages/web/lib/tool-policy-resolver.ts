@@ -1,7 +1,7 @@
 // ABOUTME: Tool policy hierarchy resolver for progressive restriction enforcement
 // ABOUTME: Computes effective policies, allowed values, and parent values for UI components
 
-import type { ToolPolicy } from '@lace/agent/tools/types';
+import type { ToolPolicy } from '@lace/ent-protocol';
 
 export interface ToolPolicyInfo {
   value: ToolPolicy;

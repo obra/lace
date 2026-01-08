@@ -1,18 +1,21 @@
 // ABOUTME: Tests for persona catalog API endpoint (GET /api/persona/catalog)
-// ABOUTME: Verifies persona listing with real PersonaRegistry implementation
+// ABOUTME: Verifies persona listing via ENT protocol (no PersonaRegistry reach-in)
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { loader } from '@lace/web/app/routes/api.persona.catalog';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createLoaderArgs } from '@lace/web/test-utils/route-test-helpers';
 import type { PersonaCatalogResponse } from '@lace/web/app/routes/api.persona.catalog';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
+import { shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 
 describe('Persona Catalog API', () => {
   const _tempContext = setupWebTest();
 
+  afterEach(() => shutdownSupervisorForTests());
+
   describe('GET /api/persona/catalog', () => {
-    it('should return personas from registry', async () => {
+    it('should return personas from ENT', async () => {
       const mockRequest = new Request('http://localhost/api/persona/catalog');
       const response = await loader(createLoaderArgs(mockRequest, {}));
       const data = await parseResponse<PersonaCatalogResponse>(response);

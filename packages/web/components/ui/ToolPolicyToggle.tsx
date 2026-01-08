@@ -4,7 +4,7 @@
 'use client';
 
 import React, { memo } from 'react';
-import type { ToolPolicy } from '@lace/agent/tools/types';
+import type { ToolPolicy } from '@lace/ent-protocol';
 
 interface ToolPolicyToggleProps {
   value: ToolPolicy;

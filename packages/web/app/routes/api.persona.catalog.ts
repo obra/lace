@@ -1,11 +1,11 @@
 // ABOUTME: Persona catalog API endpoint
-// ABOUTME: Returns available personas from PersonaRegistry for agent creation
+// ABOUTME: Returns available personas via ENT protocol for agent creation
 
-import { personaRegistry } from '@lace/web/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import type { PersonaInfo } from '@lace/web/lib/server/lace-imports';
+import type { PersonaInfo } from '@lace/ent-protocol';
 import type { Route } from './+types/api.persona.catalog';
+import { getProviderManagementAgent, getSupervisor } from '@lace/web/lib/server/supervisor-service';
 
 export interface PersonaCatalogResponse {
   personas: PersonaInfo[];
@@ -13,7 +13,16 @@ export interface PersonaCatalogResponse {
 
 export async function loader({ request: _request }: Route.LoaderArgs) {
   try {
-    const personas = personaRegistry.listAvailablePersonas();
+    const supervisor = await getSupervisor();
+    const mgmt = await getProviderManagementAgent();
+    const res = await supervisor.agentRequest({
+      workspaceSessionId: mgmt.workspaceSessionId,
+      sessionId: mgmt.agentSessionId,
+      method: 'ent/personas/list',
+      requestParams: {},
+    });
+
+    const personas = (res as { personas?: PersonaInfo[] }).personas ?? [];
 
     return createSuperjsonResponse({ personas } as PersonaCatalogResponse);
   } catch (error: unknown) {
