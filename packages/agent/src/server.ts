@@ -2889,12 +2889,15 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('session/new', async (params: unknown) => {
     assertInitialized(state);
-    if (state.activeSession)
+    if (state.activeTurn || [...state.jobs.values()].some((job) => job.status === 'running'))
       throw {
         code: AcpErrorCodes.SessionBusy,
         message: 'SessionBusy',
         data: { category: 'session' },
       };
+
+    state.pendingPermissionRequests.clear();
+    state.jobs.clear();
 
     const parsed = params as { workDir: string; persona?: string; systemPrompt?: unknown };
     if (!parsed?.workDir) throwInvalidParams('workDir is required');
@@ -2995,12 +2998,19 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
     }
 
-    if (state.activeSession && state.activeSession.meta.sessionId !== parsed.sessionId) {
+    if (state.activeTurn) {
       throw {
         code: AcpErrorCodes.SessionBusy,
         message: 'SessionBusy',
         data: { category: 'session' },
       };
+    }
+
+    const switchingSessions =
+      state.activeSession && state.activeSession.meta.sessionId !== parsed.sessionId;
+    if (switchingSessions) {
+      state.pendingPermissionRequests.clear();
+      state.jobs.clear();
     }
 
     let loaded: LoadedSession;

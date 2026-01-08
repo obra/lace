@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { appendDurableEvent } from '../storage/event-log';
+import { ensureSessionFiles, writeSessionMeta, writeSessionState } from '../storage/session-store';
 import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
 import { defaultInitializeParams } from './helpers/initialize';
 
@@ -735,5 +738,245 @@ describe('Ent protocol contract (selected coverage)', () => {
       content: [{ type: 'text', text: 'hi' }],
       priority: 'normal',
     });
+  });
+
+  it('supports credentials status and session list/load/fork/set_mode', async () => {
+    agent = spawnAgentProcess({ laceDir });
+    await withTimeout(agent.peer.request('initialize', defaultInitializeParams()), 2_000, 'init');
+
+    const { providers } = (await withTimeout(
+      agent.peer.request('ent/providers/list'),
+      2_000,
+      'providers/list'
+    )) as { providers: ProviderInfo[] };
+    const providerId =
+      providers.find((p) => p.providerId === 'openai')?.providerId ?? providers[0].providerId;
+
+    const { connectionId } = (await withTimeout(
+      agent.peer.request('ent/connections/upsert', {
+        providerId,
+        connection: { name: 'cred-status', config: {} },
+      }),
+      2_000,
+      'connections/upsert'
+    )) as { connectionId: string };
+
+    const statusMissing = (await withTimeout(
+      agent.peer.request('ent/connections/credentials/status', { connectionId }),
+      2_000,
+      'credentials/status missing'
+    )) as { state: 'ready' | 'missing' };
+    expect(statusMissing.state).toBe('missing');
+
+    await withTimeout(
+      agent.peer.request('ent/connections/credentials/submit', {
+        connectionId,
+        values: { apiKey: 'sk-test' },
+      }),
+      2_000,
+      'credentials/submit'
+    );
+
+    const statusReady = (await withTimeout(
+      agent.peer.request('ent/connections/credentials/status', { connectionId }),
+      2_000,
+      'credentials/status ready'
+    )) as { state: 'ready' | 'missing' };
+    expect(statusReady.state).toBe('ready');
+
+    await expect(
+      agent.peer.request('ent/connections/credentials/status', { connectionId: 'missing-conn' })
+    ).rejects.toMatchObject({ code: 14, message: 'ConnectionNotFound' });
+
+    const workDirA = join(workDir, 'a');
+    const workDirB = join(workDir, 'b');
+    mkdirSync(workDirA, { recursive: true });
+    mkdirSync(workDirB, { recursive: true });
+
+    const { sessionId: sessionA } = (await withTimeout(
+      agent.peer.request('session/new', { workDir: workDirA }),
+      2_000,
+      'session/new A'
+    )) as { sessionId: string };
+
+    const { sessionId: sessionB } = (await withTimeout(
+      agent.peer.request('session/new', { workDir: workDirB }),
+      2_000,
+      'session/new B'
+    )) as { sessionId: string };
+
+    const listAll = (await withTimeout(
+      agent.peer.request('session/list', {}),
+      2_000,
+      'session/list all'
+    )) as { sessions: Array<{ sessionId: string; cwd: string }> };
+    expect(listAll.sessions.some((s) => s.sessionId === sessionA)).toBe(true);
+    expect(listAll.sessions.some((s) => s.sessionId === sessionB)).toBe(true);
+
+    const listFiltered = (await withTimeout(
+      agent.peer.request('session/list', { cwd: workDirA }),
+      2_000,
+      'session/list filtered'
+    )) as { sessions: Array<{ sessionId: string; cwd: string }> };
+    expect(listFiltered.sessions.length).toBe(1);
+    expect(listFiltered.sessions[0]).toMatchObject({ sessionId: sessionA, cwd: workDirA });
+
+    // session/load establishes the active session (switching sessions is allowed when idle)
+    const loaded = (await withTimeout(
+      agent.peer.request('session/load', { sessionId: sessionA }),
+      2_000,
+      'session/load A'
+    ).catch((error) => {
+      const message = (error as any)?.message ?? String(error);
+      throw new Error(`session/load A failed: ${message}`);
+    })) as { sessionId: string; messageCount: number; updatedAt: string };
+    expect(loaded.sessionId).toBe(sessionA);
+    expect(typeof loaded.messageCount).toBe('number');
+    expect(new Date(loaded.updatedAt).toString()).not.toBe('Invalid Date');
+
+    try {
+      await agent.peer.request('session/load', { sessionId: 'not-a-session-id' });
+      throw new Error('expected InvalidParams');
+    } catch (error) {
+      expect(error).toMatchObject({ code: -32602, message: 'InvalidParams' });
+    }
+
+    try {
+      await agent.peer.request('session/load', {
+        sessionId: 'sess_00000000-0000-0000-0000-000000000000',
+      });
+      throw new Error('expected SessionNotFound');
+    } catch (error) {
+      expect(error).toMatchObject({ code: 1, message: 'SessionNotFound' });
+    }
+
+    const fork = (await withTimeout(
+      agent.peer.request('session/fork', { sessionId: sessionA, cwd: workDirB }),
+      2_000,
+      'session/fork'
+    )) as { sessionId: string; forkedFrom: string };
+    expect(fork.sessionId).toBeTruthy();
+    expect(fork.forkedFrom).toBe(sessionA);
+
+    await withTimeout(
+      agent.peer.request('session/load', { sessionId: fork.sessionId }),
+      2_000,
+      'load fork'
+    ).catch((error) => {
+      const message = (error as any)?.message ?? String(error);
+      throw new Error(`session/load fork failed: ${message}`);
+    });
+
+    const { previousMode } = (await withTimeout(
+      agent.peer.request('session/set_mode', { mode: 'plan' }),
+      2_000,
+      'session/set_mode plan'
+    ).catch((error) => {
+      const message = (error as any)?.message ?? String(error);
+      throw new Error(`session/set_mode failed: ${message}`);
+    })) as { mode: string; previousMode: string };
+    expect(previousMode === 'plan' || previousMode === 'execute').toBe(true);
+  });
+
+  it('receives session/update notifications for context injection', async () => {
+    agent = spawnAgentProcess({ laceDir });
+    await withTimeout(agent.peer.request('initialize', defaultInitializeParams()), 2_000, 'init');
+    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+    const update = await withTimeout(
+      new Promise<any>((resolve) => {
+        agent!.peer.onRequest('session/update', async (params) => {
+          resolve(params);
+          return undefined;
+        });
+        void agent!.peer.request('ent/session/inject', {
+          content: [{ type: 'text', text: 'ctx' }],
+          priority: 'normal',
+        });
+      }),
+      2_000,
+      'session/update'
+    );
+
+    expect(update).toMatchObject({ type: 'context_injected', priority: 'normal' });
+  });
+
+  it('reissues pending permission prompts via session/request_permission on session/load', async () => {
+    const sessionId = 'sess_00000000-0000-0000-0000-000000000001';
+    const sessionDir = join(laceDir, 'agent-sessions', sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+
+    const created = new Date().toISOString();
+    writeSessionMeta(sessionDir, { sessionId, workDir, created });
+
+    ensureSessionFiles(sessionDir);
+    let state = { nextEventSeq: 1, nextStreamSeq: 1, config: {} as Record<string, unknown> } as any;
+    const toolCallId = 'tool_00000000-0000-0000-0000-000000000001';
+    const requestedAt = new Date().toISOString();
+
+    const appended = appendDurableEvent(sessionDir, state, {
+      type: 'permission_requested',
+      turnId: 'turn_00000000-0000-0000-0000-000000000001',
+      data: {
+        toolCallId,
+        turnSeq: 1,
+        tool: 'read_file',
+        kind: 'file',
+        resource: '/tmp/example.txt',
+        options: [
+          { optionId: 'allow', label: 'Allow' },
+          { optionId: 'deny', label: 'Deny' },
+        ],
+        requestedAt,
+        input: { path: '/tmp/example.txt' },
+      },
+    });
+    state = appended.nextState;
+    writeSessionState(sessionDir, state);
+
+    agent = spawnAgentProcess({ laceDir });
+    await withTimeout(agent.peer.request('initialize', defaultInitializeParams()), 2_000, 'init');
+
+    const permissionRequest = await withTimeout(
+      new Promise<any>((resolve) => {
+        agent!.peer.onRequest('session/request_permission', async (params) => {
+          resolve(params);
+          return { decision: 'allow' };
+        });
+        void agent!.peer.request('session/load', { sessionId });
+      }),
+      5_000,
+      'session/request_permission'
+    );
+
+    expect(permissionRequest).toMatchObject({
+      sessionId,
+      toolCallId,
+      requestedAt,
+      tool: 'read_file',
+      resource: '/tmp/example.txt',
+    });
+
+    // Wait for the decision to be recorded durably.
+    const events = await withTimeout(
+      (async () => {
+        for (let i = 0; i < 25; i++) {
+          const result = (await agent!.peer.request('ent/session/events', { limit: 200 })) as any;
+          if (
+            Array.isArray(result?.events) &&
+            result.events.some((e: any) => e.type === 'permission_decided')
+          ) {
+            return result.events as any[];
+          }
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        return (await agent!.peer.request('ent/session/events', { limit: 200 })) as any;
+      })(),
+      2_000,
+      'session/events'
+    );
+
+    const decided = (events as any[]).find((e: any) => e.type === 'permission_decided');
+    expect(decided?.data?.toolCallId).toBe(toolCallId);
   });
 });
