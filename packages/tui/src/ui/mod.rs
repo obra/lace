@@ -1078,9 +1078,13 @@ fn render_config_modal(state: &AppState) -> Paragraph<'static> {
         }
         config_wizard::ConfigWizardStep::SelectModel => {
             lines.push(Line::from("Select model:"));
-            for (i, m) in w.models.iter().enumerate() {
+            let max = 18usize;
+            let start = w.selected.saturating_sub(max / 2);
+            let end = (start + max).min(w.models.len());
+            for i in start..end {
                 let marker = if i == w.selected { ">" } else { " " };
-                lines.push(Line::from(format!("{marker} {m}")));
+                let m = &w.models[i];
+                lines.push(Line::from(format!("{marker} {}", m.name)));
             }
         }
         config_wizard::ConfigWizardStep::Applying => {
@@ -1167,17 +1171,17 @@ fn render_models_modal(state: &AppState) -> Paragraph<'static> {
     } else if state.models_panel.loading {
         lines.push(Line::from("Loading models..."));
     } else {
-        for (i, m) in state.models_panel.models.iter().enumerate() {
+        let max = 18usize;
+        let start = state.models_panel.selected.saturating_sub(max / 2);
+        let end = (start + max).min(state.models_panel.models.len());
+        for i in start..end {
             let marker = if i == state.models_panel.selected {
                 ">"
             } else {
                 " "
             };
-            let status = if m.disabled {
-                "[disabled]"
-            } else {
-                "[enabled]"
-            };
+            let m = &state.models_panel.models[i];
+            let status = if m.disabled { "[disabled]" } else { "[enabled]" };
             lines.push(Line::from(format!("{marker} {} {}", m.name, status)));
         }
         if state.models_panel.models.is_empty() {

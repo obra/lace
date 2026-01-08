@@ -9,7 +9,7 @@ pub struct ConfigWizardState {
     pub selected: usize,
     pub connections: Vec<ConnectionItem>,
     pub providers: Vec<ProviderItem>,
-    pub models: Vec<String>,
+    pub models: Vec<WizardModelItem>,
     pub connection_id: Option<String>,
     pub model_id: Option<String>,
     pub credential_fields: Vec<CredentialField>,
@@ -56,6 +56,13 @@ pub struct CredentialField {
     pub name: String,
     pub label: Option<String>,
     pub secret: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WizardModelItem {
+    pub model_id: String,
+    pub name: String,
+    pub disabled: bool,
 }
 
 impl ConfigWizardState {
@@ -488,30 +495,38 @@ fn on_credentials_submit(state: &mut AppState, result: &Option<Value>) -> Vec<Ou
 
 fn request_models_list(state: &mut AppState, connection_id: String) -> Vec<Outbound> {
     state.config_wizard.step = ConfigWizardStep::LoadingModels;
-    let refresh_id = state.next_client_id();
     let list_id = state.next_client_id();
-    vec![
-        Outbound::JsonRpcRequest {
-            id: refresh_id,
-            method: "ent/providers/refresh".to_string(),
-            params: Some(json!({})),
-        },
-        Outbound::JsonRpcRequest {
-            id: list_id,
-            method: "ent/models/list".to_string(),
-            params: Some(json!({ "connectionId": connection_id })),
-        },
-    ]
+    vec![Outbound::JsonRpcRequest {
+        id: list_id,
+        method: "ent/models/list".to_string(),
+        params: Some(json!({ "connectionId": connection_id })),
+    }]
 }
 
 fn on_models_list(state: &mut AppState, result: &Option<Value>) -> Vec<Outbound> {
-    let mut models: Vec<String> = Vec::new();
+    let mut models: Vec<WizardModelItem> = Vec::new();
     if let Some(Value::Object(obj)) = result {
         if let Some(Value::Array(arr)) = obj.get("models") {
             for m in arr {
                 let Some(mobj) = m.as_object() else { continue };
                 if let Some(model_id) = mobj.get("modelId").and_then(|v| v.as_str()) {
-                    models.push(model_id.to_string());
+                    let disabled = mobj
+                        .get("disabled")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    if disabled {
+                        continue;
+                    }
+                    let name = mobj
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(model_id)
+                        .to_string();
+                    models.push(WizardModelItem {
+                        model_id: model_id.to_string(),
+                        name,
+                        disabled,
+                    });
                 }
             }
         }
@@ -519,7 +534,12 @@ fn on_models_list(state: &mut AppState, result: &Option<Value>) -> Vec<Outbound>
     state.config_wizard.models = models;
     state.config_wizard.selected = 0;
     if let Some(last) = &state.prefs.last_model_id {
-        if let Some(pos) = state.config_wizard.models.iter().position(|m| m == last) {
+        if let Some(pos) = state
+            .config_wizard
+            .models
+            .iter()
+            .position(|m| &m.model_id == last)
+        {
             state.config_wizard.selected = pos;
         }
     }
@@ -543,10 +563,10 @@ fn submit_model(state: &mut AppState) -> Vec<Outbound> {
         .config_wizard
         .selected
         .min(state.config_wizard.models.len().saturating_sub(1));
-    let Some(model_id) = state.config_wizard.models.get(idx) else {
+    let Some(model) = state.config_wizard.models.get(idx) else {
         return Vec::new();
     };
-    let model_id = model_id.clone();
+    let model_id = model.model_id.clone();
     state.config_wizard.model_id = Some(model_id.clone());
     state.config_wizard.step = ConfigWizardStep::Applying;
 
