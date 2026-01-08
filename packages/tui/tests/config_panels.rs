@@ -1,6 +1,5 @@
 use lace_tui::app::config_panels::{
-    apply_model_toggle_result, handle_models_list, maybe_autoconfigure_from_connections, ModelItem,
-    ModelsPanelState,
+    handle_models_list, maybe_autoconfigure_from_connections,
 };
 use lace_tui::app::reducer::Outbound;
 use lace_tui::app::AppState;
@@ -49,7 +48,7 @@ fn autoconfigure_skips_when_connection_missing() {
 }
 
 #[test]
-fn models_list_sets_disabled_flag() {
+fn models_list_filters_disabled_models() {
     let mut state = AppState::new_with_paths(None, None);
     state.models_panel.open = true;
     let result = Some(json!({
@@ -61,37 +60,6 @@ fn models_list_sets_disabled_flag() {
         ]
     }));
     handle_models_list(&mut state, &result, None);
-    assert_eq!(state.models_panel.models.len(), 2);
-    assert!(!state.models_panel.models[0].disabled);
-    assert!(state.models_panel.models[1].disabled);
-}
-
-#[test]
-fn apply_model_toggle_result_marks_disabled() {
-    let mut state = AppState::new_with_paths(None, None);
-    state.models_panel = ModelsPanelState {
-        open: true,
-        loading: false,
-        error: None,
-        provider_id: Some("openai".to_string()),
-        connection_id: Some("c".to_string()),
-        models: vec![
-            ModelItem {
-                model_id: "a".to_string(),
-                name: "A".to_string(),
-                disabled: false,
-            },
-            ModelItem {
-                model_id: "b".to_string(),
-                name: "B".to_string(),
-                disabled: false,
-            },
-        ],
-        selected: 0,
-    };
-
-    let result = Some(json!({ "providerId": "openai", "enabled": ["a"], "disabled": ["b"] }));
-    apply_model_toggle_result(&mut state, &result);
-    assert!(!state.models_panel.models[0].disabled);
-    assert!(state.models_panel.models[1].disabled);
+    assert_eq!(state.models_panel.models.len(), 1);
+    assert_eq!(state.models_panel.models[0].model_id, "gpt-4o");
 }

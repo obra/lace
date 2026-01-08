@@ -25,7 +25,6 @@ impl Default for EnvEditorState {
 pub struct ModelItem {
     pub model_id: String,
     pub name: String,
-    pub disabled: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -142,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn handle_models_list_honors_disabled_state() {
+    fn handle_models_list_filters_disabled_state() {
         let mut state = AppState::new_with_paths(None, None);
         state.models_panel.open = true;
         state.connection_id = Some("c1".to_string());
@@ -160,9 +159,8 @@ mod tests {
             None,
         );
 
-        assert_eq!(state.models_panel.models.len(), 2);
-        assert!(state.models_panel.models[0].disabled);
-        assert!(!state.models_panel.models[1].disabled);
+        assert_eq!(state.models_panel.models.len(), 1);
+        assert_eq!(state.models_panel.models[0].model_id, "m2");
     }
 }
 
@@ -322,12 +320,10 @@ pub fn handle_models_list(
                         .and_then(|v| v.as_str())
                         .unwrap_or(model_id.as_str())
                         .to_string();
-                    let disabled = model_disabled(o);
-                    Some(ModelItem {
-                        model_id,
-                        name,
-                        disabled,
-                    })
+                    if model_disabled(o) {
+                        return None;
+                    }
+                    Some(ModelItem { model_id, name })
                 })
                 .collect::<Vec<_>>()
         })
@@ -346,36 +342,6 @@ fn model_disabled(o: &serde_json::Map<String, Value>) -> bool {
         .is_some_and(|s| s == "disabled")
 }
 
-pub fn toggle_selected_model(state: &mut AppState) -> Vec<Outbound> {
-    if !state.models_panel.open {
-        return Vec::new();
-    }
-    let Some(provider_id) = state.models_panel.provider_id.clone() else {
-        state.models_panel.error = Some("Missing providerId".to_string());
-        return Vec::new();
-    };
-    let Some(model) = state
-        .models_panel
-        .models
-        .get(state.models_panel.selected)
-        .cloned()
-    else {
-        return Vec::new();
-    };
-
-    let method = if model.disabled {
-        "ent/models/enable"
-    } else {
-        "ent/models/disable"
-    };
-    let id = state.next_client_id();
-    vec![Outbound::JsonRpcRequest {
-        id,
-        method: method.to_string(),
-        params: Some(json!({ "providerId": provider_id, "modelIds": [model.model_id] })),
-    }]
-}
-
 pub fn select_model_for_session(state: &mut AppState) -> Vec<Outbound> {
     if !state.models_panel.open {
         return Vec::new();
@@ -392,10 +358,6 @@ pub fn select_model_for_session(state: &mut AppState) -> Vec<Outbound> {
     else {
         return Vec::new();
     };
-    if model.disabled {
-        state.models_panel.error = Some("Model is disabled".to_string());
-        return Vec::new();
-    }
 
     state.models_panel.loading = true;
     let id = state.next_client_id();
@@ -410,35 +372,17 @@ pub fn select_model_for_session(state: &mut AppState) -> Vec<Outbound> {
     }]
 }
 
-pub fn apply_model_toggle_result(state: &mut AppState, result: &Option<serde_json::Value>) {
-    let Some(obj) = result.as_ref().and_then(|v| v.as_object()) else {
-        return;
+pub fn request_models_refresh(state: &mut AppState) -> Vec<Outbound> {
+    let Some(conn) = state.models_panel.connection_id.clone().filter(|s| !s.is_empty()) else {
+        state.models_panel.loading = false;
+        state.models_panel.error = Some("No active connection".to_string());
+        return Vec::new();
     };
-    let disabled = obj
-        .get("disabled")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    let disabled_set: std::collections::HashSet<String> = disabled.into_iter().collect();
-    for m in &mut state.models_panel.models {
-        m.disabled = disabled_set.contains(&m.model_id);
-    }
-}
-
-pub fn refresh_provider_catalog(state: &mut AppState) -> Vec<Outbound> {
+    state.models_panel.loading = true;
     let id = state.next_client_id();
-    let params = if let Some(provider_id) = state.models_panel.provider_id.clone() {
-        json!({ "providerId": provider_id })
-    } else {
-        json!({})
-    };
     vec![Outbound::JsonRpcRequest {
         id,
-        method: "ent/providers/refresh".to_string(),
-        params: Some(params),
+        method: "ent/models/refresh".to_string(),
+        params: Some(json!({ "connectionId": conn })),
     }]
 }

@@ -75,7 +75,6 @@ pub enum UiAction {
     ModelsPrev,
     ModelsNext,
     ModelsSelect,
-    ModelsToggle,
     ModelsRefresh,
     CloseModelsPanel,
 
@@ -93,6 +92,12 @@ pub enum UiAction {
     ConnectionsCredentialsStatus,
     ConnectionsBeginClearCredentials,
     ConnectionsCancelClearCredentials,
+    ConnectionsOpenModels,
+    ConnectionsModelsPrev,
+    ConnectionsModelsNext,
+    ConnectionsModelsToggle,
+    ConnectionsModelsRefresh,
+    ConnectionsModelsClose,
     ConnectionsClose,
 
     OpenPalette,
@@ -451,8 +456,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             Vec::new()
         }
         UiAction::ModelsSelect => crate::app::config_panels::select_model_for_session(state),
-        UiAction::ModelsToggle => crate::app::config_panels::toggle_selected_model(state),
-        UiAction::ModelsRefresh => crate::app::config_panels::refresh_provider_catalog(state),
+        UiAction::ModelsRefresh => crate::app::config_panels::request_models_refresh(state),
         UiAction::CloseModelsPanel => {
             crate::app::config_panels::close_models_panel(state);
             Vec::new()
@@ -495,6 +499,21 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         }
         UiAction::ConnectionsCancelClearCredentials => {
             crate::app::connections::cancel_clear_credentials(state);
+            Vec::new()
+        }
+        UiAction::ConnectionsOpenModels => crate::app::connections::open_models(state),
+        UiAction::ConnectionsModelsPrev => {
+            crate::app::connections::models_prev(state);
+            Vec::new()
+        }
+        UiAction::ConnectionsModelsNext => {
+            crate::app::connections::models_next(state);
+            Vec::new()
+        }
+        UiAction::ConnectionsModelsToggle => crate::app::connections::toggle_selected_model(state),
+        UiAction::ConnectionsModelsRefresh => crate::app::connections::request_models_refresh(state),
+        UiAction::ConnectionsModelsClose => {
+            crate::app::connections::close_models(state);
             Vec::new()
         }
         UiAction::ConnectionsSubmit => {

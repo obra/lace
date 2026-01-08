@@ -189,8 +189,23 @@ fn run_loop(
                             KeyCode::Down => Some(UiAction::ModelsNext),
                             KeyCode::Char('r') => Some(UiAction::ModelsRefresh),
                             KeyCode::Enter => Some(UiAction::ModelsSelect),
-                            KeyCode::Char(' ') => Some(UiAction::ModelsToggle),
-                            KeyCode::Char('x') => Some(UiAction::ModelsToggle),
+                            _ => None,
+                        };
+                        if let Some(action) = action {
+                            let out = apply_ui_action(state, action);
+                            send_outbound(transport, state, out, timeout_ms)?;
+                        }
+                        continue;
+                    }
+
+                    if state.connections.models.open {
+                        let action = match key.code {
+                            KeyCode::Esc => Some(UiAction::ConnectionsModelsClose),
+                            KeyCode::Up => Some(UiAction::ConnectionsModelsPrev),
+                            KeyCode::Down => Some(UiAction::ConnectionsModelsNext),
+                            KeyCode::Char('r') => Some(UiAction::ConnectionsModelsRefresh),
+                            KeyCode::Enter => Some(UiAction::ConnectionsModelsToggle),
+                            KeyCode::Char(' ') => Some(UiAction::ConnectionsModelsToggle),
                             _ => None,
                         };
                         if let Some(action) = action {
@@ -220,6 +235,7 @@ fn run_loop(
                             KeyCode::Char('t') => Some(UiAction::ConnectionsTest),
                             KeyCode::Char('s') => Some(UiAction::ConnectionsCredentialsStatus),
                             KeyCode::Char('k') => Some(UiAction::ConnectionsBeginClearCredentials),
+                            KeyCode::Char('m') => Some(UiAction::ConnectionsOpenModels),
                             KeyCode::Char('c') => {
                                 connections::close_connections(state);
                                 let out = config_wizard::open(state);
@@ -731,20 +747,27 @@ fn handle_agent_line(
                 if method == "ent/models/list" && state.models_panel.open {
                     crate::app::config_panels::handle_models_list(state, &result, error_message);
                 }
+                if method == "ent/models/refresh" && state.models_panel.open {
+                    let out = crate::app::config_panels::request_models_list(state);
+                    send_outbound(transport, state, out, timeout_ms)?;
+                }
+                if method == "ent/models/list" && state.connections.models.open {
+                    crate::app::connections::handle_models_list_response(state, &result, error_message);
+                }
                 if (method == "ent/models/enable" || method == "ent/models/disable")
-                    && state.models_panel.open
+                    && state.connections.models.open
                 {
                     if error_message.is_some() {
-                        state.models_panel.error = error_message.map(|s| s.to_string());
-                        state.models_panel.loading = false;
+                        state.connections.models.error = error_message.map(|s| s.to_string());
+                        state.connections.models.loading = false;
                     } else {
-                        crate::app::config_panels::apply_model_toggle_result(state, &result);
-                        let out = crate::app::config_panels::request_models_list(state);
+                        crate::app::connections::apply_model_toggle_result(state, &result);
+                        let out = crate::app::connections::open_models(state);
                         send_outbound(transport, state, out, timeout_ms)?;
                     }
                 }
-                if method == "ent/providers/refresh" && state.models_panel.open {
-                    let out = crate::app::config_panels::request_models_list(state);
+                if method == "ent/models/refresh" && state.connections.models.open {
+                    let out = crate::app::connections::open_models(state);
                     send_outbound(transport, state, out, timeout_ms)?;
                 }
             }
@@ -934,6 +957,10 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
         let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
         f.render_widget(render_models_modal(state), area);
+    } else if state.connections.models.open {
+        let area = centered_rect(80, 70, f.area());
+        f.render_widget(Clear, area);
+        f.render_widget(render_connections_models_modal(state), area);
     } else if state.connections.open {
         let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
@@ -1287,7 +1314,7 @@ fn render_env_modal(state: &AppState) -> Paragraph<'static> {
 fn render_models_modal(state: &AppState) -> Paragraph<'static> {
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(
-        "Models (Enter select, Space toggle enable/disable, r refresh)",
+        "Models (enabled only) (Enter select, r refresh)",
     ));
     lines.push(Line::from(""));
 
@@ -1306,8 +1333,7 @@ fn render_models_modal(state: &AppState) -> Paragraph<'static> {
                 " "
             };
             let m = &state.models_panel.models[i];
-            let status = if m.disabled { "[disabled]" } else { "[enabled]" };
-            lines.push(Line::from(format!("{marker} {} {}", m.name, status)));
+            lines.push(Line::from(format!("{marker} {}", m.name)));
         }
         if state.models_panel.models.is_empty() {
             lines.push(Line::from("No models found"));
@@ -1391,12 +1417,50 @@ fn render_connections_modal(state: &AppState) -> Paragraph<'static> {
         lines.push(Line::from("Enter save • Esc close"));
     } else {
         lines.push(Line::from(
-            "Up/Down select • Enter configure • c create • r refresh • e rename • d delete • t test • s status • k clear creds • Esc close",
+            "Up/Down select • Enter configure • c create • r refresh • e rename • d delete • t test • s status • k clear creds • m models • Esc close",
         ));
     }
 
     Paragraph::new(Text::from(lines))
         .block(Block::default().title("Connections").borders(Borders::ALL))
+        .wrap(Wrap { trim: true })
+}
+
+fn render_connections_models_modal(state: &AppState) -> Paragraph<'static> {
+    let mut lines: Vec<Line> = Vec::new();
+    lines.push(Line::from("Connection Models"));
+    lines.push(Line::from(""));
+
+    if let Some(err) = &state.connections.models.error {
+        lines.push(Line::from(format!("Error: {err}")));
+        lines.push(Line::from(""));
+    }
+
+    if state.connections.models.loading {
+        lines.push(Line::from("Loading models..."));
+    } else if state.connections.models.models.is_empty() {
+        lines.push(Line::from("No models"));
+    } else {
+        let max = 18usize;
+        let start = state.connections.models.selected.saturating_sub(max / 2);
+        let end = (start + max).min(state.connections.models.models.len());
+        for i in start..end {
+            let marker = if i == state.connections.models.selected {
+                ">"
+            } else {
+                " "
+            };
+            let m = &state.connections.models.models[i];
+            let status = if m.disabled { "[disabled]" } else { "[enabled]" };
+            lines.push(Line::from(format!("{marker} {} {}", m.name, status)));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from("Up/Down select • Enter/Space toggle enable/disable • r refresh • Esc close"));
+
+    Paragraph::new(Text::from(lines))
+        .block(Block::default().title("Models").borders(Borders::ALL))
         .wrap(Wrap { trim: true })
 }
 

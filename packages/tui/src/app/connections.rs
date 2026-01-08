@@ -13,6 +13,7 @@ pub struct ConnectionsState {
     pub rename_input: String,
     pub confirm_delete: bool,
     pub confirm_clear_credentials: bool,
+    pub models: ConnectionModelsState,
     pub last_test: std::collections::HashMap<String, TestResult>,
     pub credential_status: std::collections::HashMap<String, CredentialStatus>,
 }
@@ -40,6 +41,24 @@ pub struct CredentialStatus {
     pub expires_at: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectionModelsState {
+    pub open: bool,
+    pub loading: bool,
+    pub error: Option<String>,
+    pub provider_id: Option<String>,
+    pub connection_id: Option<String>,
+    pub selected: usize,
+    pub models: Vec<ConnectionModelItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectionModelItem {
+    pub model_id: String,
+    pub name: String,
+    pub disabled: bool,
+}
+
 impl ConnectionsState {
     pub fn new() -> Self {
         Self {
@@ -52,8 +71,23 @@ impl ConnectionsState {
             rename_input: String::new(),
             confirm_delete: false,
             confirm_clear_credentials: false,
+            models: ConnectionModelsState::new(),
             last_test: std::collections::HashMap::new(),
             credential_status: std::collections::HashMap::new(),
+        }
+    }
+}
+
+impl ConnectionModelsState {
+    pub fn new() -> Self {
+        Self {
+            open: false,
+            loading: false,
+            error: None,
+            provider_id: None,
+            connection_id: None,
+            selected: 0,
+            models: Vec::new(),
         }
     }
 }
@@ -69,6 +103,7 @@ pub fn open_connections(state: &mut AppState) -> Vec<Outbound> {
     state.connections.rename_input.clear();
     state.connections.confirm_delete = false;
     state.connections.confirm_clear_credentials = false;
+    state.connections.models = ConnectionModelsState::new();
 
     request_list(state)
 }
@@ -81,6 +116,7 @@ pub fn close_connections(state: &mut AppState) {
     state.connections.rename_input.clear();
     state.connections.confirm_delete = false;
     state.connections.confirm_clear_credentials = false;
+    state.connections.models = ConnectionModelsState::new();
 }
 
 pub fn prev(state: &mut AppState) {
@@ -107,6 +143,7 @@ pub fn handle_list_response(state: &mut AppState, result: &Option<Value>, error_
     state.connections.rename_input.clear();
     state.connections.confirm_delete = false;
     state.connections.confirm_clear_credentials = false;
+    state.connections.models = ConnectionModelsState::new();
 
     if let Some(err) = error_message {
         state.connections.error = Some(err.to_string());
@@ -157,6 +194,166 @@ pub fn handle_list_response(state: &mut AppState, result: &Option<Value>, error_
         state.connections.selected = state.connections.items.len().saturating_sub(1);
     }
     state.connections.error = None;
+}
+
+pub fn open_models(state: &mut AppState) -> Vec<Outbound> {
+    let Some(it) = selected_item(state) else { return Vec::new() };
+    state.connections.models.open = true;
+    state.connections.models.loading = true;
+    state.connections.models.error = None;
+    state.connections.models.provider_id = None;
+    state.connections.models.connection_id = Some(it.connection_id.clone());
+    state.connections.models.selected = 0;
+    state.connections.models.models.clear();
+
+    let id = state.next_client_id();
+    vec![Outbound::JsonRpcRequest {
+        id,
+        method: "ent/models/list".to_string(),
+        params: Some(json!({ "connectionId": it.connection_id })),
+    }]
+}
+
+pub fn close_models(state: &mut AppState) {
+    state.connections.models = ConnectionModelsState::new();
+}
+
+pub fn models_prev(state: &mut AppState) {
+    state.connections.models.selected = state.connections.models.selected.saturating_sub(1);
+}
+
+pub fn models_next(state: &mut AppState) {
+    let max = state.connections.models.models.len().saturating_sub(1);
+    state.connections.models.selected = (state.connections.models.selected + 1).min(max);
+}
+
+pub fn request_models_refresh(state: &mut AppState) -> Vec<Outbound> {
+    let Some(conn) = state.connections.models.connection_id.clone().filter(|s| !s.is_empty())
+    else {
+        state.connections.models.error = Some("Missing connectionId".to_string());
+        return Vec::new();
+    };
+    state.connections.models.loading = true;
+    let id = state.next_client_id();
+    vec![Outbound::JsonRpcRequest {
+        id,
+        method: "ent/models/refresh".to_string(),
+        params: Some(json!({ "connectionId": conn })),
+    }]
+}
+
+pub fn handle_models_list_response(
+    state: &mut AppState,
+    result: &Option<Value>,
+    error_message: Option<&str>,
+) {
+    state.connections.models.loading = false;
+    if let Some(err) = error_message {
+        state.connections.models.error = Some(err.to_string());
+        return;
+    }
+    let Some(obj) = result.as_ref().and_then(|v| v.as_object()) else {
+        state.connections.models.error = Some("Invalid models response".to_string());
+        return;
+    };
+    state.connections.models.provider_id = obj
+        .get("providerId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    state.connections.models.connection_id = obj
+        .get("connectionId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    state.connections.models.error = None;
+
+    let models = obj
+        .get("models")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|m| {
+                    let o = m.as_object()?;
+                    let model_id = o.get("modelId")?.as_str()?.to_string();
+                    let name = o
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(model_id.as_str())
+                        .to_string();
+                    let disabled = model_disabled(o);
+                    Some(ConnectionModelItem {
+                        model_id,
+                        name,
+                        disabled,
+                    })
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    state.connections.models.models = models;
+    state.connections.models.selected = 0;
+}
+
+pub fn toggle_selected_model(state: &mut AppState) -> Vec<Outbound> {
+    if !state.connections.models.open {
+        return Vec::new();
+    }
+    let Some(provider_id) = state.connections.models.provider_id.clone().filter(|s| !s.is_empty())
+    else {
+        state.connections.models.error = Some("Missing providerId".to_string());
+        return Vec::new();
+    };
+    let Some(model) = state
+        .connections
+        .models
+        .models
+        .get(state.connections.models.selected)
+        .cloned()
+    else {
+        return Vec::new();
+    };
+
+    state.connections.models.loading = true;
+    let method = if model.disabled {
+        "ent/models/enable"
+    } else {
+        "ent/models/disable"
+    };
+    let id = state.next_client_id();
+    vec![Outbound::JsonRpcRequest {
+        id,
+        method: method.to_string(),
+        params: Some(json!({ "providerId": provider_id, "modelIds": [model.model_id] })),
+    }]
+}
+
+pub fn apply_model_toggle_result(state: &mut AppState, result: &Option<Value>) {
+    let Some(obj) = result.as_ref().and_then(|v| v.as_object()) else {
+        return;
+    };
+    let disabled = obj
+        .get("disabled")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let disabled_set: std::collections::HashSet<String> = disabled.into_iter().collect();
+    for m in &mut state.connections.models.models {
+        m.disabled = disabled_set.contains(&m.model_id);
+    }
+}
+
+fn model_disabled(o: &serde_json::Map<String, Value>) -> bool {
+    if o.get("disabled").and_then(|v| v.as_bool()) == Some(true) {
+        return true;
+    }
+
+    o.get("disabledState")
+        .and_then(|v| v.as_str())
+        .is_some_and(|s| s == "disabled")
 }
 
 pub fn start_rename(state: &mut AppState) {
@@ -475,5 +672,88 @@ mod tests {
             }
             _ => panic!("expected request"),
         }
+    }
+
+    #[test]
+    fn connection_models_list_parses_disabled_state() {
+        let mut state = AppState::new_with_paths(None, None);
+        state.connections.open = true;
+        state.connections.models.open = true;
+        handle_models_list_response(
+            &mut state,
+            &Some(json!({
+              "providerId":"p1",
+              "connectionId":"c1",
+              "models":[
+                {"modelId":"m1","name":"m1","disabledState":"disabled"},
+                {"modelId":"m2","name":"m2","disabledState":"enabled"}
+              ]
+            })),
+            None,
+        );
+        assert_eq!(state.connections.models.models.len(), 2);
+        assert!(state.connections.models.models[0].disabled);
+        assert!(!state.connections.models.models[1].disabled);
+    }
+
+    #[test]
+    fn connection_models_toggle_sends_enable_when_disabled() {
+        let mut state = AppState::new_with_paths(None, None);
+        state.next_client_seq = 9;
+        state.connections.open = true;
+        state.connections.models.open = true;
+        state.connections.models.provider_id = Some("p1".to_string());
+        state.connections.models.models = vec![
+            ConnectionModelItem {
+                model_id: "m1".to_string(),
+                name: "m1".to_string(),
+                disabled: true,
+            },
+            ConnectionModelItem {
+                model_id: "m2".to_string(),
+                name: "m2".to_string(),
+                disabled: false,
+            },
+        ];
+
+        state.connections.models.selected = 0;
+        let out = toggle_selected_model(&mut state);
+        assert_eq!(out.len(), 1);
+        match &out[0] {
+            Outbound::JsonRpcRequest { id, method, params } => {
+                assert_eq!(id, "c_9");
+                assert_eq!(method, "ent/models/enable");
+                assert_eq!(
+                    params.as_ref()
+                        .and_then(|v| v.get("providerId"))
+                        .and_then(|v| v.as_str()),
+                    Some("p1")
+                );
+            }
+            _ => panic!("expected request"),
+        }
+    }
+
+    #[test]
+    fn connection_models_apply_toggle_result_updates_disabled_set() {
+        let mut state = AppState::new_with_paths(None, None);
+        state.connections.models.open = true;
+        state.connections.models.models = vec![
+            ConnectionModelItem {
+                model_id: "a".to_string(),
+                name: "A".to_string(),
+                disabled: false,
+            },
+            ConnectionModelItem {
+                model_id: "b".to_string(),
+                name: "B".to_string(),
+                disabled: false,
+            },
+        ];
+
+        let result = Some(json!({ "providerId": "p1", "enabled": ["a"], "disabled": ["b"] }));
+        apply_model_toggle_result(&mut state, &result);
+        assert!(!state.connections.models.models[0].disabled);
+        assert!(state.connections.models.models[1].disabled);
     }
 }
