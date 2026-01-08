@@ -381,11 +381,12 @@ fn on_connections_upsert(state: &mut AppState, result: &Option<Value>) -> Vec<Ou
 }
 
 fn on_credentials_start(state: &mut AppState, result: &Option<Value>) -> Vec<Outbound> {
-    let connection_id = state
-        .config_wizard
-        .connection_id
-        .clone()
-        .unwrap_or_default();
+    let Some(connection_id) = state.config_wizard.connection_id.clone().filter(|c| !c.is_empty())
+    else {
+        state.config_wizard.step = ConfigWizardStep::Error;
+        state.config_wizard.error_message = Some("missing connection id".to_string());
+        return Vec::new();
+    };
     let Some(Value::Object(obj)) = result else {
         return request_models_list(state, connection_id);
     };
@@ -482,11 +483,11 @@ fn maybe_submit_credentials_if_ready(state: &mut AppState) -> Vec<Outbound> {
 
     state.config_wizard.step = ConfigWizardStep::SubmittingCredentials;
     let id = state.next_client_id();
-    let connection_id = state
-        .config_wizard
-        .connection_id
-        .clone()
-        .unwrap_or_default();
+    let Some(connection_id) = state.config_wizard.connection_id.clone() else {
+        state.config_wizard.step = ConfigWizardStep::Error;
+        state.config_wizard.error_message = Some("missing connection id".to_string());
+        return Vec::new();
+    };
     let values = state.config_wizard.credential_values.clone();
     vec![Outbound::JsonRpcRequest {
         id,
@@ -496,11 +497,11 @@ fn maybe_submit_credentials_if_ready(state: &mut AppState) -> Vec<Outbound> {
 }
 
 fn on_credentials_submit(state: &mut AppState, result: &Option<Value>) -> Vec<Outbound> {
-    let connection_id = state
-        .config_wizard
-        .connection_id
-        .clone()
-        .unwrap_or_default();
+    let Some(connection_id) = state.config_wizard.connection_id.clone() else {
+        state.config_wizard.step = ConfigWizardStep::Error;
+        state.config_wizard.error_message = Some("missing connection id".to_string());
+        return Vec::new();
+    };
     if let Some(Value::Object(obj)) = result {
         if obj.get("ok").and_then(|v| v.as_bool()) == Some(true) {
             return request_models_list(state, connection_id);
@@ -528,10 +529,7 @@ fn on_models_list(state: &mut AppState, result: &Option<Value>) -> Vec<Outbound>
             for m in arr {
                 let Some(mobj) = m.as_object() else { continue };
                 if let Some(model_id) = mobj.get("modelId").and_then(|v| v.as_str()) {
-                    let disabled = mobj
-                        .get("disabled")
-                        .and_then(|v| v.as_bool())
-                        .unwrap_or(false);
+                    let disabled = model_disabled(mobj);
                     if disabled {
                         continue;
                     }
@@ -588,17 +586,28 @@ fn submit_model(state: &mut AppState) -> Vec<Outbound> {
     state.config_wizard.model_id = Some(model_id.clone());
     state.config_wizard.step = ConfigWizardStep::Applying;
 
-    let connection_id = state
-        .config_wizard
-        .connection_id
-        .clone()
-        .unwrap_or_default();
+    let Some(connection_id) = state.config_wizard.connection_id.clone().filter(|c| !c.is_empty())
+    else {
+        state.config_wizard.step = ConfigWizardStep::Error;
+        state.config_wizard.error_message = Some("missing connection id".to_string());
+        return Vec::new();
+    };
     let id = state.next_client_id();
     vec![Outbound::JsonRpcRequest {
         id,
         method: "ent/session/configure".to_string(),
         params: Some(json!({ "connectionId": connection_id, "modelId": model_id })),
     }]
+}
+
+fn model_disabled(o: &serde_json::Map<String, Value>) -> bool {
+    if o.get("disabled").and_then(|v| v.as_bool()) == Some(true) {
+        return true;
+    }
+
+    o.get("disabledState")
+        .and_then(|v| v.as_str())
+        .is_some_and(|s| s == "disabled")
 }
 
 fn on_session_configure(state: &mut AppState, result: &Option<Value>) -> Vec<Outbound> {
@@ -751,5 +760,40 @@ mod tests {
         assert!(out.is_empty());
         assert_eq!(state.prefs.last_connection_id, Some("c1".to_string()));
         assert_eq!(state.prefs.last_model_id, Some("m1".to_string()));
+    }
+
+    #[test]
+    fn models_list_filters_disabled_state_models() {
+        let mut state = AppState::new_with_paths(None, None);
+        state.config_wizard.open = true;
+        state.config_wizard.step = ConfigWizardStep::LoadingModels;
+        state.config_wizard.connection_id = Some("c1".to_string());
+
+        let out = handle_response(
+            &mut state,
+            "ent/models/list",
+            &Some(json!({"models":[
+              {"modelId":"m1","disabledState":"disabled"},
+              {"modelId":"m2","disabledState":"enabled"}
+            ]})),
+            None,
+        );
+
+        assert_eq!(state.config_wizard.models.len(), 1);
+        assert_eq!(state.config_wizard.models[0].model_id, "m2");
+        assert_eq!(state.config_wizard.step, ConfigWizardStep::Applying);
+
+        assert_eq!(out.len(), 1);
+        match &out[0] {
+            Outbound::JsonRpcRequest { method, params, .. } => {
+                assert_eq!(method, "ent/session/configure");
+                let Some(p) = params.as_ref().and_then(|v| v.as_object()) else {
+                    panic!("expected object params");
+                };
+                assert_eq!(p.get("connectionId").and_then(|v| v.as_str()), Some("c1"));
+                assert_eq!(p.get("modelId").and_then(|v| v.as_str()), Some("m2"));
+            }
+            _ => panic!("expected request"),
+        }
     }
 }

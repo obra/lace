@@ -142,36 +142,12 @@ This section is a living checklist. If it’s checked, it’s done and validated
 
 ### 🔎 Current “reach-ins” (generated from ripgrep)
 
-Direct `@lace/agent/*` imports in web (as of 2026-01-08):
+Validated (2026-01-08):
 
-- `packages/web/test-utils/web-test-setup.ts` (`@lace/agent/test-utils/temp-lace-dir`, `@lace/agent/providers/registry`)
-- `packages/web/types/core.ts` (`@lace/agent/threads/types`)
-- `packages/web/app/routes/__tests__/api.projects.integration.test.ts` (dynamic `@lace/agent/projects/project`)
-- `packages/web/app/routes/__tests__/api.projects.$projectId.sessions.test.ts` (dynamic `@lace/agent/projects/project`)
-- `packages/web/components/sidebar/__tests__/AgentsSection.test.tsx` (agent provider test utils)
-- `packages/web/components/sidebar/__tests__/SidebarContent-agent-creation.test.tsx` (agent provider test utils)
-- `packages/web/lib/server/lace-imports.ts` (re-exports many `@lace/agent/*`)
-
-Runtime imports of `@lace/web/lib/server/lace-imports` (as of 2026-01-08):
-
-- `packages/web/lib/server/data-dir-init.ts`
-- `packages/web/lib/server/supervisor-service.ts`
-- `packages/web/app/routes/api.projects.ts`
-- `packages/web/app/routes/api.projects.$projectId.ts`
-- `packages/web/app/routes/api.projects.$projectId.environment.ts`
-- `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.ts`
-- `packages/web/app/routes/api.projects.$projectId.configuration.ts`
-- `packages/web/app/routes/api.projects.$projectId.mcp.servers.ts`
-- `packages/web/app/routes/api.projects.$projectId.mcp.servers.$serverId.ts`
-- `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.ts`
-- `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control.ts`
-- `packages/web/app/routes/api.mcp.servers.ts`
-- `packages/web/app/routes/api.mcp.servers.$serverId.ts`
-- `packages/web/app/routes/api.settings.ts`
-
-TUI reach-in (repo-layout coupling; must be removed):
-
-- `packages/tui/src/ui/mod.rs` references `../agent/dist/main.js` (hardcoded relative path).
+- `rg -n "@lace/agent" packages/web` → 0 hits
+- `rg -n "@lace/web/lib/server/lace-imports" packages/web` → 0 hits
+- `rg -n "@lace/agent" packages/tui` → 0 hits
+- TUI default agent spawn has no repo-relative `../agent/dist/*` assumptions
 
 ### 🧭 Remaining work checklist (to fully complete this plan)
 
@@ -288,7 +264,7 @@ Runtime imports of `@lace/web/lib/server/lace-imports` to remove:
 
 Hard-rule fix first:
 
-- [ ] `packages/tui/src/ui/mod.rs`: remove hardcoded `../agent/dist/main.js` default agent path (no repo-layout coupling).
+- [x] `packages/tui/src/ui/mod.rs`: remove hardcoded `../agent/dist/main.js` default agent path (no repo-layout coupling).
 
 Parity checklist:
 

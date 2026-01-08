@@ -1,6 +1,6 @@
 use crate::app::reducer::Outbound;
 use crate::app::AppState;
-use serde_json::json;
+use serde_json::{json, Value};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnvEditorState {
@@ -75,23 +75,7 @@ pub fn maybe_autoconfigure_from_connections(
         return Vec::new();
     };
 
-    let mut seen = false;
-    if let Some(obj) = result.as_ref().and_then(|v| v.as_object()) {
-        if let Some(arr) = obj.get("connections").and_then(|v| v.as_array()) {
-            for c in arr {
-                if let Some(cobj) = c.as_object() {
-                    let cid = cobj
-                        .get("connectionId")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or_default();
-                    if cid == conn {
-                        seen = true;
-                        break;
-                    }
-                }
-            }
-        }
-    }
+    let seen = connection_exists_in_list(result, &conn);
 
     if !seen {
         return Vec::new();
@@ -107,6 +91,79 @@ pub fn maybe_autoconfigure_from_connections(
             "environment": state.environment,
         })),
     }]
+}
+
+pub fn connection_exists_in_list(result: &Option<serde_json::Value>, conn: &str) -> bool {
+    if conn.is_empty() {
+        return false;
+    }
+
+    let Some(obj) = result.as_ref().and_then(|v| v.as_object()) else {
+        return false;
+    };
+    let Some(arr) = obj.get("connections").and_then(|v| v.as_array()) else {
+        return false;
+    };
+
+    for c in arr {
+        let Some(cobj) = c.as_object() else {
+            continue;
+        };
+        let cid = cobj
+            .get("connectionId")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default();
+        if cid == conn {
+            return true;
+        }
+    }
+
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn connection_exists_in_list_handles_missing_or_invalid() {
+        assert!(!connection_exists_in_list(&None, "c1"));
+        assert!(!connection_exists_in_list(&Some(json!({})), "c1"));
+        assert!(!connection_exists_in_list(&Some(json!({"connections": []})), "c1"));
+        assert!(!connection_exists_in_list(&Some(json!({"connections": [{"connectionId":"c2"}]})), "c1"));
+    }
+
+    #[test]
+    fn connection_exists_in_list_detects_match() {
+        let result = Some(json!({"connections":[{"connectionId":"c1"},{"connectionId":"c2"}]}));
+        assert!(connection_exists_in_list(&result, "c1"));
+        assert!(connection_exists_in_list(&result, "c2"));
+    }
+
+    #[test]
+    fn handle_models_list_honors_disabled_state() {
+        let mut state = AppState::new_with_paths(None, None);
+        state.models_panel.open = true;
+        state.connection_id = Some("c1".to_string());
+
+        handle_models_list(
+            &mut state,
+            &Some(json!({
+              "providerId":"p1",
+              "connectionId":"c1",
+              "models":[
+                {"modelId":"m1","name":"m1","disabledState":"disabled"},
+                {"modelId":"m2","name":"m2","disabledState":"enabled"}
+              ]
+            })),
+            None,
+        );
+
+        assert_eq!(state.models_panel.models.len(), 2);
+        assert!(state.models_panel.models[0].disabled);
+        assert!(!state.models_panel.models[1].disabled);
+    }
 }
 
 pub fn open_env_editor(state: &mut AppState) {
@@ -265,7 +322,7 @@ pub fn handle_models_list(
                         .and_then(|v| v.as_str())
                         .unwrap_or(model_id.as_str())
                         .to_string();
-                    let disabled = o.get("disabled").and_then(|v| v.as_bool()).unwrap_or(false);
+                    let disabled = model_disabled(o);
                     Some(ModelItem {
                         model_id,
                         name,
@@ -277,6 +334,16 @@ pub fn handle_models_list(
         .unwrap_or_default();
     state.models_panel.models = models;
     state.models_panel.selected = 0;
+}
+
+fn model_disabled(o: &serde_json::Map<String, Value>) -> bool {
+    if o.get("disabled").and_then(|v| v.as_bool()) == Some(true) {
+        return true;
+    }
+
+    o.get("disabledState")
+        .and_then(|v| v.as_str())
+        .is_some_and(|s| s == "disabled")
 }
 
 pub fn toggle_selected_model(state: &mut AppState) -> Vec<Outbound> {

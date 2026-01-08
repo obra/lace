@@ -602,6 +602,7 @@ fn handle_agent_line(
                     }
                 }
                 if method == "ent/connections/list" {
+                    clear_invalid_active_connection_from_list(state, &result);
                     if !state.config_wizard.open {
                         let auto = crate::app::config_panels::maybe_autoconfigure_from_connections(
                             state,
@@ -648,6 +649,23 @@ fn handle_agent_line(
     }
 
     Ok(())
+}
+
+fn clear_invalid_active_connection_from_list(state: &mut AppState, result: &Option<Value>) {
+    let Some(conn) = state.connection_id.clone().filter(|c| !c.is_empty()) else {
+        state.connection_id = None;
+        state.model_id = None;
+        return;
+    };
+
+    let seen = crate::app::config_panels::connection_exists_in_list(result, &conn);
+    if seen {
+        return;
+    }
+
+    state.push_activity_line(format!("configure: active connection missing ({conn})"));
+    state.connection_id = None;
+    state.model_id = None;
 }
 
 fn maybe_open_config_wizard_for_prompt_error(
@@ -1570,27 +1588,7 @@ fn resolve_workdir(workdir: Option<&str>) -> io::Result<PathBuf> {
 }
 
 fn default_agent_cmd() -> Option<String> {
-    let candidate = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../agent/dist/main.js")
-        .canonicalize()
-        .ok()?;
-    Some(format!(
-        "node {}",
-        sh_quote(candidate.to_string_lossy().as_ref())
-    ))
-}
-
-fn sh_quote(s: &str) -> String {
-    let mut out = String::from("'");
-    for ch in s.chars() {
-        if ch == '\'' {
-            out.push_str("'\\''");
-        } else {
-            out.push(ch);
-        }
-    }
-    out.push('\'');
-    out
+    Some("lace-agent".to_string())
 }
 
 fn update_chat_autoscroll(state: &mut AppState, area: ratatui::layout::Rect) {
@@ -1702,6 +1700,7 @@ mod tests {
     use super::*;
     use ratatui::backend::TestBackend;
     use ratatui::Terminal;
+    use serde_json::json;
 
     #[test]
     fn vim_jk_remap_only_outside_input() {
@@ -1795,6 +1794,36 @@ mod tests {
             Outbound::JsonRpcRequest { method, .. } => assert_eq!(method, "ent/connections/list"),
             _ => panic!("expected request"),
         }
+    }
+
+    #[test]
+    fn clears_active_connection_when_missing_from_connections_list() {
+        let mut state = AppState::new_with_paths(None, None);
+        state.connection_id = Some("c_missing".to_string());
+        state.model_id = Some("m1".to_string());
+
+        clear_invalid_active_connection_from_list(
+            &mut state,
+            &Some(json!({"connections":[{"connectionId":"c1"},{"connectionId":"c2"}]})),
+        );
+
+        assert!(state.connection_id.is_none());
+        assert!(state.model_id.is_none());
+    }
+
+    #[test]
+    fn keeps_active_connection_when_present_in_connections_list() {
+        let mut state = AppState::new_with_paths(None, None);
+        state.connection_id = Some("c1".to_string());
+        state.model_id = Some("m1".to_string());
+
+        clear_invalid_active_connection_from_list(
+            &mut state,
+            &Some(json!({"connections":[{"connectionId":"c1"},{"connectionId":"c2"}]})),
+        );
+
+        assert_eq!(state.connection_id.as_deref(), Some("c1"));
+        assert_eq!(state.model_id.as_deref(), Some("m1"));
     }
 
     #[test]

@@ -23,7 +23,7 @@ Or specify an agent command explicitly:
 
 ```bash
 cd packages/tui
-cargo run -- --workdir "$(pwd)" --agent-cmd "node ../../packages/agent/dist/main.js"
+cargo run -- --workdir "$(pwd)" --agent-cmd "lace-agent"
 ```
 
 ## Preferences + state
