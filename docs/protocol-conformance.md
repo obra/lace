@@ -19,7 +19,7 @@ npm test --workspace=packages/agent -- ent-protocol.spec.ts
   - `ent/connections/credentials/start|submit|clear`
   - `ent/connections/delete` and subsequent `ConnectionNotFound`
 - **Models**
-  - `ent/models/list` (disabled flag surfaced)
+  - `ent/models/list` (disabled + disabledState surfaced)
   - `ent/models/enable|disable` (unknown model → InvalidParams)
   - `ent/models/refresh` success
   - Provider-level gating persistence across restart
@@ -27,6 +27,8 @@ npm test --workspace=packages/agent -- ent-protocol.spec.ts
   - `ent/session/configure` validates environment, mcpServers, approvalMode
   - Prompt without connection/model → InvalidParams
   - `ent/agent/status` reflects configured connection/model
+- **Session events**
+  - `ent/session/events` (limit/afterEventSeq/types)
 - **Tools & Personas**
   - `ent/tools/list` uniqueness
   - `ent/personas/list` presence
@@ -34,6 +36,13 @@ npm test --workspace=packages/agent -- ent-protocol.spec.ts
   - `ent/job/list` baseline empty
   - `ent/job/output` unknown job → JobNotFound
   - `ent/job/kill` unknown job returns success: false
+- **MCP**
+  - `ent/mcp/servers/list` baseline empty
+  - `ent/mcp/servers/upsert|delete` without active session → SessionNotFound
+  - `ent/mcp/servers/test` unknown server → McpServerNotFound
+  - `ent/mcp/tools/list` unknown server → McpServerNotFound/McpServerNotRunning
+- **Workspace**
+  - `ent/workspace/info|create` InvalidParams + WorkspaceNotFound
 - **Checkpointing & compaction**
   - `ent/session/checkpoint`
   - `ent/session/rewind` missing checkpoint → CheckpointNotFound

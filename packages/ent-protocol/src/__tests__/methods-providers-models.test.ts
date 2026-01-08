@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EntProvidersRefreshRequestSchema,
+  EntModelsListResponseSchema,
   EntModelsEnableRequestSchema,
   EntModelsDisableRequestSchema,
   EntProvidersRefreshResponseSchema,
@@ -60,6 +61,27 @@ describe('Ent protocol provider/model management schemas', () => {
       EntProvidersRefreshResponseSchema.parse({
         ...baseRequest,
         result: { ok: true, refreshedAt: new Date().toISOString() },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntModelsListResponseSchema.parse({
+        ...baseRequest,
+        result: {
+          providerId: 'openai',
+          connectionId: 'conn_123',
+          models: [
+            {
+              modelId: 'gpt-4o',
+              name: 'GPT-4o',
+              providerId: 'openai',
+              contextWindow: 128000,
+              maxOutput: 16384,
+              disabled: true,
+              disabledState: 'disabled',
+            },
+          ],
+        },
       })
     ).not.toThrow();
 

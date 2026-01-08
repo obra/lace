@@ -65,6 +65,11 @@ export const ModelInfoSchema = z
      * Absent or false means enabled.
      */
     disabled: z.boolean().optional(),
+    /**
+     * Explicit enabled/disabled state for UI rendering.
+     * When present, MUST be consistent with `disabled`.
+     */
+    disabledState: z.enum(['enabled', 'disabled']).optional(),
   })
   .strict();
 export type ModelInfo = z.infer<typeof ModelInfoSchema>;

@@ -52,7 +52,7 @@ Test matrix (per method)
     - Unknown connection → ConnectionNotFound.
 12) `ent/models/list`
     - Requires connectionId; unknown connection → ConnectionNotFound.
-    - Returns providerId, connectionId, models with `disabled` flag reflecting gating.
+    - Returns providerId, connectionId, models with `disabled` + `disabledState` reflecting gating.
 13) `ent/models/refresh`
     - Refresh valid; unknown connection → ConnectionNotFound; idempotent.
 14) `ent/models/enable` / `ent/models/disable`

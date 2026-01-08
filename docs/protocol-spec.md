@@ -1103,14 +1103,16 @@ List available models for a connection. Model catalogs are connection-scoped bec
   result: {
     providerId: string,
     connectionId: string,
-    models: ModelInfo[]  // includes disabled?: boolean when gated off
+    models: ModelInfo[]  // includes disabled/disabledState when gated off
   }
 }
 ```
 
 `ModelInfo.disabled?: boolean` — true when the model is currently disabled by provider-level gating
-(`ent/models/disable` or an `enabled` allow-list). Clients may still display disabled models to
-re-enable them.
+(`ent/models/disable` or an `enabled` allow-list).
+
+`ModelInfo.disabledState?: "enabled" | "disabled"` — explicit enabled/disabled state for UI rendering.
+Clients SHOULD prefer `disabledState` when present.
 
 ### 6.25 `ent/models/refresh` (optional)
 
@@ -1760,6 +1762,11 @@ interface ModelInfo {
    * Omitted or false means enabled/available.
    */
   disabled?: boolean;
+  /**
+   * Explicit enabled/disabled state for UI rendering.
+   * When present, MUST be consistent with `disabled` (`disabled === true` ⇔ `disabledState === "disabled"`).
+   */
+  disabledState?: "enabled" | "disabled";
 }
 ```
 

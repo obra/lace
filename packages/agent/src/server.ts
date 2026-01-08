@@ -2283,9 +2283,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       const info = mapCatalogModelToModelInfo(m, providerId) as any;
       const isDisabled =
         (enabledSet && !enabledSet.has(m.id)) || (disabledSet.size > 0 && disabledSet.has(m.id));
-      if (isDisabled) {
-        info.disabled = true;
-      }
+      info.disabled = isDisabled;
+      info.disabledState = isDisabled ? 'disabled' : 'enabled';
       return info;
     });
 
