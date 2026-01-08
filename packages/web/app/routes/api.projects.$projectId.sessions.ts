@@ -202,7 +202,12 @@ async function spawnSessionNamingHelper(
       `Return ONLY the title. No quotes. No punctuation at the end.`,
     ].join('\n');
 
-    const naming = await supervisor.agentRequest({
+    type PromptResult = {
+      content: Array<{ type: string; text?: string }>;
+      structuredOutput?: unknown;
+    };
+
+    const naming = (await supervisor.agentRequest({
       workspaceSessionId: mgmt.workspaceSessionId,
       sessionId: mgmt.agentSessionId,
       method: 'session/prompt',
@@ -219,22 +224,20 @@ async function spawnSessionNamingHelper(
           },
         },
       },
-    });
+    })) as PromptResult;
 
-    const structuredTitle =
-      (naming as { structuredOutput?: unknown }).structuredOutput &&
-      typeof (naming as any).structuredOutput === 'object' &&
-      (naming as any).structuredOutput !== null
-        ? (naming as any).structuredOutput.title
-        : undefined;
+    const structuredTitle = (() => {
+      const so = naming.structuredOutput;
+      if (!so || typeof so !== 'object') return undefined;
+      const title = (so as { title?: unknown }).title;
+      return typeof title === 'string' ? title : undefined;
+    })();
 
-    const contentTitle = Array.isArray((naming as any).content)
-      ? (naming as any).content
-          .filter((b: any) => b?.type === 'text' && typeof b.text === 'string')
-          .map((b: any) => b.text)
-          .join(' ')
-          .trim()
-      : '';
+    const contentTitle = naming.content
+      .filter((b) => b.type === 'text' && typeof b.text === 'string')
+      .map((b) => b.text)
+      .join(' ')
+      .trim();
 
     const generatedName =
       (typeof structuredTitle === 'string' && structuredTitle.trim()) ||
