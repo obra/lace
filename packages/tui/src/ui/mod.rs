@@ -103,6 +103,10 @@ fn remap_key_code(
     }
 }
 
+fn is_help_toggle_key(code: KeyCode, modifiers: KeyModifiers) -> bool {
+    code == KeyCode::F(1) && modifiers.is_empty()
+}
+
 fn run_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     transport: &AgentTransport,
@@ -317,7 +321,10 @@ fn run_loop(
 
                     if state.help_open {
                         match key.code {
-                            KeyCode::Esc | KeyCode::F(1) => {
+                            KeyCode::Esc => {
+                                let _ = apply_ui_action(state, UiAction::ToggleHelp);
+                            }
+                            KeyCode::F(1) if is_help_toggle_key(key.code, key.modifiers) => {
                                 let _ = apply_ui_action(state, UiAction::ToggleHelp);
                             }
                             _ => {}
@@ -380,7 +387,7 @@ fn run_loop(
                         }
                     }
 
-                    if key.code == KeyCode::F(1) {
+                    if is_help_toggle_key(key.code, key.modifiers) {
                         let _ = apply_ui_action(state, UiAction::ToggleHelp);
                         continue;
                     }
@@ -1898,6 +1905,14 @@ mod tests {
             ),
             KeyCode::Char('j')
         );
+    }
+
+    #[test]
+    fn help_toggle_requires_f1_with_no_modifiers() {
+        assert!(is_help_toggle_key(KeyCode::F(1), KeyModifiers::NONE));
+        assert!(!is_help_toggle_key(KeyCode::F(1), KeyModifiers::SHIFT));
+        assert!(!is_help_toggle_key(KeyCode::F(1), KeyModifiers::CONTROL));
+        assert!(!is_help_toggle_key(KeyCode::Char('?'), KeyModifiers::SHIFT));
     }
 
     #[test]

@@ -287,7 +287,7 @@ Parity checklist:
   - [ ] last-used `connectionId` + `modelId` restored automatically (agent-owned preferred; otherwise TUI config as fallback only if agent can’t)
 - [ ] UX parity:
   - [ ] command palette scrolls
-  - [ ] `?` help only triggers when input is exactly `?`
+  - [ ] `?` help only triggers when input is exactly `?` (note: help toggle now requires bare `F1` with no modifiers to avoid terminals mapping `?` → `F1`+Shift)
 - [ ] Diagnostics:
   - [ ] TUI writes a redacted ENT protocol log + agent stderr log to disk and shows the file path in the UI.
 
