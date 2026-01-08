@@ -273,22 +273,22 @@ Parity checklist:
   - [x] list (`ent/connections/list`)
   - [x] create/update (`ent/connections/upsert`)
   - [x] delete (`ent/connections/delete`)
-- [ ] Credentials:
+- [x] Credentials:
   - [x] status (`ent/connections/credentials/status`)
   - [x] start (`ent/connections/credentials/start`)
   - [x] submit (`ent/connections/credentials/submit`)
   - [x] clear (`ent/connections/credentials/clear`)
 - [ ] Models:
-  - [x] list (`ent/models/list`) shows `disabled` + `disabledState`
-  - [x] enable/disable (`ent/models/enable`, `ent/models/disable`)
-  - [ ] refresh (`ent/models/refresh` and/or `ent/providers/refresh`) wired without tight loops/spam
+  - [x] selection list (“Models…”) shows enabled models only (`ent/models/list`)
+  - [x] enable/disable is managed via “Connections…” → “Models…” (`ent/models/enable`, `ent/models/disable`)
+  - [x] refresh wired via `ent/models/refresh` (no tight loop/spam)
   - [x] selection (`ent/session/configure`) works from both “Configure” and “Models…” screens
 - [ ] Persistence:
-  - [ ] last-used `connectionId` + `modelId` restored automatically (agent-owned preferred; otherwise TUI config as fallback only if agent can’t)
+  - [x] last-used `connectionId` + `modelId` restored automatically (currently TUI prefs)
 - [ ] UX parity:
   - [ ] command palette scrolls
-  - [ ] `?` help only triggers when input is exactly `?` (note: help toggle now requires bare `F1` with no modifiers to avoid terminals mapping `?` → `F1`+Shift)
-- [ ] Diagnostics:
+  - [x] help toggle requires bare `F1` with no modifiers (avoids terminals mapping `?` → `F1`+Shift)
+  - [ ] Diagnostics:
   - [x] TUI writes a redacted ENT protocol log + agent stderr log to disk and shows the file path in the UI.
 
 ### Decisions required (do not implement without alignment)
