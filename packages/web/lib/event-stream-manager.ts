@@ -5,7 +5,7 @@ import type { AppEvent } from '@lace/web/types/app-events';
 import type { WebEvent } from '@lace/web/types/web-events';
 import { isProtocolEvent, isPermissionRequestEvent, isWebEvent } from '@lace/web/types/app-events';
 import { randomUUID } from 'crypto';
-import { logger } from '@lace/agent/utils/logger';
+import { logger } from '@lace/web/lib/logger';
 import { stringify } from '@lace/web/lib/serialization';
 
 // Type guard for errors with code property (Web Streams API errors)

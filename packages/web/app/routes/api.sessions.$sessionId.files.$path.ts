@@ -16,7 +16,7 @@ import { promises as fs, constants as fsConstants } from 'fs';
 import { resolve, relative } from 'path';
 import mime from 'mime-types';
 import { createSuccessResponse, createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { logger } from '@lace/agent/utils/logger';
+import { logger } from '@lace/web/lib/logger';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
 import {

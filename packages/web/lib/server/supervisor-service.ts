@@ -13,7 +13,7 @@ import {
 } from '@lace/supervisor';
 import { ensureLaceDir } from '@lace/web/lib/server/lace-imports';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
-import { logger } from '@lace/agent/utils/logger';
+import { logger } from '@lace/web/lib/logger';
 import type {
   ProtocolEvent,
   PermissionRequestEvent,
