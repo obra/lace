@@ -6,19 +6,16 @@ import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 
 // CRITICAL: Setup test isolation BEFORE any imports that might initialize persistence
 const context = setupWebTest();
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '@lace/web/lib/server/lace-imports';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/web/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/projects/project';
 import { parseResponse } from '@lace/web/lib/serialization';
 import type { ProjectInfo } from '@lace/web/types/core';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
+import {
+  createEntTestConnection,
+  deleteEntTestConnection,
+} from '@lace/web/test-utils/ent-test-helpers';
 
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
@@ -36,29 +33,18 @@ describe('Projects API Integration Tests', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestProviderDefaults();
-
-    // Create test provider instance
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
+    providerInstanceId = (await createEntTestConnection({ providerId: 'openai' })).connectionId;
   });
 
   afterEach(async () => {
     await shutdownSupervisorForTests();
-    cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances([providerInstanceId]);
+    await deleteEntTestConnection(providerInstanceId);
     vi.clearAllMocks();
   });
 
   describe('GET /api/projects', () => {
     it('should return all projects with session counts', async () => {
       // Create some test projects directly using the real Project class
-      const { Project } = await import('@lace/agent/projects/project');
-
       const project1Dir = join(context.tempProjectDir, 'project1');
       const project2Dir = join(context.tempProjectDir, 'project2');
       await fs.mkdir(project1Dir, { recursive: true });
@@ -153,7 +139,6 @@ describe('Projects API Integration Tests', () => {
       expect(data.lastUsedAt).toBeDefined();
 
       // Verify the project was actually created in the database
-      const { Project } = await import('@lace/agent/projects/project');
       const createdProject = Project.getById(data.id);
       expect(createdProject).not.toBeNull();
       expect(createdProject!.getName()).toBe('New Project');
@@ -186,7 +171,6 @@ describe('Projects API Integration Tests', () => {
       expect(data.id).toBeDefined();
 
       // Verify the project was actually created in the database
-      const { Project } = await import('@lace/agent/projects/project');
       const createdProject = Project.getById(data.id);
       expect(createdProject).not.toBeNull();
       expect(createdProject!.getName()).toBe('Minimal Project');

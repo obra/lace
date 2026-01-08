@@ -9,18 +9,16 @@ import {
 import { parseResponse } from '@lace/web/lib/serialization';
 import type { SessionInfo } from '@lace/web/types/core';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '@lace/web/lib/server/lace-imports';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/web/lib/server/lace-imports';
 import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import { promises as fs } from 'fs';
 import { join } from 'path';
+import { Project } from '@lace/web/lib/server/projects/project';
+import {
+  createEntTestConnection,
+  deleteEntTestConnection,
+} from '@lace/web/test-utils/ent-test-helpers';
+import { shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -31,18 +29,9 @@ describe('Session API endpoints under projects', () => {
   let projectId: string;
 
   beforeEach(async () => {
-    setupTestProviderDefaults();
-
-    // Create test provider instance
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
+    providerInstanceId = (await createEntTestConnection({ providerId: 'openai' })).connectionId;
 
     // Create a test project
-    const { Project } = await import('@lace/agent/projects/project');
     const testDir = join(context.tempProjectDir, 'sessions-test');
     await fs.mkdir(testDir, { recursive: true });
 
@@ -54,8 +43,8 @@ describe('Session API endpoints under projects', () => {
   });
 
   afterEach(async () => {
-    cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances([providerInstanceId]);
+    await shutdownSupervisorForTests();
+    await deleteEntTestConnection(providerInstanceId);
     vi.clearAllMocks();
   });
 

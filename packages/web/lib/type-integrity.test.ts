@@ -158,14 +158,13 @@ describe('Type Integrity - Current State', () => {
       const imports = [
         () => import('@lace/web/types/api'),
         () => import('@lace/web/types/core'),
-        () => import('@lace/web/lib/server/lace-imports'),
         () => import('@lace/web/lib/validation/schemas'),
         () => import('@lace/web/lib/validation/thread-id-validation'),
       ];
 
       // All imports should resolve successfully
       const resolvedImports = await Promise.all(imports.map((importFn) => importFn()));
-      expect(resolvedImports).toHaveLength(5);
+      expect(resolvedImports).toHaveLength(4);
       resolvedImports.forEach((module) => {
         expect(module).toBeDefined();
       });

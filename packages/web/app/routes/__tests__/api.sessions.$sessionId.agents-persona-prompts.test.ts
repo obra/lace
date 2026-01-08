@@ -11,12 +11,12 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 import { parseResponse } from '@lace/web/lib/serialization';
-import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
+import { Project } from '@lace/web/lib/server/projects/project';
 import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-  Project,
-} from '@lace/web/lib/server/lace-imports';
+  createEntTestConnection,
+  deleteEntTestConnection,
+} from '@lace/web/test-utils/ent-test-helpers';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -38,12 +38,7 @@ describe('Agent Creation API - Persona System Prompt Generation', () => {
       LACE_DB_PATH: ':memory:',
     };
 
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
+    providerInstanceId = (await createEntTestConnection({ providerId: 'openai' })).connectionId;
 
     const testDir = join(context.tempProjectDir, 'persona-prompts');
     await fs.mkdir(testDir, { recursive: true });
@@ -80,7 +75,8 @@ describe('Agent Creation API - Persona System Prompt Generation', () => {
   });
 
   afterEach(async () => {
-    await cleanupTestProviderInstances([providerInstanceId]);
+    await shutdownSupervisorForTests();
+    await deleteEntTestConnection(providerInstanceId);
     vi.clearAllMocks();
   });
 

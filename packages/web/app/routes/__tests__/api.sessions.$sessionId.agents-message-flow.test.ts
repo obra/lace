@@ -9,12 +9,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/web/lib/server/lace-imports';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import {
+  createEntTestConnection,
+  deleteEntTestConnection,
+} from '@lace/web/test-utils/ent-test-helpers';
+import { shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -22,7 +23,7 @@ vi.mock('server-only', () => ({}));
 // Import after mocks
 import { action as POST } from '@lace/web/app/routes/api.sessions.$sessionId.agents';
 import { action as createWorkspaceSession } from '@lace/web/app/routes/api.projects.$projectId.sessions';
-import { Project } from '@lace/web/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/projects/project';
 
 describe('Agent Creation - Initial Message Flow', () => {
   const context = setupWebTest();
@@ -38,12 +39,7 @@ describe('Agent Creation - Initial Message Flow', () => {
       LACE_DB_PATH: ':memory:',
     };
 
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
+    providerInstanceId = (await createEntTestConnection({ providerId: 'openai' })).connectionId;
 
     // Create real project and session
     const testDir = join(context.tempProjectDir, 'message-flow');
@@ -75,7 +71,8 @@ describe('Agent Creation - Initial Message Flow', () => {
   });
 
   afterEach(async () => {
-    await cleanupTestProviderInstances([providerInstanceId]);
+    await shutdownSupervisorForTests();
+    await deleteEntTestConnection(providerInstanceId);
     vi.clearAllMocks();
   });
 

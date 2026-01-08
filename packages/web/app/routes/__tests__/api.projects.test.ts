@@ -9,6 +9,7 @@ import { parseResponse } from '@lace/web/lib/serialization';
 import type { ProjectInfo } from '@lace/web/types/core';
 import { promises as fs } from 'fs';
 import { join } from 'path';
+import { Project } from '@lace/web/lib/server/projects/project';
 
 interface ErrorResponse {
   error: string;
@@ -26,8 +27,6 @@ describe('Projects API', () => {
   describe('GET /api/projects', () => {
     it('should return all projects', async () => {
       // Arrange: Create test projects using real Project class
-      const { Project } = await import('@lace/web/lib/server/lace-imports');
-
       // Create temp project directories
       const dir1 = join(context.tempProjectDir, 'project1');
       const dir2 = join(context.tempProjectDir, 'project2');
@@ -118,7 +117,6 @@ describe('Projects API', () => {
       expect(data.lastUsedAt).toBeTruthy();
 
       // Verify the project can be retrieved via Project.getAll() (tests persistence)
-      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const allProjects = Project.getAll();
       const createdProject = allProjects.find((p) => p.name === 'New Project');
       expect(createdProject).toBeTruthy();

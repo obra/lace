@@ -9,17 +9,19 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { action as POST } from '@lace/web/app/routes/api.threads.$threadId.message';
 import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 import type { MessageResponse } from '@lace/web/types/api';
-import { Project } from '@lace/web/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/projects/project';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/web/lib/server/lace-imports';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { action as createWorkspaceSession } from '@lace/web/app/routes/api.projects.$projectId.sessions';
 import { action as spawnAgent } from '@lace/web/app/routes/api.sessions.$sessionId.agents';
-import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 import { testSessionId } from '@lace/web/test-utils/test-ids';
+import {
+  createEntTestConnection,
+  deleteEntTestConnection,
+} from '@lace/web/test-utils/ent-test-helpers';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 // Console capture for verifying error output
 let consoleLogs: string[] = [];
@@ -44,18 +46,13 @@ describe('Thread Messaging API', () => {
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
-    process.env.LACE_AGENT_TEST_PROVIDER = '1';
 
-    // Create test provider instance
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
+    providerInstanceId = (await createEntTestConnection({ providerId: 'openai' })).connectionId;
 
     // Create a real test project with provider configuration
-    const project = Project.create('Test Project', process.cwd(), 'Project for testing', {
+    const projectDir = join(_tempLaceDir.tempProjectDir, 'thread-messaging');
+    await fs.mkdir(projectDir, { recursive: true });
+    const project = Project.create('Test Project', projectDir, 'Project for testing', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });
@@ -99,12 +96,11 @@ describe('Thread Messaging API', () => {
   afterEach(async () => {
     console.error = originalConsoleError;
     // Clean up provider instances
-    await cleanupTestProviderInstances([providerInstanceId]);
+    await shutdownSupervisorForTests();
+    await deleteEntTestConnection(providerInstanceId);
     // Wait a moment for any pending operations to abort
     await new Promise((resolve) => setTimeout(resolve, 20));
     vi.clearAllMocks();
-
-    delete process.env.LACE_AGENT_TEST_PROVIDER;
   });
 
   it('should accept and process messages', async () => {

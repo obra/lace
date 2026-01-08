@@ -8,9 +8,9 @@ import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-t
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/web/lib/server/lace-imports';
+  createEntTestConnection,
+  deleteEntTestConnection,
+} from '@lace/web/test-utils/ent-test-helpers';
 
 // ✅ ESSENTIAL MOCK - Server-side module compatibility in test environment
 import { vi } from 'vitest';
@@ -81,14 +81,8 @@ describe('Agent API', () => {
   });
 
   it('PUT /api/agents/:agentId updates agent metadata and ent config', async () => {
-    const originalTestProviderEnv = process.env.LACE_AGENT_TEST_PROVIDER;
-    process.env.LACE_AGENT_TEST_PROVIDER = '1';
-
-    const providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      apiKey: 'test-anthropic-key',
-    });
+    const providerInstanceId = (await createEntTestConnection({ providerId: 'openai' }))
+      .connectionId;
 
     try {
       const supervisor = await getSupervisor();
@@ -131,9 +125,7 @@ describe('Agent API', () => {
       expect(status.currentSession?.connectionId).toBe(providerInstanceId);
       expect(status.currentSession?.modelId).toBe('claude-3-5-haiku-20241022');
     } finally {
-      await cleanupTestProviderInstances([providerInstanceId]);
-      if (originalTestProviderEnv === undefined) delete process.env.LACE_AGENT_TEST_PROVIDER;
-      else process.env.LACE_AGENT_TEST_PROVIDER = originalTestProviderEnv;
+      await deleteEntTestConnection(providerInstanceId);
     }
   });
 });

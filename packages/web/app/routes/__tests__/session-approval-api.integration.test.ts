@@ -7,11 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
-import {
-  Project,
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/web/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/projects/project';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 import { loader as pendingApprovalsLoader } from '@lace/web/app/routes/api.sessions.$sessionId.approvals.pending';
@@ -20,6 +16,13 @@ import type { SessionPendingApproval } from '@lace/web/types/api';
 import { action as createWorkspaceSession } from '@lace/web/app/routes/api.projects.$projectId.sessions';
 import { action as spawnAgent } from '@lace/web/app/routes/api.sessions.$sessionId.agents';
 import { action as sendMessage } from '@lace/web/app/routes/api.threads.$threadId.message';
+import {
+  createEntTestConnection,
+  deleteEntTestConnection,
+} from '@lace/web/test-utils/ent-test-helpers';
+import { shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -33,24 +36,15 @@ describe('Session Approval API Integration (Real Components)', () => {
   let agent2SessionId: string;
 
   beforeEach(async () => {
-    process.env.LACE_AGENT_TEST_PROVIDER = '1';
-
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      apiKey: 'test-anthropic-key',
-    });
+    providerInstanceId = (await createEntTestConnection({ providerId: 'openai' })).connectionId;
 
     // Create project with provider configuration
-    project = Project.create(
-      'Session Approval Test Project',
-      _tempLaceDir.tempDir,
-      'Test project',
-      {
-        providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      }
-    );
+    const projectDir = join(_tempLaceDir.tempProjectDir, 'approvals');
+    await fs.mkdir(projectDir, { recursive: true });
+    project = Project.create('Session Approval Test Project', projectDir, 'Test project', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
 
     const createSessionRequest = new Request(
       `http://localhost/api/projects/${project.getId()}/sessions`,
@@ -112,8 +106,8 @@ describe('Session Approval API Integration (Real Components)', () => {
 
   afterEach(async () => {
     vi.clearAllMocks();
-    await cleanupTestProviderInstances([providerInstanceId]);
-    delete process.env.LACE_AGENT_TEST_PROVIDER;
+    await shutdownSupervisorForTests();
+    await deleteEntTestConnection(providerInstanceId);
   });
 
   it('should aggregate pending approvals from multiple agents', async () => {

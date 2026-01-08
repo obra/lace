@@ -16,16 +16,11 @@ interface ServerListResponse {
   }>;
 }
 
-// Mock the MCPConfigLoader
-vi.mock('@lace/web/lib/server/lace-imports', async () => {
-  const actual = await vi.importActual('@lace/web/lib/server/lace-imports');
-  return {
-    ...actual,
-    MCPConfigLoader: {
-      loadGlobalConfig: vi.fn(),
-    },
-  };
-});
+vi.mock('@lace/web/lib/server/mcp-config-store', () => ({
+  McpConfigStore: {
+    loadGlobalConfig: vi.fn(),
+  },
+}));
 
 describe('Global MCP Server List API', () => {
   beforeEach(() => {
@@ -33,8 +28,8 @@ describe('Global MCP Server List API', () => {
   });
 
   it('should return global server configurations', async () => {
-    const { MCPConfigLoader } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-    MCPConfigLoader.loadGlobalConfig = vi.fn().mockReturnValue({
+    const { McpConfigStore } = vi.mocked(await import('@lace/web/lib/server/mcp-config-store'));
+    McpConfigStore.loadGlobalConfig = vi.fn().mockReturnValue({
       servers: {
         filesystem: {
           command: 'npx',
@@ -59,8 +54,8 @@ describe('Global MCP Server List API', () => {
   });
 
   it('should return empty list when no global config exists', async () => {
-    const { MCPConfigLoader } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-    MCPConfigLoader.loadGlobalConfig = vi.fn().mockReturnValue(null);
+    const { McpConfigStore } = vi.mocked(await import('@lace/web/lib/server/mcp-config-store'));
+    McpConfigStore.loadGlobalConfig = vi.fn().mockReturnValue(null);
 
     const request = new Request('http://localhost/api/mcp/servers');
     const response = await loader(createLoaderArgs(request, {}));
@@ -71,8 +66,8 @@ describe('Global MCP Server List API', () => {
   });
 
   it('should handle configuration loading errors', async () => {
-    const { MCPConfigLoader } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-    MCPConfigLoader.loadGlobalConfig = vi.fn().mockImplementation(() => {
+    const { McpConfigStore } = vi.mocked(await import('@lace/web/lib/server/mcp-config-store'));
+    McpConfigStore.loadGlobalConfig = vi.fn().mockImplementation(() => {
       throw new Error('Config file corrupted');
     });
 

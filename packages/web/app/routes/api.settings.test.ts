@@ -6,31 +6,31 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { loader, action } from './api.settings';
-import { UserSettingsManager } from '@lace/web/lib/server/lace-imports';
+import { UserSettingsManager } from '@lace/web/lib/server/user-settings';
 import { parseResponse } from '@lace/web/lib/serialization';
 
 describe('api.settings', () => {
   let tempDir: string;
-  let originalLaceDir: string | undefined;
+  let originalLaceWebDir: string | undefined;
 
   beforeEach(() => {
     // Create temp directory for testing
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'settings-api-test-'));
 
-    // Mock LACE_DIR
-    originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
+    // Mock LACE_WEB_DIR
+    originalLaceWebDir = process.env.LACE_WEB_DIR;
+    process.env.LACE_WEB_DIR = tempDir;
 
     // Clear cache
     UserSettingsManager.clearCache();
   });
 
   afterEach(() => {
-    // Restore original LACE_DIR
-    if (originalLaceDir !== undefined) {
-      process.env.LACE_DIR = originalLaceDir;
+    // Restore original LACE_WEB_DIR
+    if (originalLaceWebDir !== undefined) {
+      process.env.LACE_WEB_DIR = originalLaceWebDir;
     } else {
-      delete process.env.LACE_DIR;
+      delete process.env.LACE_WEB_DIR;
     }
 
     // Clean up temp directory

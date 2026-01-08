@@ -11,12 +11,12 @@ import { join } from 'node:path';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 import { parseResponse } from '@lace/web/lib/serialization';
-import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
+import { Project } from '@lace/web/lib/server/projects/project';
 import {
-  cleanupTestProviderInstances,
-  createTestProviderInstance,
-  Project,
-} from '@lace/web/lib/server/lace-imports';
+  createEntTestConnection,
+  deleteEntTestConnection,
+} from '@lace/web/test-utils/ent-test-helpers';
 
 vi.mock('server-only', () => ({}));
 
@@ -41,12 +41,7 @@ describe('/api/agents/:agentId/history', () => {
       LACE_AGENT_TEST_PROVIDER: '1',
     };
 
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
+    providerInstanceId = (await createEntTestConnection({ providerId: 'openai' })).connectionId;
 
     const projectDir = join(context.tempProjectDir, 'history-test');
     await fs.mkdir(projectDir, { recursive: true });
@@ -98,7 +93,8 @@ describe('/api/agents/:agentId/history', () => {
   });
 
   afterEach(async () => {
-    await cleanupTestProviderInstances([providerInstanceId]);
+    await shutdownSupervisorForTests();
+    await deleteEntTestConnection(providerInstanceId);
     if (originalTestProviderEnv === undefined) {
       delete process.env.LACE_AGENT_TEST_PROVIDER;
     } else {

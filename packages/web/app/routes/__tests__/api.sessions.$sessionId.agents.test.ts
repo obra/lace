@@ -9,12 +9,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/web/lib/server/lace-imports';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import {
+  createEntTestConnection,
+  deleteEntTestConnection,
+} from '@lace/web/test-utils/ent-test-helpers';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -22,8 +22,8 @@ vi.mock('server-only', () => ({}));
 // Import the real API route handlers after mocks
 import { action as POST, loader as GET } from '@lace/web/app/routes/api.sessions.$sessionId.agents';
 import { action as createWorkspaceSession } from '@lace/web/app/routes/api.projects.$projectId.sessions';
-import { Project } from '@lace/web/lib/server/lace-imports';
-import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { Project } from '@lace/web/lib/server/projects/project';
+import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 
 interface ErrorResponse {
   error: string;
@@ -56,19 +56,8 @@ describe('Agent Spawning API E2E Tests', () => {
     };
 
     // Create test provider instances
-    anthropicInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
-
-    openaiInstanceId = await createTestProviderInstance({
-      catalogId: 'openai',
-      models: ['gpt-4o'],
-      displayName: 'Test OpenAI Instance',
-      apiKey: 'test-openai-key',
-    });
+    anthropicInstanceId = (await createEntTestConnection({ providerId: 'openai' })).connectionId;
+    openaiInstanceId = (await createEntTestConnection({ providerId: 'openai' })).connectionId;
 
     // Create real project and session using the session service
     const testDir = join(context.tempProjectDir, 'agent-spawning');
@@ -105,8 +94,9 @@ describe('Agent Spawning API E2E Tests', () => {
   });
 
   afterEach(async () => {
-    // Cleanup test provider instances
-    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
+    await shutdownSupervisorForTests();
+    await deleteEntTestConnection(anthropicInstanceId);
+    await deleteEntTestConnection(openaiInstanceId);
 
     vi.clearAllMocks();
   });

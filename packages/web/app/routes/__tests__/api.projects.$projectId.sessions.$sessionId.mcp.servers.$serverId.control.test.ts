@@ -7,7 +7,7 @@ import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
-import { Project, MCPConfigLoader } from '@lace/web/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/projects/project';
 import path from 'path';
 
 // ✅ ESSENTIAL MOCK - Server-side module compatibility in test environment
@@ -28,18 +28,13 @@ interface ErrorResponse {
 async function createProjectAndSession(workDir: string) {
   const fixturePath = path.resolve('test-utils/fixtures/mcp-stdio-test-server.cjs');
 
-  MCPConfigLoader.updateServerConfig(
-    'test',
-    {
-      command: process.execPath,
-      args: [fixturePath],
-      enabled: false,
-      tools: { echo: 'allow' },
-    },
-    workDir
-  );
-
   const project = Project.create('Test Project', workDir);
+  project.addMCPServer('test', {
+    command: process.execPath,
+    args: [fixturePath],
+    enabled: false,
+    tools: { echo: 'allow' },
+  });
   const supervisor = await getSupervisor();
   const created = await supervisor.createWorkspaceSession(workDir);
   await supervisor.updateWorkspaceSession(created.workspaceSessionId, {

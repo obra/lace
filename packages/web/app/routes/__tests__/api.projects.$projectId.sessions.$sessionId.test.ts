@@ -9,7 +9,7 @@ import {
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
-import { Project } from '@lace/web/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/projects/project';
 import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 
 // ✅ ESSENTIAL MOCK - Server-side module compatibility in test environment

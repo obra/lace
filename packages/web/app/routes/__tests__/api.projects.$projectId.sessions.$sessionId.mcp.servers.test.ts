@@ -7,7 +7,7 @@ import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createLoaderArgs } from '@lace/web/test-utils/route-test-helpers';
 import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
-import { Project, MCPConfigLoader } from '@lace/web/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/projects/project';
 import path from 'path';
 
 // ✅ ESSENTIAL MOCK - Server-side module compatibility in test environment
@@ -44,29 +44,19 @@ describe('Session MCP Server Status API', () => {
   it('returns configured servers with runtime status', async () => {
     const fixturePath = path.resolve('test-utils/fixtures/mcp-stdio-test-server.cjs');
 
-    MCPConfigLoader.updateServerConfig(
-      'test',
-      {
-        command: process.execPath,
-        args: [fixturePath],
-        enabled: true,
-        tools: { echo: 'allow' },
-      },
-      context.tempProjectDir
-    );
-
-    MCPConfigLoader.updateServerConfig(
-      'disabled',
-      {
-        command: process.execPath,
-        args: [fixturePath],
-        enabled: false,
-        tools: { echo: 'allow' },
-      },
-      context.tempProjectDir
-    );
-
     const project = Project.create('Test Project', context.tempProjectDir);
+    project.addMCPServer('test', {
+      command: process.execPath,
+      args: [fixturePath],
+      enabled: true,
+      tools: { echo: 'allow' },
+    });
+    project.addMCPServer('disabled', {
+      command: process.execPath,
+      args: [fixturePath],
+      enabled: false,
+      tools: { echo: 'allow' },
+    });
 
     const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);

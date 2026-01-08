@@ -19,17 +19,12 @@ interface ServerActionResponse {
   server?: ServerResponse;
 }
 
-// Mock the MCPConfigLoader
-vi.mock('@lace/web/lib/server/lace-imports', async () => {
-  const actual = await vi.importActual('@lace/web/lib/server/lace-imports');
-  return {
-    ...actual,
-    MCPConfigLoader: {
-      loadGlobalConfig: vi.fn(),
-      saveGlobalConfig: vi.fn(),
-    },
-  };
-});
+vi.mock('@lace/web/lib/server/mcp-config-store', () => ({
+  McpConfigStore: {
+    loadGlobalConfig: vi.fn(),
+    saveGlobalConfig: vi.fn(),
+  },
+}));
 
 describe('Individual Global MCP Server Management API', () => {
   beforeEach(() => {
@@ -38,8 +33,8 @@ describe('Individual Global MCP Server Management API', () => {
 
   describe('GET /api/mcp/servers/:serverId', () => {
     it('should return specific server configuration', async () => {
-      const { MCPConfigLoader } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      MCPConfigLoader.loadGlobalConfig = vi.fn().mockReturnValue({
+      const { McpConfigStore } = vi.mocked(await import('@lace/web/lib/server/mcp-config-store'));
+      McpConfigStore.loadGlobalConfig = vi.fn().mockReturnValue({
         servers: {
           filesystem: {
             command: 'npx',
@@ -63,8 +58,8 @@ describe('Individual Global MCP Server Management API', () => {
     });
 
     it('should return 404 for non-existent server', async () => {
-      const { MCPConfigLoader } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      MCPConfigLoader.loadGlobalConfig = vi.fn().mockReturnValue({
+      const { McpConfigStore } = vi.mocked(await import('@lace/web/lib/server/mcp-config-store'));
+      McpConfigStore.loadGlobalConfig = vi.fn().mockReturnValue({
         servers: {},
       });
 
@@ -77,8 +72,8 @@ describe('Individual Global MCP Server Management API', () => {
 
   describe('POST /api/mcp/servers/:serverId', () => {
     it('should create new global server', async () => {
-      const { MCPConfigLoader } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      MCPConfigLoader.loadGlobalConfig = vi.fn().mockReturnValue({
+      const { McpConfigStore } = vi.mocked(await import('@lace/web/lib/server/mcp-config-store'));
+      McpConfigStore.loadGlobalConfig = vi.fn().mockReturnValue({
         servers: {},
       });
 
@@ -98,7 +93,7 @@ describe('Individual Global MCP Server Management API', () => {
 
       expect(response.status).toBe(201);
       expect(data.message).toContain('created successfully');
-      expect(MCPConfigLoader.saveGlobalConfig).toHaveBeenCalledWith(
+      expect(McpConfigStore.saveGlobalConfig).toHaveBeenCalledWith(
         expect.objectContaining({
           servers: {
             test: expect.objectContaining({
@@ -111,8 +106,8 @@ describe('Individual Global MCP Server Management API', () => {
     });
 
     it('should prevent duplicate server creation', async () => {
-      const { MCPConfigLoader } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      MCPConfigLoader.loadGlobalConfig = vi.fn().mockReturnValue({
+      const { McpConfigStore } = vi.mocked(await import('@lace/web/lib/server/mcp-config-store'));
+      McpConfigStore.loadGlobalConfig = vi.fn().mockReturnValue({
         servers: {
           existing: {
             command: 'node',
@@ -140,8 +135,8 @@ describe('Individual Global MCP Server Management API', () => {
 
   describe('PUT /api/mcp/servers/:serverId', () => {
     it('should update existing server', async () => {
-      const { MCPConfigLoader } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      MCPConfigLoader.loadGlobalConfig = vi.fn().mockReturnValue({
+      const { McpConfigStore } = vi.mocked(await import('@lace/web/lib/server/mcp-config-store'));
+      McpConfigStore.loadGlobalConfig = vi.fn().mockReturnValue({
         servers: {
           filesystem: {
             command: 'npx',
@@ -163,7 +158,7 @@ describe('Individual Global MCP Server Management API', () => {
       const response = await action(createActionArgs(request, { serverId: 'filesystem' }));
 
       expect(response.status).toBe(200);
-      expect(MCPConfigLoader.saveGlobalConfig).toHaveBeenCalledWith(
+      expect(McpConfigStore.saveGlobalConfig).toHaveBeenCalledWith(
         expect.objectContaining({
           servers: {
             filesystem: expect.objectContaining({
@@ -178,8 +173,8 @@ describe('Individual Global MCP Server Management API', () => {
 
   describe('DELETE /api/mcp/servers/:serverId', () => {
     it('should delete existing server', async () => {
-      const { MCPConfigLoader } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
-      MCPConfigLoader.loadGlobalConfig = vi.fn().mockReturnValue({
+      const { McpConfigStore } = vi.mocked(await import('@lace/web/lib/server/mcp-config-store'));
+      McpConfigStore.loadGlobalConfig = vi.fn().mockReturnValue({
         servers: {
           filesystem: {
             command: 'npx',
@@ -200,7 +195,7 @@ describe('Individual Global MCP Server Management API', () => {
       expect(data.message).toContain('deleted successfully');
 
       // Verify the server was removed from config
-      expect(MCPConfigLoader.saveGlobalConfig).toHaveBeenCalledWith(
+      expect(McpConfigStore.saveGlobalConfig).toHaveBeenCalledWith(
         expect.objectContaining({
           servers: {}, // Should be empty after deletion
         })

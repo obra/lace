@@ -3,71 +3,56 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateSessionName } from '@lace/web/lib/server/session-naming-helper';
-import { InfrastructureHelper } from '@lace/web/lib/server/lace-imports';
-import type { AIProvider } from '@lace/web/lib/server/lace-imports';
 
-// Mock the lace-imports module
-vi.mock('@lace/web/lib/server/lace-imports', () => ({
-  InfrastructureHelper: vi.fn(),
+const mockSupervisor = {
+  agentRequest: vi.fn(),
+};
+
+vi.mock('@lace/web/lib/server/supervisor-service', () => ({
+  getSupervisor: vi.fn(async () => mockSupervisor),
+  getProviderManagementAgent: vi.fn(async () => ({
+    workspaceSessionId: 'ws_test',
+    agentSessionId: 'sess_test',
+  })),
 }));
-
-const MockedInfrastructureHelper = vi.mocked(InfrastructureHelper);
 
 describe('generateSessionName', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should create InfrastructureHelper with correct configuration', async () => {
-    const mockExecute = vi.fn().mockResolvedValue({
-      content: 'Fix Auth Bug',
-    });
-
-    MockedInfrastructureHelper.mockImplementation(
-      () =>
-        ({
-          execute: mockExecute,
-        }) as unknown as InstanceType<typeof InfrastructureHelper>
-    );
-
-    await generateSessionName('MyProject', 'I need to fix the authentication redirect bug');
-
-    expect(MockedInfrastructureHelper).toHaveBeenCalledWith({
-      model: 'fast',
-      tools: [],
-    });
-  });
-
   it('should format prompt correctly with project name and user input', async () => {
-    const mockExecute = vi.fn().mockResolvedValue({
-      content: 'Fix Auth Bug',
+    mockSupervisor.agentRequest = vi.fn(async (params: { method: string }) => {
+      if (params.method === 'session/prompt') {
+        return { content: [{ type: 'text', text: 'Fix Auth Bug' }] };
+      }
+      return {};
     });
-
-    MockedInfrastructureHelper.mockImplementation(
-      () =>
-        ({
-          execute: mockExecute,
-        }) as unknown as InstanceType<typeof InfrastructureHelper>
-    );
 
     await generateSessionName('MyProject', 'I need to fix the authentication redirect bug');
 
-    expect(mockExecute).toHaveBeenCalledWith(
-      `Here's the project name: 'MyProject'. Here's what the user wrote: 'I need to fix the authentication redirect bug'. Return a brief descriptive name for this session. No more than 5 words.`
+    expect(mockSupervisor.agentRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'session/prompt',
+        requestParams: expect.objectContaining({
+          content: [
+            {
+              type: 'text',
+              text: `Here's the project name: 'MyProject'. Here's what the user wrote: 'I need to fix the authentication redirect bug'. Return a brief descriptive name for this session. No more than 5 words.`,
+            },
+          ],
+        }),
+      })
     );
   });
 
   it('should return trimmed session name from helper result', async () => {
-    const mockExecute = vi.fn().mockResolvedValue({
-      content: '  Fix Auth Bug  ',
+    mockSupervisor.agentRequest = vi.fn(async (params: { method: string }) => {
+      if (params.method === 'session/prompt') {
+        return { content: [{ type: 'text', text: '  Fix Auth Bug  ' }] };
+      }
+      return {};
     });
-
-    MockedInfrastructureHelper.mockImplementation(
-      () =>
-        ({
-          execute: mockExecute,
-        }) as unknown as InstanceType<typeof InfrastructureHelper>
-    );
 
     const result = await generateSessionName(
       'MyProject',
@@ -78,49 +63,53 @@ describe('generateSessionName', () => {
   });
 
   it('should handle different project names and user inputs', async () => {
-    const mockExecute = vi.fn().mockResolvedValue({
-      content: 'Add Dark Mode',
+    mockSupervisor.agentRequest = vi.fn(async (params: { method: string }) => {
+      if (params.method === 'session/prompt') {
+        return { content: [{ type: 'text', text: 'Add Dark Mode' }] };
+      }
+      return {};
     });
-
-    MockedInfrastructureHelper.mockImplementation(
-      () =>
-        ({
-          execute: mockExecute,
-        }) as unknown as InstanceType<typeof InfrastructureHelper>
-    );
 
     await generateSessionName('Frontend App', 'Add dark mode toggle to settings');
 
-    expect(mockExecute).toHaveBeenCalledWith(
-      `Here's the project name: 'Frontend App'. Here's what the user wrote: 'Add dark mode toggle to settings'. Return a brief descriptive name for this session. No more than 5 words.`
+    expect(mockSupervisor.agentRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'session/prompt',
+        requestParams: expect.objectContaining({
+          content: [
+            {
+              type: 'text',
+              text: `Here's the project name: 'Frontend App'. Here's what the user wrote: 'Add dark mode toggle to settings'. Return a brief descriptive name for this session. No more than 5 words.`,
+            },
+          ],
+        }),
+      })
     );
   });
 
   it('should use fallback model when provided', async () => {
-    const mockExecute = vi.fn().mockResolvedValue({
-      content: 'Fix Auth Bug',
+    mockSupervisor.agentRequest = vi.fn(async (params: { method: string }) => {
+      if (params.method === 'ent/session/configure') {
+        return {};
+      }
+      if (params.method === 'session/prompt') {
+        return { content: [{ type: 'text', text: 'Fix Auth Bug' }] };
+      }
+      return {};
     });
-
-    const mockProvider = {} as unknown as AIProvider;
-
-    MockedInfrastructureHelper.mockImplementation(
-      () =>
-        ({
-          execute: mockExecute,
-        }) as unknown as InstanceType<typeof InfrastructureHelper>
-    );
 
     await generateSessionName('MyProject', 'Fix auth bug', {
-      provider: mockProvider,
-      modelId: 'test-model',
+      connectionId: 'conn_test',
+      modelId: 'model_test',
     });
 
-    expect(MockedInfrastructureHelper).toHaveBeenCalledWith(
+    expect(mockSupervisor.agentRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'fast',
-        tools: [],
-        fallbackProvider: mockProvider,
-        fallbackModelId: 'test-model',
+        method: 'ent/session/configure',
+        requestParams: expect.objectContaining({
+          connectionId: 'conn_test',
+          modelId: 'model_test',
+        }),
       })
     );
   });

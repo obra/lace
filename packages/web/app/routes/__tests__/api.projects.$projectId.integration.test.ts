@@ -3,10 +3,11 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
+import { Project } from '@lace/web/lib/server/projects/project';
 import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@lace/web/lib/server/lace-imports';
+  createEntTestConnection,
+  deleteEntTestConnection,
+} from '@lace/web/test-utils/ent-test-helpers';
 
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
@@ -30,33 +31,21 @@ interface SuccessResponse {
 
 describe('Individual Project API Integration Tests', () => {
   const context = setupWebTest();
-  let testProject: import('@lace/web/lib/server/lace-imports').Project;
+  let testProject: Project;
   let testProjectDir: string;
   let anthropicInstanceId: string;
   let openaiInstanceId: string;
 
   beforeEach(async () => {
     // Create test provider instances
-    anthropicInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
-
-    openaiInstanceId = await createTestProviderInstance({
-      catalogId: 'openai',
-      models: ['gpt-4o-mini', 'gpt-4o'],
-      displayName: 'Test OpenAI Instance',
-      apiKey: 'test-openai-key',
-    });
+    anthropicInstanceId = (await createEntTestConnection({ providerId: 'openai' })).connectionId;
+    openaiInstanceId = (await createEntTestConnection({ providerId: 'openai' })).connectionId;
 
     // Create temp directory for test project
     testProjectDir = join(context.tempProjectDir, 'project-id-test');
     await fs.mkdir(testProjectDir, { recursive: true });
 
     // Create a test project for each test
-    const { Project } = await import('@lace/web/lib/server/lace-imports');
     testProject = Project.create('Test Project', testProjectDir, 'A test project', {
       providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
@@ -66,7 +55,8 @@ describe('Individual Project API Integration Tests', () => {
   afterEach(async () => {
     await shutdownSupervisorForTests();
     // Clean up provider instances
-    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
+    await deleteEntTestConnection(anthropicInstanceId);
+    await deleteEntTestConnection(openaiInstanceId);
     vi.clearAllMocks();
   });
 
@@ -135,7 +125,6 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.workingDirectory).toBe(testProjectDir); // Should remain unchanged
 
       // Verify the update was persisted
-      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getName()).toBe('Updated Project Name');
     });
@@ -156,7 +145,6 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.name).toBe('Test Project'); // Should remain unchanged
 
       // Verify the update was persisted
-      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getInfo()!.description).toBe('Updated description');
     });
@@ -179,7 +167,6 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.workingDirectory).toBe(updatedDir);
 
       // Verify the update was persisted
-      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getWorkingDirectory()).toBe(updatedDir);
     });
@@ -198,7 +185,6 @@ describe('Individual Project API Integration Tests', () => {
       expect(response.status).toBe(200);
 
       // Verify the update was persisted
-      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getConfiguration()).toEqual({ newKey: 'newValue', another: 'config' });
     });
@@ -218,7 +204,6 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.isArchived).toBe(true);
 
       // Verify the update was persisted
-      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getInfo()!.isArchived).toBe(true);
     });
@@ -241,7 +226,6 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.isArchived).toBe(false);
 
       // Verify the update was persisted
-      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getInfo()!.isArchived).toBe(false);
     });
@@ -274,7 +258,6 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.isArchived).toBe(true);
 
       // Verify all updates were persisted
-      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getName()).toBe('Multi-Update Project');
       expect(updatedProject!.getInfo()!.description).toBe('Multiple fields updated');
@@ -330,7 +313,6 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.success).toBe(true);
 
       // Verify the project was actually deleted
-      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const deletedProject = Project.getById(projectId);
       expect(deletedProject).toBeNull();
     });
@@ -358,7 +340,6 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.success).toBe(true);
 
       // Verify the project was actually deleted
-      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const deletedProject = Project.getById(projectId);
       expect(deletedProject).toBeNull();
     });
