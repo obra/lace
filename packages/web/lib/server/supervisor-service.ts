@@ -13,6 +13,7 @@ import {
 } from '@lace/supervisor';
 import { ensureLaceDir } from '@lace/web/lib/server/lace-imports';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
+import { logger } from '@lace/agent/utils/logger';
 import type {
   ProtocolEvent,
   PermissionRequestEvent,
@@ -26,6 +27,23 @@ declare global {
   var laceWebSupervisor: Supervisor | undefined;
   var laceWebPendingPermissions: PendingPermissionsTracker | undefined;
   var laceWebAgentStates: Map<string, AgentState> | undefined;
+}
+
+function redactSecrets(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map(redactSecrets);
+  if (typeof value !== 'object') return value;
+
+  const record = value as Record<string, unknown>;
+  const redacted: Record<string, unknown> = {};
+  for (const [key, v] of Object.entries(record)) {
+    if (/(api[-_]?key|token|secret|password|authorization)/i.test(key)) {
+      redacted[key] = '[REDACTED]';
+      continue;
+    }
+    redacted[key] = redactSecrets(v);
+  }
+  return redacted;
 }
 
 function agentStateKey(params: { workspaceSessionId: string; agentSessionId: string }): string {
@@ -246,6 +264,12 @@ class InProcessSupervisorClient extends SupervisorClient {
     method: string;
     requestParams?: unknown;
   }) {
+    logger.info('web.ent.request', {
+      workspaceSessionId: params.workspaceSessionId,
+      sessionId: params.sessionId,
+      method: params.method,
+      params: redactSecrets(params.requestParams),
+    });
     const handler = agentMethodHandlers[params.method];
     if (!handler || handler.kind !== 'request') {
       throw new Error(`Unsupported request method: ${params.method}`);
@@ -254,6 +278,12 @@ class InProcessSupervisorClient extends SupervisorClient {
     const parsedParams = handler.paramsSchema.parse(params.requestParams ?? {}) as unknown;
     const peer = await this.supervisor.getPeer(params.workspaceSessionId, params.sessionId);
     const result = await peer.request(params.method, parsedParams);
+    logger.info('web.ent.response', {
+      workspaceSessionId: params.workspaceSessionId,
+      sessionId: params.sessionId,
+      method: params.method,
+      result: redactSecrets(result),
+    });
     return handler.resultSchema.parse(result) as unknown;
   }
 
@@ -263,6 +293,12 @@ class InProcessSupervisorClient extends SupervisorClient {
     method: string;
     notifyParams?: unknown;
   }) {
+    logger.info('web.ent.notify', {
+      workspaceSessionId: params.workspaceSessionId,
+      sessionId: params.sessionId,
+      method: params.method,
+      params: redactSecrets(params.notifyParams),
+    });
     const handler = agentMethodHandlers[params.method];
     if (!handler || handler.kind !== 'notify') {
       throw new Error(`Unsupported notify method: ${params.method}`);
