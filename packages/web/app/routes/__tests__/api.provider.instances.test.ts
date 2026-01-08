@@ -7,13 +7,27 @@ import * as path from 'path';
 import { loader as GET, action as POST } from '@lace/web/app/routes/api.provider.instances';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
-import type { ProviderInstancesConfig } from '@lace/web/lib/server/lace-imports';
-import type { ConfiguredInstance } from '@lace/web/lib/server/lace-imports';
 import type {
   InstancesResponse,
   CreateInstanceResponse,
 } from '@lace/web/app/routes/api.provider.instances';
 import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
+import { shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
+
+type ProviderInstancesConfig = {
+  version: '1.0';
+  instances: Record<
+    string,
+    {
+      displayName: string;
+      catalogProviderId: string;
+      endpoint?: string;
+      timeout?: number;
+      retryPolicy?: string;
+      modelConfig?: unknown;
+    }
+  >;
+};
 
 describe('Provider Instances API', () => {
   const tempContext = setupWebTest();
@@ -37,7 +51,9 @@ describe('Provider Instances API', () => {
     delete process.env.ANTHROPIC_API_KEY;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await shutdownSupervisorForTests();
+
     if (originalOpenAiApiKey === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = originalOpenAiApiKey;
 
@@ -80,13 +96,13 @@ describe('Provider Instances API', () => {
 
       expect(response.status).toBe(200);
       expect(data.instances).toHaveLength(2);
-      expect(data.instances[0]).toMatchObject({
+      expect(data.instances.find((i) => i.id === 'openai-prod')).toMatchObject({
         id: 'openai-prod',
         displayName: 'OpenAI Production',
         catalogProviderId: 'openai',
         hasCredentials: false, // No credentials set up
       });
-      expect(data.instances[1]).toMatchObject({
+      expect(data.instances.find((i) => i.id === 'anthropic-dev')).toMatchObject({
         id: 'anthropic-dev',
         displayName: 'Anthropic Development',
         catalogProviderId: 'anthropic',
@@ -152,8 +168,8 @@ describe('Provider Instances API', () => {
       expect(response.status).toBe(200);
       expect(data.instances).toHaveLength(2);
 
-      const withCreds = data.instances.find((i: ConfiguredInstance) => i.id === 'with-creds');
-      const withoutCreds = data.instances.find((i: ConfiguredInstance) => i.id === 'without-creds');
+      const withCreds = data.instances.find((i) => i.id === 'with-creds');
+      const withoutCreds = data.instances.find((i) => i.id === 'without-creds');
 
       expect(withCreds).toMatchObject({
         id: 'with-creds',
@@ -200,8 +216,8 @@ describe('Provider Instances API', () => {
       });
 
       // Verify optional fields are undefined (not included in response)
-      expect(data.instances[0].endpoint).toBeUndefined();
-      expect(data.instances[0].retryPolicy).toBeUndefined();
+      expect(data.instances.find((i) => i.id === 'minimal-instance')?.endpoint).toBeUndefined();
+      expect(data.instances.find((i) => i.id === 'minimal-instance')?.retryPolicy).toBeUndefined();
       // timeout should be undefined if not set (registry might set default, test actual behavior)
     });
   });
@@ -305,7 +321,7 @@ describe('Provider Instances API', () => {
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Provider not found in catalog: nonexistent');
+      expect(data.error).toBe('Provider not found: nonexistent');
     });
 
     it('should reject duplicate instance IDs', async () => {

@@ -1,11 +1,12 @@
 // ABOUTME: REST API endpoints for project configuration - GET, PUT for configuration management
 // ABOUTME: Handles project configuration retrieval and updates with validation and error handling
 
-import { Project, ProviderRegistry, ToolCatalog } from '@lace/web/lib/server/lace-imports';
+import { Project, ToolCatalog } from '@lace/web/lib/server/lace-imports';
 import { ToolPolicyResolver } from '@lace/web/lib/tool-policy-resolver';
 import type { ToolPolicy } from '@lace/web/types/core';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { getProviderManagementAgent, getSupervisor } from '@lace/web/lib/server/supervisor-service';
 // Using ToolCatalog instead of toolCacheService for better performance
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.configuration';
@@ -78,20 +79,21 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     // Validate provider instance if provided
     if (validatedData.providerInstanceId) {
-      const registry = ProviderRegistry.getInstance();
+      const supervisor = await getSupervisor();
+      const { workspaceSessionId, agentSessionId } = await getProviderManagementAgent();
+      const { connections } = (await supervisor.agentRequest({
+        workspaceSessionId,
+        sessionId: agentSessionId,
+        method: 'ent/connections/list',
+      })) as { connections: Array<{ connectionId: string; name: string }> };
 
-      const configuredInstances = await registry.getConfiguredInstances();
-      const instance = configuredInstances.find(
-        (inst) => inst.id === validatedData.providerInstanceId
-      );
-
-      if (!instance) {
+      if (!connections.some((c) => c.connectionId === validatedData.providerInstanceId)) {
         return createErrorResponse('Provider instance not found', 400, {
           code: 'VALIDATION_FAILED',
           details: {
-            availableInstances: configuredInstances.map((i) => ({
-              id: i.id,
-              name: (i as { name?: string; displayName: string }).name || i.displayName,
+            availableInstances: connections.map((c) => ({
+              id: c.connectionId,
+              name: c.name,
             })),
           },
         });

@@ -1,15 +1,10 @@
 // ABOUTME: Provider instances API endpoint
 // ABOUTME: Handles listing and creating provider instances with credential management
 
-import {
-  ProviderRegistry,
-  ProviderInstanceManager,
-  ProviderCatalogManager,
-} from '@lace/web/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
-import type { ConfiguredInstance } from '@lace/web/lib/server/lace-imports';
+import { getProviderManagementAgent, getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import type { Route } from './+types/api.provider.instances';
 
 export interface InstancesResponse {
@@ -19,6 +14,17 @@ export interface InstancesResponse {
 export interface CreateInstanceResponse {
   success: boolean;
   instanceId: string;
+}
+
+export interface ConfiguredInstance {
+  id: string;
+  displayName: string;
+  catalogProviderId: string;
+  endpoint?: string;
+  timeout?: number;
+  retryPolicy?: string;
+  modelConfig?: unknown;
+  hasCredentials: boolean;
 }
 
 const CreateInstanceSchema = z.object({
@@ -42,9 +48,37 @@ const CreateInstanceSchema = z.object({
 
 export async function loader({ request: _request }: Route.LoaderArgs) {
   try {
-    const registry = ProviderRegistry.getInstance();
+    const supervisor = await getSupervisor();
+    const { workspaceSessionId, agentSessionId } = await getProviderManagementAgent();
 
-    const instances = await registry.getConfiguredInstances();
+    const { connections } = (await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: agentSessionId,
+      method: 'ent/connections/list',
+    })) as {
+      connections: Array<{
+        connectionId: string;
+        providerId: string;
+        name: string;
+        endpoint?: string;
+        timeout?: number;
+        retryPolicy?: string;
+        modelConfig?: unknown;
+        hasCredentials?: boolean;
+        credentialState?: string;
+      }>;
+    };
+
+    const instances: ConfiguredInstance[] = connections.map((c) => ({
+      id: c.connectionId,
+      displayName: c.name,
+      catalogProviderId: c.providerId,
+      endpoint: c.endpoint,
+      timeout: c.timeout,
+      retryPolicy: c.retryPolicy,
+      modelConfig: c.modelConfig,
+      hasCredentials: c.hasCredentials ?? c.credentialState === 'ready',
+    }));
 
     return createSuperjsonResponse({ instances } as InstancesResponse);
   } catch (error: unknown) {
@@ -65,49 +99,73 @@ export async function action({ request }: Route.ActionArgs) {
     const body = (await request.json()) as unknown;
     const validatedData = CreateInstanceSchema.parse(body);
 
-    // Validate catalog provider exists
-    const catalogManager = new ProviderCatalogManager();
-    await catalogManager.loadCatalogs();
-
-    const catalogProvider = catalogManager.getProvider(validatedData.catalogProviderId);
-    if (!catalogProvider) {
-      return createErrorResponse(
-        `Provider not found in catalog: ${validatedData.catalogProviderId}`,
-        400,
-        { code: 'PROVIDER_NOT_FOUND' }
-      );
+    if (
+      validatedData.credential.additionalAuth &&
+      Object.keys(validatedData.credential.additionalAuth).length > 0
+    ) {
+      return createErrorResponse('additionalAuth is not supported via ENT yet', 400, {
+        code: 'CREDENTIAL_ADDITIONAL_AUTH_UNSUPPORTED',
+      });
     }
 
-    // Load existing instances
-    const instanceManager = new ProviderInstanceManager();
-    const config = await instanceManager.loadInstances();
+    const supervisor = await getSupervisor();
+    const { workspaceSessionId, agentSessionId } = await getProviderManagementAgent();
 
-    // Check for duplicate instance ID
-    if (config.instances[validatedData.instanceId]) {
+    const { providers } = (await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: agentSessionId,
+      method: 'ent/providers/list',
+    })) as { providers: Array<{ providerId: string }> };
+    if (!providers.some((p) => p.providerId === validatedData.catalogProviderId)) {
+      return createErrorResponse(`Provider not found: ${validatedData.catalogProviderId}`, 400, {
+        code: 'PROVIDER_NOT_FOUND',
+      });
+    }
+
+    const { connections } = (await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: agentSessionId,
+      method: 'ent/connections/list',
+    })) as { connections: Array<{ connectionId: string }> };
+    if (connections.some((c) => c.connectionId === validatedData.instanceId)) {
       return createErrorResponse(`Instance ID already exists: ${validatedData.instanceId}`, 400, {
         code: 'DUPLICATE_INSTANCE_ID',
       });
     }
 
-    // Create new instance
-    config.instances[validatedData.instanceId] = {
-      displayName: validatedData.displayName,
-      catalogProviderId: validatedData.catalogProviderId,
-      endpoint: validatedData.endpoint,
-      timeout: validatedData.timeout,
-      retryPolicy: validatedData.retryPolicy,
-    };
+    const config: Record<string, unknown> = {};
+    if (validatedData.endpoint) config.endpoint = validatedData.endpoint;
+    if (validatedData.timeout !== undefined) config.timeout = validatedData.timeout;
+    if (validatedData.retryPolicy) config.retryPolicy = validatedData.retryPolicy;
 
-    // Save instance configuration
-    await instanceManager.saveInstances(config);
-
-    // Save credentials separately
-    await instanceManager.saveCredential(validatedData.instanceId, {
-      apiKey: validatedData.credential.apiKey,
-      additionalAuth: validatedData.credential.additionalAuth,
+    await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: agentSessionId,
+      method: 'ent/connections/upsert',
+      requestParams: {
+        providerId: validatedData.catalogProviderId,
+        connection: {
+          connectionId: validatedData.instanceId,
+          name: validatedData.displayName,
+          config,
+        },
+      },
     });
 
-    // No need to refresh registry - it reads fresh data on demand
+    const credentialResult = (await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: agentSessionId,
+      method: 'ent/connections/credentials/submit',
+      requestParams: {
+        connectionId: validatedData.instanceId,
+        values: { apiKey: validatedData.credential.apiKey },
+      },
+    })) as { ok: boolean; error?: string };
+    if (!credentialResult.ok) {
+      return createErrorResponse(credentialResult.error ?? 'Failed to save credentials', 500, {
+        code: 'CREDENTIAL_SAVE_FAILED',
+      });
+    }
 
     return createSuperjsonResponse(
       {

@@ -1,8 +1,8 @@
 // ABOUTME: Provider instance connection testing endpoint
 // ABOUTME: Tests connection to configured provider instance and returns status
 
-import { ProviderRegistry } from '@lace/web/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { getProviderManagementAgent, getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import type { Route } from './+types/api.provider.instances.$instanceId.test';
 
 export interface TestConnectionResponse {
@@ -25,30 +25,22 @@ export async function action({ request, params }: Route.ActionArgs) {
   try {
     const { instanceId } = params;
 
-    const registry = ProviderRegistry.getInstance();
+    const supervisor = await getSupervisor();
+    const { workspaceSessionId, agentSessionId } = await getProviderManagementAgent();
 
-    // Try to create a provider from the instance to test connectivity
-    const provider = await registry.createProviderFromInstance(instanceId);
-
-    // Test the connection by checking provider configuration
-    const isConfigured = provider.isConfigured();
-
-    if (!isConfigured) {
-      return createSuperjsonResponse({
-        success: false,
-        status: 'error',
-        message: 'Provider is not properly configured',
-        testedAt: new Date().toISOString(),
-      } as TestConnectionResponse);
-    }
-
-    // TODO: Add actual API call test when providers support it
-    // For now, just verify the provider can be created successfully
+    const result = (await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: agentSessionId,
+      method: 'ent/connections/test',
+      requestParams: { connectionId: instanceId },
+    })) as { ok: boolean; error?: string };
 
     return createSuperjsonResponse({
-      success: true,
-      status: 'connected',
-      message: 'Connection test successful',
+      success: result.ok,
+      status: result.ok ? 'connected' : 'error',
+      message: result.ok
+        ? 'Connection test successful'
+        : (result.error ?? 'Connection test failed'),
       testedAt: new Date().toISOString(),
     } as TestConnectionResponse);
   } catch (error: unknown) {

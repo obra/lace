@@ -4,8 +4,25 @@
 import type { Route } from './+types/api.provider.instances.$instanceId.config';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { ProviderRegistry, ModelConfigSchema } from '@lace/web/lib/server/lace-imports';
-import { logger } from '@lace/agent/utils/logger';
+import { getProviderManagementAgent, getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { z } from 'zod';
+
+const ModelConfigSchema = z
+  .object({
+    enableNewModels: z.boolean().default(true),
+    disabledModels: z.array(z.string()).default([]),
+    disabledProviders: z.array(z.string()).default([]),
+    filters: z
+      .object({
+        requiredParameters: z.array(z.string()).optional(),
+        maxPromptCostPerMillion: z.number().nonnegative().optional(),
+        maxCompletionCostPerMillion: z.number().nonnegative().optional(),
+        minContextLength: z.number().int().positive().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 export async function action({ params, request }: Route.ActionArgs) {
   try {
@@ -26,31 +43,31 @@ export async function action({ params, request }: Route.ActionArgs) {
       });
     }
 
-    // Get instance manager
-    const registry = ProviderRegistry.getInstance();
-    const instanceManager = registry.getInstanceManager();
+    const supervisor = await getSupervisor();
+    const { workspaceSessionId, agentSessionId } = await getProviderManagementAgent();
 
-    // Load current instances
-    const instances = await instanceManager.loadInstances();
-    const instance = instances.instances[instanceId];
+    const { connections } = (await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: agentSessionId,
+      method: 'ent/connections/list',
+    })) as { connections: Array<{ connectionId: string; name: string }> };
 
-    if (!instance) {
+    const existing = connections.find((c) => c.connectionId === instanceId);
+    if (!existing) {
       return createErrorResponse(`Instance not found: ${instanceId}`, 404);
     }
 
-    // Update the instance with new model config
-    instances.instances[instanceId] = {
-      ...instance,
-      modelConfig: parseResult.data,
-    };
-
-    // Save updated configuration
-    await instanceManager.saveInstances(instances);
-
-    logger.info('Model config updated', {
-      instanceId,
-      disabledModels: parseResult.data.disabledModels?.length ?? 0,
-      disabledProviders: parseResult.data.disabledProviders?.length ?? 0,
+    await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: agentSessionId,
+      method: 'ent/connections/upsert',
+      requestParams: {
+        connection: {
+          connectionId: instanceId,
+          name: existing.name,
+          config: { modelConfig: parseResult.data },
+        },
+      },
     });
 
     return createSuperjsonResponse({
@@ -58,7 +75,6 @@ export async function action({ params, request }: Route.ActionArgs) {
       message: 'Configuration saved successfully',
     });
   } catch (error: unknown) {
-    logger.error('Failed to update model config', { error });
     const errorMessage = error instanceof Error ? error.message : 'Failed to update configuration';
     return createErrorResponse(errorMessage, 500);
   }

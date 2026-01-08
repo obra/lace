@@ -124,3 +124,17 @@ TODO
 - Agent: if logging raw ENT frames, redact secrets and write under the agent’s session directory.
 - TUI: write a local debug log for ENT calls and agent stderr/stdout (redacted).
 
+## Status (as of 2026-01-08)
+
+Completed
+- Spec/schemas updated for `ModelInfo.disabledState` and `ent/providers/catalog`.
+- Agent implements `ent/providers/catalog`; supervisor forwards it.
+- `ent/models/list` returns `disabled` + `disabledState`.
+- Web provider-management routes are ENT-backed:
+  - `GET /api/provider/catalog` → `ent/providers/catalog`
+  - Instances CRUD/credentials/model refresh/config → `ent/connections/*` + `ent/models/*`
+
+Audit findings (remaining agent-library usage in web)
+- Runtime: `packages/web/app/routes/api.projects.$projectId.sessions.ts` uses `ProviderRegistry` to create an ad-hoc provider for session naming (should be moved to ENT to fully decouple).
+- Runtime: many routes still import `@lace/agent/*` via `packages/web/lib/server/lace-imports.ts` for non-provider features (projects, personas, tools, MCP config, user settings).
+- Client: avoid importing `packages/web/lib/server/lace-imports.ts` into React components; keep provider UI types local (started for provider UI).

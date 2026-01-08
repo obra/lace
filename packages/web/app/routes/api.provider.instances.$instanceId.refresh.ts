@@ -4,8 +4,7 @@
 import type { Route } from './+types/api.provider.instances.$instanceId.refresh';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { ProviderRegistry, OpenRouterDynamicProvider } from '@lace/web/lib/server/lace-imports';
-import { logger } from '@lace/agent/utils/logger';
+import { getProviderManagementAgent, getSupervisor } from '@lace/web/lib/server/supervisor-service';
 
 export async function action({ params, request }: Route.ActionArgs) {
   try {
@@ -15,43 +14,33 @@ export async function action({ params, request }: Route.ActionArgs) {
       return createErrorResponse('Method not allowed', 405);
     }
 
-    // Get instance configuration
-    const registry = ProviderRegistry.getInstance();
-    const instanceManager = registry.getInstanceManager();
-    const instances = await instanceManager.loadInstances();
-    const instance = instances.instances[instanceId];
+    const supervisor = await getSupervisor();
+    const { workspaceSessionId, agentSessionId } = await getProviderManagementAgent();
 
-    if (!instance) {
-      return createErrorResponse(`Instance not found: ${instanceId}`, 404);
+    const refreshed = (await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: agentSessionId,
+      method: 'ent/models/refresh',
+      requestParams: { connectionId: instanceId },
+    })) as { ok: boolean; refreshedAt: string; error?: string };
+
+    if (!refreshed.ok) {
+      return createErrorResponse(refreshed.error ?? 'Failed to refresh catalog', 500);
     }
 
-    // Only support OpenRouter instances
-    if (instance.catalogProviderId !== 'openrouter') {
-      return createErrorResponse('Refresh only supported for OpenRouter instances', 400);
-    }
-
-    // Get API key from credentials
-    const credential = instanceManager.loadCredential(instanceId);
-    if (!credential?.apiKey) {
-      return createErrorResponse('API key required for refresh', 401);
-    }
-
-    // Force refresh the catalog
-    const dynamicProvider = new OpenRouterDynamicProvider(instanceId);
-    const catalog = await dynamicProvider.refreshCatalog(credential.apiKey);
-
-    logger.info('Catalog refreshed', {
-      instanceId,
-      modelCount: catalog.models.length,
-    });
+    const listed = (await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: agentSessionId,
+      method: 'ent/models/list',
+      requestParams: { connectionId: instanceId },
+    })) as { models: unknown[] };
 
     return createSuperjsonResponse({
       success: true,
-      modelCount: catalog.models.length,
-      lastUpdated: new Date().toISOString(),
+      modelCount: Array.isArray(listed.models) ? listed.models.length : 0,
+      lastUpdated: refreshed.refreshedAt,
     });
   } catch (error: unknown) {
-    logger.error('Failed to refresh catalog', { error });
     const errorMessage = error instanceof Error ? error.message : 'Failed to refresh catalog';
     return createErrorResponse(errorMessage, 500);
   }

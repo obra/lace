@@ -27,6 +27,8 @@ declare global {
   var laceWebSupervisor: Supervisor | undefined;
   var laceWebPendingPermissions: PendingPermissionsTracker | undefined;
   var laceWebAgentStates: Map<string, AgentState> | undefined;
+  var laceWebProviderManagementWorkspaceSessionId: string | undefined;
+  var laceWebProviderManagementAgentSessionId: string | undefined;
 }
 
 function redactSecrets(value: unknown): unknown {
@@ -397,6 +399,31 @@ export async function getSupervisor(): Promise<SupervisorClient> {
   return global.laceWebSupervisorClient;
 }
 
+export async function getProviderManagementAgent(): Promise<{
+  workspaceSessionId: string;
+  agentSessionId: string;
+}> {
+  const supervisor = await getSupervisor();
+
+  if (
+    global.laceWebProviderManagementWorkspaceSessionId &&
+    global.laceWebProviderManagementAgentSessionId
+  ) {
+    return {
+      workspaceSessionId: global.laceWebProviderManagementWorkspaceSessionId,
+      agentSessionId: global.laceWebProviderManagementAgentSessionId,
+    };
+  }
+
+  const workspace = await supervisor.createWorkspaceSession(process.cwd());
+  const agent = await supervisor.createAgentSession(workspace.workspaceSessionId);
+
+  global.laceWebProviderManagementWorkspaceSessionId = workspace.workspaceSessionId;
+  global.laceWebProviderManagementAgentSessionId = agent.sessionId;
+
+  return { workspaceSessionId: workspace.workspaceSessionId, agentSessionId: agent.sessionId };
+}
+
 export async function listPendingPermissions(
   workspaceSessionId: string
 ): Promise<PendingPermission[]> {
@@ -415,6 +442,9 @@ export async function resolvePendingPermission(params: {
 }
 
 export async function shutdownSupervisorForTests(): Promise<void> {
+  global.laceWebProviderManagementWorkspaceSessionId = undefined;
+  global.laceWebProviderManagementAgentSessionId = undefined;
+
   const client = global.laceWebSupervisorClient;
   global.laceWebSupervisorClient = undefined;
 

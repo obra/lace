@@ -4,43 +4,40 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import { loader, action } from '@lace/web/app/routes/api.provider.instances.$instanceId';
 import { parseResponse } from '@lace/web/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
-import { ProviderRegistry } from '@lace/web/lib/server/lace-imports';
-import type { ProviderInstancesConfig } from '@lace/web/lib/server/lace-imports';
 import type {
   InstanceDetailResponse,
   DeleteInstanceResponse,
   UpdateInstanceResponse,
 } from '@lace/web/app/routes/api.provider.instances.$instanceId';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
+import { shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
+
+type ProviderInstancesConfig = {
+  version: '1.0';
+  instances: Record<
+    string,
+    {
+      displayName: string;
+      catalogProviderId: string;
+      timeout?: number;
+      endpoint?: string;
+    }
+  >;
+};
 
 describe('Provider Instance Detail API', () => {
+  const tempContext = setupWebTest();
   let tempDir: string;
-  let originalLaceDir: string | undefined;
 
   beforeEach(() => {
-    // Clear Registry singleton to ensure clean state
-    ProviderRegistry.clearInstance();
-
-    // Create temp directory for testing
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-test-'));
-    originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
+    tempDir = tempContext.tempDir;
   });
 
-  afterEach(() => {
-    // Clear Registry singleton to prevent state leakage
-    ProviderRegistry.clearInstance();
-
-    // Cleanup
-    if (originalLaceDir) {
-      process.env.LACE_DIR = originalLaceDir;
-    } else {
-      delete process.env.LACE_DIR;
-    }
-    fs.rmSync(tempDir, { recursive: true, force: true });
+  afterEach(async () => {
+    await shutdownSupervisorForTests();
   });
 
   describe('GET /api/provider/instances/[instanceId]', () => {

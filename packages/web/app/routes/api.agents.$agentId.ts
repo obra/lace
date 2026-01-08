@@ -6,7 +6,7 @@ import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { z } from 'zod';
-import { ProviderRegistry } from '@lace/web/lib/server/lace-imports';
+import { getProviderManagementAgent } from '@lace/web/lib/server/supervisor-service';
 import type { Route } from './+types/api.agents.$agentId';
 
 const AgentUpdateSchema = z
@@ -111,18 +111,20 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     if (validatedData.providerInstanceId) {
-      const registry = ProviderRegistry.getInstance();
-      const configuredInstances = await registry.getConfiguredInstances();
-      const instance = configuredInstances.find(
-        (inst) => inst.id === validatedData.providerInstanceId
-      );
-      if (!instance) {
+      const { workspaceSessionId, agentSessionId } = await getProviderManagementAgent();
+      const { connections } = (await supervisor.agentRequest({
+        workspaceSessionId,
+        sessionId: agentSessionId,
+        method: 'ent/connections/list',
+      })) as { connections: Array<{ connectionId: string; name: string }> };
+
+      if (!connections.some((c) => c.connectionId === validatedData.providerInstanceId)) {
         return createErrorResponse('Provider instance not found', 400, {
           code: 'VALIDATION_FAILED',
           details: {
-            availableInstances: configuredInstances.map((i) => ({
-              id: i.id,
-              name: (i as { name?: string; displayName: string }).name || i.displayName,
+            availableInstances: connections.map((c) => ({
+              id: c.connectionId,
+              name: c.name,
             })),
           },
         });
