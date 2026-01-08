@@ -1,14 +1,13 @@
 // ABOUTME: Session API endpoints under projects hierarchy - GET sessions by project, POST new session
 // ABOUTME: Uses Project class methods for session management with proper project-session relationships
 
-import { Project, ProviderRegistry } from '@lace/web/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { generateSessionName } from '@lace/web/lib/server/session-naming-helper';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.sessions';
-import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { getProviderManagementAgent, getSupervisor } from '@lace/web/lib/server/supervisor-service';
 
 const CreateSessionSchema = z.object({
   name: z.string().min(1).optional(), // Optional for both flows
@@ -179,20 +178,69 @@ async function spawnSessionNamingHelper(
   fallbackModel: { providerInstanceId: string; modelId: string }
 ): Promise<void> {
   try {
-    // Create provider instance for fallback
-    const registry = ProviderRegistry.getInstance();
-    const fallbackProvider = await registry.createProviderFromInstanceAndModel(
-      fallbackModel.providerInstanceId,
-      fallbackModel.modelId
-    );
+    const supervisor = await getSupervisor();
+    const mgmt = await getProviderManagementAgent();
 
-    // Generate new session name using helper agent with configured provider
-    const generatedName = await generateSessionName(projectName, initialMessage, {
-      provider: fallbackProvider,
-      modelId: fallbackModel.modelId,
+    await supervisor.agentRequest({
+      workspaceSessionId: mgmt.workspaceSessionId,
+      sessionId: mgmt.agentSessionId,
+      method: 'ent/session/configure',
+      requestParams: {
+        connectionId: fallbackModel.providerInstanceId,
+        modelId: fallbackModel.modelId,
+        approvalMode: 'ask',
+      },
     });
 
-    const supervisor = await getSupervisor();
+    const prompt = [
+      `Project: ${projectName}`,
+      ``,
+      `User's first message:`,
+      initialMessage.trim(),
+      ``,
+      `Task: Generate a short, specific session title (3–7 words).`,
+      `Return ONLY the title. No quotes. No punctuation at the end.`,
+    ].join('\n');
+
+    const naming = await supervisor.agentRequest({
+      workspaceSessionId: mgmt.workspaceSessionId,
+      sessionId: mgmt.agentSessionId,
+      method: 'session/prompt',
+      requestParams: {
+        content: [{ type: 'text', text: prompt }],
+        maxTurns: 1,
+        outputFormat: {
+          type: 'json_schema',
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['title'],
+            properties: { title: { type: 'string' } },
+          },
+        },
+      },
+    });
+
+    const structuredTitle =
+      (naming as { structuredOutput?: unknown }).structuredOutput &&
+      typeof (naming as any).structuredOutput === 'object' &&
+      (naming as any).structuredOutput !== null
+        ? (naming as any).structuredOutput.title
+        : undefined;
+
+    const contentTitle = Array.isArray((naming as any).content)
+      ? (naming as any).content
+          .filter((b: any) => b?.type === 'text' && typeof b.text === 'string')
+          .map((b: any) => b.text)
+          .join(' ')
+          .trim()
+      : '';
+
+    const generatedName =
+      (typeof structuredTitle === 'string' && structuredTitle.trim()) ||
+      contentTitle.split('\n')[0]?.trim() ||
+      'New Session';
+
     await supervisor.updateWorkspaceSession(workspaceSessionId, { name: generatedName });
 
     // Emit SESSION_INFO event via SSE
