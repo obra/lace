@@ -266,12 +266,14 @@ class InProcessSupervisorClient extends SupervisorClient {
     method: string;
     requestParams?: unknown;
   }) {
-    logger.info('web.ent.request', {
-      workspaceSessionId: params.workspaceSessionId,
-      sessionId: params.sessionId,
-      method: params.method,
-      params: redactSecrets(params.requestParams),
-    });
+    if (process.env.LACE_WEB_ENT_LOG === '1') {
+      logger.info('web.ent.request', {
+        workspaceSessionId: params.workspaceSessionId,
+        sessionId: params.sessionId,
+        method: params.method,
+        params: redactSecrets(params.requestParams),
+      });
+    }
     const handler = agentMethodHandlers[params.method];
     if (!handler || handler.kind !== 'request') {
       throw new Error(`Unsupported request method: ${params.method}`);
@@ -280,12 +282,14 @@ class InProcessSupervisorClient extends SupervisorClient {
     const parsedParams = handler.paramsSchema.parse(params.requestParams ?? {}) as unknown;
     const peer = await this.supervisor.getPeer(params.workspaceSessionId, params.sessionId);
     const result = await peer.request(params.method, parsedParams);
-    logger.info('web.ent.response', {
-      workspaceSessionId: params.workspaceSessionId,
-      sessionId: params.sessionId,
-      method: params.method,
-      result: redactSecrets(result),
-    });
+    if (process.env.LACE_WEB_ENT_LOG === '1') {
+      logger.info('web.ent.response', {
+        workspaceSessionId: params.workspaceSessionId,
+        sessionId: params.sessionId,
+        method: params.method,
+        result: redactSecrets(result),
+      });
+    }
     return handler.resultSchema.parse(result) as unknown;
   }
 
@@ -295,12 +299,14 @@ class InProcessSupervisorClient extends SupervisorClient {
     method: string;
     notifyParams?: unknown;
   }) {
-    logger.info('web.ent.notify', {
-      workspaceSessionId: params.workspaceSessionId,
-      sessionId: params.sessionId,
-      method: params.method,
-      params: redactSecrets(params.notifyParams),
-    });
+    if (process.env.LACE_WEB_ENT_LOG === '1') {
+      logger.info('web.ent.notify', {
+        workspaceSessionId: params.workspaceSessionId,
+        sessionId: params.sessionId,
+        method: params.method,
+        params: redactSecrets(params.notifyParams),
+      });
+    }
     const handler = agentMethodHandlers[params.method];
     if (!handler || handler.kind !== 'notify') {
       throw new Error(`Unsupported notify method: ${params.method}`);
