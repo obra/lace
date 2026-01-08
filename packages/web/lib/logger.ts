@@ -20,7 +20,7 @@ function writeLine(message: string) {
 
 export const logger = {
   info(message: string, meta?: unknown) {
-    writeLine(format(message, meta));
+    if (process.env.LACE_WEB_LOG) writeLine(format(message, meta));
   },
   warn(message: string, meta?: unknown) {
     console.warn(format(message, meta));
@@ -29,6 +29,6 @@ export const logger = {
     console.error(format(message, meta));
   },
   debug(message: string, meta?: unknown) {
-    writeLine(format(message, meta));
+    if (process.env.LACE_WEB_LOG) writeLine(format(message, meta));
   },
 };

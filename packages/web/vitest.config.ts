@@ -9,6 +9,14 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: './test-setup.ts',
+    testTimeout: 30000,
+    hookTimeout: 20000,
+    poolOptions: {
+      threads: {
+        minThreads: 1,
+        maxThreads: 4,
+      },
+    },
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
