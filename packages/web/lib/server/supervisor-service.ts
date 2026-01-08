@@ -266,7 +266,7 @@ class InProcessSupervisorClient extends SupervisorClient {
     method: string;
     requestParams?: unknown;
   }) {
-    if (process.env.LACE_WEB_ENT_LOG === '1') {
+    if (process.env.LACE_WEB_ENT_LOG) {
       logger.info('web.ent.request', {
         workspaceSessionId: params.workspaceSessionId,
         sessionId: params.sessionId,
@@ -282,7 +282,7 @@ class InProcessSupervisorClient extends SupervisorClient {
     const parsedParams = handler.paramsSchema.parse(params.requestParams ?? {}) as unknown;
     const peer = await this.supervisor.getPeer(params.workspaceSessionId, params.sessionId);
     const result = await peer.request(params.method, parsedParams);
-    if (process.env.LACE_WEB_ENT_LOG === '1') {
+    if (process.env.LACE_WEB_ENT_LOG) {
       logger.info('web.ent.response', {
         workspaceSessionId: params.workspaceSessionId,
         sessionId: params.sessionId,
@@ -299,7 +299,7 @@ class InProcessSupervisorClient extends SupervisorClient {
     method: string;
     notifyParams?: unknown;
   }) {
-    if (process.env.LACE_WEB_ENT_LOG === '1') {
+    if (process.env.LACE_WEB_ENT_LOG) {
       logger.info('web.ent.notify', {
         workspaceSessionId: params.workspaceSessionId,
         sessionId: params.sessionId,
