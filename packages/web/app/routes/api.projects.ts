@@ -1,7 +1,7 @@
 // ABOUTME: REST API endpoints for project management - GET all projects, POST new project
 // ABOUTME: Uses Project class for business logic and validation with proper error handling
 
-import { Project } from '@lace/web/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/projects/project';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';

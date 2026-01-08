@@ -30,7 +30,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
     const { sessionId } = params;
 
-    if (!isWorkspaceSessionId(sessionId)) {
+    if (!sessionId || !isWorkspaceSessionId(sessionId)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'INVALID_REQUEST' });
     }
 

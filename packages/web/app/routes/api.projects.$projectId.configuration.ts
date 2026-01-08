@@ -1,13 +1,12 @@
 // ABOUTME: REST API endpoints for project configuration - GET, PUT for configuration management
 // ABOUTME: Handles project configuration retrieval and updates with validation and error handling
 
-import { Project, ToolCatalog } from '@lace/web/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/projects/project';
 import { ToolPolicyResolver } from '@lace/web/lib/tool-policy-resolver';
 import type { ToolPolicy } from '@lace/web/types/core';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { getProviderManagementAgent, getSupervisor } from '@lace/web/lib/server/supervisor-service';
-// Using ToolCatalog instead of toolCacheService for better performance
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.configuration';
 
@@ -31,8 +30,14 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     const configuration = project.getConfiguration();
 
-    // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
-    const availableTools = ToolCatalog.getAvailableTools(project);
+    const supervisor = await getSupervisor();
+    const { workspaceSessionId, agentSessionId } = await getProviderManagementAgent();
+    const { tools } = (await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: agentSessionId,
+      method: 'ent/tools/list',
+    })) as { tools: Array<{ name: string }> };
+    const availableTools = tools.map((t) => t.name);
 
     // Resolve tool policy hierarchy for progressive restriction
     // TODO: Get global policies for full hierarchy
@@ -110,8 +115,14 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const configuration = project.getConfiguration();
 
-    // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
-    const availableTools = ToolCatalog.getAvailableTools(project);
+    const supervisor = await getSupervisor();
+    const { workspaceSessionId, agentSessionId } = await getProviderManagementAgent();
+    const { tools } = (await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: agentSessionId,
+      method: 'ent/tools/list',
+    })) as { tools: Array<{ name: string }> };
+    const availableTools = tools.map((t) => t.name);
 
     return createSuperjsonResponse({
       configuration: {

@@ -1,7 +1,7 @@
 // ABOUTME: Individual global MCP server management API with CRUD operations
 // ABOUTME: Handles GET, PUT, DELETE for specific global MCP servers
 
-import { MCPConfigLoader } from '@lace/web/lib/server/lace-imports';
+import { McpConfigStore } from '@lace/web/lib/server/mcp-config-store';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
@@ -28,7 +28,7 @@ export async function loader({ params }: { params: unknown; context: unknown; re
   try {
     const serverId = ServerIdSchema.parse((params as { serverId: string }).serverId);
 
-    const globalConfig = MCPConfigLoader.loadGlobalConfig();
+    const globalConfig = McpConfigStore.loadGlobalConfig();
     const serverConfig = globalConfig?.servers[serverId];
 
     if (!serverConfig) {
@@ -64,7 +64,7 @@ export async function action({
       // Update existing global server
       const updates = UpdateServerSchema.parse(await request.json());
 
-      const globalConfig = MCPConfigLoader.loadGlobalConfig() || { servers: {} };
+      const globalConfig = McpConfigStore.loadGlobalConfig() || { servers: {} };
       const currentServer = globalConfig.servers[serverId];
 
       if (!currentServer) {
@@ -81,7 +81,7 @@ export async function action({
         },
       };
 
-      MCPConfigLoader.saveGlobalConfig(updatedConfig);
+      McpConfigStore.saveGlobalConfig(updatedConfig);
 
       return createSuperjsonResponse({
         message: `Global MCP server '${serverId}' updated successfully`,
@@ -91,7 +91,7 @@ export async function action({
       // Create new global server
       const serverConfig = CreateServerSchema.parse(await request.json());
 
-      const globalConfig = MCPConfigLoader.loadGlobalConfig() || { servers: {} };
+      const globalConfig = McpConfigStore.loadGlobalConfig() || { servers: {} };
 
       // Check for duplicates
       if (globalConfig.servers[serverId]) {
@@ -107,7 +107,7 @@ export async function action({
         },
       };
 
-      MCPConfigLoader.saveGlobalConfig(updatedConfig);
+      McpConfigStore.saveGlobalConfig(updatedConfig);
 
       return createSuperjsonResponse(
         {
@@ -118,7 +118,7 @@ export async function action({
       );
     } else if (request.method === 'DELETE') {
       // Delete global server
-      const globalConfig = MCPConfigLoader.loadGlobalConfig();
+      const globalConfig = McpConfigStore.loadGlobalConfig();
       if (!globalConfig?.servers[serverId]) {
         return createErrorResponse(`Global MCP server '${serverId}' not found`, 404);
       }
@@ -126,7 +126,7 @@ export async function action({
       const updatedConfig = { ...globalConfig };
       delete updatedConfig.servers[serverId];
 
-      MCPConfigLoader.saveGlobalConfig(updatedConfig);
+      McpConfigStore.saveGlobalConfig(updatedConfig);
 
       return createSuperjsonResponse({
         message: `Global MCP server '${serverId}' deleted successfully`,

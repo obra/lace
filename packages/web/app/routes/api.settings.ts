@@ -1,7 +1,7 @@
 // ABOUTME: User settings API endpoint
 // ABOUTME: Handles GET, PUT, and PATCH operations for user preferences
 
-import { UserSettingsManager } from '@lace/web/lib/server/lace-imports';
+import { UserSettingsManager } from '@lace/web/lib/server/user-settings';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import type { Route } from './+types/api.settings';

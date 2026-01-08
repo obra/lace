@@ -33,7 +33,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const { threadId: threadIdParam } = params;
 
     // Supervisor-backed "threadId" is an agent protocol sessionId (opaque string)
-    if (!isAgentSessionId(threadIdParam)) {
+    if (!threadIdParam || !isAgentSessionId(threadIdParam)) {
       return createErrorResponse('Invalid thread ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 

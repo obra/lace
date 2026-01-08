@@ -1,7 +1,7 @@
 // ABOUTME: Individual project MCP server management following established project API patterns
 // ABOUTME: Handles CRUD operations for project-specific MCP server configurations
 
-import { Project } from '@lace/web/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/projects/project';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';

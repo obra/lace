@@ -1,7 +1,7 @@
 // ABOUTME: Global MCP server management API for listing and creating servers
 // ABOUTME: Provides CRUD operations for global MCP server configurations
 
-import { MCPConfigLoader, ToolCatalog } from '@lace/web/lib/server/lace-imports';
+import { McpConfigStore } from '@lace/web/lib/server/mcp-config-store';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { logger } from '@lace/web/lib/logger';
@@ -26,7 +26,7 @@ export async function loader({
 }) {
   try {
     // Load global MCP configuration only (no project context)
-    const globalConfig = MCPConfigLoader.loadGlobalConfig();
+    const globalConfig = McpConfigStore.loadGlobalConfig();
 
     // Return server list with just configuration (no runtime status)
     const servers = Object.entries(globalConfig?.servers || {}).map(([serverId, serverConfig]) => ({
@@ -53,7 +53,7 @@ export async function action({ request }: { request: Request; params: unknown; c
     const { id, ...serverConfig } = validatedData;
 
     // Check for duplicate server ID
-    const existingConfig = MCPConfigLoader.loadGlobalConfig();
+    const existingConfig = McpConfigStore.loadGlobalConfig();
     if (existingConfig?.servers[id]) {
       return createErrorResponse(`Server '${id}' already exists`, 400, {
         code: 'DUPLICATE_SERVER',
@@ -61,10 +61,7 @@ export async function action({ request }: { request: Request; params: unknown; c
     }
 
     // Save the new server to global configuration
-    MCPConfigLoader.updateServerConfig(id, serverConfig as MCPServerConfig);
-
-    // Start async tool discovery (non-blocking)
-    await ToolCatalog.discoverAndCacheTools(id, serverConfig as MCPServerConfig);
+    McpConfigStore.updateServerConfig(id, serverConfig as MCPServerConfig);
 
     return createSuperjsonResponse({
       message: 'Server created successfully',

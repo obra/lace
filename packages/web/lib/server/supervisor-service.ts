@@ -11,7 +11,7 @@ import {
   type SupervisorServerEvent,
   type SupervisorSessionUpdate,
 } from '@lace/supervisor';
-import { ensureLaceDir } from '@lace/web/lib/server/lace-imports';
+import { ensureLaceDir } from '@lace/web/lib/server/lace-dir';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import { logger } from '@lace/web/lib/logger';
 import type {

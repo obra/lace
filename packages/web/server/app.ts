@@ -6,9 +6,14 @@ import express from 'express';
 
 export const app = express();
 
+const build = (() => import('virtual:react-router/server-build')) as unknown as Exclude<
+  Parameters<typeof createRequestHandler>[0]['build'],
+  undefined
+>;
+
 app.use(
   createRequestHandler({
-    build: () => import('virtual:react-router/server-build'),
+    build,
     getLoadContext() {
       return {
         // Add any context needed by your routes here
