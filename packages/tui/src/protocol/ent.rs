@@ -201,6 +201,26 @@ pub fn extract_agent_status_config(result: &Option<Value>) -> (Option<String>, O
     (connection_id, model_id)
 }
 
+pub fn extract_session_configure_config(result: &Option<Value>) -> (Option<String>, Option<String>) {
+    let Some(Value::Object(obj)) = result else {
+        return (None, None);
+    };
+    let Some(Value::Object(cfg)) = obj.get("config") else {
+        return (None, None);
+    };
+
+    let connection_id = cfg
+        .get("connectionId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let model_id = cfg
+        .get("modelId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    (connection_id, model_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -299,6 +319,20 @@ mod tests {
         assert_eq!(model.as_deref(), Some("gpt-4.1"));
 
         let (conn, model) = extract_agent_status_config(&Some(json!({})));
+        assert!(conn.is_none());
+        assert!(model.is_none());
+    }
+
+    #[test]
+    fn extracts_session_configure_config() {
+        let (conn, model) = extract_session_configure_config(&Some(json!({
+          "ok": true,
+          "config": { "connectionId":"c1", "modelId":"m1" }
+        })));
+        assert_eq!(conn.as_deref(), Some("c1"));
+        assert_eq!(model.as_deref(), Some("m1"));
+
+        let (conn, model) = extract_session_configure_config(&Some(json!({"ok":true})));
         assert!(conn.is_none());
         assert!(model.is_none());
     }

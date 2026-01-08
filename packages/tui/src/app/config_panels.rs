@@ -376,6 +376,40 @@ pub fn toggle_selected_model(state: &mut AppState) -> Vec<Outbound> {
     }]
 }
 
+pub fn select_model_for_session(state: &mut AppState) -> Vec<Outbound> {
+    if !state.models_panel.open {
+        return Vec::new();
+    }
+    let Some(conn) = state.connection_id.clone().filter(|s| !s.is_empty()) else {
+        state.models_panel.error = Some("No active connection".to_string());
+        return Vec::new();
+    };
+    let Some(model) = state
+        .models_panel
+        .models
+        .get(state.models_panel.selected)
+        .cloned()
+    else {
+        return Vec::new();
+    };
+    if model.disabled {
+        state.models_panel.error = Some("Model is disabled".to_string());
+        return Vec::new();
+    }
+
+    state.models_panel.loading = true;
+    let id = state.next_client_id();
+    vec![Outbound::JsonRpcRequest {
+        id,
+        method: "ent/session/configure".to_string(),
+        params: Some(json!({
+            "connectionId": conn,
+            "modelId": model.model_id,
+            "environment": state.environment,
+        })),
+    }]
+}
+
 pub fn apply_model_toggle_result(state: &mut AppState, result: &Option<serde_json::Value>) {
     let Some(obj) = result.as_ref().and_then(|v| v.as_object()) else {
         return;

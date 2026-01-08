@@ -74,6 +74,7 @@ pub enum UiAction {
     OpenModelsPanel,
     ModelsPrev,
     ModelsNext,
+    ModelsSelect,
     ModelsToggle,
     ModelsRefresh,
     CloseModelsPanel,
@@ -449,6 +450,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             state.models_panel.selected = (state.models_panel.selected + 1).min(max);
             Vec::new()
         }
+        UiAction::ModelsSelect => crate::app::config_panels::select_model_for_session(state),
         UiAction::ModelsToggle => crate::app::config_panels::toggle_selected_model(state),
         UiAction::ModelsRefresh => crate::app::config_panels::refresh_provider_catalog(state),
         UiAction::CloseModelsPanel => {

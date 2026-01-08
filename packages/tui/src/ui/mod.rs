@@ -183,7 +183,9 @@ fn run_loop(
                             KeyCode::Up => Some(UiAction::ModelsPrev),
                             KeyCode::Down => Some(UiAction::ModelsNext),
                             KeyCode::Char('r') => Some(UiAction::ModelsRefresh),
-                            KeyCode::Enter => Some(UiAction::ModelsToggle),
+                            KeyCode::Enter => Some(UiAction::ModelsSelect),
+                            KeyCode::Char(' ') => Some(UiAction::ModelsToggle),
+                            KeyCode::Char('x') => Some(UiAction::ModelsToggle),
                             _ => None,
                         };
                         if let Some(action) = action {
@@ -696,6 +698,30 @@ fn handle_agent_line(
                 if state.config_wizard.open && method.starts_with("ent/") {
                     let out = config_wizard::handle_response(state, method, &result, error_message);
                     send_outbound(transport, state, out, timeout_ms)?;
+                }
+                if method == "ent/session/configure" && !state.config_wizard.open {
+                    if let Some(err) = error_message {
+                        if state.models_panel.open {
+                            state.models_panel.error = Some(err.to_string());
+                            state.models_panel.loading = false;
+                        }
+                    } else {
+                        let (conn, model) = ent::extract_session_configure_config(&result);
+                        if conn.is_some() {
+                            state.connection_id = conn;
+                        }
+                        if model.is_some() {
+                            state.model_id = model;
+                        }
+                        state.prefs.last_connection_id = state.connection_id.clone();
+                        state.prefs.last_model_id = state.model_id.clone();
+                        let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
+
+                        if state.models_panel.open {
+                            state.models_panel.error = None;
+                            state.models_panel.loading = false;
+                        }
+                    }
                 }
                 if method == "ent/models/list" && state.models_panel.open {
                     crate::app::config_panels::handle_models_list(state, &result, error_message);
@@ -1256,7 +1282,7 @@ fn render_env_modal(state: &AppState) -> Paragraph<'static> {
 fn render_models_modal(state: &AppState) -> Paragraph<'static> {
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(
-        "Models (Enter toggle enable/disable, r refresh)",
+        "Models (Enter select, Space toggle enable/disable, r refresh)",
     ));
     lines.push(Line::from(""));
 

@@ -279,10 +279,10 @@ Parity checklist:
   - [x] submit (`ent/connections/credentials/submit`)
   - [x] clear (`ent/connections/credentials/clear`)
 - [ ] Models:
-  - [ ] list (`ent/models/list`) shows `disabled` + `disabledState`
-  - [ ] enable/disable (`ent/models/enable`, `ent/models/disable`)
+  - [x] list (`ent/models/list`) shows `disabled` + `disabledState`
+  - [x] enable/disable (`ent/models/enable`, `ent/models/disable`)
   - [ ] refresh (`ent/models/refresh` and/or `ent/providers/refresh`) wired without tight loops/spam
-  - [ ] selection (`ent/session/configure`) works from both “Configure” and “Models…” screens
+  - [x] selection (`ent/session/configure`) works from both “Configure” and “Models…” screens
 - [ ] Persistence:
   - [ ] last-used `connectionId` + `modelId` restored automatically (agent-owned preferred; otherwise TUI config as fallback only if agent can’t)
 - [ ] UX parity:

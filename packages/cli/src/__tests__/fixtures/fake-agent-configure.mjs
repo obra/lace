@@ -74,14 +74,16 @@ function handleRequest(msg) {
     return;
   }
 
-  if (method === 'ent/providers/list') {
+  if (method === 'ent/providers/catalog') {
     respond(id, {
       providers: [
         {
-          providerId: 'openai',
-          displayName: 'OpenAI',
-          supportsConnections: true,
-          supportsCatalogRefresh: false,
+          id: 'openai',
+          name: 'OpenAI',
+          type: 'openai',
+          default_large_model_id: 'gpt-test',
+          default_small_model_id: 'gpt-test',
+          models: [{ id: 'gpt-test', name: 'gpt-test', context_window: 1, default_max_tokens: 1 }],
         },
       ],
     });
