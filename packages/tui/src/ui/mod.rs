@@ -194,6 +194,8 @@ fn run_loop(
                             KeyCode::Esc => {
                                 if state.connections.confirm_delete {
                                     Some(UiAction::ConnectionsCancelDelete)
+                                } else if state.connections.confirm_clear_credentials {
+                                    Some(UiAction::ConnectionsCancelClearCredentials)
                                 } else {
                                     Some(UiAction::ConnectionsClose)
                                 }
@@ -205,6 +207,8 @@ fn run_loop(
                             KeyCode::Char('e') => Some(UiAction::ConnectionsStartRename),
                             KeyCode::Char('d') => Some(UiAction::ConnectionsBeginDelete),
                             KeyCode::Char('t') => Some(UiAction::ConnectionsTest),
+                            KeyCode::Char('s') => Some(UiAction::ConnectionsCredentialsStatus),
+                            KeyCode::Char('k') => Some(UiAction::ConnectionsBeginClearCredentials),
                             KeyCode::Char('c') => {
                                 connections::close_connections(state);
                                 let out = config_wizard::open(state);
@@ -667,8 +671,15 @@ fn handle_agent_line(
                 if method == "ent/connections/test" && state.connections.open {
                     connections::handle_test_response(state, &result, error_message);
                 }
+                if method == "ent/connections/credentials/status" && state.connections.open {
+                    connections::handle_credentials_status_response(state, &result, error_message);
+                }
                 if method == "ent/connections/delete" && state.connections.open {
                     let out = connections::handle_delete_response(state, error_message);
+                    send_outbound(transport, state, out, timeout_ms)?;
+                }
+                if method == "ent/connections/credentials/clear" && state.connections.open {
+                    let out = connections::handle_clear_credentials_response(state, error_message);
                     send_outbound(transport, state, out, timeout_ms)?;
                 }
                 if method == "ent/connections/upsert" && state.connections.open {
@@ -1291,10 +1302,21 @@ fn render_connections_modal(state: &AppState) -> Paragraph<'static> {
         for i in start..end {
             let marker = if i == state.connections.selected { ">" } else { " " };
             let it = &state.connections.items[i];
-            let cred = it
-                .credential_state
-                .clone()
-                .unwrap_or_else(|| "unknown".to_string());
+            let cred = match state.connections.credential_status.get(&it.connection_id) {
+                Some(cs) => {
+                    let label = cs
+                        .account_label
+                        .clone()
+                        .filter(|s| !s.is_empty())
+                        .map(|s| format!(":{s}"))
+                        .unwrap_or_default();
+                    format!("{}{}", cs.state, label)
+                }
+                None => it
+                    .credential_state
+                    .clone()
+                    .unwrap_or_else(|| "unknown".to_string()),
+            };
             let endpoint_str = it
                 .endpoint
                 .clone()
@@ -1324,12 +1346,14 @@ fn render_connections_modal(state: &AppState) -> Paragraph<'static> {
     lines.push(Line::from(""));
     if state.connections.confirm_delete {
         lines.push(Line::from("Delete selected connection? Enter confirm • Esc cancel"));
+    } else if state.connections.confirm_clear_credentials {
+        lines.push(Line::from("Clear credentials for selected connection? Enter confirm • Esc cancel"));
     } else if state.connections.renaming {
         lines.push(Line::from(format!("Rename: {}", state.connections.rename_input)));
         lines.push(Line::from("Enter save • Esc close"));
     } else {
         lines.push(Line::from(
-            "Up/Down select • Enter configure • c create • r refresh • e rename • d delete • t test • Esc close",
+            "Up/Down select • Enter configure • c create • r refresh • e rename • d delete • t test • s status • k clear creds • Esc close",
         ));
     }
 

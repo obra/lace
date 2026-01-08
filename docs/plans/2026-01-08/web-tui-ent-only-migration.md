@@ -274,10 +274,10 @@ Parity checklist:
   - [x] create/update (`ent/connections/upsert`)
   - [x] delete (`ent/connections/delete`)
 - [ ] Credentials:
-  - [ ] status (`ent/connections/credentials/status`)
+  - [x] status (`ent/connections/credentials/status`)
   - [x] start (`ent/connections/credentials/start`)
   - [x] submit (`ent/connections/credentials/submit`)
-  - [ ] clear (`ent/connections/credentials/clear`)
+  - [x] clear (`ent/connections/credentials/clear`)
 - [ ] Models:
   - [ ] list (`ent/models/list`) shows `disabled` + `disabledState`
   - [ ] enable/disable (`ent/models/enable`, `ent/models/disable`)

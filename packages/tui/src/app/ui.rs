@@ -89,6 +89,9 @@ pub enum UiAction {
     ConnectionsBeginDelete,
     ConnectionsCancelDelete,
     ConnectionsTest,
+    ConnectionsCredentialsStatus,
+    ConnectionsBeginClearCredentials,
+    ConnectionsCancelClearCredentials,
     ConnectionsClose,
 
     OpenPalette,
@@ -483,9 +486,20 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             Vec::new()
         }
         UiAction::ConnectionsTest => crate::app::connections::request_test_selected(state),
+        UiAction::ConnectionsCredentialsStatus => crate::app::connections::request_credentials_status(state),
+        UiAction::ConnectionsBeginClearCredentials => {
+            crate::app::connections::begin_clear_credentials(state);
+            Vec::new()
+        }
+        UiAction::ConnectionsCancelClearCredentials => {
+            crate::app::connections::cancel_clear_credentials(state);
+            Vec::new()
+        }
         UiAction::ConnectionsSubmit => {
             if state.connections.confirm_delete {
                 crate::app::connections::confirm_delete_selected(state)
+            } else if state.connections.confirm_clear_credentials {
+                crate::app::connections::confirm_clear_credentials(state)
             } else if state.connections.renaming {
                 crate::app::connections::submit_rename(state)
             } else {

@@ -12,7 +12,9 @@ pub struct ConnectionsState {
     pub renaming: bool,
     pub rename_input: String,
     pub confirm_delete: bool,
+    pub confirm_clear_credentials: bool,
     pub last_test: std::collections::HashMap<String, TestResult>,
+    pub credential_status: std::collections::HashMap<String, CredentialStatus>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,6 +33,13 @@ pub struct TestResult {
     pub latency_ms: Option<u64>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CredentialStatus {
+    pub state: String,
+    pub account_label: Option<String>,
+    pub expires_at: Option<String>,
+}
+
 impl ConnectionsState {
     pub fn new() -> Self {
         Self {
@@ -42,7 +51,9 @@ impl ConnectionsState {
             renaming: false,
             rename_input: String::new(),
             confirm_delete: false,
+            confirm_clear_credentials: false,
             last_test: std::collections::HashMap::new(),
+            credential_status: std::collections::HashMap::new(),
         }
     }
 }
@@ -57,6 +68,7 @@ pub fn open_connections(state: &mut AppState) -> Vec<Outbound> {
     state.connections.renaming = false;
     state.connections.rename_input.clear();
     state.connections.confirm_delete = false;
+    state.connections.confirm_clear_credentials = false;
 
     request_list(state)
 }
@@ -68,6 +80,7 @@ pub fn close_connections(state: &mut AppState) {
     state.connections.renaming = false;
     state.connections.rename_input.clear();
     state.connections.confirm_delete = false;
+    state.connections.confirm_clear_credentials = false;
 }
 
 pub fn prev(state: &mut AppState) {
@@ -93,6 +106,7 @@ pub fn handle_list_response(state: &mut AppState, result: &Option<Value>, error_
     state.connections.renaming = false;
     state.connections.rename_input.clear();
     state.connections.confirm_delete = false;
+    state.connections.confirm_clear_credentials = false;
 
     if let Some(err) = error_message {
         state.connections.error = Some(err.to_string());
@@ -237,6 +251,17 @@ pub fn cancel_delete(state: &mut AppState) {
     state.connections.confirm_delete = false;
 }
 
+pub fn begin_clear_credentials(state: &mut AppState) {
+    if selected_item(state).is_none() {
+        return;
+    }
+    state.connections.confirm_clear_credentials = true;
+}
+
+pub fn cancel_clear_credentials(state: &mut AppState) {
+    state.connections.confirm_clear_credentials = false;
+}
+
 pub fn confirm_delete_selected(state: &mut AppState) -> Vec<Outbound> {
     if !state.connections.confirm_delete {
         return Vec::new();
@@ -252,7 +277,83 @@ pub fn confirm_delete_selected(state: &mut AppState) -> Vec<Outbound> {
     }]
 }
 
+pub fn confirm_clear_credentials(state: &mut AppState) -> Vec<Outbound> {
+    if !state.connections.confirm_clear_credentials {
+        return Vec::new();
+    }
+    let Some(it) = selected_item(state) else { return Vec::new() };
+    state.connections.confirm_clear_credentials = false;
+    state.connections.loading = true;
+    let id = state.next_client_id();
+    vec![Outbound::JsonRpcRequest {
+        id,
+        method: "ent/connections/credentials/clear".to_string(),
+        params: Some(json!({ "connectionId": it.connection_id })),
+    }]
+}
+
+pub fn request_credentials_status(state: &mut AppState) -> Vec<Outbound> {
+    let Some(it) = selected_item(state) else { return Vec::new() };
+    state.connections.loading = true;
+    let id = state.next_client_id();
+    vec![Outbound::JsonRpcRequest {
+        id,
+        method: "ent/connections/credentials/status".to_string(),
+        params: Some(json!({ "connectionId": it.connection_id })),
+    }]
+}
+
+pub fn handle_credentials_status_response(
+    state: &mut AppState,
+    result: &Option<Value>,
+    error_message: Option<&str>,
+) {
+    state.connections.loading = false;
+    let Some(it) = selected_item(state) else { return };
+    if let Some(err) = error_message {
+        state.connections.error = Some(err.to_string());
+        return;
+    }
+    let Some(obj) = result.as_ref().and_then(|v| v.as_object()) else {
+        return;
+    };
+    let state_str = obj
+        .get("state")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let account_label = obj
+        .get("accountLabel")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let expires_at = obj
+        .get("expiresAt")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    state.connections.credential_status.insert(
+        it.connection_id.clone(),
+        CredentialStatus {
+            state: state_str,
+            account_label,
+            expires_at,
+        },
+    );
+}
+
 pub fn handle_delete_response(state: &mut AppState, error_message: Option<&str>) -> Vec<Outbound> {
+    state.connections.loading = false;
+    if let Some(err) = error_message {
+        state.connections.error = Some(err.to_string());
+        return Vec::new();
+    }
+    state.connections.error = None;
+    request_list(state)
+}
+
+pub fn handle_clear_credentials_response(
+    state: &mut AppState,
+    error_message: Option<&str>,
+) -> Vec<Outbound> {
     state.connections.loading = false;
     if let Some(err) = error_message {
         state.connections.error = Some(err.to_string());
@@ -340,6 +441,33 @@ mod tests {
         match &out[0] {
             Outbound::JsonRpcRequest { method, params, .. } => {
                 assert_eq!(method, "ent/connections/delete");
+                assert_eq!(
+                    params.as_ref().and_then(|v| v.get("connectionId")).and_then(|v| v.as_str()),
+                    Some("c1")
+                );
+            }
+            _ => panic!("expected request"),
+        }
+    }
+
+    #[test]
+    fn confirm_clear_credentials_sends_clear_request() {
+        let mut state = AppState::new_with_paths(None, None);
+        state.next_client_seq = 3;
+        state.connections.open = true;
+        state.connections.items = vec![ConnectionListItem {
+            connection_id: "c1".to_string(),
+            provider_id: "p1".to_string(),
+            name: "n1".to_string(),
+            credential_state: None,
+            endpoint: None,
+        }];
+        begin_clear_credentials(&mut state);
+        let out = confirm_clear_credentials(&mut state);
+        assert_eq!(out.len(), 1);
+        match &out[0] {
+            Outbound::JsonRpcRequest { method, params, .. } => {
+                assert_eq!(method, "ent/connections/credentials/clear");
                 assert_eq!(
                     params.as_ref().and_then(|v| v.get("connectionId")).and_then(|v| v.as_str()),
                     Some("c1")
