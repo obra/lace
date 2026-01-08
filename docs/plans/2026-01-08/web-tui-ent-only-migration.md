@@ -261,29 +261,28 @@ Direct `@lace/agent/*` imports to remove:
 - [x] `packages/web/test-utils/web-test-setup.ts`: remove `@lace/agent/test-utils/temp-lace-dir` and `ProviderRegistry` usage.
 - [x] `packages/web/components/sidebar/__tests__/AgentsSection.test.tsx`: remove agent provider test utils (not needed for this test).
 - [x] `packages/web/components/sidebar/__tests__/SidebarContent-agent-creation.test.tsx`: same as above.
-- [ ] `packages/web/app/routes/__tests__/api.projects.integration.test.ts`: remove dynamic `@lace/agent/projects/project` (blocked by project ownership decision below).
-- [ ] `packages/web/app/routes/__tests__/api.projects.$projectId.sessions.test.ts`: same as above.
+- [x] `packages/web/app/routes/__tests__/api.projects.integration.test.ts`: remove dynamic `@lace/agent/projects/project` (projects are now web-owned).
+- [x] `packages/web/app/routes/__tests__/api.projects.$projectId.sessions.test.ts`: same as above.
 
-Runtime imports of `@lace/web/lib/server/lace-imports` to remove (blocked by decisions below):
+Runtime imports of `@lace/web/lib/server/lace-imports` to remove:
 
-- [ ] Replace `ensureLaceDir` usage with supervisor/web-owned initialization:
-  - [ ] `packages/web/lib/server/data-dir-init.ts`
-  - [ ] `packages/web/lib/server/supervisor-service.ts`
-- [ ] Replace agent `Project` usage (projects/workspaces decision):
-  - [ ] `packages/web/app/routes/api.projects.ts`
-  - [ ] `packages/web/app/routes/api.projects.$projectId.ts`
-  - [ ] `packages/web/app/routes/api.projects.$projectId.environment.ts`
-  - [ ] `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.ts`
-  - [ ] `packages/web/app/routes/api.projects.$projectId.configuration.ts`
-  - [ ] `packages/web/app/routes/api.projects.$projectId.mcp.servers.ts`
-  - [ ] `packages/web/app/routes/api.projects.$projectId.mcp.servers.$serverId.ts`
-  - [ ] `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.ts`
-  - [ ] `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control.ts`
-- [ ] Replace agent settings/MCP config loaders (ownership decision):
-  - [ ] `packages/web/app/routes/api.settings.ts`
-  - [ ] `packages/web/app/routes/api.mcp.servers.ts`
-  - [ ] `packages/web/app/routes/api.mcp.servers.$serverId.ts`
-- [ ] Cleanup `packages/web/lib/server/lace-imports.ts` after runtime is migrated (prefer delete).
+- [x] Replace `ensureLaceDir` usage with web-local initialization:
+  - [x] `packages/web/lib/server/data-dir-init.ts`
+  - [x] `packages/web/lib/server/supervisor-service.ts`
+- [x] Replace agent `Project` usage with web-owned project store in `~/.lace_web`:
+  - [x] `packages/web/app/routes/api.projects.ts`
+  - [x] `packages/web/app/routes/api.projects.$projectId.ts`
+  - [x] `packages/web/app/routes/api.projects.$projectId.environment.ts`
+  - [x] `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.ts`
+  - [x] `packages/web/app/routes/api.projects.$projectId.configuration.ts`
+  - [x] `packages/web/app/routes/api.projects.$projectId.mcp.servers.ts`
+  - [x] `packages/web/app/routes/api.projects.$projectId.mcp.servers.$serverId.ts`
+  - [x] `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.ts`
+  - [x] `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control.ts`
+- [x] Replace agent settings/MCP config loaders with web-owned stores in `~/.lace_web`:
+  - [x] `packages/web/app/routes/api.settings.ts` (uses `UserSettingsManager` in web)
+  - [x] `packages/web/app/routes/api.mcp.servers.ts` / `api.mcp.servers.$serverId.ts` (uses `McpConfigStore` in web)
+- [x] Ensure `packages/web/lib/server/lace-imports.ts` has **no** `@lace/agent/*` imports (deprecated legacy surface only).
 
 #### E) TUI: web-parity provider management (single-agent) + ENT-only
 
@@ -318,20 +317,14 @@ Parity checklist:
 
 ### Decisions required (do not implement without alignment)
 
-- [ ] Projects/workspaces ownership:
-  - [ ] Option A: move Project/workspace logic out of `packages/agent` into a shared non-agent package
-  - [ ] Option B: make projects/workspaces agent-owned and expose CRUD/config over ENT
-- [ ] MCP config ownership:
-  - [ ] Option A: agent-owned, ENT-managed
-  - [ ] Option B: supervisor/web-owned storage in a non-agent package
-- [ ] User settings ownership:
-  - [ ] Option A: agent-owned, ENT-managed
-  - [ ] Option B: supervisor/web-owned storage in a non-agent package
+- [x] Projects/workspaces ownership: **web-owned** (backward incompatible; stored in `~/.lace_web`).
+- [x] MCP config ownership: **web-owned** for web UI config (stored in `~/.lace_web`), passed to agents via ENT when starting sessions.
+- [x] User settings ownership: **web-owned** (stored in `~/.lace_web`).
 
 ### Definition of Done
 
 - [ ] Provider/model/credentials management: web + TUI are ENT-only.
-- [ ] Web runtime has no `@lace/agent/*` imports and no runtime use of `@lace/web/lib/server/lace-imports`.
+- [x] Web runtime has no `@lace/agent/*` imports and no runtime use of `@lace/web/lib/server/lace-imports`.
 - [ ] TUI has no repo-layout coupling to spawn the agent and no `@lace/agent/*` imports.
 - [x] Agent ENT conformance suite is exhaustive (every method covered with success + key negative cases).
 - [ ] `npm test` (root) passes.
