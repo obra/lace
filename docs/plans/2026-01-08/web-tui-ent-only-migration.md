@@ -257,10 +257,10 @@ Constraints:
 
 Direct `@lace/agent/*` imports to remove:
 
-- [ ] `packages/web/types/core.ts`: remove dependency on `@lace/agent/threads/types` (promote wire-relevant event types to `@lace/ent-protocol` or duplicate minimal shapes in web).
-- [ ] `packages/web/test-utils/web-test-setup.ts`: remove `@lace/agent/test-utils/temp-lace-dir` and `ProviderRegistry` usage.
-- [ ] `packages/web/components/sidebar/__tests__/AgentsSection.test.tsx`: remove agent provider test utils (use ENT-driven fixtures or move to a non-agent test package).
-- [ ] `packages/web/components/sidebar/__tests__/SidebarContent-agent-creation.test.tsx`: same as above.
+- [x] `packages/web/types/core.ts`: remove dependency on `@lace/agent/threads/types` (duplicate minimal shapes in web for now).
+- [x] `packages/web/test-utils/web-test-setup.ts`: remove `@lace/agent/test-utils/temp-lace-dir` and `ProviderRegistry` usage.
+- [x] `packages/web/components/sidebar/__tests__/AgentsSection.test.tsx`: remove agent provider test utils (not needed for this test).
+- [x] `packages/web/components/sidebar/__tests__/SidebarContent-agent-creation.test.tsx`: same as above.
 - [ ] `packages/web/app/routes/__tests__/api.projects.integration.test.ts`: remove dynamic `@lace/agent/projects/project` (blocked by project ownership decision below).
 - [ ] `packages/web/app/routes/__tests__/api.projects.$projectId.sessions.test.ts`: same as above.
 
