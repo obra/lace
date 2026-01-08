@@ -128,6 +128,7 @@ pub struct AppState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingRequest {
     pub method: String,
+    pub params: Option<Value>,
     pub sent_at_ms: u64,
     pub timeout_ms: u64,
 }
@@ -219,11 +220,19 @@ impl AppState {
         id
     }
 
-    pub fn mark_request_sent(&mut self, id: String, method: String, now_ms: u64, timeout_ms: u64) {
+    pub fn mark_request_sent(
+        &mut self,
+        id: String,
+        method: String,
+        params: Option<Value>,
+        now_ms: u64,
+        timeout_ms: u64,
+    ) {
         self.pending_requests.insert(
             id,
             PendingRequest {
                 method,
+                params,
                 sent_at_ms: now_ms,
                 timeout_ms,
             },
@@ -302,9 +311,16 @@ mod tests {
     #[test]
     fn pending_request_round_trip() {
         let mut state = AppState::new();
-        state.mark_request_sent("c_1".to_string(), "session/prompt".to_string(), 100, 500);
+        state.mark_request_sent(
+            "c_1".to_string(),
+            "session/prompt".to_string(),
+            Some(Value::String("p".into())),
+            100,
+            500,
+        );
         let p = state.take_pending_request("c_1").unwrap();
         assert_eq!(p.method, "session/prompt");
+        assert_eq!(p.params, Some(Value::String("p".into())));
         assert_eq!(p.sent_at_ms, 100);
         assert_eq!(p.timeout_ms, 500);
         assert!(state.take_pending_request("c_1").is_none());

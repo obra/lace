@@ -1,5 +1,5 @@
 use lace_tui::app::config_panels::{
-    apply_model_toggle_result, handle_models_list, maybe_autoconfigure_from_prefs, ModelItem,
+    apply_model_toggle_result, handle_models_list, maybe_autoconfigure_from_connections, ModelItem,
     ModelsPanelState,
 };
 use lace_tui::app::reducer::Outbound;
@@ -7,12 +7,19 @@ use lace_tui::app::AppState;
 use serde_json::json;
 
 #[test]
-fn autoconfigure_uses_last_connection_and_model() {
+fn autoconfigure_uses_last_connection_and_model_when_present() {
     let mut state = AppState::new_with_paths(None, None);
     state.prefs.last_connection_id = Some("conn-1".to_string());
     state.prefs.last_model_id = Some("model-a".to_string());
 
-    let out = maybe_autoconfigure_from_prefs(&mut state);
+    let result = Some(json!({
+        "connections": [
+            { "connectionId": "conn-1", "credentialState": "missing" },
+            { "connectionId": "conn-2", "credentialState": "needs_input" }
+        ]
+    }));
+
+    let out = maybe_autoconfigure_from_connections(&mut state, &result);
     assert_eq!(out.len(), 1);
     match &out[0] {
         Outbound::JsonRpcRequest { method, params, .. } => {
@@ -23,6 +30,22 @@ fn autoconfigure_uses_last_connection_and_model() {
         }
         _ => panic!("expected request"),
     }
+}
+
+#[test]
+fn autoconfigure_skips_when_connection_missing() {
+    let mut state = AppState::new_with_paths(None, None);
+    state.prefs.last_connection_id = Some("conn-1".to_string());
+    state.prefs.last_model_id = Some("model-a".to_string());
+
+    let result = Some(json!({
+        "connections": [
+            { "connectionId": "conn-2", "credentialState": "ready" }
+        ]
+    }));
+
+    let out = maybe_autoconfigure_from_connections(&mut state, &result);
+    assert!(out.is_empty());
 }
 
 #[test]
@@ -37,7 +60,7 @@ fn models_list_sets_disabled_flag() {
             { "modelId": "gpt-3.5", "name": "GPT-3.5", "disabled": true }
         ]
     }));
-    handle_models_list(&mut state, &result);
+    handle_models_list(&mut state, &result, None);
     assert_eq!(state.models_panel.models.len(), 2);
     assert!(!state.models_panel.models[0].disabled);
     assert!(state.models_panel.models[1].disabled);

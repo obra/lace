@@ -17,7 +17,7 @@ fn send_request(transport: &AgentTransport, state: &mut AppState, out: Outbound)
                     params,
                 ))
                 .unwrap();
-            state.mark_request_sent(id, method, 0, 1_000_000);
+            state.mark_request_sent(id, method, None, 0, 1_000_000);
         }
         Outbound::JsonRpcResponse { .. } => {}
     }

@@ -43,6 +43,15 @@ pub fn run_tui(args: Args) -> io::Result<()> {
     state.next_client_seq = 3;
     state.push_activity_line(format!("timeout-ms={}", args.timeout_ms));
 
+    // Probe catalogs early; surface missing providers immediately in Debug/Activity
+    let probe_id = state.next_client_id();
+    let probe_req = Outbound::JsonRpcRequest {
+        id: probe_id.clone(),
+        method: "ent/providers/list".to_string(),
+        params: Some(serde_json::json!({})),
+    };
+    send_outbound(&transport, &mut state, vec![probe_req], args.timeout_ms)?;
+
     // Best-effort: populate conn/model in the status bar when supported by the agent.
     let status_req = vec![Outbound::JsonRpcRequest {
         id: state.next_client_id(),
@@ -51,11 +60,13 @@ pub fn run_tui(args: Args) -> io::Result<()> {
     }];
     send_outbound(&transport, &mut state, status_req, args.timeout_ms)?;
 
-    // Auto-apply last used connection/model/environment when none active yet.
-    let auto = crate::app::config_panels::maybe_autoconfigure_from_prefs(&mut state);
-    if !auto.is_empty() {
-        send_outbound(&transport, &mut state, auto, args.timeout_ms)?;
-    }
+    // Discover existing connections; once we know a ready connection exists we may auto-configure.
+    let connections_req = vec![Outbound::JsonRpcRequest {
+        id: state.next_client_id(),
+        method: "ent/connections/list".to_string(),
+        params: Some(serde_json::json!({})),
+    }];
+    send_outbound(&transport, &mut state, connections_req, args.timeout_ms)?;
 
     let mut terminal = TerminalGuard::init()?;
     let res = run_loop(
@@ -431,12 +442,13 @@ fn send_outbound(
     for m in out {
         match m {
             Outbound::JsonRpcRequest { id, method, params } => {
-                let line = jsonrpc::encode_request(Value::String(id.clone()), &method, params);
+                let params_clone = params.clone();
+                let line = jsonrpc::encode_request(Value::String(id.clone()), &method, params_clone.clone());
                 transport
                     .send_line(line)
                     .map_err(|e| io::Error::new(io::ErrorKind::BrokenPipe, e))?;
                 activity::push_rpc_sent(state, method.clone());
-                state.mark_request_sent(id, method, now_ms(), timeout_ms);
+                state.mark_request_sent(id, method, params_clone, now_ms(), timeout_ms);
             }
             Outbound::JsonRpcResponse { id, result } => {
                 let line = jsonrpc::encode_response_result(id, result);
@@ -511,9 +523,13 @@ fn handle_agent_line(
         jsonrpc::InboundMessage::Response { id, result, error } => {
             let mut should_refocus = false;
             let mut pending_method: Option<String> = None;
+            let mut pending_params: Option<Value> = None;
             if let Some(id_str) = id.as_str() {
                 should_refocus = state.active_prompt_request_ids.contains(id_str);
-                pending_method = state.take_pending_request(id_str).map(|p| p.method);
+                if let Some(req) = state.take_pending_request(id_str) {
+                    pending_params = req.params;
+                    pending_method = Some(req.method);
+                }
             }
 
             let error_message = error.as_ref().map(|e| e.message.as_str());
@@ -525,10 +541,31 @@ fn handle_agent_line(
                         .contains("method not found");
             if let Some(err) = error.as_ref() {
                 if !suppress_method_not_found {
-                    activity::push_rpc_error(
-                        state,
-                        err.message.clone(),
-                        Some(serde_json::to_value(err.clone()).unwrap_or(Value::Null)),
+                    let reason = err
+                        .data
+                        .as_ref()
+                        .and_then(|d| d.get("reason"))
+                        .and_then(|r| r.as_str())
+                        .map(|s| s.to_string());
+                let method_label = pending_method.clone().unwrap_or_else(|| "<unknown>".into());
+                let mut dbg = format!(
+                    "rpc error method={} code={} message={}",
+                    method_label, err.code, err.message
+                );
+                if let Some(r) = reason.clone() {
+                    dbg.push_str(&format!(" reason={r}"));
+                }
+                if let Some(params) = pending_params.clone() {
+                    dbg.push_str(&format!(" params={}", params));
+                }
+                if method_label == "ent/providers/list" || method_label == "ent/models/list" {
+                    state.push_activity_line(dbg.clone());
+                }
+                state.push_debug_line(dbg);
+                activity::push_rpc_error(
+                    state,
+                    err.message.clone(),
+                    Some(serde_json::to_value(err.clone()).unwrap_or(Value::Null)),
                     );
                 }
             }
@@ -566,6 +603,21 @@ fn handle_agent_line(
                     }
                     if model.is_some() {
                         state.model_id = model;
+                    }
+                }
+                if method == "ent/connections/list" {
+                    if !state.config_wizard.open {
+                        let auto = crate::app::config_panels::maybe_autoconfigure_from_connections(
+                            state,
+                            &result,
+                        );
+                        if !auto.is_empty() {
+                            send_outbound(transport, state, auto, timeout_ms)?;
+                        } else if state.connection_id.is_none() {
+                            // No valid saved connection; open the wizard to guide setup.
+                            let out = config_wizard::open(state);
+                            send_outbound(transport, state, out, timeout_ms)?;
+                        }
                     }
                 }
                 if state.config_wizard.open && method.starts_with("ent/") {

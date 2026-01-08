@@ -63,6 +63,21 @@ impl AgentTransport {
             }
         });
 
+        // stderr reader also logs to a file under LACE_DIR for diagnostics
+        let lace_home = std::env::var("LACE_DIR")
+            .ok()
+            .or_else(|| std::env::var("HOME").ok().map(|h| format!("{h}/.lace")))
+            .unwrap_or_else(|| ".lace".to_string());
+        let log_path = Path::new(&lace_home).join("tui-agent-stderr.log");
+        if let Some(parent) = log_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let mut stderr_log = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_path)
+            .ok();
+
         thread::spawn(move || {
             let mut reader = BufReader::new(stderr);
             let mut line = String::new();
@@ -79,6 +94,9 @@ impl AgentTransport {
                         }
                         if stderr_tx.send(line.clone()).is_err() {
                             break;
+                        }
+                        if let Some(f) = stderr_log.as_mut() {
+                            let _ = writeln!(f, "{}", line);
                         }
                     }
                     Err(_) => break,

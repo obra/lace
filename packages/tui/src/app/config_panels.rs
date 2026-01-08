@@ -53,11 +53,16 @@ impl Default for ModelsPanelState {
     }
 }
 
-/// Auto-configure session using last-known connection/model prefs when none are active.
-pub fn maybe_autoconfigure_from_prefs(state: &mut AppState) -> Vec<Outbound> {
+/// Auto-configure session using last-known connection/model prefs once we know a ready connection exists.
+/// This should be called after receiving `ent/connections/list` so we don't spam the agent with stale IDs.
+pub fn maybe_autoconfigure_from_connections(
+    state: &mut AppState,
+    result: &Option<serde_json::Value>,
+) -> Vec<Outbound> {
     if state.connection_id.is_some() {
         return Vec::new();
     }
+
     let Some(conn) = state
         .prefs
         .last_connection_id
@@ -69,6 +74,29 @@ pub fn maybe_autoconfigure_from_prefs(state: &mut AppState) -> Vec<Outbound> {
     let Some(model) = state.prefs.last_model_id.clone().filter(|s| !s.is_empty()) else {
         return Vec::new();
     };
+
+    let mut seen = false;
+    if let Some(obj) = result.as_ref().and_then(|v| v.as_object()) {
+        if let Some(arr) = obj.get("connections").and_then(|v| v.as_array()) {
+            for c in arr {
+                if let Some(cobj) = c.as_object() {
+                    let cid = cobj
+                        .get("connectionId")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_default();
+                    if cid == conn {
+                        seen = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if !seen {
+        return Vec::new();
+    }
+
     let id = state.next_client_id();
     vec![Outbound::JsonRpcRequest {
         id,
@@ -191,14 +219,8 @@ pub fn request_models_list(state: &mut AppState) -> Vec<Outbound> {
         return Vec::new();
     };
     state.models_panel.loading = true;
-    let refresh_id = state.next_client_id();
     let list_id = state.next_client_id();
     vec![
-        Outbound::JsonRpcRequest {
-            id: refresh_id,
-            method: "ent/providers/refresh".to_string(),
-            params: Some(json!({})),
-        },
         Outbound::JsonRpcRequest {
             id: list_id,
             method: "ent/models/list".to_string(),
@@ -307,13 +329,15 @@ pub fn apply_model_toggle_result(state: &mut AppState, result: &Option<serde_jso
 }
 
 pub fn refresh_provider_catalog(state: &mut AppState) -> Vec<Outbound> {
-    let Some(provider_id) = state.models_panel.provider_id.clone() else {
-        return Vec::new();
-    };
     let id = state.next_client_id();
+    let params = if let Some(provider_id) = state.models_panel.provider_id.clone() {
+        json!({ "providerId": provider_id })
+    } else {
+        json!({})
+    };
     vec![Outbound::JsonRpcRequest {
         id,
         method: "ent/providers/refresh".to_string(),
-        params: Some(json!({ "providerId": provider_id })),
+        params: Some(params),
     }]
 }
