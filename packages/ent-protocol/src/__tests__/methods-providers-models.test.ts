@@ -4,6 +4,8 @@ import {
   EntModelsListResponseSchema,
   EntModelsEnableRequestSchema,
   EntModelsDisableRequestSchema,
+  EntProvidersCatalogRequestSchema,
+  EntProvidersCatalogResponseSchema,
   EntProvidersRefreshResponseSchema,
   EntModelsEnableResponseSchema,
 } from '../schemas/methods';
@@ -92,6 +94,42 @@ describe('Ent protocol provider/model management schemas', () => {
           providerId: 'openai',
           enabled: ['gpt-4o'],
           disabled: ['gpt-3.5-turbo'],
+        },
+      })
+    ).not.toThrow();
+  });
+
+  it('accepts ent/providers/catalog request and response shapes', () => {
+    expect(() =>
+      EntProvidersCatalogRequestSchema.parse({
+        ...baseRequest,
+        method: 'ent/providers/catalog',
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProvidersCatalogResponseSchema.parse({
+        ...baseRequest,
+        result: {
+          providers: [
+            {
+              id: 'openai',
+              name: 'OpenAI',
+              type: 'openai',
+              default_large_model_id: 'gpt-4o',
+              default_small_model_id: 'gpt-4o-mini',
+              models: [
+                {
+                  id: 'gpt-4o',
+                  name: 'GPT-4o',
+                  context_window: 128000,
+                  default_max_tokens: 16384,
+                  cost_per_1m_in: 0,
+                  cost_per_1m_out: 0,
+                },
+              ],
+            },
+          ],
         },
       })
     ).not.toThrow();

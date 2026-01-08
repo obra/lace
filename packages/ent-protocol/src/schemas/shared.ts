@@ -205,11 +205,68 @@ export const ProviderInfoSchema = z
   .strict();
 export type ProviderInfo = z.infer<typeof ProviderInfoSchema>;
 
+export const ModelConfigSchema = z
+  .object({
+    enableNewModels: z.boolean(),
+    disabledModels: z.array(z.string()),
+    disabledProviders: z.array(z.string()),
+    filters: z
+      .object({
+        requiredParameters: z.array(z.string()).optional(),
+        maxPromptCostPerMillion: z.number().nonnegative().optional(),
+        maxCompletionCostPerMillion: z.number().nonnegative().optional(),
+        minContextLength: z.number().int().positive().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export type ModelConfig = z.infer<typeof ModelConfigSchema>;
+
+export const CatalogModelInfoSchema = z
+  .object({
+    id: NonEmptyStringSchema,
+    name: NonEmptyStringSchema,
+    cost_per_1m_in: z.number().min(0).optional(),
+    cost_per_1m_out: z.number().min(0).optional(),
+    cost_per_1m_in_cached: z.number().min(0).optional(),
+    cost_per_1m_out_cached: z.number().min(0).optional(),
+    context_window: z.number().int().positive(),
+    default_max_tokens: z.number().int().positive(),
+    can_reason: z.boolean().optional(),
+    has_reasoning_effort: z.boolean().optional(),
+    default_reasoning_effort: z.string().optional(),
+    reasoning_effort: z.string().optional(),
+    supports_attachments: z.boolean().optional(),
+    supported_parameters: z.array(z.string()).optional(),
+  })
+  .strict();
+export type CatalogModelInfo = z.infer<typeof CatalogModelInfoSchema>;
+
+export const CatalogProviderInfoSchema = z
+  .object({
+    name: NonEmptyStringSchema,
+    id: NonEmptyStringSchema,
+    type: NonEmptyStringSchema,
+    api_key: z.string().optional(),
+    api_endpoint: z.string().optional(),
+    default_large_model_id: NonEmptyStringSchema,
+    default_small_model_id: NonEmptyStringSchema,
+    models: z.array(CatalogModelInfoSchema),
+  })
+  .strict();
+export type CatalogProviderInfo = z.infer<typeof CatalogProviderInfoSchema>;
+
 export const ConnectionInfoSchema = z
   .object({
     connectionId: NonEmptyStringSchema,
     providerId: NonEmptyStringSchema,
     name: NonEmptyStringSchema,
+    endpoint: z.string().optional(),
+    timeout: z.number().optional(),
+    retryPolicy: z.string().optional(),
+    modelConfig: ModelConfigSchema.optional(),
+    hasCredentials: z.boolean().optional(),
     isDefault: z.boolean().optional(),
     createdAt: IsoTimestampSchema.optional(),
     lastUsedAt: IsoTimestampSchema.optional(),

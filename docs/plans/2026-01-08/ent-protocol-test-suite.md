@@ -2,7 +2,7 @@
 
 Audience: contributors adding/maintaining Ent protocol support. Goal: executable contract tests that double as usage examples and guard rails for regressions.
 
-Location: `packages/agent/tests/` (new spec file(s)), plus shared helpers under `packages/agent/tests/helpers/`.
+Current location (as of 2026-01-08): `packages/agent/src/__tests__/ent-protocol.spec.ts`.
 
 Principles
 - Run agent as a subprocess over stdio JSON-RPC; no direct file poking beyond temp dirs.
@@ -31,6 +31,8 @@ Test matrix (per method)
 6) `ent/providers/list`
    - Returns only supported provider types.
    - Empty catalog still returns [].
+6.1) `ent/providers/catalog`
+   - Returns catalog providers with models + metadata; dynamic enrichment allowed when credentials exist.
 7) `ent/providers/refresh`
    - All providers; provider-specific.
    - Unknown providerId → ok: false with error (no throw).
@@ -101,3 +103,10 @@ Make target
 Next steps
 - Implement helpers, then fill out spec cases method by method.
 - Ensure CI runs this suite (can be gated behind a job to keep runtime reasonable).
+
+Completeness criteria
+- Every ENT method documented in `docs/protocol-spec.md` and present in `packages/ent-protocol/src/schemas/methods.ts` has at least:
+  - one happy-path test (where applicable)
+  - one InvalidParams test (shape/type validation)
+  - one NotFound/unknown-ID test (where applicable)
+- Optional methods are gated by advertised capabilities from `initialize`.

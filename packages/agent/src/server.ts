@@ -1973,6 +1973,14 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     return { providers };
   });
 
+  peer.onRequest('ent/providers/catalog', async (_params: unknown) => {
+    assertInitialized(state);
+
+    const registry = ProviderRegistry.getInstance();
+    const providers = await registry.getCatalogProviders();
+    return { providers };
+  });
+
   peer.onRequest('ent/providers/refresh', async (params: unknown) => {
     assertInitialized(state);
 
@@ -2027,6 +2035,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           connectionId,
           providerId: inst.catalogProviderId,
           name: inst.displayName,
+          ...(inst.endpoint ? { endpoint: inst.endpoint } : {}),
+          ...(inst.timeout !== undefined ? { timeout: inst.timeout } : {}),
+          ...(inst.retryPolicy ? { retryPolicy: inst.retryPolicy } : {}),
+          ...(inst.modelConfig ? { modelConfig: inst.modelConfig } : {}),
+          hasCredentials: !!credential?.apiKey,
           credentialState,
         };
       });

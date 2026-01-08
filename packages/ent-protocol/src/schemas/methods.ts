@@ -13,6 +13,7 @@ import {
   PermissionRequestSchema,
   PersonaInfoSchema,
   ProviderInfoSchema,
+  CatalogProviderInfoSchema,
   SandboxConfigSchema,
   ToolInfoSchema,
   ToolResultSchema,
@@ -702,6 +703,29 @@ export const EntProvidersListResponseSchema = z
     jsonrpc: JsonRpcVersionSchema,
     id: JsonRpcIdSchema,
     result: EntProvidersListResultSchema,
+  })
+  .strict();
+
+const EntProvidersCatalogResultSchema = z
+  .object({
+    providers: z.array(CatalogProviderInfoSchema),
+  })
+  .strict();
+
+export const EntProvidersCatalogRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/providers/catalog'),
+    params: EmptyParamsSchema.optional(),
+  })
+  .strict();
+
+export const EntProvidersCatalogResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntProvidersCatalogResultSchema,
   })
   .strict();
 

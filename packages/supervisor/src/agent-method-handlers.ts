@@ -42,6 +42,8 @@ import {
   EntModelsRefreshResponseSchema,
   EntPersonasListRequestSchema,
   EntPersonasListResponseSchema,
+  EntProvidersCatalogRequestSchema,
+  EntProvidersCatalogResponseSchema,
   EntProvidersListRequestSchema,
   EntProvidersListResponseSchema,
   EntSessionCheckpointRequestSchema,
@@ -128,6 +130,11 @@ export const agentMethodHandlers: Record<string, AgentMethodHandler> = {
     kind: 'request',
     paramsSchema: EntProvidersListRequestSchema.shape.params,
     resultSchema: EntProvidersListResponseSchema.shape.result,
+  },
+  'ent/providers/catalog': {
+    kind: 'request',
+    paramsSchema: EntProvidersCatalogRequestSchema.shape.params,
+    resultSchema: EntProvidersCatalogResponseSchema.shape.result,
   },
   'ent/connections/list': {
     kind: 'request',

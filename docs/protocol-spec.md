@@ -873,6 +873,25 @@ List available provider families supported by this agent runtime.
 - Lace-like agents may return multiple providers.
 - Clients MUST feature-detect via `ent/providers` capability before calling.
 
+### 6.14.1 `ent/providers/catalog` (extension)
+
+Return the agent's provider catalog, including model metadata used by the web UI (pricing/context/etc).
+This replaces any web-server direct reads of catalog data from the agent package or filesystem.
+
+```typescript
+// Request
+{
+  method: "ent/providers/catalog"
+}
+
+// Response
+{
+  result: {
+    providers: CatalogProviderInfo[]
+  }
+}
+```
+
 ### 6.15 `ent/providers/refresh` (extension)
 
 Refresh provider catalog metadata (e.g., remote catalogs). Replaces any web-server direct reads of agent catalogs.
@@ -1883,6 +1902,39 @@ interface ProviderInfo {
 }
 ```
 
+### 11.10.1 CatalogProviderInfo / CatalogModelInfo
+
+```typescript
+// Provider catalog entry (returned by ent/providers/catalog)
+interface CatalogProviderInfo {
+  id: string;
+  name: string;
+  type: string;
+  api_key?: string;
+  api_endpoint?: string;
+  default_large_model_id: string;
+  default_small_model_id: string;
+  models: CatalogModelInfo[];
+}
+
+interface CatalogModelInfo {
+  id: string;
+  name: string;
+  cost_per_1m_in?: number;
+  cost_per_1m_out?: number;
+  cost_per_1m_in_cached?: number;
+  cost_per_1m_out_cached?: number;
+  context_window: number;
+  default_max_tokens: number;
+  can_reason?: boolean;
+  has_reasoning_effort?: boolean;
+  default_reasoning_effort?: string;
+  reasoning_effort?: string;
+  supports_attachments?: boolean;
+  supported_parameters?: string[];
+}
+```
+
 ### 11.11 ConnectionInfo
 
 ```typescript
@@ -1891,6 +1943,11 @@ interface ConnectionInfo {
   connectionId: string;
   providerId: string;                // Parent provider (immutable)
   name: string;
+  endpoint?: string;
+  timeout?: number;
+  retryPolicy?: string;
+  modelConfig?: ModelConfig;
+  hasCredentials?: boolean;
   isDefault?: boolean;
   createdAt?: string;                // ISO 8601
   lastUsedAt?: string;               // ISO 8601
@@ -1898,6 +1955,22 @@ interface ConnectionInfo {
   // Credential status (inline for convenience; also queryable via credentials/status)
   credentialState?: "ready" | "missing" | "expired" | "invalid" | "unknown";
   accountLabel?: string;             // e.g., email/org, if available
+}
+```
+
+### 11.12 ModelConfig
+
+```typescript
+interface ModelConfig {
+  enableNewModels: boolean;
+  disabledModels: string[];
+  disabledProviders: string[];
+  filters?: {
+    requiredParameters?: string[];
+    maxPromptCostPerMillion?: number;
+    maxCompletionCostPerMillion?: number;
+    minContextLength?: number;
+  };
 }
 ```
 

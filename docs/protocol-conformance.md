@@ -12,6 +12,7 @@ npm test --workspace=packages/agent -- ent-protocol.spec.ts
 
 - **Providers**
   - `ent/providers/list` happy path
+  - `ent/providers/catalog` happy path
   - `ent/providers/refresh` (success + unknown provider)
 - **Connections**
   - `ent/connections/upsert` happy path

@@ -39,6 +39,14 @@ describe('Ent protocol contract (selected coverage)', () => {
 
       await withTimeout(agent.peer.request('initialize', defaultInitializeParams()), 2_000, 'init');
 
+      const catalog = (await withTimeout(
+        agent.peer.request('ent/providers/catalog'),
+        2_000,
+        'providers/catalog'
+      )) as { providers: Array<{ id: string; models: unknown[] }> };
+      expect(catalog.providers.length).toBeGreaterThan(0);
+      expect(Array.isArray(catalog.providers[0]?.models)).toBe(true);
+
       // providers list
       const { providers } = (await withTimeout(
         agent.peer.request('ent/providers/list'),
