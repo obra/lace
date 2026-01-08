@@ -7,7 +7,7 @@ import Badge from '@lace/web/components/ui/Badge';
 import { EditInstanceModal } from './EditInstanceModal';
 import { ProviderModelGroup } from './ProviderModelGroup';
 import { providerService } from '@lace/web/lib/server/provider-service';
-import type { CatalogProvider, CatalogModel, ModelConfig } from '@lace/web/lib/server/lace-imports';
+import type { CatalogProvider, CatalogModel, ModelConfig } from './ProviderInstanceProvider';
 import type { GlobalModelFilters } from './GlobalModelSearch';
 
 interface ProviderInstanceCardProps {

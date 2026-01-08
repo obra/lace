@@ -7,6 +7,18 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { api } from '@lace/web/lib/api-client';
 import type { ProviderInfo, ModelInfo } from '@lace/web/types/api';
 
+export interface ModelConfig {
+  enableNewModels: boolean;
+  disabledModels: string[];
+  disabledProviders: string[];
+  filters?: {
+    requiredParameters?: string[];
+    maxPromptCostPerMillion?: number;
+    maxCompletionCostPerMillion?: number;
+    minContextLength?: number;
+  };
+}
+
 // Provider Instance Types
 interface ProviderInstance {
   id: string;
@@ -18,17 +30,7 @@ interface ProviderInstance {
   status?: 'connected' | 'error' | 'untested';
   modelCount?: number;
   lastTested?: string;
-  modelConfig?: {
-    enableNewModels: boolean;
-    disabledModels: string[];
-    disabledProviders: string[];
-    filters?: {
-      requiredParameters?: string[];
-      maxPromptCostPerMillion?: number;
-      maxCompletionCostPerMillion?: number;
-      minContextLength?: number;
-    };
-  };
+  modelConfig?: ModelConfig;
 }
 
 interface ProviderInstanceWithTestResult extends Omit<ProviderInstance, 'status'> {
@@ -43,7 +45,7 @@ interface TestResult {
 }
 
 // Catalog Types
-interface CatalogModel {
+export interface CatalogModel {
   id: string;
   name: string;
   cost_per_1m_in: number;

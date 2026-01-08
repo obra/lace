@@ -12,7 +12,7 @@ import { ErrorToast } from '@lace/web/components/errors/ErrorToast';
 import { GlobalModelSearch, type GlobalModelFilters } from './GlobalModelSearch';
 import { useProviderInstances } from './ProviderInstanceProvider';
 import { providerService } from '@lace/web/lib/server/provider-service';
-import type { CatalogProvider } from '@lace/web/lib/server/lace-imports';
+import type { CatalogProvider } from './ProviderInstanceProvider';
 
 export function ProviderInstanceList() {
   const {

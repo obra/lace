@@ -4,8 +4,6 @@
 // Business logic classes - should only be used by service layer
 // Import from @lace/agent where available (providers, tools, helpers)
 export { ProviderRegistry } from '@lace/agent/providers/registry';
-export { ProviderCatalogManager } from '@lace/agent/providers/catalog/manager';
-export { ProviderInstanceManager } from '@lace/agent/providers/instance/manager';
 export { ToolExecutor } from '@lace/agent/tools/executor';
 export { ToolCatalog } from '@lace/agent/tools/tool-catalog';
 export { Project } from '@lace/agent/projects/project';
@@ -26,10 +24,6 @@ export {
   CredentialSchema,
   ModelConfigSchema,
 } from '@lace/agent/providers/catalog/types';
-export type { ConfiguredInstance } from '@lace/agent/providers/registry';
-
-// OpenRouter dynamic provider from agent
-export { OpenRouterDynamicProvider } from '@lace/agent/providers/openrouter/dynamic-provider';
 
 // Tool implementations from agent
 export { FileReadTool } from '@lace/agent/tools/implementations/file_read';
