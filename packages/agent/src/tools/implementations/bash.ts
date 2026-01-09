@@ -34,6 +34,7 @@ export interface BashOutput {
 
 const bashSchema = z.object({
   command: NonEmptyString,
+  run_async: z.boolean().default(false),
 });
 
 export class BashTool extends Tool {
