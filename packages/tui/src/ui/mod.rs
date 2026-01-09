@@ -1860,27 +1860,44 @@ fn render_context_modal(state: &AppState) -> Paragraph<'static> {
             }
         }
 
-        // Show top tools if available
-        if !breakdown.core_tools.items.is_empty() || !breakdown.mcp_tools.items.is_empty() {
+        // Show all core tools
+        if !breakdown.core_tools.items.is_empty() {
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
-                "Top Tools by Token Usage:",
+                format!("Core Tools ({}):", breakdown.core_tools.items.len()),
                 Style::default().fg(colors.fg_muted),
             )));
 
-            let mut all_tools: Vec<_> = breakdown
-                .core_tools
-                .items
-                .iter()
-                .chain(breakdown.mcp_tools.items.iter())
-                .collect();
-            all_tools.sort_by(|a, b| b.tokens.cmp(&a.tokens));
-
-            for tool in all_tools.iter().take(5) {
+            for tool in &breakdown.core_tools.items {
                 lines.push(Line::from(vec![
-                    Span::styled(format!("  {:<16}", tool.name), Style::default().fg(colors.fg_secondary)),
                     Span::styled(
-                        format!("{:>8}", format_tokens(tool.tokens)),
+                        format!("  {}", tool.name),
+                        Style::default().fg(colors.fg_secondary),
+                    ),
+                    Span::styled(
+                        format!("  {:>8}", format_tokens(tool.tokens)),
+                        Style::default().fg(colors.fg_muted),
+                    ),
+                ]));
+            }
+        }
+
+        // Show all MCP tools
+        if !breakdown.mcp_tools.items.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!("MCP Tools ({}):", breakdown.mcp_tools.items.len()),
+                Style::default().fg(colors.fg_muted),
+            )));
+
+            for tool in &breakdown.mcp_tools.items {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        format!("  {}", tool.name),
+                        Style::default().fg(colors.fg_secondary),
+                    ),
+                    Span::styled(
+                        format!("  {:>8}", format_tokens(tool.tokens)),
                         Style::default().fg(colors.fg_muted),
                     ),
                 ]));
