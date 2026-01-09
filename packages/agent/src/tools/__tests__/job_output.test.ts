@@ -42,19 +42,19 @@ describe('JobOutputTool', () => {
     }
   });
 
-  it('accepts timeoutMs and cursor parameters', () => {
+  it('accepts timeoutMs and byteOffset parameters', () => {
     const tool = new JobOutputTool();
 
     const result = tool.schema.safeParse({
       jobId: 'job_abc123',
       timeoutMs: 5000,
-      cursor: 100,
+      byteOffset: 100,
     });
 
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.timeoutMs).toBe(5000);
-      expect(result.data.cursor).toBe(100);
+      expect(result.data.byteOffset).toBe(100);
     }
   });
 });

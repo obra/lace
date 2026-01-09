@@ -1824,7 +1824,29 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
         if (childProc.exitCode === null) {
           childProc.kill('SIGTERM');
-          await new Promise<void>((resolve) => childProc.once('exit', () => resolve()));
+
+          // Wait up to 2 seconds for graceful exit
+          const exitPromise = new Promise<void>((resolve) =>
+            childProc.once('exit', () => resolve())
+          );
+          const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 2_000));
+
+          await Promise.race([exitPromise, timeoutPromise]);
+
+          // Force kill if still running
+          if (childProc.exitCode === null) {
+            try {
+              childProc.kill('SIGKILL');
+            } catch {
+              // Process may have exited between check and kill
+            }
+
+            // Final wait with shorter timeout
+            await Promise.race([
+              new Promise<void>((resolve) => childProc.once('exit', () => resolve())),
+              new Promise<void>((resolve) => setTimeout(resolve, 1_000)),
+            ]);
+          }
         }
 
         await finalizeJob(job);

@@ -21,7 +21,7 @@ describe('ToolExecutor job tools registration', () => {
 
     expect(tool).toBeDefined();
     expect(tool?.name).toBe('job_output');
-    expect(tool?.description).toContain('Retrieve status and output from a background job');
+    expect(tool?.description).toContain('Get status and output from a background job');
   });
 
   it('retrieves jobs_list tool by name', () => {
@@ -31,7 +31,7 @@ describe('ToolExecutor job tools registration', () => {
 
     expect(tool).toBeDefined();
     expect(tool?.name).toBe('jobs_list');
-    expect(tool?.description).toContain('List current and recent background jobs');
+    expect(tool?.description).toContain('List all background jobs in the current session');
   });
 
   it('retrieves job_kill tool by name', () => {
