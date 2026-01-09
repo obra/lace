@@ -1265,48 +1265,92 @@ fn render_search_modal(state: &AppState) -> Paragraph<'static> {
 }
 
 fn render_config_modal(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
     let w = &state.config_wizard;
     let mut lines: Vec<Line> = Vec::new();
 
-    lines.push(Line::from("Configure"));
+    // Title
+    lines.push(Line::from(Span::styled(
+        "Configure",
+        Style::default()
+            .fg(colors.fg_primary)
+            .add_modifier(Modifier::BOLD),
+    )));
     lines.push(Line::from(""));
 
     match w.step {
         config_wizard::ConfigWizardStep::LoadingConnections => {
-            lines.push(Line::from("Loading connections..."));
+            lines.push(Line::from(Span::styled(
+                "Loading connections...",
+                Style::default().fg(colors.fg_muted),
+            )));
         }
         config_wizard::ConfigWizardStep::SelectConnection => {
-            lines.push(Line::from("Select connection:"));
+            lines.push(Line::from(Span::styled(
+                "Select connection:",
+                Style::default().fg(colors.fg_secondary),
+            )));
             for (i, c) in w.connections.iter().enumerate() {
-                let marker = if i == w.selected { ">" } else { " " };
+                let selected = i == w.selected;
+                let marker = if selected { "▸ " } else { "  " };
                 let name = c.name.clone().unwrap_or_else(|| c.connection_id.clone());
                 let cred = c
                     .credential_state
                     .clone()
                     .map(|s| format!(" [{s}]"))
                     .unwrap_or_default();
-                lines.push(Line::from(format!("{marker} {}{}", name, cred)));
+                let style = if selected {
+                    Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
+                } else {
+                    Style::default().fg(colors.fg_secondary)
+                };
+                lines.push(Line::from(Span::styled(
+                    format!("{marker}{}{}", name, cred),
+                    style,
+                )));
             }
         }
         config_wizard::ConfigWizardStep::LoadingProviders => {
-            lines.push(Line::from("No connections found; loading providers..."));
+            lines.push(Line::from(Span::styled(
+                "No connections found; loading providers...",
+                Style::default().fg(colors.fg_muted),
+            )));
         }
         config_wizard::ConfigWizardStep::SelectProvider => {
-            lines.push(Line::from("Select provider:"));
+            lines.push(Line::from(Span::styled(
+                "Select provider:",
+                Style::default().fg(colors.fg_secondary),
+            )));
             for (i, p) in w.providers.iter().enumerate() {
-                let marker = if i == w.selected { ">" } else { " " };
+                let selected = i == w.selected;
+                let marker = if selected { "▸ " } else { "  " };
                 let name = p
                     .display_name
                     .clone()
                     .unwrap_or_else(|| p.provider_id.clone());
-                lines.push(Line::from(format!("{marker} {name} ({})", p.provider_id)));
+                let style = if selected {
+                    Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
+                } else {
+                    Style::default().fg(colors.fg_secondary)
+                };
+                lines.push(Line::from(Span::styled(
+                    format!("{marker}{name} ({})", p.provider_id),
+                    style,
+                )));
             }
         }
         config_wizard::ConfigWizardStep::UpsertingConnection => {
-            lines.push(Line::from("Creating connection..."));
+            lines.push(Line::from(Span::styled(
+                "Creating connection...",
+                Style::default().fg(colors.fg_muted),
+            )));
         }
         config_wizard::ConfigWizardStep::CheckingCredentials => {
-            lines.push(Line::from("Checking credentials..."));
+            lines.push(Line::from(Span::styled(
+                "Checking credentials...",
+                Style::default().fg(colors.fg_muted),
+            )));
         }
         config_wizard::ConfigWizardStep::EnterCredential => {
             let idx = w.credential_field_index;
@@ -1317,155 +1361,295 @@ fn render_config_modal(state: &AppState) -> Paragraph<'static> {
                 } else {
                     w.credential_input.clone()
                 };
-                lines.push(Line::from(format!("Enter {label}:")));
-                lines.push(Line::from(format!("> {display}")));
+                lines.push(Line::from(Span::styled(
+                    format!("Enter {label}:"),
+                    Style::default().fg(colors.fg_secondary),
+                )));
+                lines.push(Line::from(vec![
+                    Span::styled("> ", Style::default().fg(colors.accent)),
+                    Span::styled(display, Style::default().fg(colors.fg_primary)),
+                    Span::styled("▌", Style::default().fg(colors.accent)),
+                ]));
             } else {
-                lines.push(Line::from("Enter credential:"));
+                lines.push(Line::from(Span::styled(
+                    "Enter credential:",
+                    Style::default().fg(colors.fg_secondary),
+                )));
             }
         }
         config_wizard::ConfigWizardStep::SubmittingCredentials => {
-            lines.push(Line::from("Submitting credentials..."));
+            lines.push(Line::from(Span::styled(
+                "Submitting credentials...",
+                Style::default().fg(colors.fg_muted),
+            )));
         }
         config_wizard::ConfigWizardStep::LoadingModels => {
-            lines.push(Line::from("Loading models..."));
+            lines.push(Line::from(Span::styled(
+                "Loading models...",
+                Style::default().fg(colors.fg_muted),
+            )));
         }
         config_wizard::ConfigWizardStep::SelectModel => {
-            lines.push(Line::from("Select model:"));
+            lines.push(Line::from(Span::styled(
+                "Select model:",
+                Style::default().fg(colors.fg_secondary),
+            )));
             let max = 18usize;
             let start = w.selected.saturating_sub(max / 2);
             let end = (start + max).min(w.models.len());
             for i in start..end {
-                let marker = if i == w.selected { ">" } else { " " };
+                let selected = i == w.selected;
+                let marker = if selected { "▸ " } else { "  " };
                 let m = &w.models[i];
-                lines.push(Line::from(format!("{marker} {}", m.name)));
+                let style = if selected {
+                    Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
+                } else {
+                    Style::default().fg(colors.fg_secondary)
+                };
+                lines.push(Line::from(Span::styled(format!("{marker}{}", m.name), style)));
             }
         }
         config_wizard::ConfigWizardStep::Applying => {
-            lines.push(Line::from("Applying session configuration..."));
+            lines.push(Line::from(Span::styled(
+                "Applying session configuration...",
+                Style::default().fg(colors.fg_muted),
+            )));
         }
         config_wizard::ConfigWizardStep::Done => {
-            lines.push(Line::from(format!(
-                "Configured: connectionId={} modelId={}",
-                w.connection_id.clone().unwrap_or_else(|| "?".to_string()),
-                w.model_id.clone().unwrap_or_else(|| "?".to_string())
+            lines.push(Line::from(Span::styled(
+                format!(
+                    "Configured: connectionId={} modelId={}",
+                    w.connection_id.clone().unwrap_or_else(|| "?".to_string()),
+                    w.model_id.clone().unwrap_or_else(|| "?".to_string())
+                ),
+                Style::default().fg(colors.success),
             )));
             lines.push(Line::from(""));
-            lines.push(Line::from("Press Enter or Esc to close"));
+            lines.push(Line::from(Span::styled(
+                "Press Enter or Esc to close",
+                Style::default().fg(colors.fg_muted),
+            )));
         }
         config_wizard::ConfigWizardStep::NotSupported => {
-            lines.push(Line::from(w.error_message.clone().unwrap_or_else(|| {
-                "configuration not supported by this agent".to_string()
-            })));
+            lines.push(Line::from(Span::styled(
+                w.error_message.clone().unwrap_or_else(|| {
+                    "configuration not supported by this agent".to_string()
+                }),
+                Style::default().fg(colors.warning),
+            )));
             lines.push(Line::from(""));
-            lines.push(Line::from("Press Enter or Esc to close"));
+            lines.push(Line::from(Span::styled(
+                "Press Enter or Esc to close",
+                Style::default().fg(colors.fg_muted),
+            )));
         }
         config_wizard::ConfigWizardStep::Error => {
-            lines.push(Line::from("Error:"));
-            lines.push(Line::from(
+            lines.push(Line::from(Span::styled(
+                "Error:",
+                Style::default().fg(colors.error),
+            )));
+            lines.push(Line::from(Span::styled(
                 w.error_message
                     .clone()
                     .unwrap_or_else(|| "<unknown>".to_string()),
-            ));
+                Style::default().fg(colors.error),
+            )));
             lines.push(Line::from(""));
-            lines.push(Line::from("Press Enter or Esc to close"));
+            lines.push(Line::from(Span::styled(
+                "Press Enter or Esc to close",
+                Style::default().fg(colors.fg_muted),
+            )));
         }
         config_wizard::ConfigWizardStep::Closed => {}
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from("Up/Down select • Enter confirm • Esc close"));
+    lines.push(Line::from(Span::styled(
+        "Up/Down select • Enter confirm • Esc close",
+        Style::default().fg(colors.fg_muted),
+    )));
 
     Paragraph::new(Text::from(lines))
-        .block(Block::default().title("Configure").borders(Borders::ALL))
+        .style(Style::default().bg(colors.bg_elevated))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.border_subtle))
+                .border_type(BorderType::Rounded),
+        )
         .wrap(Wrap { trim: true })
 }
 
 fn render_env_modal(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
     let mut lines: Vec<Line> = Vec::new();
-    lines.push(Line::from("Environment (KEY=VALUE)"));
+
+    // Title
+    lines.push(Line::from(Span::styled(
+        "Environment (KEY=VALUE)",
+        Style::default()
+            .fg(colors.fg_primary)
+            .add_modifier(Modifier::BOLD),
+    )));
     lines.push(Line::from(""));
 
     for (idx, (k, v)) in state.environment.iter().enumerate() {
-        let marker = if idx == state.env_editor.selected {
-            ">"
+        let selected = idx == state.env_editor.selected;
+        let marker = if selected { "▸ " } else { "  " };
+        let style = if selected {
+            Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
         } else {
-            " "
+            Style::default().fg(colors.fg_secondary)
         };
-        lines.push(Line::from(format!("{marker} {k}={v}")));
+        lines.push(Line::from(Span::styled(format!("{marker}{k}={v}"), style)));
     }
     if state.environment.is_empty() {
-        lines.push(Line::from("No variables set"));
+        lines.push(Line::from(Span::styled(
+            "No variables set",
+            Style::default().fg(colors.fg_muted),
+        )));
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from(format!("Input: {}", state.env_editor.input)));
+    lines.push(Line::from(vec![
+        Span::styled("> ", Style::default().fg(colors.accent)),
+        Span::styled(
+            state.env_editor.input.clone(),
+            Style::default().fg(colors.fg_primary),
+        ),
+        Span::styled("▌", Style::default().fg(colors.accent)),
+    ]));
     if let Some(err) = &state.env_editor.error {
-        lines.push(Line::from(format!("Error: {err}")));
+        lines.push(Line::from(Span::styled(
+            format!("Error: {err}"),
+            Style::default().fg(colors.error),
+        )));
     }
     lines.push(Line::from(""));
-    lines.push(Line::from(
+    lines.push(Line::from(Span::styled(
         "Enter add/update • d delete • s apply • Esc close",
-    ));
+        Style::default().fg(colors.fg_muted),
+    )));
 
     Paragraph::new(Text::from(lines))
-        .block(Block::default().title("Environment").borders(Borders::ALL))
+        .style(Style::default().bg(colors.bg_elevated))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.border_subtle))
+                .border_type(BorderType::Rounded),
+        )
         .wrap(Wrap { trim: true })
 }
 
 fn render_models_modal(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
     let mut lines: Vec<Line> = Vec::new();
-    lines.push(Line::from(
-        "Models (enabled only) (Enter select, r refresh)",
-    ));
+
+    // Title
+    lines.push(Line::from(Span::styled(
+        "Models",
+        Style::default()
+            .fg(colors.fg_primary)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(Span::styled(
+        "(enabled only)",
+        Style::default().fg(colors.fg_muted),
+    )));
     lines.push(Line::from(""));
 
     if let Some(err) = &state.models_panel.error {
-        lines.push(Line::from(format!("Error: {err}")));
+        lines.push(Line::from(Span::styled(
+            format!("Error: {err}"),
+            Style::default().fg(colors.error),
+        )));
     } else if state.models_panel.loading {
-        lines.push(Line::from("Loading models..."));
+        lines.push(Line::from(Span::styled(
+            "Loading models...",
+            Style::default().fg(colors.fg_muted),
+        )));
     } else {
         let max = 18usize;
         let start = state.models_panel.selected.saturating_sub(max / 2);
         let end = (start + max).min(state.models_panel.models.len());
         for i in start..end {
-            let marker = if i == state.models_panel.selected {
-                ">"
-            } else {
-                " "
-            };
+            let selected = i == state.models_panel.selected;
+            let marker = if selected { "▸ " } else { "  " };
             let m = &state.models_panel.models[i];
-            lines.push(Line::from(format!("{marker} {}", m.name)));
+            let style = if selected {
+                Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
+            } else {
+                Style::default().fg(colors.fg_secondary)
+            };
+            lines.push(Line::from(Span::styled(format!("{marker}{}", m.name), style)));
         }
         if state.models_panel.models.is_empty() {
-            lines.push(Line::from("No models found"));
+            lines.push(Line::from(Span::styled(
+                "No models found",
+                Style::default().fg(colors.fg_muted),
+            )));
         }
     }
 
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "Enter select • r refresh • Esc close",
+        Style::default().fg(colors.fg_muted),
+    )));
+
     Paragraph::new(Text::from(lines))
-        .block(Block::default().title("Models").borders(Borders::ALL))
+        .style(Style::default().bg(colors.bg_elevated))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.border_subtle))
+                .border_type(BorderType::Rounded),
+        )
         .wrap(Wrap { trim: true })
 }
 
 fn render_connections_modal(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
     let mut lines: Vec<Line> = Vec::new();
-    lines.push(Line::from("Connections"));
+
+    // Title
+    lines.push(Line::from(Span::styled(
+        "Connections",
+        Style::default()
+            .fg(colors.fg_primary)
+            .add_modifier(Modifier::BOLD),
+    )));
     lines.push(Line::from(""));
 
     if let Some(err) = &state.connections.error {
-        lines.push(Line::from(format!("Error: {err}")));
+        lines.push(Line::from(Span::styled(
+            format!("Error: {err}"),
+            Style::default().fg(colors.error),
+        )));
         lines.push(Line::from(""));
     }
 
     if state.connections.loading {
-        lines.push(Line::from("Loading connections..."));
+        lines.push(Line::from(Span::styled(
+            "Loading connections...",
+            Style::default().fg(colors.fg_muted),
+        )));
     } else if state.connections.items.is_empty() {
-        lines.push(Line::from("No connections"));
+        lines.push(Line::from(Span::styled(
+            "No connections",
+            Style::default().fg(colors.fg_muted),
+        )));
     } else {
         let max = 18usize;
         let start = state.connections.selected.saturating_sub(max / 2);
         let end = (start + max).min(state.connections.items.len());
         for i in start..end {
-            let marker = if i == state.connections.selected { ">" } else { " " };
+            let selected = i == state.connections.selected;
+            let marker = if selected { "▸ " } else { "  " };
             let it = &state.connections.items[i];
             let cred = match state.connections.credential_status.get(&it.connection_id) {
                 Some(cs) => {
@@ -1501,67 +1685,134 @@ fn render_connections_modal(state: &AppState) -> Paragraph<'static> {
                 ),
             };
 
-            lines.push(Line::from(format!(
-                "{marker} {} ({}) [{cred}]{endpoint_str}{test_str}",
-                it.name, it.provider_id
+            let style = if selected {
+                Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
+            } else {
+                Style::default().fg(colors.fg_secondary)
+            };
+            lines.push(Line::from(Span::styled(
+                format!(
+                    "{marker}{} ({}) [{cred}]{endpoint_str}{test_str}",
+                    it.name, it.provider_id
+                ),
+                style,
             )));
         }
     }
 
     lines.push(Line::from(""));
     if state.connections.confirm_delete {
-        lines.push(Line::from("Delete selected connection? Enter confirm • Esc cancel"));
+        lines.push(Line::from(Span::styled(
+            "Delete selected connection? Enter confirm • Esc cancel",
+            Style::default().fg(colors.warning),
+        )));
     } else if state.connections.confirm_clear_credentials {
-        lines.push(Line::from("Clear credentials for selected connection? Enter confirm • Esc cancel"));
+        lines.push(Line::from(Span::styled(
+            "Clear credentials for selected connection? Enter confirm • Esc cancel",
+            Style::default().fg(colors.warning),
+        )));
     } else if state.connections.renaming {
-        lines.push(Line::from(format!("Rename: {}", state.connections.rename_input)));
-        lines.push(Line::from("Enter save • Esc close"));
+        lines.push(Line::from(vec![
+            Span::styled("Rename: ", Style::default().fg(colors.fg_muted)),
+            Span::styled(
+                state.connections.rename_input.clone(),
+                Style::default().fg(colors.fg_primary),
+            ),
+            Span::styled("▌", Style::default().fg(colors.accent)),
+        ]));
+        lines.push(Line::from(Span::styled(
+            "Enter save • Esc close",
+            Style::default().fg(colors.fg_muted),
+        )));
     } else {
-        lines.push(Line::from(
-            "Up/Down select • Enter configure • c create • r refresh • e rename • d delete • t test • s status • k clear creds • m models • Esc close",
-        ));
+        lines.push(Line::from(Span::styled(
+            "Enter configure • c create • r refresh • e rename • d delete • t test • s status • k clear creds • m models • Esc close",
+            Style::default().fg(colors.fg_muted),
+        )));
     }
 
     Paragraph::new(Text::from(lines))
-        .block(Block::default().title("Connections").borders(Borders::ALL))
+        .style(Style::default().bg(colors.bg_elevated))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.border_subtle))
+                .border_type(BorderType::Rounded),
+        )
         .wrap(Wrap { trim: true })
 }
 
 fn render_connections_models_modal(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
     let mut lines: Vec<Line> = Vec::new();
-    lines.push(Line::from("Connection Models"));
+
+    // Title
+    lines.push(Line::from(Span::styled(
+        "Connection Models",
+        Style::default()
+            .fg(colors.fg_primary)
+            .add_modifier(Modifier::BOLD),
+    )));
     lines.push(Line::from(""));
 
     if let Some(err) = &state.connections.models.error {
-        lines.push(Line::from(format!("Error: {err}")));
+        lines.push(Line::from(Span::styled(
+            format!("Error: {err}"),
+            Style::default().fg(colors.error),
+        )));
         lines.push(Line::from(""));
     }
 
     if state.connections.models.loading {
-        lines.push(Line::from("Loading models..."));
+        lines.push(Line::from(Span::styled(
+            "Loading models...",
+            Style::default().fg(colors.fg_muted),
+        )));
     } else if state.connections.models.models.is_empty() {
-        lines.push(Line::from("No models"));
+        lines.push(Line::from(Span::styled(
+            "No models",
+            Style::default().fg(colors.fg_muted),
+        )));
     } else {
         let max = 18usize;
         let start = state.connections.models.selected.saturating_sub(max / 2);
         let end = (start + max).min(state.connections.models.models.len());
         for i in start..end {
-            let marker = if i == state.connections.models.selected {
-                ">"
-            } else {
-                " "
-            };
+            let selected = i == state.connections.models.selected;
+            let marker = if selected { "▸ " } else { "  " };
             let m = &state.connections.models.models[i];
-            let status = if m.disabled { "[disabled]" } else { "[enabled]" };
-            lines.push(Line::from(format!("{marker} {} {}", m.name, status)));
+            let (status, status_color) = if m.disabled {
+                ("[disabled]", colors.fg_muted)
+            } else {
+                ("[enabled]", colors.success)
+            };
+            let style = if selected {
+                Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
+            } else {
+                Style::default().fg(colors.fg_secondary)
+            };
+            lines.push(Line::from(vec![
+                Span::styled(format!("{marker}{} ", m.name), style),
+                Span::styled(status, Style::default().fg(status_color)),
+            ]));
         }
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from("Up/Down select • Enter/Space toggle enable/disable • r refresh • Esc close"));
+    lines.push(Line::from(Span::styled(
+        "Enter/Space toggle • r refresh • Esc close",
+        Style::default().fg(colors.fg_muted),
+    )));
 
     Paragraph::new(Text::from(lines))
-        .block(Block::default().title("Models").borders(Borders::ALL))
+        .style(Style::default().bg(colors.bg_elevated))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.border_subtle))
+                .border_type(BorderType::Rounded),
+        )
         .wrap(Wrap { trim: true })
 }
 
