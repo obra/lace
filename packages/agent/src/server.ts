@@ -4388,7 +4388,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                     content: [
                       {
                         type: 'text',
-                        text: `Async job started: ${jobId}\nUse job_output to check status.`,
+                        text: JSON.stringify({ jobId, status: 'started' }),
                       },
                     ],
                   };
@@ -4440,7 +4440,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                       content: [
                         {
                           type: 'text',
-                          text: `Async job started: ${jobId}\nUse job_output to check status.`,
+                          text: JSON.stringify({ jobId, status: 'started' }),
                         },
                       ],
                     };
