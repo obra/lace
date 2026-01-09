@@ -925,7 +925,15 @@ fn handle_session_update(state: &mut AppState, params: &Value) {
 }
 
 fn draw(f: &mut ratatui::Frame, state: &AppState) {
-    let input_height = if state.prefs.input_multiline { 7 } else { 3 };
+    // Dynamic input height based on content, capped at 1/3 of screen
+    let input_line_count = state.input_buffer.lines().count().max(1);
+    let input_line_count = if state.input_buffer.ends_with('\n') {
+        input_line_count + 1
+    } else {
+        input_line_count
+    };
+    let max_input_height = f.area().height / 3;
+    let input_height = (input_line_count as u16).min(max_input_height).max(1);
 
     let root = Layout::default()
         .direction(Direction::Vertical)
@@ -1638,38 +1646,49 @@ fn render_debug(state: &AppState) -> Paragraph<'static> {
 }
 
 fn render_input(state: &AppState) -> Paragraph<'static> {
-    if state.prefs.input_multiline {
-        let mut lines: Vec<Line> = Vec::new();
-        let mut first = true;
-        for l in state.input_buffer.lines() {
-            if first {
-                lines.push(Line::from(format!("> {l}")));
-                first = false;
-            } else {
-                lines.push(Line::from(format!("  {l}")));
-            }
-        }
-        if state.input_buffer.is_empty() {
-            lines.push(Line::from("> "));
-        } else if state.input_buffer.ends_with('\n') {
-            lines.push(Line::from("  "));
-        }
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
 
-        Paragraph::new(Text::from(lines))
-            .block(focused_block(
-                "Input (multiline)",
-                state.focus == Focus::Input,
-                state.prefs.theme,
-            ))
-            .wrap(Wrap { trim: false })
-            .scroll((state.input_scroll, 0))
+    let prompt = "> ";
+    let continuation = "  ";
+    let mut lines: Vec<Line> = Vec::new();
+
+    let input_lines: Vec<&str> = state.input_buffer.lines().collect();
+    let input_lines = if input_lines.is_empty() {
+        vec![""]
     } else {
-        Paragraph::new(format!("> {}", state.input_buffer)).block(focused_block(
-            "Input",
-            state.focus == Focus::Input,
-            state.prefs.theme,
-        ))
+        input_lines
+    };
+
+    // Handle trailing newline by adding empty continuation line
+    let has_trailing_newline = !state.input_buffer.is_empty() && state.input_buffer.ends_with('\n');
+    let total_lines = input_lines.len() + if has_trailing_newline { 1 } else { 0 };
+
+    for (i, line) in input_lines.iter().enumerate() {
+        let prefix = if i == 0 { prompt } else { continuation };
+        let is_last = i == total_lines - 1 && !has_trailing_newline;
+        lines.push(Line::from(vec![
+            Span::styled(prefix, Style::default().fg(colors.accent)),
+            Span::styled(line.to_string(), Style::default().fg(colors.fg_primary)),
+            if is_last {
+                Span::styled("▌", Style::default().fg(colors.accent))
+            } else {
+                Span::raw("")
+            },
+        ]));
     }
+
+    // Add continuation line with cursor if there's a trailing newline
+    if has_trailing_newline {
+        lines.push(Line::from(vec![
+            Span::styled(continuation, Style::default().fg(colors.accent)),
+            Span::styled("▌", Style::default().fg(colors.accent)),
+        ]));
+    }
+
+    Paragraph::new(Text::from(lines))
+        .style(Style::default().bg(colors.bg_base))
+        .scroll((state.input_scroll, 0))
 }
 
 fn render_permission_modal(state: &AppState) -> Paragraph<'static> {
@@ -1973,7 +1992,16 @@ fn compute_chat_rect(
     state: &AppState,
     area: ratatui::layout::Rect,
 ) -> Option<ratatui::layout::Rect> {
-    let input_height = if state.prefs.input_multiline { 7 } else { 3 };
+    // Dynamic input height based on content, capped at 1/3 of screen
+    let input_line_count = state.input_buffer.lines().count().max(1);
+    let input_line_count = if state.input_buffer.ends_with('\n') {
+        input_line_count + 1
+    } else {
+        input_line_count
+    };
+    let max_input_height = area.height / 3;
+    let input_height = (input_line_count as u16).min(max_input_height).max(1);
+
     let root = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
