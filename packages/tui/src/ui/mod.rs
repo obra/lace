@@ -97,6 +97,14 @@ pub fn run_tui(args: Args) -> io::Result<()> {
         args.timeout_ms,
     );
     terminal.restore()?;
+
+    // Print session ID for resumption
+    if let Some(session_id) = &state.session_id {
+        eprintln!();
+        eprintln!("Session: {session_id}");
+        eprintln!("Resume with: lace-tui --load {session_id}");
+    }
+
     res
 }
 
