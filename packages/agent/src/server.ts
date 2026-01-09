@@ -1847,19 +1847,29 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         await childPeer.request('session/prompt', { content: job.subagentContent });
 
         if (job.status !== 'cancelled') job.status = 'completed';
-      } catch {
+      } catch (error) {
         if (job.status !== 'cancelled') job.status = 'failed';
+        logger.error('job.subagent.failed', {
+          jobId: job.jobId,
+          error: error instanceof Error ? error.message : String(error),
+        });
       } finally {
         try {
           childPeer.close();
-        } catch {
-          // ignore
+        } catch (error) {
+          logger.debug('job.subagent.close_peer.failed', {
+            jobId: job.jobId,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
 
         try {
           job.childTransportClose?.();
-        } catch {
-          // ignore
+        } catch (error) {
+          logger.debug('job.subagent.close_transport.failed', {
+            jobId: job.jobId,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
 
         if (childProc.exitCode === null) {
@@ -1877,8 +1887,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           if (childProc.exitCode === null) {
             try {
               childProc.kill('SIGKILL');
-            } catch {
+            } catch (error) {
               // Process may have exited between check and kill
+              logger.debug('job.subagent.sigkill.failed', {
+                jobId: job.jobId,
+                error: error instanceof Error ? error.message : String(error),
+              });
             }
 
             // Final wait with shorter timeout
@@ -2889,8 +2903,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           try {
             const toolsResult = await client.listTools();
             toolCount = toolsResult.tools.length;
-          } catch {
-            // Ignore tool listing errors
+          } catch (error) {
+            logger.debug('mcp.listTools.failed', {
+              serverId,
+              error: error instanceof Error ? error.message : String(error),
+            });
           }
         }
 
@@ -3138,8 +3155,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           } else {
             proc.kill('SIGKILL');
           }
-        } catch {
-          // ignore; SIGTERM was sent
+        } catch (error) {
+          // SIGTERM was already sent; process may have exited
+          logger.debug('job.kill.sigkill.failed', {
+            jobId,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
 
         await Promise.race([
@@ -3205,8 +3226,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             } else {
               job.proc.kill('SIGTERM');
             }
-          } catch {
-            // Process may already be dead
+          } catch (error) {
+            logger.debug('session.new.job_kill.failed', {
+              jobId: job.jobId,
+              error: error instanceof Error ? error.message : String(error),
+            });
           }
         }
         job.permissionAbortController?.abort();
@@ -3346,8 +3370,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
               } else {
                 job.proc.kill('SIGTERM');
               }
-            } catch {
-              // Process may already be dead
+            } catch (error) {
+              logger.debug('session.load.job_kill.failed', {
+                jobId: job.jobId,
+                error: error instanceof Error ? error.message : String(error),
+              });
             }
           }
           job.permissionAbortController?.abort();
