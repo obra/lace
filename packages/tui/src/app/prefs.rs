@@ -30,9 +30,13 @@ impl Default for Theme {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Preferences {
+    // Deprecated: These fields are kept for backwards compatibility when loading
+    // old preferences. They are no longer used in rendering - the conversation
+    // is always shown, and debug/activity are accessed via full-screen overlays.
     pub show_chat: bool,
     pub show_activity: bool,
     pub show_debug: bool,
+
     pub keybind_mode: KeybindMode,
     pub theme: Theme,
     pub render_markdown: bool,

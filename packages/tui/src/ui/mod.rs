@@ -931,20 +931,8 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     let status = render_status(state);
     f.render_widget(status, status_area);
 
-    let body = if state.prefs.show_debug {
-        let split = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Percentage(30)])
-            .split(main_area);
-        render_main(f, state, split[0]);
-        f.render_widget(render_debug(state), split[1]);
-        split[0]
-    } else {
-        render_main(f, state, main_area);
-        main_area
-    };
-
-    let _ = body;
+    // Main area now always shows the conversation. Debug/Activity are accessed via overlays.
+    render_main(f, state, main_area);
     f.render_widget(render_input(state), input_area);
 
     if state.active_permission.is_some() {
@@ -1011,9 +999,13 @@ impl ThemeStyles {
     fn assistant_prefix(&self) -> Color {
         self.colors.fg_secondary
     }
+    // Used by render_activity which is kept for future overlay implementation
+    #[allow(dead_code)]
     fn activity_selected(&self) -> Color {
         self.colors.accent
     }
+    // Used by render_activity which is kept for future overlay implementation
+    #[allow(dead_code)]
     fn activity_error(&self) -> Color {
         self.colors.error
     }
@@ -1466,30 +1458,11 @@ fn render_connections_models_modal(state: &AppState) -> Paragraph<'static> {
         .wrap(Wrap { trim: true })
 }
 
+/// Renders the main content area. The conversation (chat) is always shown as the
+/// primary view. Debug and Activity panes have been removed in favor of full-screen
+/// overlays (to be implemented in later tasks).
 fn render_main(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout::Rect) {
-    match (state.prefs.show_chat, state.prefs.show_activity) {
-        (true, true) => {
-            let cols = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(62), Constraint::Percentage(38)])
-                .split(area);
-            f.render_widget(render_chat(state), cols[0]);
-            f.render_widget(render_activity(state), cols[1]);
-        }
-        (true, false) => {
-            f.render_widget(render_chat(state), area);
-        }
-        (false, true) => {
-            f.render_widget(render_activity(state), area);
-        }
-        (false, false) => {
-            f.render_widget(
-                Paragraph::new("No panes enabled (Ctrl+1/2)")
-                    .block(Block::default().borders(Borders::ALL)),
-                area,
-            );
-        }
-    }
+    f.render_widget(render_chat(state), area);
 }
 
 fn render_chat(state: &AppState) -> Paragraph<'static> {
@@ -1541,6 +1514,11 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
         .scroll((state.chat_scroll, 0))
 }
 
+/// Renders the Activity pane content.
+///
+/// NOTE: This function is kept for future use as a full-screen overlay.
+/// It is no longer rendered as a split pane in the main view.
+#[allow(dead_code)]
 fn render_activity(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
     let mut lines: Vec<Line> = Vec::new();
@@ -1589,6 +1567,11 @@ fn render_activity(state: &AppState) -> Paragraph<'static> {
         .scroll((state.activity_scroll, 0))
 }
 
+/// Renders the Debug pane content.
+///
+/// NOTE: This function is kept for future use as a full-screen overlay.
+/// It is no longer rendered as a split pane in the main view.
+#[allow(dead_code)]
 fn render_debug(state: &AppState) -> Paragraph<'static> {
     let mut lines: Vec<Line> = Vec::new();
     for l in state.debug_lines.iter().rev().take(200).rev() {
@@ -1915,46 +1898,24 @@ fn wrapped_line_count(width: usize, line: &str) -> usize {
     ((len.max(1) + width - 1) / width).max(1)
 }
 
+/// Computes the rectangle where the chat (conversation) is rendered.
+/// The chat is always shown as the primary view now - no split panes.
 fn compute_chat_rect(
     state: &AppState,
     area: ratatui::layout::Rect,
 ) -> Option<ratatui::layout::Rect> {
-    if !state.prefs.show_chat {
-        return None;
-    }
-
     let input_height = if state.prefs.input_multiline { 7 } else { 3 };
     let root = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(1),               // main area (first)
+            Constraint::Min(1),               // main area (chat)
             Constraint::Length(input_height), // input
             Constraint::Length(1),            // status at BOTTOM
         ])
         .split(area);
-    let main_area = root[0];
 
-    let main_area = if state.prefs.show_debug {
-        let split = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Percentage(30)])
-            .split(main_area);
-        split[0]
-    } else {
-        main_area
-    };
-
-    match (state.prefs.show_chat, state.prefs.show_activity) {
-        (true, true) => {
-            let cols = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(62), Constraint::Percentage(38)])
-                .split(main_area);
-            Some(cols[0])
-        }
-        (true, false) => Some(main_area),
-        _ => None,
-    }
+    // Chat now takes the entire main_area - no debug/activity split panes
+    Some(root[0])
 }
 
 #[cfg(test)]
