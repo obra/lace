@@ -12,7 +12,9 @@ const jobKillSchema = z.object({
 
 export class JobKillTool extends Tool {
   name = 'job_kill';
-  description = `Cancel a running background job. Only running jobs can be cancelled.`;
+  description = `Cancel a running background job. Only jobs with status="running" can be killed.
+
+After killing, status becomes "cancelled". For subagent jobs, the session is preserved - use delegate(resume=jobId) to continue later.`;
   schema = jobKillSchema;
   annotations: ToolAnnotations = {
     title: 'Kill Job',

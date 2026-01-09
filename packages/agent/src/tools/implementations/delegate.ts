@@ -17,8 +17,16 @@ const delegateSchema = z
 
 export class DelegateTool extends Tool {
   name = 'delegate';
-  description =
-    'Spawn a background subagent job and return its report (streamed job updates are available via ent/job/*).';
+  description = `Spawn a subagent to handle a task autonomously.
+
+Parameters:
+- prompt: The task for the subagent (required)
+- description: Label shown in job listings (optional)
+- run_async: Set to true to return immediately with jobId (default: false)
+- resume: JobId of a failed/cancelled job to continue from where it left off
+
+When run_async=true, returns "Async job started: job_xxx". Use job_output(jobId) to monitor.
+Default (sync): Blocks until subagent completes and returns full output.`;
   schema = delegateSchema;
   annotations: ToolAnnotations = {
     title: 'Delegate',

@@ -13,7 +13,12 @@ const jobsListSchema = z.object({
 
 export class JobsListTool extends Tool {
   name = 'jobs_list';
-  description = `List current and recent background jobs. Filter by status or type. Returns job IDs, descriptions, and status.`;
+  description = `List all background jobs in the current session. Use to find jobIds for job_output or job_kill.
+
+Filter by status: ["pending", "running", "completed", "failed", "cancelled"]
+Filter by type: ["shell", "subagent"]
+
+Returns: [{ jobId, type, status, description, startTime }]`;
   schema = jobsListSchema;
   annotations: ToolAnnotations = {
     title: 'List Jobs',
