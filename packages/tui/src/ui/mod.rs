@@ -158,7 +158,53 @@ fn run_loop(
                     if key.modifiers.contains(KeyModifiers::CONTROL)
                         && key.code == KeyCode::Char('c')
                     {
-                        break;
+                        let now_ms = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64;
+
+                        // If we have active streaming requests, cancel them
+                        if !state.active_prompt_request_ids.is_empty() {
+                            // Clone IDs first to avoid borrow issues
+                            let req_ids: Vec<_> =
+                                state.active_prompt_request_ids.iter().cloned().collect();
+                            // Send cancel for each active request
+                            for req_id in req_ids {
+                                let cancel_msg = jsonrpc::encode_notification(
+                                    "$/cancel_request",
+                                    Some(serde_json::json!({ "requestId": req_id })),
+                                );
+                                if let Err(e) = transport.send_line(cancel_msg) {
+                                    state.push_debug_line(format!("cancel send error: {e}"));
+                                }
+                            }
+                            state.push_activity_line("Cancelled active request".to_string());
+                            // Mark messages as interrupted if streaming
+                            if let Some(msg) = state.messages.last_mut() {
+                                if msg.streaming {
+                                    msg.streaming = false;
+                                    if !msg.text.ends_with('\n') {
+                                        msg.text.push('\n');
+                                    }
+                                    msg.text.push_str("✗ Interrupted");
+                                }
+                            }
+                            state.active_prompt_request_ids.clear();
+                            state.last_ctrl_c_ms = None;
+                            continue;
+                        }
+
+                        // Double Ctrl+C to quit when idle
+                        let double_press_window_ms = 500;
+                        if let Some(last_ms) = state.last_ctrl_c_ms {
+                            if now_ms - last_ms < double_press_window_ms {
+                                // Double press - quit
+                                break;
+                            }
+                        }
+                        state.last_ctrl_c_ms = Some(now_ms);
+                        state.push_activity_line("Press Ctrl+C again to quit".to_string());
+                        continue;
                     }
 
                     if let Some(req) = &state.active_permission {
@@ -2405,7 +2451,7 @@ fn render_help_modal() -> Paragraph<'static> {
     let lines = vec![
         Line::from("Help"),
         Line::from(""),
-        Line::from("Ctrl+C   Quit"),
+        Line::from("Ctrl+C   Cancel request / double to quit"),
         Line::from("Ctrl+K   Command palette"),
         Line::from("Ctrl+F   Search"),
         Line::from("Ctrl+A   Toggle activity overlay"),

@@ -147,6 +147,9 @@ pub struct AppState {
     pub slash_picker_open: bool,
     /// Selected index in the slash command picker
     pub slash_picker_selected: usize,
+
+    /// Last time Ctrl+C was pressed (for double-press detection)
+    pub last_ctrl_c_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -245,6 +248,8 @@ impl AppState {
             slash_commands: Vec::new(),
             slash_picker_open: false,
             slash_picker_selected: 0,
+
+            last_ctrl_c_ms: None,
         }
     }
 
