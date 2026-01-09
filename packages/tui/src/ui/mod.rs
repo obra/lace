@@ -1591,23 +1591,42 @@ fn render_config_modal(state: &AppState) -> Paragraph<'static> {
             )));
         }
         config_wizard::ConfigWizardStep::SelectModel => {
-            lines.push(Line::from(Span::styled(
-                "Select model:",
-                Style::default().fg(colors.fg_secondary),
-            )));
-            let max = 18usize;
-            let start = w.selected.saturating_sub(max / 2);
-            let end = (start + max).min(w.models.len());
-            for i in start..end {
-                let selected = i == w.selected;
-                let marker = if selected { "▸ " } else { "  " };
-                let m = &w.models[i];
-                let style = if selected {
-                    Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
-                } else {
-                    Style::default().fg(colors.fg_secondary)
-                };
-                lines.push(Line::from(Span::styled(format!("{marker}{}", m.name), style)));
+            // Show filter input
+            lines.push(Line::from(vec![
+                Span::styled("Filter: ", Style::default().fg(colors.fg_muted)),
+                Span::styled(w.model_filter.clone(), Style::default().fg(colors.fg_primary)),
+                Span::styled("▌", Style::default().fg(colors.accent)),
+            ]));
+            lines.push(Line::from(""));
+
+            // Get filtered models (clone names for 'static lifetime)
+            let filtered: Vec<String> = config_wizard::filtered_models(state)
+                .iter()
+                .map(|m| m.name.clone())
+                .collect();
+            if filtered.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "No matching models",
+                    Style::default().fg(colors.fg_muted),
+                )));
+            } else {
+                lines.push(Line::from(Span::styled(
+                    format!("Select model ({} available):", filtered.len()),
+                    Style::default().fg(colors.fg_secondary),
+                )));
+                let max = 16usize;
+                let start = w.selected.saturating_sub(max / 2);
+                let end = (start + max).min(filtered.len());
+                for i in start..end {
+                    let selected = i == w.selected;
+                    let marker = if selected { "▸ " } else { "  " };
+                    let style = if selected {
+                        Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
+                    } else {
+                        Style::default().fg(colors.fg_secondary)
+                    };
+                    lines.push(Line::from(Span::styled(format!("{marker}{}", filtered[i]), style)));
+                }
             }
         }
         config_wizard::ConfigWizardStep::Applying => {

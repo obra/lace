@@ -18,6 +18,8 @@ pub struct ConfigWizardState {
     pub credential_values: std::collections::BTreeMap<String, String>,
     pub error_message: Option<String>,
     pub forced_connection_id: Option<String>,
+    /// Filter query for model selection
+    pub model_filter: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,6 +85,7 @@ impl ConfigWizardState {
             credential_values: std::collections::BTreeMap::new(),
             error_message: None,
             forced_connection_id: None,
+            model_filter: String::new(),
         }
     }
 }
@@ -104,6 +107,7 @@ pub fn open(state: &mut AppState) -> Vec<Outbound> {
     state.config_wizard.credential_values.clear();
     state.config_wizard.error_message = None;
     state.config_wizard.forced_connection_id = None;
+    state.config_wizard.model_filter.clear();
 
     let id = state.next_client_id();
     vec![Outbound::JsonRpcRequest {
@@ -145,6 +149,7 @@ pub fn open_for_connection(state: &mut AppState) -> Vec<Outbound> {
     state.config_wizard.credential_values.clear();
     state.config_wizard.error_message = None;
     state.config_wizard.forced_connection_id = Some(it.connection_id.clone());
+    state.config_wizard.model_filter.clear();
 
     let id = state.next_client_id();
     vec![Outbound::JsonRpcRequest {
@@ -172,21 +177,70 @@ pub fn next(state: &mut AppState) {
             state.config_wizard.connections.len().saturating_sub(1)
         }
         ConfigWizardStep::SelectProvider => state.config_wizard.providers.len().saturating_sub(1),
-        ConfigWizardStep::SelectModel => state.config_wizard.models.len().saturating_sub(1),
+        ConfigWizardStep::SelectModel => {
+            // Use filtered count when there's a filter query
+            let query = state.config_wizard.model_filter.to_lowercase();
+            if query.is_empty() {
+                state.config_wizard.models.len().saturating_sub(1)
+            } else {
+                state
+                    .config_wizard
+                    .models
+                    .iter()
+                    .filter(|m| {
+                        m.model_id.to_lowercase().contains(&query)
+                            || m.name.to_lowercase().contains(&query)
+                    })
+                    .count()
+                    .saturating_sub(1)
+            }
+        }
         _ => 0,
     };
     state.config_wizard.selected = (state.config_wizard.selected + 1).min(max);
 }
 
 pub fn input_char(state: &mut AppState, ch: char) {
-    if state.config_wizard.step == ConfigWizardStep::EnterCredential {
-        state.config_wizard.credential_input.push(ch);
+    match state.config_wizard.step {
+        ConfigWizardStep::EnterCredential => {
+            state.config_wizard.credential_input.push(ch);
+        }
+        ConfigWizardStep::SelectModel => {
+            state.config_wizard.model_filter.push(ch);
+            state.config_wizard.selected = 0;
+        }
+        _ => {}
     }
 }
 
 pub fn backspace(state: &mut AppState) {
-    if state.config_wizard.step == ConfigWizardStep::EnterCredential {
-        state.config_wizard.credential_input.pop();
+    match state.config_wizard.step {
+        ConfigWizardStep::EnterCredential => {
+            state.config_wizard.credential_input.pop();
+        }
+        ConfigWizardStep::SelectModel => {
+            state.config_wizard.model_filter.pop();
+            state.config_wizard.selected = 0;
+        }
+        _ => {}
+    }
+}
+
+/// Returns models that match the current filter query (case-insensitive).
+pub fn filtered_models(state: &AppState) -> Vec<&WizardModelItem> {
+    let query = state.config_wizard.model_filter.to_lowercase();
+    if query.is_empty() {
+        state.config_wizard.models.iter().collect()
+    } else {
+        state
+            .config_wizard
+            .models
+            .iter()
+            .filter(|m| {
+                m.model_id.to_lowercase().contains(&query)
+                    || m.name.to_lowercase().contains(&query)
+            })
+            .collect()
     }
 }
 
@@ -634,11 +688,10 @@ fn on_models_list(state: &mut AppState, result: &Option<Value>) -> Vec<Outbound>
 }
 
 fn submit_model(state: &mut AppState) -> Vec<Outbound> {
-    let idx = state
-        .config_wizard
-        .selected
-        .min(state.config_wizard.models.len().saturating_sub(1));
-    let Some(model) = state.config_wizard.models.get(idx) else {
+    // Get filtered models list
+    let filtered: Vec<_> = filtered_models(state);
+    let idx = state.config_wizard.selected.min(filtered.len().saturating_sub(1));
+    let Some(model) = filtered.get(idx) else {
         return Vec::new();
     };
     let model_id = model.model_id.clone();
