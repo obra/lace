@@ -9,7 +9,7 @@ import { Supervisor } from '../supervisor';
 import type { SupervisorServerEvent } from './types';
 
 type SupervisorServerOptions = {
-  laceDir: string;
+  storeDir: string;
   host?: string;
   port?: number;
   endpointFilePath?: string;
@@ -105,8 +105,8 @@ function writeSse(res: ServerResponse, event: string, data: unknown) {
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-function endpointFileDefault(laceDir: string): string {
-  return join(laceDir, 'supervisor', 'endpoint.json');
+function endpointFileDefault(storeDir: string): string {
+  return join(storeDir, 'supervisor', 'endpoint.json');
 }
 
 function writeEndpointFile(params: {
@@ -136,7 +136,7 @@ function writeEndpointFile(params: {
 export function createSupervisorServer(options: SupervisorServerOptions): SupervisorServerHandle {
   const host = options.host ?? '127.0.0.1';
   const port = options.port ?? 0;
-  const endpointPath = options.endpointFilePath ?? endpointFileDefault(options.laceDir);
+  const endpointPath = options.endpointFilePath ?? endpointFileDefault(options.storeDir);
 
   const sseClients = new Set<ServerResponse>();
   const pendingPermissions = new PendingPermissionsTracker();
@@ -152,7 +152,7 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
   }
 
   const supervisor = new Supervisor({
-    laceDir: options.laceDir,
+    storeDir: options.storeDir,
     onSessionUpdate: (workspaceSessionId, update) => {
       const projectId = supervisor.getWorkspaceSession(workspaceSessionId)?.projectId;
       pendingPermissions.onSessionUpdate(workspaceSessionId, update);

@@ -138,7 +138,7 @@ This section is a living checklist. If it’s checked, it’s done and validated
 - [x] Web tool policy UI uses `ToolPolicy` from `@lace/ent-protocol` (no agent type import).
 - [x] Web session naming no longer depends on `ProviderRegistry` (generated via ENT `session/prompt`).
 - [x] Web local logger (`packages/web/lib/logger.ts`) replaces agent logger usage; logging is gated by env var truthiness.
-- [x] Test stability: `npm test` (repo root) passes; web Vitest output is reduced to avoid `vitest-worker` `onTaskUpdate` timeouts.
+- [x] Test stability: `npm test` (repo root) passes; web Vitest thread pool is capped (`packages/web/vitest.config.ts`) to avoid `vitest-worker` `onTaskUpdate` timeouts.
 
 ### 🔎 Current “reach-ins” (generated from ripgrep)
 

@@ -18,7 +18,6 @@ export type PermissionRequestParams = z.infer<
 export type PermissionDecision = z.infer<typeof SessionRequestPermissionResponseSchema>['result'];
 
 export type SupervisorAgentProcessOptions = {
-  laceDir: string;
   agentPath?: string;
   onSessionUpdate?: (update: SessionUpdateParams) => void;
   onPermissionRequest?: (params: PermissionRequestParams) => Promise<PermissionDecision>;
@@ -37,7 +36,7 @@ export class SupervisorAgentProcess {
 
     this.proc = spawn(process.execPath, [agentMainPath], {
       cwd: agentCwd,
-      env: { ...process.env, LACE_DIR: options.laceDir },
+      env: { ...process.env },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 

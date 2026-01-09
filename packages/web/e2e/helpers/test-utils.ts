@@ -71,7 +71,7 @@ async function waitForServer(url: string, timeoutMs: number = 120000): Promise<v
 }
 
 /**
- * Start a test server with isolated LACE_DIR
+ * Start a test server with isolated LACE_WEB_DIR (and agent LACE_DIR)
  */
 async function startTestServer(
   tempDir: string
@@ -87,6 +87,7 @@ async function startTestServer(
     env: {
       ...process.env,
       LACE_DIR: tempDir,
+      LACE_WEB_DIR: tempDir,
       ANTHROPIC_API_KEY: 'test-anthropic-key-for-e2e',
       LACE_DB_PATH: path.join(tempDir, 'lace.db'),
       NODE_ENV: 'test', // Use test mode - avoids Vite dev server issues

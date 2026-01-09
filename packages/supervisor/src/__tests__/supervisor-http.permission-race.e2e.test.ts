@@ -56,10 +56,13 @@ describe('Supervisor HTTP permissions race conditions (E2E)', () => {
   let workDir: string;
   let server: ReturnType<typeof createSupervisorServer> | undefined;
   let baseUrl: string | undefined;
+  let originalAgentLaceDir: string | undefined;
 
   beforeEach(() => {
     laceDir = mkdtempSync(join(tmpdir(), 'lace-supervisor-http-e2e-store-'));
     workDir = mkdtempSync(join(tmpdir(), 'lace-supervisor-http-e2e-wd-'));
+    originalAgentLaceDir = process.env.LACE_DIR;
+    process.env.LACE_DIR = laceDir;
   });
 
   afterEach(async () => {
@@ -70,10 +73,13 @@ describe('Supervisor HTTP permissions race conditions (E2E)', () => {
 
     rmSync(laceDir, { recursive: true, force: true });
     rmSync(workDir, { recursive: true, force: true });
+
+    if (originalAgentLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = originalAgentLaceDir;
   });
 
   it('executes a tool exactly once despite repeated resolves for the same toolCallId', async () => {
-    server = createSupervisorServer({ laceDir, host: '127.0.0.1', port: 0 });
+    server = createSupervisorServer({ storeDir: laceDir, host: '127.0.0.1', port: 0 });
     const listening = await withTimeout(server.listen(), 5_000, 'server.listen');
     baseUrl = listening.baseUrl;
 

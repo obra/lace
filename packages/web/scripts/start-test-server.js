@@ -10,9 +10,11 @@ const TEST_PORT_START = 23457;
 const PORT_FILE = join(process.cwd(), '.playwright-server-url');
 
 function startServer() {
-  // Create isolated temporary LACE_DIR for the entire test server session
-  const tempLaceDir = mkdtempSync(join(tmpdir(), 'lace-e2e-server-'));
-  console.log(`📁 Using temporary LACE_DIR: ${tempLaceDir}`);
+  // Create isolated temporary directories for the entire test server session
+  const tempWebDir = mkdtempSync(join(tmpdir(), 'lace-web-e2e-server-'));
+  const tempAgentDir = mkdtempSync(join(tmpdir(), 'lace-agent-e2e-server-'));
+  console.log(`📁 Using temporary LACE_WEB_DIR: ${tempWebDir}`);
+  console.log(`📁 Using temporary LACE_DIR: ${tempAgentDir}`);
 
   // Use E2E test server for tool approval tests, regular server otherwise
   const serverFile =
@@ -27,7 +29,8 @@ function startServer() {
       ANTHROPIC_KEY: 'test-anthropic-key-for-e2e-tests',
       ANTHROPIC_API_KEY: 'test-anthropic-key-for-e2e-tests',
       LACE_DB_PATH: ':memory:',
-      LACE_DIR: tempLaceDir, // Set isolated LACE_DIR for the server
+      LACE_WEB_DIR: tempWebDir,
+      LACE_DIR: tempAgentDir,
       NODE_ENV: 'development', // Use development mode for React Router v7 compatibility
       VITEST_RUNNING: 'true',
       // Enable tool approval mock provider for E2E tests
@@ -67,12 +70,14 @@ function startServer() {
 
   // Cleanup function for temp directory
   function cleanup() {
-    console.log(`🧹 Cleaning up temporary LACE_DIR: ${tempLaceDir}`);
+    console.log(`🧹 Cleaning up temporary LACE_WEB_DIR: ${tempWebDir}`);
+    console.log(`🧹 Cleaning up temporary LACE_DIR: ${tempAgentDir}`);
     try {
-      rmSync(tempLaceDir, { recursive: true, force: true });
-      console.log('✅ Temporary LACE_DIR cleaned up successfully');
+      rmSync(tempWebDir, { recursive: true, force: true });
+      rmSync(tempAgentDir, { recursive: true, force: true });
+      console.log('✅ Temporary test dirs cleaned up successfully');
     } catch (error) {
-      console.warn('⚠️ Warning: Failed to clean up temporary LACE_DIR:', error.message);
+      console.warn('⚠️ Warning: Failed to clean up temporary test dirs:', error.message);
     }
   }
 

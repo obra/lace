@@ -32,10 +32,13 @@ describe('SupervisorAgentProcess (E2E)', () => {
   let laceDir: string;
   let workDir: string;
   let supervisor: SupervisorAgentProcess | undefined;
+  let originalAgentLaceDir: string | undefined;
 
   beforeEach(() => {
     laceDir = mkdtempSync(join(tmpdir(), 'lace-supervisor-e2e-store-'));
     workDir = mkdtempSync(join(tmpdir(), 'lace-supervisor-e2e-wd-'));
+    originalAgentLaceDir = process.env.LACE_DIR;
+    process.env.LACE_DIR = laceDir;
   });
 
   afterEach(async () => {
@@ -46,6 +49,9 @@ describe('SupervisorAgentProcess (E2E)', () => {
 
     rmSync(laceDir, { recursive: true, force: true });
     rmSync(workDir, { recursive: true, force: true });
+
+    if (originalAgentLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = originalAgentLaceDir;
   });
 
   it('spawns an agent process and handles permission requests', async () => {
@@ -53,7 +59,6 @@ describe('SupervisorAgentProcess (E2E)', () => {
     const permissionRequests: Array<Record<string, unknown>> = [];
 
     supervisor = new SupervisorAgentProcess({
-      laceDir,
       onSessionUpdate: (u) => updates.push(u),
       onPermissionRequest: async (params) => {
         permissionRequests.push(params);
@@ -102,10 +107,13 @@ describe('Supervisor (E2E)', () => {
   let laceDir: string;
   let workDir: string;
   let supervisor: Supervisor | undefined;
+  let originalAgentLaceDir: string | undefined;
 
   beforeEach(() => {
     laceDir = mkdtempSync(join(tmpdir(), 'lace-supervisor2-e2e-store-'));
     workDir = mkdtempSync(join(tmpdir(), 'lace-supervisor2-e2e-wd-'));
+    originalAgentLaceDir = process.env.LACE_DIR;
+    process.env.LACE_DIR = laceDir;
   });
 
   afterEach(async () => {
@@ -116,6 +124,9 @@ describe('Supervisor (E2E)', () => {
 
     rmSync(laceDir, { recursive: true, force: true });
     rmSync(workDir, { recursive: true, force: true });
+
+    if (originalAgentLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = originalAgentLaceDir;
   });
 
   it('runs two workspace sessions as two agent processes', async () => {
@@ -126,7 +137,7 @@ describe('Supervisor (E2E)', () => {
     }> = [];
 
     supervisor = new Supervisor({
-      laceDir,
+      storeDir: laceDir,
       onSessionUpdate: (workspaceSessionId, update) => updates.push({ workspaceSessionId, update }),
       onPermissionRequest: async (workspaceSessionId, params) => {
         permissionRequests.push({ workspaceSessionId, params });
@@ -189,7 +200,7 @@ describe('Supervisor (E2E)', () => {
     }> = [];
 
     supervisor = new Supervisor({
-      laceDir,
+      storeDir: laceDir,
       onPermissionRequest: async (workspaceSessionId, params) => {
         permissionRequests.push({ workspaceSessionId, params });
         return { decision: 'allow' };
@@ -230,7 +241,7 @@ describe('Supervisor (E2E)', () => {
 
   it('persists workspace session metadata to laceDir', async () => {
     supervisor = new Supervisor({
-      laceDir,
+      storeDir: laceDir,
       onPermissionRequest: async () => ({ decision: 'allow' }),
     });
 
@@ -241,7 +252,7 @@ describe('Supervisor (E2E)', () => {
     supervisor = undefined;
 
     supervisor = new Supervisor({
-      laceDir,
+      storeDir: laceDir,
       onPermissionRequest: async () => ({ decision: 'allow' }),
     });
 
@@ -261,7 +272,7 @@ describe('Supervisor (E2E)', () => {
     process.env.LACE_AGENT_TEST_PROVIDER = '1';
 
     supervisor = new Supervisor({
-      laceDir,
+      storeDir: laceDir,
       onPermissionRequest: async () => ({ decision: 'allow' }),
     });
 
@@ -277,7 +288,7 @@ describe('Supervisor (E2E)', () => {
       supervisor = undefined;
 
       supervisor = new Supervisor({
-        laceDir,
+        storeDir: laceDir,
         onPermissionRequest: async () => ({ decision: 'allow' }),
       });
 
@@ -310,7 +321,7 @@ describe('Supervisor (E2E)', () => {
     const updates: Array<{ workspaceSessionId: string; update: Record<string, unknown> }> = [];
 
     supervisor = new Supervisor({
-      laceDir,
+      storeDir: laceDir,
       onSessionUpdate: (workspaceSessionId, update) => updates.push({ workspaceSessionId, update }),
       onPermissionRequest: async () => ({ decision: 'allow' }),
     });

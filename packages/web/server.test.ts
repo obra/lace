@@ -422,34 +422,34 @@ describe('Error Logging', () => {
   });
 });
 
-describe.sequential('LACE_DIR initialization', () => {
-  let originalLaceDir: string | undefined;
+describe.sequential('LACE_WEB_DIR initialization', () => {
+  let originalLaceWebDir: string | undefined;
 
   beforeEach(() => {
-    originalLaceDir = process.env.LACE_DIR;
+    originalLaceWebDir = process.env.LACE_WEB_DIR;
   });
 
   afterEach(() => {
-    if (originalLaceDir !== undefined) {
-      process.env.LACE_DIR = originalLaceDir;
+    if (originalLaceWebDir !== undefined) {
+      process.env.LACE_WEB_DIR = originalLaceWebDir;
     } else {
-      delete process.env.LACE_DIR;
+      delete process.env.LACE_WEB_DIR;
     }
   });
 
-  test('should create LACE_DIR when development server starts', async () => {
+  test('should create LACE_WEB_DIR when development server starts', async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-dev-test-'));
     const testLaceDir = path.join(tempDir, 'nonexistent-lace-dir');
 
     try {
-      // Ensure the test LACE_DIR doesn't exist
+      // Ensure the test LACE_WEB_DIR doesn't exist
       expect(fs.existsSync(testLaceDir)).toBe(false);
 
-      // Start development server with the non-existent LACE_DIR
+      // Start development server with the non-existent LACE_WEB_DIR
       const cleanEnv = createCleanEnv();
 
       const serverProcess = spawn('npm', ['run', 'dev'], {
-        env: { ...cleanEnv, LACE_DIR: testLaceDir, NODE_ENV: 'development' },
+        env: { ...cleanEnv, LACE_WEB_DIR: testLaceDir, NODE_ENV: 'development' },
         cwd: process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -481,7 +481,7 @@ describe.sequential('LACE_DIR initialization', () => {
         });
       });
 
-      // The LACE_DIR should now exist
+      // The LACE_WEB_DIR should now exist
       expect(fs.existsSync(testLaceDir)).toBe(true);
     } finally {
       // Clean up
@@ -491,19 +491,19 @@ describe.sequential('LACE_DIR initialization', () => {
     }
   }, 30000);
 
-  test('should create LACE_DIR when production server starts', async () => {
+  test('should create LACE_WEB_DIR when production server starts', async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-prod-test-'));
     const testLaceDir = path.join(tempDir, 'nonexistent-lace-dir');
 
     try {
-      // Ensure the test LACE_DIR doesn't exist
+      // Ensure the test LACE_WEB_DIR doesn't exist
       expect(fs.existsSync(testLaceDir)).toBe(false);
 
-      // Start production server with the non-existent LACE_DIR
+      // Start production server with the non-existent LACE_WEB_DIR
       const cleanEnv = createCleanEnv();
 
       const serverProcess = spawn('npm', ['start'], {
-        env: { ...cleanEnv, LACE_DIR: testLaceDir, NODE_ENV: 'production' },
+        env: { ...cleanEnv, LACE_WEB_DIR: testLaceDir, NODE_ENV: 'production' },
         cwd: process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -535,7 +535,7 @@ describe.sequential('LACE_DIR initialization', () => {
         });
       });
 
-      // The LACE_DIR should now exist
+      // The LACE_WEB_DIR should now exist
       expect(fs.existsSync(testLaceDir)).toBe(true);
     } finally {
       // Clean up

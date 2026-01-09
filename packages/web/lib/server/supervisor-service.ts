@@ -11,7 +11,7 @@ import {
   type SupervisorServerEvent,
   type SupervisorSessionUpdate,
 } from '@lace/supervisor';
-import { ensureLaceDir } from '@lace/web/lib/server/lace-dir';
+import { ensureLaceWebDir } from '@lace/web/lib/server/web-data-dir';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import { logger } from '@lace/web/lib/logger';
 import type {
@@ -347,10 +347,10 @@ function ensureInProcessSupervisor(): {
     };
   }
 
-  const laceDir = ensureLaceDir();
+  const storeDir = ensureLaceWebDir();
   const pendingPermissions = new PendingPermissionsTracker();
   const supervisor = new Supervisor({
-    laceDir,
+    storeDir,
     onSessionUpdate: (workspaceSessionId, update) => {
       pendingPermissions.onSessionUpdate(workspaceSessionId, update);
 

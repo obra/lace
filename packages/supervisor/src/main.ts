@@ -36,7 +36,7 @@ if (!Number.isFinite(port) || port < 0 || port > 65535) {
   process.exit(1);
 }
 
-const server = createSupervisorServer({ laceDir, host: values.host, port });
+const server = createSupervisorServer({ storeDir: laceDir, host: values.host, port });
 
 server
   .listen()

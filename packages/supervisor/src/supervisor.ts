@@ -76,7 +76,7 @@ export type CreateAgentSessionOptions = {
 };
 
 export type SupervisorOptions = {
-  laceDir: string;
+  storeDir: string;
   onSessionUpdate?: (workspaceSessionId: string, update: SessionUpdateParams) => void;
   onPermissionRequest?: (
     workspaceSessionId: string,
@@ -85,7 +85,7 @@ export type SupervisorOptions = {
 };
 
 export class Supervisor {
-  private readonly laceDir: string;
+  private readonly storeDir: string;
   private readonly store: WorkspaceSessionStore;
   private readonly sessions = new Map<
     string,
@@ -99,8 +99,8 @@ export class Supervisor {
   private readonly onPermissionRequest?: SupervisorOptions['onPermissionRequest'];
 
   constructor(options: SupervisorOptions) {
-    this.laceDir = options.laceDir;
-    this.store = new WorkspaceSessionStore(this.laceDir);
+    this.storeDir = options.storeDir;
+    this.store = new WorkspaceSessionStore(this.storeDir);
     this.onSessionUpdate = options.onSessionUpdate;
     this.onPermissionRequest = options.onPermissionRequest;
   }
@@ -142,7 +142,6 @@ export class Supervisor {
     let activeSessionId: SessionId | undefined;
 
     const agent = new SupervisorAgentProcess({
-      laceDir: this.laceDir,
       onSessionUpdate: (update) => {
         if (!activeSessionId) return;
         if (update.sessionId !== activeSessionId) return;
@@ -183,7 +182,6 @@ export class Supervisor {
     const activeSessionId: SessionId = sessionId;
 
     const agent = new SupervisorAgentProcess({
-      laceDir: this.laceDir,
       onSessionUpdate: (update) => {
         if (!activeSessionId) return;
         if (update.sessionId !== activeSessionId) return;
