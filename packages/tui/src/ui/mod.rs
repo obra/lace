@@ -246,6 +246,50 @@ fn run_loop(
                         continue;
                     }
 
+                    if state.mcp_panel.open {
+                        use crate::app::config_panels::McpPanelView;
+                        let action = match state.mcp_panel.view {
+                            McpPanelView::List => match key.code {
+                                KeyCode::Esc => Some(UiAction::McpClose),
+                                KeyCode::Up => Some(UiAction::McpPrev),
+                                KeyCode::Down => Some(UiAction::McpNext),
+                                KeyCode::Char('a') => Some(UiAction::McpAdd),
+                                KeyCode::Char('e') => Some(UiAction::McpEdit),
+                                KeyCode::Enter => Some(UiAction::McpEdit),
+                                KeyCode::Char('d') => Some(UiAction::McpDelete),
+                                KeyCode::Char('t') => Some(UiAction::McpTest),
+                                _ => None,
+                            },
+                            McpPanelView::AddEdit => match key.code {
+                                KeyCode::Esc => Some(UiAction::McpFormCancel),
+                                KeyCode::Tab | KeyCode::Down => Some(UiAction::McpFormNext),
+                                KeyCode::BackTab | KeyCode::Up => Some(UiAction::McpFormPrev),
+                                KeyCode::Enter => {
+                                    // In env field, Ctrl+Enter submits; Enter adds newline
+                                    if state.mcp_panel.form_field == 4
+                                        && !key.modifiers.contains(KeyModifiers::CONTROL) {
+                                        Some(UiAction::McpFormNewline)
+                                    } else {
+                                        Some(UiAction::McpFormSubmit)
+                                    }
+                                }
+                                KeyCode::Char(' ') if state.mcp_panel.form_field == 5 => {
+                                    Some(UiAction::McpFormToggleEnabled)
+                                }
+                                KeyCode::Backspace => Some(UiAction::McpFormBackspace),
+                                KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                    Some(UiAction::McpFormChar(ch))
+                                }
+                                _ => None,
+                            },
+                        };
+                        if let Some(action) = action {
+                            let out = apply_ui_action(state, action);
+                            send_outbound(transport, state, out, timeout_ms)?;
+                        }
+                        continue;
+                    }
+
                     if state.env_editor.open {
                         let action = match key.code {
                             KeyCode::Esc => Some(UiAction::CloseEnvEditor),
@@ -905,6 +949,30 @@ fn handle_agent_line(
                     let out = crate::app::connections::open_models(state);
                     send_outbound(transport, state, out, timeout_ms)?;
                 }
+
+                // === MCP methods ===
+                if method == "ent/mcp/servers/list" && state.mcp_panel.open {
+                    crate::app::config_panels::mcp_handle_list_response(state, &result);
+                }
+                if method == "ent/mcp/servers/upsert" && state.mcp_panel.open {
+                    crate::app::config_panels::mcp_handle_upsert_response(state, &result);
+                    // Refresh list after upsert
+                    if result.is_some() {
+                        let out = crate::app::config_panels::mcp_open(state);
+                        send_outbound(transport, state, out, timeout_ms)?;
+                    }
+                }
+                if method == "ent/mcp/servers/delete" && state.mcp_panel.open {
+                    crate::app::config_panels::mcp_handle_delete_response(state, &result);
+                }
+                if method == "ent/mcp/servers/test" && state.mcp_panel.open {
+                    // Extract serverId from pending params to identify which server
+                    if let Some(params) = pending_params.as_ref() {
+                        if let Some(sid) = params.get("serverId").and_then(|v| v.as_str()) {
+                            crate::app::config_panels::mcp_handle_test_response(state, sid, &result);
+                        }
+                    }
+                }
             }
 
             if should_refocus && state.active_permission.is_none() {
@@ -1099,7 +1167,11 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     }
 
     // Permission is now rendered inline in the conversation, not as a modal overlay
-    if state.env_editor.open {
+    if state.mcp_panel.open {
+        let area = centered_rect(80, 70, f.area());
+        f.render_widget(Clear, area);
+        f.render_widget(render_mcp_modal(state), area);
+    } else if state.env_editor.open {
         let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
         f.render_widget(render_env_modal(state), area);
@@ -1637,6 +1709,204 @@ fn render_env_modal(state: &AppState) -> Paragraph<'static> {
         "Enter add/update • d delete • s apply • Esc close",
         Style::default().fg(colors.fg_muted),
     )));
+
+    Paragraph::new(Text::from(lines))
+        .style(Style::default().bg(colors.bg_elevated))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.border_subtle))
+                .border_type(BorderType::Rounded),
+        )
+        .wrap(Wrap { trim: true })
+}
+
+fn render_mcp_modal(state: &AppState) -> Paragraph<'static> {
+    use crate::app::config_panels::McpPanelView;
+
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
+    let mut lines: Vec<Line> = Vec::new();
+
+    match state.mcp_panel.view {
+        McpPanelView::List => {
+            // Title
+            lines.push(Line::from(Span::styled(
+                "MCP Servers",
+                Style::default()
+                    .fg(colors.fg_primary)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            lines.push(Line::from(""));
+
+            if state.mcp_panel.loading {
+                lines.push(Line::from(Span::styled(
+                    "Loading...",
+                    Style::default().fg(colors.fg_muted),
+                )));
+            } else if state.mcp_panel.servers.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "No MCP servers configured",
+                    Style::default().fg(colors.fg_muted),
+                )));
+                lines.push(Line::from(""));
+                lines.push(Line::from(Span::styled(
+                    "Press 'a' to add a server",
+                    Style::default().fg(colors.fg_secondary),
+                )));
+            } else {
+                let max = 15usize;
+                let start = state.mcp_panel.selected.saturating_sub(max / 2);
+                let end = (start + max).min(state.mcp_panel.servers.len());
+                for i in start..end {
+                    let selected = i == state.mcp_panel.selected;
+                    let marker = if selected { "▸ " } else { "  " };
+                    let server = &state.mcp_panel.servers[i];
+
+                    let status_str = server.status.as_str();
+                    let enabled_str = if server.enabled { "" } else { " [disabled]" };
+                    let tools_str = server
+                        .tool_count
+                        .map(|n| format!(" ({n} tools)"))
+                        .unwrap_or_default();
+                    let cmd_str = if server.args.is_empty() {
+                        server.command.clone()
+                    } else {
+                        format!("{} {}", server.command, server.args.join(" "))
+                    };
+
+                    let style = if selected {
+                        Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
+                    } else {
+                        Style::default().fg(colors.fg_secondary)
+                    };
+
+                    lines.push(Line::from(vec![
+                        Span::styled(marker.to_string(), style),
+                        Span::styled(format!("[{}] ", status_str), Style::default().fg(colors.fg_muted)),
+                        Span::styled(server.name.clone(), style.add_modifier(Modifier::BOLD)),
+                        Span::styled(format!("{enabled_str}{tools_str}"), Style::default().fg(colors.fg_muted)),
+                    ]));
+                    lines.push(Line::from(vec![
+                        Span::styled("    ", style),
+                        Span::styled(cmd_str, Style::default().fg(colors.fg_muted)),
+                    ]));
+
+                    if let Some(err) = &server.error {
+                        lines.push(Line::from(vec![
+                            Span::styled("    ", style),
+                            Span::styled(format!("Error: {err}"), Style::default().fg(colors.error)),
+                        ]));
+                    }
+                }
+            }
+
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "a add • e edit • d delete • t test • Esc close",
+                Style::default().fg(colors.fg_muted),
+            )));
+        }
+
+        McpPanelView::AddEdit => {
+            let is_edit = state.mcp_panel.edit_server_id.is_some();
+            let title = if is_edit { "Edit MCP Server" } else { "Add MCP Server" };
+
+            lines.push(Line::from(Span::styled(
+                title,
+                Style::default()
+                    .fg(colors.fg_primary)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            lines.push(Line::from(""));
+
+            // Form fields
+            let fields = [
+                ("ID", &state.mcp_panel.form_id, 0, is_edit),
+                ("Name", &state.mcp_panel.form_name, 1, false),
+                ("Command", &state.mcp_panel.form_command, 2, false),
+                ("Args", &state.mcp_panel.form_args, 3, false),
+            ];
+
+            for (label, value, field_idx, readonly) in &fields {
+                let is_selected = state.mcp_panel.form_field == *field_idx;
+                let label_style = if is_selected {
+                    Style::default().fg(colors.accent)
+                } else {
+                    Style::default().fg(colors.fg_muted)
+                };
+                let value_style = if is_selected {
+                    Style::default().fg(colors.fg_primary)
+                } else if *readonly {
+                    Style::default().fg(colors.fg_muted)
+                } else {
+                    Style::default().fg(colors.fg_secondary)
+                };
+
+                let readonly_marker = if *readonly { " (readonly)" } else { "" };
+                let cursor = if is_selected { "▌" } else { "" };
+
+                lines.push(Line::from(vec![
+                    Span::styled(format!("{label}{readonly_marker}: "), label_style),
+                    Span::styled(value.to_string(), value_style),
+                    Span::styled(cursor, Style::default().fg(colors.accent)),
+                ]));
+            }
+
+            // Env field (multi-line)
+            let is_env_selected = state.mcp_panel.form_field == 4;
+            let env_label_style = if is_env_selected {
+                Style::default().fg(colors.accent)
+            } else {
+                Style::default().fg(colors.fg_muted)
+            };
+            lines.push(Line::from(Span::styled("Env (KEY=VALUE, one per line):", env_label_style)));
+            let env_lines: Vec<&str> = state.mcp_panel.form_env.lines().collect();
+            if env_lines.is_empty() {
+                let cursor = if is_env_selected { "▌" } else { "" };
+                lines.push(Line::from(vec![
+                    Span::styled("  ", Style::default()),
+                    Span::styled(cursor, Style::default().fg(colors.accent)),
+                ]));
+            } else {
+                for (i, line) in env_lines.iter().enumerate() {
+                    let is_last = i == env_lines.len() - 1;
+                    let cursor = if is_env_selected && is_last { "▌" } else { "" };
+                    lines.push(Line::from(vec![
+                        Span::styled(format!("  {line}"), Style::default().fg(colors.fg_secondary)),
+                        Span::styled(cursor, Style::default().fg(colors.accent)),
+                    ]));
+                }
+            }
+
+            // Enabled checkbox
+            let is_enabled_selected = state.mcp_panel.form_field == 5;
+            let enabled_style = if is_enabled_selected {
+                Style::default().fg(colors.accent)
+            } else {
+                Style::default().fg(colors.fg_muted)
+            };
+            let checkbox = if state.mcp_panel.form_enabled { "[x]" } else { "[ ]" };
+            lines.push(Line::from(Span::styled(
+                format!("{checkbox} Enabled"),
+                enabled_style,
+            )));
+
+            if let Some(err) = &state.mcp_panel.form_error {
+                lines.push(Line::from(""));
+                lines.push(Line::from(Span::styled(
+                    format!("Error: {err}"),
+                    Style::default().fg(colors.error),
+                )));
+            }
+
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "Tab/↑↓ navigate • Space toggle enabled • Enter submit • Esc cancel",
+                Style::default().fg(colors.fg_muted),
+            )));
+        }
+    }
 
     Paragraph::new(Text::from(lines))
         .style(Style::default().bg(colors.bg_elevated))

@@ -11,7 +11,7 @@ pub mod storage;
 pub mod transcript;
 pub mod ui;
 
-use crate::app::config_panels::EnvEditorState;
+use crate::app::config_panels::{EnvEditorState, McpPanelState};
 use crate::app::connections::ConnectionsState;
 use serde_json::Value;
 
@@ -134,6 +134,7 @@ pub struct AppState {
     pub tools: Vec<String>,
     pub tools_open: bool,
     pub env_editor: EnvEditorState,
+    pub mcp_panel: McpPanelState,
 
     pub debug_overlay_open: bool,
     pub activity_overlay_open: bool,
@@ -239,6 +240,7 @@ impl AppState {
             tools: Vec::new(),
             tools_open: false,
             env_editor: EnvEditorState::default(),
+            mcp_panel: McpPanelState::default(),
 
             debug_overlay_open: false,
             activity_overlay_open: false,

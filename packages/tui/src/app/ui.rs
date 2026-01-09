@@ -104,6 +104,23 @@ pub enum UiAction {
     SlashPickerNext,
     SlashPickerSelect,
 
+    OpenMcpPanel,
+    McpClose,
+    McpPrev,
+    McpNext,
+    McpAdd,
+    McpEdit,
+    McpDelete,
+    McpTest,
+    McpFormPrev,
+    McpFormNext,
+    McpFormChar(char),
+    McpFormBackspace,
+    McpFormNewline,
+    McpFormToggleEnabled,
+    McpFormSubmit,
+    McpFormCancel,
+
     PermissionPrev,
     PermissionNext,
     PermissionSubmit,
@@ -660,6 +677,10 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                     let out_connections = apply_ui_action(state, UiAction::OpenConnections);
                     out.extend(out_connections);
                 }
+                PaletteCommand::McpServers => {
+                    let out_mcp = apply_ui_action(state, UiAction::OpenMcpPanel);
+                    out.extend(out_mcp);
+                }
                 PaletteCommand::Quit => {
                     state.should_exit = true;
                 }
@@ -825,6 +846,60 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             state.slash_picker_open = false;
             Vec::new()
         }
+
+        // === MCP Panel ===
+        UiAction::OpenMcpPanel => crate::app::config_panels::mcp_open(state),
+        UiAction::McpClose => {
+            crate::app::config_panels::mcp_close(state);
+            Vec::new()
+        }
+        UiAction::McpPrev => {
+            crate::app::config_panels::mcp_prev(state);
+            Vec::new()
+        }
+        UiAction::McpNext => {
+            crate::app::config_panels::mcp_next(state);
+            Vec::new()
+        }
+        UiAction::McpAdd => {
+            crate::app::config_panels::mcp_open_add_form(state);
+            Vec::new()
+        }
+        UiAction::McpEdit => {
+            crate::app::config_panels::mcp_open_edit_form(state);
+            Vec::new()
+        }
+        UiAction::McpDelete => crate::app::config_panels::mcp_delete_selected(state),
+        UiAction::McpTest => crate::app::config_panels::mcp_test_selected(state),
+        UiAction::McpFormPrev => {
+            crate::app::config_panels::mcp_form_prev_field(state);
+            Vec::new()
+        }
+        UiAction::McpFormNext => {
+            crate::app::config_panels::mcp_form_next_field(state);
+            Vec::new()
+        }
+        UiAction::McpFormChar(ch) => {
+            crate::app::config_panels::mcp_form_char(state, ch);
+            Vec::new()
+        }
+        UiAction::McpFormBackspace => {
+            crate::app::config_panels::mcp_form_backspace(state);
+            Vec::new()
+        }
+        UiAction::McpFormNewline => {
+            crate::app::config_panels::mcp_form_newline(state);
+            Vec::new()
+        }
+        UiAction::McpFormToggleEnabled => {
+            crate::app::config_panels::mcp_form_toggle_enabled(state);
+            Vec::new()
+        }
+        UiAction::McpFormSubmit => crate::app::config_panels::mcp_form_submit(state),
+        UiAction::McpFormCancel => {
+            crate::app::config_panels::mcp_form_cancel(state);
+            Vec::new()
+        }
     }
 }
 
@@ -904,6 +979,7 @@ enum PaletteCommand {
     KeybindVim,
     OpenEnvEditorCmd,
     OpenConnectionsCmd,
+    McpServers,
     Quit,
 }
 
@@ -958,6 +1034,10 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
         PaletteItem {
             label: "Connections...",
             command: PaletteCommand::OpenConnectionsCmd,
+        },
+        PaletteItem {
+            label: "MCP Servers...",
+            command: PaletteCommand::McpServers,
         },
         PaletteItem {
             label: "Quit",
