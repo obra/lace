@@ -85,6 +85,73 @@ impl Default for McpPanelState {
     }
 }
 
+// === Context Viewer State ===
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContextItem {
+    pub name: String,
+    pub tokens: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContextCategory {
+    pub tokens: u64,
+    pub items: Vec<ContextItem>,
+}
+
+impl Default for ContextCategory {
+    fn default() -> Self {
+        Self {
+            tokens: 0,
+            items: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContextMessageSubcategories {
+    pub user_messages: u64,
+    pub agent_messages: u64,
+    pub tool_calls: u64,
+    pub tool_results: u64,
+}
+
+impl Default for ContextMessageSubcategories {
+    fn default() -> Self {
+        Self {
+            user_messages: 0,
+            agent_messages: 0,
+            tool_calls: 0,
+            tool_results: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ContextBreakdown {
+    pub model_id: String,
+    pub context_limit: u64,
+    pub total_used_tokens: u64,
+    /// Percent used as integer (0-100)
+    pub percent_used: u32,
+    pub system_prompt: ContextCategory,
+    pub core_tools: ContextCategory,
+    pub mcp_tools: ContextCategory,
+    pub messages: ContextCategory,
+    pub message_subcategories: ContextMessageSubcategories,
+    pub reserved_for_response: ContextCategory,
+    pub free_space: ContextCategory,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ContextViewerState {
+    pub open: bool,
+    pub loading: bool,
+    pub error: Option<String>,
+    pub breakdown: Option<ContextBreakdown>,
+    pub scroll: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnvEditorState {
     pub open: bool,
@@ -641,5 +708,125 @@ pub fn mcp_handle_test_response(
             server.status = McpServerStatus::Error;
             server.error = obj.get("error").and_then(|v| v.as_str()).map(|s| s.to_string());
         }
+    }
+}
+
+// === Context Viewer Functions ===
+
+pub fn context_open(state: &mut AppState) -> Vec<Outbound> {
+    state.context_viewer.open = true;
+    state.context_viewer.loading = true;
+    state.context_viewer.error = None;
+    state.context_viewer.scroll = 0;
+    let id = state.next_client_id();
+    vec![Outbound::JsonRpcRequest {
+        id,
+        method: "ent/session/context_breakdown".to_string(),
+        params: Some(json!({})),
+    }]
+}
+
+pub fn context_close(state: &mut AppState) {
+    state.context_viewer.open = false;
+}
+
+pub fn context_scroll_up(state: &mut AppState) {
+    state.context_viewer.scroll = state.context_viewer.scroll.saturating_sub(1);
+}
+
+pub fn context_scroll_down(state: &mut AppState) {
+    state.context_viewer.scroll = state.context_viewer.scroll.saturating_add(1);
+}
+
+pub fn context_handle_response(state: &mut AppState, result: &Option<serde_json::Value>) {
+    state.context_viewer.loading = false;
+
+    let Some(obj) = result.as_ref().and_then(|v| v.as_object()) else {
+        state.context_viewer.error = Some("Invalid response".to_string());
+        return;
+    };
+
+    let breakdown = ContextBreakdown {
+        model_id: obj
+            .get("modelId")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        context_limit: obj.get("contextLimit").and_then(|v| v.as_u64()).unwrap_or(0),
+        total_used_tokens: obj.get("totalUsedTokens").and_then(|v| v.as_u64()).unwrap_or(0),
+        percent_used: obj
+            .get("percentUsed")
+            .and_then(|v| v.as_f64())
+            .map(|p| (p * 100.0) as u32)
+            .unwrap_or(0),
+        system_prompt: parse_context_category(obj.get("categories").and_then(|c| c.get("systemPrompt"))),
+        core_tools: parse_context_category(obj.get("categories").and_then(|c| c.get("coreTools"))),
+        mcp_tools: parse_context_category(obj.get("categories").and_then(|c| c.get("mcpTools"))),
+        messages: parse_context_category(obj.get("categories").and_then(|c| c.get("messages"))),
+        message_subcategories: parse_message_subcategories(
+            obj.get("categories").and_then(|c| c.get("messages")),
+        ),
+        reserved_for_response: parse_context_category(
+            obj.get("categories").and_then(|c| c.get("reservedForResponse")),
+        ),
+        free_space: parse_context_category(obj.get("categories").and_then(|c| c.get("freeSpace"))),
+    };
+
+    state.context_viewer.breakdown = Some(breakdown);
+}
+
+fn parse_context_category(value: Option<&serde_json::Value>) -> ContextCategory {
+    let Some(obj) = value.and_then(|v| v.as_object()) else {
+        return ContextCategory::default();
+    };
+
+    let tokens = obj.get("tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+    let items = obj
+        .get("items")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|item| {
+                    let obj = item.as_object()?;
+                    let name = obj.get("name")?.as_str()?.to_string();
+                    let tokens = obj.get("tokens")?.as_u64()?;
+                    Some(ContextItem { name, tokens })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    ContextCategory { tokens, items }
+}
+
+fn parse_message_subcategories(value: Option<&serde_json::Value>) -> ContextMessageSubcategories {
+    let Some(obj) = value.and_then(|v| v.as_object()) else {
+        return ContextMessageSubcategories::default();
+    };
+    let Some(sub) = obj.get("subcategories").and_then(|v| v.as_object()) else {
+        return ContextMessageSubcategories::default();
+    };
+
+    ContextMessageSubcategories {
+        user_messages: sub
+            .get("userMessages")
+            .and_then(|v| v.get("tokens"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0),
+        agent_messages: sub
+            .get("agentMessages")
+            .and_then(|v| v.get("tokens"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0),
+        tool_calls: sub
+            .get("toolCalls")
+            .and_then(|v| v.get("tokens"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0),
+        tool_results: sub
+            .get("toolResults")
+            .and_then(|v| v.get("tokens"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0),
     }
 }

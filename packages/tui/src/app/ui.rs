@@ -121,6 +121,11 @@ pub enum UiAction {
     McpFormSubmit,
     McpFormCancel,
 
+    OpenContextViewer,
+    ContextViewerClose,
+    ContextViewerScrollUp,
+    ContextViewerScrollDown,
+
     PermissionPrev,
     PermissionNext,
     PermissionSubmit,
@@ -681,6 +686,10 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                     let out_mcp = apply_ui_action(state, UiAction::OpenMcpPanel);
                     out.extend(out_mcp);
                 }
+                PaletteCommand::ContextViewer => {
+                    let out_context = apply_ui_action(state, UiAction::OpenContextViewer);
+                    out.extend(out_context);
+                }
                 PaletteCommand::Quit => {
                     state.should_exit = true;
                 }
@@ -900,6 +909,21 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             crate::app::config_panels::mcp_form_cancel(state);
             Vec::new()
         }
+
+        // === Context Viewer ===
+        UiAction::OpenContextViewer => crate::app::config_panels::context_open(state),
+        UiAction::ContextViewerClose => {
+            crate::app::config_panels::context_close(state);
+            Vec::new()
+        }
+        UiAction::ContextViewerScrollUp => {
+            crate::app::config_panels::context_scroll_up(state);
+            Vec::new()
+        }
+        UiAction::ContextViewerScrollDown => {
+            crate::app::config_panels::context_scroll_down(state);
+            Vec::new()
+        }
     }
 }
 
@@ -980,6 +1004,7 @@ enum PaletteCommand {
     OpenEnvEditorCmd,
     OpenConnectionsCmd,
     McpServers,
+    ContextViewer,
     Quit,
 }
 
@@ -1038,6 +1063,10 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
         PaletteItem {
             label: "MCP Servers...",
             command: PaletteCommand::McpServers,
+        },
+        PaletteItem {
+            label: "Context Usage...",
+            command: PaletteCommand::ContextViewer,
         },
         PaletteItem {
             label: "Quit",

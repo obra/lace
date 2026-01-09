@@ -290,6 +290,20 @@ fn run_loop(
                         continue;
                     }
 
+                    if state.context_viewer.open {
+                        let action = match key.code {
+                            KeyCode::Esc => Some(UiAction::ContextViewerClose),
+                            KeyCode::Up | KeyCode::PageUp => Some(UiAction::ContextViewerScrollUp),
+                            KeyCode::Down | KeyCode::PageDown => Some(UiAction::ContextViewerScrollDown),
+                            _ => None,
+                        };
+                        if let Some(action) = action {
+                            let out = apply_ui_action(state, action);
+                            send_outbound(transport, state, out, timeout_ms)?;
+                        }
+                        continue;
+                    }
+
                     if state.env_editor.open {
                         let action = match key.code {
                             KeyCode::Esc => Some(UiAction::CloseEnvEditor),
@@ -973,6 +987,11 @@ fn handle_agent_line(
                         }
                     }
                 }
+
+                // === Context viewer ===
+                if method == "ent/session/context_breakdown" && state.context_viewer.open {
+                    crate::app::config_panels::context_handle_response(state, &result);
+                }
             }
 
             if should_refocus && state.active_permission.is_none() {
@@ -1167,7 +1186,11 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     }
 
     // Permission is now rendered inline in the conversation, not as a modal overlay
-    if state.mcp_panel.open {
+    if state.context_viewer.open {
+        let area = centered_rect(80, 70, f.area());
+        f.render_widget(Clear, area);
+        f.render_widget(render_context_modal(state), area);
+    } else if state.mcp_panel.open {
         let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
         f.render_widget(render_mcp_modal(state), area);
@@ -1719,6 +1742,182 @@ fn render_env_modal(state: &AppState) -> Paragraph<'static> {
                 .border_type(BorderType::Rounded),
         )
         .wrap(Wrap { trim: true })
+}
+
+fn render_context_modal(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Title
+    lines.push(Line::from(Span::styled(
+        "Context Usage",
+        Style::default()
+            .fg(colors.fg_primary)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(""));
+
+    if state.context_viewer.loading {
+        lines.push(Line::from(Span::styled(
+            "Loading context breakdown...",
+            Style::default().fg(colors.fg_muted),
+        )));
+    } else if let Some(err) = &state.context_viewer.error {
+        lines.push(Line::from(Span::styled(
+            format!("Error: {err}"),
+            Style::default().fg(colors.error),
+        )));
+    } else if let Some(breakdown) = &state.context_viewer.breakdown {
+        // Summary stats
+        let used_pct = breakdown.percent_used;
+        let bar_width = 40;
+        let filled = ((used_pct as usize) * bar_width / 100).min(bar_width);
+        let bar: String = "█".repeat(filled) + &"░".repeat(bar_width - filled);
+
+        lines.push(Line::from(vec![
+            Span::styled("Model: ", Style::default().fg(colors.fg_muted)),
+            Span::styled(breakdown.model_id.clone(), Style::default().fg(colors.fg_primary)),
+        ]));
+        lines.push(Line::from(""));
+
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("{bar} {used_pct}%"),
+                if used_pct > 80 {
+                    Style::default().fg(colors.warning)
+                } else {
+                    Style::default().fg(colors.accent)
+                },
+            ),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!(
+                    "{} / {} tokens",
+                    format_tokens(breakdown.total_used_tokens),
+                    format_tokens(breakdown.context_limit)
+                ),
+                Style::default().fg(colors.fg_muted),
+            ),
+        ]));
+        lines.push(Line::from(""));
+
+        // Category breakdown with bars
+        let categories = [
+            ("System Prompt", breakdown.system_prompt.tokens, colors.accent),
+            ("Core Tools", breakdown.core_tools.tokens, colors.fg_secondary),
+            ("MCP Tools", breakdown.mcp_tools.tokens, colors.warning),
+            ("Messages", breakdown.messages.tokens, colors.success),
+            ("Reserved", breakdown.reserved_for_response.tokens, colors.fg_muted),
+            ("Free Space", breakdown.free_space.tokens, colors.border_subtle),
+        ];
+
+        let max_tokens = breakdown.context_limit.max(1);
+        for (label, tokens, color) in categories {
+            if tokens > 0 || label == "Free Space" {
+                let pct = (tokens * 100 / max_tokens) as usize;
+                let mini_bar_filled = (pct * 20 / 100).min(20);
+                let mini_bar: String = "▓".repeat(mini_bar_filled) + &"░".repeat(20 - mini_bar_filled);
+
+                lines.push(Line::from(vec![
+                    Span::styled(format!("{label:<16}"), Style::default().fg(colors.fg_muted)),
+                    Span::styled(mini_bar, Style::default().fg(color)),
+                    Span::styled(
+                        format!(" {:>8} ({:>2}%)", format_tokens(tokens), pct),
+                        Style::default().fg(colors.fg_secondary),
+                    ),
+                ]));
+            }
+        }
+
+        // Message subcategories if messages have tokens
+        if breakdown.messages.tokens > 0 {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "Message Breakdown:",
+                Style::default().fg(colors.fg_muted),
+            )));
+
+            let subs = &breakdown.message_subcategories;
+            let sub_items = [
+                ("  User Messages", subs.user_messages),
+                ("  Agent Messages", subs.agent_messages),
+                ("  Tool Calls", subs.tool_calls),
+                ("  Tool Results", subs.tool_results),
+            ];
+
+            for (label, tokens) in sub_items {
+                if tokens > 0 {
+                    lines.push(Line::from(vec![
+                        Span::styled(format!("{label:<18}"), Style::default().fg(colors.fg_muted)),
+                        Span::styled(
+                            format!("{:>8}", format_tokens(tokens)),
+                            Style::default().fg(colors.fg_secondary),
+                        ),
+                    ]));
+                }
+            }
+        }
+
+        // Show top tools if available
+        if !breakdown.core_tools.items.is_empty() || !breakdown.mcp_tools.items.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "Top Tools by Token Usage:",
+                Style::default().fg(colors.fg_muted),
+            )));
+
+            let mut all_tools: Vec<_> = breakdown
+                .core_tools
+                .items
+                .iter()
+                .chain(breakdown.mcp_tools.items.iter())
+                .collect();
+            all_tools.sort_by(|a, b| b.tokens.cmp(&a.tokens));
+
+            for tool in all_tools.iter().take(5) {
+                lines.push(Line::from(vec![
+                    Span::styled(format!("  {:<16}", tool.name), Style::default().fg(colors.fg_secondary)),
+                    Span::styled(
+                        format!("{:>8}", format_tokens(tool.tokens)),
+                        Style::default().fg(colors.fg_muted),
+                    ),
+                ]));
+            }
+        }
+    } else {
+        lines.push(Line::from(Span::styled(
+            "No context data available",
+            Style::default().fg(colors.fg_muted),
+        )));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "Esc close",
+        Style::default().fg(colors.fg_muted),
+    )));
+
+    Paragraph::new(Text::from(lines))
+        .style(Style::default().bg(colors.bg_elevated))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.border_subtle))
+                .border_type(BorderType::Rounded),
+        )
+        .wrap(Wrap { trim: true })
+}
+
+fn format_tokens(tokens: u64) -> String {
+    if tokens >= 1_000_000 {
+        format!("{:.1}M", tokens as f64 / 1_000_000.0)
+    } else if tokens >= 1_000 {
+        format!("{:.1}K", tokens as f64 / 1_000.0)
+    } else {
+        tokens.to_string()
+    }
 }
 
 fn render_mcp_modal(state: &AppState) -> Paragraph<'static> {
