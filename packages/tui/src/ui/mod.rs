@@ -955,11 +955,8 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     render_main(f, state, main_area);
     f.render_widget(render_input(state), input_area);
 
-    if state.active_permission.is_some() {
-        let area = centered_rect(80, 70, f.area());
-        f.render_widget(Clear, area);
-        f.render_widget(render_permission_modal(state), area);
-    } else if state.env_editor.open {
+    // Permission is now rendered inline in the conversation, not as a modal overlay
+    if state.env_editor.open {
         let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
         f.render_widget(render_env_modal(state), area);
@@ -1566,6 +1563,11 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
         )));
     }
 
+    // Show permission request inline
+    if state.active_permission.is_some() {
+        lines.extend(render_permission_inline(state, colors));
+    }
+
     Paragraph::new(Text::from(lines))
         .style(Style::default().bg(colors.bg_base))
         .wrap(Wrap { trim: false })
@@ -1691,65 +1693,92 @@ fn render_input(state: &AppState) -> Paragraph<'static> {
         .scroll((state.input_scroll, 0))
 }
 
-fn render_permission_modal(state: &AppState) -> Paragraph<'static> {
-    let styles = theme_styles(state.prefs.theme);
-    let req = state.active_permission.as_ref().expect("active_permission");
-    let mut lines: Vec<Line> = Vec::new();
+/// Renders permission request inline in the conversation flow.
+/// Returns lines to be appended to the conversation view.
+fn render_permission_inline(state: &AppState, colors: &theme::ThemeColors) -> Vec<Line<'static>> {
+    let Some(req) = state.active_permission.as_ref() else {
+        return Vec::new();
+    };
 
-    lines.push(Line::from("Permission required"));
-    lines.push(Line::from(format!(
-        "tool={} kind={} resource={}",
-        req.tool.clone().unwrap_or_else(|| "?".to_string()),
-        req.kind.clone().unwrap_or_else(|| "?".to_string()),
-        req.resource.clone().unwrap_or_else(|| "?".to_string())
-    )));
-    if let Some(turn_id) = &req.turn_id {
-        lines.push(Line::from(format!("turnId={turn_id}")));
+    let mut lines = Vec::new();
+    lines.push(Line::from("")); // spacing
+
+    // Tool name with indicator
+    let tool = req.tool.clone().unwrap_or_else(|| "unknown".to_string());
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!("{} ", '\u{25B6}'), // play triangle
+            Style::default().fg(colors.warning),
+        ),
+        Span::styled(
+            tool,
+            Style::default()
+                .fg(colors.fg_primary)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ]));
+
+    // Resource summary (e.g., file path or command)
+    if let Some(resource) = &req.resource {
+        lines.push(Line::from(Span::styled(
+            format!("  {}", resource),
+            Style::default().fg(colors.fg_secondary),
+        )));
     }
-    if let Some(turn_seq) = req.turn_seq {
-        lines.push(Line::from(format!("turnSeq={turn_seq}")));
-    }
-    if let Some(job_id) = &req.job_id {
-        lines.push(Line::from(format!("jobId={job_id}")));
-    }
+
+    // Show tool input if available
     if let Some(tool_call_id) = &req.tool_call_id {
-        lines.push(Line::from(format!("toolCallId={tool_call_id}")));
-        match state.tool_inputs_by_tool_call_id.get(tool_call_id) {
-            Some(input) => {
-                lines.push(Line::from("input:"));
-                let pretty =
-                    serde_json::to_string_pretty(input).unwrap_or_else(|_| input.to_string());
-                for l in pretty.lines() {
-                    lines.push(Line::from(Span::styled(
-                        format!("  {l}"),
-                        Style::default().fg(styles.dim()),
-                    )));
-                }
+        if let Some(input) = state.tool_inputs_by_tool_call_id.get(tool_call_id) {
+            let pretty =
+                serde_json::to_string_pretty(input).unwrap_or_else(|_| input.to_string());
+            // Limit input preview to avoid overwhelming the UI
+            let preview_lines: Vec<&str> = pretty.lines().take(6).collect();
+            for l in &preview_lines {
+                lines.push(Line::from(Span::styled(
+                    format!("  {}", l),
+                    Style::default().fg(colors.fg_muted),
+                )));
             }
-            None => lines.push(Line::from("input=<unavailable>")),
+            if pretty.lines().count() > 6 {
+                lines.push(Line::from(Span::styled(
+                    "  ...".to_string(),
+                    Style::default().fg(colors.fg_muted),
+                )));
+            }
         }
     }
-    lines.push(Line::from(""));
-    lines.push(Line::from("Options:"));
 
-    for (i, o) in req.options.iter().enumerate() {
-        let marker = if i == state.active_permission_selected {
-            ">"
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "  Allow this action?",
+        Style::default().fg(colors.fg_primary),
+    )));
+    lines.push(Line::from(""));
+
+    // Options - one per line with selection indicator
+    for (i, opt) in req.options.iter().enumerate() {
+        let selected = i == state.active_permission_selected;
+        let marker = if selected { "\u{25B8} " } else { "  " }; // right-pointing triangle
+        let style = if selected {
+            Style::default()
+                .fg(colors.fg_primary)
+                .bg(colors.bg_surface)
         } else {
-            " "
+            Style::default().fg(colors.fg_secondary)
         };
-        lines.push(Line::from(format!(
-            "{marker} {} - {}",
-            o.option_id, o.label
+        lines.push(Line::from(Span::styled(
+            format!("  {}{}", marker, opt.label),
+            style,
         )));
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from("Use Up/Down, Enter; Esc denies if available"));
+    lines.push(Line::from(Span::styled(
+        "  Up/Down to select, Enter to confirm, Esc to deny",
+        Style::default().fg(colors.fg_muted),
+    )));
 
-    Paragraph::new(Text::from(lines))
-        .block(Block::default().title("Permission").borders(Borders::ALL))
-        .wrap(Wrap { trim: true })
+    lines
 }
 
 fn focused_block(title: &'static str, focused: bool, theme: Theme) -> Block<'static> {
@@ -1978,7 +2007,53 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
         total += 2; // blank line + thinking indicator line
     }
 
+    // Add lines for inline permission UI if showing
+    if let Some(req) = state.active_permission.as_ref() {
+        total += permission_inline_line_count(state, req);
+    }
+
     total
+}
+
+/// Calculates the number of lines the inline permission UI will take.
+fn permission_inline_line_count(
+    state: &AppState,
+    req: &crate::app::PermissionRequest,
+) -> usize {
+    let mut count = 0;
+
+    count += 1; // spacing
+    count += 1; // tool name line
+
+    // Resource line
+    if req.resource.is_some() {
+        count += 1;
+    }
+
+    // Tool input preview (up to 6 lines + possible "..." line)
+    if let Some(tool_call_id) = &req.tool_call_id {
+        if let Some(input) = state.tool_inputs_by_tool_call_id.get(tool_call_id) {
+            let pretty =
+                serde_json::to_string_pretty(input).unwrap_or_else(|_| input.to_string());
+            let line_count = pretty.lines().count();
+            count += line_count.min(6);
+            if line_count > 6 {
+                count += 1; // "..." line
+            }
+        }
+    }
+
+    count += 1; // blank line
+    count += 1; // "Allow this action?" line
+    count += 1; // blank line
+
+    // Options
+    count += req.options.len();
+
+    count += 1; // blank line
+    count += 1; // help text line
+
+    count
 }
 
 fn wrapped_line_count(width: usize, line: &str) -> usize {
