@@ -1,5 +1,6 @@
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
@@ -43,12 +44,10 @@ impl AgentTransport {
         let (stderr_tx, stderr_rx) = mpsc::channel::<String>();
         let (outbound_tx, outbound_rx) = mpsc::channel::<String>();
 
-        let lace_home = std::env::var("LACE_DIR")
-            .ok()
-            .or_else(|| std::env::var("HOME").ok().map(|h| format!("{h}/.lace")))
-            .unwrap_or_else(|| ".lace".to_string());
+        let tui_home = crate::app::storage::resolve_tui_state_dir()
+            .unwrap_or_else(|| PathBuf::from(".lace_tui"));
 
-        let protocol_log_path = Path::new(&lace_home).join("tui-ent-protocol.log");
+        let protocol_log_path = tui_home.join("tui-ent-protocol.log");
         if let Some(parent) = protocol_log_path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
@@ -90,8 +89,8 @@ impl AgentTransport {
             }
         });
 
-        // stderr reader also logs to a file under LACE_DIR for diagnostics
-        let log_path = Path::new(&lace_home).join("tui-agent-stderr.log");
+        // stderr reader also logs to a file under the TUI state directory for diagnostics
+        let log_path = tui_home.join("tui-agent-stderr.log");
         if let Some(parent) = log_path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }

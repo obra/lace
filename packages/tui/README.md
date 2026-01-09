@@ -30,11 +30,11 @@ cargo run -- --workdir "$(pwd)" --agent-cmd "lace-agent"
 
 Session aliases are stored at:
 
-- `$LACE_DIR/tui/session-aliases.json`, else
-- `$XDG_STATE_HOME/lace/tui/session-aliases.json`, else
-- `$HOME/.local/state/lace/tui/session-aliases.json`
+- `$LACE_TUI_DIR/session-aliases.json`, else
+- `$XDG_STATE_HOME/lace_tui/session-aliases.json`, else
+- `$HOME/.local/state/lace_tui/session-aliases.json`
 
-UI preferences are stored at the same base dir under `tui/preferences.json` (theme, keybind mode, pane visibility, etc).
+UI preferences are stored at the same base dir under `preferences.json` (theme, keybind mode, pane visibility, etc).
 
 ## Test
 
