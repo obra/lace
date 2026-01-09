@@ -7,7 +7,7 @@ import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
 const jobsListSchema = z.object({
   status: z.array(z.enum(['pending', 'running', 'completed', 'failed', 'cancelled'])).optional(),
-  type: z.array(z.enum(['shell', 'subagent'])).optional(),
+  type: z.array(z.enum(['bash', 'delegate'])).optional(),
   limit: z.number().int().min(1).max(100).default(50),
 });
 
@@ -16,7 +16,7 @@ export class JobsListTool extends Tool {
   description = `List all background jobs in the current session. Use to find jobIds for job_output or job_kill.
 
 Filter by status: ["pending", "running", "completed", "failed", "cancelled"]
-Filter by type: ["shell", "subagent"]
+Filter by type: ["bash", "delegate"]
 
 Returns: [{ jobId, type, status, description, startTime }]`;
   schema = jobsListSchema;

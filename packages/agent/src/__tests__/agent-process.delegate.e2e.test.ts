@@ -41,7 +41,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       const p = params as Record<string, unknown>;
       updates.push(p);
 
-      if (p.type === 'job_started' && p.jobType === 'subagent' && typeof p.jobId === 'string') {
+      if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
         delegateJobId = p.jobId;
       }
 
@@ -166,7 +166,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       const { outerJobId, innerJobId } = await withTimeout(
         new Promise<{ outerJobId: string; innerJobId: string }>((resolve) => {
           const interval = setInterval(() => {
-            const subagents = started.filter((s) => s.jobType === 'subagent');
+            const subagents = started.filter((s) => s.jobType === 'delegate');
             if (subagents.length < 2) return;
 
             const outerJobId = subagents[0]!.jobId;

@@ -219,7 +219,7 @@ describe('lace-agent jobs (E2E over stdio)', () => {
     agent.peer.onRequest('session/update', async (params) => {
       const p = params as Record<string, unknown>;
       updates.push(p);
-      if (p.type === 'job_started' && p.jobType === 'subagent' && typeof p.jobId === 'string') {
+      if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
         subagentJobId = p.jobId;
       }
       return undefined;
@@ -275,7 +275,7 @@ describe('lace-agent jobs (E2E over stdio)', () => {
 
     const subagentJob = list.jobs.find((j) => j.jobId === subagentJobId);
     expect(subagentJob).toBeDefined();
-    expect(subagentJob?.type).toBe('subagent');
+    expect(subagentJob?.type).toBe('delegate');
     expect(subagentJob?.subagentSessionId).toBeDefined();
     expect(subagentJob?.subagentSessionId).toMatch(/^sess_/);
 

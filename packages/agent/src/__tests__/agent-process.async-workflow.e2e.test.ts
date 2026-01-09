@@ -43,7 +43,7 @@ describe('async job workflow (E2E)', () => {
       agent.peer.onRequest('session/update', async (params) => {
         const p = params as Record<string, unknown>;
         updates.push(p);
-        if (p.type === 'job_started' && p.jobType === 'shell' && typeof p.jobId === 'string') {
+        if (p.type === 'job_started' && p.jobType === 'bash' && typeof p.jobId === 'string') {
           shellJobId = p.jobId;
         }
         return undefined;

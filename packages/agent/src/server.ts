@@ -182,7 +182,7 @@ function mapCatalogModelToModelInfo(model: CatalogModel, providerId: string) {
   };
 }
 
-type JobType = 'shell' | 'subagent';
+type JobType = 'bash' | 'delegate';
 type JobStatus = 'running' | 'completed' | 'failed' | 'cancelled';
 
 type JobState = {
@@ -1163,7 +1163,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const job: JobState = {
       jobId,
       parentJobId: options.parentJobId,
-      type: 'shell',
+      type: 'bash',
       status: 'running',
       description: options.description,
       command: options.command,
@@ -1187,7 +1187,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         data: {
           jobId,
           parentJobId: options.parentJobId,
-          jobType: 'shell',
+          jobType: 'bash',
           description: options.description,
           command: options.command,
         },
@@ -1202,7 +1202,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         type: 'job_started',
         jobId,
         parentJobId: options.parentJobId,
-        jobType: 'shell',
+        jobType: 'bash',
         description: options.description,
       },
       options.turnContext
@@ -1240,7 +1240,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const job: JobState = {
       jobId,
       parentJobId: options.parentJobId,
-      type: 'subagent',
+      type: 'delegate',
       status: 'running',
       description: options.description ?? 'Subagent',
       command: options.prompt,
@@ -1267,7 +1267,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         data: {
           jobId,
           parentJobId: options.parentJobId,
-          jobType: 'subagent',
+          jobType: 'delegate',
           description: job.description,
           command: options.prompt,
         },
@@ -1282,7 +1282,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         type: 'job_started',
         jobId,
         parentJobId: options.parentJobId,
-        jobType: 'subagent',
+        jobType: 'delegate',
         description: job.description,
       },
       options.turnContext
@@ -1325,7 +1325,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           type: 'job_update',
           jobId: job.jobId,
           parentJobId: job.parentJobId,
-          jobType: 'shell',
+          jobType: 'bash',
           channel: 'internal',
           update: {
             type: 'tool_use',
@@ -1377,7 +1377,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             type: 'job_update',
             jobId: job.jobId,
             parentJobId: job.parentJobId,
-            jobType: 'shell',
+            jobType: 'bash',
             channel: 'internal',
             update: {
               type: 'tool_use',
@@ -1421,7 +1421,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           type: 'job_update',
           jobId: job.jobId,
           parentJobId: job.parentJobId,
-          jobType: 'shell',
+          jobType: 'bash',
           channel: 'stdout',
           update: { type: 'text_delta', text: chunk },
         });
@@ -1434,7 +1434,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           type: 'job_update',
           jobId: job.jobId,
           parentJobId: job.parentJobId,
-          jobType: 'shell',
+          jobType: 'bash',
           channel: 'stderr',
           update: { type: 'text_delta', text: chunk },
         });
@@ -1543,7 +1543,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           const mappedJobId = mapChildJobId(p.jobId);
           const mappedParentJobId =
             typeof p.parentJobId === 'string' ? mapChildJobId(p.parentJobId) : job.jobId;
-          const jobType = p.jobType === 'subagent' ? 'subagent' : 'shell';
+          const jobType = p.jobType === 'delegate' ? 'delegate' : 'bash';
           const description = typeof p.description === 'string' ? p.description : undefined;
 
           ensureForwardedJobRecord({
@@ -1591,7 +1591,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           const record = ensureForwardedJobRecord({
             jobId: mappedJobId,
             parentJobId: mappedParentJobId,
-            type: p.jobType === 'subagent' ? 'subagent' : 'shell',
+            type: p.jobType === 'delegate' ? 'delegate' : 'bash',
           });
           record.status = outcome;
           record.finished = true;
@@ -1642,7 +1642,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           const record = ensureForwardedJobRecord({
             jobId: mappedJobId,
             parentJobId: mappedParentJobId,
-            type: p.jobType === 'subagent' ? 'subagent' : 'shell',
+            type: p.jobType === 'delegate' ? 'delegate' : 'bash',
           });
 
           const channel = p.channel === 'stdout' || p.channel === 'stderr' ? p.channel : 'internal';
@@ -1676,7 +1676,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             type: 'job_update',
             jobId: job.jobId,
             parentJobId: job.parentJobId,
-            jobType: 'subagent',
+            jobType: 'delegate',
             channel: 'internal',
             update: { type: 'text_delta', text: p.text },
           });
@@ -1689,7 +1689,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             type: 'job_update',
             jobId: job.jobId,
             parentJobId: job.parentJobId,
-            jobType: 'subagent',
+            jobType: 'delegate',
             channel: 'internal',
             update: {
               type: 'tool_use',
@@ -1712,7 +1712,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             type: 'job_update',
             jobId: job.jobId,
             parentJobId: job.parentJobId,
-            jobType: 'subagent',
+            jobType: 'delegate',
             channel: 'internal',
             update: p as any,
           });
@@ -2102,7 +2102,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         if (!jobId) continue;
 
         if (parsed.type === 'job_started') {
-          const jobType = data.jobType === 'subagent' ? 'subagent' : 'shell';
+          const jobType = data.jobType === 'delegate' ? 'delegate' : 'bash';
           const startTime = timestamp ?? new Date().toISOString();
           byId.set(jobId, {
             jobId,
@@ -2135,7 +2135,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           } else {
             byId.set(jobId, {
               jobId,
-              type: 'shell',
+              type: 'bash',
               status: outcome ?? 'failed',
               startTime: timestamp ?? new Date().toISOString(),
               exitCode,
@@ -3105,7 +3105,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     if (!jobId) return undefined;
 
     const job = state.jobs.get(jobId);
-    if (!job || job.type !== 'subagent' || job.finished) return undefined;
+    if (!job || job.type !== 'delegate' || job.finished) return undefined;
     if (!job.childPeer) return undefined;
 
     const priority =
@@ -4810,7 +4810,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
         const job: JobState = {
           jobId,
-          type: 'shell',
+          type: 'bash',
           status: 'running',
           description: 'Background shell job',
           command: jobCommand,
@@ -4827,13 +4827,13 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
         await writeAndAdvance({
           type: 'job_started',
-          data: { jobId, jobType: 'shell', description: job.description, command: jobCommand },
+          data: { jobId, jobType: 'bash', description: job.description, command: jobCommand },
         });
 
         await emitUpdate(nextJobTurnSeq++, {
           type: 'job_started',
           jobId,
-          jobType: 'shell',
+          jobType: 'bash',
           description: job.description,
         });
 
@@ -4852,7 +4852,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
         const job: JobState = {
           jobId,
-          type: 'subagent',
+          type: 'delegate',
           status: 'running',
           description: 'Subagent',
           command: subagentText,
@@ -4872,7 +4872,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           type: 'job_started',
           data: {
             jobId,
-            jobType: 'subagent',
+            jobType: 'delegate',
             description: job.description,
             command: subagentText,
           },
@@ -4881,7 +4881,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         await emitUpdate(nextJobTurnSeq++, {
           type: 'job_started',
           jobId,
-          jobType: 'subagent',
+          jobType: 'delegate',
           description: job.description,
         });
 
@@ -5181,8 +5181,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       state.activeTurn = null;
 
       for (const job of deferredJobs) {
-        if (job.type === 'shell') runShellJobProcess(job);
-        if (job.type === 'subagent') runSubagentJobProcess(job);
+        if (job.type === 'bash') runShellJobProcess(job);
+        if (job.type === 'delegate') runSubagentJobProcess(job);
       }
 
       return result;

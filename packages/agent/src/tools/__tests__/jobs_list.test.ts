@@ -33,12 +33,12 @@ describe('JobsListTool', () => {
     const tool = new JobsListTool();
 
     const result = tool.schema.safeParse({
-      type: ['shell'],
+      type: ['bash'],
     });
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.type).toEqual(['shell']);
+      expect(result.data.type).toEqual(['bash']);
     }
   });
 
