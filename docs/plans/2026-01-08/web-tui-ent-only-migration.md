@@ -41,17 +41,7 @@ Make **both** UIs (web + TUI) manage providers, provider instances (connections)
 
 **Deliverable:** the spec explicitly supports everything the web provider UI needs.
 
-TODO
-- Confirm/clarify the canonical entities:
-  - `providerId` = catalog provider type (e.g. `openai`, `openrouter`)
-  - `connectionId` = provider instance id (user-managed)
-- Ensure all provider-management behaviors have ENT methods and stable schemas:
-  - list catalog providers
-  - list/create/update/delete connections (including endpoint/timeout/modelConfig)
-  - credentials start/submit/status/clear
-  - list/refresh models per connection
-  - enable/disable models (persisted by agent)
-- Update `ModelInfo` to include `disabledState` (UI-friendly) and keep `disabled` for compatibility.
+Completed (see “Status” below).
 
 ### 2) Conformance test suite (agent-owned, runs end-to-end)
 
@@ -59,33 +49,13 @@ TODO
 1) documents “best practices” usage patterns
 2) tests the agent’s ENT implementation end-to-end over stdio JSON-RPC
 
-TODO
-- Expand `packages/agent/src/__tests__/ent-protocol.spec.ts` to cover every ENT method:
-  - at least 1 success case (where applicable)
-  - key InvalidParams / NotFound / permission-denied cases
-  - schema validation on both params and results
-- Avoid network flakiness:
-  - tests must not require real provider credentials
-  - use deterministic fake catalogs where needed (mock `fetch` or env switches)
+Completed (see “Status” below).
 
 ### 3) Web: refactor provider management routes to call ENT
 
 **Deliverable:** `packages/web` provider settings page works with **zero** agent-library usage for provider/model management.
 
-TODO
-- Replace these routes to call ENT instead of `@lace/web/lib/server/lace-imports`:
-  - `packages/web/app/routes/api.provider.catalog.ts`
-  - `packages/web/app/routes/api.provider.instances.ts`
-  - `packages/web/app/routes/api.provider.instances.$instanceId.ts`
-  - `packages/web/app/routes/api.provider.instances.$instanceId.test.ts`
-  - `packages/web/app/routes/api.provider.instances.$instanceId.refresh.ts`
-  - `packages/web/app/routes/api.provider.instances.$instanceId.config.ts`
-- Add a “provider management agent session” (cached singleton) in
-  `packages/web/lib/server/supervisor-service.ts` that:
-  - ensures an agent process exists even when no workspace/project session is active
-  - is used exclusively by provider-management routes
-- Delete/stop exporting provider-management internals from
-  `packages/web/lib/server/lace-imports.ts` once unused.
+Completed (see “Status” below).
 
 ### 4) TUI: implement web-parity provider management (single-agent)
 
@@ -97,12 +67,7 @@ TODO
 - enable/disable models
 - select last-used connection+model automatically
 
-TODO
-- Persist last-used `connectionId` + `modelId` in the agent (preferred) or TUI config (only if the agent can’t).
-- Ensure TUI never reads catalog data from disk; only ENT calls.
-- Fix UX issues:
-  - command palette scroll
-  - avoid interpreting `?` as help unless input is exactly `?` (or empty + `?`, per web behavior)
+Completed (see “Status” below).
 
 ## Testing + validation
 
