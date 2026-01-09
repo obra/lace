@@ -317,11 +317,25 @@ impl AppState {
                 .map(|m| m.role == Role::User)
                 .unwrap_or(false)
     }
+
+    /// Returns tool calls that should be shown inline in the conversation.
+    /// These are tool_use items that are still in progress (not complete or error).
+    pub fn pending_tool_calls(&self) -> Vec<&activity::ActivityItem> {
+        self.activity
+            .iter()
+            .filter(|item| {
+                item.kind == activity::ActivityKind::ToolUse
+                    && item.status.as_deref() != Some("completed")
+                    && item.status.as_deref() != Some("error")
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn pending_request_round_trip() {
@@ -339,5 +353,73 @@ mod tests {
         assert_eq!(p.sent_at_ms, 100);
         assert_eq!(p.timeout_ms, 500);
         assert!(state.take_pending_request("c_1").is_none());
+    }
+
+    #[test]
+    fn pending_tool_calls_filters_by_status() {
+        let mut state = AppState::new();
+
+        // Add a tool call that is running (no status or in-progress status)
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_1".to_string(),
+            Some("shell.exec".to_string()),
+            Some("running".to_string()),
+            json!({"command": "echo hello"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        // Add a tool call that is completed
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_2".to_string(),
+            Some("file.read".to_string()),
+            Some("completed".to_string()),
+            json!({"path": "/tmp/file.txt"}),
+            Some(json!({"content": "file contents"})),
+            None,
+            None,
+            None,
+        );
+
+        // Add a tool call with error status
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_3".to_string(),
+            Some("file.write".to_string()),
+            Some("error".to_string()),
+            json!({"path": "/etc/passwd"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        // Add a tool call that is awaiting permission
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_4".to_string(),
+            Some("shell.exec".to_string()),
+            Some("awaiting_permission".to_string()),
+            json!({"command": "rm -rf /"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let pending = state.pending_tool_calls();
+
+        // Should only include tool_1 (running) and tool_4 (awaiting_permission)
+        assert_eq!(pending.len(), 2);
+        assert!(pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_1")));
+        assert!(pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_4")));
+
+        // Should NOT include completed or error
+        assert!(!pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_2")));
+        assert!(!pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_3")));
     }
 }

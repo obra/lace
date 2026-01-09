@@ -1465,6 +1465,33 @@ fn render_main(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout::
     f.render_widget(render_chat(state), area);
 }
 
+/// Renders a single tool call line with status indicator.
+fn render_tool_call_line(item: &activity::ActivityItem, colors: &theme::ThemeColors) -> Line<'static> {
+    let status_char = match item.status.as_deref() {
+        Some("completed") | Some("success") => '\u{2713}', // checkmark
+        Some("error") => '\u{2717}',                       // X mark
+        _ => '\u{25B6}',                                   // play/running triangle
+    };
+    let status_color = match item.status.as_deref() {
+        Some("completed") | Some("success") => colors.success,
+        Some("error") => colors.error,
+        _ => colors.accent,
+    };
+
+    let tool_name = item
+        .tool_name
+        .clone()
+        .unwrap_or_else(|| "unknown".to_string());
+
+    Line::from(vec![
+        Span::styled(
+            format!("{} ", status_char),
+            Style::default().fg(status_color),
+        ),
+        Span::styled(tool_name, Style::default().fg(colors.fg_primary)),
+    ])
+}
+
 fn render_chat(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
     let colors = &styles.colors;
@@ -1510,6 +1537,15 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
                     Style::default().fg(colors.fg_primary),
                 )));
             }
+        }
+    }
+
+    // Show in-progress tool calls inline
+    let pending_tools = state.pending_tool_calls();
+    if !pending_tools.is_empty() {
+        lines.push(Line::from(""));
+        for item in pending_tools {
+            lines.push(render_tool_call_line(item, colors));
         }
     }
 
@@ -1909,6 +1945,13 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
                 total += wrapped_line_count(content_width, l);
             }
         }
+    }
+
+    // Add lines for pending tool calls
+    let pending_tools = state.pending_tool_calls();
+    if !pending_tools.is_empty() {
+        total += 1; // blank line before tool calls
+        total += pending_tools.len(); // one line per tool call
     }
 
     // Add lines for thinking indicator if showing

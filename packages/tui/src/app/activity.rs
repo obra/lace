@@ -25,6 +25,8 @@ pub struct ActivityItem {
     pub details: Option<Value>,
 
     pub tool_call_id: Option<String>,
+    pub tool_name: Option<String>,
+    pub status: Option<String>,
     pub job_id: Option<String>,
     pub turn_id: Option<String>,
     pub turn_seq: Option<i64>,
@@ -41,6 +43,8 @@ pub fn push_log_line(state: &mut AppState, summary: String) {
             expanded: false,
             details: None,
             tool_call_id: None,
+            tool_name: None,
+            status: None,
             job_id: None,
             turn_id: None,
             turn_seq: None,
@@ -59,6 +63,8 @@ pub fn push_rpc_sent(state: &mut AppState, method: String) {
             expanded: false,
             details: None,
             tool_call_id: None,
+            tool_name: None,
+            status: None,
             job_id: None,
             turn_id: None,
             turn_seq: None,
@@ -77,6 +83,8 @@ pub fn push_rpc_error(state: &mut AppState, message: String, details: Option<Val
             expanded: true,
             details,
             tool_call_id: None,
+            tool_name: None,
+            status: None,
             job_id: None,
             turn_id: None,
             turn_seq: None,
@@ -95,6 +103,8 @@ pub fn push_timeout(state: &mut AppState, id: String, method: String) {
             expanded: false,
             details: None,
             tool_call_id: None,
+            tool_name: None,
+            status: None,
             job_id: None,
             turn_id: None,
             turn_seq: None,
@@ -116,6 +126,8 @@ pub fn push_job_started(state: &mut AppState, job_id: String, job_type: Option<S
             expanded: false,
             details: None,
             tool_call_id: None,
+            tool_name: None,
+            status: None,
             job_id: Some(job_id),
             turn_id: None,
             turn_seq: None,
@@ -137,6 +149,8 @@ pub fn push_job_finished(state: &mut AppState, job_id: String, outcome: Option<S
             expanded: false,
             details: None,
             tool_call_id: None,
+            tool_name: None,
+            status: None,
             job_id: Some(job_id),
             turn_id: None,
             turn_seq: None,
@@ -163,6 +177,8 @@ pub fn push_turn_end(
             expanded: false,
             details: None,
             tool_call_id: None,
+            tool_name: None,
+            status: None,
             job_id: None,
             turn_id,
             turn_seq,
@@ -186,9 +202,9 @@ pub fn upsert_tool_use(
     });
 
     let summary = {
-        let status = status.unwrap_or_else(|| "?".to_string());
-        let name = name.unwrap_or_else(|| "?".to_string());
-        format!("tool_use {status} {name} ({tool_call_id})")
+        let status_str = status.clone().unwrap_or_else(|| "?".to_string());
+        let name_str = name.clone().unwrap_or_else(|| "?".to_string());
+        format!("tool_use {status_str} {name_str} ({tool_call_id})")
     };
 
     let details = Some({
@@ -217,6 +233,8 @@ pub fn upsert_tool_use(
         Some(i) => {
             if let Some(item) = state.activity.get_mut(i) {
                 item.summary = summary;
+                item.tool_name = name;
+                item.status = status;
                 item.details = merge_details(item.details.take(), details);
                 item.job_id = job_id;
                 item.turn_id = turn_id;
@@ -234,6 +252,8 @@ pub fn upsert_tool_use(
                     expanded: false,
                     details,
                     tool_call_id: Some(tool_call_id),
+                    tool_name: name,
+                    status,
                     job_id,
                     turn_id,
                     turn_seq,
@@ -290,6 +310,8 @@ pub fn attach_permission_details(
                     expanded: true,
                     details,
                     tool_call_id: Some(tool_call_id),
+                    tool_name: None,
+                    status: None,
                     job_id: None,
                     turn_id: None,
                     turn_seq: None,
