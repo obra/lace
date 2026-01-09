@@ -64,6 +64,14 @@ pub struct PermissionAllowKey {
     pub resource: String,
 }
 
+/// Slash command advertised by the agent in its capabilities
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SlashCommand {
+    pub name: String,
+    pub description: String,
+    pub input_hint: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppState {
     pub session_id: Option<String>,
@@ -132,6 +140,13 @@ pub struct AppState {
 
     /// Cumulative token usage for this session
     pub token_count: Option<u64>,
+
+    /// Slash commands advertised by the agent
+    pub slash_commands: Vec<SlashCommand>,
+    /// Whether the slash command picker is open
+    pub slash_picker_open: bool,
+    /// Selected index in the slash command picker
+    pub slash_picker_selected: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -226,6 +241,10 @@ impl AppState {
             activity_overlay_open: false,
 
             token_count: None,
+
+            slash_commands: Vec::new(),
+            slash_picker_open: false,
+            slash_picker_selected: 0,
         }
     }
 

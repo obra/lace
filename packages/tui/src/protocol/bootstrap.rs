@@ -1,3 +1,4 @@
+use crate::app::SlashCommand;
 use crate::protocol::transport::AgentTransport;
 use crate::protocol::{ent, jsonrpc};
 use serde_json::{json, Value};
@@ -5,11 +6,18 @@ use std::io;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+/// Result from bootstrapping an agent session
+#[derive(Debug, Clone)]
+pub struct BootstrapResult {
+    pub session_id: String,
+    pub slash_commands: Vec<SlashCommand>,
+}
+
 pub fn bootstrap_session(
     transport: &AgentTransport,
     workdir: &Path,
     load_session_id: Option<&str>,
-) -> io::Result<String> {
+) -> io::Result<BootstrapResult> {
     transport
         .send_line(jsonrpc::encode_request(
             json!("c_1"),
@@ -40,6 +48,7 @@ pub fn bootstrap_session(
 
     let mut init_ok = false;
     let mut session_id: Option<String> = None;
+    let mut slash_commands: Vec<SlashCommand> = Vec::new();
 
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {
@@ -68,6 +77,7 @@ pub fn bootstrap_session(
                     if let Some(error) = error {
                         return Err(io::Error::new(io::ErrorKind::Other, error.message));
                     }
+                    slash_commands = extract_slash_commands(&result);
                     init_ok = true;
                 } else if id == json!("c_2") {
                     if let Some(error) = error {
@@ -92,7 +102,10 @@ pub fn bootstrap_session(
 
         if init_ok {
             if let Some(sid) = session_id.clone() {
-                return Ok(sid);
+                return Ok(BootstrapResult {
+                    session_id: sid,
+                    slash_commands,
+                });
             }
         }
     }
@@ -107,4 +120,45 @@ fn extract_session_id(result: Option<Value>) -> Option<String> {
     let result = result?;
     let obj = result.as_object()?;
     obj.get("sessionId")?.as_str().map(|s| s.to_string())
+}
+
+fn extract_slash_commands(result: &Option<Value>) -> Vec<SlashCommand> {
+    let result = match result {
+        Some(v) => v,
+        None => return Vec::new(),
+    };
+    let obj = match result.as_object() {
+        Some(o) => o,
+        None => return Vec::new(),
+    };
+    let capabilities = match obj.get("capabilities").and_then(|v| v.as_object()) {
+        Some(c) => c,
+        None => return Vec::new(),
+    };
+    let commands = match capabilities.get("slashCommands").and_then(|v| v.as_array()) {
+        Some(a) => a,
+        None => return Vec::new(),
+    };
+
+    commands
+        .iter()
+        .filter_map(|cmd| {
+            let obj = cmd.as_object()?;
+            let name = obj.get("name")?.as_str()?.to_string();
+            let description = obj
+                .get("description")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let input_hint = obj
+                .get("inputHint")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            Some(SlashCommand {
+                name,
+                description,
+                input_hint,
+            })
+        })
+        .collect()
 }

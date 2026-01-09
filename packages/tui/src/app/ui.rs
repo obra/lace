@@ -98,6 +98,12 @@ pub enum UiAction {
     PaletteNext,
     PaletteSubmit,
 
+    SlashPickerOpen,
+    SlashPickerClose,
+    SlashPickerPrev,
+    SlashPickerNext,
+    SlashPickerSelect,
+
     PermissionPrev,
     PermissionNext,
     PermissionSubmit,
@@ -109,7 +115,14 @@ pub enum UiAction {
 pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> {
     match action {
         UiAction::InputChar(ch) => {
-            state.input_buffer.push(ch);
+            // Open slash picker when / is typed as first character
+            if ch == '/' && state.input_buffer.is_empty() && !state.slash_commands.is_empty() {
+                state.input_buffer.push(ch);
+                state.slash_picker_open = true;
+                state.slash_picker_selected = 0;
+            } else {
+                state.input_buffer.push(ch);
+            }
             Vec::new()
         }
         UiAction::Backspace => {
@@ -774,7 +787,66 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             state.permission_guidance_input.pop();
             Vec::new()
         }
+        UiAction::SlashPickerOpen => {
+            if !state.slash_commands.is_empty() {
+                state.slash_picker_open = true;
+                state.slash_picker_selected = 0;
+            }
+            Vec::new()
+        }
+        UiAction::SlashPickerClose => {
+            state.slash_picker_open = false;
+            Vec::new()
+        }
+        UiAction::SlashPickerPrev => {
+            state.slash_picker_selected = state.slash_picker_selected.saturating_sub(1);
+            Vec::new()
+        }
+        UiAction::SlashPickerNext => {
+            let filtered = filtered_slash_commands(state);
+            let max = filtered.len().saturating_sub(1);
+            state.slash_picker_selected = (state.slash_picker_selected + 1).min(max);
+            Vec::new()
+        }
+        UiAction::SlashPickerSelect => {
+            let filtered = filtered_slash_commands(state);
+            // Clone needed values before modifying state
+            let selected_cmd = filtered
+                .get(state.slash_picker_selected)
+                .map(|cmd| (cmd.name.clone(), cmd.input_hint.is_some()));
+            drop(filtered);
+
+            if let Some((name, has_hint)) = selected_cmd {
+                state.input_buffer = format!("/{}", name);
+                if has_hint {
+                    state.input_buffer.push(' ');
+                }
+            }
+            state.slash_picker_open = false;
+            Vec::new()
+        }
     }
+}
+
+/// Returns slash commands filtered by current input (after the `/`)
+fn filtered_slash_commands(state: &AppState) -> Vec<&crate::app::SlashCommand> {
+    let query = state
+        .input_buffer
+        .strip_prefix('/')
+        .unwrap_or("")
+        .to_lowercase();
+    state
+        .slash_commands
+        .iter()
+        .filter(|cmd| {
+            if query.is_empty() {
+                true
+            } else {
+                cmd.name.to_lowercase().contains(&query)
+                    || cmd.description.to_lowercase().contains(&query)
+            }
+        })
+        .collect()
 }
 
 fn should_remember_permission_decision(decision: &str) -> bool {

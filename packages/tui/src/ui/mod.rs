@@ -49,10 +49,12 @@ pub fn run_tui(args: Args) -> io::Result<()> {
         .unwrap_or_else(|| default_agent_cmd().unwrap_or_else(|| "lace-agent".to_string()));
 
     let transport = AgentTransport::spawn_shell(&agent_cmd, &workdir)?;
-    let session_id = bootstrap_session(&transport, &workdir, args.load_session_id.as_deref())?;
+    let bootstrap_result =
+        bootstrap_session(&transport, &workdir, args.load_session_id.as_deref())?;
 
     let mut state = AppState::new();
-    state.session_id = Some(session_id);
+    state.session_id = Some(bootstrap_result.session_id);
+    state.slash_commands = bootstrap_result.slash_commands;
     state.workdir = workdir.to_string_lossy().to_string();
     state.next_client_seq = 3;
     state.push_activity_line(format!("timeout-ms={}", args.timeout_ms));
@@ -421,6 +423,43 @@ fn run_loop(
                         }
                         if state.should_exit {
                             break;
+                        }
+                        continue;
+                    }
+
+                    // Slash command picker - shows when typing `/` commands
+                    if state.slash_picker_open {
+                        let action = match key.code {
+                            KeyCode::Esc => Some(UiAction::SlashPickerClose),
+                            KeyCode::Enter | KeyCode::Tab => Some(UiAction::SlashPickerSelect),
+                            KeyCode::Up => Some(UiAction::SlashPickerPrev),
+                            KeyCode::Down => Some(UiAction::SlashPickerNext),
+                            KeyCode::Backspace => {
+                                // Backspace in picker: update input and close if no longer starts with /
+                                state.input_buffer.pop();
+                                if !state.input_buffer.starts_with('/') {
+                                    state.slash_picker_open = false;
+                                } else {
+                                    // Re-filter and reset selection
+                                    state.slash_picker_selected = 0;
+                                }
+                                None
+                            }
+                            KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                // Type into input while picker is open
+                                state.input_buffer.push(ch);
+                                state.slash_picker_selected = 0;
+                                // Close picker if space is typed (user is done with command name)
+                                if ch == ' ' {
+                                    state.slash_picker_open = false;
+                                }
+                                None
+                            }
+                            _ => None,
+                        };
+                        if let Some(action) = action {
+                            let out = apply_ui_action(state, action);
+                            send_outbound(transport, state, out, timeout_ms)?;
                         }
                         continue;
                     }
@@ -990,6 +1029,21 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     }
     f.render_widget(render_input(state), input_area);
 
+    // Slash command picker appears just above the input area
+    if state.slash_picker_open {
+        // Calculate picker area: above the input, same width, 12 lines tall
+        let picker_height = 12u16;
+        let picker_y = input_area.y.saturating_sub(picker_height);
+        let picker_area = ratatui::layout::Rect {
+            x: input_area.x,
+            y: picker_y,
+            width: input_area.width.min(60), // Cap width for readability
+            height: picker_height,
+        };
+        f.render_widget(Clear, picker_area);
+        f.render_widget(render_slash_picker(state), picker_area);
+    }
+
     // Permission is now rendered inline in the conversation, not as a modal overlay
     if state.env_editor.open {
         let area = centered_rect(80, 70, f.area());
@@ -1539,6 +1593,90 @@ fn render_env_modal(state: &AppState) -> Paragraph<'static> {
                 .border_type(BorderType::Rounded),
         )
         .wrap(Wrap { trim: true })
+}
+
+fn render_slash_picker(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Filter slash commands based on current input
+    let query = state
+        .input_buffer
+        .strip_prefix('/')
+        .unwrap_or("")
+        .to_lowercase();
+    let filtered: Vec<_> = state
+        .slash_commands
+        .iter()
+        .filter(|cmd| {
+            if query.is_empty() {
+                true
+            } else {
+                cmd.name.to_lowercase().contains(&query)
+                    || cmd.description.to_lowercase().contains(&query)
+            }
+        })
+        .collect();
+
+    // Show commands with selection
+    let max = 8usize;
+    let start = state.slash_picker_selected.saturating_sub(max / 2);
+    let end = (start + max).min(filtered.len());
+    for i in start..end {
+        let selected = i == state.slash_picker_selected;
+        let marker = if selected { "▸ " } else { "  " };
+        let cmd = &filtered[i];
+        let style = if selected {
+            Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
+        } else {
+            Style::default().fg(colors.fg_secondary)
+        };
+
+        // Show name and description
+        let name_style = if selected {
+            Style::default()
+                .fg(colors.accent)
+                .bg(colors.bg_surface)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(colors.accent)
+        };
+        let desc_style = if selected {
+            Style::default().fg(colors.fg_muted).bg(colors.bg_surface)
+        } else {
+            Style::default().fg(colors.fg_muted)
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled(marker, style),
+            Span::styled(format!("/{}", cmd.name), name_style),
+            Span::styled(format!(" - {}", cmd.description), desc_style),
+        ]));
+    }
+
+    if filtered.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  No matching commands",
+            Style::default().fg(colors.fg_muted),
+        )));
+    }
+
+    // Legend
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "↑↓ navigate • Enter/Tab select • Esc close",
+        Style::default().fg(colors.fg_muted),
+    )));
+
+    Paragraph::new(Text::from(lines))
+        .style(Style::default().bg(colors.bg_elevated))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.border_subtle))
+                .border_type(BorderType::Rounded),
+        )
 }
 
 fn render_connections_modal(state: &AppState) -> Paragraph<'static> {
