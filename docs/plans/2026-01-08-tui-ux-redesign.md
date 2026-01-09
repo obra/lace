@@ -389,10 +389,8 @@ Status bar indicator:
 
 ---
 
-## Open Questions
+## Assumptions
 
-1. **Rounded corners**: Support varies by terminal. Fallback strategy?
-2. **True color support**: Assume 24-bit color or degrade gracefully?
-3. **Unicode markers**: Safe to assume unicode support (✓✗▶) or need ASCII
-   fallbacks?
-4. **Vim mode**: Keep the j/k mapping? Expand it?
+- **Modern terminals**: Assume 24-bit true color and full unicode support. No
+  fallbacks for basic terminals.
+- **Vim mode**: Low priority. Keep existing j/k mapping but don't expand.
