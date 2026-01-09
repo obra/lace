@@ -708,7 +708,20 @@ fn handle_agent_line(
                 send_outbound(transport, state, out, timeout_ms)?;
             }
 
-            reduce(state, AppEvent::RpcResponse { id: id.clone() });
+            // Extract token usage from session/prompt responses
+            let usage_tokens = if pending_method.as_deref() == Some("session/prompt") {
+                ent::extract_prompt_usage(&result)
+            } else {
+                None
+            };
+
+            reduce(
+                state,
+                AppEvent::RpcResponse {
+                    id: id.clone(),
+                    usage_tokens,
+                },
+            );
 
             if matches!(
                 pending_method.as_deref(),
@@ -1077,6 +1090,18 @@ fn theme_styles(theme: Theme) -> ThemeStyles {
     ThemeStyles::new(theme)
 }
 
+/// Format token count for display in status bar.
+/// Uses K/M suffixes for readability.
+fn format_token_count(count: u64) -> String {
+    if count >= 1_000_000 {
+        format!("{:.1}M", count as f64 / 1_000_000.0)
+    } else if count >= 1_000 {
+        format!("{:.1}k", count as f64 / 1_000.0)
+    } else {
+        count.to_string()
+    }
+}
+
 fn render_status(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
     let colors = &styles.colors;
@@ -1093,8 +1118,11 @@ fn render_status(state: &AppState) -> Paragraph<'static> {
         .and_then(|c| c.split('-').next().map(|s| s.to_string()))
         .unwrap_or_else(|| "—".to_string());
 
-    // Token count - placeholder for now, will be wired up later
-    let tokens = "—";
+    // Token count with nice formatting
+    let tokens = state
+        .token_count
+        .map(format_token_count)
+        .unwrap_or_else(|| "—".to_string());
 
     // Shorten workdir if too long
     let workdir = state.workdir.clone();
@@ -1114,7 +1142,7 @@ fn render_status(state: &AppState) -> Paragraph<'static> {
         sep.clone(),
         Span::styled(provider, Style::default().fg(colors.fg_muted)),
         sep.clone(),
-        Span::styled(format!("{} tokens", tokens), Style::default().fg(colors.fg_muted)),
+        Span::styled(format!("{tokens} tokens"), Style::default().fg(colors.fg_muted)),
         sep,
         Span::styled(short_workdir, Style::default().fg(colors.fg_muted)),
         Span::raw(" "),
@@ -2734,5 +2762,24 @@ mod tests {
         let before = state.chat_scroll;
         update_chat_autoscroll(&mut state, area);
         assert_eq!(state.chat_scroll, before);
+    }
+
+    #[test]
+    fn format_token_count_uses_appropriate_suffix() {
+        // Small numbers - no suffix
+        assert_eq!(format_token_count(0), "0");
+        assert_eq!(format_token_count(500), "500");
+        assert_eq!(format_token_count(999), "999");
+
+        // Thousands - k suffix
+        assert_eq!(format_token_count(1000), "1.0k");
+        assert_eq!(format_token_count(1500), "1.5k");
+        assert_eq!(format_token_count(12345), "12.3k");
+        assert_eq!(format_token_count(999_999), "1000.0k");
+
+        // Millions - M suffix
+        assert_eq!(format_token_count(1_000_000), "1.0M");
+        assert_eq!(format_token_count(1_500_000), "1.5M");
+        assert_eq!(format_token_count(10_000_000), "10.0M");
     }
 }

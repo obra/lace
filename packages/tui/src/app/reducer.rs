@@ -38,6 +38,8 @@ pub enum AppEvent {
     },
     RpcResponse {
         id: Value,
+        /// Token usage from session/prompt response (inputTokens + outputTokens)
+        usage_tokens: Option<u64>,
     },
 }
 
@@ -94,11 +96,15 @@ pub fn reduce(state: &mut AppState, event: AppEvent) -> Vec<Outbound> {
             state.active_prompt_request_ids.insert(request_id);
             Vec::new()
         }
-        AppEvent::RpcResponse { id } => {
+        AppEvent::RpcResponse { id, usage_tokens } => {
             if let Some(id_str) = id.as_str() {
                 if state.active_prompt_request_ids.remove(id_str) {
                     end_assistant_stream(state);
                 }
+            }
+            // Accumulate token usage if provided
+            if let Some(tokens) = usage_tokens {
+                state.token_count = Some(state.token_count.unwrap_or(0) + tokens);
             }
             Vec::new()
         }
@@ -341,7 +347,13 @@ mod tests {
 
         assert!(state.messages[0].streaming);
 
-        reduce(&mut state, AppEvent::RpcResponse { id: json!("c_1") });
+        reduce(
+            &mut state,
+            AppEvent::RpcResponse {
+                id: json!("c_1"),
+                usage_tokens: None,
+            },
+        );
 
         assert!(!state.messages[0].streaming);
     }
@@ -388,5 +400,41 @@ mod tests {
             }]
         );
         assert!(state.permission_queue.is_empty());
+    }
+
+    #[test]
+    fn rpc_response_accumulates_token_usage() {
+        let mut state = AppState::new();
+        assert_eq!(state.token_count, None);
+
+        // First response with usage
+        reduce(
+            &mut state,
+            AppEvent::RpcResponse {
+                id: json!("c_1"),
+                usage_tokens: Some(150),
+            },
+        );
+        assert_eq!(state.token_count, Some(150));
+
+        // Second response adds to the total
+        reduce(
+            &mut state,
+            AppEvent::RpcResponse {
+                id: json!("c_2"),
+                usage_tokens: Some(200),
+            },
+        );
+        assert_eq!(state.token_count, Some(350));
+
+        // Response without usage doesn't change the count
+        reduce(
+            &mut state,
+            AppEvent::RpcResponse {
+                id: json!("c_3"),
+                usage_tokens: None,
+            },
+        );
+        assert_eq!(state.token_count, Some(350));
     }
 }

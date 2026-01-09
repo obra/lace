@@ -132,7 +132,13 @@ fn e2e_permission_flow_with_fake_agent() {
                     saw_new = true;
                 } else if id == json!("c_3") {
                     saw_prompt_response = true;
-                    reduce(&mut state, AppEvent::RpcResponse { id: json!("c_3") });
+                    reduce(
+                        &mut state,
+                        AppEvent::RpcResponse {
+                            id: json!("c_3"),
+                            usage_tokens: None,
+                        },
+                    );
                 }
             }
         }

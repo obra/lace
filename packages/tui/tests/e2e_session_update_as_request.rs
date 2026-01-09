@@ -71,7 +71,13 @@ fn e2e_session_update_can_arrive_as_request() {
             jsonrpc::InboundMessage::Response { id, .. } => {
                 if id == json!("c_3") {
                     saw_prompt_response = true;
-                    reduce(&mut state, AppEvent::RpcResponse { id: json!("c_3") });
+                    reduce(
+                        &mut state,
+                        AppEvent::RpcResponse {
+                            id: json!("c_3"),
+                            usage_tokens: None,
+                        },
+                    );
                 }
             }
             jsonrpc::InboundMessage::Notification { .. } => {}

@@ -221,6 +221,28 @@ pub fn extract_session_configure_config(result: &Option<Value>) -> (Option<Strin
     (connection_id, model_id)
 }
 
+/// Extract token usage from a session/prompt response.
+/// Returns the sum of inputTokens + outputTokens if present.
+pub fn extract_prompt_usage(result: &Option<Value>) -> Option<u64> {
+    let Some(Value::Object(obj)) = result else {
+        return None;
+    };
+    let Some(Value::Object(usage)) = obj.get("usage") else {
+        return None;
+    };
+
+    let input = usage
+        .get("inputTokens")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    let output = usage
+        .get("outputTokens")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+
+    Some(input + output)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -335,5 +357,23 @@ mod tests {
         let (conn, model) = extract_session_configure_config(&Some(json!({"ok":true})));
         assert!(conn.is_none());
         assert!(model.is_none());
+    }
+
+    #[test]
+    fn extracts_prompt_usage() {
+        let usage = extract_prompt_usage(&Some(json!({
+            "turnId": "turn_test",
+            "stopReason": "end_turn",
+            "usage": { "inputTokens": 100, "outputTokens": 50 }
+        })));
+        assert_eq!(usage, Some(150));
+
+        // Missing usage field
+        let usage = extract_prompt_usage(&Some(json!({"turnId": "turn_test"})));
+        assert_eq!(usage, None);
+
+        // Empty result
+        let usage = extract_prompt_usage(&None);
+        assert_eq!(usage, None);
     }
 }

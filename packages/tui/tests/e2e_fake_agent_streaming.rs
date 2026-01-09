@@ -85,7 +85,13 @@ fn e2e_streaming_text_delta_and_turn_end() {
             jsonrpc::InboundMessage::Response { id, .. } => {
                 if id == json!("c_3") {
                     saw_prompt_response = true;
-                    reduce(&mut state, AppEvent::RpcResponse { id: json!("c_3") });
+                    reduce(
+                        &mut state,
+                        AppEvent::RpcResponse {
+                            id: json!("c_3"),
+                            usage_tokens: None,
+                        },
+                    );
                 }
             }
         }

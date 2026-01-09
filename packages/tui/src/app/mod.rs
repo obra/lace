@@ -129,6 +129,9 @@ pub struct AppState {
 
     pub debug_overlay_open: bool,
     pub activity_overlay_open: bool,
+
+    /// Cumulative token usage for this session
+    pub token_count: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -221,6 +224,8 @@ impl AppState {
 
             debug_overlay_open: false,
             activity_overlay_open: false,
+
+            token_count: None,
         }
     }
 
