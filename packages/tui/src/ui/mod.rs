@@ -355,6 +355,22 @@ fn run_loop(
                         continue;
                     }
 
+                    if state.debug_overlay_open {
+                        match key.code {
+                            KeyCode::Esc => {
+                                state.debug_overlay_open = false;
+                            }
+                            KeyCode::Up | KeyCode::PageUp => {
+                                state.debug_scroll = state.debug_scroll.saturating_sub(1);
+                            }
+                            KeyCode::Down | KeyCode::PageDown => {
+                                state.debug_scroll = state.debug_scroll.saturating_add(1);
+                            }
+                            _ => {}
+                        }
+                        continue;
+                    }
+
                     if state.help_open {
                         match key.code {
                             KeyCode::Esc => {
@@ -405,6 +421,10 @@ fn run_loop(
                             }
                             KeyCode::Char('e') => {
                                 let _ = apply_ui_action(state, UiAction::ToggleMultilineInput);
+                                continue;
+                            }
+                            KeyCode::Char('d') => {
+                                state.debug_overlay_open = !state.debug_overlay_open;
                                 continue;
                             }
                             KeyCode::Char('1') => {
@@ -951,8 +971,12 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     let status = render_status(state);
     f.render_widget(status, status_area);
 
-    // Main area now always shows the conversation. Debug/Activity are accessed via overlays.
-    render_main(f, state, main_area);
+    // Main area: show debug overlay if open, otherwise conversation
+    if state.debug_overlay_open {
+        f.render_widget(render_debug_overlay(state), main_area);
+    } else {
+        render_main(f, state, main_area);
+    }
     f.render_widget(render_input(state), input_area);
 
     // Permission is now rendered inline in the conversation, not as a modal overlay
@@ -1647,6 +1671,34 @@ fn render_debug(state: &AppState) -> Paragraph<'static> {
         .scroll((state.debug_scroll, 0))
 }
 
+/// Renders a full-screen debug log overlay.
+/// Toggled with Ctrl+D, closed with Esc.
+fn render_debug_overlay(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Header
+    lines.push(Line::from(Span::styled(
+        "Debug Log                                        [Esc to close]",
+        Style::default().fg(colors.fg_muted),
+    )));
+    lines.push(Line::from(""));
+
+    // Show debug lines (oldest at top, most recent at bottom)
+    for line in state.debug_lines.iter().rev().take(200).rev() {
+        lines.push(Line::from(Span::styled(
+            line.clone(),
+            Style::default().fg(colors.fg_secondary),
+        )));
+    }
+
+    Paragraph::new(Text::from(lines))
+        .style(Style::default().bg(colors.bg_base))
+        .wrap(Wrap { trim: false })
+        .scroll((state.debug_scroll, 0))
+}
+
 fn render_input(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
     let colors = &styles.colors;
@@ -1865,6 +1917,7 @@ fn render_help_modal() -> Paragraph<'static> {
         Line::from("Ctrl+C   Quit"),
         Line::from("Ctrl+K   Command palette"),
         Line::from("Ctrl+F   Search"),
+        Line::from("Ctrl+D   Toggle debug overlay"),
         Line::from("Ctrl+E   Toggle multiline input"),
         Line::from("Ctrl+1   Toggle Chat pane"),
         Line::from("Ctrl+2   Toggle Activity pane"),

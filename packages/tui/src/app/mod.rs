@@ -126,6 +126,8 @@ pub struct AppState {
     pub tools_open: bool,
     pub env_editor: EnvEditorState,
     pub models_panel: ModelsPanelState,
+
+    pub debug_overlay_open: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -215,6 +217,8 @@ impl AppState {
             tools_open: false,
             env_editor: EnvEditorState::default(),
             models_panel: ModelsPanelState::default(),
+
+            debug_overlay_open: false,
         }
     }
 
