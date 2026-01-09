@@ -128,6 +128,7 @@ pub struct AppState {
     pub models_panel: ModelsPanelState,
 
     pub debug_overlay_open: bool,
+    pub activity_overlay_open: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -219,6 +220,7 @@ impl AppState {
             models_panel: ModelsPanelState::default(),
 
             debug_overlay_open: false,
+            activity_overlay_open: false,
         }
     }
 

@@ -371,6 +371,22 @@ fn run_loop(
                         continue;
                     }
 
+                    if state.activity_overlay_open {
+                        match key.code {
+                            KeyCode::Esc => {
+                                state.activity_overlay_open = false;
+                            }
+                            KeyCode::Up | KeyCode::PageUp => {
+                                state.activity_scroll = state.activity_scroll.saturating_sub(1);
+                            }
+                            KeyCode::Down | KeyCode::PageDown => {
+                                state.activity_scroll = state.activity_scroll.saturating_add(1);
+                            }
+                            _ => {}
+                        }
+                        continue;
+                    }
+
                     if state.help_open {
                         match key.code {
                             KeyCode::Esc => {
@@ -425,6 +441,12 @@ fn run_loop(
                             }
                             KeyCode::Char('d') => {
                                 state.debug_overlay_open = !state.debug_overlay_open;
+                                state.activity_overlay_open = false; // Close activity if opening debug
+                                continue;
+                            }
+                            KeyCode::Char('a') => {
+                                state.activity_overlay_open = !state.activity_overlay_open;
+                                state.debug_overlay_open = false; // Close debug if opening activity
                                 continue;
                             }
                             KeyCode::Char('1') => {
@@ -971,9 +993,11 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     let status = render_status(state);
     f.render_widget(status, status_area);
 
-    // Main area: show debug overlay if open, otherwise conversation
+    // Main area: show overlays if open, otherwise conversation
     if state.debug_overlay_open {
         f.render_widget(render_debug_overlay(state), main_area);
+    } else if state.activity_overlay_open {
+        f.render_widget(render_activity_overlay(state), main_area);
     } else {
         render_main(f, state, main_area);
     }
@@ -1699,6 +1723,64 @@ fn render_debug_overlay(state: &AppState) -> Paragraph<'static> {
         .scroll((state.debug_scroll, 0))
 }
 
+/// Renders a full-screen activity overlay.
+/// Toggled with Ctrl+A, closed with Esc.
+fn render_activity_overlay(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Header
+    lines.push(Line::from(Span::styled(
+        "Activity                                         [Esc to close]",
+        Style::default().fg(colors.fg_muted),
+    )));
+    lines.push(Line::from(""));
+
+    // Activity items
+    for item in state.activity.iter() {
+        let status_char = match item.kind {
+            activity::ActivityKind::ToolUse => match item.status.as_deref() {
+                Some("completed") => '\u{2713}', // checkmark
+                Some("error") => '\u{2717}',     // X mark
+                _ => '\u{25B6}',                 // play triangle
+            },
+            activity::ActivityKind::TurnEnd => '\u{25C6}', // diamond
+            activity::ActivityKind::JobStarted | activity::ActivityKind::JobFinished => {
+                '\u{25CF}' // filled circle
+            }
+            _ => '\u{00B7}', // middle dot
+        };
+
+        let status_color = match item.status.as_deref() {
+            Some("completed") | Some("success") => colors.success,
+            Some("error") => colors.error,
+            _ => colors.fg_muted,
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled(format!("{} ", status_char), Style::default().fg(status_color)),
+            Span::styled(format!("{:?}", item.kind), Style::default().fg(colors.fg_primary)),
+            Span::styled(
+                format!("  {}", item.summary),
+                Style::default().fg(colors.fg_muted),
+            ),
+        ]));
+    }
+
+    if state.activity.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "(no activity yet)",
+            Style::default().fg(colors.fg_muted),
+        )));
+    }
+
+    Paragraph::new(Text::from(lines))
+        .style(Style::default().bg(colors.bg_base))
+        .wrap(Wrap { trim: false })
+        .scroll((state.activity_scroll, 0))
+}
+
 fn render_input(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
     let colors = &styles.colors;
@@ -1917,6 +1999,7 @@ fn render_help_modal() -> Paragraph<'static> {
         Line::from("Ctrl+C   Quit"),
         Line::from("Ctrl+K   Command palette"),
         Line::from("Ctrl+F   Search"),
+        Line::from("Ctrl+A   Toggle activity overlay"),
         Line::from("Ctrl+D   Toggle debug overlay"),
         Line::from("Ctrl+E   Toggle multiline input"),
         Line::from("Ctrl+1   Toggle Chat pane"),
