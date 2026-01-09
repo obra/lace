@@ -7,6 +7,7 @@ import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { z } from 'zod';
 import { getProviderManagementAgent } from '@lace/web/lib/server/supervisor-service';
+import type { ThreadTokenUsage } from '@lace/ent-protocol';
 import type { Route } from './+types/api.agents.$agentId';
 
 const AgentUpdateSchema = z
@@ -42,7 +43,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const { record } = await findWorkspaceForAgentSession(agentId);
+    const { supervisor, record } = await findWorkspaceForAgentSession(agentId);
     if (!record) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
@@ -52,6 +53,12 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
+    const tokenUsage = (await supervisor.agentRequest({
+      workspaceSessionId: record.workspaceSessionId,
+      sessionId: agentId,
+      method: 'ent/session/token_usage',
+    })) as ThreadTokenUsage;
+
     return createSuperjsonResponse({
       threadId: meta.sessionId,
       name: meta.name ?? '',
@@ -59,7 +66,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       modelId: meta.modelId ?? '',
       persona: '',
       status: 'idle',
-      tokenUsage: undefined,
+      tokenUsage,
       createdAt: meta.createdAt ? new Date(meta.createdAt) : undefined,
     });
   } catch (error: unknown) {

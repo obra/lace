@@ -15,14 +15,14 @@ import { parseResponse } from '@lace/web/lib/serialization';
 
 vi.mock('server-only', () => ({}));
 
-describe('Supervisor-backed agent token usage (not supported)', () => {
+describe('Supervisor-backed agent token usage (supported)', () => {
   const context = setupWebTest();
 
   afterEach(async () => {
     await shutdownSupervisorForTests();
   });
 
-  it('GET /api/agents/:agentId returns tokenUsage as undefined', async () => {
+  it('GET /api/agents/:agentId returns tokenUsage', async () => {
     const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
@@ -31,18 +31,18 @@ describe('Supervisor-backed agent token usage (not supported)', () => {
     const data = await parseResponse<{ tokenUsage?: unknown }>(response);
 
     expect(response.status).toBe(200);
-    expect(data.tokenUsage).toBeUndefined();
+    expect(data.tokenUsage).toBeTruthy();
   });
 
-  it('GET /api/agents/:agentId/context returns 501 NOT_SUPPORTED', async () => {
+  it('GET /api/agents/:agentId/context returns context breakdown', async () => {
     const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
     const request = new Request(`http://localhost:3000/api/agents/${created.sessionId}/context`);
     const response = await getContext(createLoaderArgs(request, { agentId: created.sessionId }));
-    const data = await parseResponse<{ error: string }>(response);
+    const data = await parseResponse<Record<string, unknown>>(response);
 
-    expect(response.status).toBe(501);
-    expect(data.error).toBe('Context breakdown is not supported for supervisor-backed agents');
+    expect(response.status).toBe(200);
+    expect(data.categories).toBeTruthy();
   });
 });

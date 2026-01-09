@@ -1,5 +1,5 @@
 // ABOUTME: Integration tests for compaction/token tracking behavior during supervisor cutover
-// ABOUTME: In PR9, supervisor-backed agents do not expose token usage accounting yet
+// ABOUTME: Supervisor-backed agents expose token usage and context breakdown via ENT
 
 /**
  * @vitest-environment node
@@ -32,7 +32,7 @@ async function waitForEvent(params: {
   throw new Error('Timed out waiting for durable event');
 }
 
-describe('Supervisor-backed agent compaction/token usage (not supported)', () => {
+describe('Supervisor-backed agent compaction/token usage (supported)', () => {
   const context = setupWebTest();
   let originalTestProviderEnv: string | undefined;
 
@@ -46,7 +46,7 @@ describe('Supervisor-backed agent compaction/token usage (not supported)', () =>
     await shutdownSupervisorForTests();
   });
 
-  it('does not expose tokenUsage even after agent activity', async () => {
+  it('exposes tokenUsage and context breakdown after agent activity', async () => {
     const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
@@ -86,7 +86,7 @@ describe('Supervisor-backed agent compaction/token usage (not supported)', () =>
     const agentData = await parseResponse<{ tokenUsage?: unknown }>(agentResponse);
 
     expect(agentResponse.status).toBe(200);
-    expect(agentData.tokenUsage).toBeUndefined();
+    expect(agentData.tokenUsage).toBeTruthy();
 
     const contextRequest = new Request(
       `http://localhost:3000/api/agents/${created.sessionId}/context`
@@ -94,6 +94,8 @@ describe('Supervisor-backed agent compaction/token usage (not supported)', () =>
     const contextResponse = await getContext(
       createLoaderArgs(contextRequest, { agentId: created.sessionId })
     );
-    expect(contextResponse.status).toBe(501);
+    const breakdown = await parseResponse<Record<string, unknown>>(contextResponse);
+    expect(contextResponse.status).toBe(200);
+    expect(breakdown.categories).toBeTruthy();
   });
 });
