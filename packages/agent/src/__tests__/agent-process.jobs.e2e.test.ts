@@ -209,4 +209,102 @@ describe('lace-agent jobs (E2E over stdio)', () => {
 
     expect(output.status).toBe('cancelled');
   });
+
+  it('job record includes subagentSessionId for subagent jobs', { timeout: 20_000 }, async () => {
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+
+    const updates: Array<Record<string, unknown>> = [];
+    let subagentJobId: string | undefined;
+
+    agent.peer.onRequest('session/update', async (params) => {
+      const p = params as Record<string, unknown>;
+      updates.push(p);
+      if (p.type === 'job_started' && p.jobType === 'subagent' && typeof p.jobId === 'string') {
+        subagentJobId = p.jobId;
+      }
+      return undefined;
+    });
+
+    agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+
+    await withTimeout(
+      agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
+      2_000,
+      'initialize'
+    );
+
+    const created = (await withTimeout(
+      agent.peer.request('session/new', { workDir }),
+      2_000,
+      'session/new'
+    )) as { sessionId: string };
+
+    await withTimeout(
+      agent.peer.request('session/prompt', { content: [{ type: 'text', text: 'subagent: hi' }] }),
+      10_000,
+      'session/prompt'
+    );
+
+    // Wait for job_finished to ensure subagent session was created
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          if (!subagentJobId) return;
+          const finished = updates.find(
+            (u) => u.type === 'job_finished' && u.jobId === subagentJobId
+          );
+          if (finished) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      10_000,
+      'job_finished update'
+    );
+
+    expect(subagentJobId).toMatch(/^job_/);
+
+    // Get job list and verify subagentSessionId is present
+    const list = (await withTimeout(agent.peer.request('ent/job/list'), 2_000, 'ent/job/list')) as {
+      jobs: Array<{ jobId: string; type: string; subagentSessionId?: string }>;
+    };
+
+    const subagentJob = list.jobs.find((j) => j.jobId === subagentJobId);
+    expect(subagentJob).toBeDefined();
+    expect(subagentJob?.type).toBe('subagent');
+    expect(subagentJob?.subagentSessionId).toBeDefined();
+    expect(subagentJob?.subagentSessionId).toMatch(/^sess_/);
+
+    // Verify persistence after restart
+    await agent.shutdown();
+    agent = undefined;
+
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+
+    await withTimeout(
+      agent.peer.request('initialize', defaultInitializeParams()),
+      2_000,
+      'initialize (restart)'
+    );
+    await withTimeout(
+      agent.peer.request('session/load', { sessionId: created.sessionId }),
+      2_000,
+      'session/load (restart)'
+    );
+
+    const listAfterRestart = (await withTimeout(
+      agent.peer.request('ent/job/list'),
+      2_000,
+      'ent/job/list (restart)'
+    )) as { jobs: Array<{ jobId: string; type: string; subagentSessionId?: string }> };
+
+    const jobAfterRestart = listAfterRestart.jobs.find((j) => j.jobId === subagentJobId);
+    expect(jobAfterRestart?.subagentSessionId).toBeDefined();
+    expect(jobAfterRestart?.subagentSessionId).toMatch(/^sess_/);
+  });
 });

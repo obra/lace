@@ -201,7 +201,7 @@ type JobState = {
   proc?: ChildProcess;
   permissionAbortController?: AbortController;
   childPeer?: JsonRpcPeer;
-  childSessionId?: string;
+  subagentSessionId?: string;
   childTransportClose?: () => void;
   finished: boolean;
   completion: Promise<void>;
@@ -917,7 +917,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     job.proc = undefined;
     job.childPeer = undefined;
-    job.childSessionId = undefined;
+    job.subagentSessionId = undefined;
     job.childTransportClose = undefined;
     job.finished = true;
 
@@ -1594,7 +1594,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           record.finished = true;
           record.proc = undefined;
           record.childPeer = undefined;
-          record.childSessionId = undefined;
+          record.subagentSessionId = undefined;
           record.childTransportClose = undefined;
           record.exitCode = exitCode;
 
@@ -1775,7 +1775,22 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         const created = (await childPeer.request('session/new', {
           workDir: state.activeSession.meta.workDir,
         })) as { sessionId: string };
-        job.childSessionId = created.sessionId;
+        job.subagentSessionId = created.sessionId;
+
+        // Persist subagentSessionId for resume functionality
+        await runExclusive(() => {
+          let sessionState = readSessionState(state.activeSession!.dir);
+          const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+            type: 'job_session_assigned',
+            data: {
+              jobId: job.jobId,
+              subagentSessionId: created.sessionId,
+            },
+          });
+          sessionState = nextState;
+          writeSessionState(state.activeSession!.dir, sessionState);
+          state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+        });
 
         await childPeer.request('session/prompt', { content: job.subagentContent });
 
@@ -2030,6 +2045,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     command?: string;
     startTime: string;
     exitCode?: number;
+    subagentSessionId?: string;
   }> => {
     if (!state.activeSession) return [];
 
@@ -2053,6 +2069,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         command?: string;
         startTime: string;
         exitCode?: number;
+        subagentSessionId?: string;
       }
     >();
 
@@ -2061,7 +2078,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       if (!line) continue;
       try {
         const parsed = JSON.parse(line) as { type?: string; timestamp?: string; data?: any };
-        if (parsed.type !== 'job_started' && parsed.type !== 'job_finished') continue;
+        if (
+          parsed.type !== 'job_started' &&
+          parsed.type !== 'job_finished' &&
+          parsed.type !== 'job_session_assigned'
+        )
+          continue;
         const timestamp = typeof parsed.timestamp === 'string' ? parsed.timestamp : undefined;
         const data = parsed.data ?? {};
         const jobId = toNonEmptyString(data.jobId);
@@ -2079,6 +2101,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             command: toNonEmptyString(data.command) ?? undefined,
             startTime,
           });
+        } else if (parsed.type === 'job_session_assigned') {
+          const existing = byId.get(jobId);
+          const subagentSessionId = toNonEmptyString(data.subagentSessionId);
+          if (existing && subagentSessionId) {
+            existing.subagentSessionId = subagentSessionId;
+          }
         } else {
           const existing = byId.get(jobId);
           const exitCode = typeof data.exitCode === 'number' ? data.exitCode : undefined;
@@ -2888,6 +2916,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       description: j.description,
       command: j.command,
       startTime: j.startTime,
+      ...(j.subagentSessionId ? { subagentSessionId: j.subagentSessionId } : {}),
     }));
 
     return { jobs };
@@ -4535,6 +4564,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                   description: j.description,
                   command: j.command,
                   startTime: j.startTime,
+                  ...(j.subagentSessionId ? { subagentSessionId: j.subagentSessionId } : {}),
                 }));
 
                 // Apply filters

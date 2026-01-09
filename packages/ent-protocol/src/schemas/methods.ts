@@ -1249,6 +1249,7 @@ const EntJobListResultSchema = z
           command: z.string().optional(),
           startTime: IsoTimestampSchema,
           parentToolUseId: NonEmptyStringSchema.optional(),
+          subagentSessionId: NonEmptyStringSchema.optional(),
         })
         .strict()
     ),
