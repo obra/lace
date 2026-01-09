@@ -111,7 +111,7 @@ fn e2e_permission_flow_with_fake_agent() {
                         "expected tool_use input to be cached before permission decision"
                     );
 
-                    let out = decide_permission(active, "allow").unwrap();
+                    let out = decide_permission(active, "allow", None).unwrap();
                     apply_outbound(&transport, out);
                     decided_permission = true;
                     continue;

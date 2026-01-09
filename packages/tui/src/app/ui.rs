@@ -113,6 +113,8 @@ pub enum UiAction {
     PermissionNext,
     PermissionSubmit,
     PermissionCancel,
+    PermissionGuidanceChar(char),
+    PermissionGuidanceBackspace,
 }
 
 pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> {
@@ -740,10 +742,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             out
         }
         UiAction::PermissionPrev => {
-            if let Some(req) = &state.active_permission {
-                if req.options.is_empty() {
-                    return Vec::new();
-                }
+            if state.active_permission.is_some() {
                 state.active_permission_selected =
                     state.active_permission_selected.saturating_sub(1);
             }
@@ -751,10 +750,8 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         }
         UiAction::PermissionNext => {
             if let Some(req) = &state.active_permission {
-                if req.options.is_empty() {
-                    return Vec::new();
-                }
-                let max = req.options.len() - 1;
+                // Max is options.len() to include the guidance row as the last selectable item
+                let max = req.options.len();
                 state.active_permission_selected = (state.active_permission_selected + 1).min(max);
             }
             Vec::new()
@@ -764,9 +761,16 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 return Vec::new();
             };
 
+            // When guidance row is selected (index == options.len()), default to first option
+            let selected_idx = if state.active_permission_selected >= req.options.len() {
+                0
+            } else {
+                state.active_permission_selected
+            };
+
             let decision = req
                 .options
-                .get(state.active_permission_selected)
+                .get(selected_idx)
                 .map(|o| o.option_id.clone())
                 .unwrap_or_default();
 
@@ -792,8 +796,15 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 );
             }
 
-            match decide_permission(req, &decision) {
+            let guidance = if state.permission_guidance_input.is_empty() {
+                None
+            } else {
+                Some(state.permission_guidance_input.as_str())
+            };
+
+            match decide_permission(req, &decision, guidance) {
                 Ok(out) => {
+                    state.permission_guidance_input.clear();
                     state.activate_next_permission_if_needed();
                     out
                 }
@@ -817,6 +828,14 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             };
             state.active_permission_selected = idx;
             apply_ui_action(state, UiAction::PermissionSubmit)
+        }
+        UiAction::PermissionGuidanceChar(ch) => {
+            state.permission_guidance_input.push(ch);
+            Vec::new()
+        }
+        UiAction::PermissionGuidanceBackspace => {
+            state.permission_guidance_input.pop();
+            Vec::new()
         }
     }
 }
@@ -1192,6 +1211,174 @@ mod tests {
         match &out[0] {
             Outbound::JsonRpcResponse { result, .. } => {
                 assert_eq!(result, &json!({"decision":"deny"}))
+            }
+            _ => panic!("expected response"),
+        }
+    }
+
+    #[test]
+    fn permission_submit_with_guidance_includes_guidance_in_response() {
+        use crate::app::{PermissionOption, PermissionRequest};
+        use serde_json::json;
+
+        let mut state = AppState::new();
+        state.active_permission = Some(PermissionRequest {
+            id: json!("a_1"),
+            tool: Some("shell.exec".to_string()),
+            kind: Some("execute".to_string()),
+            resource: Some("echo hi".to_string()),
+            tool_call_id: Some("tool_1".to_string()),
+            turn_id: None,
+            turn_seq: None,
+            job_id: None,
+            options: vec![
+                PermissionOption {
+                    option_id: "allow".to_string(),
+                    label: "Allow".to_string(),
+                },
+                PermissionOption {
+                    option_id: "deny".to_string(),
+                    label: "Deny".to_string(),
+                },
+            ],
+        });
+        state.active_permission_selected = 0;
+        state.permission_guidance_input = "be careful with output".to_string();
+
+        let out = apply_ui_action(&mut state, UiAction::PermissionSubmit);
+        assert_eq!(out.len(), 1);
+        assert!(state.active_permission.is_none());
+        // Guidance should be cleared after submission
+        assert!(state.permission_guidance_input.is_empty());
+
+        match &out[0] {
+            Outbound::JsonRpcResponse { id, result } => {
+                assert_eq!(id, &json!("a_1"));
+                assert_eq!(
+                    result,
+                    &json!({"decision":"allow","guidance":"be careful with output"})
+                );
+            }
+            _ => panic!("expected response"),
+        }
+    }
+
+    #[test]
+    fn permission_guidance_typing_and_backspace() {
+        use crate::app::{PermissionOption, PermissionRequest};
+        use serde_json::json;
+
+        let mut state = AppState::new();
+        state.active_permission = Some(PermissionRequest {
+            id: json!("a_1"),
+            tool: Some("shell.exec".to_string()),
+            kind: None,
+            resource: None,
+            tool_call_id: None,
+            turn_id: None,
+            turn_seq: None,
+            job_id: None,
+            options: vec![PermissionOption {
+                option_id: "allow".to_string(),
+                label: "Allow".to_string(),
+            }],
+        });
+
+        // Type some guidance
+        apply_ui_action(&mut state, UiAction::PermissionGuidanceChar('h'));
+        apply_ui_action(&mut state, UiAction::PermissionGuidanceChar('i'));
+        assert_eq!(state.permission_guidance_input, "hi");
+
+        // Backspace removes last char
+        apply_ui_action(&mut state, UiAction::PermissionGuidanceBackspace);
+        assert_eq!(state.permission_guidance_input, "h");
+
+        apply_ui_action(&mut state, UiAction::PermissionGuidanceBackspace);
+        assert!(state.permission_guidance_input.is_empty());
+    }
+
+    #[test]
+    fn permission_next_includes_guidance_row() {
+        use crate::app::{PermissionOption, PermissionRequest};
+        use serde_json::json;
+
+        let mut state = AppState::new();
+        state.active_permission = Some(PermissionRequest {
+            id: json!("a_1"),
+            tool: Some("shell.exec".to_string()),
+            kind: None,
+            resource: None,
+            tool_call_id: None,
+            turn_id: None,
+            turn_seq: None,
+            job_id: None,
+            options: vec![
+                PermissionOption {
+                    option_id: "allow".to_string(),
+                    label: "Allow".to_string(),
+                },
+                PermissionOption {
+                    option_id: "deny".to_string(),
+                    label: "Deny".to_string(),
+                },
+            ],
+        });
+        state.active_permission_selected = 0;
+
+        // Navigate to the second option
+        apply_ui_action(&mut state, UiAction::PermissionNext);
+        assert_eq!(state.active_permission_selected, 1);
+
+        // Navigate to the guidance row (index 2, which is options.len())
+        apply_ui_action(&mut state, UiAction::PermissionNext);
+        assert_eq!(state.active_permission_selected, 2);
+
+        // Should not go past guidance row
+        apply_ui_action(&mut state, UiAction::PermissionNext);
+        assert_eq!(state.active_permission_selected, 2);
+    }
+
+    #[test]
+    fn permission_submit_from_guidance_row_uses_first_option() {
+        use crate::app::{PermissionOption, PermissionRequest};
+        use serde_json::json;
+
+        let mut state = AppState::new();
+        state.active_permission = Some(PermissionRequest {
+            id: json!("a_1"),
+            tool: Some("shell.exec".to_string()),
+            kind: None,
+            resource: None,
+            tool_call_id: None,
+            turn_id: None,
+            turn_seq: None,
+            job_id: None,
+            options: vec![
+                PermissionOption {
+                    option_id: "allow".to_string(),
+                    label: "Allow".to_string(),
+                },
+                PermissionOption {
+                    option_id: "deny".to_string(),
+                    label: "Deny".to_string(),
+                },
+            ],
+        });
+        // Select guidance row (index 2)
+        state.active_permission_selected = 2;
+        state.permission_guidance_input = "test guidance".to_string();
+
+        let out = apply_ui_action(&mut state, UiAction::PermissionSubmit);
+        assert_eq!(out.len(), 1);
+
+        match &out[0] {
+            Outbound::JsonRpcResponse { id, result } => {
+                assert_eq!(id, &json!("a_1"));
+                // Should default to first option (allow) when on guidance row
+                assert_eq!(
+                    result,
+                    &json!({"decision":"allow","guidance":"test guidance"})
+                );
             }
             _ => panic!("expected response"),
         }

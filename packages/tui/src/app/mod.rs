@@ -95,6 +95,7 @@ pub struct AppState {
 
     pub active_permission: Option<PermissionRequest>,
     pub active_permission_selected: usize,
+    pub permission_guidance_input: String,
 
     pub palette_open: bool,
     pub palette_query: String,
@@ -191,6 +192,7 @@ impl AppState {
 
             active_permission: None,
             active_permission_selected: 0,
+            permission_guidance_input: String::new(),
 
             palette_open: false,
             palette_query: String::new(),
@@ -277,6 +279,7 @@ impl AppState {
         if let Some(next) = self.permission_queue.pop_front() {
             self.active_permission = Some(next);
             self.active_permission_selected = 0;
+            self.permission_guidance_input.clear();
         }
     }
 

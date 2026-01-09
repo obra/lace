@@ -159,13 +159,29 @@ fn run_loop(
                         break;
                     }
 
-                    if state.active_permission.is_some() {
-                        let action = match key.code {
-                            KeyCode::Up => Some(UiAction::PermissionPrev),
-                            KeyCode::Down => Some(UiAction::PermissionNext),
-                            KeyCode::Enter => Some(UiAction::PermissionSubmit),
-                            KeyCode::Esc => Some(UiAction::PermissionCancel),
-                            _ => None,
+                    if let Some(req) = &state.active_permission {
+                        let options_count = req.options.len();
+                        let guidance_selected = state.active_permission_selected == options_count;
+
+                        let action = if guidance_selected {
+                            // When guidance row is selected, handle typing
+                            match key.code {
+                                KeyCode::Up => Some(UiAction::PermissionPrev),
+                                KeyCode::Down => Some(UiAction::PermissionNext),
+                                KeyCode::Enter => Some(UiAction::PermissionSubmit),
+                                KeyCode::Esc => Some(UiAction::PermissionCancel),
+                                KeyCode::Backspace => Some(UiAction::PermissionGuidanceBackspace),
+                                KeyCode::Char(ch) => Some(UiAction::PermissionGuidanceChar(ch)),
+                                _ => None,
+                            }
+                        } else {
+                            match key.code {
+                                KeyCode::Up => Some(UiAction::PermissionPrev),
+                                KeyCode::Down => Some(UiAction::PermissionNext),
+                                KeyCode::Enter => Some(UiAction::PermissionSubmit),
+                                KeyCode::Esc => Some(UiAction::PermissionCancel),
+                                _ => None,
+                            }
                         };
                         if let Some(action) = action {
                             let out = apply_ui_action(state, action);
@@ -2239,6 +2255,47 @@ fn render_permission_inline(state: &AppState, colors: &theme::ThemeColors) -> Ve
         )));
     }
 
+    // Guidance input row (after regular options)
+    let guidance_selected = state.active_permission_selected == req.options.len();
+    lines.push(Line::from(Span::styled(
+        "  ──────────────────────",
+        Style::default().fg(colors.border_subtle),
+    )));
+
+    let guidance_marker = if guidance_selected { "\u{25B8} " } else { "  " };
+    let guidance_style = if guidance_selected {
+        Style::default()
+            .fg(colors.fg_primary)
+            .bg(colors.bg_surface)
+    } else {
+        Style::default().fg(colors.fg_muted)
+    };
+
+    if state.permission_guidance_input.is_empty() {
+        lines.push(Line::from(vec![
+            Span::styled(format!("  {}", guidance_marker), guidance_style),
+            Span::styled("Type guidance...", Style::default().fg(colors.fg_muted)),
+            if guidance_selected {
+                Span::styled("\u{258C}", Style::default().fg(colors.accent))
+            } else {
+                Span::raw("")
+            },
+        ]));
+    } else {
+        lines.push(Line::from(vec![
+            Span::styled(format!("  {}", guidance_marker), guidance_style),
+            Span::styled(
+                state.permission_guidance_input.clone(),
+                Style::default().fg(colors.fg_primary),
+            ),
+            if guidance_selected {
+                Span::styled("\u{258C}", Style::default().fg(colors.accent))
+            } else {
+                Span::raw("")
+            },
+        ]));
+    }
+
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "  Up/Down to select, Enter to confirm, Esc to deny",
@@ -2554,6 +2611,10 @@ fn permission_inline_line_count(
 
     // Options
     count += req.options.len();
+
+    // Guidance input (separator + input row)
+    count += 1; // separator line
+    count += 1; // guidance input line
 
     count += 1; // blank line
     count += 1; // help text line
