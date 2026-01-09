@@ -4350,7 +4350,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                   };
                 }
               } else if (toolName === 'delegate') {
-                const prompt = toNonEmptyString((finalInput as any).prompt);
+                const prompt = toNonEmptyString((finalInput as Record<string, unknown>).prompt);
+                const runAsync = (finalInput as Record<string, unknown>).run_async === true;
+                const description = toNonEmptyString(
+                  (finalInput as Record<string, unknown>).description
+                );
+
                 if (!prompt) {
                   coreResult = {
                     status: 'failed',
@@ -4359,59 +4364,76 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 } else {
                   const { jobId } = await startSubagentJob({
                     prompt,
-                    description: 'Delegate',
+                    description: description || 'Delegate',
                     turnContext: { turnId, turnSeq: toolTurnSeq },
                   });
 
-                  const job = state.jobs.get(jobId);
-                  if (job) {
-                    const abortPromise = new Promise<never>((_, reject) => {
-                      abortController.signal.addEventListener(
-                        'abort',
-                        () => reject(new Error('cancelled')),
+                  if (runAsync) {
+                    // Return immediately without waiting for completion
+                    coreResult = {
+                      status: 'completed',
+                      content: [
                         {
-                          once: true,
-                        }
-                      );
-                    });
+                          type: 'text',
+                          text: `Async job started: ${jobId}\nUse job_output to check status.`,
+                        },
+                      ],
+                    };
+                  } else {
+                    // Wait for job completion (existing behavior)
+                    const job = state.jobs.get(jobId);
+                    if (job) {
+                      const abortPromise = new Promise<never>((_, reject) => {
+                        abortController.signal.addEventListener(
+                          'abort',
+                          () => reject(new Error('cancelled')),
+                          {
+                            once: true,
+                          }
+                        );
+                      });
 
-                    try {
-                      await Promise.race([job.completion, abortPromise]);
-                    } catch {
-                      job.status = 'cancelled';
-                      await finalizeJob(job);
+                      try {
+                        await Promise.race([job.completion, abortPromise]);
+                      } catch {
+                        job.status = 'cancelled';
+                        await finalizeJob(job);
+                      }
                     }
+
+                    let output = '';
+                    try {
+                      output = readFileSync(
+                        getJobOutputPath(state.activeSession.dir, jobId),
+                        'utf8'
+                      );
+                    } catch {
+                      output = '';
+                    }
+
+                    const tailLimit = 64 * 1024;
+                    const truncated = output.length > tailLimit;
+                    const reportText = truncated ? output.slice(-tailLimit) : output;
+
+                    const status = job?.status ?? 'failed';
+                    coreResult = {
+                      status:
+                        status === 'completed'
+                          ? 'completed'
+                          : status === 'cancelled'
+                            ? 'aborted'
+                            : 'failed',
+                      content: [
+                        {
+                          type: 'text',
+                          text:
+                            `delegate jobId=${jobId}\n\n` +
+                            (reportText.trim().length > 0 ? reportText.trim() : '(no output)') +
+                            (truncated ? '\n\n(truncated)' : ''),
+                        },
+                      ],
+                    };
                   }
-
-                  let output = '';
-                  try {
-                    output = readFileSync(getJobOutputPath(state.activeSession.dir, jobId), 'utf8');
-                  } catch {
-                    output = '';
-                  }
-
-                  const tailLimit = 64 * 1024;
-                  const truncated = output.length > tailLimit;
-                  const reportText = truncated ? output.slice(-tailLimit) : output;
-
-                  const status = job?.status ?? 'failed';
-                  coreResult = {
-                    status:
-                      status === 'completed'
-                        ? 'completed'
-                        : status === 'cancelled'
-                          ? 'aborted'
-                          : 'failed',
-                    content: [
-                      {
-                        type: 'text',
-                        text:
-                          `delegate jobId=${jobId}\n\n` +
-                          (reportText.trim().length > 0 ? reportText.trim() : '(no output)') +
-                          (truncated ? '\n\n(truncated)' : ''),
-                      },
-                    ],
-                  };
                 }
               } else {
                 coreResult = await toolExecutor.execute(
