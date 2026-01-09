@@ -683,6 +683,96 @@ export const EntSessionEventsResponseSchema = z
   })
   .strict();
 
+const EntSessionTokenUsageResultSchema = z
+  .object({
+    totalPromptTokens: z.number(),
+    totalCompletionTokens: z.number(),
+    totalTokens: z.number(),
+    contextLimit: z.number(),
+    percentUsed: z.number(),
+    nearLimit: z.boolean(),
+  })
+  .strict();
+
+export const EntSessionTokenUsageRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/token_usage'),
+    params: EmptyParamsSchema.optional(),
+  })
+  .strict();
+
+export const EntSessionTokenUsageResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntSessionTokenUsageResultSchema,
+  })
+  .strict();
+
+const ContextBreakdownItemDetailSchema = z
+  .object({
+    name: z.string(),
+    tokens: z.number(),
+  })
+  .strict();
+
+const ContextBreakdownCategoryDetailSchema = z
+  .object({
+    tokens: z.number(),
+    items: z.array(ContextBreakdownItemDetailSchema).optional(),
+  })
+  .strict();
+
+const ContextBreakdownMessageCategoryDetailSchema = ContextBreakdownCategoryDetailSchema.extend({
+  subcategories: z
+    .object({
+      userMessages: z.object({ tokens: z.number() }).strict(),
+      agentMessages: z.object({ tokens: z.number() }).strict(),
+      toolCalls: z.object({ tokens: z.number() }).strict(),
+      toolResults: z.object({ tokens: z.number() }).strict(),
+    })
+    .strict(),
+}).strict();
+
+const EntSessionContextBreakdownResultSchema = z
+  .object({
+    timestamp: IsoTimestampSchema,
+    modelId: z.string(),
+    contextLimit: z.number(),
+    totalUsedTokens: z.number(),
+    percentUsed: z.number(),
+    categories: z
+      .object({
+        systemPrompt: ContextBreakdownCategoryDetailSchema,
+        coreTools: ContextBreakdownCategoryDetailSchema,
+        mcpTools: ContextBreakdownCategoryDetailSchema,
+        messages: ContextBreakdownMessageCategoryDetailSchema,
+        reservedForResponse: ContextBreakdownCategoryDetailSchema,
+        freeSpace: ContextBreakdownCategoryDetailSchema,
+      })
+      .strict(),
+  })
+  .strict();
+
+export const EntSessionContextBreakdownRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/context_breakdown'),
+    params: EmptyParamsSchema.optional(),
+  })
+  .strict();
+
+export const EntSessionContextBreakdownResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntSessionContextBreakdownResultSchema,
+  })
+  .strict();
+
 const EntProvidersListResultSchema = z
   .object({
     providers: z.array(ProviderInfoSchema),
