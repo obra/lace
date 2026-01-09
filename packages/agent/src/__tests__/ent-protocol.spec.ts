@@ -421,6 +421,127 @@ describe('Ent protocol contract (selected coverage)', () => {
     expect(ok.applied).toEqual(expect.arrayContaining(['connectionId', 'modelId']));
   });
 
+  it('ent/session/token_usage and ent/session/context_breakdown return context metrics', async () => {
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    await requestOk({
+      agent,
+      method: 'initialize',
+      requestSchema: MethodSchemas.InitializeRequestSchema,
+      responseSchema: MethodSchemas.InitializeResponseSchema,
+      params: defaultInitializeParams({ approvalMode: 'approve' }),
+      label: 'initialize',
+    });
+    await requestOk({
+      agent,
+      method: 'session/new',
+      requestSchema: MethodSchemas.SessionNewRequestSchema,
+      responseSchema: MethodSchemas.SessionNewResponseSchema,
+      params: { workDir: laceDir },
+      label: 'session/new',
+    });
+
+    const { providers } = await requestOk<{ providers: ProviderInfo[] }>({
+      agent,
+      method: 'ent/providers/list',
+      requestSchema: MethodSchemas.EntProvidersListRequestSchema,
+      responseSchema: MethodSchemas.EntProvidersListResponseSchema,
+      label: 'providers/list',
+    });
+    const providerId =
+      providers.find((p) => p.providerId === 'openai')?.providerId ?? providers[0].providerId;
+
+    const { connectionId } = await requestOk<{ connectionId: string }>({
+      agent,
+      method: 'ent/connections/upsert',
+      requestSchema: MethodSchemas.EntConnectionsUpsertRequestSchema,
+      responseSchema: MethodSchemas.EntConnectionsUpsertResponseSchema,
+      params: { providerId, connection: { name: 'token-usage', config: {} } },
+      label: 'connections/upsert',
+    });
+
+    const credential = await requestOk<{ ok: boolean }>({
+      agent,
+      method: 'ent/connections/credentials/submit',
+      requestSchema: MethodSchemas.EntConnectionsCredentialsSubmitRequestSchema,
+      responseSchema: MethodSchemas.EntConnectionsCredentialsSubmitResponseSchema,
+      params: { connectionId, values: { apiKey: 'sk-test' } },
+      label: 'credentials/submit',
+    });
+    expect(credential.ok).toBe(true);
+
+    const { models } = await requestOk<{ models: Array<{ modelId: string }> }>({
+      agent,
+      method: 'ent/models/list',
+      requestSchema: MethodSchemas.EntModelsListRequestSchema,
+      responseSchema: MethodSchemas.EntModelsListResponseSchema,
+      params: { connectionId },
+      label: 'models/list',
+    });
+    const modelId = models[0].modelId;
+
+    await requestOk({
+      agent,
+      method: 'ent/session/configure',
+      requestSchema: MethodSchemas.EntSessionConfigureRequestSchema,
+      responseSchema: MethodSchemas.EntSessionConfigureResponseSchema,
+      params: { connectionId, modelId, approvalMode: 'approve' },
+      label: 'session/configure',
+    });
+
+    const initialUsage = await requestOk<Record<string, unknown>>({
+      agent,
+      method: 'ent/session/token_usage',
+      requestSchema: MethodSchemas.EntSessionTokenUsageRequestSchema,
+      responseSchema: MethodSchemas.EntSessionTokenUsageResponseSchema,
+      params: {},
+      label: 'session/token_usage (initial)',
+    });
+
+    const initialBreakdown = await requestOk<Record<string, unknown>>({
+      agent,
+      method: 'ent/session/context_breakdown',
+      requestSchema: MethodSchemas.EntSessionContextBreakdownRequestSchema,
+      responseSchema: MethodSchemas.EntSessionContextBreakdownResponseSchema,
+      params: {},
+      label: 'session/context_breakdown (initial)',
+    });
+
+    const prompt = await requestOk<{ usage: { inputTokens: number; outputTokens: number } }>({
+      agent,
+      method: 'session/prompt',
+      requestSchema: MethodSchemas.SessionPromptRequestSchema,
+      responseSchema: MethodSchemas.SessionPromptResponseSchema,
+      params: { content: [{ type: 'text', text: 'hello' }] },
+      timeoutMs: 10_000,
+      label: 'session/prompt',
+    });
+    expect(prompt.usage.inputTokens + prompt.usage.outputTokens).toBeGreaterThan(0);
+
+    const laterUsage = await requestOk<Record<string, unknown>>({
+      agent,
+      method: 'ent/session/token_usage',
+      requestSchema: MethodSchemas.EntSessionTokenUsageRequestSchema,
+      responseSchema: MethodSchemas.EntSessionTokenUsageResponseSchema,
+      params: {},
+      label: 'session/token_usage (later)',
+    });
+    expect((laterUsage as any).totalTokens).toBeGreaterThanOrEqual(
+      (initialUsage as any).totalTokens
+    );
+
+    const laterBreakdown = await requestOk<Record<string, unknown>>({
+      agent,
+      method: 'ent/session/context_breakdown',
+      requestSchema: MethodSchemas.EntSessionContextBreakdownRequestSchema,
+      responseSchema: MethodSchemas.EntSessionContextBreakdownResponseSchema,
+      params: {},
+      label: 'session/context_breakdown (later)',
+    });
+    expect((laterBreakdown as any).totalUsedTokens).toBeGreaterThanOrEqual(
+      (initialBreakdown as any).totalUsedTokens
+    );
+  });
+
   it('supports connection listing, credential start/submit, and provider filter', async () => {
     agent = spawnAgentProcess({ laceDir });
     await requestOk({

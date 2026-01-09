@@ -23,6 +23,8 @@ import {
   type PermissionRequest,
   type ToolInfo,
   type ToolResult,
+  type ContextBreakdown,
+  type ThreadTokenUsage,
 } from '@lace/ent-protocol';
 import type { z } from 'zod';
 import {
@@ -392,6 +394,164 @@ async function getModelPricing(
   } catch {
     return null;
   }
+}
+
+async function getContextLimitForModel(
+  state: AgentServerState,
+  connectionId?: string,
+  modelId?: string
+): Promise<number | null> {
+  // Keep behavior deterministic for tests and avoid network flakiness.
+  if (isTestProviderEnabled()) return null;
+
+  if (!connectionId || !modelId) return null;
+
+  try {
+    const instances = await state.providerInstances.loadInstances();
+    const instance = instances.instances[connectionId];
+    if (!instance) return null;
+
+    const catalogProvider = state.providerCatalog.getProvider(instance.catalogProviderId);
+    if (!catalogProvider) return null;
+
+    const model = catalogProvider.models.find((m) => m.id === modelId);
+    if (!model) return null;
+
+    return typeof model.context_window === 'number' ? model.context_window : null;
+  } catch {
+    return null;
+  }
+}
+
+async function computeContextBreakdownForActiveSession(state: AgentServerState): Promise<{
+  breakdown: ContextBreakdown;
+  tokenUsage: ThreadTokenUsage;
+}> {
+  const DEFAULT_CONTEXT_LIMIT = 200_000;
+  const RESERVED_FOR_RESPONSE_TOKENS = 4096;
+
+  const effectiveConfig = state.activeSession?.state.config
+    ? { ...state.config, ...state.activeSession.state.config }
+    : state.config;
+
+  const connectionId = effectiveConfig.connectionId;
+  const modelId = effectiveConfig.modelId ?? 'unknown-model';
+
+  const providerMessages = buildProviderMessagesFromDurableEvents(state.activeSession!.dir);
+
+  let systemPromptTokens = 0;
+  let userTokens = 0;
+  let assistantTokens = 0;
+  let toolCallTokens = 0;
+  let toolResultTokens = 0;
+
+  for (const message of providerMessages) {
+    if (message.role === 'system') systemPromptTokens += estimateTokens(message.content ?? '');
+    if (message.role === 'user') userTokens += estimateTokens(message.content ?? '');
+    if (message.role === 'assistant') assistantTokens += estimateTokens(message.content ?? '');
+
+    if ((message as any).toolCalls) {
+      toolCallTokens += estimateTokens(JSON.stringify((message as any).toolCalls));
+    }
+    if ((message as any).toolResults) {
+      toolResultTokens += estimateTokens(JSON.stringify((message as any).toolResults));
+    }
+  }
+
+  const { executor: coreExecutor } = createToolExecutorForMode(effectiveConfig.executionMode);
+  const { executor: allExecutor } = createToolExecutorForMode(
+    effectiveConfig.executionMode,
+    state.mcpServerManager
+  );
+
+  const coreTools = coreExecutor.getAllTools();
+  const coreToolNames = new Set(coreTools.map((t) => t.name));
+  const allTools = allExecutor.getAllTools();
+
+  const coreToolItems: Array<{ name: string; tokens: number }> = [];
+  const mcpToolItems: Array<{ name: string; tokens: number }> = [];
+  let coreToolsTokens = 0;
+  let mcpToolsTokens = 0;
+
+  for (const tool of coreTools) {
+    const schema = {
+      name: tool.name,
+      description: tool.description,
+      input_schema: tool.inputSchema,
+    };
+    const tokens = estimateTokens(JSON.stringify(schema));
+    coreToolItems.push({ name: tool.name, tokens });
+    coreToolsTokens += tokens;
+  }
+
+  for (const tool of allTools) {
+    if (coreToolNames.has(tool.name)) continue;
+    const schema = {
+      name: tool.name,
+      description: tool.description,
+      input_schema: tool.inputSchema,
+    };
+    const tokens = estimateTokens(JSON.stringify(schema));
+    mcpToolItems.push({ name: tool.name, tokens });
+    mcpToolsTokens += tokens;
+  }
+
+  const messagesTokens = userTokens + assistantTokens + toolCallTokens + toolResultTokens;
+  const totalUsedTokens = systemPromptTokens + coreToolsTokens + mcpToolsTokens + messagesTokens;
+
+  const contextLimit =
+    (await getContextLimitForModel(state, connectionId, effectiveConfig.modelId)) ??
+    DEFAULT_CONTEXT_LIMIT;
+
+  const percentUsed = contextLimit > 0 ? totalUsedTokens / contextLimit : 0;
+  const freeTokens = contextLimit - totalUsedTokens - RESERVED_FOR_RESPONSE_TOKENS;
+
+  const breakdown: ContextBreakdown = {
+    timestamp: new Date().toISOString(),
+    modelId,
+    contextLimit,
+    totalUsedTokens,
+    percentUsed,
+    categories: {
+      systemPrompt: { tokens: systemPromptTokens },
+      coreTools: {
+        tokens: coreToolsTokens,
+        ...(coreToolItems.length > 0 ? { items: coreToolItems } : {}),
+      },
+      mcpTools: {
+        tokens: mcpToolsTokens,
+        ...(mcpToolItems.length > 0 ? { items: mcpToolItems } : {}),
+      },
+      messages: {
+        tokens: messagesTokens,
+        subcategories: {
+          userMessages: { tokens: userTokens },
+          agentMessages: { tokens: assistantTokens },
+          toolCalls: { tokens: toolCallTokens },
+          toolResults: { tokens: toolResultTokens },
+        },
+      },
+      reservedForResponse: { tokens: RESERVED_FOR_RESPONSE_TOKENS },
+      freeSpace: { tokens: Math.max(0, freeTokens) },
+    },
+  };
+
+  const tokenUsage: ThreadTokenUsage = {
+    totalPromptTokens:
+      systemPromptTokens +
+      coreToolsTokens +
+      mcpToolsTokens +
+      userTokens +
+      toolCallTokens +
+      toolResultTokens,
+    totalCompletionTokens: assistantTokens,
+    totalTokens: totalUsedTokens,
+    contextLimit,
+    percentUsed,
+    nearLimit: percentUsed >= 0.8,
+  };
+
+  return { breakdown, tokenUsage };
 }
 
 function createToolExecutorForMode(
@@ -3621,6 +3781,32 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
 
     return result;
+  });
+
+  peer.onRequest('ent/session/token_usage', async (_params: unknown) => {
+    assertInitialized(state);
+    if (!state.activeSession)
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
+
+    const { tokenUsage } = await computeContextBreakdownForActiveSession(state);
+    return tokenUsage;
+  });
+
+  peer.onRequest('ent/session/context_breakdown', async (_params: unknown) => {
+    assertInitialized(state);
+    if (!state.activeSession)
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
+
+    const { breakdown } = await computeContextBreakdownForActiveSession(state);
+    return breakdown;
   });
 
   peer.onRequest('$/cancel_request', async (params: unknown) => {
