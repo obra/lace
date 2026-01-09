@@ -616,7 +616,16 @@ fn run_loop(
                         key.modifiers,
                     );
                     let action = match code {
-                        KeyCode::Tab => Some(UiAction::FocusNext),
+                        // Tab opens slash picker for autocomplete when in input with "/"
+                        KeyCode::Tab if state.focus == Focus::Input => {
+                            if state.input_buffer.starts_with('/')
+                                && !state.slash_commands.is_empty()
+                            {
+                                Some(UiAction::SlashPickerOpen)
+                            } else {
+                                None // Tab does nothing without "/" prefix
+                            }
+                        }
                         KeyCode::PageUp => Some(UiAction::ScrollUp),
                         KeyCode::PageDown => Some(UiAction::ScrollDown),
                         KeyCode::Up => match state.focus {
