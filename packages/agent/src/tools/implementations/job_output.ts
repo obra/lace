@@ -10,7 +10,7 @@ const jobOutputSchema = z.object({
   jobId: NonEmptyString,
   block: z.boolean().default(true),
   timeoutMs: z.number().int().min(0).max(600_000).default(30_000),
-  cursor: z.number().int().min(0).default(0),
+  byteOffset: z.number().int().min(0).default(0),
 });
 
 export class JobOutputTool extends Tool {
@@ -19,7 +19,7 @@ export class JobOutputTool extends Tool {
 
 **Blocking (default):** Waits up to timeoutMs for job completion, then returns.
 **Non-blocking:** Set block=false to check current status without waiting.
-**Incremental:** Use cursor (byte offset) to read new output since last check.
+**Incremental:** Use byteOffset to read new output since last check.
 
 Returns: { status: "running"|"completed"|"failed"|"cancelled", output: string, exitCode?: number }`;
   schema = jobOutputSchema;

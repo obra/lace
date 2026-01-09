@@ -4514,9 +4514,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                     typeof (finalInput as Record<string, unknown>).timeoutMs === 'number'
                       ? ((finalInput as Record<string, unknown>).timeoutMs as number)
                       : 30_000;
-                  const cursor =
-                    typeof (finalInput as Record<string, unknown>).cursor === 'number'
-                      ? ((finalInput as Record<string, unknown>).cursor as number)
+                  const byteOffset =
+                    typeof (finalInput as Record<string, unknown>).byteOffset === 'number'
+                      ? ((finalInput as Record<string, unknown>).byteOffset as number)
                       : 0;
 
                   // Block until job completion if requested
@@ -4550,15 +4550,15 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                       totalBytes = 0;
                     }
 
-                    const clampedCursor = Math.min(cursor, totalBytes);
-                    const bytesToRead = Math.max(0, totalBytes - clampedCursor);
+                    const clampedOffset = Math.min(byteOffset, totalBytes);
+                    const bytesToRead = Math.max(0, totalBytes - clampedOffset);
 
                     let output = '';
                     if (bytesToRead > 0) {
                       const fd = openSync(outputPath, 'r');
                       try {
                         const buf = Buffer.allocUnsafe(bytesToRead);
-                        const read = readSync(fd, buf, 0, bytesToRead, clampedCursor);
+                        const read = readSync(fd, buf, 0, bytesToRead, clampedOffset);
                         output = buf.subarray(0, read).toString('utf8');
                       } finally {
                         closeSync(fd);
@@ -4570,7 +4570,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                       status: record.status,
                       output,
                       ...(record.exitCode !== undefined ? { exitCode: record.exitCode } : {}),
-                      cursor: totalBytes,
+                      byteOffset: totalBytes,
                     };
 
                     coreResult = {
