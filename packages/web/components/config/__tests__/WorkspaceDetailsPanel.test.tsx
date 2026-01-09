@@ -16,7 +16,7 @@ describe('WorkspaceDetailsPanel', () => {
   const baseContainerInfo: WorkspaceInfo = {
     sessionId: 'session-123',
     projectDir: '/home/user/project',
-    clonePath: '/home/user/.lace/worktrees/session-123',
+    clonePath: '/home/user/.lace_web/worktrees/session-123',
     containerId: 'workspace-session-123',
     state: 'running',
     containerMountPath: '/workspace',

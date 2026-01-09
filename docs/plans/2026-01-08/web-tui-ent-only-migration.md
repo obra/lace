@@ -14,7 +14,7 @@ Make **both** UIs (web + TUI) manage providers, provider instances (connections)
 
 - Web/TUI MUST NOT:
   - read `packages/agent/**/providers/**` catalog files
-  - read/write `~/.lace/**` or any `provider-instances.json` / credential files
+  - read/write `~/.lace/**` (agent-owned state) or any `provider-instances.json` / credential files
   - call `ProviderRegistry`, `ProviderInstanceManager`, `ProviderCatalogManager`, etc
 - Web/TUI MAY:
   - start/own a supervisor session / agent process
@@ -153,11 +153,12 @@ Validated (2026-01-08):
 
 #### A) “Definition of Done” checks (run repeatedly)
 
-- [ ] `rg -n "@lace/agent" packages/web` returns **0 runtime hits** (tests may remain temporarily only if explicitly allowed).
-- [ ] `rg -n "@lace/web/lib/server/lace-imports" packages/web` returns **0 runtime hits** (tests may remain temporarily only if explicitly allowed).
-- [ ] `rg -n "@lace/agent" packages/tui` returns **0 hits**.
-- [ ] TUI has **no** repo-relative path assumptions to spawn the agent (`../agent/dist/*` etc.).
-- [ ] Provider/model/credentials management remains ENT-only (web + TUI).
+- [x] `rg -n "@lace/agent" packages/web` returns **0 runtime hits** (tests may remain temporarily only if explicitly allowed).
+- [x] `rg -n "@lace/web/lib/server/lace-imports" packages/web` returns **0 runtime hits** (tests may remain temporarily only if explicitly allowed).
+- [x] `rg -n "@lace/agent" packages/tui` returns **0 hits** (should be impossible; different language).
+- [x] TUI has **no** repo-relative path assumptions to spawn the agent (`../agent/dist/*` etc.).
+- [x] Web/TUI do not read/write `~/.lace/**` (agent-owned).
+- [x] Provider/model/credentials management remains ENT-only (web + TUI).
 
 #### B) Protocol spec + behavior confirmations (docs + schemas)
 
@@ -265,6 +266,7 @@ Runtime imports of `@lace/web/lib/server/lace-imports` to remove:
 Hard-rule fix first:
 
 - [x] `packages/tui/src/ui/mod.rs`: remove hardcoded `../agent/dist/main.js` default agent path (no repo-layout coupling).
+- [x] TUI stores state/logs under its own dir (defaults to `~/.lace_tui`, override with `LACE_TUI_DIR`), not `~/.lace/**`.
 
 Parity checklist:
 
@@ -299,8 +301,8 @@ Parity checklist:
 
 ### Definition of Done
 
-- [ ] Provider/model/credentials management: web + TUI are ENT-only.
+- [x] Provider/model/credentials management: web + TUI are ENT-only.
 - [x] Web runtime has no `@lace/agent/*` imports and no runtime use of `@lace/web/lib/server/lace-imports`.
-- [ ] TUI has no repo-layout coupling to spawn the agent and no `@lace/agent/*` imports.
+- [x] TUI has no repo-layout coupling to spawn the agent and no `@lace/agent/*` imports.
 - [x] Agent ENT conformance suite is exhaustive (every method covered with success + key negative cases).
-- [ ] `npm test` (root) passes.
+- [x] `npm test` (root) passes.
