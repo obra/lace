@@ -211,22 +211,6 @@ fn run_loop(
                         continue;
                     }
 
-                    if state.models_panel.open {
-                        let action = match key.code {
-                            KeyCode::Esc => Some(UiAction::CloseModelsPanel),
-                            KeyCode::Up => Some(UiAction::ModelsPrev),
-                            KeyCode::Down => Some(UiAction::ModelsNext),
-                            KeyCode::Char('r') => Some(UiAction::ModelsRefresh),
-                            KeyCode::Enter => Some(UiAction::ModelsSelect),
-                            _ => None,
-                        };
-                        if let Some(action) = action {
-                            let out = apply_ui_action(state, action);
-                            send_outbound(transport, state, out, timeout_ms)?;
-                        }
-                        continue;
-                    }
-
                     if state.connections.models.open {
                         let action = match key.code {
                             KeyCode::Esc => Some(UiAction::ConnectionsModelsClose),
@@ -805,12 +789,7 @@ fn handle_agent_line(
                     send_outbound(transport, state, out, timeout_ms)?;
                 }
                 if method == "ent/session/configure" && !state.config_wizard.open {
-                    if let Some(err) = error_message {
-                        if state.models_panel.open {
-                            state.models_panel.error = Some(err.to_string());
-                            state.models_panel.loading = false;
-                        }
-                    } else {
+                    if error_message.is_none() {
                         let (conn, model) = ent::extract_session_configure_config(&result);
                         if conn.is_some() {
                             state.connection_id = conn;
@@ -821,19 +800,7 @@ fn handle_agent_line(
                         state.prefs.last_connection_id = state.connection_id.clone();
                         state.prefs.last_model_id = state.model_id.clone();
                         let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
-
-                        if state.models_panel.open {
-                            state.models_panel.error = None;
-                            state.models_panel.loading = false;
-                        }
                     }
-                }
-                if method == "ent/models/list" && state.models_panel.open {
-                    crate::app::config_panels::handle_models_list(state, &result, error_message);
-                }
-                if method == "ent/models/refresh" && state.models_panel.open {
-                    let out = crate::app::config_panels::request_models_list(state);
-                    send_outbound(transport, state, out, timeout_ms)?;
                 }
                 if method == "ent/models/list" && state.connections.models.open {
                     crate::app::connections::handle_models_list_response(state, &result, error_message);
@@ -1028,10 +995,6 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
         let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
         f.render_widget(render_env_modal(state), area);
-    } else if state.models_panel.open {
-        let area = centered_rect(80, 70, f.area());
-        f.render_widget(Clear, area);
-        f.render_widget(render_models_modal(state), area);
     } else if state.connections.models.open {
         let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
@@ -1564,74 +1527,6 @@ fn render_env_modal(state: &AppState) -> Paragraph<'static> {
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "Enter add/update • d delete • s apply • Esc close",
-        Style::default().fg(colors.fg_muted),
-    )));
-
-    Paragraph::new(Text::from(lines))
-        .style(Style::default().bg(colors.bg_elevated))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(colors.border_subtle))
-                .border_type(BorderType::Rounded),
-        )
-        .wrap(Wrap { trim: true })
-}
-
-fn render_models_modal(state: &AppState) -> Paragraph<'static> {
-    let styles = theme_styles(state.prefs.theme);
-    let colors = &styles.colors;
-    let mut lines: Vec<Line> = Vec::new();
-
-    // Title
-    lines.push(Line::from(Span::styled(
-        "Models",
-        Style::default()
-            .fg(colors.fg_primary)
-            .add_modifier(Modifier::BOLD),
-    )));
-    lines.push(Line::from(Span::styled(
-        "(enabled only)",
-        Style::default().fg(colors.fg_muted),
-    )));
-    lines.push(Line::from(""));
-
-    if let Some(err) = &state.models_panel.error {
-        lines.push(Line::from(Span::styled(
-            format!("Error: {err}"),
-            Style::default().fg(colors.error),
-        )));
-    } else if state.models_panel.loading {
-        lines.push(Line::from(Span::styled(
-            "Loading models...",
-            Style::default().fg(colors.fg_muted),
-        )));
-    } else {
-        let max = 18usize;
-        let start = state.models_panel.selected.saturating_sub(max / 2);
-        let end = (start + max).min(state.models_panel.models.len());
-        for i in start..end {
-            let selected = i == state.models_panel.selected;
-            let marker = if selected { "▸ " } else { "  " };
-            let m = &state.models_panel.models[i];
-            let style = if selected {
-                Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
-            } else {
-                Style::default().fg(colors.fg_secondary)
-            };
-            lines.push(Line::from(Span::styled(format!("{marker}{}", m.name), style)));
-        }
-        if state.models_panel.models.is_empty() {
-            lines.push(Line::from(Span::styled(
-                "No models found",
-                Style::default().fg(colors.fg_muted),
-            )));
-        }
-    }
-
-    lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "Enter select • r refresh • Esc close",
         Style::default().fg(colors.fg_muted),
     )));
 

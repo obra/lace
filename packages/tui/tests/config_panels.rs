@@ -1,6 +1,4 @@
-use lace_tui::app::config_panels::{
-    handle_models_list, maybe_autoconfigure_from_connections,
-};
+use lace_tui::app::config_panels::maybe_autoconfigure_from_connections;
 use lace_tui::app::reducer::Outbound;
 use lace_tui::app::AppState;
 use serde_json::json;
@@ -45,21 +43,4 @@ fn autoconfigure_skips_when_connection_missing() {
 
     let out = maybe_autoconfigure_from_connections(&mut state, &result);
     assert!(out.is_empty());
-}
-
-#[test]
-fn models_list_filters_disabled_models() {
-    let mut state = AppState::new_with_paths(None, None);
-    state.models_panel.open = true;
-    let result = Some(json!({
-        "providerId": "openai",
-        "connectionId": "conn-1",
-        "models": [
-            { "modelId": "gpt-4o", "name": "GPT-4o" },
-            { "modelId": "gpt-3.5", "name": "GPT-3.5", "disabled": true }
-        ]
-    }));
-    handle_models_list(&mut state, &result, None);
-    assert_eq!(state.models_panel.models.len(), 1);
-    assert_eq!(state.models_panel.models[0].model_id, "gpt-4o");
 }

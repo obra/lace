@@ -67,13 +67,6 @@ pub enum UiAction {
     EnvApply,
     CloseEnvEditor,
 
-    OpenModelsPanel,
-    ModelsPrev,
-    ModelsNext,
-    ModelsSelect,
-    ModelsRefresh,
-    CloseModelsPanel,
-
     OpenConnections,
     ConnectionsPrev,
     ConnectionsNext,
@@ -420,22 +413,6 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             crate::app::config_panels::close_env_editor(state);
             Vec::new()
         }
-        UiAction::OpenModelsPanel => crate::app::config_panels::open_models_panel(state),
-        UiAction::ModelsPrev => {
-            state.models_panel.selected = state.models_panel.selected.saturating_sub(1);
-            Vec::new()
-        }
-        UiAction::ModelsNext => {
-            let max = state.models_panel.models.len().saturating_sub(1);
-            state.models_panel.selected = (state.models_panel.selected + 1).min(max);
-            Vec::new()
-        }
-        UiAction::ModelsSelect => crate::app::config_panels::select_model_for_session(state),
-        UiAction::ModelsRefresh => crate::app::config_panels::request_models_refresh(state),
-        UiAction::CloseModelsPanel => {
-            crate::app::config_panels::close_models_panel(state);
-            Vec::new()
-        }
         UiAction::OpenConnections => crate::app::connections::open_connections(state),
         UiAction::ConnectionsPrev => {
             crate::app::connections::prev(state);
@@ -666,10 +643,6 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 PaletteCommand::OpenEnvEditorCmd => {
                     let _ = apply_ui_action(state, UiAction::OpenEnvEditor);
                 }
-                PaletteCommand::OpenModelsPanelCmd => {
-                    let out_models = apply_ui_action(state, UiAction::OpenModelsPanel);
-                    out.extend(out_models);
-                }
                 PaletteCommand::OpenConnectionsCmd => {
                     let out_connections = apply_ui_action(state, UiAction::OpenConnections);
                     out.extend(out_connections);
@@ -858,7 +831,6 @@ enum PaletteCommand {
     KeybindDefault,
     KeybindVim,
     OpenEnvEditorCmd,
-    OpenModelsPanelCmd,
     OpenConnectionsCmd,
     Quit,
 }
@@ -910,10 +882,6 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
         PaletteItem {
             label: "Environment...",
             command: PaletteCommand::OpenEnvEditorCmd,
-        },
-        PaletteItem {
-            label: "Models...",
-            command: PaletteCommand::OpenModelsPanelCmd,
         },
         PaletteItem {
             label: "Connections...",
