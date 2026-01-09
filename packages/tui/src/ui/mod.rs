@@ -785,8 +785,20 @@ fn handle_agent_line(
                     send_outbound(transport, state, out, timeout_ms)?;
                 }
                 if method == "ent/connections/upsert" && state.connections.open {
-                    let out = connections::handle_upsert_response(state, error_message);
-                    send_outbound(transport, state, out, timeout_ms)?;
+                    // Handle upsert response for model toggle when models panel is open
+                    if state.connections.models.open {
+                        state.connections.models.loading = false;
+                        if let Some(err) = error_message {
+                            state.connections.models.error = Some(err.to_string());
+                            // Revert optimistic update by re-fetching model list
+                            let out = connections::open_models(state);
+                            send_outbound(transport, state, out, timeout_ms)?;
+                        }
+                        // On success, the optimistic update is already applied
+                    } else {
+                        let out = connections::handle_upsert_response(state, error_message);
+                        send_outbound(transport, state, out, timeout_ms)?;
+                    }
                 }
                 if state.config_wizard.open && method.starts_with("ent/") {
                     let out = config_wizard::handle_response(state, method, &result, error_message);
@@ -826,18 +838,9 @@ fn handle_agent_line(
                 if method == "ent/models/list" && state.connections.models.open {
                     crate::app::connections::handle_models_list_response(state, &result, error_message);
                 }
-                if (method == "ent/models/enable" || method == "ent/models/disable")
-                    && state.connections.models.open
-                {
-                    if error_message.is_some() {
-                        state.connections.models.error = error_message.map(|s| s.to_string());
-                        state.connections.models.loading = false;
-                    } else {
-                        crate::app::connections::apply_model_toggle_result(state, &result);
-                        let out = crate::app::connections::open_models(state);
-                        send_outbound(transport, state, out, timeout_ms)?;
-                    }
-                }
+                // Note: Model toggling now uses ent/connections/upsert instead of
+                // ent/models/enable/disable, which operates at the connection level
+                // rather than provider level, avoiding issues with dynamic model catalogs.
                 if method == "ent/models/refresh" && state.connections.models.open {
                     let out = crate::app::connections::open_models(state);
                     send_outbound(transport, state, out, timeout_ms)?;
@@ -1283,8 +1286,8 @@ fn render_search_modal(state: &AppState) -> Paragraph<'static> {
         let start = s.selected.saturating_sub(max / 2);
         let end = (start + max).min(s.results.len());
         for idx in start..end {
-            let marker = if idx == s.selected { ">" } else { " " };
-            lines.push(Line::from(format!("{marker} {}", s.results[idx].label)));
+            let marker = if idx == s.selected { "▸ " } else { "  " };
+            lines.push(Line::from(format!("{marker}{}", s.results[idx].label)));
         }
     }
 
@@ -1807,7 +1810,10 @@ fn render_connections_models_modal(state: &AppState) -> Paragraph<'static> {
             Style::default().fg(colors.fg_muted),
         )));
     } else {
-        let max = 18usize;
+        // Use max=10 to ensure the legend is visible in small terminals (24 rows).
+        // With a 70% height modal (~16 rows), minus borders (2), minus fixed content
+        // (title, empty lines, legend = 4), we have ~10 rows for models.
+        let max = 10usize;
         let start = state.connections.models.selected.saturating_sub(max / 2);
         let end = (start + max).min(state.connections.models.models.len());
         for i in start..end {
@@ -1911,22 +1917,14 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
             text.push_str(" ▌");
         }
 
-        if state.prefs.render_markdown {
-            for l in markdown::render_markdownish_lines(&text) {
-                let style = if l.is_code {
-                    Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
-                } else {
-                    Style::default().fg(colors.fg_primary)
-                };
-                lines.push(Line::from(Span::styled(l.text, style)));
-            }
-        } else {
-            for l in text.lines() {
-                lines.push(Line::from(Span::styled(
-                    l.to_string(),
-                    Style::default().fg(colors.fg_primary),
-                )));
-            }
+        // Markdown rendering is always enabled
+        for l in markdown::render_markdownish_lines(&text) {
+            let style = if l.is_code {
+                Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
+            } else {
+                Style::default().fg(colors.fg_primary)
+            };
+            lines.push(Line::from(Span::styled(l.text, style)));
         }
     }
 
@@ -1971,8 +1969,8 @@ fn render_activity(state: &AppState) -> Paragraph<'static> {
     let start = total.saturating_sub(200);
     for (idx, item) in state.activity.iter().enumerate().skip(start) {
         let selected = idx == state.activity_selected && state.focus == Focus::Activity;
-        let sel_marker = if selected { ">" } else { " " };
-        let exp_marker = if item.expanded { "v" } else { " " };
+        let sel_marker = if selected { "▸" } else { " " };
+        let exp_marker = if item.expanded { "▾" } else { " " };
 
         let mut style = Style::default();
         if selected {
@@ -2531,14 +2529,9 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
             text.push_str(" ▌");
         }
 
-        if state.prefs.render_markdown {
-            for l in markdown::render_markdownish_lines(&text) {
-                total += wrapped_line_count(content_width, &l.text);
-            }
-        } else {
-            for l in text.lines() {
-                total += wrapped_line_count(content_width, l);
-            }
+        // Markdown rendering is always enabled
+        for l in markdown::render_markdownish_lines(&text) {
+            total += wrapped_line_count(content_width, &l.text);
         }
     }
 
@@ -2827,5 +2820,167 @@ mod tests {
         assert_eq!(format_token_count(1_000_000), "1.0M");
         assert_eq!(format_token_count(1_500_000), "1.5M");
         assert_eq!(format_token_count(10_000_000), "10.0M");
+    }
+
+    #[test]
+    fn connections_models_modal_shows_legend_after_toggle() {
+        use crate::app::connections::{ConnectionModelItem, toggle_selected_model};
+
+        let mut state = AppState::new_with_paths(None, None);
+        state.connections.open = true;
+        state.connections.models.open = true;
+        state.connections.models.loading = false;
+        state.connections.models.connection_id = Some("conn-1".to_string());
+        state.connections.models.connection_name = Some("Test Connection".to_string());
+        state.connections.models.models = vec![
+            ConnectionModelItem {
+                model_id: "model-1".to_string(),
+                name: "Model One".to_string(),
+                disabled: false,
+            },
+            ConnectionModelItem {
+                model_id: "model-2".to_string(),
+                name: "Model Two".to_string(),
+                disabled: false,
+            },
+        ];
+        state.connections.models.selected = 0;
+
+        // Render before toggle and check for legend
+        let backend = TestBackend::new(80, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|f| draw(f, &state)).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let buffer_str: String = (0..buffer.area.height)
+            .flat_map(|y| {
+                (0..buffer.area.width)
+                    .map(move |x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+            })
+            .collect();
+
+        assert!(
+            buffer_str.contains("Enter/Space toggle"),
+            "Legend should be visible before toggle. Buffer content:\n{}",
+            buffer_str
+        );
+
+        // Toggle the model
+        let _out = toggle_selected_model(&mut state);
+
+        // loading is now true, render again
+        terminal.draw(|f| draw(f, &state)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let buffer_str_loading: String = (0..buffer.area.height)
+            .flat_map(|y| {
+                (0..buffer.area.width)
+                    .map(move |x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+            })
+            .collect();
+
+        assert!(
+            buffer_str_loading.contains("Enter/Space toggle"),
+            "Legend should be visible during loading. Buffer content:\n{}",
+            buffer_str_loading
+        );
+
+        // Simulate response: loading = false
+        state.connections.models.loading = false;
+
+        terminal.draw(|f| draw(f, &state)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let buffer_str_after: String = (0..buffer.area.height)
+            .flat_map(|y| {
+                (0..buffer.area.width)
+                    .map(move |x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+            })
+            .collect();
+
+        assert!(
+            buffer_str_after.contains("Enter/Space toggle"),
+            "Legend should be visible after toggle. Buffer content:\n{}",
+            buffer_str_after
+        );
+    }
+
+    #[test]
+    fn connections_models_modal_shows_legend_with_many_models() {
+        use crate::app::connections::{ConnectionModelItem, toggle_selected_model};
+
+        let mut state = AppState::new_with_paths(None, None);
+        state.connections.open = true;
+        state.connections.models.open = true;
+        state.connections.models.loading = false;
+        state.connections.models.connection_id = Some("conn-1".to_string());
+        state.connections.models.connection_name = Some("Test Connection".to_string());
+
+        // Create 20 models to test windowing
+        state.connections.models.models = (0..20)
+            .map(|i| ConnectionModelItem {
+                model_id: format!("model-{}", i),
+                name: format!("Model Number {}", i),
+                disabled: false,
+            })
+            .collect();
+        state.connections.models.selected = 10; // Select middle model
+
+        // Render with a smaller terminal to trigger potential overflow
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|f| draw(f, &state)).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let buffer_str: String = (0..buffer.area.height)
+            .flat_map(|y| {
+                (0..buffer.area.width)
+                    .map(move |x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+            })
+            .collect();
+
+        // Before fix: This assertion would fail because max=18 is too large
+        // After fix: max=12 should ensure legend is visible
+        assert!(
+            buffer_str.contains("Enter/Space toggle"),
+            "Legend should be visible with many models before toggle. Buffer:\n{}",
+            buffer_str
+        );
+
+        // Toggle the selected model
+        let _out = toggle_selected_model(&mut state);
+
+        // During loading, content shrinks significantly
+        assert!(state.connections.models.loading);
+        terminal.draw(|f| draw(f, &state)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let buffer_str_loading: String = (0..buffer.area.height)
+            .flat_map(|y| {
+                (0..buffer.area.width)
+                    .map(move |x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+            })
+            .collect();
+
+        assert!(
+            buffer_str_loading.contains("Enter/Space toggle"),
+            "Legend should be visible during loading. Buffer:\n{}",
+            buffer_str_loading
+        );
+
+        // After response, loading = false
+        state.connections.models.loading = false;
+
+        terminal.draw(|f| draw(f, &state)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let buffer_str_after: String = (0..buffer.area.height)
+            .flat_map(|y| {
+                (0..buffer.area.width)
+                    .map(move |x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+            })
+            .collect();
+
+        assert!(
+            buffer_str_after.contains("Enter/Space toggle"),
+            "Legend should be visible with many models after toggle. Buffer:\n{}",
+            buffer_str_after
+        );
     }
 }

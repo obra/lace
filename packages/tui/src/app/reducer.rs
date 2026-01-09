@@ -84,7 +84,7 @@ pub fn reduce(state: &mut AppState, event: AppEvent) -> Vec<Outbound> {
         AppEvent::JobFinished { .. } => Vec::new(),
         AppEvent::PermissionRequested(req) => {
             if let Some(decision) = auto_permission_decision(state, &req) {
-                if let Ok(out) = decide_permission(req.clone(), &decision, None) {
+                if let Ok(out) = decide_permission(req.clone(), &decision) {
                     return out;
                 }
             }
@@ -136,22 +136,12 @@ pub fn take_next_permission(state: &mut AppState) -> Option<PermissionRequest> {
 pub fn decide_permission(
     request: PermissionRequest,
     decision: &str,
-    guidance: Option<&str>,
 ) -> Result<Vec<Outbound>, String> {
     if !request.options.is_empty() && !request.options.iter().any(|o| o.option_id == decision) {
         return Err(format!("invalid optionId: {decision}"));
     }
 
-    let mut result_map: serde_json::Map<String, Value> = serde_json::Map::new();
-    result_map.insert("decision".to_string(), Value::String(decision.to_string()));
-
-    if let Some(g) = guidance {
-        if !g.is_empty() {
-            result_map.insert("guidance".to_string(), Value::String(g.to_string()));
-        }
-    }
-
-    let result = Value::Object(result_map);
+    let result = serde_json::json!({ "decision": decision });
     Ok(vec![Outbound::JsonRpcResponse {
         id: request.id,
         result,
@@ -322,7 +312,7 @@ mod tests {
         assert_eq!(state.permission_queue.len(), 1);
 
         let active = take_next_permission(&mut state).unwrap();
-        let out = decide_permission(active, "allow", None).unwrap();
+        let out = decide_permission(active, "allow").unwrap();
         assert_eq!(
             out,
             vec![Outbound::JsonRpcResponse {

@@ -46,7 +46,6 @@ pub enum UiAction {
     ToggleMultilineInput,
     SetTheme(crate::app::prefs::Theme),
     SetKeybindMode(crate::app::prefs::KeybindMode),
-    ToggleMarkdownRendering,
     SendInput,
 
     CopySelectedActivity,
@@ -312,11 +311,6 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         }
         UiAction::SetKeybindMode(mode) => {
             state.prefs.keybind_mode = mode;
-            let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
-            Vec::new()
-        }
-        UiAction::ToggleMarkdownRendering => {
-            state.prefs.render_markdown = !state.prefs.render_markdown;
             let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
             Vec::new()
         }
@@ -640,9 +634,6 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 PaletteCommand::Sessions => {
                     out.extend(crate::app::sessions::open_sessions(state));
                 }
-                PaletteCommand::Search => {
-                    crate::app::search::open(state);
-                }
                 PaletteCommand::ToggleMultilineInput => {
                     let _ = apply_ui_action(state, UiAction::ToggleMultilineInput);
                 }
@@ -672,24 +663,6 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                         UiAction::SetKeybindMode(crate::app::prefs::KeybindMode::Vim),
                     );
                 }
-                PaletteCommand::ToggleMarkdownRendering => {
-                    let _ = apply_ui_action(state, UiAction::ToggleMarkdownRendering);
-                }
-                PaletteCommand::CopySelectedActivity => {
-                    let _ = apply_ui_action(state, UiAction::CopySelectedActivity);
-                }
-                PaletteCommand::CopyLastAssistantMessage => {
-                    let _ = apply_ui_action(state, UiAction::CopyLastAssistantMessage);
-                }
-                PaletteCommand::CopyToolInput => {
-                    let _ = apply_ui_action(state, UiAction::CopyToolInput);
-                }
-                PaletteCommand::CopyToolResult => {
-                    let _ = apply_ui_action(state, UiAction::CopyToolResult);
-                }
-                PaletteCommand::ExportTranscript => {
-                    let _ = apply_ui_action(state, UiAction::ExportTranscript);
-                }
                 PaletteCommand::OpenEnvEditorCmd => {
                     let _ = apply_ui_action(state, UiAction::OpenEnvEditor);
                 }
@@ -700,9 +673,6 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 PaletteCommand::OpenConnectionsCmd => {
                     let out_connections = apply_ui_action(state, UiAction::OpenConnections);
                     out.extend(out_connections);
-                }
-                PaletteCommand::FocusInput => {
-                    state.focus = crate::app::Focus::Input;
                 }
                 PaletteCommand::Quit => {
                     state.should_exit = true;
@@ -731,25 +701,36 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 return Vec::new();
             };
 
-            // When guidance row is selected (index == options.len()), default to first option
-            let selected_idx = if state.active_permission_selected >= req.options.len() {
-                0
-            } else {
-                state.active_permission_selected
-            };
+            let has_guidance = !state.permission_guidance_input.is_empty();
 
-            let decision = req
-                .options
-                .get(selected_idx)
-                .map(|o| o.option_id.clone())
-                .unwrap_or_default();
+            // When guidance is provided, always deny (guidance = "no, do this instead")
+            // When guidance row is selected (index == options.len()), default to first option
+            let decision = if has_guidance {
+                // Find a deny option, or fall back to "deny" string
+                req.options
+                    .iter()
+                    .find(|o| o.option_id.to_lowercase().contains("deny"))
+                    .map(|o| o.option_id.clone())
+                    .unwrap_or_else(|| "deny".to_string())
+            } else {
+                let selected_idx = if state.active_permission_selected >= req.options.len() {
+                    0
+                } else {
+                    state.active_permission_selected
+                };
+                req.options
+                    .get(selected_idx)
+                    .map(|o| o.option_id.clone())
+                    .unwrap_or_default()
+            };
 
             if decision.is_empty() {
                 state.push_debug_line("permission: no options available".to_string());
                 return Vec::new();
             }
 
-            if should_remember_permission_decision(&decision) {
+            // Only remember decisions when not providing guidance (guidance = rejection)
+            if !has_guidance && should_remember_permission_decision(&decision) {
                 if let Some(key) = crate::app::reducer::permission_allow_key(&req) {
                     state.permission_allowlist.insert(key, decision.clone());
                 }
@@ -766,14 +747,27 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 );
             }
 
-            let guidance = if state.permission_guidance_input.is_empty() {
-                None
-            } else {
-                Some(state.permission_guidance_input.as_str())
-            };
-
-            match decide_permission(req, &decision, guidance) {
-                Ok(out) => {
+            match decide_permission(req, &decision) {
+                Ok(mut out) => {
+                    // If guidance was provided, send it as a follow-up user message
+                    // This way the agent gets: 1) permission denied, 2) guidance as user input
+                    if has_guidance {
+                        let guidance_text = std::mem::take(&mut state.permission_guidance_input);
+                        let id = state.next_client_id();
+                        state.active_prompt_request_ids.insert(id.clone());
+                        state.messages.push(ChatMessage {
+                            role: Role::User,
+                            text: guidance_text.clone(),
+                            streaming: false,
+                            turn_id: None,
+                            turn_seq: None,
+                        });
+                        out.push(Outbound::JsonRpcRequest {
+                            id,
+                            method: "session/prompt".to_string(),
+                            params: Some(json!({ "content": [ { "type": "text", "text": guidance_text } ] })),
+                        });
+                    }
                     state.permission_guidance_input.clear();
                     state.activate_next_permission_if_needed();
                     out
@@ -857,20 +851,12 @@ enum PaletteCommand {
     NewSession,
     Configure,
     Sessions,
-    Search,
     ToggleMultilineInput,
     ThemeDark,
     ThemeLight,
     ThemeHighContrast,
     KeybindDefault,
     KeybindVim,
-    ToggleMarkdownRendering,
-    CopySelectedActivity,
-    CopyLastAssistantMessage,
-    CopyToolInput,
-    CopyToolResult,
-    ExportTranscript,
-    FocusInput,
     OpenEnvEditorCmd,
     OpenModelsPanelCmd,
     OpenConnectionsCmd,
@@ -898,10 +884,6 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
             command: PaletteCommand::Sessions,
         },
         PaletteItem {
-            label: "Search...",
-            command: PaletteCommand::Search,
-        },
-        PaletteItem {
             label: "Toggle Multiline Input",
             command: PaletteCommand::ToggleMultilineInput,
         },
@@ -926,30 +908,6 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
             command: PaletteCommand::KeybindVim,
         },
         PaletteItem {
-            label: "Toggle Markdown Rendering",
-            command: PaletteCommand::ToggleMarkdownRendering,
-        },
-        PaletteItem {
-            label: "Copy Selected Activity",
-            command: PaletteCommand::CopySelectedActivity,
-        },
-        PaletteItem {
-            label: "Copy Last Assistant Message",
-            command: PaletteCommand::CopyLastAssistantMessage,
-        },
-        PaletteItem {
-            label: "Copy Tool Input",
-            command: PaletteCommand::CopyToolInput,
-        },
-        PaletteItem {
-            label: "Copy Tool Result",
-            command: PaletteCommand::CopyToolResult,
-        },
-        PaletteItem {
-            label: "Export Transcript",
-            command: PaletteCommand::ExportTranscript,
-        },
-        PaletteItem {
             label: "Environment...",
             command: PaletteCommand::OpenEnvEditorCmd,
         },
@@ -960,10 +918,6 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
         PaletteItem {
             label: "Connections...",
             command: PaletteCommand::OpenConnectionsCmd,
-        },
-        PaletteItem {
-            label: "Focus Input",
-            command: PaletteCommand::FocusInput,
         },
         PaletteItem {
             label: "Quit",
@@ -1172,11 +1126,12 @@ mod tests {
     }
 
     #[test]
-    fn permission_submit_with_guidance_includes_guidance_in_response() {
+    fn permission_submit_with_guidance_denies_and_sends_prompt() {
         use crate::app::{PermissionOption, PermissionRequest};
         use serde_json::json;
 
         let mut state = AppState::new();
+        state.next_client_seq = 5;
         state.active_permission = Some(PermissionRequest {
             id: json!("a_1"),
             tool: Some("shell.exec".to_string()),
@@ -1197,25 +1152,42 @@ mod tests {
                 },
             ],
         });
+        // Even with "allow" selected, guidance should cause denial
         state.active_permission_selected = 0;
         state.permission_guidance_input = "be careful with output".to_string();
 
         let out = apply_ui_action(&mut state, UiAction::PermissionSubmit);
-        assert_eq!(out.len(), 1);
+        // Should produce 2 outputs: deny response + prompt request
+        assert_eq!(out.len(), 2);
         assert!(state.active_permission.is_none());
         // Guidance should be cleared after submission
         assert!(state.permission_guidance_input.is_empty());
 
+        // First output: plain deny (no guidance field)
         match &out[0] {
             Outbound::JsonRpcResponse { id, result } => {
                 assert_eq!(id, &json!("a_1"));
-                assert_eq!(
-                    result,
-                    &json!({"decision":"allow","guidance":"be careful with output"})
-                );
+                assert_eq!(result, &json!({"decision":"deny"}));
             }
             _ => panic!("expected response"),
         }
+
+        // Second output: session/prompt with guidance text
+        match &out[1] {
+            Outbound::JsonRpcRequest { id, method, params } => {
+                assert_eq!(id, "c_5");
+                assert_eq!(method, "session/prompt");
+                let params = params.as_ref().unwrap();
+                let content = params.get("content").unwrap().as_array().unwrap();
+                assert_eq!(content[0].get("text").unwrap(), "be careful with output");
+            }
+            _ => panic!("expected request"),
+        }
+
+        // Guidance should also appear in chat as user message
+        assert_eq!(state.messages.len(), 1);
+        assert_eq!(state.messages[0].role, Role::User);
+        assert_eq!(state.messages[0].text, "be careful with output");
     }
 
     #[test]
@@ -1294,11 +1266,12 @@ mod tests {
     }
 
     #[test]
-    fn permission_submit_from_guidance_row_uses_first_option() {
+    fn permission_submit_from_guidance_row_denies_and_sends_prompt() {
         use crate::app::{PermissionOption, PermissionRequest};
         use serde_json::json;
 
         let mut state = AppState::new();
+        state.next_client_seq = 7;
         state.active_permission = Some(PermissionRequest {
             id: json!("a_1"),
             tool: Some("shell.exec".to_string()),
@@ -1324,16 +1297,69 @@ mod tests {
         state.permission_guidance_input = "test guidance".to_string();
 
         let out = apply_ui_action(&mut state, UiAction::PermissionSubmit);
+        // Should produce 2 outputs: deny response + prompt request
+        assert_eq!(out.len(), 2);
+
+        // First output: plain deny (no guidance field)
+        match &out[0] {
+            Outbound::JsonRpcResponse { id, result } => {
+                assert_eq!(id, &json!("a_1"));
+                assert_eq!(result, &json!({"decision":"deny"}));
+            }
+            _ => panic!("expected response"),
+        }
+
+        // Second output: session/prompt with guidance text
+        match &out[1] {
+            Outbound::JsonRpcRequest { id, method, params } => {
+                assert_eq!(id, "c_7");
+                assert_eq!(method, "session/prompt");
+                let params = params.as_ref().unwrap();
+                let content = params.get("content").unwrap().as_array().unwrap();
+                assert_eq!(content[0].get("text").unwrap(), "test guidance");
+            }
+            _ => panic!("expected request"),
+        }
+    }
+
+    #[test]
+    fn permission_submit_from_guidance_row_without_text_uses_first_option() {
+        use crate::app::{PermissionOption, PermissionRequest};
+        use serde_json::json;
+
+        let mut state = AppState::new();
+        state.active_permission = Some(PermissionRequest {
+            id: json!("a_1"),
+            tool: Some("shell.exec".to_string()),
+            kind: None,
+            resource: None,
+            tool_call_id: None,
+            turn_id: None,
+            turn_seq: None,
+            job_id: None,
+            options: vec![
+                PermissionOption {
+                    option_id: "allow".to_string(),
+                    label: "Allow".to_string(),
+                },
+                PermissionOption {
+                    option_id: "deny".to_string(),
+                    label: "Deny".to_string(),
+                },
+            ],
+        });
+        // Select guidance row (index 2) but no guidance text
+        state.active_permission_selected = 2;
+        state.permission_guidance_input.clear();
+
+        let out = apply_ui_action(&mut state, UiAction::PermissionSubmit);
         assert_eq!(out.len(), 1);
 
         match &out[0] {
             Outbound::JsonRpcResponse { id, result } => {
                 assert_eq!(id, &json!("a_1"));
-                // Should default to first option (allow) when on guidance row
-                assert_eq!(
-                    result,
-                    &json!({"decision":"allow","guidance":"test guidance"})
-                );
+                // Without guidance text, falls back to first option
+                assert_eq!(result, &json!({"decision":"allow"}));
             }
             _ => panic!("expected response"),
         }
@@ -1426,30 +1452,5 @@ mod tests {
         let out = apply_ui_action(&mut state, UiAction::SetKeybindMode(KeybindMode::Vim));
         assert!(out.is_empty());
         assert_eq!(state.prefs.keybind_mode, KeybindMode::Vim);
-    }
-
-    #[test]
-    fn toggle_markdown_updates_preferences() {
-        let mut state = AppState::new_with_paths(None, None);
-        assert!(state.prefs.render_markdown);
-        let out = apply_ui_action(&mut state, UiAction::ToggleMarkdownRendering);
-        assert!(out.is_empty());
-        assert!(!state.prefs.render_markdown);
-    }
-
-    #[test]
-    fn palette_search_opens_modal() {
-        let mut state = AppState::new_with_paths(None, None);
-        apply_ui_action(&mut state, UiAction::OpenPalette);
-        apply_ui_action(&mut state, UiAction::PaletteChar('s'));
-        apply_ui_action(&mut state, UiAction::PaletteChar('e'));
-        apply_ui_action(&mut state, UiAction::PaletteChar('a'));
-        apply_ui_action(&mut state, UiAction::PaletteChar('r'));
-        apply_ui_action(&mut state, UiAction::PaletteChar('c'));
-        apply_ui_action(&mut state, UiAction::PaletteChar('h'));
-
-        let out = apply_ui_action(&mut state, UiAction::PaletteSubmit);
-        assert!(out.is_empty());
-        assert!(state.search.open);
     }
 }

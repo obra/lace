@@ -48,8 +48,11 @@ pub struct ConnectionModelsState {
     pub error: Option<String>,
     pub provider_id: Option<String>,
     pub connection_id: Option<String>,
+    pub connection_name: Option<String>,
     pub selected: usize,
     pub models: Vec<ConnectionModelItem>,
+    /// Tracks which models are disabled at the connection level
+    pub disabled_models: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -86,8 +89,10 @@ impl ConnectionModelsState {
             error: None,
             provider_id: None,
             connection_id: None,
+            connection_name: None,
             selected: 0,
             models: Vec::new(),
+            disabled_models: Vec::new(),
         }
     }
 }
@@ -203,8 +208,10 @@ pub fn open_models(state: &mut AppState) -> Vec<Outbound> {
     state.connections.models.error = None;
     state.connections.models.provider_id = None;
     state.connections.models.connection_id = Some(it.connection_id.clone());
+    state.connections.models.connection_name = Some(it.name.clone());
     state.connections.models.selected = 0;
     state.connections.models.models.clear();
+    state.connections.models.disabled_models.clear();
 
     let id = state.next_client_id();
     vec![Outbound::JsonRpcRequest {
@@ -266,6 +273,7 @@ pub fn handle_models_list_response(
         .map(|s| s.to_string());
     state.connections.models.error = None;
 
+    let mut disabled_models: Vec<String> = Vec::new();
     let models = obj
         .get("models")
         .and_then(|v| v.as_array())
@@ -280,6 +288,9 @@ pub fn handle_models_list_response(
                         .unwrap_or(model_id.as_str())
                         .to_string();
                     let disabled = model_disabled(o);
+                    if disabled {
+                        disabled_models.push(model_id.clone());
+                    }
                     Some(ConnectionModelItem {
                         model_id,
                         name,
@@ -291,6 +302,7 @@ pub fn handle_models_list_response(
         .unwrap_or_default();
 
     state.connections.models.models = models;
+    state.connections.models.disabled_models = disabled_models;
     state.connections.models.selected = 0;
 }
 
@@ -298,9 +310,24 @@ pub fn toggle_selected_model(state: &mut AppState) -> Vec<Outbound> {
     if !state.connections.models.open {
         return Vec::new();
     }
-    let Some(provider_id) = state.connections.models.provider_id.clone().filter(|s| !s.is_empty())
+    let Some(connection_id) = state
+        .connections
+        .models
+        .connection_id
+        .clone()
+        .filter(|s| !s.is_empty())
     else {
-        state.connections.models.error = Some("Missing providerId".to_string());
+        state.connections.models.error = Some("Missing connectionId".to_string());
+        return Vec::new();
+    };
+    let Some(connection_name) = state
+        .connections
+        .models
+        .connection_name
+        .clone()
+        .filter(|s| !s.is_empty())
+    else {
+        state.connections.models.error = Some("Missing connection name".to_string());
         return Vec::new();
     };
     let Some(model) = state
@@ -313,37 +340,51 @@ pub fn toggle_selected_model(state: &mut AppState) -> Vec<Outbound> {
         return Vec::new();
     };
 
-    state.connections.models.loading = true;
-    let method = if model.disabled {
-        "ent/models/enable"
+    // Update the local disabled_models list
+    let mut disabled_models = state.connections.models.disabled_models.clone();
+    if model.disabled {
+        // Model is currently disabled, so enable it by removing from disabled list
+        disabled_models.retain(|id| id != &model.model_id);
     } else {
-        "ent/models/disable"
-    };
+        // Model is currently enabled, so disable it by adding to disabled list
+        if !disabled_models.contains(&model.model_id) {
+            disabled_models.push(model.model_id.clone());
+        }
+    }
+
+    // Optimistically update local state
+    if let Some(m) = state
+        .connections
+        .models
+        .models
+        .get_mut(state.connections.models.selected)
+    {
+        m.disabled = !m.disabled;
+    }
+    state.connections.models.disabled_models = disabled_models.clone();
+
+    state.connections.models.loading = true;
     let id = state.next_client_id();
+
+    // Use ent/connections/upsert with modelConfig to persist the change
+    // This matches how the web UI handles model toggling
     vec![Outbound::JsonRpcRequest {
         id,
-        method: method.to_string(),
-        params: Some(json!({ "providerId": provider_id, "modelIds": [model.model_id] })),
+        method: "ent/connections/upsert".to_string(),
+        params: Some(json!({
+            "connection": {
+                "connectionId": connection_id,
+                "name": connection_name,
+                "config": {
+                    "modelConfig": {
+                        "enableNewModels": true,
+                        "disabledModels": disabled_models,
+                        "disabledProviders": []
+                    }
+                }
+            }
+        })),
     }]
-}
-
-pub fn apply_model_toggle_result(state: &mut AppState, result: &Option<Value>) {
-    let Some(obj) = result.as_ref().and_then(|v| v.as_object()) else {
-        return;
-    };
-    let disabled = obj
-        .get("disabled")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    let disabled_set: std::collections::HashSet<String> = disabled.into_iter().collect();
-    for m in &mut state.connections.models.models {
-        m.disabled = disabled_set.contains(&m.model_id);
-    }
 }
 
 fn model_disabled(o: &serde_json::Map<String, Value>) -> bool {
@@ -694,15 +735,22 @@ mod tests {
         assert_eq!(state.connections.models.models.len(), 2);
         assert!(state.connections.models.models[0].disabled);
         assert!(!state.connections.models.models[1].disabled);
+
+        // Also verify disabled_models list is populated
+        assert_eq!(state.connections.models.disabled_models.len(), 1);
+        assert!(state.connections.models.disabled_models.contains(&"m1".to_string()));
     }
 
     #[test]
-    fn connection_models_toggle_sends_enable_when_disabled() {
+    fn connection_models_toggle_sends_upsert_to_enable_disabled_model() {
         let mut state = AppState::new_with_paths(None, None);
         state.next_client_seq = 9;
         state.connections.open = true;
         state.connections.models.open = true;
+        state.connections.models.connection_id = Some("c1".to_string());
+        state.connections.models.connection_name = Some("My Connection".to_string());
         state.connections.models.provider_id = Some("p1".to_string());
+        state.connections.models.disabled_models = vec!["m1".to_string()];
         state.connections.models.models = vec![
             ConnectionModelItem {
                 model_id: "m1".to_string(),
@@ -722,38 +770,79 @@ mod tests {
         match &out[0] {
             Outbound::JsonRpcRequest { id, method, params } => {
                 assert_eq!(id, "c_9");
-                assert_eq!(method, "ent/models/enable");
+                assert_eq!(method, "ent/connections/upsert");
+
+                let conn = params.as_ref()
+                    .and_then(|v| v.get("connection"))
+                    .expect("should have connection");
                 assert_eq!(
-                    params.as_ref()
-                        .and_then(|v| v.get("providerId"))
-                        .and_then(|v| v.as_str()),
-                    Some("p1")
+                    conn.get("connectionId").and_then(|v| v.as_str()),
+                    Some("c1")
                 );
+                assert_eq!(
+                    conn.get("name").and_then(|v| v.as_str()),
+                    Some("My Connection")
+                );
+
+                let config = conn.get("config").expect("should have config");
+                let model_config = config.get("modelConfig").expect("should have modelConfig");
+                let disabled = model_config.get("disabledModels")
+                    .and_then(|v| v.as_array())
+                    .expect("should have disabledModels array");
+
+                // Model m1 was disabled, toggling should enable it (remove from disabled list)
+                assert!(!disabled.iter().any(|v| v.as_str() == Some("m1")));
             }
             _ => panic!("expected request"),
         }
+
+        // Verify optimistic update applied
+        assert!(!state.connections.models.models[0].disabled);
+        assert!(state.connections.models.disabled_models.is_empty());
     }
 
     #[test]
-    fn connection_models_apply_toggle_result_updates_disabled_set() {
+    fn connection_models_toggle_sends_upsert_to_disable_enabled_model() {
         let mut state = AppState::new_with_paths(None, None);
+        state.next_client_seq = 5;
+        state.connections.open = true;
         state.connections.models.open = true;
+        state.connections.models.connection_id = Some("c1".to_string());
+        state.connections.models.connection_name = Some("My Connection".to_string());
+        state.connections.models.provider_id = Some("p1".to_string());
+        state.connections.models.disabled_models = vec![];
         state.connections.models.models = vec![
             ConnectionModelItem {
-                model_id: "a".to_string(),
-                name: "A".to_string(),
-                disabled: false,
-            },
-            ConnectionModelItem {
-                model_id: "b".to_string(),
-                name: "B".to_string(),
+                model_id: "m1".to_string(),
+                name: "m1".to_string(),
                 disabled: false,
             },
         ];
 
-        let result = Some(json!({ "providerId": "p1", "enabled": ["a"], "disabled": ["b"] }));
-        apply_model_toggle_result(&mut state, &result);
-        assert!(!state.connections.models.models[0].disabled);
-        assert!(state.connections.models.models[1].disabled);
+        state.connections.models.selected = 0;
+        let out = toggle_selected_model(&mut state);
+        assert_eq!(out.len(), 1);
+        match &out[0] {
+            Outbound::JsonRpcRequest { method, params, .. } => {
+                assert_eq!(method, "ent/connections/upsert");
+
+                let conn = params.as_ref()
+                    .and_then(|v| v.get("connection"))
+                    .expect("should have connection");
+                let config = conn.get("config").expect("should have config");
+                let model_config = config.get("modelConfig").expect("should have modelConfig");
+                let disabled = model_config.get("disabledModels")
+                    .and_then(|v| v.as_array())
+                    .expect("should have disabledModels array");
+
+                // Model m1 was enabled, toggling should disable it (add to disabled list)
+                assert!(disabled.iter().any(|v| v.as_str() == Some("m1")));
+            }
+            _ => panic!("expected request"),
+        }
+
+        // Verify optimistic update applied
+        assert!(state.connections.models.models[0].disabled);
+        assert!(state.connections.models.disabled_models.contains(&"m1".to_string()));
     }
 }
