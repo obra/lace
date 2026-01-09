@@ -54,9 +54,6 @@ pub enum UiAction {
     CopyToolInput,
     CopyToolResult,
     ExportTranscript,
-    ToggleChat,
-    ToggleActivity,
-    ToggleDebug,
     FocusNext,
     ScrollUp,
     ScrollDown,
@@ -396,24 +393,6 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 send_input(state)
             }
         }
-        UiAction::ToggleChat => {
-            state.prefs.show_chat = !state.prefs.show_chat;
-            state.ensure_focus_visible();
-            let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
-            Vec::new()
-        }
-        UiAction::ToggleActivity => {
-            state.prefs.show_activity = !state.prefs.show_activity;
-            state.ensure_focus_visible();
-            let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
-            Vec::new()
-        }
-        UiAction::ToggleDebug => {
-            state.prefs.show_debug = !state.prefs.show_debug;
-            state.ensure_focus_visible();
-            let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
-            Vec::new()
-        }
         UiAction::OpenEnvEditor => {
             crate::app::config_panels::open_env_editor(state);
             Vec::new()
@@ -711,15 +690,6 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 PaletteCommand::ExportTranscript => {
                     let _ = apply_ui_action(state, UiAction::ExportTranscript);
                 }
-                PaletteCommand::ToggleChat => {
-                    let _ = apply_ui_action(state, UiAction::ToggleChat);
-                }
-                PaletteCommand::ToggleActivity => {
-                    let _ = apply_ui_action(state, UiAction::ToggleActivity);
-                }
-                PaletteCommand::ToggleDebug => {
-                    let _ = apply_ui_action(state, UiAction::ToggleDebug);
-                }
                 PaletteCommand::OpenEnvEditorCmd => {
                     let _ = apply_ui_action(state, UiAction::OpenEnvEditor);
                 }
@@ -900,9 +870,6 @@ enum PaletteCommand {
     CopyToolInput,
     CopyToolResult,
     ExportTranscript,
-    ToggleChat,
-    ToggleActivity,
-    ToggleDebug,
     FocusInput,
     OpenEnvEditorCmd,
     OpenModelsPanelCmd,
@@ -981,18 +948,6 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
         PaletteItem {
             label: "Export Transcript",
             command: PaletteCommand::ExportTranscript,
-        },
-        PaletteItem {
-            label: "Toggle Chat Pane",
-            command: PaletteCommand::ToggleChat,
-        },
-        PaletteItem {
-            label: "Toggle Activity Pane",
-            command: PaletteCommand::ToggleActivity,
-        },
-        PaletteItem {
-            label: "Toggle Debug Pane",
-            command: PaletteCommand::ToggleDebug,
         },
         PaletteItem {
             label: "Environment...",
@@ -1395,7 +1350,9 @@ mod tests {
         apply_ui_action(&mut state, UiAction::FocusNext);
         assert_eq!(state.focus, Focus::Chat);
 
-        apply_ui_action(&mut state, UiAction::ToggleChat);
+        // Directly hide chat pane (ToggleChat action was removed)
+        state.prefs.show_chat = false;
+        state.ensure_focus_visible();
         assert_eq!(state.focus, Focus::Input);
 
         apply_ui_action(&mut state, UiAction::FocusNext);

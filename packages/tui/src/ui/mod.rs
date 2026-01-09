@@ -465,18 +465,6 @@ fn run_loop(
                                 state.debug_overlay_open = false; // Close debug if opening activity
                                 continue;
                             }
-                            KeyCode::Char('1') => {
-                                let _ = apply_ui_action(state, UiAction::ToggleChat);
-                                continue;
-                            }
-                            KeyCode::Char('2') => {
-                                let _ = apply_ui_action(state, UiAction::ToggleActivity);
-                                continue;
-                            }
-                            KeyCode::Char('3') => {
-                                let _ = apply_ui_action(state, UiAction::ToggleDebug);
-                                continue;
-                            }
                             _ => {}
                         }
                     }
@@ -2392,9 +2380,6 @@ fn render_help_modal() -> Paragraph<'static> {
         Line::from("Ctrl+A   Toggle activity overlay"),
         Line::from("Ctrl+D   Toggle debug overlay"),
         Line::from("Ctrl+E   Toggle multiline input"),
-        Line::from("Ctrl+1   Toggle Chat pane"),
-        Line::from("Ctrl+2   Toggle Activity pane"),
-        Line::from("Ctrl+3   Toggle Debug pane"),
         Line::from("Tab      Cycle focus"),
         Line::from("Up/Down  Scroll or history (depends on focus)"),
         Line::from("PgUp/Dn  Scroll focused pane (incl. multiline input)"),
