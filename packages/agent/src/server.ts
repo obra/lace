@@ -4321,7 +4321,35 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
               let coreResult: CoreToolResult;
 
-              if (toolName === 'delegate') {
+              // Handle bash with run_async=true - spawn background job instead of sync execution
+              if (
+                toolName === 'bash' &&
+                (finalInput as Record<string, unknown>).run_async === true
+              ) {
+                const command = toNonEmptyString((finalInput as Record<string, unknown>).command);
+                if (!command) {
+                  coreResult = {
+                    status: 'failed',
+                    content: [{ type: 'text', text: 'bash.command is required' }],
+                  };
+                } else {
+                  const { jobId } = await _startShellJob({
+                    command,
+                    description: command.substring(0, 50),
+                    turnContext: { turnId, turnSeq: toolTurnSeq },
+                  });
+
+                  coreResult = {
+                    status: 'completed',
+                    content: [
+                      {
+                        type: 'text',
+                        text: `Async job started: ${jobId}\nUse job_output to check status.`,
+                      },
+                    ],
+                  };
+                }
+              } else if (toolName === 'delegate') {
                 const prompt = toNonEmptyString((finalInput as any).prompt);
                 if (!prompt) {
                   coreResult = {
