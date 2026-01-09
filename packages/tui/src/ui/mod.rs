@@ -991,57 +991,51 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
 
 #[derive(Debug, Clone, Copy)]
 struct ThemeStyles {
-    status_fg: Color,
-    status_bg: Color,
-    focused_border: Color,
-    user_prefix: Color,
-    assistant_prefix: Color,
-    activity_selected: Color,
-    activity_error: Color,
-    dim: Color,
-    code_fg: Color,
-    code_bg: Color,
+    pub colors: theme::ThemeColors,
+}
+
+impl ThemeStyles {
+    fn new(theme: Theme) -> Self {
+        Self {
+            colors: theme::ThemeColors::from_pref(theme),
+        }
+    }
+
+    // Convenience accessors for backwards compatibility during migration
+    fn status_fg(&self) -> Color {
+        self.colors.fg_primary
+    }
+    fn status_bg(&self) -> Color {
+        self.colors.bg_surface
+    }
+    fn focused_border(&self) -> Color {
+        self.colors.accent
+    }
+    fn user_prefix(&self) -> Color {
+        self.colors.accent
+    }
+    fn assistant_prefix(&self) -> Color {
+        self.colors.fg_secondary
+    }
+    fn activity_selected(&self) -> Color {
+        self.colors.accent
+    }
+    fn activity_error(&self) -> Color {
+        self.colors.error
+    }
+    fn dim(&self) -> Color {
+        self.colors.fg_muted
+    }
+    fn code_fg(&self) -> Color {
+        self.colors.fg_primary
+    }
+    fn code_bg(&self) -> Color {
+        self.colors.bg_surface
+    }
 }
 
 fn theme_styles(theme: Theme) -> ThemeStyles {
-    match theme {
-        Theme::Dark => ThemeStyles {
-            status_fg: Color::White,
-            status_bg: Color::DarkGray,
-            focused_border: Color::Yellow,
-            user_prefix: Color::Green,
-            assistant_prefix: Color::Cyan,
-            activity_selected: Color::Yellow,
-            activity_error: Color::Red,
-            dim: Color::DarkGray,
-            code_fg: Color::White,
-            code_bg: Color::Black,
-        },
-        Theme::Light => ThemeStyles {
-            status_fg: Color::Black,
-            status_bg: Color::White,
-            focused_border: Color::Blue,
-            user_prefix: Color::Blue,
-            assistant_prefix: Color::Magenta,
-            activity_selected: Color::Blue,
-            activity_error: Color::Red,
-            dim: Color::Gray,
-            code_fg: Color::Black,
-            code_bg: Color::Gray,
-        },
-        Theme::HighContrast => ThemeStyles {
-            status_fg: Color::Yellow,
-            status_bg: Color::Black,
-            focused_border: Color::Yellow,
-            user_prefix: Color::Yellow,
-            assistant_prefix: Color::White,
-            activity_selected: Color::Yellow,
-            activity_error: Color::Red,
-            dim: Color::Gray,
-            code_fg: Color::White,
-            code_bg: Color::Black,
-        },
-    }
+    ThemeStyles::new(theme)
 }
 
 fn render_status(state: &AppState) -> Paragraph<'static> {
@@ -1065,7 +1059,7 @@ fn render_status(state: &AppState) -> Paragraph<'static> {
     let text = Line::from(vec![
         Span::styled(
             " lace-tui ",
-            Style::default().fg(styles.status_fg).bg(styles.status_bg),
+            Style::default().fg(styles.status_fg()).bg(styles.status_bg()),
         ),
         Span::raw(" "),
         Span::raw(format!("sess={sid} ")),
@@ -1504,8 +1498,8 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
             text.push_str("▌");
         }
         let prefix_color = match m.role {
-            Role::User => styles.user_prefix,
-            Role::Assistant => styles.assistant_prefix,
+            Role::User => styles.user_prefix(),
+            Role::Assistant => styles.assistant_prefix(),
         };
         lines.push(Line::from(vec![Span::styled(
             prefix,
@@ -1516,7 +1510,7 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
                 if l.is_code {
                     lines.push(Line::from(Span::styled(
                         l.text,
-                        Style::default().fg(styles.code_fg).bg(styles.code_bg),
+                        Style::default().fg(styles.code_fg()).bg(styles.code_bg()),
                     )));
                 } else {
                     lines.push(Line::from(l.text));
@@ -1552,12 +1546,12 @@ fn render_activity(state: &AppState) -> Paragraph<'static> {
 
         let mut style = Style::default();
         if selected {
-            style = style.fg(styles.activity_selected);
+            style = style.fg(styles.activity_selected());
         } else if matches!(
             item.kind,
             activity::ActivityKind::RpcError | activity::ActivityKind::Timeout
         ) {
-            style = style.fg(styles.activity_error);
+            style = style.fg(styles.activity_error());
         }
 
         lines.push(Line::from(vec![
@@ -1572,7 +1566,7 @@ fn render_activity(state: &AppState) -> Paragraph<'static> {
                 for l in pretty.lines() {
                     lines.push(Line::from(Span::styled(
                         format!("    {l}"),
-                        Style::default().fg(styles.dim),
+                        Style::default().fg(styles.dim()),
                     )));
                 }
             }
@@ -1669,7 +1663,7 @@ fn render_permission_modal(state: &AppState) -> Paragraph<'static> {
                 for l in pretty.lines() {
                     lines.push(Line::from(Span::styled(
                         format!("  {l}"),
-                        Style::default().fg(styles.dim),
+                        Style::default().fg(styles.dim()),
                     )));
                 }
             }
@@ -1703,7 +1697,7 @@ fn focused_block(title: &'static str, focused: bool, theme: Theme) -> Block<'sta
     let base = Block::default().title(title).borders(Borders::ALL);
     if focused {
         let styles = theme_styles(theme);
-        base.border_style(Style::default().fg(styles.focused_border))
+        base.border_style(Style::default().fg(styles.focused_border()))
     } else {
         base
     }
