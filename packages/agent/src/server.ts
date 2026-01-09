@@ -880,6 +880,24 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     }
   };
 
+  // Cache for deriveJobsForActiveSession - avoids re-reading events.jsonl on every call
+  let jobsCache: {
+    sessionId: string;
+    fileSize: number;
+    fileMtime: number;
+    result: Array<{
+      jobId: string;
+      parentJobId?: string;
+      type: JobType;
+      status: JobStatus;
+      description?: string;
+      command?: string;
+      startTime: string;
+      exitCode?: number;
+      subagentSessionId?: string;
+    }>;
+  } | null = null;
+
   const emitSessionUpdate = async (
     update: SessionUpdate,
     context?: { turnId?: string; turnSeq?: number; jobId?: string }
@@ -2143,8 +2161,38 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   }> => {
     if (!state.activeSession) return [];
 
+    const sessionId = state.activeSession.meta.sessionId;
     const sessionDir = state.activeSession.dir;
     const eventsPath = join(sessionDir, 'events.jsonl');
+
+    // Check cache validity
+    let fileSize = 0;
+    let fileMtime = 0;
+    try {
+      const stats = statSync(eventsPath);
+      fileSize = stats.size;
+      fileMtime = stats.mtimeMs;
+    } catch {
+      return [];
+    }
+
+    if (
+      jobsCache &&
+      jobsCache.sessionId === sessionId &&
+      jobsCache.fileSize === fileSize &&
+      jobsCache.fileMtime === fileMtime
+    ) {
+      // Cache hit - but still need to update running job status from in-memory state
+      const result = jobsCache.result.map((job) => {
+        if (job.status === 'running' && !state.jobs.has(job.jobId)) {
+          return { ...job, status: 'failed' as JobStatus };
+        }
+        return job;
+      });
+      return result;
+    }
+
+    // Cache miss - read and parse the file
     let raw = '';
     try {
       raw = readFileSync(eventsPath, 'utf8');
@@ -2171,7 +2219,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     for (const line of lines) {
       if (!line) continue;
       try {
-        const parsed = JSON.parse(line) as { type?: string; timestamp?: string; data?: any };
+        const parsed = JSON.parse(line) as { type?: string; timestamp?: string; data?: unknown };
         if (
           parsed.type !== 'job_started' &&
           parsed.type !== 'job_finished' &&
@@ -2179,7 +2227,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         )
           continue;
         const timestamp = typeof parsed.timestamp === 'string' ? parsed.timestamp : undefined;
-        const data = parsed.data ?? {};
+        const data = (parsed.data ?? {}) as Record<string, unknown>;
         const jobId = toNonEmptyString(data.jobId);
         if (!jobId) continue;
 
@@ -2229,13 +2277,23 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       }
     }
 
-    for (const job of byId.values()) {
+    // Update cache with parsed results (before applying running status updates)
+    const parsedResult = Array.from(byId.values());
+    jobsCache = {
+      sessionId,
+      fileSize,
+      fileMtime,
+      result: parsedResult,
+    };
+
+    // Apply running job status updates from in-memory state
+    for (const job of parsedResult) {
       if (job.status === 'running' && !state.jobs.has(job.jobId)) {
         job.status = 'failed';
       }
     }
 
-    return Array.from(byId.values());
+    return parsedResult;
   };
 
   peer.onRequest('ent/providers/list', async (_params: unknown) => {
