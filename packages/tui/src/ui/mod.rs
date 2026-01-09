@@ -918,17 +918,18 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     let root = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),
-            Constraint::Min(1),
-            Constraint::Length(input_height),
+            Constraint::Min(1),               // main area (first)
+            Constraint::Length(input_height), // input
+            Constraint::Length(1),            // status at BOTTOM
         ])
         .split(f.area());
 
-    let status = render_status(state);
-    f.render_widget(status, root[0]);
+    let main_area = root[0];
+    let input_area = root[1];
+    let status_area = root[2];
 
-    let main_area = root[1];
-    let input_area = root[2];
+    let status = render_status(state);
+    f.render_widget(status, status_area);
 
     let body = if state.prefs.show_debug {
         let split = Layout::default()
@@ -1920,12 +1921,12 @@ fn compute_chat_rect(
     let root = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),
-            Constraint::Min(1),
-            Constraint::Length(input_height),
+            Constraint::Min(1),               // main area (first)
+            Constraint::Length(input_height), // input
+            Constraint::Length(1),            // status at BOTTOM
         ])
         .split(area);
-    let main_area = root[1];
+    let main_area = root[0];
 
     let main_area = if state.prefs.show_debug {
         let split = Layout::default()
