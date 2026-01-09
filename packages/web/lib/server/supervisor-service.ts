@@ -21,6 +21,7 @@ import type {
 } from '@lace/web/types/protocol-events';
 import type { WebEvent } from '@lace/web/types/web-events';
 import type { AgentState } from '@lace/web/types/core';
+import type { ToolPolicy } from '@lace/ent-protocol';
 
 declare global {
   var laceWebSupervisorClient: SupervisorClient | undefined;
@@ -247,7 +248,13 @@ class InProcessSupervisorClient extends SupervisorClient {
 
   override async upsertAgentSessionMeta(
     workspaceSessionId: string,
-    params: { sessionId: string; name?: string; connectionId?: string; modelId?: string }
+    params: {
+      sessionId: string;
+      name?: string;
+      connectionId?: string;
+      modelId?: string;
+      toolPolicies?: Record<string, ToolPolicy>;
+    }
   ) {
     this.supervisor.upsertAgentSessionMeta(workspaceSessionId, params);
   }

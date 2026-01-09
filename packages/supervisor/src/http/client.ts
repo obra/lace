@@ -5,6 +5,7 @@ import type {
 } from '../supervisor';
 import type { WorkspaceSessionRecord } from '../workspace-session-store';
 import type { PendingPermission, SupervisorServerEvent } from './types';
+import type { ToolPolicy } from '@lace/ent-protocol';
 
 type SupervisorClientOptions = {
   baseUrl: string;
@@ -123,7 +124,13 @@ export class SupervisorClient {
 
   async upsertAgentSessionMeta(
     workspaceSessionId: string,
-    params: { sessionId: string; name?: string; connectionId?: string; modelId?: string }
+    params: {
+      sessionId: string;
+      name?: string;
+      connectionId?: string;
+      modelId?: string;
+      toolPolicies?: Record<string, ToolPolicy>;
+    }
   ): Promise<void> {
     await fetchJson(
       asUrl(

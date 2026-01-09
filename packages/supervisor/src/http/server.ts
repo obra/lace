@@ -47,6 +47,7 @@ const UpsertAgentMetaSchema = z
     name: z.string().min(1).optional(),
     connectionId: z.string().min(1).optional(),
     modelId: z.string().min(1).optional(),
+    toolPolicies: z.record(z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
   })
   .strict();
 
