@@ -35,6 +35,7 @@ export interface BashOutput {
 const bashSchema = z.object({
   command: NonEmptyString,
   background: z.boolean().default(false),
+  description: z.string().optional(),
 });
 
 export class BashTool extends Tool {
@@ -44,6 +45,7 @@ export class BashTool extends Tool {
 Parameters:
 - command: The shell command to run
 - background: Set to true for background execution (returns jobId immediately)
+- description: Label shown in job listings when background=true (optional)
 
 When background=true, returns { jobId, status: "started" }. Use job_output(jobId) to check status/output.
 

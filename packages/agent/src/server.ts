@@ -4368,6 +4368,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 (finalInput as Record<string, unknown>).background === true
               ) {
                 const command = toNonEmptyString((finalInput as Record<string, unknown>).command);
+                const description = toNonEmptyString(
+                  (finalInput as Record<string, unknown>).description
+                );
                 if (!command) {
                   coreResult = {
                     status: 'failed',
@@ -4376,7 +4379,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 } else {
                   const { jobId } = await _startShellJob({
                     command,
-                    description: command.substring(0, 50),
+                    description: description || command.substring(0, 50),
                     turnContext: { turnId, turnSeq: toolTurnSeq },
                   });
 
