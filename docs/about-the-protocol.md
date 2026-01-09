@@ -323,6 +323,10 @@ This "subagents as jobs" model means subagents are not first-class protocol peer
 
 `ent/session/configure` allows mid-session changes to model, thinking tokens, budget, etc. Covers Claude SDK's dynamic configuration methods.
 
+### Context Introspection
+
+`ent/session/token_usage` and `ent/session/context_breakdown` provide structured context usage data for UIs (e.g., a "context visualizer") without requiring clients to re-tokenize messages or inspect agent internals.
+
 ---
 
 ## 12. Discovery and Configuration Methods

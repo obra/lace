@@ -30,6 +30,9 @@ npm test --workspace=packages/agent -- ent-protocol.spec.ts
   - `ent/agent/status` reflects configured connection/model
 - **Session events**
   - `ent/session/events` (limit/afterEventSeq/types)
+- **Session introspection**
+  - `ent/session/token_usage` (basic shape + sanity)
+  - `ent/session/context_breakdown` (categories present + totals consistent)
 - **Tools & Personas**
   - `ent/tools/list` uniqueness
   - `ent/personas/list` presence

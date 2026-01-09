@@ -177,6 +177,8 @@ interface AgentCapabilities {
     checkpoint?: boolean;        // ent/session/checkpoint
     rewind?: boolean;            // ent/session/rewind
     configure?: boolean;         // ent/session/configure
+    tokenUsage?: boolean;        // ent/session/token_usage
+    contextBreakdown?: boolean;  // ent/session/context_breakdown
   };
 
   // Conversation commands (sent via session/prompt)
@@ -1416,6 +1418,68 @@ Create a workspace container for a session.
 }
 ```
 
+### 6.36 `ent/session/token_usage`
+
+Returns an estimated token usage summary for the current session context.
+
+```typescript
+// Request
+{
+  method: "ent/session/token_usage"
+}
+
+// Response
+{
+  result: {
+    totalPromptTokens: number,
+    totalCompletionTokens: number,
+    totalTokens: number,
+    contextLimit: number,
+    percentUsed: number,  // 0..1
+    nearLimit: boolean
+  }
+}
+```
+
+### 6.37 `ent/session/context_breakdown`
+
+Returns a structured breakdown of where context tokens are being spent. Intended to power a "context visualizer" UI.
+
+```typescript
+// Request
+{
+  method: "ent/session/context_breakdown"
+}
+
+// Response
+{
+  result: {
+    timestamp: string,    // ISO 8601
+    modelId: string,
+    contextLimit: number,
+    totalUsedTokens: number,
+    percentUsed: number,  // 0..1
+    categories: {
+      systemPrompt: { tokens: number, items?: { name: string, tokens: number }[] },
+      coreTools: { tokens: number, items?: { name: string, tokens: number }[] },
+      mcpTools: { tokens: number, items?: { name: string, tokens: number }[] },
+      messages: {
+        tokens: number,
+        items?: { name: string, tokens: number }[],
+        subcategories: {
+          userMessages: { tokens: number },
+          agentMessages: { tokens: number },
+          toolCalls: { tokens: number },
+          toolResults: { tokens: number }
+        }
+      },
+      reservedForResponse: { tokens: number, items?: { name: string, tokens: number }[] },
+      freeSpace: { tokens: number, items?: { name: string, tokens: number }[] }
+    }
+  }
+}
+```
+
 ---
 
 ## 7. Methods: Agent → Client
@@ -2003,6 +2067,8 @@ interface ModelConfig {
 | `ent/session/rewind` | 🔧 Extension | |
 | `ent/session/checkpoint` | 🔧 Extension | |
 | `ent/session/events` | 🔧 Extension | History replay |
+| `ent/session/token_usage` | 🔧 Extension | Context insight |
+| `ent/session/context_breakdown` | 🔧 Extension | Context insight |
 | `ent/job/*` | 🔧 Extension | Propose to ACP |
 | `ent/agent/ping` | 🔧 Extension | Health check |
 | `ent/agent/status` | 🔧 Extension | |
@@ -2050,6 +2116,7 @@ interface ModelConfig {
 | Thinking tokens | ✅ `ent/session/configure` |
 | Sandbox config | ✅ `initialize` config |
 | Session history | ✅ `ent/session/events` |
+| Context visualization | ✅ `ent/session/token_usage`, `ent/session/context_breakdown` |
 | Provider discovery | ✅ `ent/providers/list` |
 | Connection management | ✅ `ent/connections/*` |
 | Authentication | ✅ `ent/connections/credentials/*` |
