@@ -10,7 +10,7 @@ const delegateSchema = z
   .object({
     prompt: NonEmptyString,
     description: z.string().optional(),
-    run_async: z.boolean().default(false),
+    background: z.boolean().default(false),
     resume: z.string().optional(),
   })
   .strict();
@@ -22,10 +22,10 @@ export class DelegateTool extends Tool {
 Parameters:
 - prompt: The task for the subagent (required)
 - description: Label shown in job listings (optional)
-- run_async: Set to true to return immediately with jobId (default: false)
+- background: Set to true to return immediately with jobId (default: false)
 - resume: JobId of a failed/cancelled job to continue from where it left off
 
-When run_async=true, returns "Async job started: job_xxx". Use job_output(jobId) to monitor.
+When background=true, returns { jobId, status: "started" }. Use job_output(jobId) to monitor.
 Default (sync): Blocks until subagent completes and returns full output.`;
   schema = delegateSchema;
   annotations: ToolAnnotations = {

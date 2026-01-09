@@ -1,25 +1,25 @@
-// ABOUTME: Tests for DelegateTool schema validation, including run_async support
+// ABOUTME: Tests for DelegateTool schema validation, including background support
 
 import { describe, expect, it } from 'vitest';
 import { DelegateTool } from '../implementations/delegate';
 
 describe('DelegateTool schema', () => {
-  it('accepts run_async parameter', () => {
+  it('accepts background parameter', () => {
     const tool = new DelegateTool();
     const schema = tool.schema;
 
     const result = schema.safeParse({
       prompt: 'find all typescript files',
-      run_async: true,
+      background: true,
     });
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.run_async).toBe(true);
+      expect(result.data.background).toBe(true);
     }
   });
 
-  it('defaults run_async to false', () => {
+  it('defaults background to false', () => {
     const tool = new DelegateTool();
     const schema = tool.schema;
 
@@ -29,7 +29,7 @@ describe('DelegateTool schema', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.run_async).toBe(false);
+      expect(result.data.background).toBe(false);
     }
   });
 

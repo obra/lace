@@ -4362,10 +4362,10 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
               let coreResult: CoreToolResult;
 
-              // Handle bash with run_async=true - spawn background job instead of sync execution
+              // Handle bash with background=true - spawn background job instead of sync execution
               if (
                 toolName === 'bash' &&
-                (finalInput as Record<string, unknown>).run_async === true
+                (finalInput as Record<string, unknown>).background === true
               ) {
                 const command = toNonEmptyString((finalInput as Record<string, unknown>).command);
                 if (!command) {
@@ -4392,7 +4392,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 }
               } else if (toolName === 'delegate') {
                 const prompt = toNonEmptyString((finalInput as Record<string, unknown>).prompt);
-                const runAsync = (finalInput as Record<string, unknown>).run_async === true;
+                const background = (finalInput as Record<string, unknown>).background === true;
                 const description = toNonEmptyString(
                   (finalInput as Record<string, unknown>).description
                 );
@@ -4430,7 +4430,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                     resumeSessionId,
                   });
 
-                  if (runAsync) {
+                  if (background) {
                     // Return immediately without waiting for completion
                     coreResult = {
                       status: 'completed',

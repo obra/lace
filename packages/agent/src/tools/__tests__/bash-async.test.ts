@@ -1,27 +1,27 @@
-// ABOUTME: Tests for bash tool's run_async schema parameter
-// ABOUTME: Verifies that the schema accepts run_async boolean with default false
+// ABOUTME: Tests for bash tool's background schema parameter
+// ABOUTME: Verifies that the schema accepts background boolean with default false
 
 import { describe, expect, it } from 'vitest';
 import { BashTool } from '../implementations/bash';
 
 describe('BashTool schema', () => {
-  it('accepts run_async parameter', () => {
+  it('accepts background parameter', () => {
     const tool = new BashTool();
     const schema = tool.schema;
 
-    // Should parse successfully with run_async
+    // Should parse successfully with background
     const result = schema.safeParse({
       command: 'echo hi',
-      run_async: true,
+      background: true,
     });
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.run_async).toBe(true);
+      expect(result.data.background).toBe(true);
     }
   });
 
-  it('defaults run_async to false', () => {
+  it('defaults background to false', () => {
     const tool = new BashTool();
     const schema = tool.schema;
 
@@ -31,7 +31,7 @@ describe('BashTool schema', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.run_async).toBe(false);
+      expect(result.data.background).toBe(false);
     }
   });
 });

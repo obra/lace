@@ -15,7 +15,7 @@ const jobOutputSchema = z.object({
 
 export class JobOutputTool extends Tool {
   name = 'job_output';
-  description = `Get status and output from a background job (started with run_async=true).
+  description = `Get status and output from a background job (started with background=true).
 
 **Blocking (default):** Waits up to timeoutMs for job completion, then returns.
 **Non-blocking:** Set block=false to check current status without waiting.

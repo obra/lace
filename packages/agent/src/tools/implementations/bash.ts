@@ -34,7 +34,7 @@ export interface BashOutput {
 
 const bashSchema = z.object({
   command: NonEmptyString,
-  run_async: z.boolean().default(false),
+  background: z.boolean().default(false),
 });
 
 export class BashTool extends Tool {
@@ -43,9 +43,9 @@ export class BashTool extends Tool {
 
 Parameters:
 - command: The shell command to run
-- run_async: Set to true for background execution (returns jobId immediately)
+- background: Set to true for background execution (returns jobId immediately)
 
-When run_async=true, returns "Async job started: job_xxx". Use job_output(jobId) to check status/output.
+When background=true, returns { jobId, status: "started" }. Use job_output(jobId) to check status/output.
 
 Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain with && or ;.`;
   schema = bashSchema;
