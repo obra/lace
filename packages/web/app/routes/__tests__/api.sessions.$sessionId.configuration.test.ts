@@ -20,6 +20,7 @@ interface ConfigurationResponse {
     providerInstanceId?: string;
     modelId?: string;
     availableTools?: string[];
+    toolPolicies?: Record<string, string>;
   };
 }
 
@@ -55,7 +56,7 @@ describe('Session Configuration API', () => {
     expect(response.status).toBe(200);
     expect(data.configuration.providerInstanceId).toBe('conn_test');
     expect(data.configuration.modelId).toBe('model_test');
-    expect(data.configuration.availableTools).toEqual([]);
+    expect(data.configuration.availableTools).toContain('bash');
   });
 
   it('GET /api/sessions/:sessionId/configuration returns 400 for invalid session ID format', async () => {

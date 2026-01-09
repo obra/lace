@@ -12,6 +12,7 @@ const ConfigurationSchema = z
   .object({
     providerInstanceId: z.string().optional(),
     modelId: z.string().optional(),
+    toolPolicies: z.record(z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
     runtimeOverrides: z
       .object({
         permissionMode: z.enum(['normal', 'yolo', 'read-only']).optional(),
@@ -37,12 +38,24 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     }
 
     const coordinator = record.agents[0];
+    if (!coordinator) {
+      return createErrorResponse('Session has no coordinator agent', 500, {
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+    }
+    const { tools } = (await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: coordinator.sessionId,
+      method: 'ent/tools/list',
+    })) as { tools: Array<{ name: string }> };
+    const availableTools = tools.map((t) => t.name);
 
     return createSuperjsonResponse({
       configuration: {
-        providerInstanceId: coordinator?.connectionId,
-        modelId: coordinator?.modelId,
-        availableTools: [],
+        providerInstanceId: coordinator.connectionId,
+        modelId: coordinator.modelId,
+        toolPolicies: coordinator.toolPolicies ?? {},
+        availableTools,
       },
     });
   } catch (error: unknown) {
@@ -100,6 +113,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         ? { connectionId: validatedData.providerInstanceId }
         : {}),
       ...(typeof validatedData.modelId === 'string' ? { modelId: validatedData.modelId } : {}),
+      ...(validatedData.toolPolicies ? { toolPolicies: validatedData.toolPolicies } : {}),
     });
 
     await supervisor.agentRequest({
@@ -115,6 +129,13 @@ export async function action({ request, params }: Route.ActionArgs) {
       },
     });
 
+    const { tools } = (await supervisor.agentRequest({
+      workspaceSessionId,
+      sessionId: coordinator.sessionId,
+      method: 'ent/tools/list',
+    })) as { tools: Array<{ name: string }> };
+    const availableTools = tools.map((t) => t.name);
+
     return createSuperjsonResponse({
       configuration: {
         providerInstanceId:
@@ -123,7 +144,8 @@ export async function action({ request, params }: Route.ActionArgs) {
             : coordinator.connectionId,
         modelId:
           typeof validatedData.modelId === 'string' ? validatedData.modelId : coordinator.modelId,
-        availableTools: [],
+        toolPolicies: validatedData.toolPolicies ?? coordinator.toolPolicies ?? {},
+        availableTools,
       },
     });
   } catch (error: unknown) {

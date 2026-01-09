@@ -131,7 +131,7 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
   const updateSessionConfiguration = useCallback(
     async (sessionId: string, config: Record<string, unknown>): Promise<void> => {
       try {
-        await api.put(`/api/sessions/${sessionId}/configuration`, { configuration: config });
+        await api.put(`/api/sessions/${sessionId}/configuration`, config);
       } catch (error) {
         console.error('Error updating session configuration:', error);
         throw error;

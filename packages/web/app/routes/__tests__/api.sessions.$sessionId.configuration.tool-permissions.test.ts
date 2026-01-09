@@ -1,5 +1,5 @@
-// ABOUTME: Tests for unsupported tool permission settings in supervisor-backed session configuration
-// ABOUTME: Tool policies are not configured via web session configuration in PR9
+// ABOUTME: Tests for tool permission settings in supervisor-backed session configuration
+// ABOUTME: Tool policies are configured per coordinator agent and enforced by the supervisor
 
 import { describe, it, expect, afterEach } from 'vitest';
 import {
@@ -15,16 +15,20 @@ import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/
 import { vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
-describe('Session Configuration API - Tool Permissions (unsupported)', () => {
+describe('Session Configuration API - Tool Permissions', () => {
   const context = setupWebTest();
 
   afterEach(async () => {
     await shutdownSupervisorForTests();
   });
 
-  it('GET does not include tool policy structures', async () => {
+  it('GET includes tool policy structures', async () => {
     const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+    await supervisor.upsertAgentSessionMeta(created.workspaceSessionId, {
+      sessionId: created.sessionId,
+      toolPolicies: { bash: 'deny' },
+    });
 
     const request = new Request(
       `http://localhost/api/sessions/${created.workspaceSessionId}/configuration`
@@ -35,12 +39,11 @@ describe('Session Configuration API - Tool Permissions (unsupported)', () => {
     const data = await parseResponse<{ configuration: Record<string, unknown> }>(response);
 
     expect(response.status).toBe(200);
-    expect(data.configuration.availableTools).toEqual([]);
-    expect('tools' in data.configuration).toBe(false);
-    expect('toolPolicies' in data.configuration).toBe(false);
+    expect(data.configuration.availableTools).toEqual(expect.any(Array));
+    expect(data.configuration.toolPolicies).toEqual({ bash: 'deny' });
   });
 
-  it('PUT rejects toolPolicies updates', async () => {
+  it('PUT accepts toolPolicies updates', async () => {
     const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
 
@@ -56,9 +59,9 @@ describe('Session Configuration API - Tool Permissions (unsupported)', () => {
     const response = await PUT(
       createActionArgs(request, { sessionId: created.workspaceSessionId })
     );
-    const data = await parseResponse<{ error: string }>(response);
+    const data = await parseResponse<{ configuration: Record<string, unknown> }>(response);
 
-    expect(response.status).toBe(400);
-    expect(data.error).toBe('Invalid request data');
+    expect(response.status).toBe(200);
+    expect(data.configuration.toolPolicies).toEqual({ bash: 'deny' });
   });
 });
