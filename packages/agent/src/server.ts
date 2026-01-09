@@ -1236,6 +1236,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       const proc = spawn(job.command ?? '', {
         cwd: state.activeSession.meta.workDir,
         shell: true,
+        detached: process.platform !== 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
       });
       job.proc = proc;
@@ -2849,7 +2850,41 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     job.status = 'cancelled';
 
     if (job.proc) {
-      job.proc.kill('SIGTERM');
+      const proc = job.proc;
+      try {
+        // Kill the entire process group on POSIX so we don't leak child processes (e.g. `sleep`)
+        // that can keep the shell alive and prevent job completion/finalization.
+        if (process.platform !== 'win32' && typeof proc.pid === 'number') {
+          process.kill(-proc.pid, 'SIGTERM');
+        } else {
+          proc.kill('SIGTERM');
+        }
+      } catch {
+        return { success: false };
+      }
+
+      // Best-effort: wait briefly for graceful shutdown; if still running, escalate.
+      await Promise.race([
+        job.completion,
+        new Promise<void>((resolve) => setTimeout(resolve, 500)),
+      ]);
+      if (!job.finished) {
+        try {
+          if (process.platform !== 'win32' && typeof proc.pid === 'number') {
+            process.kill(-proc.pid, 'SIGKILL');
+          } else {
+            proc.kill('SIGKILL');
+          }
+        } catch {
+          // ignore; SIGTERM was sent
+        }
+
+        await Promise.race([
+          job.completion,
+          new Promise<void>((resolve) => setTimeout(resolve, 1_500)),
+        ]);
+      }
+
       return { success: true };
     }
 
