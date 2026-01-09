@@ -11,6 +11,7 @@ const delegateSchema = z
     prompt: NonEmptyString,
     description: z.string().optional(),
     run_async: z.boolean().default(false),
+    resume: z.string().optional(),
   })
   .strict();
 

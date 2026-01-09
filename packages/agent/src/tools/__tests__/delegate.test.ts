@@ -47,4 +47,16 @@ describe('DelegateTool schema', () => {
       expect(result.data.description).toBe('API exploration');
     }
   });
+
+  it('accepts resume parameter', () => {
+    const tool = new DelegateTool();
+    const result = tool.schema.safeParse({
+      prompt: 'continue previous work',
+      resume: 'job_abc123',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.resume).toBe('job_abc123');
+    }
+  });
 });

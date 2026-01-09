@@ -1219,6 +1219,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     description?: string;
     parentJobId?: string;
     turnContext?: { turnId: string; turnSeq: number };
+    resumeSessionId?: string;
   }): Promise<{ jobId: string }> => {
     if (!state.activeSession)
       throw {
@@ -1251,6 +1252,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       finished: false,
       completion,
       resolveCompletion,
+      // For resume: pre-set the subagentSessionId if resuming a previous session
+      ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
     };
 
     state.jobs.set(jobId, job);
@@ -1772,25 +1775,34 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           config: { approvalMode: 'ask' },
         });
 
-        const created = (await childPeer.request('session/new', {
-          workDir: state.activeSession.meta.workDir,
-        })) as { sessionId: string };
-        job.subagentSessionId = created.sessionId;
-
-        // Persist subagentSessionId for resume functionality
-        await runExclusive(() => {
-          let sessionState = readSessionState(state.activeSession!.dir);
-          const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
-            type: 'job_session_assigned',
-            data: {
-              jobId: job.jobId,
-              subagentSessionId: created.sessionId,
-            },
+        // Resume existing session or create a new one
+        if (job.subagentSessionId) {
+          // Resume: load the existing session
+          await childPeer.request('session/load', {
+            sessionId: job.subagentSessionId,
           });
-          sessionState = nextState;
-          writeSessionState(state.activeSession!.dir, sessionState);
-          state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-        });
+        } else {
+          // New session
+          const created = (await childPeer.request('session/new', {
+            workDir: state.activeSession.meta.workDir,
+          })) as { sessionId: string };
+          job.subagentSessionId = created.sessionId;
+
+          // Persist subagentSessionId for resume functionality
+          await runExclusive(() => {
+            let sessionState = readSessionState(state.activeSession!.dir);
+            const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+              type: 'job_session_assigned',
+              data: {
+                jobId: job.jobId,
+                subagentSessionId: created.sessionId,
+              },
+            });
+            sessionState = nextState;
+            writeSessionState(state.activeSession!.dir, sessionState);
+            state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+          });
+        }
 
         await childPeer.request('session/prompt', { content: job.subagentContent });
 
@@ -4384,17 +4396,38 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 const description = toNonEmptyString(
                   (finalInput as Record<string, unknown>).description
                 );
+                const resumeJobId = toNonEmptyString(
+                  (finalInput as Record<string, unknown>).resume
+                );
+
+                // If resuming, look up the previous job's subagentSessionId
+                let resumeSessionId: string | undefined;
+                let resumeError: string | undefined;
+                if (resumeJobId) {
+                  const previousJob = state.jobs.get(resumeJobId);
+                  if (!previousJob?.subagentSessionId) {
+                    resumeError = `Cannot resume job ${resumeJobId}: no subagentSessionId found`;
+                  } else {
+                    resumeSessionId = previousJob.subagentSessionId;
+                  }
+                }
 
                 if (!prompt) {
                   coreResult = {
                     status: 'failed',
                     content: [{ type: 'text', text: 'delegate.prompt is required' }],
                   };
+                } else if (resumeError) {
+                  coreResult = {
+                    status: 'failed',
+                    content: [{ type: 'text', text: resumeError }],
+                  };
                 } else {
                   const { jobId } = await startSubagentJob({
                     prompt,
                     description: description || 'Delegate',
                     turnContext: { turnId, turnSeq: toolTurnSeq },
+                    resumeSessionId,
                   });
 
                   if (runAsync) {

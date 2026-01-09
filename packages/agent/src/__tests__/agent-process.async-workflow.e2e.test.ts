@@ -342,7 +342,7 @@ describe('async job workflow (E2E)', () => {
       'session/prompt'
     );
 
-    // Wait for job
+    // Wait for job to start
     await withTimeout(
       new Promise<void>((resolve) => {
         const interval = setInterval(() => {
@@ -358,13 +358,14 @@ describe('async job workflow (E2E)', () => {
 
     expect(jobId).toMatch(/^job_/);
 
-    // Get output before restart
+    // Wait for job to complete (blocking read)
     const outputBefore = (await withTimeout(
-      agent.peer.request('ent/job/output', { jobId }),
-      2_000,
+      agent.peer.request('ent/job/output', { jobId, block: true, timeout: 5000 }),
+      6_000,
       'ent/job/output (before restart)'
     )) as { status: string; output: string };
 
+    expect(outputBefore.status).toBe('completed');
     expect(outputBefore.output).toContain('test');
 
     // Shutdown and restart
