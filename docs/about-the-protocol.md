@@ -76,6 +76,13 @@ All Ent-specific methods use the `ent/` prefix:
 
 This keeps the namespace clean and makes it obvious which parts are standard ACP vs our extensions.
 
+### UI / Agent Boundary (very important)
+
+In Lace, the **agent owns its on-disk state** under `~/.lace/**` (or the configured lace dir). UIs (web, TUI) MUST treat this as an implementation detail and MUST NOT read or write it directly.
+
+- Web and TUI should only interact with providers/models/connections/credentials through Ent methods such as `ent/providers/catalog`, `ent/connections/*`, and `ent/models/*`.
+- Web may have its own datastore for web-only concepts (projects, settings) outside the protocol.
+
 ---
 
 ## 4. Process and Session Model

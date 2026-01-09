@@ -840,6 +840,11 @@ This section defines how agents expose provider families and configured connecti
 | `modelId` | Model identifier within a provider (opaque string) | `"claude-sonnet-4-20250514"`, `"gpt-4o"` |
 | `connectionId` | Configured connection to a provider: endpoint + settings + credentials | `"conn_anthropic_prod"`, `"conn_openai_dev"` |
 
+**Glossary**:
+- **Provider catalog entry**: The metadata returned by `ent/providers/catalog` describing a provider family and its models (pricing/context window/etc). Identified by `providerId`.
+- **Connection**: A user-managed instance of a provider family: endpoint + non-secret config + credentials. Identified by `connectionId` and paired with exactly one `providerId`.
+- **Model**: A model identifier within a provider family. Identified by `modelId`. Availability may vary by connection (endpoint/credentials) and may also be gated (enabled/disabled) by the agent.
+
 **Invariants**:
 - A `connectionId` is always paired with exactly one `providerId`. This pairing MUST NOT change.
 - Credentials are mutable: agents MUST support updating credentials for an existing `connectionId` (credential rotation) without changing the connection's identity.
@@ -1157,7 +1162,10 @@ Refresh model catalog from upstream provider.
 }
 ```
 
-**Note**: Only available if `ent/providers.catalogRefresh` is `true`.
+**Behavior**:
+- Agents MAY serve cached results; `refreshedAt` indicates the freshness boundary for that connection's model catalog.
+- `ent/models/refresh` does not return the model list; clients SHOULD call `ent/models/list` after a successful refresh.
+- Capability gate: `AgentCapabilities["ent/providers"].catalogRefresh` MUST be true for agents that implement this method.
 
 ### 6.26 `ent/models/enable` / `ent/models/disable` (extension)
 
@@ -1181,7 +1189,7 @@ Toggle model availability for a specific provider. UI must call these; the web t
 Rules:
 - Idempotent; enabling an already-enabled model is a no-op.
 - Unknown `modelIds` SHOULD error.
-- State is provider-global and persisted by the agent (not session-scoped, not web-written).
+- State is **provider-global** (keyed by `providerId`) and persisted by the agent (not session-scoped, not web-written).
 
 ### 6.27 `ent/tools/list`
 

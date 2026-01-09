@@ -35,8 +35,10 @@ npm test --workspace=packages/agent -- ent-protocol.spec.ts
   - `ent/personas/list` presence
 - **Jobs**
   - `ent/job/list` baseline empty
+  - `ent/job/output` blocking + pagination (`block`, `timeout`, `tailBytes`, `afterOffset`)
   - `ent/job/output` unknown job → JobNotFound
   - `ent/job/kill` unknown job returns success: false
+  - `ent/job/kill` running job returns success: true
 - **MCP**
   - `ent/mcp/servers/list` baseline empty
   - `ent/mcp/servers/upsert|delete` without active session → SessionNotFound
@@ -55,9 +57,6 @@ npm test --workspace=packages/agent -- ent-protocol.spec.ts
 
 ## Gaps to fill (add tests before shipping)
 
-- Job streaming pagination semantics (`tailBytes`, `afterOffset`) with real job output
-- `ent/job/kill` on running job (success path) and subagent job behaviour
-- `ent/job/output` blocking with `block: true` and `timeout`
 - `ent/job/inject` delivery to running subagent
 - `ent/session/events` ordering and durability assertions
 - Budget enforcement edge cases (maxBudgetUsd unset vs zero) already covered elsewhere but should be referenced here
@@ -68,6 +67,7 @@ npm test --workspace=packages/agent -- ent-protocol.spec.ts
 
 - Tests must assert spec errors (e.g., `-32602 InvalidParams`, `JobNotFound` code 8) rather than loosening expectations to match implementation quirks.
 - Avoid touching agent state on disk from the client side; all mutations go through protocol calls.
+- Conformance tests should validate params/results against `@lace/ent-protocol` Zod schemas (see `packages/ent-protocol/src/schemas/methods.ts`).
 - Keep test runtime reasonable; prefer targeted contract cases over long conversational flows.
 
 ## Updating this document

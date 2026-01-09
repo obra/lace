@@ -162,14 +162,14 @@ Validated (2026-01-08):
 
 #### B) Protocol spec + behavior confirmations (docs + schemas)
 
-- [ ] Add/confirm a glossary in docs:
-  - [ ] `providerId` = catalog provider type (e.g. `openai`)
-  - [ ] `connectionId` = user-managed provider instance id
-- [ ] Confirm and document semantics:
-  - [ ] `ent/models/enable` + `ent/models/disable` are **global-per-connection** (persisted), not session-scoped.
-  - [ ] `ent/models/list` always includes `disabled` + `disabledState`.
-  - [ ] `ent/providers/refresh` and `ent/models/refresh` timing guarantees (what “refresh” means; whether it’s async; what to poll).
-  - [ ] `ent/providers/catalog` is the single source of truth for the catalog provider list + metadata.
+- [x] Add/confirm a glossary in docs:
+  - [x] `providerId` = catalog provider type (e.g. `openai`)
+  - [x] `connectionId` = user-managed provider instance id
+- [x] Confirm and document semantics:
+  - [x] `ent/models/enable` + `ent/models/disable` are **provider-global** (persisted), not session-scoped.
+  - [x] `ent/models/list` always includes `disabled` + `disabledState`.
+  - [x] `ent/providers/refresh` and `ent/models/refresh` semantics are documented in `docs/protocol-spec.md`.
+  - [x] `ent/providers/catalog` is the single source of truth for the catalog provider list + metadata.
 
 #### C) Agent ENT conformance suite (exhaustive; best practices + implementation test)
 
@@ -226,9 +226,9 @@ Coverage checklist (must be exhaustive):
 
 Constraints:
 
-- [ ] No real provider credentials required; deterministic behavior only.
-- [ ] Tests validate schemas for both params and results (strict round-trip).
-- [ ] Key negative cases covered (InvalidParams / NotFound / permission denied) where applicable.
+- [x] No real provider credentials required; deterministic behavior only.
+- [x] Tests validate schemas for both params and results (strict round-trip).
+- [x] Key negative cases covered (InvalidParams / NotFound / permission denied) where applicable.
 
 #### D) Web: remove remaining agent library usage (beyond provider management)
 
@@ -280,17 +280,17 @@ Parity checklist:
   - [x] start (`ent/connections/credentials/start`)
   - [x] submit (`ent/connections/credentials/submit`)
   - [x] clear (`ent/connections/credentials/clear`)
-- [ ] Models:
+- [x] Models:
   - [x] selection list (“Models…”) shows enabled models only (`ent/models/list`)
   - [x] enable/disable is managed via “Connections…” → “Models…” (`ent/models/enable`, `ent/models/disable`)
   - [x] refresh wired via `ent/models/refresh` (no tight loop/spam)
   - [x] selection (`ent/session/configure`) works from both “Configure” and “Models…” screens
-- [ ] Persistence:
+- [x] Persistence:
   - [x] last-used `connectionId` + `modelId` restored automatically (currently TUI prefs)
-- [ ] UX parity:
-  - [ ] command palette scrolls
+- [x] UX parity:
+  - [x] command palette scrolls
   - [x] help toggle requires bare `F1` with no modifiers (avoids terminals mapping `?` → `F1`+Shift)
-  - [ ] Diagnostics:
+  - [x] Diagnostics:
   - [x] TUI writes a redacted ENT protocol log + agent stderr log to disk and shows the file path in the UI.
 
 ### Decisions required (do not implement without alignment)
