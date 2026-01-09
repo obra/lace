@@ -690,6 +690,15 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                     let out_context = apply_ui_action(state, UiAction::OpenContextViewer);
                     out.extend(out_context);
                 }
+                PaletteCommand::CompactContext => {
+                    let id = state.next_client_id();
+                    state.push_activity_line("Compacting context...".to_string());
+                    out.push(Outbound::JsonRpcRequest {
+                        id,
+                        method: "ent/session/compact".to_string(),
+                        params: Some(json!({})),
+                    });
+                }
                 PaletteCommand::Quit => {
                     state.should_exit = true;
                 }
@@ -1005,6 +1014,7 @@ enum PaletteCommand {
     OpenConnectionsCmd,
     McpServers,
     ContextViewer,
+    CompactContext,
     Quit,
 }
 
@@ -1067,6 +1077,10 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
         PaletteItem {
             label: "Context Usage...",
             command: PaletteCommand::ContextViewer,
+        },
+        PaletteItem {
+            label: "Compact Context...",
+            command: PaletteCommand::CompactContext,
         },
         PaletteItem {
             label: "Quit",
