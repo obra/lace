@@ -23,7 +23,7 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
+use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap};
 use ratatui::Terminal;
 use serde_json::Value;
 use std::io;
@@ -1792,33 +1792,69 @@ fn focused_block(title: &'static str, focused: bool, theme: Theme) -> Block<'sta
 }
 
 fn render_palette_modal(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
     let mut lines: Vec<Line> = Vec::new();
-    lines.push(Line::from("Command Palette"));
-    lines.push(Line::from(format!("> {}", state.palette_query)));
+
+    // Search input with prompt
+    lines.push(Line::from(vec![
+        Span::styled("> ", Style::default().fg(colors.accent)),
+        Span::styled(
+            state.palette_query.clone(),
+            Style::default().fg(colors.fg_primary),
+        ),
+        Span::styled("▌", Style::default().fg(colors.accent)),
+    ]));
     lines.push(Line::from(""));
 
+    // Filter and display palette items
     let items = palette_labels(&state.palette_query);
     if items.is_empty() {
-        lines.push(Line::from("(no matches)"));
+        lines.push(Line::from(Span::styled(
+            "(no matches)",
+            Style::default().fg(colors.fg_muted),
+        )));
     } else {
         let idx = state.palette_selected.min(items.len() - 1);
         let window = 12usize;
         let start = idx.saturating_sub(window / 2);
         let end = (start + window).min(items.len());
         for i in start..end {
-            let marker = if i == idx { ">" } else { " " };
-            lines.push(Line::from(format!("{marker} {}", items[i])));
+            let selected = i == idx;
+            let marker = if selected { "▸ " } else { "  " };
+            let style = if selected {
+                Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
+            } else {
+                Style::default().fg(colors.fg_secondary)
+            };
+            lines.push(Line::from(Span::styled(
+                format!("{}{}", marker, items[i]),
+                style,
+            )));
         }
         if end < items.len() {
-            lines.push(Line::from(format!("... (+{} more)", items.len() - end)));
+            lines.push(Line::from(Span::styled(
+                format!("... (+{} more)", items.len() - end),
+                Style::default().fg(colors.fg_muted),
+            )));
         }
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from("Esc to close"));
+    lines.push(Line::from(Span::styled(
+        "Esc to close",
+        Style::default().fg(colors.fg_muted),
+    )));
 
     Paragraph::new(Text::from(lines))
-        .block(Block::default().title("Palette").borders(Borders::ALL))
+        .style(Style::default().bg(colors.bg_elevated))
+        .block(
+            Block::default()
+                .title("Palette")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.border_subtle))
+                .border_type(BorderType::Rounded),
+        )
         .wrap(Wrap { trim: true })
 }
 
