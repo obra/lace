@@ -1002,13 +1002,6 @@ impl ThemeStyles {
         }
     }
 
-    // Convenience accessors for backwards compatibility during migration
-    fn status_fg(&self) -> Color {
-        self.colors.fg_primary
-    }
-    fn status_bg(&self) -> Color {
-        self.colors.bg_surface
-    }
     fn focused_border(&self) -> Color {
         self.colors.accent
     }
@@ -1041,35 +1034,48 @@ fn theme_styles(theme: Theme) -> ThemeStyles {
 
 fn render_status(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
-    let sid = state
-        .session_id
-        .clone()
-        .unwrap_or_else(|| "<none>".to_string());
-    let conn = state
-        .connection_id
-        .clone()
-        .unwrap_or_else(|| "<unset>".to_string());
+    let colors = &styles.colors;
+
     let model = state
         .model_id
         .clone()
-        .unwrap_or_else(|| "<unset>".to_string());
-    let last = state
-        .last_activity_ms
-        .map(|ms| ms.to_string())
-        .unwrap_or_else(|| "<none>".to_string());
+        .unwrap_or_else(|| "no model".to_string());
+
+    // Extract provider name from connection_id (e.g., "anthropic-prod" -> "anthropic")
+    let provider = state
+        .connection_id
+        .clone()
+        .and_then(|c| c.split('-').next().map(|s| s.to_string()))
+        .unwrap_or_else(|| "—".to_string());
+
+    // Token count - placeholder for now, will be wired up later
+    let tokens = "—";
+
+    // Shorten workdir if too long
+    let workdir = state.workdir.clone();
+    let short_workdir = if workdir.len() > 30 {
+        format!("…{}", &workdir[workdir.len() - 28..])
+    } else {
+        workdir
+    };
+
+    let sep = Span::styled(" · ", Style::default().fg(colors.fg_muted));
+
     let text = Line::from(vec![
         Span::styled(
-            " lace-tui ",
-            Style::default().fg(styles.status_fg()).bg(styles.status_bg()),
+            format!(" {}", model),
+            Style::default().fg(colors.fg_primary),
         ),
+        sep.clone(),
+        Span::styled(provider, Style::default().fg(colors.fg_muted)),
+        sep.clone(),
+        Span::styled(format!("{} tokens", tokens), Style::default().fg(colors.fg_muted)),
+        sep,
+        Span::styled(short_workdir, Style::default().fg(colors.fg_muted)),
         Span::raw(" "),
-        Span::raw(format!("sess={sid} ")),
-        Span::raw(format!("conn={conn} model={model} ")),
-        Span::raw(format!("last={last} ")),
-        Span::raw(format!("workdir={} ", state.workdir)),
-        Span::raw(" Ctrl+C quit  Ctrl+1/2/3 panes "),
     ]);
-    Paragraph::new(text).style(Style::default())
+
+    Paragraph::new(text).style(Style::default().bg(colors.bg_surface))
 }
 
 fn render_sessions_modal(state: &AppState) -> Paragraph<'static> {
