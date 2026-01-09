@@ -1124,60 +1124,114 @@ fn render_status(state: &AppState) -> Paragraph<'static> {
 }
 
 fn render_sessions_modal(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
     let s = &state.sessions;
     let mut lines: Vec<Line> = Vec::new();
 
-    lines.push(Line::from("Sessions"));
+    // Title
+    lines.push(Line::from(Span::styled(
+        "Sessions",
+        Style::default()
+            .fg(colors.fg_primary)
+            .add_modifier(Modifier::BOLD),
+    )));
     lines.push(Line::from(""));
 
     if s.loading {
-        lines.push(Line::from("Loading sessions..."));
+        lines.push(Line::from(Span::styled(
+            "Loading sessions...",
+            Style::default().fg(colors.fg_muted),
+        )));
     } else if let Some(err) = &s.error {
-        lines.push(Line::from(format!("Error: {err}")));
+        lines.push(Line::from(Span::styled(
+            format!("Error: {err}"),
+            Style::default().fg(colors.error),
+        )));
     } else {
-        lines.push(Line::from(format!("Filter: {}", s.query)));
+        // Search/filter input
+        lines.push(Line::from(vec![
+            Span::styled("> ", Style::default().fg(colors.accent)),
+            Span::styled(s.query.clone(), Style::default().fg(colors.fg_primary)),
+            Span::styled("▌", Style::default().fg(colors.accent)),
+        ]));
         lines.push(Line::from(""));
 
-        let max = 18usize;
-        let start = s.selected.saturating_sub(max / 2);
-        let end = (start + max).min(s.filtered.len());
-        for sel_idx in start..end {
-            let idx = s.filtered[sel_idx];
-            let selected = sel_idx == s.selected;
-            let marker = if selected { ">" } else { " " };
-            let it = &s.items[idx];
-            let alias = state
-                .session_aliases
-                .get(&it.session_id)
-                .cloned()
-                .unwrap_or_default();
-            let title = if alias.is_empty() {
-                it.session_id.clone()
-            } else {
-                format!("{alias} ({})", it.session_id)
-            };
-            let work = it.work_dir.clone().unwrap_or_else(|| "?".to_string());
-            let last_active = it.last_active.clone().unwrap_or_else(|| "?".to_string());
-            lines.push(Line::from(format!("{marker} {title}")));
+        // Session list
+        if s.filtered.is_empty() {
             lines.push(Line::from(Span::styled(
-                format!("    {work}  lastActive={last_active}"),
-                Style::default().fg(Color::DarkGray),
+                "(no sessions)",
+                Style::default().fg(colors.fg_muted),
             )));
+        } else {
+            let max = 18usize;
+            let start = s.selected.saturating_sub(max / 2);
+            let end = (start + max).min(s.filtered.len());
+
+            for sel_idx in start..end {
+                let idx = s.filtered[sel_idx];
+                let selected = sel_idx == s.selected;
+                let it = &s.items[idx];
+                let alias = state
+                    .session_aliases
+                    .get(&it.session_id)
+                    .cloned()
+                    .unwrap_or_default();
+                let title = if alias.is_empty() {
+                    it.session_id.clone()
+                } else {
+                    format!(
+                        "{alias} ({})",
+                        &it.session_id[..8.min(it.session_id.len())]
+                    )
+                };
+
+                let marker = if selected { "▸ " } else { "  " };
+                let style = if selected {
+                    Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
+                } else {
+                    Style::default().fg(colors.fg_secondary)
+                };
+
+                lines.push(Line::from(Span::styled(format!("{marker}{title}"), style)));
+
+                // Show workdir and last active on second line for selected
+                if selected {
+                    let work = it.work_dir.clone().unwrap_or_else(|| "?".to_string());
+                    let last_active = it.last_active.clone().unwrap_or_else(|| "?".to_string());
+                    lines.push(Line::from(Span::styled(
+                        format!("     {} · {}", work, last_active),
+                        Style::default().fg(colors.fg_muted),
+                    )));
+                }
+            }
         }
 
+        // Rename input if active
         if s.renaming {
             lines.push(Line::from(""));
-            lines.push(Line::from(format!("Rename: {}", s.rename_input)));
+            lines.push(Line::from(vec![
+                Span::styled("Rename: ", Style::default().fg(colors.fg_muted)),
+                Span::styled(s.rename_input.clone(), Style::default().fg(colors.fg_primary)),
+                Span::styled("▌", Style::default().fg(colors.accent)),
+            ]));
         }
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from(
-        "Up/Down select • Enter load • r rename • Esc close",
-    ));
+    lines.push(Line::from(Span::styled(
+        "Enter load · r rename · Esc close",
+        Style::default().fg(colors.fg_muted),
+    )));
 
     Paragraph::new(Text::from(lines))
-        .block(Block::default().title("Sessions").borders(Borders::ALL))
+        .style(Style::default().bg(colors.bg_elevated))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.border_subtle))
+                .border_type(BorderType::Rounded),
+        )
         .wrap(Wrap { trim: true })
 }
 
