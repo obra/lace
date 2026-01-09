@@ -306,6 +306,17 @@ impl AppState {
             _ => {}
         }
     }
+
+    /// Returns true if the agent is "thinking" - i.e., we're awaiting a response.
+    /// This is true when we have active prompt requests and the last message is from the user.
+    pub fn is_thinking(&self) -> bool {
+        !self.active_prompt_request_ids.is_empty()
+            && self
+                .messages
+                .last()
+                .map(|m| m.role == Role::User)
+                .unwrap_or(false)
+    }
 }
 
 #[cfg(test)]

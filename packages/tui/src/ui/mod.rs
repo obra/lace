@@ -21,7 +21,7 @@ use crossterm::terminal::{
 use crossterm::{execute, terminal};
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
-use ratatui::style::{Color, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 use ratatui::Terminal;
@@ -29,6 +29,18 @@ use serde_json::Value;
 use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
+
+/// Returns an animated spinner character based on the current time.
+/// The spinner cycles through a set of braille characters every 100ms.
+fn spinning_char() -> char {
+    const SPINNER: &[char] = &['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    let ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let idx = ((ms / 100) % SPINNER.len() as u128) as usize;
+    SPINNER[idx]
+}
 
 pub fn run_tui(args: Args) -> io::Result<()> {
     let workdir = resolve_workdir(args.workdir.as_deref())?;
@@ -993,12 +1005,6 @@ impl ThemeStyles {
     fn focused_border(&self) -> Color {
         self.colors.accent
     }
-    fn user_prefix(&self) -> Color {
-        self.colors.accent
-    }
-    fn assistant_prefix(&self) -> Color {
-        self.colors.fg_secondary
-    }
     // Used by render_activity which is kept for future overlay implementation
     #[allow(dead_code)]
     fn activity_selected(&self) -> Color {
@@ -1011,12 +1017,6 @@ impl ThemeStyles {
     }
     fn dim(&self) -> Color {
         self.colors.fg_muted
-    }
-    fn code_fg(&self) -> Color {
-        self.colors.fg_primary
-    }
-    fn code_bg(&self) -> Color {
-        self.colors.bg_surface
     }
 }
 
@@ -1467,49 +1467,63 @@ fn render_main(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout::
 
 fn render_chat(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
     let mut lines: Vec<Line> = Vec::new();
+
     for m in &state.messages {
-        let prefix = match m.role {
-            Role::User => "user: ",
-            Role::Assistant => "assistant: ",
+        let prefix_style = match m.role {
+            Role::User => Style::default().fg(colors.accent).add_modifier(Modifier::BOLD),
+            Role::Assistant => Style::default().fg(colors.fg_secondary),
         };
+
+        // Add spacing before message (except for first message)
+        if !lines.is_empty() {
+            lines.push(Line::from(""));
+        }
+
+        // Role indicator - use friendly labels
+        let role_text = match m.role {
+            Role::User => "you",
+            Role::Assistant => "assistant",
+        };
+        lines.push(Line::from(Span::styled(role_text, prefix_style)));
+
+        // Message content with streaming cursor if applicable
         let mut text = m.text.clone();
         if m.role == Role::Assistant && m.streaming {
-            text.push_str("▌");
+            text.push_str(" ▌");
         }
-        let prefix_color = match m.role {
-            Role::User => styles.user_prefix(),
-            Role::Assistant => styles.assistant_prefix(),
-        };
-        lines.push(Line::from(vec![Span::styled(
-            prefix,
-            Style::default().fg(prefix_color),
-        )]));
+
         if state.prefs.render_markdown {
             for l in markdown::render_markdownish_lines(&text) {
-                if l.is_code {
-                    lines.push(Line::from(Span::styled(
-                        l.text,
-                        Style::default().fg(styles.code_fg()).bg(styles.code_bg()),
-                    )));
+                let style = if l.is_code {
+                    Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
                 } else {
-                    lines.push(Line::from(l.text));
-                }
+                    Style::default().fg(colors.fg_primary)
+                };
+                lines.push(Line::from(Span::styled(l.text, style)));
             }
         } else {
             for l in text.lines() {
-                lines.push(Line::from(l.to_string()));
+                lines.push(Line::from(Span::styled(
+                    l.to_string(),
+                    Style::default().fg(colors.fg_primary),
+                )));
             }
         }
+    }
+
+    // Show thinking indicator if awaiting response
+    if state.is_thinking() {
         lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            format!("{} Thinking...", spinning_char()),
+            Style::default().fg(colors.spinner),
+        )));
     }
 
     Paragraph::new(Text::from(lines))
-        .block(focused_block(
-            "Chat",
-            state.focus == Focus::Chat,
-            state.prefs.theme,
-        ))
+        .style(Style::default().bg(colors.bg_base))
         .wrap(Wrap { trim: false })
         .scroll((state.chat_scroll, 0))
 }
@@ -1866,16 +1880,24 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
     }
 
     let mut total: usize = 0;
+    let mut first_message = true;
     for m in &state.messages {
-        let prefix = match m.role {
-            Role::User => "user: ",
-            Role::Assistant => "assistant: ",
+        // Blank line before message (except first)
+        if !first_message {
+            total += 1;
+        }
+        first_message = false;
+
+        // Role label line ("you" or "assistant")
+        let role_text = match m.role {
+            Role::User => "you",
+            Role::Assistant => "assistant",
         };
-        total += wrapped_line_count(content_width, prefix);
+        total += wrapped_line_count(content_width, role_text);
 
         let mut text = m.text.clone();
         if m.role == Role::Assistant && m.streaming {
-            text.push_str("▌");
+            text.push_str(" ▌");
         }
 
         if state.prefs.render_markdown {
@@ -1887,9 +1909,13 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
                 total += wrapped_line_count(content_width, l);
             }
         }
-
-        total += 1; // blank line after message
     }
+
+    // Add lines for thinking indicator if showing
+    if state.is_thinking() {
+        total += 2; // blank line + thinking indicator line
+    }
+
     total
 }
 
