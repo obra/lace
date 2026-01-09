@@ -471,4 +471,81 @@ describe('async job workflow (E2E)', () => {
     // false command exits with status 1
     expect(output.exitCode).toBe(1);
   });
+
+  it('session switch kills running jobs', { timeout: 30_000 }, async () => {
+    agent = spawnAgentProcess({ laceDir });
+
+    let jobId: string | undefined;
+    let session1Id: string | undefined;
+
+    agent.peer.onRequest('session/update', async (params) => {
+      const p = params as Record<string, unknown>;
+      if (p.type === 'job_started' && typeof p.jobId === 'string') {
+        jobId = p.jobId;
+      }
+      return undefined;
+    });
+
+    agent.peer.onRequest('session/request_permission', async () => {
+      return { decision: 'allow' };
+    });
+
+    await withTimeout(
+      agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'allow' } })
+      ),
+      2_000,
+      'initialize'
+    );
+
+    // Create first session and start a long-running job
+    const session1 = (await withTimeout(
+      agent.peer.request('session/new', { workDir }),
+      2_000,
+      'session/new (1)'
+    )) as { sessionId: string };
+    session1Id = session1.sessionId;
+
+    await withTimeout(
+      agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'job: sleep 60' }],
+      }),
+      5_000,
+      'session/prompt (start job)'
+    );
+
+    // Wait for job to start
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          if (jobId) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      3_000,
+      'job started'
+    );
+
+    // Switch to a new session
+    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new (2)');
+
+    // Load back the first session and check job status
+    await withTimeout(
+      agent.peer.request('session/load', { sessionId: session1Id }),
+      2_000,
+      'session/load'
+    );
+
+    // Job should have been killed (cancelled status)
+    const output = (await withTimeout(
+      agent.peer.request('ent/job/output', { jobId }),
+      2_000,
+      'ent/job/output'
+    )) as { status: string };
+
+    expect(output.status).toBe('cancelled');
+  });
 });

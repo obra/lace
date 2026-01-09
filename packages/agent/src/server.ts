@@ -3125,12 +3125,40 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('session/new', async (params: unknown) => {
     assertInitialized(state);
-    if (state.activeTurn || [...state.jobs.values()].some((job) => job.status === 'running'))
+    if (state.activeTurn)
       throw {
         code: AcpErrorCodes.SessionBusy,
         message: 'SessionBusy',
         data: { category: 'session' },
       };
+
+    // Kill all running jobs before switching sessions
+    for (const job of state.jobs.values()) {
+      if (job.status === 'running') {
+        job.status = 'cancelled';
+        if (job.proc) {
+          try {
+            if (process.platform !== 'win32' && typeof job.proc.pid === 'number') {
+              process.kill(-job.proc.pid, 'SIGTERM');
+            } else {
+              job.proc.kill('SIGTERM');
+            }
+          } catch {
+            // Process may already be dead
+          }
+        }
+        job.permissionAbortController?.abort();
+      }
+    }
+
+    // Wait briefly for processes to terminate
+    await Promise.all(
+      [...state.jobs.values()]
+        .filter((job) => job.proc && job.proc.exitCode === null)
+        .map((job) =>
+          Promise.race([job.completion, new Promise<void>((resolve) => setTimeout(resolve, 500))])
+        )
+    );
 
     state.pendingPermissionRequests.clear();
     state.jobs.clear();
@@ -3245,6 +3273,34 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const switchingSessions =
       state.activeSession && state.activeSession.meta.sessionId !== parsed.sessionId;
     if (switchingSessions) {
+      // Kill all running jobs before switching sessions
+      for (const job of state.jobs.values()) {
+        if (job.status === 'running') {
+          job.status = 'cancelled';
+          if (job.proc) {
+            try {
+              if (process.platform !== 'win32' && typeof job.proc.pid === 'number') {
+                process.kill(-job.proc.pid, 'SIGTERM');
+              } else {
+                job.proc.kill('SIGTERM');
+              }
+            } catch {
+              // Process may already be dead
+            }
+          }
+          job.permissionAbortController?.abort();
+        }
+      }
+
+      // Wait briefly for processes to terminate
+      await Promise.all(
+        [...state.jobs.values()]
+          .filter((job) => job.proc && job.proc.exitCode === null)
+          .map((job) =>
+            Promise.race([job.completion, new Promise<void>((resolve) => setTimeout(resolve, 500))])
+          )
+      );
+
       state.pendingPermissionRequests.clear();
       state.jobs.clear();
     }
