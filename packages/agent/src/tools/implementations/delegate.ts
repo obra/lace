@@ -9,6 +9,8 @@ import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 const delegateSchema = z
   .object({
     prompt: NonEmptyString,
+    description: z.string().optional(),
+    run_async: z.boolean().default(false),
   })
   .strict();
 
