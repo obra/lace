@@ -239,6 +239,59 @@ describe('Supervisor (E2E)', () => {
     ]);
   });
 
+  it('applies per-agent tool policies before prompting for permission', async () => {
+    const updates: Array<{ workspaceSessionId: string; update: Record<string, unknown> }> = [];
+    const permissionRequests: Array<{
+      workspaceSessionId: string;
+      params: Record<string, unknown>;
+    }> = [];
+
+    supervisor = new Supervisor({
+      storeDir: laceDir,
+      onSessionUpdate: (workspaceSessionId, update) => updates.push({ workspaceSessionId, update }),
+      onPermissionRequest: async (workspaceSessionId, params) => {
+        permissionRequests.push({ workspaceSessionId, params });
+        return { decision: 'allow' };
+      },
+    });
+
+    const ws = await supervisor.createWorkspaceSession(workDir);
+
+    supervisor.upsertAgentSessionMeta(ws.workspaceSessionId, {
+      sessionId: ws.sessionId,
+      toolPolicies: { bash: 'deny' },
+    });
+
+    await withTimeout(
+      supervisor.promptSession(ws.workspaceSessionId, ws.sessionId, [
+        { type: 'text', text: 'run: echo denied' },
+      ]),
+      10_000,
+      'prompt (denied)'
+    );
+
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          const denied = updates.find(
+            (u) =>
+              u.workspaceSessionId === ws.workspaceSessionId &&
+              u.update.type === 'tool_use' &&
+              u.update.status === 'denied'
+          );
+          if (denied) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      5_000,
+      'tool_use denied update'
+    );
+
+    expect(permissionRequests).toEqual([]);
+  });
+
   it('persists workspace session metadata to laceDir', async () => {
     supervisor = new Supervisor({
       storeDir: laceDir,

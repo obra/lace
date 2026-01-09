@@ -29,6 +29,7 @@ import {
   isSessionId,
   type JsonRpcPeer,
   type SessionId,
+  type ToolPolicy,
   SessionListRequestSchema,
   SessionListResponseSchema,
   SessionLoadRequestSchema,
@@ -150,6 +151,13 @@ export class Supervisor {
       onPermissionRequest: async (params) => {
         if (!activeSessionId) return { decision: 'deny' };
         if (params.sessionId !== activeSessionId) return { decision: 'deny' };
+
+        const toolPolicy = this.store
+          .get(workspaceSessionId)
+          ?.agents.find((a) => a.sessionId === activeSessionId)?.toolPolicies?.[params.tool];
+        if (toolPolicy === 'allow') return { decision: 'allow' };
+        if (toolPolicy === 'deny' || toolPolicy === 'disable') return { decision: 'deny' };
+
         if (!this.onPermissionRequest) return { decision: 'deny' };
         return await this.onPermissionRequest(workspaceSessionId, params);
       },
@@ -190,6 +198,13 @@ export class Supervisor {
       onPermissionRequest: async (params) => {
         if (!activeSessionId) return { decision: 'deny' };
         if (params.sessionId !== activeSessionId) return { decision: 'deny' };
+
+        const toolPolicy = this.store
+          .get(workspaceSessionId)
+          ?.agents.find((a) => a.sessionId === activeSessionId)?.toolPolicies?.[params.tool];
+        if (toolPolicy === 'allow') return { decision: 'allow' };
+        if (toolPolicy === 'deny' || toolPolicy === 'disable') return { decision: 'deny' };
+
         if (!this.onPermissionRequest) return { decision: 'deny' };
         return await this.onPermissionRequest(workspaceSessionId, params);
       },
@@ -406,6 +421,7 @@ export class Supervisor {
       name?: string;
       connectionId?: string;
       modelId?: string;
+      toolPolicies?: Record<string, ToolPolicy>;
     }
   ): void {
     this.store.upsertAgent(workspaceSessionId, params);

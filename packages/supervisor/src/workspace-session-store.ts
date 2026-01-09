@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import type { ToolPolicy } from '@lace/ent-protocol';
 
 export type WorkspaceSessionRecord = {
   workspaceSessionId: string;
@@ -12,6 +13,7 @@ export type WorkspaceSessionRecord = {
     name?: string;
     connectionId?: string;
     modelId?: string;
+    toolPolicies?: Record<string, ToolPolicy>;
     createdAt: string;
     lastUsedAt: string;
   }>;
@@ -84,6 +86,7 @@ export class WorkspaceSessionStore {
       name?: string;
       connectionId?: string;
       modelId?: string;
+      toolPolicies?: Record<string, ToolPolicy>;
     }
   ): void {
     this.loadIfNeeded();
@@ -100,6 +103,7 @@ export class WorkspaceSessionStore {
       if (typeof params.name === 'string') existing.name = params.name;
       if (typeof params.connectionId === 'string') existing.connectionId = params.connectionId;
       if (typeof params.modelId === 'string') existing.modelId = params.modelId;
+      if (params.toolPolicies) existing.toolPolicies = params.toolPolicies;
       existing.lastUsedAt = now;
     } else {
       record.agents.push({
@@ -107,6 +111,7 @@ export class WorkspaceSessionStore {
         ...(typeof params.name === 'string' ? { name: params.name } : {}),
         ...(typeof params.connectionId === 'string' ? { connectionId: params.connectionId } : {}),
         ...(typeof params.modelId === 'string' ? { modelId: params.modelId } : {}),
+        ...(params.toolPolicies ? { toolPolicies: params.toolPolicies } : {}),
         createdAt: now,
         lastUsedAt: now,
       });
