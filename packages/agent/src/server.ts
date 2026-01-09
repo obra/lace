@@ -81,6 +81,8 @@ import { logger } from './utils/logger';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
 const JOB_LOG_DIR = 'jobs';
+const MAX_CONCURRENT_JOBS = 10;
+const MAX_JOB_OUTPUT_BYTES = 10 * 1024 * 1024; // 10 MB
 
 type SessionUpdateParams = z.infer<typeof SessionUpdateNotificationSchema>['params'];
 type DistributiveOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never;
@@ -1151,6 +1153,16 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         data: { category: 'session' },
       };
 
+    // Check concurrent job limit
+    const runningJobCount = [...state.jobs.values()].filter((j) => j.status === 'running').length;
+    if (runningJobCount >= MAX_CONCURRENT_JOBS) {
+      throw {
+        code: -32003, // ResourceLimitExceeded
+        message: `Maximum concurrent jobs (${MAX_CONCURRENT_JOBS}) exceeded`,
+        data: { category: 'session' },
+      };
+    }
+
     const jobId = `job_${randomUUID()}`;
     const startedAt = new Date().toISOString();
     const outputPath = getJobOutputPath(state.activeSession.dir, jobId);
@@ -1227,6 +1239,16 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         message: 'SessionNotFound',
         data: { category: 'session' },
       };
+
+    // Check concurrent job limit
+    const runningJobCount = [...state.jobs.values()].filter((j) => j.status === 'running').length;
+    if (runningJobCount >= MAX_CONCURRENT_JOBS) {
+      throw {
+        code: -32003, // ResourceLimitExceeded
+        message: `Maximum concurrent jobs (${MAX_CONCURRENT_JOBS}) exceeded`,
+        data: { category: 'session' },
+      };
+    }
 
     const jobId = `job_${randomUUID()}`;
     const startedAt = new Date().toISOString();
@@ -1410,7 +1432,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       const appendOutput = async (chunk: string) => {
         if (!state.activeSession) return;
         await runExclusive(() => {
-          appendFileSync(job.outputPath, chunk, { encoding: 'utf8' });
+          // Check output size limit
+          const currentSize = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
+          if (currentSize >= MAX_JOB_OUTPUT_BYTES) return; // Already at limit
+          const remaining = MAX_JOB_OUTPUT_BYTES - currentSize;
+          const toWrite = chunk.length <= remaining ? chunk : chunk.slice(0, remaining);
+          appendFileSync(job.outputPath, toWrite, { encoding: 'utf8' });
         });
       };
 
@@ -1490,7 +1517,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       const appendJobOutput = async (text: string) => {
         if (!state.activeSession) return;
         await runExclusive(() => {
-          appendFileSync(job.outputPath, text, { encoding: 'utf8' });
+          // Check output size limit
+          const currentSize = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
+          if (currentSize >= MAX_JOB_OUTPUT_BYTES) return; // Already at limit
+          const remaining = MAX_JOB_OUTPUT_BYTES - currentSize;
+          const toWrite = text.length <= remaining ? text : text.slice(0, remaining);
+          appendFileSync(job.outputPath, toWrite, { encoding: 'utf8' });
         });
       };
 
@@ -1650,7 +1682,15 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
           if (update.type === 'text_delta' && typeof update.text === 'string') {
             await runExclusive(() => {
-              appendFileSync(record.outputPath, update.text, { encoding: 'utf8' });
+              // Check output size limit
+              const currentSize = existsSync(record.outputPath)
+                ? statSync(record.outputPath).size
+                : 0;
+              if (currentSize >= MAX_JOB_OUTPUT_BYTES) return; // Already at limit
+              const remaining = MAX_JOB_OUTPUT_BYTES - currentSize;
+              const toWrite =
+                update.text.length <= remaining ? update.text : update.text.slice(0, remaining);
+              appendFileSync(record.outputPath, toWrite, { encoding: 'utf8' });
             });
           }
 
