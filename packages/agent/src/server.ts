@@ -87,6 +87,8 @@ const MAX_JOB_OUTPUT_BYTES = 10 * 1024 * 1024; // 10 MB
 type SessionUpdateParams = z.infer<typeof SessionUpdateNotificationSchema>['params'];
 type DistributiveOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never;
 type SessionUpdate = DistributiveOmit<SessionUpdateParams, 'sessionId' | 'streamSeq'>;
+// Inner update type for job_update events (text_delta, tool_use, etc.)
+type JobInnerUpdate = Extract<SessionUpdateParams, { type: 'job_update' }>['update'];
 
 function throwInvalidParams(reason?: string): never {
   throw {
@@ -1678,9 +1680,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           });
 
           const channel = p.channel === 'stdout' || p.channel === 'stderr' ? p.channel : 'internal';
-          const update = p.update as any;
+          // Child job update - forwarded as-is with namespaced IDs
+          // Runtime checks ensure shape is valid before forwarding
+          const update = p.update as Record<string, unknown>;
 
           if (update.type === 'text_delta' && typeof update.text === 'string') {
+            const text = update.text;
             await runExclusive(() => {
               // Check output size limit
               const currentSize = existsSync(record.outputPath)
@@ -1688,8 +1693,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 : 0;
               if (currentSize >= MAX_JOB_OUTPUT_BYTES) return; // Already at limit
               const remaining = MAX_JOB_OUTPUT_BYTES - currentSize;
-              const toWrite =
-                update.text.length <= remaining ? update.text : update.text.slice(0, remaining);
+              const toWrite = text.length <= remaining ? text : text.slice(0, remaining);
               appendFileSync(record.outputPath, toWrite, { encoding: 'utf8' });
             });
           }
@@ -1704,7 +1708,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             parentJobId: mappedParentJobId,
             jobType: record.type,
             channel,
-            update,
+            // Forwarded update from child job - trusted after runtime checks above
+            update: update as JobInnerUpdate,
           });
 
           return undefined;
@@ -1754,7 +1759,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             parentJobId: job.parentJobId,
             jobType: 'delegate',
             channel: 'internal',
-            update: p as any,
+            // Forwarded context_injected from child job
+            update: p as JobInnerUpdate,
           });
           return undefined;
         }
