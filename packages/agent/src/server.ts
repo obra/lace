@@ -48,10 +48,7 @@ import {
   deriveCheckpointFilesFromDurableEvents,
   deriveFilesReadFromDurableEvents,
 } from './storage/files-from-events';
-import {
-  derivePendingPermissionsFromDurableEvents,
-  type PendingPermissionRecord,
-} from './storage/permissions-from-events';
+import { derivePendingPermissionsFromDurableEvents } from './storage/permissions-from-events';
 import { ProviderCatalogManager } from './providers/catalog/manager';
 import { ProviderInstanceManager } from './providers/instance/manager';
 import {
@@ -79,8 +76,14 @@ import { personaRegistry } from './config/persona-registry';
 import { loadPromptConfig } from './config/prompts';
 import { logger } from './utils/logger';
 import { getUserSlashCommands, findUserCommand } from './user-commands';
-import { formatJobNotification } from './jobs/format-notification';
-import { ensureJobLogDir, getJobOutputPath, getLastLines } from './jobs/job-manager';
+import { ensureJobLogDir, getJobOutputPath } from './jobs/job-manager';
+import { createRunShellJobProcess } from './jobs/shell-job';
+import { runSubagentJobProcess as runSubagentJobProcessImpl } from './jobs/subagent-job';
+import {
+  createQueueJobNotification,
+  createSetupProgressTimer,
+  createFinalizeJob,
+} from './jobs/job-notifications';
 import {
   SUPPORTED_PROVIDER_TYPES,
   JOB_LOG_DIR,
@@ -116,70 +119,7 @@ import {
   recordsShallowEqual,
   mcpServerConfigEquivalent,
 } from './rpc/utils';
-
-function extractTextFromContentBlocks(content: unknown[]): string {
-  if (!Array.isArray(content)) return '';
-  return content
-    .filter(
-      (b) =>
-        b &&
-        typeof b === 'object' &&
-        (b as any).type === 'text' &&
-        typeof (b as any).text === 'string'
-    )
-    .map((b) => String((b as any).text))
-    .join('\n');
-}
-
-/**
- * Extracts content blocks from a prompt, preserving both text and image blocks.
- * Returns string if only text blocks, array if any images present.
- */
-function extractContentBlocks(content: unknown): string | ContentBlock[] {
-  if (!Array.isArray(content)) {
-    if (typeof content === 'string') return content;
-    return '';
-  }
-
-  const blocks: ContentBlock[] = [];
-  let hasImages = false;
-
-  for (const block of content) {
-    if (!block || typeof block !== 'object') continue;
-
-    const b = block as Record<string, unknown>;
-    if (b.type === 'text' && typeof b.text === 'string') {
-      blocks.push({ type: 'text', text: b.text });
-    } else if (b.type === 'image' && b.source && typeof b.source === 'object') {
-      const source = b.source as Record<string, unknown>;
-      if (
-        source.type === 'base64' &&
-        typeof source.media_type === 'string' &&
-        typeof source.data === 'string'
-      ) {
-        blocks.push({
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: source.media_type,
-            data: source.data,
-          },
-        });
-        hasImages = true;
-      }
-    }
-  }
-
-  // If no images, return simple string for backward compatibility
-  if (!hasImages) {
-    return blocks
-      .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
-      .map((b) => b.text)
-      .join('\n');
-  }
-
-  return blocks;
-}
+import { requestPermissionFromClient, reissuePendingPermissionRequests } from './rpc/permissions';
 
 async function createProviderForTurn(options: {
   connectionId?: string;
@@ -756,122 +696,9 @@ async function reconcileMcpServersForActiveSession(state: AgentServerState): Pro
   }
 }
 
-// Exported for testing - converts durable events to provider messages
-export function buildProviderMessagesFromDurableEvents(sessionDir: string): ProviderMessage[] {
-  const eventsPath = join(sessionDir, 'events.jsonl');
-  let raw = '';
-  try {
-    raw = readFileSync(eventsPath, 'utf8');
-  } catch {
-    return [];
-  }
+// Re-export public API from message-builder
+export { buildProviderMessagesFromDurableEvents } from './events/message-builder';
 
-  const messages: ProviderMessage[] = [];
-  const lines = raw.split('\n');
-
-  for (const line of lines) {
-    if (!line) continue;
-    try {
-      const parsed = JSON.parse(line) as { type?: string; data?: Record<string, unknown> };
-      const type = typeof parsed.type === 'string' ? parsed.type : '';
-      const data = typeof parsed.data === 'object' && parsed.data ? parsed.data : {};
-
-      if (type === 'prompt') {
-        const content = extractContentBlocks((data as Record<string, unknown>).content);
-        // Check if content is non-empty (string or array with items)
-        const hasContent = typeof content === 'string' ? content.trim() : content.length > 0;
-        if (hasContent) messages.push({ role: 'user', content });
-        continue;
-      }
-
-      if (type === 'context_injected') {
-        const content = extractTextFromContentBlocks((data as any).content);
-        if (content.trim()) messages.push({ role: 'system', content });
-        continue;
-      }
-
-      if (type === 'context_compacted') {
-        const summary = typeof (data as any).summary === 'string' ? (data as any).summary : '';
-        const preserved = Array.isArray((data as any).preserved) ? (data as any).preserved : [];
-
-        messages.length = 0;
-        if (summary.trim()) messages.push({ role: 'system', content: summary });
-
-        for (const msg of preserved) {
-          if (!msg || typeof msg !== 'object') continue;
-          const role = (msg as any).role;
-          const content = (msg as any).content;
-          if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
-          if (typeof content !== 'string') continue;
-
-          const toolCalls = Array.isArray((msg as any).toolCalls)
-            ? (msg as any).toolCalls
-            : undefined;
-          const toolResults = Array.isArray((msg as any).toolResults)
-            ? (msg as any).toolResults
-            : undefined;
-
-          messages.push({
-            role,
-            content,
-            ...(toolCalls ? { toolCalls } : {}),
-            ...(toolResults ? { toolResults } : {}),
-          });
-        }
-
-        continue;
-      }
-
-      if (type === 'message') {
-        const content =
-          typeof (data as any).content === 'string'
-            ? (data as any).content
-            : extractTextFromContentBlocks((data as any).content);
-        messages.push({ role: 'assistant', content: content ?? '' });
-        continue;
-      }
-
-      if (type === 'tool_use') {
-        const toolCallId = toNonEmptyString((data as any).toolCallId);
-        const name = toNonEmptyString((data as any).name);
-        const input = (data as any).input;
-        const result = (data as any).result as ToolResult | undefined;
-        if (!toolCallId || !name) continue;
-
-        const toolCall: CoreToolCall = {
-          id: toolCallId,
-          name,
-          arguments: typeof input === 'object' && input ? (input as any) : {},
-        };
-
-        if (messages.length === 0 || messages[messages.length - 1]!.role !== 'assistant') {
-          messages.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
-        } else {
-          const last = messages[messages.length - 1]!;
-          last.toolCalls = [...(last.toolCalls || []), toolCall];
-        }
-
-        if (result) {
-          const coreResult = coreToolResultFromProtocol(result, toolCallId);
-          const last = messages[messages.length - 1];
-          const canAppendToUser =
-            last && last.role === 'user' && last.toolResults && last.toolResults.length > 0;
-          if (canAppendToUser) {
-            last.toolResults!.push(coreResult);
-          } else {
-            messages.push({ role: 'user', content: '', toolResults: [coreResult] });
-          }
-        }
-
-        continue;
-      }
-    } catch {
-      // Ignore malformed lines.
-    }
-  }
-
-  return messages;
-}
 
 function estimateProviderTokens(messages: ProviderMessage[]): number {
   let total = 0;
@@ -1117,7 +944,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     job.resolveCompletion();
   };
 
-  const requestPermissionFromClient = async (request: {
+  const _requestPermissionFromClient = async (request: {
     sessionId: string;
     turnId: string;
     turnSeq: number;
@@ -1129,183 +956,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     options: Array<{ optionId: string; label: string }>;
     input: Record<string, unknown>;
     signal?: AbortSignal;
-  }): Promise<{ decision?: string; updatedInput?: Record<string, unknown> }> => {
-    const requestedAt = new Date().toISOString();
+  }): Promise<{ decision?: string; updatedInput?: Record<string, unknown> }> =>
+    requestPermissionFromClient(peer, state, runExclusive, request);
 
-    const record: PendingPermissionRecord = {
-      toolCallId: request.toolCallId,
-      turnId: request.turnId,
-      turnSeq: request.turnSeq,
-      jobId: request.jobId,
-      tool: request.tool,
-      kind: request.kind,
-      resource: request.resource,
-      options: request.options,
-      requestedAt,
-      input: request.input,
-    };
-
-    await runExclusive(() => {
-      let sessionState = readSessionState(state.activeSession!.dir);
-      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
-        type: 'permission_requested',
-        turnId: request.turnId,
-        data: {
-          toolCallId: request.toolCallId,
-          turnSeq: request.turnSeq,
-          ...(request.jobId ? { jobId: request.jobId } : {}),
-          tool: request.tool,
-          ...(request.kind ? { kind: request.kind } : {}),
-          resource: request.resource,
-          options: request.options,
-          requestedAt,
-          input: request.input,
-        },
-      });
-      sessionState = nextState;
-      writeSessionState(state.activeSession!.dir, sessionState);
-      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-    });
-
-    const { requestId: rpcId, result } = peer.requestWithId('session/request_permission', {
-      sessionId: request.sessionId,
-      turnId: request.turnId,
-      turnSeq: request.turnSeq,
-      jobId: request.jobId,
-      tool: request.tool,
-      kind: request.kind,
-      resource: request.resource,
-      options: request.options,
-      requestedAt,
-      toolCallId: request.toolCallId,
-    });
-
-    state.pendingPermissionRequests.set(request.toolCallId, {
-      requestId: String(rpcId),
-      rpcId,
-      record,
-      result,
-    });
-
-    const abortPromise = request.signal
-      ? new Promise<never>((_, reject) => {
-          request.signal!.addEventListener('abort', () => reject(new Error('cancelled')), {
-            once: true,
-          });
-        })
-      : null;
-
-    let response: any;
-    try {
-      response = abortPromise ? await Promise.race([result, abortPromise]) : await result;
-    } catch {
-      peer.abandonRequest(rpcId);
-      state.pendingPermissionRequests.delete(request.toolCallId);
-
-      await runExclusive(() => {
-        let sessionState = readSessionState(state.activeSession!.dir);
-        const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
-          type: 'permission_cancelled',
-          turnId: request.turnId,
-          data: { toolCallId: request.toolCallId, turnSeq: request.turnSeq, reason: 'cancelled' },
-        });
-        sessionState = nextState;
-        writeSessionState(state.activeSession!.dir, sessionState);
-        state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-      });
-
-      throw new Error('cancelled');
-    }
-
-    const decision = toNonEmptyString(response?.decision) ?? undefined;
-    const updatedInput =
-      response?.updatedInput && typeof response.updatedInput === 'object'
-        ? (response.updatedInput as Record<string, unknown>)
-        : undefined;
-
-    state.pendingPermissionRequests.delete(request.toolCallId);
-
-    await runExclusive(() => {
-      let sessionState = readSessionState(state.activeSession!.dir);
-      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
-        type: 'permission_decided',
-        turnId: request.turnId,
-        data: {
-          toolCallId: request.toolCallId,
-          turnSeq: request.turnSeq,
-          ...(decision ? { decision } : {}),
-          ...(updatedInput ? { updatedInput } : {}),
-        },
-      });
-      sessionState = nextState;
-      writeSessionState(state.activeSession!.dir, sessionState);
-      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-    });
-
-    return { ...(decision ? { decision } : {}), ...(updatedInput ? { updatedInput } : {}) };
-  };
-
-  const reissuePendingPermissionRequests = async (): Promise<void> => {
-    if (!state.activeSession) return;
-
-    const sessionId = state.activeSession.meta.sessionId;
-    const pending = derivePendingPermissionsFromDurableEvents(state.activeSession.dir);
-    for (const record of pending) {
-      if (state.pendingPermissionRequests.has(record.toolCallId)) continue;
-
-      const { requestId: rpcId, result } = peer.requestWithId('session/request_permission', {
-        sessionId,
-        turnId: record.turnId,
-        turnSeq: record.turnSeq,
-        ...(record.jobId ? { jobId: record.jobId } : {}),
-        toolCallId: record.toolCallId,
-        tool: record.tool,
-        kind: record.kind,
-        resource: record.resource,
-        options: record.options,
-        requestedAt: record.requestedAt,
-      });
-
-      state.pendingPermissionRequests.set(record.toolCallId, {
-        requestId: String(rpcId),
-        rpcId,
-        record,
-        result,
-      });
-
-      void (async () => {
-        try {
-          const response = (await result) as any;
-          const decision = toNonEmptyString(response?.decision) ?? undefined;
-          const updatedInput =
-            response?.updatedInput && typeof response.updatedInput === 'object'
-              ? (response.updatedInput as Record<string, unknown>)
-              : undefined;
-
-          state.pendingPermissionRequests.delete(record.toolCallId);
-
-          await runExclusive(() => {
-            let sessionState = readSessionState(state.activeSession!.dir);
-            const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
-              type: 'permission_decided',
-              turnId: record.turnId,
-              data: {
-                toolCallId: record.toolCallId,
-                turnSeq: record.turnSeq,
-                ...(decision ? { decision } : {}),
-                ...(updatedInput ? { updatedInput } : {}),
-              },
-            });
-            sessionState = nextState;
-            writeSessionState(state.activeSession!.dir, sessionState);
-            state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-          });
-        } catch {
-          state.pendingPermissionRequests.delete(record.toolCallId);
-        }
-      })();
-    }
-  };
+  const _reissuePendingPermissionRequests = async (): Promise<void> =>
+    reissuePendingPermissionRequests(peer, state, runExclusive);
 
   const _startShellJob = async (options: {
     command: string;
@@ -1542,7 +1197,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
         let decision: { decision?: string; updatedInput?: Record<string, unknown> };
         try {
-          decision = await requestPermissionFromClient({
+          decision = await _requestPermissionFromClient({
             sessionId: state.activeSession.meta.sessionId,
             turnId: permissionTurnId,
             turnSeq: permissionTurnSeq,
@@ -2038,7 +1693,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           typeof p.turnId === 'string' ? p.turnId : (job.originTurnId ?? `turn_${randomUUID()}`);
         const turnSeq = typeof p.turnSeq === 'number' ? p.turnSeq : (job.originTurnSeq ?? 0);
 
-        const decision = await requestPermissionFromClient({
+        const decision = await _requestPermissionFromClient({
           sessionId: state.activeSession!.meta.sessionId,
           turnId,
           turnSeq,
@@ -2351,7 +2006,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       const sessionId = state.activeSession.meta.sessionId;
       const pendingRecords = derivePendingPermissionsFromDurableEvents(state.activeSession.dir);
       if (pendingRecords.some((p) => !state.pendingPermissionRequests.has(p.toolCallId))) {
-        await reissuePendingPermissionRequests();
+        await _reissuePendingPermissionRequests();
       }
 
       for (const record of pendingRecords) {
@@ -3766,7 +3421,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     }
     state.activeSession = loaded;
     await reconcileMcpServersForActiveSession(state);
-    await reissuePendingPermissionRequests();
+    await _reissuePendingPermissionRequests();
     const summary = summarizeDurableEvents(loaded.dir);
     // ACP-aligned: lastActive renamed to updatedAt
     return {
@@ -4848,7 +4503,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                   | undefined;
 
                 try {
-                  permissionResponse = await requestPermissionFromClient({
+                  permissionResponse = await _requestPermissionFromClient({
                     sessionId: state.activeSession.meta.sessionId,
                     turnId,
                     turnSeq: toolTurnSeq,
@@ -5545,7 +5200,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
               | { decision?: string; updatedInput?: Record<string, unknown> }
               | undefined;
             try {
-              permissionResponse = await requestPermissionFromClient({
+              permissionResponse = await _requestPermissionFromClient({
                 sessionId: state.activeSession.meta.sessionId,
                 turnId,
                 turnSeq: 1,
