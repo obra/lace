@@ -1383,11 +1383,34 @@ Example failure:
 192|     { timeout: 20_000 },
 ```
 
-**Next Steps:**
-1. Run E2E tests in isolation to reproduce
-2. Check if failures are related to the events/ → message-building/ rename
-3. If agent package issue, write failing unit tests first (TDD)
-4. Fix root cause
+**Root Cause Found (2025-01-10):**
+
+The stale `dist/events/` directory from before the rename was causing tsc-alias to incorrectly rewrite:
+```javascript
+import { EventEmitter } from 'events';  // Node.js built-in
+```
+to:
+```javascript
+import { EventEmitter } from '../events';  // Our stale directory - WRONG!
+```
+
+**Fix Applied:**
+```bash
+rm -rf dist tsconfig.tsbuildinfo && npm run build
+```
+
+This reduced failures from 87 to 11.
+
+**Additional Fix Required:**
+The `ent/personas/list` handler was accidentally removed in commit `8cf48c775` during the server.ts cleanup.
+Restored in commit `1ac891400` by adding the handler to `rpc/handlers/tools.ts`.
+
+**Remaining Failures (Pre-existing, 10 tests):**
+- Job-related E2E tests in `agent-process.async-workflow.e2e.test.ts` and `agent-process.jobs.e2e.test.ts`
+- These are timing/async issues not related to this refactor
+
+**Prevention:**
+When renaming directories, always run `npm run build:clean` (or `rm -rf dist`) to avoid stale artifacts
 
 #### Files Changed
 
