@@ -124,6 +124,7 @@ import { registerInitializeHandler } from './rpc/handlers/initialize';
 import { registerAgentStatusHandlers } from './rpc/handlers/agent-status';
 import { registerProviderHandlers } from './rpc/handlers/providers';
 import { registerConnectionHandlers } from './rpc/handlers/connections';
+import { registerModelHandlers } from './rpc/handlers/models';
 
 async function createProviderForTurn(options: {
   connectionId?: string;
@@ -1029,27 +1030,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   registerAgentStatusHandlers(peer, state, () => _reissuePendingPermissionRequests());
   registerProviderHandlers(peer, state);
   registerConnectionHandlers(peer, state);
-
-  const ensureProviderCatalogLoaded = async () => {
-    if (state.providerCatalogLoaded) return;
-    try {
-      await state.providerCatalog.loadCatalogs();
-      if (state.providerCatalog.getAvailableProviders().length === 0) {
-        throw new Error('provider catalog empty after load');
-      }
-      state.providerCatalogLoaded = true;
-    } catch (error) {
-      logger.error('catalog.load.failed', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      state.providerCatalogLoaded = false;
-      throw {
-        code: EntErrorCodes.ProviderError,
-        message: 'Provider catalog unavailable',
-        data: { category: 'provider', reason: 'CatalogLoadFailed' },
-      };
-    }
-  };
+  registerModelHandlers(peer, state);
 
   const deriveJobsForActiveSession = (): Array<{
     jobId: string;
@@ -1198,169 +1179,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     return parsedResult;
   };
-
-
-  peer.onRequest('ent/models/list', async (params: unknown) => {
-    assertInitialized(state);
-
-    const parsed = params as { connectionId: string };
-    const connectionId = toNonEmptyString(parsed?.connectionId);
-    if (!connectionId) throwInvalidParams('connectionId is required');
-
-    const instances = await state.providerInstances.loadInstances();
-    const instance = instances.instances[connectionId];
-    if (!instance)
-      throw {
-        code: EntErrorCodes.ConnectionNotFound,
-        message: 'ConnectionNotFound',
-        data: { category: 'provider' },
-      };
-
-    await ensureProviderCatalogLoaded();
-    const providerId = instance.catalogProviderId;
-    let provider = state.providerCatalog.getProvider(providerId);
-    if (!provider) throwInvalidParams(`Unknown providerId: ${providerId}`);
-
-    // Prefer per-connection dynamic catalogs when available (e.g. OpenAI, OpenRouter).
-    const registry = ProviderRegistry.getInstance();
-    const instanceCatalog = await registry.getCatalogForInstance(connectionId);
-    if (instanceCatalog) provider = instanceCatalog;
-
-    const gating = state.providerCatalog.getModelGating(providerId);
-    const enabledSet =
-      gating.enabled && gating.enabled.length > 0 ? new Set(gating.enabled) : undefined;
-    const disabledSet = new Set(gating.disabled ?? []);
-
-    const models = provider.models.map((m) => {
-      const info = mapCatalogModelToModelInfo(m, providerId) as any;
-      const isDisabled =
-        (enabledSet && !enabledSet.has(m.id)) || (disabledSet.size > 0 && disabledSet.has(m.id));
-      info.disabled = isDisabled;
-      info.disabledState = isDisabled ? 'disabled' : 'enabled';
-      return info;
-    });
-
-    return { providerId, connectionId, models };
-  });
-
-  peer.onRequest('ent/models/refresh', async (params: unknown) => {
-    assertInitialized(state);
-
-    const parsed = params as { connectionId: string };
-    const connectionId = toNonEmptyString(parsed?.connectionId);
-    if (!connectionId) throwInvalidParams('connectionId is required');
-
-    const instances = await state.providerInstances.loadInstances();
-    const instance = instances.instances[connectionId];
-    if (!instance)
-      throw {
-        code: EntErrorCodes.ConnectionNotFound,
-        message: 'ConnectionNotFound',
-        data: { category: 'provider' },
-      };
-
-    await ensureProviderCatalogLoaded();
-    const providerId = instance.catalogProviderId;
-    const provider = state.providerCatalog.getProvider(providerId);
-    if (!provider)
-      throw {
-        code: EntErrorCodes.ProviderError,
-        message: 'Provider not found',
-        data: { category: 'provider' },
-      };
-
-    // Prefer per-connection dynamic refresh when available.
-    const registry = ProviderRegistry.getInstance();
-    const refreshed = await registry.getCatalogForInstance(connectionId, true);
-    if (refreshed) {
-      return {
-        connectionId,
-        refreshedAt: new Date().toISOString(),
-        ok: true,
-      };
-    }
-
-    // Refresh the model catalog (currently a no-op for static catalogs)
-    return {
-      connectionId,
-      refreshedAt: new Date().toISOString(),
-      ok: true,
-    };
-  });
-
-  const updateModelGating = async (
-    providerId: string,
-    modelIds: string[],
-    action: 'enable' | 'disable'
-  ) => {
-    await ensureProviderCatalogLoaded();
-    const provider = state.providerCatalog.getProvider(providerId);
-    if (!provider) throwInvalidParams(`Unknown providerId: ${providerId}`);
-
-    const providerModels = new Set(provider.models.map((m) => m.id));
-    for (const id of modelIds) {
-      if (!providerModels.has(id)) throwInvalidParams(`Unknown modelId for provider: ${id}`);
-    }
-
-    const gating = state.providerCatalog.getModelGating(providerId);
-    const enabled = new Set(gating.enabled ?? []);
-    const disabled = new Set(gating.disabled ?? []);
-
-    if (action === 'enable') {
-      for (const id of modelIds) {
-        enabled.add(id);
-        disabled.delete(id);
-      }
-    } else {
-      for (const id of modelIds) {
-        disabled.add(id);
-        enabled.delete(id);
-      }
-    }
-
-    const enabledArr = Array.from(enabled).sort();
-    const disabledArr = Array.from(disabled).sort();
-    await state.providerCatalog.setModelGating(providerId, {
-      enabled: enabledArr,
-      disabled: disabledArr,
-    });
-
-    return { providerId, enabled: enabledArr, disabled: disabledArr };
-  };
-
-  peer.onRequest('ent/models/enable', async (params: unknown) => {
-    assertInitialized(state);
-    const parsed = params as { providerId?: string; modelIds?: unknown };
-    const providerId = toNonEmptyString(parsed.providerId);
-    if (!providerId) throwInvalidParams('providerId is required');
-    if (!Array.isArray(parsed.modelIds) || parsed.modelIds.length === 0)
-      throwInvalidParams('modelIds must be a non-empty array of strings');
-    const modelIds: string[] = [];
-    for (const id of parsed.modelIds) {
-      const v = toNonEmptyString(id);
-      if (!v) throwInvalidParams('modelIds must be strings');
-      modelIds.push(v);
-    }
-
-    return await updateModelGating(providerId, modelIds, 'enable');
-  });
-
-  peer.onRequest('ent/models/disable', async (params: unknown) => {
-    assertInitialized(state);
-    const parsed = params as { providerId?: string; modelIds?: unknown };
-    const providerId = toNonEmptyString(parsed.providerId);
-    if (!providerId) throwInvalidParams('providerId is required');
-    if (!Array.isArray(parsed.modelIds) || parsed.modelIds.length === 0)
-      throwInvalidParams('modelIds must be a non-empty array of strings');
-    const modelIds: string[] = [];
-    for (const id of parsed.modelIds) {
-      const v = toNonEmptyString(id);
-      if (!v) throwInvalidParams('modelIds must be strings');
-      modelIds.push(v);
-    }
-
-    return await updateModelGating(providerId, modelIds, 'disable');
-  });
 
   peer.onRequest('ent/tools/list', async (_params: unknown) => {
     assertInitialized(state);
