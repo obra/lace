@@ -73,6 +73,9 @@ export class Agent {
       messageCount: number;
     }>
   > {
+    if (!this.state.initialized) {
+      await this.initialize();
+    }
     return Session.list(cwd);
   }
 }
