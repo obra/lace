@@ -2,23 +2,34 @@
 
 ## Overview
 
-This plan refactors how Lace resolves model specifications when spawning agents for tasks. Currently, when creating a task with an agent assignment, you must specify the full provider instance ID and model. This change allows more flexible specifications: just a persona (using defaults), a speed preference (fast/smart), or explicit provider/model.
+This plan refactors how Lace resolves model specifications when spawning agents
+for tasks. Currently, when creating a task with an agent assignment, you must
+specify the full provider instance ID and model. This change allows more
+flexible specifications: just a persona (using defaults), a speed preference
+(fast/smart), or explicit provider/model.
 
 ## Background Context
 
 ### Key Concepts
-- **Provider Instance**: A configured connection to an AI provider (e.g., "anthropic-prod", "openai-dev")
-- **Model**: The specific AI model to use (e.g., "claude-3-5-haiku-20241022", "gpt-4")
-- **NewAgentSpec**: A string format for specifying that a new agent should be created for a task
-- **Persona**: The system prompt/personality for an agent (e.g., "lace", "coding-agent")
+
+- **Provider Instance**: A configured connection to an AI provider (e.g.,
+  "anthropic-prod", "openai-dev")
+- **Model**: The specific AI model to use (e.g., "claude-3-5-haiku-20241022",
+  "gpt-4")
+- **NewAgentSpec**: A string format for specifying that a new agent should be
+  created for a task
+- **Persona**: The system prompt/personality for an agent (e.g., "lace",
+  "coding-agent")
 
 ### Current Format
+
 ```
 new:persona:providerInstanceId/modelId
 Example: "new:lace:anthropic-prod/claude-3-5-haiku-20241022"
 ```
 
 ### New Formats (what we're building)
+
 ```
 new:persona                           -> Use session defaults
 new:persona;fast                      -> Use system "fast" model
@@ -30,9 +41,11 @@ new:persona;instanceId:modelId        -> Explicit specification
 
 ### Task 1: Create Model Resolution Function
 
-**Goal**: Create a single function that resolves any model specification to concrete provider and model IDs.
+**Goal**: Create a single function that resolves any model specification to
+concrete provider and model IDs.
 
 **Files to modify**:
+
 - `packages/core/src/providers/provider-utils.ts`
 
 **Implementation**:
@@ -74,7 +87,7 @@ export function resolveModelSpec(
     }
     return {
       providerInstanceId: context.providerInstanceId,
-      modelId: context.modelId
+      modelId: context.modelId,
     };
   }
 
@@ -84,7 +97,7 @@ export function resolveModelSpec(
     const parsed = parseProviderModel(modelString);
     return {
       providerInstanceId: parsed.instanceId,
-      modelId: parsed.modelId
+      modelId: parsed.modelId,
     };
   }
 
@@ -93,7 +106,7 @@ export function resolveModelSpec(
     const parsed = parseProviderModel(spec);
     return {
       providerInstanceId: parsed.instanceId,
-      modelId: parsed.modelId
+      modelId: parsed.modelId,
     };
   }
 
@@ -121,14 +134,14 @@ describe('resolveModelSpec', () => {
   it('should use context defaults when no spec provided', () => {
     const context = {
       providerInstanceId: 'anthropic-prod',
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     };
 
     const result = resolveModelSpec(undefined, context);
 
     expect(result).toEqual({
       providerInstanceId: 'anthropic-prod',
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
   });
 
@@ -137,26 +150,30 @@ describe('resolveModelSpec', () => {
   });
 
   it('should resolve fast model from user settings', () => {
-    vi.mocked(UserSettingsManager.getDefaultModel).mockReturnValue('instance-fast:model-fast');
+    vi.mocked(UserSettingsManager.getDefaultModel).mockReturnValue(
+      'instance-fast:model-fast'
+    );
 
     const result = resolveModelSpec('fast');
 
     expect(UserSettingsManager.getDefaultModel).toHaveBeenCalledWith('fast');
     expect(result).toEqual({
       providerInstanceId: 'instance-fast',
-      modelId: 'model-fast'
+      modelId: 'model-fast',
     });
   });
 
   it('should resolve smart model from user settings', () => {
-    vi.mocked(UserSettingsManager.getDefaultModel).mockReturnValue('instance-smart:model-smart');
+    vi.mocked(UserSettingsManager.getDefaultModel).mockReturnValue(
+      'instance-smart:model-smart'
+    );
 
     const result = resolveModelSpec('smart');
 
     expect(UserSettingsManager.getDefaultModel).toHaveBeenCalledWith('smart');
     expect(result).toEqual({
       providerInstanceId: 'instance-smart',
-      modelId: 'model-smart'
+      modelId: 'model-smart',
     });
   });
 
@@ -165,7 +182,7 @@ describe('resolveModelSpec', () => {
 
     expect(result).toEqual({
       providerInstanceId: 'my-instance',
-      modelId: 'my-model'
+      modelId: 'my-model',
     });
   });
 
@@ -176,6 +193,7 @@ describe('resolveModelSpec', () => {
 ```
 
 **How to test**:
+
 ```bash
 # Run the test in watch mode
 npx vitest packages/core/src/providers/provider-utils.test.ts
@@ -193,6 +211,7 @@ npx vitest run packages/core/src/providers/provider-utils.test.ts
 **Goal**: Update the NewAgentSpec type to support the new flexible format.
 
 **Files to modify**:
+
 - `packages/core/src/threads/types.ts`
 
 **Implementation**:
@@ -221,7 +240,7 @@ export function createNewAgentSpec(
 
 export interface ParsedNewAgentSpec {
   persona: string;
-  modelSpec?: string;  // undefined | 'fast' | 'smart' | 'instanceId:modelId'
+  modelSpec?: string; // undefined | 'fast' | 'smart' | 'instanceId:modelId'
 }
 
 export function parseNewAgentSpec(spec: NewAgentSpec): ParsedNewAgentSpec {
@@ -237,7 +256,7 @@ export function parseNewAgentSpec(spec: NewAgentSpec): ParsedNewAgentSpec {
 
   return {
     persona,
-    modelSpec
+    modelSpec,
   };
 }
 ```
@@ -313,7 +332,9 @@ describe('NewAgentSpec', () => {
 
     it('throws on invalid format', () => {
       const spec = asNewAgentSpec('invalid');
-      expect(() => parseNewAgentSpec(spec)).toThrow('Invalid NewAgentSpec format');
+      expect(() => parseNewAgentSpec(spec)).toThrow(
+        'Invalid NewAgentSpec format'
+      );
     });
   });
 
@@ -337,7 +358,7 @@ describe('NewAgentSpec', () => {
         { persona: 'lace', modelSpec: undefined },
         { persona: 'helper', modelSpec: 'fast' },
         { persona: 'coder', modelSpec: 'smart' },
-        { persona: 'analyst', modelSpec: 'prod:gpt-4' }
+        { persona: 'analyst', modelSpec: 'prod:gpt-4' },
       ];
 
       for (const original of specs) {
@@ -353,6 +374,7 @@ describe('NewAgentSpec', () => {
 ```
 
 **How to test**:
+
 ```bash
 npx vitest run packages/core/src/threads/new-agent-spec.test.ts
 ```
@@ -363,19 +385,26 @@ npx vitest run packages/core/src/threads/new-agent-spec.test.ts
 
 ### Task 3: Update TaskManager to Use New Resolution
 
-**Goal**: Update TaskManager to use the new model resolution when spawning agents.
+**Goal**: Update TaskManager to use the new model resolution when spawning
+agents.
 
 **Files to modify**:
+
 - `packages/core/src/tasks/task-manager.ts`
 
 **Changes needed**:
 
 1. Update imports (add at top):
+
 ```typescript
-import { resolveModelSpec, type ModelResolutionContext } from '@lace/core/providers/provider-utils';
+import {
+  resolveModelSpec,
+  type ModelResolutionContext,
+} from '@lace/core/providers/provider-utils';
 ```
 
 2. Update the `handleAgentSpawning` method (around line 296):
+
 ```typescript
 private async handleAgentSpawning(task: Task): Promise<void> {
   if (!task.assignedTo || !isNewAgentSpec(task.assignedTo)) {
@@ -422,6 +451,7 @@ private async handleAgentSpawning(task: Task): Promise<void> {
 ```
 
 3. Add sessionConfig property to TaskManager:
+
 ```typescript
 export class TaskManager extends EventEmitter {
   private instanceId: string;
@@ -451,14 +481,17 @@ describe('agent spawning with flexible model specs', () => {
   it('should use session defaults when no model spec provided', async () => {
     taskManager.setSessionConfig({
       providerInstanceId: 'session-provider',
-      modelId: 'session-model'
+      modelId: 'session-model',
     });
 
-    const task = await taskManager.createTask({
-      title: 'Test',
-      prompt: 'Test',
-      assignedTo: createNewAgentSpec('lace')  // No model spec
-    }, context);
+    const task = await taskManager.createTask(
+      {
+        title: 'Test',
+        prompt: 'Test',
+        assignedTo: createNewAgentSpec('lace'), // No model spec
+      },
+      context
+    );
 
     expect(mockAgentCallback).toHaveBeenCalledWith(
       'lace',
@@ -469,13 +502,18 @@ describe('agent spawning with flexible model specs', () => {
   });
 
   it('should resolve fast model from user settings', async () => {
-    vi.mocked(UserSettingsManager.getDefaultModel).mockReturnValue('fast-provider:fast-model');
+    vi.mocked(UserSettingsManager.getDefaultModel).mockReturnValue(
+      'fast-provider:fast-model'
+    );
 
-    const task = await taskManager.createTask({
-      title: 'Test',
-      prompt: 'Test',
-      assignedTo: createNewAgentSpec('lace', 'fast')
-    }, context);
+    const task = await taskManager.createTask(
+      {
+        title: 'Test',
+        prompt: 'Test',
+        assignedTo: createNewAgentSpec('lace', 'fast'),
+      },
+      context
+    );
 
     expect(mockAgentCallback).toHaveBeenCalledWith(
       'lace',
@@ -486,11 +524,14 @@ describe('agent spawning with flexible model specs', () => {
   });
 
   it('should use explicit model spec', async () => {
-    const task = await taskManager.createTask({
-      title: 'Test',
-      prompt: 'Test',
-      assignedTo: createNewAgentSpec('lace', 'my-provider:my-model')
-    }, context);
+    const task = await taskManager.createTask(
+      {
+        title: 'Test',
+        prompt: 'Test',
+        assignedTo: createNewAgentSpec('lace', 'my-provider:my-model'),
+      },
+      context
+    );
 
     expect(mockAgentCallback).toHaveBeenCalledWith(
       'lace',
@@ -503,6 +544,7 @@ describe('agent spawning with flexible model specs', () => {
 ```
 
 **How to test**:
+
 ```bash
 npx vitest run packages/core/src/tasks/task-manager.test.ts
 ```
@@ -513,14 +555,17 @@ npx vitest run packages/core/src/tasks/task-manager.test.ts
 
 ### Task 4: Update Session to Provide Config to TaskManager
 
-**Goal**: Make Session pass its configuration to TaskManager for default model resolution.
+**Goal**: Make Session pass its configuration to TaskManager for default model
+resolution.
 
 **Files to modify**:
+
 - `packages/core/src/sessions/session.ts`
 
 **Changes needed**:
 
 1. Update TaskManager initialization (around line 230):
+
 ```typescript
 // After creating the TaskManager
 session._taskManager = taskManager;
@@ -530,7 +575,7 @@ const effectiveConfig = session.getEffectiveConfiguration();
 if (effectiveConfig.providerInstanceId && effectiveConfig.modelId) {
   taskManager.setSessionConfig({
     providerInstanceId: effectiveConfig.providerInstanceId,
-    modelId: effectiveConfig.modelId
+    modelId: effectiveConfig.modelId,
   });
 }
 
@@ -538,19 +583,22 @@ if (effectiveConfig.providerInstanceId && effectiveConfig.modelId) {
 session.setupAgentCreationCallback();
 ```
 
-2. Also update in the `getById` method where TaskManager is reconstructed (around line 512):
+2. Also update in the `getById` method where TaskManager is reconstructed
+   (around line 512):
+
 ```typescript
 // After setting session._taskManager
 const effectiveConfig = session.getEffectiveConfiguration();
 if (effectiveConfig.providerInstanceId && effectiveConfig.modelId) {
   session._taskManager.setSessionConfig({
     providerInstanceId: effectiveConfig.providerInstanceId,
-    modelId: effectiveConfig.modelId
+    modelId: effectiveConfig.modelId,
   });
 }
 ```
 
 **Test**: The existing Session tests should continue to pass. Run:
+
 ```bash
 npx vitest run packages/core/src/sessions/session.test.ts
 ```
@@ -564,21 +612,26 @@ npx vitest run packages/core/src/sessions/session.test.ts
 **Goal**: Update the delegate tool to use the new simplified format.
 
 **Files to modify**:
+
 - `packages/core/src/tools/implementations/delegate.ts`
 
 **Changes needed**:
 
 1. Update the schema to accept the new format:
+
 ```typescript
 schema = z.object({
   title: NonEmptyString,
   prompt: NonEmptyString,
   expected_response: NonEmptyString,
-  model: z.string().describe('Model spec: "fast", "smart", or "instanceId:modelId"'),
+  model: z
+    .string()
+    .describe('Model spec: "fast", "smart", or "instanceId:modelId"'),
 });
 ```
 
 2. Update `performTaskBasedDelegation` method:
+
 ```typescript
 private async performTaskBasedDelegation(
   params: {
@@ -615,44 +668,53 @@ Add tests for the new formats:
 
 ```typescript
 it('should accept fast model specification', async () => {
-  const result = await delegateTool.execute({
-    name: 'delegate',
-    arguments: {
-      title: 'Test',
-      prompt: 'Test prompt',
-      expected_response: 'Test response',
-      model: 'fast'  // Just 'fast' instead of 'provider:model'
-    }
-  }, mockContext);
+  const result = await delegateTool.execute(
+    {
+      name: 'delegate',
+      arguments: {
+        title: 'Test',
+        prompt: 'Test prompt',
+        expected_response: 'Test response',
+        model: 'fast', // Just 'fast' instead of 'provider:model'
+      },
+    },
+    mockContext
+  );
 
   expect(result.success).toBe(true);
   // Verify task was created with correct spec
 });
 
 it('should accept smart model specification', async () => {
-  const result = await delegateTool.execute({
-    name: 'delegate',
-    arguments: {
-      title: 'Test',
-      prompt: 'Test prompt',
-      expected_response: 'Test response',
-      model: 'smart'
-    }
-  }, mockContext);
+  const result = await delegateTool.execute(
+    {
+      name: 'delegate',
+      arguments: {
+        title: 'Test',
+        prompt: 'Test prompt',
+        expected_response: 'Test response',
+        model: 'smart',
+      },
+    },
+    mockContext
+  );
 
   expect(result.success).toBe(true);
 });
 
 it('should accept explicit provider:model format', async () => {
-  const result = await delegateTool.execute({
-    name: 'delegate',
-    arguments: {
-      title: 'Test',
-      prompt: 'Test prompt',
-      expected_response: 'Test response',
-      model: 'my-provider:my-model'
-    }
-  }, mockContext);
+  const result = await delegateTool.execute(
+    {
+      name: 'delegate',
+      arguments: {
+        title: 'Test',
+        prompt: 'Test prompt',
+        expected_response: 'Test response',
+        model: 'my-provider:my-model',
+      },
+    },
+    mockContext
+  );
 
   expect(result.success).toBe(true);
 });
@@ -664,9 +726,11 @@ it('should accept explicit provider:model format', async () => {
 
 ### Task 6: Integration Testing
 
-**Goal**: Create an integration test that verifies the entire flow works end-to-end.
+**Goal**: Create an integration test that verifies the entire flow works
+end-to-end.
 
-**Create new file**: `packages/core/src/tasks/task-assignment-model-resolution.integration.test.ts`
+**Create new file**:
+`packages/core/src/tasks/task-assignment-model-resolution.integration.test.ts`
 
 ```typescript
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -686,11 +750,13 @@ describe('Task Assignment Model Resolution Integration', () => {
 
   beforeEach(() => {
     // Setup user settings for fast/smart
-    vi.mocked(UserSettingsManager.getDefaultModel).mockImplementation((tier) => {
-      if (tier === 'fast') return 'fast-instance:fast-model';
-      if (tier === 'smart') return 'smart-instance:smart-model';
-      throw new Error('Unknown tier');
-    });
+    vi.mocked(UserSettingsManager.getDefaultModel).mockImplementation(
+      (tier) => {
+        if (tier === 'fast') return 'fast-instance:fast-model';
+        if (tier === 'smart') return 'smart-instance:smart-model';
+        throw new Error('Unknown tier');
+      }
+    );
 
     // Create project with default provider config
     const project = Project.create(
@@ -699,13 +765,13 @@ describe('Task Assignment Model Resolution Integration', () => {
       'Test project',
       {
         providerInstanceId: 'default-instance',
-        modelId: 'default-model'
+        modelId: 'default-model',
       }
     );
 
     session = Session.create({
       name: 'Test Session',
-      projectId: project.getId()
+      projectId: project.getId(),
     });
 
     taskManager = session.getTaskManager()!;
@@ -716,11 +782,14 @@ describe('Task Assignment Model Resolution Integration', () => {
     taskManager.setAgentCreationCallback(agentCallback);
 
     // Test 1: Default (no model spec)
-    await taskManager.createTask({
-      title: 'Test default',
-      prompt: 'Test',
-      assignedTo: createNewAgentSpec('lace')
-    }, { actor: 'test' });
+    await taskManager.createTask(
+      {
+        title: 'Test default',
+        prompt: 'Test',
+        assignedTo: createNewAgentSpec('lace'),
+      },
+      { actor: 'test' }
+    );
 
     expect(agentCallback).toHaveBeenCalledWith(
       'lace',
@@ -730,11 +799,14 @@ describe('Task Assignment Model Resolution Integration', () => {
     );
 
     // Test 2: Fast
-    await taskManager.createTask({
-      title: 'Test fast',
-      prompt: 'Test',
-      assignedTo: createNewAgentSpec('helper', 'fast')
-    }, { actor: 'test' });
+    await taskManager.createTask(
+      {
+        title: 'Test fast',
+        prompt: 'Test',
+        assignedTo: createNewAgentSpec('helper', 'fast'),
+      },
+      { actor: 'test' }
+    );
 
     expect(agentCallback).toHaveBeenCalledWith(
       'helper',
@@ -744,11 +816,14 @@ describe('Task Assignment Model Resolution Integration', () => {
     );
 
     // Test 3: Smart
-    await taskManager.createTask({
-      title: 'Test smart',
-      prompt: 'Test',
-      assignedTo: createNewAgentSpec('analyst', 'smart')
-    }, { actor: 'test' });
+    await taskManager.createTask(
+      {
+        title: 'Test smart',
+        prompt: 'Test',
+        assignedTo: createNewAgentSpec('analyst', 'smart'),
+      },
+      { actor: 'test' }
+    );
 
     expect(agentCallback).toHaveBeenCalledWith(
       'analyst',
@@ -758,11 +833,14 @@ describe('Task Assignment Model Resolution Integration', () => {
     );
 
     // Test 4: Explicit
-    await taskManager.createTask({
-      title: 'Test explicit',
-      prompt: 'Test',
-      assignedTo: createNewAgentSpec('coder', 'custom:gpt-4')
-    }, { actor: 'test' });
+    await taskManager.createTask(
+      {
+        title: 'Test explicit',
+        prompt: 'Test',
+        assignedTo: createNewAgentSpec('coder', 'custom:gpt-4'),
+      },
+      { actor: 'test' }
+    );
 
     expect(agentCallback).toHaveBeenCalledWith(
       'coder',
@@ -775,6 +853,7 @@ describe('Task Assignment Model Resolution Integration', () => {
 ```
 
 **How to test**:
+
 ```bash
 npx vitest run packages/core/src/tasks/task-assignment-model-resolution.integration.test.ts
 ```
@@ -786,15 +865,19 @@ npx vitest run packages/core/src/tasks/task-assignment-model-resolution.integrat
 ## Testing Strategy
 
 ### Unit Tests
+
 Each function should have isolated unit tests:
+
 1. `resolveModelSpec` - test all input combinations
 2. `parseNewAgentSpec` - test parsing logic
 3. TaskManager updates - mock dependencies, test resolution
 
 ### Integration Tests
+
 Test the full flow from task creation to agent spawning with different specs.
 
 ### Manual Testing
+
 1. Start the web UI: `npm run dev`
 2. Create a task and assign to new agent with different specs
 3. Verify agent is created with correct model
@@ -802,6 +885,7 @@ Test the full flow from task creation to agent spawning with different specs.
 ## Rollback Plan
 
 If issues arise:
+
 1. The changes are backward compatible - old format still works
 2. Can revert individual commits
 3. Main risk is in TaskManager changes - can revert just that file
@@ -809,6 +893,7 @@ If issues arise:
 ## Documentation Updates
 
 After implementation, update:
+
 1. `docs/architecture/CODE-MAP.md` - Note the new model resolution
 2. `CLAUDE.md` - Add section on model specification formats
 3. API documentation for the delegate tool
@@ -822,7 +907,8 @@ After implementation, update:
 
 ## Common Pitfalls to Avoid
 
-1. **Don't forget mocking**: When testing, mock `UserSettingsManager.getDefaultModel`
+1. **Don't forget mocking**: When testing, mock
+   `UserSettingsManager.getDefaultModel`
 2. **Check for undefined**: Session config might not have provider/model set
 3. **Error messages**: Make errors clear about what formats are accepted
 4. **Backward compatibility**: Ensure old `provider/model` format still works
@@ -830,6 +916,7 @@ After implementation, update:
 ## Commit Message Convention
 
 Use conventional commits:
+
 - `feat:` for new features
 - `test:` for test additions
 - `refactor:` for code restructuring

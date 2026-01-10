@@ -57,11 +57,19 @@ export type {
 export { ApprovalDecision } from '@lace/core/tools/types';
 
 // Task management
-export type { Task, TaskNote, TaskStatus, TaskPriority } from '@lace/core/tasks/types';
+export type {
+  Task,
+  TaskNote,
+  TaskStatus,
+  TaskPriority,
+} from '@lace/core/tasks/types';
 
 // Agent and provider system
 export type { AgentState } from '@lace/core/agents/agent';
-export type { ProviderInfo, ModelInfo } from '@lace/core/providers/base-provider';
+export type {
+  ProviderInfo,
+  ModelInfo,
+} from '@lace/core/providers/base-provider';
 
 // Project management
 export type { ProjectInfo } from '@lace/core/projects/project';
@@ -141,7 +149,8 @@ import type { Session, Agent, MessageRequest } from '@lace/web/types/web';
 
 ### Event Types (`@/types/events`)
 
-**Location**: `packages/web/types/app-events.ts`, `packages/web/types/protocol-events.ts`, `packages/web/types/web-events.ts`  
+**Location**: `packages/web/types/app-events.ts`,
+`packages/web/types/protocol-events.ts`, `packages/web/types/web-events.ts`  
 **Purpose**: Unified event model for web (protocol + web-internal)
 
 **Event Classification**:
@@ -188,13 +197,13 @@ if (isProtocolEvent(event)) {
     case 'text_delta':
     case 'tool_use':
     case 'turn_end':
-      // ...
+    // ...
   }
 } else if (isWebEvent(event)) {
   switch (event.type) {
     case 'USER_MESSAGE':
     case 'AGENT_STATE_CHANGE':
-      // ...
+    // ...
   }
 }
 ```
@@ -203,7 +212,11 @@ if (isProtocolEvent(event)) {
 
 ```typescript
 import type { AppEvent } from '@lace/web/types/app-events';
-import { isProtocolEvent, isWebEvent, isPermissionRequestEvent } from '@lace/web/types/app-events';
+import {
+  isProtocolEvent,
+  isWebEvent,
+  isPermissionRequestEvent,
+} from '@lace/web/types/app-events';
 ```
 
 ### Server-Only Classes (`@/lib/server/lace-imports`)
@@ -327,7 +340,12 @@ export const CreateTaskRequestSchema = z.object({
 **Core Types** (shared business logic):
 
 ```typescript
-import type { ThreadId, Task, ToolResult, ApprovalDecision } from '@lace/web/lib/core';
+import type {
+  ThreadId,
+  Task,
+  ToolResult,
+  ApprovalDecision,
+} from '@lace/web/lib/core';
 import { isThreadId, asThreadId, EVENT_TYPES } from '@lace/web/lib/core';
 ```
 
@@ -353,13 +371,20 @@ import { getAllEventTypes, isPersistedEvent } from '@lace/web/types/events';
 **Server Classes** (API routes only):
 
 ```typescript
-import { Agent, ThreadManager, Session } from '@lace/web/lib/server/lace-imports';
+import {
+  Agent,
+  ThreadManager,
+  Session,
+} from '@lace/web/lib/server/lace-imports';
 ```
 
 **Validation** (runtime checking):
 
 ```typescript
-import { MessageRequestSchema, ThreadIdSchema } from '@lace/web/lib/validation/schemas';
+import {
+  MessageRequestSchema,
+  ThreadIdSchema,
+} from '@lace/web/lib/validation/schemas';
 ```
 
 ### ❌ Forbidden Patterns

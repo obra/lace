@@ -355,8 +355,8 @@ curl -X GET http://localhost:3000/api/sessions/test-session-id/configuration
 ### Changes Made
 
 1. **Updated route imports** -
-   `import { getSessionService } from '@lace/web/lib/server/session-service'` instead of
-   direct business logic
+   `import { getSessionService } from '@lace/web/lib/server/session-service'`
+   instead of direct business logic
 2. **Refactored GET endpoint** - Uses
    `sessionService.getEffectiveConfiguration()` with proper error handling
 3. **Refactored PUT endpoint** - Uses

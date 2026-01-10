@@ -403,7 +403,10 @@ import { MCPServerManager } from '@lace/core/mcp/server-manager';
 import { MCPConfigLoader } from '@lace/core/config/mcp-config-loader';
 import { logger } from '@lace/core/utils/logger';
 import type { Project } from '@lace/core/projects/project';
-import type { MCPServerConfig, DiscoveredTool } from '@lace/core/config/mcp-types';
+import type {
+  MCPServerConfig,
+  DiscoveredTool,
+} from '@lace/core/config/mcp-types';
 
 export class ToolCatalog {
   /**
@@ -862,7 +865,10 @@ npm install --save-dev @modelcontextprotocol/server-filesystem
 ```typescript
 // packages/web/app/routes/__tests__/mcp-discovery-integration.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { setupWebTest, cleanupWebTest } from '@lace/web/test-utils/web-test-setup';
+import {
+  setupWebTest,
+  cleanupWebTest,
+} from '@lace/web/test-utils/web-test-setup';
 import { Project, ToolCatalog } from '@lace/web/lib/server/lace-imports';
 import { parseResponse } from '@lace/web/lib/serialization';
 

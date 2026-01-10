@@ -2,12 +2,16 @@
 
 ## One-Sentence Summary
 
-Build a small, scriptable CLI client that can drive **any** Ent-protocol-speaking agent over **NDJSON JSON-RPC over stdio**, with a line-based **REPL** and interactive **permission prompting** (no curses/TUI).
+Build a small, scriptable CLI client that can drive **any**
+Ent-protocol-speaking agent over **NDJSON JSON-RPC over stdio**, with a
+line-based **REPL** and interactive **permission prompting** (no curses/TUI).
 
 ## Goals
 
-- Provide a **simple but functional** way to drive a single agent process from a terminal.
-- Work with **Lace agent** (`lace-agent`) and **non-Lace agents** that implement the Ent protocol.
+- Provide a **simple but functional** way to drive a single agent process from a
+  terminal.
+- Work with **Lace agent** (`lace-agent`) and **non-Lace agents** that implement
+  the Ent protocol.
 - Be **easy to automate** with tools like `expect`:
   - Stable prompts
   - Predictable, line-oriented output
@@ -35,20 +39,24 @@ Create a new package:
 
 Key dependency:
 
-- `@lace/ent-protocol` (use the shared `JsonRpcPeer` + `createNdjsonStdioTransport`)
+- `@lace/ent-protocol` (use the shared `JsonRpcPeer` +
+  `createNdjsonStdioTransport`)
 
 ## Transport Model (v1)
 
 The CLI MUST support two ways to talk to an agent:
 
 1. **Spawn mode (default)**:
-   - Spawns a child process (default: `node <repo>/packages/agent/dist/main.js` or `lace-agent` if on PATH)
+   - Spawns a child process (default: `node <repo>/packages/agent/dist/main.js`
+     or `lace-agent` if on PATH)
    - Uses child `stdin/stdout` as the JSON-RPC transport
 2. **Attach mode**:
-   - Still stdio-based, but uses a user-provided command (e.g., `ssh host lace-agent --stdio`)
+   - Still stdio-based, but uses a user-provided command (e.g.,
+     `ssh host lace-agent --stdio`)
    - The CLI treats it the same as spawn mode: a subprocess with stdio pipes
 
 Notes:
+
 - The CLI MUST NOT write logs to the agent’s stdin/stdout stream.
 - Any debug logs MUST go to stderr.
 
@@ -77,7 +85,8 @@ On startup, the CLI:
 During the session, the CLI must:
 
 - Handle agent → client notifications/requests:
-  - `session/update` (request/notification depending on implementation; Lace currently uses request handler in supervisor)
+  - `session/update` (request/notification depending on implementation; Lace
+    currently uses request handler in supervisor)
   - `session/request_permission` (request; must reply)
 
 ## REPL UX Requirements
@@ -89,13 +98,14 @@ Prompts MUST be stable and easily matchable:
 - Primary prompt: `lace> `
 - Permission prompt: `permission> `
 
-No ANSI cursor movement.
-Color output is optional and MUST be disable-able with `--no-color`.
+No ANSI cursor movement. Color output is optional and MUST be disable-able with
+`--no-color`.
 
 ### Input Grammar
 
 - Lines starting with `:` are commands.
-- Any other non-empty line is treated as a prompt to the agent (a single `ContentBlock { type: "text" }`).
+- Any other non-empty line is treated as a prompt to the agent (a single
+  `ContentBlock { type: "text" }`).
 - Empty line does nothing.
 
 ### Minimal Commands
@@ -108,7 +118,8 @@ Required commands (v1):
 - `:new [workDir]` — create a new session (default workDir: current directory).
 - `:load <sessionId>` — load an existing session.
 - `:list` — calls `session/list` (optionally filtered by workDir).
-- `:prompt <text>` — send a prompt explicitly (same as typing a line, but allows empty text).
+- `:prompt <text>` — send a prompt explicitly (same as typing a line, but allows
+  empty text).
 - `:cancel` — send `session/cancel`.
 - `:raw <json>` — send a raw JSON-RPC request/notification for debugging.
 
@@ -126,10 +137,12 @@ Two modes:
 
 1. **Human mode (default)**:
    - Print session updates as compact, readable single lines.
-   - Print results/errors as single-line summaries plus optional `--verbose` JSON.
+   - Print results/errors as single-line summaries plus optional `--verbose`
+     JSON.
 
 2. **JSON lines mode (`--json`)**:
-   - Every inbound/outbound message is written as exactly one JSON object per line.
+   - Every inbound/outbound message is written as exactly one JSON object per
+     line.
    - No extra decoration.
 
 Suggested JSONL shapes:
@@ -143,6 +156,7 @@ Suggested JSONL shapes:
 ```
 
 In JSON mode:
+
 - Logs must go to stderr (or be disabled).
 - Stdout must be only JSON lines.
 
@@ -151,10 +165,12 @@ In JSON mode:
 When the agent sends `session/request_permission`:
 
 1. Print a summary:
-   - `tool`, `kind`, `resource`, `toolCallId`, `turnId`, `turnSeq`, optional `jobId`
+   - `tool`, `kind`, `resource`, `toolCallId`, `turnId`, `turnSeq`, optional
+     `jobId`
    - list options with `optionId` + `label`
 2. Prompt for a decision:
-   - User enters an `optionId` (e.g., `allow`, `deny`, `allow_session`, `allow_always`)
+   - User enters an `optionId` (e.g., `allow`, `deny`, `allow_session`,
+     `allow_always`)
 3. Optional updated input:
    - If user enters `edit`, then CLI prompts:
      - `updatedInput (JSON, blank for none)> `
@@ -166,14 +182,18 @@ When the agent sends `session/request_permission`:
 ```
 
 Constraints:
-- Do not invent decisions; the CLI should prefer to choose from the agent-provided `options[]`.
-- Provide `deny` as a fallback only if present in `options[]`; otherwise require explicit selection.
+
+- Do not invent decisions; the CLI should prefer to choose from the
+  agent-provided `options[]`.
+- Provide `deny` as a fallback only if present in `options[]`; otherwise require
+  explicit selection.
 
 ## Config / Flags
 
 Required flags:
 
-- `--agent-cmd "<command>"` (default: `lace-agent` if available, else Node path to built `packages/agent/dist/main.js`)
+- `--agent-cmd "<command>"` (default: `lace-agent` if available, else Node path
+  to built `packages/agent/dist/main.js`)
 - `--workdir <path>` (default: `process.cwd()`)
 - `--new` (start with `session/new`)
 - `--load <sessionId>` (start with `session/load`)
@@ -183,7 +203,8 @@ Required flags:
 Recommended flags:
 
 - `--approval-mode <ask|approveReads|approveEdits|approve|deny|dangerouslySkipPermissions>`
-  - Used only for `initialize { config: { approvalMode } }` when talking to Lace agent.
+  - Used only for `initialize { config: { approvalMode } }` when talking to Lace
+    agent.
   - Non-Lace agents may ignore; that’s OK.
 - `--timeout-ms <n>` for request timeouts (client-side).
 
@@ -194,8 +215,11 @@ Recommended flags:
 - Use `@lace/ent-protocol`:
   - `createNdjsonStdioTransport({ readable, writable })`
   - `new JsonRpcPeer(transport, { idPrefix: "c_" })`
-- Handle `session/update` via `peer.onRequest('session/update', ...)` and return `undefined`.
-- Handle `session/request_permission` via `peer.onRequest('session/request_permission', ...)` and return `{ decision, updatedInput? }`.
+- Handle `session/update` via `peer.onRequest('session/update', ...)` and return
+  `undefined`.
+- Handle `session/request_permission` via
+  `peer.onRequest('session/request_permission', ...)` and return
+  `{ decision, updatedInput? }`.
 - Ensure concurrent output from async updates does not corrupt prompts:
   - Always print updates on their own line.
   - Re-print the active prompt after handling an async update if in TTY mode.
@@ -206,8 +230,10 @@ Manual acceptance checklist (no TUI):
 
 1. Run `lace` and `:new`.
 2. Type `job: echo hi` and see job updates.
-3. Trigger a permissioned tool use (write) and verify interactive approval works.
-4. Run with `--json` and verify stdout is valid JSONL (one JSON object per line).
+3. Trigger a permissioned tool use (write) and verify interactive approval
+   works.
+4. Run with `--json` and verify stdout is valid JSONL (one JSON object per
+   line).
 5. Drive a full flow via `expect` (send prompt, approve, see completion).
 
 ## Repo Integration Notes
@@ -215,4 +241,3 @@ Manual acceptance checklist (no TUI):
 - The CLI package should be able to run against a built agent:
   - `npm run build --workspace=packages/agent`
   - `npm run dev --workspace=packages/cli` (or similar)
-

@@ -5,6 +5,7 @@
 **✅ IMPLEMENTATION COMPLETE**
 
 **Completed Tasks**: 1, 2, 3, 4, 5, 6, 7
+
 - Task 1: API endpoint for workspace information ✅ (8d034de46)
 - Task 2: SessionProvider with workspace data ✅ (f064a4fa9, 388eac408)
 - Task 3: Workspace badge in sidebar ✅ (bb3efdd2b)
@@ -20,21 +21,27 @@
 ### What Was Built
 
 **Backend/API Layer:**
-- `/api/sessions/:sessionId/workspace` endpoint returning workspace mode and detailed info
+
+- `/api/sessions/:sessionId/workspace` endpoint returning workspace mode and
+  detailed info
 - Comprehensive error handling and SuperJSON serialization
 - 5 API route tests passing
 
 **React Hooks:**
+
 - `useWorkspaceDetails` hook for fetching and managing workspace state
 - Handles loading, error states, and provides reload functionality
 - 8 hook tests passing
 
 **Provider Integration:**
-- Extended SessionProvider with `workspaceMode`, `workspaceInfo`, `workspaceLoading`
+
+- Extended SessionProvider with `workspaceMode`, `workspaceInfo`,
+  `workspaceLoading`
 - Automatic data fetching when session loads
 - Updated provider mocks for testing
 
 **UI Components:**
+
 - **WorkspaceDetailsPanel**: Comprehensive workspace information display
   - 16 component tests passing
   - Conditional rendering for container vs local modes
@@ -48,13 +55,15 @@
   - Graceful fallback for unavailable data
 
 **Navigation Flow:**
+
 - Workspace badge → SessionEditModal (workspace tab)
 - Tab parameter threading through component hierarchy
 - Proper state management (modal open/close, tab selection)
 
 ### Architecture Decisions Made
 
-1. **Separate `useWorkspaceDetails` hook** instead of inline fetch in SessionProvider
+1. **Separate `useWorkspaceDetails` hook** instead of inline fetch in
+   SessionProvider
    - Better separation of concerns
    - Reusable if needed elsewhere
    - Cleaner testing
@@ -84,6 +93,7 @@
 - **Theme Support**: Uses DaisyUI variables for theming
 
 ### Files Created
+
 - `packages/web/app/routes/api.sessions.$sessionId.workspace.ts`
 - `packages/web/app/routes/__tests__/api.sessions.$sessionId.workspace.test.ts`
 - `packages/web/hooks/useWorkspaceDetails.ts`
@@ -92,11 +102,14 @@
 - `packages/web/components/config/__tests__/WorkspaceDetailsPanel.test.tsx`
 
 ### Files Modified
+
 - `packages/web/lib/fontawesome.ts` (added faBox icon)
-- `packages/web/components/providers/SessionProvider.tsx` (workspace data integration)
+- `packages/web/components/providers/SessionProvider.tsx` (workspace data
+  integration)
 - `packages/web/__tests__/utils/provider-mocks.ts` (workspace mock fields)
 - `packages/web/components/sidebar/SessionSection.tsx` (workspace badge)
-- `packages/web/components/config/SessionEditModal.tsx` (workspace tab, initialTab support)
+- `packages/web/components/config/SessionEditModal.tsx` (workspace tab,
+  initialTab support)
 - `packages/web/components/pages/AgentPageContent.tsx` (tab navigation state)
 - `packages/web/components/sidebar/SidebarContent.tsx` (prop signature update)
 - `packages/web/app/routes.ts` (workspace route registration)
@@ -104,31 +117,44 @@
 ## Key Implementation Learnings
 
 ### Import Patterns Discovered
-- ✅ WorkspaceInfo type: `import type { WorkspaceInfo } from '@lace/core/workspace/workspace-container-manager'`
+
+- ✅ WorkspaceInfo type:
+  `import type { WorkspaceInfo } from '@lace/core/workspace/workspace-container-manager'`
   - NOT `@lace/core/workspace/...` - that path doesn't resolve in web package
-- ✅ API client: `import { api } from '@lace/web/lib/api-client'` then use `api.get<T>(url)`
+- ✅ API client: `import { api } from '@lace/web/lib/api-client'` then use
+  `api.get<T>(url)`
 - ✅ Response parsing: `await parseResponse<T>(response)` not `.json()`
-- ✅ Error responses: `createErrorResponse(message, status, { code })` - uses `error` field not `message`
+- ✅ Error responses: `createErrorResponse(message, status, { code })` - uses
+  `error` field not `message`
 
 ### Test Patterns Used
-- Route tests: `createLoaderArgs(request, params)` where request = `new Request(url)`
-- Hook tests: Mock `api` with `vi.mock('@/lib/api-client', () => ({ api: { get: vi.fn() } }))`
-- Must call `setupWebTest()`, `setupTestProviderDefaults()`, `createTestProviderInstance()` in beforeEach
+
+- Route tests: `createLoaderArgs(request, params)` where request =
+  `new Request(url)`
+- Hook tests: Mock `api` with
+  `vi.mock('@/lib/api-client', () => ({ api: { get: vi.fn() } }))`
+- Must call `setupWebTest()`, `setupTestProviderDefaults()`,
+  `createTestProviderInstance()` in beforeEach
 - Project.create() takes positional args: `(name, dir, description?, config?)`
 - Session needs provider config or tests fail with "No model configured"
 
 ### Component Architecture
-- SessionProvider exposes: `workspaceMode`, `workspaceInfo`, `workspaceLoading` (separate from agent loading)
-- SessionSection accesses via: `const { workspaceMode, workspaceLoading } = useSessionContext()`
+
+- SessionProvider exposes: `workspaceMode`, `workspaceInfo`, `workspaceLoading`
+  (separate from agent loading)
+- SessionSection accesses via:
+  `const { workspaceMode, workspaceLoading } = useSessionContext()`
 - Badge is simple button element, not separate component (YAGNI)
 
 ### What's Working
+
 - ✅ API endpoint returns workspace data (5 tests passing)
 - ✅ useWorkspaceDetails hook fetches and manages state (8 tests passing)
 - ✅ SessionProvider integrates workspace data
 - ✅ Workspace badge displays in sidebar
 - ✅ Badge click opens config modal directly to workspace tab ✅ COMPLETED
-- ✅ WorkspaceDetailsPanel displays comprehensive workspace info (16 tests passing)
+- ✅ WorkspaceDetailsPanel displays comprehensive workspace info (16 tests
+  passing)
 - ✅ All code passes linting and pre-commit hooks
 - ✅ Build succeeds with no errors
 
@@ -139,15 +165,20 @@
 ### ~~Task 4: Create WorkspaceDetailsPanel Component~~ ✅ COMPLETED (38a58838c)
 
 **Files to Create**:
+
 - `packages/web/components/config/WorkspaceDetailsPanel.tsx`
 - `packages/web/components/config/__tests__/WorkspaceDetailsPanel.test.tsx`
 
 **Before You Start**:
-1. Check if `faBox`, `faFolder`, `faCircle` icons already exist in `lib/fontawesome.ts`
+
+1. Check if `faBox`, `faFolder`, `faCircle` icons already exist in
+   `lib/fontawesome.ts`
 2. If not, add them first (part of Task 7, but needed for Task 4)
 
 **Key Points**:
-- Component receives: `mode: 'container' | 'local'`, `info: WorkspaceInfo | null`, `isLoading?: boolean`
+
+- Component receives: `mode: 'container' | 'local'`,
+  `info: WorkspaceInfo | null`, `isLoading?: boolean`
 - Shows different sections for container vs local mode
 - Container mode: shows container ID, mount path, branch, worktree paths
 - Local mode: shows project directory with info alert about direct access
@@ -158,63 +189,81 @@
 ### ~~Remaining Critical Tasks~~ ALL COMPLETED
 
 **Task 5**: ✅ COMPLETED (97a311a19)
+
 - Added "Workspace" tab to SessionEditModal
 - Integrated WorkspaceDetailsPanel
 - Added initialTab prop support
 - Handles unavailable workspace data gracefully
 
 **Task 6**: ✅ COMPLETED (9adb48470)
+
 - Updated onConfigureSession signature throughout component hierarchy
 - Workspace badge now passes 'workspace' to open modal on correct tab
 - State management for initialTab in AgentPageContent
 - Proper cleanup when modal closes
 
 **Task 7**: ✅ COMPLETED (38a58838c)
+
 - Added faBox icon to lib/fontawesome.ts
 - faFolder and faCircle were already present
 - All icons working in WorkspaceDetailsPanel
 
 **Task 8**: Ready for E2E testing (optional)
+
 - Implementation complete and ready for manual testing
 - Suggested test scenarios documented below
 
 ## Overview
 
-Add workspace mode visibility to the web UI so users can see whether a session is running in a container or locally, and view detailed workspace information including paths, container details, and git branch information.
+Add workspace mode visibility to the web UI so users can see whether a session
+is running in a container or locally, and view detailed workspace information
+including paths, container details, and git branch information.
 
 ## Background
 
 Lace supports two workspace modes:
-- **Container mode**: Creates isolated git worktrees in containers with dual mounts (working tree + git database)
-- **Local mode**: Runs directly on host without containers, using project directory directly
 
-Currently, the web UI doesn't show which mode a session uses or provide visibility into workspace details. Users need this information to understand where their edits are happening.
+- **Container mode**: Creates isolated git worktrees in containers with dual
+  mounts (working tree + git database)
+- **Local mode**: Runs directly on host without containers, using project
+  directory directly
+
+Currently, the web UI doesn't show which mode a session uses or provide
+visibility into workspace details. Users need this information to understand
+where their edits are happening.
 
 ## Architecture Context
 
 ### Key Types and Interfaces
 
-**WorkspaceInfo** (`packages/core/src/workspace/workspace-container-manager.ts:10-18`):
+**WorkspaceInfo**
+(`packages/core/src/workspace/workspace-container-manager.ts:10-18`):
+
 ```typescript
 export interface WorkspaceInfo {
   sessionId: string;
-  projectDir: string;          // Original project location
-  clonePath: string;            // Worktree path (container) or projectDir (local)
-  containerId: string;          // "workspace-{sessionId}" or "local-{sessionId}"
-  state: string;                // "running", "stopped", etc.
-  containerMountPath?: string;  // Where project is mounted in container
-  branchName?: string;          // Git branch for this session
+  projectDir: string; // Original project location
+  clonePath: string; // Worktree path (container) or projectDir (local)
+  containerId: string; // "workspace-{sessionId}" or "local-{sessionId}"
+  state: string; // "running", "stopped", etc.
+  containerMountPath?: string; // Where project is mounted in container
+  branchName?: string; // Git branch for this session
 }
 ```
 
 **Session Methods** (`packages/core/src/sessions/session.ts`):
+
 - `getWorkspaceInfo()`: Returns `WorkspaceInfo | undefined` (line 743-745)
-- `getEffectiveConfiguration()`: Returns merged project+session config including `workspaceMode` (line 948-978)
-- `waitForWorkspace()`: Waits for workspace initialization to complete (line 812-820)
+- `getEffectiveConfiguration()`: Returns merged project+session config including
+  `workspaceMode` (line 948-978)
+- `waitForWorkspace()`: Waits for workspace initialization to complete (line
+  812-820)
 
 **Workspace Modes**:
+
 - Determined by `workspaceMode` field in session configuration
-- Type: `'container' | 'local'` (from `packages/core/src/workspace/workspace-manager.ts:24`)
+- Type: `'container' | 'local'` (from
+  `packages/core/src/workspace/workspace-manager.ts:24`)
 
 ### Data Flow
 
@@ -230,27 +279,35 @@ export interface WorkspaceInfo {
 **Status**: Implemented and committed (8d034de46)
 
 **What Was Built**:
+
 - Created `packages/web/app/routes/api.sessions.$sessionId.workspace.ts`
 - Returns `{ mode: 'container' | 'local', info: WorkspaceInfo | null }`
 - Registered route in `app/routes.ts`
-- Comprehensive test coverage (5 tests passing) in `app/routes/__tests__/api.sessions.$sessionId.workspace.test.ts`
+- Comprehensive test coverage (5 tests passing) in
+  `app/routes/__tests__/api.sessions.$sessionId.workspace.test.ts`
 
 **Implementation Notes**:
+
 - Used `createSuperjsonResponse` and `createErrorResponse` (not raw json())
 - Cast sessionId to ThreadId type for Session.getById()
 - Used `parseResponse` in tests (not .json())
-- Imported WorkspaceInfo from `~/workspace/workspace-container-manager` (not @lace/core path)
-- Tests follow existing patterns: setupWebTest(), createLoaderArgs(request, params), parseResponse()
+- Imported WorkspaceInfo from `~/workspace/workspace-container-manager` (not
+  @lace/core path)
+- Tests follow existing patterns: setupWebTest(), createLoaderArgs(request,
+  params), parseResponse()
 
 **Goal**: Expose workspace data to the web UI through a new API endpoint.
 
 **Files to Create/Modify**:
+
 - Create: `packages/web/app/routes/api.sessions.$sessionId.workspace.ts`
-- Reference: `packages/web/app/routes/api.sessions.$sessionId.ts` (similar structure)
+- Reference: `packages/web/app/routes/api.sessions.$sessionId.ts` (similar
+  structure)
 
 **Implementation Steps**:
 
 1. Create the route file with loader function:
+
 ```typescript
 // ABOUTME: API endpoint for session workspace information
 // ABOUTME: Returns workspace mode and detailed workspace info
@@ -294,6 +351,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
 ```
 
 2. Register the route in `packages/web/app/routes.ts`:
+
 ```typescript
 // Add to the routes array:
 route('api/sessions/:sessionId/workspace', 'routes/api.sessions.$sessionId.workspace.ts'),
@@ -301,7 +359,8 @@ route('api/sessions/:sessionId/workspace', 'routes/api.sessions.$sessionId.works
 
 **Testing**:
 
-Create test file: `packages/web/app/routes/__tests__/api.sessions.$sessionId.workspace.test.ts`
+Create test file:
+`packages/web/app/routes/__tests__/api.sessions.$sessionId.workspace.test.ts`
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -309,7 +368,10 @@ import { loader } from '../api.sessions.$sessionId.workspace';
 import { Session } from '@lace/core/sessions/session';
 import { Project } from '@lace/core/projects/project';
 import { getPersistence } from '@lace/core/persistence/database';
-import { setupTestEnvironment, cleanupTestEnvironment } from '@lace/web/test-utils/test-helpers';
+import {
+  setupTestEnvironment,
+  cleanupTestEnvironment,
+} from '@lace/web/test-utils/test-helpers';
 
 describe('GET /api/sessions/:sessionId/workspace', () => {
   beforeEach(() => {
@@ -331,7 +393,7 @@ describe('GET /api/sessions/:sessionId/workspace', () => {
 
   it('returns 404 if session does not exist', async () => {
     const response = await loader({
-      params: { sessionId: 'nonexistent' }
+      params: { sessionId: 'nonexistent' },
     } as any);
     const data = await response.json();
 
@@ -439,6 +501,7 @@ describe('GET /api/sessions/:sessionId/workspace', () => {
 ```
 
 **Manual Testing**:
+
 1. Start dev server: `npm run dev`
 2. Create a session in the UI
 3. Use browser dev tools or curl to test the endpoint:
@@ -448,6 +511,7 @@ describe('GET /api/sessions/:sessionId/workspace', () => {
 4. Verify response contains `mode` and `info` fields
 
 **Commit Message**:
+
 ```
 feat(api): add workspace information endpoint
 
@@ -467,7 +531,9 @@ workspace mode (container/local) and detailed WorkspaceInfo.
 **Status**: Implemented and committed (f064a4fa9, 388eac408)
 
 **What Was Built**:
-- Created `useWorkspaceDetails` hook in `packages/web/hooks/useWorkspaceDetails.ts`
+
+- Created `useWorkspaceDetails` hook in
+  `packages/web/hooks/useWorkspaceDetails.ts`
   - Fetches workspace data from new API endpoint
   - Returns workspaceMode, workspaceInfo, loading, error, reload()
   - Comprehensive test coverage (8 tests passing)
@@ -476,48 +542,63 @@ workspace mode (container/local) and detailed WorkspaceInfo.
 - Updated provider-mocks.ts to include workspace fields
 
 **Implementation Differences from Plan**:
-- Created separate `useWorkspaceDetails` hook instead of adding fetch logic directly to SessionProvider
+
+- Created separate `useWorkspaceDetails` hook instead of adding fetch logic
+  directly to SessionProvider
 - Cleaner separation of concerns - hook can be reused independently
 - Uses `api.get()` from api-client (standard pattern)
 - Mock uses `vi.mock('@/lib/api-client', () => ({ api: { get: vi.fn() } }))`
 
 **Notes for Next Session**:
-- WorkspaceInfo type imported from `~/workspace/workspace-container-manager`
-- Hook returns loading state separately (workspaceLoading) to avoid conflicting with agent loading
-- Error state is captured but not currently exposed in SessionContext (only in hook)
 
-**Goal**: Add workspace mode and info to SessionProvider context so both sidebar and modal can access it.
+- WorkspaceInfo type imported from `~/workspace/workspace-container-manager`
+- Hook returns loading state separately (workspaceLoading) to avoid conflicting
+  with agent loading
+- Error state is captured but not currently exposed in SessionContext (only in
+  hook)
+
+**Goal**: Add workspace mode and info to SessionProvider context so both sidebar
+and modal can access it.
 
 **Files to Modify**:
+
 - `packages/web/components/providers/SessionProvider.tsx`
 - `packages/web/components/providers/__tests__/SessionProvider.test.tsx`
 
 **Implementation Steps**:
 
 1. Update the context interface (around line 15-20):
+
 ```typescript
 interface SessionContextValue {
   sessionDetails: SessionDetails | null;
   isLoading: boolean;
   error: string | null;
   refreshSession: () => Promise<void>;
-  workspaceMode: 'container' | 'local' | undefined;  // NEW
-  workspaceInfo: WorkspaceInfo | null | undefined;    // NEW
+  workspaceMode: 'container' | 'local' | undefined; // NEW
+  workspaceInfo: WorkspaceInfo | null | undefined; // NEW
 }
 ```
 
 2. Import WorkspaceInfo type at the top:
+
 ```typescript
 import type { WorkspaceInfo } from '@lace/core/workspace/workspace-container-manager';
 ```
 
 3. Add state variables in SessionProvider component (around line 40-45):
+
 ```typescript
-const [workspaceMode, setWorkspaceMode] = useState<'container' | 'local' | undefined>(undefined);
-const [workspaceInfo, setWorkspaceInfo] = useState<WorkspaceInfo | null | undefined>(undefined);
+const [workspaceMode, setWorkspaceMode] = useState<
+  'container' | 'local' | undefined
+>(undefined);
+const [workspaceInfo, setWorkspaceInfo] = useState<
+  WorkspaceInfo | null | undefined
+>(undefined);
 ```
 
 4. Create function to fetch workspace data:
+
 ```typescript
 const fetchWorkspaceData = async (sessionId: string) => {
   try {
@@ -537,7 +618,9 @@ const fetchWorkspaceData = async (sessionId: string) => {
 };
 ```
 
-5. Update the useEffect that fetches session details to also fetch workspace data:
+5. Update the useEffect that fetches session details to also fetch workspace
+   data:
+
 ```typescript
 useEffect(() => {
   if (!sessionId) {
@@ -561,7 +644,8 @@ useEffect(() => {
       // Fetch workspace data
       await fetchWorkspaceData(sessionId);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load session';
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to load session';
       setError(errorMessage);
       setSessionDetails(null);
       setWorkspaceMode(undefined);
@@ -576,6 +660,7 @@ useEffect(() => {
 ```
 
 6. Update the context value to include new fields:
+
 ```typescript
 const value: SessionContextValue = {
   sessionDetails,
@@ -588,6 +673,7 @@ const value: SessionContextValue = {
 ```
 
 7. Update refreshSession to also refresh workspace data:
+
 ```typescript
 const refreshSession = async () => {
   if (!sessionId) return;
@@ -601,7 +687,8 @@ const refreshSession = async () => {
     // Refresh workspace data
     await fetchWorkspaceData(sessionId);
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Failed to refresh session';
+    const errorMessage =
+      err instanceof Error ? err.message : 'Failed to refresh session';
     setError(errorMessage);
   }
 };
@@ -609,7 +696,8 @@ const refreshSession = async () => {
 
 **Testing**:
 
-Update test file: `packages/web/components/providers/__tests__/SessionProvider.test.tsx`
+Update test file:
+`packages/web/components/providers/__tests__/SessionProvider.test.tsx`
 
 Add these tests:
 
@@ -798,12 +886,14 @@ describe('SessionProvider workspace data', () => {
 ```
 
 **Manual Testing**:
+
 1. Add temporary debug output in a component that uses SessionProvider
 2. Create a session and verify workspace data appears in React DevTools
 3. Switch between sessions and verify data updates
 4. Check browser console for any errors
 
 **Commit Message**:
+
 ```
 feat(web): add workspace data to SessionProvider
 
@@ -824,41 +914,56 @@ workspace info to all consuming components.
 **Status**: Implemented and committed (bb3efdd2b)
 
 **What Was Built**:
-- Added workspace mode badge to session header actions in SessionSection.tsx:109-124
-- Badge displays "Container" (blue) or "Local" (green) based on workspaceMode from context
+
+- Added workspace mode badge to session header actions in
+  SessionSection.tsx:109-124
+- Badge displays "Container" (blue) or "Local" (green) based on workspaceMode
+  from context
 - Clicking badge calls handleConfigureSession to open config modal
 - Hidden when workspaceLoading or mode is null
 - Uses inline styles for color (blue: #3b82f6, green: #10b981)
 
 **Implementation Differences from Plan**:
-- Badge placed in header actions (next to configure button) instead of in sidebar body
+
+- Badge placed in header actions (next to configure button) instead of in
+  sidebar body
 - Simpler inline implementation rather than separate WorkspaceBadge component
 - Used inline color styles instead of DaisyUI badge classes for more control
 - No icons yet (will be added in Task 7)
 
 **Notes for Next Session**:
-- Badge currently just opens modal - Task 6 will wire it to open directly to workspace tab
-- onConfigureSession currently takes no parameters - will need to update signature in Task 6
 
-**Goal**: Display workspace mode badge in the sidebar that opens the SessionConfigModal.
+- Badge currently just opens modal - Task 6 will wire it to open directly to
+  workspace tab
+- onConfigureSession currently takes no parameters - will need to update
+  signature in Task 6
+
+**Goal**: Display workspace mode badge in the sidebar that opens the
+SessionConfigModal.
 
 **Files to Modify**:
+
 - `packages/web/components/sidebar/SessionSection.tsx`
 - `packages/web/components/sidebar/__tests__/SessionSection.test.tsx`
 
 **Implementation Steps**:
 
 1. Import necessary items at the top of SessionSection.tsx:
+
 ```typescript
 import { faBox, faFolder } from '@lace/web/lib/fontawesome'; // Add these icons
 ```
 
-2. Get workspace data from context (add after line 35 where other context is accessed):
+2. Get workspace data from context (add after line 35 where other context is
+   accessed):
+
 ```typescript
 const { workspaceMode, workspaceInfo } = useSessionContext();
 ```
 
-3. Create workspace badge component (add after permission mode handler, around line 78):
+3. Create workspace badge component (add after permission mode handler, around
+   line 78):
+
 ```typescript
 // Workspace badge component
 const WorkspaceBadge = () => {
@@ -883,7 +988,9 @@ const WorkspaceBadge = () => {
 };
 ```
 
-4. Add the badge to the UI (inside the SidebarSection children, after permission mode selector around line 155):
+4. Add the badge to the UI (inside the SidebarSection children, after permission
+   mode selector around line 155):
+
 ```typescript
 <div className="p-3 space-y-3">
   {/* Permission Mode Selector */}
@@ -918,7 +1025,8 @@ const WorkspaceBadge = () => {
 
 **Testing**:
 
-Update test file: `packages/web/components/sidebar/__tests__/SessionSection.test.tsx`
+Update test file:
+`packages/web/components/sidebar/__tests__/SessionSection.test.tsx`
 
 ```typescript
 import { describe, it, expect, vi } from 'vitest';
@@ -1056,6 +1164,7 @@ describe('SessionSection workspace badge', () => {
 ```
 
 **Manual Testing**:
+
 1. Start dev server and open the app
 2. Create a session with local mode (default)
 3. Verify "Local" badge appears in sidebar with ghost styling
@@ -1064,6 +1173,7 @@ describe('SessionSection workspace badge', () => {
 6. Verify "Container" badge appears with primary styling
 
 **Commit Message**:
+
 ```
 feat(web): add workspace mode badge to sidebar
 
@@ -1081,9 +1191,11 @@ Add clickable badge to SessionSection showing workspace mode
 
 ### Task 4: Create WorkspaceDetailsPanel Component
 
-**Goal**: Create a reusable component that displays comprehensive workspace information.
+**Goal**: Create a reusable component that displays comprehensive workspace
+information.
 
 **Files to Create**:
+
 - `packages/web/components/config/WorkspaceDetailsPanel.tsx`
 - `packages/web/components/config/__tests__/WorkspaceDetailsPanel.test.tsx`
 
@@ -1502,6 +1614,7 @@ describe('WorkspaceDetailsPanel', () => {
 ```
 
 **Manual Testing**:
+
 1. Create a Storybook story or temporary test page
 2. Render with container mode info and verify all fields display
 3. Render with local mode info and verify simplified display
@@ -1509,6 +1622,7 @@ describe('WorkspaceDetailsPanel', () => {
 5. Test with partial data (missing optional fields)
 
 **Commit Message**:
+
 ```
 feat(web): add WorkspaceDetailsPanel component
 
@@ -1527,25 +1641,31 @@ information with conditional rendering based on mode.
 
 ### Task 5: Integrate WorkspaceDetailsPanel into SessionConfigModal
 
-**Goal**: Add a "Workspace" tab to the SessionConfigModal that displays the WorkspaceDetailsPanel.
+**Goal**: Add a "Workspace" tab to the SessionConfigModal that displays the
+WorkspaceDetailsPanel.
 
 **Files to Modify**:
+
 - `packages/web/components/config/SessionConfigPanel.tsx`
 
 **Implementation Steps**:
 
 1. Import necessary items at the top:
+
 ```typescript
 import { WorkspaceDetailsPanel } from './WorkspaceDetailsPanel';
 import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
 ```
 
 2. Get workspace data from context (add where other data is accessed):
+
 ```typescript
 const { workspaceMode, workspaceInfo } = useSessionContext();
 ```
 
-3. Add workspace tab to the tab list (find where tabs are defined, likely around the role="tablist" section):
+3. Add workspace tab to the tab list (find where tabs are defined, likely around
+   the role="tablist" section):
+
 ```typescript
 <div role="tablist" className="tabs tabs-boxed">
   {/* Existing tabs... */}
@@ -1560,7 +1680,9 @@ const { workspaceMode, workspaceInfo } = useSessionContext();
 </div>
 ```
 
-4. Add workspace tab content panel (where other tab content panels are rendered):
+4. Add workspace tab content panel (where other tab content panels are
+   rendered):
+
 ```typescript
 {activeTab === 'workspace' && (
   <div data-testid="workspace-tab-content">
@@ -1581,7 +1703,9 @@ const { workspaceMode, workspaceInfo } = useSessionContext();
 )}
 ```
 
-5. If the modal accepts an `initialTab` prop to open directly to a specific tab, add support for 'workspace':
+5. If the modal accepts an `initialTab` prop to open directly to a specific tab,
+   add support for 'workspace':
+
 ```typescript
 interface SessionConfigPanelProps {
   sessionId: string;
@@ -1712,14 +1836,17 @@ describe('SessionConfigPanel workspace tab', () => {
 ```
 
 **Manual Testing**:
+
 1. Open SessionConfigModal from any session
 2. Click on the new "Workspace" tab
 3. Verify workspace details display correctly
 4. Test with both container and local mode sessions
 5. Click workspace badge in sidebar and verify modal opens
-6. If initialTab support was added, verify badge click opens directly to workspace tab
+6. If initialTab support was added, verify badge click opens directly to
+   workspace tab
 
 **Commit Message**:
+
 ```
 feat(web): add workspace tab to SessionConfigModal
 
@@ -1737,11 +1864,14 @@ Integrate WorkspaceDetailsPanel into SessionConfigModal as a new
 
 ### Task 6: Connect Workspace Badge Click to Modal Tab
 
-**Goal**: Make the workspace badge in the sidebar open the SessionConfigModal directly to the Workspace tab.
+**Goal**: Make the workspace badge in the sidebar open the SessionConfigModal
+directly to the Workspace tab.
 
 **Files to Modify**:
+
 - `packages/web/components/sidebar/SessionSection.tsx` (minor update)
-- `packages/web/components/config/SessionConfigPanel.tsx` (if not already done in Task 5)
+- `packages/web/components/config/SessionConfigPanel.tsx` (if not already done
+  in Task 5)
 
 **Implementation Steps**:
 
@@ -1778,6 +1908,7 @@ const WorkspaceBadge = () => {
 ```
 
 2. Update the SessionSectionProps interface to accept optional tab parameter:
+
 ```typescript
 interface SessionSectionProps {
   isMobile?: boolean;
@@ -1786,7 +1917,8 @@ interface SessionSectionProps {
 }
 ```
 
-3. In the parent component that renders SessionSection (likely in a route file), update to handle the initialTab parameter:
+3. In the parent component that renders SessionSection (likely in a route file),
+   update to handle the initialTab parameter:
 
 ```typescript
 // Example from parent component
@@ -1868,6 +2000,7 @@ describe('Workspace badge to modal navigation', () => {
 ```
 
 **Manual Testing**:
+
 1. Open a session in the web UI
 2. Locate the workspace badge in the sidebar
 3. Click the badge
@@ -1880,6 +2013,7 @@ describe('Workspace badge to modal navigation', () => {
 7. Switch between tabs manually to ensure navigation works
 
 **Commit Message**:
+
 ```
 feat(web): connect workspace badge to config modal tab
 
@@ -1896,26 +2030,30 @@ to the Workspace tab for immediate access to details.
 
 ### Task 7: Add Font Awesome Icons
 
-**Goal**: Ensure the new icons (faBox, faFolder) are available in the icon library.
+**Goal**: Ensure the new icons (faBox, faFolder) are available in the icon
+library.
 
 **Files to Modify**:
+
 - `packages/web/lib/fontawesome.ts` (or wherever icons are registered)
 
 **Implementation Steps**:
 
-1. Check current icon registration file (likely `packages/web/lib/fontawesome.ts` or similar):
+1. Check current icon registration file (likely
+   `packages/web/lib/fontawesome.ts` or similar):
 
 ```typescript
 // Add these imports if not already present
 import {
-  faBox,           // For container mode
-  faFolder,        // For local mode
-  faCircle,        // For state indicators
+  faBox, // For container mode
+  faFolder, // For local mode
+  faCircle, // For state indicators
   // ... other icons
 } from '@fortawesome/free-solid-svg-icons';
 ```
 
 2. Export them if using a custom export pattern:
+
 ```typescript
 export {
   faBox,
@@ -1926,13 +2064,14 @@ export {
 ```
 
 3. If using library registration pattern, ensure they're added:
+
 ```typescript
 import { library } from '@fortawesome/fontawesome-svg-core';
 
 library.add(
   faBox,
   faFolder,
-  faCircle,
+  faCircle
   // ... other icons
 );
 ```
@@ -1942,6 +2081,7 @@ library.add(
 No unit tests needed for icon registration, but verify:
 
 1. Component imports work:
+
 ```typescript
 import { faBox, faFolder } from '@lace/web/lib/fontawesome';
 ```
@@ -1949,6 +2089,7 @@ import { faBox, faFolder } from '@lace/web/lib/fontawesome';
 2. Icons render without console errors
 
 **Manual Testing**:
+
 1. Run the dev server
 2. Open browser console
 3. Navigate to a session page
@@ -1956,6 +2097,7 @@ import { faBox, faFolder } from '@lace/web/lib/fontawesome';
 5. Verify workspace badge displays the correct icon
 
 **Commit Message**:
+
 ```
 feat(web): add workspace-related FontAwesome icons
 
@@ -1971,9 +2113,11 @@ components.
 
 ### Task 8: End-to-End Testing
 
-**Goal**: Verify the complete feature works from session creation through workspace info display.
+**Goal**: Verify the complete feature works from session creation through
+workspace info display.
 
 **Files to Create**:
+
 - `packages/web/e2e/workspace-visibility.e2e.ts`
 
 **Implementation Steps**:
@@ -1985,7 +2129,7 @@ import { test, expect } from '@playwright/test';
 import {
   setupTestProject,
   setupTestSession,
-  cleanupTestData
+  cleanupTestData,
 } from './helpers/test-setup';
 
 test.describe('Workspace Visibility', () => {
@@ -2037,7 +2181,10 @@ test.describe('Workspace Visibility', () => {
 
   test('displays container workspace badge and details', async ({ page }) => {
     // Skip on non-macOS (containers only on macOS)
-    test.skip(process.platform !== 'darwin', 'Containers only supported on macOS');
+    test.skip(
+      process.platform !== 'darwin',
+      'Containers only supported on macOS'
+    );
 
     // Create test project and session with container mode
     const projectId = await setupTestProject(page, {
@@ -2080,7 +2227,9 @@ test.describe('Workspace Visibility', () => {
     await expect(detailsPanel).toContainText('/workspace');
   });
 
-  test('workspace tab can be accessed directly from modal', async ({ page }) => {
+  test('workspace tab can be accessed directly from modal', async ({
+    page,
+  }) => {
     // Setup
     const projectId = await setupTestProject(page, {
       name: 'Modal Nav Test',
@@ -2166,17 +2315,20 @@ test.describe('Workspace Visibility', () => {
 
 **Manual E2E Testing Checklist**:
 
-Create a testing checklist document: `docs/plans/2025-10-01/workspace-visibility-testing-checklist.md`
+Create a testing checklist document:
+`docs/plans/2025-10-01/workspace-visibility-testing-checklist.md`
 
 ```markdown
 # Workspace Visibility Manual Testing Checklist
 
 ## Setup
+
 - [ ] Dev server running (`npm run dev`)
 - [ ] Browser dev tools open (check console for errors)
 - [ ] Test project created
 
 ## Local Mode Session
+
 - [ ] Create new session with default (local) workspace mode
 - [ ] Workspace badge appears in sidebar
 - [ ] Badge shows "Local" text with ghost styling
@@ -2184,6 +2336,7 @@ Create a testing checklist document: `docs/plans/2025-10-01/workspace-visibility
 - [ ] Badge shows "running" state indicator
 
 ## Badge Click Behavior
+
 - [ ] Click workspace badge
 - [ ] SessionConfigModal opens
 - [ ] Workspace tab is automatically selected
@@ -2194,6 +2347,7 @@ Create a testing checklist document: `docs/plans/2025-10-01/workspace-visibility
 - [ ] "Direct Project Access" alert visible
 
 ## Modal Navigation
+
 - [ ] Close modal
 - [ ] Click configure session button (gear icon)
 - [ ] Modal opens to default tab (general)
@@ -2203,6 +2357,7 @@ Create a testing checklist document: `docs/plans/2025-10-01/workspace-visibility
 - [ ] Switch to workspace tab again (verify tab switching works)
 
 ## Container Mode Session (macOS only)
+
 - [ ] Create new session with container workspace mode
 - [ ] Badge shows "Container" with primary styling
 - [ ] Badge has box icon
@@ -2216,6 +2371,7 @@ Create a testing checklist document: `docs/plans/2025-10-01/workspace-visibility
 - [ ] All container-specific sections visible
 
 ## Session Switching
+
 - [ ] Create both local and container sessions in same project
 - [ ] Switch from local to container session
 - [ ] Verify badge updates (Local → Container)
@@ -2226,12 +2382,14 @@ Create a testing checklist document: `docs/plans/2025-10-01/workspace-visibility
 - [ ] Verify details update
 
 ## Error Handling
+
 - [ ] Check browser console for errors during all operations
 - [ ] Verify no missing icon warnings
 - [ ] Test with slow network (dev tools network throttling)
 - [ ] Verify loading states appear appropriately
 
 ## Accessibility
+
 - [ ] Tab through sidebar with keyboard
 - [ ] Workspace badge is keyboard focusable
 - [ ] Enter key activates badge
@@ -2239,6 +2397,7 @@ Create a testing checklist document: `docs/plans/2025-10-01/workspace-visibility
 - [ ] Screen reader announces badge purpose (check title attribute)
 
 ## Visual Regression
+
 - [ ] Workspace section doesn't break sidebar layout
 - [ ] Badge sizing appropriate
 - [ ] Modal workspace tab fits with existing tabs
@@ -2247,12 +2406,14 @@ Create a testing checklist document: `docs/plans/2025-10-01/workspace-visibility
 - [ ] Icons render at correct sizes
 
 ## Notes
+
 - Document any issues found
 - Screenshot any visual problems
 - Note browser/OS for any platform-specific issues
 ```
 
 **Commit Message**:
+
 ```
 test(e2e): add comprehensive workspace visibility tests
 
@@ -2273,6 +2434,7 @@ from session creation to detail display.
 ## Testing Strategy Summary
 
 ### Unit Tests
+
 - API endpoint with all edge cases (Task 1)
 - SessionProvider workspace data integration (Task 2)
 - SessionSection badge rendering (Task 3)
@@ -2280,16 +2442,19 @@ from session creation to detail display.
 - SessionConfigModal tab integration (Task 5)
 
 ### Integration Tests
+
 - Badge click → modal navigation (Task 6)
 - Provider → components data flow (Task 2-3)
 - Modal tab switching (Task 5)
 
 ### E2E Tests
+
 - Complete user flow (Task 8)
 - Cross-session consistency (Task 8)
 - Platform-specific behavior (Task 8)
 
 ### Manual Testing
+
 - Visual verification checklist (Task 8)
 - Accessibility checks (Task 8)
 - Error handling (all tasks)
@@ -2317,18 +2482,21 @@ from session creation to detail display.
 4. Manual testing checklist
 5. Check no console errors
 6. Review all commits
-7. Verify feature works on both macOS (container) and other platforms (local only)
+7. Verify feature works on both macOS (container) and other platforms (local
+   only)
 
 ## Quick Testing Guide
 
 ### Manual Testing Checklist (5-10 minutes)
 
 **Prerequisites:**
+
 - Dev server running: `npm run dev`
 - At least one project created
 - At least one session created
 
 **Basic Flow:**
+
 1. ✅ Navigate to a session in the web UI
 2. ✅ Look for workspace badge in sidebar (should show "Container" or "Local")
 3. ✅ Badge is color-coded: blue for Container, green for Local
@@ -2337,31 +2505,40 @@ from session creation to detail display.
 6. ✅ Workspace details panel displays:
    - Header with workspace type and status indicator
    - Primary Information section (Working Directory, Session ID)
-   - Mode-specific sections (Container Details/Git Configuration OR Local Details)
-7. ✅ Switch to other tabs (Basics, Environment, Tool Policies) - they should work
+   - Mode-specific sections (Container Details/Git Configuration OR Local
+     Details)
+7. ✅ Switch to other tabs (Basics, Environment, Tool Policies) - they should
+   work
 8. ✅ Close modal, reopen via gear icon - should open to "Basics" tab by default
 9. ✅ Click workspace badge again - should open to "Workspace" tab
 
 **Container Mode (macOS only):**
+
 - Verify Container Details section shows: Container ID, Container Mount Path
-- Verify Git Configuration section shows: Branch, Worktree Path, Original Project
+- Verify Git Configuration section shows: Branch, Worktree Path, Original
+  Project
 
 **Local Mode:**
+
 - Verify Local Details section shows: Project Directory
 - Verify info alert about "Direct Project Access"
 
 **Edge Cases:**
-- Create a brand new session and immediately check workspace tab (may show loading state)
+
+- Create a brand new session and immediately check workspace tab (may show
+  loading state)
 - Switch between sessions - workspace info should update
 
 ### Automated Tests Status
 
 **Unit Tests:** 29 tests passing
+
 - API routes: 5 tests
 - React hooks: 8 tests
 - React components: 16 tests
 
 **Run Tests:**
+
 ```bash
 # All tests
 npm test
@@ -2373,6 +2550,7 @@ npx vitest --run app/routes/__tests__/api.sessions.$sessionId.workspace.test.ts
 ```
 
 **Build Verification:**
+
 ```bash
 npm run build  # Should complete with no errors
 npm run lint   # Should pass with no warnings
@@ -2381,41 +2559,55 @@ npm run lint   # Should pass with no warnings
 ## Common Issues and Solutions
 
 ### Issue: Workspace info is undefined
-**Solution**: Workspace initialization is async. Use `session.waitForWorkspace()` or handle undefined gracefully in UI.
+
+**Solution**: Workspace initialization is async. Use
+`session.waitForWorkspace()` or handle undefined gracefully in UI.
 
 ### Issue: Tests fail on non-macOS platforms
-**Solution**: Container mode only works on macOS. Use `test.skip(process.platform !== 'darwin')` for container tests.
+
+**Solution**: Container mode only works on macOS. Use
+`test.skip(process.platform !== 'darwin')` for container tests.
 
 ### Issue: Type errors with WorkspaceInfo
-**Solution**: Import from correct location: `@lace/core/workspace/workspace-container-manager`
+
+**Solution**: Import from correct location:
+`@lace/core/workspace/workspace-container-manager`
 
 ### Issue: SessionProvider context not updating
-**Solution**: Verify `fetchWorkspaceData` is called in useEffect and after session changes.
+
+**Solution**: Verify `fetchWorkspaceData` is called in useEffect and after
+session changes.
 
 ### Issue: Modal doesn't open to correct tab
-**Solution**: Check `initialTab` prop is passed correctly and SessionConfigModal supports 'workspace' tab value.
+
+**Solution**: Check `initialTab` prop is passed correctly and SessionConfigModal
+supports 'workspace' tab value.
 
 ## Architecture Decisions
 
 ### Why SessionProvider for workspace data?
+
 - Avoids duplicate API calls
 - Single source of truth
 - Automatic updates on session changes
 - Consistent with existing session data flow
 
 ### Why unified display instead of two components?
+
 - Reduces code duplication
 - Easier to maintain
 - Better user experience (consistent layout)
 - Conditional rendering is simple
 
 ### Why read-only panel?
+
 - YAGNI: No user requirements for actions
 - Safer (no accidental workspace destruction)
 - Can add actions later if needed
 - Keeps implementation simple
 
 ### Why badge instead of just text?
+
 - Visual prominence
 - Clickable affordance
 - Consistent with DaisyUI patterns
@@ -2424,9 +2616,11 @@ npm run lint   # Should pass with no warnings
 ## Dependencies
 
 ### New Dependencies
+
 None required (all using existing packages)
 
 ### Existing Dependencies Used
+
 - React Router v7 (routing)
 - DaisyUI (styling)
 - FontAwesome (icons)
@@ -2437,16 +2631,19 @@ None required (all using existing packages)
 ## Performance Considerations
 
 ### API Calls
+
 - Workspace data fetched once per session load
 - Cached in SessionProvider
 - No polling (workspace state is stable)
 
 ### Rendering
+
 - WorkspaceDetailsPanel only renders when tab is active
 - Conditional rendering minimizes DOM nodes
 - No expensive computations
 
 ### Data Size
+
 - WorkspaceInfo is small (~200 bytes)
 - No pagination needed
 - No large data transfers
@@ -2497,4 +2694,5 @@ Feature is complete when:
 2. Where exactly are tabs defined in SessionConfigPanel? (Task 5)
 3. What's the icon registration pattern in fontawesome.ts? (Task 7)
 4. Are there existing E2E test helpers for creating projects/sessions? (Task 8)
-5. What's the current pattern for prop threading between sidebar and modal? (Task 6)
+5. What's the current pattern for prop threading between sidebar and modal?
+   (Task 6)

@@ -1,19 +1,26 @@
 # Protocol Events Migration Specification
 
-**Goal**: Make protocol events THE internal event system for the web package. LaceEvent stays in the agent package as its internal representation.
+**Goal**: Make protocol events THE internal event system for the web package.
+LaceEvent stays in the agent package as its internal representation.
 
-**Date**: 2026-01-05
-**Status**: Implemented (web consumes protocol events directly)
+**Date**: 2026-01-05 **Status**: Implemented (web consumes protocol events
+directly)
 
 ---
 
 ## Executive Summary
 
-Previously, the web package received protocol events from the supervisor, translated them to LaceEvent format, then consumed LaceEvent throughout the UI. This created an unnecessary translation layer and coupled the web package to agent internals.
+Previously, the web package received protocol events from the supervisor,
+translated them to LaceEvent format, then consumed LaceEvent throughout the UI.
+This created an unnecessary translation layer and coupled the web package to
+agent internals.
 
-**Current State**: Web consumes protocol events directly via `AppEvent = ProtocolEvent | PermissionRequestEvent | WebEvent` and derives a stable timeline model in `useProcessedEvents`.
+**Current State**: Web consumes protocol events directly via
+`AppEvent = ProtocolEvent | PermissionRequestEvent | WebEvent` and derives a
+stable timeline model in `useProcessedEvents`.
 
-**Target State**: Web package consumes protocol event types DIRECTLY. LaceEvent remains agent-internal only.
+**Target State**: Web package consumes protocol event types DIRECTLY. LaceEvent
+remains agent-internal only.
 
 ---
 
@@ -33,8 +40,10 @@ AppEvent (ProtocolEvent | PermissionRequestEvent | WebEvent) ← Web components 
 
 1. **Protocol Events** (`@lace/ent-protocol`)
    - Wire format: `session/update` notifications with discriminated union types
-   - Event types: `text_delta`, `thinking`, `usage`, `tool_use`, `turn_start`, `turn_end`, `error`, etc.
-   - Location: `packages/ent-protocol/src/schemas/methods.ts` (SessionUpdateParamsSchema)
+   - Event types: `text_delta`, `thinking`, `usage`, `tool_use`, `turn_start`,
+     `turn_end`, `error`, etc.
+   - Location: `packages/ent-protocol/src/schemas/methods.ts`
+     (SessionUpdateParamsSchema)
    - Additional: `session/request_permission` for tool approvals
 
 2. **Supervisor Events** (`@lace/supervisor`)
@@ -44,7 +53,8 @@ AppEvent (ProtocolEvent | PermissionRequestEvent | WebEvent) ← Web components 
 
 3. **LaceEvent** (`@lace/agent`)
    - Internal agent representation
-   - Types: conversation events, transient streaming events, and workflow events (agent-internal only)
+   - Types: conversation events, transient streaming events, and workflow events
+     (agent-internal only)
    - Location: `packages/agent/src/threads/types.ts`
    - **36 total event types** including transient and persisted
 
@@ -57,6 +67,7 @@ AppEvent (ProtocolEvent | PermissionRequestEvent | WebEvent) ← Web components 
 ### Web Package LaceEvent Usage
 
 **Files using LaceEvent** (20 files total):
+
 - `types/core.ts` - Re-exports LaceEvent from `@lace/agent/threads/types`
 - `lib/event-stream-manager.ts` - Broadcasts LaceEvent via SSE
 - `lib/sse-store.ts` - Subscription store filtering LaceEvent
@@ -75,29 +86,30 @@ AppEvent (ProtocolEvent | PermissionRequestEvent | WebEvent) ← Web components 
 
 ### Timeline model
 
-| Protocol Update | Timeline entry | Notes |
-|----------------|-----------|-------|
-| `text_delta` | transient `AGENT_MESSAGE` | Aggregated by `(agentSessionId, turnId)` with derived id fallback |
-| `turn_end` | final `AGENT_MESSAGE` | Finalizes content for a turn |
-| `tool_use` | `TOOL_AGGREGATED` | Includes tool call + result; permission request attached in metadata |
-| `error` | `AGENT_ERROR` | Rendered via `AgentErrorEntry` |
+| Protocol Update | Timeline entry            | Notes                                                                |
+| --------------- | ------------------------- | -------------------------------------------------------------------- |
+| `text_delta`    | transient `AGENT_MESSAGE` | Aggregated by `(agentSessionId, turnId)` with derived id fallback    |
+| `turn_end`      | final `AGENT_MESSAGE`     | Finalizes content for a turn                                         |
+| `tool_use`      | `TOOL_AGGREGATED`         | Includes tool call + result; permission request attached in metadata |
+| `error`         | `AGENT_ERROR`             | Rendered via `AgentErrorEntry`                                       |
 
 ### Web-internal events (non-protocol)
 
 These are web-generated and not part of the protocol event stream:
 
-| WebEvent | Source | Notes |
-|-----------|--------|-------------|
-| `USER_MESSAGE` | Optimistic send | Not the durable protocol record; used for instant UX |
-| `AGENT_STATE_CHANGE` | Supervisor/web | Drives busy/typing state |
-| `LOCAL_SYSTEM_MESSAGE` | Web | Connection + UX messaging |
-| `TOOL_APPROVAL_RESPONSE` | Web | User decision (paired with durable protocol permission flow) |
+| WebEvent                 | Source          | Notes                                                        |
+| ------------------------ | --------------- | ------------------------------------------------------------ |
+| `USER_MESSAGE`           | Optimistic send | Not the durable protocol record; used for instant UX         |
+| `AGENT_STATE_CHANGE`     | Supervisor/web  | Drives busy/typing state                                     |
+| `LOCAL_SYSTEM_MESSAGE`   | Web             | Connection + UX messaging                                    |
+| `TOOL_APPROVAL_RESPONSE` | Web             | User decision (paired with durable protocol permission flow) |
 
 ---
 
 ## Data Structure Comparison
 
 ### Protocol Event Structure
+
 ```typescript
 // From ent-protocol SessionUpdateNotificationSchema
 {
@@ -144,6 +156,7 @@ These are web-generated and not part of the protocol event stream:
 ```
 
 ### LaceEvent Structure
+
 ```typescript
 {
   id?: string,
@@ -166,7 +179,8 @@ These are web-generated and not part of the protocol event stream:
 
 1. **ID Context**:
    - Protocol: `sessionId` = agent session, embedded in params
-   - LaceEvent: `context.threadId` = agent session, `context.sessionId` = workspace session
+   - LaceEvent: `context.threadId` = agent session, `context.sessionId` =
+     workspace session
 
 2. **Metadata**:
    - Protocol: `streamSeq`, `turnId`, `turnSeq`, `jobId` at top level
@@ -186,18 +200,22 @@ These are web-generated and not part of the protocol event stream:
 
 ### Phase 1: Create Protocol Event Type Definitions (SMALL)
 
-**Goal**: Define TypeScript types for protocol events that web package will consume.
+**Goal**: Define TypeScript types for protocol events that web package will
+consume.
 
 **Files to create**:
+
 - `packages/web/types/protocol-events.ts` - Web-friendly protocol event types
 
 **Approach**:
+
 1. Import protocol schemas from `@lace/ent-protocol`
 2. Use `z.infer<>` to extract TypeScript types
 3. Add helper types for common patterns (tool status, content blocks, etc.)
 4. Create discriminated union type for all session update events
 
 **Example**:
+
 ```typescript
 // packages/web/types/protocol-events.ts
 import type { z } from 'zod';
@@ -206,8 +224,12 @@ import {
   SessionRequestPermissionRequestSchema,
 } from '@lace/ent-protocol';
 
-export type SessionUpdate = z.infer<typeof SessionUpdateNotificationSchema>['params'];
-export type PermissionRequest = z.infer<typeof SessionRequestPermissionRequestSchema>['params'];
+export type SessionUpdate = z.infer<
+  typeof SessionUpdateNotificationSchema
+>['params'];
+export type PermissionRequest = z.infer<
+  typeof SessionRequestPermissionRequestSchema
+>['params'];
 
 // Extract individual update types
 export type TextDeltaUpdate = Extract<SessionUpdate, { type: 'text_delta' }>;
@@ -227,7 +249,7 @@ export interface ProtocolEvent {
   // Context (from supervisor)
   workspaceSessionId: string;
   projectId?: string;
-  agentSessionId: string;  // from update.sessionId
+  agentSessionId: string; // from update.sessionId
 }
 
 export interface PermissionRequestEvent {
@@ -245,18 +267,22 @@ export interface PermissionRequestEvent {
 
 ### Phase 2: Update Translation Layer (MEDIUM)
 
-**Goal**: Modify `supervisor-service.ts` to emit protocol events instead of LaceEvent.
+**Goal**: Modify `supervisor-service.ts` to emit protocol events instead of
+LaceEvent.
 
 **Files to modify**:
+
 - `packages/web/lib/server/supervisor-service.ts`
 
 **Changes**:
+
 1. Remove `updateToLaceEvents()` function
 2. Modify `bridgeEventToWeb()` to pass protocol events directly
 3. Update EventStreamManager to handle `ProtocolEvent` type
 4. Keep workspace/project context wrapping
 
 **Before**:
+
 ```typescript
 function bridgeEventToWeb(event: SupervisorServerEvent) {
   if (event.type === 'session_update') {
@@ -267,6 +293,7 @@ function bridgeEventToWeb(event: SupervisorServerEvent) {
 ```
 
 **After**:
+
 ```typescript
 function bridgeEventToWeb(event: SupervisorServerEvent) {
   if (event.type === 'session_update') {
@@ -294,9 +321,11 @@ function bridgeEventToWeb(event: SupervisorServerEvent) {
 
 ### Phase 3: Update Event Stream Infrastructure (LARGE)
 
-**Goal**: Modify event broadcasting and subscription to work with protocol events.
+**Goal**: Modify event broadcasting and subscription to work with protocol
+events.
 
 **Files to modify**:
+
 - `packages/web/lib/event-stream-manager.ts`
 - `packages/web/lib/sse-store.ts`
 - `packages/web/types/stream-events.ts`
@@ -304,9 +333,11 @@ function bridgeEventToWeb(event: SupervisorServerEvent) {
 **Changes**:
 
 1. **EventStreamManager**:
-   - Change `broadcast()` parameter from `LaceEvent` to `ProtocolEvent | PermissionRequestEvent | WebEvent`
+   - Change `broadcast()` parameter from `LaceEvent` to
+     `ProtocolEvent | PermissionRequestEvent | WebEvent`
    - Update filtering logic to work with protocol event structure
-   - Update `shouldSendToConnection()` to filter by `agentSessionId` instead of `context.threadId`
+   - Update `shouldSendToConnection()` to filter by `agentSessionId` instead of
+     `context.threadId`
 
 2. **SSEStore**:
    - Update `EventFilter` interface for protocol event structure
@@ -322,20 +353,21 @@ function bridgeEventToWeb(event: SupervisorServerEvent) {
      - etc.
 
 **Example WebEvent**:
+
 ```typescript
 // packages/web/types/web-events.ts
 export type WebEventType =
   | 'USER_MESSAGE'
   | 'AGENT_STATE_CHANGE'
   | 'AGENT_SPAWNED'
-  | 'PROJECT_CREATED'
-  // ... etc
+  | 'PROJECT_CREATED';
+// ... etc
 
 export interface WebEvent {
   id: string;
   timestamp: Date;
   type: WebEventType;
-  data: any;  // Discriminated by type
+  data: any; // Discriminated by type
   workspaceSessionId?: string;
   projectId?: string;
   agentSessionId?: string;
@@ -354,6 +386,7 @@ export type AppEvent = ProtocolEvent | PermissionRequestEvent | WebEvent;
 **Goal**: Modify React hooks to consume protocol events instead of LaceEvent.
 
 **Files to modify**:
+
 - `packages/web/hooks/useEventStream.ts` - Event handler routing
 - `packages/web/hooks/useProcessedEvents.ts` - Timeline processing
 - `packages/web/hooks/useAgentEvents.ts` - Event collection
@@ -367,6 +400,7 @@ export type AppEvent = ProtocolEvent | PermissionRequestEvent | WebEvent;
    - Map protocol events to handler callbacks
 
 **Before**:
+
 ```typescript
 switch (event.type) {
   case 'USER_MESSAGE':
@@ -379,6 +413,7 @@ switch (event.type) {
 ```
 
 **After**:
+
 ```typescript
 if (isProtocolEvent(event)) {
   switch (event.update.type) {
@@ -415,6 +450,7 @@ if (isProtocolEvent(event)) {
 **Goal**: Modify timeline rendering to work with protocol events.
 
 **Files to modify**:
+
 - `packages/web/components/timeline/TimelineView.tsx`
 - `packages/web/components/timeline/TimelineMessage.tsx`
 - `packages/web/components/timeline/AgentErrorEntry.tsx`
@@ -427,6 +463,7 @@ if (isProtocolEvent(event)) {
 3. Modify rendering logic for new event shapes
 
 **Example**:
+
 ```typescript
 // Before
 function renderEvent(event: LaceEvent) {
@@ -456,10 +493,12 @@ function renderEvent(event: AppEvent) {
 **Goal**: Update context providers to work with protocol events.
 
 **Files to modify**:
+
 - `packages/web/components/providers/EventStreamProvider.tsx`
 - Related context providers
 
 **Changes**:
+
 1. Update type imports
 2. Modify event handler interfaces
 3. Update context value types
@@ -473,9 +512,11 @@ function renderEvent(event: AppEvent) {
 **Goal**: Ensure API routes that return events use correct types.
 
 **Files to modify**:
+
 - `packages/web/app/routes/api.agents.$agentId.history.ts`
 
 **Changes**:
+
 1. Update response types
 2. Ensure serialization handles protocol events correctly
 
@@ -488,6 +529,7 @@ function renderEvent(event: AppEvent) {
 **Goal**: Fix debug tools and tests to work with new event system.
 
 **Files to modify**:
+
 - `packages/web/components/debug/EventStreamMonitor.tsx`
 - `packages/web/types/events.test.ts`
 - `packages/web/hooks/__tests__/useSmartAutoscroll.test.tsx`
@@ -495,6 +537,7 @@ function renderEvent(event: AppEvent) {
 - Other test files using LaceEvent
 
 **Changes**:
+
 1. Update EventStreamMonitor to display protocol events
 2. Rewrite event-related tests
 3. Update test fixtures and mocks
@@ -508,9 +551,11 @@ function renderEvent(event: AppEvent) {
 **Goal**: Clean up imports and remove dead code.
 
 **Files to modify**:
+
 - `packages/web/types/core.ts` - Remove LaceEvent re-exports
 
 **Changes**:
+
 1. Remove `export type { LaceEvent, ... } from '@lace/agent/threads/types'`
 2. Remove unused agent imports
 3. Update documentation
@@ -524,26 +569,33 @@ function renderEvent(event: AppEvent) {
 ### Technical Risks
 
 1. **Type Safety Loss**:
-   - **Risk**: Protocol events use Zod schemas; extracting types may lose some runtime validation
-   - **Mitigation**: Keep Zod schemas imported; add runtime type guards where needed
+   - **Risk**: Protocol events use Zod schemas; extracting types may lose some
+     runtime validation
+   - **Mitigation**: Keep Zod schemas imported; add runtime type guards where
+     needed
 
 2. **Event Processing Complexity**:
-   - **Risk**: Protocol events are more granular; may need more client-side aggregation
+   - **Risk**: Protocol events are more granular; may need more client-side
+     aggregation
    - **Mitigation**: Build robust event processing in `useProcessedEvents` hook
 
 3. **Missing Protocol Events**:
-   - **Risk**: Some LaceEvent types have no protocol equivalent (jobs, mode_change, etc.)
-   - **Mitigation**: Identify if web needs these; add to protocol if necessary OR keep as web-internal events
+   - **Risk**: Some LaceEvent types have no protocol equivalent (jobs,
+     mode_change, etc.)
+   - **Mitigation**: Identify if web needs these; add to protocol if necessary
+     OR keep as web-internal events
 
 4. **Streaming Performance**:
    - **Risk**: More events = more network traffic and processing
-   - **Mitigation**: Benchmark and optimize; consider server-side event coalescing if needed
+   - **Mitigation**: Benchmark and optimize; consider server-side event
+     coalescing if needed
 
 ### Migration Risks
 
 1. **Breaking Changes**:
    - **Risk**: All event-consuming code must change simultaneously
-   - **Mitigation**: Use feature flag or parallel implementation during transition
+   - **Mitigation**: Use feature flag or parallel implementation during
+     transition
 
 2. **Testing Coverage**:
    - **Risk**: Extensive testing needed to ensure UI still works correctly
@@ -551,11 +603,13 @@ function renderEvent(event: AppEvent) {
 
 3. **Timeline Rendering**:
    - **Risk**: Timeline aggregation logic is complex; easy to break
-   - **Mitigation**: Port tests first; validate against known conversation histories
+   - **Mitigation**: Port tests first; validate against known conversation
+     histories
 
 ### Open Questions
 
-1. **Job Events**: Protocol has `job_started`, `job_finished`, `job_update` - does web need these?
+1. **Job Events**: Protocol has `job_started`, `job_finished`, `job_update` -
+   does web need these?
    - Current LaceEvent doesn't have job equivalents
    - Supervisor supports jobs but web may not consume them yet
 
@@ -576,18 +630,21 @@ function renderEvent(event: AppEvent) {
 ## Testing Strategy
 
 ### Unit Tests
+
 - Event type guards and discriminators
 - Event filtering logic in sse-store
 - Event processing in useProcessedEvents
 - Protocol event → UI data transformations
 
 ### Integration Tests
+
 - Event flow from supervisor → web UI
 - Timeline rendering with protocol events
 - Tool approval flow with permission_request events
 - Compaction events display
 
 ### E2E Tests
+
 - Full conversation with streaming, tools, errors
 - Multi-agent sessions
 - Event filtering and subscription
@@ -598,6 +655,7 @@ function renderEvent(event: AppEvent) {
 ## File Impact Summary
 
 ### Files to Create (3 files)
+
 - `packages/web/types/protocol-events.ts` - Protocol event types
 - `packages/web/types/web-events.ts` - Web-internal event types
 - `packages/web/types/app-events.ts` - Union types and type guards
@@ -605,6 +663,7 @@ function renderEvent(event: AppEvent) {
 ### Files to Modify (25+ files)
 
 **Critical Path** (must change together):
+
 1. `packages/web/lib/server/supervisor-service.ts` - Translation layer
 2. `packages/web/lib/event-stream-manager.ts` - Broadcasting
 3. `packages/web/lib/sse-store.ts` - Subscriptions
@@ -614,6 +673,7 @@ function renderEvent(event: AppEvent) {
 7. `packages/web/components/timeline/TimelineView.tsx` - Rendering
 
 **Secondary** (can be updated incrementally):
+
 - `packages/web/types/core.ts` - Type exports
 - `packages/web/types/stream-events.ts` - Stream types
 - `packages/web/hooks/useAgentTokenUsage.ts` - Token tracking
@@ -625,35 +685,38 @@ function renderEvent(event: AppEvent) {
 - Test files (~6 files)
 
 ### Files to Delete (0 files)
+
 - No files deleted; LaceEvent stays in agent package
 
 ---
 
 ## Implementation Complexity Estimates
 
-| Phase | Complexity | Estimated Hours | Risk Level |
-|-------|-----------|-----------------|------------|
-| 1. Protocol Type Definitions | SMALL | 2-3 | LOW |
-| 2. Translation Layer | MEDIUM | 4-6 | MEDIUM |
-| 3. Event Stream Infrastructure | LARGE | 8-12 | HIGH |
-| 4. Event Hooks | LARGE | 12-16 | HIGH |
-| 5. Timeline Components | LARGE | 10-14 | HIGH |
-| 6. Provider Components | MEDIUM | 4-6 | MEDIUM |
-| 7. API Routes | SMALL | 2-3 | LOW |
-| 8. Debug & Testing | MEDIUM | 6-8 | MEDIUM |
-| 9. Cleanup | SMALL | 1-2 | LOW |
-| **TOTAL** | | **49-70 hours** | |
+| Phase                          | Complexity | Estimated Hours | Risk Level |
+| ------------------------------ | ---------- | --------------- | ---------- |
+| 1. Protocol Type Definitions   | SMALL      | 2-3             | LOW        |
+| 2. Translation Layer           | MEDIUM     | 4-6             | MEDIUM     |
+| 3. Event Stream Infrastructure | LARGE      | 8-12            | HIGH       |
+| 4. Event Hooks                 | LARGE      | 12-16           | HIGH       |
+| 5. Timeline Components         | LARGE      | 10-14           | HIGH       |
+| 6. Provider Components         | MEDIUM     | 4-6             | MEDIUM     |
+| 7. API Routes                  | SMALL      | 2-3             | LOW        |
+| 8. Debug & Testing             | MEDIUM     | 6-8             | MEDIUM     |
+| 9. Cleanup                     | SMALL      | 1-2             | LOW        |
+| **TOTAL**                      |            | **49-70 hours** |            |
 
 ---
 
 ## Recommended Approach
 
 ### Option A: Big Bang Migration (NOT RECOMMENDED)
+
 - Implement all phases in one PR
 - High risk of breaking things
 - Difficult to review
 
 ### Option B: Incremental with Feature Flag (RECOMMENDED)
+
 1. Implement dual event system
 2. Add feature flag to switch between LaceEvent and Protocol events
 3. Implement phases 1-3 (infrastructure)
@@ -664,6 +727,7 @@ function renderEvent(event: AppEvent) {
 8. Remove LaceEvent code (phase 9)
 
 ### Option C: Parallel Event System (ALTERNATIVE)
+
 1. Keep LaceEvent system running
 2. Add protocol event handling in parallel
 3. Migrate components one by one
@@ -705,15 +769,15 @@ function renderEvent(event: AppEvent) {
 
 ```typescript
 type SessionUpdate =
-  | TextDeltaUpdate      // Streaming text
-  | ThinkingUpdate       // Thinking tokens
-  | UsageUpdate          // Token usage
-  | ToolUseUpdate        // Tool execution
-  | TurnStartUpdate      // Turn boundary
-  | TurnEndUpdate        // Turn completion
-  | ErrorUpdate          // Error events
-  | SessionInfoUpdate    // Session metadata
-  | ContextWindowUpdate  // Context usage
+  | TextDeltaUpdate // Streaming text
+  | ThinkingUpdate // Thinking tokens
+  | UsageUpdate // Token usage
+  | ToolUseUpdate // Tool execution
+  | TurnStartUpdate // Turn boundary
+  | TurnEndUpdate // Turn completion
+  | ErrorUpdate // Error events
+  | SessionInfoUpdate // Session metadata
+  | ContextWindowUpdate // Context usage
   | CompactionStartUpdate
   | CompactionCompleteUpdate
   | McpConfigChangedUpdate
@@ -723,7 +787,7 @@ type SessionUpdate =
   | PlanUpdate
   | JobStartedUpdate
   | JobFinishedUpdate
-  | JobUpdateUpdate
+  | JobUpdateUpdate;
 ```
 
 ### Permission Request

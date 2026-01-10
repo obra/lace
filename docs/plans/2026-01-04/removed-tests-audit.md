@@ -1,8 +1,7 @@
 # Removed Tests Audit Report
 
-**Date:** 2026-01-04
-**Auditor:** Bot (Claude Code)
-**Scope:** Audit of test files deleted during agent-process refactoring
+**Date:** 2026-01-04 **Auditor:** Bot (Claude Code) **Scope:** Audit of test
+files deleted during agent-process refactoring
 
 ---
 
@@ -10,21 +9,24 @@
 
 **109 test files were deleted. 25 test files were added.**
 
-The refactoring shifted from unit-heavy testing in `packages/core` to E2E-heavy testing in `packages/agent`. Most deletions are expected (Tasks feature removed, old-world architecture replaced), but there are **significant coverage gaps** for retry logic and token management.
+The refactoring shifted from unit-heavy testing in `packages/core` to E2E-heavy
+testing in `packages/agent`. Most deletions are expected (Tasks feature removed,
+old-world architecture replaced), but there are **significant coverage gaps**
+for retry logic and token management.
 
 ---
 
 ## Test File Statistics
 
-| Package | Deleted | Added | Net Change |
-|---------|---------|-------|------------|
-| packages/core | 77 | 1 | -76 |
-| packages/web | 32 | 0 | -32 |
-| packages/agent | 0 | 12 | +12 |
-| packages/supervisor | 0 | 2 | +2 |
-| packages/ent-protocol | 0 | 4 | +4 |
-| packages/cli | 0 | 6 | +6 |
-| **Total** | **109** | **25** | **-84** |
+| Package               | Deleted | Added  | Net Change |
+| --------------------- | ------- | ------ | ---------- |
+| packages/core         | 77      | 1      | -76        |
+| packages/web          | 32      | 0      | -32        |
+| packages/agent        | 0       | 12     | +12        |
+| packages/supervisor   | 0       | 2      | +2         |
+| packages/ent-protocol | 0       | 4      | +4         |
+| packages/cli          | 0       | 6      | +6         |
+| **Total**             | **109** | **25** | **-84**    |
 
 ---
 
@@ -35,6 +37,7 @@ The refactoring shifted from unit-heavy testing in `packages/core` to E2E-heavy 
 These tests were for the Tasks feature that was intentionally removed:
 
 **Core package:**
+
 - `tasks/agent-spawning-personas.test.ts`
 - `tasks/agent-spawning-update.test.ts`
 - `tasks/agent-spawning.test.ts`
@@ -42,6 +45,7 @@ These tests were for the Tasks feature that was intentionally removed:
 - `tasks/task-assignment-model-resolution.integration.test.ts`
 
 **Web package:**
+
 - `app/routes/__tests__/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes.test.ts`
 - `app/routes/__tests__/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.test.ts`
 - `app/routes/__tests__/api.projects.$projectId.sessions.$sessionId.tasks.test.ts`
@@ -62,35 +66,39 @@ These tests were for the Tasks feature that was intentionally removed:
 These tests were for components replaced by the new architecture:
 
 #### Thread Management → `packages/agent/src/storage/`
-| Deleted | Replacement |
-|---------|-------------|
-| `threads/thread-manager.test.ts` | `event-log.test.ts`, `session-store.test.ts` |
-| `threads/thread-manager-stateless*.test.ts` | E2E tests in `packages/agent` |
-| `threads/approval-events.test.ts` | `supervisor-http.permission-race.e2e.test.ts` |
-| `threads/approval-queries.test.ts` | New approval flow via ent-protocol |
-| `threads/conversation-builder.test.ts` | Event-sourced approach |
+
+| Deleted                                     | Replacement                                   |
+| ------------------------------------------- | --------------------------------------------- |
+| `threads/thread-manager.test.ts`            | `event-log.test.ts`, `session-store.test.ts`  |
+| `threads/thread-manager-stateless*.test.ts` | E2E tests in `packages/agent`                 |
+| `threads/approval-events.test.ts`           | `supervisor-http.permission-race.e2e.test.ts` |
+| `threads/approval-queries.test.ts`          | New approval flow via ent-protocol            |
+| `threads/conversation-builder.test.ts`      | Event-sourced approach                        |
 
 #### Session System → File-based session store
-| Deleted | Replacement |
-|---------|-------------|
-| `sessions/session.test.ts` | `session-store.test.ts` |
-| `sessions/session-config*.test.ts` | File-based config in `state.json` |
-| `sessions/session-permission*.test.ts` | Supervisor E2E tests |
-| `sessions/session-workspace.test.ts` | Still in core |
+
+| Deleted                                | Replacement                       |
+| -------------------------------------- | --------------------------------- |
+| `sessions/session.test.ts`             | `session-store.test.ts`           |
+| `sessions/session-config*.test.ts`     | File-based config in `state.json` |
+| `sessions/session-permission*.test.ts` | Supervisor E2E tests              |
+| `sessions/session-workspace.test.ts`   | Still in core                     |
 
 #### Persistence Layer → JSONL event log
-| Deleted | Status |
-|---------|--------|
-| `persistence/database*.test.ts` | Replaced by `event-log.test.ts` |
-| `persistence/sql-profiler.test.ts` | N/A - no SQLite |
-| `persistence/get-pending-approvals*.test.ts` | Covered by supervisor tests |
+
+| Deleted                                      | Status                          |
+| -------------------------------------------- | ------------------------------- |
+| `persistence/database*.test.ts`              | Replaced by `event-log.test.ts` |
+| `persistence/sql-profiler.test.ts`           | N/A - no SQLite                 |
+| `persistence/get-pending-approvals*.test.ts` | Covered by supervisor tests     |
 
 #### Web Session Service → Supervisor
-| Deleted | Status |
-|---------|--------|
+
+| Deleted                                         | Status                |
+| ----------------------------------------------- | --------------------- |
 | `lib/server/session-service*.test.ts` (8 files) | Architecture replaced |
-| `lib/server/thread-manager*.test.ts` (2 files) | Architecture replaced |
-| `lib/server/agent-*.test.ts` (3 files) | Architecture replaced |
+| `lib/server/thread-manager*.test.ts` (2 files)  | Architecture replaced |
+| `lib/server/agent-*.test.ts` (3 files)          | Architecture replaced |
 
 **Status:** Expected deletion. New architecture provides coverage.
 
@@ -101,72 +109,80 @@ These tests were for components replaced by the new architecture:
 These tests covered important agent behaviors:
 
 #### Abort Handling ⚠️ HIGH PRIORITY GAP
-| Deleted | New Coverage |
-|---------|--------------|
-| `agents/agent-abort.test.ts` | Partial - E2E only |
-| `agents/agent-abort-reliability.test.ts` | **NONE** |
-| `agents/agent-tool-abort.test.ts` | Partial - cancellation tested |
 
-**Gap:** No reliability tests for abort under concurrent/network failure scenarios.
+| Deleted                                  | New Coverage                  |
+| ---------------------------------------- | ----------------------------- |
+| `agents/agent-abort.test.ts`             | Partial - E2E only            |
+| `agents/agent-abort-reliability.test.ts` | **NONE**                      |
+| `agents/agent-tool-abort.test.ts`        | Partial - cancellation tested |
+
+**Gap:** No reliability tests for abort under concurrent/network failure
+scenarios.
 
 #### Tool Approval/Permissions ✅ COVERED
-| Deleted | New Coverage |
-|---------|--------------|
-| `agents/agent-tool-permissions.test.ts` | `agent-process.e2e.test.ts` |
-| `agents/agent-approval-orchestration.test.ts` | `supervisor-http.permission-race.e2e.test.ts` |
+
+| Deleted                                        | New Coverage                                  |
+| ---------------------------------------------- | --------------------------------------------- |
+| `agents/agent-tool-permissions.test.ts`        | `agent-process.e2e.test.ts`                   |
+| `agents/agent-approval-orchestration.test.ts`  | `supervisor-http.permission-race.e2e.test.ts` |
 | `agents/tool-approval-race-conditions.test.ts` | `supervisor-http.permission-race.e2e.test.ts` |
-| `tools/tool-executor-policy.test.ts` | Partial |
+| `tools/tool-executor-policy.test.ts`           | Partial                                       |
 
 **Status:** Well covered by E2E tests.
 
 #### Compaction ⚠️ MEDIUM PRIORITY GAP
-| Deleted | New Coverage |
-|---------|--------------|
-| `agents/agent-auto-compact.test.ts` | **NONE** |
-| `agents/agent-compaction-events.test.ts` | Partial |
-| `threads/compaction-integration.test.ts` | `agent-process.e2e.test.ts` (truncate/summarize) |
-| `threads/compaction-visibility.test.ts` | **NONE** |
-| `threads/compaction/enhanced-summarize.test.ts` | Core still has strategy tests |
+
+| Deleted                                         | New Coverage                                     |
+| ----------------------------------------------- | ------------------------------------------------ |
+| `agents/agent-auto-compact.test.ts`             | **NONE**                                         |
+| `agents/agent-compaction-events.test.ts`        | Partial                                          |
+| `threads/compaction-integration.test.ts`        | `agent-process.e2e.test.ts` (truncate/summarize) |
+| `threads/compaction-visibility.test.ts`         | **NONE**                                         |
+| `threads/compaction/enhanced-summarize.test.ts` | Core still has strategy tests                    |
 
 **Gap:** No auto-compact trigger tests. No stress tests.
 
 #### Retry Logic ⚠️ HIGH PRIORITY GAP
-| Deleted | New Coverage |
-|---------|--------------|
-| `agents/agent-retry.test.ts` | **NONE** |
-| `retry-integration.test.ts` | **NONE** |
+
+| Deleted                      | New Coverage |
+| ---------------------------- | ------------ |
+| `agents/agent-retry.test.ts` | **NONE**     |
+| `retry-integration.test.ts`  | **NONE**     |
 
 **Gap:** Retry logic is completely untested in new suite.
 
 #### Token Management ⚠️ HIGH PRIORITY GAP
-| Deleted | New Coverage |
-|---------|--------------|
-| `agents/agent-token.test.ts` | **NONE** |
-| `token-management/context-analyzer.test.ts` | **NONE** |
+
+| Deleted                                     | New Coverage |
+| ------------------------------------------- | ------------ |
+| `agents/agent-token.test.ts`                | **NONE**     |
+| `token-management/context-analyzer.test.ts` | **NONE**     |
 
 **Gap:** No token budget enforcement tests.
 
 #### Turn/Queue Processing ⚠️ MEDIUM PRIORITY
-| Deleted | New Coverage |
-|---------|--------------|
-| `agents/agent-queue-*.test.ts` (6 files) | Different architecture |
-| `agents/agent-turn-tracking.test.ts` | E2E only |
-| `agents/turn-tracking-integration.test.ts` | E2E only |
 
-**Status:** New architecture uses different message flow. E2E tests provide some coverage.
+| Deleted                                    | New Coverage           |
+| ------------------------------------------ | ---------------------- |
+| `agents/agent-queue-*.test.ts` (6 files)   | Different architecture |
+| `agents/agent-turn-tracking.test.ts`       | E2E only               |
+| `agents/turn-tracking-integration.test.ts` | E2E only               |
+
+**Status:** New architecture uses different message flow. E2E tests provide some
+coverage.
 
 ---
 
 ### 4. Concerning Deletions: Integration Tests (6 files)
 
-| Deleted | Priority | Status |
-|---------|----------|--------|
-| `agents/agent.test.ts` | HIGH | Partially covered by `agent-process.e2e.test.ts` |
-| `app/full-flow.test.ts` | HIGH | **NOT REPLACED** |
-| `app/api/compaction-sse.test.ts` | MEDIUM | **NOT REPLACED** |
-| `hooks/useSSEStream.e2e.test.ts` | MEDIUM | **NOT REPLACED** |
-| `lib/event-stream-manager-agent-errors.test.ts` | MEDIUM | **NOT REPLACED** |
-| `mcp/real-server.integration.test.ts` | LOW | MCP tests still in core |
+| Deleted                                         | Priority | Status                                           |
+| ----------------------------------------------- | -------- | ------------------------------------------------ |
+| `agents/agent.test.ts`                          | HIGH     | Partially covered by `agent-process.e2e.test.ts` |
+| `app/full-flow.test.ts`                         | HIGH     | **NOT REPLACED**                                 |
+| `app/api/compaction-sse.test.ts`                | MEDIUM   | **NOT REPLACED**                                 |
+| `hooks/useSSEStream.e2e.test.ts`                | MEDIUM   | **NOT REPLACED**                                 |
+| `lib/event-stream-manager-agent-errors.test.ts` | MEDIUM   | **NOT REPLACED**                                 |
+| `mcp/real-server.integration.test.ts`           | LOW      | MCP tests still in core                          |
 
 **Gap:** Web package has no full-flow integration test for new architecture.
 
@@ -176,47 +192,47 @@ These tests covered important agent behaviors:
 
 ### What's Well Covered
 
-| Area | Test Files | Coverage Quality |
-|------|------------|------------------|
-| Event durability | `event-log.test.ts`, `durable-events.test.ts` | Excellent |
-| Session storage | `session-store.test.ts` | Good |
-| Permission lifecycle | `agent-process.e2e.test.ts` (4+ scenarios) | Excellent |
-| Permission race conditions | `supervisor-http.permission-race.e2e.test.ts` | Excellent |
-| Permission persistence | `agent-process.e2e.test.ts` (restart test) | Excellent |
-| Subagent/delegation | `agent-process.delegate.e2e.test.ts`, `agent-process.subagent.e2e.test.ts` | Excellent |
-| Job management | `agent-process.jobs.e2e.test.ts` | Good |
-| Provider configuration | `providers-connections.test.ts`, `agent-process.providers.e2e.test.ts` | Good |
-| Session modes | `session-set-mode.e2e.test.ts` | Good |
-| Checkpoints/rewind | `agent-process.e2e.test.ts` | Good |
-| Protocol transport | `stdio.test.ts`, `peer.test.ts` | Good |
-| CLI integration | `e2e.lace-agent.test.ts`, `e2e.configure.test.ts` | Good |
+| Area                       | Test Files                                                                 | Coverage Quality |
+| -------------------------- | -------------------------------------------------------------------------- | ---------------- |
+| Event durability           | `event-log.test.ts`, `durable-events.test.ts`                              | Excellent        |
+| Session storage            | `session-store.test.ts`                                                    | Good             |
+| Permission lifecycle       | `agent-process.e2e.test.ts` (4+ scenarios)                                 | Excellent        |
+| Permission race conditions | `supervisor-http.permission-race.e2e.test.ts`                              | Excellent        |
+| Permission persistence     | `agent-process.e2e.test.ts` (restart test)                                 | Excellent        |
+| Subagent/delegation        | `agent-process.delegate.e2e.test.ts`, `agent-process.subagent.e2e.test.ts` | Excellent        |
+| Job management             | `agent-process.jobs.e2e.test.ts`                                           | Good             |
+| Provider configuration     | `providers-connections.test.ts`, `agent-process.providers.e2e.test.ts`     | Good             |
+| Session modes              | `session-set-mode.e2e.test.ts`                                             | Good             |
+| Checkpoints/rewind         | `agent-process.e2e.test.ts`                                                | Good             |
+| Protocol transport         | `stdio.test.ts`, `peer.test.ts`                                            | Good             |
+| CLI integration            | `e2e.lace-agent.test.ts`, `e2e.configure.test.ts`                          | Good             |
 
 ### What's Missing
 
-| Area | Priority | Recommendation |
-|------|----------|----------------|
-| Retry logic | **HIGH** | Add `agent-process.retry.e2e.test.ts` |
-| Token management | **HIGH** | Add token budget enforcement tests |
-| Abort reliability | **MEDIUM** | Add abort under failure scenarios |
-| Auto-compaction | **MEDIUM** | Add trigger threshold tests |
-| Web full-flow | **MEDIUM** | Add web integration test for supervisor architecture |
-| SSE streaming | **LOW** | Add event stream E2E |
+| Area              | Priority   | Recommendation                                       |
+| ----------------- | ---------- | ---------------------------------------------------- |
+| Retry logic       | **HIGH**   | Add `agent-process.retry.e2e.test.ts`                |
+| Token management  | **HIGH**   | Add token budget enforcement tests                   |
+| Abort reliability | **MEDIUM** | Add abort under failure scenarios                    |
+| Auto-compaction   | **MEDIUM** | Add trigger threshold tests                          |
+| Web full-flow     | **MEDIUM** | Add web integration test for supervisor architecture |
+| SSE streaming     | **LOW**    | Add event stream E2E                                 |
 
 ---
 
 ## Coverage Gap Summary
 
-| Behavior | Old Tests | New Tests | Gap Severity |
-|----------|-----------|-----------|--------------|
-| Event durability | 5 files | 3 files | ✅ None |
-| Permission system | 8 files | 3 files | ✅ Low |
-| Subagent/delegation | 2 files | 3 files | ✅ None |
-| Compaction | 5 files | 1 file (E2E) | ⚠️ Medium |
-| Abort handling | 3 files | 0.5 files (partial) | ⚠️ Medium |
-| Turn tracking | 4 files | E2E only | ⚠️ Medium |
-| **Retry logic** | 2 files | 0 files | 🔴 **HIGH** |
-| **Token management** | 2 files | 0 files | 🔴 **HIGH** |
-| Web full-flow | 1 file | 0 files | ⚠️ Medium |
+| Behavior             | Old Tests | New Tests           | Gap Severity |
+| -------------------- | --------- | ------------------- | ------------ |
+| Event durability     | 5 files   | 3 files             | ✅ None      |
+| Permission system    | 8 files   | 3 files             | ✅ Low       |
+| Subagent/delegation  | 2 files   | 3 files             | ✅ None      |
+| Compaction           | 5 files   | 1 file (E2E)        | ⚠️ Medium    |
+| Abort handling       | 3 files   | 0.5 files (partial) | ⚠️ Medium    |
+| Turn tracking        | 4 files   | E2E only            | ⚠️ Medium    |
+| **Retry logic**      | 2 files   | 0 files             | 🔴 **HIGH**  |
+| **Token management** | 2 files   | 0 files             | 🔴 **HIGH**  |
+| Web full-flow        | 1 file    | 0 files             | ⚠️ Medium    |
 
 ---
 
@@ -260,11 +276,13 @@ These tests covered important agent behaviors:
 ### Testing Philosophy Shift
 
 **Old approach:** Unit-heavy testing in `packages/core`
+
 - Many small, isolated tests
 - Fast execution
 - Good for regression detection
 
 **New approach:** E2E-heavy testing in `packages/agent`
+
 - Fewer, comprehensive integration tests
 - Slower execution
 - Good for system-level confidence
@@ -272,11 +290,13 @@ These tests covered important agent behaviors:
 ### Trade-offs
 
 **Pros of new approach:**
+
 - Tests real system behavior end-to-end
 - Less test maintenance as internals change
 - Higher confidence in integration points
 
 **Cons of new approach:**
+
 - Slower test execution
 - Harder to isolate failures
 - Less granular regression detection
@@ -285,12 +305,14 @@ These tests covered important agent behaviors:
 ### Recommendation
 
 Consider adding a middle layer of unit tests for critical business logic:
+
 - Retry policy logic
 - Token budget calculations
 - Compaction strategy selection
 - Permission policy evaluation
 
-These would catch regressions faster than E2E tests while being more stable than the old architecture-coupled tests.
+These would catch regressions faster than E2E tests while being more stable than
+the old architecture-coupled tests.
 
 ---
 

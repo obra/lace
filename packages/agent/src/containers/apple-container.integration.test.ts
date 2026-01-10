@@ -15,7 +15,7 @@ describe.skipIf(process.platform !== 'darwin')('AppleContainerRuntime Integratio
   let testDir: string;
   let concurrentTestDir: string;
   let containerId: string;
-  let createdContainers: string[] = [];
+  const createdContainers: string[] = [];
 
   beforeAll(async () => {
     runtime = new AppleContainerRuntime();

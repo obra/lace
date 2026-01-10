@@ -1,16 +1,15 @@
 # ACP RFD: Forking of Existing Sessions
 
-> Source: https://agentclientprotocol.com/rfds/session-fork
-> Fetched: 2026-01-05
+> Source: https://agentclientprotocol.com/rfds/session-fork Fetched: 2026-01-05
 > Status: Draft
 
 ## Motivation
 
 When you want to summarize the current conversation to use it in a future chat,
 sending a message asking for the summary would become part of its context,
-affecting future user interactions. Session forking enables creating a branch
-of the conversation, issuing additional messages, and then closing the fork
-without polluting the original session's history.
+affecting future user interactions. Session forking enables creating a branch of
+the conversation, issuing additional messages, and then closing the fork without
+polluting the original session's history.
 
 This enables functionality that requires using the current chat without
 polluting its history, ranging from summaries to potentially subagents.
@@ -77,8 +76,8 @@ forking with a different working directory than the initial session.
 
 ### Why Not Extend `session/new`?
 
-The decision was that `session/fork` and `session/new` must be different
-methods because they require different options:
+The decision was that `session/fork` and `session/new` must be different methods
+because they require different options:
 
 1. `session/new` has options such as capabilities and MCP which are not
    recommended when forking, as the context being forked was built with other

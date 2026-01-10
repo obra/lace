@@ -43,6 +43,7 @@ dead code:
 
 1. **Add ThreadManager to context** - ✅ extend existing pattern
 2. **DelegationBox fetches its own data** - ✅:
+
    ```tsx
    function DelegationBox({ delegateThreadId }) {
      const threadManager = useThreadManager();

@@ -1,12 +1,13 @@
 # Simplify Compaction Architecture
 
-**Date:** 2025-10-01
-**Status:** Planned
-**Branch:** `simplify-compaction`
+**Date:** 2025-10-01 **Status:** Planned **Branch:** `simplify-compaction`
 
 ## Overview
 
-Simplify the compaction architecture by storing compacted events as first-class database rows with `visibleToModel` flags, rather than nesting them inside COMPACTION events. This eliminates complexity, makes the data model clearer, and makes `visibleToModel` the single source of truth.
+Simplify the compaction architecture by storing compacted events as first-class
+database rows with `visibleToModel` flags, rather than nesting them inside
+COMPACTION events. This eliminates complexity, makes the data model clearer, and
+makes `visibleToModel` the single source of truth.
 
 ## Current Architecture (Complex)
 
@@ -24,6 +25,7 @@ Sent to model: [summary, e4, e5]
 ```
 
 **Problems:**
+
 - Compacted events are "virtual" - nested in COMPACTION event data
 - Need special hydration logic for timestamps
 - Complex merge logic in buildWorkingConversation (~60 lines)
@@ -43,6 +45,7 @@ UI shows all: [e1(grey), e2(grey), e3(grey), summary, COMPACTION(grey), e4, e5]
 ```
 
 **Benefits:**
+
 - All events are first-class database rows
 - `visibleToModel` is single source of truth
 - `buildWorkingConversation()` reduced from ~60 lines to ~3 lines
@@ -56,6 +59,7 @@ UI shows all: [e1(grey), e2(grey), e3(grey), summary, COMPACTION(grey), e4, e5]
 ### Task 1: Update CompactionData Type
 
 **Files:**
+
 - `packages/core/src/threads/compaction/types.ts`
 
 **Changes:**
@@ -65,7 +69,7 @@ UI shows all: [e1(grey), e2(grey), e3(grey), summary, COMPACTION(grey), e4, e5]
 export interface CompactionData {
   strategyId: string;
   originalEventCount: number;
-  compactedEvents: LaceEvent[];  // ← Remove this
+  compactedEvents: LaceEvent[]; // ← Remove this
   metadata?: Record<string, unknown>;
 }
 
@@ -73,14 +77,14 @@ export interface CompactionData {
 export interface CompactionData {
   strategyId: string;
   originalEventCount: number;
-  compactedEventCount: number;  // Just a count
-  metadata?: Record<string, unknown>;  // Can include summary text for UI
+  compactedEventCount: number; // Just a count
+  metadata?: Record<string, unknown>; // Can include summary text for UI
 }
 
 // ADD
 export interface CompactionResult {
-  compactionEvent: LaceEvent;  // COMPACTION event (metadata only)
-  compactedEvents: LaceEvent[];  // Events to persist as separate rows
+  compactionEvent: LaceEvent; // COMPACTION event (metadata only)
+  compactedEvents: LaceEvent[]; // Events to persist as separate rows
 }
 ```
 
@@ -89,13 +93,18 @@ Update CompactionStrategy interface:
 ```typescript
 export interface CompactionStrategy {
   id: string;
-  compact(events: LaceEvent[], context: CompactionContext): Promise<CompactionResult>;  // Changed return type
+  compact(
+    events: LaceEvent[],
+    context: CompactionContext
+  ): Promise<CompactionResult>; // Changed return type
 }
 ```
 
-**Test:** Update `packages/core/src/threads/compaction/types.test.ts` if exists, or add basic type validation test.
+**Test:** Update `packages/core/src/threads/compaction/types.test.ts` if exists,
+or add basic type validation test.
 
 **Commit:**
+
 ```
 refactor(compaction): change CompactionData to remove nested events
 
@@ -108,6 +117,7 @@ CompactionResult with separate compactionEvent and compactedEvents array.
 ### Task 2: Update Trim Strategy
 
 **Files:**
+
 - `packages/core/src/threads/compaction/trim-tool-results-strategy.ts`
 - `packages/core/src/threads/compaction/trim-tool-results-strategy.test.ts`
 
@@ -158,6 +168,7 @@ async compact(events: LaceEvent[], context: CompactionContext): Promise<Compacti
 **Tests:** Update assertions to expect CompactionResult instead of single event.
 
 **Commit:**
+
 ```
 refactor(compaction): update trim strategy to return CompactionResult
 
@@ -170,6 +181,7 @@ nesting events inside COMPACTION data.
 ### Task 3: Update Summarize Strategy
 
 **Files:**
+
 - `packages/core/src/threads/compaction/summarize-strategy.ts`
 - `packages/core/src/threads/compaction/summarize-strategy.test.ts`
 
@@ -213,6 +225,7 @@ async compact(events: LaceEvent[], context: CompactionContext): Promise<Compacti
 **Tests:** Update to expect CompactionResult.
 
 **Commit:**
+
 ```
 refactor(compaction): update summarize strategy to return CompactionResult
 
@@ -225,6 +238,7 @@ summary inside COMPACTION data.
 ### Task 4: Update ThreadManager.compact()
 
 **Files:**
+
 - `packages/core/src/threads/thread-manager.ts`
 
 **Changes:**
@@ -319,9 +333,11 @@ async compact(
 }
 ```
 
-**Test:** Update compaction tests to verify compacted events are persisted as real rows.
+**Test:** Update compaction tests to verify compacted events are persisted as
+real rows.
 
 **Commit:**
+
 ```
 refactor(threads): persist compacted events as first-class database rows
 
@@ -335,6 +351,7 @@ visibleToModel the single source of truth.
 ### Task 5: Simplify buildWorkingConversation()
 
 **Files:**
+
 - `packages/core/src/threads/conversation-builder.ts`
 - `packages/core/src/threads/conversation-builder.test.ts`
 
@@ -345,7 +362,7 @@ Replace entire function with simple filter:
 ```typescript
 export function buildWorkingConversation(events: LaceEvent[]): LaceEvent[] {
   // Filter to only events visible to model
-  const visibleEvents = events.filter(e => e.visibleToModel !== false);
+  const visibleEvents = events.filter((e) => e.visibleToModel !== false);
 
   // Apply tool result deduplication
   return deduplicateToolResults(visibleEvents);
@@ -353,12 +370,14 @@ export function buildWorkingConversation(events: LaceEvent[]): LaceEvent[] {
 ```
 
 Remove helper functions (no longer needed):
+
 - `findLastCompactionEventWithIndex()`
 - `isCompactionData()` type guard
 
 **Tests:** Update to test simple filtering logic instead of complex merge logic.
 
 **Commit:**
+
 ```
 refactor(conversation): simplify buildWorkingConversation to filter by visibility
 
@@ -371,12 +390,15 @@ visibleToModel flag. Reduces function from ~60 lines to ~3 lines.
 ### Task 6: Remove Event Hydration
 
 **Files:**
+
 - Delete `packages/core/src/threads/event-hydration.ts`
 - `packages/core/src/threads/conversation-builder.ts` (remove import)
 
-**Justification:** Events are now real database rows with proper timestamps. No need for hydration logic that converts timestamp strings to Date objects.
+**Justification:** Events are now real database rows with proper timestamps. No
+need for hydration logic that converts timestamp strings to Date objects.
 
 **Commit:**
+
 ```
 refactor(threads): remove event hydration module
 
@@ -389,6 +411,7 @@ first-class database rows with proper Date timestamps.
 ### Task 7: Update Web CompactionEntry Component
 
 **Files:**
+
 - `packages/web/components/timeline/CompactionEntry.tsx`
 
 **Changes:**
@@ -430,6 +453,7 @@ export function CompactionEntry({ data, timestamp }: CompactionEntryProps) {
 ```
 
 **Commit:**
+
 ```
 refactor(web): update CompactionEntry to use compactedEventCount
 
@@ -477,9 +501,11 @@ sqlite3 ~/.lace/lace.db "SELECT id, type, visible_to_model FROM events ORDER BY 
 
 ## Breaking Changes
 
-**BREAKING:** Existing COMPACTION events will not work correctly after this change.
+**BREAKING:** Existing COMPACTION events will not work correctly after this
+change.
 
 **Old format:**
+
 ```json
 {
   "type": "COMPACTION",
@@ -492,13 +518,14 @@ sqlite3 ~/.lace/lace.db "SELECT id, type, visible_to_model FROM events ORDER BY 
 ```
 
 **New format:**
+
 ```json
 {
   "type": "COMPACTION",
   "data": {
     "strategyId": "summarize",
     "originalEventCount": 50,
-    "compactedEventCount": 1,  // Just a count
+    "compactedEventCount": 1, // Just a count
     "metadata": { "summary": "..." }
   }
 }
@@ -509,11 +536,13 @@ sqlite3 ~/.lace/lace.db "SELECT id, type, visible_to_model FROM events ORDER BY 
 ## Code Size Reduction
 
 **Files that get simpler:**
+
 - `conversation-builder.ts`: ~60 lines → ~10 lines
 - `thread-manager.ts`: Simpler compact() logic
 - Delete `event-hydration.ts`: ~50 lines removed
 
 **Files that get slightly more complex:**
+
 - Compaction strategies: Need to return CompactionResult (marginal)
 
 **Net effect:** ~100 lines of code removed, significantly reduced complexity.
@@ -530,17 +559,18 @@ sqlite3 ~/.lace/lace.db "SELECT id, type, visible_to_model FROM events ORDER BY 
 ## Follow-up Work
 
 After this refactor:
+
 - Implement event visibility UI (from event-visibility.md plan)
 - Remove Agent.getLaceEvents() (from remove-getLaceEvents.md plan)
 - Add manual pruning UI (future)
 
 ## Decision Log
 
-**Q: Why not migrate existing COMPACTION events?**
-A: We're pre-deploy and can break compatibility. Clean break is simpler than migration.
+**Q: Why not migrate existing COMPACTION events?** A: We're pre-deploy and can
+break compatibility. Clean break is simpler than migration.
 
-**Q: Should compacted events have explicit visibleToModel=true?**
-A: Yes! During second compaction, they'll be marked false, so explicit true prevents confusion.
+**Q: Should compacted events have explicit visibleToModel=true?** A: Yes! During
+second compaction, they'll be marked false, so explicit true prevents confusion.
 
-**Q: What if a strategy returns no events (complete summarization)?**
-A: Still valid - compactedEvents can be empty array, just COMPACTION event persisted.
+**Q: What if a strategy returns no events (complete summarization)?** A: Still
+valid - compactedEvents can be empty array, just COMPACTION event persisted.

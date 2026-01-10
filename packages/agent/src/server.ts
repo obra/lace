@@ -122,6 +122,7 @@ import {
 import { requestPermissionFromClient, reissuePendingPermissionRequests } from './rpc/permissions';
 import { registerInitializeHandler } from './rpc/handlers/initialize';
 import { registerAgentStatusHandlers } from './rpc/handlers/agent-status';
+import { registerProviderHandlers } from './rpc/handlers/providers';
 
 async function createProviderForTurn(options: {
   connectionId?: string;
@@ -1025,7 +1026,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   registerInitializeHandler(peer, state, createToolExecutorForMode);
   registerAgentStatusHandlers(peer, state, () => _reissuePendingPermissionRequests());
-
+  registerProviderHandlers(peer, state);
 
   const ensureProviderCatalogLoaded = async () => {
     if (state.providerCatalogLoaded) return;
@@ -1195,55 +1196,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     return parsedResult;
   };
-
-  peer.onRequest('ent/providers/list', async (_params: unknown) => {
-    assertInitialized(state);
-
-    await ensureProviderCatalogLoaded();
-
-    const providers = state.providerCatalog
-      .getAvailableProviders()
-      .filter((p) => SUPPORTED_PROVIDER_TYPES.has(p.type.toLowerCase()))
-      .map((p) => ({
-        providerId: p.id,
-        displayName: p.name,
-        supportsConnections: true,
-        supportsCatalogRefresh: true,
-      }));
-
-    return { providers };
-  });
-
-  peer.onRequest('ent/providers/catalog', async (_params: unknown) => {
-    assertInitialized(state);
-
-    const registry = ProviderRegistry.getInstance();
-    const providers = await registry.getCatalogProviders();
-    return { providers };
-  });
-
-  peer.onRequest('ent/providers/refresh', async (params: unknown) => {
-    assertInitialized(state);
-
-    const parsed = params as { providerId?: string } | undefined;
-    const providerId = parsed?.providerId;
-
-    await state.providerCatalog.loadCatalogs();
-    state.providerCatalogLoaded = true;
-
-    if (providerId) {
-      const provider = state.providerCatalog.getProvider(providerId);
-      if (!provider) {
-        return {
-          ok: false,
-          refreshedAt: new Date().toISOString(),
-          error: `Unknown providerId: ${providerId}`,
-        };
-      }
-    }
-
-    return { ok: true, refreshedAt: new Date().toISOString() };
-  });
 
   peer.onRequest('ent/connections/list', async (params: unknown) => {
     assertInitialized(state);

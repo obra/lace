@@ -2,13 +2,14 @@
 
 ## Scope
 
-- **41 references** to CombinedTokenUsage  
+- **41 references** to CombinedTokenUsage
 - **13 files** importing or using the type
 - **3 files** actually accessing `.thread.` fields
 
 ## Files Affected
 
 ### Core Package (10 files)
+
 1. `token-management/types.ts` - Type definitions
 2. `agents/agent.ts` - Creates CombinedTokenUsage in AGENT_MESSAGE events
 3. `threads/token-aggregation.ts` - Extracts from events
@@ -21,6 +22,7 @@
 10. `tools/types.ts` - Type imports
 
 ### Web Package (3 files)
+
 1. `hooks/useAgentTokenUsage.ts` - **Reads thread field for footer**
 2. `lib/server/session-service.ts` - Type imports
 3. `types/core.ts` - Re-exports types
@@ -28,22 +30,25 @@
 ## Key Usage Patterns
 
 ### Pattern 1: Creating TokenUsage (agent.ts:940-988)
+
 ```typescript
 const agentMessageTokenUsage: CombinedTokenUsage = {
   message: { promptTokens, completionTokens, totalTokens },
-  thread: threadTokenUsage  // Currently: cumulative sum
+  thread: threadTokenUsage, // Currently: cumulative sum
 };
 ```
 
 ### Pattern 2: Reading for UI (useAgentTokenUsage.ts:78-97)
+
 ```typescript
 const threadData = tokenUsageData?.thread;
 setTokenUsage({
-  totalTokens: threadData.totalTokens  // Displays in footer
+  totalTokens: threadData.totalTokens, // Displays in footer
 });
 ```
 
 ### Pattern 3: Accumulating for Billing (base-helper.ts:146-151)
+
 ```typescript
 totalUsage.thread.totalPromptTokens += response.usage.promptTokens;
 totalUsage.thread.totalTokens += response.usage.totalTokens;
@@ -53,6 +58,7 @@ totalUsage.thread.totalTokens += response.usage.totalTokens;
 ## Critical Insight
 
 `base-helper.ts` is the ONLY place that actually needs cumulative totals!
+
 - It's tracking cost/billing for helper API calls
 - UI should NEVER see this - it wants current context
 
@@ -60,13 +66,13 @@ totalUsage.thread.totalTokens += response.usage.totalTokens;
 
 ```typescript
 interface TurnTokenUsage {
-  inputTokens: number;    // THIS turn's input
-  outputTokens: number;   // THIS turn's output  
+  inputTokens: number; // THIS turn's input
+  outputTokens: number; // THIS turn's output
   totalTokens: number;
 }
 
 interface ContextWindowUsage {
-  currentTokens: number;  // Would be sent if user types now
+  currentTokens: number; // Would be sent if user types now
   limit: number;
   percentUsed: number;
   nearLimit: boolean;
@@ -80,9 +86,9 @@ interface BillingMetrics {
 }
 
 interface TokenUsageMetrics {
-  turn: TurnTokenUsage;          // This API call
-  context: ContextWindowUsage;   // Current window (UI)
-  billing?: BillingMetrics;      // Optional cumulative (helpers only)
+  turn: TurnTokenUsage; // This API call
+  context: ContextWindowUsage; // Current window (UI)
+  billing?: BillingMetrics; // Optional cumulative (helpers only)
 }
 ```
 

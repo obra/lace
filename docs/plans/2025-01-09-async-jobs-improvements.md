@@ -1,10 +1,15 @@
 # Async Jobs API & Runtime Improvements
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
+> implement this plan task-by-task.
 
-**Goal:** Improve the async jobs feature with cleaner API naming and robust runtime behavior based on opus review recommendations.
+**Goal:** Improve the async jobs feature with cleaner API naming and robust
+runtime behavior based on opus review recommendations.
 
-**Architecture:** Refactor parameter names for consistency (`run_async` → `background`, `shell`/`subagent` → `bash`/`delegate`), add missing schema parameters, return structured JSON instead of prose, and harden runtime with process cleanup on session switch, timeouts, and resource limits.
+**Architecture:** Refactor parameter names for consistency (`run_async` →
+`background`, `shell`/`subagent` → `bash`/`delegate`), add missing schema
+parameters, return structured JSON instead of prose, and harden runtime with
+process cleanup on session switch, timeouts, and resource limits.
 
 **Tech Stack:** TypeScript, Zod schemas, Node.js child_process
 
@@ -15,6 +20,7 @@
 ### Task 1: Rename `run_async` to `background`
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/implementations/bash.ts:9-13`
 - Modify: `packages/agent/src/tools/implementations/delegate.ts:9-16`
 - Modify: `packages/agent/src/server.ts` (multiple locations using `run_async`)
@@ -23,6 +29,7 @@
 **Step 1: Update bash schema**
 
 In `packages/agent/src/tools/implementations/bash.ts`, change:
+
 ```typescript
 const bashSchema = z.object({
   command: NonEmptyString,
@@ -31,6 +38,7 @@ const bashSchema = z.object({
 ```
 
 And update the description to reference `background` instead of `run_async`:
+
 ```typescript
 description = `Execute shell commands in isolated bash processes.
 
@@ -46,6 +54,7 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
 **Step 2: Update delegate schema**
 
 In `packages/agent/src/tools/implementations/delegate.ts`, change:
+
 ```typescript
 const delegateSchema = z
   .object({
@@ -58,6 +67,7 @@ const delegateSchema = z
 ```
 
 And update the description:
+
 ```typescript
 description = `Spawn a subagent to handle a task autonomously.
 
@@ -74,12 +84,15 @@ Default (sync): Blocks until subagent completes and returns full output.`;
 **Step 3: Update server.ts runtime checks**
 
 Search for `run_async` in server.ts and replace with `background`:
+
 - Line ~4368: `(finalInput as Record<string, unknown>).background === true`
-- Line ~4395: `const runAsync = (finalInput as Record<string, unknown>).background === true`
+- Line ~4395:
+  `const runAsync = (finalInput as Record<string, unknown>).background === true`
 
 **Step 4: Run tests to verify**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 Expected: All 5 tests pass (tests use ENT protocol directly, not tool schemas)
 
 **Step 5: Commit**
@@ -100,6 +113,7 @@ EOF
 ### Task 2: Standardize job type names (`shell`/`subagent` → `bash`/`delegate`)
 
 **Files:**
+
 - Modify: `packages/ent-protocol/src/schemas/methods.ts:1246,1247,1747,1888`
 - Modify: `packages/agent/src/server.ts` (JobType, multiple locations)
 - Modify: `packages/agent/src/tools/implementations/jobs_list.ts:10`
@@ -108,6 +122,7 @@ EOF
 **Step 1: Update ENT protocol schema**
 
 In `packages/ent-protocol/src/schemas/methods.ts`, change all occurrences:
+
 - Line 1246: `type: z.enum(['bash', 'delegate'])`
 - Line 1747: `jobType: z.enum(['bash', 'delegate'])`
 - Line 1888: `jobType: z.enum(['bash', 'delegate']).optional()`
@@ -115,11 +130,13 @@ In `packages/ent-protocol/src/schemas/methods.ts`, change all occurrences:
 **Step 2: Update server.ts JobType**
 
 At line ~185, change:
+
 ```typescript
 type JobType = 'bash' | 'delegate';
 ```
 
 Then search and replace throughout server.ts:
+
 - `type: 'shell'` → `type: 'bash'`
 - `type: 'subagent'` → `type: 'delegate'`
 - `jobType: 'shell'` → `jobType: 'bash'`
@@ -130,23 +147,28 @@ Then search and replace throughout server.ts:
 **Step 3: Update jobs_list tool schema**
 
 In `packages/agent/src/tools/implementations/jobs_list.ts`, change line 10:
+
 ```typescript
 type: z.array(z.enum(['bash', 'delegate'])).optional(),
 ```
 
 **Step 4: Run tests**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 Expected: Tests fail - need to update test assertions
 
 **Step 5: Update tests for new type names**
 
-In `packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`, change:
+In `packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`,
+change:
+
 - Line 46: `p.jobType === 'bash'` (was `'shell'`)
 
 **Step 6: Run tests again**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 Expected: All 5 tests pass
 
 **Step 7: Commit**
@@ -167,6 +189,7 @@ EOF
 ### Task 3: Add `description` parameter to bash tool
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/implementations/bash.ts`
 - Modify: `packages/agent/src/server.ts` (startShellJob call)
 - Test: existing E2E tests
@@ -182,6 +205,7 @@ const bashSchema = z.object({
 ```
 
 Update description:
+
 ```typescript
 description = `Execute shell commands in isolated bash processes.
 
@@ -198,8 +222,11 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
 **Step 2: Pass description to startShellJob**
 
 In server.ts around line 4368, extract and pass description:
+
 ```typescript
-const description = toNonEmptyString((finalInput as Record<string, unknown>).description);
+const description = toNonEmptyString(
+  (finalInput as Record<string, unknown>).description
+);
 
 const { jobId } = await startShellJob({
   command,
@@ -210,7 +237,8 @@ const { jobId } = await startShellJob({
 
 **Step 3: Run tests**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 Expected: All 5 tests pass
 
 **Step 4: Commit**
@@ -231,12 +259,14 @@ EOF
 ### Task 4: Return structured JSON from async job launch
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts:4383-4391,4435-4443`
 - Test: existing E2E tests (may need minor updates)
 
 **Step 1: Update bash async return**
 
 Around line 4383-4391, change:
+
 ```typescript
 coreResult = {
   status: 'completed',
@@ -252,6 +282,7 @@ coreResult = {
 **Step 2: Update delegate async return**
 
 Around line 4435-4443, change:
+
 ```typescript
 coreResult = {
   status: 'completed',
@@ -266,7 +297,8 @@ coreResult = {
 
 **Step 3: Run tests**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 Expected: All 5 tests pass (tests use ENT protocol, not tool output parsing)
 
 **Step 4: Commit**
@@ -287,6 +319,7 @@ EOF
 ### Task 5: Rename `cursor` to `byteOffset` in job_output
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/implementations/job_output.ts:13`
 - Modify: `packages/agent/src/server.ts` (job_output runtime handling)
 - Test: existing tests
@@ -294,6 +327,7 @@ EOF
 **Step 1: Update job_output schema**
 
 In `packages/agent/src/tools/implementations/job_output.ts`, change line 13:
+
 ```typescript
 const jobOutputSchema = z.object({
   jobId: NonEmptyString,
@@ -304,6 +338,7 @@ const jobOutputSchema = z.object({
 ```
 
 Update description:
+
 ```typescript
 description = `Get status and output from a background job (started with background=true).
 
@@ -317,6 +352,7 @@ Returns: { status: "running"|"completed"|"failed"|"cancelled", output: string, e
 **Step 2: Update server.ts runtime handling**
 
 Around line 4509-4512, change `cursor` references to `byteOffset`:
+
 ```typescript
 const byteOffset =
   typeof (finalInput as Record<string, unknown>).byteOffset === 'number'
@@ -326,7 +362,8 @@ const byteOffset =
 
 **Step 3: Run tests**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 Expected: All 5 tests pass
 
 **Step 4: Commit**
@@ -349,12 +386,14 @@ EOF
 ### Task 6: Kill running jobs on session switch
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts:3245-3250`
 - Test: new test case
 
 **Step 1: Write failing test**
 
 Add to `packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`:
+
 ```typescript
 it('session switch kills running jobs', { timeout: 30_000 }, async () => {
   agent = spawnAgentProcess({ laceDir });
@@ -440,12 +479,14 @@ it('session switch kills running jobs', { timeout: 30_000 }, async () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts -t "session switch"`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts -t "session switch"`
 Expected: FAIL - job remains running
 
 **Step 3: Implement job cleanup on session switch**
 
 In server.ts around line 3245-3250, add job cleanup before clearing:
+
 ```typescript
 if (switchingSessions) {
   state.pendingPermissionRequests.clear();
@@ -456,7 +497,10 @@ if (switchingSessions) {
       job.status = 'cancelled';
       if (job.proc) {
         try {
-          if (process.platform !== 'win32' && typeof job.proc.pid === 'number') {
+          if (
+            process.platform !== 'win32' &&
+            typeof job.proc.pid === 'number'
+          ) {
             process.kill(-job.proc.pid, 'SIGTERM');
           } else {
             job.proc.kill('SIGTERM');
@@ -489,12 +533,14 @@ Note: The session/load handler will need to be made async or use a helper.
 
 **Step 4: Run test to verify it passes**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts -t "session switch"`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts -t "session switch"`
 Expected: PASS
 
 **Step 5: Run all tests**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 Expected: All 6 tests pass
 
 **Step 6: Commit**
@@ -515,19 +561,25 @@ EOF
 ### Task 7: Add timeout on subagent exit wait
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts:1825-1828`
 - Test: new test case (optional - hard to test)
 
 **Step 1: Implement timeout with SIGKILL escalation**
 
 In server.ts around line 1825-1828, change:
+
 ```typescript
 if (childProc.exitCode === null) {
   childProc.kill('SIGTERM');
 
   // Wait up to 2 seconds for graceful exit
-  const exitPromise = new Promise<void>((resolve) => childProc.once('exit', () => resolve()));
-  const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 2_000));
+  const exitPromise = new Promise<void>((resolve) =>
+    childProc.once('exit', () => resolve())
+  );
+  const timeoutPromise = new Promise<void>((resolve) =>
+    setTimeout(resolve, 2_000)
+  );
 
   await Promise.race([exitPromise, timeoutPromise]);
 
@@ -550,7 +602,8 @@ if (childProc.exitCode === null) {
 
 **Step 2: Run tests**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 Expected: All tests pass
 
 **Step 3: Commit**
@@ -571,12 +624,14 @@ EOF
 ### Task 8: Add resource limits (MAX_CONCURRENT_JOBS, MAX_JOB_OUTPUT_BYTES)
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts`
 - Test: new test cases
 
 **Step 1: Write failing test for concurrent job limit**
 
 Add to test file:
+
 ```typescript
 it('enforces concurrent job limit', { timeout: 30_000 }, async () => {
   agent = spawnAgentProcess({ laceDir });
@@ -603,7 +658,11 @@ it('enforces concurrent job limit', { timeout: 30_000 }, async () => {
     'initialize'
   );
 
-  await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+  await withTimeout(
+    agent.peer.request('session/new', { workDir }),
+    2_000,
+    'session/new'
+  );
 
   // Try to spawn more than MAX_CONCURRENT_JOBS (10)
   const results: Array<{ error?: { message: string } }> = [];
@@ -634,18 +693,21 @@ it('enforces concurrent job limit', { timeout: 30_000 }, async () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts -t "concurrent job limit"`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts -t "concurrent job limit"`
 Expected: FAIL - no limit enforced
 
 **Step 3: Add constants and enforce limits**
 
 At top of server.ts (after imports), add:
+
 ```typescript
 const MAX_CONCURRENT_JOBS = 10;
 const MAX_JOB_OUTPUT_BYTES = 10 * 1024 * 1024; // 10 MB
 ```
 
 In startShellJob and startSubagentJob functions, add check at beginning:
+
 ```typescript
 const runningJobCount = [...state.jobs.values()].filter(
   (j) => j.status === 'running'
@@ -662,6 +724,7 @@ if (runningJobCount >= MAX_CONCURRENT_JOBS) {
 Also add `ResourceLimitExceeded` to the error codes if not present.
 
 In appendOutput functions, add size check:
+
 ```typescript
 const appendOutput = async (chunk: string) => {
   if (!state.activeSession) return;
@@ -684,12 +747,14 @@ const appendOutput = async (chunk: string) => {
 
 **Step 4: Run test to verify it passes**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts -t "concurrent job limit"`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts -t "concurrent job limit"`
 Expected: PASS
 
 **Step 5: Run all tests**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 Expected: All tests pass
 
 **Step 6: Commit**
@@ -713,11 +778,13 @@ EOF
 ### Task 9: Add logging to empty catch blocks
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts` (multiple locations)
 
 **Step 1: Find and add logging to empty catches**
 
-Search for `catch {}` and `catch {\n` patterns in server.ts and add appropriate logging. For each catch block, add minimal logging that explains what failed:
+Search for `catch {}` and `catch {\n` patterns in server.ts and add appropriate
+logging. For each catch block, add minimal logging that explains what failed:
 
 ```typescript
 // Example transforms:
@@ -734,6 +801,7 @@ Search for `catch {}` and `catch {\n` patterns in server.ts and add appropriate 
 ```
 
 Focus on these specific areas:
+
 - Line ~1358-1363: Permission request failures
 - Line ~1815-1817: Peer close failures
 - Line ~1820-1823: Transport close failures
@@ -743,7 +811,8 @@ Focus on these specific areas:
 
 **Step 2: Run tests**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 Expected: All tests pass
 
 **Step 3: Commit**
@@ -765,17 +834,21 @@ EOF
 ### Task 10: Fix `any` type cast in subagent update forwarding
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts:1538-1540`
 
 **Step 1: Add proper typing**
 
 Around line 1538, change:
+
 ```typescript
 childPeer.onRequest('session/update', async (params) => {
   const p = params as Record<string, unknown>;
 ```
 
-To use a more specific type or add runtime validation. Since session/update has many shapes, the `Record<string, unknown>` is appropriate but we can be more careful about how we access properties:
+To use a more specific type or add runtime validation. Since session/update has
+many shapes, the `Record<string, unknown>` is appropriate but we can be more
+careful about how we access properties:
 
 ```typescript
 childPeer.onRequest('session/update', async (params: unknown) => {
@@ -784,18 +857,21 @@ childPeer.onRequest('session/update', async (params: unknown) => {
   const type = typeof p.type === 'string' ? p.type : undefined;
 ```
 
-Also check line ~228-232 (extractTextFromContentBlocks) which has `(b as any).type`:
+Also check line ~228-232 (extractTextFromContentBlocks) which has
+`(b as any).type`:
+
 ```typescript
 function extractTextFromContentBlocks(content: unknown[]): string {
   if (!Array.isArray(content)) return '';
   return content
-    .filter((b): b is { type: 'text'; text: string } =>
-      b !== null &&
-      typeof b === 'object' &&
-      'type' in b &&
-      (b as { type: unknown }).type === 'text' &&
-      'text' in b &&
-      typeof (b as { text: unknown }).text === 'string'
+    .filter(
+      (b): b is { type: 'text'; text: string } =>
+        b !== null &&
+        typeof b === 'object' &&
+        'type' in b &&
+        (b as { type: unknown }).type === 'text' &&
+        'text' in b &&
+        typeof (b as { text: unknown }).text === 'string'
     )
     .map((b) => b.text)
     .join('\n');
@@ -804,12 +880,13 @@ function extractTextFromContentBlocks(content: unknown[]): string {
 
 **Step 2: Run linting**
 
-Run: `npm run lint -- packages/agent/src/server.ts`
-Expected: No `any` type errors
+Run: `npm run lint -- packages/agent/src/server.ts` Expected: No `any` type
+errors
 
 **Step 3: Run tests**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 Expected: All tests pass
 
 **Step 4: Commit**
@@ -830,23 +907,28 @@ EOF
 ### Task 11: Cache deriveJobsForActiveSession results (optional optimization)
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts:2051-2157`
 
 **Step 1: Add caching with invalidation**
 
 Add a cache variable in state:
+
 ```typescript
 type ServerState = {
   // ... existing fields
   jobListCache?: {
     sessionId: string;
     eventsModTime: number;
-    jobs: Array<{ /* job list type */ }>;
+    jobs: Array<{
+      /* job list type */
+    }>;
   };
 };
 ```
 
 Modify deriveJobsForActiveSession to use cache:
+
 ```typescript
 const deriveJobsForActiveSession = (): Array<{
   // ... return type
@@ -889,7 +971,8 @@ const deriveJobsForActiveSession = (): Array<{
 
 **Step 2: Run tests**
 
-Run: `npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+Run:
+`npm test -- --run packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 Expected: All tests pass
 
 **Step 3: Commit**
@@ -910,6 +993,7 @@ EOF
 ## Summary
 
 After completing all tasks:
+
 1. Run full test suite: `npm test -- --run`
 2. Run linting: `npm run lint`
 3. Use superpowers:finishing-a-development-branch skill to complete the work

@@ -2,17 +2,23 @@
 
 ## Executive Summary
 
-This design document outlines the implementation of container-based isolation for Lace sessions. Each session will run its code and tools in an isolated container with its own local git clone, providing complete separation between concurrent sessions while maintaining seamless integration with the existing Lace architecture.
+This design document outlines the implementation of container-based isolation
+for Lace sessions. Each session will run its code and tools in an isolated
+container with its own local git clone, providing complete separation between
+concurrent sessions while maintaining seamless integration with the existing
+Lace architecture.
 
 ## Implementation Status
 
 ### Phase 1 ✅ COMPLETED
+
 - Container runtime abstraction layer implemented
 - AppleContainerRuntime using macOS `container` CLI tool
 - Full test coverage (24 tests passing)
 - Path translation and volume mounting working
 
 ### Phase 2 🚧 PLANNED
+
 - Session integration with containers
 - Tool executor modifications
 - Git worktree management
@@ -20,7 +26,8 @@ This design document outlines the implementation of container-based isolation fo
 
 ## Goals
 
-- **Isolation**: Each session operates in its own container with a dedicated git clone
+- **Isolation**: Each session operates in its own container with a dedicated git
+  clone
 - **Transparency**: Tools and agents work without modification
 - **Efficiency**: Containers start on-demand using lightweight Apple Container
 - **Standards**: Use industry-standard devcontainer.json configuration
@@ -31,9 +38,11 @@ This design document outlines the implementation of container-based isolation fo
 
 ### Core Concepts
 
-1. **Session = Clone + Container**: Each session gets its own local git clone and container
+1. **Session = Clone + Container**: Each session gets its own local git clone
+   and container
 2. **Lazy Container Start**: Containers start when agents receive messages
-3. **Tool Interception**: ToolExecutor transparently redirects all operations to containers
+3. **Tool Interception**: ToolExecutor transparently redirects all operations to
+   containers
 4. **Session Ownership**: Session class manages container lifecycle
 
 ### Component Relationships
@@ -56,15 +65,24 @@ Project (has git repo)
 
 ### Key Discoveries
 
-1. **Container Tool vs sandbox-exec**: The macOS `container` CLI tool is the correct approach for Apple Containers, not the deprecated `sandbox-exec`.
+1. **Container Tool vs sandbox-exec**: The macOS `container` CLI tool is the
+   correct approach for Apple Containers, not the deprecated `sandbox-exec`.
 
-2. **Working Directory Paths**: Container working directories must use container-internal paths (e.g., `/workspace`), not host paths. This was a critical discovery during integration testing.
+2. **Working Directory Paths**: Container working directories must use
+   container-internal paths (e.g., `/workspace`), not host paths. This was a
+   critical discovery during integration testing.
 
-3. **Exit Code 143**: When stopping containers, exit code 143 is normal and indicates successful SIGTERM signal handling. This should not be treated as an error.
+3. **Exit Code 143**: When stopping containers, exit code 143 is normal and
+   indicates successful SIGTERM signal handling. This should not be treated as
+   an error.
 
-4. **Volume Mount Syntax**: The `container` tool doesn't support Docker-style mount options (`:ro/:rw`). Mounts are specified as `-v "source:target"` without suffixes.
+4. **Volume Mount Syntax**: The `container` tool doesn't support Docker-style
+   mount options (`:ro/:rw`). Mounts are specified as `-v "source:target"`
+   without suffixes.
 
-5. **Container ID Uniqueness**: Container names must be globally unique. We append 8-character UUID suffixes to prevent conflicts during testing and concurrent operations.
+5. **Container ID Uniqueness**: Container names must be globally unique. We
+   append 8-character UUID suffixes to prevent conflicts during testing and
+   concurrent operations.
 
 ### Implementation Architecture
 
@@ -92,23 +110,32 @@ class AppleContainerRuntime extends BaseContainerRuntime {
 
 ### Testing Insights
 
-1. **Integration Tests Required**: Unit tests with mocks weren't sufficient. Real container launch tests were essential to discover the working directory and mount issues.
+1. **Integration Tests Required**: Unit tests with mocks weren't sufficient.
+   Real container launch tests were essential to discover the working directory
+   and mount issues.
 
-2. **Cleanup Complexity**: Container cleanup requires careful timeout handling and force-kill fallback strategies.
+2. **Cleanup Complexity**: Container cleanup requires careful timeout handling
+   and force-kill fallback strategies.
 
-3. **Initialization Time**: Containers need ~2 seconds after creation to be fully ready for exec commands.
+3. **Initialization Time**: Containers need ~2 seconds after creation to be
+   fully ready for exec commands.
 
 ### 1. Session Clone Management (Phase 2)
 
-Each session gets its own local git clone to provide complete isolation with full git functionality.
+Each session gets its own local git clone to provide complete isolation with
+full git functionality.
 
 **Important: Why Clones, Not Worktrees**
+
 - Git worktrees only contain a `.git` file pointing to the parent repository
 - Containers need the full `.git` directory for git operations
-- Local clones with `--local` flag use hardlinks, providing similar space efficiency
+- Local clones with `--local` flag use hardlinks, providing similar space
+  efficiency
 - Each container gets a self-contained repository that works independently
 
-Local clones use hardlinks for efficiency, making them almost as space-efficient as worktrees while providing the complete git functionality needed inside containers.
+Local clones use hardlinks for efficiency, making them almost as space-efficient
+as worktrees while providing the complete git functionality needed inside
+containers.
 
 ```typescript
 // In ContainerManager class
@@ -174,6 +201,7 @@ private async ensureSessionClone(): Promise<string> {
 ```
 
 **Key Points**:
+
 - Local clones created lazily on first container start (not at session creation)
 - Located at `~/.lace/sessions/session-{sessionId}/`
 - If project lacks git repo, one is initialized automatically
@@ -183,7 +211,8 @@ private async ensureSessionClone(): Promise<string> {
 
 ### 2. Container Lifecycle
 
-Containers are managed by a ContainerManager that's created during session reconstruction:
+Containers are managed by a ContainerManager that's created during session
+reconstruction:
 
 ```typescript
 // In Session class - lazy initialization during reconstruction
@@ -218,6 +247,7 @@ async getContainerManager(): Promise<ContainerManager | null> {
 ```
 
 **Container States**:
+
 - **Not Started**: Initial state, no container exists
 - **Running**: Container is active and accepting commands
 - **Stopped**: Container exists but is not running
@@ -252,6 +282,7 @@ private async getDevcontainerConfig(): Promise<DevcontainerConfig> {
 ```
 
 **Supported devcontainer.json fields**:
+
 - `image`: Container image to use
 - `build.dockerfile`: Custom Dockerfile path
 - `features`: Additional dev container features
@@ -326,13 +357,17 @@ protected async executeValidated(
 }
 ```
 
-**File operations** work naturally since the session clone is mounted at `/workspace` in the container.
+**File operations** work naturally since the session clone is mounted at
+`/workspace` in the container.
 
-**MCP servers** run on the host but execute commands inside the container via the container exec API. This allows them to maintain their connection to the Agent while still operating on container-isolated files.
+**MCP servers** run on the host but execute commands inside the container via
+the container exec API. This allows them to maintain their connection to the
+Agent while still operating on container-isolated files.
 
 ### 6. Container Implementation
 
-Primary implementation uses Apple's container framework on macOS, which provides lightweight, fast container isolation:
+Primary implementation uses Apple's container framework on macOS, which provides
+lightweight, fast container isolation:
 
 ```typescript
 // packages/core/src/containers/apple-container.ts
@@ -352,20 +387,21 @@ export class AppleContainer implements Container {
 
   async exec(command: string[], options?: ExecOptions): Promise<ExecResult> {
     const args = [
-      'container', 'exec',
+      'container',
+      'exec',
       `lace-session-${this.config.sessionId}`,
-      ...command
+      ...command,
     ];
 
     const result = await exec(args.join(' '), {
       cwd: options?.cwd,
-      env: options?.env
+      env: options?.env,
     });
 
     return {
       stdout: result.stdout,
       stderr: result.stderr,
-      exitCode: result.exitCode
+      exitCode: result.exitCode,
     };
   }
 
@@ -375,7 +411,9 @@ export class AppleContainer implements Container {
 
   async isRunning(): Promise<boolean> {
     try {
-      const result = await exec(`container inspect lace-session-${this.config.sessionId}`);
+      const result = await exec(
+        `container inspect lace-session-${this.config.sessionId}`
+      );
       return result.stdout.includes('"Running": true');
     } catch {
       return false;
@@ -386,7 +424,8 @@ export class AppleContainer implements Container {
 
 ### 7. Container Runtime Strategy
 
-Apple Container is the primary runtime for macOS due to its superior performance and native integration:
+Apple Container is the primary runtime for macOS due to its superior performance
+and native integration:
 
 ```typescript
 interface Container {
@@ -407,7 +446,8 @@ interface Container {
 
 ### Async Cleanup and Orphan Detection
 
-The current `Session.destroy()` is synchronous but container cleanup requires async operations. Solution: Dual-phase cleanup with orphan detection on startup.
+The current `Session.destroy()` is synchronous but container cleanup requires
+async operations. Solution: Dual-phase cleanup with orphan detection on startup.
 
 ```typescript
 // In Session class
@@ -600,9 +640,11 @@ This ensures file operations work correctly whether in container or on host.
 
 ### Environment Variables
 
-- `LACE_CONTAINERS_ENABLED`: Enable/disable container isolation (default: false initially)
+- `LACE_CONTAINERS_ENABLED`: Enable/disable container isolation (default: false
+  initially)
 - `LACE_CONTAINER_RUNTIME`: Override detected runtime (apple|docker|podman)
-- `LACE_CONTAINER_IDLE_TIMEOUT`: Minutes before stopping idle containers (default: 30)
+- `LACE_CONTAINER_IDLE_TIMEOUT`: Minutes before stopping idle containers
+  (default: 30)
 
 ### Feature Flags
 
@@ -612,8 +654,8 @@ export const features = {
   containers: {
     enabled: process.env.LACE_CONTAINERS_ENABLED === 'true',
     runtime: process.env.LACE_CONTAINER_RUNTIME || 'auto',
-    idleTimeout: parseInt(process.env.LACE_CONTAINER_IDLE_TIMEOUT || '30')
-  }
+    idleTimeout: parseInt(process.env.LACE_CONTAINER_IDLE_TIMEOUT || '30'),
+  },
 };
 ```
 
@@ -621,7 +663,8 @@ export const features = {
 
 1. **Opt-in Beta**: Initially disabled by default
 2. **Gradual Rollout**: Enable for new sessions first
-3. **Backward Compatibility**: Existing sessions continue working without containers
+3. **Backward Compatibility**: Existing sessions continue working without
+   containers
 4. **Migration Tool**: Utility to convert existing sessions to containerized
 
 ## Security Considerations
@@ -665,17 +708,18 @@ export const features = {
 
 ## Risks and Mitigations
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Apple Container instability (beta) | High | Extensive testing, graceful error handling |
-| Container startup latency | Medium | Lazy initialization, container reuse |
-| Filesystem performance | Medium | Use virtiofs, optimize mounts |
-| Resource leaks | High | Orphan detection, cleanup tracking |
-| Clone branch conflicts | Low | Session-specific branches |
+| Risk                               | Impact | Mitigation                                 |
+| ---------------------------------- | ------ | ------------------------------------------ |
+| Apple Container instability (beta) | High   | Extensive testing, graceful error handling |
+| Container startup latency          | Medium | Lazy initialization, container reuse       |
+| Filesystem performance             | Medium | Use virtiofs, optimize mounts              |
+| Resource leaks                     | High   | Orphan detection, cleanup tracking         |
+| Clone branch conflicts             | Low    | Session-specific branches                  |
 
 ## Rollback Plan
 
 If containers cause issues:
+
 1. Set `LACE_CONTAINERS_ENABLED=false`
 2. Sessions revert to host execution
 3. Existing clones remain but aren't used
@@ -683,4 +727,7 @@ If containers cause issues:
 
 ## Conclusion
 
-Container isolation provides Lace sessions with true workspace separation while maintaining the existing developer experience. By intercepting at the ToolExecutor level and using standard devcontainer configuration, we achieve isolation with minimal code changes and maximum compatibility.
+Container isolation provides Lace sessions with true workspace separation while
+maintaining the existing developer experience. By intercepting at the
+ToolExecutor level and using standard devcontainer configuration, we achieve
+isolation with minimal code changes and maximum compatibility.

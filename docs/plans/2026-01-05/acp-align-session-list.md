@@ -1,7 +1,7 @@
 # ACP Alignment: session/list
 
-> Created: 2026-01-05
-> Reference: [ACP RFD Session List](../../reference/acp/rfd-session-list.md)
+> Created: 2026-01-05 Reference:
+> [ACP RFD Session List](../../reference/acp/rfd-session-list.md)
 
 ## Current Ent Implementation
 
@@ -18,6 +18,7 @@ const SessionListParamsSchema = z
 ```
 
 **Parameters:**
+
 - `workDir` (optional): Filter by working directory
 
 ### Response Schema
@@ -41,6 +42,7 @@ const SessionListResultSchema = z
 ```
 
 **Session fields:**
+
 - `sessionId` (required): Session identifier
 - `created` (required): ISO timestamp of creation
 - `lastActive` (required): ISO timestamp of last activity
@@ -53,10 +55,10 @@ const SessionListResultSchema = z
 
 ### Request Parameters
 
-| Parameter | Type   | Description                              |
-| --------- | ------ | ---------------------------------------- |
-| `cwd`     | string | Filters sessions by working directory    |
-| `cursor`  | string | Opaque pagination token                  |
+| Parameter | Type   | Description                           |
+| --------- | ------ | ------------------------------------- |
+| `cwd`     | string | Filters sessions by working directory |
+| `cursor`  | string | Opaque pagination token               |
 
 ### Response Structure
 
@@ -67,11 +69,11 @@ interface SessionListResult {
 }
 
 interface SessionInfo {
-  sessionId: string;    // Required
-  cwd: string;          // Required
-  title?: string;       // Optional
-  updatedAt?: string;   // Optional - ISO 8601
-  _meta?: object;       // Optional - agent-specific
+  sessionId: string; // Required
+  cwd: string; // Required
+  title?: string; // Optional
+  updatedAt?: string; // Optional - ISO 8601
+  _meta?: object; // Optional - agent-specific
 }
 ```
 
@@ -81,23 +83,23 @@ interface SessionInfo {
 
 ### Parameter Naming
 
-| Ent Protocol | ACP RFD  | Status       |
-| ------------ | -------- | ------------ |
-| `workDir`    | `cwd`    | **RENAME**   |
-| -            | `cursor` | **ADD**      |
+| Ent Protocol | ACP RFD  | Status     |
+| ------------ | -------- | ---------- |
+| `workDir`    | `cwd`    | **RENAME** |
+| -            | `cursor` | **ADD**    |
 
 ### Response Fields
 
-| Ent Protocol   | ACP RFD     | Status         |
-| -------------- | ----------- | -------------- |
-| `sessionId`    | `sessionId` | OK             |
-| `workDir`      | `cwd`       | **RENAME**     |
-| `created`      | -           | **KEEP** (Ent) |
-| `lastActive`   | `updatedAt` | **RENAME**     |
-| `messageCount` | -           | **KEEP** (Ent) |
-| -              | `title`     | **ADD**        |
-| -              | `_meta`     | **ADD**        |
-| -              | `nextCursor`| **ADD**        |
+| Ent Protocol   | ACP RFD      | Status         |
+| -------------- | ------------ | -------------- |
+| `sessionId`    | `sessionId`  | OK             |
+| `workDir`      | `cwd`        | **RENAME**     |
+| `created`      | -            | **KEEP** (Ent) |
+| `lastActive`   | `updatedAt`  | **RENAME**     |
+| `messageCount` | -            | **KEEP** (Ent) |
+| -              | `title`      | **ADD**        |
+| -              | `_meta`      | **ADD**        |
+| -              | `nextCursor` | **ADD**        |
 
 ---
 
@@ -137,8 +139,8 @@ useful information not covered by ACP core spec.
 ```typescript
 const SessionListParamsSchema = z
   .object({
-    cwd: NonEmptyStringSchema.optional(),        // renamed from workDir
-    cursor: NonEmptyStringSchema.optional(),     // added for pagination
+    cwd: NonEmptyStringSchema.optional(), // renamed from workDir
+    cursor: NonEmptyStringSchema.optional(), // added for pagination
   })
   .strict();
 ```
@@ -152,12 +154,12 @@ const SessionListResultSchema = z
       z
         .object({
           sessionId: SessionIdSchema,
-          cwd: NonEmptyStringSchema,             // renamed from workDir
-          title: z.string().optional(),          // added per ACP
-          updatedAt: IsoTimestampSchema,         // renamed from lastActive
-          created: IsoTimestampSchema,           // Ent extension - keep
-          messageCount: z.number(),              // Ent extension - keep
-          _meta: z.record(z.string(), z.unknown()).optional(),  // added per ACP
+          cwd: NonEmptyStringSchema, // renamed from workDir
+          title: z.string().optional(), // added per ACP
+          updatedAt: IsoTimestampSchema, // renamed from lastActive
+          created: IsoTimestampSchema, // Ent extension - keep
+          messageCount: z.number(), // Ent extension - keep
+          _meta: z.record(z.string(), z.unknown()).optional(), // added per ACP
         })
         .strict()
     ),
@@ -172,7 +174,8 @@ const SessionListResultSchema = z
 
 ### Breaking Changes
 
-Field renames: `workDir` → `cwd`, `lastActive` → `updatedAt`. Make all changes at once (pre-1.0, no backward compat).
+Field renames: `workDir` → `cwd`, `lastActive` → `updatedAt`. Make all changes
+at once (pre-1.0, no backward compat).
 
 1. Update schema in `packages/ent-protocol/src/schemas/methods.ts`
 2. Update all handler implementations

@@ -788,7 +788,8 @@ git commit -m "feat(tui): borderless growing input with prompt character"
 
 **Files:**
 
-- Modify: `src/ui/mod.rs:1640-1710` (render_permission_modal → render_permission_inline)
+- Modify: `src/ui/mod.rs:1640-1710` (render_permission_modal →
+  render_permission_inline)
 - Modify: `src/ui/mod.rs:948-951` (draw function overlay logic)
 
 **Step 1: Create inline permission renderer**

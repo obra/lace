@@ -206,11 +206,19 @@ export type {
   ToolAnnotations,
 } from '@lace/core/tools/types';
 
-export type { Task, TaskNote, TaskStatus, TaskPriority } from '@lace/core/tasks/types';
+export type {
+  Task,
+  TaskNote,
+  TaskStatus,
+  TaskPriority,
+} from '@lace/core/tasks/types';
 
 export type { AgentState } from '@lace/core/agents/agent';
 
-export type { ProviderInfo, ModelInfo } from '@lace/core/providers/base-provider';
+export type {
+  ProviderInfo,
+  ModelInfo,
+} from '@lace/core/providers/base-provider';
 
 export { ApprovalDecision } from '@lace/core/tools/types';
 
@@ -817,7 +825,8 @@ grep -r "Agent\|ThreadManager\|ToolExecutor\|Session\|Project" packages/web/hook
 
 Fix any violations by:
 
-1. Change to type-only imports: `import type { Agent } from '@lace/web/types/web'`
+1. Change to type-only imports:
+   `import type { Agent } from '@lace/web/types/web'`
 2. Move business logic to API routes or server components
 
 **Test**: `npm run build` **Expected**: No server-only imports in client code

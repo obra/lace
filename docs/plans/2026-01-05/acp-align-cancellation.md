@@ -51,16 +51,16 @@ export const EntProtocolNotificationSchema = z.union([
 
 ### Key Changes from Current Approach
 
-| Aspect           | Current Ent                      | ACP RFD                                    |
-| ---------------- | -------------------------------- | ------------------------------------------ |
-| Method name      | `session/cancel`                 | `$/cancel_request`                         |
-| Scope            | Session-level                    | Per-request (by ID)                        |
-| Parameter        | None (empty)                     | `{ requestId: string \| number }`          |
-| Error code       | Not specified                    | `-32800` (Request Cancelled)               |
-| Bidirectional    | Client -> Agent only             | Either party can send                      |
-| Response options | None (it's a notification)       | Error `-32800` OR valid partial response   |
-| Optional         | Implicit                         | Explicitly optional (implementations vary) |
-| SDK integration  | None                             | Maps to native cancellation tokens         |
+| Aspect           | Current Ent                | ACP RFD                                    |
+| ---------------- | -------------------------- | ------------------------------------------ |
+| Method name      | `session/cancel`           | `$/cancel_request`                         |
+| Scope            | Session-level              | Per-request (by ID)                        |
+| Parameter        | None (empty)               | `{ requestId: string \| number }`          |
+| Error code       | Not specified              | `-32800` (Request Cancelled)               |
+| Bidirectional    | Client -> Agent only       | Either party can send                      |
+| Response options | None (it's a notification) | Error `-32800` OR valid partial response   |
+| Optional         | Implicit                   | Explicitly optional (implementations vary) |
+| SDK integration  | None                       | Maps to native cancellation tokens         |
 
 ### ACP Schema
 
@@ -133,9 +133,11 @@ error code.
 
 ### 4. Remove `session/cancel`
 
-**Decision**: Remove `session/cancel` entirely in favor of `$/cancel_request`. No backward compatibility needed (pre-1.0).
+**Decision**: Remove `session/cancel` entirely in favor of `$/cancel_request`.
+No backward compatibility needed (pre-1.0).
 
-Clients that want to cancel a session's current operation should send `$/cancel_request` with the request ID of the `session/prompt` call.
+Clients that want to cancel a session's current operation should send
+`$/cancel_request` with the request ID of the `session/prompt` call.
 
 ### 5. Update Notification Union
 
@@ -154,16 +156,20 @@ The supervisor/agent needs to:
 
 1. Track in-flight request IDs
 2. Handle `$/cancel_request` by looking up the request ID
-3. **Auto-cascade**: When a `session/prompt` is cancelled, automatically send `$/cancel_request` for all pending `session/request_permission` calls
+3. **Auto-cascade**: When a `session/prompt` is cancelled, automatically send
+   `$/cancel_request` for all pending `session/request_permission` calls
 4. Return either:
-   - Error response with code `-32800` (for user-initiated cancellation via `$/cancel_request`)
+   - Error response with code `-32800` (for user-initiated cancellation via
+     `$/cancel_request`)
    - Valid response with `stopReason: 'cancelled'`
 
 ### 7. Internal Cancellation Error Codes
 
-**Decision**: Internal cancellations (timeouts, resource constraints) should use different error codes, NOT `-32800`.
+**Decision**: Internal cancellations (timeouts, resource constraints) should use
+different error codes, NOT `-32800`.
 
 Error code mapping:
+
 - `-32800`: User-initiated cancellation via `$/cancel_request`
 - `11` (BudgetExceeded): Budget limit reached
 - Timeout-specific errors: Use appropriate error codes (not -32800)
@@ -213,7 +219,8 @@ export const CancelledErrorSchema = z
 
 ### Schemas to Remove
 
-1. **`SessionCancelNotificationSchema`**: Delete entirely - replaced by `CancelRequestNotificationSchema`
+1. **`SessionCancelNotificationSchema`**: Delete entirely - replaced by
+   `CancelRequestNotificationSchema`
 
 ## Implementation Plan
 
@@ -222,7 +229,8 @@ export const CancelledErrorSchema = z
 1. Remove `SessionCancelNotificationSchema` from schemas
 2. Add `CancelRequestNotificationSchema`
 3. Add `JSONRPC_ERROR_CANCELLED = -32800` constant
-4. Update `EntProtocolNotificationSchema` union (remove session/cancel, add $/cancel_request)
+4. Update `EntProtocolNotificationSchema` union (remove session/cancel, add
+   $/cancel_request)
 
 ### 2. Implement Request Tracking
 
@@ -231,6 +239,7 @@ Agent/supervisor must track in-flight requests by ID to enable cancellation.
 ### 3. Implement Auto-Cascade
 
 When `session/prompt` request is cancelled:
+
 1. Send `$/cancel_request` for all pending `session/request_permission` requests
 2. Send `$/cancel_request` for any other nested requests
 3. Clean up resources
@@ -242,18 +251,23 @@ Change from `session/cancel` to `$/cancel_request` with prompt request ID.
 
 ### 5. Clarify Internal Cancellation Error Codes
 
-Document that `-32800` is ONLY for user-initiated `$/cancel_request`. Internal cancellations use:
+Document that `-32800` is ONLY for user-initiated `$/cancel_request`. Internal
+cancellations use:
+
 - `11` (BudgetExceeded)
 - Other appropriate error codes
 - NOT `-32800`
 
 ## Decisions Made
 
-1. **session/cancel removed**: Replace entirely with `$/cancel_request`. No backward compatibility.
+1. **session/cancel removed**: Replace entirely with `$/cancel_request`. No
+   backward compatibility.
 
-2. **Auto-cascade**: YES - automatically send `$/cancel_request` for pending permission requests when prompt cancelled (per RFD mermaid diagram pattern).
+2. **Auto-cascade**: YES - automatically send `$/cancel_request` for pending
+   permission requests when prompt cancelled (per RFD mermaid diagram pattern).
 
-3. **Internal cancellation error codes**: NO - do NOT use `-32800` for internal cancellations. Use appropriate error codes:
+3. **Internal cancellation error codes**: NO - do NOT use `-32800` for internal
+   cancellations. Use appropriate error codes:
    - Budget exceeded: `11` (BudgetExceeded)
    - Timeouts: Appropriate timeout error
    - Resource constraints: Appropriate error

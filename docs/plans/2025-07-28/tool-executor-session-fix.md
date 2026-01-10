@@ -63,6 +63,7 @@ enforcement.** Tools without session context should be denied execution
    ```
 
 2. **Update ToolExecutor Security Logic** ✅ DONE
+
    ```typescript
    async requestToolPermission(call: ToolCall, context?: ToolContext): Promise<'granted' | 'pending'> {
      // SECURITY: Fail-safe - require session context

@@ -135,7 +135,10 @@ import { homedir } from 'os';
 import { createSuperjsonResponse } from '@lace/web/lib/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { ListDirectoryRequestSchema } from '@lace/web/types/filesystem';
-import type { DirectoryEntry, ListDirectoryResponse } from '@lace/web/types/filesystem';
+import type {
+  DirectoryEntry,
+  ListDirectoryResponse,
+} from '@lace/web/types/filesystem';
 
 export async function GET(request: NextRequest) {
   try {

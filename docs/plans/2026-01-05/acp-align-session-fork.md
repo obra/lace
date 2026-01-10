@@ -11,28 +11,34 @@ fork as an option in `session/load`.
 ### Schema (packages/ent-protocol/src/schemas/methods.ts)
 
 **Capabilities Declaration:**
+
 ```typescript
 const AgentCapabilitiesSchema = z.object({
   // ...
   sessionResume: z.boolean().optional(),
-  sessionFork: z.boolean().optional(),  // Boolean flag
+  sessionFork: z.boolean().optional(), // Boolean flag
   // ...
 });
 ```
 
 **SessionLoad with Fork Option:**
-```typescript
-const SessionLoadParamsSchema = z.object({
-  sessionId: SessionIdSchema,
-  fork: z.boolean().optional(),  // Fork embedded in session/load
-}).strict();
 
-const SessionLoadResultSchema = z.object({
-  sessionId: SessionIdSchema,
-  forkedFrom: SessionIdSchema.optional(),  // Returns original if forked
-  messageCount: z.number(),
-  lastActive: IsoTimestampSchema,
-}).strict();
+```typescript
+const SessionLoadParamsSchema = z
+  .object({
+    sessionId: SessionIdSchema,
+    fork: z.boolean().optional(), // Fork embedded in session/load
+  })
+  .strict();
+
+const SessionLoadResultSchema = z
+  .object({
+    sessionId: SessionIdSchema,
+    forkedFrom: SessionIdSchema.optional(), // Returns original if forked
+    messageCount: z.number(),
+    lastActive: IsoTimestampSchema,
+  })
+  .strict();
 ```
 
 ### Handler (packages/agent/src/server.ts)
@@ -41,12 +47,13 @@ const SessionLoadResultSchema = z.object({
 peer.onRequest('session/load', async (params: unknown) => {
   const parsed = params as { sessionId: string; fork?: boolean };
   // ...
-  if (parsed.fork) throwInvalidParams('fork not implemented');  // NOT IMPLEMENTED
+  if (parsed.fork) throwInvalidParams('fork not implemented'); // NOT IMPLEMENTED
   // ...
 });
 ```
 
 **Current Capabilities Response:**
+
 ```typescript
 capabilities: {
   streaming: true,
@@ -62,6 +69,7 @@ capabilities: {
 ### Capabilities Declaration
 
 ACP uses a nested object structure for session capabilities:
+
 ```json
 {
   "session": {
@@ -76,6 +84,7 @@ forking.
 ### Dedicated Method
 
 ACP proposes a separate `session/fork` method:
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -98,6 +107,7 @@ ACP proposes a separate `session/fork` method:
 ### Response
 
 Returns same structure as `session/load`:
+
 - **sessionId**: New forked session ID
 - **forkedFrom**: Original session ID
 
@@ -106,11 +116,13 @@ Returns same structure as `session/load`:
 ### 1. Capabilities Schema Change
 
 **From:**
+
 ```typescript
 sessionFork: z.boolean().optional(),
 ```
 
 **To:**
+
 ```typescript
 session: z.object({
   fork: z.object({}).optional(),
@@ -118,42 +130,50 @@ session: z.object({
 }).strict().optional(),
 ```
 
-
 ### 2. Add session/fork Method
 
 Create new request/response schemas:
 
 ```typescript
-const SessionForkParamsSchema = z.object({
-  sessionId: SessionIdSchema,
-  cwd: NonEmptyStringSchema.optional(),
-  mcpServers: z.array(McpServerConfigSchema).optional(),
-}).strict();
+const SessionForkParamsSchema = z
+  .object({
+    sessionId: SessionIdSchema,
+    cwd: NonEmptyStringSchema.optional(),
+    mcpServers: z.array(McpServerConfigSchema).optional(),
+  })
+  .strict();
 
-const SessionForkResultSchema = z.object({
-  sessionId: SessionIdSchema,
-  forkedFrom: SessionIdSchema,
-  messageCount: z.number(),
-  lastActive: IsoTimestampSchema,
-}).strict();
+const SessionForkResultSchema = z
+  .object({
+    sessionId: SessionIdSchema,
+    forkedFrom: SessionIdSchema,
+    messageCount: z.number(),
+    lastActive: IsoTimestampSchema,
+  })
+  .strict();
 
-export const SessionForkRequestSchema = z.object({
-  jsonrpc: JsonRpcVersionSchema,
-  id: JsonRpcIdSchema,
-  method: z.literal('session/fork'),
-  params: SessionForkParamsSchema,
-}).strict();
+export const SessionForkRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('session/fork'),
+    params: SessionForkParamsSchema,
+  })
+  .strict();
 
-export const SessionForkResponseSchema = z.object({
-  jsonrpc: JsonRpcVersionSchema,
-  id: JsonRpcIdSchema,
-  result: SessionForkResultSchema,
-}).strict();
+export const SessionForkResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: SessionForkResultSchema,
+  })
+  .strict();
 ```
 
 ### 3. Remove session/load fork Option
 
-**Decision**: Remove `fork` parameter from `SessionLoadParamsSchema` entirely. No backward compatibility.
+**Decision**: Remove `fork` parameter from `SessionLoadParamsSchema` entirely.
+No backward compatibility.
 
 Clients must use the dedicated `session/fork` method.
 
@@ -202,15 +222,15 @@ peer.onRequest('session/fork', async (params: unknown) => {
 
 ## Zod Schema Changes Summary
 
-| Current Schema | ACP-Aligned Schema | Notes |
-|----------------|-------------------|-------|
-| `sessionFork: z.boolean().optional()` | `session.fork: z.object({}).optional()` | Nested object for extensibility |
-| `sessionResume: z.boolean().optional()` | `session.resume: z.object({}).optional()` | Consistent with fork |
-| `SessionLoadParams.fork` | Remove entirely | Use session/fork method |
-| N/A | `SessionForkParamsSchema` | New method params |
-| N/A | `SessionForkResultSchema` | New method result |
-| N/A | `SessionForkRequestSchema` | New request schema |
-| N/A | `SessionForkResponseSchema` | New response schema |
+| Current Schema                          | ACP-Aligned Schema                        | Notes                           |
+| --------------------------------------- | ----------------------------------------- | ------------------------------- |
+| `sessionFork: z.boolean().optional()`   | `session.fork: z.object({}).optional()`   | Nested object for extensibility |
+| `sessionResume: z.boolean().optional()` | `session.resume: z.object({}).optional()` | Consistent with fork            |
+| `SessionLoadParams.fork`                | Remove entirely                           | Use session/fork method         |
+| N/A                                     | `SessionForkParamsSchema`                 | New method params               |
+| N/A                                     | `SessionForkResultSchema`                 | New method result               |
+| N/A                                     | `SessionForkRequestSchema`                | New request schema              |
+| N/A                                     | `SessionForkResponseSchema`               | New response schema             |
 
 ## Implementation Order
 
@@ -224,13 +244,17 @@ peer.onRequest('session/fork', async (params: unknown) => {
 
 ### 7. Update Protocol Documentation
 
-1. **Update `docs/protocol-spec.md`**: Add `session/fork` method, update capabilities schema
+1. **Update `docs/protocol-spec.md`**: Add `session/fork` method, update
+   capabilities schema
 2. **Update `docs/about-the-protocol.md`**: Document alignment with ACP RFD
 
 ## Open Questions
 
-1. **Resume Alignment**: The ACP likely has a similar pattern for `session/resume`. Should we align that at the same time?
+1. **Resume Alignment**: The ACP likely has a similar pattern for
+   `session/resume`. Should we align that at the same time?
 
-2. **MCP Server Semantics**: When forking with new `mcpServers`, should they replace or merge with the original session's servers?
+2. **MCP Server Semantics**: When forking with new `mcpServers`, should they
+   replace or merge with the original session's servers?
 
-3. **Checkpoint Forking**: The ACP reserves the fork object for future `messageId` support. Should we add a placeholder schema for this now?
+3. **Checkpoint Forking**: The ACP reserves the fork object for future
+   `messageId` support. Should we add a placeholder schema for this now?

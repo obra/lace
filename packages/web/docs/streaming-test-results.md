@@ -64,7 +64,8 @@ Tests for all SSE event types:
 
 ### SSE Event Detection
 
-Use the in-app `EventStreamMonitor` debug UI to inspect live SSE traffic (including `protocol:text_delta`).
+Use the in-app `EventStreamMonitor` debug UI to inspect live SSE traffic
+(including `protocol:text_delta`).
 
 ## Test Architecture
 
@@ -119,7 +120,8 @@ Use the in-app `EventStreamMonitor` debug UI to inspect live SSE traffic (includ
 The comprehensive test suite confirms that:
 
 1. ✅ `web:USER_MESSAGE` events are captured and processed
-2. ✅ Assistant messages are built from `protocol:text_delta` + `protocol:turn_end`
+2. ✅ Assistant messages are built from `protocol:text_delta` +
+   `protocol:turn_end`
 3. ✅ `protocol:text_delta` enables real-time streaming
 4. ✅ `web:AGENT_STATE_CHANGE` updates are tracked and distributed
 

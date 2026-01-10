@@ -1,20 +1,23 @@
 # Remove Agent.getLaceEvents() Method
 
-**Date:** 2025-10-01
-**Status:** Planned
-**Part of:** simplify-compaction PR
+**Date:** 2025-10-01 **Status:** Planned **Part of:** simplify-compaction PR
 
 ## Background
 
 Currently Agent has two methods for retrieving events:
-- `getLaceEvents()` - Returns working conversation (calls buildWorkingConversation)
+
+- `getLaceEvents()` - Returns working conversation (calls
+  buildWorkingConversation)
 - `getAllEvents()` - Returns complete history from ThreadManager
 
-The `getLaceEvents()` method creates confusion and is rarely used correctly. After simplifying compaction, `buildWorkingConversation()` becomes a simple visibility filter, making this method redundant.
+The `getLaceEvents()` method creates confusion and is rarely used correctly.
+After simplifying compaction, `buildWorkingConversation()` becomes a simple
+visibility filter, making this method redundant.
 
 ## Current State
 
 **Agent.getLaceEvents()** (line ~2454):
+
 ```typescript
 getLaceEvents(threadId?: string): LaceEvent[] {
   const targetThreadId = threadId || this._threadId;
@@ -23,6 +26,7 @@ getLaceEvents(threadId?: string): LaceEvent[] {
 ```
 
 **Agent.getAllEvents()** (different method):
+
 ```typescript
 getAllEvents(): LaceEvent[] {
   return this._threadManager.getAllEvents(this._threadId);  // Returns everything
@@ -37,17 +41,22 @@ getAllEvents(): LaceEvent[] {
 - **ThreadManager.getEvents()**: Filters to visible events only
 
 Callers can filter by visibility themselves if needed:
+
 ```typescript
 const allEvents = agent.getAllEvents();
-const visibleOnly = allEvents.filter(e => e.visibleToModel !== false);
+const visibleOnly = allEvents.filter((e) => e.visibleToModel !== false);
 ```
 
 ## Motivation
 
-1. **Single Responsibility**: Agent provides complete history; ThreadManager handles filtering
-2. **Reduce Confusion**: Two similar methods with subtly different behavior is confusing
-3. **Simplify After Refactor**: buildWorkingConversation is now trivial, doesn't need Agent wrapper
-4. **Tests Should Be Explicit**: Tests that need working conversation should call ThreadManager directly
+1. **Single Responsibility**: Agent provides complete history; ThreadManager
+   handles filtering
+2. **Reduce Confusion**: Two similar methods with subtly different behavior is
+   confusing
+3. **Simplify After Refactor**: buildWorkingConversation is now trivial, doesn't
+   need Agent wrapper
+4. **Tests Should Be Explicit**: Tests that need working conversation should
+   call ThreadManager directly
 
 ## Implementation
 
@@ -58,6 +67,7 @@ grep -rn "getLaceEvents" packages/core/src
 ```
 
 **Expected usages (~31 total):**
+
 - Test files using it to get events
 - Possibly Agent internal use
 
@@ -66,12 +76,14 @@ grep -rn "getLaceEvents" packages/core/src
 For each usage:
 
 1. **If just need any events**: Change to `agent.getAllEvents()`
-2. **If need working conversation**: Use `agent['_threadManager'].getEvents(threadId)`
+2. **If need working conversation**: Use
+   `agent['_threadManager'].getEvents(threadId)`
 3. **If testing conversation building**: Consider testing ThreadManager directly
 
 ### Files to Update
 
 Based on previous analysis:
+
 - `src/agent-thread-integration.test.ts`
 - `src/agents/agent-thread-events.test.ts`
 - `src/agents/agent-threadmanager-encapsulation.test.ts`
@@ -80,24 +92,28 @@ Based on previous analysis:
 ### Example Migrations
 
 **Before:**
+
 ```typescript
 const events = agent.getLaceEvents();
 expect(events.length).toBeGreaterThan(0);
 ```
 
 **After:**
+
 ```typescript
 const events = agent.getAllEvents();
 expect(events.length).toBeGreaterThan(0);
 ```
 
 **Before (if testing working conversation specifically):**
+
 ```typescript
 const events = agent.getLaceEvents();
 // Expect only visible events
 ```
 
 **After:**
+
 ```typescript
 const events = agent['_threadManager'].getEvents(agent.getThreadId());
 // Expect only visible events
@@ -118,29 +134,36 @@ getLaceEvents(threadId?: string): LaceEvent[] {
 ## Testing
 
 After removal:
+
 ```bash
 npm test
 ```
 
-All tests should pass with updated calls to `getAllEvents()` or `ThreadManager.getEvents()`.
+All tests should pass with updated calls to `getAllEvents()` or
+`ThreadManager.getEvents()`.
 
 ## Decision Log
 
 **Why keep getAllEvents() but remove getLaceEvents()?**
-- `getAllEvents()` is used in production (web API needs complete history with visibility flags)
+
+- `getAllEvents()` is used in production (web API needs complete history with
+  visibility flags)
 - `getLaceEvents()` is test-only and duplicates functionality
-- After simplifying buildWorkingConversation, the distinction becomes meaningless
+- After simplifying buildWorkingConversation, the distinction becomes
+  meaningless
 
 **Why not keep both?**
+
 - Having two similar methods is confusing
 - The working conversation is a ThreadManager concern, not an Agent concern
 - Tests that care about conversation building should test ThreadManager directly
 - YAGNI - one method is enough
 
-**Can callers still get working conversation?**
-Yes, two ways:
+**Can callers still get working conversation?** Yes, two ways:
+
 1. `agent.getAllEvents().filter(e => e.visibleToModel !== false)`
-2. Access ThreadManager if really needed: `agent['_threadManager'].getEvents(threadId)`
+2. Access ThreadManager if really needed:
+   `agent['_threadManager'].getEvents(threadId)`
 
 ## Commit Message
 

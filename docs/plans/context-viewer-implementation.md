@@ -2,7 +2,11 @@
 
 ## Executive Summary
 
-Users need visibility into how their conversation context is being consumed. This feature adds a context viewer modal that shows a detailed breakdown of token usage across categories (system prompt, tools, messages, etc.). The viewer is accessible by clicking the existing token usage display in the chat footer and provides a static snapshot of context at that moment.
+Users need visibility into how their conversation context is being consumed.
+This feature adds a context viewer modal that shows a detailed breakdown of
+token usage across categories (system prompt, tools, messages, etc.). The viewer
+is accessible by clicking the existing token usage display in the chat footer
+and provides a static snapshot of context at that moment.
 
 ## Design Overview
 
@@ -12,7 +16,8 @@ Users need visibility into how their conversation context is being consumed. Thi
 2. User clicks on the `CompactTokenUsage` component in the chat footer
 3. Modal opens showing context breakdown with:
    - Header: Model info, context limit, timestamp
-   - Visualization: Treemap (preferred) or progress bars showing proportional usage
+   - Visualization: Treemap (preferred) or progress bars showing proportional
+     usage
    - Detailed list: Category breakdowns with token counts and sub-items
 4. User reviews the breakdown (static snapshot, no real-time updates)
 5. User closes modal by clicking backdrop, ESC key, or close button
@@ -30,11 +35,11 @@ Three-layer implementation:
 ```typescript
 // Core response from API
 interface ContextBreakdown {
-  timestamp: string;           // ISO timestamp of snapshot
-  modelId: string;             // e.g., "claude-sonnet-4-5"
-  contextLimit: number;        // e.g., 200000
-  totalUsedTokens: number;     // Sum of all categories except free space
-  percentUsed: number;         // 0-1 decimal
+  timestamp: string; // ISO timestamp of snapshot
+  modelId: string; // e.g., "claude-sonnet-4-5"
+  contextLimit: number; // e.g., 200000
+  totalUsedTokens: number; // Sum of all categories except free space
+  percentUsed: number; // 0-1 decimal
 
   categories: {
     systemPrompt: CategoryDetail;
@@ -48,7 +53,7 @@ interface ContextBreakdown {
 
 interface CategoryDetail {
   tokens: number;
-  items?: ItemDetail[];  // Optional drill-down
+  items?: ItemDetail[]; // Optional drill-down
 }
 
 interface MessageCategoryDetail extends CategoryDetail {
@@ -61,7 +66,7 @@ interface MessageCategoryDetail extends CategoryDetail {
 }
 
 interface ItemDetail {
-  name: string;    // e.g., "bash", "deepwiki__read_wiki_structure"
+  name: string; // e.g., "bash", "deepwiki__read_wiki_structure"
   tokens: number;
 }
 ```
@@ -79,11 +84,13 @@ Build the core token analysis engine.
 **Objective**: Define TypeScript interfaces for context breakdown data.
 
 **Files to Create**:
+
 - `packages/core/src/token-management/context-breakdown-types.ts`
 
 **What to Do**:
 
 1. Create the file with ABOUTME comments:
+
    ```typescript
    // ABOUTME: Type definitions for context breakdown feature
    // ABOUTME: Interfaces for categorizing and reporting token usage
@@ -102,6 +109,7 @@ Build the core token analysis engine.
    ```
 
 **Testing**:
+
 - No runtime tests needed (just types)
 - Verify TypeScript compilation: `npm run build`
 
@@ -114,23 +122,29 @@ Build the core token analysis engine.
 **Objective**: Set up the main analyzer class with empty methods.
 
 **Files to Create**:
+
 - `packages/core/src/token-management/context-analyzer.ts`
 
 **Files to Read First** (understand existing patterns):
-- `packages/core/src/token-management/token-counter.ts` - Token counting utilities
-- `packages/core/src/agents/agent.ts` - Agent class structure, look for `getContextLimit()`, `getModel()`
+
+- `packages/core/src/token-management/token-counter.ts` - Token counting
+  utilities
+- `packages/core/src/agents/agent.ts` - Agent class structure, look for
+  `getContextLimit()`, `getModel()`
 - `packages/core/src/threads/thread-manager.ts` - Thread event retrieval
 - `packages/core/src/tools/executor.ts` - Tool registration
 
 **What to Do**:
 
 1. Create file with ABOUTME comments:
+
    ```typescript
    // ABOUTME: Context analyzer that breaks down token usage by category
    // ABOUTME: Analyzes thread events and agent state to calculate context breakdown
    ```
 
 2. Import dependencies:
+
    ```typescript
    import type { ThreadId } from '@lace/core/threads/types';
    import type { Agent } from '@lace/core/agents/agent';
@@ -154,6 +168,7 @@ Build the core token analysis engine.
    ```
 
 **Testing**:
+
 - Verify TypeScript compilation: `npm run build`
 
 **Commit**: `feat(token-management): add ContextAnalyzer skeleton`
@@ -165,20 +180,30 @@ Build the core token analysis engine.
 **Objective**: Calculate tokens used by system prompts and context.
 
 **Files to Modify**:
+
 - `packages/core/src/token-management/context-analyzer.ts`
 
 **Files to Read First**:
-- `packages/core/src/threads/types.ts` - Look for `SYSTEM_PROMPT`, `USER_SYSTEM_PROMPT` event types
-- `packages/core/src/providers/base-provider.ts` - Look for `buildConversation()` method
-- `packages/core/src/token-management/token-counter.ts` - Token counting utilities
+
+- `packages/core/src/threads/types.ts` - Look for `SYSTEM_PROMPT`,
+  `USER_SYSTEM_PROMPT` event types
+- `packages/core/src/providers/base-provider.ts` - Look for
+  `buildConversation()` method
+- `packages/core/src/token-management/token-counter.ts` - Token counting
+  utilities
 
 **Reference Code Locations**:
-- Agent builds conversation with system prompts: `packages/core/src/agents/agent.ts` around line 400-500 (look for `buildConversationFromEvents`)
-- System prompt events: `packages/core/src/threads/types.ts` event type definitions
+
+- Agent builds conversation with system prompts:
+  `packages/core/src/agents/agent.ts` around line 400-500 (look for
+  `buildConversationFromEvents`)
+- System prompt events: `packages/core/src/threads/types.ts` event type
+  definitions
 
 **What to Do**:
 
 1. Add private helper method:
+
    ```typescript
    private static async countSystemPromptTokens(
      threadId: ThreadId,
@@ -209,7 +234,9 @@ Build the core token analysis engine.
    }
    ```
 
-2. Update `analyze()` method to use this helper (but don't implement full method yet):
+2. Update `analyze()` method to use this helper (but don't implement full method
+   yet):
+
    ```typescript
    static async analyze(
      threadId: ThreadId,
@@ -308,6 +335,7 @@ describe('ContextAnalyzer', () => {
 ```
 
 **Testing**:
+
 1. Run tests (they should fail initially): `npm test context-analyzer`
 2. Implement the code above
 3. Run tests again (should pass): `npm test context-analyzer`
@@ -322,20 +350,28 @@ describe('ContextAnalyzer', () => {
 **Objective**: Calculate tokens used by tool definitions (core + MCP).
 
 **Files to Modify**:
+
 - `packages/core/src/token-management/context-analyzer.ts`
 
 **Files to Read First**:
-- `packages/core/src/tools/executor.ts` - Look for `getTools()` or similar method
-- `packages/core/src/tools/tool.ts` - Base tool class, look for `toJSON()` or schema methods
+
+- `packages/core/src/tools/executor.ts` - Look for `getTools()` or similar
+  method
+- `packages/core/src/tools/tool.ts` - Base tool class, look for `toJSON()` or
+  schema methods
 - `packages/core/src/mcp/client.ts` - MCP tool discovery
 
 **Reference Code**:
-- Look at how Agent sends tools to provider: `packages/core/src/agents/agent.ts` search for "tools" and "toolExecutor"
-- Provider tool formatting: `packages/core/src/providers/anthropic/provider.ts` or similar
+
+- Look at how Agent sends tools to provider: `packages/core/src/agents/agent.ts`
+  search for "tools" and "toolExecutor"
+- Provider tool formatting: `packages/core/src/providers/anthropic/provider.ts`
+  or similar
 
 **What to Do**:
 
 1. Add helper methods:
+
    ```typescript
    private static async countToolTokens(
      agent: Agent
@@ -381,6 +417,7 @@ describe('ContextAnalyzer', () => {
    ```
 
 2. Update `analyze()` method:
+
    ```typescript
    static async analyze(
      threadId: ThreadId,
@@ -436,7 +473,7 @@ describe('Tool Token Counting', () => {
     const breakdown = await ContextAnalyzer.analyze(threadId, agent);
 
     const bashTool = breakdown.categories.coreTools.items?.find(
-      t => t.name === 'bash'
+      (t) => t.name === 'bash'
     );
     expect(bashTool).toBeDefined();
     expect(bashTool!.tokens).toBeGreaterThan(0);
@@ -462,12 +499,15 @@ describe('Tool Token Counting', () => {
 ```
 
 **Testing**:
+
 1. Write tests first: `npm test context-analyzer`
 2. Implement code
 3. Run tests: `npm test context-analyzer`
 4. Verify all tests pass
 
-**Note**: You may need to explore the codebase to find exact method names. Use grep:
+**Note**: You may need to explore the codebase to find exact method names. Use
+grep:
+
 ```bash
 cd packages/core
 grep -r "getTools" src/tools/
@@ -480,18 +520,23 @@ grep -r "class Tool" src/tools/tool.ts
 
 #### Task 1.5: Implement Message Token Counting
 
-**Objective**: Calculate tokens used by conversation messages, broken down by type.
+**Objective**: Calculate tokens used by conversation messages, broken down by
+type.
 
 **Files to Modify**:
+
 - `packages/core/src/token-management/context-analyzer.ts`
 
 **Files to Read First**:
-- `packages/core/src/threads/types.ts` - Event types: `USER_MESSAGE`, `AGENT_MESSAGE`, `TOOL_CALL`, `TOOL_RESULT`
+
+- `packages/core/src/threads/types.ts` - Event types: `USER_MESSAGE`,
+  `AGENT_MESSAGE`, `TOOL_CALL`, `TOOL_RESULT`
 - `packages/core/src/threads/thread-manager.ts` - Getting events from thread
 
 **What to Do**:
 
 1. Add helper method:
+
    ```typescript
    private static async countMessageTokens(
      threadId: ThreadId,
@@ -557,6 +602,7 @@ grep -r "class Tool" src/tools/tool.ts
    ```
 
 2. Update `analyze()` method:
+
    ```typescript
    static async analyze(
      threadId: ThreadId,
@@ -599,7 +645,9 @@ describe('Message Token Counting', () => {
 
     const breakdown = await ContextAnalyzer.analyze(threadId, agent);
 
-    expect(breakdown.categories.messages.subcategories.userMessages.tokens).toBeGreaterThan(0);
+    expect(
+      breakdown.categories.messages.subcategories.userMessages.tokens
+    ).toBeGreaterThan(0);
   });
 
   it('should count agent message tokens', async () => {
@@ -611,7 +659,9 @@ describe('Message Token Counting', () => {
 
     const breakdown = await ContextAnalyzer.analyze(threadId, agent);
 
-    expect(breakdown.categories.messages.subcategories.agentMessages.tokens).toBeGreaterThan(0);
+    expect(
+      breakdown.categories.messages.subcategories.agentMessages.tokens
+    ).toBeGreaterThan(0);
   });
 
   it('should count tool call tokens', async () => {
@@ -619,28 +669,33 @@ describe('Message Token Counting', () => {
       type: 'TOOL_CALL',
       data: {
         toolName: 'bash',
-        arguments: { command: 'ls -la' }
+        arguments: { command: 'ls -la' },
       },
       timestamp: Date.now(),
     });
 
     const breakdown = await ContextAnalyzer.analyze(threadId, agent);
 
-    expect(breakdown.categories.messages.subcategories.toolCalls.tokens).toBeGreaterThan(0);
+    expect(
+      breakdown.categories.messages.subcategories.toolCalls.tokens
+    ).toBeGreaterThan(0);
   });
 
   it('should count tool result tokens', async () => {
     await threadManager.addEvent(threadId, {
       type: 'TOOL_RESULT',
       data: {
-        result: 'total 64\ndrwxr-xr-x  10 user  staff   320 Sep 29 14:23 .\n...'
+        result:
+          'total 64\ndrwxr-xr-x  10 user  staff   320 Sep 29 14:23 .\n...',
       },
       timestamp: Date.now(),
     });
 
     const breakdown = await ContextAnalyzer.analyze(threadId, agent);
 
-    expect(breakdown.categories.messages.subcategories.toolResults.tokens).toBeGreaterThan(0);
+    expect(
+      breakdown.categories.messages.subcategories.toolResults.tokens
+    ).toBeGreaterThan(0);
   });
 
   it('should calculate total message tokens correctly', async () => {
@@ -671,6 +726,7 @@ describe('Message Token Counting', () => {
 ```
 
 **Testing**:
+
 1. Write tests first
 2. Implement code
 3. Run tests: `npm test context-analyzer`
@@ -684,19 +740,24 @@ describe('Message Token Counting', () => {
 **Objective**: Calculate tokens reserved for agent response buffer.
 
 **Files to Modify**:
+
 - `packages/core/src/token-management/context-analyzer.ts`
 
 **Files to Read First**:
-- `packages/core/src/agents/agent.ts` - Look for output token settings, max tokens config
+
+- `packages/core/src/agents/agent.ts` - Look for output token settings, max
+  tokens config
 - `packages/core/src/token-management/types.ts` - Token budget types
 
 **Reference**:
+
 - Current auto-compact threshold is 80% (from `TokenUsageDisplay.tsx` line 54)
 - Reserved tokens ensure agent has space to respond
 
 **What to Do**:
 
 1. Add helper method:
+
    ```typescript
    private static getReservedTokens(agent: Agent): number {
      // 1. Try to get max output tokens from agent config
@@ -713,6 +774,7 @@ describe('Message Token Counting', () => {
    ```
 
 2. Update `analyze()` method:
+
    ```typescript
    static async analyze(
      threadId: ThreadId,
@@ -786,6 +848,7 @@ describe('Reserved and Free Space Tokens', () => {
 ```
 
 **Testing**:
+
 1. Write tests first
 2. Implement code
 3. Run tests: `npm test context-analyzer`
@@ -800,6 +863,7 @@ describe('Reserved and Free Space Tokens', () => {
 **Objective**: Test full end-to-end context analysis with realistic scenarios.
 
 **Files to Modify**:
+
 - `packages/core/src/token-management/context-analyzer.test.ts`
 
 **What to Do**:
@@ -838,7 +902,10 @@ describe('ContextAnalyzer Integration', () => {
       type: 'TOOL_CALL',
       data: {
         toolName: 'file-write',
-        arguments: { path: 'factorial.js', content: 'function factorial(n) {...}' }
+        arguments: {
+          path: 'factorial.js',
+          content: 'function factorial(n) {...}',
+        },
       },
       timestamp: Date.now(),
     });
@@ -899,6 +966,7 @@ describe('ContextAnalyzer Integration', () => {
 ```
 
 **Testing**:
+
 1. Run integration tests: `npm test context-analyzer`
 2. Fix any failures
 3. Run full test suite: `npm test`
@@ -912,22 +980,26 @@ describe('ContextAnalyzer Integration', () => {
 **Objective**: Make ContextAnalyzer available to other packages.
 
 **Files to Modify**:
+
 - `packages/core/src/token-management/index.ts` (create if doesn't exist)
 
 **What to Do**:
 
 1. Check if index file exists:
+
    ```bash
    ls packages/core/src/token-management/index.ts
    ```
 
 2. If it doesn't exist, create it with ABOUTME comments:
+
    ```typescript
    // ABOUTME: Token management module exports
    // ABOUTME: Provides token counting, budgeting, and context analysis utilities
    ```
 
 3. Add exports:
+
    ```typescript
    export { ContextAnalyzer } from './context-analyzer';
    export type {
@@ -942,6 +1014,7 @@ describe('ContextAnalyzer Integration', () => {
    ```
 
 **Testing**:
+
 - Verify TypeScript compilation: `npm run build`
 - Verify exports are accessible: Try importing in another file temporarily
 
@@ -950,10 +1023,12 @@ describe('ContextAnalyzer Integration', () => {
 ---
 
 **Phase 1 Complete! Checkpoint:**
+
 - Run full test suite: `npm test`
 - Build packages: `npm run build`
 - Commit all changes if not already committed
-- Review: You now have a working context analyzer that can break down token usage by category
+- Review: You now have a working context analyzer that can break down token
+  usage by category
 
 ---
 
@@ -968,9 +1043,11 @@ Expose context data through a REST API endpoint.
 **Objective**: Set up the API route structure.
 
 **Files to Create**:
+
 - `packages/web/app/routes/api.agents.$agentId.context.ts`
 
 **Files to Read First** (understand patterns):
+
 - `packages/web/app/routes/api.agents.$agentId.ts` - Existing agent route
 - `packages/web/app/routes.ts` - Route registration
 - `packages/web/lib/server/session-service.ts` - Session/agent lookup
@@ -978,6 +1055,7 @@ Expose context data through a REST API endpoint.
 **What to Do**:
 
 1. Create the route file with ABOUTME comments:
+
    ```typescript
    // ABOUTME: API endpoint for agent context breakdown
    // ABOUTME: Returns detailed token usage categorization for an agent's thread
@@ -1005,6 +1083,7 @@ Expose context data through a REST API endpoint.
    ```
 
 **Testing**:
+
 - Start dev server: `npm run dev`
 - Verify route compilation: Check terminal for any errors
 - Test endpoint: `curl http://localhost:3000/api/agents/test-id/context`
@@ -1019,15 +1098,19 @@ Expose context data through a REST API endpoint.
 **Objective**: Get agent from session service.
 
 **Files to Modify**:
+
 - `packages/web/app/routes/api.agents.$agentId.context.ts`
 
 **Files to Read First**:
-- `packages/web/lib/server/session-service.ts` - Look for `getAgent()` or similar
+
+- `packages/web/lib/server/session-service.ts` - Look for `getAgent()` or
+  similar
 - Other API routes that access agents
 
 **What to Do**:
 
 1. Implement agent lookup:
+
    ```typescript
    export async function loader({ params }: Route.LoaderArgs) {
      const { agentId } = params;
@@ -1043,13 +1126,12 @@ Expose context data through a REST API endpoint.
        if (!agent) {
          throw new Response('Agent not found', {
            status: 404,
-           statusText: 'Not Found'
+           statusText: 'Not Found',
          });
        }
 
        // TODO: Call ContextAnalyzer in next task
        return json({ message: 'Agent found', agentId: agent.threadId });
-
      } catch (error) {
        // If it's already a Response (like 404), rethrow
        if (error instanceof Response) {
@@ -1060,13 +1142,14 @@ Expose context data through a REST API endpoint.
        console.error('[Context API] Error fetching agent:', error);
        throw new Response('Internal server error', {
          status: 500,
-         statusText: 'Internal Server Error'
+         statusText: 'Internal Server Error',
        });
      }
    }
    ```
 
 **Testing**:
+
 1. Start dev server: `npm run dev`
 2. Create an agent in the UI (or use existing agent)
 3. Get agent ID from URL (e.g., `/project/123/session/456/agent/789`)
@@ -1084,11 +1167,13 @@ Expose context data through a REST API endpoint.
 **Objective**: Use ContextAnalyzer to get breakdown and return as JSON.
 
 **Files to Modify**:
+
 - `packages/web/app/routes/api.agents.$agentId.context.ts`
 
 **What to Do**:
 
 1. Complete the loader implementation:
+
    ```typescript
    export async function loader({ params }: Route.LoaderArgs) {
      const { agentId } = params;
@@ -1107,7 +1192,6 @@ Expose context data through a REST API endpoint.
 
        // 3. Return as JSON
        return json(breakdown);
-
      } catch (error) {
        if (error instanceof Response) {
          throw error;
@@ -1116,23 +1200,26 @@ Expose context data through a REST API endpoint.
        console.error('[Context API] Error analyzing context:', error);
        throw new Response('Failed to analyze context', {
          status: 500,
-         statusText: 'Internal Server Error'
+         statusText: 'Internal Server Error',
        });
      }
    }
    ```
 
 **Testing**:
+
 1. Start dev server: `npm run dev`
 2. Have an active conversation with an agent
 3. Test endpoint: `curl http://localhost:3000/api/agents/<agentId>/context | jq`
 4. Verify response structure:
-   - Has `timestamp`, `modelId`, `contextLimit`, `totalUsedTokens`, `percentUsed`
+   - Has `timestamp`, `modelId`, `contextLimit`, `totalUsedTokens`,
+     `percentUsed`
    - Has `categories` object with all expected categories
    - Token counts are reasonable numbers
    - Items arrays are present where expected
 
 **Manual Testing Checklist**:
+
 - [ ] Empty conversation (new agent) - should work
 - [ ] Conversation with user messages - should count tokens
 - [ ] Conversation with tool calls - should count tool tokens
@@ -1145,6 +1232,7 @@ Expose context data through a REST API endpoint.
 ---
 
 **Phase 2 Complete! Checkpoint:**
+
 - API endpoint is functional
 - Returns proper error codes
 - Test manually with curl or Postman
@@ -1163,11 +1251,13 @@ Build the UI components to display context breakdown.
 **Objective**: Import core types into web package with proper serialization.
 
 **Files to Create**:
+
 - `packages/web/types/context.ts`
 
 **What to Do**:
 
 1. Create type file with ABOUTME comments:
+
    ```typescript
    // ABOUTME: Frontend types for context breakdown feature
    // ABOUTME: Re-exports core types with web-specific additions
@@ -1181,11 +1271,7 @@ Build the UI components to display context breakdown.
    } from '@lace/core/token-management';
 
    // Re-export core types
-   export type {
-     CategoryDetail,
-     MessageCategoryDetail,
-     ItemDetail,
-   };
+   export type { CategoryDetail, MessageCategoryDetail, ItemDetail };
 
    // Frontend type that matches API response
    // (Should be identical to core type, but explicitly defined for clarity)
@@ -1194,10 +1280,16 @@ Build the UI components to display context breakdown.
 
 2. Update `packages/web/types/index.ts` (if it exists) to export:
    ```typescript
-   export type { ContextBreakdown, CategoryDetail, MessageCategoryDetail, ItemDetail } from './context';
+   export type {
+     ContextBreakdown,
+     CategoryDetail,
+     MessageCategoryDetail,
+     ItemDetail,
+   } from './context';
    ```
 
 **Testing**:
+
 - Verify TypeScript compilation: `cd packages/web && npm run build`
 
 **Commit**: `feat(web): add context breakdown type definitions`
@@ -1209,15 +1301,18 @@ Build the UI components to display context breakdown.
 **Objective**: Build the detailed list view showing categories and token counts.
 
 **Files to Create**:
+
 - `packages/web/components/context/ContextBreakdownList.tsx`
 
 **Files to Read First** (understand component patterns):
+
 - `packages/web/components/ui/Alert.tsx` - DaisyUI component wrapper example
 - `packages/web/components/ui/Badge.tsx` - Badge styling
 
 **What to Do**:
 
 1. Create component file:
+
    ```typescript
    // ABOUTME: Detailed list view of context breakdown by category
    // ABOUTME: Shows token counts, percentages, and nested items
@@ -1395,7 +1490,9 @@ Build the UI components to display context breakdown.
    ```
 
 **Testing**:
-1. Create test file: `packages/web/components/context/ContextBreakdownList.test.tsx`
+
+1. Create test file:
+   `packages/web/components/context/ContextBreakdownList.test.tsx`
 
 ```typescript
 // ABOUTME: Tests for context breakdown list component
@@ -1497,15 +1594,18 @@ describe('ContextBreakdownList', () => {
 **Objective**: Build the modal that displays context breakdown.
 
 **Files to Create**:
+
 - `packages/web/components/context/ContextViewerModal.tsx`
 
 **Files to Read First**:
+
 - `packages/web/components/ui/Modal.tsx` (or look for DaisyUI modal examples)
 - Other modal components in the codebase
 
 **What to Do**:
 
 1. Create modal component:
+
    ```typescript
    // ABOUTME: Modal dialog for viewing agent context breakdown
    // ABOUTME: Displays snapshot of token usage with visualization and details
@@ -1826,6 +1926,7 @@ describe('ContextViewerModal', () => {
 ```
 
 **Testing**:
+
 1. Run tests: `npm test ContextViewerModal`
 2. Fix any failures
 3. Manual testing in browser (next task)
@@ -1839,11 +1940,13 @@ describe('ContextViewerModal', () => {
 **Objective**: Make clicking token usage display open the modal.
 
 **Files to Modify**:
+
 - `packages/web/components/ui/CompactTokenUsage.tsx`
 
 **What to Do**:
 
 1. Add modal state and click handler:
+
    ```typescript
    // At the top, add import
    import { ContextViewerModal } from '@lace/web/components/context/ContextViewerModal';
@@ -1896,6 +1999,7 @@ describe('ContextViewerModal', () => {
    ```
 
 **Testing**:
+
 1. Start dev server: `npm run dev`
 2. Navigate to agent chat page
 3. Click on token usage display in footer
@@ -1916,6 +2020,7 @@ describe('ContextViewerModal', () => {
 ---
 
 **Phase 3 Complete! Checkpoint:**
+
 - Modal opens on click
 - Context breakdown displays correctly
 - All categories show accurate data
@@ -2012,6 +2117,7 @@ export function TreemapPrototype({ breakdown }: { breakdown: ContextBreakdown })
 ```
 
 **Testing**:
+
 1. Import prototype into modal temporarily
 2. Verify it renders correctly
 3. Check bundle size impact: `npm run build && ls -lh dist/`
@@ -2027,9 +2133,11 @@ export function TreemapPrototype({ breakdown }: { breakdown: ContextBreakdown })
 **Objective**: Add treemap to context modal.
 
 **Files to Create**:
+
 - `packages/web/components/context/ContextTreemap.tsx`
 
 **Files to Modify**:
+
 - `packages/web/components/context/ContextViewerModal.tsx`
 
 **Only proceed if Task 4.1 decision was YES to treemap**
@@ -2037,6 +2145,7 @@ export function TreemapPrototype({ breakdown }: { breakdown: ContextBreakdown })
 **What to Do**:
 
 1. Create treemap component (customize based on library):
+
    ```typescript
    // ABOUTME: Treemap visualization of context breakdown
    // ABOUTME: Shows proportional rectangles for each category
@@ -2132,6 +2241,7 @@ export function TreemapPrototype({ breakdown }: { breakdown: ContextBreakdown })
    ```
 
 **Testing**:
+
 1. Verify treemap renders correctly
 2. Test hover interactions
 3. Verify colors match theme
@@ -2146,6 +2256,7 @@ export function TreemapPrototype({ breakdown }: { breakdown: ContextBreakdown })
 **Objective**: Add progress bars if treemap wasn't chosen.
 
 **Files to Create**:
+
 - `packages/web/components/context/ContextProgressBars.tsx`
 
 **Only proceed if Task 4.1 decision was NO to treemap**
@@ -2153,6 +2264,7 @@ export function TreemapPrototype({ breakdown }: { breakdown: ContextBreakdown })
 **What to Do**:
 
 1. Create progress bar component:
+
    ```typescript
    // ABOUTME: Progress bar visualization of context breakdown
    // ABOUTME: Shows stacked and individual progress bars for categories
@@ -2290,6 +2402,7 @@ export function TreemapPrototype({ breakdown }: { breakdown: ContextBreakdown })
    ```
 
 **Testing**:
+
 1. Verify progress bars render correctly
 2. Verify percentages are accurate
 3. Test with different data sizes
@@ -2300,6 +2413,7 @@ export function TreemapPrototype({ breakdown }: { breakdown: ContextBreakdown })
 ---
 
 **Phase 4 Complete! Checkpoint:**
+
 - Visualization is complete (either treemap or progress bars)
 - Modal has both visual and detailed breakdown
 - Ready for final polish
@@ -2317,11 +2431,13 @@ Final touches, edge cases, and documentation.
 **Objective**: Ensure all edge cases are handled gracefully.
 
 **Files to Modify**:
+
 - `packages/web/components/context/ContextViewerModal.tsx`
 
 **What to Do**:
 
 1. Enhance loading state:
+
    ```typescript
    {loading && (
      <div className="flex flex-col items-center justify-center py-12 gap-4">
@@ -2334,6 +2450,7 @@ Final touches, edge cases, and documentation.
    ```
 
 2. Enhance error state with retry:
+
    ```typescript
    {error && (
      <div className="alert alert-error">
@@ -2365,6 +2482,7 @@ Final touches, edge cases, and documentation.
    ```
 
 **Testing**:
+
 1. Test loading state (add artificial delay)
 2. Test error state (simulate API failure)
 3. Test empty conversation
@@ -2379,11 +2497,13 @@ Final touches, edge cases, and documentation.
 **Objective**: Ensure modal is keyboard navigable and screen reader friendly.
 
 **Files to Modify**:
+
 - `packages/web/components/context/ContextViewerModal.tsx`
 
 **What to Do**:
 
 1. Add ARIA attributes:
+
    ```typescript
    <div
      className="modal-box max-w-3xl max-h-[90vh] overflow-y-auto"
@@ -2400,6 +2520,7 @@ Final touches, edge cases, and documentation.
    ```
 
 2. Add focus trap (when modal opens, focus should be trapped inside):
+
    ```typescript
    // Use a library like 'focus-trap-react' or implement custom logic
    ```
@@ -2419,6 +2540,7 @@ Final touches, edge cases, and documentation.
    ```
 
 **Testing**:
+
 1. Tab through modal (should stay within modal)
 2. Test with screen reader (VoiceOver on Mac, NVDA on Windows)
 3. Verify all interactive elements are reachable
@@ -2433,13 +2555,14 @@ Final touches, edge cases, and documentation.
 **Objective**: Document the new components for other developers.
 
 **Files to Create**:
+
 - `packages/web/components/context/README.md`
 
 **What to Do**:
 
 Create documentation:
 
-```markdown
+````markdown
 # Context Viewer Components
 
 Components for displaying detailed breakdown of agent context usage.
@@ -2451,6 +2574,7 @@ Components for displaying detailed breakdown of agent context usage.
 Main modal dialog that fetches and displays context breakdown.
 
 **Usage:**
+
 ```tsx
 import { ContextViewerModal } from '@lace/web/components/context/ContextViewerModal';
 
@@ -2469,13 +2593,16 @@ function MyComponent() {
   );
 }
 ```
+````
 
 **Props:**
+
 - `agentId: ThreadId` - ID of the agent to analyze
 - `isOpen: boolean` - Whether modal is visible
 - `onClose: () => void` - Callback when modal should close
 
 **Behavior:**
+
 - Fetches context breakdown when opened (static snapshot)
 - Displays loading spinner while fetching
 - Shows error alert if fetch fails
@@ -2486,13 +2613,15 @@ function MyComponent() {
 Detailed list view of token usage by category.
 
 **Usage:**
+
 ```tsx
 import { ContextBreakdownList } from '@lace/web/components/context/ContextBreakdownList';
 
-<ContextBreakdownList breakdown={breakdown} />
+<ContextBreakdownList breakdown={breakdown} />;
 ```
 
 **Props:**
+
 - `breakdown: ContextBreakdown` - Context breakdown data
 
 ### ContextTreemap / ContextProgressBars
@@ -2500,12 +2629,13 @@ import { ContextBreakdownList } from '@lace/web/components/context/ContextBreakd
 Visual representation of context usage (one or the other is used).
 
 **Usage:**
+
 ```tsx
 import { ContextTreemap } from '@lace/web/components/context/ContextTreemap';
 // OR
 import { ContextProgressBars } from '@lace/web/components/context/ContextProgressBars';
 
-<ContextTreemap breakdown={breakdown} />
+<ContextTreemap breakdown={breakdown} />;
 ```
 
 ## Data Structure
@@ -2533,6 +2663,7 @@ interface ContextBreakdown {
 ## Integration
 
 The context viewer is integrated into `CompactTokenUsage` component:
+
 - Clicking the token usage display opens the modal
 - Modal shows snapshot of current context state
 - No real-time updates (re-open modal to refresh)
@@ -2540,6 +2671,7 @@ The context viewer is integrated into `CompactTokenUsage` component:
 ## Testing
 
 Run component tests:
+
 ```bash
 npm test ContextViewerModal
 npm test ContextBreakdownList
@@ -2550,7 +2682,8 @@ npm test ContextBreakdownList
 Context data comes from: `GET /api/agents/:agentId/context`
 
 See `packages/web/app/routes/api.agents.$agentId.context.ts`
-```
+
+````
 
 **Commit**: `docs(web): add context viewer component documentation`
 
@@ -2585,19 +2718,22 @@ See `packages/web/app/routes/api.agents.$agentId.context.ts`
 
    **Types**:
    - `packages/web/types/context.ts` - Frontend type definitions
-   ```
+````
 
 2. Add usage notes to CLAUDE.md if relevant:
+
    ```markdown
    ## Context Viewer
 
    Users can view detailed context breakdown by clicking the token usage display
    in the chat footer. The modal shows:
+
    - Token counts by category (system, tools, messages, reserved, free)
    - Visual representation (treemap or progress bars)
    - Detailed listing of tools and message types
 
    Implementation follows our component system philosophy:
+
    - DaisyUI-based modal
    - Strong TypeScript types
    - Static snapshot approach (no real-time updates)
@@ -2613,9 +2749,11 @@ See `packages/web/app/routes/api.agents.$agentId.context.ts`
 **Objective**: Add E2E test using Playwright.
 
 **Files to Create**:
+
 - `packages/web/e2e/context-viewer.spec.ts`
 
 **Files to Read First**:
+
 - Other E2E test files to understand patterns
 
 **What to Do**:
@@ -2634,12 +2772,16 @@ test.describe('Context Viewer', () => {
     // ... setup code
   });
 
-  test('should open context modal when clicking token usage', async ({ page }) => {
+  test('should open context modal when clicking token usage', async ({
+    page,
+  }) => {
     // Navigate to agent chat
     await page.goto('/project/1/session/1/agent/1');
 
     // Wait for token usage display
-    await page.waitForSelector('[data-testid="token-usage"]', { timeout: 5000 });
+    await page.waitForSelector('[data-testid="token-usage"]', {
+      timeout: 5000,
+    });
 
     // Click token usage
     await page.click('[data-testid="token-usage"]');
@@ -2701,15 +2843,19 @@ test.describe('Context Viewer', () => {
     await page.click('[data-testid="token-usage"]');
 
     // Verify message tokens are greater than 0
-    const messageTokens = await page.textContent('[data-testid="messages-tokens"]');
+    const messageTokens = await page.textContent(
+      '[data-testid="messages-tokens"]'
+    );
     expect(parseInt(messageTokens || '0')).toBeGreaterThan(0);
   });
 });
 ```
 
-**Note**: You'll need to add `data-testid` attributes to components for reliable E2E testing.
+**Note**: You'll need to add `data-testid` attributes to components for reliable
+E2E testing.
 
 **Testing**:
+
 1. Run E2E tests: `npm run test:e2e`
 2. Fix any failures
 3. Ensure tests are stable (no flakiness)
@@ -2719,6 +2865,7 @@ test.describe('Context Viewer', () => {
 ---
 
 **Phase 5 Complete! Checkpoint:**
+
 - All edge cases handled
 - Accessibility improved
 - Documentation complete
@@ -2731,6 +2878,7 @@ test.describe('Context Viewer', () => {
 Before marking this feature complete, verify:
 
 ### Functionality
+
 - [ ] Context analyzer correctly counts tokens for all categories
 - [ ] API endpoint returns valid JSON
 - [ ] Modal opens when clicking token usage
@@ -2742,6 +2890,7 @@ Before marking this feature complete, verify:
 - [ ] Empty conversation handled gracefully
 
 ### Code Quality
+
 - [ ] All tests pass: `npm test`
 - [ ] TypeScript compiles without errors: `npm run build`
 - [ ] Linting passes: `npm run lint`
@@ -2750,6 +2899,7 @@ Before marking this feature complete, verify:
 - [ ] Components follow our styling patterns (DaisyUI)
 
 ### Documentation
+
 - [ ] Component README exists
 - [ ] CODE-MAP updated
 - [ ] All functions have clear comments
@@ -2757,6 +2907,7 @@ Before marking this feature complete, verify:
 - [ ] API endpoint documented
 
 ### Testing
+
 - [ ] Unit tests for ContextAnalyzer
 - [ ] Component tests for all React components
 - [ ] E2E test for full user flow
@@ -2764,18 +2915,21 @@ Before marking this feature complete, verify:
 - [ ] Tested with different conversation states
 
 ### Performance
+
 - [ ] Modal loads quickly (< 1 second)
 - [ ] No performance regression in chat UI
 - [ ] Bundle size increase is acceptable
 - [ ] No memory leaks (modal cleanup works)
 
 ### Accessibility
+
 - [ ] Keyboard navigation works
 - [ ] Screen reader announces loading states
 - [ ] Focus trap works in modal
 - [ ] ARIA labels present
 
 ### Git Hygiene
+
 - [ ] Frequent, logical commits throughout
 - [ ] Clear commit messages following conventions
 - [ ] No uncommitted changes
@@ -2786,6 +2940,7 @@ Before marking this feature complete, verify:
 ### Issue: Token counts don't match expectations
 
 **Solution**:
+
 - Verify token counting utility is accurate
 - Check that all event types are being processed
 - Compare with actual provider API token counts
@@ -2793,6 +2948,7 @@ Before marking this feature complete, verify:
 ### Issue: Modal doesn't close
 
 **Solution**:
+
 - Check ESC key handler is registered correctly
 - Verify backdrop click handler
 - Check React state management (isOpen prop)
@@ -2800,6 +2956,7 @@ Before marking this feature complete, verify:
 ### Issue: API returns 404 for valid agent
 
 **Solution**:
+
 - Verify SessionService.getAgent() method exists and works
 - Check agent ID format (might need type conversion)
 - Add logging to API route to debug
@@ -2807,6 +2964,7 @@ Before marking this feature complete, verify:
 ### Issue: Tests fail intermittently
 
 **Solution**:
+
 - Add proper `waitFor` assertions
 - Mock API calls consistently
 - Clear mocks between tests (`beforeEach`)
@@ -2814,6 +2972,7 @@ Before marking this feature complete, verify:
 ### Issue: TypeScript errors about core package imports
 
 **Solution**:
+
 - Verify workspace reference in `packages/web/package.json`
 - Check that core package exports types correctly
 - Rebuild core package: `cd packages/core && npm run build`
@@ -2821,6 +2980,7 @@ Before marking this feature complete, verify:
 ## References
 
 ### Key Files to Reference
+
 - Token counting: `packages/core/src/token-management/token-counter.ts`
 - Agent structure: `packages/core/src/agents/agent.ts`
 - Thread events: `packages/core/src/threads/types.ts`
@@ -2828,11 +2988,13 @@ Before marking this feature complete, verify:
 - DaisyUI docs: https://daisyui.com/components/modal/
 
 ### Testing Patterns
+
 - Agent setup: Look at `packages/core/src/agents/agent.test.ts`
 - Component testing: Look at `packages/web/components/ui/__tests__/`
 - E2E testing: Look at existing Playwright tests
 
 ### Component Patterns
+
 - Modal structure: Search for existing modals in codebase
 - DaisyUI usage: Look at `Alert.tsx`, `Badge.tsx` components
 - API client usage: Look at `useAgentTokenUsage` hook

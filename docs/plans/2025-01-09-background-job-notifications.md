@@ -1,12 +1,18 @@
 # Background Job Notifications Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
+> implement this plan task-by-task.
 
-**Goal:** Inject notifications into the agent's conversation when background jobs complete or reach progress checkpoints.
+**Goal:** Inject notifications into the agent's conversation when background
+jobs complete or reach progress checkpoints.
 
-**Architecture:** Notifications are queued when job events occur and delivered as user messages at safe injection points (turn boundaries, after tool completion, when idle). Progress updates are sent at configurable intervals with a 5-minute default.
+**Architecture:** Notifications are queued when job events occur and delivered
+as user messages at safe injection points (turn boundaries, after tool
+completion, when idle). Progress updates are sent at configurable intervals with
+a 5-minute default.
 
-**Tech Stack:** TypeScript, Zod schemas, existing job infrastructure in server.ts
+**Tech Stack:** TypeScript, Zod schemas, existing job infrastructure in
+server.ts
 
 ---
 
@@ -76,22 +82,23 @@ Use job_output tool with jobId "job_abc123" to see captured output.
 
 ## 2. Design Decisions
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Injection timing | First safe turn boundary | Never wait for user message |
-| Message type | User message | Can't add roles on most providers |
-| Progress trigger | Parameter on job launch | Simple, explicit |
-| Default progress interval | 5 minutes (300000ms) | Balance between awareness and spam |
-| Multi-job batching | Separate notifications | Simple |
-| Last N lines | 3 lines | Good context without overwhelming |
-| Line truncation | 200 chars | Prevent massive single-line output |
-| Persistence | Not required | Don't go out of our way |
+| Decision                  | Choice                   | Rationale                          |
+| ------------------------- | ------------------------ | ---------------------------------- |
+| Injection timing          | First safe turn boundary | Never wait for user message        |
+| Message type              | User message             | Can't add roles on most providers  |
+| Progress trigger          | Parameter on job launch  | Simple, explicit                   |
+| Default progress interval | 5 minutes (300000ms)     | Balance between awareness and spam |
+| Multi-job batching        | Separate notifications   | Simple                             |
+| Last N lines              | 3 lines                  | Good context without overwhelming  |
+| Line truncation           | 200 chars                | Prevent massive single-line output |
+| Persistence               | Not required             | Don't go out of our way            |
 
 ---
 
 ## Task 1: Add Notification Queue to State
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts`
 
 **Step 1: Define notification types**
@@ -137,6 +144,7 @@ git commit -m "feat(jobs): add notification queue to agent state"
 ## Task 2: Add Progress Interval to Job Schemas
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/implementations/bash.ts`
 - Modify: `packages/agent/src/tools/implementations/delegate.ts`
 - Create: `packages/agent/src/tools/__tests__/bash-progress.test.ts`
@@ -162,7 +170,8 @@ Add same parameter to delegate tool.
 
 **Step 3: Write tests**
 
-Test that schema accepts valid progressIntervalMs values and rejects invalid ones.
+Test that schema accepts valid progressIntervalMs values and rejects invalid
+ones.
 
 **Step 4: Commit**
 
@@ -178,6 +187,7 @@ git commit -m "feat(jobs): add progressIntervalMs parameter to bash and delegate
 ## Task 3: Extend JobState for Progress Tracking
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts`
 
 **Step 1: Add progress fields to JobState**
@@ -192,7 +202,7 @@ type JobState = {
 };
 ```
 
-**Step 2: Update _startShellJob to accept progressIntervalMs**
+**Step 2: Update \_startShellJob to accept progressIntervalMs**
 
 Pass through from tool args to job state.
 
@@ -210,6 +220,7 @@ git commit -m "feat(jobs): extend JobState with progress tracking fields"
 ## Task 4: Implement Notification Formatter
 
 **Files:**
+
 - Create: `packages/agent/src/jobs/format-notification.ts`
 - Create: `packages/agent/src/jobs/__tests__/format-notification.test.ts`
 
@@ -287,6 +298,7 @@ git commit -m "feat(jobs): implement notification formatter"
 ## Task 5: Generate Completion Notifications
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts`
 
 **Step 1: Create helper to get last N lines from job output**
@@ -311,7 +323,9 @@ function queueJobNotification(
   type: JobNotificationType,
   options?: { reason?: string; deltaBytes?: number }
 ) {
-  const outputBytes = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
+  const outputBytes = existsSync(job.outputPath)
+    ? statSync(job.outputPath).size
+    : 0;
   const durationMs = Date.now() - new Date(job.startedAt).getTime();
   const lastLines = getLastLines(job.outputPath, type === 'completed' ? 1 : 3);
 
@@ -351,6 +365,7 @@ git commit -m "feat(jobs): generate completion notifications"
 ## Task 6: Implement Notification Injection
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts`
 
 **Step 1: Create injectPendingNotifications helper**
@@ -379,6 +394,7 @@ async function injectPendingNotifications(): Promise<boolean> {
 **Step 2: Add injection points**
 
 Call `injectPendingNotifications()` at:
+
 - Start of `session/prompt` handler (before processing user message)
 - After tool execution completes (in the tool execution loop)
 - When turn ends and agent goes idle
@@ -399,6 +415,7 @@ git commit -m "feat(jobs): implement notification injection at turn boundaries"
 ## Task 7: Implement Progress Timer
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts`
 
 **Step 1: Set up progress timer on job start**
@@ -409,7 +426,8 @@ In `_startShellJob` and `startSubagentJob`, when job has `progressIntervalMs`:
 const DEFAULT_PROGRESS_INTERVAL = 300000; // 5 minutes
 
 // Use provided interval or default for background jobs
-const progressInterval = options.progressIntervalMs ??
+const progressInterval =
+  options.progressIntervalMs ??
   (options.background ? DEFAULT_PROGRESS_INTERVAL : undefined);
 
 if (progressInterval) {
@@ -423,7 +441,9 @@ if (progressInterval) {
       return;
     }
 
-    const currentBytes = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
+    const currentBytes = existsSync(job.outputPath)
+      ? statSync(job.outputPath).size
+      : 0;
     const deltaBytes = currentBytes - (job.lastProgressBytes ?? 0);
 
     queueJobNotification(job, 'progress', { deltaBytes });
@@ -465,7 +485,9 @@ git commit -m "feat(jobs): implement progress notification timer"
 ## Task 8: E2E Tests for Notifications
 
 **Files:**
-- Modify: `packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+
+- Modify:
+  `packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 
 **Step 1: Test completion notification injection**
 
@@ -508,12 +530,14 @@ git commit -m "test(jobs): add E2E tests for job notifications"
 ## Task 9: Update Tool Descriptions
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/implementations/bash.ts`
 - Modify: `packages/agent/src/tools/implementations/delegate.ts`
 
 **Step 1: Update bash tool description**
 
 Document that:
+
 - Background jobs send completion notifications automatically
 - Progress notifications sent every 5 minutes by default
 - Can customize with `progressIntervalMs`
@@ -532,22 +556,25 @@ git commit -m "docs(tools): document background job notification behavior"
 
 ## Summary
 
-| Task | Description | Files |
-|------|-------------|-------|
-| 1 | Add notification queue to state | server.ts |
-| 2 | Add progressIntervalMs to schemas | bash.ts, delegate.ts |
-| 3 | Extend JobState for progress tracking | server.ts |
-| 4 | Implement notification formatter | format-notification.ts |
-| 5 | Generate completion notifications | server.ts |
-| 6 | Implement notification injection | server.ts |
-| 7 | Implement progress timer | server.ts |
-| 8 | E2E tests for notifications | async-workflow.e2e.test.ts |
-| 9 | Update tool descriptions | bash.ts, delegate.ts |
+| Task | Description                           | Files                      |
+| ---- | ------------------------------------- | -------------------------- |
+| 1    | Add notification queue to state       | server.ts                  |
+| 2    | Add progressIntervalMs to schemas     | bash.ts, delegate.ts       |
+| 3    | Extend JobState for progress tracking | server.ts                  |
+| 4    | Implement notification formatter      | format-notification.ts     |
+| 5    | Generate completion notifications     | server.ts                  |
+| 6    | Implement notification injection      | server.ts                  |
+| 7    | Implement progress timer              | server.ts                  |
+| 8    | E2E tests for notifications           | async-workflow.e2e.test.ts |
+| 9    | Update tool descriptions              | bash.ts, delegate.ts       |
 
 ---
 
 ## Open Questions / Future Work
 
-1. **Subagent output capture**: Verify that delegate job output (agent text responses) is being captured correctly to job output file
-2. **Notification acknowledgment**: Should agent explicitly acknowledge notifications? (Probably not needed initially)
-3. **Rate limiting**: If many jobs complete simultaneously, should we rate-limit notification injection? (Start simple, optimize if needed)
+1. **Subagent output capture**: Verify that delegate job output (agent text
+   responses) is being captured correctly to job output file
+2. **Notification acknowledgment**: Should agent explicitly acknowledge
+   notifications? (Probably not needed initially)
+3. **Rate limiting**: If many jobs complete simultaneously, should we rate-limit
+   notification injection? (Start simple, optimize if needed)

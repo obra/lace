@@ -2,7 +2,9 @@
 
 ## Problem
 
-We're currently sending the ENTIRE conversation history (500+ events, ~108K tokens) with every Responses API request. This:
+We're currently sending the ENTIRE conversation history (500+ events, ~108K
+tokens) with every Responses API request. This:
+
 - Wastes bandwidth sending 108K tokens over the wire
 - Causes rate limit errors (124K tokens requested per call)
 - Prevents prompt caching from working effectively
@@ -10,7 +12,9 @@ We're currently sending the ENTIRE conversation history (500+ events, ~108K toke
 
 ## Root Cause
 
-The Responses API supports stateful conversations via `previous_response_id`, but we're not using it. Instead, we're treating it like Chat Completions and sending full history.
+The Responses API supports stateful conversations via `previous_response_id`,
+but we're not using it. Instead, we're treating it like Chat Completions and
+sending full history.
 
 ## How Responses API Should Work
 
@@ -42,7 +46,8 @@ const response2 = await openai.responses.create({
 ## Key Insights from Docs
 
 1. **previous_response_id chains responses** - OpenAI stores state server-side
-2. **You still get billed for all chained tokens** - but you don't SEND them over wire
+2. **You still get billed for all chained tokens** - but you don't SEND them
+   over wire
 3. **Prompt caching works automatically** - 50-90% discount on cached tokens
 4. **Tool calls/results in current turn must be included** in input
 5. **Responses stored for 30 days** (unless store=false)
@@ -53,17 +58,19 @@ const response2 = await openai.responses.create({
 ### 1. Thread Metadata Storage
 
 Add to thread metadata:
+
 ```typescript
 interface ThreadMetadata {
   // ... existing fields
-  openaiResponseId?: string;  // Last response.id from OpenAI Responses API
-  openaiLastInstructions?: string;  // Last system prompt sent
+  openaiResponseId?: string; // Last response.id from OpenAI Responses API
+  openaiLastInstructions?: string; // Last system prompt sent
 }
 ```
 
 ### 2. Update `_createResponsesAPIPayload`
 
 Current behavior:
+
 ```typescript
 // Converts ALL messages to input items
 for (const msg of messages.filter((m) => m.role !== 'system')) {
@@ -72,6 +79,7 @@ for (const msg of messages.filter((m) => m.role !== 'system')) {
 ```
 
 New behavior:
+
 ```typescript
 private _createResponsesAPIPayload(
   messages: ProviderMessage[],
@@ -173,15 +181,18 @@ private _convertMessagesToInputItems(
 ### 4. Update Provider Methods
 
 Both streaming and non-streaming need to:
+
 1. Get `previousResponseId` from somewhere (thread metadata? passed as param?)
 2. Pass it to `_createResponsesAPIPayload`
 3. Store the new `response.id` after successful response
 
 ### 5. Thread Integration
 
-The challenge: Providers are stateless, but we need to track response IDs per thread.
+The challenge: Providers are stateless, but we need to track response IDs per
+thread.
 
 **Option A: Pass via ProviderMessage metadata**
+
 ```typescript
 interface ProviderMessage {
   role: 'user' | 'assistant' | 'system';
@@ -189,12 +200,13 @@ interface ProviderMessage {
   toolCalls?: ToolCall[];
   toolResults?: ToolResult[];
   metadata?: {
-    openaiResponseId?: string;  // For Responses API chaining
+    openaiResponseId?: string; // For Responses API chaining
   };
 }
 ```
 
 **Option B: Pass as method parameter**
+
 ```typescript
 async createStreamingResponse(
   messages: ProviderMessage[],
@@ -214,6 +226,7 @@ async createStreamingResponse(
 ### 6. Agent Integration
 
 Agent needs to:
+
 1. Track last `openaiResponseId` in thread metadata
 2. Pass it to provider when calling Responses API models
 3. Update it after each successful response
@@ -261,6 +274,7 @@ private async _createStreamingResponse(): Promise<ProviderResponse> {
 ### 7. Return Response ID
 
 Update ProviderResponse type:
+
 ```typescript
 export interface ProviderResponse {
   content: string;
@@ -288,11 +302,13 @@ export interface ProviderResponse {
 ## Expected Results
 
 **Before:**
+
 - Sending: 108K tokens over wire per request
 - Billed: 124K tokens (108K input + 16K max output)
 - Rate limit: Hit after 4 requests
 
 **After:**
+
 - Sending: ~500-2000 tokens over wire (just new messages + tool results)
 - Billed: 124K tokens (full chain, but 90% cached = ~12K effective cost)
 - Rate limit: Much less likely, and when hit, properly retried
@@ -311,4 +327,5 @@ export interface ProviderResponse {
 - **Thread metadata** needs migration if we change structure
 - **Response ID cleanup** - 30 day TTL, what happens after?
 - **Model switches mid-conversation** - need to restart chain
-- **Error handling** - if previous_response_id is invalid, fall back to full history
+- **Error handling** - if previous_response_id is invalid, fall back to full
+  history

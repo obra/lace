@@ -1,10 +1,17 @@
 # Dissolve @lace/core into @lace/agent
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
+> implement this plan task-by-task.
 
-**Goal:** Eliminate `packages/core` by moving all execution-related code into `packages/agent`, making the agent a fully standalone unit that speaks Ent protocol.
+**Goal:** Eliminate `packages/core` by moving all execution-related code into
+`packages/agent`, making the agent a fully standalone unit that speaks Ent
+protocol.
 
-**Architecture:** The agent becomes self-contained with tools, providers, MCP, workspace, and all execution logic. The supervisor and web communicate with agents exclusively via Ent protocol. Types needed by web come from `@lace/ent-protocol`. No package imports `@lace/core` because it no longer exists.
+**Architecture:** The agent becomes self-contained with tools, providers, MCP,
+workspace, and all execution logic. The supervisor and web communicate with
+agents exclusively via Ent protocol. Types needed by web come from
+`@lace/ent-protocol`. No package imports `@lace/core` because it no longer
+exists.
 
 **Tech Stack:** TypeScript, Ent protocol (JSON-RPC 2.0), Zod schemas
 
@@ -14,36 +21,38 @@
 
 ### What's in `packages/core/src/`:
 
-| Directory | Purpose | Destination |
-|-----------|---------|-------------|
-| `tools/` | Tool implementations, executor, schemas | → `packages/agent` |
-| `providers/` | Provider registry, catalog, instances | → `packages/agent` |
-| `mcp/` | MCP server management | → `packages/agent` |
-| `workspace/` | Container and workspace management | → `packages/agent` |
-| `containers/` | Container utilities | → `packages/agent` |
-| `config/` | Lace dir, MCP config, personas | → `packages/agent` |
-| `threads/` | Types + compaction (partial) | Types → `ent-protocol`, compaction → `agent` |
-| `token-management/` | Token counting | → `packages/agent` |
-| `utils/` | Logger, token estimation | → `packages/agent` (or inline) |
-| `helpers/` | Infrastructure helpers | → `packages/agent` |
-| `projects/` | Project management | → `packages/agent` |
-| `test-utils/` | Test utilities | → each package owns its own |
-| `agents/` | Empty after refactor | Delete |
-| `sessions/` | Empty after refactor | Delete |
-| `persistence/` | Empty after refactor | Delete |
-| `tasks/` | Empty after refactor | Delete |
+| Directory           | Purpose                                 | Destination                                  |
+| ------------------- | --------------------------------------- | -------------------------------------------- |
+| `tools/`            | Tool implementations, executor, schemas | → `packages/agent`                           |
+| `providers/`        | Provider registry, catalog, instances   | → `packages/agent`                           |
+| `mcp/`              | MCP server management                   | → `packages/agent`                           |
+| `workspace/`        | Container and workspace management      | → `packages/agent`                           |
+| `containers/`       | Container utilities                     | → `packages/agent`                           |
+| `config/`           | Lace dir, MCP config, personas          | → `packages/agent`                           |
+| `threads/`          | Types + compaction (partial)            | Types → `ent-protocol`, compaction → `agent` |
+| `token-management/` | Token counting                          | → `packages/agent`                           |
+| `utils/`            | Logger, token estimation                | → `packages/agent` (or inline)               |
+| `helpers/`          | Infrastructure helpers                  | → `packages/agent`                           |
+| `projects/`         | Project management                      | → `packages/agent`                           |
+| `test-utils/`       | Test utilities                          | → each package owns its own                  |
+| `agents/`           | Empty after refactor                    | Delete                                       |
+| `sessions/`         | Empty after refactor                    | Delete                                       |
+| `persistence/`      | Empty after refactor                    | Delete                                       |
+| `tasks/`            | Empty after refactor                    | Delete                                       |
 
 ### Protocol Extensions Required
 
 For web to work without importing agent code, these protocol methods are needed:
 
 **Already implemented:**
+
 - `ent/providers/list` - provider families
 - `ent/connections/*` - connection CRUD
 - `ent/connections/credentials/*` - credential management
 - `ent/models/list` - models per connection
 
 **Need to add:**
+
 - `ent/tools/list` - list available tools and their schemas
 - `ent/mcp/servers/list` - list MCP server configurations
 - `ent/mcp/servers/upsert` - add/update MCP server
@@ -58,12 +67,12 @@ For web to work without importing agent code, these protocol methods are needed:
 
 Web currently imports ~40 things from core. After dissolution:
 
-| Current Import | New Source |
-|---------------|------------|
-| Type definitions (ToolCall, LaceEvent, etc.) | `@lace/ent-protocol` |
-| `logger` | Local logger or supervisor's logging |
-| `ProviderRegistry`, `ToolCatalog`, etc. | Via supervisor → protocol calls |
-| Test utilities | Local test utilities |
+| Current Import                               | New Source                           |
+| -------------------------------------------- | ------------------------------------ |
+| Type definitions (ToolCall, LaceEvent, etc.) | `@lace/ent-protocol`                 |
+| `logger`                                     | Local logger or supervisor's logging |
+| `ProviderRegistry`, `ToolCatalog`, etc.      | Via supervisor → protocol calls      |
+| Test utilities                               | Local test utilities                 |
 
 ---
 
@@ -71,11 +80,13 @@ Web currently imports ~40 things from core. After dissolution:
 
 ### Phase 1: Move Code to Agent (No Protocol Changes)
 
-Move all execution code from core → agent. Agent continues to work. Web temporarily broken (acceptable during migration).
+Move all execution code from core → agent. Agent continues to work. Web
+temporarily broken (acceptable during migration).
 
 ### Phase 2: Add Protocol Methods
 
-Add new Ent protocol methods for tools, MCP, workspace, personas. Agent implements handlers. Also fix missing `ent/models/refresh` handler.
+Add new Ent protocol methods for tools, MCP, workspace, personas. Agent
+implements handlers. Also fix missing `ent/models/refresh` handler.
 
 ### Phase 3: Update Supervisor
 
@@ -91,7 +102,8 @@ Remove `packages/core` entirely.
 
 ### Phase 6: Restore Critical Test Coverage
 
-Add tests for retry logic, token management, abort handling, auto-compaction, and web full-flow that were deleted during refactoring.
+Add tests for retry logic, token management, abort handling, auto-compaction,
+and web full-flow that were deleted during refactoring.
 
 ---
 
@@ -100,6 +112,7 @@ Add tests for retry logic, token management, abort handling, auto-compaction, an
 ### Task 1.1: Create Agent Directory Structure
 
 **Files:**
+
 - Create: `packages/agent/src/tools/` (directory)
 - Create: `packages/agent/src/providers/` (directory)
 - Create: `packages/agent/src/mcp/` (directory)
@@ -128,6 +141,7 @@ git commit -m "chore(agent): create directory structure for core dissolution"
 ### Task 1.2: Move Tools Package
 
 **Files:**
+
 - Move: `packages/core/src/tools/` → `packages/agent/src/tools/`
 - Update: `packages/agent/src/server.ts` (change imports)
 
@@ -139,9 +153,11 @@ cp -r packages/core/src/tools/* packages/agent/src/tools/
 
 **Step 2: Update internal imports in tools/**
 
-All imports like `from '@lace/core/...'` need to become relative imports or `from '@lace/agent/...'`.
+All imports like `from '@lace/core/...'` need to become relative imports or
+`from '@lace/agent/...'`.
 
 Files to update:
+
 - `packages/agent/src/tools/executor.ts`
 - `packages/agent/src/tools/tool.ts`
 - `packages/agent/src/tools/tool-catalog.ts`
@@ -150,6 +166,7 @@ Files to update:
 **Step 3: Update server.ts imports**
 
 Change:
+
 ```typescript
 import { ToolExecutor } from '@lace/core/tools/executor';
 import type { Tool as CoreTool } from '@lace/core/tools/tool';
@@ -157,6 +174,7 @@ import { ... } from '@lace/core/tools/types';
 ```
 
 To:
+
 ```typescript
 import { ToolExecutor } from './tools/executor';
 import type { Tool } from './tools/tool';
@@ -182,6 +200,7 @@ git commit -m "feat(agent): move tools from core to agent"
 ### Task 1.3: Move Providers Package
 
 **Files:**
+
 - Move: `packages/core/src/providers/` → `packages/agent/src/providers/`
 - Update: `packages/agent/src/server.ts`
 
@@ -194,8 +213,10 @@ cp -r packages/core/src/providers/* packages/agent/src/providers/
 **Step 2: Update internal imports**
 
 Files to update:
+
 - All files in `packages/agent/src/providers/`
-- Provider implementations: `anthropic.ts`, `openai.ts`, `lmstudio.ts`, `ollama.ts`, `openrouter/`
+- Provider implementations: `anthropic.ts`, `openai.ts`, `lmstudio.ts`,
+  `ollama.ts`, `openrouter/`
 
 **Step 3: Update server.ts imports**
 
@@ -220,6 +241,7 @@ git commit -m "feat(agent): move providers from core to agent"
 ### Task 1.4: Move MCP Package
 
 **Files:**
+
 - Move: `packages/core/src/mcp/` → `packages/agent/src/mcp/`
 - Update: `packages/agent/src/server.ts`
 
@@ -254,6 +276,7 @@ git commit -m "feat(agent): move MCP from core to agent"
 ### Task 1.5: Move Workspace and Containers
 
 **Files:**
+
 - Move: `packages/core/src/workspace/` → `packages/agent/src/workspace/`
 - Move: `packages/core/src/containers/` → `packages/agent/src/containers/`
 
@@ -285,12 +308,14 @@ git commit -m "feat(agent): move workspace and containers from core to agent"
 ### Task 1.6: Move Config Package
 
 **Files:**
+
 - Move: `packages/core/src/config/` → `packages/agent/src/config/`
 - Update: existing `packages/agent/src/config/lace-dir.ts`
 
 **Step 1: Copy config directory**
 
-Note: Agent already has `config/lace-dir.ts` that re-exports from core. Replace with actual implementation.
+Note: Agent already has `config/lace-dir.ts` that re-exports from core. Replace
+with actual implementation.
 
 ```bash
 cp -r packages/core/src/config/* packages/agent/src/config/
@@ -317,6 +342,7 @@ git commit -m "feat(agent): move config from core to agent"
 ### Task 1.7: Move Utils Package
 
 **Files:**
+
 - Move: `packages/core/src/utils/` → `packages/agent/src/utils/`
 
 **Step 1: Copy utils directory**
@@ -348,7 +374,9 @@ git commit -m "feat(agent): move utils from core to agent"
 ### Task 1.8: Move Token Management
 
 **Files:**
-- Move: `packages/core/src/token-management/` → `packages/agent/src/token-management/`
+
+- Move: `packages/core/src/token-management/` →
+  `packages/agent/src/token-management/`
 
 **Step 1: Copy directory**
 
@@ -377,6 +405,7 @@ git commit -m "feat(agent): move token-management from core to agent"
 ### Task 1.9: Move Helpers Package
 
 **Files:**
+
 - Move: `packages/core/src/helpers/` → `packages/agent/src/helpers/`
 
 **Step 1: Copy directory**
@@ -406,6 +435,7 @@ git commit -m "feat(agent): move helpers from core to agent"
 ### Task 1.10: Move Projects Package
 
 **Files:**
+
 - Move: `packages/core/src/projects/` → `packages/agent/src/projects/`
 
 **Step 1: Copy directory**
@@ -435,7 +465,9 @@ git commit -m "feat(agent): move projects from core to agent"
 ### Task 1.11: Move Remaining Compaction Code
 
 **Files:**
-- Move: `packages/core/src/threads/compaction/` → `packages/agent/src/compaction/strategies/`
+
+- Move: `packages/core/src/threads/compaction/` →
+  `packages/agent/src/compaction/strategies/`
 - Update: `packages/agent/src/compaction/compact-dropped-messages.ts`
 
 **Step 1: Copy compaction strategies**
@@ -467,12 +499,15 @@ git commit -m "feat(agent): move compaction strategies from core to agent"
 ### Task 1.12: Move Types to ent-protocol
 
 **Files:**
+
 - Update: `packages/ent-protocol/src/types/` with shared types
-- Types to move: `LaceEvent`, `LaceEventType`, `ToolCall`, `ToolResult`, `ProviderInfo`, `ModelInfo`
+- Types to move: `LaceEvent`, `LaceEventType`, `ToolCall`, `ToolResult`,
+  `ProviderInfo`, `ModelInfo`
 
 **Step 1: Identify types needed by web**
 
 From web's `types/core.ts`:
+
 - `LaceEvent`, `LaceEventType`, `ErrorType`, `ErrorPhase`, `AgentErrorData`
 - `ToolCall`, `ToolResult`, `ToolAnnotations`, `ToolPolicy`, `ApprovalDecision`
 - `ProviderInfo`, `ProviderResponse`, `ModelInfo`
@@ -507,6 +542,7 @@ git commit -m "feat(ent-protocol): add shared types for tool, provider, workspac
 ### Task 1.13: Remove Core Dependency from Agent
 
 **Files:**
+
 - Update: `packages/agent/package.json`
 
 **Step 1: Remove @lace/core from dependencies**
@@ -541,6 +577,7 @@ git commit -m "chore(agent): remove @lace/core dependency"
 ### Task 2.1: Add Tool Protocol Methods
 
 **Files:**
+
 - Update: `packages/ent-protocol/src/schemas/methods.ts`
 - Update: `packages/agent/src/server.ts`
 
@@ -549,15 +586,19 @@ git commit -m "chore(agent): remove @lace/core dependency"
 ```typescript
 // ent/tools/list
 const EntToolsListParamsSchema = z.object({}).strict();
-const EntToolsListResultSchema = z.object({
-  tools: z.array(z.object({
-    name: z.string(),
-    description: z.string(),
-    schema: z.record(z.string(), z.unknown()), // JSON Schema
-    category: z.string().optional(),
-    requiresApproval: z.boolean(),
-  })),
-}).strict();
+const EntToolsListResultSchema = z
+  .object({
+    tools: z.array(
+      z.object({
+        name: z.string(),
+        description: z.string(),
+        schema: z.record(z.string(), z.unknown()), // JSON Schema
+        category: z.string().optional(),
+        requiresApproval: z.boolean(),
+      })
+    ),
+  })
+  .strict();
 ```
 
 **Add handler in server.ts:**
@@ -566,7 +607,7 @@ const EntToolsListResultSchema = z.object({
 peer.onRequest('ent/tools/list', async () => {
   const tools = toolExecutor.getAllTools();
   return {
-    tools: tools.map(t => ({
+    tools: tools.map((t) => ({
       name: t.name,
       description: t.description,
       schema: t.getJsonSchema(),
@@ -584,10 +625,12 @@ peer.onRequest('ent/tools/list', async () => {
 ### Task 2.2: Add MCP Protocol Methods
 
 **Files:**
+
 - Update: `packages/ent-protocol/src/schemas/methods.ts`
 - Update: `packages/agent/src/server.ts`
 
 **Add schemas for:**
+
 - `ent/mcp/servers/list`
 - `ent/mcp/servers/upsert`
 - `ent/mcp/servers/delete`
@@ -603,10 +646,12 @@ peer.onRequest('ent/tools/list', async () => {
 ### Task 2.3: Add Workspace Protocol Methods
 
 **Files:**
+
 - Update: `packages/ent-protocol/src/schemas/methods.ts`
 - Update: `packages/agent/src/server.ts`
 
 **Add schemas for:**
+
 - `ent/workspace/info`
 - `ent/workspace/create`
 
@@ -619,10 +664,12 @@ peer.onRequest('ent/tools/list', async () => {
 ### Task 2.4: Add Persona Protocol Methods
 
 **Files:**
+
 - Update: `packages/ent-protocol/src/schemas/methods.ts`
 - Update: `packages/agent/src/server.ts`
 
 **Add schemas for:**
+
 - `ent/personas/list`
 
 **Add handlers in server.ts.**
@@ -634,9 +681,12 @@ peer.onRequest('ent/tools/list', async () => {
 ### Task 2.5: Add Missing `ent/models/refresh` Handler
 
 **Files:**
+
 - Update: `packages/agent/src/server.ts`
 
-**Note:** Schema already exists in `packages/ent-protocol/src/schemas/methods.ts` (lines 964-979). Only the handler is missing.
+**Note:** Schema already exists in
+`packages/ent-protocol/src/schemas/methods.ts` (lines 964-979). Only the handler
+is missing.
 
 **Add handler in server.ts:**
 
@@ -647,7 +697,10 @@ peer.onRequest('ent/models/refresh', async (params: unknown) => {
 
   const instance = providerInstanceManager.getInstance(parsed.connectionId);
   if (!instance) {
-    throw { code: AcpErrorCodes.ConnectionNotFound, message: 'ConnectionNotFound' };
+    throw {
+      code: AcpErrorCodes.ConnectionNotFound,
+      message: 'ConnectionNotFound',
+    };
   }
 
   const provider = providerRegistry.getProvider(instance.catalogProviderId);
@@ -660,7 +713,7 @@ peer.onRequest('ent/models/refresh', async (params: unknown) => {
 
   return {
     connectionId: parsed.connectionId,
-    models: models.map(m => ({
+    models: models.map((m) => ({
       modelId: m.id,
       name: m.name,
       description: m.description,
@@ -692,11 +745,14 @@ git commit -m "feat(agent): add ent/models/refresh handler"
 ### Task 3.1: Add Supervisor HTTP Endpoints for New Protocol Methods
 
 **Files:**
+
 - Update: `packages/supervisor/src/http/server.ts`
 
-For each new protocol method, add corresponding HTTP endpoint that proxies to agent.
+For each new protocol method, add corresponding HTTP endpoint that proxies to
+agent.
 
 **Pattern:**
+
 ```typescript
 app.get('/api/tools', async (req, res) => {
   const agentPeer = getAgentPeer(req.sessionId);
@@ -714,17 +770,20 @@ app.get('/api/tools', async (req, res) => {
 ### Task 4.1: Update Web Types
 
 **Files:**
+
 - Update: `packages/web/types/core.ts` → rename to `types/protocol.ts`
 - Update all imports to use `@lace/ent-protocol` types
 
 **Step 1: Replace core type imports**
 
 Change:
+
 ```typescript
 import type { ToolCall } from '@lace/core/tools/types';
 ```
 
 To:
+
 ```typescript
 import type { ToolCall } from '@lace/ent-protocol';
 ```
@@ -736,6 +795,7 @@ import type { ToolCall } from '@lace/ent-protocol';
 ### Task 4.2: Remove Runtime Core Imports from Web
 
 **Files:**
+
 - Delete: `packages/web/lib/server/lace-imports.ts`
 - Update: `packages/web/app/routes/api.provider.catalog.ts`
 - Update: `packages/web/app/routes/api.mcp.servers.ts`
@@ -750,6 +810,7 @@ import type { ToolCall } from '@lace/ent-protocol';
 ### Task 4.3: Create Web-Local Logger
 
 **Files:**
+
 - Create: `packages/web/lib/logger.ts`
 - Update: 9 files that import `@lace/core/utils/logger`
 
@@ -774,6 +835,7 @@ export const logger = {
 ### Task 4.4: Remove Core Dependency from Web
 
 **Files:**
+
 - Update: `packages/web/package.json`
 
 **Step 1: Remove @lace/core from dependencies**
@@ -799,6 +861,7 @@ git commit -m "chore(web): remove @lace/core dependency"
 ### Task 5.1: Remove Core Package
 
 **Files:**
+
 - Delete: `packages/core/` (entire directory)
 - Update: root `package.json` (remove from workspaces if needed)
 - Update: `tsconfig.json` references
@@ -833,11 +896,13 @@ git commit -m "chore: remove @lace/core package - agent is now standalone"
 
 ## Phase 6: Restore Critical Test Coverage
 
-These tests were deleted during the refactoring and need to be restored in the new architecture.
+These tests were deleted during the refactoring and need to be restored in the
+new architecture.
 
 ### Task 6.1: Add Retry Logic Tests (HIGH Priority)
 
 **Files:**
+
 - Create: `packages/agent/src/__tests__/agent-process.retry.e2e.test.ts`
 
 **Test scenarios:**
@@ -897,6 +962,7 @@ git commit -m "test(agent): add retry logic e2e tests"
 ### Task 6.2: Add Token Management Tests (HIGH Priority)
 
 **Files:**
+
 - Create: `packages/agent/src/__tests__/agent-process.tokens.e2e.test.ts`
 
 **Test scenarios:**
@@ -953,6 +1019,7 @@ git commit -m "test(agent): add token management e2e tests"
 ### Task 6.3: Add Abort Reliability Tests (MEDIUM Priority)
 
 **Files:**
+
 - Create: `packages/agent/src/__tests__/agent-process.abort.e2e.test.ts`
 
 **Test scenarios:**
@@ -1019,6 +1086,7 @@ git commit -m "test(agent): add abort reliability e2e tests"
 ### Task 6.4: Add Auto-Compaction Tests (MEDIUM Priority)
 
 **Files:**
+
 - Create: `packages/agent/src/__tests__/agent-process.auto-compact.e2e.test.ts`
 
 **Test scenarios:**
@@ -1073,6 +1141,7 @@ git commit -m "test(agent): add auto-compaction e2e tests"
 ### Task 6.5: Add Web Full-Flow Integration Test (MEDIUM Priority)
 
 **Files:**
+
 - Create: `packages/web/app/__tests__/full-flow.e2e.test.ts`
 
 **Test scenarios:**
@@ -1133,12 +1202,14 @@ git commit -m "test(web): add full-flow e2e integration test"
 After completing all phases:
 
 ### Build & Lint
+
 - [ ] `npm run build` succeeds for all packages
 - [ ] `npm test` passes for all packages
 - [ ] `npm run typecheck` passes
 - [ ] `npm run lint` passes
 
 ### Architecture
+
 - [ ] No package imports from `@lace/core`
 - [ ] Agent can run standalone: `npx lace-agent`
 - [ ] CLI can talk to agent: `npx lace --new`
@@ -1146,6 +1217,7 @@ After completing all phases:
 - [ ] All protocol methods work end-to-end
 
 ### Protocol Completeness
+
 - [ ] `ent/tools/list` works
 - [ ] `ent/mcp/servers/*` methods work
 - [ ] `ent/workspace/*` methods work
@@ -1153,6 +1225,7 @@ After completing all phases:
 - [ ] `ent/models/refresh` works
 
 ### Test Coverage Restored
+
 - [ ] Retry logic tests pass (`agent-process.retry.e2e.test.ts`)
 - [ ] Token management tests pass (`agent-process.tokens.e2e.test.ts`)
 - [ ] Abort reliability tests pass (`agent-process.abort.e2e.test.ts`)
@@ -1163,33 +1236,33 @@ After completing all phases:
 
 ## Appendix: Files to Move Summary
 
-| From (core) | To (agent) | Notes |
-|-------------|------------|-------|
-| `tools/` | `tools/` | All tool implementations |
-| `providers/` | `providers/` | Registry, catalog, instances, implementations |
-| `mcp/` | `mcp/` | Server manager |
-| `workspace/` | `workspace/` | Workspace management |
-| `containers/` | `containers/` | Container utilities |
-| `config/` | `config/` | Lace dir, MCP config, personas |
-| `threads/compaction/` | `compaction/` | Strategies only, not thread types |
-| `token-management/` | `token-management/` | Token counting |
-| `utils/` | `utils/` | Logger, token estimation |
-| `helpers/` | `helpers/` | Infrastructure helpers |
-| `projects/` | `projects/` | Project management |
-| `threads/types.ts` | `@lace/ent-protocol` | Shared types only |
+| From (core)           | To (agent)           | Notes                                         |
+| --------------------- | -------------------- | --------------------------------------------- |
+| `tools/`              | `tools/`             | All tool implementations                      |
+| `providers/`          | `providers/`         | Registry, catalog, instances, implementations |
+| `mcp/`                | `mcp/`               | Server manager                                |
+| `workspace/`          | `workspace/`         | Workspace management                          |
+| `containers/`         | `containers/`        | Container utilities                           |
+| `config/`             | `config/`            | Lace dir, MCP config, personas                |
+| `threads/compaction/` | `compaction/`        | Strategies only, not thread types             |
+| `token-management/`   | `token-management/`  | Token counting                                |
+| `utils/`              | `utils/`             | Logger, token estimation                      |
+| `helpers/`            | `helpers/`           | Infrastructure helpers                        |
+| `projects/`           | `projects/`          | Project management                            |
+| `threads/types.ts`    | `@lace/ent-protocol` | Shared types only                             |
 
 ---
 
 ## Appendix: New Protocol Methods Summary
 
-| Method | Purpose |
-|--------|---------|
-| `ent/tools/list` | List available tools with schemas |
-| `ent/mcp/servers/list` | List MCP server configurations |
-| `ent/mcp/servers/upsert` | Add/update MCP server |
-| `ent/mcp/servers/delete` | Remove MCP server |
-| `ent/mcp/servers/test` | Test MCP server connection |
-| `ent/mcp/tools/list` | List tools from MCP servers |
-| `ent/workspace/info` | Get workspace info |
-| `ent/workspace/create` | Create workspace container |
-| `ent/personas/list` | List available personas |
+| Method                   | Purpose                           |
+| ------------------------ | --------------------------------- |
+| `ent/tools/list`         | List available tools with schemas |
+| `ent/mcp/servers/list`   | List MCP server configurations    |
+| `ent/mcp/servers/upsert` | Add/update MCP server             |
+| `ent/mcp/servers/delete` | Remove MCP server                 |
+| `ent/mcp/servers/test`   | Test MCP server connection        |
+| `ent/mcp/tools/list`     | List tools from MCP servers       |
+| `ent/workspace/info`     | Get workspace info                |
+| `ent/workspace/create`   | Create workspace container        |
+| `ent/personas/list`      | List available personas           |

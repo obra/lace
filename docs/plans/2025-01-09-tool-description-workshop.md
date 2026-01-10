@@ -1,8 +1,10 @@
 # Tool Description Workshop Plan
 
-**Goal:** Improve async job tool descriptions so agents understand the workflow without prior knowledge.
+**Goal:** Improve async job tool descriptions so agents understand the workflow
+without prior knowledge.
 
-**Approach:** Draft descriptions → Test with haiku subagents → Iterate until haiku succeeds
+**Approach:** Draft descriptions → Test with haiku subagents → Iterate until
+haiku succeeds
 
 ---
 
@@ -10,17 +12,18 @@
 
 ### Current Descriptions (Problems)
 
-| Tool | Current Description | Issues |
-|------|---------------------|--------|
-| bash | "Execute shell commands..." | `run_async` undocumented |
-| delegate | "Spawn a background subagent..." | `run_async` and `resume` undocumented, references internal "ent/job/*" |
-| job_output | "Retrieve status and output..." | Response format unclear, cursor unexplained |
-| jobs_list | "List current and recent..." | Relationship to other tools unclear |
-| job_kill | "Cancel a running background job" | Fine, but no workflow context |
+| Tool       | Current Description               | Issues                                                                  |
+| ---------- | --------------------------------- | ----------------------------------------------------------------------- |
+| bash       | "Execute shell commands..."       | `run_async` undocumented                                                |
+| delegate   | "Spawn a background subagent..."  | `run_async` and `resume` undocumented, references internal "ent/job/\*" |
+| job_output | "Retrieve status and output..."   | Response format unclear, cursor unexplained                             |
+| jobs_list  | "List current and recent..."      | Relationship to other tools unclear                                     |
+| job_kill   | "Cancel a running background job" | Fine, but no workflow context                                           |
 
 ### Missing Conceptual Framework
 
 An agent needs to understand:
+
 1. **When** to use async (long-running tasks, parallel work)
 2. **What** async returns (jobId)
 3. **How** to monitor (job_output with block=true or polling)
@@ -32,6 +35,7 @@ An agent needs to understand:
 ## Phase 2: Draft Improved Descriptions
 
 ### bash
+
 ```
 Execute shell commands in isolated bash processes.
 
@@ -43,6 +47,7 @@ Exit codes shown even for successful tool execution. Chain commands with && or ;
 ```
 
 ### delegate
+
 ```
 Spawn a subagent to handle a task autonomously.
 
@@ -60,6 +65,7 @@ Parameters:
 ```
 
 ### job_output
+
 ```
 Get status and output from a background job (started with run_async=true).
 
@@ -73,6 +79,7 @@ Returns: { status: "running"|"completed"|"failed"|"cancelled", output: string, e
 ```
 
 ### jobs_list
+
 ```
 List all background jobs in the current session. Use to find jobIds for job_output or job_kill.
 
@@ -84,6 +91,7 @@ Returns array of: { jobId, type, status, description, startTime }
 ```
 
 ### job_kill
+
 ```
 Cancel a running background job. Use jobs_list to find running jobs.
 
@@ -97,24 +105,32 @@ For subagent jobs, the subagent's session is preserved - use delegate(resume=job
 ## Phase 3: Haiku Validation Tests
 
 ### Test 1: Basic Async Bash
-**Task:** "Run `sleep 5 && echo done` in the background, then check if it's still running"
-**Success criteria:** Haiku uses run_async=true, gets jobId, calls job_output
+
+**Task:** "Run `sleep 5 && echo done` in the background, then check if it's
+still running" **Success criteria:** Haiku uses run_async=true, gets jobId,
+calls job_output
 
 ### Test 2: Parallel Work
-**Task:** "Run three commands in parallel: `echo one`, `echo two`, `echo three`. Collect all outputs."
-**Success criteria:** Haiku spawns 3 async jobs, waits for all with job_output
+
+**Task:** "Run three commands in parallel: `echo one`, `echo two`, `echo three`.
+Collect all outputs." **Success criteria:** Haiku spawns 3 async jobs, waits for
+all with job_output
 
 ### Test 3: Kill Long Job
+
 **Task:** "Start a `sleep 60` in the background, then cancel it immediately"
 **Success criteria:** Haiku uses run_async, then job_kill
 
 ### Test 4: Subagent Workflow
-**Task:** "Delegate a task to search for all TypeScript files, run it async, wait for completion"
-**Success criteria:** Haiku uses delegate(run_async=true), then job_output to wait
+
+**Task:** "Delegate a task to search for all TypeScript files, run it async,
+wait for completion" **Success criteria:** Haiku uses delegate(run_async=true),
+then job_output to wait
 
 ### Test 5: Resume Understanding
-**Task:** "If a subagent job failed, how would you continue its work?"
-**Success criteria:** Haiku explains delegate(resume=jobId) without being told
+
+**Task:** "If a subagent job failed, how would you continue its work?" **Success
+criteria:** Haiku explains delegate(resume=jobId) without being told
 
 ---
 
@@ -131,7 +147,7 @@ while haiku_fails_tests:
 
 ## Execution Steps
 
-1. [ ] Update tool descriptions in implementations/*.ts
+1. [ ] Update tool descriptions in implementations/\*.ts
 2. [ ] Run Test 1-5 with haiku subagents
 3. [ ] Document failures and confusion points
 4. [ ] Revise descriptions based on failures

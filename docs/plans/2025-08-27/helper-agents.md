@@ -1004,7 +1004,10 @@ import { HelperResult } from './types';
 import { ToolCall, ToolResult } from '@lace/core/tools/types';
 import { Tool } from '@lace/core/tools/tool';
 import { ToolExecutor } from '@lace/core/tools/executor';
-import { AIProvider, ProviderMessage } from '@lace/core/providers/base-provider';
+import {
+  AIProvider,
+  ProviderMessage,
+} from '@lace/core/providers/base-provider';
 import { CombinedTokenUsage } from '@lace/core/token-management/types';
 import { logger } from '@lace/core/utils/logger';
 

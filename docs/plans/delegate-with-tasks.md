@@ -69,7 +69,11 @@ Replace the entire implementation:
 import { z } from 'zod';
 import { Tool } from '@lace/core/tools/tool';
 import { NonEmptyString } from '@lace/core/tools/schemas/common';
-import type { ToolResult, ToolContext, ToolAnnotations } from '@lace/core/tools/types';
+import type {
+  ToolResult,
+  ToolContext,
+  ToolAnnotations,
+} from '@lace/core/tools/types';
 import { TaskManager } from '@lace/core/tasks/task-manager';
 import { logger } from '@lace/core/utils/logger';
 

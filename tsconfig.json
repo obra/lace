@@ -16,11 +16,5 @@
     }
   },
   "include": ["src/**/*", "types/**/*"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "packages",
-    "knip.config.ts",
-    "production-build.test.ts"
-  ]
+  "exclude": ["node_modules", "dist", "packages", "knip.config.ts", "production-build.test.ts"]
 }

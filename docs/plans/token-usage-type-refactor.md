@@ -3,6 +3,7 @@
 ## Problem
 
 Current `CombinedTokenUsage.thread` field is ambiguous:
+
 - **What it contains**: Cumulative billing totals (sum of all API calls)
 - **What UI uses it for**: Current context window usage
 - **Result**: Footer shows 48K when actual context is 14K
@@ -12,38 +13,39 @@ Current `CombinedTokenUsage.thread` field is ambiguous:
 ```typescript
 // What was sent/received THIS turn
 interface TurnTokenUsage {
-  inputTokens: number;       // Tokens sent to API this turn
-  outputTokens: number;      // Tokens received from API this turn
-  totalTokens: number;       // inputTokens + outputTokens
+  inputTokens: number; // Tokens sent to API this turn
+  outputTokens: number; // Tokens received from API this turn
+  totalTokens: number; // inputTokens + outputTokens
 }
 
 // Current context window state (for UI)
 interface ContextWindowUsage {
-  currentTokens: number;      // What would be sent if user types now
-  limit: number;              // Model's context window size
-  percentUsed: number;        // currentTokens / limit
-  nearLimit: boolean;         // percentUsed >= 0.8
+  currentTokens: number; // What would be sent if user types now
+  limit: number; // Model's context window size
+  percentUsed: number; // currentTokens / limit
+  nearLimit: boolean; // percentUsed >= 0.8
 }
 
 // Cumulative spend across all turns (for billing/analytics)
 interface CumulativeSpend {
-  totalInputTokens: number;   // Sum of all inputs ever sent
-  totalOutputTokens: number;  // Sum of all outputs ever received
-  totalTokens: number;        // Total API spend
-  turnCount: number;          // Number of API calls made
+  totalInputTokens: number; // Sum of all inputs ever sent
+  totalOutputTokens: number; // Sum of all outputs ever received
+  totalTokens: number; // Total API spend
+  turnCount: number; // Number of API calls made
 }
 
 // Combined for AGENT_MESSAGE events
 interface TokenUsageMetrics {
-  turn: TurnTokenUsage;              // This specific turn
-  context: ContextWindowUsage;       // Current window state
-  cumulative?: CumulativeSpend;      // Optional billing data
+  turn: TurnTokenUsage; // This specific turn
+  context: ContextWindowUsage; // Current window state
+  cumulative?: CumulativeSpend; // Optional billing data
 }
 ```
 
 ## Impact Analysis
 
 ### Files to Search:
+
 1. Type definitions: `token-management/types.ts`
 2. Event creation: `agents/agent.ts` (creates AGENT_MESSAGE)
 3. Event reading: `hooks/useAgentTokenUsage.ts` (frontend)

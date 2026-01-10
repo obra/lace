@@ -1,10 +1,13 @@
 # Ent Protocol Specification
 
-A JSON-RPC 2.0 protocol for agent-client communication. Designed for ACP compatibility while supporting the full Claude Agent SDK feature set.
+A JSON-RPC 2.0 protocol for agent-client communication. Designed for ACP
+compatibility while supporting the full Claude Agent SDK feature set.
 
-See [about-the-protocol.md](about-the-protocol.md) for design decisions and rationale.
+See [about-the-protocol.md](about-the-protocol.md) for design decisions and
+rationale.
 
 **Design Principles:**
+
 1. ACP-compatible where possible (same method names, params, semantics)
 2. Agent-centric execution (agent has direct FS/terminal access)
 3. Extensions prefixed with `ent/` for non-ACP features
@@ -14,18 +17,31 @@ See [about-the-protocol.md](about-the-protocol.md) for design decisions and rati
 
 ## 1. Process and Session Model
 
-**One process = one conversation stream.** Each agent process handles exactly one session at a time.
+**One process = one conversation stream.** Each agent process handles exactly
+one session at a time.
 
 - `initialize` is called once when the process starts
 - `session/new` or `session/load` establishes the active session
 - The process serves that session until it exits
 - To work with multiple sessions concurrently, spawn multiple agent processes
 
-This design ensures clean isolation: each agent process has its own conversation state, tool permissions, and resource handles.
+This design ensures clean isolation: each agent process has its own conversation
+state, tool permissions, and resource handles.
 
-**Terminology note**: In this protocol, "session" refers to a single agent conversation stream (prompt/response turns with shared context). In higher-level products (e.g., Lace), a protocol `sessionId` typically maps to an agent identifier—one conversation with one agent. If your product has a broader "session" concept (e.g., a workspace grouping multiple agents), that grouping is outside this protocol's scope and should use a different term to avoid confusion.
+**Terminology note**: In this protocol, "session" refers to a single agent
+conversation stream (prompt/response turns with shared context). In higher-level
+products (e.g., Lace), a protocol `sessionId` typically maps to an agent
+identifier—one conversation with one agent. If your product has a broader
+"session" concept (e.g., a workspace grouping multiple agents), that grouping is
+outside this protocol's scope and should use a different term to avoid
+confusion.
 
-**Subagent spawning**: When an agent spawns subagents (via Task tool or similar), the **agent process** is responsible for spawning and managing subagent processes. The supervisor/client sees subagents as background jobs via `ent/job/*` methods. Subagent IDs are agent-generated (prefixed with `job_agent_`). The supervisor does NOT spawn subagent processes directly—it only monitors them through the protocol.
+**Subagent spawning**: When an agent spawns subagents (via Task tool or
+similar), the **agent process** is responsible for spawning and managing
+subagent processes. The supervisor/client sees subagents as background jobs via
+`ent/job/*` methods. Subagent IDs are agent-generated (prefixed with
+`job_agent_`). The supervisor does NOT spawn subagent processes directly—it only
+monitors them through the protocol.
 
 ```
 Supervisor/Client
@@ -38,19 +54,31 @@ Supervisor/Client
       └──▶ (spawns) Background Shell (job_shell_1)
 ```
 
-**Design choice**: This "subagents as jobs" model means subagents are not first-class protocol peers—you cannot send `session/prompt` directly to a subagent. This is intentional for v1: it simplifies the protocol and matches the common case where subagents run autonomously and return results. If interactive multi-agent collaboration becomes a requirement, future protocol versions could add "subagent = full protocol peer" where the supervisor can connect to subagent processes directly.
+**Design choice**: This "subagents as jobs" model means subagents are not
+first-class protocol peers—you cannot send `session/prompt` directly to a
+subagent. This is intentional for v1: it simplifies the protocol and matches the
+common case where subagents run autonomously and return results. If interactive
+multi-agent collaboration becomes a requirement, future protocol versions could
+add "subagent = full protocol peer" where the supervisor can connect to subagent
+processes directly.
 
-**Note**: `session/list` queries available sessions on disk without loading them. It does not imply multi-session support within a single process.
+**Note**: `session/list` queries available sessions on disk without loading
+them. It does not imply multi-session support within a single process.
 
 ### Non-goals (v1)
 
-To prevent future drift, these are explicitly **not** goals for this protocol version:
+To prevent future drift, these are explicitly **not** goals for this protocol
+version:
 
-1. **Subagents as protocol peers**: Subagents are async jobs, not direct protocol peers. Clients cannot send `session/prompt` to a subagent. Use `ent/job/inject` to provide context to running jobs.
+1. **Subagents as protocol peers**: Subagents are async jobs, not direct
+   protocol peers. Clients cannot send `session/prompt` to a subagent. Use
+   `ent/job/inject` to provide context to running jobs.
 
-2. **Offline history mirroring**: Browsing history requires live connectivity. The protocol does not define a sync/replication mechanism for offline access.
+2. **Offline history mirroring**: Browsing history requires live connectivity.
+   The protocol does not define a sync/replication mechanism for offline access.
 
-3. **Multi-session per process**: Each process handles one conversation stream. For multiple concurrent sessions, spawn multiple processes.
+3. **Multi-session per process**: Each process handles one conversation stream.
+   For multiple concurrent sessions, spawn multiple processes.
 
 ---
 
@@ -61,22 +89,30 @@ To prevent future drift, these are explicitly **not** goals for this protocol ve
 - **Transport**: stdin/stdout (required), HTTP/SSE (optional)
 - **Direction**: Bidirectional
 
-**Stdout is protocol-only**: When using stdio transport, stdout MUST contain only JSON-RPC messages. All logs, diagnostics, and debug output MUST go to stderr. This ensures clean message parsing.
+**Stdout is protocol-only**: When using stdio transport, stdout MUST contain
+only JSON-RPC messages. All logs, diagnostics, and debug output MUST go to
+stderr. This ensures clean message parsing.
 
 ### 2.1 Naming Conventions
 
 Follow ACP naming patterns for maximum compatibility:
 
-| Pattern | Example | Rationale |
-|---------|---------|-----------|
+| Pattern                     | Example                                                                               | Rationale                                       |
+| --------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------- |
 | `Id` suffix for identifiers | `sessionId`, `turnId`, `jobId`, `toolCallId`, `providerId`, `modelId`, `connectionId` | ACP convention; prevents "wrong id" wiring bugs |
-| Opaque strings | `sessionId: "sess_abc123"` | Clients treat identifiers as opaque; no parsing |
-| camelCase | `sessionId`, `toolCallId` | Matches JSON/JavaScript conventions |
-| Verb phrases for methods | `session/prompt`, `ent/connections/credentials/start` | Action-oriented naming |
+| Opaque strings              | `sessionId: "sess_abc123"`                                                            | Clients treat identifiers as opaque; no parsing |
+| camelCase                   | `sessionId`, `toolCallId`                                                             | Matches JSON/JavaScript conventions             |
+| Verb phrases for methods    | `session/prompt`, `ent/connections/credentials/start`                                 | Action-oriented naming                          |
 
-**Identifier opacity**: All identifier fields (`sessionId`, `turnId`, `jobId`, `toolCallId`/`toolUseId`, `providerId`, `modelId`, `connectionId`, `checkpointId`, `taskId`, `optionId`, `requestId`) are opaque strings. Clients MUST NOT parse, validate, or assume structure in these values. Note: `eventSeq` is a numeric sequence, not an opaque string. Note: `toolCallId` and `toolUseId` are the same identifier (see §8.1).
+**Identifier opacity**: All identifier fields (`sessionId`, `turnId`, `jobId`,
+`toolCallId`/`toolUseId`, `providerId`, `modelId`, `connectionId`,
+`checkpointId`, `taskId`, `optionId`, `requestId`) are opaque strings. Clients
+MUST NOT parse, validate, or assume structure in these values. Note: `eventSeq`
+is a numeric sequence, not an opaque string. Note: `toolCallId` and `toolUseId`
+are the same identifier (see §8.1).
 
-**Ent extensions**: Methods prefixed with `ent/` are protocol extensions not in ACP. The prefix makes it clear which parts are standard vs extended.
+**Ent extensions**: Methods prefixed with `ent/` are protocol extensions not in
+ACP. The prefix makes it clear which parts are standard vs extended.
 
 ---
 
@@ -86,21 +122,21 @@ Standard JSON-RPC 2.0:
 
 ```typescript
 interface Request {
-  jsonrpc: "2.0";
+  jsonrpc: '2.0';
   id: string | number;
   method: string;
   params?: object;
 }
 
 interface Response {
-  jsonrpc: "2.0";
+  jsonrpc: '2.0';
   id: string | number;
   result?: object;
   error?: { code: number; message: string; data?: any };
 }
 
 interface Notification {
-  jsonrpc: "2.0";
+  jsonrpc: '2.0';
   method: string;
   params?: object;
 }
@@ -109,21 +145,29 @@ interface Notification {
 ### 3.1 ID Namespacing
 
 To prevent ID collision, client and agent use distinct ID spaces:
+
 - **Client IDs**: Positive integers or strings starting with `c_`
 - **Agent IDs**: Negative integers or strings starting with `a_`
 
 ### 3.2 Idempotency and Retries
 
-- **Requests**: Retrying a request with the same `id` is safe; the recipient returns the cached response.
-- **Permission responses**: `toolCallId` is globally unique within a session (across parent agent and all jobs/subagents). Duplicate responses for the same `toolCallId` are ignored.
-- **Notifications**: Fire-and-forget. Duplicates may cause redundant processing but should not corrupt state.
+- **Requests**: Retrying a request with the same `id` is safe; the recipient
+  returns the cached response.
+- **Permission responses**: `toolCallId` is globally unique within a session
+  (across parent agent and all jobs/subagents). Duplicate responses for the same
+  `toolCallId` are ignored.
+- **Notifications**: Fire-and-forget. Duplicates may cause redundant processing
+  but should not corrupt state.
 
-**Caching bounds**: Response caches are bounded to prevent unbounded memory growth:
+**Caching bounds**: Response caches are bounded to prevent unbounded memory
+growth:
+
 - Cache size: Up to 1000 recent request IDs per direction
 - Eviction: LRU (least recently used)
 - Scope: Per-session (cache cleared on session end)
 
-Implementations SHOULD NOT rely on cached responses for requests older than the cache size.
+Implementations SHOULD NOT rely on cached responses for requests older than the
+cache size.
 
 ---
 
@@ -134,24 +178,25 @@ Implementations SHOULD NOT rely on cached responses for requests older than the 
 ```typescript
 interface ClientCapabilities {
   // ACP standard
-  streaming?: boolean;           // Can handle streaming updates
-  permissions?: boolean;         // Can handle permission requests
-  images?: boolean;              // Can handle image content
+  streaming?: boolean; // Can handle streaming updates
+  permissions?: boolean; // Can handle permission requests
+  images?: boolean; // Can handle image content
 
   // We declare these FALSE (agent handles internally)
-  fileSystem?: false;            // Agent has direct FS access
-  terminal?: false;              // Agent has direct terminal access
+  fileSystem?: false; // Agent has direct FS access
+  terminal?: false; // Agent has direct terminal access
 
   // Ent extensions
-  "ent/contextInjection"?: boolean;  // Supports session/inject
-  "ent/backgroundJobs"?: boolean;    // Supports job/* methods
-  "ent/jobStreaming"?: "full" | "coalesced" | "none";  // Job output verbosity preference
-  "ent/providers"?: {                // Provider/config management via agent (not web direct access)
-    list: boolean;                  // ent/providers/list
-    connections: boolean;           // ent/connections/*
-    models: boolean;                // ent/models/*
-    catalogRefresh?: boolean;       // ent/providers/refresh
-    modelGating?: boolean;          // ent/models/enable, ent/models/disable
+  'ent/contextInjection'?: boolean; // Supports session/inject
+  'ent/backgroundJobs'?: boolean; // Supports job/* methods
+  'ent/jobStreaming'?: 'full' | 'coalesced' | 'none'; // Job output verbosity preference
+  'ent/providers'?: {
+    // Provider/config management via agent (not web direct access)
+    list: boolean; // ent/providers/list
+    connections: boolean; // ent/connections/*
+    models: boolean; // ent/models/*
+    catalogRefresh?: boolean; // ent/providers/refresh
+    modelGating?: boolean; // ent/models/enable, ent/models/disable
   };
 }
 ```
@@ -165,7 +210,7 @@ interface AgentCapabilities {
   multiTurn: boolean;
   sessionResume?: boolean;
   sessionFork?: boolean;
-  modes?: string[];              // ["ask", "architect", "code"]
+  modes?: string[]; // ["ask", "architect", "code"]
 
   // Tools
   tools: ToolInfo[];
@@ -173,12 +218,12 @@ interface AgentCapabilities {
   // State operations (each maps to a protocol method)
   // Client uses these to know which ent/session/* methods are available
   operations?: {
-    compact?: boolean;           // ent/session/compact
-    checkpoint?: boolean;        // ent/session/checkpoint
-    rewind?: boolean;            // ent/session/rewind
-    configure?: boolean;         // ent/session/configure
-    tokenUsage?: boolean;        // ent/session/token_usage
-    contextBreakdown?: boolean;  // ent/session/context_breakdown
+    compact?: boolean; // ent/session/compact
+    checkpoint?: boolean; // ent/session/checkpoint
+    rewind?: boolean; // ent/session/rewind
+    configure?: boolean; // ent/session/configure
+    tokenUsage?: boolean; // ent/session/token_usage
+    contextBreakdown?: boolean; // ent/session/context_breakdown
   };
 
   // Conversation commands (sent via session/prompt)
@@ -186,23 +231,24 @@ interface AgentCapabilities {
   slashCommands?: SlashCommand[];
 
   // Ent extension feature flags
-  "ent/contextInjection": boolean;
-  "ent/backgroundJobs": boolean;
-  "ent/fileCheckpointing": boolean;
-  "ent/structuredOutput": boolean;
-  "ent/providers"?: {               // Provider/config management the agent exposes
-    list: boolean;                  // ent/providers/list
-    connections: boolean;           // ent/connections/*
-    models: boolean;                // ent/models/*
-    catalogRefresh?: boolean;       // ent/providers/refresh
-    modelGating?: boolean;          // ent/models/enable, ent/models/disable
+  'ent/contextInjection': boolean;
+  'ent/backgroundJobs': boolean;
+  'ent/fileCheckpointing': boolean;
+  'ent/structuredOutput': boolean;
+  'ent/providers'?: {
+    // Provider/config management the agent exposes
+    list: boolean; // ent/providers/list
+    connections: boolean; // ent/connections/*
+    models: boolean; // ent/models/*
+    catalogRefresh?: boolean; // ent/providers/refresh
+    modelGating?: boolean; // ent/models/enable, ent/models/disable
   };
 }
 
 interface SlashCommand {
-  name: string;           // "commit"
-  description: string;    // "Create a git commit"
-  inputHint?: string;     // "-m <message>"
+  name: string; // "commit"
+  description: string; // "Create a git commit"
+  inputHint?: string; // "-m <message>"
 }
 ```
 
@@ -336,7 +382,10 @@ interface SlashCommand {
 }
 ```
 
-**Durable event guarantee**: A successful `session/prompt` response implies that corresponding durable events (`turn_start`, `message`, `tool_use`, `turn_end`) have been written and can be fetched via `ent/session/events` with stable ordering. The `turnId` in the response matches the `turnId` in those events.
+**Durable event guarantee**: A successful `session/prompt` response implies that
+corresponding durable events (`turn_start`, `message`, `tool_use`, `turn_end`)
+have been written and can be fetched via `ent/session/events` with stable
+ordering. The `turnId` in the response matches the `turnId` in those events.
 
 ### 5.5 `$/cancel_request` (ACP-compatible, notification)
 
@@ -353,17 +402,27 @@ Cancels a request or ongoing operation.
 ```
 
 **Cancellation semantics**:
-- If a turn is running (matching `requestId`), it stops and returns with `stopReason: "cancelled"` and error code `-32800`.
-- If a tool is `awaiting_permission` under the request being cancelled, the pending permission request is **invalidated**. The agent MUST emit a `tool_use` update with `status: "cancelled"`, append a durable `permission_cancelled` event, and discard the pending request from `ent/agent/status.pendingPermissions`. Clients MUST dismiss any approval UI for that `toolCallId` (or treat it as stale if a new permission request is later reissued).
+
+- If a turn is running (matching `requestId`), it stops and returns with
+  `stopReason: "cancelled"` and error code `-32800`.
+- If a tool is `awaiting_permission` under the request being cancelled, the
+  pending permission request is **invalidated**. The agent MUST emit a
+  `tool_use` update with `status: "cancelled"`, append a durable
+  `permission_cancelled` event, and discard the pending request from
+  `ent/agent/status.pendingPermissions`. Clients MUST dismiss any approval UI
+  for that `toolCallId` (or treat it as stale if a new permission request is
+  later reissued).
 - If no request or turn is in progress, the notification is silently ignored.
 
-**Error code**: Returns `-32800` (RequestCancelled) when responding to the cancelled request.
+**Error code**: Returns `-32800` (RequestCancelled) when responding to the
+cancelled request.
 
 ### 5.6 `session/set_mode`
 
 Set the agent's execution mode. This controls what tools are available.
 
-**Note**: This is distinct from approval policy. To change whether tools require permission prompts, use `ent/session/configure` with `approvalMode`.
+**Note**: This is distinct from approval policy. To change whether tools require
+permission prompts, use `ent/session/configure` with `approvalMode`.
 
 ```typescript
 // Request
@@ -415,13 +474,15 @@ Set the agent's execution mode. This controls what tools are available.
 ```
 
 **Field renames**: This method has been updated to align with ACP RFD:
+
 - `workDir` → `cwd` (both parameter and response field)
 - `lastActive` → `updatedAt` (response field)
 - Added `title`, `_meta`, `cursor`, `nextCursor` for pagination and metadata
 
 ### 5.8 `session/fork` (ACP draft RFD)
 
-Create a new session by forking an existing session. The forked session preserves the conversation history of the original.
+Create a new session by forking an existing session. The forked session
+preserves the conversation history of the original.
 
 ```typescript
 // Request
@@ -445,7 +506,9 @@ Create a new session by forking an existing session. The forked session preserve
 }
 ```
 
-**Behavior**: Creates a new independent session with a copy of the original's conversation history. Further changes to either session are independent. The original session is unchanged.
+**Behavior**: Creates a new independent session with a copy of the original's
+conversation history. Further changes to either session are independent. The
+original session is unchanged.
 
 ---
 
@@ -453,12 +516,17 @@ Create a new session by forking an existing session. The forked session preserve
 
 ### 6.1 `ent/session/compact`
 
-Compact conversation history to reduce context usage. State operation, not conversation.
+Compact conversation history to reduce context usage. State operation, not
+conversation.
 
 Notes on `strategy`:
-- `truncate`: preserve conversation structure but reduce size by trimming large tool results in older context.
-- `summarize`: preserve recent context verbatim and insert a summary of older non-user events; returns `summary` in the response.
-- `selective`: currently treated the same as `summarize` (reserved for future finer-grained strategies).
+
+- `truncate`: preserve conversation structure but reduce size by trimming large
+  tool results in older context.
+- `summarize`: preserve recent context verbatim and insert a summary of older
+  non-user events; returns `summary` in the response.
+- `selective`: currently treated the same as `summarize` (reserved for future
+  finer-grained strategies).
 
 ```typescript
 // Request
@@ -501,7 +569,8 @@ Inject context mid-turn. Not in ACP.
 
 ### 6.3 `ent/session/configure`
 
-Dynamic configuration changes. Covers Claude SDK's `setModel()`, `setMaxThinkingTokens()`, etc.
+Dynamic configuration changes. Covers Claude SDK's `setModel()`,
+`setMaxThinkingTokens()`, etc.
 
 ```typescript
 // Request
@@ -537,7 +606,9 @@ Dynamic configuration changes. Covers Claude SDK's `setModel()`, `setMaxThinking
 ```
 
 **Notes**
-- Env overlays are applied in-memory for this session and MUST NOT be written to disk by the agent.
+
+- Env overlays are applied in-memory for this session and MUST NOT be written to
+  disk by the agent.
 
 ### 6.4 `ent/session/rewind`
 
@@ -588,7 +659,10 @@ Create explicit checkpoint.
 
 List background jobs (shells, subagents).
 
-**Job identity requirements**: `jobId` SHOULD be generated using UUID/ULID/UUIDv7 or include a session-unique prefix (e.g., `${sessionId}:job_${n}`) to prevent collisions across session resume and restarts. Job IDs must be unique within the session lifetime.
+**Job identity requirements**: `jobId` SHOULD be generated using
+UUID/ULID/UUIDv7 or include a session-unique prefix (e.g.,
+`${sessionId}:job_${n}`) to prevent collisions across session resume and
+restarts. Job IDs must be unique within the session lifetime.
 
 ```typescript
 // Request
@@ -615,7 +689,8 @@ List background jobs (shells, subagents).
 
 ### 6.7 `ent/job/output`
 
-Get job output. Returns both raw output and a structured report suitable for parent context injection.
+Get job output. Returns both raw output and a structured report suitable for
+parent context injection.
 
 ```typescript
 // Request
@@ -657,9 +732,16 @@ Get job output. Returns both raw output and a structured report suitable for par
 }
 ```
 
-**Report vs stream**: The supervisor sees the full job stream via `job_update` notifications. However, the parent agent SHOULD only incorporate `report` (not raw `output`) into its own LLM context to avoid context bloat. This preserves the "private subagent context" model—subagents can think verbosely without polluting the parent's context window.
+**Report vs stream**: The supervisor sees the full job stream via `job_update`
+notifications. However, the parent agent SHOULD only incorporate `report` (not
+raw `output`) into its own LLM context to avoid context bloat. This preserves
+the "private subagent context" model—subagents can think verbosely without
+polluting the parent's context window.
 
-**Sufficiency guarantee**: `ent/job/output` MUST be sufficient to recover a job's final state and report even if `job_update` streaming was set to `none` or updates were missed due to reconnection. Clients can rely on this method for authoritative job results.
+**Sufficiency guarantee**: `ent/job/output` MUST be sufficient to recover a
+job's final state and report even if `job_update` streaming was set to `none` or
+updates were missed due to reconnection. Clients can rely on this method for
+authoritative job results.
 
 ### 6.8 `ent/job/kill`
 
@@ -684,7 +766,8 @@ Kill background job.
 
 ### 6.9 `ent/job/inject` (notification)
 
-Inject context into a running job (subagent). Allows supervisor to provide additional information without making the job a full protocol peer.
+Inject context into a running job (subagent). Allows supervisor to provide
+additional information without making the job a full protocol peer.
 
 ```typescript
 {
@@ -700,7 +783,9 @@ Inject context into a running job (subagent). Allows supervisor to provide addit
 }
 ```
 
-**Note**: This is a notification (no response). The agent should forward the injection to the specified job if it's still running. If the job has completed, the injection is silently dropped.
+**Note**: This is a notification (no response). The agent should forward the
+injection to the specified job if it's still running. If the job has completed,
+the injection is silently dropped.
 
 ### 6.10 `ent/agent/ping`
 
@@ -725,13 +810,17 @@ Lightweight health check. Use for liveness detection and supervisor heartbeats.
 }
 ```
 
-**Timeout guidance**: Clients SHOULD treat no response within 5 seconds as agent unresponsive. For detailed status (session info, pending permissions), use `ent/agent/status` instead.
+**Timeout guidance**: Clients SHOULD treat no response within 5 seconds as agent
+unresponsive. For detailed status (session info, pending permissions), use
+`ent/agent/status` instead.
 
 ### 6.11 `ent/agent/status`
 
-Query agent status. Covers Claude SDK's `supportedModels()`, `mcpServerStatus()`, `accountInfo()`.
+Query agent status. Covers Claude SDK's `supportedModels()`,
+`mcpServerStatus()`, `accountInfo()`.
 
-Also returns pending permission requests, enabling protocol clients (e.g., supervisors) to restore state after reconnection.
+Also returns pending permission requests, enabling protocol clients (e.g.,
+supervisors) to restore state after reconnection.
 
 ```typescript
 // Request
@@ -782,9 +871,14 @@ Also returns pending permission requests, enabling protocol clients (e.g., super
 
 ### 6.12 `ent/session/events`
 
-Fetch session event history. Used by protocol clients (e.g., supervisors) that need to reconstruct conversation state after reconnection or process restart.
+Fetch session event history. Used by protocol clients (e.g., supervisors) that
+need to reconstruct conversation state after reconnection or process restart.
 
-**Durable events only**: This method returns durable events, not streaming deltas. For example, instead of individual `text_delta` updates, it returns complete `message` events with full text. This provides a stable history format suitable for persistence and replay. Durable events may represent ongoing state (e.g., a `permission_requested` that has not yet been decided).
+**Durable events only**: This method returns durable events, not streaming
+deltas. For example, instead of individual `text_delta` updates, it returns
+complete `message` events with full text. This provides a stable history format
+suitable for persistence and replay. Durable events may represent ongoing state
+(e.g., a `permission_requested` that has not yet been decided).
 
 ```typescript
 // Request
@@ -818,44 +912,66 @@ Fetch session event history. Used by protocol clients (e.g., supervisors) that n
 ```
 
 **Durable event types** (distinct from streaming `session/update` types):
+
 - `prompt`: User prompt submitted (full content)
 - `message`: Agent message (full text, not deltas)
 - `tool_use`: Tool execution (complete with result)
-- `permission_requested`: Permission prompt issued for a tool call (includes tool input needed to resume)
-- `permission_decided`: Permission decision received (includes decision + optional updatedInput)
+- `permission_requested`: Permission prompt issued for a tool call (includes
+  tool input needed to resume)
+- `permission_decided`: Permission decision received (includes decision +
+  optional updatedInput)
 - `permission_cancelled`: Permission request invalidated (cancel/timeout)
 - `error`: Error occurred
 - `turn_start`: Turn began
 - `turn_end`: Turn completed (with stop reason)
 
-Events are ordered by `eventSeq` and can be paginated. The `eventSeq` is globally stable across reconnections and never resets.
+Events are ordered by `eventSeq` and can be paginated. The `eventSeq` is
+globally stable across reconnections and never resets.
 
 ### 6.13 Provider and Connection Model
 
-This section defines how agents expose provider families and configured connections.
+This section defines how agents expose provider families and configured
+connections.
 
 **Terminology** (ACP-compatible field names):
 
-| Field | Description | Example |
-|-------|-------------|---------|
-| `providerId` | Provider family/runtime identifier (opaque string) | `"anthropic"`, `"openai"`, `"openai-compatible"`, `"claude-code-wrapper"` |
-| `modelId` | Model identifier within a provider (opaque string) | `"claude-sonnet-4-20250514"`, `"gpt-4o"` |
-| `connectionId` | Configured connection to a provider: endpoint + settings + credentials | `"conn_anthropic_prod"`, `"conn_openai_dev"` |
+| Field          | Description                                                            | Example                                                                   |
+| -------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `providerId`   | Provider family/runtime identifier (opaque string)                     | `"anthropic"`, `"openai"`, `"openai-compatible"`, `"claude-code-wrapper"` |
+| `modelId`      | Model identifier within a provider (opaque string)                     | `"claude-sonnet-4-20250514"`, `"gpt-4o"`                                  |
+| `connectionId` | Configured connection to a provider: endpoint + settings + credentials | `"conn_anthropic_prod"`, `"conn_openai_dev"`                              |
 
 **Glossary**:
-- **Provider catalog entry**: The metadata returned by `ent/providers/catalog` describing a provider family and its models (pricing/context window/etc). Identified by `providerId`.
-- **Connection**: A user-managed instance of a provider family: endpoint + non-secret config + credentials. Identified by `connectionId` and paired with exactly one `providerId`.
-- **Model**: A model identifier within a provider family. Identified by `modelId`. Availability may vary by connection (endpoint/credentials) and may also be gated (enabled/disabled) by the agent.
+
+- **Provider catalog entry**: The metadata returned by `ent/providers/catalog`
+  describing a provider family and its models (pricing/context window/etc).
+  Identified by `providerId`.
+- **Connection**: A user-managed instance of a provider family: endpoint +
+  non-secret config + credentials. Identified by `connectionId` and paired with
+  exactly one `providerId`.
+- **Model**: A model identifier within a provider family. Identified by
+  `modelId`. Availability may vary by connection (endpoint/credentials) and may
+  also be gated (enabled/disabled) by the agent.
 
 **Invariants**:
-- A `connectionId` is always paired with exactly one `providerId`. This pairing MUST NOT change.
-- Credentials are mutable: agents MUST support updating credentials for an existing `connectionId` (credential rotation) without changing the connection's identity.
-- Methods operating on a specific connection take `connectionId` only (not both `providerId` and `connectionId`), except when creating a new connection.
+
+- A `connectionId` is always paired with exactly one `providerId`. This pairing
+  MUST NOT change.
+- Credentials are mutable: agents MUST support updating credentials for an
+  existing `connectionId` (credential rotation) without changing the
+  connection's identity.
+- Methods operating on a specific connection take `connectionId` only (not both
+  `providerId` and `connectionId`), except when creating a new connection.
 - Sessions can switch active `connectionId` via `ent/session/configure`.
 
-**Wrapper guidance**: Agents wrapping single-provider runtimes (e.g., Claude Code, Codex) should expose one `providerId`, one `connectionId`, and set `ProviderInfo.supportsConnections: false`. Credentials may use `{ kind: "ready" }` for ambient auth or implement device_code/browser flows.
+**Wrapper guidance**: Agents wrapping single-provider runtimes (e.g., Claude
+Code, Codex) should expose one `providerId`, one `connectionId`, and set
+`ProviderInfo.supportsConnections: false`. Credentials may use
+`{ kind: "ready" }` for ambient auth or implement device_code/browser flows.
 
-**Isolation requirement**: The web tier/supervisor MUST NOT read or write agent provider config files directly. All catalog refreshes, connection CRUD, and model visibility changes MUST flow through the Ent methods below.
+**Isolation requirement**: The web tier/supervisor MUST NOT read or write agent
+provider config files directly. All catalog refreshes, connection CRUD, and
+model visibility changes MUST flow through the Ent methods below.
 
 ### 6.14 `ent/providers/list`
 
@@ -876,14 +992,16 @@ List available provider families supported by this agent runtime.
 ```
 
 **Notes**:
+
 - Wrappers (Claude Code, Codex) typically return exactly one provider.
 - Lace-like agents may return multiple providers.
 - Clients MUST feature-detect via `ent/providers` capability before calling.
 
 ### 6.14.1 `ent/providers/catalog` (extension)
 
-Return the agent's provider catalog, including model metadata used by the web UI (pricing/context/etc).
-This replaces any web-server direct reads of catalog data from the agent package or filesystem.
+Return the agent's provider catalog, including model metadata used by the web UI
+(pricing/context/etc). This replaces any web-server direct reads of catalog data
+from the agent package or filesystem.
 
 ```typescript
 // Request
@@ -901,7 +1019,8 @@ This replaces any web-server direct reads of catalog data from the agent package
 
 ### 6.15 `ent/providers/refresh` (extension)
 
-Refresh provider catalog metadata (e.g., remote catalogs). Replaces any web-server direct reads of agent catalogs.
+Refresh provider catalog metadata (e.g., remote catalogs). Replaces any
+web-server direct reads of agent catalogs.
 
 ```typescript
 // Request
@@ -913,7 +1032,8 @@ Refresh provider catalog metadata (e.g., remote catalogs). Replaces any web-serv
 
 - `providerId` optional: omitted = refresh all providers.
 - Idempotent; agents may serve cached results when nothing changed.
-- Capability gate: `AgentCapabilities["ent/providers"].catalogRefresh` MUST be true.
+- Capability gate: `AgentCapabilities["ent/providers"].catalogRefresh` MUST be
+  true.
 
 ### 6.16 `ent/connections/list`
 
@@ -938,7 +1058,8 @@ List configured connections, optionally filtered by provider.
 
 ### 6.17 `ent/connections/upsert`
 
-Create or update a connection. When creating, `providerId` is required. When updating, only `connectionId` is needed.
+Create or update a connection. When creating, `providerId` is required. When
+updating, only `connectionId` is needed.
 
 ```typescript
 // Request
@@ -964,7 +1085,8 @@ Create or update a connection. When creating, `providerId` is required. When upd
 }
 ```
 
-**Security requirement**: The `config` object MUST NOT contain credentials. Use `ent/connections/credentials/*` methods to manage credentials separately.
+**Security requirement**: The `config` object MUST NOT contain credentials. Use
+`ent/connections/credentials/*` methods to manage credentials separately.
 
 ### 6.18 `ent/connections/delete`
 
@@ -1035,7 +1157,8 @@ Get credential status for a connection.
 
 ### 6.21 `ent/connections/credentials/start`
 
-Begin an interactive credential/login flow for a connection. Supports credential rotation for existing connections.
+Begin an interactive credential/login flow for a connection. Supports credential
+rotation for existing connections.
 
 ```typescript
 // Request
@@ -1066,9 +1189,12 @@ Begin an interactive credential/login flow for a connection. Supports credential
 ```
 
 **Behavior**:
+
 - If already authenticated with valid credentials, return `{ kind: "ready" }`.
 - Implementations MAY ignore `method` and choose the best available flow.
-- This method supports credential rotation: calling it on a connection with existing credentials initiates a new credential flow that replaces the old credentials on successful completion.
+- This method supports credential rotation: calling it on a connection with
+  existing credentials initiates a new credential flow that replaces the old
+  credentials on successful completion.
 
 ### 6.22 `ent/connections/credentials/submit`
 
@@ -1090,7 +1216,8 @@ Submit credentials or flow completion information.
 }
 ```
 
-**Security requirement**: Agents MUST NOT emit secrets in `session/update` streams, `ent/session/events`, or error messages. Secrets MUST be redacted.
+**Security requirement**: Agents MUST NOT emit secrets in `session/update`
+streams, `ent/session/events`, or error messages. Secrets MUST be redacted.
 
 ### 6.23 `ent/connections/credentials/clear` (optional)
 
@@ -1113,7 +1240,9 @@ Clear credentials for a connection without deleting the connection itself.
 
 ### 6.24 `ent/models/list`
 
-List available models for a connection. Model catalogs are connection-scoped because available models can vary by endpoint and credentials (especially for OpenAI-compatible providers).
+List available models for a connection. Model catalogs are connection-scoped
+because available models can vary by endpoint and credentials (especially for
+OpenAI-compatible providers).
 
 ```typescript
 // Request
@@ -1134,11 +1263,11 @@ List available models for a connection. Model catalogs are connection-scoped bec
 }
 ```
 
-`ModelInfo.disabled?: boolean` — true when the model is currently disabled by provider-level gating
-(`ent/models/disable` or an `enabled` allow-list).
+`ModelInfo.disabled?: boolean` — true when the model is currently disabled by
+provider-level gating (`ent/models/disable` or an `enabled` allow-list).
 
-`ModelInfo.disabledState?: "enabled" | "disabled"` — explicit enabled/disabled state for UI rendering.
-Clients SHOULD prefer `disabledState` when present.
+`ModelInfo.disabledState?: "enabled" | "disabled"` — explicit enabled/disabled
+state for UI rendering. Clients SHOULD prefer `disabledState` when present.
 
 ### 6.25 `ent/models/refresh` (optional)
 
@@ -1165,13 +1294,18 @@ Refresh model catalog from upstream provider.
 ```
 
 **Behavior**:
-- Agents MAY serve cached results; `refreshedAt` indicates the freshness boundary for that connection's model catalog.
-- `ent/models/refresh` does not return the model list; clients SHOULD call `ent/models/list` after a successful refresh.
-- Capability gate: `AgentCapabilities["ent/providers"].catalogRefresh` MUST be true for agents that implement this method.
+
+- Agents MAY serve cached results; `refreshedAt` indicates the freshness
+  boundary for that connection's model catalog.
+- `ent/models/refresh` does not return the model list; clients SHOULD call
+  `ent/models/list` after a successful refresh.
+- Capability gate: `AgentCapabilities["ent/providers"].catalogRefresh` MUST be
+  true for agents that implement this method.
 
 ### 6.26 `ent/models/enable` / `ent/models/disable` (extension)
 
-Toggle model availability for a specific provider. UI must call these; the web tier MUST NOT mutate agent disk config directly.
+Toggle model availability for a specific provider. UI must call these; the web
+tier MUST NOT mutate agent disk config directly.
 
 ```typescript
 // Request
@@ -1189,9 +1323,11 @@ Toggle model availability for a specific provider. UI must call these; the web t
 ```
 
 Rules:
+
 - Idempotent; enabling an already-enabled model is a no-op.
 - Unknown `modelIds` SHOULD error.
-- State is **provider-global** (keyed by `providerId`) and persisted by the agent (not session-scoped, not web-written).
+- State is **provider-global** (keyed by `providerId`) and persisted by the
+  agent (not session-scoped, not web-written).
 
 ### 6.27 `ent/tools/list`
 
@@ -1230,6 +1366,7 @@ List available agent personas for configuration.
 ```
 
 **PersonaInfo interface**:
+
 ```typescript
 interface PersonaInfo {
   name: string;
@@ -1443,7 +1580,8 @@ Returns an estimated token usage summary for the current session context.
 
 ### 6.37 `ent/session/context_breakdown`
 
-Returns a structured breakdown of where context tokens are being spent. Intended to power a "context visualizer" UI.
+Returns a structured breakdown of where context tokens are being spent. Intended
+to power a "context visualizer" UI.
 
 ```typescript
 // Request
@@ -1486,11 +1624,16 @@ Returns a structured breakdown of where context tokens are being spent. Intended
 
 ### 7.1 `session/update` (notification)
 
-Stream updates during turn processing. All updates include correlation IDs for ordering and disambiguation.
+Stream updates during turn processing. All updates include correlation IDs for
+ordering and disambiguation.
 
-**ACP note**: This method shares the same name and notification pattern as ACP's `session/update`, but uses Ent-native update types (e.g., `text_delta` instead of ACP's `agent_message_chunk`, `tool_use` instead of `tool_call`). An adapter layer would be needed for wire compatibility with ACP clients.
+**ACP note**: This method shares the same name and notification pattern as ACP's
+`session/update`, but uses Ent-native update types (e.g., `text_delta` instead
+of ACP's `agent_message_chunk`, `tool_use` instead of `tool_call`). An adapter
+layer would be needed for wire compatibility with ACP clients.
 
 **Common fields** (included in all session/update notifications):
+
 ```typescript
 {
   jsonrpc: "2.0",
@@ -1512,12 +1655,22 @@ Stream updates during turn processing. All updates include correlation IDs for o
 }
 ```
 
-**Ordering**: Use `streamSeq` for global ordering of all updates. Use `turnId` + `turnSeq` for turn-scoped ordering. Job updates may have `jobId` without `turnId` if they outlive the originating turn.
+**Ordering**: Use `streamSeq` for global ordering of all updates. Use `turnId` +
+`turnSeq` for turn-scoped ordering. Job updates may have `jobId` without
+`turnId` if they outlive the originating turn.
 
 **Sequence number ownership and persistence**:
-- `streamSeq`: Assigned by the **emitting agent process** at time of emission. For `job_update`, the parent agent assigns the sequence (not the subagent). MUST be monotonic for the lifetime of the process+session. Implementations SHOULD persist the last `streamSeq` checkpoint to survive session resume, but are NOT required to persist every streaming update—only the counter value.
-- `eventSeq`: Assigned by the agent when writing durable events. MUST be persisted in the session log (JSONL or equivalent). Used for `ent/session/events` pagination.
-- `turnSeq`: Assigned per-turn, resets each turn. Does not require cross-restart persistence.
+
+- `streamSeq`: Assigned by the **emitting agent process** at time of emission.
+  For `job_update`, the parent agent assigns the sequence (not the subagent).
+  MUST be monotonic for the lifetime of the process+session. Implementations
+  SHOULD persist the last `streamSeq` checkpoint to survive session resume, but
+  are NOT required to persist every streaming update—only the counter value.
+- `eventSeq`: Assigned by the agent when writing durable events. MUST be
+  persisted in the session log (JSONL or equivalent). Used for
+  `ent/session/events` pagination.
+- `turnSeq`: Assigned per-turn, resets each turn. Does not require cross-restart
+  persistence.
 
 **Update types:**
 
@@ -1659,27 +1812,51 @@ Stream updates during turn processing. All updates include correlation IDs for o
 }
 ```
 
-**Job updates**: The `job_update` wrapper allows job/subagent activity to stream through the same channel using the same update type vocabulary. The inner `update` field contains any of the standard update types (`text_delta`, `tool_use`, `usage`, etc.). This lets client renderers reuse one codepath for both top-level and job updates.
+**Job updates**: The `job_update` wrapper allows job/subagent activity to stream
+through the same channel using the same update type vocabulary. The inner
+`update` field contains any of the standard update types (`text_delta`,
+`tool_use`, `usage`, etc.). This lets client renderers reuse one codepath for
+both top-level and job updates.
 
-**Recursion restriction**: The following types MUST NOT appear as the inner `update.type`: `job_update`, `job_started`, `job_finished`. These are top-level lifecycle events only.
+**Recursion restriction**: The following types MUST NOT appear as the inner
+`update.type`: `job_update`, `job_started`, `job_finished`. These are top-level
+lifecycle events only.
 
-**Nested jobs**: When a subagent spawns its own subagents, the parent agent MUST forward all descendant jobs as flattened top-level `job_started`/`job_update`/`job_finished` events. Use `parentJobId` to represent the hierarchy. This avoids recursive nesting while still representing arbitrarily deep job trees.
+**Nested jobs**: When a subagent spawns its own subagents, the parent agent MUST
+forward all descendant jobs as flattened top-level
+`job_started`/`job_update`/`job_finished` events. Use `parentJobId` to represent
+the hierarchy. This avoids recursive nesting while still representing
+arbitrarily deep job trees.
 
-**Backpressure guidance**: Implementations MAY coalesce multiple `text_delta` updates into larger chunks, especially within `job_update`. For verbose jobs (test suites, builds), aggressive coalescing prevents UI lockups and transport buffer growth.
+**Backpressure guidance**: Implementations MAY coalesce multiple `text_delta`
+updates into larger chunks, especially within `job_update`. For verbose jobs
+(test suites, builds), aggressive coalescing prevents UI lockups and transport
+buffer growth.
 
-**Job streaming capability** (`ent/jobStreaming`): Controls how much job output the agent sends:
+**Job streaming capability** (`ent/jobStreaming`): Controls how much job output
+the agent sends:
+
 - `full`: Forward all `job_update` deltas as they occur (default)
-- `coalesced`: Coalesce `text_delta` updates into larger chunks; suppress high-frequency updates
-- `none`: Only send `job_started`, `job_finished`, and final report via `ent/job/output`; no streaming deltas
+- `coalesced`: Coalesce `text_delta` updates into larger chunks; suppress
+  high-frequency updates
+- `none`: Only send `job_started`, `job_finished`, and final report via
+  `ent/job/output`; no streaming deltas
 
 ### 7.2 `session/request_permission` (ACP-compatible)
 
-Agent requests permission to execute a tool. This is a **request** (has `id`), not a notification.
+Agent requests permission to execute a tool. This is a **request** (has `id`),
+not a notification.
 
 **Pause semantics**:
-- After sending this request, the agent MUST NOT execute the tool until it receives a response (or `session/cancel`, or timeout).
-- If `jobId` is present, the agent MUST pause execution of **that job only** until decision is received. The agent MAY continue other unrelated work (including the parent turn) unless it is logically awaiting the job's completion.
-- The agent should emit a `tool_use` update with `status: "awaiting_permission"` to indicate the pause state.
+
+- After sending this request, the agent MUST NOT execute the tool until it
+  receives a response (or `session/cancel`, or timeout).
+- If `jobId` is present, the agent MUST pause execution of **that job only**
+  until decision is received. The agent MAY continue other unrelated work
+  (including the parent turn) unless it is logically awaiting the job's
+  completion.
+- The agent should emit a `tool_use` update with `status: "awaiting_permission"`
+  to indicate the pause state.
 
 ```typescript
 // Request (Agent → Client)
@@ -1718,15 +1895,29 @@ Agent requests permission to execute a tool. This is a **request** (has `id`), n
 ```
 
 **Global uniqueness requirements**:
-- `toolCallId` MUST be globally unique within the session **across the parent agent and all jobs/subagents**. This is critical for permission deduplication and routing.
-- Recommended: Use UUID/ULID/UUIDv7 for `toolCallId`. If using counters, namespace with jobId (e.g., `${jobId}:${n}`) and ensure jobId uniqueness.
+
+- `toolCallId` MUST be globally unique within the session **across the parent
+  agent and all jobs/subagents**. This is critical for permission deduplication
+  and routing.
+- Recommended: Use UUID/ULID/UUIDv7 for `toolCallId`. If using counters,
+  namespace with jobId (e.g., `${jobId}:${n}`) and ensure jobId uniqueness.
 - `turnId` SHOULD be UUID/ULID/UUIDv7 to prevent correlation collisions.
 
-**Idempotency**: If the client sends duplicate responses for the same `toolCallId`, the agent ignores all but the first. This prevents race conditions from network retries or UI double-clicks.
+**Idempotency**: If the client sends duplicate responses for the same
+`toolCallId`, the agent ignores all but the first. This prevents race conditions
+from network retries or UI double-clicks.
 
-**Durable identity**: `toolCallId` is the durable identifier for a permission prompt/tool execution. The JSON-RPC `id` / `PermissionRequest.requestId` is an ephemeral transport request id and may change if the agent reissues the permission prompt after a restart or reconnect.
+**Durable identity**: `toolCallId` is the durable identifier for a permission
+prompt/tool execution. The JSON-RPC `id` / `PermissionRequest.requestId` is an
+ephemeral transport request id and may change if the agent reissues the
+permission prompt after a restart or reconnect.
 
-**Durability**: The agent MUST persist permission requests and permission decisions in its session's durable event log (`events.jsonl`). Pending permissions are derived by scanning for `permission_requested` events that do not yet have a matching `permission_decided`/`permission_cancelled`. After an agent restart, the agent MUST reissue permission prompts for any pending `toolCallId`s so the client receives a fresh JSON-RPC `id` to respond to.
+**Durability**: The agent MUST persist permission requests and permission
+decisions in its session's durable event log (`events.jsonl`). Pending
+permissions are derived by scanning for `permission_requested` events that do
+not yet have a matching `permission_decided`/`permission_cancelled`. After an
+agent restart, the agent MUST reissue permission prompts for any pending
+`toolCallId`s so the client receives a fresh JSON-RPC `id` to respond to.
 
 ---
 
@@ -1736,13 +1927,22 @@ Agent requests permission to execute a tool. This is a **request** (has `id`), n
 
 ```typescript
 type ContentBlock =
-  | { type: "text"; text: string }
-  | { type: "image"; data: string; mediaType: string }  // base64
-  | { type: "tool_use"; toolUseId: string; name: string; input: object }
-  | { type: "tool_result"; toolUseId: string; content: string; isError?: boolean }
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mediaType: string } // base64
+  | { type: 'tool_use'; toolUseId: string; name: string; input: object }
+  | {
+      type: 'tool_result';
+      toolUseId: string;
+      content: string;
+      isError?: boolean;
+    };
 ```
 
-**toolUseId vs toolCallId**: ContentBlock uses `toolUseId` for Anthropic API compatibility. This is the **same identifier** as `toolCallId` used in `session/update` and `session/request_permission`. Implementations MUST treat them as equivalent—when correlating tool executions across streaming updates, permission requests, and content blocks, `toolUseId === toolCallId`.
+**toolUseId vs toolCallId**: ContentBlock uses `toolUseId` for Anthropic API
+compatibility. This is the **same identifier** as `toolCallId` used in
+`session/update` and `session/request_permission`. Implementations MUST treat
+them as equivalent—when correlating tool executions across streaming updates,
+permission requests, and content blocks, `toolUseId === toolCallId`.
 
 ---
 
@@ -1750,56 +1950,57 @@ type ContentBlock =
 
 ### 10.1 JSON-RPC Standard
 
-| Code | Name |
-|------|------|
-| -32700 | ParseError |
+| Code   | Name           |
+| ------ | -------------- |
+| -32700 | ParseError     |
 | -32600 | InvalidRequest |
 | -32601 | MethodNotFound |
-| -32602 | InvalidParams |
-| -32603 | InternalError |
+| -32602 | InvalidParams  |
+| -32603 | InternalError  |
 
 ### 10.2 ACP Standard
 
-| Code | Name |
-|------|------|
-| 1 | SessionNotFound |
-| 2 | SessionBusy |
-| 3 | PermissionDenied |
-| 4 | ToolNotFound |
-| 5 | MaxTurnsExceeded |
-| 6 | Cancelled |
+| Code   | Name                                                               |
+| ------ | ------------------------------------------------------------------ |
+| 1      | SessionNotFound                                                    |
+| 2      | SessionBusy                                                        |
+| 3      | PermissionDenied                                                   |
+| 4      | ToolNotFound                                                       |
+| 5      | MaxTurnsExceeded                                                   |
+| 6      | Cancelled                                                          |
 | -32800 | RequestCancelled (per-request cancellation via `$/cancel_request`) |
 
 ### 10.3 Ent Extensions
 
-| Code | Name |
-|------|------|
-| 7 | ProviderError |
-| 8 | JobNotFound |
-| 9 | NotInitialized |
-| 10 | AlreadyInitialized |
-| 11 | BudgetExceeded |
-| 12 | CheckpointNotFound |
-| 13 | StructuredOutputInvalid |
-| 14 | ConnectionNotFound |
-| 11 | BudgetExceeded |
-| 12 | CheckpointNotFound |
-| 13 | StructuredOutputInvalid |
-| 14 | ConnectionNotFound |
+| Code | Name                    |
+| ---- | ----------------------- |
+| 7    | ProviderError           |
+| 8    | JobNotFound             |
+| 9    | NotInitialized          |
+| 10   | AlreadyInitialized      |
+| 11   | BudgetExceeded          |
+| 12   | CheckpointNotFound      |
+| 13   | StructuredOutputInvalid |
+| 14   | ConnectionNotFound      |
+| 11   | BudgetExceeded          |
+| 12   | CheckpointNotFound      |
+| 13   | StructuredOutputInvalid |
+| 14   | ConnectionNotFound      |
 
 ### 10.4 Error Reporting Contract
 
 Errors fall into distinct categories for client handling:
 
-| Category | Error Codes | Meaning | Client Action |
-|----------|-------------|---------|---------------|
-| **Agent internal** | -32603, 9, 10 | Agent process failure | Restart agent |
-| **Provider** | 7 | LLM API error (rate limit, auth, etc.) | Retry or escalate |
-| **Tool** | 4, `tool_use.status=failed` | Tool execution failed | Show to user |
-| **Session** | 1, 2, 5, 6, 11, 12 | Session state issue | Handle per code |
-| **Protocol** | -32700 to -32600 | Malformed request | Fix client |
+| Category           | Error Codes                 | Meaning                                | Client Action     |
+| ------------------ | --------------------------- | -------------------------------------- | ----------------- |
+| **Agent internal** | -32603, 9, 10               | Agent process failure                  | Restart agent     |
+| **Provider**       | 7                           | LLM API error (rate limit, auth, etc.) | Retry or escalate |
+| **Tool**           | 4, `tool_use.status=failed` | Tool execution failed                  | Show to user      |
+| **Session**        | 1, 2, 5, 6, 11, 12          | Session state issue                    | Handle per code   |
+| **Protocol**       | -32700 to -32600            | Malformed request                      | Fix client        |
 
 Error responses SHOULD include `data.category` to disambiguate:
+
 ```typescript
 {
   error: {
@@ -1825,7 +2026,7 @@ interface McpServerConfig {
   command: string;
   args?: string[];
   env?: Record<string, string>;
-  transport?: "stdio" | "sse" | "http";
+  transport?: 'stdio' | 'sse' | 'http';
 }
 ```
 
@@ -1863,7 +2064,7 @@ interface ModelInfo {
    * Explicit enabled/disabled state for UI rendering.
    * When present, MUST be consistent with `disabled` (`disabled === true` ⇔ `disabledState === "disabled"`).
    */
-  disabledState?: "enabled" | "disabled";
+  disabledState?: 'enabled' | 'disabled';
 }
 ```
 
@@ -1871,15 +2072,26 @@ interface ModelInfo {
 
 ```typescript
 interface ToolInfo {
-  name: string;                // MUST be stable and unique within agent
+  name: string; // MUST be stable and unique within agent
   description: string;
-  kind: "read" | "edit" | "delete" | "search" | "execute" | "think" | "fetch" | "other";
-  inputSchema: JsonSchema;     // MUST be present (required for approval policies)
+  kind:
+    | 'read'
+    | 'edit'
+    | 'delete'
+    | 'search'
+    | 'execute'
+    | 'think'
+    | 'fetch'
+    | 'other';
+  inputSchema: JsonSchema; // MUST be present (required for approval policies)
   requiresPermission?: boolean;
 }
 ```
 
-**Normative requirements**: `name` MUST be stable across sessions and unique within the agent's tool set. `inputSchema` MUST be present and follow JSON Schema (draft-07+). Clients MAY use `name` for approval policies, UI rendering, and tool-specific logic.
+**Normative requirements**: `name` MUST be stable across sessions and unique
+within the agent's tool set. `inputSchema` MUST be present and follow JSON
+Schema (draft-07+). Clients MAY use `name` for approval policies, UI rendering,
+and tool-specific logic.
 
 ### 11.5 JsonSchema
 
@@ -1919,32 +2131,36 @@ interface UsageInfo {
 ```typescript
 // Tool results support structured content, not just strings
 interface ToolResult {
-  outcome: "completed" | "failed" | "denied" | "timeout" | "cancelled";
+  outcome: 'completed' | 'failed' | 'denied' | 'timeout' | 'cancelled';
   content: ToolResultContent[];
-  meta?: Record<string, any>;  // Tool-specific metadata
+  meta?: Record<string, any>; // Tool-specific metadata
 }
 
 type ToolResultContent =
-  | { type: "text"; text: string }
-  | { type: "json"; data: any }
-  | { type: "image"; data: string; mediaType: string }
-  | { type: "error"; message: string; code?: string };
+  | { type: 'text'; text: string }
+  | { type: 'json'; data: any }
+  | { type: 'image'; data: string; mediaType: string }
+  | { type: 'error'; message: string; code?: string };
 ```
 
 **Lifecycle vs outcome alignment**:
-- `tool_use.status` tracks lifecycle: `pending` → `awaiting_permission` → `running` → terminal
-- Terminal states are: `completed` | `failed` | `denied` | `timeout` | `cancelled`
+
+- `tool_use.status` tracks lifecycle: `pending` → `awaiting_permission` →
+  `running` → terminal
+- Terminal states are: `completed` | `failed` | `denied` | `timeout` |
+  `cancelled`
 - `ToolResult.outcome` MUST equal the terminal `tool_use.status`
-- Example: a tool that errors has `status: "failed"` and `outcome: "failed"`; a successful tool has `status: "completed"` and `outcome: "completed"`
+- Example: a tool that errors has `status: "failed"` and `outcome: "failed"`; a
+  successful tool has `status: "completed"` and `outcome: "completed"`
 
 ### 11.8 McpServerStatus
 
 ```typescript
 interface McpServerStatus {
   name: string;
-  status: "connected" | "connecting" | "disconnected" | "error";
+  status: 'connected' | 'connecting' | 'disconnected' | 'error';
   error?: string;
-  tools?: string[];       // Available tools from this server
+  tools?: string[]; // Available tools from this server
   lastConnected?: string; // ISO 8601
 }
 ```
@@ -1954,17 +2170,17 @@ interface McpServerStatus {
 ```typescript
 // Pending permission request (for reconnection scenarios)
 interface PermissionRequest {
-  requestId: string;       // JSON-RPC request ID for the currently-issued prompt (may change if reissued)
-  toolCallId: string;      // MUST be globally unique across session + jobs
+  requestId: string; // JSON-RPC request ID for the currently-issued prompt (may change if reissued)
+  toolCallId: string; // MUST be globally unique across session + jobs
   sessionId: string;
-  turnId: string;          // SHOULD be UUID
+  turnId: string; // SHOULD be UUID
   turnSeq: number;
-  jobId?: string;          // If present, permission is for a job's tool use
+  jobId?: string; // If present, permission is for a job's tool use
   tool: string;
   kind?: string;
   resource: string;
   options: { optionId: string; label: string }[];
-  requestedAt: string;     // ISO 8601
+  requestedAt: string; // ISO 8601
 }
 ```
 
@@ -1973,9 +2189,9 @@ interface PermissionRequest {
 ```typescript
 // Provider family descriptor (returned by ent/providers/list)
 interface ProviderInfo {
-  providerId: string;               // Provider identifier (opaque)
+  providerId: string; // Provider identifier (opaque)
   displayName: string;
-  supportsConnections: boolean;     // Can create multiple connections
+  supportsConnections: boolean; // Can create multiple connections
   supportsCatalogRefresh?: boolean; // Connections can call ent/models/refresh
 }
 ```
@@ -2019,7 +2235,7 @@ interface CatalogModelInfo {
 // Configured provider connection (returned by ent/connections/list)
 interface ConnectionInfo {
   connectionId: string;
-  providerId: string;                // Parent provider (immutable)
+  providerId: string; // Parent provider (immutable)
   name: string;
   endpoint?: string;
   timeout?: number;
@@ -2027,12 +2243,12 @@ interface ConnectionInfo {
   modelConfig?: ModelConfig;
   hasCredentials?: boolean;
   isDefault?: boolean;
-  createdAt?: string;                // ISO 8601
-  lastUsedAt?: string;               // ISO 8601
+  createdAt?: string; // ISO 8601
+  lastUsedAt?: string; // ISO 8601
 
   // Credential status (inline for convenience; also queryable via credentials/status)
-  credentialState?: "ready" | "missing" | "expired" | "invalid" | "unknown";
-  accountLabel?: string;             // e.g., email/org, if available
+  credentialState?: 'ready' | 'missing' | 'expired' | 'invalid' | 'unknown';
+  accountLabel?: string; // e.g., email/org, if available
 }
 ```
 
@@ -2056,102 +2272,108 @@ interface ModelConfig {
 
 ## 12. Compatibility Summary
 
-| Method | ACP Status | Notes |
-|--------|------------|-------|
-| `initialize` | ✅ Compatible | Extended params |
-| `session/new` | ✅ Compatible | |
-| `session/load` | ✅ Compatible | |
-| `session/prompt` | ✅ Compatible | Extended params |
-| `$/cancel_request` | ✅ Compatible | Per-request cancellation |
-| `session/set_mode` | 🔸 Shape compatible | Ent-native mode values |
-| `session/list` | ✅ ACP Draft | Updated field names (cwd, updatedAt) |
-| `session/fork` | ✅ ACP Draft | New method for session forking |
-| `session/update` | 🔸 Shape compatible | Ent-native type names |
-| `session/request_permission` | ✅ Compatible | |
-| `ent/session/compact` | 🔧 Extension | |
-| `ent/session/inject` | 🔧 Extension | Propose to ACP |
-| `ent/session/configure` | 🔧 Extension | |
-| `ent/session/rewind` | 🔧 Extension | |
-| `ent/session/checkpoint` | 🔧 Extension | |
-| `ent/session/events` | 🔧 Extension | History replay |
-| `ent/session/token_usage` | 🔧 Extension | Context insight |
-| `ent/session/context_breakdown` | 🔧 Extension | Context insight |
-| `ent/job/*` | 🔧 Extension | Propose to ACP |
-| `ent/agent/ping` | 🔧 Extension | Health check |
-| `ent/agent/status` | 🔧 Extension | |
-| `ent/providers/list` | 🔧 Extension | Provider discovery |
-| `ent/connections/*` | 🔧 Extension | Connection management |
-| `ent/connections/credentials/*` | 🔧 Extension | Connection-scoped auth |
-| `ent/models/*` | 🔧 Extension | Connection-scoped catalog |
-| `ent/tools/list` | 🔧 Extension | Tool discovery |
-| `ent/personas/list` | 🔧 Extension | Persona discovery |
-| `ent/mcp/servers/list` | 🔧 Extension | MCP server management |
-| `ent/mcp/servers/upsert` | 🔧 Extension | MCP server management |
-| `ent/mcp/servers/delete` | 🔧 Extension | MCP server management |
-| `ent/mcp/servers/test` | 🔧 Extension | MCP connectivity testing |
-| `ent/mcp/tools/list` | 🔧 Extension | MCP tool discovery |
-| `ent/workspace/info` | 🔧 Extension | Workspace management |
-| `ent/workspace/create` | 🔧 Extension | Workspace creation |
-| `fs/*` | ❌ Not implemented | Agent-centric |
-| `terminal/*` | ❌ Not implemented | Agent-centric |
+| Method                          | ACP Status          | Notes                                |
+| ------------------------------- | ------------------- | ------------------------------------ |
+| `initialize`                    | ✅ Compatible       | Extended params                      |
+| `session/new`                   | ✅ Compatible       |                                      |
+| `session/load`                  | ✅ Compatible       |                                      |
+| `session/prompt`                | ✅ Compatible       | Extended params                      |
+| `$/cancel_request`              | ✅ Compatible       | Per-request cancellation             |
+| `session/set_mode`              | 🔸 Shape compatible | Ent-native mode values               |
+| `session/list`                  | ✅ ACP Draft        | Updated field names (cwd, updatedAt) |
+| `session/fork`                  | ✅ ACP Draft        | New method for session forking       |
+| `session/update`                | 🔸 Shape compatible | Ent-native type names                |
+| `session/request_permission`    | ✅ Compatible       |                                      |
+| `ent/session/compact`           | 🔧 Extension        |                                      |
+| `ent/session/inject`            | 🔧 Extension        | Propose to ACP                       |
+| `ent/session/configure`         | 🔧 Extension        |                                      |
+| `ent/session/rewind`            | 🔧 Extension        |                                      |
+| `ent/session/checkpoint`        | 🔧 Extension        |                                      |
+| `ent/session/events`            | 🔧 Extension        | History replay                       |
+| `ent/session/token_usage`       | 🔧 Extension        | Context insight                      |
+| `ent/session/context_breakdown` | 🔧 Extension        | Context insight                      |
+| `ent/job/*`                     | 🔧 Extension        | Propose to ACP                       |
+| `ent/agent/ping`                | 🔧 Extension        | Health check                         |
+| `ent/agent/status`              | 🔧 Extension        |                                      |
+| `ent/providers/list`            | 🔧 Extension        | Provider discovery                   |
+| `ent/connections/*`             | 🔧 Extension        | Connection management                |
+| `ent/connections/credentials/*` | 🔧 Extension        | Connection-scoped auth               |
+| `ent/models/*`                  | 🔧 Extension        | Connection-scoped catalog            |
+| `ent/tools/list`                | 🔧 Extension        | Tool discovery                       |
+| `ent/personas/list`             | 🔧 Extension        | Persona discovery                    |
+| `ent/mcp/servers/list`          | 🔧 Extension        | MCP server management                |
+| `ent/mcp/servers/upsert`        | 🔧 Extension        | MCP server management                |
+| `ent/mcp/servers/delete`        | 🔧 Extension        | MCP server management                |
+| `ent/mcp/servers/test`          | 🔧 Extension        | MCP connectivity testing             |
+| `ent/mcp/tools/list`            | 🔧 Extension        | MCP tool discovery                   |
+| `ent/workspace/info`            | 🔧 Extension        | Workspace management                 |
+| `ent/workspace/create`          | 🔧 Extension        | Workspace creation                   |
+| `fs/*`                          | ❌ Not implemented  | Agent-centric                        |
+| `terminal/*`                    | ❌ Not implemented  | Agent-centric                        |
 
 ---
 
 ## 13. Claude Agent SDK Feature Coverage
 
-| SDK Feature | Protocol Support |
-|-------------|-----------------|
-| Subprocess execution | ✅ Architecture |
-| JSON-over-stdio | ✅ Transport |
-| Streaming messages | ✅ `session/update` |
-| Session persist/resume | ✅ `session/new`, `session/load` |
-| Session forking | ✅ `session/load` with fork |
-| Subagents | ✅ `ent/job/*` + updates |
-| Tool whitelist/blacklist | ✅ `initialize` config |
-| Execution modes | ✅ `session/set_mode` (plan/execute) |
-| Approval modes | ✅ `ent/session/configure` (ask/approveReads/approveEdits/approve/deny/skip) |
-| Permission callbacks | ✅ `session/request_permission` |
-| MCP integration | ✅ `initialize` config |
-| Context compaction | ✅ `ent/session/compact` |
-| File checkpointing | ✅ `ent/session/checkpoint`, `rewind` |
-| Interrupt/cancel | ✅ `session/cancel` |
-| Context injection | ✅ `ent/session/inject` |
-| Partial streaming | ✅ `session/update` |
-| Structured output | ✅ `session/prompt` outputFormat |
-| Budget control | ✅ `initialize` + error code |
-| Model switching | ✅ `ent/session/configure` |
-| Thinking tokens | ✅ `ent/session/configure` |
-| Sandbox config | ✅ `initialize` config |
-| Session history | ✅ `ent/session/events` |
-| Context visualization | ✅ `ent/session/token_usage`, `ent/session/context_breakdown` |
-| Provider discovery | ✅ `ent/providers/list` |
-| Connection management | ✅ `ent/connections/*` |
-| Authentication | ✅ `ent/connections/credentials/*` |
-| Model catalog | ✅ `ent/models/*` (connection-scoped) |
+| SDK Feature              | Protocol Support                                                             |
+| ------------------------ | ---------------------------------------------------------------------------- |
+| Subprocess execution     | ✅ Architecture                                                              |
+| JSON-over-stdio          | ✅ Transport                                                                 |
+| Streaming messages       | ✅ `session/update`                                                          |
+| Session persist/resume   | ✅ `session/new`, `session/load`                                             |
+| Session forking          | ✅ `session/load` with fork                                                  |
+| Subagents                | ✅ `ent/job/*` + updates                                                     |
+| Tool whitelist/blacklist | ✅ `initialize` config                                                       |
+| Execution modes          | ✅ `session/set_mode` (plan/execute)                                         |
+| Approval modes           | ✅ `ent/session/configure` (ask/approveReads/approveEdits/approve/deny/skip) |
+| Permission callbacks     | ✅ `session/request_permission`                                              |
+| MCP integration          | ✅ `initialize` config                                                       |
+| Context compaction       | ✅ `ent/session/compact`                                                     |
+| File checkpointing       | ✅ `ent/session/checkpoint`, `rewind`                                        |
+| Interrupt/cancel         | ✅ `session/cancel`                                                          |
+| Context injection        | ✅ `ent/session/inject`                                                      |
+| Partial streaming        | ✅ `session/update`                                                          |
+| Structured output        | ✅ `session/prompt` outputFormat                                             |
+| Budget control           | ✅ `initialize` + error code                                                 |
+| Model switching          | ✅ `ent/session/configure`                                                   |
+| Thinking tokens          | ✅ `ent/session/configure`                                                   |
+| Sandbox config           | ✅ `initialize` config                                                       |
+| Session history          | ✅ `ent/session/events`                                                      |
+| Context visualization    | ✅ `ent/session/token_usage`, `ent/session/context_breakdown`                |
+| Provider discovery       | ✅ `ent/providers/list`                                                      |
+| Connection management    | ✅ `ent/connections/*`                                                       |
+| Authentication           | ✅ `ent/connections/credentials/*`                                           |
+| Model catalog            | ✅ `ent/models/*` (connection-scoped)                                        |
 
 ---
 
 ## 14. Command Routing Architecture
 
-This section describes how user commands (including slash commands) are routed between client and agent.
+This section describes how user commands (including slash commands) are routed
+between client and agent.
 
 ### 14.1 Command Categories
 
 Commands fall into three categories with different routing behavior:
 
-| Category | Examples | Routing | Protocol Method |
-|----------|----------|---------|-----------------|
-| **UI-only** | `/clear`, `/quit`, `/settings` | Client handles locally | None |
-| **State operations** | `/compact`, `/checkpoint`, `/rewind` | Client calls protocol method | `ent/session/*` |
-| **Conversation** | `/commit`, `/review-pr`, natural language | Client sends as prompt | `session/prompt` |
+| Category             | Examples                                  | Routing                      | Protocol Method  |
+| -------------------- | ----------------------------------------- | ---------------------------- | ---------------- |
+| **UI-only**          | `/clear`, `/quit`, `/settings`            | Client handles locally       | None             |
+| **State operations** | `/compact`, `/checkpoint`, `/rewind`      | Client calls protocol method | `ent/session/*`  |
+| **Conversation**     | `/commit`, `/review-pr`, natural language | Client sends as prompt       | `session/prompt` |
 
 ### 14.2 Distinguishing State Operations from Conversation
 
-The key distinction: **does this produce conversation content, or modify session state?**
+The key distinction: **does this produce conversation content, or modify session
+state?**
 
-- **State operations**: Modify session state, return structured data, don't become part of conversation history. Examples: compacting history, creating checkpoints, switching models.
+- **State operations**: Modify session state, return structured data, don't
+  become part of conversation history. Examples: compacting history, creating
+  checkpoints, switching models.
 
-- **Conversation actions**: Agent talks through the action, produces text/tool output that becomes part of history. Examples: creating a commit, reviewing code, answering questions.
+- **Conversation actions**: Agent talks through the action, produces text/tool
+  output that becomes part of history. Examples: creating a commit, reviewing
+  code, answering questions.
 
 ### 14.3 Capability Advertisement
 
@@ -2182,7 +2404,7 @@ function routeCommand(input: string): void {
   const [cmd, ...args] = parseSlashCommand(input);
 
   // 1. Client-only (hardcoded set)
-  if (["clear", "quit", "settings", "help"].includes(cmd)) {
+  if (['clear', 'quit', 'settings', 'help'].includes(cmd)) {
     handleLocally(cmd, args);
     return;
   }
@@ -2195,8 +2417,8 @@ function routeCommand(input: string): void {
   }
 
   // 3. Check if it's a known slash command
-  if (capabilities.slashCommands?.some(c => c.name === cmd)) {
-    await sessionPrompt(input);  // send original text
+  if (capabilities.slashCommands?.some((c) => c.name === cmd)) {
+    await sessionPrompt(input); // send original text
     return;
   }
 
@@ -2207,8 +2429,12 @@ function routeCommand(input: string): void {
 
 ### 14.5 Benefits of This Design
 
-1. **State operations are methods** - Structured request/response, not conversation pollution
-2. **Conversation commands are prompts** - Agent handles naturally, highly extensible
+1. **State operations are methods** - Structured request/response, not
+   conversation pollution
+2. **Conversation commands are prompts** - Agent handles naturally, highly
+   extensible
 3. **Clear separation** - Client knows what goes where
-4. **Extensibility where it matters** - New skills = add to slashCommands, no protocol change
-5. **Stability where it matters** - State operations are well-defined protocol methods
+4. **Extensibility where it matters** - New skills = add to slashCommands, no
+   protocol change
+5. **Stability where it matters** - State operations are well-defined protocol
+   methods

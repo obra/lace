@@ -2,12 +2,17 @@
 
 ## Executive Summary
 
-This specification describes the refactoring of Lace from a monolithic in-process architecture to a modular, process-per-agent architecture. The goals are:
+This specification describes the refactoring of Lace from a monolithic
+in-process architecture to a modular, process-per-agent architecture. The goals
+are:
 
-1. **Composability**: Each agent runs as a standalone process, enabling reuse and composition
+1. **Composability**: Each agent runs as a standalone process, enabling reuse
+   and composition
 2. **Remote-readiness**: Architecture supports both local and remote agents
-3. **Clean boundaries**: Supervisor is storage-agnostic; agents own their own state
-4. **Protocol-driven**: All communication via JSON-RPC 2.0 (Ent protocol extending ACP)
+3. **Clean boundaries**: Supervisor is storage-agnostic; agents own their own
+   state
+4. **Protocol-driven**: All communication via JSON-RPC 2.0 (Ent protocol
+   extending ACP)
 
 ---
 
@@ -17,13 +22,13 @@ This specification describes the refactoring of Lace from a monolithic in-proces
 
 The existing architecture has several issues that prevent modularization:
 
-| Component | Current State | Problem |
-|-----------|--------------|---------|
-| **Agent** | In-process object running full loop (LLM → tools → approvals → continue) | Tightly coupled to runtime; not reusable |
-| **ThreadManager** | SQLite-backed with process-local cache (`processLocalThreadCache`) | No cross-process invalidation; stale cache bugs |
-| **Tool Execution** | Tools access `context.agent` for workspace, env, read-before-write | Can't run tools outside agent process |
-| **Web Server** | Reaches directly into Session/Agent objects | Violates process boundaries |
-| **Persistence** | Centralized SQLite via ThreadManager | Wrong abstraction for process-per-agent |
+| Component          | Current State                                                            | Problem                                         |
+| ------------------ | ------------------------------------------------------------------------ | ----------------------------------------------- |
+| **Agent**          | In-process object running full loop (LLM → tools → approvals → continue) | Tightly coupled to runtime; not reusable        |
+| **ThreadManager**  | SQLite-backed with process-local cache (`processLocalThreadCache`)       | No cross-process invalidation; stale cache bugs |
+| **Tool Execution** | Tools access `context.agent` for workspace, env, read-before-write       | Can't run tools outside agent process           |
+| **Web Server**     | Reaches directly into Session/Agent objects                              | Violates process boundaries                     |
+| **Persistence**    | Centralized SQLite via ThreadManager                                     | Wrong abstraction for process-per-agent         |
 
 ### 1.2 Target State (End-State Design)
 
@@ -73,7 +78,8 @@ The existing architecture has several issues that prevent modularization:
 
 Each agent process is a standalone unit that:
 
-- Runs the LLM "thinking loop" (streaming tokens, tool-call selection, continuation)
+- Runs the LLM "thinking loop" (streaming tokens, tool-call selection,
+  continuation)
 - Executes tools locally (in its own environment)
 - Owns and manages its event log (JSONL file)
 - Derives all state from its event log
@@ -87,18 +93,20 @@ Each agent process is a standalone unit that:
 **Format**: One JSON object per line, append-only
 
 **Event Structure**:
+
 ```typescript
 interface LaceEvent {
-  seq: number;           // Monotonic sequence number
-  id?: string;           // Stable ID for dedup
-  type: EventType;       // USER_MESSAGE, TOOL_CALL, TOOL_RESULT, etc.
-  timestamp: string;     // ISO 8601
-  transient?: boolean;   // If true, not persisted (token streaming)
-  data: EventData;       // Type-specific payload
+  seq: number; // Monotonic sequence number
+  id?: string; // Stable ID for dedup
+  type: EventType; // USER_MESSAGE, TOOL_CALL, TOOL_RESULT, etc.
+  timestamp: string; // ISO 8601
+  transient?: boolean; // If true, not persisted (token streaming)
+  data: EventData; // Type-specific payload
 }
 ```
 
 **Persisted Event Types**:
+
 - `USER_MESSAGE` - User input
 - `ASSISTANT_MESSAGE` - Agent response
 - `TOOL_CALL` - Tool invocation request
@@ -109,6 +117,7 @@ interface LaceEvent {
 - `COMPACTION` - Points to snapshot blob
 
 **Transient Events** (not persisted, or marked `transient: true`):
+
 - Token streaming
 - Thinking updates
 - Usage deltas
@@ -116,6 +125,7 @@ interface LaceEvent {
 **Crash Recovery**: Ignore trailing partial lines on read
 
 **Compaction Strategy**:
+
 - Periodic snapshot (`snapshot.json`) + new segment file
 - OR "compaction event" pointing to summary blob
 - Enables fast startup without replaying entire log
@@ -124,19 +134,21 @@ interface LaceEvent {
 
 Agent derives all runtime state from its event log:
 
-| State | Derived From |
-|-------|--------------|
-| Current conversation | Filter persisted USER/ASSISTANT messages |
-| Pending approvals | TOOL_CALL without matching TOOL_APPROVAL_RESPONSE |
-| Token usage | Sum of usage events |
-| Read files (for read-before-write) | File paths from TOOL_RESULT events |
-| Current turn | Latest turnId from events |
+| State                              | Derived From                                      |
+| ---------------------------------- | ------------------------------------------------- |
+| Current conversation               | Filter persisted USER/ASSISTANT messages          |
+| Pending approvals                  | TOOL_CALL without matching TOOL_APPROVAL_RESPONSE |
+| Token usage                        | Sum of usage events                               |
+| Read files (for read-before-write) | File paths from TOOL_RESULT events                |
+| Current turn                       | Latest turnId from events                         |
 
 ### 2.4 Tool Execution
 
-**Location**: Tools execute inside the agent process (or on the agent's machine for remote agents)
+**Location**: Tools execute inside the agent process (or on the agent's machine
+for remote agents)
 
 **ToolContext Fields** (expanded, no `context.agent`):
+
 ```typescript
 interface ToolContext {
   agentId: string;
@@ -153,7 +165,8 @@ interface ToolContext {
 }
 ```
 
-**Read-Before-Write Enforcement**: Agent implements `hasFileBeenRead()` by scanning its event log for file read events.
+**Read-Before-Write Enforcement**: Agent implements `hasFileBeenRead()` by
+scanning its event log for file read events.
 
 ---
 
@@ -163,20 +176,21 @@ interface ToolContext {
 
 The supervisor/router is the central coordinator that:
 
-| Does | Does NOT |
-|------|----------|
-| Spawn/connect to agent processes | Read agent files (JSONL or any format) |
-| Forward agent events to web UI (SSE/WS) | Own agent state or history |
-| Route user commands to agents | Execute tools |
-| Maintain session metadata | Manage agent persistence |
-| Optional: cache/mirror events | Assume agent storage format |
+| Does                                    | Does NOT                               |
+| --------------------------------------- | -------------------------------------- |
+| Spawn/connect to agent processes        | Read agent files (JSONL or any format) |
+| Forward agent events to web UI (SSE/WS) | Own agent state or history             |
+| Route user commands to agents           | Execute tools                          |
+| Maintain session metadata               | Manage agent persistence               |
+| Optional: cache/mirror events           | Assume agent storage format            |
 
 ### 3.2 Storage Agnosticism
 
 **Core Principle**: Supervisor never reads agent history from disk.
 
 - If UI needs history → supervisor calls `agent.getEvents()` via JSON-RPC
-- Supervisor can cache protocol events as optimization (its own store, separate from agent)
+- Supervisor can cache protocol events as optimization (its own store, separate
+  from agent)
 - Agent is sole authority for its event stream
 
 ### 3.3 Session Management
@@ -186,10 +200,10 @@ Sessions are **supervisor-owned metadata**, not coupled to agent storage:
 ```typescript
 interface Session {
   sessionId: string;
-  agentIds: string[];              // Membership list
-  config: SessionConfig;           // Defaults for spawned agents
-  projectId?: string;              // Project grouping
-  workspaceInfo?: WorkspaceInfo;   // Shared workspace
+  agentIds: string[]; // Membership list
+  config: SessionConfig; // Defaults for spawned agents
+  projectId?: string; // Project grouping
+  workspaceInfo?: WorkspaceInfo; // Shared workspace
 }
 
 interface SessionConfig {
@@ -201,6 +215,7 @@ interface SessionConfig {
 ```
 
 **Session Lifecycle**:
+
 1. Supervisor creates session with config
 2. Supervisor spawns agents, passing `sessionId` + config
 3. Agents record `sessionId` in event context
@@ -218,23 +233,23 @@ interface SessionConfig {
 
 ### 4.2 Supervisor → Agent Methods
 
-| Method | Parameters | Purpose |
-|--------|-----------|---------|
-| `agent.init` | `{ agentId, sessionId?, config }` | Initialize agent |
-| `agent.sendUserMessage` | `{ content, clientMessageId? }` | Send user message |
-| `agent.abort` | `{}` | Abort current turn |
-| `agent.getInfo` | `{}` | Get agent metadata |
-| `agent.getEvents` | `{ afterSeq?, limit? }` | Page through history |
-| `agent.getPendingApprovals` | `{}` | List pending approvals |
-| `agent.respondApproval` | `{ toolCallId, decision }` | Respond to approval |
-| `agent.compact` | `{ strategy?, upToSeq? }` | Trigger compaction |
+| Method                      | Parameters                        | Purpose                |
+| --------------------------- | --------------------------------- | ---------------------- |
+| `agent.init`                | `{ agentId, sessionId?, config }` | Initialize agent       |
+| `agent.sendUserMessage`     | `{ content, clientMessageId? }`   | Send user message      |
+| `agent.abort`               | `{}`                              | Abort current turn     |
+| `agent.getInfo`             | `{}`                              | Get agent metadata     |
+| `agent.getEvents`           | `{ afterSeq?, limit? }`           | Page through history   |
+| `agent.getPendingApprovals` | `{}`                              | List pending approvals |
+| `agent.respondApproval`     | `{ toolCallId, decision }`        | Respond to approval    |
+| `agent.compact`             | `{ strategy?, upToSeq? }`         | Trigger compaction     |
 
 ### 4.3 Agent → Supervisor Notifications
 
-| Notification | Payload | Purpose |
-|-------------|---------|---------|
+| Notification   | Payload          | Purpose                              |
+| -------------- | ---------------- | ------------------------------------ |
 | `event.append` | `{ seq, event }` | Emit durable event (forwarded to UI) |
-| `agent.status` | `{ status }` | Status change (optional) |
+| `agent.status` | `{ status }`     | Status change (optional)             |
 
 ### 4.4 Approval Flow
 
@@ -259,22 +274,23 @@ Agent                              Supervisor                         UI
 ### 5.1 Relationship to ACP
 
 Ent is an **extension** of ACP (Agent Communication Protocol):
+
 - Uses ACP naming conventions: `sessionId`, `turnId`, `jobId`, `toolCallId`
 - Adds connection/provider management for multi-backend support
 - Backwards-compatible: wrappers can ignore unsupported methods
 
 ### 5.2 Naming Conventions
 
-| Concept | Wire Field Name | Notes |
-|---------|-----------------|-------|
-| Session | `sessionId` | ACP standard |
-| Turn | `turnId` | ACP standard |
-| Job/subagent | `jobId` | ACP standard |
-| Tool invocation | `toolCallId` | ACP standard |
-| Tool result ref | `toolUseId` | ACP standard |
-| Provider family | `provider` | Opaque string (ACP-compatible) |
-| Model | `model` | Opaque string (ACP-compatible) |
-| Connection | `connectionId` | New: concrete endpoint + credentials |
+| Concept         | Wire Field Name | Notes                                |
+| --------------- | --------------- | ------------------------------------ |
+| Session         | `sessionId`     | ACP standard                         |
+| Turn            | `turnId`        | ACP standard                         |
+| Job/subagent    | `jobId`         | ACP standard                         |
+| Tool invocation | `toolCallId`    | ACP standard                         |
+| Tool result ref | `toolUseId`     | ACP standard                         |
+| Provider family | `provider`      | Opaque string (ACP-compatible)       |
+| Model           | `model`         | Opaque string (ACP-compatible)       |
+| Connection      | `connectionId`  | New: concrete endpoint + credentials |
 
 ### 5.3 Provider/Connection Model
 
@@ -289,6 +305,7 @@ Provider (family/runtime, e.g., "anthropic", "openai")
 ```
 
 **Key Invariants**:
+
 1. Connection ⇔ Provider pairing is immutable
 2. Credentials are mutable (rotation supported)
 3. Credentials never appear in event streams or error messages
@@ -297,39 +314,46 @@ Provider (family/runtime, e.g., "anthropic", "openai")
 ### 5.4 Ent Methods
 
 **Provider Discovery**:
+
 - `ent/providers/list` → List available providers with capabilities
 
 **Connection Management**:
+
 - `ent/connections/list({ provider? })` → List connections
 - `ent/connections/upsert({ provider, connection })` → Create/update
 - `ent/connections/delete({ connectionId })` → Delete
 - `ent/connections/test({ connectionId, modelId? })` → Validate
 
 **Credential Management**:
+
 - `ent/connections/credentials/status({ connectionId })` → Auth state
 - `ent/connections/credentials/start({ connectionId, method? })` → Start login
 - `ent/connections/credentials/submit({ connectionId, values })` → Submit creds
 
 **Model Management**:
+
 - `ent/models/list({ connection })` → List models for connection
 - `ent/models/refresh({ connection })` → Refresh catalog
 
 **Session Configuration**:
+
 - `initialize.config`: `{ provider, model, connection? }`
 - `ent/session/configure`: `{ connection?, model?, approvalMode? }`
 - `ent/agent/status.currentSession`: `{ provider, model, connection }`
 
 ### 5.5 Configuration Ownership
 
-| Concern | Owner | Where Stored |
-|---------|-------|--------------|
-| Provider instances | Agent | Agent-local store |
-| Credentials | Agent (supervisor configures) | Agent-local store |
-| Active selection | Agent | Agent config |
-| Session membership | Supervisor | Supervisor metadata |
-| Project identity | Supervisor (UX) + Agent (persisted) | Agent event context |
+| Concern            | Owner                               | Where Stored        |
+| ------------------ | ----------------------------------- | ------------------- |
+| Provider instances | Agent                               | Agent-local store   |
+| Credentials        | Agent (supervisor configures)       | Agent-local store   |
+| Active selection   | Agent                               | Agent config        |
+| Session membership | Supervisor                          | Supervisor metadata |
+| Project identity   | Supervisor (UX) + Agent (persisted) | Agent event context |
 
-**Scope**: Provider instances are **global** (per-user/per-machine), not per-project:
+**Scope**: Provider instances are **global** (per-user/per-machine), not
+per-project:
+
 - Any agent process can read/write the same provider instance store
 - Supervisor configures once; spawns many agents using them
 - Projects store `defaultProviderInstanceId` for selection
@@ -359,14 +383,14 @@ Provider (family/runtime, e.g., "anthropic", "openai")
 
 ### 6.2 Files to Modify
 
-| File | Change |
-|------|--------|
-| `packages/core/src/tools/executor.ts` | Stop calling `context.agent.getFullSession()` |
-| `packages/core/src/tools/tool.ts` | Use `context.hasFileBeenRead()` not `context.agent.hasFileBeenRead()` |
-| `packages/core/src/tools/implementations/delegate.ts` | Use `actorThreadId`/`sessionId` from context |
-| `packages/core/src/agents/agent.ts` | Extract to standalone process with JSONL persistence |
-| `packages/core/src/threads/thread-manager.ts` | Replace with per-agent event log |
-| `packages/web/lib/server/session-service.ts` | Use Runtime API, not in-process objects |
+| File                                                  | Change                                                                |
+| ----------------------------------------------------- | --------------------------------------------------------------------- |
+| `packages/core/src/tools/executor.ts`                 | Stop calling `context.agent.getFullSession()`                         |
+| `packages/core/src/tools/tool.ts`                     | Use `context.hasFileBeenRead()` not `context.agent.hasFileBeenRead()` |
+| `packages/core/src/tools/implementations/delegate.ts` | Use `actorThreadId`/`sessionId` from context                          |
+| `packages/core/src/agents/agent.ts`                   | Extract to standalone process with JSONL persistence                  |
+| `packages/core/src/threads/thread-manager.ts`         | Replace with per-agent event log                                      |
+| `packages/web/lib/server/session-service.ts`          | Use Runtime API, not in-process objects                               |
 
 ---
 
@@ -374,27 +398,27 @@ Provider (family/runtime, e.g., "anthropic", "openai")
 
 ### Agreed Decisions
 
-| Decision | Rationale |
-|----------|-----------|
-| One process per agent thread (always) | Clean isolation, remote-ready |
-| JSON-RPC 2.0 over stdio | Debuggable, works everywhere |
-| Tools execute in agent process | Enables remote agents |
-| JSONL per-agent (not SQLite) | Single-writer, no cache invalidation |
-| Supervisor is storage-agnostic | Clean boundary, testable |
-| History requires live connectivity | Simplifies architecture |
-| ToolContext expansion (not new abstraction) | Minimal change, explicit deps |
-| Sessions are supervisor metadata only | Decouples from agent storage |
-| Provider instances are global scope | Avoid credential duplication |
-| ACP naming conventions | Interoperability |
+| Decision                                    | Rationale                            |
+| ------------------------------------------- | ------------------------------------ |
+| One process per agent thread (always)       | Clean isolation, remote-ready        |
+| JSON-RPC 2.0 over stdio                     | Debuggable, works everywhere         |
+| Tools execute in agent process              | Enables remote agents                |
+| JSONL per-agent (not SQLite)                | Single-writer, no cache invalidation |
+| Supervisor is storage-agnostic              | Clean boundary, testable             |
+| History requires live connectivity          | Simplifies architecture              |
+| ToolContext expansion (not new abstraction) | Minimal change, explicit deps        |
+| Sessions are supervisor metadata only       | Decouples from agent storage         |
+| Provider instances are global scope         | Avoid credential duplication         |
+| ACP naming conventions                      | Interoperability                     |
 
 ### Open Questions (Deferred)
 
-| Question | Current Status |
-|----------|---------------|
-| Subagent/job spawning semantics | Noted as next focus |
-| Session vs "everything is agents" | Sessions retained for now |
-| Remote transport details | Assumed socket later; stdio first |
-| Wrapper compatibility testing | Guidance provided |
+| Question                          | Current Status                    |
+| --------------------------------- | --------------------------------- |
+| Subagent/job spawning semantics   | Noted as next focus               |
+| Session vs "everything is agents" | Sessions retained for now         |
+| Remote transport details          | Assumed socket later; stdio first |
+| Wrapper compatibility testing     | Guidance provided                 |
 
 ---
 
@@ -412,9 +436,9 @@ type EventType =
   | 'TURN_START'
   | 'TURN_END'
   | 'COMPACTION'
-  | 'TOKEN_STREAM'      // transient
-  | 'THINKING_UPDATE'   // transient
-  | 'USAGE_UPDATE';     // transient
+  | 'TOKEN_STREAM' // transient
+  | 'THINKING_UPDATE' // transient
+  | 'USAGE_UPDATE'; // transient
 ```
 
 ## Appendix B: Message Flow Diagram

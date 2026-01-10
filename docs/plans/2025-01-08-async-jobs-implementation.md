@@ -1,10 +1,15 @@
 # Async Jobs Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
+> implement this plan task-by-task.
 
-**Goal:** Add `run_async` parameter to bash/delegate tools and create job management tools for agent self-service.
+**Goal:** Add `run_async` parameter to bash/delegate tools and create job
+management tools for agent self-service.
 
-**Architecture:** Extend existing job infrastructure (shell/subagent jobs already work via `job:` prefix) to be accessible through standard tool invocations. Job management tools are runtime-handled stubs (like delegate) that call into the existing job registry functions.
+**Architecture:** Extend existing job infrastructure (shell/subagent jobs
+already work via `job:` prefix) to be accessible through standard tool
+invocations. Job management tools are runtime-handled stubs (like delegate) that
+call into the existing job registry functions.
 
 **Tech Stack:** TypeScript, Zod schemas, ENT protocol, Vitest
 
@@ -12,23 +17,28 @@
 
 ## Current State Summary
 
-- **Job infrastructure exists**: `startShellJob()`, `startSubagentJob()`, `finalizeJob()` in server.ts
-- **ENT protocol methods exist**: `ent/job/list`, `ent/job/output`, `ent/job/kill` in server.ts
+- **Job infrastructure exists**: `startShellJob()`, `startSubagentJob()`,
+  `finalizeJob()` in server.ts
+- **ENT protocol methods exist**: `ent/job/list`, `ent/job/output`,
+  `ent/job/kill` in server.ts
 - **Bash tool**: Full foreground implementation, no `run_async` parameter
 - **Delegate tool**: Stub class, runtime-handled at server.ts:4324-4387
-- **Testing pattern**: E2E tests in `agent-process.jobs.e2e.test.ts` using `job:` prefix
+- **Testing pattern**: E2E tests in `agent-process.jobs.e2e.test.ts` using
+  `job:` prefix
 
 ---
 
 ## Task 1: Add `run_async` Parameter to Bash Tool Schema
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/implementations/bash.ts:35-37`
 - Test: `packages/agent/src/tools/implementations/bash.test.ts`
 
 **Step 1: Write the failing test**
 
-Create test file at `packages/agent/src/tools/implementations/bash-async.test.ts`:
+Create test file at
+`packages/agent/src/tools/implementations/bash-async.test.ts`:
 
 ```typescript
 import { describe, expect, it } from 'vitest';
@@ -74,7 +84,8 @@ Expected: FAIL - `run_async` property not recognized in schema
 
 **Step 3: Update bash schema to include run_async**
 
-In `packages/agent/src/tools/implementations/bash.ts`, update the schema at line 35:
+In `packages/agent/src/tools/implementations/bash.ts`, update the schema at line
+35:
 
 ```typescript
 const bashSchema = z.object({
@@ -106,6 +117,7 @@ EOF
 ## Task 2: Add Runtime Handling for Async Bash
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts` (near tool execution, ~line 4388)
 - Test: `packages/agent/src/__tests__/agent-process.jobs.e2e.test.ts`
 
@@ -114,55 +126,61 @@ EOF
 Add to `packages/agent/src/__tests__/agent-process.jobs.e2e.test.ts`:
 
 ```typescript
-it('spawns async bash job via run_async parameter', { timeout: 20_000 }, async () => {
-  agent = spawnAgentProcess({ laceDir });
+it(
+  'spawns async bash job via run_async parameter',
+  { timeout: 20_000 },
+  async () => {
+    agent = spawnAgentProcess({ laceDir });
 
-  const updates: Array<Record<string, unknown>> = [];
-  let jobId: string | undefined;
+    const updates: Array<Record<string, unknown>> = [];
+    let jobId: string | undefined;
 
-  agent.peer.onRequest('session/update', async (params) => {
-    const p = params as Record<string, unknown>;
-    updates.push(p);
-    if (p.type === 'job_started' && typeof p.jobId === 'string') jobId = p.jobId;
-    return undefined;
-  });
+    agent.peer.onRequest('session/update', async (params) => {
+      const p = params as Record<string, unknown>;
+      updates.push(p);
+      if (p.type === 'job_started' && typeof p.jobId === 'string')
+        jobId = p.jobId;
+      return undefined;
+    });
 
-  agent.peer.onRequest('session/request_permission', async () => {
-    return { decision: 'allow' };
-  });
+    agent.peer.onRequest('session/request_permission', async () => {
+      return { decision: 'allow' };
+    });
 
-  await withTimeout(
-    agent.peer.request(
-      'initialize',
-      defaultInitializeParams({ config: { approvalMode: 'allow' } })
-    ),
-    2_000,
-    'initialize'
-  );
+    await withTimeout(
+      agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'allow' } })
+      ),
+      2_000,
+      'initialize'
+    );
 
-  await withTimeout(
-    agent.peer.request('session/new', { workDir }),
-    2_000,
-    'session/new'
-  );
+    await withTimeout(
+      agent.peer.request('session/new', { workDir }),
+      2_000,
+      'session/new'
+    );
 
-  // Use a multi-turn prompt that will invoke bash with run_async
-  // We need the model to actually call the tool, so we use a simple echo
-  await withTimeout(
-    agent.peer.request('session/prompt', {
-      content: [{ type: 'text', text: 'run: echo test-async-job' }],
-    }),
-    5_000,
-    'session/prompt'
-  );
+    // Use a multi-turn prompt that will invoke bash with run_async
+    // We need the model to actually call the tool, so we use a simple echo
+    await withTimeout(
+      agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'run: echo test-async-job' }],
+      }),
+      5_000,
+      'session/prompt'
+    );
 
-  // For now, verify the run: shortcut still works
-  // The actual run_async tool parameter test needs model interaction
-  // which is tested in integration tests
-});
+    // For now, verify the run: shortcut still works
+    // The actual run_async tool parameter test needs model interaction
+    // which is tested in integration tests
+  }
+);
 ```
 
-**Note:** Full E2E testing of `run_async` requires model interaction. For TDD, we'll add a unit test that verifies the runtime branching logic.
+**Note:** Full E2E testing of `run_async` requires model interaction. For TDD,
+we'll add a unit test that verifies the runtime branching logic.
 
 **Step 2: Create unit test for runtime async detection**
 
@@ -194,7 +212,9 @@ Expected: PASS (logic test, not integration)
 
 **Step 4: Add async branch in server.ts tool execution**
 
-In `packages/agent/src/server.ts`, find the tool execution block around line 4388 (after the delegate handling). Add before the standard `toolExecutor.execute()` call:
+In `packages/agent/src/server.ts`, find the tool execution block around line
+4388 (after the delegate handling). Add before the standard
+`toolExecutor.execute()` call:
 
 ```typescript
 // Handle bash with run_async=true
@@ -250,6 +270,7 @@ EOF
 ## Task 3: Add `run_async` Parameter to Delegate Tool Schema
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/implementations/delegate.ts:9-13`
 - Test: `packages/agent/src/tools/implementations/delegate.test.ts` (new)
 
@@ -350,6 +371,7 @@ EOF
 ## Task 4: Add Runtime Handling for Async Delegate
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts` (~line 4324-4387)
 - Test: `packages/agent/src/__tests__/agent-process.jobs.e2e.test.ts`
 
@@ -358,67 +380,77 @@ EOF
 Add to `packages/agent/src/__tests__/agent-process.jobs.e2e.test.ts`:
 
 ```typescript
-it('spawns async subagent job via delegate run_async', { timeout: 20_000 }, async () => {
-  agent = spawnAgentProcess({ laceDir });
+it(
+  'spawns async subagent job via delegate run_async',
+  { timeout: 20_000 },
+  async () => {
+    agent = spawnAgentProcess({ laceDir });
 
-  const updates: Array<Record<string, unknown>> = [];
-  let subagentJobId: string | undefined;
+    const updates: Array<Record<string, unknown>> = [];
+    let subagentJobId: string | undefined;
 
-  agent.peer.onRequest('session/update', async (params) => {
-    const p = params as Record<string, unknown>;
-    updates.push(p);
-    if (p.type === 'job_started' && p.jobType === 'subagent' && typeof p.jobId === 'string') {
-      subagentJobId = p.jobId;
-    }
-    return undefined;
-  });
+    agent.peer.onRequest('session/update', async (params) => {
+      const p = params as Record<string, unknown>;
+      updates.push(p);
+      if (
+        p.type === 'job_started' &&
+        p.jobType === 'subagent' &&
+        typeof p.jobId === 'string'
+      ) {
+        subagentJobId = p.jobId;
+      }
+      return undefined;
+    });
 
-  agent.peer.onRequest('session/request_permission', async () => {
-    return { decision: 'allow' };
-  });
+    agent.peer.onRequest('session/request_permission', async () => {
+      return { decision: 'allow' };
+    });
 
-  await withTimeout(
-    agent.peer.request(
-      'initialize',
-      defaultInitializeParams({ config: { approvalMode: 'allow' } })
-    ),
-    2_000,
-    'initialize'
-  );
+    await withTimeout(
+      agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'allow' } })
+      ),
+      2_000,
+      'initialize'
+    );
 
-  await withTimeout(
-    agent.peer.request('session/new', { workDir }),
-    2_000,
-    'session/new'
-  );
+    await withTimeout(
+      agent.peer.request('session/new', { workDir }),
+      2_000,
+      'session/new'
+    );
 
-  // Use subagent: prefix to trigger delegate (existing pattern)
-  await withTimeout(
-    agent.peer.request('session/prompt', {
-      content: [{ type: 'text', text: 'subagent: say hello' }],
-    }),
-    10_000,
-    'session/prompt'
-  );
+    // Use subagent: prefix to trigger delegate (existing pattern)
+    await withTimeout(
+      agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'subagent: say hello' }],
+      }),
+      10_000,
+      'session/prompt'
+    );
 
-  // Wait for job to finish
-  await withTimeout(
-    new Promise<void>((resolve) => {
-      const interval = setInterval(() => {
-        if (!subagentJobId) return;
-        const finished = updates.find((u) => u.type === 'job_finished' && u.jobId === subagentJobId);
-        if (finished) {
-          clearInterval(interval);
-          resolve();
-        }
-      }, 10);
-    }),
-    10_000,
-    'subagent job_finished'
-  );
+    // Wait for job to finish
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          if (!subagentJobId) return;
+          const finished = updates.find(
+            (u) => u.type === 'job_finished' && u.jobId === subagentJobId
+          );
+          if (finished) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      10_000,
+      'subagent job_finished'
+    );
 
-  expect(subagentJobId).toMatch(/^job_/);
-});
+    expect(subagentJobId).toMatch(/^job_/);
+  }
+);
 ```
 
 **Step 2: Run test**
@@ -428,7 +460,8 @@ Expected: Should pass with existing infrastructure
 
 **Step 3: Modify delegate runtime handling for run_async**
 
-In `packages/agent/src/server.ts`, update the delegate handling block around line 4324:
+In `packages/agent/src/server.ts`, update the delegate handling block around
+line 4324:
 
 ```typescript
 if (toolName === 'delegate') {
@@ -481,7 +514,10 @@ if (toolName === 'delegate') {
 
       let output = '';
       try {
-        output = readFileSync(getJobOutputPath(state.activeSession.dir, jobId), 'utf8');
+        output = readFileSync(
+          getJobOutputPath(state.activeSession.dir, jobId),
+          'utf8'
+        );
       } catch {
         output = '';
       }
@@ -503,7 +539,9 @@ if (toolName === 'delegate') {
             type: 'text',
             text:
               `delegate jobId=${jobId}\n\n` +
-              (reportText.trim().length > 0 ? reportText.trim() : '(no output)') +
+              (reportText.trim().length > 0
+                ? reportText.trim()
+                : '(no output)') +
               (truncated ? '\n\n(truncated)' : ''),
           },
         ],
@@ -536,6 +574,7 @@ EOF
 ## Task 5: Create `job_output` Tool Schema (Stub)
 
 **Files:**
+
 - Create: `packages/agent/src/tools/implementations/job_output.ts`
 - Test: `packages/agent/src/tools/implementations/job_output.test.ts`
 
@@ -680,6 +719,7 @@ EOF
 ## Task 6: Create `jobs_list` Tool Schema (Stub)
 
 **Files:**
+
 - Create: `packages/agent/src/tools/implementations/jobs_list.ts`
 - Test: `packages/agent/src/tools/implementations/jobs_list.test.ts`
 
@@ -750,7 +790,9 @@ import { Tool } from '../tool';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
 const jobsListSchema = z.object({
-  status: z.array(z.enum(['pending', 'running', 'completed', 'failed', 'cancelled'])).optional(),
+  status: z
+    .array(z.enum(['pending', 'running', 'completed', 'failed', 'cancelled']))
+    .optional(),
   type: z.array(z.enum(['shell', 'subagent'])).optional(),
   limit: z.number().int().min(1).max(100).default(50),
 });
@@ -806,6 +848,7 @@ EOF
 ## Task 7: Create `job_kill` Tool Schema (Stub)
 
 **Files:**
+
 - Create: `packages/agent/src/tools/implementations/job_kill.ts`
 - Test: `packages/agent/src/tools/implementations/job_kill.test.ts`
 
@@ -917,12 +960,14 @@ EOF
 ## Task 8: Register Job Tools in Executor
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/executor.ts` (~line 225-232)
 - Modify: `packages/agent/src/tools/implementations/index.ts`
 
 **Step 1: Write the failing test**
 
-Add to existing executor tests or create `packages/agent/src/tools/job-tools-registration.test.ts`:
+Add to existing executor tests or create
+`packages/agent/src/tools/job-tools-registration.test.ts`:
 
 ```typescript
 import { describe, expect, it } from 'vitest';
@@ -958,7 +1003,8 @@ export { JobKillTool } from './job_kill';
 
 **Step 4: Register job tools in executor.ts**
 
-In `packages/agent/src/tools/executor.ts`, update the default tools list around line 225:
+In `packages/agent/src/tools/executor.ts`, update the default tools list around
+line 225:
 
 ```typescript
 import { JobOutputTool, JobsListTool, JobKillTool } from './implementations';
@@ -992,6 +1038,7 @@ EOF
 ## Task 9: Implement Runtime Handling for Job Tools
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts` (tool execution section)
 - Test: `packages/agent/src/__tests__/agent-process.jobs.e2e.test.ts`
 
@@ -1000,71 +1047,77 @@ EOF
 Add to `packages/agent/src/__tests__/agent-process.jobs.e2e.test.ts`:
 
 ```typescript
-it('job_output tool returns job status and output', { timeout: 20_000 }, async () => {
-  agent = spawnAgentProcess({ laceDir });
+it(
+  'job_output tool returns job status and output',
+  { timeout: 20_000 },
+  async () => {
+    agent = spawnAgentProcess({ laceDir });
 
-  let jobId: string | undefined;
+    let jobId: string | undefined;
 
-  agent.peer.onRequest('session/update', async (params) => {
-    const p = params as Record<string, unknown>;
-    if (p.type === 'job_started' && typeof p.jobId === 'string') jobId = p.jobId;
-    return undefined;
-  });
+    agent.peer.onRequest('session/update', async (params) => {
+      const p = params as Record<string, unknown>;
+      if (p.type === 'job_started' && typeof p.jobId === 'string')
+        jobId = p.jobId;
+      return undefined;
+    });
 
-  agent.peer.onRequest('session/request_permission', async () => {
-    return { decision: 'allow' };
-  });
+    agent.peer.onRequest('session/request_permission', async () => {
+      return { decision: 'allow' };
+    });
 
-  await withTimeout(
-    agent.peer.request(
-      'initialize',
-      defaultInitializeParams({ config: { approvalMode: 'allow' } })
-    ),
-    2_000,
-    'initialize'
-  );
+    await withTimeout(
+      agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'allow' } })
+      ),
+      2_000,
+      'initialize'
+    );
 
-  await withTimeout(
-    agent.peer.request('session/new', { workDir }),
-    2_000,
-    'session/new'
-  );
+    await withTimeout(
+      agent.peer.request('session/new', { workDir }),
+      2_000,
+      'session/new'
+    );
 
-  // Start a job via the shortcut
-  await withTimeout(
-    agent.peer.request('session/prompt', {
-      content: [{ type: 'text', text: 'job: echo hello-from-job' }],
-    }),
-    5_000,
-    'session/prompt'
-  );
+    // Start a job via the shortcut
+    await withTimeout(
+      agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'job: echo hello-from-job' }],
+      }),
+      5_000,
+      'session/prompt'
+    );
 
-  // Wait for job to complete
-  await withTimeout(
-    new Promise<void>((resolve) => {
-      const interval = setInterval(async () => {
-        if (!jobId) return;
-        const list = (await agent!.peer.request('ent/job/list')) as {
-          jobs: Array<{ jobId: string; status: string }>;
-        };
-        const job = list.jobs.find((j) => j.jobId === jobId);
-        if (job?.status === 'completed') {
-          clearInterval(interval);
-          resolve();
-        }
-      }, 50);
-    }),
-    5_000,
-    'job completion'
-  );
+    // Wait for job to complete
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(async () => {
+          if (!jobId) return;
+          const list = (await agent!.peer.request('ent/job/list')) as {
+            jobs: Array<{ jobId: string; status: string }>;
+          };
+          const job = list.jobs.find((j) => j.jobId === jobId);
+          if (job?.status === 'completed') {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 50);
+      }),
+      5_000,
+      'job completion'
+    );
 
-  expect(jobId).toBeDefined();
-});
+    expect(jobId).toBeDefined();
+  }
+);
 ```
 
 **Step 2: Add runtime handling for job_output, jobs_list, job_kill**
 
-In `packages/agent/src/server.ts`, add handling before the standard `toolExecutor.execute()`:
+In `packages/agent/src/server.ts`, add handling before the standard
+`toolExecutor.execute()`:
 
 ```typescript
 // Handle job_output tool
@@ -1130,7 +1183,9 @@ if (toolName === 'job_output') {
   // ... existing delegate handling
 ```
 
-**Note:** The actual implementation will need to extract the helper functions for `ent/job/output`, `ent/job/list`, `ent/job/kill` from the RPC handlers so they can be reused by the tool handlers.
+**Note:** The actual implementation will need to extract the helper functions
+for `ent/job/output`, `ent/job/list`, `ent/job/kill` from the RPC handlers so
+they can be reused by the tool handlers.
 
 **Step 3: Run E2E tests**
 
@@ -1155,7 +1210,9 @@ EOF
 ## Task 10: Integration Test - Full Async Job Workflow
 
 **Files:**
-- Create: `packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+
+- Create:
+  `packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 
 **Step 1: Write comprehensive E2E test**
 
@@ -1164,7 +1221,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
+import {
+  spawnAgentProcess,
+  withTimeout,
+  type SpawnedAgent,
+} from './helpers/agent-process';
 import { defaultInitializeParams } from './helpers/initialize';
 
 describe('async job workflow (E2E)', () => {
@@ -1186,99 +1247,108 @@ describe('async job workflow (E2E)', () => {
     rmSync(workDir, { recursive: true, force: true });
   });
 
-  it('complete async bash workflow: spawn, list, check output, kill', { timeout: 30_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir });
+  it(
+    'complete async bash workflow: spawn, list, check output, kill',
+    { timeout: 30_000 },
+    async () => {
+      agent = spawnAgentProcess({ laceDir });
 
-    const updates: Array<Record<string, unknown>> = [];
-    let shellJobId: string | undefined;
+      const updates: Array<Record<string, unknown>> = [];
+      let shellJobId: string | undefined;
 
-    agent.peer.onRequest('session/update', async (params) => {
-      const p = params as Record<string, unknown>;
-      updates.push(p);
-      if (p.type === 'job_started' && p.jobType === 'shell' && typeof p.jobId === 'string') {
-        shellJobId = p.jobId;
-      }
-      return undefined;
-    });
+      agent.peer.onRequest('session/update', async (params) => {
+        const p = params as Record<string, unknown>;
+        updates.push(p);
+        if (
+          p.type === 'job_started' &&
+          p.jobType === 'shell' &&
+          typeof p.jobId === 'string'
+        ) {
+          shellJobId = p.jobId;
+        }
+        return undefined;
+      });
 
-    agent.peer.onRequest('session/request_permission', async () => {
-      return { decision: 'allow' };
-    });
+      agent.peer.onRequest('session/request_permission', async () => {
+        return { decision: 'allow' };
+      });
 
-    await withTimeout(
-      agent.peer.request(
-        'initialize',
-        defaultInitializeParams({ config: { approvalMode: 'allow' } })
-      ),
-      2_000,
-      'initialize'
-    );
+      await withTimeout(
+        agent.peer.request(
+          'initialize',
+          defaultInitializeParams({ config: { approvalMode: 'allow' } })
+        ),
+        2_000,
+        'initialize'
+      );
 
-    await withTimeout(
-      agent.peer.request('session/new', { workDir }),
-      2_000,
-      'session/new'
-    );
+      await withTimeout(
+        agent.peer.request('session/new', { workDir }),
+        2_000,
+        'session/new'
+      );
 
-    // Spawn a long-running job that we can kill
-    await withTimeout(
-      agent.peer.request('session/prompt', {
-        content: [{ type: 'text', text: 'job: sleep 60' }],
-      }),
-      5_000,
-      'session/prompt (spawn job)'
-    );
+      // Spawn a long-running job that we can kill
+      await withTimeout(
+        agent.peer.request('session/prompt', {
+          content: [{ type: 'text', text: 'job: sleep 60' }],
+        }),
+        5_000,
+        'session/prompt (spawn job)'
+      );
 
-    // Wait for job_started
-    await withTimeout(
-      new Promise<void>((resolve) => {
-        const interval = setInterval(() => {
-          if (shellJobId) {
-            clearInterval(interval);
-            resolve();
-          }
-        }, 10);
-      }),
-      3_000,
-      'job_started'
-    );
+      // Wait for job_started
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          const interval = setInterval(() => {
+            if (shellJobId) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 10);
+        }),
+        3_000,
+        'job_started'
+      );
 
-    expect(shellJobId).toMatch(/^job_/);
+      expect(shellJobId).toMatch(/^job_/);
 
-    // List jobs - should show running
-    const list = (await withTimeout(
-      agent.peer.request('ent/job/list'),
-      2_000,
-      'ent/job/list'
-    )) as { jobs: Array<{ jobId: string; status: string }> };
+      // List jobs - should show running
+      const list = (await withTimeout(
+        agent.peer.request('ent/job/list'),
+        2_000,
+        'ent/job/list'
+      )) as { jobs: Array<{ jobId: string; status: string }> };
 
-    const runningJob = list.jobs.find((j) => j.jobId === shellJobId);
-    expect(runningJob?.status).toBe('running');
+      const runningJob = list.jobs.find((j) => j.jobId === shellJobId);
+      expect(runningJob?.status).toBe('running');
 
-    // Kill the job
-    const killed = (await withTimeout(
-      agent.peer.request('ent/job/kill', { jobId: shellJobId }),
-      2_000,
-      'ent/job/kill'
-    )) as { success: boolean };
+      // Kill the job
+      const killed = (await withTimeout(
+        agent.peer.request('ent/job/kill', { jobId: shellJobId }),
+        2_000,
+        'ent/job/kill'
+      )) as { success: boolean };
 
-    expect(killed.success).toBe(true);
+      expect(killed.success).toBe(true);
 
-    // Check final status
-    const output = (await withTimeout(
-      agent.peer.request('ent/job/output', { jobId: shellJobId }),
-      2_000,
-      'ent/job/output'
-    )) as { status: string };
+      // Check final status
+      const output = (await withTimeout(
+        agent.peer.request('ent/job/output', { jobId: shellJobId }),
+        2_000,
+        'ent/job/output'
+      )) as { status: string };
 
-    expect(output.status).toBe('cancelled');
-  });
+      expect(output.status).toBe('cancelled');
+    }
+  );
 });
 ```
 
 **Step 2: Run test**
 
-Run: `npm test -- packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
+Run:
+`npm test -- packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 Expected: PASS
 
 **Step 3: Commit**
@@ -1298,6 +1368,7 @@ EOF
 ## Task 11: Store subagentSessionId in Job Record
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts` (JobState type and startSubagentJob)
 
 **Step 1: Write the failing test**
@@ -1312,7 +1383,11 @@ it('job record includes subagentSessionId', { timeout: 20_000 }, async () => {
 
   agent.peer.onRequest('session/update', async (params) => {
     const p = params as Record<string, unknown>;
-    if (p.type === 'job_started' && p.jobType === 'subagent' && typeof p.jobId === 'string') {
+    if (
+      p.type === 'job_started' &&
+      p.jobType === 'subagent' &&
+      typeof p.jobId === 'string'
+    ) {
       jobId = p.jobId;
     }
     return undefined;
@@ -1323,12 +1398,19 @@ it('job record includes subagentSessionId', { timeout: 20_000 }, async () => {
   });
 
   await withTimeout(
-    agent.peer.request('initialize', defaultInitializeParams({ config: { approvalMode: 'allow' } })),
+    agent.peer.request(
+      'initialize',
+      defaultInitializeParams({ config: { approvalMode: 'allow' } })
+    ),
     2_000,
     'initialize'
   );
 
-  await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+  await withTimeout(
+    agent.peer.request('session/new', { workDir }),
+    2_000,
+    'session/new'
+  );
 
   await withTimeout(
     agent.peer.request('session/prompt', {
@@ -1344,7 +1426,11 @@ it('job record includes subagentSessionId', { timeout: 20_000 }, async () => {
       const interval = setInterval(async () => {
         if (!jobId) return;
         const list = (await agent!.peer.request('ent/job/list')) as {
-          jobs: Array<{ jobId: string; status: string; subagentSessionId?: string }>;
+          jobs: Array<{
+            jobId: string;
+            status: string;
+            subagentSessionId?: string;
+          }>;
         };
         const job = list.jobs.find((j) => j.jobId === jobId);
         if (job?.status === 'completed') {
@@ -1369,7 +1455,8 @@ Expected: FAIL - subagentSessionId not in job list response
 
 **Step 3: Update JobState type and startSubagentJob**
 
-In `packages/agent/src/server.ts`, add `subagentSessionId` to JobState and populate it when creating subagent session:
+In `packages/agent/src/server.ts`, add `subagentSessionId` to JobState and
+populate it when creating subagent session:
 
 ```typescript
 // In JobState type definition
@@ -1388,7 +1475,7 @@ jobs: Array.from(state.jobs.values()).map((j) => ({
   jobId: j.jobId,
   // ... other fields
   subagentSessionId: j.subagentSessionId,
-}))
+}));
 ```
 
 **Step 5: Run test to verify it passes**
@@ -1414,6 +1501,7 @@ EOF
 ## Task 12: Implement Job Resume for Delegate Tool
 
 **Files:**
+
 - Modify: `packages/agent/src/server.ts` (delegate runtime handling)
 - Test: `packages/agent/src/__tests__/agent-process.jobs.e2e.test.ts`
 
@@ -1422,75 +1510,90 @@ EOF
 Add to `packages/agent/src/__tests__/agent-process.jobs.e2e.test.ts`:
 
 ```typescript
-it('can resume a failed/cancelled subagent job', { timeout: 30_000 }, async () => {
-  agent = spawnAgentProcess({ laceDir });
+it(
+  'can resume a failed/cancelled subagent job',
+  { timeout: 30_000 },
+  async () => {
+    agent = spawnAgentProcess({ laceDir });
 
-  let firstJobId: string | undefined;
-  let firstJobSessionId: string | undefined;
+    let firstJobId: string | undefined;
+    let firstJobSessionId: string | undefined;
 
-  agent.peer.onRequest('session/update', async (params) => {
-    const p = params as Record<string, unknown>;
-    if (p.type === 'job_started' && p.jobType === 'subagent' && typeof p.jobId === 'string') {
-      firstJobId = p.jobId;
-    }
-    return undefined;
-  });
+    agent.peer.onRequest('session/update', async (params) => {
+      const p = params as Record<string, unknown>;
+      if (
+        p.type === 'job_started' &&
+        p.jobType === 'subagent' &&
+        typeof p.jobId === 'string'
+      ) {
+        firstJobId = p.jobId;
+      }
+      return undefined;
+    });
 
-  agent.peer.onRequest('session/request_permission', async () => {
-    return { decision: 'allow' };
-  });
+    agent.peer.onRequest('session/request_permission', async () => {
+      return { decision: 'allow' };
+    });
 
-  await withTimeout(
-    agent.peer.request('initialize', defaultInitializeParams({ config: { approvalMode: 'allow' } })),
-    2_000,
-    'initialize'
-  );
+    await withTimeout(
+      agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'allow' } })
+      ),
+      2_000,
+      'initialize'
+    );
 
-  const session = (await withTimeout(
-    agent.peer.request('session/new', { workDir }),
-    2_000,
-    'session/new'
-  )) as { sessionId: string };
+    const session = (await withTimeout(
+      agent.peer.request('session/new', { workDir }),
+      2_000,
+      'session/new'
+    )) as { sessionId: string };
 
-  // Start a subagent job that will take a while
-  await withTimeout(
-    agent.peer.request('session/prompt', {
-      content: [{ type: 'text', text: 'subagent: think for a moment then say hello' }],
-    }),
-    5_000,
-    'session/prompt (start job)'
-  );
+    // Start a subagent job that will take a while
+    await withTimeout(
+      agent.peer.request('session/prompt', {
+        content: [
+          { type: 'text', text: 'subagent: think for a moment then say hello' },
+        ],
+      }),
+      5_000,
+      'session/prompt (start job)'
+    );
 
-  // Wait for job to start
-  await withTimeout(
-    new Promise<void>((resolve) => {
-      const interval = setInterval(async () => {
-        if (firstJobId) {
-          clearInterval(interval);
-          resolve();
-        }
-      }, 10);
-    }),
-    3_000,
-    'job_started'
-  );
+    // Wait for job to start
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(async () => {
+          if (firstJobId) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      3_000,
+      'job_started'
+    );
 
-  // Get the subagentSessionId before killing
-  const listBefore = (await agent.peer.request('ent/job/list')) as {
-    jobs: Array<{ jobId: string; subagentSessionId?: string }>;
-  };
-  firstJobSessionId = listBefore.jobs.find((j) => j.jobId === firstJobId)?.subagentSessionId;
+    // Get the subagentSessionId before killing
+    const listBefore = (await agent.peer.request('ent/job/list')) as {
+      jobs: Array<{ jobId: string; subagentSessionId?: string }>;
+    };
+    firstJobSessionId = listBefore.jobs.find(
+      (j) => j.jobId === firstJobId
+    )?.subagentSessionId;
 
-  // Kill the job
-  await agent.peer.request('ent/job/kill', { jobId: firstJobId });
+    // Kill the job
+    await agent.peer.request('ent/job/kill', { jobId: firstJobId });
 
-  // Now test resume - this would be done via delegate with resume parameter
-  // For now, verify the subagentSessionId is available for resume
-  expect(firstJobSessionId).toBeDefined();
+    // Now test resume - this would be done via delegate with resume parameter
+    // For now, verify the subagentSessionId is available for resume
+    expect(firstJobSessionId).toBeDefined();
 
-  // The actual resume test would spawn a new subagent with session/load
-  // This is tested by verifying the infrastructure is in place
-});
+    // The actual resume test would spawn a new subagent with session/load
+    // This is tested by verifying the infrastructure is in place
+  }
+);
 ```
 
 **Step 2: Update delegate runtime to support resume parameter**
@@ -1517,7 +1620,12 @@ if (toolName === 'delegate') {
       if (!previousJob?.subagentSessionId) {
         coreResult = {
           status: 'failed',
-          content: [{ type: 'text', text: `Cannot resume job ${resumeJobId}: no subagentSessionId found` }],
+          content: [
+            {
+              type: 'text',
+              text: `Cannot resume job ${resumeJobId}: no subagentSessionId found`,
+            },
+          ],
         };
         // skip rest of delegate handling
       } else {
@@ -1530,7 +1638,7 @@ if (toolName === 'delegate') {
         prompt,
         description: description ?? 'Delegate',
         turnContext: { turnId, turnSeq: toolTurnSeq },
-        resumeSessionId,  // pass to subagent runner
+        resumeSessionId, // pass to subagent runner
       });
       // ... rest of handling
     }
@@ -1546,13 +1654,15 @@ const startSubagentJob = async (options: {
   description?: string;
   parentJobId?: string;
   turnContext?: { turnId: string; turnSeq: number };
-  resumeSessionId?: string;  // if provided, resume this session instead of creating new
+  resumeSessionId?: string; // if provided, resume this session instead of creating new
 }): Promise<{ jobId: string }> => {
   // ... existing setup ...
 
   // In runSubagentJobProcess, handle resume:
   if (options.resumeSessionId) {
-    await childPeer.request('session/load', { sessionId: options.resumeSessionId });
+    await childPeer.request('session/load', {
+      sessionId: options.resumeSessionId,
+    });
     job.subagentSessionId = options.resumeSessionId;
   } else {
     const sessionResult = await childPeer.request('session/new', { workDir });
@@ -1584,19 +1694,19 @@ EOF
 
 ## Summary
 
-| Task | Description | Files |
-|------|-------------|-------|
-| 1 | Add `run_async` to bash schema | bash.ts |
-| 2 | Runtime handling for async bash | server.ts |
-| 3 | Add `run_async` to delegate schema | delegate.ts |
-| 4 | Runtime handling for async delegate | server.ts |
-| 5 | Create job_output tool stub | job_output.ts |
-| 6 | Create jobs_list tool stub | jobs_list.ts |
-| 7 | Create job_kill tool stub | job_kill.ts |
-| 8 | Register job tools in executor | executor.ts, index.ts |
-| 9 | Runtime handling for job tools | server.ts |
-| 10 | Full workflow E2E test | async-workflow.e2e.test.ts |
-| 11 | Store subagentSessionId in job record | server.ts |
-| 12 | Implement job resume for delegate | server.ts |
+| Task | Description                           | Files                      |
+| ---- | ------------------------------------- | -------------------------- |
+| 1    | Add `run_async` to bash schema        | bash.ts                    |
+| 2    | Runtime handling for async bash       | server.ts                  |
+| 3    | Add `run_async` to delegate schema    | delegate.ts                |
+| 4    | Runtime handling for async delegate   | server.ts                  |
+| 5    | Create job_output tool stub           | job_output.ts              |
+| 6    | Create jobs_list tool stub            | jobs_list.ts               |
+| 7    | Create job_kill tool stub             | job_kill.ts                |
+| 8    | Register job tools in executor        | executor.ts, index.ts      |
+| 9    | Runtime handling for job tools        | server.ts                  |
+| 10   | Full workflow E2E test                | async-workflow.e2e.test.ts |
+| 11   | Store subagentSessionId in job record | server.ts                  |
+| 12   | Implement job resume for delegate     | server.ts                  |
 
 **Total: 12 tasks with ~35 commits**

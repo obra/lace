@@ -2,17 +2,24 @@
 
 ## Overview
 
-Implement a system where agents automatically receive notifications when tasks they created are updated by other agents. This prevents "orphaned" tasks where creators never know when their delegated work is completed.
+Implement a system where agents automatically receive notifications when tasks
+they created are updated by other agents. This prevents "orphaned" tasks where
+creators never know when their delegated work is completed.
 
 ## Problem Statement
 
-Currently when Agent A creates a task and Agent B completes it, Agent A never knows about the completion. The conversation just stops after task creation, leaving the user wondering what happened to their delegated work.
+Currently when Agent A creates a task and Agent B completes it, Agent A never
+knows about the completion. The conversation just stops after task creation,
+leaving the user wondering what happened to their delegated work.
 
 ## Solution Architecture
 
-**Design Pattern**: Static utility functions handle notification routing, called by Session as orchestrator.
+**Design Pattern**: Static utility functions handle notification routing, called
+by Session as orchestrator.
 
-**Key Insight**: Session already manages both TaskManager and Agents, making it the natural coordination point. Pure functions keep the logic testable and Session's responsibilities clean.
+**Key Insight**: Session already manages both TaskManager and Agents, making it
+the natural coordination point. Pure functions keep the logic testable and
+Session's responsibilities clean.
 
 ## Implementation Tasks
 
@@ -23,11 +30,13 @@ Currently when Agent A creates a task and Agent B completes it, Agent A never kn
 **File**: `packages/core/src/utils/task-notifications.ts` (new file)
 
 **What to do:**
+
 1. Create the file with TypeScript interfaces for notifications
 2. Define notification target types and priorities
 3. NO implementation logic yet - just type definitions
 
 **Code to write:**
+
 ```typescript
 // ABOUTME: Type definitions for task notification routing system
 // ABOUTME: Defines interfaces and types used by notification utilities
@@ -35,7 +44,11 @@ Currently when Agent A creates a task and Agent B completes it, Agent A never kn
 export interface TaskNotification {
   threadId: ThreadId;
   message: string;
-  notificationType: 'completion' | 'assignment' | 'status_change' | 'note_added';
+  notificationType:
+    | 'completion'
+    | 'assignment'
+    | 'status_change'
+    | 'note_added';
   taskId: string;
   priority: 'immediate' | 'background';
 }
@@ -46,12 +59,12 @@ export interface TaskNotificationContext {
 }
 
 export type NotificationTarget =
-  | 'creator'                    // Always notify task creator
-  | 'assignee'                   // Always notify current assignee
-  | 'old_assignee'              // Notify previous assignee (reassignments)
-  | 'creator_unless_actor'      // Notify creator if they didn't cause the update
-  | 'assignee_unless_actor'     // Notify assignee if they didn't cause the update
-  | 'creator_unless_author';    // Notify creator if they didn't author the change
+  | 'creator' // Always notify task creator
+  | 'assignee' // Always notify current assignee
+  | 'old_assignee' // Notify previous assignee (reassignments)
+  | 'creator_unless_actor' // Notify creator if they didn't cause the update
+  | 'assignee_unless_actor' // Notify assignee if they didn't cause the update
+  | 'creator_unless_author'; // Notify creator if they didn't author the change
 
 // Re-export core types this utility needs
 export type { Task, TaskNote, TaskContext } from '@lace/core/tasks/types';
@@ -59,18 +72,25 @@ export type { ThreadId } from '@lace/core/threads/types';
 ```
 
 **Imports needed:**
+
 ```typescript
 import type { ThreadId } from '@lace/core/threads/types';
 import type { Task, TaskNote, TaskContext } from '@lace/core/tasks/types';
 import type { Agent } from '@lace/core/agents/agent';
 ```
 
-**How to test**: Create a simple test file that imports these types and verifies they compile. No runtime tests yet.
+**How to test**: Create a simple test file that imports these types and verifies
+they compile. No runtime tests yet.
 
 **Test file**: `packages/core/src/utils/task-notifications.test.ts`
+
 ```typescript
 import { describe, it, expect } from 'vitest';
-import type { TaskNotification, TaskNotificationContext, NotificationTarget } from './task-notifications';
+import type {
+  TaskNotification,
+  TaskNotificationContext,
+  NotificationTarget,
+} from './task-notifications';
 
 describe('Task Notification Types', () => {
   it('should compile notification types correctly', () => {
@@ -80,7 +100,7 @@ describe('Task Notification Types', () => {
       message: 'test',
       notificationType: 'completion',
       taskId: 'task_123',
-      priority: 'immediate'
+      priority: 'immediate',
     };
     expect(notification).toBeDefined();
   });
@@ -94,11 +114,13 @@ describe('Task Notification Types', () => {
 **File**: `packages/core/src/utils/task-notifications.test.ts` (expand existing)
 
 **What to do:**
+
 1. Add a comprehensive test that verifies the core functionality
 2. This test WILL FAIL because we haven't implemented the function yet
 3. Follow TDD - write the test that describes exactly what we want
 
 **Test to add:**
+
 ```typescript
 import { vi } from 'vitest';
 import { routeTaskNotifications } from './task-notifications';
@@ -111,7 +133,7 @@ describe('Task Notification Routing', () => {
 
   it('should notify creator when task completed by different agent', async () => {
     const mockAgent = {
-      sendMessage: vi.fn().mockResolvedValue(undefined)
+      sendMessage: vi.fn().mockResolvedValue(undefined),
     };
     const mockGetAgent = vi.fn().mockReturnValue(mockAgent);
 
@@ -127,7 +149,7 @@ describe('Task Notification Routing', () => {
         priority: 'medium' as const,
         createdAt: new Date(),
         updatedAt: new Date(),
-        notes: []
+        notes: [],
       },
       previousTask: {
         id: 'task_123',
@@ -139,14 +161,14 @@ describe('Task Notification Routing', () => {
         priority: 'medium' as const,
         createdAt: new Date(),
         updatedAt: new Date(),
-        notes: []
+        notes: [],
       },
-      context: { actor: assigneeAgent }
+      context: { actor: assigneeAgent },
     };
 
     await routeTaskNotifications(taskEvent, {
       getAgent: mockGetAgent,
-      sessionId
+      sessionId,
     });
 
     // Verify creator was notified
@@ -162,6 +184,7 @@ describe('Task Notification Routing', () => {
 ```
 
 **Key learning points for engineer:**
+
 - `asThreadId()` creates properly formatted thread IDs
 - `vi.fn().mockResolvedValue()` mocks async functions
 - `expect.stringContaining()` checks partial string matches
@@ -176,11 +199,13 @@ describe('Task Notification Routing', () => {
 **File**: `packages/core/src/utils/task-notifications.ts` (expand existing)
 
 **What to do:**
+
 1. Implement ONLY enough to make the test pass
 2. Focus on task completion notifications only
 3. Hard-code the logic - no fancy rules engine yet
 
 **Code to add:**
+
 ```typescript
 export async function routeTaskNotifications(
   event: TaskManagerEvent,
@@ -193,11 +218,12 @@ export async function routeTaskNotifications(
   const { task, previousTask, context: taskContext } = event;
 
   // Only handle completion notifications for now
-  if (task.status === 'completed' &&
-      previousTask &&
-      previousTask.status !== 'completed' &&
-      task.createdBy !== taskContext.actor) {
-
+  if (
+    task.status === 'completed' &&
+    previousTask &&
+    previousTask.status !== 'completed' &&
+    task.createdBy !== taskContext.actor
+  ) {
     const creatorAgent = context.getAgent(task.createdBy);
     if (creatorAgent) {
       const message = `Task '${task.id}' that you created has been completed by ${taskContext.actor}:
@@ -215,12 +241,13 @@ You can now review the results or create follow-up tasks.`;
 export interface TaskManagerEvent {
   type: 'task:updated' | 'task:created' | 'task:note_added';
   task: Task;
-  previousTask?: Task;  // For updates only
+  previousTask?: Task; // For updates only
   context: TaskContext;
 }
 ```
 
 **Imports needed:**
+
 ```typescript
 import type { Agent } from '@lace/core/agents/agent';
 ```
@@ -232,10 +259,11 @@ import type { Agent } from '@lace/core/agents/agent';
 #### Task 1.4: Add test and implementation for assignment notifications
 
 **Test to add** (in same test file):
+
 ```typescript
 it('should notify assignee when task is assigned to them', async () => {
   const mockAgent = {
-    sendMessage: vi.fn().mockResolvedValue(undefined)
+    sendMessage: vi.fn().mockResolvedValue(undefined),
   };
   const mockGetAgent = vi.fn().mockReturnValue(mockAgent);
 
@@ -251,14 +279,14 @@ it('should notify assignee when task is assigned to them', async () => {
       priority: 'high' as const,
       createdAt: new Date(),
       updatedAt: new Date(),
-      notes: []
+      notes: [],
     },
-    context: { actor: creatorAgent }
+    context: { actor: creatorAgent },
   };
 
   await routeTaskNotifications(taskEvent, {
     getAgent: mockGetAgent,
-    sessionId
+    sessionId,
   });
 
   // Verify assignee was notified
@@ -273,6 +301,7 @@ it('should notify assignee when task is assigned to them', async () => {
 ```
 
 **Implementation to add**:
+
 ```typescript
 export async function routeTaskNotifications(
   event: TaskManagerEvent,
@@ -318,6 +347,7 @@ Use your task_add_note tool to record progress and task_complete when done.`;
 **File**: `packages/core/src/sessions/session.ts`
 
 **What to do:**
+
 1. Add event listener setup in Session constructor
 2. Create handler methods that call the utility
 3. NO new dependencies yet - make it compile but don't test integration
@@ -325,12 +355,14 @@ Use your task_add_note tool to record progress and task_complete when done.`;
 **Code changes:**
 
 Add to constructor (after TaskManager creation):
+
 ```typescript
 // Set up task notification routing
 this.setupTaskNotificationRouting();
 ```
 
 Add private methods:
+
 ```typescript
 private setupTaskNotificationRouting(): void {
   this._taskManager.on('task:updated', this.handleTaskUpdate.bind(this));
@@ -357,6 +389,7 @@ private async handleTaskCreated(event: any): Promise<void> {
 ```
 
 **Key points for engineer:**
+
 - Use dynamic import to avoid circular dependencies
 - Bind methods to preserve `this` context in event listeners
 - Event data structure matches what TaskManager emits
@@ -368,16 +401,19 @@ private async handleTaskCreated(event: any): Promise<void> {
 **File**: `packages/core/src/utils/task-notifications.ts`
 
 **What to do:**
+
 1. Check what TaskManager actually emits for events
 2. Update the `TaskManagerEvent` interface to match reality
 3. Handle the mismatch between our design and existing code
 
 **How to investigate:**
+
 1. Look at `packages/core/src/tasks/task-manager.ts` around line 164
 2. See what object structure is passed to `this.emit('task:updated', ...)`
 3. Update interface to match
 
 **Expected findings:**
+
 ```typescript
 // TaskManager actually emits:
 this.emit('task:updated', {
@@ -389,6 +425,7 @@ this.emit('task:updated', {
 ```
 
 **Interface fix:**
+
 ```typescript
 export interface TaskManagerEvent {
   type: 'task:updated' | 'task:created' | 'task:note_added';
@@ -399,7 +436,8 @@ export interface TaskManagerEvent {
 }
 ```
 
-**Problem discovered**: TaskManager doesn't provide `previousTask` in events. We need a different approach for detecting changes.
+**Problem discovered**: TaskManager doesn't provide `previousTask` in events. We
+need a different approach for detecting changes.
 
 **Commit message**: `fix: align TaskManagerEvent interface with reality`
 
@@ -407,9 +445,11 @@ export interface TaskManagerEvent {
 
 **File**: `packages/core/src/utils/task-notifications.ts`
 
-**Problem**: We need previous task state to detect what changed, but TaskManager events don't include it.
+**Problem**: We need previous task state to detect what changed, but TaskManager
+events don't include it.
 
 **Solution Options:**
+
 1. **Session maintains task snapshots** (recommended)
 2. **Modify TaskManager to include previousTask** (breaks existing code)
 3. **Query database for previous state** (expensive)
@@ -419,6 +459,7 @@ export interface TaskManagerEvent {
 **Implementation:**
 
 Update Session to track previous states:
+
 ```typescript
 // Add to Session class
 private _previousTaskStates = new Map<string, Task>();
@@ -438,6 +479,7 @@ private async handleTaskUpdate(event: TaskManagerEvent): Promise<void> {
 ```
 
 Update utility function signature:
+
 ```typescript
 export interface TaskNotificationContext {
   getAgent: (threadId: ThreadId) => Agent | null;
@@ -454,30 +496,49 @@ export interface TaskNotificationContext {
 
 **File**: `packages/core/src/utils/task-notifications.test.ts` (expand)
 
-**What to do**: Add test cases for every notification scenario. Write all tests first, then implement.
+**What to do**: Add test cases for every notification scenario. Write all tests
+first, then implement.
 
 **Critical test cases to add:**
 
 1. **Assignment notifications**:
+
 ```typescript
-it('should notify new assignee when task is assigned', async () => { /* test task creation with assignedTo */ });
-it('should notify both agents when task is reassigned', async () => { /* test assignedTo change */ });
+it('should notify new assignee when task is assigned', async () => {
+  /* test task creation with assignedTo */
+});
+it('should notify both agents when task is reassigned', async () => {
+  /* test assignedTo change */
+});
 ```
 
 2. **Status change notifications**:
+
 ```typescript
-it('should notify creator when assignee starts working', async () => { /* pending → in_progress */ });
-it('should notify creator when task becomes blocked', async () => { /* * → blocked */ });
+it('should notify creator when assignee starts working', async () => {
+  /* pending → in_progress */
+});
+it('should notify creator when task becomes blocked', async () => {
+  /* * → blocked */
+});
 ```
 
 3. **Edge cases**:
+
 ```typescript
-it('should not notify creator when they complete their own task', async () => { /* creator === actor */ });
-it('should handle missing agents gracefully', async () => { /* getAgent returns null */ });
-it('should not notify for trivial status changes', async () => { /* pending → pending */ });
+it('should not notify creator when they complete their own task', async () => {
+  /* creator === actor */
+});
+it('should handle missing agents gracefully', async () => {
+  /* getAgent returns null */
+});
+it('should not notify for trivial status changes', async () => {
+  /* pending → pending */
+});
 ```
 
 **Testing patterns to teach engineer:**
+
 - Create mock agents with `sendMessage: vi.fn().mockResolvedValue(undefined)`
 - Use `expect.stringContaining()` for message content verification
 - Test negative cases (should NOT notify) with `expect().not.toHaveBeenCalled()`
@@ -491,15 +552,18 @@ it('should not notify for trivial status changes', async () => { /* pending → 
 
 **File**: `packages/core/src/utils/task-notifications.ts`
 
-**What to do**: Implement the core logic to make tests pass, one notification type at a time.
+**What to do**: Implement the core logic to make tests pass, one notification
+type at a time.
 
 **Implementation strategy**:
+
 1. Start with task completion (already working)
 2. Add assignment notifications
 3. Add status change notifications
 4. Add edge case handling
 
 **Key functions to implement:**
+
 ```typescript
 function analyzeTaskEventForNotifications(
   event: TaskManagerEvent,
@@ -515,22 +579,31 @@ function analyzeTaskEventForNotifications(
   }
 }
 
-function analyzeTaskCreation(task: Task, context: TaskContext): TaskNotification[] {
+function analyzeTaskCreation(
+  task: Task,
+  context: TaskContext
+): TaskNotification[] {
   // Handle assignment notifications for newly created tasks
 }
 
-function analyzeTaskUpdate(task: Task, previousTask: Task | null, context: TaskContext): TaskNotification[] {
+function analyzeTaskUpdate(
+  task: Task,
+  previousTask: Task | null,
+  context: TaskContext
+): TaskNotification[] {
   // Handle completion, status changes, reassignments
 }
 ```
 
 **Implementation tips for engineer:**
+
 - Implement one notification type at a time
 - Run tests after each type to ensure it works
 - Use helper functions to avoid repetition
 - Focus on the business logic first, optimize later
 
 **Commit after each type**:
+
 - `feat: implement task assignment notifications`
 - `feat: implement task status change notifications`
 - `feat: implement task completion notifications`
@@ -539,11 +612,16 @@ function analyzeTaskUpdate(task: Task, previousTask: Task | null, context: TaskC
 
 **File**: `packages/core/src/utils/task-notifications.ts`
 
-**What to do**: Extract message formatting into pure functions for consistency and testing.
+**What to do**: Extract message formatting into pure functions for consistency
+and testing.
 
 **Functions to create:**
+
 ```typescript
-function formatCompletionNotification(task: Task, completedBy: ThreadId): string {
+function formatCompletionNotification(
+  task: Task,
+  completedBy: ThreadId
+): string {
   return `Task '${task.id}' that you created has been completed by ${completedBy}:
 Title: "${task.title}"
 Status: completed ✅
@@ -564,15 +642,21 @@ ${task.prompt}
 Use your task_add_note tool to record progress and task_complete when done.`;
 }
 
-function formatStatusChangeNotification(task: Task, newStatus: string, changedBy: ThreadId): string {
+function formatStatusChangeNotification(
+  task: Task,
+  newStatus: string,
+  changedBy: ThreadId
+): string {
   return `Task '${task.id}' status changed to ${newStatus} by ${changedBy}:
 Title: "${task.title}"`;
 }
 ```
 
-**Testing approach**: Add unit tests for each formatter function to verify message content.
+**Testing approach**: Add unit tests for each formatter function to verify
+message content.
 
-**Refactor existing code**: Replace inline message strings with formatter function calls.
+**Refactor existing code**: Replace inline message strings with formatter
+function calls.
 
 **Commit message**: `refactor: extract message formatting functions`
 
@@ -582,9 +666,11 @@ Title: "${task.title}"`;
 
 **File**: `packages/core/src/tasks/task-notification-integration.test.ts` (new)
 
-**What to do**: Test the entire flow from task update through to agent receiving message.
+**What to do**: Test the entire flow from task update through to agent receiving
+message.
 
 **Test setup needed**:
+
 ```typescript
 import { Session } from '@lace/core/sessions/session';
 import { Agent } from '@lace/core/agents/agent';
@@ -610,12 +696,14 @@ describe('Task Notification Integration', () => {
 ```
 
 **Key integration testing concepts:**
+
 - Use real Session and Agent objects, not mocks
 - Test the actual message delivery pipeline
 - Verify events appear in thread history
 - Test with real TaskManager events
 
 **Expected challenges**:
+
 - Need to set up full agent infrastructure
 - May need to mock provider responses
 - Threading and async timing issues
@@ -628,7 +716,8 @@ describe('Task Notification Integration', () => {
 
 **What to do**: Run integration tests and fix whatever breaks. Common issues:
 
-1. **Circular import problems**: Session imports utility, utility imports Session types
+1. **Circular import problems**: Session imports utility, utility imports
+   Session types
    - **Fix**: Create shared types file or use dynamic imports
 
 2. **Agent.sendMessage() doesn't exist or works differently**:
@@ -641,6 +730,7 @@ describe('Task Notification Integration', () => {
    - **Fix**: Update interfaces to match actual TaskManager events
 
 **Debugging approach for engineer:**
+
 - Add extensive logging to see what events are actually emitted
 - Use debugger to step through event flow
 - Check that event listeners are actually registered
@@ -653,13 +743,15 @@ describe('Task Notification Integration', () => {
 #### Task 5.1: Add note notification tests
 
 **Test scenarios**:
+
 - Significant notes (>50 chars) notify creator
 - Trivial notes ("started working") don't notify
 - Creator's own notes don't notify themselves
 
 #### Task 5.2: Implement note notifications
 
-**Implementation location**: Add to `analyzeTaskEventForNotifications()` function
+**Implementation location**: Add to `analyzeTaskEventForNotifications()`
+function
 
 ### Phase 6: Polish and Documentation
 
@@ -668,6 +760,7 @@ describe('Task Notification Integration', () => {
 **File**: Create `packages/core/src/utils/task-notification-config.ts`
 
 **What to add**:
+
 ```typescript
 export interface TaskNotificationConfig {
   enableCompletionNotifications: boolean;
@@ -682,24 +775,27 @@ export const DEFAULT_NOTIFICATION_CONFIG: TaskNotificationConfig = {
   enableAssignmentNotifications: true,
   enableStatusChangeNotifications: true,
   enableNoteNotifications: false, // Start conservative
-  noteNotificationMinLength: 50
+  noteNotificationMinLength: 50,
 };
 ```
 
 #### Task 6.2: Add performance considerations
 
 **Potential issues**:
+
 - Lots of agents × lots of tasks = lots of events
 - Message injection could be slow
 - Need to handle agent unavailability gracefully
 
 **Solutions to implement**:
+
 - Async message delivery with error handling
 - Handle agent unavailability gracefully
 
 #### Task 6.3: Update documentation
 
 **Files to update**:
+
 - `docs/architecture/CODE-MAP.md` - Add task notification utilities
 - Add ABOUTME comments to new files
 - Update Session class documentation
@@ -707,35 +803,45 @@ export const DEFAULT_NOTIFICATION_CONFIG: TaskNotificationConfig = {
 ## Testing Strategy
 
 ### Unit Tests
+
 - Test utility functions in isolation with mocked dependencies
 - Focus on business logic: who gets notified when
 - Test message formatting functions separately
 
 ### Integration Tests
-- Test full flow: TaskManager event → Session coordination → Agent message delivery
+
+- Test full flow: TaskManager event → Session coordination → Agent message
+  delivery
 - Use real components but controlled scenarios
 - Verify events appear in thread history correctly
 
 ### Manual Testing
+
 - Create tasks through web UI
 - Complete them with different agents
 - Verify notifications appear in creator's conversation
 
 ## Success Criteria
 
-1. **Functional**: When Agent A creates a task and Agent B completes it, Agent A gets notified
+1. **Functional**: When Agent A creates a task and Agent B completes it, Agent A
+   gets notified
 2. **Non-disruptive**: Existing task functionality continues to work unchanged
 3. **Testable**: >90% test coverage on notification logic
 4. **Performant**: No noticeable delay in task operations
-5. **Maintainable**: Clear separation between notification logic and core Session concerns
-
+5. **Maintainable**: Clear separation between notification logic and core
+   Session concerns
 
 ## Implementation Notes
 
-- **Follow TDD strictly**: Write failing test → implement minimum → refactor → repeat
+- **Follow TDD strictly**: Write failing test → implement minimum → refactor →
+  repeat
 - **Commit frequently**: After each test passes, commit the change
-- **Start simple**: Implement only completion notifications first, add others incrementally
-- **Use existing patterns**: Study how Session currently coordinates between TaskManager and Agents
-- **Watch for coupling**: If notification logic starts polluting Session, extract to separate coordinator class
+- **Start simple**: Implement only completion notifications first, add others
+  incrementally
+- **Use existing patterns**: Study how Session currently coordinates between
+  TaskManager and Agents
+- **Watch for coupling**: If notification logic starts polluting Session,
+  extract to separate coordinator class
 
-This plan gets the engineer from zero to fully functional task notifications while maintaining code quality and testability.
+This plan gets the engineer from zero to fully functional task notifications
+while maintaining code quality and testability.

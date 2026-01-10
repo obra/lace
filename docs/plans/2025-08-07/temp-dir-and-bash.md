@@ -1294,7 +1294,10 @@ feat(tools): add temp directory support to Tool base class
 // ABOUTME: Tests the complete flow from process temp to tool-call directories
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getProcessTempDir, clearProcessTempDirCache } from '@lace/core/config/lace-dir';
+import {
+  getProcessTempDir,
+  clearProcessTempDirCache,
+} from '@lace/core/config/lace-dir';
 import { Project } from '@lace/core/projects/project';
 import { Session } from '@lace/core/sessions/session';
 import { Tool } from './tool';
@@ -1479,7 +1482,8 @@ npm run build
 **TypeScript Errors**:
 
 - Never use `any` type - use `unknown` and type guards instead
-- Import types properly: `import type { Session } from '@lace/core/sessions/session'`
+- Import types properly:
+  `import type { Session } from '@lace/core/sessions/session'`
 - Use proper type assertions: `as string` not `as any`
 
 **Test Failures**:

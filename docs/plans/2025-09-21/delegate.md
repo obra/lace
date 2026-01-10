@@ -2,11 +2,15 @@
 
 ## Overview
 
-This plan addresses multiple issues discovered during the model invocation refactoring:
+This plan addresses multiple issues discovered during the model invocation
+refactoring:
 
-1. **Tool Selection Confusion**: Agents confuse `task_add` and `delegate` tools due to overlapping functionality
-2. **Poor Error Messages**: Tool validation failures provide minimal context for debugging
-3. **Missing Trajectory Adjustment**: Tool validation failures aren't sent back to the model for correction
+1. **Tool Selection Confusion**: Agents confuse `task_add` and `delegate` tools
+   due to overlapping functionality
+2. **Poor Error Messages**: Tool validation failures provide minimal context for
+   debugging
+3. **Missing Trajectory Adjustment**: Tool validation failures aren't sent back
+   to the model for correction
 4. **Inconsistent APIs**: Similar functionality has different interfaces
 
 ## Background Context
@@ -36,6 +40,7 @@ This plan addresses multiple issues discovered during the model invocation refac
 ```
 
 **Problems:**
+
 - Agents don't know which tool to use for subagent creation
 - Different APIs for essentially the same underlying operation
 - Agent tried to call `task_add` with `delegate` parameters
@@ -46,11 +51,13 @@ This plan addresses multiple issues discovered during the model invocation refac
 The agent received: "create a task... and assign it to a new subagent"
 
 **Agent reasoning probably was:**
+
 1. "Create a task" → use `task_add` tool
 2. "Assign to subagent" → somehow add subagent parameters
 3. Result: called `task_add` with `delegate` parameters
 
-**The issue:** The tools have conceptual overlap but different APIs, causing confusion.
+**The issue:** The tools have conceptual overlap but different APIs, causing
+confusion.
 
 ## Implementation Plan
 
@@ -58,15 +65,18 @@ The agent received: "create a task... and assign it to a new subagent"
 
 #### Task 1: Enhance Tool Validation Error Messages
 
-**Goal**: Provide actionable error messages that help agents choose the correct tool.
+**Goal**: Provide actionable error messages that help agents choose the correct
+tool.
 
 **Files to modify:**
+
 - `packages/core/src/tools/executor.ts`
 - `packages/core/src/agents/agent.ts` (error handling)
 
 **Changes needed:**
 
 1. **Enhanced validation error format:**
+
 ```typescript
 interface ToolValidationError {
   tool: string;
@@ -84,20 +94,24 @@ interface ToolValidationError {
 ```
 
 2. **Add suggestion system for common mistakes:**
+
 ```typescript
 const TOOL_CONFUSION_HINTS = {
   task_add: {
     invalidParams: ['expected_response', 'model'],
-    suggestion: "Did you mean to use the 'delegate' tool? The 'delegate' tool accepts 'expected_response' and 'model' parameters for subagent assignment."
+    suggestion:
+      "Did you mean to use the 'delegate' tool? The 'delegate' tool accepts 'expected_response' and 'model' parameters for subagent assignment.",
   },
   delegate: {
     invalidParams: ['tasks', 'assignedTo'],
-    suggestion: "Did you mean to use the 'task_add' tool? The 'task_add' tool accepts 'tasks' array for task creation."
-  }
+    suggestion:
+      "Did you mean to use the 'task_add' tool? The 'task_add' tool accepts 'tasks' array for task creation.",
+  },
 };
 ```
 
 3. **Improved error message format:**
+
 ```
 Tool call validation failed for 'task_add':
 
@@ -133,15 +147,17 @@ try {
     // Send enhanced error back to agent for trajectory adjustment
     return {
       status: 'error',
-      content: [{
-        type: 'text',
-        text: enhancedError.userFriendlyMessage
-      }],
+      content: [
+        {
+          type: 'text',
+          text: enhancedError.userFriendlyMessage,
+        },
+      ],
       metadata: {
         validationError: enhancedError,
         canRetry: true,
-        suggestions: enhancedError.suggestions
-      }
+        suggestions: enhancedError.suggestions,
+      },
     };
   }
   throw error;
@@ -149,29 +165,35 @@ try {
 ```
 
 **Testing:**
+
 ```bash
 # Create specific test for validation error enhancement
 npx vitest run src/tools/executor-validation-errors.test.ts
 ```
 
-**Commit**: `feat: enhance tool validation error messages with suggestions and context`
+**Commit**:
+`feat: enhance tool validation error messages with suggestions and context`
 
 ---
 
 #### Task 2: Ensure Tool Validation Failures Reach the Model
 
-**Goal**: Tool validation failures should be sent as TOOL_RESULT events so the model can adjust.
+**Goal**: Tool validation failures should be sent as TOOL_RESULT events so the
+model can adjust.
 
 **Files to modify:**
+
 - `packages/core/src/agents/agent.ts`
 - `packages/core/src/tools/executor.ts`
 
 **Current flow (broken):**
+
 ```
 Model sends TOOL_CALL → ToolExecutor validates → Validation fails → ???
 ```
 
 **Desired flow (fixed):**
+
 ```
 Model sends TOOL_CALL → ToolExecutor validates → Validation fails → TOOL_RESULT with error → Model gets feedback
 ```
@@ -190,8 +212,8 @@ this.threadManager.addEvent(this.threadId, {
     id: toolCall.id,
     name: toolCall.name,
     result: toolResult,
-    isValidationError: toolResult.metadata?.validationError ? true : false
-  }
+    isValidationError: toolResult.metadata?.validationError ? true : false,
+  },
 });
 
 // Continue conversation with validation error as context
@@ -202,6 +224,7 @@ if (toolResult.status === 'error' && toolResult.metadata?.canRetry) {
 ```
 
 **Testing:**
+
 ```typescript
 // Test that validation failures create TOOL_RESULT events
 it('should create TOOL_RESULT event for validation failures', async () => {
@@ -211,15 +234,17 @@ it('should create TOOL_RESULT event for validation failures', async () => {
   await agent.handleMessage({
     role: 'user',
     content: 'test',
-    tool_calls: [{
-      id: 'test',
-      name: 'task_add',
-      arguments: { invalid: 'params' }
-    }]
+    tool_calls: [
+      {
+        id: 'test',
+        name: 'task_add',
+        arguments: { invalid: 'params' },
+      },
+    ],
   });
 
   const events = getEventsForThread(agent.threadId);
-  const toolResult = events.find(e => e.type === 'TOOL_RESULT');
+  const toolResult = events.find((e) => e.type === 'TOOL_RESULT');
 
   expect(toolResult).toBeDefined();
   expect(toolResult.data.result.status).toBe('error');
@@ -227,25 +252,30 @@ it('should create TOOL_RESULT event for validation failures', async () => {
 });
 ```
 
-**Commit**: `feat: ensure tool validation failures create TOOL_RESULT events for model feedback`
+**Commit**:
+`feat: ensure tool validation failures create TOOL_RESULT events for model feedback`
 
 ---
 
 #### Task 3: Improve Provider Context in Error Messages
 
-**Goal**: Show useful provider instance and model info instead of generic "Provider: openai".
+**Goal**: Show useful provider instance and model info instead of generic
+"Provider: openai".
 
 **Files to modify:**
+
 - Error handling throughout the system
 - Agent error formatting
 - Event emission context
 
 **Current (useless):**
+
 ```
 Provider: openai
 ```
 
 **Desired (useful):**
+
 ```
 Provider: openai-dev (gpt-4)
 ```
@@ -270,12 +300,13 @@ const context: ToolContext = {
   providerContext: {
     instanceId: this.metadata.providerInstanceId,
     modelId: this.metadata.modelId,
-    displayName: this.getDisplayName()
-  }
+    displayName: this.getDisplayName(),
+  },
 };
 ```
 
-**Commit**: `feat: include detailed provider context in tool execution and error messages`
+**Commit**:
+`feat: include detailed provider context in tool execution and error messages`
 
 ---
 
@@ -283,9 +314,11 @@ const context: ToolContext = {
 
 #### Task 4: Design Unified Delegate API
 
-**Goal**: Replace delegate tool's single-task API with task-array API compatible with task_add.
+**Goal**: Replace delegate tool's single-task API with task-array API compatible
+with task_add.
 
 **Current delegate API:**
+
 ```typescript
 {
   title: string,
@@ -296,6 +329,7 @@ const context: ToolContext = {
 ```
 
 **Proposed unified API:**
+
 ```typescript
 {
   tasks: [{
@@ -309,6 +343,7 @@ const context: ToolContext = {
 ```
 
 **Benefits:**
+
 - Familiar array format for agents
 - Supports bulk delegation to same agent
 - Clear separation: tasks = what to do, assignTo = who does it
@@ -316,6 +351,7 @@ const context: ToolContext = {
 - Uses our new flexible NewAgentSpec format
 
 **Breaking change strategy:**
+
 - Update delegate tool implementation
 - Update tool description and examples
 - Update any existing delegate calls in tests
@@ -326,21 +362,29 @@ const context: ToolContext = {
 #### Task 5: Implement Unified Delegate API
 
 **Files to modify:**
+
 - `packages/core/src/tools/implementations/delegate.ts`
 
 **Implementation:**
 
 ```typescript
 const delegateSchema = z.object({
-  tasks: z.array(
-    z.object({
-      title: NonEmptyString,
-      prompt: NonEmptyString,
-      expected_response: NonEmptyString.optional(),
-      priority: z.enum(['high', 'medium', 'low']).default('medium')
-    })
-  ).min(1).max(10),
-  assignTo: z.string().describe('NewAgentSpec: "new:persona[;modelSpec]" where modelSpec is "fast", "smart", or "provider:model"')
+  tasks: z
+    .array(
+      z.object({
+        title: NonEmptyString,
+        prompt: NonEmptyString,
+        expected_response: NonEmptyString.optional(),
+        priority: z.enum(['high', 'medium', 'low']).default('medium'),
+      })
+    )
+    .min(1)
+    .max(10),
+  assignTo: z
+    .string()
+    .describe(
+      'NewAgentSpec: "new:persona[;modelSpec]" where modelSpec is "fast", "smart", or "provider:model"'
+    ),
 });
 
 export class DelegateTool extends Tool {
@@ -376,35 +420,48 @@ delegate({
 
   schema = delegateSchema;
 
-  protected async executeValidated(args: z.infer<typeof delegateSchema>, context?: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(
+    args: z.infer<typeof delegateSchema>,
+    context?: ToolContext
+  ): Promise<ToolResult> {
     const { tasks, assignTo } = args;
 
     // Validate NewAgentSpec format
     if (!isNewAgentSpec(assignTo)) {
-      return this.createError(`Invalid agent specification: ${assignTo}. Expected NewAgentSpec format like "new:lace;fast"`);
+      return this.createError(
+        `Invalid agent specification: ${assignTo}. Expected NewAgentSpec format like "new:lace;fast"`
+      );
     }
 
     // Create all tasks with the same agent assignment
     const createdTasks = [];
     for (const taskData of tasks) {
-      const task = await taskManager.createTask({
-        title: taskData.title,
-        prompt: this.formatDelegatePrompt(taskData.prompt, taskData.expected_response),
-        priority: taskData.priority,
-        assignedTo: assignTo
-      }, { actor: context?.agent?.threadId || 'delegate' });
+      const task = await taskManager.createTask(
+        {
+          title: taskData.title,
+          prompt: this.formatDelegatePrompt(
+            taskData.prompt,
+            taskData.expected_response
+          ),
+          priority: taskData.priority,
+          assignedTo: assignTo,
+        },
+        { actor: context?.agent?.threadId || 'delegate' }
+      );
 
       createdTasks.push(task);
     }
 
     // Wait for all tasks to complete
     const results = await Promise.all(
-      createdTasks.map(task => this.waitForTaskCompletion(task.id, taskManager, context))
+      createdTasks.map((task) =>
+        this.waitForTaskCompletion(task.id, taskManager, context)
+      )
     );
 
     return this.createResult(results, {
-      taskIds: createdTasks.map(t => t.id),
-      assignedAgent: assignTo
+      taskIds: createdTasks.map((t) => t.id),
+      assignedAgent: assignTo,
     });
   }
 }
@@ -417,22 +474,29 @@ delegate({
 #### Task 6: Update Tool Tests for New Delegate API
 
 **Files to modify:**
+
 - `packages/core/src/tools/delegate.test.ts`
 - Any other tests using delegate tool
 
 **Test updates:**
+
 ```typescript
 it('should delegate tasks using unified API', async () => {
   testSetup.setMockResponses(['Research complete', 'Analysis done']);
 
-  const result = await tool.execute({
-    tasks: [{
-      title: 'Research email tools',
-      prompt: 'Find AI email composition tools',
-      expected_response: 'Tool comparison table'
-    }],
-    assignTo: createNewAgentSpec('lace', 'fast')
-  }, context);
+  const result = await tool.execute(
+    {
+      tasks: [
+        {
+          title: 'Research email tools',
+          prompt: 'Find AI email composition tools',
+          expected_response: 'Tool comparison table',
+        },
+      ],
+      assignTo: createNewAgentSpec('lace', 'fast'),
+    },
+    context
+  );
 
   expect(result.status).toBe('completed');
   expect(result.content).toHaveLength(1);
@@ -442,13 +506,16 @@ it('should delegate tasks using unified API', async () => {
 it('should support bulk delegation', async () => {
   testSetup.setMockResponses(['Task 1 done', 'Task 2 done']);
 
-  const result = await tool.execute({
-    tasks: [
-      { title: 'Task 1', prompt: 'Do task 1', expected_response: 'Result 1' },
-      { title: 'Task 2', prompt: 'Do task 2', expected_response: 'Result 2' }
-    ],
-    assignTo: 'new:lace;smart'
-  }, context);
+  const result = await tool.execute(
+    {
+      tasks: [
+        { title: 'Task 1', prompt: 'Do task 1', expected_response: 'Result 1' },
+        { title: 'Task 2', prompt: 'Do task 2', expected_response: 'Result 2' },
+      ],
+      assignTo: 'new:lace;smart',
+    },
+    context
+  );
 
   expect(result.status).toBe('completed');
   expect(result.content).toHaveLength(2);
@@ -464,9 +531,11 @@ it('should support bulk delegation', async () => {
 
 #### Task 7: Implement Enhanced Tool Validation Error Messages
 
-**Goal**: Provide detailed, actionable error messages when tool calls fail validation.
+**Goal**: Provide detailed, actionable error messages when tool calls fail
+validation.
 
 **Files to modify:**
+
 - `packages/core/src/tools/tool.ts` (base Tool class)
 - `packages/core/src/tools/executor.ts`
 
@@ -538,17 +607,20 @@ protected generateSuggestions(args: Record<string, unknown>, error: z.ZodError):
 ```
 
 **Testing:**
+
 ```typescript
 it('should provide helpful suggestions for tool confusion', async () => {
   const tool = new TaskCreateTool();
 
   const invalidArgs = {
-    tasks: [{
-      title: 'Test',
-      prompt: 'Test',
-      expected_response: 'Should fail',  // Invalid for task_add
-      model: 'fast'                       // Invalid for task_add
-    }]
+    tasks: [
+      {
+        title: 'Test',
+        prompt: 'Test',
+        expected_response: 'Should fail', // Invalid for task_add
+        model: 'fast', // Invalid for task_add
+      },
+    ],
   };
 
   try {
@@ -561,18 +633,22 @@ it('should provide helpful suggestions for tool confusion', async () => {
 });
 ```
 
-**Commit**: `feat: add comprehensive tool validation error messages with suggestions`
+**Commit**:
+`feat: add comprehensive tool validation error messages with suggestions`
 
 ---
 
 #### Task 8: Ensure Validation Errors Create TOOL_RESULT Events
 
-**Goal**: Tool validation failures should flow back to the model as TOOL_RESULT events.
+**Goal**: Tool validation failures should flow back to the model as TOOL_RESULT
+events.
 
 **Files to modify:**
+
 - `packages/core/src/agents/agent.ts`
 
 **Current problematic flow:**
+
 ```typescript
 // Agent.handleToolCall()
 try {
@@ -585,6 +661,7 @@ try {
 ```
 
 **Fixed flow:**
+
 ```typescript
 // Agent.handleToolCall()
 try {
@@ -599,20 +676,22 @@ try {
       name: toolCall.name,
       result: result,
       isError: result.status === 'error',
-      isValidationError: result.metadata?.validationError ? true : false
-    }
+      isValidationError: result.metadata?.validationError ? true : false,
+    },
   });
 
   // For validation errors, continue conversation (don't throw)
   if (result.status === 'error' && result.metadata?.canRetry) {
-    logger.info('Tool validation failed, sending error to model for trajectory adjustment', {
-      threadId: this.threadId,
-      toolName: toolCall.name,
-      error: result.content[0]?.text
-    });
+    logger.info(
+      'Tool validation failed, sending error to model for trajectory adjustment',
+      {
+        threadId: this.threadId,
+        toolName: toolCall.name,
+        error: result.content[0]?.text,
+      }
+    );
     return; // Let conversation continue with error context
   }
-
 } catch (error) {
   // Only throw for unexpected errors, not validation failures
   throw error;
@@ -620,21 +699,24 @@ try {
 ```
 
 **Testing:**
+
 ```typescript
 it('should send validation errors back to model for course correction', async () => {
   const agent = createTestAgent();
   const mockProvider = new MockProvider();
 
   // Send invalid tool call
-  await agent.sendMessage('Create a task', [{
-    id: 'test_123',
-    name: 'task_add',
-    arguments: { invalid: 'parameters' }
-  }]);
+  await agent.sendMessage('Create a task', [
+    {
+      id: 'test_123',
+      name: 'task_add',
+      arguments: { invalid: 'parameters' },
+    },
+  ]);
 
   // Should create TOOL_RESULT event
   const events = getThreadEvents(agent.threadId);
-  const toolResult = events.find(e => e.type === 'TOOL_RESULT');
+  const toolResult = events.find((e) => e.type === 'TOOL_RESULT');
   expect(toolResult).toBeDefined();
   expect(toolResult.data.isValidationError).toBe(true);
 
@@ -646,7 +728,7 @@ it('should send validation errors back to model for course correction', async ()
     expect.objectContaining({
       role: 'tool',
       tool_call_id: 'test_123',
-      content: expect.stringContaining('Tool call validation failed')
+      content: expect.stringContaining('Tool call validation failed'),
     })
   );
 });
@@ -663,6 +745,7 @@ it('should send validation errors back to model for course correction', async ()
 **Goal**: Make it crystal clear when to use `task_add` vs `delegate`.
 
 **Files to modify:**
+
 - `packages/core/src/tools/implementations/task-manager/tools.ts`
 - `packages/core/src/tools/implementations/delegate.ts`
 
@@ -726,16 +809,19 @@ delegate({
 })`;
 ```
 
-**Commit**: `docs: clarify task_add vs delegate tool usage with clear guidelines`
+**Commit**:
+`docs: clarify task_add vs delegate tool usage with clear guidelines`
 
 ---
 
 #### Task 10: Add Integration Tests for New Delegate API
 
 **Files to create:**
+
 - `packages/core/src/tools/delegate-unified-api.integration.test.ts`
 
 **Test scenarios:**
+
 ```typescript
 describe('Delegate Tool Unified API Integration', () => {
   it('should work with task array format and NewAgentSpec', async () => {
@@ -763,6 +849,7 @@ describe('Delegate Tool Unified API Integration', () => {
 ## Success Criteria
 
 ### Phase 1 (Error Handling) - Critical
+
 - [ ] Tool validation failures create detailed, actionable error messages
 - [ ] Error messages include full tool call context and suggestions
 - [ ] Validation failures create TOOL_RESULT events sent to model
@@ -770,6 +857,7 @@ describe('Delegate Tool Unified API Integration', () => {
 - [ ] Models can course-correct after validation failures
 
 ### Phase 2 (API Unification) - High Priority
+
 - [ ] Delegate tool accepts task array format like task_add
 - [ ] assignTo parameter uses NewAgentSpec format
 - [ ] Backward compatibility maintained during transition
@@ -777,6 +865,7 @@ describe('Delegate Tool Unified API Integration', () => {
 - [ ] All existing delegate functionality preserved
 
 ### Integration Tests
+
 - [ ] Agent confusion scenario resolved (task_add vs delegate)
 - [ ] Bulk delegation works with new API
 - [ ] Error trajectory adjustment works end-to-end
@@ -785,16 +874,19 @@ describe('Delegate Tool Unified API Integration', () => {
 ## Risk Mitigation
 
 ### Breaking Changes
+
 - New delegate API is breaking change - update all tests
 - Consider gradual migration if needed
 - Document migration path for any external users
 
 ### Error Handling Changes
+
 - Ensure validation errors don't break existing error handling
 - Test that critical errors still bubble up appropriately
 - Verify agent stability with new error flow
 
 ### Performance Considerations
+
 - Enhanced error messages shouldn't impact happy path performance
 - Bulk delegation shouldn't create excessive database load
 - Tool validation performance should remain fast
@@ -802,16 +894,19 @@ describe('Delegate Tool Unified API Integration', () => {
 ## Testing Strategy
 
 ### Unit Tests
+
 - Tool validation error enhancement
 - NewAgentSpec parsing in delegate tool
 - Error message formatting
 
 ### Integration Tests
+
 - End-to-end tool call failure and recovery
 - Bulk delegation workflow
 - Agent trajectory adjustment after errors
 
 ### Manual Testing
+
 1. Trigger the original failure scenario
 2. Verify agent gets helpful error and course-corrects
 3. Test bulk delegation with new API
@@ -834,20 +929,26 @@ describe('Delegate Tool Unified API Integration', () => {
 ## Post-Implementation
 
 ### Documentation Updates
+
 - Update CLAUDE.md with new delegate API examples
 - Update tool usage patterns in agent personas
 - Document error handling improvements
 
 ### Monitoring
+
 - Track tool validation error rates
 - Monitor agent tool selection patterns
 - Watch for any new confusion patterns
 
 ## Notes
 
-This plan addresses the fundamental architectural issue where two tools (task_add and delegate) have overlapping functionality but different APIs, causing agent confusion. The unified approach makes the system more coherent and easier to use correctly.
+This plan addresses the fundamental architectural issue where two tools
+(task_add and delegate) have overlapping functionality but different APIs,
+causing agent confusion. The unified approach makes the system more coherent and
+easier to use correctly.
 
-The error handling improvements ensure that when agents do make mistakes, they get enough information to self-correct rather than failing silently or crashing.
+The error handling improvements ensure that when agents do make mistakes, they
+get enough information to self-correct rather than failing silently or crashing.
 
 ---
 
@@ -856,18 +957,22 @@ The error handling improvements ensure that when agents do make mistakes, they g
 **Completed on 2025-09-21:**
 
 ### Phase 1: Enhanced Error Messages ✅
+
 - **Task 1**: Enhanced tool validation error messages in `Tool` base class
-  - Added detailed error formatting with received args, validation errors, and valid parameters
+  - Added detailed error formatting with received args, validation errors, and
+    valid parameters
   - Includes metadata for programmatic error handling
   - Tests: `src/tools/tool.test.ts` and `src/tools/validation-flow.test.ts`
 
 ### Phase 2: Tool Validation Flow ✅
+
 - **Task 2**: Confirmed validation failures create TOOL_RESULT events
   - Validation errors already flow back as TOOL_RESULT with `status: 'failed'`
   - Format converters mark these as errors for provider (`is_error: true`)
   - Integration tests verify complete flow
 
 ### Phase 3: Unified Delegate API ✅
+
 - **Task 4-6**: Updated delegate tool to match task_add format
   - Changed from single task to `tasks` array format
   - Changed from `model` to `assignTo` with NewAgentSpec format
@@ -876,12 +981,16 @@ The error handling improvements ensure that when agents do make mistakes, they g
   - Updated existing tests: `delegate-task-based.test.ts`
 
 ### Documentation Updates ✅
+
 - Updated delegate tool description with new examples
 - Shows unified API format matching task_add
 - Clear NewAgentSpec format documentation
 
 ### Not Implemented (Future Work):
+
 - **Task 3**: Provider context improvements (not critical for current issue)
 - **Task 8**: Debug logging improvements (can be added as needed)
 
-The main objectives have been achieved: tool validation errors now provide clear, actionable messages, and the delegate tool API has been unified with task_add for consistency.
+The main objectives have been achieved: tool validation errors now provide
+clear, actionable messages, and the delegate tool API has been unified with
+task_add for consistency.

@@ -1,14 +1,19 @@
 # Protocol Alignment Master Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development to implement this plan task-by-task.
 
-**Goal:** Align Lace's Ent protocol with ACP RFDs and eliminate legacy event translation layers
+**Goal:** Align Lace's Ent protocol with ACP RFDs and eliminate legacy event
+translation layers
 
-**Architecture:** This plan covers protocol schema changes, web interface refactoring to use protocol events directly, and documentation updates. All changes are breaking (pre-1.0).
+**Architecture:** This plan covers protocol schema changes, web interface
+refactoring to use protocol events directly, and documentation updates. All
+changes are breaking (pre-1.0).
 
 **Tech Stack:** TypeScript, Zod schemas, JSON-RPC, React
 
 **Reference Docs:**
+
 - `docs/plans/2026-01-05/acp-align-session-list.md`
 - `docs/plans/2026-01-05/acp-align-session-fork.md`
 - `docs/plans/2026-01-05/acp-align-session-info.md`
@@ -21,9 +26,11 @@
 
 ## Task 1: Fix SessionId Regex (Foundation)
 
-**Why first:** This prevents future superjson-style bugs. Simple, isolated change.
+**Why first:** This prevents future superjson-style bugs. Simple, isolated
+change.
 
 **Files:**
+
 - Modify: `packages/ent-protocol/src/ids.ts:7-13`
 - Modify: `packages/ent-protocol/src/__tests__/ids.test.ts`
 
@@ -51,8 +58,8 @@ describe('SessionIdSchema strict validation', () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run packages/ent-protocol/src/__tests__/ids.test.ts`
-Expected: FAIL - current regex accepts everything
+Run: `npx vitest run packages/ent-protocol/src/__tests__/ids.test.ts` Expected:
+FAIL - current regex accepts everything
 
 **Step 3: Update regex to strict format**
 
@@ -63,21 +70,26 @@ export const SessionIdSchema = z
   .string()
   .min(1)
   .max(128)
-  .refine((value) => /^sess_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value), {
-    message: 'sessionId must be sess_<uuid> format',
-  })
+  .refine(
+    (value) =>
+      /^sess_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+        value
+      ),
+    {
+      message: 'sessionId must be sess_<uuid> format',
+    }
+  )
   .brand<'SessionId'>();
 ```
 
 **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run packages/ent-protocol/src/__tests__/ids.test.ts`
-Expected: PASS
+Run: `npx vitest run packages/ent-protocol/src/__tests__/ids.test.ts` Expected:
+PASS
 
 **Step 5: Build and test all packages**
 
-Run: `npm run build && npm test`
-Expected: All pass
+Run: `npm run build && npm test` Expected: All pass
 
 **Step 6: Commit**
 
@@ -93,9 +105,11 @@ the overly permissive regex. No backward compatibility (pre-1.0)."
 
 ## Task 2: Add Missing Protocol Event Types
 
-**Why:** These events are actively used in web but have no protocol representation.
+**Why:** These events are actively used in web but have no protocol
+representation.
 
 **Files:**
+
 - Modify: `packages/ent-protocol/src/schemas/methods.ts` (add after line 1538)
 
 **Step 1: Write test for new event schemas**
@@ -138,7 +152,9 @@ describe('Extended session/update types', () => {
       type: 'compaction_start',
       auto: true,
     };
-    expect(() => SessionUpdateCompactionStartSchema.parse(update)).not.toThrow();
+    expect(() =>
+      SessionUpdateCompactionStartSchema.parse(update)
+    ).not.toThrow();
   });
 
   it('should validate compaction_complete update', () => {
@@ -148,7 +164,9 @@ describe('Extended session/update types', () => {
       previousTokens: 100000,
       currentTokens: 50000,
     };
-    expect(() => SessionUpdateCompactionCompleteSchema.parse(update)).not.toThrow();
+    expect(() =>
+      SessionUpdateCompactionCompleteSchema.parse(update)
+    ).not.toThrow();
   });
 
   it('should validate error update', () => {
@@ -175,7 +193,9 @@ describe('Extended session/update types', () => {
         enabled: true,
       },
     };
-    expect(() => SessionUpdateMcpConfigChangedSchema.parse(update)).not.toThrow();
+    expect(() =>
+      SessionUpdateMcpConfigChangedSchema.parse(update)
+    ).not.toThrow();
   });
 
   it('should validate mcp_server_status update', () => {
@@ -186,19 +206,23 @@ describe('Extended session/update types', () => {
       status: 'running',
       toolCount: 5,
     };
-    expect(() => SessionUpdateMcpServerStatusSchema.parse(update)).not.toThrow();
+    expect(() =>
+      SessionUpdateMcpServerStatusSchema.parse(update)
+    ).not.toThrow();
   });
 });
 ```
 
 **Step 2: Run test to verify schemas don't exist**
 
-Run: `npx vitest run packages/ent-protocol/src/__tests__/session-update-events.test.ts`
+Run:
+`npx vitest run packages/ent-protocol/src/__tests__/session-update-events.test.ts`
 Expected: FAIL - schemas not found
 
 **Step 3: Add new event schemas**
 
-In `packages/ent-protocol/src/schemas/methods.ts`, after `SessionUpdateTurnEndSchema` (around line 1517), add:
+In `packages/ent-protocol/src/schemas/methods.ts`, after
+`SessionUpdateTurnEndSchema` (around line 1517), add:
 
 ```typescript
 const SessionUpdateSessionInfoSchema = z
@@ -360,13 +384,13 @@ const SessionUpdateParamsSchema = z.discriminatedUnion('type', [
 
 **Step 6: Run test to verify**
 
-Run: `npx vitest run packages/ent-protocol/src/__tests__/session-update-events.test.ts`
+Run:
+`npx vitest run packages/ent-protocol/src/__tests__/session-update-events.test.ts`
 Expected: PASS
 
 **Step 7: Build**
 
-Run: `npm run build`
-Expected: Success
+Run: `npm run build` Expected: Success
 
 **Step 8: Commit**
 
@@ -390,6 +414,7 @@ Add protocol events for:
 **Reference:** `docs/plans/2026-01-05/acp-align-session-list.md`
 
 **Files:**
+
 - Modify: `packages/ent-protocol/src/schemas/methods.ts:224-261`
 - Modify: `packages/agent/src/server.ts` (session/list handler)
 - Modify: Tests
@@ -425,14 +450,16 @@ describe('session/list ACP alignment', () => {
       jsonrpc: '2.0',
       id: 1,
       result: {
-        sessions: [{
-          sessionId: 'sess_550e8400-e29b-41d4-a716-446655440000',
-          cwd: '/home/user',
-          updatedAt: '2026-01-05T00:00:00.000Z',
-          title: 'My session',
-          created: '2026-01-05T00:00:00.000Z',
-          messageCount: 5,
-        }],
+        sessions: [
+          {
+            sessionId: 'sess_550e8400-e29b-41d4-a716-446655440000',
+            cwd: '/home/user',
+            updatedAt: '2026-01-05T00:00:00.000Z',
+            title: 'My session',
+            created: '2026-01-05T00:00:00.000Z',
+            messageCount: 5,
+          },
+        ],
         nextCursor: 'cursor_xyz',
       },
     };
@@ -443,7 +470,8 @@ describe('session/list ACP alignment', () => {
 
 **Step 2: Run test**
 
-Run: `npx vitest run packages/ent-protocol/src/__tests__/methods.test.ts -t "session/list"`
+Run:
+`npx vitest run packages/ent-protocol/src/__tests__/methods.test.ts -t "session/list"`
 Expected: FAIL
 
 **Step 3: Update SessionListParamsSchema**
@@ -451,8 +479,8 @@ Expected: FAIL
 ```typescript
 const SessionListParamsSchema = z
   .object({
-    cwd: NonEmptyStringSchema.optional(),      // renamed from workDir
-    cursor: NonEmptyStringSchema.optional(),   // added for pagination
+    cwd: NonEmptyStringSchema.optional(), // renamed from workDir
+    cursor: NonEmptyStringSchema.optional(), // added for pagination
   })
   .strict();
 ```
@@ -466,12 +494,12 @@ const SessionListResultSchema = z
       z
         .object({
           sessionId: SessionIdSchema,
-          cwd: NonEmptyStringSchema,             // renamed from workDir
-          title: z.string().optional(),          // added
-          updatedAt: IsoTimestampSchema,         // renamed from lastActive
-          created: IsoTimestampSchema,           // Ent extension - keep
-          messageCount: z.number(),              // Ent extension - keep
-          _meta: z.record(z.string(), z.unknown()).optional(),  // added
+          cwd: NonEmptyStringSchema, // renamed from workDir
+          title: z.string().optional(), // added
+          updatedAt: IsoTimestampSchema, // renamed from lastActive
+          created: IsoTimestampSchema, // Ent extension - keep
+          messageCount: z.number(), // Ent extension - keep
+          _meta: z.record(z.string(), z.unknown()).optional(), // added
         })
         .strict()
     ),
@@ -482,17 +510,18 @@ const SessionListResultSchema = z
 
 **Step 5: Update agent handler**
 
-In `packages/agent/src/server.ts`, find the `session/list` handler and update to use new field names. Update response to include `title`, `_meta`, `nextCursor`.
+In `packages/agent/src/server.ts`, find the `session/list` handler and update to
+use new field names. Update response to include `title`, `_meta`, `nextCursor`.
 
 **Step 6: Run tests**
 
-Run: `npx vitest run packages/ent-protocol/src/__tests__/methods.test.ts -t "session/list"`
+Run:
+`npx vitest run packages/ent-protocol/src/__tests__/methods.test.ts -t "session/list"`
 Expected: PASS
 
 **Step 7: Build**
 
-Run: `npm run build`
-Expected: Success
+Run: `npm run build` Expected: Success
 
 **Step 8: Commit**
 
@@ -514,6 +543,7 @@ Breaking changes:
 **Reference:** `docs/plans/2026-01-05/acp-align-session-fork.md`
 
 **Files:**
+
 - Modify: `packages/ent-protocol/src/schemas/methods.ts`
 - Modify: `packages/agent/src/server.ts`
 
@@ -599,11 +629,13 @@ In `SessionLoadParamsSchema`, remove the `fork` field entirely.
 **Step 5: Update capabilities schema**
 
 Change from:
+
 ```typescript
 sessionFork: z.boolean().optional(),
 ```
 
 To:
+
 ```typescript
 session: z
   .object({
@@ -620,7 +652,8 @@ In `EntProtocolRequestSchema`, add `SessionForkRequestSchema`.
 
 **Step 7: Implement handler in agent**
 
-In `packages/agent/src/server.ts`, add `session/fork` handler (copy and adapt session/load logic).
+In `packages/agent/src/server.ts`, add `session/fork` handler (copy and adapt
+session/load logic).
 
 **Step 8: Run tests**
 
@@ -645,6 +678,7 @@ git commit -m "feat(protocol): add session/fork method per ACP RFD
 **Reference:** `docs/plans/2026-01-05/acp-align-cancellation.md`
 
 **Files:**
+
 - Modify: `packages/ent-protocol/src/schemas/methods.ts`
 - Modify: `packages/ent-protocol/src/schemas/jsonrpc.ts`
 - Modify: `packages/agent/src/server.ts`
@@ -659,7 +693,9 @@ describe('$/cancel_request', () => {
       method: '$/cancel_request',
       params: { requestId: 123 },
     };
-    expect(() => CancelRequestNotificationSchema.parse(notification)).not.toThrow();
+    expect(() =>
+      CancelRequestNotificationSchema.parse(notification)
+    ).not.toThrow();
   });
 
   it('should accept string requestId', () => {
@@ -668,7 +704,9 @@ describe('$/cancel_request', () => {
       method: '$/cancel_request',
       params: { requestId: 'req_abc' },
     };
-    expect(() => CancelRequestNotificationSchema.parse(notification)).not.toThrow();
+    expect(() =>
+      CancelRequestNotificationSchema.parse(notification)
+    ).not.toThrow();
   });
 });
 ```
@@ -712,7 +750,8 @@ Delete the entire `SessionCancelNotificationSchema` definition.
 
 **Step 6: Update notification union**
 
-In `EntProtocolNotificationSchema`, replace `SessionCancelNotificationSchema` with `CancelRequestNotificationSchema`.
+In `EntProtocolNotificationSchema`, replace `SessionCancelNotificationSchema`
+with `CancelRequestNotificationSchema`.
 
 **Step 7: Implement handler with auto-cascade**
 
@@ -773,11 +812,13 @@ git commit -m "feat(protocol): replace session/cancel with $/cancel_request
 **Reference:** `docs/plans/2026-01-05/protocol-alignment-plan.md` Task 1
 
 **Files:**
+
 - Modify: `packages/supervisor/src/http/server.ts:150-294`
 
 **Step 1: Add missing imports**
 
 Ensure these schemas are imported from `@lace/ent-protocol`:
+
 - `EntConnectionsTestRequestSchema`, `EntConnectionsTestResponseSchema`
 - `EntSessionCompactRequestSchema`, `EntSessionCompactResponseSchema`
 - `EntSessionCheckpointRequestSchema`, `EntSessionCheckpointResponseSchema`
@@ -787,6 +828,7 @@ Ensure these schemas are imported from `@lace/ent-protocol`:
 **Step 2: Add handlers to agentMethodHandlers**
 
 After line 223 (connections/credentials/clear):
+
 ```typescript
   'ent/connections/test': {
     kind: 'request',
@@ -796,6 +838,7 @@ After line 223 (connections/credentials/clear):
 ```
 
 After line 183 (ent/session/events):
+
 ```typescript
   'ent/session/compact': {
     kind: 'request',
@@ -815,6 +858,7 @@ After line 183 (ent/session/events):
 ```
 
 After line 243 (ent/job/kill):
+
 ```typescript
   'ent/job/inject': {
     kind: 'notify',
@@ -824,8 +868,7 @@ After line 243 (ent/job/kill):
 
 **Step 3: Build and test**
 
-Run: `npm run build`
-Expected: Success
+Run: `npm run build` Expected: Success
 
 **Step 4: Commit**
 
@@ -848,11 +891,13 @@ Add HTTP handlers for:
 **Why:** Replace LaceEvent types to align with protocol events.
 
 **Files:**
+
 - Modify: `packages/agent/src/threads/types.ts`
 
 **Step 1: Rename event types**
 
 In `EVENT_TYPES` array:
+
 - `'SESSION_UPDATED'` → `'SESSION_INFO'`
 - Add: `'CONTEXT_WINDOW'`
 - Add: `'COMPACTION_START'` (already exists)
@@ -885,6 +930,7 @@ export interface ContextWindowData {
 **Step 4: Update LaceEvent union**
 
 Replace:
+
 ```typescript
 | (BaseLaceEvent & {
     type: 'SESSION_UPDATED';
@@ -893,6 +939,7 @@ Replace:
 ```
 
 With:
+
 ```typescript
 | (BaseLaceEvent & {
     type: 'SESSION_INFO';
@@ -907,13 +954,13 @@ With:
 **Step 5: Update transient types**
 
 In `isTransientEventType()`:
+
 - Change `'SESSION_UPDATED'` → `'SESSION_INFO'`
 - Add `'CONTEXT_WINDOW'`
 
 **Step 6: Build**
 
-Run: `npm run build`
-Expected: Success (web will have errors - that's next task)
+Run: `npm run build` Expected: Success (web will have errors - that's next task)
 
 **Step 7: Commit**
 
@@ -931,6 +978,7 @@ git commit -m "refactor(agent): align event types with protocol
 ## Task 8: Update Web Emission Points
 
 **Files:**
+
 - Modify: `packages/web/app/routes/api.projects.$projectId.sessions.ts`
 
 **Step 1: Update SESSION_UPDATED emission**
@@ -958,8 +1006,8 @@ eventManager.broadcast({
 
 **Step 2: Build**
 
-Run: `npm run build`
-Expected: May have type errors in event handlers - that's next
+Run: `npm run build` Expected: May have type errors in event handlers - that's
+next
 
 **Step 3: Commit**
 
@@ -975,12 +1023,14 @@ Use title field per ACP RFD, add updatedAt timestamp"
 ## Task 9: Update Web Event Handlers
 
 **Files:**
+
 - Modify: `packages/web/hooks/useEventStream.ts`
 - Modify: Any components using `onSessionUpdated`
 
 **Step 1: Update useEventStream handler name**
 
 In `EventHandlers` interface:
+
 ```typescript
 // Before:
 onSessionUpdated?: (event: LaceEvent) => void;
@@ -1011,8 +1061,7 @@ Update each usage to `onSessionInfo`.
 
 **Step 4: Build**
 
-Run: `npm run build`
-Expected: Success
+Run: `npm run build` Expected: Success
 
 **Step 5: Commit**
 
@@ -1026,12 +1075,14 @@ git commit -m "refactor(web): rename onSessionUpdated → onSessionInfo"
 ## Task 10: Update Protocol Documentation
 
 **Files:**
+
 - Modify: `docs/protocol-spec.md`
 - Modify: `docs/about-the-protocol.md`
 
 **Step 1: Add new session/update types to spec**
 
 In `docs/protocol-spec.md`, find the session/update section and add:
+
 - `session_info`
 - `context_window`
 - `compaction_start` / `compaction_complete`
@@ -1040,7 +1091,8 @@ In `docs/protocol-spec.md`, find the session/update section and add:
 
 **Step 2: Update session/list in spec**
 
-Document field renames: `workDir` → `cwd`, `lastActive` → `updatedAt`, add `cursor`, `title`, `_meta`.
+Document field renames: `workDir` → `cwd`, `lastActive` → `updatedAt`, add
+`cursor`, `title`, `_meta`.
 
 **Step 3: Add session/fork to spec**
 
@@ -1052,7 +1104,8 @@ Replace `session/cancel` with `$/cancel_request`. Document `-32800` error code.
 
 **Step 5: Update about-the-protocol.md**
 
-Add section explaining ACP RFD alignments and intentional divergences (camelCase vs snake_case, etc.).
+Add section explaining ACP RFD alignments and intentional divergences (camelCase
+vs snake_case, etc.).
 
 **Step 6: Commit**
 
@@ -1071,23 +1124,29 @@ Document all protocol changes:
 
 ## Task 11: Eliminate LaceEvent Translation Layer (Web)
 
-**Context:** The web currently translates protocol `session/update` events to `LaceEvent` types. Remove this translation and use protocol types directly.
+**Context:** The web currently translates protocol `session/update` events to
+`LaceEvent` types. Remove this translation and use protocol types directly.
 
 **Files:**
+
 - Modify: `packages/web/lib/server/supervisor-service.ts:56-129`
 - Modify: `packages/web/lib/sse-store.ts`
 - Modify: `packages/web/hooks/useProcessedEvents.ts`
 
 **Step 1: Remove updateToLaceEvents function**
 
-In `supervisor-service.ts`, delete the entire `updateToLaceEvents` function (lines 56-129).
+In `supervisor-service.ts`, delete the entire `updateToLaceEvents` function
+(lines 56-129).
 
 **Step 2: Update bridgeEventToWeb**
 
 Change from calling `updateToLaceEvents` to forwarding protocol events directly:
 
 ```typescript
-function bridgeEventToWeb(event: SupervisorServerEvent, params: { supervisorProjectId?: string }) {
+function bridgeEventToWeb(
+  event: SupervisorServerEvent,
+  params: { supervisorProjectId?: string }
+) {
   if (event.type === 'session_update') {
     const manager = EventStreamManager.getInstance();
     // Forward protocol event directly with added context
@@ -1113,23 +1172,23 @@ function bridgeEventToWeb(event: SupervisorServerEvent, params: { supervisorProj
 
 **Step 3: Update sse-store types**
 
-In `sse-store.ts`, change event type from `LaceEvent` to protocol event types. Import from `@lace/ent-protocol` instead of `@lace/agent`.
+In `sse-store.ts`, change event type from `LaceEvent` to protocol event types.
+Import from `@lace/ent-protocol` instead of `@lace/agent`.
 
 **Step 4: Update useProcessedEvents**
 
 Change to handle protocol event types:
+
 - `text_delta` instead of `AGENT_TOKEN`
 - `tool_use` instead of `TOOL_CALL` / `TOOL_RESULT`
 
 **Step 5: Build and fix type errors**
 
-Run: `npm run build`
-Fix any type errors incrementally.
+Run: `npm run build` Fix any type errors incrementally.
 
 **Step 6: Test**
 
-Run: `npm test`
-Expected: All pass
+Run: `npm test` Expected: All pass
 
 **Step 7: Commit**
 
@@ -1147,14 +1206,17 @@ Web now consumes protocol events directly:
 
 ## Task 12: Document Tool Status State Machine
 
-**Reference:** `docs/design/tools.md` exists but doesn't document the state machine
+**Reference:** `docs/design/tools.md` exists but doesn't document the state
+machine
 
 **Files:**
+
 - Create: `docs/design/tool-status-state-machine.md`
 
 **Step 1: Write state machine doc**
 
 Create the file with:
+
 - State diagram
 - Status meanings
 - Transition rules
@@ -1180,21 +1242,22 @@ pending → awaiting_permission → completed|failed|denied|timeout|cancelled"
 
 ## Summary
 
-| Task | Type | Effort | Breaking |
-|------|------|--------|----------|
-| 1. SessionId regex | Fix | Small | No |
-| 2. Protocol event types | Extension | Medium | No (additive) |
-| 3. session/list alignment | Schema change | Small | Yes |
-| 4. session/fork method | Feature | Medium | Yes (removes fork param) |
-| 5. $/cancel_request | Feature | Medium | Yes (removes session/cancel) |
-| 6. HTTP handlers | Feature | Small | No (additive) |
-| 7. Internal event types | Refactor | Small | No (internal) |
-| 8. Web emission | Refactor | Small | No (internal) |
-| 9. Web handlers | Refactor | Small | No (internal) |
-| 10. Protocol docs | Documentation | Small | N/A |
-| 11. LaceEvent elimination | Refactor | Large | No (internal) |
-| 12. State machine docs | Documentation | Small | N/A |
+| Task                      | Type          | Effort | Breaking                     |
+| ------------------------- | ------------- | ------ | ---------------------------- |
+| 1. SessionId regex        | Fix           | Small  | No                           |
+| 2. Protocol event types   | Extension     | Medium | No (additive)                |
+| 3. session/list alignment | Schema change | Small  | Yes                          |
+| 4. session/fork method    | Feature       | Medium | Yes (removes fork param)     |
+| 5. $/cancel_request       | Feature       | Medium | Yes (removes session/cancel) |
+| 6. HTTP handlers          | Feature       | Small  | No (additive)                |
+| 7. Internal event types   | Refactor      | Small  | No (internal)                |
+| 8. Web emission           | Refactor      | Small  | No (internal)                |
+| 9. Web handlers           | Refactor      | Small  | No (internal)                |
+| 10. Protocol docs         | Documentation | Small  | N/A                          |
+| 11. LaceEvent elimination | Refactor      | Large  | No (internal)                |
+| 12. State machine docs    | Documentation | Small  | N/A                          |
 
 **Total estimated effort:** 2-3 hours of focused implementation
 
-**All changes are breaking** - No backward compatibility maintained anywhere (pre-1.0 project).
+**All changes are breaking** - No backward compatibility maintained anywhere
+(pre-1.0 project).

@@ -1,10 +1,15 @@
 # Protocol Alignment Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
+> implement this plan task-by-task.
 
-**Goal:** Align Ent protocol implementation with spec, clean up type flow, add missing HTTP handlers
+**Goal:** Align Ent protocol implementation with spec, clean up type flow, add
+missing HTTP handlers
 
-**Architecture:** The supervisor HTTP server acts as a bridge between web clients and agent processes. Some protocol methods have schemas defined but aren't exposed via HTTP. The translation layer between protocol events and LaceEvent needs type safety improvements.
+**Architecture:** The supervisor HTTP server acts as a bridge between web
+clients and agent processes. Some protocol methods have schemas defined but
+aren't exposed via HTTP. The translation layer between protocol events and
+LaceEvent needs type safety improvements.
 
 **Tech Stack:** TypeScript, Zod schemas, Node.js HTTP server
 
@@ -13,7 +18,9 @@
 ## Task 1: Add Missing HTTP Method Handlers
 
 **Files:**
-- Modify: `packages/supervisor/src/http/server.ts:150-294` (agentMethodHandlers object)
+
+- Modify: `packages/supervisor/src/http/server.ts:150-294` (agentMethodHandlers
+  object)
 
 **Step 1: Add ent/connections/test handler**
 
@@ -95,8 +102,7 @@ import {
 
 **Step 7: Build and verify**
 
-Run: `npm run build`
-Expected: No TypeScript errors
+Run: `npm run build` Expected: No TypeScript errors
 
 **Step 8: Commit**
 
@@ -116,9 +122,11 @@ Add HTTP handlers for:
 
 ## Task 2: Fix session/update Notification Semantics
 
-**Context:** The spec says `session/update` is a notification (fire-and-forget), but it's registered as a request handler.
+**Context:** The spec says `session/update` is a notification (fire-and-forget),
+but it's registered as a request handler.
 
 **Files:**
+
 - Modify: `packages/supervisor/src/supervisor-agent-process.ts`
 
 **Step 1: Find the current handler**
@@ -128,16 +136,19 @@ Search for `onRequest('session/update'` in the file.
 **Step 2: Change to notification handler**
 
 Change from:
+
 ```typescript
 this.peer.onRequest('session/update', async (params) => {
 ```
 
 To:
+
 ```typescript
 this.peer.onNotification('session/update', (params) => {
 ```
 
-Note: Remove `async` since notifications don't return values. The callback should not return anything.
+Note: Remove `async` since notifications don't return values. The callback
+should not return anything.
 
 **Step 3: Remove any return statement in the handler**
 
@@ -145,12 +156,12 @@ The handler should just process the event without returning.
 
 **Step 4: Verify peer has onNotification**
 
-Check `packages/ent-protocol/src/rpc/peer.ts` for `onNotification` method. If it doesn't exist, add it (similar to `onRequest` but without response handling).
+Check `packages/ent-protocol/src/rpc/peer.ts` for `onNotification` method. If it
+doesn't exist, add it (similar to `onRequest` but without response handling).
 
 **Step 5: Build and test**
 
-Run: `npm run build && npm test`
-Expected: Build succeeds, tests pass
+Run: `npm run build && npm test` Expected: Build succeeds, tests pass
 
 **Step 6: Commit**
 
@@ -166,21 +177,24 @@ not a request expecting a response."
 
 ## Task 3: Clean Up Translation Layer Type Safety
 
-**Context:** The `updateToLaceEvents` function uses defensive `typeof` checks instead of trusting Zod-validated types.
+**Context:** The `updateToLaceEvents` function uses defensive `typeof` checks
+instead of trusting Zod-validated types.
 
 **Files:**
+
 - Modify: `packages/web/lib/server/supervisor-service.ts:56-129`
 
 **Step 1: Import protocol types**
 
 Add import:
+
 ```typescript
 import type { z } from 'zod';
-import {
-  SessionUpdateNotificationSchema,
-} from '@lace/ent-protocol';
+import { SessionUpdateNotificationSchema } from '@lace/ent-protocol';
 
-type SessionUpdateParams = z.infer<typeof SessionUpdateNotificationSchema>['params'];
+type SessionUpdateParams = z.infer<
+  typeof SessionUpdateNotificationSchema
+>['params'];
 ```
 
 **Step 2: Add type narrowing helper**
@@ -188,18 +202,23 @@ type SessionUpdateParams = z.infer<typeof SessionUpdateNotificationSchema>['para
 Before `updateToLaceEvents`, add:
 
 ```typescript
-function isTextDelta(update: SessionUpdateParams): update is SessionUpdateParams & { type: 'text_delta' } {
+function isTextDelta(
+  update: SessionUpdateParams
+): update is SessionUpdateParams & { type: 'text_delta' } {
   return update.type === 'text_delta';
 }
 
-function isToolUse(update: SessionUpdateParams): update is SessionUpdateParams & { type: 'tool_use' } {
+function isToolUse(
+  update: SessionUpdateParams
+): update is SessionUpdateParams & { type: 'tool_use' } {
   return update.type === 'tool_use';
 }
 ```
 
 **Step 3: Rewrite updateToLaceEvents with proper types**
 
-Replace the function body to use discriminated union narrowing instead of `typeof` checks:
+Replace the function body to use discriminated union narrowing instead of
+`typeof` checks:
 
 ```typescript
 function updateToLaceEvents(params: {
@@ -217,19 +236,24 @@ function updateToLaceEvents(params: {
   };
 
   if (isTextDelta(update)) {
-    return [{
-      type: 'AGENT_TOKEN',
-      timestamp: new Date(),
-      transient: true,
-      data: { token: update.text },
-      context: baseContext,
-    }];
+    return [
+      {
+        type: 'AGENT_TOKEN',
+        timestamp: new Date(),
+        transient: true,
+        data: { token: update.text },
+        context: baseContext,
+      },
+    ];
   }
 
   if (isToolUse(update)) {
     const events: LaceEvent[] = [];
 
-    if (update.status === 'pending' || update.status === 'awaiting_permission') {
+    if (
+      update.status === 'pending' ||
+      update.status === 'awaiting_permission'
+    ) {
       events.push({
         type: 'TOOL_CALL',
         timestamp: new Date(),
@@ -242,13 +266,23 @@ function updateToLaceEvents(params: {
       });
     }
 
-    if (['completed', 'failed', 'denied', 'timeout', 'cancelled'].includes(update.status) && update.result) {
+    if (
+      ['completed', 'failed', 'denied', 'timeout', 'cancelled'].includes(
+        update.status
+      ) &&
+      update.result
+    ) {
       events.push({
         type: 'TOOL_RESULT',
         timestamp: new Date(),
         data: {
           id: update.toolCallId,
-          status: update.status === 'completed' ? 'completed' : update.status === 'denied' ? 'denied' : 'failed',
+          status:
+            update.status === 'completed'
+              ? 'completed'
+              : update.status === 'denied'
+                ? 'denied'
+                : 'failed',
           content: toToolResultContent(update.result.content ?? []),
         },
         context: baseContext,
@@ -264,12 +298,12 @@ function updateToLaceEvents(params: {
 
 **Step 4: Remove defensive type checks**
 
-Delete the `isRecord` helper and manual `typeof` checks that are no longer needed.
+Delete the `isRecord` helper and manual `typeof` checks that are no longer
+needed.
 
 **Step 5: Build and test**
 
-Run: `npm run build`
-Expected: No TypeScript errors
+Run: `npm run build` Expected: No TypeScript errors
 
 **Step 6: Commit**
 
@@ -285,9 +319,12 @@ narrowing. The protocol types from Zod are trustworthy."
 
 ## Task 4: Align PersonaInfo Schema with Implementation
 
-**Context:** Spec says `{id, name, description?, tags?}` but implementation has `{name, isUserDefined, path}`. The implementation seems correct for Lace's file-based persona system.
+**Context:** Spec says `{id, name, description?, tags?}` but implementation has
+`{name, isUserDefined, path}`. The implementation seems correct for Lace's
+file-based persona system.
 
 **Files:**
+
 - Modify: `docs/protocol-spec.md` (Section 6.26)
 
 **Step 1: Update spec to match implementation**
@@ -318,10 +355,13 @@ rather than the generic {id, name, description?, tags?}."
 
 ## Task 5: Document Tool Status State Machine
 
-**Context:** The `tool_use` update has status values but state transitions aren't documented.
+**Context:** The `tool_use` update has status values but state transitions
+aren't documented.
 
 **Files:**
-- Modify: `docs/protocol-spec.md` or create `docs/design/tool-status-state-machine.md`
+
+- Modify: `docs/protocol-spec.md` or create
+  `docs/design/tool-status-state-machine.md`
 
 **Step 1: Create state machine documentation**
 
@@ -329,34 +369,17 @@ rather than the generic {id, name, description?, tags?}."
 ## Tool Execution State Machine
 
 Tool execution follows this state machine:
-
 ```
-┌─────────┐
-│ pending │──────────────────────────────────────┐
-└────┬────┘                                      │
-     │ requires permission?                      │ no permission needed
-     ▼                                           │
-┌──────────────────────┐                         │
-│ awaiting_permission  │                         │
-└──────────┬───────────┘                         │
-           │                                     │
-     ┌─────┴─────┬──────────┐                    │
-     ▼           ▼          ▼                    │
-┌────────┐  ┌────────┐  ┌─────────┐              │
-│ denied │  │timeout │  │ allowed │◀─────────────┘
-└────────┘  └────────┘  └────┬────┘
-                             │ execute
-                             ▼
-                    ┌────────┴────────┐
-                    ▼                 ▼
-               ┌───────────┐    ┌────────┐
-               │ completed │    │ failed │
-               └───────────┘    └────────┘
-                                     ▲
-                                     │
-                              ┌──────────┐
-                              │cancelled │ (user interrupt)
-                              └──────────┘
+
+┌─────────┐ │ pending │──────────────────────────────────────┐ └────┬────┘ │ │
+requires permission? │ no permission needed ▼ │ ┌──────────────────────┐ │ │
+awaiting_permission │ │ └──────────┬───────────┘ │ │ │ ┌─────┴─────┬──────────┐
+│ ▼ ▼ ▼ │ ┌────────┐ ┌────────┐ ┌─────────┐ │ │ denied │ │timeout │ │ allowed
+│◀─────────────┘ └────────┘ └────────┘ └────┬────┘ │ execute ▼
+┌────────┴────────┐ ▼ ▼ ┌───────────┐ ┌────────┐ │ completed │ │ failed │
+└───────────┘ └────────┘ ▲ │ ┌──────────┐ │cancelled │ (user interrupt)
+└──────────┘
+
 ```
 
 ### Terminal States
@@ -390,12 +413,12 @@ pending → awaiting_permission → completed|failed|denied|timeout|cancelled"
 
 ## Summary
 
-| Task | Priority | Effort |
-|------|----------|--------|
-| 1. Add missing HTTP handlers | High | Small |
-| 2. Fix notification semantics | Medium | Small |
-| 3. Clean up type safety | Medium | Medium |
-| 4. Align PersonaInfo spec | Low | Small |
-| 5. Document state machine | Low | Small |
+| Task                          | Priority | Effort |
+| ----------------------------- | -------- | ------ |
+| 1. Add missing HTTP handlers  | High     | Small  |
+| 2. Fix notification semantics | Medium   | Small  |
+| 3. Clean up type safety       | Medium   | Medium |
+| 4. Align PersonaInfo spec     | Low      | Small  |
+| 5. Document state machine     | Low      | Small  |
 
 Tasks 1-3 are implementation fixes. Tasks 4-5 are documentation alignment.

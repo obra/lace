@@ -1,7 +1,6 @@
 # ACP Session List RFD
 
-> Source: https://agentclientprotocol.com/rfds/session-list
-> Status: Draft
+> Source: https://agentclientprotocol.com/rfds/session-list Status: Draft
 > Fetched: 2026-01-05
 
 ## Overview
@@ -14,9 +13,11 @@ features like session history, session switching, and session cleanup.
 
 Currently, the ACP protocol lacks session discovery capabilities:
 
-1. **No session discovery** - Clients cannot query what sessions exist on an agent
+1. **No session discovery** - Clients cannot query what sessions exist on an
+   agent
 2. **Limited history access** - Users cannot browse past conversations
-3. **Client-side complexity** - Each client must maintain its own session registry
+3. **Client-side complexity** - Each client must maintain its own session
+   registry
 
 ## Proposed Solution
 
@@ -24,9 +25,9 @@ Currently, the ACP protocol lacks session discovery capabilities:
 
 #### Request Parameters (all optional)
 
-| Parameter | Type   | Description                              |
-| --------- | ------ | ---------------------------------------- |
-| `cwd`     | string | Filters sessions by working directory    |
+| Parameter | Type   | Description                                 |
+| --------- | ------ | ------------------------------------------- |
+| `cwd`     | string | Filters sessions by working directory       |
 | `cursor`  | string | Opaque pagination token from prior response |
 
 Minimal requests require no parameters, returning all available sessions.
@@ -40,11 +41,11 @@ interface SessionListResult {
 }
 
 interface SessionInfo {
-  sessionId: string;    // Required - unique identifier
-  cwd: string;          // Required - working directory
-  title?: string;       // Optional - human-readable name
-  updatedAt?: string;   // Optional - ISO 8601 timestamp
-  _meta?: object;       // Optional - agent-specific metadata
+  sessionId: string; // Required - unique identifier
+  cwd: string; // Required - working directory
+  title?: string; // Optional - human-readable name
+  updatedAt?: string; // Optional - ISO 8601 timestamp
+  _meta?: object; // Optional - agent-specific metadata
 }
 ```
 
@@ -60,6 +61,7 @@ initialization, allowing optional implementation.
 ### Cursor Pagination
 
 Uses opaque tokens rather than offset-based pagination, providing:
+
 - Stability across concurrent modifications
 - Server-side flexibility in implementation
 - No client-side parsing requirements
@@ -84,10 +86,9 @@ mechanisms.
 
 ## Implementation Roadmap
 
-**Phase 1:** Protocol schema updates and documentation
-**Phase 2:** Rust and TypeScript SDK implementations
-**Phase 3:** Reference agent demonstrating in-memory registries and automatic
-title generation
+**Phase 1:** Protocol schema updates and documentation **Phase 2:** Rust and
+TypeScript SDK implementations **Phase 3:** Reference agent demonstrating
+in-memory registries and automatic title generation
 
 ## Security and Compatibility
 

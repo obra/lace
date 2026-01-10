@@ -592,7 +592,12 @@ creates maintenance burden and potential drift between definitions.
 
 ```typescript
 // Add to packages/web/lib/core-types-import.ts
-export type { Task, TaskNote, TaskStatus, TaskPriority } from '@lace/core/tasks/types';
+export type {
+  Task,
+  TaskNote,
+  TaskStatus,
+  TaskPriority,
+} from '@lace/core/tasks/types';
 export type { ThreadId, AssigneeId } from '@lace/core/threads/types';
 export type { ToolResult } from '@lace/core/tools/types';
 ```

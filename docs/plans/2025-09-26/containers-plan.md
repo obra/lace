@@ -2,13 +2,19 @@
 
 ## Overview
 
-Implementation plan for container-based isolation in Lace sessions. Each session runs its tools and code in an isolated Apple Container with its own local git clone, preventing any interference between concurrent sessions. This is a critical requirement for multi-session safety.
+Implementation plan for container-based isolation in Lace sessions. Each session
+runs its tools and code in an isolated Apple Container with its own local git
+clone, preventing any interference between concurrent sessions. This is a
+critical requirement for multi-session safety.
 
 ## Status
 
 ### ✅ Phase 1 - Container Runtime Abstraction (COMPLETED)
-- Created container abstraction interface (`ContainerRuntime`, `ContainerConfig`, `ExecOptions`, etc.)
-- Implemented `BaseContainerRuntime` class with path translation and mount management
+
+- Created container abstraction interface (`ContainerRuntime`,
+  `ContainerConfig`, `ExecOptions`, etc.)
+- Implemented `BaseContainerRuntime` class with path translation and mount
+  management
 - Built `AppleContainerRuntime` using macOS `container` CLI tool
 - Added comprehensive unit and integration tests (24 tests passing)
 - Fixed critical issues:
@@ -22,6 +28,7 @@ Implementation plan for container-based isolation in Lace sessions. Each session
 ## Phase 1 Implementation Details
 
 ### Container Runtime Interface
+
 ```typescript
 // packages/core/src/containers/types.ts
 export interface ContainerRuntime {
@@ -38,6 +45,7 @@ export interface ContainerRuntime {
 ```
 
 ### AppleContainerRuntime Key Features
+
 - Uses macOS `container` CLI tool (not sandbox-exec)
 - Automatic unique ID generation with UUID suffixes
 - Volume mount support (without Docker-style `:ro/:rw` suffixes)
@@ -49,6 +57,7 @@ export interface ContainerRuntime {
 ## Phase 2 - Session Integration
 
 ### Goals
+
 - Integrate container runtime with Lace sessions
 - Each session gets its own isolated container
 - Tools execute transparently in containers
@@ -57,24 +66,33 @@ export interface ContainerRuntime {
 ### Implementation Tasks
 
 #### Task 1: Local Clone Management
+
 Use `git clone --local` to create full git repositories for containers:
 
 ```typescript
 // packages/core/src/workspace/clone-manager.ts
 export class CloneManager {
-  static async createSessionClone(projectDir: string, sessionId: string): Promise<string>;
+  static async createSessionClone(
+    projectDir: string,
+    sessionId: string
+  ): Promise<string>;
   static async removeSessionClone(sessionId: string): Promise<void>;
   static async listSessionClones(): Promise<string[]>;
 }
 ```
 
 Why local clones (not worktrees):
-- **Containers need `.git` directory**: Worktrees only have a `.git` file pointing to parent
+
+- **Containers need `.git` directory**: Worktrees only have a `.git` file
+  pointing to parent
 - **Full isolation**: Each container gets complete git functionality
-- **Hardlinks for efficiency**: `git clone --local` uses hardlinks, minimal space overhead
-- **Self-contained**: Can be mounted into container without external dependencies
+- **Hardlinks for efficiency**: `git clone --local` uses hardlinks, minimal
+  space overhead
+- **Self-contained**: Can be mounted into container without external
+  dependencies
 
 #### Task 2: Session Container Integration
+
 Update Session class to manage containers:
 
 ```typescript
@@ -99,12 +117,14 @@ class Session {
       this._containerId = runtime.create({
         id: `session-${this._sessionId}`,
         workingDirectory: '/workspace',
-        mounts: [{
-          source: this._clonePath,
-          target: '/workspace',
-          readonly: false
-        }],
-        environment: this.getEnvironmentVariables()
+        mounts: [
+          {
+            source: this._clonePath,
+            target: '/workspace',
+            readonly: false,
+          },
+        ],
+        environment: this.getEnvironmentVariables(),
       });
 
       await runtime.start(this._containerId);
@@ -116,6 +136,7 @@ class Session {
 ```
 
 #### Task 3: Tool Executor Integration
+
 Modify ToolExecutor to detect and use containers:
 
 ```typescript
@@ -140,28 +161,29 @@ async executeTool(toolName: string, args: unknown, context: ToolContext): Promis
 ```
 
 #### Task 4: Tool Implementation Updates
+
 Update tools to use containers when available:
 
 ```typescript
 // packages/core/src/tools/implementations/bash.ts
 class BashTool extends Tool {
-  protected async executeValidated(args: BashArgs, context?: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(
+    args: BashArgs,
+    context?: ToolContext
+  ): Promise<ToolResult> {
     if (context?.containerRuntime && context?.containerId) {
       // Execute in container
-      const result = await context.containerRuntime.exec(
-        context.containerId,
-        {
-          command: ['/bin/bash', '-c', args.command],
-          workingDirectory: context.workingDirectory,
-          environment: context.processEnv,
-          timeout: args.timeout
-        }
-      );
+      const result = await context.containerRuntime.exec(context.containerId, {
+        command: ['/bin/bash', '-c', args.command],
+        workingDirectory: context.workingDirectory,
+        environment: context.processEnv,
+        timeout: args.timeout,
+      });
 
       return this.createResult({
         stdout: result.stdout,
         stderr: result.stderr,
-        exitCode: result.exitCode
+        exitCode: result.exitCode,
       });
     }
 
@@ -195,12 +217,14 @@ class BashTool extends Tool {
 ## Original Prerequisites (Reference)
 
 ### Required Knowledge
+
 - Basic TypeScript/Node.js
 - Git cloning and branching (`git clone --local` command)
 - Basic container concepts (images, volumes, exec)
 - Test-Driven Development (write failing tests first)
 
 ### Setup Your Development Environment
+
 ```bash
 # Clone the repo and install dependencies
 git clone <repo-url>
@@ -217,21 +241,26 @@ git checkout -b containers
 ```
 
 ### Key Files You'll Be Working With
+
 - `packages/core/src/sessions/session.ts` - Main session class
 - `packages/core/src/tools/executor.ts` - Intercepts all tool executions
-- `packages/core/src/tools/implementations/bash.ts` - Example tool that needs container support
+- `packages/core/src/tools/implementations/bash.ts` - Example tool that needs
+  container support
 - `packages/core/src/config/lace-dir.ts` - Manages Lace directories
 
 ## Implementation Tasks
 
 ### Task 1: Create Container Abstraction Interface
 
-**Goal**: Define the contract for container implementations without building the implementation yet.
+**Goal**: Define the contract for container implementations without building the
+implementation yet.
 
 **Files to create**:
+
 - `packages/core/src/containers/types.ts`
 
 **Code to write**:
+
 ```typescript
 // packages/core/src/containers/types.ts
 // ABOUTME: Container abstraction interface for different container runtimes
@@ -276,6 +305,7 @@ export interface DevcontainerConfig {
 ```
 
 **Test to write FIRST**:
+
 ```typescript
 // packages/core/src/containers/types.test.ts
 import { describe, it, expect } from 'vitest';
@@ -288,7 +318,7 @@ describe('Container types', () => {
       start: async () => {},
       stop: async () => {},
       exec: async () => ({ stdout: '', stderr: '', exitCode: 0 }),
-      isRunning: async () => true
+      isRunning: async () => true,
     };
 
     expect(mockContainer).toBeDefined();
@@ -297,11 +327,13 @@ describe('Container types', () => {
 ```
 
 **How to test**:
+
 ```bash
 npm test packages/core/src/containers/types.test.ts
 ```
 
 **Commit**:
+
 ```bash
 git add packages/core/src/containers/
 git commit -m "Add container abstraction interface"
@@ -311,12 +343,15 @@ git commit -m "Add container abstraction interface"
 
 ### Task 2: Add Feature Flag for Containers
 
-**Goal**: Add a feature flag so containers are disabled by default during development.
+**Goal**: Add a feature flag so containers are disabled by default during
+development.
 
 **Files to modify**:
+
 - `packages/core/src/config/features.ts` (create if doesn't exist)
 
 **Code to write**:
+
 ```typescript
 // packages/core/src/config/features.ts
 // ABOUTME: Feature flags for experimental features
@@ -335,8 +370,8 @@ export function getFeatures(): Features {
     containers: {
       enabled: process.env.LACE_CONTAINERS_ENABLED === 'true',
       runtime: (process.env.LACE_CONTAINER_RUNTIME as any) || 'auto',
-      idleTimeout: parseInt(process.env.LACE_CONTAINER_IDLE_TIMEOUT || '30')
-    }
+      idleTimeout: parseInt(process.env.LACE_CONTAINER_IDLE_TIMEOUT || '30'),
+    },
   };
 }
 
@@ -346,6 +381,7 @@ export function isContainersEnabled(): boolean {
 ```
 
 **Test to write FIRST**:
+
 ```typescript
 // packages/core/src/config/features.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -388,6 +424,7 @@ describe('Features configuration', () => {
 ```
 
 **Commit**:
+
 ```bash
 git add packages/core/src/config/features.*
 git commit -m "Add containers feature flag"
@@ -400,9 +437,11 @@ git commit -m "Add containers feature flag"
 **Goal**: Add methods to create and manage local git clones for sessions.
 
 **Files to create**:
+
 - `packages/core/src/workspace/clone-manager.ts`
 
 **Code to write**:
+
 ```typescript
 // packages/core/src/workspace/clone-manager.ts
 // ABOUTME: Manages local git clones for session isolation
@@ -421,7 +460,10 @@ export class CloneManager {
    * @param sessionId Unique session identifier
    * @returns Path to the created clone
    */
-  static async createSessionClone(projectDir: string, sessionId: string): Promise<string> {
+  static async createSessionClone(
+    projectDir: string,
+    sessionId: string
+  ): Promise<string> {
     // Ensure project has git repo
     const gitDir = join(projectDir, '.git');
     if (!existsSync(gitDir)) {
@@ -444,8 +486,8 @@ export class CloneManager {
             GIT_AUTHOR_NAME: 'Lace',
             GIT_AUTHOR_EMAIL: 'lace@localhost',
             GIT_COMMITTER_NAME: 'Lace',
-            GIT_COMMITTER_EMAIL: 'lace@localhost'
-          }
+            GIT_COMMITTER_EMAIL: 'lace@localhost',
+          },
         });
       } catch (error) {
         // Might fail if no files to commit, that's ok
@@ -468,7 +510,10 @@ export class CloneManager {
       return sessionPath;
     }
 
-    logger.info('Creating local clone for session', { projectDir, sessionPath });
+    logger.info('Creating local clone for session', {
+      projectDir,
+      sessionPath,
+    });
 
     // Create local clone (uses hardlinks for efficiency)
     execSync(`git clone --local "${projectDir}" "${sessionPath}"`);
@@ -503,7 +548,7 @@ export class CloneManager {
     logger.info('Session clone moved to trash', {
       from: sessionPath,
       to: trashPath,
-      note: 'Can be manually deleted later from ~/.lace/.trash/'
+      note: 'Can be manually deleted later from ~/.lace/.trash/',
     });
   }
 
@@ -517,6 +562,7 @@ export class CloneManager {
 ```
 
 **Test to write FIRST**:
+
 ```typescript
 // packages/core/src/workspace/clone-manager.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -551,7 +597,10 @@ describe('CloneManager', () => {
   it('should initialize git repo if not present', async () => {
     expect(CloneManager.isGitRepo(testProjectDir)).toBe(false);
 
-    const sessionPath = await CloneManager.createSessionClone(testProjectDir, testSessionId);
+    const sessionPath = await CloneManager.createSessionClone(
+      testProjectDir,
+      testSessionId
+    );
 
     expect(CloneManager.isGitRepo(testProjectDir)).toBe(true);
     expect(sessionPath).toContain('sessions');
@@ -564,25 +613,39 @@ describe('CloneManager', () => {
     execSync('git add -A', { cwd: testProjectDir });
     execSync('git commit -m "test"', { cwd: testProjectDir });
 
-    const sessionPath = await CloneManager.createSessionClone(testProjectDir, testSessionId);
+    const sessionPath = await CloneManager.createSessionClone(
+      testProjectDir,
+      testSessionId
+    );
 
     expect(sessionPath).toContain('sessions');
     expect(sessionPath).toContain(testSessionId);
 
     // Verify clone was created and has its own branch
-    const branch = execSync('git branch --show-current', { cwd: sessionPath }).toString();
+    const branch = execSync('git branch --show-current', {
+      cwd: sessionPath,
+    }).toString();
     expect(branch.trim()).toBe(`session-${testSessionId}`);
   });
 
   it('should handle existing clone gracefully', async () => {
-    const path1 = await CloneManager.createSessionClone(testProjectDir, testSessionId);
-    const path2 = await CloneManager.createSessionClone(testProjectDir, testSessionId);
+    const path1 = await CloneManager.createSessionClone(
+      testProjectDir,
+      testSessionId
+    );
+    const path2 = await CloneManager.createSessionClone(
+      testProjectDir,
+      testSessionId
+    );
 
     expect(path1).toBe(path2);
   });
 
   it('should move clone to trash', async () => {
-    const sessionPath = await CloneManager.createSessionClone(testProjectDir, testSessionId);
+    const sessionPath = await CloneManager.createSessionClone(
+      testProjectDir,
+      testSessionId
+    );
 
     await CloneManager.removeSessionClone(testSessionId);
 
@@ -595,6 +658,7 @@ describe('CloneManager', () => {
 ```
 
 **Commit**:
+
 ```bash
 git add packages/core/src/workspace/
 git commit -m "Add clone manager for session isolation"
@@ -604,19 +668,27 @@ git commit -m "Add clone manager for session isolation"
 
 ### Task 4: Add Mock Container Implementation for Testing
 
-**Goal**: Create a mock container that pretends to run commands (for testing without real containers).
+**Goal**: Create a mock container that pretends to run commands (for testing
+without real containers).
 
 **Files to create**:
+
 - `packages/core/src/containers/mock-container.ts`
 
 **Code to write**:
+
 ```typescript
 // packages/core/src/containers/mock-container.ts
 // ABOUTME: Mock container implementation for testing without real containers
 // ABOUTME: Executes commands locally but pretends to be a container
 
 import { spawn } from 'child_process';
-import type { Container, ContainerConfig, ExecOptions, ExecResult } from './types';
+import type {
+  Container,
+  ContainerConfig,
+  ExecOptions,
+  ExecResult,
+} from './types';
 
 export class MockContainer implements Container {
   private running = false;
@@ -628,7 +700,7 @@ export class MockContainer implements Container {
 
   async start(): Promise<void> {
     // Simulate container startup
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
     this.running = true;
   }
 
@@ -645,7 +717,7 @@ export class MockContainer implements Container {
       const child = spawn(command[0], command.slice(1), {
         cwd: options?.cwd || this.config.sessionPath,
         env: { ...process.env, ...options?.env },
-        shell: true
+        shell: true,
       });
 
       let stdout = '';
@@ -665,7 +737,7 @@ export class MockContainer implements Container {
         resolve({
           stdout,
           stderr,
-          exitCode: exitCode || 0
+          exitCode: exitCode || 0,
         });
       });
 
@@ -686,6 +758,7 @@ export class MockContainer implements Container {
 ```
 
 **Test to write FIRST**:
+
 ```typescript
 // packages/core/src/containers/mock-container.test.ts
 import { describe, it, expect } from 'vitest';
@@ -697,7 +770,7 @@ describe('MockContainer', () => {
       sessionId: 'test-123',
       sessionPath: '/tmp/test',
       mountPoint: '/workspace',
-      image: 'test-image'
+      image: 'test-image',
     });
 
     expect(await container.isRunning()).toBe(false);
@@ -714,7 +787,7 @@ describe('MockContainer', () => {
       sessionId: 'test-123',
       sessionPath: process.cwd(),
       mountPoint: '/workspace',
-      image: 'test-image'
+      image: 'test-image',
     });
 
     await container.start();
@@ -729,10 +802,12 @@ describe('MockContainer', () => {
       sessionId: 'test-123',
       sessionPath: '/tmp/test',
       mountPoint: '/workspace',
-      image: 'test-image'
+      image: 'test-image',
     });
 
-    await expect(container.exec(['echo', 'hello'])).rejects.toThrow('Container is not running');
+    await expect(container.exec(['echo', 'hello'])).rejects.toThrow(
+      'Container is not running'
+    );
   });
 
   it('should handle command timeout', async () => {
@@ -740,7 +815,7 @@ describe('MockContainer', () => {
       sessionId: 'test-123',
       sessionPath: process.cwd(),
       mountPoint: '/workspace',
-      image: 'test-image'
+      image: 'test-image',
     });
 
     await container.start();
@@ -753,6 +828,7 @@ describe('MockContainer', () => {
 ```
 
 **Commit**:
+
 ```bash
 git add packages/core/src/containers/mock-container.*
 git commit -m "Add mock container for testing"
@@ -765,9 +841,11 @@ git commit -m "Add mock container for testing"
 **Goal**: Parse standard .devcontainer/devcontainer.json files.
 
 **Files to create**:
+
 - `packages/core/src/workspace/devcontainer-parser.ts`
 
 **Code to write**:
+
 ```typescript
 // packages/core/src/workspace/devcontainer-parser.ts
 // ABOUTME: Parses devcontainer.json configuration files
@@ -785,7 +863,11 @@ export class DevcontainerParser {
    */
   static parse(projectDir: string): DevcontainerConfig {
     // Check for .devcontainer/devcontainer.json
-    const devcontainerPath = join(projectDir, '.devcontainer', 'devcontainer.json');
+    const devcontainerPath = join(
+      projectDir,
+      '.devcontainer',
+      'devcontainer.json'
+    );
 
     if (existsSync(devcontainerPath)) {
       try {
@@ -800,10 +882,12 @@ export class DevcontainerParser {
           features: config.features,
           mounts: config.mounts,
           containerEnv: config.containerEnv || config.remoteEnv,
-          postCreateCommand: config.postCreateCommand
+          postCreateCommand: config.postCreateCommand,
         };
       } catch (error) {
-        logger.warn('Failed to parse devcontainer.json, using defaults', { error });
+        logger.warn('Failed to parse devcontainer.json, using defaults', {
+          error,
+        });
       }
     }
 
@@ -814,7 +898,10 @@ export class DevcontainerParser {
         const content = readFileSync(rootDevcontainerPath, 'utf8');
         const config = JSON.parse(content);
 
-        logger.debug('Found .devcontainer.json in root', { projectDir, config });
+        logger.debug('Found .devcontainer.json in root', {
+          projectDir,
+          config,
+        });
 
         return {
           image: config.image,
@@ -822,17 +909,21 @@ export class DevcontainerParser {
           features: config.features,
           mounts: config.mounts,
           containerEnv: config.containerEnv || config.remoteEnv,
-          postCreateCommand: config.postCreateCommand
+          postCreateCommand: config.postCreateCommand,
         };
       } catch (error) {
-        logger.warn('Failed to parse .devcontainer.json, using defaults', { error });
+        logger.warn('Failed to parse .devcontainer.json, using defaults', {
+          error,
+        });
       }
     }
 
     // Default to Microsoft universal devcontainer
-    logger.debug('No devcontainer.json found, using default image', { projectDir });
+    logger.debug('No devcontainer.json found, using default image', {
+      projectDir,
+    });
     return {
-      image: 'mcr.microsoft.com/devcontainers/universal:2-linux'
+      image: 'mcr.microsoft.com/devcontainers/universal:2-linux',
     };
   }
 
@@ -851,6 +942,7 @@ export class DevcontainerParser {
 ```
 
 **Test to write FIRST**:
+
 ```typescript
 // packages/core/src/workspace/devcontainer-parser.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -873,7 +965,9 @@ describe('DevcontainerParser', () => {
   it('should return default config when no devcontainer.json exists', () => {
     const config = DevcontainerParser.parse(testDir);
 
-    expect(config.image).toBe('mcr.microsoft.com/devcontainers/universal:2-linux');
+    expect(config.image).toBe(
+      'mcr.microsoft.com/devcontainers/universal:2-linux'
+    );
     expect(config.build).toBeUndefined();
   });
 
@@ -884,9 +978,9 @@ describe('DevcontainerParser', () => {
     const devcontainerConfig = {
       image: 'mcr.microsoft.com/devcontainers/typescript-node:1',
       features: {
-        'ghcr.io/devcontainers/features/node:1': {}
+        'ghcr.io/devcontainers/features/node:1': {},
       },
-      postCreateCommand: 'npm install'
+      postCreateCommand: 'npm install',
     };
 
     writeFileSync(
@@ -896,7 +990,9 @@ describe('DevcontainerParser', () => {
 
     const config = DevcontainerParser.parse(testDir);
 
-    expect(config.image).toBe('mcr.microsoft.com/devcontainers/typescript-node:1');
+    expect(config.image).toBe(
+      'mcr.microsoft.com/devcontainers/typescript-node:1'
+    );
     expect(config.features).toEqual(devcontainerConfig.features);
     expect(config.postCreateCommand).toBe('npm install');
   });
@@ -904,11 +1000,11 @@ describe('DevcontainerParser', () => {
   it('should parse root .devcontainer.json', () => {
     const devcontainerConfig = {
       build: {
-        dockerfile: 'Dockerfile'
+        dockerfile: 'Dockerfile',
       },
       containerEnv: {
-        NODE_ENV: 'development'
-      }
+        NODE_ENV: 'development',
+      },
     };
 
     writeFileSync(
@@ -932,18 +1028,23 @@ describe('DevcontainerParser', () => {
     const config = DevcontainerParser.parse(testDir);
 
     // Should fall back to default
-    expect(config.image).toBe('mcr.microsoft.com/devcontainers/universal:2-linux');
+    expect(config.image).toBe(
+      'mcr.microsoft.com/devcontainers/universal:2-linux'
+    );
   });
 
   it('should validate config correctly', () => {
     expect(DevcontainerParser.validate({ image: 'test' })).toBe(true);
-    expect(DevcontainerParser.validate({ build: { dockerfile: 'Dockerfile' } })).toBe(true);
+    expect(
+      DevcontainerParser.validate({ build: { dockerfile: 'Dockerfile' } })
+    ).toBe(true);
     expect(DevcontainerParser.validate({})).toBe(false);
   });
 });
 ```
 
 **Commit**:
+
 ```bash
 git add packages/core/src/workspace/devcontainer-parser.*
 git commit -m "Add devcontainer.json parser"
@@ -953,12 +1054,15 @@ git commit -m "Add devcontainer.json parser"
 
 ### Task 6: Add Orphan Cleanup System
 
-**Goal**: Implement cleanup for orphaned containers and session clones from crashed sessions.
+**Goal**: Implement cleanup for orphaned containers and session clones from
+crashed sessions.
 
 **Files to create**:
+
 - `packages/core/src/containers/orphan-cleanup.ts`
 
 **Code to write**:
+
 ```typescript
 // packages/core/src/containers/orphan-cleanup.ts
 // ABOUTME: Cleanup system for orphaned containers and session clones
@@ -1007,7 +1111,10 @@ export class OrphanCleanup {
     return false;
   }
 
-  private static async cleanupSession(sessionId: string, projectId: string): Promise<void> {
+  private static async cleanupSession(
+    sessionId: string,
+    projectId: string
+  ): Promise<void> {
     logger.debug('Cleaning up orphaned session', { sessionId });
 
     // Stop and remove container
@@ -1016,12 +1123,19 @@ export class OrphanCleanup {
       execSync(`container stop ${containerName} 2>/dev/null || true`);
       execSync(`container rm ${containerName} 2>/dev/null || true`);
     } catch (error) {
-      logger.debug('Container cleanup error (expected if not exists)', { sessionId, error });
+      logger.debug('Container cleanup error (expected if not exists)', {
+        sessionId,
+        error,
+      });
     }
 
     // Move session clone to trash
     try {
-      const sessionPath = join(getLaceDir(), 'sessions', `session-${sessionId}`);
+      const sessionPath = join(
+        getLaceDir(),
+        'sessions',
+        `session-${sessionId}`
+      );
       if (existsSync(sessionPath)) {
         // Move to trash directory with timestamp for safety
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -1029,7 +1143,10 @@ export class OrphanCleanup {
         mkdirSync(trashDir, { recursive: true });
 
         execSync(`mv "${sessionPath}" "${trashDir}/"`);
-        logger.info('Moved orphaned session to trash', { sessionPath, trashDir });
+        logger.info('Moved orphaned session to trash', {
+          sessionPath,
+          trashDir,
+        });
       }
     } catch (error) {
       logger.debug('Session cleanup error', { sessionId, error });
@@ -1055,7 +1172,7 @@ export class OrphanCleanup {
 
     // Get all session IDs
     const sessions = getPersistence().getAllSessions();
-    const sessionIds = new Set(sessions.map(s => s.id));
+    const sessionIds = new Set(sessions.map((s) => s.id));
 
     // Move orphaned sessions to trash
     for (const dir of sessionDirs) {
@@ -1076,6 +1193,7 @@ export class OrphanCleanup {
 ```
 
 **Test to write**:
+
 ```typescript
 // packages/core/src/containers/orphan-cleanup.test.ts
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -1098,19 +1216,26 @@ describe('OrphanCleanup', () => {
     vi.mocked(getPersistence).getAllSessions.mockReturnValue(mockSessions);
 
     // Mock isSessionActive to return false for orphan-1
-    vi.spyOn(OrphanCleanup as any, 'isSessionActive')
-      .mockImplementation((id) => id === 'active-1');
+    vi.spyOn(OrphanCleanup as any, 'isSessionActive').mockImplementation(
+      (id) => id === 'active-1'
+    );
 
     await OrphanCleanup.cleanupAll();
 
     // Should have cleaned up orphan-1 but not active-1
-    expect(getPersistence().updateSession).toHaveBeenCalledWith('orphan-1', { status: 'cleaned' });
-    expect(getPersistence().updateSession).not.toHaveBeenCalledWith('active-1', expect.anything());
+    expect(getPersistence().updateSession).toHaveBeenCalledWith('orphan-1', {
+      status: 'cleaned',
+    });
+    expect(getPersistence().updateSession).not.toHaveBeenCalledWith(
+      'active-1',
+      expect.anything()
+    );
   });
 });
 ```
 
 **Commit**:
+
 ```bash
 git add packages/core/src/containers/orphan-cleanup.*
 git commit -m "Add orphan cleanup system for containers and session clones"
@@ -1121,11 +1246,13 @@ git commit -m "Add orphan cleanup system for containers and session clones"
 ### Task 7: Integrate Container Support into Session
 
 **Files to modify**:
+
 - `packages/core/src/sessions/session.ts`
 
 **Changes to make**:
 
 1. Add imports at the top:
+
 ```typescript
 import { WorktreeManager } from '@lace/core/workspace/worktree-manager';
 import { DevcontainerParser } from '@lace/core/workspace/devcontainer-parser';
@@ -1135,12 +1262,14 @@ import { isContainersEnabled } from '@lace/core/config/features';
 ```
 
 2. Add properties to Session class:
+
 ```typescript
 private _worktreePath?: string;
 private _container?: Container;
 ```
 
 3. Modify `Session.create()` to create worktree:
+
 ```typescript
 // After session creation, before return
 if (isContainersEnabled()) {
@@ -1152,13 +1281,14 @@ if (isContainersEnabled()) {
     );
     logger.info('Created worktree for session', {
       sessionId: sessionData.id,
-      worktreePath: session._worktreePath
+      worktreePath: session._worktreePath,
     });
   }
 }
 ```
 
 4. Add container management methods:
+
 ```typescript
 /**
  * Get or start the container for this session
@@ -1225,6 +1355,7 @@ async stopContainer(): Promise<void> {
 ```
 
 5. Modify `destroy()` to clean up:
+
 ```typescript
 // In destroy() method, add:
 if (isContainersEnabled()) {
@@ -1245,6 +1376,7 @@ if (isContainersEnabled()) {
 ```
 
 **Test to write**:
+
 ```typescript
 // packages/core/src/sessions/session-containers.test.ts
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -1257,7 +1389,11 @@ describe('Session container support', () => {
 
   beforeEach(() => {
     // Create a test project
-    project = Project.create('Test Project', process.cwd(), 'Test project for containers');
+    project = Project.create(
+      'Test Project',
+      process.cwd(),
+      'Test project for containers'
+    );
   });
 
   afterEach(() => {
@@ -1272,7 +1408,7 @@ describe('Session container support', () => {
     const session = Session.create({
       name: 'Test Session',
       projectId: project.getId(),
-      configuration: {}
+      configuration: {},
     });
 
     const container = await session.getOrStartContainer();
@@ -1285,11 +1421,11 @@ describe('Session container support', () => {
     const session = Session.create({
       name: 'Test Session',
       projectId: project.getId(),
-      configuration: {}
+      configuration: {},
     });
 
     // Wait for async worktree creation
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     const container = await session.getOrStartContainer();
     expect(container).toBeDefined();
@@ -1302,10 +1438,10 @@ describe('Session container support', () => {
     const session = Session.create({
       name: 'Test Session',
       projectId: project.getId(),
-      configuration: {}
+      configuration: {},
     });
 
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     const container1 = await session.getOrStartContainer();
     const container2 = await session.getOrStartContainer();
@@ -1319,10 +1455,10 @@ describe('Session container support', () => {
     const session = Session.create({
       name: 'Test Session',
       projectId: project.getId(),
-      configuration: {}
+      configuration: {},
     });
 
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     const container = await session.getOrStartContainer();
     expect(await container?.isRunning()).toBe(true);
@@ -1334,6 +1470,7 @@ describe('Session container support', () => {
 ```
 
 **Commit**:
+
 ```bash
 git add packages/core/src/sessions/
 git commit -m "Add container support to Session class"
@@ -1346,17 +1483,20 @@ git commit -m "Add container support to Session class"
 **Goal**: Intercept tool execution to run in containers when available.
 
 **Files to modify**:
+
 - `packages/core/src/tools/executor.ts`
 
 **Changes to make**:
 
 1. Import Session at the top:
+
 ```typescript
 import { Session } from '@lace/core/sessions/session';
 import { isContainersEnabled } from '@lace/core/config/features';
 ```
 
 2. Modify `executeTool()` method to check for containers:
+
 ```typescript
 async executeTool(
   toolName: string,
@@ -1391,6 +1531,7 @@ async executeTool(
 ```
 
 **Test to write**:
+
 ```typescript
 // packages/core/src/tools/executor-containers.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -1428,18 +1569,22 @@ describe('ToolExecutor container support', () => {
     project = Project.create('Test', process.cwd());
     session = Session.create({
       projectId: project.getId(),
-      name: 'Test Session'
+      name: 'Test Session',
     });
   });
 
   it('should execute on host when containers disabled', async () => {
     vi.spyOn(features, 'isContainersEnabled').mockReturnValue(false);
 
-    const result = await executor.executeTool('test', { message: 'hello' }, {
-      sessionId: session.getId(),
-      threadId: 'test-thread',
-      signal: new AbortController().signal
-    });
+    const result = await executor.executeTool(
+      'test',
+      { message: 'hello' },
+      {
+        sessionId: session.getId(),
+        threadId: 'test-thread',
+        signal: new AbortController().signal,
+      }
+    );
 
     expect(result.content).toContain('executed on host');
   });
@@ -1448,13 +1593,17 @@ describe('ToolExecutor container support', () => {
     vi.spyOn(features, 'isContainersEnabled').mockReturnValue(true);
 
     // Wait for session to initialize
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const result = await executor.executeTool('test', { message: 'hello' }, {
-      sessionId: session.getId(),
-      threadId: 'test-thread',
-      signal: new AbortController().signal
-    });
+    const result = await executor.executeTool(
+      'test',
+      { message: 'hello' },
+      {
+        sessionId: session.getId(),
+        threadId: 'test-thread',
+        signal: new AbortController().signal,
+      }
+    );
 
     expect(result.content).toContain('executed in container');
   });
@@ -1477,12 +1626,16 @@ describe('ToolExecutor container support', () => {
 
     executor.registerTool('capture', new ContextCaptureTool());
 
-    await executor.executeTool('capture', {}, {
-      sessionId: session.getId(),
-      threadId: 'test-thread',
-      signal: new AbortController().signal,
-      workingDirectory: '/original/path'
-    });
+    await executor.executeTool(
+      'capture',
+      {},
+      {
+        sessionId: session.getId(),
+        threadId: 'test-thread',
+        signal: new AbortController().signal,
+        workingDirectory: '/original/path',
+      }
+    );
 
     expect(capturedContext.workingDirectory).toBe('/workspace');
   });
@@ -1490,6 +1643,7 @@ describe('ToolExecutor container support', () => {
 ```
 
 **Commit**:
+
 ```bash
 git add packages/core/src/tools/
 git commit -m "Add container support to ToolExecutor"
@@ -1502,11 +1656,13 @@ git commit -m "Add container support to ToolExecutor"
 **Goal**: Make BashTool execute commands in container when available.
 
 **Files to modify**:
+
 - `packages/core/src/tools/implementations/bash.ts`
 
 **Changes to make**:
 
 1. Modify `executeCommand()` to check for container:
+
 ```typescript
 private async executeCommand(command: string, context: ToolContext): Promise<ToolResult> {
   const startTime = Date.now();
@@ -1573,6 +1729,7 @@ private async executeCommand(command: string, context: ToolContext): Promise<Too
 ```
 
 **Test to write**:
+
 ```typescript
 // packages/core/src/tools/implementations/bash-container.test.ts
 import { describe, it, expect, vi } from 'vitest';
@@ -1590,7 +1747,7 @@ describe('BashTool container support', () => {
       sessionId: 'test-session',
       threadId: 'test-thread',
       signal: new AbortController().signal,
-      workingDirectory: '/workspace'
+      workingDirectory: '/workspace',
     };
   });
 
@@ -1606,13 +1763,16 @@ describe('BashTool container support', () => {
       sessionId: 'test',
       sessionPath: process.cwd(),
       mountPoint: '/workspace',
-      image: 'test'
+      image: 'test',
     });
     await container.start();
 
     context.container = container;
 
-    const result = await tool.execute({ command: 'echo "from container"' }, context);
+    const result = await tool.execute(
+      { command: 'echo "from container"' },
+      context
+    );
 
     expect(result.content).toContain('from container');
     expect(result.content).toContain('exitCode: 0');
@@ -1623,7 +1783,7 @@ describe('BashTool container support', () => {
       sessionId: 'test',
       worktreePath: '/invalid/path',
       mountPoint: '/workspace',
-      image: 'test'
+      image: 'test',
     });
     // Don't start container to simulate error
 
@@ -1640,7 +1800,7 @@ describe('BashTool container support', () => {
       sessionId: 'test',
       sessionPath: process.cwd(),
       mountPoint: '/workspace',
-      image: 'test'
+      image: 'test',
     });
     await container.start();
 
@@ -1658,6 +1818,7 @@ describe('BashTool container support', () => {
 ```
 
 **Commit**:
+
 ```bash
 git add packages/core/src/tools/implementations/
 git commit -m "Add container support to BashTool"
@@ -1670,9 +1831,11 @@ git commit -m "Add container support to BashTool"
 **Goal**: Create the real Apple Container wrapper (for production use).
 
 **Files to create**:
+
 - `packages/core/src/containers/apple-container.ts`
 
 **Code to write**:
+
 ```typescript
 // packages/core/src/containers/apple-container.ts
 // ABOUTME: Apple Container implementation using Apple's container CLI
@@ -1680,7 +1843,12 @@ git commit -m "Add container support to BashTool"
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import type { Container, ContainerConfig, ExecOptions, ExecResult } from './types';
+import type {
+  Container,
+  ContainerConfig,
+  ExecOptions,
+  ExecResult,
+} from './types';
 import { logger } from '@lace/core/utils/logger';
 
 const execAsync = promisify(exec);
@@ -1698,7 +1866,7 @@ export class AppleContainer implements Container {
   async start(): Promise<void> {
     logger.info('Starting Apple container', {
       containerName: this.containerName,
-      image: this.config.image
+      image: this.config.image,
     });
 
     try {
@@ -1723,12 +1891,12 @@ export class AppleContainer implements Container {
       this._isRunning = true;
 
       logger.info('Apple container started successfully', {
-        containerName: this.containerName
+        containerName: this.containerName,
       });
     } catch (error: any) {
       logger.error('Failed to start Apple container', {
         containerName: this.containerName,
-        error: error.message
+        error: error.message,
       });
       throw new Error(`Failed to start container: ${error.message}`);
     }
@@ -1736,7 +1904,7 @@ export class AppleContainer implements Container {
 
   async stop(): Promise<void> {
     logger.info('Stopping Apple container', {
-      containerName: this.containerName
+      containerName: this.containerName,
     });
 
     try {
@@ -1745,12 +1913,12 @@ export class AppleContainer implements Container {
       this._isRunning = false;
 
       logger.info('Apple container stopped successfully', {
-        containerName: this.containerName
+        containerName: this.containerName,
       });
     } catch (error: any) {
       // Container might already be stopped
       logger.debug('Error stopping container (might be already stopped)', {
-        error: error.message
+        error: error.message,
       });
       this._isRunning = false;
     }
@@ -1779,13 +1947,13 @@ export class AppleContainer implements Container {
     try {
       const { stdout, stderr } = await execAsync(execCmd, {
         timeout: options?.timeout,
-        maxBuffer: 10 * 1024 * 1024 // 10MB buffer
+        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
       });
 
       return {
         stdout,
         stderr,
-        exitCode: 0
+        exitCode: 0,
       };
     } catch (error: any) {
       // exec returns non-zero exit code as error
@@ -1793,7 +1961,7 @@ export class AppleContainer implements Container {
         return {
           stdout: error.stdout || '',
           stderr: error.stderr || '',
-          exitCode: error.code
+          exitCode: error.code,
         };
       }
       throw error;
@@ -1802,7 +1970,9 @@ export class AppleContainer implements Container {
 
   async isRunning(): Promise<boolean> {
     try {
-      const { stdout } = await execAsync(`container inspect ${this.containerName} --format='{{.State.Running}}'`);
+      const { stdout } = await execAsync(
+        `container inspect ${this.containerName} --format='{{.State.Running}}'`
+      );
       return stdout.trim() === 'true';
     } catch {
       return false;
@@ -1812,11 +1982,13 @@ export class AppleContainer implements Container {
 ```
 
 **Test notes**:
+
 - This requires Apple's container CLI to be installed
 - Tests should check for availability and skip if not present
 - Use MockContainer for CI testing
 
 **Integration test to write**:
+
 ```typescript
 // packages/core/src/containers/apple-container.integration.test.ts
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -1843,38 +2015,43 @@ describe('AppleContainer integration', () => {
     // Clean up any test containers
     if (hasAppleContainer) {
       try {
-        await execAsync('container rm -f $(container ps -aq --filter name=lace-test)');
+        await execAsync(
+          'container rm -f $(container ps -aq --filter name=lace-test)'
+        );
       } catch {
         // Ignore cleanup errors
       }
     }
   });
 
-  it.skipIf(!hasAppleContainer)('should start and stop real container', async () => {
-    const container = new AppleContainer({
-      sessionId: 'test-integration',
-      worktreePath: '/tmp',
-      mountPoint: '/workspace',
-      image: 'alpine:latest' // Small test image
-    });
+  it.skipIf(!hasAppleContainer)(
+    'should start and stop real container',
+    async () => {
+      const container = new AppleContainer({
+        sessionId: 'test-integration',
+        worktreePath: '/tmp',
+        mountPoint: '/workspace',
+        image: 'alpine:latest', // Small test image
+      });
 
-    await container.start();
-    expect(await container.isRunning()).toBe(true);
+      await container.start();
+      expect(await container.isRunning()).toBe(true);
 
-    const result = await container.exec(['echo', 'hello from container']);
-    expect(result.stdout).toContain('hello from container');
-    expect(result.exitCode).toBe(0);
+      const result = await container.exec(['echo', 'hello from container']);
+      expect(result.stdout).toContain('hello from container');
+      expect(result.exitCode).toBe(0);
 
-    await container.stop();
-    expect(await container.isRunning()).toBe(false);
-  });
+      await container.stop();
+      expect(await container.isRunning()).toBe(false);
+    }
+  );
 
   it.skipIf(!hasAppleContainer)('should handle working directory', async () => {
     const container = new AppleContainer({
       sessionId: 'test-cwd',
       worktreePath: '/tmp',
       mountPoint: '/workspace',
-      image: 'alpine:latest'
+      image: 'alpine:latest',
     });
 
     await container.start();
@@ -1888,6 +2065,7 @@ describe('AppleContainer integration', () => {
 ```
 
 **Commit**:
+
 ```bash
 git add packages/core/src/containers/apple-container.*
 git commit -m "Add Apple Container implementation"
@@ -1900,9 +2078,11 @@ git commit -m "Add Apple Container implementation"
 **Goal**: Create a factory that selects the right container implementation.
 
 **Files to create**:
+
 - `packages/core/src/containers/factory.ts`
 
 **Code to write**:
+
 ```typescript
 // packages/core/src/containers/factory.ts
 // ABOUTME: Factory for creating appropriate container implementation
@@ -1963,7 +2143,10 @@ export class ContainerFactory {
     }
 
     // In development/test, use mock
-    if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') {
+    if (
+      process.env.NODE_ENV === 'test' ||
+      process.env.NODE_ENV === 'development'
+    ) {
       logger.info('Using mock container for development/test');
       this.runtimeCache = 'mock';
       return 'mock';
@@ -1993,7 +2176,9 @@ export class ContainerFactory {
         return new MockContainer(config);
 
       case 'none':
-        throw new Error('No container runtime available. Please install Apple Container or Docker.');
+        throw new Error(
+          'No container runtime available. Please install Apple Container or Docker.'
+        );
 
       default:
         throw new Error(`Unknown container runtime: ${runtime}`);
@@ -2010,6 +2195,7 @@ export class ContainerFactory {
 ```
 
 **Test to write**:
+
 ```typescript
 // packages/core/src/containers/factory.test.ts
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -2026,8 +2212,8 @@ describe('ContainerFactory', () => {
       containers: {
         enabled: true,
         runtime: 'mock',
-        idleTimeout: 30
-      }
+        idleTimeout: 30,
+      },
     });
 
     const runtime = await ContainerFactory.detectRuntime();
@@ -2041,7 +2227,7 @@ describe('ContainerFactory', () => {
       sessionId: 'test',
       worktreePath: '/tmp',
       mountPoint: '/workspace',
-      image: 'test'
+      image: 'test',
     });
 
     expect(container.constructor.name).toBe('MockContainer');
@@ -2052,21 +2238,24 @@ describe('ContainerFactory', () => {
       containers: {
         enabled: true,
         runtime: 'none',
-        idleTimeout: 30
-      }
+        idleTimeout: 30,
+      },
     });
 
-    await expect(ContainerFactory.create({
-      sessionId: 'test',
-      worktreePath: '/tmp',
-      mountPoint: '/workspace',
-      image: 'test'
-    })).rejects.toThrow('No container runtime available');
+    await expect(
+      ContainerFactory.create({
+        sessionId: 'test',
+        worktreePath: '/tmp',
+        mountPoint: '/workspace',
+        image: 'test',
+      })
+    ).rejects.toThrow('No container runtime available');
   });
 });
 ```
 
 **Commit**:
+
 ```bash
 git add packages/core/src/containers/factory.*
 git commit -m "Add container factory for runtime selection"
@@ -2079,11 +2268,13 @@ git commit -m "Add container factory for runtime selection"
 **Goal**: Replace MockContainer with ContainerFactory in Session.
 
 **Files to modify**:
+
 - `packages/core/src/sessions/session.ts`
 
 **Changes**:
 
 Replace the import:
+
 ```typescript
 // Remove: import { MockContainer } from '@lace/core/containers/mock-container';
 // Add:
@@ -2091,6 +2282,7 @@ import { ContainerFactory } from '@lace/core/containers/factory';
 ```
 
 Update `getOrStartContainer()`:
+
 ```typescript
 // Replace: this._container = new MockContainer(...)
 // With:
@@ -2098,13 +2290,16 @@ this._container = await ContainerFactory.create({
   sessionId: this._sessionId,
   worktreePath: this._worktreePath,
   mountPoint: '/workspace',
-  image: devcontainerConfig.image || 'mcr.microsoft.com/devcontainers/universal:2-linux',
+  image:
+    devcontainerConfig.image ||
+    'mcr.microsoft.com/devcontainers/universal:2-linux',
   env: devcontainerConfig.containerEnv,
-  mounts: devcontainerConfig.mounts
+  mounts: devcontainerConfig.mounts,
 });
 ```
 
 **Commit**:
+
 ```bash
 git add packages/core/src/sessions/session.ts
 git commit -m "Use ContainerFactory in Session"
@@ -2117,11 +2312,13 @@ git commit -m "Use ContainerFactory in Session"
 **Goal**: Let users see container status in session info.
 
 **Files to modify**:
+
 - `packages/core/src/sessions/session.ts`
 
 **Changes**:
 
 1. Add to SessionInfo interface:
+
 ```typescript
 export interface SessionInfo {
   // ... existing fields ...
@@ -2135,6 +2332,7 @@ export interface SessionInfo {
 ```
 
 2. Update `getInfo()` method:
+
 ```typescript
 async getInfo(): Promise<SessionInfo | null> {
   const agents = this.getAgents();
@@ -2166,6 +2364,7 @@ async getInfo(): Promise<SessionInfo | null> {
 ```
 
 **Test to write**:
+
 ```typescript
 // Add to session-containers.test.ts
 it('should include container info in session info', async () => {
@@ -2174,10 +2373,10 @@ it('should include container info in session info', async () => {
   const session = Session.create({
     name: 'Test Session',
     projectId: project.getId(),
-    configuration: {}
+    configuration: {},
   });
 
-  await new Promise(resolve => setTimeout(resolve, 100));
+  await new Promise((resolve) => setTimeout(resolve, 100));
   await session.getOrStartContainer();
 
   const info = await session.getInfo();
@@ -2190,6 +2389,7 @@ it('should include container info in session info', async () => {
 ```
 
 **Commit**:
+
 ```bash
 git add packages/core/src/sessions/
 git commit -m "Add container status to session info"
@@ -2202,9 +2402,11 @@ git commit -m "Add container status to session info"
 **Goal**: Create comprehensive integration tests for the container system.
 
 **Files to create**:
+
 - `packages/core/src/integration/containers.integration.test.ts`
 
 **Code to write**:
+
 ```typescript
 // packages/core/src/integration/containers.integration.test.ts
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
@@ -2245,11 +2447,11 @@ describe('Container Integration', () => {
   it('should execute bash commands in container', async () => {
     const session = Session.create({
       name: 'Test Session',
-      projectId: project.getId()
+      projectId: project.getId(),
     });
 
     // Wait for worktree creation
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     const executor = new ToolExecutor();
     executor.registerTool('bash', new BashTool());
@@ -2260,7 +2462,7 @@ describe('Container Integration', () => {
       {
         sessionId: session.getId(),
         threadId: 'test-thread',
-        signal: new AbortController().signal
+        signal: new AbortController().signal,
       }
     );
 
@@ -2271,15 +2473,15 @@ describe('Container Integration', () => {
   it('should isolate sessions from each other', async () => {
     const session1 = Session.create({
       name: 'Session 1',
-      projectId: project.getId()
+      projectId: project.getId(),
     });
 
     const session2 = Session.create({
       name: 'Session 2',
-      projectId: project.getId()
+      projectId: project.getId(),
     });
 
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     const executor = new ToolExecutor();
     executor.registerTool('bash', new BashTool());
@@ -2291,7 +2493,7 @@ describe('Container Integration', () => {
       {
         sessionId: session1.getId(),
         threadId: 'thread1',
-        signal: new AbortController().signal
+        signal: new AbortController().signal,
       }
     );
 
@@ -2302,7 +2504,7 @@ describe('Container Integration', () => {
       {
         sessionId: session2.getId(),
         threadId: 'thread2',
-        signal: new AbortController().signal
+        signal: new AbortController().signal,
       }
     );
 
@@ -2313,10 +2515,10 @@ describe('Container Integration', () => {
   it('should persist changes in worktree', async () => {
     const session = Session.create({
       name: 'Test Session',
-      projectId: project.getId()
+      projectId: project.getId(),
     });
 
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     const executor = new ToolExecutor();
     executor.registerTool('bash', new BashTool());
@@ -2328,7 +2530,7 @@ describe('Container Integration', () => {
       {
         sessionId: session.getId(),
         threadId: 'test',
-        signal: new AbortController().signal
+        signal: new AbortController().signal,
       }
     );
 
@@ -2342,7 +2544,7 @@ describe('Container Integration', () => {
       {
         sessionId: session.getId(),
         threadId: 'test',
-        signal: new AbortController().signal
+        signal: new AbortController().signal,
       }
     );
 
@@ -2356,21 +2558,25 @@ describe('Container Integration', () => {
     mkdirSync(devcontainerDir);
     writeFileSync(
       join(devcontainerDir, 'devcontainer.json'),
-      JSON.stringify({
-        image: 'node:18-alpine',
-        containerEnv: {
-          TEST_VAR: 'from-devcontainer'
+      JSON.stringify(
+        {
+          image: 'node:18-alpine',
+          containerEnv: {
+            TEST_VAR: 'from-devcontainer',
+          },
+          postCreateCommand: 'echo "setup complete" > /tmp/setup.txt',
         },
-        postCreateCommand: 'echo "setup complete" > /tmp/setup.txt'
-      }, null, 2)
+        null,
+        2
+      )
     );
 
     const session = Session.create({
       name: 'DevContainer Test',
-      projectId: project.getId()
+      projectId: project.getId(),
     });
 
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     const executor = new ToolExecutor();
     executor.registerTool('bash', new BashTool());
@@ -2382,7 +2588,7 @@ describe('Container Integration', () => {
       {
         sessionId: session.getId(),
         threadId: 'test',
-        signal: new AbortController().signal
+        signal: new AbortController().signal,
       }
     );
 
@@ -2395,7 +2601,7 @@ describe('Container Integration', () => {
       {
         sessionId: session.getId(),
         threadId: 'test',
-        signal: new AbortController().signal
+        signal: new AbortController().signal,
       }
     );
 
@@ -2407,6 +2613,7 @@ describe('Container Integration', () => {
 ```
 
 **Commit**:
+
 ```bash
 git add packages/core/src/integration/
 git commit -m "Add container integration tests"
@@ -2419,28 +2626,36 @@ git commit -m "Add container integration tests"
 **Goal**: Document the container feature for users and developers.
 
 **Files to create**:
+
 - `docs/features/containers.md`
 
 **Content to write**:
-```markdown
+
+````markdown
 # Container Isolation
 
 ## Overview
 
-Lace can run each session's tools and code in isolated containers, providing complete separation between concurrent sessions. This feature is currently in beta and disabled by default.
+Lace can run each session's tools and code in isolated containers, providing
+complete separation between concurrent sessions. This feature is currently in
+beta and disabled by default.
 
 ## Enabling Containers
 
 Set the environment variable:
+
 ```bash
 export LACE_CONTAINERS_ENABLED=true
 ```
+````
 
 ## How It Works
 
-1. **Git Worktrees**: Each session creates its own git worktree from the project repository
+1. **Git Worktrees**: Each session creates its own git worktree from the project
+   repository
 2. **Container per Session**: Each session runs in its own container
-3. **Tool Execution**: All tools (bash, file operations, etc.) execute inside the container
+3. **Tool Execution**: All tools (bash, file operations, etc.) execute inside
+   the container
 4. **Persistence**: Changes persist in the worktree even when containers restart
 
 ## Container Configuration
@@ -2465,6 +2680,7 @@ Lace respects standard `.devcontainer/devcontainer.json` files in your project:
 ### Default Container
 
 If no devcontainer.json is found, Lace uses:
+
 - `mcr.microsoft.com/devcontainers/universal:2-linux`
 
 ## Container Runtimes
@@ -2476,6 +2692,7 @@ Lace supports multiple container runtimes:
 3. **Mock** (for development/testing)
 
 The runtime is auto-detected, or you can specify:
+
 ```bash
 export LACE_CONTAINER_RUNTIME=apple  # or docker, mock
 ```
@@ -2483,24 +2700,29 @@ export LACE_CONTAINER_RUNTIME=apple  # or docker, mock
 ## Requirements
 
 ### For Apple Container
+
 - macOS 15+ with Apple Silicon
 - Apple's container CLI installed
 
 ### For Docker
+
 - Docker Desktop or Docker Engine installed
 
 ## Troubleshooting
 
 ### Container Won't Start
+
 - Check that your chosen runtime is installed
 - Verify the devcontainer.json image exists
 - Check logs for specific error messages
 
 ### Files Not Persisting
+
 - Ensure the project directory is a git repository
 - Check that worktrees are being created in `~/.lace/worktrees/`
 
 ### Performance Issues
+
 - Containers may take 1-2 seconds to start initially
 - File operations should be near-native speed
 - Report performance issues with specific tools
@@ -2527,13 +2749,14 @@ Containers:
 - Containers only have access to their worktree
 - No network access between containers (currently)
 - Host filesystem is not accessible (except mounted worktree)
-```
+
+````
 
 **Commit**:
 ```bash
 git add docs/features/containers.md
 git commit -m "Add container feature documentation"
-```
+````
 
 ---
 
@@ -2542,49 +2765,62 @@ git commit -m "Add container feature documentation"
 **Goal**: Update main README with container feature information.
 
 **Files to modify**:
+
 - `README.md` (add section about containers)
 
 **Add this section**:
-```markdown
+
+````markdown
 ## Container Isolation (Beta)
 
-Lace supports running each session in an isolated container with its own git worktree:
+Lace supports running each session in an isolated container with its own git
+worktree:
 
-- **Complete Isolation**: Each session gets its own container and working directory
-- **Devcontainer Support**: Uses your project's `.devcontainer/devcontainer.json`
+- **Complete Isolation**: Each session gets its own container and working
+  directory
+- **Devcontainer Support**: Uses your project's
+  `.devcontainer/devcontainer.json`
 - **Transparent**: Tools automatically execute in containers when enabled
 
 To enable:
+
 ```bash
 export LACE_CONTAINERS_ENABLED=true
 ```
+````
 
 See [Container Documentation](docs/features/containers.md) for details.
-```
+
+````
 
 **Commit**:
 ```bash
 git add README.md
 git commit -m "Add container feature to README"
-```
+````
 
 ---
 
 ## Testing Strategy
 
 ### Unit Tests
+
 Run after each task:
+
 ```bash
 npm test <specific-test-file>
 ```
 
 ### Integration Tests
+
 Run after completing core functionality:
+
 ```bash
 npm test packages/core/src/integration/containers.integration.test.ts
 ```
 
 ### Manual Testing
+
 1. Enable containers: `export LACE_CONTAINERS_ENABLED=true`
 2. Start Lace: `npm run dev`
 3. Create a project and session
@@ -2593,7 +2829,9 @@ npm test packages/core/src/integration/containers.integration.test.ts
 6. Verify session isolation
 
 ### Test Coverage
+
 Check coverage after implementation:
+
 ```bash
 npm run test:coverage
 ```
@@ -2619,6 +2857,7 @@ npm run test:coverage
 ## Rollback Plan
 
 If issues arise:
+
 1. Set `LACE_CONTAINERS_ENABLED=false`
 2. Sessions revert to host execution
 3. Git worktrees remain but aren't used

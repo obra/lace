@@ -1,15 +1,20 @@
 # Event Visibility Implementation Plan
 
-**Date:** 2025-10-01
-**Feature:** Show compacted events in UI with visual indication they're not sent to model
+**Date:** 2025-10-01 **Feature:** Show compacted events in UI with visual
+indication they're not sent to model
 
 ## Overview
 
-Currently, when conversation history is compacted to save tokens, the pre-compaction events are completely hidden from the web UI. This plan implements a `visibleToModel` flag on events so the UI can show all events but visually distinguish which ones are still sent to the AI model (normal appearance) vs. which have been compacted away (greyed out).
+Currently, when conversation history is compacted to save tokens, the
+pre-compaction events are completely hidden from the web UI. This plan
+implements a `visibleToModel` flag on events so the UI can show all events but
+visually distinguish which ones are still sent to the AI model (normal
+appearance) vs. which have been compacted away (greyed out).
 
 ## Background: How Compaction Works
 
-Lace uses an event-sourcing architecture where conversations are stored as immutable event sequences. When a conversation gets too long, we "compact" it:
+Lace uses an event-sourcing architecture where conversations are stored as
+immutable event sequences. When a conversation gets too long, we "compact" it:
 
 1. **Before compaction:** Events 1-100 exist in database
 2. **Compaction happens:** AI summarizes events 1-100 into a summary
@@ -17,37 +22,49 @@ Lace uses an event-sourcing architecture where conversations are stored as immut
    - Events 1-100 still in database but marked `visibleToModel: false`
    - New summary event (USER_MESSAGE) created with `visibleToModel: true`
    - COMPACTION event created as metadata marker with `visibleToModel: false`
-   - Future events (101+) continue with `visibleToModel: undefined` (treated as true)
+   - Future events (101+) continue with `visibleToModel: undefined` (treated as
+     true)
 
 When the AI processes the next message, it only sees:
+
 - The summary event
 - The COMPACTION event is NOT sent (it's metadata)
 - Events after compaction
 
-**Key insight:** Multiple compactions can happen. A second compaction would mark the first summary event as `visibleToModel: false` and create a new summary.
+**Key insight:** Multiple compactions can happen. A second compaction would mark
+the first summary event as `visibleToModel: false` and create a new summary.
 
 ## Architecture Notes
 
 ### Event Flow
+
 ```
 User Input → LaceEvent created → Persisted to SQLite → Emitted via EventEmitter
 → SSE to web clients → UI renders
 ```
 
 ### Key Components
-- **ThreadManager** (`packages/core/src/threads/thread-manager.ts`): Manages events and compaction
-- **Agent** (`packages/core/src/agents/agent.ts`): Event hub that emits transient events
-- **Database** (`packages/core/src/persistence/database.ts`): SQLite persistence with migrations
-- **Types** (`packages/core/src/threads/types.ts`): Single source of truth for event types
+
+- **ThreadManager** (`packages/core/src/threads/thread-manager.ts`): Manages
+  events and compaction
+- **Agent** (`packages/core/src/agents/agent.ts`): Event hub that emits
+  transient events
+- **Database** (`packages/core/src/persistence/database.ts`): SQLite persistence
+  with migrations
+- **Types** (`packages/core/src/threads/types.ts`): Single source of truth for
+  event types
 
 ### Event Naming Convention
+
 - Event types: `SCREAMING_SNAKE_CASE` (e.g., `USER_MESSAGE`, `COMPACTION_START`)
 - Stored in `EVENT_TYPES` array
 - Discriminated union `LaceEvent` for type safety
 
 ### Testing Philosophy
+
 - **TDD:** Write failing tests first, implement to make them pass
-- **Co-location:** Tests next to source files (e.g., `agent.ts` → `agent.test.ts`)
+- **Co-location:** Tests next to source files (e.g., `agent.ts` →
+  `agent.test.ts`)
 - **Test framework:** Vitest
 - **Integration tests:** Test cross-component interactions
 - **E2E tests:** Playwright for full web UI flows
@@ -58,15 +75,18 @@ User Input → LaceEvent created → Persisted to SQLite → Emitted via EventEm
 
 **Objective:** Add `visible_to_model` column to events table.
 
-**Why this first:** Foundation for everything else. No code can use the field until the schema supports it.
+**Why this first:** Foundation for everything else. No code can use the field
+until the schema supports it.
 
 **Files to modify:**
+
 - `packages/core/src/persistence/database.ts`
 
 **Steps:**
 
 1. Find the `runMigrations()` method (around line 290)
 2. Add migration check:
+
 ```typescript
 if (currentVersion < 14) {
   this.migrateToV14();
@@ -74,6 +94,7 @@ if (currentVersion < 14) {
 ```
 
 3. Add migration method after `upgradeToVersion13()`:
+
 ```typescript
 private migrateToV14(): void {
   if (!this.db) return;
@@ -90,7 +111,8 @@ private migrateToV14(): void {
 }
 ```
 
-**Why BOOLEAN not INTEGER:** SQLite stores booleans as integers (0/1/NULL) but accepts BOOLEAN as type affinity for clarity.
+**Why BOOLEAN not INTEGER:** SQLite stores booleans as integers (0/1/NULL) but
+accepts BOOLEAN as type affinity for clarity.
 
 **Testing:**
 
@@ -169,11 +191,13 @@ describe('Database Migration v14: Event Visibility', () => {
 ```
 
 **How to test:**
+
 ```bash
 npm test database-migration-v14.test.ts
 ```
 
 **Commit message:**
+
 ```
 feat(db): add visible_to_model column for event visibility tracking
 
@@ -186,16 +210,21 @@ means not visible (compacted away or manually pruned).
 
 ### Task 2: Add EVENT_UPDATED Type Definition
 
-**Objective:** Define the new transient event type for notifying clients about visibility changes.
+**Objective:** Define the new transient event type for notifying clients about
+visibility changes.
 
-**Why this next:** Types are the contract. Define them before implementing logic.
+**Why this next:** Types are the contract. Define them before implementing
+logic.
 
 **Files to modify:**
+
 - `packages/core/src/threads/types.ts`
 
 **Steps:**
 
-1. Add `'EVENT_UPDATED'` to `EVENT_TYPES` array (in transient section, around line 47):
+1. Add `'EVENT_UPDATED'` to `EVENT_TYPES` array (in transient section, around
+   line 47):
+
 ```typescript
   // Error events (transient)
   'AGENT_ERROR',
@@ -206,6 +235,7 @@ means not visible (compacted away or manually pruned).
 ```
 
 2. Add data interface after `AgentErrorData` (around line 384):
+
 ```typescript
 // Event visibility update data
 export interface EventUpdatedData {
@@ -214,7 +244,9 @@ export interface EventUpdatedData {
 }
 ```
 
-3. Add to `LaceEvent` discriminated union (after `AGENT_ERROR` case, around line 498):
+3. Add to `LaceEvent` discriminated union (after `AGENT_ERROR` case, around line
+   498):
+
 ```typescript
   | (BaseLaceEvent & {
       type: 'AGENT_ERROR';
@@ -231,6 +263,7 @@ export interface EventUpdatedData {
 ```
 
 4. Update `isTransientEventType()` helper (around line 58):
+
 ```typescript
     // Error events
     'AGENT_ERROR',
@@ -240,7 +273,9 @@ export interface EventUpdatedData {
     'MCP_CONFIG_CHANGED',
 ```
 
-5. Add to `createLaceEventFromDb()` switch statement in `packages/core/src/persistence/database.ts` (around line 175):
+5. Add to `createLaceEventFromDb()` switch statement in
+   `packages/core/src/persistence/database.ts` (around line 175):
+
 ```typescript
     case 'EVENT_UPDATED':
       // EVENT_UPDATED is transient and should never be in database
@@ -282,11 +317,13 @@ describe('EVENT_UPDATED type', () => {
 ```
 
 **How to test:**
+
 ```bash
 npm test types.test.ts
 ```
 
 **Commit message:**
+
 ```
 feat(types): add EVENT_UPDATED transient event type
 
@@ -299,27 +336,32 @@ pruning.
 
 ### Task 3: Add visibleToModel Field to LaceEvent Persistence
 
-**Objective:** Support reading and writing the `visibleToModel` field when persisting events.
+**Objective:** Support reading and writing the `visibleToModel` field when
+persisting events.
 
-**Why this next:** Database layer needs to handle the new field before ThreadManager can use it.
+**Why this next:** Database layer needs to handle the new field before
+ThreadManager can use it.
 
 **Files to modify:**
+
 - `packages/core/src/persistence/database.ts`
 
 **Steps:**
 
-1. Update `addEvent()` method to handle `visibleToModel` field (around line 580):
+1. Update `addEvent()` method to handle `visibleToModel` field (around line
+   580):
 
 Find the INSERT statement:
+
 ```typescript
-const result = this.db
-  .prepare(
-    `INSERT INTO events (id, thread_id, type, timestamp, data)
+const result = this.db.prepare(
+  `INSERT INTO events (id, thread_id, type, timestamp, data)
      VALUES (?, ?, ?, ?, ?)`
-  )
+);
 ```
 
 Change to:
+
 ```typescript
 const result = this.db
   .prepare(
@@ -339,17 +381,18 @@ const result = this.db
 2. Update `getEvents()` method to read the field (around line 650):
 
 Find the SELECT:
+
 ```typescript
-const rows = this.db
-  .prepare(
-    `SELECT id, thread_id, type, timestamp, data
+const rows = this.db.prepare(
+  `SELECT id, thread_id, type, timestamp, data
      FROM events
      WHERE thread_id = ?
      ORDER BY timestamp ASC`
-  )
+);
 ```
 
 Change to:
+
 ```typescript
 const rows = this.db
   .prepare(
@@ -359,16 +402,17 @@ const rows = this.db
      ORDER BY timestamp ASC`
   )
   .all(threadId) as Array<{
-    id: string;
-    thread_id: string;
-    type: string;
-    timestamp: string;
-    data: string;
-    visible_to_model: number | null;
-  }>;
+  id: string;
+  thread_id: string;
+  type: string;
+  timestamp: string;
+  data: string;
+  visible_to_model: number | null;
+}>;
 ```
 
 3. Update event creation to include `visibleToModel` (in the loop):
+
 ```typescript
 for (const row of rows) {
   const data = JSON.parse(row.data);
@@ -382,9 +426,8 @@ for (const row of rows) {
   );
 
   // Return new object if visibility explicitly set to false (maintains immutability)
-  const finalEvent = row.visible_to_model === 0
-    ? { ...event, visibleToModel: false }
-    : event;
+  const finalEvent =
+    row.visible_to_model === 0 ? { ...event, visibleToModel: false } : event;
   // If NULL or 1, leave as undefined (treated as true)
 
   events.push(finalEvent);
@@ -392,6 +435,7 @@ for (const row of rows) {
 ```
 
 4. Add new method `updateEventVisibility()` after `addEvent()`:
+
 ```typescript
 /**
  * Update the visibility flag for a specific event
@@ -561,11 +605,13 @@ describe('Event Visibility Persistence', () => {
 ```
 
 **How to test:**
+
 ```bash
 npm test event-visibility.test.ts
 ```
 
 **Commit message:**
+
 ```
 feat(db): persist and read visibleToModel field for events
 
@@ -578,11 +624,13 @@ visible during compaction.
 
 ### Task 4: Implement ThreadManager.compact() Visibility Updates
 
-**Objective:** When compaction runs, mark pre-compaction events as `visibleToModel: false` and return info about which events changed.
+**Objective:** When compaction runs, mark pre-compaction events as
+`visibleToModel: false` and return info about which events changed.
 
 **Why this next:** Core logic for setting visibility flags during compaction.
 
 **Files to modify:**
+
 - `packages/core/src/threads/thread-manager.ts`
 
 **Steps:**
@@ -590,6 +638,7 @@ visible during compaction.
 1. Find the `compact()` method (around line 495)
 
 2. Modify the method signature to return metadata:
+
 ```typescript
 async compact(
   threadId: string,
@@ -604,6 +653,7 @@ async compact(
 3. After the compaction event is added, mark events as not visible:
 
 Find this section (after `this.addEvent(threadId, compactionEvent)`):
+
 ```typescript
 logger.info('THREADMANAGER: Compaction complete', {
   threadId,
@@ -616,6 +666,7 @@ return compactionEvent;
 ```
 
 Replace with:
+
 ```typescript
 // Mark pre-compaction events as not visible to model
 const hiddenEventIds: string[] = [];
@@ -628,7 +679,9 @@ const thread = this.getThread(threadId);
 
 if (thread) {
   // Find the index of the compaction event we just added
-  const compactionIndex = thread.events.findIndex(e => e.id === compactionEvent.id);
+  const compactionIndex = thread.events.findIndex(
+    (e) => e.id === compactionEvent.id
+  );
 
   // Mark all events before the compaction as not visible
   for (let i = 0; i < compactionIndex; i++) {
@@ -731,7 +784,7 @@ describe('Compaction Visibility', () => {
 
     // Verify by reading from database
     const thread = manager.getThread(threadId);
-    const event1Updated = thread!.events.find(e => e.id === event1!.id);
+    const event1Updated = thread!.events.find((e) => e.id === event1!.id);
     expect(event1Updated!.visibleToModel).toBe(false);
   });
 
@@ -788,11 +841,13 @@ describe('Compaction Visibility', () => {
 
     // First batch should still be hidden
     const thread = manager.getThread(threadId);
-    const event1Updated = thread!.events.find(e => e.id === event1!.id);
+    const event1Updated = thread!.events.find((e) => e.id === event1!.id);
     expect(event1Updated!.visibleToModel).toBe(false);
 
     // First compaction event should still be hidden
-    const firstCompaction = thread!.events.find(e => e.id === result1.compactionEvent.id);
+    const firstCompaction = thread!.events.find(
+      (e) => e.id === result1.compactionEvent.id
+    );
     expect(firstCompaction!.visibleToModel).toBe(false);
 
     // Second batch should now be hidden
@@ -822,7 +877,7 @@ describe('Compaction Visibility', () => {
 
       // Read from database to verify
       const thread = manager.getThread(threadId);
-      const found = thread!.events.find(e => e.id === compactedEvent.id);
+      const found = thread!.events.find((e) => e.id === compactedEvent.id);
       expect(found!.visibleToModel).toBeUndefined(); // NULL/undefined = visible
     }
   });
@@ -830,11 +885,13 @@ describe('Compaction Visibility', () => {
 ```
 
 **How to test:**
+
 ```bash
 npm test compaction-visibility.test.ts
 ```
 
 **Commit message:**
+
 ```
 feat(threads): mark events as not visible during compaction
 
@@ -847,20 +904,24 @@ for downstream processing.
 
 ### Task 5: Emit EVENT_UPDATED from Agent During Compaction
 
-**Objective:** When Agent calls `ThreadManager.compact()`, emit `EVENT_UPDATED` events for each hidden event so web clients can update in real-time.
+**Objective:** When Agent calls `ThreadManager.compact()`, emit `EVENT_UPDATED`
+events for each hidden event so web clients can update in real-time.
 
 **Why this next:** Connects the compaction logic to the event emission system.
 
 **Files to modify:**
+
 - `packages/core/src/agents/agent.ts`
 
 **Steps:**
 
-1. Find the `compact()` method in Agent (search for `async compact(`). There are two implementations - one for manual compaction and one for auto-compaction.
+1. Find the `compact()` method in Agent (search for `async compact(`). There are
+   two implementations - one for manual compaction and one for auto-compaction.
 
 2. Update manual compaction (around line 2200):
 
 Find:
+
 ```typescript
 // Emit completion event
 this._addEventAndEmit({
@@ -877,6 +938,7 @@ this._addEventAndEmit({
 ```
 
 Add AFTER the COMPACTION_COMPLETE:
+
 ```typescript
 // Emit EVENT_UPDATED for each hidden event
 for (const eventId of result.hiddenEventIds) {
@@ -894,11 +956,14 @@ for (const eventId of result.hiddenEventIds) {
 
 3. Update auto-compaction (around line 2485):
 
-Find the similar COMPACTION_COMPLETE emission and add the same EVENT_UPDATED loop after it.
+Find the similar COMPACTION_COMPLETE emission and add the same EVENT_UPDATED
+loop after it.
 
-**Important:** The `compact()` call now returns an object, so update the destructuring:
+**Important:** The `compact()` call now returns an object, so update the
+destructuring:
 
 Change:
+
 ```typescript
 const compactionEvent = await this._threadManager.compact(
   threadId,
@@ -908,6 +973,7 @@ const compactionEvent = await this._threadManager.compact(
 ```
 
 To:
+
 ```typescript
 const result = await this._threadManager.compact(
   threadId,
@@ -1002,7 +1068,7 @@ describe('Agent Compaction Event Emission', () => {
     // Add some events
     agent.getLaceEvents(); // Force event creation
     const events = agent.getLaceEvents();
-    const preCompactionEventIds = events.map(e => e.id);
+    const preCompactionEventIds = events.map((e) => e.id);
 
     // Compact
     await agent.compact();
@@ -1019,7 +1085,7 @@ describe('Agent Compaction Event Emission', () => {
     }
 
     // All updated event IDs should be from pre-compaction events
-    const updatedIds = updatedEvents.map(e => e.data.eventId);
+    const updatedIds = updatedEvents.map((e) => e.data.eventId);
     for (const id of updatedIds) {
       expect(preCompactionEventIds).toContain(id);
     }
@@ -1061,7 +1127,10 @@ describe('Agent Compaction Event Emission', () => {
 
     const eventSequence: string[] = [];
     agent.on('thread_event_added', ({ event }) => {
-      if (event.type === 'COMPACTION_COMPLETE' || event.type === 'EVENT_UPDATED') {
+      if (
+        event.type === 'COMPACTION_COMPLETE' ||
+        event.type === 'EVENT_UPDATED'
+      ) {
         eventSequence.push(event.type);
       }
     });
@@ -1069,7 +1138,9 @@ describe('Agent Compaction Event Emission', () => {
     await agent.compact();
 
     // COMPACTION_COMPLETE should come before EVENT_UPDATED
-    const compactionCompleteIndex = eventSequence.indexOf('COMPACTION_COMPLETE');
+    const compactionCompleteIndex = eventSequence.indexOf(
+      'COMPACTION_COMPLETE'
+    );
     const firstUpdateIndex = eventSequence.indexOf('EVENT_UPDATED');
 
     expect(compactionCompleteIndex).toBeGreaterThanOrEqual(0);
@@ -1079,11 +1150,13 @@ describe('Agent Compaction Event Emission', () => {
 ```
 
 **How to test:**
+
 ```bash
 npm test agent-compaction-events.test.ts
 ```
 
 **Commit message:**
+
 ```
 feat(agent): emit EVENT_UPDATED events after compaction
 
@@ -1097,17 +1170,21 @@ visible during compaction. Enables real-time UI updates via SSE.
 
 **Objective:** Forward `EVENT_UPDATED` events from core to web clients via SSE.
 
-**Why this next:** Wire up the backend event flow before implementing frontend handling.
+**Why this next:** Wire up the backend event flow before implementing frontend
+handling.
 
 **Files to modify:**
+
 - `packages/web/lib/event-stream-manager.ts`
 - `packages/web/types/core.ts`
 
 **Steps:**
 
-1. Update `packages/web/types/core.ts` to include EVENT_UPDATED in exported types:
+1. Update `packages/web/types/core.ts` to include EVENT_UPDATED in exported
+   types:
 
 Find the type re-exports (around line 10):
+
 ```typescript
 export type {
   LaceEvent,
@@ -1116,18 +1193,24 @@ export type {
 } from '@lace/core/threads/types';
 ```
 
-Verify `EVENT_UPDATED` and `EventUpdatedData` are exported from core. If not, add:
+Verify `EVENT_UPDATED` and `EventUpdatedData` are exported from core. If not,
+add:
+
 ```typescript
 export type { EventUpdatedData } from '@lace/core/threads/types';
 ```
 
 2. Update `packages/web/lib/event-stream-manager.ts`:
 
-Find the `handleAgentEvent` method (or wherever events are forwarded to SSE clients).
+Find the `handleAgentEvent` method (or wherever events are forwarded to SSE
+clients).
 
-The EventStreamManager should already forward all LaceEvents. Verify that `EVENT_UPDATED` will flow through automatically. If there's filtering, ensure `EVENT_UPDATED` is included.
+The EventStreamManager should already forward all LaceEvents. Verify that
+`EVENT_UPDATED` will flow through automatically. If there's filtering, ensure
+`EVENT_UPDATED` is included.
 
 Look for code like:
+
 ```typescript
 private handleAgentEvent(event: LaceEvent) {
   // Forward to all connected clients
@@ -1139,7 +1222,8 @@ If there's a whitelist of event types, add `'EVENT_UPDATED'` to it.
 
 **Testing:**
 
-Add to `packages/web/lib/event-stream-manager.test.ts` (or create if doesn't exist):
+Add to `packages/web/lib/event-stream-manager.test.ts` (or create if doesn't
+exist):
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -1221,17 +1305,19 @@ describe('EventStreamManager EVENT_UPDATED handling', () => {
     }
 
     expect(receivedEvents).toHaveLength(10);
-    expect(receivedEvents.every(e => e.type === 'EVENT_UPDATED')).toBe(true);
+    expect(receivedEvents.every((e) => e.type === 'EVENT_UPDATED')).toBe(true);
   });
 });
 ```
 
 **How to test:**
+
 ```bash
 npm test event-stream-manager.test.ts
 ```
 
 **Commit message:**
+
 ```
 feat(web): forward EVENT_UPDATED events via SSE
 
@@ -1243,17 +1329,22 @@ through the event stream manager for real-time UI updates.
 
 ### Task 7: Update Client-side Event State on EVENT_UPDATED
 
-**Objective:** When the web client receives `EVENT_UPDATED` via SSE, update the local event state to reflect the new visibility.
+**Objective:** When the web client receives `EVENT_UPDATED` via SSE, update the
+local event state to reflect the new visibility.
 
-**Why this next:** Client needs to track visibility changes before we can render them.
+**Why this next:** Client needs to track visibility changes before we can render
+them.
 
 **Files to modify:**
-- `packages/web/hooks/useEventStream.ts` or `packages/web/hooks/useAgentEvents.ts`
+
+- `packages/web/hooks/useEventStream.ts` or
+  `packages/web/hooks/useAgentEvents.ts`
 - `packages/web/components/providers/EventStreamProvider.tsx`
 
 **Steps:**
 
-1. Find where events are stored in client state. Look at `EventStreamProvider.tsx` (around line 30):
+1. Find where events are stored in client state. Look at
+   `EventStreamProvider.tsx` (around line 30):
 
 ```typescript
 const [events, setEvents] = useState<LaceEvent[]>([]);
@@ -1262,11 +1353,12 @@ const [events, setEvents] = useState<LaceEvent[]>([]);
 2. Add handler for `EVENT_UPDATED` in the event processing logic:
 
 Find where incoming SSE events are processed:
+
 ```typescript
 useEffect(() => {
   const handleEvent = (event: LaceEvent) => {
     if (event.type === 'USER_MESSAGE' || event.type === 'AGENT_MESSAGE') {
-      setEvents(prev => [...prev, event]);
+      setEvents((prev) => [...prev, event]);
     }
     // ... other event type handlers
   };
@@ -1277,11 +1369,12 @@ useEffect(() => {
 ```
 
 Add `EVENT_UPDATED` handler:
+
 ```typescript
 if (event.type === 'EVENT_UPDATED') {
   // Update existing event's visibility
-  setEvents(prev =>
-    prev.map(e =>
+  setEvents((prev) =>
+    prev.map((e) =>
       e.id === event.data.eventId
         ? { ...e, visibleToModel: event.data.visibleToModel }
         : e
@@ -1453,11 +1546,13 @@ describe('useEventStream EVENT_UPDATED handling', () => {
 ```
 
 **How to test:**
+
 ```bash
 npm test useEventStream.test.tsx
 ```
 
 **Commit message:**
+
 ```
 feat(web): update event visibility on EVENT_UPDATED reception
 
@@ -1469,11 +1564,14 @@ visibleToModel flag on existing events in client state.
 
 ### Task 8: Render Greyed-Out Events in Timeline
 
-**Objective:** Apply visual styling to events where `visibleToModel === false` to indicate they're not sent to the model.
+**Objective:** Apply visual styling to events where `visibleToModel === false`
+to indicate they're not sent to the model.
 
-**Why this next:** Final user-facing feature - make visibility changes visible in the UI.
+**Why this next:** Final user-facing feature - make visibility changes visible
+in the UI.
 
 **Files to modify:**
+
 - `packages/web/components/timeline/TimelineMessageWithDetails.tsx`
 - `packages/web/components/timeline/TimelineView.tsx`
 
@@ -1482,6 +1580,7 @@ visibleToModel flag on existing events in client state.
 1. Update `TimelineMessageWithDetails.tsx` to accept and use visibility flag:
 
 Add to props interface:
+
 ```typescript
 interface TimelineMessageWithDetailsProps {
   event: LaceEvent | ProcessedEvent;
@@ -1493,6 +1592,7 @@ interface TimelineMessageWithDetailsProps {
 ```
 
 2. Add styling logic:
+
 ```typescript
 export function TimelineMessageWithDetails({
   event,
@@ -1526,13 +1626,16 @@ export function TimelineMessageWithDetails({
 }
 ```
 
-**Note on UI choice:** Use the badge approach (shown above) rather than plain text. The badge is:
+**Note on UI choice:** Use the badge approach (shown above) rather than plain
+text. The badge is:
+
 - More compact and less intrusive
 - Consistent with DaisyUI component patterns
 - Shorter label ("Compacted" vs "Not sent to model")
 - Easier to style or hide later if needed
 
-3. Update `TimelineView.tsx` to pass visibility through if needed (it should already pass the full event object).
+3. Update `TimelineView.tsx` to pass visibility through if needed (it should
+   already pass the full event object).
 
 **Testing:**
 
@@ -1639,6 +1742,7 @@ describe('TimelineMessageWithDetails visibility styling', () => {
 ```
 
 **How to test manually:**
+
 1. Start the dev server: `npm run dev`
 2. Create a conversation with several messages
 3. Trigger compaction (via UI or API)
@@ -1647,11 +1751,13 @@ describe('TimelineMessageWithDetails visibility styling', () => {
 6. Check that the "Compacted" badge appears on greyed-out messages
 
 **How to test automated:**
+
 ```bash
 npm test TimelineMessageWithDetails.test.tsx
 ```
 
 **Commit message:**
+
 ```
 feat(web): render non-visible events with greyed-out styling
 
@@ -1663,11 +1769,13 @@ Add "Compacted" badge for compacted events.
 
 ### Task 9: End-to-End Integration Test
 
-**Objective:** Test the complete flow from compaction trigger through UI rendering.
+**Objective:** Test the complete flow from compaction trigger through UI
+rendering.
 
 **Why this next:** Verify all pieces work together correctly.
 
 **Files to create:**
+
 - `packages/web/e2e/event-visibility.e2e.ts`
 
 **Steps:**
@@ -1694,14 +1802,19 @@ test.describe('Event Visibility After Compaction', () => {
     await page.click('button:has-text("Create")');
 
     // Send a message
-    await page.fill('textarea[placeholder="Type a message..."]', 'Hello, create a test function');
+    await page.fill(
+      'textarea[placeholder="Type a message..."]',
+      'Hello, create a test function'
+    );
     await page.press('textarea', 'Enter');
 
     // Wait for response
     await page.waitForSelector('text=/function test/i', { timeout: 10000 });
 
     // Verify message is visible (normal opacity)
-    const userMessage = page.locator('text="Hello, create a test function"').first();
+    const userMessage = page
+      .locator('text="Hello, create a test function"')
+      .first();
     await expect(userMessage).not.toHaveClass(/opacity-40/);
 
     // Trigger compaction
@@ -1709,7 +1822,9 @@ test.describe('Event Visibility After Compaction', () => {
     await page.click('button:has-text("Compact History")');
 
     // Wait for compaction to complete
-    await page.waitForSelector('text=/compaction complete/i', { timeout: 5000 });
+    await page.waitForSelector('text=/compaction complete/i', {
+      timeout: 5000,
+    });
 
     // Verify original message is now greyed out
     await expect(userMessage).toHaveClass(/opacity-40/);
@@ -1719,7 +1834,10 @@ test.describe('Event Visibility After Compaction', () => {
     await expect(badge).toBeVisible();
 
     // Send another message after compaction
-    await page.fill('textarea[placeholder="Type a message..."]', 'Create another function');
+    await page.fill(
+      'textarea[placeholder="Type a message..."]',
+      'Create another function'
+    );
     await page.press('textarea', 'Enter');
 
     // Wait for response
@@ -1780,7 +1898,9 @@ test.describe('Event Visibility After Compaction', () => {
     await page.waitForSelector('text=/compaction complete/i');
 
     // Find the COMPACTION event in timeline
-    const compactionEvent = page.locator('[data-event-type="COMPACTION"]').first();
+    const compactionEvent = page
+      .locator('[data-event-type="COMPACTION"]')
+      .first();
     await expect(compactionEvent).toBeVisible();
     await expect(compactionEvent).toHaveClass(/opacity-40/);
   });
@@ -1810,11 +1930,13 @@ test.describe('Event Visibility After Compaction', () => {
 ```
 
 **How to test:**
+
 ```bash
 npm run test:e2e event-visibility.e2e.ts
 ```
 
 **Commit message:**
+
 ```
 test(e2e): add comprehensive event visibility tests
 
@@ -1829,6 +1951,7 @@ including multiple compactions and real-time SSE updates.
 **Objective:** Document the feature and add any final polish.
 
 **Files to create/modify:**
+
 - `docs/architecture/event-visibility.md`
 - Update `CLAUDE.md` if needed
 
@@ -1841,13 +1964,17 @@ including multiple compactions and real-time SSE updates.
 
 ## Overview
 
-The event visibility system allows Lace to distinguish between events that are sent to the AI model (visible) versus events that have been compacted away to save tokens (not visible). This enables the UI to show the complete conversation history while visually indicating which parts the AI "remembers."
+The event visibility system allows Lace to distinguish between events that are
+sent to the AI model (visible) versus events that have been compacted away to
+save tokens (not visible). This enables the UI to show the complete conversation
+history while visually indicating which parts the AI "remembers."
 
 ## Core Concepts
 
 ### visibleToModel Flag
 
 Every `LaceEvent` has an optional `visibleToModel` boolean field:
+
 - `undefined` or `true`: Event is sent to the model
 - `false`: Event is not sent to the model (compacted or pruned)
 
@@ -1855,17 +1982,19 @@ Every `LaceEvent` has an optional `visibleToModel` boolean field:
 
 Visibility is set to `false` in two scenarios:
 
-1. **During compaction**: All events before the compaction point are marked not visible
+1. **During compaction**: All events before the compaction point are marked not
+   visible
 2. **Manual pruning** (future): User can manually hide events
 
 ### Event Flow
-
 ```
+
 1. Events created → visibleToModel: undefined (visible by default)
 2. Compaction triggered → Pre-compaction events marked visibleToModel: false
 3. EVENT_UPDATED emitted → Web clients notified via SSE
 4. UI updates → Greyed out styling applied
-```
+
+````
 
 ## Implementation Details
 
@@ -1873,7 +2002,7 @@ Visibility is set to `false` in two scenarios:
 
 ```sql
 ALTER TABLE events ADD COLUMN visible_to_model BOOLEAN;
-```
+````
 
 - NULL/undefined = visible (default)
 - 0/false = not visible
@@ -1894,7 +2023,10 @@ ALTER TABLE events ADD COLUMN visible_to_model BOOLEAN;
 
 ### Multiple Compactions
 
-The system handles multiple compactions correctly. **Key principle: ALL events before the compaction point are marked not visible, including previous summaries.** This is correct because each new summary supersedes all previous summaries.
+The system handles multiple compactions correctly. **Key principle: ALL events
+before the compaction point are marked not visible, including previous
+summaries.** This is correct because each new summary supersedes all previous
+summaries.
 
 ```
 Initial: [e1, e2, e3] all visible
@@ -1915,7 +2047,10 @@ Second compaction (compacts ALL events before this point, including summary1):
 - [COMPACTION2] → not visible (metadata)
 ```
 
-**Why summary1 becomes not visible:** The compaction logic marks ALL events before the compaction index as not visible. The index is determined by timestamp/position, not by whether an event was previously a summary. This ensures the model only sees the most recent summary.
+**Why summary1 becomes not visible:** The compaction logic marks ALL events
+before the compaction index as not visible. The index is determined by
+timestamp/position, not by whether an event was previously a summary. This
+ensures the model only sees the most recent summary.
 
 ### UI Rendering
 
@@ -1923,7 +2058,7 @@ Components check `event.visibleToModel !== false` to determine styling:
 
 ```typescript
 const isVisibleToModel = event.visibleToModel !== false;
-const visibilityClasses = isVisibleToModel ? "" : "opacity-40";
+const visibilityClasses = isVisibleToModel ? '' : 'opacity-40';
 ```
 
 ## Testing Strategy
@@ -1938,6 +2073,7 @@ const visibilityClasses = isVisibleToModel ? "" : "opacity-40";
 2. **Visibility presets**: Quick filters (show all, show visible only)
 3. **Visibility history**: Track when events were hidden
 4. **Bulk operations**: Mark multiple events at once
+
 ```
 
 2. Add inline code comments where complex logic exists
@@ -1946,11 +2082,13 @@ const visibilityClasses = isVisibleToModel ? "" : "opacity-40";
 
 **Commit message:**
 ```
+
 docs: add event visibility architecture documentation
 
-Document the event visibility system including database schema,
-compaction flow, and UI rendering strategy.
-```
+Document the event visibility system including database schema, compaction flow,
+and UI rendering strategy.
+
+````
 
 ---
 
@@ -2027,9 +2165,10 @@ npm run build
 
 # Start dev server and manually verify
 npm run dev
-```
+````
 
 Expected behavior:
+
 1. Old conversations show all events
 2. Pre-compaction events are greyed out with "Compacted" badge
 3. Post-compaction events are normal
@@ -2044,23 +2183,29 @@ Expected behavior:
 
 ### Q: Why mutate events during deserialization in Task 3?
 
-**A:** Don't! The original plan had a bug. Use the spread operator to maintain immutability:
+**A:** Don't! The original plan had a bug. Use the spread operator to maintain
+immutability:
 
 ```typescript
-const finalEvent = row.visible_to_model === 0
-  ? { ...event, visibleToModel: false }
-  : event;
+const finalEvent =
+  row.visible_to_model === 0 ? { ...event, visibleToModel: false } : event;
 ```
 
-This creates a new object only when needed, respecting the immutable events principle.
+This creates a new object only when needed, respecting the immutable events
+principle.
 
 ### Q: Why invalidate cache before reading thread data in Task 4?
 
-**A:** To prevent race conditions. If we update the database, then read from cache, then invalidate cache, another component could read stale data between steps 1 and 3. By invalidating first, we ensure all subsequent reads (including ours) get fresh data.
+**A:** To prevent race conditions. If we update the database, then read from
+cache, then invalidate cache, another component could read stale data between
+steps 1 and 3. By invalidating first, we ensure all subsequent reads (including
+ours) get fresh data.
 
 ### Q: Do previous summaries become "not visible" after a second compaction?
 
-**A:** Yes! ALL events before the compaction point are marked not visible, including previous summaries. This is correct because:
+**A:** Yes! ALL events before the compaction point are marked not visible,
+including previous summaries. This is correct because:
+
 - Compaction point is determined by timestamp/index, not event type
 - The new summary supersedes all previous content (including old summaries)
 - The model only needs the most recent summary, not a "summary of summaries"
@@ -2068,6 +2213,7 @@ This creates a new object only when needed, respecting the immutable events prin
 ### Q: Badge or text label for the UI indicator?
 
 **A:** Use the badge approach:
+
 ```typescript
 <span className="badge badge-ghost badge-xs opacity-60">
   Compacted
@@ -2075,6 +2221,7 @@ This creates a new object only when needed, respecting the immutable events prin
 ```
 
 Reasons:
+
 - More compact and less intrusive
 - Consistent with DaisyUI patterns
 - Shorter, clearer label

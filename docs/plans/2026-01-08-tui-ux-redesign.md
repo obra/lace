@@ -50,8 +50,8 @@ One line showing:
 
 ### Input Area
 
-No visible border - just a prompt character and cursor. Grows upward as you
-type multiple lines. Maximum ~30% of screen before internal scroll.
+No visible border - just a prompt character and cursor. Grows upward as you type
+multiple lines. Maximum ~30% of screen before internal scroll.
 
 - **Submission**: Cmd+Enter (or Ctrl+Enter) to send
 - **Newlines**: Plain Enter
@@ -83,8 +83,8 @@ When agent is processing:
 ⠸ Thinking...
 ```
 
-Animated spinner (⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ cycle), muted color. Transforms into actual
-content as tokens arrive.
+Animated spinner (⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ cycle), muted color. Transforms into actual content
+as tokens arrive.
 
 ### Tool Calls Inline
 

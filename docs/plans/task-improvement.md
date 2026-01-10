@@ -13,11 +13,11 @@ policy-wrapper.ts - add step 1.5: │ // 1.5. Check if tool is marked as safe
 internal │ if (cliOptions.allowSafeInternalTools !== false) { // Default true │
 const tool = toolExecutor.getTool(toolName); │ if
 (tool?.annotations?.safeInternal === true) {│ return
-ApprovalDecision.ALLOW_ONCE; │ } │ } │ │ Implementation for Task Tools: │ All
+ApprovalDecision.ALLOW*ONCE; │ } │ } │ │ Implementation for Task Tools: │ All
 task management tools would be marked as safeInternal: true since they're pure
 internal state management with no external │ effects. │ │ ### 2. Task Management
-Tool Renderers │ │ Current System: │ │ _ Uses `TimelineEntry` component with
-status indicators │ _ Tool renderers follow naming convention:
+Tool Renderers │ │ Current System: │ │ * Uses `TimelineEntry` component with
+status indicators │ \_ Tool renderers follow naming convention:
 `TaskAddToolRenderer`, `TaskListToolRenderer`, etc. │ \* Generic renderer shows
 raw JSON input/output with `[GENERIC]` indicator │ │ Proposed Designs: │ │ ####
 A. Task Add Renderer (TaskAddToolRenderer) │ │ Option 1: Minimal Success │ │ ✓

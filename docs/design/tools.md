@@ -16,7 +16,8 @@ basic implementation to advanced UI rendering and maintenance strategies.
 8. [Deployment & Integration](#deployment--integration)
 9. [Best Practices & Patterns](#best-practices--patterns)
 10. [Troubleshooting](#troubleshooting)
-11. [Tool Status State Machine](tool-status-state-machine.md) - Execution lifecycle and status transitions
+11. [Tool Status State Machine](tool-status-state-machine.md) - Execution
+    lifecycle and status transitions
 
 ## Tool System Overview
 

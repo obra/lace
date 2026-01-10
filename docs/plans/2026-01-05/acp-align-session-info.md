@@ -1,14 +1,15 @@
 # ACP Alignment: Session Info Update
 
-**Date**: 2026-01-05
-**Author**: Bot
-**Status**: Draft
+**Date**: 2026-01-05 **Author**: Bot **Status**: Draft
 
 ---
 
 ## Overview
 
-This document specifies the alignment between our current `SESSION_UPDATED` event and the ACP draft RFD for `session_info_update`. The goal is to rename our internal event to `session_info` (matching ACP naming) and use `title` instead of `name` to match ACP field conventions.
+This document specifies the alignment between our current `SESSION_UPDATED`
+event and the ACP draft RFD for `session_info_update`. The goal is to rename our
+internal event to `session_info` (matching ACP naming) and use `title` instead
+of `name` to match ACP field conventions.
 
 ---
 
@@ -71,9 +72,11 @@ case 'SESSION_UPDATED':
 
 ### Problems with Current Implementation
 
-1. **Non-standard naming**: Uses `SESSION_UPDATED` (internal Lace convention) instead of ACP's `session_info_update` or `session_info`
+1. **Non-standard naming**: Uses `SESSION_UPDATED` (internal Lace convention)
+   instead of ACP's `session_info_update` or `session_info`
 2. **Field naming mismatch**: Uses `name` instead of ACP's `title`
-3. **Limited extensibility**: Only supports `name` field, no `updatedAt` or `_meta`
+3. **Limited extensibility**: Only supports `name` field, no `updatedAt` or
+   `_meta`
 
 ---
 
@@ -83,15 +86,16 @@ case 'SESSION_UPDATED':
 
 ### Proposal Summary
 
-Add a `session_info_update` variant to `SessionUpdate` for dynamic session identification.
+Add a `session_info_update` variant to `SessionUpdate` for dynamic session
+identification.
 
 ### Fields
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `title` | string | Optional | Session title for display |
-| `updatedAt` | string (ISO timestamp) | Optional | When the update occurred |
-| `_meta` | object | Optional | Custom metadata |
+| Field       | Type                   | Required | Description               |
+| ----------- | ---------------------- | -------- | ------------------------- |
+| `title`     | string                 | Optional | Session title for display |
+| `updatedAt` | string (ISO timestamp) | Optional | When the update occurred  |
+| `_meta`     | object                 | Optional | Custom metadata           |
 
 ### Excluded Fields
 
@@ -110,16 +114,17 @@ Add a `session_info_update` variant to `SessionUpdate` for dynamic session ident
 
 ### Summary of Changes
 
-| Aspect | Current (Ent) | ACP RFD | Aligned |
-|--------|---------------|---------|---------|
-| Event type | `SESSION_UPDATED` | `session_info_update` | `session_info` |
-| Data field | `name` | `title` | `title` |
-| Timestamp | (none) | `updatedAt` | `updatedAt` (optional) |
-| Metadata | (none) | `_meta` | `_meta` (optional) |
+| Aspect     | Current (Ent)     | ACP RFD               | Aligned                |
+| ---------- | ----------------- | --------------------- | ---------------------- |
+| Event type | `SESSION_UPDATED` | `session_info_update` | `session_info`         |
+| Data field | `name`            | `title`               | `title`                |
+| Timestamp  | (none)            | `updatedAt`           | `updatedAt` (optional) |
+| Metadata   | (none)            | `_meta`               | `_meta` (optional)     |
 
 ### Rationale for `session_info` (not `session_info_update`)
 
-The ACP RFD uses `session_info_update` as the full variant name, but our `session/update` types use shorter discriminators:
+The ACP RFD uses `session_info_update` as the full variant name, but our
+`session/update` types use shorter discriminators:
 
 - `text_delta` (not `text_delta_update`)
 - `tool_use` (not `tool_use_update`)
@@ -162,7 +167,9 @@ export const SessionUpdateSessionInfoSchema = z
   })
   .strict();
 
-export type SessionUpdateSessionInfo = z.infer<typeof SessionUpdateSessionInfoSchema>;
+export type SessionUpdateSessionInfo = z.infer<
+  typeof SessionUpdateSessionInfoSchema
+>;
 ```
 
 ### Internal LaceEvent Type
@@ -195,20 +202,24 @@ export interface SessionInfoData {
 
 ### 1. Update Protocol Schemas
 
-1. **Add `SessionUpdateSessionInfoSchema`** to `packages/ent-protocol/src/schemas/methods.ts`
+1. **Add `SessionUpdateSessionInfoSchema`** to
+   `packages/ent-protocol/src/schemas/methods.ts`
 2. **Add to discriminated unions** (`SessionUpdateInnerNonJobSchema`, etc.)
 
 ### 2. Update Internal Types
 
-1. **Replace `SessionUpdatedData`** with `SessionInfoData` in `packages/agent/src/threads/types.ts`
-2. **Rename event type**: `SESSION_UPDATED` → `SESSION_INFO` in `EVENT_TYPES` array
+1. **Replace `SessionUpdatedData`** with `SessionInfoData` in
+   `packages/agent/src/threads/types.ts`
+2. **Rename event type**: `SESSION_UPDATED` → `SESSION_INFO` in `EVENT_TYPES`
+   array
 3. **Update transient list** in `isTransientEventType()`
 
 ### 3. Update Emission Points
 
 1. **Update session naming route** (`api.projects.$projectId.sessions.ts`)
    - Change `type: 'SESSION_UPDATED'` to `type: 'SESSION_INFO'`
-   - Change `data: { name: generatedName }` to `data: { title: generatedName, updatedAt: new Date() }`
+   - Change `data: { name: generatedName }` to
+     `data: { title: generatedName, updatedAt: new Date() }`
 
 ### 4. Update Consumption Points
 
@@ -219,14 +230,16 @@ export interface SessionInfoData {
 
 ### 5. Update Protocol Documentation
 
-1. **Update `docs/protocol-spec.md`**: Add `session_info` to session/update types
+1. **Update `docs/protocol-spec.md`**: Add `session_info` to session/update
+   types
 2. **Update `docs/about-the-protocol.md`**: Document alignment with ACP RFD
 
 ---
 
 ## 6. Breaking Change - No Backward Compatibility
 
-**Decision**: Make all changes in one shot. No phased migration or dual support needed (pre-1.0).
+**Decision**: Make all changes in one shot. No phased migration or dual support
+needed (pre-1.0).
 
 ---
 
@@ -290,7 +303,8 @@ When sent via the Ent protocol's `session/update` notification:
 
 ### ACP RFD is Draft Status
 
-The ACP RFD for `session_info_update` is still a draft. If the final ACP spec changes field names or structure, we may need to adjust. However, aligning now:
+The ACP RFD for `session_info_update` is still a draft. If the final ACP spec
+changes field names or structure, we may need to adjust. However, aligning now:
 
 - Reduces future migration effort
 - Demonstrates ACP alignment intent
@@ -298,7 +312,8 @@ The ACP RFD for `session_info_update` is still a draft. If the final ACP spec ch
 
 ### No Database Migration Needed
 
-`SESSION_UPDATED` is transient (not persisted), so no database migration is required.
+`SESSION_UPDATED` is transient (not persisted), so no database migration is
+required.
 
 ---
 

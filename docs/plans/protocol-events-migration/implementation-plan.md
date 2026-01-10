@@ -1,12 +1,18 @@
 # Protocol Events Migration Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
+> implement this plan task-by-task.
 
-**Goal:** Migrate web package from LaceEvent to protocol events as the primary internal event system.
+**Goal:** Migrate web package from LaceEvent to protocol events as the primary
+internal event system.
 
-**Architecture:** Web package will consume protocol event types directly from `@lace/ent-protocol`. LaceEvent remains in agent package only. Translation layer is removed, replaced by direct protocol event forwarding. Event processing hooks and timeline components updated to work with protocol event structure.
+**Architecture:** Web package will consume protocol event types directly from
+`@lace/ent-protocol`. LaceEvent remains in agent package only. Translation layer
+is removed, replaced by direct protocol event forwarding. Event processing hooks
+and timeline components updated to work with protocol event structure.
 
-**Tech Stack:** TypeScript, Zod schemas, React hooks, React Router v7, SSE event streaming
+**Tech Stack:** TypeScript, Zod schemas, React hooks, React Router v7, SSE event
+streaming
 
 **Estimated Total Time:** 49-70 hours across 9 phases
 
@@ -17,7 +23,9 @@
 ### Task 1.1: Create Protocol Event Type Wrappers
 
 **Files:**
-- Create: `/Users/jesse/Documents/GitHub/lace/packages/web/types/protocol-events.ts`
+
+- Create:
+  `/Users/jesse/Documents/GitHub/lace/packages/web/types/protocol-events.ts`
 
 **Step 1: Write the failing test**
 
@@ -31,7 +39,7 @@ import type {
   ProtocolEvent,
   TextDeltaUpdate,
   ToolUseUpdate,
-  PermissionRequestEvent
+  PermissionRequestEvent,
 } from '../protocol-events';
 
 describe('Protocol Event Types', () => {
@@ -118,10 +126,14 @@ import {
  */
 
 // Extract base session update type
-export type SessionUpdate = z.infer<typeof SessionUpdateNotificationSchema>['params'];
+export type SessionUpdate = z.infer<
+  typeof SessionUpdateNotificationSchema
+>['params'];
 
 // Extract permission request type
-export type PermissionRequest = z.infer<typeof SessionRequestPermissionRequestSchema>['params'];
+export type PermissionRequest = z.infer<
+  typeof SessionRequestPermissionRequestSchema
+>['params'];
 
 // Extract individual update types using discriminated union
 export type TextDeltaUpdate = Extract<SessionUpdate, { type: 'text_delta' }>;
@@ -131,17 +143,41 @@ export type ToolUseUpdate = Extract<SessionUpdate, { type: 'tool_use' }>;
 export type TurnStartUpdate = Extract<SessionUpdate, { type: 'turn_start' }>;
 export type TurnEndUpdate = Extract<SessionUpdate, { type: 'turn_end' }>;
 export type ErrorUpdate = Extract<SessionUpdate, { type: 'error' }>;
-export type SessionInfoUpdate = Extract<SessionUpdate, { type: 'session_info' }>;
-export type ContextWindowUpdate = Extract<SessionUpdate, { type: 'context_window' }>;
-export type CompactionStartUpdate = Extract<SessionUpdate, { type: 'compaction_start' }>;
-export type CompactionCompleteUpdate = Extract<SessionUpdate, { type: 'compaction_complete' }>;
-export type McpConfigChangedUpdate = Extract<SessionUpdate, { type: 'mcp_config_changed' }>;
-export type McpServerStatusUpdate = Extract<SessionUpdate, { type: 'mcp_server_status' }>;
+export type SessionInfoUpdate = Extract<
+  SessionUpdate,
+  { type: 'session_info' }
+>;
+export type ContextWindowUpdate = Extract<
+  SessionUpdate,
+  { type: 'context_window' }
+>;
+export type CompactionStartUpdate = Extract<
+  SessionUpdate,
+  { type: 'compaction_start' }
+>;
+export type CompactionCompleteUpdate = Extract<
+  SessionUpdate,
+  { type: 'compaction_complete' }
+>;
+export type McpConfigChangedUpdate = Extract<
+  SessionUpdate,
+  { type: 'mcp_config_changed' }
+>;
+export type McpServerStatusUpdate = Extract<
+  SessionUpdate,
+  { type: 'mcp_server_status' }
+>;
 export type ModeChangeUpdate = Extract<SessionUpdate, { type: 'mode_change' }>;
-export type ContextInjectedUpdate = Extract<SessionUpdate, { type: 'context_injected' }>;
+export type ContextInjectedUpdate = Extract<
+  SessionUpdate,
+  { type: 'context_injected' }
+>;
 export type PlanUpdate = Extract<SessionUpdate, { type: 'plan' }>;
 export type JobStartedUpdate = Extract<SessionUpdate, { type: 'job_started' }>;
-export type JobFinishedUpdate = Extract<SessionUpdate, { type: 'job_finished' }>;
+export type JobFinishedUpdate = Extract<
+  SessionUpdate,
+  { type: 'job_finished' }
+>;
 export type JobUpdateUpdate = Extract<SessionUpdate, { type: 'job_update' }>;
 
 /**
@@ -200,6 +236,7 @@ git commit -m "feat(web): add protocol event type definitions
 ### Task 1.2: Create Web-Internal Event Types
 
 **Files:**
+
 - Create: `/Users/jesse/Documents/GitHub/lace/packages/web/types/web-events.ts`
 
 **Step 1: Write the failing test**
@@ -211,7 +248,7 @@ import type {
   WebEvent,
   UserMessageSentEvent,
   AgentStateChangeEvent,
-  AgentSpawnedEvent
+  AgentSpawnedEvent,
 } from '../web-events';
 
 describe('Web Internal Event Types', () => {
@@ -537,6 +574,7 @@ git commit -m "feat(web): add web-internal event types
 ### Task 1.3: Create Unified App Event Types and Type Guards
 
 **Files:**
+
 - Create: `/Users/jesse/Documents/GitHub/lace/packages/web/types/app-events.ts`
 
 **Step 1: Write the failing test**
@@ -666,7 +704,9 @@ export function isProtocolEvent(event: AppEvent): event is ProtocolEvent {
 /**
  * Type guard to check if an event is a permission request event
  */
-export function isPermissionRequestEvent(event: AppEvent): event is PermissionRequestEvent {
+export function isPermissionRequestEvent(
+  event: AppEvent
+): event is PermissionRequestEvent {
   return 'request' in event && event.request !== undefined;
 }
 
@@ -674,7 +714,12 @@ export function isPermissionRequestEvent(event: AppEvent): event is PermissionRe
  * Type guard to check if an event is a web-internal event
  */
 export function isWebEvent(event: AppEvent): event is WebEvent {
-  return 'type' in event && typeof event.type === 'string' && !('update' in event) && !('request' in event);
+  return (
+    'type' in event &&
+    typeof event.type === 'string' &&
+    !('update' in event) &&
+    !('request' in event)
+  );
 }
 
 /**
@@ -713,7 +758,11 @@ export function getAgentSessionId(event: AppEvent): string | undefined {
  * Get the workspace session ID from any event type
  */
 export function getWorkspaceSessionId(event: AppEvent): string | undefined {
-  if (isProtocolEvent(event) || isPermissionRequestEvent(event) || isWebEvent(event)) {
+  if (
+    isProtocolEvent(event) ||
+    isPermissionRequestEvent(event) ||
+    isWebEvent(event)
+  ) {
     return event.workspaceSessionId;
   }
   return undefined;
@@ -748,8 +797,11 @@ git commit -m "feat(web): add unified app event types and type guards
 ### Task 2.1: Modify Supervisor Service to Emit Protocol Events
 
 **Files:**
-- Modify: `/Users/jesse/Documents/GitHub/lace/packages/web/lib/server/supervisor-service.ts`
-- Test: `/Users/jesse/Documents/GitHub/lace/packages/web/lib/server/__tests__/supervisor-service.test.ts`
+
+- Modify:
+  `/Users/jesse/Documents/GitHub/lace/packages/web/lib/server/supervisor-service.ts`
+- Test:
+  `/Users/jesse/Documents/GitHub/lace/packages/web/lib/server/__tests__/supervisor-service.test.ts`
 
 **Step 1: Write the failing test**
 
@@ -766,7 +818,10 @@ If no test exists, create one:
 // packages/web/lib/server/__tests__/supervisor-service.test.ts
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { SupervisorServerEvent } from '@lace/supervisor';
-import type { ProtocolEvent, PermissionRequestEvent } from '@/types/protocol-events';
+import type {
+  ProtocolEvent,
+  PermissionRequestEvent,
+} from '@/types/protocol-events';
 import type { AppEvent } from '@/types/app-events';
 
 // Mock event stream manager
@@ -840,7 +895,8 @@ describe('Supervisor Service - Protocol Event Forwarding', () => {
     bridgeEventToWeb(supervisorEvent);
 
     expect(mockBroadcast).toHaveBeenCalledTimes(1);
-    const broadcasted = mockBroadcast.mock.calls[0][0] as PermissionRequestEvent;
+    const broadcasted = mockBroadcast.mock
+      .calls[0][0] as PermissionRequestEvent;
 
     expect(broadcasted).toMatchObject({
       request: supervisorEvent.request,
@@ -863,7 +919,7 @@ describe('Supervisor Service - Protocol Event Forwarding', () => {
       'session_info',
     ];
 
-    eventTypes.forEach(type => {
+    eventTypes.forEach((type) => {
       mockBroadcast.mockClear();
 
       const supervisorEvent: SupervisorServerEvent = {
@@ -906,7 +962,8 @@ cd /Users/jesse/Documents/GitHub/lace
 head -100 packages/web/lib/server/supervisor-service.ts
 ```
 
-Take note of the current `updateToLaceEvents()` function and `bridgeEventToWeb()` implementation.
+Take note of the current `updateToLaceEvents()` function and
+`bridgeEventToWeb()` implementation.
 
 **Step 4: Implement protocol event forwarding**
 
@@ -917,7 +974,10 @@ Update the supervisor service to forward protocol events directly:
 // Replace updateToLaceEvents translation with direct forwarding
 
 import type { SupervisorServerEvent } from '@lace/supervisor';
-import type { ProtocolEvent, PermissionRequestEvent } from '@/types/protocol-events';
+import type {
+  ProtocolEvent,
+  PermissionRequestEvent,
+} from '@/types/protocol-events';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { randomUUID } from 'crypto';
 
@@ -984,8 +1044,11 @@ git commit -m "refactor(web): forward protocol events directly from supervisor
 ### Task 3.1: Update EventStreamManager to Handle AppEvent Types
 
 **Files:**
-- Modify: `/Users/jesse/Documents/GitHub/lace/packages/web/lib/event-stream-manager.ts`
-- Test: `/Users/jesse/Documents/GitHub/lace/packages/web/lib/__tests__/event-stream-manager.test.ts`
+
+- Modify:
+  `/Users/jesse/Documents/GitHub/lace/packages/web/lib/event-stream-manager.ts`
+- Test:
+  `/Users/jesse/Documents/GitHub/lace/packages/web/lib/__tests__/event-stream-manager.test.ts`
 
 **Step 1: Write the failing test**
 
@@ -1084,7 +1147,9 @@ describe('EventStreamManager - AppEvent Support', () => {
       agentSessionId: 'sess_456',
     };
 
-    const connectionId = manager.createConnection('ws_123', { agentSessionId: 'sess_123' });
+    const connectionId = manager.createConnection('ws_123', {
+      agentSessionId: 'sess_123',
+    });
 
     manager.subscribe(connectionId, (event) => {
       receivedEvents.push(event);
@@ -1227,7 +1292,10 @@ export class EventStreamManager {
   /**
    * Subscribe to events for a connection
    */
-  public subscribe(connectionId: string, callback: (event: AppEvent) => void): void {
+  public subscribe(
+    connectionId: string,
+    callback: (event: AppEvent) => void
+  ): void {
     const connection = this.connections.get(connectionId);
     if (!connection) {
       throw new Error(`Connection ${connectionId} not found`);
@@ -1250,17 +1318,26 @@ export class EventStreamManager {
   /**
    * Determine if an event should be sent to a connection based on its filter
    */
-  private shouldSendToConnection(event: AppEvent, filter: ConnectionFilter): boolean {
+  private shouldSendToConnection(
+    event: AppEvent,
+    filter: ConnectionFilter
+  ): boolean {
     // Workspace session must match
     const eventWorkspaceSessionId = getWorkspaceSessionId(event);
-    if (filter.workspaceSessionId && eventWorkspaceSessionId !== filter.workspaceSessionId) {
+    if (
+      filter.workspaceSessionId &&
+      eventWorkspaceSessionId !== filter.workspaceSessionId
+    ) {
       return false;
     }
 
     // Agent session must match if filter is set
     if (filter.agentSessionId) {
       const eventAgentSessionId = getAgentSessionId(event);
-      if (!eventAgentSessionId || eventAgentSessionId !== filter.agentSessionId) {
+      if (
+        !eventAgentSessionId ||
+        eventAgentSessionId !== filter.agentSessionId
+      ) {
         return false;
       }
     }
@@ -1331,8 +1408,10 @@ git commit -m "refactor(web): update EventStreamManager for AppEvent types
 ### Task 3.2: Update SSEStore for AppEvent Types
 
 **Files:**
+
 - Modify: `/Users/jesse/Documents/GitHub/lace/packages/web/lib/sse-store.ts`
-- Test: `/Users/jesse/Documents/GitHub/lace/packages/web/lib/__tests__/sse-store.test.ts`
+- Test:
+  `/Users/jesse/Documents/GitHub/lace/packages/web/lib/__tests__/sse-store.test.ts`
 
 **Step 1: Write the failing test**
 
@@ -1380,9 +1459,8 @@ describe('SSEStore - AppEvent Support', () => {
       agentSessionId: 'sess_123',
     };
 
-    store.subscribe(
-      { protocolEventTypes: ['text_delta'] },
-      (event) => receivedEvents.push(event)
+    store.subscribe({ protocolEventTypes: ['text_delta'] }, (event) =>
+      receivedEvents.push(event)
     );
 
     store.emit(textEvent);
@@ -1407,13 +1485,16 @@ describe('SSEStore - AppEvent Support', () => {
       id: 'evt_2',
       timestamp: new Date(),
       type: 'AGENT_STATE_CHANGE',
-      data: { agentSessionId: 'sess_123', previousState: 'idle', newState: 'thinking' },
+      data: {
+        agentSessionId: 'sess_123',
+        previousState: 'idle',
+        newState: 'thinking',
+      },
       workspaceSessionId: 'ws_123',
     };
 
-    store.subscribe(
-      { webEventTypes: ['USER_MESSAGE_SENT'] },
-      (event) => receivedEvents.push(event)
+    store.subscribe({ webEventTypes: ['USER_MESSAGE_SENT'] }, (event) =>
+      receivedEvents.push(event)
     );
 
     store.emit(userMessageEvent);
@@ -1452,9 +1533,8 @@ describe('SSEStore - AppEvent Support', () => {
       agentSessionId: 'sess_456',
     };
 
-    store.subscribe(
-      { agentSessionId: 'sess_123' },
-      (event) => receivedEvents.push(event)
+    store.subscribe({ agentSessionId: 'sess_123' }, (event) =>
+      receivedEvents.push(event)
     );
 
     store.emit(event1);
@@ -1480,9 +1560,8 @@ describe('SSEStore - AppEvent Support', () => {
       agentSessionId: 'sess_123',
     };
 
-    const unsubscribe = store.subscribe(
-      {},
-      (event) => receivedEvents.push(event)
+    const unsubscribe = store.subscribe({}, (event) =>
+      receivedEvents.push(event)
     );
 
     store.emit(event);
@@ -1677,7 +1756,9 @@ git commit -m "refactor(web): update SSEStore for AppEvent types
 ### Task 3.3: Update Stream Event Types
 
 **Files:**
-- Modify: `/Users/jesse/Documents/GitHub/lace/packages/web/types/stream-events.ts`
+
+- Modify:
+  `/Users/jesse/Documents/GitHub/lace/packages/web/types/stream-events.ts`
 
 **Step 1: Read current stream-events.ts**
 
@@ -1750,8 +1831,11 @@ git commit -m "refactor(web): update stream event types for AppEvent
 ### Task 4.1: Update useEventStream Hook
 
 **Files:**
-- Modify: `/Users/jesse/Documents/GitHub/lace/packages/web/hooks/useEventStream.ts`
-- Test: `/Users/jesse/Documents/GitHub/lace/packages/web/hooks/__tests__/useEventStream.test.tsx`
+
+- Modify:
+  `/Users/jesse/Documents/GitHub/lace/packages/web/hooks/useEventStream.ts`
+- Test:
+  `/Users/jesse/Documents/GitHub/lace/packages/web/hooks/__tests__/useEventStream.test.tsx`
 
 **Step 1: Write the failing test**
 
@@ -1952,7 +2036,7 @@ import type { AppEvent } from '@/types/app-events';
 import {
   isProtocolEvent,
   isPermissionRequestEvent,
-  isWebEvent
+  isWebEvent,
 } from '@/types/app-events';
 import { SSEStore } from '@/lib/sse-store';
 
@@ -1961,13 +2045,30 @@ import { SSEStore } from '@/lib/sse-store';
  */
 export interface EventHandlers {
   // Protocol events
-  onTextDelta?: (data: { text: string; agentSessionId: string; streamSeq: number }) => void;
+  onTextDelta?: (data: {
+    text: string;
+    agentSessionId: string;
+    streamSeq: number;
+  }) => void;
   onThinking?: (data: { text: string; agentSessionId: string }) => void;
   onUsage?: (data: { inputTokens: number; outputTokens: number }) => void;
-  onToolCall?: (data: { toolCallId: string; name: string; input: unknown; status: string }) => void;
-  onToolResult?: (data: { toolCallId: string; outcome: string; content: unknown[] }) => void;
+  onToolCall?: (data: {
+    toolCallId: string;
+    name: string;
+    input: unknown;
+    status: string;
+  }) => void;
+  onToolResult?: (data: {
+    toolCallId: string;
+    outcome: string;
+    content: unknown[];
+  }) => void;
   onTurnStart?: (data: { turnId: string; agentSessionId: string }) => void;
-  onTurnEnd?: (data: { turnId: string; content: unknown[]; agentSessionId: string }) => void;
+  onTurnEnd?: (data: {
+    turnId: string;
+    content: unknown[];
+    agentSessionId: string;
+  }) => void;
   onError?: (data: { code: string; message: string; phase?: string }) => void;
 
   // Permission requests
@@ -1981,8 +2082,15 @@ export interface EventHandlers {
 
   // Web events
   onUserMessage?: (data: { content: string; agentSessionId: string }) => void;
-  onAgentStateChange?: (data: { agentSessionId: string; previousState: string; newState: string }) => void;
-  onAgentSpawned?: (data: { agentSessionId: string; parentSessionId?: string }) => void;
+  onAgentStateChange?: (data: {
+    agentSessionId: string;
+    previousState: string;
+    newState: string;
+  }) => void;
+  onAgentSpawned?: (data: {
+    agentSessionId: string;
+    parentSessionId?: string;
+  }) => void;
 
   // Generic fallback
   onEvent?: (event: AppEvent) => void;
@@ -2240,8 +2348,11 @@ git commit -m "refactor(web): rewrite useEventStream for protocol events
 This task handles the complex timeline event aggregation logic.
 
 **Files:**
-- Modify: `/Users/jesse/Documents/GitHub/lace/packages/web/hooks/useProcessedEvents.ts`
-- Test: `/Users/jesse/Documents/GitHub/lace/packages/web/hooks/__tests__/useProcessedEvents.test.tsx`
+
+- Modify:
+  `/Users/jesse/Documents/GitHub/lace/packages/web/hooks/useProcessedEvents.ts`
+- Test:
+  `/Users/jesse/Documents/GitHub/lace/packages/web/hooks/__tests__/useProcessedEvents.test.tsx`
 
 **Step 1: Write the failing test**
 
@@ -2464,6 +2575,7 @@ cat packages/web/hooks/useProcessedEvents.ts
 **Step 4: Implement protocol event processing**
 
 This is a large rewrite. The implementation needs to:
+
 - Aggregate `text_delta` events by turn ID
 - Pair `tool_use` pending/completed events by toolCallId
 - Handle thinking, errors, and other event types
@@ -2472,21 +2584,25 @@ This is a large rewrite. The implementation needs to:
 // packages/web/hooks/useProcessedEvents.ts
 import { useMemo } from 'react';
 import type { AppEvent } from '@/types/app-events';
-import { isProtocolEvent, isPermissionRequestEvent, isWebEvent } from '@/types/app-events';
+import {
+  isProtocolEvent,
+  isPermissionRequestEvent,
+  isWebEvent,
+} from '@/types/app-events';
 import type { ProtocolEvent } from '@/types/protocol-events';
 
 /**
  * Processed event types for timeline rendering
  */
 export type ProcessedEventType =
-  | 'message'      // Aggregated text_delta or turn_end
-  | 'thinking'     // Thinking tokens
-  | 'tool'         // Tool call + result pair
-  | 'error'        // Error event
-  | 'permission'   // Permission request
+  | 'message' // Aggregated text_delta or turn_end
+  | 'thinking' // Thinking tokens
+  | 'tool' // Tool call + result pair
+  | 'error' // Error event
+  | 'permission' // Permission request
   | 'user_message' // User message
-  | 'system'       // System message
-  | 'metadata';    // Session info, context window, etc.
+  | 'system' // System message
+  | 'metadata'; // Session info, context window, etc.
 
 export interface ProcessedEvent {
   id: string;
@@ -2543,7 +2659,10 @@ export function useProcessedEvents(events: AppEvent[]): {
 function processEvents(events: AppEvent[]): ProcessedEvent[] {
   const processed: ProcessedEvent[] = [];
   const textDeltasByTurn = new Map<string, ProtocolEvent[]>();
-  const toolCallsById = new Map<string, { call?: ProtocolEvent; result?: ProtocolEvent }>();
+  const toolCallsById = new Map<
+    string,
+    { call?: ProtocolEvent; result?: ProtocolEvent }
+  >();
 
   // First pass: collect text deltas and tool calls
   for (const event of events) {
@@ -2558,7 +2677,11 @@ function processEvents(events: AppEvent[]): ProcessedEvent[] {
         const existing = toolCallsById.get(update.toolCallId) || {};
         if (update.status === 'pending' || update.status === 'running') {
           existing.call = event;
-        } else if (update.status === 'completed' || update.status === 'failed' || update.status === 'denied') {
+        } else if (
+          update.status === 'completed' ||
+          update.status === 'failed' ||
+          update.status === 'denied'
+        ) {
           existing.result = event;
         }
         toolCallsById.set(update.toolCallId, existing);
@@ -2625,7 +2748,7 @@ function processProtocolEvent(
       if (isLastInTurn) {
         // Aggregate all text deltas for this turn
         const aggregatedText = turnDeltas
-          .map(e => (e.update as any).text || '')
+          .map((e) => (e.update as any).text || '')
           .join('');
 
         return {
@@ -2659,8 +2782,12 @@ function processProtocolEvent(
       if (!toolPair?.call) return null;
 
       // Only create processed event when we have the result
-      if (update.status === 'completed' || update.status === 'failed' || update.status === 'denied') {
-        const callUpdate = (toolPair.call.update as any);
+      if (
+        update.status === 'completed' ||
+        update.status === 'failed' ||
+        update.status === 'denied'
+      ) {
+        const callUpdate = toolPair.call.update as any;
         const resultUpdate = update;
 
         return {
@@ -2757,7 +2884,9 @@ function processProtocolEvent(
 /**
  * Process a permission request event
  */
-function processPermissionRequest(event: PermissionRequestEvent): ProcessedEvent {
+function processPermissionRequest(
+  event: PermissionRequestEvent
+): ProcessedEvent {
   const { request } = event;
 
   return {
@@ -2837,26 +2966,32 @@ git commit -m "refactor(web): rewrite useProcessedEvents for protocol events
 ## Remaining Phases Summary
 
 **Phase 4 (continued):**
+
 - Task 4.3: Update useAgentEvents hook
 - Task 4.4: Update useAgentTokenUsage hook
 
 **Phase 5: Timeline Components** (10-14 hours)
+
 - Task 5.1: Update TimelineView
 - Task 5.2: Update TimelineMessage
 - Task 5.3: Update AgentErrorEntry
 - Task 5.4: Update other timeline components
 
 **Phase 6: Provider Components** (4-6 hours)
+
 - Task 6.1: Update EventStreamProvider
 
 **Phase 7: API Routes** (2-3 hours)
+
 - Task 7.1: Update agent history API route
 
 **Phase 8: Debug & Testing** (6-8 hours)
+
 - Task 8.1: Update EventStreamMonitor
 - Task 8.2: Update test files and fixtures
 
 **Phase 9: Cleanup** (1-2 hours)
+
 - Task 9.1: Remove LaceEvent imports from web package
 - Task 9.2: Update documentation
 
@@ -2865,6 +3000,7 @@ git commit -m "refactor(web): rewrite useProcessedEvents for protocol events
 ## Notes on Test-Driven Development
 
 Each task follows TDD:
+
 1. Write failing test first
 2. Run test to verify failure
 3. Implement minimal code to pass
@@ -2872,6 +3008,7 @@ Each task follows TDD:
 5. Commit
 
 This ensures:
+
 - All new code is tested
 - Tests actually test behavior (not mocks)
 - Regression protection
@@ -2904,7 +3041,8 @@ if (USE_PROTOCOL_EVENTS) {
 
 ## Performance Considerations
 
-- **Event aggregation**: `useProcessedEvents` may be expensive for large event lists
+- **Event aggregation**: `useProcessedEvents` may be expensive for large event
+  lists
   - Consider memoization strategies
   - Add virtual scrolling for timeline if needed
 

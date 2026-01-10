@@ -1,14 +1,16 @@
 # ACP Session Usage Alignment Spec
 
-**Date:** 2026-01-05
-**Status:** Analysis Complete
-**Related:** [RFD: Session Usage and Context Status](../../reference/acp/rfd-session-usage.md)
+**Date:** 2026-01-05 **Status:** Analysis Complete **Related:**
+[RFD: Session Usage and Context Status](../../reference/acp/rfd-session-usage.md)
 
 ---
 
 ## Executive Summary
 
-The ACP RFD proposes separating **per-turn token usage** (in `PromptResponse`) from **session-level context status** (pushed via `session/update` notifications). Our current Ent implementation partially covers this but uses different field naming and lacks the context window status notification.
+The ACP RFD proposes separating **per-turn token usage** (in `PromptResponse`)
+from **session-level context status** (pushed via `session/update`
+notifications). Our current Ent implementation partially covers this but uses
+different field naming and lacks the context window status notification.
 
 ---
 
@@ -33,6 +35,7 @@ export const UsageInfoSchema = z
 ```
 
 **Used in:**
+
 - `SessionPromptResultSchema` (line 312) - the `session/prompt` response
 - `SessionUpdateTurnEndSchema` (line 1515) - the `turn_end` notification
 
@@ -54,7 +57,8 @@ const SessionUpdateUsageSchema = z
   .strict();
 ```
 
-This is a per-turn usage update sent during streaming, NOT a context window status.
+This is a per-turn usage update sent during streaming, NOT a context window
+status.
 
 ### 3. Cost in PromptResponse
 
@@ -92,7 +96,8 @@ After `ent/session/compact`, we emit a durable event:
 }
 ```
 
-**Note:** This is internal durability, NOT a protocol notification to the client.
+**Note:** This is internal durability, NOT a protocol notification to the
+client.
 
 ---
 
@@ -102,9 +107,9 @@ After `ent/session/compact`, we emit a durable event:
 
 ```typescript
 interface Usage {
-  total_tokens: number;        // REQUIRED
-  input_tokens: number;        // REQUIRED
-  output_tokens: number;       // REQUIRED
+  total_tokens: number; // REQUIRED
+  input_tokens: number; // REQUIRED
+  output_tokens: number; // REQUIRED
   thought_tokens?: number;
   cached_read_tokens?: number;
   cached_write_tokens?: number;
@@ -112,6 +117,7 @@ interface Usage {
 ```
 
 Key differences from Ent:
+
 - Uses `snake_case` (ACP standard) vs `camelCase` (Ent)
 - `total_tokens` is REQUIRED in ACP, optional in Ent
 - Cost is NOT included in usage (separate concern)
@@ -120,17 +126,18 @@ Key differences from Ent:
 
 ```typescript
 interface UsageUpdate {
-  type: "usage_update";
-  used: number;   // tokens currently in context
-  size: number;   // max context window
+  type: 'usage_update';
+  used: number; // tokens currently in context
+  size: number; // max context window
   cost?: {
     amount: number;
-    currency: string;  // ISO 4217
+    currency: string; // ISO 4217
   };
 }
 ```
 
 This is completely missing from Ent. We have no way to tell clients:
+
 - How full the context window is
 - What the max context size is
 - When to warn about approaching limits
@@ -139,14 +146,14 @@ This is completely missing from Ent. We have no way to tell clients:
 
 ## Gap Analysis
 
-| Feature | ACP RFD | Ent Current | Gap |
-|---------|---------|-------------|-----|
-| Per-turn usage | `Usage` in result | `UsageInfoSchema` | Field naming (snake_case vs camelCase) |
-| total_tokens required | Yes | Optional | Need to make required |
-| Context window used | `usage_update.used` | Missing | Need to add |
-| Context window size | `usage_update.size` | Missing | Need to add |
-| Cost currency | ISO 4217 any | USD only | Low priority |
-| Update timing | Push on change | Only in results | Need notification |
+| Feature               | ACP RFD             | Ent Current       | Gap                                    |
+| --------------------- | ------------------- | ----------------- | -------------------------------------- |
+| Per-turn usage        | `Usage` in result   | `UsageInfoSchema` | Field naming (snake_case vs camelCase) |
+| total_tokens required | Yes                 | Optional          | Need to make required                  |
+| Context window used   | `usage_update.used` | Missing           | Need to add                            |
+| Context window size   | `usage_update.size` | Missing           | Need to add                            |
+| Cost currency         | ISO 4217 any        | USD only          | Low priority                           |
+| Update timing         | Push on change      | Only in results   | Need notification                      |
 
 ---
 
@@ -154,7 +161,8 @@ This is completely missing from Ent. We have no way to tell clients:
 
 ### Phase 1: Add Context Window Notification (High Priority)
 
-**Why:** Clients need to know context utilization to warn users and trigger compaction.
+**Why:** Clients need to know context utilization to warn users and trigger
+compaction.
 
 #### 1.1 Add SessionUpdateContextWindow Schema
 
@@ -166,14 +174,15 @@ Add after `SessionUpdateUsageSchema`:
 const SessionUpdateContextWindowSchema = z
   .object({
     type: z.literal('context_window'),
-    used: z.number(),      // tokens currently in context
-    size: z.number(),      // max context window size
-    percentage: z.number().optional(),  // convenience: used/size * 100
+    used: z.number(), // tokens currently in context
+    size: z.number(), // max context window size
+    percentage: z.number().optional(), // convenience: used/size * 100
   })
   .strict();
 ```
 
-**Note:** We deviate from ACP's `usage_update` type name to avoid confusion with our existing `usage` type which is per-turn.
+**Note:** We deviate from ACP's `usage_update` type name to avoid confusion with
+our existing `usage` type which is per-turn.
 
 #### 1.2 Register in Discriminated Unions
 
@@ -201,7 +210,8 @@ In the turn completion handler, emit context window status after usage.
 
 ### Phase 2: Keep camelCase (Medium Priority)
 
-**Decision**: Keep Ent's `camelCase` for usage fields. The Ent protocol is already an extension of ACP. Document the field mapping in protocol docs.
+**Decision**: Keep Ent's `camelCase` for usage fields. The Ent protocol is
+already an extension of ACP. Document the field mapping in protocol docs.
 
 No migration needed - this is intentional divergence.
 
@@ -219,16 +229,18 @@ Ensure all usage producers calculate this.
 
 ## Compaction Event Relationship
 
-The `context_compacted` durable event and `context_window` notification serve different purposes:
+The `context_compacted` durable event and `context_window` notification serve
+different purposes:
 
-| Aspect | `context_compacted` (durable) | `context_window` (notification) |
-|--------|-------------------------------|----------------------------------|
-| Storage | Written to `events.jsonl` | Fire-and-forget to client |
-| Purpose | Audit/replay | UI updates |
-| Content | Strategy, messages affected | Current utilization |
-| Timing | Once per compaction | After compaction + turns |
+| Aspect  | `context_compacted` (durable) | `context_window` (notification) |
+| ------- | ----------------------------- | ------------------------------- |
+| Storage | Written to `events.jsonl`     | Fire-and-forget to client       |
+| Purpose | Audit/replay                  | UI updates                      |
+| Content | Strategy, messages affected   | Current utilization             |
+| Timing  | Once per compaction           | After compaction + turns        |
 
 They work together:
+
 1. Compaction runs
 2. `context_compacted` event persisted
 3. `context_window` notification sent to clients
@@ -257,24 +269,26 @@ const SessionUpdateContextWindowSchema = z
 ```typescript
 const SessionUpdateInnerNonJobSchema = z.discriminatedUnion('type', [
   // ... existing ...
-  SessionUpdateContextWindowSchema,  // Add this
+  SessionUpdateContextWindowSchema, // Add this
 ]);
 
 const _SessionUpdateInnerSchema = z.discriminatedUnion('type', [
   // ... existing ...
-  SessionUpdateContextWindowSchema,  // Add this
+  SessionUpdateContextWindowSchema, // Add this
 ]);
 
 const SessionUpdateParamsSchema = z.discriminatedUnion('type', [
   // ... existing ...
-  SessionUpdateBaseParamsSchema.merge(SessionUpdateContextWindowSchema),  // Add this
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateContextWindowSchema), // Add this
 ]);
 ```
 
 ### Optional: Export Type
 
 ```typescript
-export type SessionUpdateContextWindow = z.infer<typeof SessionUpdateContextWindowSchema>;
+export type SessionUpdateContextWindow = z.infer<
+  typeof SessionUpdateContextWindowSchema
+>;
 ```
 
 ---
@@ -285,8 +299,10 @@ export type SessionUpdateContextWindow = z.infer<typeof SessionUpdateContextWind
 2. **Agent emission** - Emit after compaction and turns
 3. **Supervisor forwarding** - Ensure notification reaches clients
 4. **Client handling** - Update UI to show context utilization
-5. **Update `docs/protocol-spec.md`** - Add `context_window` to session/update types, document field mapping (camelCase vs snake_case)
-6. **Update `docs/about-the-protocol.md`** - Document alignment with ACP usage RFD
+5. **Update `docs/protocol-spec.md`** - Add `context_window` to session/update
+   types, document field mapping (camelCase vs snake_case)
+6. **Update `docs/about-the-protocol.md`** - Document alignment with ACP usage
+   RFD
 
 ---
 
