@@ -1,9 +1,6 @@
 // ABOUTME: Agent server entry point - orchestrates RPC handlers and delegates to specialized modules
 
-import { randomUUID } from 'node:crypto';
-import { readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
-import { AcpErrorCodes, type JsonRpcPeer } from '@lace/ent-protocol';
+import type { JsonRpcPeer } from '@lace/ent-protocol';
 import { loadSession, readSessionState, writeSessionState } from './storage/session-store';
 import { appendDurableEvent } from './storage/event-log';
 import { ProviderCatalogManager } from './providers/catalog/manager';
@@ -13,21 +10,21 @@ import { ToolExecutor } from './tools/executor';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import { createRunShellJobProcess } from './jobs/shell-job';
 import { runSubagentJobProcess as runSubagentJobProcessImpl } from './jobs/subagent-job';
-import { getJobOutputPath } from './jobs/job-manager';
 import {
   createQueueJobNotification,
   createSetupProgressTimer,
   createFinalizeJob,
 } from './jobs/job-notifications';
 import {
-  MAX_CONCURRENT_JOBS,
-  type SessionUpdate,
-  type JobType,
-  type JobStatus,
-  type JobState,
-  type AgentServerState,
-} from './server-types';
-import { toNonEmptyString, toolKindFromName } from './rpc/utils';
+  createShellJob,
+  createSubagentJob,
+  JobCreationError,
+  type CreateShellJobOptions,
+  type CreateSubagentJobOptions,
+} from './jobs/job-creation';
+import { createJobDerivation } from './jobs/job-derivation';
+import { type SessionUpdate, type JobState, type AgentServerState } from './server-types';
+import { toolKindFromName } from './rpc/utils';
 import { requestPermissionFromClient, reissuePendingPermissionRequests } from './rpc/permissions';
 import { registerAllHandlers } from './rpc/register-handlers';
 
@@ -101,24 +98,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     }
   };
 
-  // Cache for deriveJobsForActiveSession - avoids re-reading events.jsonl on every call
-  let jobsCache: {
-    sessionId: string;
-    fileSize: number;
-    fileMtime: number;
-    result: Array<{
-      jobId: string;
-      parentJobId?: string;
-      type: JobType;
-      status: JobStatus;
-      description?: string;
-      command?: string;
-      startTime: string;
-      exitCode?: number;
-      subagentSessionId?: string;
-    }>;
-  } | null = null;
-
   const emitSessionUpdate = async (
     update: SessionUpdate,
     context?: { turnId?: string; turnSeq?: number; jobId?: string }
@@ -182,196 +161,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   const _reissuePendingPermissionRequests = async (): Promise<void> =>
     reissuePendingPermissionRequests(peer, state, runExclusive);
 
-  const _startShellJob = async (options: {
-    command: string;
-    description?: string;
-    parentJobId?: string;
-    turnContext?: { turnId: string; turnSeq: number };
-    progressIntervalMs?: number;
-  }): Promise<{ jobId: string }> => {
-    if (!state.activeSession)
-      throw {
-        code: AcpErrorCodes.SessionNotFound,
-        message: 'SessionNotFound',
-        data: { category: 'session' },
-      };
-
-    // Check concurrent job limit
-    const runningJobCount = [...state.jobs.values()].filter((j) => j.status === 'running').length;
-    if (runningJobCount >= MAX_CONCURRENT_JOBS) {
-      throw {
-        code: -32003, // ResourceLimitExceeded
-        message: `Maximum concurrent jobs (${MAX_CONCURRENT_JOBS}) exceeded`,
-        data: { category: 'session' },
-      };
-    }
-
-    const jobId = `job_${randomUUID()}`;
-    const startedAt = new Date().toISOString();
-    const outputPath = getJobOutputPath(state.activeSession.dir, jobId);
-
-    let resolveCompletion!: () => void;
-    const completion = new Promise<void>((resolve) => {
-      resolveCompletion = resolve;
-    });
-
-    const job: JobState = {
-      jobId,
-      parentJobId: options.parentJobId,
-      type: 'bash',
-      status: 'running',
-      description: options.description,
-      command: options.command,
-      startedAt,
-      originTurnId: options.turnContext?.turnId,
-      originTurnSeq: options.turnContext?.turnSeq,
-      outputPath,
-      finished: false,
-      completion,
-      resolveCompletion,
-      progressIntervalMs: options.progressIntervalMs,
-    };
-
-    state.jobs.set(jobId, job);
-
-    await runExclusive(() => {
-      let sessionState = readSessionState(state.activeSession!.dir);
-      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
-        type: 'job_started',
-        turnId: options.turnContext?.turnId,
-        turnSeq: options.turnContext?.turnSeq,
-        data: {
-          jobId,
-          parentJobId: options.parentJobId,
-          jobType: 'bash',
-          description: options.description,
-          command: options.command,
-        },
-      });
-      sessionState = nextState;
-      writeSessionState(state.activeSession!.dir, sessionState);
-      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-    });
-
-    await emitSessionUpdate(
-      {
-        type: 'job_started',
-        jobId,
-        parentJobId: options.parentJobId,
-        jobType: 'bash',
-        description: options.description,
-      },
-      options.turnContext
-        ? { turnId: options.turnContext.turnId, turnSeq: options.turnContext.turnSeq }
-        : undefined
-    );
-
-    // Set up progress timer for background job
-    setupProgressTimer(job);
-
-    void runShellJobProcess(job);
-    return { jobId };
-  };
-
-  const startSubagentJob = async (options: {
-    prompt: string;
-    description?: string;
-    parentJobId?: string;
-    turnContext?: { turnId: string; turnSeq: number };
-    resumeSessionId?: string;
-    progressIntervalMs?: number;
-    connectionId?: string;
-    modelId?: string;
-  }): Promise<{ jobId: string }> => {
-    if (!state.activeSession)
-      throw {
-        code: AcpErrorCodes.SessionNotFound,
-        message: 'SessionNotFound',
-        data: { category: 'session' },
-      };
-
-    // Check concurrent job limit
-    const runningJobCount = [...state.jobs.values()].filter((j) => j.status === 'running').length;
-    if (runningJobCount >= MAX_CONCURRENT_JOBS) {
-      throw {
-        code: -32003, // ResourceLimitExceeded
-        message: `Maximum concurrent jobs (${MAX_CONCURRENT_JOBS}) exceeded`,
-        data: { category: 'session' },
-      };
-    }
-
-    const jobId = `job_${randomUUID()}`;
-    const startedAt = new Date().toISOString();
-    const outputPath = getJobOutputPath(state.activeSession.dir, jobId);
-
-    let resolveCompletion!: () => void;
-    const completion = new Promise<void>((resolve) => {
-      resolveCompletion = resolve;
-    });
-
-    const job: JobState = {
-      jobId,
-      parentJobId: options.parentJobId,
-      type: 'delegate',
-      status: 'running',
-      description: options.description ?? 'Subagent',
-      command: options.prompt,
-      subagentContent: [{ type: 'text', text: options.prompt }],
-      startedAt,
-      originTurnId: options.turnContext?.turnId,
-      originTurnSeq: options.turnContext?.turnSeq,
-      outputPath,
-      finished: false,
-      completion,
-      resolveCompletion,
-      progressIntervalMs: options.progressIntervalMs,
-      connectionId: options.connectionId,
-      modelId: options.modelId,
-      // For resume: pre-set the subagentSessionId if resuming a previous session
-      ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
-    };
-
-    state.jobs.set(jobId, job);
-
-    await runExclusive(() => {
-      let sessionState = readSessionState(state.activeSession!.dir);
-      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
-        type: 'job_started',
-        turnId: options.turnContext?.turnId,
-        turnSeq: options.turnContext?.turnSeq,
-        data: {
-          jobId,
-          parentJobId: options.parentJobId,
-          jobType: 'delegate',
-          description: job.description,
-          command: options.prompt,
-        },
-      });
-      sessionState = nextState;
-      writeSessionState(state.activeSession!.dir, sessionState);
-      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-    });
-
-    await emitSessionUpdate(
-      {
-        type: 'job_started',
-        jobId,
-        parentJobId: options.parentJobId,
-        jobType: 'delegate',
-        description: job.description,
-      },
-      options.turnContext
-        ? { turnId: options.turnContext.turnId, turnSeq: options.turnContext.turnSeq }
-        : undefined
-    );
-
-    // Set up progress timer for background job
-    setupProgressTimer(job);
-
-    void runSubagentJobProcess(job);
-    return { jobId };
-  };
-
+  // Create job process runners - needed by job creation deps
   const runShellJobProcess = createRunShellJobProcess({
     getState: () => ({
       activeSession: state.activeSession,
@@ -394,153 +184,82 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
   };
 
-  const deriveJobsForActiveSession = (): Array<{
+  // Persist job_started event to session storage
+  const persistJobStartedEvent = async (event: {
     jobId: string;
     parentJobId?: string;
-    type: JobType;
-    status: JobStatus;
+    jobType: 'bash' | 'delegate';
     description?: string;
     command?: string;
-    startTime: string;
-    exitCode?: number;
-    subagentSessionId?: string;
-  }> => {
-    if (!state.activeSession) return [];
-
-    const sessionId = state.activeSession.meta.sessionId;
-    const sessionDir = state.activeSession.dir;
-    const eventsPath = join(sessionDir, 'events.jsonl');
-
-    // Check cache validity
-    let fileSize = 0;
-    let fileMtime = 0;
-    try {
-      const stats = statSync(eventsPath);
-      fileSize = stats.size;
-      fileMtime = stats.mtimeMs;
-    } catch {
-      return [];
-    }
-
-    if (
-      jobsCache &&
-      jobsCache.sessionId === sessionId &&
-      jobsCache.fileSize === fileSize &&
-      jobsCache.fileMtime === fileMtime
-    ) {
-      // Cache hit - but still need to update running job status from in-memory state
-      const result = jobsCache.result.map((job) => {
-        if (job.status === 'running' && !state.jobs.has(job.jobId)) {
-          return { ...job, status: 'failed' as JobStatus };
-        }
-        return job;
+    turnContext?: { turnId: string; turnSeq: number };
+  }): Promise<void> => {
+    await runExclusive(() => {
+      let sessionState = readSessionState(state.activeSession!.dir);
+      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+        type: 'job_started',
+        turnId: event.turnContext?.turnId,
+        turnSeq: event.turnContext?.turnSeq,
+        data: {
+          jobId: event.jobId,
+          parentJobId: event.parentJobId,
+          jobType: event.jobType,
+          description: event.description,
+          command: event.command,
+        },
       });
-      return result;
-    }
-
-    // Cache miss - read and parse the file
-    let raw = '';
-    try {
-      raw = readFileSync(eventsPath, 'utf8');
-    } catch {
-      return [];
-    }
-
-    const byId = new Map<
-      string,
-      {
-        jobId: string;
-        parentJobId?: string;
-        type: JobType;
-        status: JobStatus;
-        description?: string;
-        command?: string;
-        startTime: string;
-        exitCode?: number;
-        subagentSessionId?: string;
-      }
-    >();
-
-    const lines = raw.split('\n');
-    for (const line of lines) {
-      if (!line) continue;
-      try {
-        const parsed = JSON.parse(line) as { type?: string; timestamp?: string; data?: unknown };
-        if (
-          parsed.type !== 'job_started' &&
-          parsed.type !== 'job_finished' &&
-          parsed.type !== 'job_session_assigned'
-        )
-          continue;
-        const timestamp = typeof parsed.timestamp === 'string' ? parsed.timestamp : undefined;
-        const data = (parsed.data ?? {}) as Record<string, unknown>;
-        const jobId = toNonEmptyString(data.jobId);
-        if (!jobId) continue;
-
-        if (parsed.type === 'job_started') {
-          const jobType = data.jobType === 'delegate' ? 'delegate' : 'bash';
-          const startTime = timestamp ?? new Date().toISOString();
-          byId.set(jobId, {
-            jobId,
-            parentJobId: toNonEmptyString(data.parentJobId) ?? undefined,
-            type: jobType,
-            status: 'running',
-            description: toNonEmptyString(data.description) ?? undefined,
-            command: toNonEmptyString(data.command) ?? undefined,
-            startTime,
-          });
-        } else if (parsed.type === 'job_session_assigned') {
-          const existing = byId.get(jobId);
-          const subagentSessionId = toNonEmptyString(data.subagentSessionId);
-          if (existing && subagentSessionId) {
-            existing.subagentSessionId = subagentSessionId;
-          }
-        } else {
-          const existing = byId.get(jobId);
-          const exitCode = typeof data.exitCode === 'number' ? data.exitCode : undefined;
-          const outcome =
-            data.outcome === 'completed' ||
-            data.outcome === 'failed' ||
-            data.outcome === 'cancelled'
-              ? data.outcome
-              : undefined;
-
-          if (existing) {
-            existing.status = outcome ?? existing.status;
-            existing.exitCode = exitCode;
-          } else {
-            byId.set(jobId, {
-              jobId,
-              type: 'bash',
-              status: outcome ?? 'failed',
-              startTime: timestamp ?? new Date().toISOString(),
-              exitCode,
-            });
-          }
-        }
-      } catch {
-        // Ignore malformed lines.
-      }
-    }
-
-    // Update cache with parsed results (before applying running status updates)
-    const parsedResult = Array.from(byId.values());
-    jobsCache = {
-      sessionId,
-      fileSize,
-      fileMtime,
-      result: parsedResult,
-    };
-
-    // Apply running job status updates from in-memory state
-    for (const job of parsedResult) {
-      if (job.status === 'running' && !state.jobs.has(job.jobId)) {
-        job.status = 'failed';
-      }
-    }
-
-    return parsedResult;
+      sessionState = nextState;
+      writeSessionState(state.activeSession!.dir, sessionState);
+      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+    });
   };
+
+  // Job creation wrappers - delegate to extracted library functions
+  const _startShellJob = async (options: CreateShellJobOptions): Promise<{ jobId: string }> => {
+    try {
+      return await createShellJob(options, {
+        getActiveSession: () => state.activeSession,
+        getJobs: () => state.jobs,
+        persistJobStartedEvent,
+        emitSessionUpdate,
+        setupProgressTimer,
+        runShellJobProcess: (job) => void runShellJobProcess(job),
+        runSubagentJobProcess: (job) => void runSubagentJobProcess(job),
+      });
+    } catch (err) {
+      if (err instanceof JobCreationError) {
+        throw { code: err.code, message: err.message, data: { category: err.category } };
+      }
+      throw err;
+    }
+  };
+
+  const startSubagentJob = async (options: CreateSubagentJobOptions): Promise<{ jobId: string }> => {
+    try {
+      return await createSubagentJob(options, {
+        getActiveSession: () => state.activeSession,
+        getJobs: () => state.jobs,
+        persistJobStartedEvent,
+        emitSessionUpdate,
+        setupProgressTimer,
+        runShellJobProcess: (job) => void runShellJobProcess(job),
+        runSubagentJobProcess: (job) => void runSubagentJobProcess(job),
+      });
+    } catch (err) {
+      if (err instanceof JobCreationError) {
+        throw { code: err.code, message: err.message, data: { category: err.category } };
+      }
+      throw err;
+    }
+  };
+
+  // Job derivation - uses extracted library function with caching
+  const deriveJobsForActiveSession = createJobDerivation({
+    getActiveSession: () =>
+      state.activeSession
+        ? { sessionId: state.activeSession.meta.sessionId, dir: state.activeSession.dir }
+        : null,
+    getRunningJobs: () => state.jobs,
+  });
 
   // Register all RPC handlers with dependencies
   registerAllHandlers(peer, state, {
