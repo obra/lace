@@ -35,7 +35,7 @@ import { registerAllHandlers } from './rpc/register-handlers';
 export {
   buildProviderMessagesFromDurableEvents,
   estimateProviderTokens,
-} from './events/message-builder';
+} from './message-building/message-builder';
 
 export function createToolExecutorForMode(
   executionMode: 'plan' | 'execute',

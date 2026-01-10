@@ -25,7 +25,7 @@ import { TestAgentProvider } from '@lace/agent/runtime/test-provider';
 import { compactDroppedMessagesWithCore } from '@lace/agent/compaction/compact-dropped-messages';
 import { findUserCommand } from '@lace/agent/user-commands';
 import { getJobOutputPath } from '@lace/agent/jobs/job-manager';
-import { buildProviderMessagesFromDurableEvents } from '@lace/agent/events/message-builder';
+import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import { type SessionUpdate, type AgentServerState } from '@lace/agent/server-types';
 import {
   throwInvalidParams,

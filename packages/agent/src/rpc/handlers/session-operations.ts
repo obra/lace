@@ -36,7 +36,7 @@ import { reconcileMcpServersForActiveSession } from './mcp-servers';
 import {
   buildProviderMessagesFromDurableEvents,
   estimateProviderTokens,
-} from '../../events/message-builder';
+} from '../../message-building/message-builder';
 import { compactDroppedMessagesWithCore } from '../../compaction/compact-dropped-messages';
 import { ProviderRegistry } from '../../providers/registry';
 import { TestAgentProvider } from '../../runtime/test-provider';
