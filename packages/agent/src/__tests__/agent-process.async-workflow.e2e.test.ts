@@ -548,4 +548,194 @@ describe('async job workflow (E2E)', () => {
 
     expect(output.status).toBe('cancelled');
   });
+
+  it(
+    'injects completion notification when background job finishes',
+    { timeout: 30_000 },
+    async () => {
+      agent = spawnAgentProcess({ laceDir });
+
+      let jobId: string | undefined;
+      const updates: Array<Record<string, unknown>> = [];
+
+      agent.peer.onRequest('session/update', async (params) => {
+        const p = params as Record<string, unknown>;
+        updates.push(p);
+        if (p.type === 'job_started' && typeof p.jobId === 'string') {
+          jobId = p.jobId;
+        }
+        return undefined;
+      });
+
+      agent.peer.onRequest('session/request_permission', async () => {
+        return { decision: 'allow' };
+      });
+
+      await withTimeout(
+        agent.peer.request(
+          'initialize',
+          defaultInitializeParams({ config: { approvalMode: 'allow' } })
+        ),
+        2_000,
+        'initialize'
+      );
+
+      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+      // Start a quick job that will complete
+      await withTimeout(
+        agent.peer.request('session/prompt', {
+          content: [{ type: 'text', text: 'job: echo "test output"' }],
+        }),
+        5_000,
+        'session/prompt (start job)'
+      );
+
+      // Wait for job to complete
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          const interval = setInterval(() => {
+            if (!jobId) return;
+            const finished = updates.find((u) => u.type === 'job_finished' && u.jobId === jobId);
+            if (finished) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 10);
+        }),
+        5_000,
+        'job_finished update'
+      );
+
+      // Send another prompt - the notification should be injected
+      // The prompt will fail because no provider is configured, but the notification
+      // is injected before provider creation, so it will be in the events
+      try {
+        await withTimeout(
+          agent.peer.request('session/prompt', {
+            content: [{ type: 'text', text: 'What was the previous output?' }],
+          }),
+          10_000,
+          'session/prompt (check notification)'
+        );
+      } catch {
+        // Expected - no provider configured
+      }
+
+      // Verify the session events show the notification was injected
+      const events = (await withTimeout(
+        agent.peer.request('ent/session/events', { limit: 100 }),
+        2_000,
+        'ent/session/events'
+      )) as { events: Array<{ type: string; data?: Record<string, unknown> }> };
+
+      // Find a prompt that contains the notification
+      const promptWithNotification = events.events.find(
+        (e) =>
+          e.type === 'prompt' &&
+          Array.isArray(e.data?.content) &&
+          (e.data?.content as Array<{ type: string; text?: string }>).some(
+            (c) =>
+              c.type === 'text' &&
+              typeof c.text === 'string' &&
+              c.text.includes('<background-job-notification')
+          )
+      );
+
+      expect(promptWithNotification).toBeDefined();
+    }
+  );
+
+  it('injects failure notification when background job fails', { timeout: 30_000 }, async () => {
+    agent = spawnAgentProcess({ laceDir });
+
+    let jobId: string | undefined;
+    const updates: Array<Record<string, unknown>> = [];
+
+    agent.peer.onRequest('session/update', async (params) => {
+      const p = params as Record<string, unknown>;
+      updates.push(p);
+      if (p.type === 'job_started' && typeof p.jobId === 'string') {
+        jobId = p.jobId;
+      }
+      return undefined;
+    });
+
+    agent.peer.onRequest('session/request_permission', async () => {
+      return { decision: 'allow' };
+    });
+
+    await withTimeout(
+      agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'allow' } })
+      ),
+      2_000,
+      'initialize'
+    );
+
+    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+    // Start a job that will fail
+    await withTimeout(
+      agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'job: exit 1' }],
+      }),
+      5_000,
+      'session/prompt (start failing job)'
+    );
+
+    // Wait for job to complete (fail)
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          if (!jobId) return;
+          const finished = updates.find((u) => u.type === 'job_finished' && u.jobId === jobId);
+          if (finished) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      5_000,
+      'job_finished update'
+    );
+
+    // Send another prompt to trigger notification injection
+    // The prompt will fail because no provider is configured, but the notification
+    // is injected before provider creation
+    try {
+      await withTimeout(
+        agent.peer.request('session/prompt', {
+          content: [{ type: 'text', text: 'What happened?' }],
+        }),
+        10_000,
+        'session/prompt (check notification)'
+      );
+    } catch {
+      // Expected - no provider configured
+    }
+
+    // Verify the notification was injected with 'failed' type
+    const events = (await withTimeout(
+      agent.peer.request('ent/session/events', { limit: 100 }),
+      2_000,
+      'ent/session/events'
+    )) as { events: Array<{ type: string; data?: Record<string, unknown> }> };
+
+    const promptWithFailureNotification = events.events.find(
+      (e) =>
+        e.type === 'prompt' &&
+        Array.isArray(e.data?.content) &&
+        (e.data?.content as Array<{ type: string; text?: string }>).some(
+          (c) =>
+            c.type === 'text' &&
+            typeof c.text === 'string' &&
+            c.text.includes('<background-job-notification') &&
+            c.text.includes('type="failed"')
+        )
+    );
+
+    expect(promptWithFailureNotification).toBeDefined();
+  });
 });
