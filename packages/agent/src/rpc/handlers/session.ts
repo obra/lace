@@ -25,11 +25,7 @@ import {
   summarizeDurableEvents,
 } from '../../storage/event-log';
 import type { AgentServerState } from '../../server-types';
-import {
-  assertInitialized,
-  throwInvalidParams,
-  toNonEmptyString,
-} from '../utils';
+import { assertInitialized, throwInvalidParams, toNonEmptyString } from '../utils';
 import { loadPromptConfig } from '../../config/prompts';
 import { logger } from '../../utils/logger';
 import { reconcileMcpServersForActiveSession } from './mcp-servers';

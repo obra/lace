@@ -1,8 +1,8 @@
 // ABOUTME: Agent server entry point - orchestrates RPC handlers and delegates to specialized modules
 
 import { randomUUID } from 'node:crypto';
-import { join, statSync } from 'node:fs';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { AcpErrorCodes, type JsonRpcPeer } from '@lace/ent-protocol';
 import { loadSession, readSessionState, writeSessionState } from './storage/session-store';
 import { appendDurableEvent } from './storage/event-log';

@@ -13,7 +13,13 @@ import { registerSessionOperationHandlers } from './handlers/session-operations'
 import { registerMcpHandlers } from './handlers/mcp-servers';
 import { registerPromptHandler } from './handlers/prompt';
 import { registerWorkspaceHandlers } from './handlers/workspace';
-import type { AgentServerState, JobState, SessionUpdate, JobType, JobStatus } from '../server-types';
+import type {
+  AgentServerState,
+  JobState,
+  SessionUpdate,
+  JobType,
+  JobStatus,
+} from '../server-types';
 import type { MCPServerManager } from '../mcp/server-manager';
 
 /**
@@ -106,12 +112,7 @@ export function registerAllHandlers(
     deps.runExclusive,
     deps.reissuePendingPermissions
   );
-  registerSessionOperationHandlers(
-    peer,
-    state,
-    deps.runExclusive,
-    deps.createToolExecutorForMode
-  );
+  registerSessionOperationHandlers(peer, state, deps.runExclusive, deps.createToolExecutorForMode);
 
   // MCP server management
   registerMcpHandlers(peer, state, deps.runExclusive);

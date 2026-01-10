@@ -1,19 +1,9 @@
 // ABOUTME: Prompt handler - core conversation processing for user messages and agent responses
 
 import { randomUUID } from 'node:crypto';
-import {
-  readFileSync,
-  statSync,
-  openSync,
-  readSync,
-  closeSync,
-} from 'node:fs';
+import { readFileSync, statSync, openSync, readSync, closeSync } from 'node:fs';
 import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
-import {
-  AcpErrorCodes,
-  type JsonRpcPeer,
-  type ToolResult,
-} from '@lace/ent-protocol';
+import { AcpErrorCodes, type JsonRpcPeer, type ToolResult } from '@lace/ent-protocol';
 import {
   ensureSessionFiles,
   getSessionDir,
@@ -30,20 +20,13 @@ import {
 } from '@lace/agent/storage/files-from-events';
 import { ProviderRegistry } from '@lace/agent/providers/registry';
 import { AIProvider } from '@lace/agent/providers/base-provider';
-import type {
-  ToolResult as CoreToolResult,
-} from '@lace/agent/tools/types';
+import type { ToolResult as CoreToolResult } from '@lace/agent/tools/types';
 import { TestAgentProvider } from '@lace/agent/runtime/test-provider';
 import { compactDroppedMessagesWithCore } from '@lace/agent/compaction/compact-dropped-messages';
 import { findUserCommand } from '@lace/agent/user-commands';
 import { getJobOutputPath } from '@lace/agent/jobs/job-manager';
-import {
-  buildProviderMessagesFromDurableEvents,
-} from '@lace/agent/events/message-builder';
-import {
-  type SessionUpdate,
-  type AgentServerState,
-} from '@lace/agent/server-types';
+import { buildProviderMessagesFromDurableEvents } from '@lace/agent/events/message-builder';
+import { type SessionUpdate, type AgentServerState } from '@lace/agent/server-types';
 import {
   throwInvalidParams,
   toNonEmptyString,
@@ -240,7 +223,7 @@ async function handleSlashCommand(
         state.activeSession = loadSession(newSessionId);
 
         // Notify the client that the session has changed
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
         await emitUpdate(0, {
           type: 'session_changed',
           newSessionId,
