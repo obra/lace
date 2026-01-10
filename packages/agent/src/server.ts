@@ -2010,6 +2010,26 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       const childPeer = new JsonRpcPeer(childTransport, { idPrefix: 'c_' });
       job.childPeer = childPeer;
 
+      // Buffer for collecting stderr output
+      let stderrBuffer = '';
+
+      // Capture stderr from child process for debugging
+      childProc.stderr?.on('data', (chunk: Buffer) => {
+        stderrBuffer += chunk.toString('utf8');
+      });
+
+      // Log if child process exits with error
+      childProc.on('exit', (code, signal) => {
+        if (code !== 0 && code !== null) {
+          logger.debug('job.subagent.child_exit', {
+            jobId: job.jobId,
+            exitCode: code,
+            signal,
+            stderrLength: stderrBuffer.length,
+          });
+        }
+      });
+
       const appendJobOutput = async (text: string) => {
         if (!state.activeSession) return;
         await runExclusive(() => {
@@ -2357,9 +2377,33 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         if (job.status !== 'cancelled') job.status = 'completed';
       } catch (error) {
         if (job.status !== 'cancelled') job.status = 'failed';
+
+        // Extract detailed error information
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorCode =
+          error && typeof error === 'object' && 'code' in error ? (error as any).code : undefined;
+        const errorData =
+          error && typeof error === 'object' && 'data' in error ? (error as any).data : undefined;
+
+        // Build detailed error output
+        const errorDetails = [
+          `\n[SUBAGENT ERROR]`,
+          `Message: ${errorMessage}`,
+          ...(errorCode !== undefined ? [`Code: ${errorCode}`] : []),
+          ...(errorData ? [`Data: ${JSON.stringify(errorData)}`] : []),
+          ...(stderrBuffer.trim() ? [`Stderr: ${stderrBuffer.trim()}`] : []),
+          ...(error instanceof Error && error.stack ? [`Stack: ${error.stack}`] : []),
+        ].join('\n');
+
+        // Write error details to job output file so they're visible via ent/job/output
+        await appendJobOutput(errorDetails);
+
         logger.error('job.subagent.failed', {
           jobId: job.jobId,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMessage,
+          code: errorCode,
+          data: errorData,
+          stderr: stderrBuffer.trim() || undefined,
         });
       } finally {
         try {
