@@ -1,0 +1,615 @@
+// ABOUTME: Subagent job execution - handles spawning and managing AI subagent processes
+
+import { randomUUID } from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { mkdirSync, existsSync, appendFileSync, statSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
+import {
+  readSessionState,
+  writeSessionState,
+  loadSession,
+} from '@lace/agent/storage/session-store';
+import { appendDurableEvent } from '@lace/agent/storage/event-log';
+import { getJobOutputPath } from './job-manager';
+import { logger } from '@lace/agent/utils/logger';
+import {
+  MAX_JOB_OUTPUT_BYTES,
+  type SessionUpdate,
+  type JobInnerUpdate,
+  type JobType,
+  type JobState,
+  type AgentServerState,
+} from '../server-types';
+
+/**
+ * Server-level dependencies that runSubagentJobProcess needs.
+ * These are passed in to avoid coupling to the global state object.
+ */
+export interface SubagentJobDependencies {
+  /** Get the current server state */
+  getState: () => AgentServerState;
+  /** Run work exclusively with lock */
+  runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>;
+  /** Emit session update to clients */
+  emitSessionUpdate: (update: SessionUpdate) => Promise<void>;
+  /** Request permission from client */
+  requestPermissionFromClient: (request: {
+    sessionId: string;
+    turnId: string;
+    turnSeq: number;
+    jobId: string;
+    toolCallId: string;
+    tool: string;
+    kind?: string;
+    resource: string;
+    options: Array<{ optionId: string; label: string }>;
+    input: Record<string, unknown>;
+  }) => Promise<{ decision?: string; updatedInput?: Record<string, unknown> }>;
+  /** Finalize job completion */
+  finalizeJob: (job: JobState, options?: { exitCode?: number }) => Promise<void>;
+}
+
+/**
+ * Runs a subagent job process by spawning a child lace-agent process
+ * and communicating with it via JSON-RPC over stdio.
+ */
+export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependencies): void {
+  const { getState, runExclusive, emitSessionUpdate, requestPermissionFromClient, finalizeJob } =
+    deps;
+
+  // Helper to write error output directly to the job output file.
+  // This is used for error reporting and doesn't depend on state.activeSession.
+  const writeErrorToJobOutput = (errorText: string) => {
+    try {
+      // Ensure the job-logs directory exists
+      const logDir = join(dirname(job.outputPath), '.');
+      if (!existsSync(dirname(job.outputPath))) {
+        mkdirSync(dirname(job.outputPath), { recursive: true, mode: 0o700 });
+      }
+      appendFileSync(job.outputPath, errorText, { encoding: 'utf8' });
+    } catch (writeErr) {
+      logger.error('job.subagent.write_error_failed', {
+        jobId: job.jobId,
+        error: writeErr instanceof Error ? writeErr.message : String(writeErr),
+      });
+    }
+  };
+
+  void (async () => {
+    const state = getState();
+
+    if (!state.activeSession) {
+      job.status = 'failed';
+      writeErrorToJobOutput('[SUBAGENT ERROR]\nMessage: No active session\n');
+      await finalizeJob(job);
+      return;
+    }
+    if (job.proc || job.finished) return;
+    if (!job.subagentContent || !Array.isArray(job.subagentContent)) {
+      job.status = 'failed';
+      writeErrorToJobOutput('[SUBAGENT ERROR]\nMessage: Missing subagentContent\n');
+      await finalizeJob(job);
+      return;
+    }
+
+    // Buffer for collecting stderr output
+    let stderrBuffer = '';
+    let childProc: ReturnType<typeof spawn> | undefined;
+    let childTransport: ReturnType<typeof createNdjsonStdioTransport> | undefined;
+    let childPeer: JsonRpcPeer | undefined;
+
+    try {
+      childProc = spawn(process.execPath, [process.argv[1] ?? ''], {
+        cwd: process.cwd(),
+        env: { ...process.env },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      job.proc = childProc;
+
+      // Handle spawn errors (e.g., executable not found)
+      childProc.on('error', (err) => {
+        stderrBuffer += `[SPAWN ERROR] ${err.message}\n`;
+      });
+
+      // Capture stderr from child process for debugging
+      childProc.stderr?.on('data', (chunk: Buffer) => {
+        stderrBuffer += chunk.toString('utf8');
+      });
+
+      // Log if child process exits with error
+      childProc.on('exit', (code, signal) => {
+        if (code !== 0 && code !== null) {
+          logger.debug('job.subagent.child_exit', {
+            jobId: job.jobId,
+            exitCode: code,
+            signal,
+            stderrLength: stderrBuffer.length,
+          });
+        }
+      });
+
+      // With stdio: ['pipe', 'pipe', 'pipe'], stdout and stdin are guaranteed non-null
+      if (!childProc.stdout || !childProc.stdin) {
+        throw new Error('Failed to create stdio pipes for child process');
+      }
+
+      childTransport = createNdjsonStdioTransport({
+        readable: childProc.stdout,
+        writable: childProc.stdin,
+      });
+      job.childTransportClose = childTransport.close;
+
+      childPeer = new JsonRpcPeer(childTransport, { idPrefix: 'c_' });
+      job.childPeer = childPeer;
+    } catch (setupError) {
+      // Error during spawn/transport/peer setup
+      job.status = 'failed';
+      const errorMessage = setupError instanceof Error ? setupError.message : String(setupError);
+      const errorStack = setupError instanceof Error ? setupError.stack : undefined;
+      const errorDetails = [
+        '[SUBAGENT ERROR]',
+        `Message: Setup failed - ${errorMessage}`,
+        ...(stderrBuffer.trim() ? [`Stderr: ${stderrBuffer.trim()}`] : []),
+        ...(errorStack ? [`Stack: ${errorStack}`] : []),
+      ].join('\n');
+      writeErrorToJobOutput(errorDetails);
+      logger.error('job.subagent.setup_failed', {
+        jobId: job.jobId,
+        error: errorMessage,
+        stderr: stderrBuffer.trim() || undefined,
+      });
+      await finalizeJob(job);
+      return;
+    }
+
+    const appendJobOutput = async (text: string) => {
+      const currentState = getState();
+      if (!currentState.activeSession) return;
+      await runExclusive(() => {
+        // Check output size limit
+        const currentSize = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
+        if (currentSize >= MAX_JOB_OUTPUT_BYTES) return; // Already at limit
+        const remaining = MAX_JOB_OUTPUT_BYTES - currentSize;
+        const toWrite = text.length <= remaining ? text : text.slice(0, remaining);
+        appendFileSync(job.outputPath, toWrite, { encoding: 'utf8' });
+      });
+    };
+
+    const childJobIdMap = new Map<string, string>();
+
+    const mapChildJobId = (childJobId: string): string => {
+      const existing = childJobIdMap.get(childJobId);
+      if (existing) return existing;
+      const mapped = `${job.jobId}_${childJobId}`;
+      childJobIdMap.set(childJobId, mapped);
+      return mapped;
+    };
+
+    const ensureForwardedJobRecord = (options: {
+      jobId: string;
+      parentJobId?: string;
+      type: JobType;
+      description?: string;
+    }): JobState => {
+      const currentState = getState();
+      const existing = currentState.jobs.get(options.jobId);
+      if (existing) return existing;
+
+      let resolveCompletion!: () => void;
+      const completion = new Promise<void>((resolve) => {
+        resolveCompletion = resolve;
+      });
+
+      const record: JobState = {
+        jobId: options.jobId,
+        parentJobId: options.parentJobId,
+        type: options.type,
+        status: 'running',
+        description: options.description,
+        startedAt: new Date().toISOString(),
+        outputPath: getJobOutputPath(currentState.activeSession!.dir, options.jobId),
+        finished: false,
+        completion,
+        resolveCompletion,
+      };
+
+      currentState.jobs.set(options.jobId, record);
+      return record;
+    };
+
+    childPeer.onRequest('session/update', async (params) => {
+      const p = params as Record<string, unknown>;
+      const type = p.type;
+
+      if (type === 'job_started' && typeof p.jobId === 'string') {
+        const mappedJobId = mapChildJobId(p.jobId);
+        const mappedParentJobId =
+          typeof p.parentJobId === 'string' ? mapChildJobId(p.parentJobId) : job.jobId;
+        const jobType = p.jobType === 'delegate' ? 'delegate' : 'bash';
+        const description = typeof p.description === 'string' ? p.description : undefined;
+
+        ensureForwardedJobRecord({
+          jobId: mappedJobId,
+          parentJobId: mappedParentJobId,
+          type: jobType,
+          description,
+        });
+
+        await runExclusive(() => {
+          const currentState = getState();
+          let sessionState = readSessionState(currentState.activeSession!.dir);
+          const { nextState } = appendDurableEvent(currentState.activeSession!.dir, sessionState, {
+            type: 'job_started',
+            data: {
+              jobId: mappedJobId,
+              parentJobId: mappedParentJobId,
+              jobType,
+              description,
+            },
+          });
+          sessionState = nextState;
+          writeSessionState(currentState.activeSession!.dir, sessionState);
+          const updatedState = getState();
+          updatedState.activeSession = loadSession(currentState.activeSession!.meta.sessionId);
+        });
+
+        await emitSessionUpdate({
+          type: 'job_started',
+          jobId: mappedJobId,
+          parentJobId: mappedParentJobId,
+          jobType,
+          description,
+        });
+
+        return undefined;
+      }
+
+      if (type === 'job_finished' && typeof p.jobId === 'string') {
+        const mappedJobId = mapChildJobId(p.jobId);
+        const mappedParentJobId =
+          typeof p.parentJobId === 'string' ? mapChildJobId(p.parentJobId) : job.jobId;
+        const exitCode = typeof p.exitCode === 'number' ? p.exitCode : undefined;
+        const outcome =
+          p.outcome === 'completed' || p.outcome === 'failed' ? p.outcome : 'cancelled';
+
+        const record = ensureForwardedJobRecord({
+          jobId: mappedJobId,
+          parentJobId: mappedParentJobId,
+          type: p.jobType === 'delegate' ? 'delegate' : 'bash',
+        });
+        record.status = outcome;
+        record.finished = true;
+        record.proc = undefined;
+        record.childPeer = undefined;
+        record.subagentSessionId = undefined;
+        record.childTransportClose = undefined;
+        record.exitCode = exitCode;
+
+        await runExclusive(() => {
+          const currentState = getState();
+          let sessionState = readSessionState(currentState.activeSession!.dir);
+          const { nextState } = appendDurableEvent(currentState.activeSession!.dir, sessionState, {
+            type: 'job_finished',
+            data: {
+              jobId: mappedJobId,
+              parentJobId: mappedParentJobId,
+              outcome,
+              ...(exitCode !== undefined ? { exitCode } : {}),
+            },
+          });
+          sessionState = nextState;
+          writeSessionState(currentState.activeSession!.dir, sessionState);
+          const updatedState = getState();
+          updatedState.activeSession = loadSession(currentState.activeSession!.meta.sessionId);
+        });
+
+        await emitSessionUpdate({
+          type: 'job_finished',
+          jobId: mappedJobId,
+          parentJobId: mappedParentJobId,
+          ...(exitCode !== undefined ? { exitCode } : {}),
+          outcome,
+        });
+
+        record.resolveCompletion();
+        return undefined;
+      }
+
+      if (
+        type === 'job_update' &&
+        typeof p.jobId === 'string' &&
+        p.update &&
+        typeof p.update === 'object'
+      ) {
+        const mappedJobId = mapChildJobId(p.jobId);
+        const mappedParentJobId =
+          typeof p.parentJobId === 'string' ? mapChildJobId(p.parentJobId) : job.jobId;
+
+        const record = ensureForwardedJobRecord({
+          jobId: mappedJobId,
+          parentJobId: mappedParentJobId,
+          type: p.jobType === 'delegate' ? 'delegate' : 'bash',
+        });
+
+        const channel = p.channel === 'stdout' || p.channel === 'stderr' ? p.channel : 'internal';
+        // Child job update - forwarded as-is with namespaced IDs
+        // Runtime checks ensure shape is valid before forwarding
+        const update = p.update as Record<string, unknown>;
+
+        if (update.type === 'text_delta' && typeof update.text === 'string') {
+          const text = update.text;
+          await runExclusive(() => {
+            // Check output size limit
+            const currentSize = existsSync(record.outputPath)
+              ? statSync(record.outputPath).size
+              : 0;
+            if (currentSize >= MAX_JOB_OUTPUT_BYTES) return; // Already at limit
+            const remaining = MAX_JOB_OUTPUT_BYTES - currentSize;
+            const toWrite = text.length <= remaining ? text : text.slice(0, remaining);
+            appendFileSync(record.outputPath, toWrite, { encoding: 'utf8' });
+          });
+        }
+
+        if (update.type === 'tool_use' && typeof update.toolCallId === 'string') {
+          update.toolCallId = `${mappedJobId}:${update.toolCallId}`;
+        }
+
+        await emitSessionUpdate({
+          type: 'job_update',
+          jobId: mappedJobId,
+          parentJobId: mappedParentJobId,
+          jobType: record.type,
+          channel,
+          // Forwarded update from child job - trusted after runtime checks above
+          update: update as JobInnerUpdate,
+        });
+
+        return undefined;
+      }
+
+      if (type === 'text_delta' && typeof p.text === 'string') {
+        await appendJobOutput(p.text);
+        await emitSessionUpdate({
+          type: 'job_update',
+          jobId: job.jobId,
+          parentJobId: job.parentJobId,
+          jobType: 'delegate',
+          channel: 'internal',
+          update: { type: 'text_delta', text: p.text },
+        });
+        return undefined;
+      }
+
+      if (type === 'tool_use' && typeof p.toolCallId === 'string' && typeof p.name === 'string') {
+        const namespacedToolCallId = `${job.jobId}:${p.toolCallId}`;
+        await emitSessionUpdate({
+          type: 'job_update',
+          jobId: job.jobId,
+          parentJobId: job.parentJobId,
+          jobType: 'delegate',
+          channel: 'internal',
+          update: {
+            type: 'tool_use',
+            toolCallId: namespacedToolCallId,
+            name: p.name,
+            kind: typeof p.kind === 'string' ? (p.kind as any) : undefined,
+            input: (typeof p.input === 'object' && p.input ? (p.input as any) : {}) as Record<
+              string,
+              unknown
+            >,
+            status: p.status as any,
+            ...(p.result ? { result: p.result as any } : {}),
+          },
+        });
+        return undefined;
+      }
+
+      if (type === 'context_injected') {
+        await emitSessionUpdate({
+          type: 'job_update',
+          jobId: job.jobId,
+          parentJobId: job.parentJobId,
+          jobType: 'delegate',
+          channel: 'internal',
+          // Forwarded context_injected from child job
+          update: p as JobInnerUpdate,
+        });
+        return undefined;
+      }
+
+      return undefined;
+    });
+
+    childPeer.onRequest('session/request_permission', async (params) => {
+      const p = params as Record<string, unknown>;
+
+      const childToolCallId =
+        typeof p.toolCallId === 'string' ? p.toolCallId : `tool_${randomUUID()}`;
+
+      const mappedJobId = typeof p.jobId === 'string' ? mapChildJobId(p.jobId) : job.jobId;
+      const namespacedToolCallId = `${mappedJobId}:${childToolCallId}`;
+
+      const turnId =
+        typeof p.turnId === 'string' ? p.turnId : (job.originTurnId ?? `turn_${randomUUID()}`);
+      const turnSeq = typeof p.turnSeq === 'number' ? p.turnSeq : (job.originTurnSeq ?? 0);
+
+      const currentState = getState();
+      const decision = await requestPermissionFromClient({
+        sessionId: currentState.activeSession!.meta.sessionId,
+        turnId,
+        turnSeq,
+        jobId: mappedJobId,
+        toolCallId: namespacedToolCallId,
+        tool: typeof p.tool === 'string' ? p.tool : 'unknown',
+        kind: typeof p.kind === 'string' ? p.kind : undefined,
+        resource: typeof p.resource === 'string' ? p.resource : '',
+        options: Array.isArray(p.options)
+          ? (p.options as any)
+          : [
+              { optionId: 'allow', label: 'Allow' },
+              { optionId: 'deny', label: 'Deny' },
+            ],
+        input: (typeof p.input === 'object' && p.input ? (p.input as any) : {}) as Record<
+          string,
+          unknown
+        >,
+      });
+
+      if (job.finished || job.status === 'cancelled') {
+        return { decision: 'deny' };
+      }
+
+      return { decision: decision.decision ?? 'deny', updatedInput: decision.updatedInput };
+    });
+
+    try {
+      const currentState = getState();
+
+      await childPeer.request('initialize', {
+        protocolVersion: '1.0',
+        clientInfo: { name: 'lace-agent', version: '0.1.0' },
+        capabilities: {
+          streaming: true,
+          permissions: true,
+          'ent/jobStreaming': currentState.jobStreaming,
+        },
+        config: { approvalMode: 'ask' },
+      });
+
+      // Resume existing session or create a new one
+      if (job.subagentSessionId) {
+        // Resume: load the existing session
+        await childPeer.request('session/load', {
+          sessionId: job.subagentSessionId,
+        });
+      } else {
+        // New session
+        const created = (await childPeer.request('session/new', {
+          workDir: currentState.activeSession!.meta.workDir,
+        })) as { sessionId: string };
+        job.subagentSessionId = created.sessionId;
+
+        // Persist subagentSessionId for resume functionality
+        await runExclusive(() => {
+          const updatedState = getState();
+          let sessionState = readSessionState(updatedState.activeSession!.dir);
+          const { nextState } = appendDurableEvent(updatedState.activeSession!.dir, sessionState, {
+            type: 'job_session_assigned',
+            data: {
+              jobId: job.jobId,
+              subagentSessionId: created.sessionId,
+            },
+          });
+          sessionState = nextState;
+          writeSessionState(updatedState.activeSession!.dir, sessionState);
+          const stateAfterWrite = getState();
+          stateAfterWrite.activeSession = loadSession(updatedState.activeSession!.meta.sessionId);
+        });
+      }
+
+      // Configure subagent session with provider/model if specified
+      if (job.connectionId || job.modelId) {
+        await childPeer.request('ent/session/configure', {
+          ...(job.connectionId ? { connectionId: job.connectionId } : {}),
+          ...(job.modelId ? { modelId: job.modelId } : {}),
+        });
+      }
+
+      await childPeer.request('session/prompt', { content: job.subagentContent });
+
+      if (job.status !== 'cancelled') job.status = 'completed';
+    } catch (error) {
+      if (job.status !== 'cancelled') job.status = 'failed';
+
+      // Extract detailed error information
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorCode =
+        error && typeof error === 'object' && 'code' in error ? (error as any).code : undefined;
+      const errorData =
+        error && typeof error === 'object' && 'data' in error ? (error as any).data : undefined;
+
+      // Build detailed error output
+      const errorDetails = [
+        `\n[SUBAGENT ERROR]`,
+        `Message: ${errorMessage}`,
+        ...(errorCode !== undefined ? [`Code: ${errorCode}`] : []),
+        ...(errorData ? [`Data: ${JSON.stringify(errorData)}`] : []),
+        ...(stderrBuffer.trim() ? [`Stderr: ${stderrBuffer.trim()}`] : []),
+        ...(error instanceof Error && error.stack ? [`Stack: ${error.stack}`] : []),
+      ].join('\n');
+
+      // Write error details to job output file so they're visible via ent/job/output
+      // Use writeErrorToJobOutput as fallback if appendJobOutput fails (e.g., no active session)
+      try {
+        await appendJobOutput(errorDetails);
+      } catch {
+        writeErrorToJobOutput(errorDetails);
+      }
+      // Always also write via direct method in case appendJobOutput silently returned
+      const currentState = getState();
+      if (!currentState.activeSession) {
+        writeErrorToJobOutput(errorDetails);
+      }
+
+      logger.error('job.subagent.failed', {
+        jobId: job.jobId,
+        error: errorMessage,
+        code: errorCode,
+        data: errorData,
+        stderr: stderrBuffer.trim() || undefined,
+      });
+    } finally {
+      try {
+        childPeer?.close();
+      } catch (error) {
+        logger.debug('job.subagent.close_peer.failed', {
+          jobId: job.jobId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      try {
+        job.childTransportClose?.();
+      } catch (error) {
+        logger.debug('job.subagent.close_transport.failed', {
+          jobId: job.jobId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      if (childProc && childProc.exitCode === null) {
+        childProc.kill('SIGTERM');
+
+        // Wait up to 2 seconds for graceful exit
+        const exitPromise = new Promise<void>((resolve) =>
+          childProc!.once('exit', () => resolve())
+        );
+        const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 2_000));
+
+        await Promise.race([exitPromise, timeoutPromise]);
+
+        // Force kill if still running
+        if (childProc.exitCode === null) {
+          try {
+            childProc.kill('SIGKILL');
+          } catch (error) {
+            // Process may have exited between check and kill
+            logger.debug('job.subagent.sigkill.failed', {
+              jobId: job.jobId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+
+          // Final wait with shorter timeout
+          await Promise.race([
+            new Promise<void>((resolve) => childProc!.once('exit', () => resolve())),
+            new Promise<void>((resolve) => setTimeout(resolve, 1_000)),
+          ]);
+        }
+      }
+
+      await finalizeJob(job);
+    }
+  })();
+}
