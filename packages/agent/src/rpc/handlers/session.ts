@@ -18,9 +18,17 @@ import {
   writeSessionState,
   type SessionState,
 } from '../../storage/session-store';
-import { appendDurableEvent, readDurableEvents, summarizeDurableEvents } from '../../storage/event-log';
+import {
+  appendDurableEvent,
+  readDurableEvents,
+  summarizeDurableEvents,
+} from '../../storage/event-log';
 import type { AgentServerState } from '../../server-types';
-import { assertInitialized, recordsShallowEqual, throwInvalidParams, toNonEmptyString } from '../utils';
+import {
+  assertInitialized,
+  throwInvalidParams,
+  toNonEmptyString,
+} from '../utils';
 import { loadPromptConfig } from '../../config/prompts';
 import { logger } from '../../utils/logger';
 import { reconcileMcpServersForActiveSession } from './mcp-servers';
@@ -320,7 +328,7 @@ export function registerSessionHandlers(
     };
   });
 
-  peer.onRequest('$/cancel_request', async (params: unknown) => {
+  peer.onRequest('$/cancel_request', async (_params: unknown) => {
     assertInitialized(state);
 
     // Auto-cascade: send $/cancel_request for all pending permission requests
