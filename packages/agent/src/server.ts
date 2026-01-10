@@ -1,294 +1,41 @@
+// ABOUTME: Agent server entry point - orchestrates RPC handlers and delegates to specialized modules
+
 import { randomUUID } from 'node:crypto';
-import { spawn, type ChildProcess } from 'node:child_process';
-import {
-  mkdirSync,
-  existsSync,
-  appendFileSync,
-  readFileSync,
-  statSync,
-  openSync,
-  readSync,
-  closeSync,
-} from 'node:fs';
-import { join, dirname, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
-import {
-  createNdjsonStdioTransport,
-  AcpErrorCodes,
-  EntErrorCodes,
-  McpServerConfigSchema,
-  isSessionId,
-  JsonRpcPeer,
-  SessionUpdateNotificationSchema,
-  SessionForkParamsSchema,
-  type PermissionRequest,
-  type ToolResult,
-  type ContextBreakdown,
-  type ThreadTokenUsage,
-} from '@lace/ent-protocol';
-import type { z } from 'zod';
-import {
-  ensureSessionFiles,
-  getSessionDir,
-  listSessions,
-  loadSession,
-  readSessionState,
-  writeSessionMeta,
-  writeSessionState,
-  type LoadedSession,
-  type SessionState,
-} from './storage/session-store';
-import { appendDurableEvent, readDurableEvents, summarizeDurableEvents } from './storage/event-log';
-import {
-  writeCheckpoint,
-  findCheckpointByEventSeq,
-  restoreCheckpointFiles,
-} from './storage/checkpoint-store';
-import {
-  deriveCheckpointFilesFromDurableEvents,
-  deriveFilesReadFromDurableEvents,
-} from './storage/files-from-events';
-import { derivePendingPermissionsFromDurableEvents } from './storage/permissions-from-events';
+import { join, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { AcpErrorCodes, type JsonRpcPeer } from '@lace/ent-protocol';
+import { loadSession, readSessionState, writeSessionState } from './storage/session-store';
+import { appendDurableEvent } from './storage/event-log';
 import { ProviderCatalogManager } from './providers/catalog/manager';
 import { ProviderInstanceManager } from './providers/instance/manager';
-import {
-  ProviderInstanceSchema,
-  type CatalogModel,
-  type ProviderInstance,
-} from './providers/catalog/types';
-import { ProviderRegistry } from './providers/registry';
-import { AIProvider, type ProviderMessage, type ContentBlock } from './providers/base-provider';
-import { ToolExecutor } from './tools/executor';
-import { estimateTokens } from '@lace/agent/utils/token-estimation';
-// CoreTool alias for backwards compatibility with provider interface
-import type { Tool as CoreTool } from '@lace/agent/tools/tool';
-import type {
-  ToolCall as CoreToolCall,
-  ToolResult as CoreToolResult,
-  ToolPolicy,
-} from './tools/types';
-import { TestAgentProvider } from './runtime/test-provider';
 import { MCPServerManager } from './mcp/server-manager';
-import type { MCPServerConfig } from '@lace/agent/config/mcp-types';
-import { compactDroppedMessagesWithCore } from './compaction/compact-dropped-messages';
-import { WorkspaceManagerFactory } from './workspace/workspace-manager';
-import { personaRegistry } from './config/persona-registry';
-import { loadPromptConfig } from './config/prompts';
-import { logger } from './utils/logger';
-import { getUserSlashCommands, findUserCommand } from './user-commands';
-import { ensureJobLogDir, getJobOutputPath } from './jobs/job-manager';
+import { ToolExecutor } from './tools/executor';
+import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import { createRunShellJobProcess } from './jobs/shell-job';
 import { runSubagentJobProcess as runSubagentJobProcessImpl } from './jobs/subagent-job';
+import { getJobOutputPath } from './jobs/job-manager';
 import {
   createQueueJobNotification,
   createSetupProgressTimer,
   createFinalizeJob,
 } from './jobs/job-notifications';
 import {
-  SUPPORTED_PROVIDER_TYPES,
-  JOB_LOG_DIR,
   MAX_CONCURRENT_JOBS,
-  MAX_JOB_OUTPUT_BYTES,
-  DEFAULT_PROGRESS_INTERVAL_MS,
-  type SessionUpdateParams,
   type SessionUpdate,
-  type JobInnerUpdate,
   type JobType,
   type JobStatus,
-  type JobNotificationType,
   type JobState,
-  type PendingJobNotification,
   type AgentServerState,
 } from './server-types';
-import {
-  throwInvalidParams,
-  toNonEmptyString,
-  toPositiveInt,
-  getEndpointFromConfig,
-  assertConfigHasNoCredentials,
-  parseProviderInstanceOverridesFromConnectionConfig,
-  mapCatalogModelToModelInfo,
-  toolKindFromName,
-  protocolToolResultFromCore,
-  coreToolResultFromProtocol,
-  shouldAskPermission,
-  isTestProviderEnabled,
-  assertInitialized,
-  arraysShallowEqual,
-  recordsShallowEqual,
-  mcpServerConfigEquivalent,
-} from './rpc/utils';
+import { toNonEmptyString, toolKindFromName } from './rpc/utils';
 import { requestPermissionFromClient, reissuePendingPermissionRequests } from './rpc/permissions';
 import { registerAllHandlers } from './rpc/register-handlers';
-import {
-  reconcileMcpServersForActiveSession,
-} from './rpc/handlers/mcp-servers';
 
-async function getContextLimitForModel(
-  state: AgentServerState,
-  connectionId?: string,
-  modelId?: string
-): Promise<number | null> {
-  // Keep behavior deterministic for tests and avoid network flakiness.
-  if (isTestProviderEnabled()) return null;
-
-  if (!connectionId || !modelId) return null;
-
-  try {
-    const instances = await state.providerInstances.loadInstances();
-    const instance = instances.instances[connectionId];
-    if (!instance) return null;
-
-    const catalogProvider = state.providerCatalog.getProvider(instance.catalogProviderId);
-    if (!catalogProvider) return null;
-
-    const model = catalogProvider.models.find((m) => m.id === modelId);
-    if (!model) return null;
-
-    return typeof model.context_window === 'number' ? model.context_window : null;
-  } catch {
-    return null;
-  }
-}
-
-async function computeContextBreakdownForActiveSession(state: AgentServerState): Promise<{
-  breakdown: ContextBreakdown;
-  tokenUsage: ThreadTokenUsage;
-}> {
-  const DEFAULT_CONTEXT_LIMIT = 200_000;
-  const RESERVED_FOR_RESPONSE_TOKENS = 4096;
-
-  const effectiveConfig = state.activeSession?.state.config
-    ? { ...state.config, ...state.activeSession.state.config }
-    : state.config;
-
-  const connectionId = effectiveConfig.connectionId;
-  const modelId = effectiveConfig.modelId ?? 'unknown-model';
-
-  const providerMessages = buildProviderMessagesFromDurableEvents(state.activeSession!.dir);
-
-  let systemPromptTokens = 0;
-  let userTokens = 0;
-  let assistantTokens = 0;
-  let toolCallTokens = 0;
-  let toolResultTokens = 0;
-
-  for (const message of providerMessages) {
-    const contentText =
-      typeof message.content === 'string'
-        ? message.content
-        : message.content
-            .filter((b: unknown): b is ContentBlock & { type: 'text' } => {
-              return (b as ContentBlock).type === 'text';
-            })
-            .map((b: ContentBlock & { type: 'text' }) => b.text)
-            .join('\n');
-    if (message.role === 'system') systemPromptTokens += estimateTokens(contentText);
-    if (message.role === 'user') userTokens += estimateTokens(contentText);
-    if (message.role === 'assistant') assistantTokens += estimateTokens(contentText);
-
-    if ((message as any).toolCalls) {
-      toolCallTokens += estimateTokens(JSON.stringify((message as any).toolCalls));
-    }
-    if ((message as any).toolResults) {
-      toolResultTokens += estimateTokens(JSON.stringify((message as any).toolResults));
-    }
-  }
-
-  const { executor: coreExecutor } = createToolExecutorForMode(effectiveConfig.executionMode);
-  const { executor: allExecutor } = createToolExecutorForMode(
-    effectiveConfig.executionMode,
-    state.mcpServerManager
-  );
-
-  const coreTools = coreExecutor.getAllTools();
-  const coreToolNames = new Set(coreTools.map((t) => t.name));
-  const allTools = allExecutor.getAllTools();
-
-  const coreToolItems: Array<{ name: string; tokens: number }> = [];
-  const mcpToolItems: Array<{ name: string; tokens: number }> = [];
-  let coreToolsTokens = 0;
-  let mcpToolsTokens = 0;
-
-  for (const tool of coreTools) {
-    const schema = {
-      name: tool.name,
-      description: tool.description,
-      input_schema: tool.inputSchema,
-    };
-    const tokens = estimateTokens(JSON.stringify(schema));
-    coreToolItems.push({ name: tool.name, tokens });
-    coreToolsTokens += tokens;
-  }
-
-  for (const tool of allTools) {
-    if (coreToolNames.has(tool.name)) continue;
-    const schema = {
-      name: tool.name,
-      description: tool.description,
-      input_schema: tool.inputSchema,
-    };
-    const tokens = estimateTokens(JSON.stringify(schema));
-    mcpToolItems.push({ name: tool.name, tokens });
-    mcpToolsTokens += tokens;
-  }
-
-  const messagesTokens = userTokens + assistantTokens + toolCallTokens + toolResultTokens;
-  const totalUsedTokens = systemPromptTokens + coreToolsTokens + mcpToolsTokens + messagesTokens;
-
-  const contextLimit =
-    (await getContextLimitForModel(state, connectionId, effectiveConfig.modelId)) ??
-    DEFAULT_CONTEXT_LIMIT;
-
-  const percentUsed = contextLimit > 0 ? totalUsedTokens / contextLimit : 0;
-  const freeTokens = contextLimit - totalUsedTokens - RESERVED_FOR_RESPONSE_TOKENS;
-
-  const breakdown: ContextBreakdown = {
-    timestamp: new Date().toISOString(),
-    modelId,
-    contextLimit,
-    totalUsedTokens,
-    percentUsed,
-    categories: {
-      systemPrompt: { tokens: systemPromptTokens },
-      coreTools: {
-        tokens: coreToolsTokens,
-        ...(coreToolItems.length > 0 ? { items: coreToolItems } : {}),
-      },
-      mcpTools: {
-        tokens: mcpToolsTokens,
-        ...(mcpToolItems.length > 0 ? { items: mcpToolItems } : {}),
-      },
-      messages: {
-        tokens: messagesTokens,
-        subcategories: {
-          userMessages: { tokens: userTokens },
-          agentMessages: { tokens: assistantTokens },
-          toolCalls: { tokens: toolCallTokens },
-          toolResults: { tokens: toolResultTokens },
-        },
-      },
-      reservedForResponse: { tokens: RESERVED_FOR_RESPONSE_TOKENS },
-      freeSpace: { tokens: Math.max(0, freeTokens) },
-    },
-  };
-
-  const tokenUsage: ThreadTokenUsage = {
-    totalPromptTokens:
-      systemPromptTokens +
-      coreToolsTokens +
-      mcpToolsTokens +
-      userTokens +
-      toolCallTokens +
-      toolResultTokens,
-    totalCompletionTokens: assistantTokens,
-    totalTokens: totalUsedTokens,
-    contextLimit,
-    percentUsed,
-    nearLimit: percentUsed >= 0.8,
-  };
-
-  return { breakdown, tokenUsage };
-}
+// Re-export public API from message-builder for backwards compatibility
+export {
+  buildProviderMessagesFromDurableEvents,
+  estimateProviderTokens,
+} from './events/message-builder';
 
 export function createToolExecutorForMode(
   executionMode: 'plan' | 'execute',
@@ -318,10 +65,6 @@ export function createToolExecutorForMode(
 
   return { executor, toolsForProvider };
 }
-
-// Import and re-export public API from message-builder
-import { buildProviderMessagesFromDurableEvents, estimateProviderTokens } from './events/message-builder';
-export { buildProviderMessagesFromDurableEvents, estimateProviderTokens } from './events/message-builder';
 
 export function createAgentServerState(): AgentServerState {
   return {
@@ -409,8 +152,17 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   // Create job notification functions using factories
   const queueJobNotification = createQueueJobNotification(state, runPromptInternalRef);
-  const setupProgressTimer = createSetupProgressTimer(state, runPromptInternalRef, queueJobNotification);
-  const finalizeJob = createFinalizeJob(state, runExclusive, emitSessionUpdate, queueJobNotification);
+  const setupProgressTimer = createSetupProgressTimer(
+    state,
+    runPromptInternalRef,
+    queueJobNotification
+  );
+  const finalizeJob = createFinalizeJob(
+    state,
+    runExclusive,
+    emitSessionUpdate,
+    queueJobNotification
+  );
 
   const _requestPermissionFromClient = async (request: {
     sessionId: string;
@@ -805,10 +557,4 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     runSubagentJobProcess,
     runPromptInternalRef,
   });
-
-  peer.onRequest('ent/personas/list', async (_params: unknown) => {
-    const personas = personaRegistry.listAvailablePersonas();
-    return { personas };
-  });
-
 }
