@@ -10,7 +10,7 @@ import {
   readSync,
   closeSync,
 } from 'node:fs';
-import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
+import { join, dirname, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
 import {
   createNdjsonStdioTransport,
   AcpErrorCodes,
@@ -1985,50 +1985,108 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   };
 
   const runSubagentJobProcess = (job: JobState) => {
+    // Helper to write error output directly to the job output file.
+    // This is used for error reporting and doesn't depend on state.activeSession.
+    const writeErrorToJobOutput = (errorText: string) => {
+      try {
+        // Ensure the job-logs directory exists
+        const logDir = join(dirname(job.outputPath), '.');
+        if (!existsSync(dirname(job.outputPath))) {
+          mkdirSync(dirname(job.outputPath), { recursive: true, mode: 0o700 });
+        }
+        appendFileSync(job.outputPath, errorText, { encoding: 'utf8' });
+      } catch (writeErr) {
+        logger.error('job.subagent.write_error_failed', {
+          jobId: job.jobId,
+          error: writeErr instanceof Error ? writeErr.message : String(writeErr),
+        });
+      }
+    };
+
     void (async () => {
-      if (!state.activeSession) return;
+      if (!state.activeSession) {
+        job.status = 'failed';
+        writeErrorToJobOutput('[SUBAGENT ERROR]\nMessage: No active session\n');
+        await finalizeJob(job);
+        return;
+      }
       if (job.proc || job.finished) return;
       if (!job.subagentContent || !Array.isArray(job.subagentContent)) {
         job.status = 'failed';
+        writeErrorToJobOutput('[SUBAGENT ERROR]\nMessage: Missing subagentContent\n');
         await finalizeJob(job);
         return;
       }
 
-      const childProc = spawn(process.execPath, [process.argv[1] ?? ''], {
-        cwd: process.cwd(),
-        env: { ...process.env },
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      job.proc = childProc;
-
-      const childTransport = createNdjsonStdioTransport({
-        readable: childProc.stdout,
-        writable: childProc.stdin,
-      });
-      job.childTransportClose = childTransport.close;
-
-      const childPeer = new JsonRpcPeer(childTransport, { idPrefix: 'c_' });
-      job.childPeer = childPeer;
-
       // Buffer for collecting stderr output
       let stderrBuffer = '';
+      let childProc: ReturnType<typeof spawn> | undefined;
+      let childTransport: ReturnType<typeof createNdjsonStdioTransport> | undefined;
+      let childPeer: JsonRpcPeer | undefined;
 
-      // Capture stderr from child process for debugging
-      childProc.stderr?.on('data', (chunk: Buffer) => {
-        stderrBuffer += chunk.toString('utf8');
-      });
+      try {
+        childProc = spawn(process.execPath, [process.argv[1] ?? ''], {
+          cwd: process.cwd(),
+          env: { ...process.env },
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+        job.proc = childProc;
 
-      // Log if child process exits with error
-      childProc.on('exit', (code, signal) => {
-        if (code !== 0 && code !== null) {
-          logger.debug('job.subagent.child_exit', {
-            jobId: job.jobId,
-            exitCode: code,
-            signal,
-            stderrLength: stderrBuffer.length,
-          });
+        // Handle spawn errors (e.g., executable not found)
+        childProc.on('error', (err) => {
+          stderrBuffer += `[SPAWN ERROR] ${err.message}\n`;
+        });
+
+        // Capture stderr from child process for debugging
+        childProc.stderr?.on('data', (chunk: Buffer) => {
+          stderrBuffer += chunk.toString('utf8');
+        });
+
+        // Log if child process exits with error
+        childProc.on('exit', (code, signal) => {
+          if (code !== 0 && code !== null) {
+            logger.debug('job.subagent.child_exit', {
+              jobId: job.jobId,
+              exitCode: code,
+              signal,
+              stderrLength: stderrBuffer.length,
+            });
+          }
+        });
+
+        // With stdio: ['pipe', 'pipe', 'pipe'], stdout and stdin are guaranteed non-null
+        if (!childProc.stdout || !childProc.stdin) {
+          throw new Error('Failed to create stdio pipes for child process');
         }
-      });
+
+        childTransport = createNdjsonStdioTransport({
+          readable: childProc.stdout,
+          writable: childProc.stdin,
+        });
+        job.childTransportClose = childTransport.close;
+
+        childPeer = new JsonRpcPeer(childTransport, { idPrefix: 'c_' });
+        job.childPeer = childPeer;
+      } catch (setupError) {
+        // Error during spawn/transport/peer setup
+        job.status = 'failed';
+        const errorMessage = setupError instanceof Error ? setupError.message : String(setupError);
+        const errorStack = setupError instanceof Error ? setupError.stack : undefined;
+        const errorDetails = [
+          '[SUBAGENT ERROR]',
+          `Message: Setup failed - ${errorMessage}`,
+          ...(stderrBuffer.trim() ? [`Stderr: ${stderrBuffer.trim()}`] : []),
+          ...(errorStack ? [`Stack: ${errorStack}`] : []),
+        ].join('\n');
+        writeErrorToJobOutput(errorDetails);
+        logger.error('job.subagent.setup_failed', {
+          jobId: job.jobId,
+          error: errorMessage,
+          stderr: stderrBuffer.trim() || undefined,
+        });
+        await finalizeJob(job);
+        return;
+      }
 
       const appendJobOutput = async (text: string) => {
         if (!state.activeSession) return;
@@ -2396,7 +2454,16 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         ].join('\n');
 
         // Write error details to job output file so they're visible via ent/job/output
-        await appendJobOutput(errorDetails);
+        // Use writeErrorToJobOutput as fallback if appendJobOutput fails (e.g., no active session)
+        try {
+          await appendJobOutput(errorDetails);
+        } catch {
+          writeErrorToJobOutput(errorDetails);
+        }
+        // Always also write via direct method in case appendJobOutput silently returned
+        if (!state.activeSession) {
+          writeErrorToJobOutput(errorDetails);
+        }
 
         logger.error('job.subagent.failed', {
           jobId: job.jobId,
@@ -2407,7 +2474,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         });
       } finally {
         try {
-          childPeer.close();
+          childPeer?.close();
         } catch (error) {
           logger.debug('job.subagent.close_peer.failed', {
             jobId: job.jobId,
@@ -2424,12 +2491,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           });
         }
 
-        if (childProc.exitCode === null) {
+        if (childProc && childProc.exitCode === null) {
           childProc.kill('SIGTERM');
 
           // Wait up to 2 seconds for graceful exit
           const exitPromise = new Promise<void>((resolve) =>
-            childProc.once('exit', () => resolve())
+            childProc!.once('exit', () => resolve())
           );
           const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 2_000));
 
@@ -2449,7 +2516,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
             // Final wait with shorter timeout
             await Promise.race([
-              new Promise<void>((resolve) => childProc.once('exit', () => resolve())),
+              new Promise<void>((resolve) => childProc!.once('exit', () => resolve())),
               new Promise<void>((resolve) => setTimeout(resolve, 1_000)),
             ]);
           }
