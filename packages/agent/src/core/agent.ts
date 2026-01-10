@@ -3,7 +3,8 @@
 import { ProviderCatalogManager } from '@lace/agent/providers/catalog/manager';
 import { ProviderInstanceManager } from '@lace/agent/providers/instance/manager';
 import { MCPServerManager } from '@lace/agent/mcp/server-manager';
-import type { AgentConfig, AgentState } from './types';
+import { Session } from './session';
+import type { AgentConfig, AgentState, SessionConfig } from './types';
 
 export class Agent {
   readonly laceDir: string;
@@ -38,5 +39,40 @@ export class Agent {
     await this.state.providerCatalog.loadCatalogs();
     this.state.providerCatalogLoaded = true;
     this.state.initialized = true;
+  }
+
+  /**
+   * Create a new session with the given configuration
+   */
+  async createSession(config: SessionConfig): Promise<Session> {
+    if (!this.state.initialized) {
+      await this.initialize();
+    }
+    return Session.create(config);
+  }
+
+  /**
+   * Load an existing session by ID
+   */
+  async loadSession(sessionId: string): Promise<Session> {
+    if (!this.state.initialized) {
+      await this.initialize();
+    }
+    return Session.load(sessionId);
+  }
+
+  /**
+   * List all available sessions, optionally filtered by cwd
+   */
+  async listSessions(cwd?: string): Promise<
+    Array<{
+      sessionId: string;
+      cwd: string;
+      createdAt: string;
+      updatedAt: string;
+      messageCount: number;
+    }>
+  > {
+    return Session.list(cwd);
   }
 }
