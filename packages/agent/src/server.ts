@@ -1286,9 +1286,15 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
   };
 
+  // Reference to the prompt handler logic, assigned when session/prompt is registered.
+  // This allows queueJobNotification to trigger turns internally when notifications
+  // are pending and the agent is idle.
+  let runPromptInternal: ((content: unknown[]) => Promise<void>) | null = null;
+
   /**
    * Queue a job notification for delivery to the agent.
-   * If the agent is idle (no active turn), notifies the supervisor that a notification is ready.
+   * If the agent is idle (no active turn) and runPromptInternal is available,
+   * triggers an internal turn to process the notification immediately.
    */
   const queueJobNotification = (
     job: JobState,
@@ -1318,15 +1324,15 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       createdAt: Date.now(),
     });
 
-    // If agent is idle (no active turn), notify the supervisor that notifications are ready
-    // The supervisor can then trigger a session/prompt to have the agent process them
-    if (!state.activeTurn && state.activeSession) {
-      peer.notify('session/update', {
-        sessionId: state.activeSession.meta.sessionId,
-        type: 'notification_ready',
-        pendingCount: state.jobNotificationQueue.length,
-        jobId: job.jobId,
-        notificationType: type,
+    // If agent is idle (no active turn), trigger an internal turn to process notifications
+    if (!state.activeTurn && state.activeSession && runPromptInternal) {
+      // Use setImmediate to avoid blocking the current execution and allow any
+      // in-flight state updates to complete before starting the turn
+      setImmediate(() => {
+        // Re-check conditions since state may have changed
+        if (!state.activeTurn && state.activeSession && state.jobNotificationQueue.length > 0) {
+          void runPromptInternal!([]);
+        }
       });
     }
   };
@@ -4612,7 +4618,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
   });
 
-  peer.onRequest('session/prompt', async (params: unknown) => {
+  // Core prompt handling logic, extracted to allow internal triggering of turns
+  // for notification processing when the agent is idle.
+  const handlePrompt = async (params: { content: unknown[]; outputFormat?: unknown }) => {
     assertInitialized(state);
     if (!state.activeSession)
       throw {
@@ -4631,7 +4639,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       ? { ...state.config, ...state.activeSession.state.config }
       : state.config;
 
-    const parsed = params as { content: unknown[]; outputFormat?: unknown };
+    const parsed = params;
     const turnId = `turn_${randomUUID()}`;
     const startedAt = new Date().toISOString();
     const abortController = new AbortController();
@@ -5965,6 +5973,21 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       // Ensure activeTurn is cleared even if an exception is thrown
       state.activeTurn = null;
     }
+  };
+
+  // Assign the internal prompt runner for use by queueJobNotification
+  runPromptInternal = async (content: unknown[]) => {
+    try {
+      await handlePrompt({ content });
+    } catch {
+      // Silently ignore errors from internally-triggered turns
+      // (e.g., SessionBusy if a turn started between check and execution)
+    }
+  };
+
+  // Register the RPC handler
+  peer.onRequest('session/prompt', async (params: unknown) => {
+    return handlePrompt(params as { content: unknown[]; outputFormat?: unknown });
   });
 
   peer.onRequest('ent/workspace/info', async (params: unknown) => {
