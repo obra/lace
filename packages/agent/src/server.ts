@@ -80,6 +80,7 @@ import { loadPromptConfig } from './config/prompts';
 import { logger } from './utils/logger';
 import { getUserSlashCommands, findUserCommand } from './user-commands';
 import { formatJobNotification } from './jobs/format-notification';
+import { ensureJobLogDir, getJobOutputPath, getLastLines } from './jobs/job-manager';
 import {
   SUPPORTED_PROVIDER_TYPES,
   JOB_LOG_DIR,
@@ -115,29 +116,6 @@ import {
   recordsShallowEqual,
   mcpServerConfigEquivalent,
 } from './rpc/utils';
-
-function ensureJobLogDir(sessionDir: string): string {
-  const dir = join(sessionDir, JOB_LOG_DIR);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
-  return dir;
-}
-
-function getJobOutputPath(sessionDir: string, jobId: string): string {
-  return join(ensureJobLogDir(sessionDir), `${jobId}.log`);
-}
-
-/**
- * Get the last N lines from a job output file.
- */
-function getLastLines(outputPath: string, n: number): string[] {
-  try {
-    const content = readFileSync(outputPath, 'utf8');
-    const lines = content.split('\n').filter((line) => line.length > 0);
-    return lines.slice(-n);
-  } catch {
-    return [];
-  }
-}
 
 function extractTextFromContentBlocks(content: unknown[]): string {
   if (!Array.isArray(content)) return '';
