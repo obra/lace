@@ -1,7 +1,8 @@
 // ABOUTME: Session lifecycle RPC handlers for creating, loading, and managing sessions
 
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, join } from 'node:fs';
+import { appendFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   AcpErrorCodes,
   SessionForkParamsSchema,
