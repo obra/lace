@@ -82,10 +82,14 @@ import { getUserSlashCommands, findUserCommand } from './user-commands';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
 const JOB_LOG_DIR = 'jobs';
+const MAX_CONCURRENT_JOBS = 10;
+const MAX_JOB_OUTPUT_BYTES = 10 * 1024 * 1024; // 10 MB
 
 type SessionUpdateParams = z.infer<typeof SessionUpdateNotificationSchema>['params'];
 type DistributiveOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never;
 type SessionUpdate = DistributiveOmit<SessionUpdateParams, 'sessionId' | 'streamSeq'>;
+// Inner update type for job_update events (text_delta, tool_use, etc.)
+type JobInnerUpdate = Extract<SessionUpdateParams, { type: 'job_update' }>['update'];
 
 function throwInvalidParams(reason?: string): never {
   throw {
@@ -183,7 +187,7 @@ function mapCatalogModelToModelInfo(model: CatalogModel, providerId: string) {
   };
 }
 
-type JobType = 'shell' | 'subagent';
+type JobType = 'bash' | 'delegate';
 type JobStatus = 'running' | 'completed' | 'failed' | 'cancelled';
 
 type JobState = {
@@ -202,7 +206,7 @@ type JobState = {
   proc?: ChildProcess;
   permissionAbortController?: AbortController;
   childPeer?: JsonRpcPeer;
-  childSessionId?: string;
+  subagentSessionId?: string;
   childTransportClose?: () => void;
   finished: boolean;
   completion: Promise<void>;
@@ -1138,6 +1142,24 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     }
   };
 
+  // Cache for deriveJobsForActiveSession - avoids re-reading events.jsonl on every call
+  let jobsCache: {
+    sessionId: string;
+    fileSize: number;
+    fileMtime: number;
+    result: Array<{
+      jobId: string;
+      parentJobId?: string;
+      type: JobType;
+      status: JobStatus;
+      description?: string;
+      command?: string;
+      startTime: string;
+      exitCode?: number;
+      subagentSessionId?: string;
+    }>;
+  } | null = null;
+
   const emitSessionUpdate = async (
     update: SessionUpdate,
     context?: { turnId?: string; turnSeq?: number; jobId?: string }
@@ -1179,7 +1201,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     job.proc = undefined;
     job.childPeer = undefined;
-    job.childSessionId = undefined;
+    job.subagentSessionId = undefined;
     job.childTransportClose = undefined;
     job.finished = true;
 
@@ -1413,6 +1435,16 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         data: { category: 'session' },
       };
 
+    // Check concurrent job limit
+    const runningJobCount = [...state.jobs.values()].filter((j) => j.status === 'running').length;
+    if (runningJobCount >= MAX_CONCURRENT_JOBS) {
+      throw {
+        code: -32003, // ResourceLimitExceeded
+        message: `Maximum concurrent jobs (${MAX_CONCURRENT_JOBS}) exceeded`,
+        data: { category: 'session' },
+      };
+    }
+
     const jobId = `job_${randomUUID()}`;
     const startedAt = new Date().toISOString();
     const outputPath = getJobOutputPath(state.activeSession.dir, jobId);
@@ -1425,7 +1457,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const job: JobState = {
       jobId,
       parentJobId: options.parentJobId,
-      type: 'shell',
+      type: 'bash',
       status: 'running',
       description: options.description,
       command: options.command,
@@ -1449,7 +1481,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         data: {
           jobId,
           parentJobId: options.parentJobId,
-          jobType: 'shell',
+          jobType: 'bash',
           description: options.description,
           command: options.command,
         },
@@ -1464,7 +1496,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         type: 'job_started',
         jobId,
         parentJobId: options.parentJobId,
-        jobType: 'shell',
+        jobType: 'bash',
         description: options.description,
       },
       options.turnContext
@@ -1481,6 +1513,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     description?: string;
     parentJobId?: string;
     turnContext?: { turnId: string; turnSeq: number };
+    resumeSessionId?: string;
   }): Promise<{ jobId: string }> => {
     if (!state.activeSession)
       throw {
@@ -1488,6 +1521,16 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         message: 'SessionNotFound',
         data: { category: 'session' },
       };
+
+    // Check concurrent job limit
+    const runningJobCount = [...state.jobs.values()].filter((j) => j.status === 'running').length;
+    if (runningJobCount >= MAX_CONCURRENT_JOBS) {
+      throw {
+        code: -32003, // ResourceLimitExceeded
+        message: `Maximum concurrent jobs (${MAX_CONCURRENT_JOBS}) exceeded`,
+        data: { category: 'session' },
+      };
+    }
 
     const jobId = `job_${randomUUID()}`;
     const startedAt = new Date().toISOString();
@@ -1501,7 +1544,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const job: JobState = {
       jobId,
       parentJobId: options.parentJobId,
-      type: 'subagent',
+      type: 'delegate',
       status: 'running',
       description: options.description ?? 'Subagent',
       command: options.prompt,
@@ -1513,6 +1556,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       finished: false,
       completion,
       resolveCompletion,
+      // For resume: pre-set the subagentSessionId if resuming a previous session
+      ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
     };
 
     state.jobs.set(jobId, job);
@@ -1526,7 +1571,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         data: {
           jobId,
           parentJobId: options.parentJobId,
-          jobType: 'subagent',
+          jobType: 'delegate',
           description: job.description,
           command: options.prompt,
         },
@@ -1541,7 +1586,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         type: 'job_started',
         jobId,
         parentJobId: options.parentJobId,
-        jobType: 'subagent',
+        jobType: 'delegate',
         description: job.description,
       },
       options.turnContext
@@ -1584,7 +1629,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           type: 'job_update',
           jobId: job.jobId,
           parentJobId: job.parentJobId,
-          jobType: 'shell',
+          jobType: 'bash',
           channel: 'internal',
           update: {
             type: 'tool_use',
@@ -1636,7 +1681,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             type: 'job_update',
             jobId: job.jobId,
             parentJobId: job.parentJobId,
-            jobType: 'shell',
+            jobType: 'bash',
             channel: 'internal',
             update: {
               type: 'tool_use',
@@ -1669,7 +1714,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       const appendOutput = async (chunk: string) => {
         if (!state.activeSession) return;
         await runExclusive(() => {
-          appendFileSync(job.outputPath, chunk, { encoding: 'utf8' });
+          // Check output size limit
+          const currentSize = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
+          if (currentSize >= MAX_JOB_OUTPUT_BYTES) return; // Already at limit
+          const remaining = MAX_JOB_OUTPUT_BYTES - currentSize;
+          const toWrite = chunk.length <= remaining ? chunk : chunk.slice(0, remaining);
+          appendFileSync(job.outputPath, toWrite, { encoding: 'utf8' });
         });
       };
 
@@ -1680,7 +1730,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           type: 'job_update',
           jobId: job.jobId,
           parentJobId: job.parentJobId,
-          jobType: 'shell',
+          jobType: 'bash',
           channel: 'stdout',
           update: { type: 'text_delta', text: chunk },
         });
@@ -1693,7 +1743,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           type: 'job_update',
           jobId: job.jobId,
           parentJobId: job.parentJobId,
-          jobType: 'shell',
+          jobType: 'bash',
           channel: 'stderr',
           update: { type: 'text_delta', text: chunk },
         });
@@ -1749,7 +1799,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       const appendJobOutput = async (text: string) => {
         if (!state.activeSession) return;
         await runExclusive(() => {
-          appendFileSync(job.outputPath, text, { encoding: 'utf8' });
+          // Check output size limit
+          const currentSize = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
+          if (currentSize >= MAX_JOB_OUTPUT_BYTES) return; // Already at limit
+          const remaining = MAX_JOB_OUTPUT_BYTES - currentSize;
+          const toWrite = text.length <= remaining ? text : text.slice(0, remaining);
+          appendFileSync(job.outputPath, toWrite, { encoding: 'utf8' });
         });
       };
 
@@ -1802,7 +1857,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           const mappedJobId = mapChildJobId(p.jobId);
           const mappedParentJobId =
             typeof p.parentJobId === 'string' ? mapChildJobId(p.parentJobId) : job.jobId;
-          const jobType = p.jobType === 'subagent' ? 'subagent' : 'shell';
+          const jobType = p.jobType === 'delegate' ? 'delegate' : 'bash';
           const description = typeof p.description === 'string' ? p.description : undefined;
 
           ensureForwardedJobRecord({
@@ -1850,13 +1905,13 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           const record = ensureForwardedJobRecord({
             jobId: mappedJobId,
             parentJobId: mappedParentJobId,
-            type: p.jobType === 'subagent' ? 'subagent' : 'shell',
+            type: p.jobType === 'delegate' ? 'delegate' : 'bash',
           });
           record.status = outcome;
           record.finished = true;
           record.proc = undefined;
           record.childPeer = undefined;
-          record.childSessionId = undefined;
+          record.subagentSessionId = undefined;
           record.childTransportClose = undefined;
           record.exitCode = exitCode;
 
@@ -1901,15 +1956,25 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           const record = ensureForwardedJobRecord({
             jobId: mappedJobId,
             parentJobId: mappedParentJobId,
-            type: p.jobType === 'subagent' ? 'subagent' : 'shell',
+            type: p.jobType === 'delegate' ? 'delegate' : 'bash',
           });
 
           const channel = p.channel === 'stdout' || p.channel === 'stderr' ? p.channel : 'internal';
-          const update = p.update as any;
+          // Child job update - forwarded as-is with namespaced IDs
+          // Runtime checks ensure shape is valid before forwarding
+          const update = p.update as Record<string, unknown>;
 
           if (update.type === 'text_delta' && typeof update.text === 'string') {
+            const text = update.text;
             await runExclusive(() => {
-              appendFileSync(record.outputPath, update.text, { encoding: 'utf8' });
+              // Check output size limit
+              const currentSize = existsSync(record.outputPath)
+                ? statSync(record.outputPath).size
+                : 0;
+              if (currentSize >= MAX_JOB_OUTPUT_BYTES) return; // Already at limit
+              const remaining = MAX_JOB_OUTPUT_BYTES - currentSize;
+              const toWrite = text.length <= remaining ? text : text.slice(0, remaining);
+              appendFileSync(record.outputPath, toWrite, { encoding: 'utf8' });
             });
           }
 
@@ -1923,7 +1988,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             parentJobId: mappedParentJobId,
             jobType: record.type,
             channel,
-            update,
+            // Forwarded update from child job - trusted after runtime checks above
+            update: update as JobInnerUpdate,
           });
 
           return undefined;
@@ -1935,7 +2001,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             type: 'job_update',
             jobId: job.jobId,
             parentJobId: job.parentJobId,
-            jobType: 'subagent',
+            jobType: 'delegate',
             channel: 'internal',
             update: { type: 'text_delta', text: p.text },
           });
@@ -1948,7 +2014,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             type: 'job_update',
             jobId: job.jobId,
             parentJobId: job.parentJobId,
-            jobType: 'subagent',
+            jobType: 'delegate',
             channel: 'internal',
             update: {
               type: 'tool_use',
@@ -1971,9 +2037,10 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             type: 'job_update',
             jobId: job.jobId,
             parentJobId: job.parentJobId,
-            jobType: 'subagent',
+            jobType: 'delegate',
             channel: 'internal',
-            update: p as any,
+            // Forwarded context_injected from child job
+            update: p as JobInnerUpdate,
           });
           return undefined;
         }
@@ -2034,32 +2101,92 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           config: { approvalMode: 'ask' },
         });
 
-        const created = (await childPeer.request('session/new', {
-          workDir: state.activeSession.meta.workDir,
-        })) as { sessionId: string };
-        job.childSessionId = created.sessionId;
+        // Resume existing session or create a new one
+        if (job.subagentSessionId) {
+          // Resume: load the existing session
+          await childPeer.request('session/load', {
+            sessionId: job.subagentSessionId,
+          });
+        } else {
+          // New session
+          const created = (await childPeer.request('session/new', {
+            workDir: state.activeSession.meta.workDir,
+          })) as { sessionId: string };
+          job.subagentSessionId = created.sessionId;
+
+          // Persist subagentSessionId for resume functionality
+          await runExclusive(() => {
+            let sessionState = readSessionState(state.activeSession!.dir);
+            const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+              type: 'job_session_assigned',
+              data: {
+                jobId: job.jobId,
+                subagentSessionId: created.sessionId,
+              },
+            });
+            sessionState = nextState;
+            writeSessionState(state.activeSession!.dir, sessionState);
+            state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+          });
+        }
 
         await childPeer.request('session/prompt', { content: job.subagentContent });
 
         if (job.status !== 'cancelled') job.status = 'completed';
-      } catch {
+      } catch (error) {
         if (job.status !== 'cancelled') job.status = 'failed';
+        logger.error('job.subagent.failed', {
+          jobId: job.jobId,
+          error: error instanceof Error ? error.message : String(error),
+        });
       } finally {
         try {
           childPeer.close();
-        } catch {
-          // ignore
+        } catch (error) {
+          logger.debug('job.subagent.close_peer.failed', {
+            jobId: job.jobId,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
 
         try {
           job.childTransportClose?.();
-        } catch {
-          // ignore
+        } catch (error) {
+          logger.debug('job.subagent.close_transport.failed', {
+            jobId: job.jobId,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
 
         if (childProc.exitCode === null) {
           childProc.kill('SIGTERM');
-          await new Promise<void>((resolve) => childProc.once('exit', () => resolve()));
+
+          // Wait up to 2 seconds for graceful exit
+          const exitPromise = new Promise<void>((resolve) =>
+            childProc.once('exit', () => resolve())
+          );
+          const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 2_000));
+
+          await Promise.race([exitPromise, timeoutPromise]);
+
+          // Force kill if still running
+          if (childProc.exitCode === null) {
+            try {
+              childProc.kill('SIGKILL');
+            } catch (error) {
+              // Process may have exited between check and kill
+              logger.debug('job.subagent.sigkill.failed', {
+                jobId: job.jobId,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+
+            // Final wait with shorter timeout
+            await Promise.race([
+              new Promise<void>((resolve) => childProc.once('exit', () => resolve())),
+              new Promise<void>((resolve) => setTimeout(resolve, 1_000)),
+            ]);
+          }
         }
 
         await finalizeJob(job);
@@ -2305,11 +2432,42 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     command?: string;
     startTime: string;
     exitCode?: number;
+    subagentSessionId?: string;
   }> => {
     if (!state.activeSession) return [];
 
+    const sessionId = state.activeSession.meta.sessionId;
     const sessionDir = state.activeSession.dir;
     const eventsPath = join(sessionDir, 'events.jsonl');
+
+    // Check cache validity
+    let fileSize = 0;
+    let fileMtime = 0;
+    try {
+      const stats = statSync(eventsPath);
+      fileSize = stats.size;
+      fileMtime = stats.mtimeMs;
+    } catch {
+      return [];
+    }
+
+    if (
+      jobsCache &&
+      jobsCache.sessionId === sessionId &&
+      jobsCache.fileSize === fileSize &&
+      jobsCache.fileMtime === fileMtime
+    ) {
+      // Cache hit - but still need to update running job status from in-memory state
+      const result = jobsCache.result.map((job) => {
+        if (job.status === 'running' && !state.jobs.has(job.jobId)) {
+          return { ...job, status: 'failed' as JobStatus };
+        }
+        return job;
+      });
+      return result;
+    }
+
+    // Cache miss - read and parse the file
     let raw = '';
     try {
       raw = readFileSync(eventsPath, 'utf8');
@@ -2328,6 +2486,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         command?: string;
         startTime: string;
         exitCode?: number;
+        subagentSessionId?: string;
       }
     >();
 
@@ -2335,15 +2494,20 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     for (const line of lines) {
       if (!line) continue;
       try {
-        const parsed = JSON.parse(line) as { type?: string; timestamp?: string; data?: any };
-        if (parsed.type !== 'job_started' && parsed.type !== 'job_finished') continue;
+        const parsed = JSON.parse(line) as { type?: string; timestamp?: string; data?: unknown };
+        if (
+          parsed.type !== 'job_started' &&
+          parsed.type !== 'job_finished' &&
+          parsed.type !== 'job_session_assigned'
+        )
+          continue;
         const timestamp = typeof parsed.timestamp === 'string' ? parsed.timestamp : undefined;
-        const data = parsed.data ?? {};
+        const data = (parsed.data ?? {}) as Record<string, unknown>;
         const jobId = toNonEmptyString(data.jobId);
         if (!jobId) continue;
 
         if (parsed.type === 'job_started') {
-          const jobType = data.jobType === 'subagent' ? 'subagent' : 'shell';
+          const jobType = data.jobType === 'delegate' ? 'delegate' : 'bash';
           const startTime = timestamp ?? new Date().toISOString();
           byId.set(jobId, {
             jobId,
@@ -2354,6 +2518,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             command: toNonEmptyString(data.command) ?? undefined,
             startTime,
           });
+        } else if (parsed.type === 'job_session_assigned') {
+          const existing = byId.get(jobId);
+          const subagentSessionId = toNonEmptyString(data.subagentSessionId);
+          if (existing && subagentSessionId) {
+            existing.subagentSessionId = subagentSessionId;
+          }
         } else {
           const existing = byId.get(jobId);
           const exitCode = typeof data.exitCode === 'number' ? data.exitCode : undefined;
@@ -2370,7 +2540,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           } else {
             byId.set(jobId, {
               jobId,
-              type: 'shell',
+              type: 'bash',
               status: outcome ?? 'failed',
               startTime: timestamp ?? new Date().toISOString(),
               exitCode,
@@ -2382,13 +2552,23 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       }
     }
 
-    for (const job of byId.values()) {
+    // Update cache with parsed results (before applying running status updates)
+    const parsedResult = Array.from(byId.values());
+    jobsCache = {
+      sessionId,
+      fileSize,
+      fileMtime,
+      result: parsedResult,
+    };
+
+    // Apply running job status updates from in-memory state
+    for (const job of parsedResult) {
       if (job.status === 'running' && !state.jobs.has(job.jobId)) {
         job.status = 'failed';
       }
     }
 
-    return Array.from(byId.values());
+    return parsedResult;
   };
 
   peer.onRequest('ent/providers/list', async (_params: unknown) => {
@@ -3062,8 +3242,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           try {
             const toolsResult = await client.listTools();
             toolCount = toolsResult.tools.length;
-          } catch {
-            // Ignore tool listing errors
+          } catch (error) {
+            logger.debug('mcp.listTools.failed', {
+              serverId,
+              error: error instanceof Error ? error.message : String(error),
+            });
           }
         }
 
@@ -3163,6 +3346,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       description: j.description,
       command: j.command,
       startTime: j.startTime,
+      ...(j.subagentSessionId ? { subagentSessionId: j.subagentSessionId } : {}),
     }));
 
     return { jobs };
@@ -3310,8 +3494,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           } else {
             proc.kill('SIGKILL');
           }
-        } catch {
-          // ignore; SIGTERM was sent
+        } catch (error) {
+          // SIGTERM was already sent; process may have exited
+          logger.debug('job.kill.sigkill.failed', {
+            jobId,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
 
         await Promise.race([
@@ -3339,7 +3527,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     if (!jobId) return undefined;
 
     const job = state.jobs.get(jobId);
-    if (!job || job.type !== 'subagent' || job.finished) return undefined;
+    if (!job || job.type !== 'delegate' || job.finished) return undefined;
     if (!job.childPeer) return undefined;
 
     const priority =
@@ -3359,12 +3547,43 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   peer.onRequest('session/new', async (params: unknown) => {
     assertInitialized(state);
-    if (state.activeTurn || [...state.jobs.values()].some((job) => job.status === 'running'))
+    if (state.activeTurn)
       throw {
         code: AcpErrorCodes.SessionBusy,
         message: 'SessionBusy',
         data: { category: 'session' },
       };
+
+    // Kill all running jobs before switching sessions
+    for (const job of state.jobs.values()) {
+      if (job.status === 'running') {
+        job.status = 'cancelled';
+        if (job.proc) {
+          try {
+            if (process.platform !== 'win32' && typeof job.proc.pid === 'number') {
+              process.kill(-job.proc.pid, 'SIGTERM');
+            } else {
+              job.proc.kill('SIGTERM');
+            }
+          } catch (error) {
+            logger.debug('session.new.job_kill.failed', {
+              jobId: job.jobId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+        job.permissionAbortController?.abort();
+      }
+    }
+
+    // Wait briefly for processes to terminate
+    await Promise.all(
+      [...state.jobs.values()]
+        .filter((job) => job.proc && job.proc.exitCode === null)
+        .map((job) =>
+          Promise.race([job.completion, new Promise<void>((resolve) => setTimeout(resolve, 500))])
+        )
+    );
 
     state.pendingPermissionRequests.clear();
     state.jobs.clear();
@@ -3479,6 +3698,37 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     const switchingSessions =
       state.activeSession && state.activeSession.meta.sessionId !== parsed.sessionId;
     if (switchingSessions) {
+      // Kill all running jobs before switching sessions
+      for (const job of state.jobs.values()) {
+        if (job.status === 'running') {
+          job.status = 'cancelled';
+          if (job.proc) {
+            try {
+              if (process.platform !== 'win32' && typeof job.proc.pid === 'number') {
+                process.kill(-job.proc.pid, 'SIGTERM');
+              } else {
+                job.proc.kill('SIGTERM');
+              }
+            } catch (error) {
+              logger.debug('session.load.job_kill.failed', {
+                jobId: job.jobId,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+          }
+          job.permissionAbortController?.abort();
+        }
+      }
+
+      // Wait briefly for processes to terminate
+      await Promise.all(
+        [...state.jobs.values()]
+          .filter((job) => job.proc && job.proc.exitCode === null)
+          .map((job) =>
+            Promise.race([job.completion, new Promise<void>((resolve) => setTimeout(resolve, 500))])
+          )
+      );
+
       state.pendingPermissionRequests.clear();
       state.jobs.clear();
     }
@@ -4643,69 +4893,309 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
               let coreResult: CoreToolResult;
 
-              if (toolName === 'delegate') {
-                const prompt = toNonEmptyString((finalInput as any).prompt);
+              // Handle bash with background=true - spawn background job instead of sync execution
+              if (
+                toolName === 'bash' &&
+                (finalInput as Record<string, unknown>).background === true
+              ) {
+                const command = toNonEmptyString((finalInput as Record<string, unknown>).command);
+                const description = toNonEmptyString(
+                  (finalInput as Record<string, unknown>).description
+                );
+                if (!command) {
+                  coreResult = {
+                    status: 'failed',
+                    content: [{ type: 'text', text: 'bash.command is required' }],
+                  };
+                } else {
+                  const { jobId } = await _startShellJob({
+                    command,
+                    description: description || command.substring(0, 50),
+                    turnContext: { turnId, turnSeq: toolTurnSeq },
+                  });
+
+                  coreResult = {
+                    status: 'completed',
+                    content: [
+                      {
+                        type: 'text',
+                        text: JSON.stringify({ jobId, status: 'started' }),
+                      },
+                    ],
+                  };
+                }
+              } else if (toolName === 'delegate') {
+                const prompt = toNonEmptyString((finalInput as Record<string, unknown>).prompt);
+                const background = (finalInput as Record<string, unknown>).background === true;
+                const description = toNonEmptyString(
+                  (finalInput as Record<string, unknown>).description
+                );
+                const resumeJobId = toNonEmptyString(
+                  (finalInput as Record<string, unknown>).resume
+                );
+
+                // If resuming, look up the previous job's subagentSessionId
+                let resumeSessionId: string | undefined;
+                let resumeError: string | undefined;
+                if (resumeJobId) {
+                  const previousJob = state.jobs.get(resumeJobId);
+                  if (!previousJob?.subagentSessionId) {
+                    resumeError = `Cannot resume job ${resumeJobId}: no subagentSessionId found`;
+                  } else {
+                    resumeSessionId = previousJob.subagentSessionId;
+                  }
+                }
+
                 if (!prompt) {
                   coreResult = {
                     status: 'failed',
                     content: [{ type: 'text', text: 'delegate.prompt is required' }],
                   };
+                } else if (resumeError) {
+                  coreResult = {
+                    status: 'failed',
+                    content: [{ type: 'text', text: resumeError }],
+                  };
                 } else {
                   const { jobId } = await startSubagentJob({
                     prompt,
-                    description: 'Delegate',
+                    description: description || 'Delegate',
                     turnContext: { turnId, turnSeq: toolTurnSeq },
+                    resumeSessionId,
                   });
 
-                  const job = state.jobs.get(jobId);
-                  if (job) {
-                    const abortPromise = new Promise<never>((_, reject) => {
-                      abortController.signal.addEventListener(
-                        'abort',
-                        () => reject(new Error('cancelled')),
+                  if (background) {
+                    // Return immediately without waiting for completion
+                    coreResult = {
+                      status: 'completed',
+                      content: [
                         {
-                          once: true,
-                        }
-                      );
-                    });
+                          type: 'text',
+                          text: JSON.stringify({ jobId, status: 'started' }),
+                        },
+                      ],
+                    };
+                  } else {
+                    // Wait for job completion (existing behavior)
+                    const job = state.jobs.get(jobId);
+                    if (job) {
+                      const abortPromise = new Promise<never>((_, reject) => {
+                        abortController.signal.addEventListener(
+                          'abort',
+                          () => reject(new Error('cancelled')),
+                          {
+                            once: true,
+                          }
+                        );
+                      });
 
-                    try {
-                      await Promise.race([job.completion, abortPromise]);
-                    } catch {
-                      job.status = 'cancelled';
-                      await finalizeJob(job);
+                      try {
+                        await Promise.race([job.completion, abortPromise]);
+                      } catch {
+                        job.status = 'cancelled';
+                        await finalizeJob(job);
+                      }
                     }
+
+                    let output = '';
+                    try {
+                      output = readFileSync(
+                        getJobOutputPath(state.activeSession.dir, jobId),
+                        'utf8'
+                      );
+                    } catch {
+                      output = '';
+                    }
+
+                    const tailLimit = 64 * 1024;
+                    const truncated = output.length > tailLimit;
+                    const reportText = truncated ? output.slice(-tailLimit) : output;
+
+                    const status = job?.status ?? 'failed';
+                    coreResult = {
+                      status:
+                        status === 'completed'
+                          ? 'completed'
+                          : status === 'cancelled'
+                            ? 'aborted'
+                            : 'failed',
+                      content: [
+                        {
+                          type: 'text',
+                          text:
+                            `delegate jobId=${jobId}\n\n` +
+                            (reportText.trim().length > 0 ? reportText.trim() : '(no output)') +
+                            (truncated ? '\n\n(truncated)' : ''),
+                        },
+                      ],
+                    };
                   }
-
-                  let output = '';
-                  try {
-                    output = readFileSync(getJobOutputPath(state.activeSession.dir, jobId), 'utf8');
-                  } catch {
-                    output = '';
-                  }
-
-                  const tailLimit = 64 * 1024;
-                  const truncated = output.length > tailLimit;
-                  const reportText = truncated ? output.slice(-tailLimit) : output;
-
-                  const status = job?.status ?? 'failed';
+                }
+              } else if (toolName === 'job_output') {
+                // Runtime handling for job_output tool - reuses ent/job/output logic
+                const jobId = toNonEmptyString((finalInput as Record<string, unknown>).jobId);
+                if (!jobId) {
                   coreResult = {
-                    status:
-                      status === 'completed'
-                        ? 'completed'
-                        : status === 'cancelled'
-                          ? 'aborted'
-                          : 'failed',
-                    content: [
-                      {
-                        type: 'text',
-                        text:
-                          `delegate jobId=${jobId}\n\n` +
-                          (reportText.trim().length > 0 ? reportText.trim() : '(no output)') +
-                          (truncated ? '\n\n(truncated)' : ''),
-                      },
-                    ],
+                    status: 'failed',
+                    content: [{ type: 'text', text: 'job_output.jobId is required' }],
                   };
+                } else {
+                  const block = (finalInput as Record<string, unknown>).block !== false;
+                  const timeoutMs =
+                    typeof (finalInput as Record<string, unknown>).timeoutMs === 'number'
+                      ? ((finalInput as Record<string, unknown>).timeoutMs as number)
+                      : 30_000;
+                  const byteOffset =
+                    typeof (finalInput as Record<string, unknown>).byteOffset === 'number'
+                      ? ((finalInput as Record<string, unknown>).byteOffset as number)
+                      : 0;
+
+                  // Block until job completion if requested
+                  const runningJob = state.jobs.get(jobId);
+                  if (block && runningJob?.status === 'running') {
+                    await Promise.race([
+                      runningJob.completion,
+                      timeoutMs > 0
+                        ? new Promise<void>((resolve) => setTimeout(resolve, timeoutMs))
+                        : new Promise<void>(() => {}),
+                    ]);
+                  }
+
+                  // Look up job from derived list (includes persisted jobs)
+                  const jobs = deriveJobsForActiveSession();
+                  const record = jobs.find((j) => j.jobId === jobId);
+
+                  if (!record) {
+                    coreResult = {
+                      status: 'failed',
+                      content: [{ type: 'text', text: `Job not found: ${jobId}` }],
+                    };
+                  } else {
+                    const sessionDir = state.activeSession.dir;
+                    const outputPath = getJobOutputPath(sessionDir, jobId);
+
+                    let totalBytes = 0;
+                    try {
+                      totalBytes = statSync(outputPath).size;
+                    } catch {
+                      totalBytes = 0;
+                    }
+
+                    const clampedOffset = Math.min(byteOffset, totalBytes);
+                    const bytesToRead = Math.max(0, totalBytes - clampedOffset);
+
+                    let output = '';
+                    if (bytesToRead > 0) {
+                      const fd = openSync(outputPath, 'r');
+                      try {
+                        const buf = Buffer.allocUnsafe(bytesToRead);
+                        const read = readSync(fd, buf, 0, bytesToRead, clampedOffset);
+                        output = buf.subarray(0, read).toString('utf8');
+                      } finally {
+                        closeSync(fd);
+                      }
+                    }
+
+                    const result = {
+                      jobId,
+                      status: record.status,
+                      output,
+                      ...(record.exitCode !== undefined ? { exitCode: record.exitCode } : {}),
+                      byteOffset: totalBytes,
+                    };
+
+                    coreResult = {
+                      status: 'completed',
+                      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+                    };
+                  }
+                }
+              } else if (toolName === 'jobs_list') {
+                // Runtime handling for jobs_list tool - reuses ent/job/list logic
+                const statusFilter = Array.isArray((finalInput as Record<string, unknown>).status)
+                  ? ((finalInput as Record<string, unknown>).status as string[])
+                  : undefined;
+                const typeFilter = Array.isArray((finalInput as Record<string, unknown>).type)
+                  ? ((finalInput as Record<string, unknown>).type as string[])
+                  : undefined;
+                const limit =
+                  typeof (finalInput as Record<string, unknown>).limit === 'number'
+                    ? ((finalInput as Record<string, unknown>).limit as number)
+                    : 50;
+
+                let jobs = deriveJobsForActiveSession().map((j) => ({
+                  jobId: j.jobId,
+                  parentJobId: j.parentJobId,
+                  type: j.type,
+                  status: j.status,
+                  description: j.description,
+                  command: j.command,
+                  startTime: j.startTime,
+                  ...(j.subagentSessionId ? { subagentSessionId: j.subagentSessionId } : {}),
+                }));
+
+                // Apply filters
+                if (statusFilter && statusFilter.length > 0) {
+                  jobs = jobs.filter((j) => statusFilter.includes(j.status));
+                }
+                if (typeFilter && typeFilter.length > 0) {
+                  jobs = jobs.filter((j) => typeFilter.includes(j.type));
+                }
+
+                // Apply limit
+                jobs = jobs.slice(0, limit);
+
+                coreResult = {
+                  status: 'completed',
+                  content: [{ type: 'text', text: JSON.stringify({ jobs }, null, 2) }],
+                };
+              } else if (toolName === 'job_kill') {
+                // Runtime handling for job_kill tool - reuses ent/job/kill logic
+                const jobId = toNonEmptyString((finalInput as Record<string, unknown>).jobId);
+                if (!jobId) {
+                  coreResult = {
+                    status: 'failed',
+                    content: [{ type: 'text', text: 'job_kill.jobId is required' }],
+                  };
+                } else {
+                  const job = state.jobs.get(jobId);
+                  if (!job || job.status !== 'running') {
+                    coreResult = {
+                      status: 'completed',
+                      content: [
+                        {
+                          type: 'text',
+                          text: JSON.stringify({ success: false, reason: 'Job not running' }),
+                        },
+                      ],
+                    };
+                  } else {
+                    job.status = 'cancelled';
+
+                    let killed = false;
+                    if (job.proc) {
+                      const proc = job.proc;
+                      try {
+                        // Kill the entire process group on POSIX so we don't leak child processes
+                        if (process.platform !== 'win32' && typeof proc.pid === 'number') {
+                          process.kill(-proc.pid, 'SIGTERM');
+                        } else {
+                          proc.kill('SIGTERM');
+                        }
+                        killed = true;
+                      } catch {
+                        killed = false;
+                      }
+                    } else {
+                      // Subagent job - just mark as cancelled (completion promise will resolve)
+                      killed = true;
+                    }
+
+                    coreResult = {
+                      status: 'completed',
+                      content: [{ type: 'text', text: JSON.stringify({ success: killed }) }],
+                    };
+                  }
                 }
               } else {
                 coreResult = await toolExecutor.execute(
@@ -4854,7 +5344,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
         const job: JobState = {
           jobId,
-          type: 'shell',
+          type: 'bash',
           status: 'running',
           description: 'Background shell job',
           command: jobCommand,
@@ -4871,13 +5361,13 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
         await writeAndAdvance({
           type: 'job_started',
-          data: { jobId, jobType: 'shell', description: job.description, command: jobCommand },
+          data: { jobId, jobType: 'bash', description: job.description, command: jobCommand },
         });
 
         await emitUpdate(nextJobTurnSeq++, {
           type: 'job_started',
           jobId,
-          jobType: 'shell',
+          jobType: 'bash',
           description: job.description,
         });
 
@@ -4896,7 +5386,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
         const job: JobState = {
           jobId,
-          type: 'subagent',
+          type: 'delegate',
           status: 'running',
           description: 'Subagent',
           command: subagentText,
@@ -4916,7 +5406,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           type: 'job_started',
           data: {
             jobId,
-            jobType: 'subagent',
+            jobType: 'delegate',
             description: job.description,
             command: subagentText,
           },
@@ -4925,7 +5415,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         await emitUpdate(nextJobTurnSeq++, {
           type: 'job_started',
           jobId,
-          jobType: 'subagent',
+          jobType: 'delegate',
           description: job.description,
         });
 
@@ -5225,8 +5715,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       state.activeTurn = null;
 
       for (const job of deferredJobs) {
-        if (job.type === 'shell') runShellJobProcess(job);
-        if (job.type === 'subagent') runSubagentJobProcess(job);
+        if (job.type === 'bash') runShellJobProcess(job);
+        if (job.type === 'delegate') runSubagentJobProcess(job);
       }
 
       return result;

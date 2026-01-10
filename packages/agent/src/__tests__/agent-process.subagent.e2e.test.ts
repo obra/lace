@@ -42,7 +42,7 @@ describe('lace-agent subagents (E2E over stdio)', () => {
       agent.peer.onRequest('session/update', async (params) => {
         const p = params as Record<string, unknown>;
         updates.push(p);
-        if (p.type === 'job_started' && p.jobType === 'subagent' && typeof p.jobId === 'string') {
+        if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
           subagentJobId = p.jobId;
         }
         return undefined;
@@ -102,7 +102,7 @@ describe('lace-agent subagents (E2E over stdio)', () => {
 
     agent.peer.onRequest('session/update', async (params) => {
       const p = params as Record<string, unknown>;
-      if (p.type === 'job_started' && p.jobType === 'subagent' && typeof p.jobId === 'string') {
+      if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
         subagentJobId = p.jobId;
       }
       return undefined;

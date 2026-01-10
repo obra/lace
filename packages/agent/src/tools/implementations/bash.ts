@@ -34,13 +34,22 @@ export interface BashOutput {
 
 const bashSchema = z.object({
   command: NonEmptyString,
+  background: z.boolean().default(false),
+  description: z.string().optional(),
 });
 
 export class BashTool extends Tool {
   name = 'bash';
-  description = `Execute shell commands in isolated bash processes. Each call is independent - no state persists between calls.
-Output truncated to first 100 + last 50 lines. Chain commands with && or ; for sequential operations.
-Exit codes shown even for successful tool execution. Working directory persists within session.`;
+  description = `Execute shell commands in isolated bash processes.
+
+Parameters:
+- command: The shell command to run
+- background: Set to true for background execution (returns jobId immediately)
+- description: Label shown in job listings when background=true (optional)
+
+When background=true, returns { jobId, status: "started" }. Use job_output(jobId) to check status/output.
+
+Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain with && or ;.`;
   schema = bashSchema;
   annotations: ToolAnnotations = {
     title: 'Run commands with bash',

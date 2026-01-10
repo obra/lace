@@ -1244,12 +1244,13 @@ const EntJobListResultSchema = z
         .object({
           jobId: NonEmptyStringSchema,
           parentJobId: NonEmptyStringSchema.optional(),
-          type: z.enum(['shell', 'subagent']),
+          type: z.enum(['bash', 'delegate']),
           status: z.enum(['running', 'completed', 'failed', 'cancelled']),
           description: z.string().optional(),
           command: z.string().optional(),
           startTime: IsoTimestampSchema,
           parentToolUseId: NonEmptyStringSchema.optional(),
+          subagentSessionId: NonEmptyStringSchema.optional(),
         })
         .strict()
     ),
@@ -1744,7 +1745,7 @@ const SessionUpdateJobStartedSchema = z
     type: z.literal('job_started'),
     jobId: NonEmptyStringSchema,
     parentJobId: NonEmptyStringSchema.optional(),
-    jobType: z.enum(['shell', 'subagent']),
+    jobType: z.enum(['bash', 'delegate']),
     description: z.string().optional(),
   })
   .strict();
@@ -1896,7 +1897,7 @@ const SessionUpdateJobUpdateSchema = z
     type: z.literal('job_update'),
     jobId: NonEmptyStringSchema,
     parentJobId: NonEmptyStringSchema.optional(),
-    jobType: z.enum(['shell', 'subagent']).optional(),
+    jobType: z.enum(['bash', 'delegate']).optional(),
     channel: z.enum(['stdout', 'stderr', 'internal']).optional(),
     update: SessionUpdateInnerNonJobSchema,
   })

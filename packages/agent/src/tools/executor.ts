@@ -14,6 +14,9 @@ import { RipgrepSearchTool } from './implementations/ripgrep_search';
 import { FileFindTool } from './implementations/file_find';
 import { UrlFetchTool } from './implementations/url_fetch';
 import { DelegateTool } from './implementations/delegate';
+import { JobOutputTool } from './implementations/job_output';
+import { JobsListTool } from './implementations/jobs_list';
+import { JobKillTool } from './implementations/job_kill';
 import { MCPServerManager } from '../mcp/server-manager';
 import type { MCPServerConnection } from '@lace/agent/config/mcp-types';
 import { MCPToolAdapter } from '../mcp/tool-adapter';
@@ -230,6 +233,9 @@ export class ToolExecutor {
       new FileFindTool(),
       new UrlFetchTool(),
       new DelegateTool(),
+      new JobOutputTool(),
+      new JobsListTool(),
+      new JobKillTool(),
     ];
 
     this.registerTools(tools);

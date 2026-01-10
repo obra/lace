@@ -971,7 +971,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       responseSchema: MethodSchemas.EntJobListResponseSchema,
       label: 'job/list after start',
     });
-    const jobId = listAfterStart.jobs.find((j) => j.type === 'shell')?.jobId;
+    const jobId = listAfterStart.jobs.find((j) => j.type === 'bash')?.jobId;
     expect(jobId).toBeTruthy();
 
     const full = await requestOk<{
@@ -1036,7 +1036,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       label: 'job/list for kill',
     });
     const sleepJobId = listForKill.jobs.find(
-      (j) => j.type === 'shell' && j.status === 'running'
+      (j) => j.type === 'bash' && j.status === 'running'
     )?.jobId;
     expect(sleepJobId).toBeTruthy();
 
