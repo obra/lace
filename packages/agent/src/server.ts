@@ -373,11 +373,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   };
 
   const runShellJobProcess = createRunShellJobProcess({
-    state: {
+    getState: () => ({
       activeSession: state.activeSession,
       config: state.config,
       jobStreaming: state.jobStreaming,
-    },
+    }),
     runExclusive,
     emitSessionUpdate,
     requestPermissionFromClient: _requestPermissionFromClient,

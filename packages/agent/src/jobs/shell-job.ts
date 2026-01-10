@@ -10,7 +10,7 @@ import { readSessionState, type LoadedSession } from '../storage/session-store';
 import type { ToolResult } from '@lace/ent-protocol';
 
 export type ShellJobContext = {
-  state: {
+  getState: () => {
     activeSession: LoadedSession | null;
     config: {
       approvalMode:
@@ -46,13 +46,15 @@ export type ShellJobContext = {
 export const createRunShellJobProcess = (context: ShellJobContext) => {
   return (job: JobState) => {
     void (async () => {
-      if (!context.state.activeSession) return;
+      // Get current state each time job runs (not captured at creation time)
+      const state = context.getState();
+      if (!state.activeSession) return;
       if (job.proc || job.finished) return;
 
-      const sessionState = readSessionState(context.state.activeSession.dir);
+      const sessionState = readSessionState(state.activeSession.dir);
       const effectiveConfig = sessionState.config
-        ? { ...context.state.config, ...sessionState.config }
-        : context.state.config;
+        ? { ...state.config, ...sessionState.config }
+        : state.config;
 
       const toolName = 'bash';
       const kind = toolKindFromName(toolName);
@@ -90,7 +92,7 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
         let decision: { decision?: string; updatedInput?: Record<string, unknown> };
         try {
           decision = await context.requestPermissionFromClient({
-            sessionId: context.state.activeSession.meta.sessionId,
+            sessionId: state.activeSession.meta.sessionId,
             turnId: permissionTurnId,
             turnSeq: permissionTurnSeq,
             jobId: job.jobId,
@@ -147,7 +149,7 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
       }
 
       const proc = spawn(job.command ?? '', {
-        cwd: context.state.activeSession!.meta.workDir,
+        cwd: state.activeSession.meta.workDir,
         shell: true,
         detached: process.platform !== 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -158,7 +160,7 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
       proc.stderr!.setEncoding('utf8');
 
       const appendOutput = async (chunk: string) => {
-        if (!context.state.activeSession) return;
+        if (!state.activeSession) return;
         await context.runExclusive(() => {
           // Check output size limit
           const currentSize = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
@@ -171,7 +173,7 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
 
       const onStdout = async (chunk: string) => {
         await appendOutput(chunk);
-        if (context.state.jobStreaming === 'none') return;
+        if (state.jobStreaming === 'none') return;
         await context.emitSessionUpdate({
           type: 'job_update',
           jobId: job.jobId,
@@ -184,7 +186,7 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
 
       const onStderr = async (chunk: string) => {
         await appendOutput(chunk);
-        if (context.state.jobStreaming === 'none') return;
+        if (state.jobStreaming === 'none') return;
         await context.emitSessionUpdate({
           type: 'job_update',
           jobId: job.jobId,
