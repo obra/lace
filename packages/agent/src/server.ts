@@ -210,6 +210,11 @@ type JobState = {
   finished: boolean;
   completion: Promise<void>;
   resolveCompletion: () => void;
+  // Progress notification fields
+  progressIntervalMs?: number;
+  lastProgressAt?: number;
+  lastProgressBytes?: number;
+  progressTimer?: ReturnType<typeof setInterval>;
 };
 
 type JobNotificationType = 'completed' | 'failed' | 'cancelled' | 'progress';
@@ -1176,6 +1181,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     description?: string;
     parentJobId?: string;
     turnContext?: { turnId: string; turnSeq: number };
+    progressIntervalMs?: number;
   }): Promise<{ jobId: string }> => {
     if (!state.activeSession)
       throw {
@@ -1217,6 +1223,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       finished: false,
       completion,
       resolveCompletion,
+      progressIntervalMs: options.progressIntervalMs,
     };
 
     state.jobs.set(jobId, job);
@@ -1263,6 +1270,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     parentJobId?: string;
     turnContext?: { turnId: string; turnSeq: number };
     resumeSessionId?: string;
+    progressIntervalMs?: number;
   }): Promise<{ jobId: string }> => {
     if (!state.activeSession)
       throw {
@@ -1305,6 +1313,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       finished: false,
       completion,
       resolveCompletion,
+      progressIntervalMs: options.progressIntervalMs,
       // For resume: pre-set the subagentSessionId if resuming a previous session
       ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
     };
