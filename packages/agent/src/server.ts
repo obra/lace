@@ -132,6 +132,7 @@ import {
   reconcileMcpServersForActiveSession,
 } from './rpc/handlers/mcp-servers';
 import { registerPromptHandler } from './rpc/handlers/prompt';
+import { registerWorkspaceHandlers } from './rpc/handlers/workspace';
 
 async function getContextLimitForModel(
   state: AgentServerState,
@@ -661,6 +662,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   registerSessionHandlers(peer, state, createToolExecutorForMode, runExclusive, _reissuePendingPermissionRequests);
   registerSessionOperationHandlers(peer, state, runExclusive, createToolExecutorForMode);
   registerMcpHandlers(peer, state, runExclusive);
+  registerWorkspaceHandlers(peer, state);
 
   const deriveJobsForActiveSession = (): Array<{
     jobId: string;
@@ -833,57 +835,4 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     runPromptInternalRef
   );
 
-  peer.onRequest('ent/personas/list', async (_params: unknown) => {
-    const personas = personaRegistry.listAvailablePersonas();
-    return { personas };
-  });
-
-  peer.onRequest('ent/workspace/info', async (params: unknown) => {
-    assertInitialized(state);
-    const parsed = params as { sessionId?: string };
-    const sessionId = toNonEmptyString(parsed?.sessionId);
-    if (!sessionId) throwInvalidParams('sessionId is required');
-
-    const workspaceManager = WorkspaceManagerFactory.get();
-    const workspace = await workspaceManager.inspectWorkspace(sessionId);
-    if (!workspace) {
-      throw {
-        code: -32603,
-        message: 'WorkspaceNotFound',
-        data: { category: 'workspace', sessionId },
-      };
-    }
-
-    return {
-      sessionId: workspace.sessionId,
-      projectDir: workspace.projectDir,
-      clonePath: workspace.clonePath,
-      containerId: workspace.containerId,
-      state: workspace.state,
-      containerMountPath: workspace.containerMountPath,
-      branchName: workspace.branchName,
-    };
-  });
-
-  peer.onRequest('ent/workspace/create', async (params: unknown) => {
-    assertInitialized(state);
-    const parsed = params as { projectDir?: string; sessionId?: string };
-    const projectDir = toNonEmptyString(parsed?.projectDir);
-    const sessionId = toNonEmptyString(parsed?.sessionId);
-    if (!projectDir) throwInvalidParams('projectDir is required');
-    if (!sessionId) throwInvalidParams('sessionId is required');
-
-    const workspaceManager = WorkspaceManagerFactory.get();
-    const workspace = await workspaceManager.createWorkspace(projectDir, sessionId);
-
-    return {
-      sessionId: workspace.sessionId,
-      projectDir: workspace.projectDir,
-      clonePath: workspace.clonePath,
-      containerId: workspace.containerId,
-      state: workspace.state,
-      containerMountPath: workspace.containerMountPath,
-      branchName: workspace.branchName,
-    };
-  });
 }
