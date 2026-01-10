@@ -80,18 +80,22 @@ import { loadPromptConfig } from './config/prompts';
 import { logger } from './utils/logger';
 import { getUserSlashCommands, findUserCommand } from './user-commands';
 import { formatJobNotification } from './jobs/format-notification';
-
-const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
-const JOB_LOG_DIR = 'jobs';
-const MAX_CONCURRENT_JOBS = 10;
-const MAX_JOB_OUTPUT_BYTES = 10 * 1024 * 1024; // 10 MB
-const DEFAULT_PROGRESS_INTERVAL_MS = 300000; // 5 minutes
-
-type SessionUpdateParams = z.infer<typeof SessionUpdateNotificationSchema>['params'];
-type DistributiveOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never;
-type SessionUpdate = DistributiveOmit<SessionUpdateParams, 'sessionId' | 'streamSeq'>;
-// Inner update type for job_update events (text_delta, tool_use, etc.)
-type JobInnerUpdate = Extract<SessionUpdateParams, { type: 'job_update' }>['update'];
+import {
+  SUPPORTED_PROVIDER_TYPES,
+  JOB_LOG_DIR,
+  MAX_CONCURRENT_JOBS,
+  MAX_JOB_OUTPUT_BYTES,
+  DEFAULT_PROGRESS_INTERVAL_MS,
+  type SessionUpdateParams,
+  type SessionUpdate,
+  type JobInnerUpdate,
+  type JobType,
+  type JobStatus,
+  type JobNotificationType,
+  type JobState,
+  type PendingJobNotification,
+  type AgentServerState,
+} from './server-types';
 
 function throwInvalidParams(reason?: string): never {
   throw {
@@ -188,49 +192,6 @@ function mapCatalogModelToModelInfo(model: CatalogModel, providerId: string) {
     supportsImages: !!model.supports_attachments,
   };
 }
-
-type JobType = 'bash' | 'delegate';
-type JobStatus = 'running' | 'completed' | 'failed' | 'cancelled';
-
-type JobState = {
-  jobId: string;
-  parentJobId?: string;
-  type: JobType;
-  status: JobStatus;
-  description?: string;
-  command?: string;
-  subagentContent?: unknown[];
-  startedAt: string;
-  originTurnId?: string;
-  originTurnSeq?: number;
-  exitCode?: number;
-  outputPath: string;
-  proc?: ChildProcess;
-  permissionAbortController?: AbortController;
-  childPeer?: JsonRpcPeer;
-  subagentSessionId?: string;
-  childTransportClose?: () => void;
-  finished: boolean;
-  completion: Promise<void>;
-  resolveCompletion: () => void;
-  // Progress notification fields
-  progressIntervalMs?: number;
-  lastProgressAt?: number;
-  lastProgressBytes?: number;
-  progressTimer?: ReturnType<typeof setInterval>;
-  // Subagent provider/model configuration
-  connectionId?: string;
-  modelId?: string;
-};
-
-type JobNotificationType = 'completed' | 'failed' | 'cancelled' | 'progress';
-
-type PendingJobNotification = {
-  jobId: string;
-  type: JobNotificationType;
-  content: string;
-  createdAt: number;
-};
 
 function ensureJobLogDir(sessionDir: string): string {
   const dir = join(sessionDir, JOB_LOG_DIR);
@@ -1165,49 +1126,6 @@ function estimateProviderTokens(messages: ProviderMessage[]): number {
   }
   return total;
 }
-
-export type AgentServerState = {
-  initialized: boolean;
-  activeSession: LoadedSession | null;
-  config: {
-    executionMode: 'plan' | 'execute';
-    approvalMode:
-      | 'ask'
-      | 'approveReads'
-      | 'approveEdits'
-      | 'approve'
-      | 'deny'
-      | 'dangerouslySkipPermissions';
-    connectionId?: string;
-    modelId?: string;
-    maxBudgetUsd?: number;
-    maxThinkingTokens?: number;
-    environment?: Record<string, string>;
-  };
-  activeTurn: null | {
-    turnId: string;
-    startedAt: string;
-    status: 'running' | 'awaiting_permission';
-    abortController: AbortController;
-  };
-  providerCatalog: ProviderCatalogManager;
-  providerCatalogLoaded: boolean;
-  providerInstances: ProviderInstanceManager;
-  mcpServerManager: MCPServerManager;
-  jobs: Map<string, JobState>;
-  pendingPermissionRequests: Map<
-    string,
-    {
-      requestId: string;
-      rpcId: unknown;
-      record: PendingPermissionRecord;
-      result: Promise<unknown>;
-    }
-  >;
-  sessionMutex: Promise<void>;
-  jobStreaming: 'full' | 'coalesced' | 'none';
-  jobNotificationQueue: PendingJobNotification[];
-};
 
 export function createAgentServerState(): AgentServerState {
   return {
