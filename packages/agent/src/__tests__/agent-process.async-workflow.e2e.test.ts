@@ -411,11 +411,15 @@ describe('async job workflow (E2E)', () => {
     agent = spawnAgentProcess({ laceDir });
 
     let jobId: string | undefined;
+    let jobFinished = false;
 
     agent.peer.onRequest('session/update', async (params) => {
       const p = params as Record<string, unknown>;
       if (p.type === 'job_started' && typeof p.jobId === 'string') {
         jobId = p.jobId;
+      }
+      if (p.type === 'job_finished' && p.jobId === jobId) {
+        jobFinished = true;
       }
       return undefined;
     });
@@ -444,7 +448,7 @@ describe('async job workflow (E2E)', () => {
       'session/prompt (failing job)'
     );
 
-    // Wait for job completion
+    // Wait for job to start
     await withTimeout(
       new Promise<void>((resolve) => {
         const interval = setInterval(() => {
@@ -459,6 +463,20 @@ describe('async job workflow (E2E)', () => {
     );
 
     expect(jobId).toMatch(/^job_/);
+
+    // Wait for job to finish
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          if (jobFinished) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      5_000,
+      'job finished'
+    );
 
     // Check that job is marked as having failed
     const output = (await withTimeout(

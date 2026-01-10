@@ -4352,8 +4352,13 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       const jobMatch = promptText.match(/^\s*job:\s*(.+)\s*$/m);
       const jobCommand = jobMatch?.[1]?.trim();
 
-      const subagentMatch = promptText.match(/^\s*subagent:\s*(.+)\s*$/m);
-      const subagentText = subagentMatch?.[1]?.trim();
+      // Supports: "subagent: prompt" or "subagent config=connId,modelId: prompt"
+      const subagentMatch = promptText.match(
+        /^\s*subagent(?:\s+config=([^,\s]+)?,([^\s:]+)?)?\s*:\s*(.+)\s*$/m
+      );
+      const subagentConnectionId = subagentMatch?.[1]?.trim() || undefined;
+      const subagentModelId = subagentMatch?.[2]?.trim() || undefined;
+      const subagentText = subagentMatch?.[3]?.trim();
 
       const workDir = state.activeSession.meta.workDir;
       const filesRead = deriveFilesReadFromDurableEvents(state.activeSession.dir, workDir);
@@ -5229,6 +5234,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           finished: false,
           completion,
           resolveCompletion,
+          connectionId: subagentConnectionId,
+          modelId: subagentModelId,
         };
 
         state.jobs.set(jobId, job);
