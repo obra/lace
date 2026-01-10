@@ -212,6 +212,15 @@ type JobState = {
   resolveCompletion: () => void;
 };
 
+type JobNotificationType = 'completed' | 'failed' | 'cancelled' | 'progress';
+
+type PendingJobNotification = {
+  jobId: string;
+  type: JobNotificationType;
+  content: string;
+  createdAt: number;
+};
+
 function ensureJobLogDir(sessionDir: string): string {
   const dir = join(sessionDir, JOB_LOG_DIR);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -844,6 +853,7 @@ export type AgentServerState = {
   >;
   sessionMutex: Promise<void>;
   jobStreaming: 'full' | 'coalesced' | 'none';
+  jobNotificationQueue: PendingJobNotification[];
 };
 
 export function createAgentServerState(): AgentServerState {
@@ -860,6 +870,7 @@ export function createAgentServerState(): AgentServerState {
     pendingPermissionRequests: new Map(),
     sessionMutex: Promise.resolve(),
     jobStreaming: 'full',
+    jobNotificationQueue: [],
   };
 }
 
