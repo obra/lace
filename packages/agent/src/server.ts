@@ -84,6 +84,7 @@ const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmst
 const JOB_LOG_DIR = 'jobs';
 const MAX_CONCURRENT_JOBS = 10;
 const MAX_JOB_OUTPUT_BYTES = 10 * 1024 * 1024; // 10 MB
+const DEFAULT_PROGRESS_INTERVAL_MS = 300000; // 5 minutes
 
 type SessionUpdateParams = z.infer<typeof SessionUpdateNotificationSchema>['params'];
 type DistributiveOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never;
@@ -984,6 +985,38 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
   };
 
+  /**
+   * Set up a progress timer for a background job.
+   * If progressIntervalMs is specified on the job, or if using the default for background jobs,
+   * create a timer that queues progress notifications at the specified interval.
+   */
+  const setupProgressTimer = (job: JobState) => {
+    // Use provided interval or default for background jobs
+    const progressInterval = job.progressIntervalMs ?? DEFAULT_PROGRESS_INTERVAL_MS;
+
+    job.lastProgressAt = Date.now();
+    job.lastProgressBytes = 0;
+
+    job.progressTimer = setInterval(() => {
+      // Stop timer if job is no longer running
+      if (job.status !== 'running') {
+        if (job.progressTimer) {
+          clearInterval(job.progressTimer);
+          job.progressTimer = undefined;
+        }
+        return;
+      }
+
+      const currentBytes = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
+      const deltaBytes = currentBytes - (job.lastProgressBytes ?? 0);
+
+      queueJobNotification(job, 'progress', { deltaBytes });
+
+      job.lastProgressAt = Date.now();
+      job.lastProgressBytes = currentBytes;
+    }, progressInterval);
+  };
+
   const finalizeJob = async (job: JobState, options: { exitCode?: number } = {}) => {
     if (!state.activeSession) return;
     if (job.finished) {
@@ -1321,6 +1354,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         : undefined
     );
 
+    // Set up progress timer for background job
+    setupProgressTimer(job);
+
     void runShellJobProcess(job);
     return { jobId };
   };
@@ -1412,6 +1448,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         ? { turnId: options.turnContext.turnId, turnSeq: options.turnContext.turnSeq }
         : undefined
     );
+
+    // Set up progress timer for background job
+    setupProgressTimer(job);
 
     void runSubagentJobProcess(job);
     return { jobId };
