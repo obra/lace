@@ -12,6 +12,7 @@ const delegateSchema = z
     description: z.string().optional(),
     background: z.boolean().default(false),
     resume: z.string().optional(),
+    progressIntervalMs: z.number().int().min(5000).max(600000).optional(),
   })
   .strict();
 
@@ -24,8 +25,10 @@ Parameters:
 - description: Label shown in job listings (optional)
 - background: Set to true to return immediately with jobId (default: false)
 - resume: JobId of a failed/cancelled job to continue from where it left off
+- progressIntervalMs: For background jobs, interval in ms for progress notifications (5000-600000, default 300000)
 
 When background=true, returns { jobId, status: "started" }. Use job_output(jobId) to monitor.
+Background jobs send completion notifications automatically. Progress notifications sent every 5 minutes by default.
 Default (sync): Blocks until subagent completes and returns full output.`;
   schema = delegateSchema;
   annotations: ToolAnnotations = {
