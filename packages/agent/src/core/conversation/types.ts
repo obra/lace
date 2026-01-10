@@ -1,5 +1,6 @@
 // ABOUTME: Types for ConversationRunner - the extracted agentic loop
 
+import type { AIProvider } from '@lace/agent/providers/base-provider';
 import type { SessionUpdate } from '../types';
 
 /**
@@ -38,6 +39,8 @@ export interface RunnerConfig {
 export interface RunParams {
   /** Content blocks for the prompt */
   content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mediaType: string }>;
+  /** AI provider to use for generating responses */
+  provider: AIProvider;
   /** Optional output format constraint */
   outputFormat?: unknown;
   /** Maximum turns before stopping (default: 10) */
