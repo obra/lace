@@ -118,21 +118,10 @@ import {
   mcpServerConfigEquivalent,
 } from './rpc/utils';
 import { requestPermissionFromClient, reissuePendingPermissionRequests } from './rpc/permissions';
-import { registerInitializeHandler } from './rpc/handlers/initialize';
-import { registerAgentStatusHandlers } from './rpc/handlers/agent-status';
-import { registerProviderHandlers } from './rpc/handlers/providers';
-import { registerConnectionHandlers } from './rpc/handlers/connections';
-import { registerModelHandlers } from './rpc/handlers/models';
-import { registerToolHandlers } from './rpc/handlers/tools';
-import { registerJobHandlers } from './rpc/handlers/jobs';
-import { registerSessionHandlers } from './rpc/handlers/session';
-import { registerSessionOperationHandlers } from './rpc/handlers/session-operations';
+import { registerAllHandlers } from './rpc/register-handlers';
 import {
-  registerMcpHandlers,
   reconcileMcpServersForActiveSession,
 } from './rpc/handlers/mcp-servers';
-import { registerPromptHandler } from './rpc/handlers/prompt';
-import { registerWorkspaceHandlers } from './rpc/handlers/workspace';
 
 async function getContextLimitForModel(
   state: AgentServerState,
@@ -653,17 +642,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
   };
 
-  registerInitializeHandler(peer, state, createToolExecutorForMode);
-  registerAgentStatusHandlers(peer, state, () => _reissuePendingPermissionRequests());
-  registerProviderHandlers(peer, state);
-  registerConnectionHandlers(peer, state);
-  registerModelHandlers(peer, state);
-  registerToolHandlers(peer, state, createToolExecutorForMode);
-  registerSessionHandlers(peer, state, createToolExecutorForMode, runExclusive, _reissuePendingPermissionRequests);
-  registerSessionOperationHandlers(peer, state, runExclusive, createToolExecutorForMode);
-  registerMcpHandlers(peer, state, runExclusive);
-  registerWorkspaceHandlers(peer, state);
-
   const deriveJobsForActiveSession = (): Array<{
     jobId: string;
     parentJobId?: string;
@@ -812,27 +790,25 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     return parsedResult;
   };
 
+  // Register all RPC handlers with dependencies
+  registerAllHandlers(peer, state, {
+    createToolExecutorForMode,
+    runExclusive,
+    emitSessionUpdate,
+    reissuePendingPermissions: () => _reissuePendingPermissionRequests(),
+    deriveJobsForActiveSession,
+    requestPermissionFromClient: _requestPermissionFromClient,
+    finalizeJob,
+    startShellJob: _startShellJob,
+    startSubagentJob,
+    runShellJobProcess,
+    runSubagentJobProcess,
+    runPromptInternalRef,
+  });
+
   peer.onRequest('ent/personas/list', async (_params: unknown) => {
     const personas = personaRegistry.listAvailablePersonas();
     return { personas };
   });
-
-  registerJobHandlers(peer, state, deriveJobsForActiveSession, finalizeJob);
-
-  registerPromptHandler(
-    peer,
-    state,
-    runExclusive,
-    emitSessionUpdate,
-    _requestPermissionFromClient,
-    createToolExecutorForMode,
-    _startShellJob,
-    startSubagentJob,
-    deriveJobsForActiveSession,
-    runShellJobProcess,
-    runSubagentJobProcess,
-    finalizeJob,
-    runPromptInternalRef
-  );
 
 }
