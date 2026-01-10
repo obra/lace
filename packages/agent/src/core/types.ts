@@ -32,7 +32,7 @@ export interface PromptParams {
 
 export interface TurnResult {
   turnId: string;
-  stopReason: 'end_turn' | 'max_tokens' | 'cancelled' | 'budget_exceeded';
+  stopReason: 'end_turn' | 'max_tokens' | 'max_turns' | 'cancelled' | 'budget_exceeded';
   content: Array<{ type: 'text'; text: string }>;
   usage: { inputTokens: number; outputTokens: number };
   cost?: number;

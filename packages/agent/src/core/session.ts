@@ -12,6 +12,8 @@ import {
   type SessionMeta,
   type SessionState,
 } from '@lace/agent/storage/session-store';
+import { ConversationRunner } from './conversation/runner';
+import type { AIProvider } from '@lace/agent/providers/base-provider';
 import type { SessionConfig, PromptParams, TurnResult, SessionUpdateHandler } from './types';
 
 export class Session {
@@ -86,19 +88,48 @@ export class Session {
     }));
   }
 
+  private runner: ConversationRunner | null = null;
+
   /**
    * Send a prompt to the session and get a response
-   * @throws Error - Not implemented yet (Phase 3)
+   * @param params - Prompt parameters including content
+   * @param provider - AI provider to use for generation
+   * @param onUpdate - Optional callback for streaming updates
    */
-  async prompt(_params: PromptParams, _onUpdate?: SessionUpdateHandler): Promise<TurnResult> {
-    throw new Error('Not implemented: prompt() will be added in Phase 3');
+  async prompt(
+    params: PromptParams,
+    provider: AIProvider,
+    onUpdate?: SessionUpdateHandler
+  ): Promise<TurnResult> {
+    this.runner = new ConversationRunner({
+      sessionDir: this.sessionDir,
+      cwd: this.cwd,
+      onUpdate: onUpdate ?? (() => {}),
+      connectionId: this.sessionState.config?.connectionId,
+      modelId: this.sessionState.config?.modelId,
+      environment: this.sessionState.config?.environment,
+    });
+
+    const result = await this.runner.run({
+      content: params.content,
+      provider,
+      outputFormat: params.outputFormat,
+    });
+
+    return {
+      turnId: result.turnId,
+      stopReason: result.stopReason,
+      content: result.content,
+      usage: result.usage,
+    };
   }
 
   /**
    * Cancel any in-progress operation
-   * @throws Error - Not implemented yet (Phase 3)
    */
   cancel(): void {
-    throw new Error('Not implemented: cancel() will be added in Phase 3');
+    if (this.runner) {
+      this.runner.cancel();
+    }
   }
 }
