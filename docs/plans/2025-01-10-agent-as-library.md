@@ -1306,3 +1306,112 @@ console.log('Result:', result);
 ```
 
 **Usage via RPC:** Unchanged - existing RPC clients continue to work.
+
+---
+
+## Implementation Status (Updated 2025-01-10)
+
+### Completed Phases
+
+| Phase | Status | Commit | Notes |
+|-------|--------|--------|-------|
+| Phase 1: Core Agent Class | ✅ Complete | 79d4415a5 | Agent class with initialize/createSession/loadSession/listSessions |
+| Phase 2: Core Session Class | ✅ Complete | 7d860b765, 2acfa9719 | Session class with create/load. Fixed missing init check in listSessions |
+| Phase 3: ConversationRunner | ✅ Complete | 4cfaef9d1, 7b4784ccc, b45765d3a | Skeleton + run() + wired to Session.prompt() |
+| Phase 4: Special Tool Handlers | ✅ Complete | e1fff2a59 | Extracted to core/tools/special/ |
+| Phase 5: RPC Thin Adapters | ⏸ Pending | - | Requires wiring tool execution into ConversationRunner |
+| Phase 6: Package Exports | ✅ Complete | 994cf3add | Updated src/index.ts |
+
+### Key Learnings & Issues Encountered
+
+#### 1. events/ Directory Naming Conflict (CRITICAL)
+
+**Problem:** The original `src/events/` directory conflicted with Node.js's built-in `events` module. When tsc-alias rewrote paths, it transformed:
+```typescript
+import { EventEmitter } from 'events'  // Node built-in
+```
+to:
+```typescript
+import { EventEmitter } from '../events'  // Our directory - WRONG!
+```
+
+**Root Cause:** tsc-alias performs string replacement without understanding Node.js module resolution semantics. Any directory named `events`, `fs`, `path`, etc. will cause collisions.
+
+**Fix:** Renamed `src/events/` to `src/message-building/` (commit 63661fbaa)
+
+**Lesson:** Never name directories after Node.js built-in modules when using tsc-alias.
+
+#### 2. Session ID Format Mismatch
+
+**Plan specified:** `session_<uuid>` format
+**Actual ent-protocol requirement:** `sess_<uuid>` format
+
+The implementer correctly adapted to match the real API rather than the plan.
+
+#### 3. ProviderCatalogManager API Difference
+
+**Plan specified:** `await this.state.providerCatalog.load()`
+**Actual API:** `await this.state.providerCatalog.loadCatalogs()`
+
+Plan was written without verifying the actual method signature.
+
+#### 4. Missing Initialization Check
+
+Code review caught that `listSessions()` lacked the auto-initialization check that `createSession()` and `loadSession()` had. Fixed in commit 2acfa9719.
+
+### Test Status After Phase 6
+
+**Unit Tests:** 210 passed ✅
+**E2E Tests (packages/agent):** 11 failed ❌ (timeouts)
+**Web Tests (packages/web):** 144 failed ❌
+
+### Known Issues Requiring Investigation
+
+#### E2E Test Failures (Priority: HIGH)
+
+After Phase 6 completion, E2E tests in packages/agent are failing with timeouts. The test file shows:
+```
+Test Files  28 failed | 107 passed (135)
+     Tests  144 failed | 1040 passed | 1 skipped | 1 todo (1186)
+```
+
+Example failure:
+```
+190|   it(
+   |   ^
+191|     'returns to idle when a turn is cancelled (no stuck streaming stat…
+192|     { timeout: 20_000 },
+```
+
+**Next Steps:**
+1. Run E2E tests in isolation to reproduce
+2. Check if failures are related to the events/ → message-building/ rename
+3. If agent package issue, write failing unit tests first (TDD)
+4. Fix root cause
+
+#### Files Changed
+
+| File | Action |
+|------|--------|
+| `src/events/message-builder.ts` | Moved to `src/message-building/message-builder.ts` |
+| `src/core/agent.ts` | Created |
+| `src/core/types.ts` | Created |
+| `src/core/session.ts` | Created |
+| `src/core/conversation/runner.ts` | Created |
+| `src/core/conversation/types.ts` | Created |
+| `src/core/conversation/index.ts` | Created |
+| `src/core/tools/special/types.ts` | Created |
+| `src/core/tools/special/delegate.ts` | Created |
+| `src/core/tools/special/job-tools.ts` | Created |
+| `src/core/tools/special/index.ts` | Created |
+| `src/index.ts` | Updated exports |
+
+### Architecture Notes
+
+The core/ layer is designed to be RPC-agnostic:
+- `Agent` manages provider catalog and sessions
+- `Session` wraps session-store and coordinates conversation
+- `ConversationRunner` implements the agentic loop (currently skeleton)
+- `core/tools/special/` contains runtime tool orchestration (delegate, job tools)
+
+The separation between `tools/implementations/` (tool definitions) and `core/tools/special/` (runtime orchestration) is intentional - special tools need access to session state, job management, and abort controllers which are core concerns.
