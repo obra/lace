@@ -21,7 +21,6 @@ import {
   SessionUpdateNotificationSchema,
   SessionForkParamsSchema,
   type PermissionRequest,
-  type ToolInfo,
   type ToolResult,
   type ContextBreakdown,
   type ThreadTokenUsage,
@@ -109,7 +108,6 @@ import {
   parseProviderInstanceOverridesFromConnectionConfig,
   mapCatalogModelToModelInfo,
   toolKindFromName,
-  protocolToolInfoForCoreTool,
   protocolToolResultFromCore,
   coreToolResultFromProtocol,
   shouldAskPermission,
@@ -125,6 +123,7 @@ import { registerAgentStatusHandlers } from './rpc/handlers/agent-status';
 import { registerProviderHandlers } from './rpc/handlers/providers';
 import { registerConnectionHandlers } from './rpc/handlers/connections';
 import { registerModelHandlers } from './rpc/handlers/models';
+import { registerToolHandlers } from './rpc/handlers/tools';
 
 async function createProviderForTurn(options: {
   connectionId?: string;
@@ -1031,6 +1030,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   registerProviderHandlers(peer, state);
   registerConnectionHandlers(peer, state);
   registerModelHandlers(peer, state);
+  registerToolHandlers(peer, state, createToolExecutorForMode);
 
   const deriveJobsForActiveSession = (): Array<{
     jobId: string;
@@ -1179,26 +1179,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
     return parsedResult;
   };
-
-  peer.onRequest('ent/tools/list', async (_params: unknown) => {
-    assertInitialized(state);
-
-    const { toolsForProvider } = createToolExecutorForMode(
-      state.config.executionMode,
-      state.mcpServerManager
-    );
-
-    const seenToolNames = new Set<string>();
-    const tools: ToolInfo[] = [];
-    for (const tool of toolsForProvider) {
-      const info = protocolToolInfoForCoreTool(tool);
-      if (seenToolNames.has(info.name)) continue;
-      seenToolNames.add(info.name);
-      tools.push(info);
-    }
-
-    return { tools };
-  });
 
   peer.onRequest('ent/personas/list', async (_params: unknown) => {
     const personas = personaRegistry.listAvailablePersonas();
