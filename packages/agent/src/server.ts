@@ -1288,6 +1288,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   /**
    * Queue a job notification for delivery to the agent.
+   * If the agent is idle (no active turn), notifies the supervisor that a notification is ready.
    */
   const queueJobNotification = (
     job: JobState,
@@ -1316,6 +1317,18 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       content,
       createdAt: Date.now(),
     });
+
+    // If agent is idle (no active turn), notify the supervisor that notifications are ready
+    // The supervisor can then trigger a session/prompt to have the agent process them
+    if (!state.activeTurn && state.activeSession) {
+      peer.notify('session/update', {
+        sessionId: state.activeSession.meta.sessionId,
+        type: 'notification_ready',
+        pendingCount: state.jobNotificationQueue.length,
+        jobId: job.jobId,
+        notificationType: type,
+      });
+    }
   };
 
   /**

@@ -756,4 +756,97 @@ describe('async job workflow (E2E)', () => {
 
     expect(promptWithFailureNotification).toBeDefined();
   });
+
+  it(
+    'emits notification_ready update when job completes and agent is idle',
+    { timeout: 30_000 },
+    async () => {
+      agent = spawnAgentProcess({ laceDir });
+
+      let jobId: string | undefined;
+      let sessionId: string | undefined;
+      const updates: Array<Record<string, unknown>> = [];
+
+      agent.peer.onRequest('session/update', async (params) => {
+        const p = params as Record<string, unknown>;
+        updates.push(p);
+        if (p.type === 'job_started' && typeof p.jobId === 'string') {
+          jobId = p.jobId;
+        }
+        return undefined;
+      });
+
+      agent.peer.onRequest('session/request_permission', async () => {
+        return { decision: 'allow' };
+      });
+
+      await withTimeout(
+        agent.peer.request(
+          'initialize',
+          defaultInitializeParams({ config: { approvalMode: 'allow' } })
+        ),
+        2_000,
+        'initialize'
+      );
+
+      const sessionResult = (await withTimeout(
+        agent.peer.request('session/new', { workDir }),
+        2_000,
+        'session/new'
+      )) as { sessionId: string };
+      sessionId = sessionResult.sessionId;
+
+      // Start a quick background job
+      await withTimeout(
+        agent.peer.request('session/prompt', {
+          content: [{ type: 'text', text: 'job: echo "quick output"' }],
+        }),
+        5_000,
+        'session/prompt (start job)'
+      );
+
+      // Wait for job to finish
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          const interval = setInterval(() => {
+            if (!jobId) return;
+            const finished = updates.find((u) => u.type === 'job_finished' && u.jobId === jobId);
+            if (finished) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 10);
+        }),
+        5_000,
+        'job_finished update'
+      );
+
+      // The agent should be idle now - wait for notification_ready update
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          const interval = setInterval(() => {
+            const notifReady = updates.find(
+              (u) => u.type === 'notification_ready' && u.jobId === jobId
+            );
+            if (notifReady) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 10);
+        }),
+        3_000,
+        'notification_ready update'
+      );
+
+      // Verify the notification_ready update has the expected fields
+      const notifReadyUpdate = updates.find(
+        (u) => u.type === 'notification_ready' && u.jobId === jobId
+      );
+
+      expect(notifReadyUpdate).toBeDefined();
+      expect(notifReadyUpdate?.sessionId).toBe(sessionId);
+      expect(notifReadyUpdate?.pendingCount).toBeGreaterThan(0);
+      expect(notifReadyUpdate?.notificationType).toBe('completed');
+    }
+  );
 });
