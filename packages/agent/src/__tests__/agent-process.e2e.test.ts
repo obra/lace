@@ -239,7 +239,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     'requests permission before running bash and records a tool_use event',
     { timeout: 15_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir });
+      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
       const updates: unknown[] = [];
       agent.peer.onRequest('session/update', async (params) => {
@@ -309,18 +309,21 @@ describe('lace-agent process (E2E over stdio)', () => {
       )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
 
       // context_injected is added on session creation with the system prompt
+      // The LLM (test provider) emits a message before the tool call ("Running echo hi..."),
+      // so we expect an extra message event before permission_requested
       expect(durable.events.map((e) => e.type)).toEqual([
         'context_injected',
         'prompt',
         'turn_start',
+        'message', // LLM's initial response before tool call
         'permission_requested',
         'permission_decided',
         'tool_use',
-        'message',
+        'message', // LLM's final response after tool result
         'turn_end',
       ]);
 
-      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     }
   );
 
@@ -398,7 +401,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     'reissues pending permission prompts after agent restart (derived from events.jsonl)',
     { timeout: 25_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir });
+      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
       let sawPermissionRequest = false;
       agent.peer.onRequest('session/request_permission', async () => {
@@ -649,7 +652,7 @@ describe('lace-agent process (E2E over stdio)', () => {
   });
 
   it('can cancel a turn that is awaiting permission', { timeout: 15_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir });
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
     const updates: unknown[] = [];
     agent.peer.onRequest('session/update', async (params) => {

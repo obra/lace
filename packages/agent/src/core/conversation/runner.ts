@@ -1,12 +1,19 @@
 // ABOUTME: ConversationRunner - the agentic loop for executing prompts
-// This is the core conversation engine extracted from rpc/handlers/prompt.ts
-// It handles message building, provider calls, tool execution, and event persistence.
+// This is the core conversation engine. It handles message building, provider
+// calls, tool execution, permission handling, and event persistence.
 
 import { randomUUID } from 'node:crypto';
-import type { RunnerConfig, RunParams, RunResult } from './types';
+import { readFileSync, statSync, openSync, readSync, closeSync } from 'node:fs';
+import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
+import type { ToolResult } from '@lace/ent-protocol';
+import type { ToolResult as CoreToolResult } from '@lace/agent/tools/types';
 import { readSessionState, writeSessionState, type SessionState } from '@lace/agent/storage/session-store';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
+import { deriveFilesReadFromDurableEvents } from '@lace/agent/storage/files-from-events';
+import { getJobOutputPath } from '@lace/agent/jobs/job-manager';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
+import { toNonEmptyString, toolKindFromName, protocolToolResultFromCore, shouldAskPermission } from '@lace/agent/rpc/utils';
+import type { RunnerConfig, RunnerDependencies, RunParams, RunResult, ApprovalMode } from './types';
 
 /**
  * ConversationRunner executes prompts through the agentic loop.
@@ -23,9 +30,11 @@ import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-buil
  */
 export class ConversationRunner {
   private readonly config: RunnerConfig;
+  private readonly deps: RunnerDependencies;
 
-  constructor(config: RunnerConfig) {
+  constructor(config: RunnerConfig, deps: RunnerDependencies) {
     this.config = config;
+    this.deps = deps;
   }
 
   /**
@@ -44,100 +53,877 @@ export class ConversationRunner {
    * 3. Make provider call(s) with tool execution loop
    * 4. Write results as durable events
    * 5. Emit session updates throughout
-   *
-   * Currently implements single-turn conversation only (no tool execution).
    */
   async run(params: RunParams): Promise<RunResult> {
-    const { content, provider } = params;
-    const { sessionDir, modelId } = this.config;
+    const { content, maxTurns = 10, abortController, turnId, startedAt } = params;
+    const { sessionDir, cwd, executionMode, approvalMode, modelId, environment, maxBudgetUsd, sessionId } = this.config;
 
-    // 1. Create turn ID
-    const turnId = `turn_${randomUUID()}`;
+    const filesRead = deriveFilesReadFromDurableEvents(sessionDir, cwd);
 
-    // 2. Read session state
-    let sessionState: SessionState = readSessionState(sessionDir);
+    const envOverlay =
+      environment && typeof environment === 'object'
+        ? environment
+        : undefined;
 
-    // Helper to write a durable event and advance state
-    let durableTurnSeq = 0;
-    const writeAndAdvance = (event: { type: string; data: Record<string, unknown> }) => {
-      const { nextState } = appendDurableEvent(sessionDir, sessionState, {
-        type: event.type,
-        data: event.data,
-        turnId,
-        turnSeq: durableTurnSeq++,
-      });
-      sessionState = nextState;
-      writeSessionState(sessionDir, sessionState);
-    };
-
-    // 3. Write prompt event
-    writeAndAdvance({ type: 'prompt', data: { content } });
-    writeAndAdvance({ type: 'turn_start', data: {} });
-
-    // Emit turn_start update
-    this.config.onUpdate({ type: 'turn_start' });
-
-    // 4. Build provider messages from durable events
-    const providerMessages = buildProviderMessagesFromDurableEvents(sessionDir);
-
-    // 5. Call provider
-    const response = await provider.createStreamingResponse(
-      providerMessages,
-      [], // No tools for single-turn (skipping tool execution for now)
-      modelId ?? 'unknown-model',
-      undefined // No abort signal for now
+    const { executor: toolExecutor, toolsForProvider } = this.deps.createToolExecutor(
+      executionMode,
+      this.deps.mcpServerManager
     );
 
-    // Extract assistant text content
-    const assistantText = typeof response.content === 'string' ? response.content : '';
+    const provider = await this.deps.createProvider();
+    const modelPricing = await this.deps.getModelPricing();
 
-    // Emit text delta update if there's content
-    if (assistantText.length > 0) {
-      this.config.onUpdate({ type: 'text_delta', text: assistantText });
-    }
+    // Track token usage across the turn
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let sessionCostUsd = this.deps.getSessionCostUsd();
 
-    // 6. Write response event
-    writeAndAdvance({ type: 'message', data: { content: assistantText } });
-
-    // Determine stop reason
-    const stopReason: RunResult['stopReason'] =
-      response.stopReason === 'max_tokens' ? 'max_tokens' : 'end_turn';
-
-    // Write turn_end event
-    writeAndAdvance({ type: 'turn_end', data: { stopReason } });
-
-    // Track token usage
-    const inputTokens = response.usage?.promptTokens ?? 0;
-    const outputTokens = response.usage?.completionTokens ?? 0;
-
-    // 7. Build and return result
-    const result: RunResult = {
-      turnId,
-      stopReason,
-      content: assistantText.length > 0
-        ? [{ type: 'text', text: assistantText }]
-        : [],
-      usage: { inputTokens, outputTokens },
+    // Helper to write durable events
+    let durableTurnSeq = 0;
+    const writeAndAdvance = async (event: { type: string; data: Record<string, unknown> }) => {
+      await this.deps.runExclusive(() => {
+        let sessionState: SessionState = readSessionState(sessionDir);
+        const { nextState } = appendDurableEvent(sessionDir, sessionState, {
+          type: event.type,
+          data: event.data,
+          turnId,
+          turnSeq: durableTurnSeq++,
+        });
+        sessionState = nextState;
+        writeSessionState(sessionDir, sessionState);
+      });
     };
 
-    // Emit turn_end update
-    this.config.onUpdate({
-      type: 'turn_end',
-      stopReason: result.stopReason,
-      content: result.content,
-      usage: result.usage,
+    let providerMessages = buildProviderMessagesFromDurableEvents(sessionDir);
+    let finalAssistantContent = '';
+    let stopReason: RunResult['stopReason'] = 'end_turn';
+
+    let streamTurnSeq = 0;
+    let completedTurns = 0;
+
+    try {
+      for (; completedTurns < maxTurns; completedTurns++) {
+        const messageTurnSeq = streamTurnSeq++;
+        let streamedAny = false;
+        let tokenQueue: Promise<void> = Promise.resolve();
+
+        const onToken = (payload: { token?: string }) => {
+          if (abortController.signal.aborted) return;
+          if (!payload?.token) return;
+          streamedAny = true;
+          const token = payload.token;
+          tokenQueue = tokenQueue
+            .then(async () => {
+              if (abortController.signal.aborted) return;
+              await this.deps.onUpdate(messageTurnSeq, { type: 'text_delta', text: token });
+            })
+            .catch(() => undefined);
+        };
+
+        provider.on('token', onToken);
+        const response = await provider.createStreamingResponse(
+          providerMessages,
+          toolsForProvider,
+          modelId || 'unknown-model',
+          abortController.signal
+        );
+        provider.off('token', onToken);
+        await tokenQueue;
+
+        if (abortController.signal.aborted) {
+          stopReason = 'cancelled';
+          break;
+        }
+
+        // Track token usage from this response
+        if (response.usage) {
+          totalInputTokens += response.usage.promptTokens ?? 0;
+          totalOutputTokens += response.usage.completionTokens ?? 0;
+
+          // Calculate cost for this response if pricing is available
+          if (modelPricing) {
+            const inputCost = ((response.usage.promptTokens ?? 0) / 1_000_000) * modelPricing.costPer1mIn;
+            const outputCost = ((response.usage.completionTokens ?? 0) / 1_000_000) * modelPricing.costPer1mOut;
+            sessionCostUsd += inputCost + outputCost;
+          }
+        }
+
+        // Check budget before continuing
+        if (maxBudgetUsd && maxBudgetUsd > 0 && sessionCostUsd > maxBudgetUsd) {
+          stopReason = 'budget_exceeded';
+        }
+
+        const assistantText = typeof response.content === 'string' ? response.content : '';
+        finalAssistantContent = assistantText;
+
+        if (!streamedAny && assistantText.length > 0) {
+          await this.deps.onUpdate(messageTurnSeq, { type: 'text_delta', text: assistantText });
+        }
+
+        await writeAndAdvance({ type: 'message', data: { content: assistantText } });
+
+        const toolCalls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
+        if (toolCalls.length === 0) {
+          stopReason = response.stopReason === 'max_tokens' ? 'max_tokens' : 'end_turn';
+          break;
+        }
+
+        providerMessages = [
+          ...providerMessages,
+          {
+            role: 'assistant' as const,
+            content: assistantText,
+            toolCalls: toolCalls.map((tc: { id: string; name: string; arguments: unknown }) => ({
+              id: tc.id,
+              name: tc.name,
+              arguments: (tc.arguments ?? {}) as Record<string, unknown>,
+            })),
+          },
+        ];
+
+        let shouldContinue = true;
+
+        for (const toolCall of toolCalls) {
+          const result = await this.executeToolCall({
+            toolCall,
+            streamTurnSeq,
+            toolExecutor,
+            executionMode,
+            approvalMode,
+            cwd,
+            filesRead,
+            envOverlay,
+            abortController,
+            turnId,
+            startedAt,
+            sessionId,
+            writeAndAdvance,
+          });
+
+          streamTurnSeq = result.streamTurnSeq;
+          providerMessages = [...providerMessages, { role: 'user', content: '', toolResults: [result.coreResult] }];
+
+          if (!result.shouldContinue) {
+            shouldContinue = false;
+          }
+        }
+
+        if (!shouldContinue) {
+          break;
+        }
+
+        // Stop the agentic loop if budget exceeded (after completing current turn)
+        if (stopReason === 'budget_exceeded') {
+          break;
+        }
+      }
+
+      if (abortController.signal.aborted) {
+        stopReason = 'cancelled';
+      }
+    } finally {
+      provider.cleanup();
+    }
+
+    // Update session usage
+    this.deps.updateSessionUsage({
+      costDelta: sessionCostUsd - this.deps.getSessionCostUsd(),
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
     });
 
-    return result;
+    if (stopReason === 'end_turn' && completedTurns >= maxTurns) {
+      stopReason = 'max_turns';
+    }
+
+    await writeAndAdvance({ type: 'turn_end', data: { stopReason } });
+
+    return {
+      turnId,
+      stopReason,
+      content: finalAssistantContent.length > 0
+        ? [{ type: 'text' as const, text: finalAssistantContent }]
+        : [],
+      usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+    };
+  }
+
+  /**
+   * Execute a single tool call.
+   */
+  private async executeToolCall(params: {
+    toolCall: { id?: string; name?: string; arguments?: unknown };
+    streamTurnSeq: number;
+    toolExecutor: { getTool: (name: string) => unknown; execute: (...args: unknown[]) => Promise<CoreToolResult> };
+    executionMode: 'plan' | 'execute';
+    approvalMode: ApprovalMode;
+    cwd: string;
+    filesRead: Set<string>;
+    envOverlay?: Record<string, string>;
+    abortController: AbortController;
+    turnId: string;
+    startedAt: string;
+    sessionId: string;
+    writeAndAdvance: (event: { type: string; data: Record<string, unknown> }) => Promise<void>;
+  }): Promise<{
+    streamTurnSeq: number;
+    coreResult: CoreToolResult;
+    shouldContinue: boolean;
+  }> {
+    const {
+      toolCall, executionMode, approvalMode, cwd, filesRead, envOverlay,
+      abortController, turnId, startedAt, sessionId, writeAndAdvance,
+    } = params;
+    let { streamTurnSeq, toolExecutor } = params;
+
+    const toolCallId = toNonEmptyString(toolCall.id) ?? `tool_${randomUUID()}`;
+    const toolName = toNonEmptyString(toolCall.name) ?? '';
+    const toolInput =
+      typeof toolCall.arguments === 'object' && toolCall.arguments
+        ? (toolCall.arguments as Record<string, unknown>)
+        : {};
+
+    const toolTurnSeq = streamTurnSeq++;
+    const kind = toolKindFromName(toolName);
+
+    await this.deps.onUpdate(toolTurnSeq, {
+      type: 'tool_use',
+      toolCallId,
+      name: toolName,
+      kind,
+      input: toolInput,
+      status: 'pending',
+    });
+
+    // Handle deny mode
+    if (approvalMode === 'deny') {
+      const denied: ToolResult = {
+        outcome: 'denied',
+        content: [{ type: 'error', message: 'Denied by policy' }],
+      };
+
+      await this.deps.onUpdate(toolTurnSeq, {
+        type: 'tool_use',
+        toolCallId,
+        name: toolName,
+        kind,
+        input: toolInput,
+        status: 'denied',
+        result: denied,
+      });
+
+      await writeAndAdvance({
+        type: 'tool_use',
+        data: { toolCallId, name: toolName, kind, input: toolInput, result: denied },
+      });
+
+      return {
+        streamTurnSeq,
+        coreResult: { status: 'denied', content: [{ type: 'text', text: 'Denied by policy' }] },
+        shouldContinue: false,
+      };
+    }
+
+    // Handle plan mode restrictions
+    if (executionMode === 'plan' && kind !== 'read' && kind !== 'search') {
+      const denied: ToolResult = {
+        outcome: 'denied',
+        content: [{ type: 'error', message: 'Tool denied in plan mode' }],
+      };
+
+      await this.deps.onUpdate(toolTurnSeq, {
+        type: 'tool_use',
+        toolCallId,
+        name: toolName,
+        kind,
+        input: toolInput,
+        status: 'denied',
+        result: denied,
+      });
+
+      await writeAndAdvance({
+        type: 'tool_use',
+        data: { toolCallId, name: toolName, kind, input: toolInput, result: denied },
+      });
+
+      return {
+        streamTurnSeq,
+        coreResult: { status: 'denied', content: [{ type: 'text', text: 'Tool denied in plan mode' }] },
+        shouldContinue: false,
+      };
+    }
+
+    // Check if tool exists
+    const tool = toolExecutor.getTool(toolName);
+    if (!tool && toolName !== 'delegate') {
+      const failed: ToolResult = {
+        outcome: 'failed',
+        content: [{ type: 'error', message: `Tool not found: ${toolName}` }],
+      };
+
+      await this.deps.onUpdate(toolTurnSeq, {
+        type: 'tool_use',
+        toolCallId,
+        name: toolName,
+        kind,
+        input: toolInput,
+        status: 'failed',
+        result: failed,
+      });
+
+      await writeAndAdvance({
+        type: 'tool_use',
+        data: { toolCallId, name: toolName, kind, input: toolInput, result: failed },
+      });
+
+      return {
+        streamTurnSeq,
+        coreResult: { status: 'failed', content: [{ type: 'text', text: `Tool not found: ${toolName}` }] },
+        shouldContinue: false,
+      };
+    }
+
+    // Handle bash with background=true BEFORE permission check.
+    // Background jobs handle their own permission flow via shell-job.ts.
+    if (toolName === 'bash' && toolInput.background === true) {
+      const command = toNonEmptyString(toolInput.command);
+      const description = toNonEmptyString(toolInput.description);
+      if (!command) {
+        const failed: ToolResult = {
+          outcome: 'failed',
+          content: [{ type: 'error', message: 'bash.command is required' }],
+        };
+        await this.deps.onUpdate(toolTurnSeq, {
+          type: 'tool_use',
+          toolCallId,
+          name: toolName,
+          kind,
+          input: toolInput,
+          status: 'failed',
+          result: failed,
+        });
+        await writeAndAdvance({
+          type: 'tool_use',
+          data: { toolCallId, name: toolName, kind, input: toolInput, result: failed },
+        });
+        return {
+          streamTurnSeq,
+          coreResult: { status: 'failed', content: [{ type: 'text', text: 'bash.command is required' }] },
+          shouldContinue: false,
+        };
+      }
+
+      const { jobId } = await this.deps.startShellJob({
+        command,
+        description: description || command.substring(0, 50),
+        turnContext: { turnId, turnSeq: toolTurnSeq },
+      });
+
+      const completed: ToolResult = {
+        outcome: 'completed',
+        content: [{ type: 'text', text: JSON.stringify({ jobId, status: 'started' }) }],
+      };
+      await this.deps.onUpdate(toolTurnSeq, {
+        type: 'tool_use',
+        toolCallId,
+        name: toolName,
+        kind,
+        input: toolInput,
+        status: 'completed',
+        result: completed,
+      });
+      await writeAndAdvance({
+        type: 'tool_use',
+        data: { toolCallId, name: toolName, kind, input: toolInput, result: completed },
+      });
+      return {
+        streamTurnSeq,
+        coreResult: { status: 'completed', content: [{ type: 'text', text: JSON.stringify({ jobId, status: 'started' }) }] },
+        shouldContinue: true,
+      };
+    }
+
+    let finalInput = toolInput;
+
+    // Handle permission request
+    const needsPermission = shouldAskPermission(approvalMode, kind);
+    if (needsPermission) {
+      this.deps.setActiveTurnStatus('awaiting_permission', abortController);
+
+      const options = [
+        { optionId: 'allow', label: 'Allow' },
+        { optionId: 'deny', label: 'Deny' },
+      ];
+
+      await this.deps.onUpdate(toolTurnSeq, {
+        type: 'tool_use',
+        toolCallId,
+        name: toolName,
+        kind,
+        input: toolInput,
+        status: 'awaiting_permission',
+      });
+
+      let permissionResponse: { decision?: string; updatedInput?: Record<string, unknown> } | undefined;
+
+      // Compute a meaningful resource for the permission request:
+      // - For bash: use the command
+      // - For file operations: use the path
+      // - Otherwise: use the tool name
+      let resource = toolName;
+      if (toolName === 'bash' && toolInput.command) {
+        resource = String(toolInput.command);
+      } else if (toolInput.path) {
+        resource = String(toolInput.path);
+      }
+
+      try {
+        permissionResponse = await this.deps.requestPermission({
+          sessionId,
+          turnId,
+          turnSeq: toolTurnSeq,
+          toolCallId,
+          tool: toolName,
+          kind,
+          resource,
+          options,
+          input: toolInput,
+          signal: abortController.signal,
+        });
+      } catch {
+        const cancelled: ToolResult = {
+          outcome: 'cancelled',
+          content: [{ type: 'error', message: 'Cancelled' }],
+        };
+
+        await this.deps.onUpdate(toolTurnSeq, {
+          type: 'tool_use',
+          toolCallId,
+          name: toolName,
+          kind,
+          input: toolInput,
+          status: 'cancelled',
+          result: cancelled,
+        });
+
+        await writeAndAdvance({
+          type: 'tool_use',
+          data: { toolCallId, name: toolName, kind, input: toolInput, result: cancelled },
+        });
+
+        return {
+          streamTurnSeq,
+          coreResult: { status: 'aborted', content: [{ type: 'text', text: 'Cancelled' }] },
+          shouldContinue: false,
+        };
+      }
+
+      this.deps.setActiveTurnStatus('running', abortController);
+
+      const decision = toNonEmptyString(permissionResponse?.decision);
+      if (permissionResponse?.updatedInput) {
+        finalInput = permissionResponse.updatedInput;
+      }
+
+      if (decision === 'deny') {
+        const denied: ToolResult = {
+          outcome: 'denied',
+          content: [{ type: 'error', message: 'Denied by user' }],
+        };
+
+        await this.deps.onUpdate(toolTurnSeq, {
+          type: 'tool_use',
+          toolCallId,
+          name: toolName,
+          kind,
+          input: toolInput,
+          status: 'denied',
+          result: denied,
+        });
+
+        await writeAndAdvance({
+          type: 'tool_use',
+          data: { toolCallId, name: toolName, kind, input: toolInput, result: denied },
+        });
+
+        return {
+          streamTurnSeq,
+          coreResult: { status: 'denied', content: [{ type: 'text', text: 'Denied by user' }] },
+          shouldContinue: false,
+        };
+      }
+    }
+
+    await this.deps.onUpdate(toolTurnSeq, {
+      type: 'tool_use',
+      toolCallId,
+      name: toolName,
+      kind,
+      input: finalInput,
+      status: 'running',
+    });
+
+    // Execute the tool
+    const coreResult = await this.executeToolByName({
+      toolName,
+      toolCallId,
+      finalInput,
+      toolTurnSeq,
+      toolExecutor,
+      cwd,
+      filesRead,
+      envOverlay,
+      abortController,
+      turnId,
+    });
+
+    const protocolResult = protocolToolResultFromCore(coreResult);
+    const terminalStatus =
+      protocolResult.outcome === 'completed'
+        ? 'completed'
+        : protocolResult.outcome === 'denied'
+          ? 'denied'
+          : protocolResult.outcome === 'cancelled'
+            ? 'cancelled'
+            : 'failed';
+
+    await this.deps.onUpdate(toolTurnSeq, {
+      type: 'tool_use',
+      toolCallId,
+      name: toolName,
+      kind,
+      input: finalInput,
+      status: terminalStatus,
+      result: protocolResult,
+    });
+
+    await writeAndAdvance({
+      type: 'tool_use',
+      data: {
+        toolCallId,
+        name: toolName,
+        kind,
+        input: finalInput,
+        result: protocolResult,
+      },
+    });
+
+    // Update files read tracking
+    if (toolName === 'file_read' && coreResult.status === 'completed') {
+      const p = toNonEmptyString(finalInput.path);
+      if (p) filesRead.add(isAbsolutePath(p) ? p : resolvePath(cwd, p));
+    }
+
+    // Determine if the turn should continue based on tool result status
+    const shouldContinue =
+      coreResult.status !== 'denied' &&
+      coreResult.status !== 'aborted' &&
+      coreResult.status !== 'pending';
+
+    return {
+      streamTurnSeq,
+      coreResult,
+      shouldContinue,
+    };
+  }
+
+  /**
+   * Execute a tool by name, handling special built-in tools.
+   */
+  private async executeToolByName(params: {
+    toolName: string;
+    toolCallId: string;
+    finalInput: Record<string, unknown>;
+    toolTurnSeq: number;
+    toolExecutor: { execute: (...args: unknown[]) => Promise<CoreToolResult> };
+    cwd: string;
+    filesRead: Set<string>;
+    envOverlay?: Record<string, string>;
+    abortController: AbortController;
+    turnId: string;
+  }): Promise<CoreToolResult> {
+    const { toolName, toolCallId, finalInput, toolTurnSeq, toolExecutor, cwd, filesRead, envOverlay, abortController, turnId } = params;
+
+    // Note: bash with background=true is handled before permission check and never reaches here.
+
+    // Handle delegate tool
+    if (toolName === 'delegate') {
+      return await this.executeDelegateTool({ finalInput, toolTurnSeq, abortController, turnId });
+    }
+
+    // Handle job_output tool
+    if (toolName === 'job_output') {
+      return await this.executeJobOutputTool({ finalInput });
+    }
+
+    // Handle jobs_list tool
+    if (toolName === 'jobs_list') {
+      return this.executeJobsListTool({ finalInput });
+    }
+
+    // Handle job_kill tool
+    if (toolName === 'job_kill') {
+      return this.executeJobKillTool({ finalInput });
+    }
+
+    // Default: execute through tool executor
+    return await toolExecutor.execute(
+      { id: toolCallId, name: toolName, arguments: finalInput },
+      {
+        signal: abortController.signal,
+        workingDirectory: cwd,
+        toolTempRoot: join(this.config.sessionDir, 'tool-temp'),
+        processEnv: envOverlay,
+        hasFileBeenRead: (p: string) => filesRead.has(isAbsolutePath(p) ? p : resolvePath(cwd, p)),
+      }
+    );
+  }
+
+  /**
+   * Execute the delegate tool.
+   */
+  private async executeDelegateTool(params: {
+    finalInput: Record<string, unknown>;
+    toolTurnSeq: number;
+    abortController: AbortController;
+    turnId: string;
+  }): Promise<CoreToolResult> {
+    const { finalInput, toolTurnSeq, abortController, turnId } = params;
+
+    const prompt = toNonEmptyString(finalInput.prompt);
+    const background = finalInput.background === true;
+    const description = toNonEmptyString(finalInput.description);
+    const resumeJobId = toNonEmptyString(finalInput.resume);
+    const connectionId = toNonEmptyString(finalInput.connectionId) ?? undefined;
+    const modelId = toNonEmptyString(finalInput.modelId) ?? undefined;
+
+    // If resuming, look up the previous job's subagentSessionId
+    let resumeSessionId: string | undefined;
+    let resumeError: string | undefined;
+    if (resumeJobId) {
+      const previousJob = this.deps.getJob(resumeJobId);
+      if (!previousJob?.subagentSessionId) {
+        resumeError = `Cannot resume job ${resumeJobId}: no subagentSessionId found`;
+      } else {
+        resumeSessionId = previousJob.subagentSessionId;
+      }
+    }
+
+    if (!prompt) {
+      return { status: 'failed', content: [{ type: 'text', text: 'delegate.prompt is required' }] };
+    }
+
+    if (resumeError) {
+      return { status: 'failed', content: [{ type: 'text', text: resumeError }] };
+    }
+
+    const { jobId } = await this.deps.startSubagentJob({
+      prompt,
+      description: description || 'Delegate',
+      turnContext: { turnId, turnSeq: toolTurnSeq },
+      resumeSessionId,
+      connectionId,
+      modelId,
+    });
+
+    if (background) {
+      return {
+        status: 'completed',
+        content: [{ type: 'text', text: JSON.stringify({ jobId, status: 'started' }) }],
+      };
+    }
+
+    // Wait for job completion
+    const job = this.deps.getJob(jobId);
+    if (job) {
+      const abortPromise = new Promise<never>((_, reject) => {
+        abortController.signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true });
+      });
+
+      try {
+        await Promise.race([job.completion, abortPromise]);
+      } catch {
+        job.status = 'cancelled';
+        await this.deps.finalizeJob(job);
+      }
+    }
+
+    let output = '';
+    try {
+      output = readFileSync(getJobOutputPath(this.config.sessionDir, jobId), 'utf8');
+    } catch {
+      output = '';
+    }
+
+    const tailLimit = 64 * 1024;
+    const truncated = output.length > tailLimit;
+    const reportText = truncated ? output.slice(-tailLimit) : output;
+
+    const status = job?.status ?? 'failed';
+    return {
+      status: status === 'completed' ? 'completed' : status === 'cancelled' ? 'aborted' : 'failed',
+      content: [
+        {
+          type: 'text',
+          text:
+            `delegate jobId=${jobId}\n\n` +
+            (reportText.trim().length > 0 ? reportText.trim() : '(no output)') +
+            (truncated ? '\n\n(truncated)' : ''),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Execute the job_output tool.
+   */
+  private async executeJobOutputTool(params: { finalInput: Record<string, unknown> }): Promise<CoreToolResult> {
+    const { finalInput } = params;
+
+    const jobId = toNonEmptyString(finalInput.jobId);
+    if (!jobId) {
+      return { status: 'failed', content: [{ type: 'text', text: 'job_output.jobId is required' }] };
+    }
+
+    const block = finalInput.block !== false;
+    const timeoutMs = typeof finalInput.timeoutMs === 'number' ? finalInput.timeoutMs : 30_000;
+    const byteOffset = typeof finalInput.byteOffset === 'number' ? finalInput.byteOffset : 0;
+
+    // Block until job completion if requested
+    const runningJob = this.deps.getJob(jobId);
+    if (block && runningJob?.status === 'running') {
+      await Promise.race([
+        runningJob.completion,
+        timeoutMs > 0 ? new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)) : new Promise<void>(() => {}),
+      ]);
+    }
+
+    // Look up job from derived list (includes persisted jobs)
+    const jobs = this.deps.deriveJobs();
+    const record = jobs.find((j) => j.jobId === jobId);
+
+    if (!record) {
+      return { status: 'failed', content: [{ type: 'text', text: `Job not found: ${jobId}` }] };
+    }
+
+    const outputPath = getJobOutputPath(this.config.sessionDir, jobId);
+
+    let totalBytes = 0;
+    try {
+      totalBytes = statSync(outputPath).size;
+    } catch {
+      totalBytes = 0;
+    }
+
+    const clampedOffset = Math.min(byteOffset, totalBytes);
+    const bytesToRead = Math.max(0, totalBytes - clampedOffset);
+
+    let output = '';
+    if (bytesToRead > 0) {
+      const fd = openSync(outputPath, 'r');
+      try {
+        const buf = Buffer.allocUnsafe(bytesToRead);
+        const read = readSync(fd, buf, 0, bytesToRead, clampedOffset);
+        output = buf.subarray(0, read).toString('utf8');
+      } finally {
+        closeSync(fd);
+      }
+    }
+
+    const result = {
+      jobId,
+      status: record.status,
+      output,
+      ...(record.exitCode !== undefined ? { exitCode: record.exitCode } : {}),
+      byteOffset: totalBytes,
+    };
+
+    return { status: 'completed', content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+  }
+
+  /**
+   * Execute the jobs_list tool.
+   */
+  private executeJobsListTool(params: { finalInput: Record<string, unknown> }): CoreToolResult {
+    const { finalInput } = params;
+
+    const statusFilter = Array.isArray(finalInput.status) ? (finalInput.status as string[]) : undefined;
+    const typeFilter = Array.isArray(finalInput.type) ? (finalInput.type as string[]) : undefined;
+    const limit = typeof finalInput.limit === 'number' ? finalInput.limit : 50;
+
+    let jobs = this.deps.deriveJobs().map((j) => ({
+      jobId: j.jobId,
+      parentJobId: j.parentJobId,
+      type: j.type,
+      status: j.status,
+      description: j.description,
+      command: j.command,
+      startTime: j.startTime,
+      ...(j.subagentSessionId ? { subagentSessionId: j.subagentSessionId } : {}),
+    }));
+
+    // Apply filters
+    if (statusFilter && statusFilter.length > 0) {
+      jobs = jobs.filter((j) => statusFilter.includes(j.status));
+    }
+    if (typeFilter && typeFilter.length > 0) {
+      jobs = jobs.filter((j) => typeFilter.includes(j.type));
+    }
+
+    // Apply limit
+    jobs = jobs.slice(0, limit);
+
+    return { status: 'completed', content: [{ type: 'text', text: JSON.stringify({ jobs }, null, 2) }] };
+  }
+
+  /**
+   * Execute the job_kill tool.
+   */
+  private executeJobKillTool(params: { finalInput: Record<string, unknown> }): CoreToolResult {
+    const { finalInput } = params;
+
+    const jobId = toNonEmptyString(finalInput.jobId);
+    if (!jobId) {
+      return { status: 'failed', content: [{ type: 'text', text: 'job_kill.jobId is required' }] };
+    }
+
+    const job = this.deps.getJob(jobId);
+    if (!job || job.status !== 'running') {
+      return {
+        status: 'completed',
+        content: [{ type: 'text', text: JSON.stringify({ success: false, reason: 'Job not running' }) }],
+      };
+    }
+
+    job.status = 'cancelled';
+
+    let killed = false;
+    if (job.proc) {
+      const proc = job.proc;
+      try {
+        // Kill the entire process group on POSIX so we don't leak child processes
+        if (process.platform !== 'win32' && typeof proc.pid === 'number') {
+          process.kill(-proc.pid, 'SIGTERM');
+        } else {
+          proc.kill('SIGTERM');
+        }
+        killed = true;
+      } catch {
+        killed = false;
+      }
+    } else {
+      // Subagent job - just mark as cancelled (completion promise will resolve)
+      killed = true;
+    }
+
+    return { status: 'completed', content: [{ type: 'text', text: JSON.stringify({ success: killed }) }] };
   }
 
   /**
    * Cancel any in-progress operation.
-   *
-   * @throws Error - Not yet implemented (skeleton only)
    */
   cancel(): void {
-    // TODO: Implement abort controller logic
-    throw new Error('Not implemented: cancel() will be implemented in later phases');
+    // The abort controller is passed in via RunParams
+    // The caller is responsible for aborting it
   }
 }

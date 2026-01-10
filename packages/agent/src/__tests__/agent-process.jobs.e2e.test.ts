@@ -31,7 +31,7 @@ describe('lace-agent jobs (E2E over stdio)', () => {
   });
 
   it('spawns a shell job, streams updates, and persists output', { timeout: 20_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir });
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
     const updates: Array<Record<string, unknown>> = [];
     let jobId: string | undefined;
@@ -140,7 +140,7 @@ describe('lace-agent jobs (E2E over stdio)', () => {
   });
 
   it('can cancel a job while it is awaiting permission', { timeout: 20_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir });
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
     let observedJobId: string | undefined;
     let permissionForJobId: string | undefined;

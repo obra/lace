@@ -35,7 +35,7 @@ describe('async job workflow (E2E)', () => {
     'complete async bash workflow: spawn, list, check output, kill',
     { timeout: 30_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir });
+      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
       const updates: Array<Record<string, unknown>> = [];
       let shellJobId: string | undefined;
@@ -123,7 +123,7 @@ describe('async job workflow (E2E)', () => {
     'multiple concurrent jobs: spawn several, list all, verify statuses',
     { timeout: 30_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir });
+      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
       const updates: Array<Record<string, unknown>> = [];
       const jobIds: string[] = [];
@@ -231,7 +231,7 @@ describe('async job workflow (E2E)', () => {
     'job completion: spawn short job, wait for completion, verify output',
     { timeout: 30_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir });
+      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
       const updates: Array<Record<string, unknown>> = [];
       let jobId: string | undefined;
@@ -300,7 +300,7 @@ describe('async job workflow (E2E)', () => {
   );
 
   it('job persistence: jobs survive agent restart', { timeout: 30_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir });
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
     let jobId: string | undefined;
     let sessionId: string | undefined;
@@ -372,7 +372,7 @@ describe('async job workflow (E2E)', () => {
     await agent.shutdown();
     agent = undefined;
 
-    agent = spawnAgentProcess({ laceDir });
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
     agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
     await withTimeout(
@@ -408,7 +408,7 @@ describe('async job workflow (E2E)', () => {
   });
 
   it('job error handling: job with non-zero exit code', { timeout: 30_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir });
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
     let jobId: string | undefined;
     let jobFinished = false;
@@ -491,7 +491,7 @@ describe('async job workflow (E2E)', () => {
   });
 
   it('session switch kills running jobs', { timeout: 30_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir });
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
     let jobId: string | undefined;
     let session1Id: string | undefined;
@@ -571,7 +571,7 @@ describe('async job workflow (E2E)', () => {
     'injects completion notification when background job finishes',
     { timeout: 30_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir });
+      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
       let jobId: string | undefined;
       const updates: Array<Record<string, unknown>> = [];
@@ -665,7 +665,7 @@ describe('async job workflow (E2E)', () => {
   );
 
   it('injects failure notification when background job fails', { timeout: 30_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir });
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
     let jobId: string | undefined;
     const updates: Array<Record<string, unknown>> = [];
@@ -761,7 +761,7 @@ describe('async job workflow (E2E)', () => {
     'automatically triggers a turn when job completes and agent is idle',
     { timeout: 30_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir });
+      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
       let jobId: string | undefined;
       let initialTurnId: string | undefined;

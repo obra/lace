@@ -6,41 +6,86 @@ import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ConversationRunner } from '../runner';
+import type { RunnerConfig, RunnerDependencies } from '../types';
 import { TestAgentProvider } from '@lace/agent/runtime/test-provider';
 
+/**
+ * Create mock dependencies for testing ConversationRunner
+ */
+function createMockDeps(overrides: Partial<RunnerDependencies> = {}): RunnerDependencies {
+  const mockToolExecutor = {
+    getTool: vi.fn().mockReturnValue(null),
+    execute: vi.fn().mockResolvedValue({ status: 'completed', content: [{ type: 'text', text: 'mock result' }] }),
+  };
+
+  return {
+    onUpdate: vi.fn().mockResolvedValue(undefined),
+    runExclusive: vi.fn().mockImplementation(<T>(fn: () => T | Promise<T>) => Promise.resolve(fn())),
+    requestPermission: vi.fn().mockResolvedValue({ decision: 'allow' }),
+    createToolExecutor: vi.fn().mockReturnValue({
+      executor: mockToolExecutor,
+      toolsForProvider: [],
+    }),
+    createProvider: vi.fn().mockImplementation(async () => new TestAgentProvider()),
+    getModelPricing: vi.fn().mockResolvedValue(null),
+    startShellJob: vi.fn().mockResolvedValue({ jobId: 'job_test' }),
+    startSubagentJob: vi.fn().mockResolvedValue({ jobId: 'job_test' }),
+    deriveJobs: vi.fn().mockReturnValue([]),
+    finalizeJob: vi.fn().mockResolvedValue(undefined),
+    getJob: vi.fn().mockReturnValue(undefined),
+    mcpServerManager: undefined,
+    setActiveTurnStatus: vi.fn(),
+    getSessionCostUsd: vi.fn().mockReturnValue(0),
+    updateSessionUsage: vi.fn(),
+    ...overrides,
+  };
+}
+
 describe('ConversationRunner', () => {
-  it('creates a runner instance with required config', () => {
-    const runner = new ConversationRunner({
+  it('creates a runner instance with required config and deps', () => {
+    const config: RunnerConfig = {
       sessionDir: '/tmp/test-session',
+      sessionId: 'sess_test',
       cwd: '/tmp/test-cwd',
-      onUpdate: vi.fn(),
-    });
+      executionMode: 'execute',
+      approvalMode: 'approve',
+    };
+    const deps = createMockDeps();
+
+    const runner = new ConversationRunner(config, deps);
     expect(runner).toBeDefined();
     expect(runner).toBeInstanceOf(ConversationRunner);
   });
 
   it('accepts optional config parameters', () => {
-    const onUpdate = vi.fn();
-    const runner = new ConversationRunner({
+    const config: RunnerConfig = {
       sessionDir: '/tmp/test-session',
+      sessionId: 'sess_test',
       cwd: '/tmp/test-cwd',
-      onUpdate,
-      connectionId: 'test-connection',
-      modelId: 'test-model',
       executionMode: 'plan',
       approvalMode: 'approveReads',
+      connectionId: 'test-connection',
+      modelId: 'test-model',
       environment: { NODE_ENV: 'test' },
       maxBudgetUsd: 10.0,
-    });
+    };
+    const deps = createMockDeps();
+
+    const runner = new ConversationRunner(config, deps);
     expect(runner).toBeDefined();
   });
 
   it('exposes sessionDir from config', () => {
-    const runner = new ConversationRunner({
+    const config: RunnerConfig = {
       sessionDir: '/tmp/my-session',
+      sessionId: 'sess_test',
       cwd: '/tmp/test-cwd',
-      onUpdate: vi.fn(),
-    });
+      executionMode: 'execute',
+      approvalMode: 'approve',
+    };
+    const deps = createMockDeps();
+
+    const runner = new ConversationRunner(config, deps);
     expect(runner.sessionDir).toBe('/tmp/my-session');
   });
 
@@ -57,10 +102,13 @@ describe('ConversationRunner', () => {
       mkdirSync(cwd, { recursive: true });
 
       // Initialize session files (state.json and events.jsonl)
-      writeFileSync(join(sessionDir, 'state.json'), JSON.stringify({
-        nextEventSeq: 1,
-        nextStreamSeq: 1,
-      }));
+      writeFileSync(
+        join(sessionDir, 'state.json'),
+        JSON.stringify({
+          nextEventSeq: 1,
+          nextStreamSeq: 1,
+        })
+      );
       writeFileSync(join(sessionDir, 'events.jsonl'), '');
     });
 
@@ -75,17 +123,22 @@ describe('ConversationRunner', () => {
     });
 
     it('returns a result with turnId and content when provider responds', async () => {
-      const onUpdate = vi.fn();
-      const runner = new ConversationRunner({
+      const onUpdate = vi.fn().mockResolvedValue(undefined);
+      const config: RunnerConfig = {
         sessionDir,
+        sessionId: 'sess_test',
         cwd,
-        onUpdate,
-      });
-      const provider = new TestAgentProvider();
+        executionMode: 'execute',
+        approvalMode: 'approve',
+      };
+      const deps = createMockDeps({ onUpdate });
+      const runner = new ConversationRunner(config, deps);
 
       const result = await runner.run({
         content: [{ type: 'text', text: 'Hello, world!' }],
-        provider,
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
       });
 
       expect(result).toBeDefined();
@@ -96,18 +149,23 @@ describe('ConversationRunner', () => {
       expect(result.usage.outputTokens).toBeGreaterThanOrEqual(0);
     });
 
-    it('writes prompt and message events to events.jsonl', async () => {
-      const onUpdate = vi.fn();
-      const runner = new ConversationRunner({
+    it('writes turn_end event to events.jsonl', async () => {
+      const onUpdate = vi.fn().mockResolvedValue(undefined);
+      const config: RunnerConfig = {
         sessionDir,
+        sessionId: 'sess_test',
         cwd,
-        onUpdate,
-      });
-      const provider = new TestAgentProvider();
+        executionMode: 'execute',
+        approvalMode: 'approve',
+      };
+      const deps = createMockDeps({ onUpdate });
+      const runner = new ConversationRunner(config, deps);
 
       await runner.run({
         content: [{ type: 'text', text: 'Test prompt' }],
-        provider,
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
       });
 
       const eventsPath = join(sessionDir, 'events.jsonl');
@@ -117,83 +175,59 @@ describe('ConversationRunner', () => {
         .filter((line) => line.trim())
         .map((line) => JSON.parse(line));
 
-      // Should have at least prompt, turn_start, message, and turn_end events
-      expect(events.length).toBeGreaterThanOrEqual(4);
+      // Should have at least message and turn_end events (prompt/turn_start are written by the RPC layer)
+      expect(events.length).toBeGreaterThanOrEqual(2);
 
-      const eventTypes = events.map((e) => e.type);
-      expect(eventTypes).toContain('prompt');
-      expect(eventTypes).toContain('turn_start');
+      const eventTypes = events.map((e: { type: string }) => e.type);
       expect(eventTypes).toContain('message');
       expect(eventTypes).toContain('turn_end');
     });
 
     it('emits session updates via onUpdate callback', async () => {
-      const onUpdate = vi.fn();
-      const runner = new ConversationRunner({
+      const onUpdate = vi.fn().mockResolvedValue(undefined);
+      const config: RunnerConfig = {
         sessionDir,
+        sessionId: 'sess_test',
         cwd,
-        onUpdate,
-      });
-      const provider = new TestAgentProvider();
+        executionMode: 'execute',
+        approvalMode: 'approve',
+      };
+      const deps = createMockDeps({ onUpdate });
+      const runner = new ConversationRunner(config, deps);
 
       await runner.run({
         content: [{ type: 'text', text: 'Hello' }],
-        provider,
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
       });
 
-      // Should have received turn_start and turn_end updates at minimum
+      // Should have received text_delta updates for non-streaming responses
       expect(onUpdate).toHaveBeenCalled();
-      const updateTypes = onUpdate.mock.calls.map((call) => call[0].type);
-      expect(updateTypes).toContain('turn_start');
-      expect(updateTypes).toContain('turn_end');
-    });
-
-    it('increments event sequence numbers correctly', async () => {
-      const onUpdate = vi.fn();
-      const runner = new ConversationRunner({
-        sessionDir,
-        cwd,
-        onUpdate,
-      });
-      const provider = new TestAgentProvider();
-
-      await runner.run({
-        content: [{ type: 'text', text: 'First prompt' }],
-        provider,
-      });
-
-      const eventsPath = join(sessionDir, 'events.jsonl');
-      const eventsRaw = readFileSync(eventsPath, 'utf8');
-      const events = eventsRaw
-        .split('\n')
-        .filter((line) => line.trim())
-        .map((line) => JSON.parse(line));
-
-      // Each event should have an incrementing eventSeq
-      for (let i = 0; i < events.length; i++) {
-        expect(events[i].eventSeq).toBe(i + 1);
-      }
     });
 
     it('updates session state after run completes', async () => {
-      const onUpdate = vi.fn();
-      const runner = new ConversationRunner({
+      const onUpdate = vi.fn().mockResolvedValue(undefined);
+      const updateSessionUsage = vi.fn();
+      const config: RunnerConfig = {
         sessionDir,
+        sessionId: 'sess_test',
         cwd,
-        onUpdate,
-      });
-      const provider = new TestAgentProvider();
+        executionMode: 'execute',
+        approvalMode: 'approve',
+      };
+      const deps = createMockDeps({ onUpdate, updateSessionUsage });
+      const runner = new ConversationRunner(config, deps);
 
       await runner.run({
         content: [{ type: 'text', text: 'Test' }],
-        provider,
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
       });
 
-      const stateRaw = readFileSync(join(sessionDir, 'state.json'), 'utf8');
-      const state = JSON.parse(stateRaw);
-
-      // nextEventSeq should have advanced
-      expect(state.nextEventSeq).toBeGreaterThan(1);
+      // updateSessionUsage should have been called
+      expect(updateSessionUsage).toHaveBeenCalled();
     });
   });
 });

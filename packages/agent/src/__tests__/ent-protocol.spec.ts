@@ -917,7 +917,7 @@ describe('Ent protocol contract (selected coverage)', () => {
   });
 
   it('covers job output pagination, blocking, and kill success for shell jobs', async () => {
-    agent = spawnAgentProcess({ laceDir });
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
     await requestOk({
       agent,
       method: 'initialize',

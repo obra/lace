@@ -101,8 +101,8 @@ describe('agent abort reliability (E2E)', () => {
   });
 
   it('aborts cleanly during tool execution', { timeout: 20_000 }, async () => {
-    // Setup: Use real provider to trigger bash tool with a slow command
-    agent = spawnAgentProcess({ laceDir });
+    // Setup: Use test provider to trigger bash tool with a slow command
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
     const updates: unknown[] = [];
     agent.peer.onRequest('session/update', async (params) => {
@@ -179,7 +179,7 @@ describe('agent abort reliability (E2E)', () => {
 
   it('aborts cleanly while awaiting permission', { timeout: 15_000 }, async () => {
     // Setup: Trigger tool requiring permission, never respond
-    agent = spawnAgentProcess({ laceDir });
+    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
 
     const updates: unknown[] = [];
     agent.peer.onRequest('session/update', async (params) => {

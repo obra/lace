@@ -236,12 +236,20 @@ export class TestAgentProvider extends AIProvider {
           const toolCalls: ToolCall[] = [
             { id: toolCallId, name: requested.name, arguments: requested.args },
           ];
-          const content =
-            requested.name === 'file_read'
-              ? `Reading ${(requested.args as Record<string, unknown>).path as string}...`
-              : requested.name === 'delegate'
-                ? `Delegating ${(requested.args as Record<string, unknown>).prompt as string}...`
-                : `Writing ${(requested.args as Record<string, unknown>).path as string}...`;
+          let content: string;
+          switch (requested.name) {
+            case 'file_read':
+              content = `Reading ${(requested.args as Record<string, unknown>).path as string}...`;
+              break;
+            case 'delegate':
+              content = `Delegating ${(requested.args as Record<string, unknown>).prompt as string}...`;
+              break;
+            case 'bash':
+              content = `Running ${(requested.args as Record<string, unknown>).command as string}...`;
+              break;
+            default:
+              content = `Writing ${(requested.args as Record<string, unknown>).path as string}...`;
+          }
           this.emit('token', { token: content });
           this.emit('complete', { response: { content, toolCalls, stopReason: 'tool_use' } });
           // If retry-on-error is enabled, transition to awaiting_retry so we can retry on failure
@@ -283,10 +291,34 @@ export class TestAgentProvider extends AIProvider {
 
   private extractRequestedTool(
     text: string
-  ): null | { name: 'delegate' | 'file_read' | 'file_write'; args: Record<string, unknown> } {
+  ): null | { name: 'delegate' | 'file_read' | 'file_write' | 'bash'; args: Record<string, unknown> } {
     const delegateMatch = text.match(/delegate\s+(.+)\s*$/i);
     const delegatePrompt = delegateMatch?.[1]?.trim();
     if (delegatePrompt) return { name: 'delegate', args: { prompt: delegatePrompt } };
+
+    // Handle "subagent config=connId,modelId: prompt" or "subagent: prompt" pattern
+    const subagentMatch = text.match(/subagent(?:\s+config=([^,\s]+)?,([^\s:]+)?)?\s*:\s*(.+)\s*$/i);
+    if (subagentMatch) {
+      const connectionId = subagentMatch[1]?.trim() || undefined;
+      const modelId = subagentMatch[2]?.trim() || undefined;
+      const prompt = subagentMatch[3]?.trim();
+      if (prompt) {
+        return {
+          name: 'delegate',
+          args: { prompt, connectionId, modelId },
+        };
+      }
+    }
+
+    // Handle "job: <command>" pattern for background shell jobs
+    const jobMatch = text.match(/job[:\s]\s*(.+)\s*$/i);
+    const jobCommand = jobMatch?.[1]?.trim();
+    if (jobCommand) return { name: 'bash', args: { command: jobCommand, background: true } };
+
+    // Handle "run: <command>" or "run <command>" pattern for bash
+    const runMatch = text.match(/run[:\s]\s*(.+)\s*$/i);
+    const runCommand = runMatch?.[1]?.trim();
+    if (runCommand) return { name: 'bash', args: { command: runCommand } };
 
     const readPath = this.extractRequestedPath(text);
     if (readPath) return { name: 'file_read', args: { path: readPath } };
