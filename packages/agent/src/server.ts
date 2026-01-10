@@ -4246,7 +4246,18 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         });
       };
 
-      await writeAndAdvance({ type: 'prompt', data: { content: parsed.content } });
+      // Inject any pending job notifications before the user's prompt
+      let promptContent = parsed.content as unknown[];
+      if (state.jobNotificationQueue.length > 0) {
+        const notifications = state.jobNotificationQueue.splice(0);
+        const notificationBlocks = notifications.map((n) => ({
+          type: 'text' as const,
+          text: n.content,
+        }));
+        promptContent = [...notificationBlocks, ...promptContent];
+      }
+
+      await writeAndAdvance({ type: 'prompt', data: { content: promptContent } });
       await writeAndAdvance({ type: 'turn_start', data: {} });
       await emitSessionUpdate({ type: 'turn_start' }, { turnId, turnSeq: 0 });
 
