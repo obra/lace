@@ -1,9 +1,10 @@
-// ABOUTME: Tool management RPC handlers for listing available tools
+// ABOUTME: Tool and persona management RPC handlers
 
-import type { JsonRpcPeer, ToolInfo } from '@lace/ent-protocol';
+import type { JsonRpcPeer, ToolInfo, PersonaInfo } from '@lace/ent-protocol';
 import type { AgentServerState } from '../../server-types';
 import { protocolToolInfoForCoreTool } from '../utils';
 import { assertInitialized } from '../utils';
+import { personaRegistry } from '../../config/persona-registry';
 
 export type CreateToolExecutorForMode = (
   executionMode: 'plan' | 'execute',
@@ -39,5 +40,11 @@ export function registerToolHandlers(
     }
 
     return { tools };
+  });
+
+  // Persona listing handler
+  peer.onRequest('ent/personas/list', async (_params: unknown) => {
+    const personas: PersonaInfo[] = personaRegistry.listAvailablePersonas();
+    return { personas };
   });
 }
