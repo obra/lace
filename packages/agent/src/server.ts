@@ -79,11 +79,13 @@ import { personaRegistry } from './config/persona-registry';
 import { loadPromptConfig } from './config/prompts';
 import { logger } from './utils/logger';
 import { getUserSlashCommands, findUserCommand } from './user-commands';
+import { formatJobNotification } from './jobs/format-notification';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
 const JOB_LOG_DIR = 'jobs';
 const MAX_CONCURRENT_JOBS = 10;
 const MAX_JOB_OUTPUT_BYTES = 10 * 1024 * 1024; // 10 MB
+const DEFAULT_PROGRESS_INTERVAL_MS = 300000; // 5 minutes
 
 type SessionUpdateParams = z.infer<typeof SessionUpdateNotificationSchema>['params'];
 type DistributiveOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never;
@@ -211,6 +213,23 @@ type JobState = {
   finished: boolean;
   completion: Promise<void>;
   resolveCompletion: () => void;
+  // Progress notification fields
+  progressIntervalMs?: number;
+  lastProgressAt?: number;
+  lastProgressBytes?: number;
+  progressTimer?: ReturnType<typeof setInterval>;
+  // Subagent provider/model configuration
+  connectionId?: string;
+  modelId?: string;
+};
+
+type JobNotificationType = 'completed' | 'failed' | 'cancelled' | 'progress';
+
+type PendingJobNotification = {
+  jobId: string;
+  type: JobNotificationType;
+  content: string;
+  createdAt: number;
 };
 
 function ensureJobLogDir(sessionDir: string): string {
@@ -221,6 +240,19 @@ function ensureJobLogDir(sessionDir: string): string {
 
 function getJobOutputPath(sessionDir: string, jobId: string): string {
   return join(ensureJobLogDir(sessionDir), `${jobId}.log`);
+}
+
+/**
+ * Get the last N lines from a job output file.
+ */
+function getLastLines(outputPath: string, n: number): string[] {
+  try {
+    const content = readFileSync(outputPath, 'utf8');
+    const lines = content.split('\n').filter((line) => line.length > 0);
+    return lines.slice(-n);
+  } catch {
+    return [];
+  }
 }
 
 function extractTextFromContentBlocks(content: unknown[]): string {
@@ -1174,6 +1206,7 @@ export type AgentServerState = {
   >;
   sessionMutex: Promise<void>;
   jobStreaming: 'full' | 'coalesced' | 'none';
+  jobNotificationQueue: PendingJobNotification[];
 };
 
 export function createAgentServerState(): AgentServerState {
@@ -1190,6 +1223,7 @@ export function createAgentServerState(): AgentServerState {
     pendingPermissionRequests: new Map(),
     sessionMutex: Promise.resolve(),
     jobStreaming: 'full',
+    jobNotificationQueue: [],
   };
 }
 
@@ -1252,6 +1286,70 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
   };
 
+  /**
+   * Queue a job notification for delivery to the agent.
+   */
+  const queueJobNotification = (
+    job: JobState,
+    type: JobNotificationType,
+    options?: { reason?: string; deltaBytes?: number }
+  ) => {
+    const outputBytes = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
+    const durationMs = Date.now() - new Date(job.startedAt).getTime();
+    // For completed jobs show just the last line, for others show last 3
+    const lastLines = getLastLines(job.outputPath, type === 'completed' ? 1 : 3);
+
+    const content = formatJobNotification({
+      jobId: job.jobId,
+      type,
+      exitCode: job.exitCode,
+      durationMs,
+      outputBytes,
+      deltaBytes: options?.deltaBytes,
+      lastLines,
+      reason: options?.reason,
+    });
+
+    state.jobNotificationQueue.push({
+      jobId: job.jobId,
+      type,
+      content,
+      createdAt: Date.now(),
+    });
+  };
+
+  /**
+   * Set up a progress timer for a background job.
+   * If progressIntervalMs is specified on the job, or if using the default for background jobs,
+   * create a timer that queues progress notifications at the specified interval.
+   */
+  const setupProgressTimer = (job: JobState) => {
+    // Use provided interval or default for background jobs
+    const progressInterval = job.progressIntervalMs ?? DEFAULT_PROGRESS_INTERVAL_MS;
+
+    job.lastProgressAt = Date.now();
+    job.lastProgressBytes = 0;
+
+    job.progressTimer = setInterval(() => {
+      // Stop timer if job is no longer running
+      if (job.status !== 'running') {
+        if (job.progressTimer) {
+          clearInterval(job.progressTimer);
+          job.progressTimer = undefined;
+        }
+        return;
+      }
+
+      const currentBytes = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
+      const deltaBytes = currentBytes - (job.lastProgressBytes ?? 0);
+
+      queueJobNotification(job, 'progress', { deltaBytes });
+
+      job.lastProgressAt = Date.now();
+      job.lastProgressBytes = currentBytes;
+    }, progressInterval);
+  };
+
   const finalizeJob = async (job: JobState, options: { exitCode?: number } = {}) => {
     if (!state.activeSession) return;
     if (job.finished) {
@@ -1296,6 +1394,21 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       ...(typeof job.exitCode === 'number' ? { exitCode: job.exitCode } : {}),
       outcome: job.status,
     });
+
+    // Clear progress timer if running
+    if (job.progressTimer) {
+      clearInterval(job.progressTimer);
+      job.progressTimer = undefined;
+    }
+
+    // Queue completion notification for the agent
+    const notificationType: JobNotificationType =
+      job.status === 'completed'
+        ? 'completed'
+        : job.status === 'cancelled'
+          ? 'cancelled'
+          : 'failed';
+    queueJobNotification(job, notificationType);
 
     job.resolveCompletion();
   };
@@ -1495,6 +1608,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     description?: string;
     parentJobId?: string;
     turnContext?: { turnId: string; turnSeq: number };
+    progressIntervalMs?: number;
   }): Promise<{ jobId: string }> => {
     if (!state.activeSession)
       throw {
@@ -1536,6 +1650,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       finished: false,
       completion,
       resolveCompletion,
+      progressIntervalMs: options.progressIntervalMs,
     };
 
     state.jobs.set(jobId, job);
@@ -1572,6 +1687,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         : undefined
     );
 
+    // Set up progress timer for background job
+    setupProgressTimer(job);
+
     void runShellJobProcess(job);
     return { jobId };
   };
@@ -1582,6 +1700,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     parentJobId?: string;
     turnContext?: { turnId: string; turnSeq: number };
     resumeSessionId?: string;
+    progressIntervalMs?: number;
+    connectionId?: string;
+    modelId?: string;
   }): Promise<{ jobId: string }> => {
     if (!state.activeSession)
       throw {
@@ -1624,6 +1745,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       finished: false,
       completion,
       resolveCompletion,
+      progressIntervalMs: options.progressIntervalMs,
+      connectionId: options.connectionId,
+      modelId: options.modelId,
       // For resume: pre-set the subagentSessionId if resuming a previous session
       ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
     };
@@ -1661,6 +1785,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         ? { turnId: options.turnContext.turnId, turnSeq: options.turnContext.turnSeq }
         : undefined
     );
+
+    // Set up progress timer for background job
+    setupProgressTimer(job);
 
     void runSubagentJobProcess(job);
     return { jobId };
@@ -2195,6 +2322,14 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             sessionState = nextState;
             writeSessionState(state.activeSession!.dir, sessionState);
             state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+          });
+        }
+
+        // Configure subagent session with provider/model if specified
+        if (job.connectionId || job.modelId) {
+          await childPeer.request('ent/session/configure', {
+            ...(job.connectionId ? { connectionId: job.connectionId } : {}),
+            ...(job.modelId ? { modelId: job.modelId } : {}),
           });
         }
 
@@ -4508,7 +4643,18 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         });
       };
 
-      await writeAndAdvance({ type: 'prompt', data: { content: parsed.content } });
+      // Inject any pending job notifications before the user's prompt
+      let promptContent = parsed.content as unknown[];
+      if (state.jobNotificationQueue.length > 0) {
+        const notifications = state.jobNotificationQueue.splice(0);
+        const notificationBlocks = notifications.map((n) => ({
+          type: 'text' as const,
+          text: n.content,
+        }));
+        promptContent = [...notificationBlocks, ...promptContent];
+      }
+
+      await writeAndAdvance({ type: 'prompt', data: { content: promptContent } });
       await writeAndAdvance({ type: 'turn_start', data: {} });
       await emitSessionUpdate({ type: 'turn_start' }, { turnId, turnSeq: 0 });
 
@@ -4596,8 +4742,13 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       const jobMatch = effectivePromptText.match(/^\s*job:\s*(.+)\s*$/m);
       const jobCommand = jobMatch?.[1]?.trim();
 
-      const subagentMatch = effectivePromptText.match(/^\s*subagent:\s*(.+)\s*$/m);
-      const subagentText = subagentMatch?.[1]?.trim();
+      // Supports: "subagent: prompt" or "subagent config=connId,modelId: prompt"
+      const subagentMatch = effectivePromptText.match(
+        /^\s*subagent(?:\s+config=([^,\s]+)?,([^\s:]+)?)?\s*:\s*(.+)\s*$/m
+      );
+      const subagentConnectionId = subagentMatch?.[1]?.trim() || undefined;
+      const subagentModelId = subagentMatch?.[2]?.trim() || undefined;
+      const subagentText = subagentMatch?.[3]?.trim();
 
       const workDir = state.activeSession.meta.workDir;
       const filesRead = deriveFilesReadFromDurableEvents(state.activeSession.dir, workDir);
@@ -5001,6 +5152,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 const resumeJobId = toNonEmptyString(
                   (finalInput as Record<string, unknown>).resume
                 );
+                const connectionId =
+                  toNonEmptyString((finalInput as Record<string, unknown>).connectionId) ??
+                  undefined;
+                const modelId =
+                  toNonEmptyString((finalInput as Record<string, unknown>).modelId) ?? undefined;
 
                 // If resuming, look up the previous job's subagentSessionId
                 let resumeSessionId: string | undefined;
@@ -5030,6 +5186,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                     description: description || 'Delegate',
                     turnContext: { turnId, turnSeq: toolTurnSeq },
                     resumeSessionId,
+                    connectionId,
+                    modelId,
                   });
 
                   if (background) {
@@ -5466,6 +5624,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           finished: false,
           completion,
           resolveCompletion,
+          connectionId: subagentConnectionId,
+          modelId: subagentModelId,
         };
 
         state.jobs.set(jobId, job);
