@@ -37,6 +37,7 @@ export type PlanUpdate = Extract<SessionUpdate, { type: 'plan' }>;
 export type JobStartedUpdate = Extract<SessionUpdate, { type: 'job_started' }>;
 export type JobFinishedUpdate = Extract<SessionUpdate, { type: 'job_finished' }>;
 export type JobUpdateUpdate = Extract<SessionUpdate, { type: 'job_update' }>;
+export type SessionChangedUpdate = Extract<SessionUpdate, { type: 'session_changed' }>;
 
 /**
  * Web-specific wrapper for protocol events.

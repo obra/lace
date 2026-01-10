@@ -117,6 +117,18 @@ fn decode_session_update_inner(params: &Value, out: &mut Vec<AppEvent>, job_id: 
                 });
             }
         }
+        "session_changed" => {
+            if let Some(new_session_id) = obj.get("newSessionId").and_then(|v| v.as_str()) {
+                let reason = obj
+                    .get("reason")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                out.push(AppEvent::SessionChanged {
+                    new_session_id: new_session_id.to_string(),
+                    reason,
+                });
+            }
+        }
         _ => {}
     }
 }

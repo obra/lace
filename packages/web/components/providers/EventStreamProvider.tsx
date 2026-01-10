@@ -89,10 +89,8 @@ export function EventStreamProvider({
   const { updateAgentState } = useSessionContext();
 
   // Agent events hook (no longer manages approvals internally)
-  const { events, loadingHistory, addAgentEvent, updateEventVisibility } = useAgentEventsHook(
-    agentId,
-    false
-  );
+  const { events, loadingHistory, addAgentEvent, updateEventVisibility, clearEvents } =
+    useAgentEventsHook(agentId, false);
 
   // API hooks
   const sessionAPI = useSessionAPIHook();
@@ -183,6 +181,20 @@ export function EventStreamProvider({
     [updateEventVisibility]
   );
 
+  // Session changed handler (e.g., from /clear command)
+  const handleSessionChanged = useCallback(
+    (data: { newSessionId: string; reason?: string; agentSessionId: string }) => {
+      // Clear events when the agent's session is reset
+      clearEvents();
+      // Note: This is informational, not an error, but we use console.warn
+      // because console.log is not allowed by linting rules
+      console.warn(
+        `[EventStreamProvider] Session changed for agent ${data.agentSessionId}: ${data.reason || 'unknown reason'}, new session: ${data.newSessionId}`
+      );
+    },
+    [clearEvents]
+  );
+
   const handleAgentError = useCallback(
     (event: AppEvent) => {
       // Add AGENT_ERROR event directly to timeline - don't convert to AGENT_MESSAGE
@@ -232,6 +244,8 @@ export function EventStreamProvider({
       onCompactionStart: handleCompactionStart,
       onCompactionComplete: handleCompactionComplete,
       onEventUpdated: handleEventUpdated,
+      // Session change events (e.g., /clear)
+      onSessionChanged: handleSessionChanged,
     };
 
     return options;
@@ -247,6 +261,7 @@ export function EventStreamProvider({
     handleCompactionComplete,
     handleEventUpdated,
     handleAgentError,
+    handleSessionChanged,
   ]);
 
   // Event stream hook with stable options object

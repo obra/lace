@@ -40,6 +40,7 @@ const SlashCommandSchema = z
     name: NonEmptyStringSchema,
     description: z.string(),
     inputHint: z.string().optional(),
+    source: z.enum(['builtin', 'user']).optional(),
   })
   .strict();
 
@@ -1850,6 +1851,16 @@ const SessionUpdateErrorSchema = z
   .strict();
 export type SessionUpdateError = z.infer<typeof SessionUpdateErrorSchema>;
 
+// Session Changed - notifies that the session has been replaced (e.g., from /clear)
+const SessionUpdateSessionChangedSchema = z
+  .object({
+    type: z.literal('session_changed'),
+    newSessionId: SessionIdSchema,
+    reason: z.enum(['clear', 'fork']).optional(),
+  })
+  .strict();
+export type SessionUpdateSessionChanged = z.infer<typeof SessionUpdateSessionChangedSchema>;
+
 const SessionUpdateBaseParamsSchema = z
   .object({
     sessionId: SessionIdSchema,
@@ -1877,6 +1888,7 @@ const SessionUpdateInnerNonJobSchema = z.discriminatedUnion('type', [
   SessionUpdateCompactionCompleteSchema,
   SessionUpdateContextWindowSchema,
   SessionUpdateErrorSchema,
+  SessionUpdateSessionChangedSchema,
 ]);
 
 const SessionUpdateJobUpdateSchema = z
@@ -1910,6 +1922,7 @@ const _SessionUpdateInnerSchema = z.discriminatedUnion('type', [
   SessionUpdateCompactionCompleteSchema,
   SessionUpdateContextWindowSchema,
   SessionUpdateErrorSchema,
+  SessionUpdateSessionChangedSchema,
 ]);
 
 const SessionUpdateParamsSchema = z.discriminatedUnion('type', [
@@ -1932,6 +1945,7 @@ const SessionUpdateParamsSchema = z.discriminatedUnion('type', [
   SessionUpdateBaseParamsSchema.merge(SessionUpdateCompactionCompleteSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateContextWindowSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateErrorSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateSessionChangedSchema),
 ]);
 
 export const SessionUpdateNotificationSchema = z

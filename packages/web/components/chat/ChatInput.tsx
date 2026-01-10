@@ -1,9 +1,14 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { NativeSpeechInput, useSpeechRecognition } from '@lace/web/components/ui/NativeSpeechInput';
 import { FileAttachment, AttachedFile } from '@lace/web/components/ui/FileAttachment';
 import { Alert } from '@lace/web/components/ui/Alert';
+import {
+  SlashCommandPicker,
+  BUILTIN_SLASH_COMMANDS,
+  type SlashCommand,
+} from '@lace/web/components/chat/SlashCommandPicker';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperPlane, faStop, faPlus } from '@lace/web/lib/fontawesome';
 
@@ -50,6 +55,8 @@ export const ChatInput = React.forwardRef<{ focus: () => void }, ChatInputProps>
   const [isDragOver, setIsDragOver] = useState(false);
   const [forceStopSpeech, setForceStopSpeech] = useState(false);
   const [shouldSendAfterStop, setShouldSendAfterStop] = useState(false);
+  const [showSlashPicker, setShowSlashPicker] = useState(false);
+  const [slashPickerIndex, setSlashPickerIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Expose focus method via ref
@@ -142,7 +149,42 @@ export const ChatInput = React.forwardRef<{ focus: () => void }, ChatInputProps>
     return () => window.removeEventListener('focus', handleWindowFocus);
   }, [disabled, isListening]);
 
+  // Show/hide slash command picker based on input
+  useEffect(() => {
+    if (value.startsWith('/') && !isListening) {
+      setShowSlashPicker(true);
+      // Reset selection when picker opens or query changes
+      setSlashPickerIndex(0);
+    } else {
+      setShowSlashPicker(false);
+    }
+  }, [value, isListening]);
+
+  // Handle slash command selection
+  const handleSlashCommandSelect = useCallback(
+    (command: SlashCommand) => {
+      onChange(`/${command.name} `);
+      setShowSlashPicker(false);
+      textareaRef.current?.focus();
+    },
+    [onChange]
+  );
+
+  // Close slash picker
+  const handleSlashPickerClose = useCallback(() => {
+    setShowSlashPicker(false);
+    textareaRef.current?.focus();
+  }, []);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // If slash picker is open, let it handle navigation keys
+    if (showSlashPicker) {
+      if (['ArrowUp', 'ArrowDown', 'Enter', 'Tab', 'Escape'].includes(e.key)) {
+        // These keys are handled by SlashCommandPicker
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (isListening) {
@@ -302,12 +344,23 @@ export const ChatInput = React.forwardRef<{ focus: () => void }, ChatInputProps>
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (!isListening) {
+          if (!isListening && !showSlashPicker) {
             onSubmit();
           }
         }}
         className="relative"
       >
+        {/* Slash Command Picker */}
+        {showSlashPicker && (
+          <SlashCommandPicker
+            query={value.slice(1)} // Remove leading "/"
+            selectedIndex={slashPickerIndex}
+            onSelectionChange={setSlashPickerIndex}
+            onSelect={handleSlashCommandSelect}
+            onClose={handleSlashPickerClose}
+          />
+        )}
+
         {/* Clean Input Container - Matching Sample Design */}
         <div
           className={`

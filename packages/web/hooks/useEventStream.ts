@@ -82,6 +82,11 @@ interface EventHandlers {
 
   // Session events
   onSessionInfo?: (event: AppEvent) => void;
+  onSessionChanged?: (data: {
+    newSessionId: string;
+    reason?: string;
+    agentSessionId: string;
+  }) => void;
 
   // Agent events
   onAgentSpawned?: (event: AgentEvent) => void;
@@ -343,6 +348,19 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
               break;
             case 'session_info':
               currentOptions.onSessionInfo?.(event);
+              break;
+            case 'session_changed':
+              {
+                const sessionUpdate = event.update as {
+                  newSessionId?: string;
+                  reason?: string;
+                };
+                currentOptions.onSessionChanged?.({
+                  newSessionId: sessionUpdate.newSessionId || '',
+                  reason: sessionUpdate.reason,
+                  agentSessionId: event.agentSessionId,
+                });
+              }
               break;
           }
         } else if (isPermissionRequestEvent(event)) {

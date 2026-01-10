@@ -78,6 +78,7 @@ import { WorkspaceManagerFactory } from './workspace/workspace-manager';
 import { personaRegistry } from './config/persona-registry';
 import { loadPromptConfig } from './config/prompts';
 import { logger } from './utils/logger';
+import { getUserSlashCommands, findUserCommand } from './user-commands';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
 const JOB_LOG_DIR = 'jobs';
@@ -420,6 +421,267 @@ async function getContextLimitForModel(
     return typeof model.context_window === 'number' ? model.context_window : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Handle built-in slash commands (e.g., /compact, /mode, /help).
+ * Returns a turn result if the command was handled, or null if not recognized.
+ */
+async function handleSlashCommand(
+  state: AgentServerState,
+  command: string,
+  args: string,
+  turnId: string,
+  writeAndAdvance: (event: { type: string; data: Record<string, unknown> }) => Promise<void>,
+  emitUpdate: (turnSeq: number, update: SessionUpdate) => Promise<void>
+): Promise<{
+  turnId: string;
+  stopReason: 'end_turn';
+  content: { type: 'text'; text: string }[];
+  usage: { inputTokens: number; outputTokens: number };
+} | null> {
+  const finishTurn = async (text: string) => {
+    // Write the message event for durability
+    await writeAndAdvance({
+      type: 'message',
+      data: { content: text },
+    });
+    await writeAndAdvance({ type: 'turn_end', data: { stopReason: 'end_turn' } });
+    // Emit streaming updates
+    await emitUpdate(1, { type: 'text_delta', text });
+    await emitUpdate(2, {
+      type: 'turn_end',
+      stopReason: 'end_turn',
+      content: [{ type: 'text', text }],
+      usage: { inputTokens: 0, outputTokens: 0 },
+    });
+    return {
+      turnId,
+      stopReason: 'end_turn' as const,
+      content: [{ type: 'text' as const, text }],
+      usage: { inputTokens: 0, outputTokens: 0 },
+    };
+  };
+
+  switch (command.toLowerCase()) {
+    case 'compact': {
+      // Trigger context compaction
+      if (!state.activeSession) {
+        return finishTurn('Error: No active session.');
+      }
+
+      try {
+        // Use the summarize strategy for compaction
+        const sessionDir = state.activeSession.dir;
+        const sessionId = state.activeSession.meta.sessionId;
+        const providerMessages = buildProviderMessagesFromDurableEvents(sessionDir);
+
+        if (providerMessages.length < 2) {
+          return finishTurn('Context is already minimal. Nothing to compact.');
+        }
+
+        // Get effective config for provider creation
+        const effectiveConfig = state.activeSession.state.config
+          ? { ...state.config, ...state.activeSession.state.config }
+          : state.config;
+
+        const provider = await createProviderForTurn({
+          connectionId: effectiveConfig.connectionId,
+          modelId: effectiveConfig.modelId,
+        });
+
+        const result = await compactDroppedMessagesWithCore({
+          strategyId: 'summarize',
+          dropped: providerMessages.slice(0, -1),
+          provider,
+          modelId: effectiveConfig.modelId,
+          threadId: sessionId,
+        });
+
+        if (result.summary) {
+          // Write compaction event
+          await writeAndAdvance({
+            type: 'compaction',
+            data: {
+              summary: result.summary,
+              droppedCount: providerMessages.length - 1,
+            },
+          });
+          return finishTurn(`Context compacted. Summary:\n\n${result.summary}`);
+        } else {
+          return finishTurn('Compaction completed but no summary was generated.');
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return finishTurn(`Error during compaction: ${msg}`);
+      }
+    }
+
+    case 'clear': {
+      // Clear the conversation - create a new session with the same workdir
+      if (!state.activeSession) {
+        return finishTurn('Error: No active session.');
+      }
+
+      try {
+        const workDir = state.activeSession.meta.workDir;
+        const sessionConfig = state.activeSession.state.config;
+
+        // Create a new session
+        const newSessionId = `sess_${randomUUID()}`;
+        const created = new Date().toISOString();
+        const newSessionDir = getSessionDir(newSessionId);
+
+        writeSessionMeta(newSessionDir, { sessionId: newSessionId, workDir, created });
+        writeSessionState(newSessionDir, {
+          nextEventSeq: 0,
+          nextStreamSeq: 0,
+          config: sessionConfig,
+        });
+        ensureSessionFiles(newSessionDir);
+
+        // Switch to the new session
+        state.activeSession = loadSession(newSessionId);
+
+        // Notify the client that the session has changed
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await emitUpdate(0, {
+          type: 'session_changed',
+          newSessionId,
+          reason: 'clear',
+        } as any);
+
+        return finishTurn(`Conversation cleared. New session: ${newSessionId}`);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return finishTurn(`Error clearing conversation: ${msg}`);
+      }
+    }
+
+    case 'mode': {
+      // Change approval mode
+      if (!args) {
+        const currentMode =
+          state.activeSession?.state.config?.approvalMode ?? state.config.approvalMode ?? 'ask';
+        return finishTurn(
+          `Current approval mode: ${currentMode}\n\nAvailable modes:\n- ask: Ask permission for each tool use\n- approveReads: Auto-approve read/search operations\n- approveEdits: Auto-approve reads + file edits\n- approve: Auto-approve everything\n- deny: Deny all tool use (read-only)`
+        );
+      }
+
+      const validModes = new Set([
+        'ask',
+        'approveReads',
+        'approveEdits',
+        'approve',
+        'deny',
+        'dangerouslySkipPermissions',
+      ]);
+
+      if (!validModes.has(args)) {
+        return finishTurn(
+          `Invalid mode: ${args}\n\nValid modes: ask, approveReads, approveEdits, approve, deny`
+        );
+      }
+
+      if (!state.activeSession) {
+        return finishTurn('Error: No active session.');
+      }
+
+      try {
+        const currentState = readSessionState(state.activeSession.dir);
+        const nextConfig = {
+          ...currentState.config,
+          approvalMode: args as typeof state.config.approvalMode,
+        };
+        const nextState = { ...currentState, config: nextConfig };
+        writeSessionState(state.activeSession.dir, nextState);
+        state.activeSession = loadSession(state.activeSession.meta.sessionId);
+
+        return finishTurn(`Approval mode changed to: ${args}`);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return finishTurn(`Error changing mode: ${msg}`);
+      }
+    }
+
+    case 'help': {
+      // Show available commands
+      const helpText = args
+        ? getCommandHelp(args)
+        : `Available slash commands:
+
+/compact - Summarize and compress context to reduce token usage
+/clear - Clear conversation and start fresh (creates new session)
+/mode [mode] - Show or change approval mode
+/help [command] - Show this help or details for a specific command
+
+Type /help <command> for more details on a specific command.`;
+
+      return finishTurn(helpText);
+    }
+
+    case 'abort': {
+      // Abort doesn't make sense in session/prompt since we're starting a new turn
+      return finishTurn(
+        'The /abort command is used to cancel an in-progress operation. Since this is a new prompt, there is nothing to abort.'
+      );
+    }
+
+    default:
+      // Command not recognized - return null to fall through to normal processing
+      return null;
+  }
+}
+
+function getCommandHelp(command: string): string {
+  switch (command.toLowerCase()) {
+    case 'compact':
+      return `/compact - Summarize and compress context
+
+Reduces token usage by summarizing earlier conversation history. Useful when approaching context limits.
+
+Usage: /compact`;
+
+    case 'clear':
+      return `/clear - Clear conversation and start fresh
+
+Creates a new session with the same working directory and configuration, giving you a clean slate.
+
+Usage: /clear`;
+
+    case 'mode':
+      return `/mode - Show or change approval mode
+
+Controls how the agent handles tool permissions.
+
+Usage:
+  /mode         - Show current mode
+  /mode <mode>  - Change to specified mode
+
+Available modes:
+  ask           - Ask permission for each tool use (default)
+  approveReads  - Auto-approve read/search operations
+  approveEdits  - Auto-approve reads + file edits
+  approve       - Auto-approve everything (yolo mode)
+  deny          - Deny all tool use (read-only mode)`;
+
+    case 'help':
+      return `/help - Show available commands
+
+Usage:
+  /help           - List all commands
+  /help <command> - Show details for a specific command`;
+
+    case 'abort':
+      return `/abort - Abort current operation
+
+Cancels any running operation. Only useful when an operation is in progress.
+
+Usage: /abort`;
+
+    default:
+      return `Unknown command: ${command}\n\nType /help to see available commands.`;
   }
 }
 
@@ -1898,6 +2160,19 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           catalogRefresh: true,
           modelGating: true,
         },
+        slashCommands: [
+          { name: 'compact', description: 'Summarize and compress context', source: 'builtin' },
+          { name: 'clear', description: 'Clear conversation, start fresh', source: 'builtin' },
+          {
+            name: 'mode',
+            description: 'Switch approval mode (ask|approveReads|approveEdits|approve|deny)',
+            source: 'builtin',
+          },
+          { name: 'abort', description: 'Abort current operation', source: 'builtin' },
+          { name: 'help', description: 'Show available commands', source: 'builtin' },
+          // Include user commands from ~/.lace/commands/ (global only at init time)
+          ...getUserSlashCommands(),
+        ],
       },
     };
   });
@@ -3950,13 +4225,60 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         .map((b) => b.text)
         .join('\n');
 
-      const runMatch = promptText.match(/^\s*run:\s*(.+)\s*$/m);
+      // Handle slash commands (e.g., /compact, /mode approve, /help)
+      let effectivePromptText = promptText;
+      const slashMatch = promptText.match(/^\/(\w+)(?:\s+(.*))?$/);
+      if (slashMatch) {
+        const slashCmd = slashMatch[1];
+        const slashArgs = slashMatch[2]?.trim() ?? '';
+        const workDir = state.activeSession.meta.workDir;
+
+        // First check built-in commands
+        const slashResult = await handleSlashCommand(
+          state,
+          slashCmd,
+          slashArgs,
+          turnId,
+          writeAndAdvance,
+          emitUpdate
+        );
+        if (slashResult) {
+          // Slash command was handled, return result
+          state.activeTurn = null;
+          return slashResult;
+        }
+
+        // Check for user-defined command
+        const userCmd = findUserCommand(slashCmd, workDir);
+        if (userCmd) {
+          // Expand user command: body + args
+          effectivePromptText = slashArgs ? `${userCmd.body}\n\n${slashArgs}` : userCmd.body;
+
+          // If the user command specifies a mode, apply it for this turn
+          if (userCmd.mode) {
+            const currentState = readSessionState(state.activeSession.dir);
+            const nextConfig = {
+              ...currentState.config,
+              approvalMode: userCmd.mode,
+            };
+            const nextState = { ...currentState, config: nextConfig };
+            writeSessionState(state.activeSession.dir, nextState);
+            state.activeSession = loadSession(state.activeSession.meta.sessionId);
+          }
+
+          // Update the parsed content for the rest of the flow
+          (parsed.content as any[]) = [{ type: 'text', text: effectivePromptText }];
+        }
+        // If neither built-in nor user command, fall through to normal processing with original prompt
+      }
+
+      const runMatch = effectivePromptText.match(/^\s*run:\s*(.+)\s*$/m);
       const command = runMatch?.[1]?.trim();
 
-      const jobMatch = promptText.match(/^\s*job:\s*(.+)\s*$/m);
+      const jobMatch = effectivePromptText.match(/^\s*job:\s*(.+)\s*$/m);
       const jobCommand = jobMatch?.[1]?.trim();
 
-      const subagentMatch = promptText.match(/^\s*subagent:\s*(.+)\s*$/m);
+      const subagentMatch = effectivePromptText.match(/^\s*subagent:\s*(.+)\s*$/m);
       const subagentText = subagentMatch?.[1]?.trim();
 
       const workDir = state.activeSession.meta.workDir;

@@ -41,6 +41,10 @@ pub enum AppEvent {
         /// Token usage from session/prompt response (inputTokens + outputTokens)
         usage_tokens: Option<u64>,
     },
+    SessionChanged {
+        new_session_id: String,
+        reason: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,6 +110,18 @@ pub fn reduce(state: &mut AppState, event: AppEvent) -> Vec<Outbound> {
             if let Some(tokens) = usage_tokens {
                 state.token_count = Some(state.token_count.unwrap_or(0) + tokens);
             }
+            Vec::new()
+        }
+        AppEvent::SessionChanged {
+            new_session_id,
+            reason: _,
+        } => {
+            // Update the session ID when the agent notifies us of a session change
+            state.session_id = Some(new_session_id);
+            // Clear the conversation messages for the new session
+            state.messages.clear();
+            // Reset token count for the new session
+            state.token_count = None;
             Vec::new()
         }
     }

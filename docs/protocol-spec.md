@@ -1575,6 +1575,13 @@ Stream updates during turn processing. All updates include correlation IDs for o
   _meta?: Record<string, unknown>
 }
 
+// Session changed (session replaced)
+{
+  type: "session_changed",
+  newSessionId: string,     // The new session ID
+  reason?: "clear" | "fork" // Why the session changed
+}
+
 // Context window utilization
 {
   type: "context_window",

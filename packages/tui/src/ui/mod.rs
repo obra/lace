@@ -55,8 +55,9 @@ pub fn run_tui(args: Args) -> io::Result<()> {
     let mut state = AppState::new();
     state.session_id = Some(bootstrap_result.session_id);
     state.slash_commands = bootstrap_result.slash_commands;
+    state.messages = bootstrap_result.history;
     state.workdir = workdir.to_string_lossy().to_string();
-    state.next_client_seq = 3;
+    state.next_client_seq = 4; // Updated since we now send c_history request
     state.push_activity_line(format!("timeout-ms={}", args.timeout_ms));
 
     if let Some(dir) = resolve_tui_dir_for_logs() {
@@ -2216,11 +2217,24 @@ fn render_slash_picker(state: &AppState) -> Paragraph<'static> {
             Style::default().fg(colors.fg_muted)
         };
 
-        lines.push(Line::from(vec![
+        // Build spans for the command line
+        let mut spans = vec![
             Span::styled(marker, style),
             Span::styled(format!("/{}", cmd.name), name_style),
             Span::styled(format!(" - {}", cmd.description), desc_style),
-        ]));
+        ];
+
+        // Add source badge for user commands
+        if cmd.source.as_deref() == Some("user") {
+            let badge_style = if selected {
+                Style::default().fg(colors.accent).bg(colors.bg_surface)
+            } else {
+                Style::default().fg(colors.accent)
+            };
+            spans.push(Span::styled(" (user)", badge_style));
+        }
+
+        lines.push(Line::from(spans));
     }
 
     if filtered.is_empty() {

@@ -14,6 +14,7 @@ interface UseAgentEventsReturn {
   // Event handlers for the parent to wire to useEventStream
   addAgentEvent: (event: AppEvent) => void;
   updateEventVisibility: (eventId: string, visibleToModel: boolean) => void;
+  clearEvents: () => void;
 }
 
 export function useAgentEvents(
@@ -97,6 +98,12 @@ export function useAgentEvents(
     setEvents((prev) => prev.map((e) => (e.id === eventId ? { ...e, visibleToModel } : e)));
   }, []);
 
+  // Clear all events (used when session is reset via /clear)
+  const clearEvents = useCallback(() => {
+    seenEvents.current.clear();
+    setEvents([]);
+  }, []);
+
   // Load historical events when agent changes
   useEffect(() => {
     if (!agentId) {
@@ -173,5 +180,6 @@ export function useAgentEvents(
     // Export event handlers for parent to use
     addAgentEvent,
     updateEventVisibility,
+    clearEvents,
   };
 }
