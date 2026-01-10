@@ -60,7 +60,7 @@ import {
   type ProviderInstance,
 } from './providers/catalog/types';
 import { ProviderRegistry } from './providers/registry';
-import { AIProvider, type ProviderMessage } from './providers/base-provider';
+import { AIProvider, type ProviderMessage, type ContentBlock } from './providers/base-provider';
 import { ToolExecutor } from './tools/executor';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 // CoreTool alias for backwards compatibility with provider interface
@@ -235,6 +235,56 @@ function extractTextFromContentBlocks(content: unknown[]): string {
     )
     .map((b) => String((b as any).text))
     .join('\n');
+}
+
+/**
+ * Extracts content blocks from a prompt, preserving both text and image blocks.
+ * Returns string if only text blocks, array if any images present.
+ */
+function extractContentBlocks(content: unknown): string | ContentBlock[] {
+  if (!Array.isArray(content)) {
+    if (typeof content === 'string') return content;
+    return '';
+  }
+
+  const blocks: ContentBlock[] = [];
+  let hasImages = false;
+
+  for (const block of content) {
+    if (!block || typeof block !== 'object') continue;
+
+    const b = block as Record<string, unknown>;
+    if (b.type === 'text' && typeof b.text === 'string') {
+      blocks.push({ type: 'text', text: b.text });
+    } else if (b.type === 'image' && b.source && typeof b.source === 'object') {
+      const source = b.source as Record<string, unknown>;
+      if (
+        source.type === 'base64' &&
+        typeof source.media_type === 'string' &&
+        typeof source.data === 'string'
+      ) {
+        blocks.push({
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: source.media_type,
+            data: source.data,
+          },
+        });
+        hasImages = true;
+      }
+    }
+  }
+
+  // If no images, return simple string for backward compatibility
+  if (!hasImages) {
+    return blocks
+      .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+      .map((b) => b.text)
+      .join('\n');
+  }
+
+  return blocks;
 }
 
 function toolKindFromName(name: string): ToolInfo['kind'] {
@@ -712,9 +762,16 @@ async function computeContextBreakdownForActiveSession(state: AgentServerState):
   let toolResultTokens = 0;
 
   for (const message of providerMessages) {
-    if (message.role === 'system') systemPromptTokens += estimateTokens(message.content ?? '');
-    if (message.role === 'user') userTokens += estimateTokens(message.content ?? '');
-    if (message.role === 'assistant') assistantTokens += estimateTokens(message.content ?? '');
+    const contentText =
+      typeof message.content === 'string'
+        ? message.content
+        : message.content
+            .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
+            .map((b) => b.text)
+            .join('\n');
+    if (message.role === 'system') systemPromptTokens += estimateTokens(contentText);
+    if (message.role === 'user') userTokens += estimateTokens(contentText);
+    if (message.role === 'assistant') assistantTokens += estimateTokens(contentText);
 
     if ((message as any).toolCalls) {
       toolCallTokens += estimateTokens(JSON.stringify((message as any).toolCalls));
@@ -960,8 +1017,10 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Prov
       const data = typeof parsed.data === 'object' && parsed.data ? parsed.data : {};
 
       if (type === 'prompt') {
-        const content = extractTextFromContentBlocks((data as any).content);
-        if (content.trim()) messages.push({ role: 'user', content });
+        const content = extractContentBlocks((data as Record<string, unknown>).content);
+        // Check if content is non-empty (string or array with items)
+        const hasContent = typeof content === 'string' ? content.trim() : content.length > 0;
+        if (hasContent) messages.push({ role: 'user', content });
         continue;
       }
 
@@ -1057,7 +1116,16 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Prov
 function estimateProviderTokens(messages: ProviderMessage[]): number {
   let total = 0;
   for (const message of messages) {
-    if (typeof message.content === 'string') total += estimateTokens(message.content);
+    if (typeof message.content === 'string') {
+      total += estimateTokens(message.content);
+    } else {
+      // Count tokens for text blocks only (images don't count as text tokens)
+      const textContent = message.content
+        .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
+        .map((b) => b.text)
+        .join('\n');
+      total += estimateTokens(textContent);
+    }
     if ((message as any).toolCalls)
       total += estimateTokens(JSON.stringify((message as any).toolCalls));
     if ((message as any).toolResults)

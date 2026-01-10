@@ -9,7 +9,17 @@ import {
   ProviderConfig,
   ProviderInfo,
   ModelInfo,
+  ContentBlock,
 } from './base-provider';
+
+/** Helper to extract text from string or content blocks */
+function getTextContent(content: string | ContentBlock[]): string {
+  if (typeof content === 'string') return content;
+  return content
+    .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n');
+}
 import { ToolCall } from '@lace/agent/tools/types';
 import { Tool } from '@lace/agent/tools/tool';
 import { logger } from '@lace/agent/utils/logger';
@@ -303,11 +313,12 @@ export class LMStudioProvider extends AIProvider {
     }
 
     for (const msg of messages) {
+      const textContent = getTextContent(msg.content);
       // For assistant messages with tool calls, add the assistant message with tool_calls array
       if (msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0) {
         lmMessages.push({
           role: 'assistant',
-          content: msg.content || '',
+          content: textContent,
           tool_calls: msg.toolCalls.map((toolCall) => ({
             id: toolCall.id,
             type: 'function',
@@ -320,10 +331,10 @@ export class LMStudioProvider extends AIProvider {
       } else if (msg.role === 'user' && msg.toolResults && msg.toolResults.length > 0) {
         // For user messages with tool results, convert to tool messages
         // First add the user message if it has content
-        if (msg.content) {
+        if (textContent.trim()) {
           lmMessages.push({
             role: 'user',
-            content: msg.content,
+            content: textContent,
           });
         }
 
@@ -339,7 +350,7 @@ export class LMStudioProvider extends AIProvider {
         // Regular messages
         lmMessages.push({
           role: msg.role,
-          content: msg.content || '',
+          content: textContent,
         });
       }
     }

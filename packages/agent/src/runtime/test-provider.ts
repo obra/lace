@@ -2,9 +2,19 @@ import {
   AIProvider,
   type ProviderMessage,
   type ProviderResponse,
+  type ContentBlock,
 } from '../providers/base-provider';
 import type { Tool } from '@lace/agent/tools/tool';
 import type { ToolCall, ToolResult } from '@lace/agent/tools/types';
+
+/** Helper to extract text from string or content blocks */
+function getTextContent(content: string | ContentBlock[]): string {
+  if (typeof content === 'string') return content;
+  return content
+    .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n');
+}
 
 type TestProviderState = {
   phase: 'needs_tool' | 'awaiting_retry' | 'final';
@@ -201,9 +211,8 @@ export class TestAgentProvider extends AIProvider {
           }
         }
 
-        const lastUserText = [...messages]
-          .reverse()
-          .find((m) => m.role === 'user' && typeof m.content === 'string')?.content;
+        const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
+        const lastUserText = lastUserMessage ? getTextContent(lastUserMessage.content) : undefined;
 
         // Generate mock token usage based on message length
         // Use fixed values for predictable cost calculations in tests

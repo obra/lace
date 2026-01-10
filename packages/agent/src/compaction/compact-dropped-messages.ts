@@ -2,11 +2,21 @@ import {
   AIProvider,
   type ConversationState,
   type ProviderMessage,
+  type ContentBlock,
 } from '../providers/base-provider';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { LaceEvent } from '@lace/agent/threads/types';
 import type { CompactionStrategy } from './types';
 import { registerDefaultStrategies } from './registry';
+
+/** Helper to extract text from string or content blocks */
+function getTextContent(content: string | ContentBlock[]): string {
+  if (typeof content === 'string') return content;
+  return content
+    .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n');
+}
 
 class ModelPinnedProvider extends AIProvider {
   constructor(
@@ -77,16 +87,17 @@ function laceEventsFromProviderMessages(
   const events: LaceEvent[] = [];
 
   for (const message of messages) {
+    const textContent = getTextContent(message.content);
     if (message.role === 'system') {
-      if (message.content.trim()) {
-        events.push({ type: 'SYSTEM_PROMPT', data: message.content, context: { threadId } });
+      if (textContent.trim()) {
+        events.push({ type: 'SYSTEM_PROMPT', data: textContent, context: { threadId } });
       }
       continue;
     }
 
     if (message.role === 'user') {
-      if (message.content.trim()) {
-        events.push({ type: 'USER_MESSAGE', data: message.content, context: { threadId } });
+      if (textContent.trim()) {
+        events.push({ type: 'USER_MESSAGE', data: textContent, context: { threadId } });
       }
 
       const toolResults = Array.isArray(message.toolResults) ? message.toolResults : [];
@@ -98,10 +109,10 @@ function laceEventsFromProviderMessages(
     }
 
     if (message.role === 'assistant') {
-      if (message.content.trim()) {
+      if (textContent.trim()) {
         events.push({
           type: 'AGENT_MESSAGE',
-          data: { content: message.content },
+          data: { content: textContent },
           context: { threadId },
         });
       }

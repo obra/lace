@@ -30,7 +30,17 @@ import {
   ProviderConfig,
   ProviderInfo,
   ConversationState,
+  ContentBlock,
 } from './base-provider';
+
+/** Helper to extract text from string or content blocks */
+function getTextContent(content: string | ContentBlock[]): string {
+  if (typeof content === 'string') return content;
+  return content
+    .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n');
+}
 import { ToolCall } from '@lace/agent/tools/types';
 import { Tool } from '@lace/agent/tools/tool';
 import { logger } from '@lace/agent/utils/logger';
@@ -228,7 +238,7 @@ export class OpenAIProvider extends AIProvider {
       // Convert messages to text for token counting, excluding system messages to avoid double-counting
       for (const message of messages) {
         if (message.role !== 'system') {
-          messageText += `${message.role}: ${message.content}\n`;
+          messageText += `${message.role}: ${getTextContent(message.content)}\n`;
         }
       }
 
@@ -571,11 +581,12 @@ export class OpenAIProvider extends AIProvider {
 
     for (const msg of messages) {
       if (msg.role === 'user' || msg.role === 'assistant') {
+        const textContent = getTextContent(msg.content);
         // Add text message if it has content
-        if (msg.content && msg.content.trim()) {
+        if (textContent.trim()) {
           inputItems.push({
             role: msg.role,
-            content: msg.content,
+            content: textContent,
           });
         }
 

@@ -14,11 +14,13 @@ use crate::args::Args;
 use crate::protocol::bootstrap::bootstrap_session;
 use crate::protocol::transport::AgentTransport;
 use crate::protocol::{ent, jsonrpc};
-use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use crossterm::event::{
+    self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEventKind, KeyModifiers,
+};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use crossterm::{execute, terminal};
+use crossterm::execute;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Color, Modifier, Style};
@@ -213,6 +215,25 @@ fn run_loop(
                         }
                         state.last_ctrl_c_ms = Some(now_ms);
                         state.push_activity_line("Press Ctrl+C again to quit".to_string());
+                        continue;
+                    }
+
+                    // Debug: log key events when in input focus
+                    if state.focus == Focus::Input {
+                        state.push_debug_line(format!(
+                            "key: {:?} modifiers: {:?}",
+                            key.code, key.modifiers
+                        ));
+                    }
+
+                    // Ctrl+V for image paste when in Input focus
+                    if key.modifiers.contains(KeyModifiers::CONTROL)
+                        && key.code == KeyCode::Char('v')
+                        && state.focus == Focus::Input
+                    {
+                        state.push_debug_line("Ctrl+V detected, trying image paste".to_string());
+                        let out = apply_ui_action(state, UiAction::PasteImage);
+                        send_outbound(transport, state, out, timeout_ms)?;
                         continue;
                     }
 
@@ -629,17 +650,43 @@ fn run_loop(
                         }
                         KeyCode::PageUp => Some(UiAction::ScrollUp),
                         KeyCode::PageDown => Some(UiAction::ScrollDown),
+                        KeyCode::Left if state.focus == Focus::Input => Some(UiAction::CursorLeft),
+                        KeyCode::Right if state.focus == Focus::Input => Some(UiAction::CursorRight),
+                        KeyCode::Home if state.focus == Focus::Input => Some(UiAction::CursorHome),
+                        KeyCode::End if state.focus == Focus::Input => Some(UiAction::CursorEnd),
+                        KeyCode::Delete if state.focus == Focus::Input => Some(UiAction::Delete),
                         KeyCode::Up => match state.focus {
-                            Focus::Input => Some(UiAction::HistoryPrev),
+                            Focus::Input => {
+                                // In multi-line: up on first line goes to history, else moves cursor
+                                let on_first_line = !state.input_buffer[..state.input_cursor].contains('\n');
+                                if on_first_line {
+                                    Some(UiAction::HistoryPrev)
+                                } else {
+                                    Some(UiAction::CursorUp)
+                                }
+                            }
                             Focus::Activity => Some(UiAction::ActivityPrev),
                             _ => Some(UiAction::ScrollUp),
                         },
                         KeyCode::Down => match state.focus {
-                            Focus::Input => Some(UiAction::HistoryNext),
+                            Focus::Input => {
+                                // In multi-line: down on last line goes to history, else moves cursor
+                                let on_last_line = !state.input_buffer[state.input_cursor..].contains('\n');
+                                if on_last_line {
+                                    Some(UiAction::HistoryNext)
+                                } else {
+                                    Some(UiAction::CursorDown)
+                                }
+                            }
                             Focus::Activity => Some(UiAction::ActivityNext),
                             _ => Some(UiAction::ScrollDown),
                         },
                         KeyCode::Enter => match state.focus {
+                            // Shift+Enter always inserts a newline
+                            Focus::Input if key.modifiers.contains(KeyModifiers::SHIFT) => {
+                                Some(UiAction::InsertNewline)
+                            }
+                            // Ctrl+Enter sends in multiline mode
                             Focus::Input
                                 if state.prefs.input_multiline
                                     && key.modifiers.contains(KeyModifiers::CONTROL) =>
@@ -654,6 +701,37 @@ fn run_loop(
                             Focus::Input => Some(UiAction::Backspace),
                             _ => None,
                         },
+                        // Emacs bindings for input field
+                        KeyCode::Char('a')
+                            if state.focus == Focus::Input
+                                && key.modifiers.contains(KeyModifiers::CONTROL) =>
+                        {
+                            Some(UiAction::CursorHome)
+                        }
+                        KeyCode::Char('e')
+                            if state.focus == Focus::Input
+                                && key.modifiers.contains(KeyModifiers::CONTROL) =>
+                        {
+                            Some(UiAction::CursorEnd)
+                        }
+                        KeyCode::Char('k')
+                            if state.focus == Focus::Input
+                                && key.modifiers.contains(KeyModifiers::CONTROL) =>
+                        {
+                            Some(UiAction::KillToEnd)
+                        }
+                        KeyCode::Char('u')
+                            if state.focus == Focus::Input
+                                && key.modifiers.contains(KeyModifiers::CONTROL) =>
+                        {
+                            Some(UiAction::KillToStart)
+                        }
+                        KeyCode::Char('w')
+                            if state.focus == Focus::Input
+                                && key.modifiers.contains(KeyModifiers::CONTROL) =>
+                        {
+                            Some(UiAction::KillWordBack)
+                        }
                         KeyCode::Char('g')
                             if state.focus == Focus::Activity
                                 && !key.modifiers.contains(KeyModifiers::CONTROL) =>
@@ -700,6 +778,13 @@ fn run_loop(
 
                     if state.should_exit {
                         break;
+                    }
+                }
+                Event::Paste(text) => {
+                    // Handle pasted text - insert directly without triggering submit
+                    if state.focus == Focus::Input {
+                        let out = apply_ui_action(state, UiAction::PasteText(text));
+                        send_outbound(transport, state, out, timeout_ms)?;
                     }
                 }
                 Event::Resize(_, _) => {}
@@ -1143,14 +1228,48 @@ fn handle_session_update(state: &mut AppState, params: &Value) {
     }
 }
 
+/// Count how many visual lines the input buffer will take when wrapped.
+/// Accounts for the prompt prefix ("> " or "  ") on each line.
+fn count_input_wrapped_lines(input: &str, content_width: usize) -> usize {
+    if content_width == 0 {
+        return 1;
+    }
+
+    let lines: Vec<&str> = input.lines().collect();
+    let lines = if lines.is_empty() { vec![""] } else { lines };
+
+    let has_trailing_newline = !input.is_empty() && input.ends_with('\n');
+
+    let mut total = 0;
+    for line in &lines {
+        // Each logical line takes at least 1 visual line
+        // Additional lines are needed if the content wraps
+        let line_len = line.chars().count();
+        if line_len == 0 {
+            total += 1;
+        } else {
+            // Calculate wrapped lines: ceiling division
+            total += (line_len + content_width - 1) / content_width;
+        }
+    }
+
+    // Add line for trailing newline (continuation line with cursor)
+    if has_trailing_newline {
+        total += 1;
+    }
+
+    total.max(1)
+}
+
 fn draw(f: &mut ratatui::Frame, state: &AppState) {
-    // Dynamic input height based on content, capped at 1/3 of screen
-    let input_line_count = state.input_buffer.lines().count().max(1);
-    let input_line_count = if state.input_buffer.ends_with('\n') {
-        input_line_count + 1
-    } else {
-        input_line_count
-    };
+    // Dynamic input height based on content, accounting for wrapped lines
+    // Input width is roughly the terminal width minus prompt prefix ("> ")
+    let input_content_width = f.area().width.saturating_sub(3) as usize; // "> " prefix + cursor
+    let mut input_line_count = count_input_wrapped_lines(&state.input_buffer, input_content_width);
+    // Add line for image attachment indicator
+    if !state.pending_images.is_empty() {
+        input_line_count += 1;
+    }
     let max_input_height = f.area().height / 3;
     let input_height = (input_line_count as u16).min(max_input_height).max(1);
 
@@ -1167,8 +1286,18 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     let input_area = root[1];
     let status_area = root[2];
 
-    let status = render_status(state);
-    f.render_widget(status, status_area);
+    // Split status area into left (info) and right (progress indicator)
+    let right_width = status_right_width(state);
+    let status_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Min(1),
+            Constraint::Length(right_width),
+        ])
+        .split(status_area);
+
+    f.render_widget(render_status_left(state), status_layout[0]);
+    f.render_widget(render_status_right(state), status_layout[1]);
 
     // Main area: show overlays if open, otherwise conversation
     if state.debug_overlay_open {
@@ -1285,7 +1414,8 @@ fn format_token_count(count: u64) -> String {
     }
 }
 
-fn render_status(state: &AppState) -> Paragraph<'static> {
+/// Renders the left part of status bar (model, provider, tokens, workdir)
+fn render_status_left(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
     let colors = &styles.colors;
 
@@ -1317,21 +1447,88 @@ fn render_status(state: &AppState) -> Paragraph<'static> {
 
     let sep = Span::styled(" · ", Style::default().fg(colors.fg_muted));
 
-    let text = Line::from(vec![
-        Span::styled(
-            format!(" {}", model),
-            Style::default().fg(colors.fg_primary),
-        ),
+    let spans = vec![
+        Span::raw(" "),
+        Span::styled(model, Style::default().fg(colors.fg_primary)),
         sep.clone(),
         Span::styled(provider, Style::default().fg(colors.fg_muted)),
         sep.clone(),
-        Span::styled(format!("{tokens} tokens"), Style::default().fg(colors.fg_muted)),
+        Span::styled(
+            format!("{tokens} tokens"),
+            Style::default().fg(colors.fg_muted),
+        ),
         sep,
         Span::styled(short_workdir, Style::default().fg(colors.fg_muted)),
-        Span::raw(" "),
-    ]);
+    ];
 
+    let text = Line::from(spans);
     Paragraph::new(text).style(Style::default().bg(colors.bg_surface))
+}
+
+/// Renders the right part of status bar (progress indicator)
+fn render_status_right(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
+
+    let mut spans: Vec<Span> = Vec::new();
+
+    // Check for pending tool calls first (more specific than "thinking")
+    let pending_tools = state.pending_tool_calls();
+    if !pending_tools.is_empty() {
+        // Show the first pending tool with spinner
+        if let Some(tool) = pending_tools.first() {
+            let tool_name = tool
+                .tool_name
+                .clone()
+                .unwrap_or_else(|| "tool".to_string());
+            spans.push(Span::styled(
+                format!("{} ", spinning_char()),
+                Style::default().fg(colors.spinner),
+            ));
+            spans.push(Span::styled(
+                tool_name,
+                Style::default().fg(colors.accent),
+            ));
+            if pending_tools.len() > 1 {
+                spans.push(Span::styled(
+                    format!(" +{}", pending_tools.len() - 1),
+                    Style::default().fg(colors.fg_muted),
+                ));
+            }
+            spans.push(Span::raw(" "));
+        }
+    } else if state.is_thinking() {
+        // Show thinking indicator
+        spans.push(Span::styled(
+            format!("{} Thinking... ", spinning_char()),
+            Style::default().fg(colors.spinner),
+        ));
+    }
+
+    let text = Line::from(spans);
+    Paragraph::new(text).style(Style::default().bg(colors.bg_surface))
+}
+
+/// Calculate the width needed for the right status bar section
+fn status_right_width(state: &AppState) -> u16 {
+    let pending_tools = state.pending_tool_calls();
+    if !pending_tools.is_empty() {
+        if let Some(tool) = pending_tools.first() {
+            let tool_name = tool
+                .tool_name
+                .clone()
+                .unwrap_or_else(|| "tool".to_string());
+            let mut width = 2 + tool_name.len(); // spinner + space + name
+            if pending_tools.len() > 1 {
+                width += format!(" +{}", pending_tools.len() - 1).len();
+            }
+            width += 1; // trailing space
+            return width as u16;
+        }
+    } else if state.is_thinking() {
+        return 15; // "⠋ Thinking... " is about 14-15 chars
+    }
+    0
 }
 
 fn render_sessions_modal(state: &AppState) -> Paragraph<'static> {
@@ -2552,14 +2749,7 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
         }
     }
 
-    // Show thinking indicator if awaiting response
-    if state.is_thinking() {
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            format!("{} Thinking...", spinning_char()),
-            Style::default().fg(colors.spinner),
-        )));
-    }
+    // Thinking indicator is now shown in the status bar
 
     // Show permission request inline
     if state.active_permission.is_some() {
@@ -2739,6 +2929,20 @@ fn render_input(state: &AppState) -> Paragraph<'static> {
     let continuation = "  ";
     let mut lines: Vec<Line> = Vec::new();
 
+    // Show pending images indicator
+    if !state.pending_images.is_empty() {
+        let count = state.pending_images.len();
+        let label = if count == 1 {
+            "[1 image attached]".to_string()
+        } else {
+            format!("[{} images attached]", count)
+        };
+        lines.push(Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(label, Style::default().fg(colors.accent).add_modifier(Modifier::DIM)),
+        ]));
+    }
+
     let input_lines: Vec<&str> = state.input_buffer.lines().collect();
     let input_lines = if input_lines.is_empty() {
         vec![""]
@@ -2774,6 +2978,7 @@ fn render_input(state: &AppState) -> Paragraph<'static> {
 
     Paragraph::new(Text::from(lines))
         .style(Style::default().bg(colors.bg_base))
+        .wrap(Wrap { trim: false })
         .scroll((state.input_scroll, 0))
 }
 
@@ -2990,14 +3195,16 @@ fn render_help_modal() -> Paragraph<'static> {
         Line::from("Ctrl+C   Cancel request / double to quit"),
         Line::from("Ctrl+K   Command palette"),
         Line::from("Ctrl+F   Search"),
+        Line::from("Ctrl+V   Paste image from clipboard (macOS)"),
         Line::from("Ctrl+A   Toggle activity overlay"),
         Line::from("Ctrl+D   Toggle debug overlay"),
         Line::from("Ctrl+E   Toggle multiline input"),
         Line::from("Tab      Cycle focus"),
         Line::from("Up/Down  Scroll or history (depends on focus)"),
         Line::from("PgUp/Dn  Scroll focused pane (incl. multiline input)"),
-        Line::from("Enter    Toggle expand (Activity)"),
-        Line::from("Ctrl+Enter  Send (multiline input)"),
+        Line::from("Enter    Send message / Toggle expand (Activity)"),
+        Line::from("Shift+Enter  Insert newline in input"),
+        Line::from("Ctrl+Enter   Send (multiline input mode)"),
         Line::from("g        Jump to turn (Activity)"),
         Line::from("y        Copy selected activity (Activity)"),
         Line::from("e        Jump last error (non-input panes)"),
@@ -3052,8 +3259,7 @@ impl TerminalGuard {
     fn init() -> io::Result<Self> {
         enable_raw_mode()?;
         let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen)?;
-        terminal::enable_raw_mode()?;
+        execute!(stdout, EnterAlternateScreen, EnableBracketedPaste)?;
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;
         Ok(Self {
@@ -3067,7 +3273,7 @@ impl TerminalGuard {
             return Ok(());
         }
         disable_raw_mode()?;
-        execute!(io::stdout(), LeaveAlternateScreen)?;
+        execute!(io::stdout(), DisableBracketedPaste, LeaveAlternateScreen)?;
         self.restored = true;
         Ok(())
     }
@@ -3157,10 +3363,7 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
         total += pending_tools.len(); // one line per tool call
     }
 
-    // Add lines for thinking indicator if showing
-    if state.is_thinking() {
-        total += 2; // blank line + thinking indicator line
-    }
+    // Thinking indicator is now in the status bar, not the chat
 
     // Add lines for inline permission UI if showing
     if let Some(req) = state.active_permission.as_ref() {
@@ -3226,13 +3429,13 @@ fn compute_chat_rect(
     state: &AppState,
     area: ratatui::layout::Rect,
 ) -> Option<ratatui::layout::Rect> {
-    // Dynamic input height based on content, capped at 1/3 of screen
-    let input_line_count = state.input_buffer.lines().count().max(1);
-    let input_line_count = if state.input_buffer.ends_with('\n') {
-        input_line_count + 1
-    } else {
-        input_line_count
-    };
+    // Dynamic input height based on content, accounting for wrapped lines
+    let input_content_width = area.width.saturating_sub(3) as usize;
+    let mut input_line_count = count_input_wrapped_lines(&state.input_buffer, input_content_width);
+    // Add line for image attachment indicator
+    if !state.pending_images.is_empty() {
+        input_line_count += 1;
+    }
     let max_input_height = area.height / 3;
     let input_height = (input_line_count as u16).min(max_input_height).max(1);
 

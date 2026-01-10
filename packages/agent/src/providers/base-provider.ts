@@ -332,7 +332,18 @@ export abstract class AIProvider extends EventEmitter {
   // System prompt handling with fallback logic
   protected getEffectiveSystemPrompt(messages: ProviderMessage[]): string {
     const systemMessage = messages.find((msg) => msg.role === 'system');
-    return systemMessage?.content || this._systemPrompt || 'You are a helpful assistant.';
+    if (!systemMessage) {
+      return this._systemPrompt || 'You are a helpful assistant.';
+    }
+    // Extract text from content (system prompts don't have images)
+    if (typeof systemMessage.content === 'string') {
+      return systemMessage.content || this._systemPrompt || 'You are a helpful assistant.';
+    }
+    const textContent = systemMessage.content
+      .filter((b): b is TextContentBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('\n');
+    return textContent || this._systemPrompt || 'You are a helpful assistant.';
   }
 
   // Base stop reason normalization - providers should override for specific mappings
@@ -591,9 +602,25 @@ export abstract class AIProvider extends EventEmitter {
 
 // Use ToolResult directly from types.ts instead of maintaining a separate type
 
+export interface TextContentBlock {
+  type: 'text';
+  text: string;
+}
+
+export interface ImageContentBlock {
+  type: 'image';
+  source: {
+    type: 'base64';
+    media_type: string;
+    data: string;
+  };
+}
+
+export type ContentBlock = TextContentBlock | ImageContentBlock;
+
 export interface ProviderMessage {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  content: string | ContentBlock[];
   toolCalls?: ToolCall[]; // For assistant messages with tool calls
   toolResults?: ToolResult[]; // For user messages with tool results - using our internal type
 }

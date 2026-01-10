@@ -1,10 +1,55 @@
 // ABOUTME: Provider-specific format conversion functions for enhanced ProviderMessage format
 // ABOUTME: Converts generic tool call format to provider-specific native formats
 
-import { ProviderMessage } from './base-provider';
+import { ProviderMessage, ContentBlock } from './base-provider';
 import { ToolCall } from '@lace/agent/tools/types';
 import Anthropic from '@anthropic-ai/sdk';
 import type { Content, Part } from '@google/genai';
+
+/**
+ * Helper to convert our ContentBlock to Anthropic's content block format
+ */
+function toAnthropicContentBlock(
+  block: ContentBlock
+): Anthropic.TextBlockParam | Anthropic.ImageBlockParam {
+  if (block.type === 'text') {
+    return { type: 'text', text: block.text };
+  } else {
+    return {
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: block.source.media_type as
+          | 'image/jpeg'
+          | 'image/png'
+          | 'image/gif'
+          | 'image/webp',
+        data: block.source.data,
+      },
+    };
+  }
+}
+
+/**
+ * Helper to check if content has any non-empty value
+ */
+function hasContent(content: string | ContentBlock[]): boolean {
+  if (typeof content === 'string') {
+    return content.trim().length > 0;
+  }
+  return content.length > 0;
+}
+
+/**
+ * Helper to get text from content (for cases where we need string only)
+ */
+function getTextContent(content: string | ContentBlock[]): string {
+  if (typeof content === 'string') return content;
+  return content
+    .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n');
+}
 
 /**
  * Converts enhanced ProviderMessage format to Anthropic's content blocks format
@@ -16,41 +61,56 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
       if (msg.role === 'user') {
         // User messages can have tool results
         if (msg.toolResults && msg.toolResults.length > 0) {
-          const content: Anthropic.ToolResultBlockParam[] = msg.toolResults.map((result) => ({
-            type: 'tool_result',
-            tool_use_id: result.id || '',
-            content: result.content.map((block) => block.text || '').join('\n'),
-            // Convert our status to Anthropic's is_error flag
-            ...(result.status !== 'completed' ? { is_error: true } : {}),
-          }));
+          const toolResultBlocks: Anthropic.ToolResultBlockParam[] = msg.toolResults.map(
+            (result) => ({
+              type: 'tool_result',
+              tool_use_id: result.id || '',
+              content: result.content.map((block) => block.text || '').join('\n'),
+              // Convert our status to Anthropic's is_error flag
+              ...(result.status !== 'completed' ? { is_error: true } : {}),
+            })
+          );
 
-          // If there's also text content, add it
-          if (msg.content && msg.content.trim()) {
+          // If there's also text/image content, add it
+          if (hasContent(msg.content)) {
+            const contentBlocks: Anthropic.ContentBlockParam[] =
+              typeof msg.content === 'string'
+                ? [{ type: 'text', text: msg.content }]
+                : msg.content.map(toAnthropicContentBlock);
             return {
               role: 'user',
-              content: [{ type: 'text', text: msg.content }, ...content],
+              content: [...contentBlocks, ...toolResultBlocks],
             };
           }
 
           return {
             role: 'user',
-            content,
+            content: toolResultBlocks,
           };
         } else {
-          // Pure text user message
-          return {
-            role: 'user',
-            content: msg.content,
-          };
+          // Pure user message (text or text+images)
+          if (typeof msg.content === 'string') {
+            return {
+              role: 'user',
+              content: msg.content,
+            };
+          } else {
+            // Content blocks with potential images
+            return {
+              role: 'user',
+              content: msg.content.map(toAnthropicContentBlock),
+            };
+          }
         }
       } else if (msg.role === 'assistant') {
         // Assistant messages can have tool calls
+        const textContent = getTextContent(msg.content);
         if (msg.toolCalls && msg.toolCalls.length > 0) {
           const content: (Anthropic.TextBlockParam | Anthropic.ToolUseBlockParam)[] = [];
 
           // Add text content if present
-          if (msg.content && msg.content.trim()) {
-            content.push({ type: 'text', text: msg.content });
+          if (textContent.trim()) {
+            content.push({ type: 'text', text: textContent });
           }
 
           // Add tool calls
@@ -71,17 +131,58 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
           // Pure text assistant message
           return {
             role: 'assistant',
-            content: msg.content,
+            content: textContent,
           };
         }
       } else {
         // System messages shouldn't reach here due to filter, but handle gracefully
         return {
           role: 'assistant',
-          content: msg.content,
+          content: getTextContent(msg.content),
         };
       }
     });
+}
+
+/**
+ * Helper to convert our ContentBlock to OpenAI's content part format
+ */
+type OpenAIContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
+function toOpenAIContentPart(block: ContentBlock): OpenAIContentPart {
+  if (block.type === 'text') {
+    return { type: 'text', text: block.text };
+  } else {
+    // OpenAI uses data URLs for base64 images
+    return {
+      type: 'image_url',
+      image_url: {
+        url: `data:${block.source.media_type};base64,${block.source.data}`,
+      },
+    };
+  }
+}
+
+/**
+ * Convert content to OpenAI format - string for simple text, array for images
+ */
+function toOpenAIContent(content: string | ContentBlock[]): string | OpenAIContentPart[] {
+  if (typeof content === 'string') return content;
+
+  // Check if we have any images
+  const hasImages = content.some((b) => b.type === 'image');
+  if (!hasImages) {
+    // Just text, return as string
+    return content
+      .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+      .map((b) => b.text)
+      .join('\n');
+  }
+
+  // Has images, return as array
+  return content.map(toOpenAIContentPart);
 }
 
 /**
@@ -103,9 +204,9 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
               content: result.content.map((block) => block.text || '').join('\n'),
             }));
 
-          // If there's also text content, include the user message first
-          if (msg.content && msg.content.trim()) {
-            return [{ role: 'user', content: msg.content }, ...toolMessages];
+          // If there's also text/image content, include the user message first
+          if (hasContent(msg.content)) {
+            return [{ role: 'user', content: toOpenAIContent(msg.content) }, ...toolMessages];
           }
 
           return toolMessages;
@@ -113,16 +214,17 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
           return [
             {
               role: 'user',
-              content: msg.content,
+              content: toOpenAIContent(msg.content),
             },
           ];
         }
       } else if (msg.role === 'assistant') {
+        const textContent = getTextContent(msg.content);
         if (msg.toolCalls && msg.toolCalls.length > 0) {
           return [
             {
               role: 'assistant',
-              content: msg.content || null,
+              content: textContent || null,
               tool_calls: msg.toolCalls.map((toolCall: ToolCall) => ({
                 id: toolCall.id,
                 type: 'function',
@@ -137,7 +239,7 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
           return [
             {
               role: 'assistant',
-              content: msg.content,
+              content: textContent,
             },
           ];
         }
@@ -145,7 +247,7 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
         return [
           {
             role: msg.role,
-            content: msg.content,
+            content: getTextContent(msg.content),
           },
         ];
       }
@@ -155,9 +257,11 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
 /**
  * Converts enhanced ProviderMessage format to text-only format
  * (Fallback for providers that don't support native tool calling)
+ * Note: Images are discarded in text-only format as they cannot be represented as text
  */
 export function convertToTextOnlyFormat(messages: ProviderMessage[]): ProviderMessage[] {
   return messages.map((msg): ProviderMessage => {
+    const textContent = getTextContent(msg.content);
     if (msg.role === 'user' && msg.toolResults && msg.toolResults.length > 0) {
       // Convert tool results to text descriptions
       const toolResultTexts = msg.toolResults.map((result) => {
@@ -169,7 +273,7 @@ export function convertToTextOnlyFormat(messages: ProviderMessage[]): ProviderMe
         }
       });
 
-      const combinedContent = [msg.content, ...toolResultTexts].filter(Boolean).join('\n\n');
+      const combinedContent = [textContent, ...toolResultTexts].filter(Boolean).join('\n\n');
 
       return {
         role: 'user',
@@ -182,17 +286,17 @@ export function convertToTextOnlyFormat(messages: ProviderMessage[]): ProviderMe
           `[Called tool: ${toolCall.name} with input: ${JSON.stringify(toolCall.arguments)}]`
       );
 
-      const combinedContent = [msg.content, ...toolCallTexts].filter(Boolean).join('\n\n');
+      const combinedContent = [textContent, ...toolCallTexts].filter(Boolean).join('\n\n');
 
       return {
         role: 'assistant',
         content: combinedContent || toolCallTexts.join('\n\n'),
       };
     } else {
-      // No tool calls/results, return as-is
+      // No tool calls/results, return as-is (with text content only)
       return {
         role: msg.role,
-        content: msg.content,
+        content: textContent,
       };
     }
   });
@@ -207,9 +311,25 @@ export function convertToGeminiFormat(messages: ProviderMessage[]): Content[] {
     .map((msg): Content => {
       const parts: Part[] = [];
 
-      // Add text content if present
-      if (msg.content && msg.content.trim()) {
-        parts.push({ text: msg.content });
+      // Add content blocks (text and images)
+      if (typeof msg.content === 'string') {
+        if (msg.content.trim()) {
+          parts.push({ text: msg.content });
+        }
+      } else {
+        for (const block of msg.content) {
+          if (block.type === 'text' && block.text.trim()) {
+            parts.push({ text: block.text });
+          } else if (block.type === 'image') {
+            // Gemini uses inlineData for base64 images
+            parts.push({
+              inlineData: {
+                mimeType: block.source.media_type,
+                data: block.source.data,
+              },
+            });
+          }
+        }
       }
 
       if (msg.role === 'assistant' && msg.toolCalls) {

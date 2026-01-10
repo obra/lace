@@ -86,9 +86,11 @@ pub struct AppState {
     pub active_prompt_request_ids: std::collections::HashSet<String>,
 
     pub input_buffer: String,
+    pub input_cursor: usize, // Byte position in input_buffer
     pub input_scroll: u16,
     pub input_history: Vec<String>,
     pub input_history_index: Option<usize>,
+    pub pending_images: Vec<String>, // Paths to images pending attachment
 
     pub focus: Focus,
     pub chat_scroll: u16,
@@ -194,9 +196,11 @@ impl AppState {
             active_prompt_request_ids: std::collections::HashSet::new(),
 
             input_buffer: String::new(),
+            input_cursor: 0,
             input_scroll: 0,
             input_history: Vec::new(),
             input_history_index: None,
+            pending_images: Vec::new(),
 
             focus: Focus::Input,
             chat_scroll: 0,

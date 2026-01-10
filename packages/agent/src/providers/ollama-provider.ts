@@ -9,7 +9,17 @@ import {
   ProviderConfig,
   ProviderInfo,
   ModelInfo,
+  ContentBlock,
 } from './base-provider';
+
+/** Helper to extract text from string or content blocks */
+function getTextContent(content: string | ContentBlock[]): string {
+  if (typeof content === 'string') return content;
+  return content
+    .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n');
+}
 import { ToolCall } from '@lace/agent/tools/types';
 import { Tool } from '@lace/agent/tools/tool';
 import { logger } from '@lace/agent/utils/logger';
@@ -131,7 +141,7 @@ export class OllamaProvider extends AIProvider {
         ollamaMessages.push(
           ...messages.map((msg) => ({
             role: msg.role,
-            content: msg.content,
+            content: getTextContent(msg.content),
           }))
         );
 
@@ -261,7 +271,7 @@ export class OllamaProvider extends AIProvider {
         ollamaMessages.push(
           ...messages.map((msg) => ({
             role: msg.role,
-            content: msg.content,
+            content: getTextContent(msg.content),
           }))
         );
 
