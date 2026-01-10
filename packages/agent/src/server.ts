@@ -78,6 +78,7 @@ import { WorkspaceManagerFactory } from './workspace/workspace-manager';
 import { personaRegistry } from './config/persona-registry';
 import { loadPromptConfig } from './config/prompts';
 import { logger } from './utils/logger';
+import { formatJobNotification } from './jobs/format-notification';
 
 const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
 const JOB_LOG_DIR = 'jobs';
@@ -234,6 +235,19 @@ function ensureJobLogDir(sessionDir: string): string {
 
 function getJobOutputPath(sessionDir: string, jobId: string): string {
   return join(ensureJobLogDir(sessionDir), `${jobId}.log`);
+}
+
+/**
+ * Get the last N lines from a job output file.
+ */
+function getLastLines(outputPath: string, n: number): string[] {
+  try {
+    const content = readFileSync(outputPath, 'utf8');
+    const lines = content.split('\n').filter((line) => line.length > 0);
+    return lines.slice(-n);
+  } catch {
+    return [];
+  }
 }
 
 function extractTextFromContentBlocks(content: unknown[]): string {
@@ -938,6 +952,38 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
   };
 
+  /**
+   * Queue a job notification for delivery to the agent.
+   */
+  const queueJobNotification = (
+    job: JobState,
+    type: JobNotificationType,
+    options?: { reason?: string; deltaBytes?: number }
+  ) => {
+    const outputBytes = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
+    const durationMs = Date.now() - new Date(job.startedAt).getTime();
+    // For completed jobs show just the last line, for others show last 3
+    const lastLines = getLastLines(job.outputPath, type === 'completed' ? 1 : 3);
+
+    const content = formatJobNotification({
+      jobId: job.jobId,
+      type,
+      exitCode: job.exitCode,
+      durationMs,
+      outputBytes,
+      deltaBytes: options?.deltaBytes,
+      lastLines,
+      reason: options?.reason,
+    });
+
+    state.jobNotificationQueue.push({
+      jobId: job.jobId,
+      type,
+      content,
+      createdAt: Date.now(),
+    });
+  };
+
   const finalizeJob = async (job: JobState, options: { exitCode?: number } = {}) => {
     if (!state.activeSession) return;
     if (job.finished) {
@@ -982,6 +1028,21 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       ...(typeof job.exitCode === 'number' ? { exitCode: job.exitCode } : {}),
       outcome: job.status,
     });
+
+    // Clear progress timer if running
+    if (job.progressTimer) {
+      clearInterval(job.progressTimer);
+      job.progressTimer = undefined;
+    }
+
+    // Queue completion notification for the agent
+    const notificationType: JobNotificationType =
+      job.status === 'completed'
+        ? 'completed'
+        : job.status === 'cancelled'
+          ? 'cancelled'
+          : 'failed';
+    queueJobNotification(job, notificationType);
 
     job.resolveCompletion();
   };
