@@ -1286,8 +1286,15 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
   };
 
+  // Reference to the prompt handler logic, assigned when session/prompt is registered.
+  // This allows queueJobNotification to trigger turns internally when notifications
+  // are pending and the agent is idle.
+  let runPromptInternal: ((content: unknown[]) => Promise<void>) | null = null;
+
   /**
    * Queue a job notification for delivery to the agent.
+   * If the agent is idle (no active turn) and runPromptInternal is available,
+   * triggers an internal turn to process the notification immediately.
    */
   const queueJobNotification = (
     job: JobState,
@@ -1316,6 +1323,18 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       content,
       createdAt: Date.now(),
     });
+
+    // If agent is idle (no active turn), trigger an internal turn to process notifications
+    if (!state.activeTurn && state.activeSession && runPromptInternal) {
+      // Use setImmediate to avoid blocking the current execution and allow any
+      // in-flight state updates to complete before starting the turn
+      setImmediate(() => {
+        // Re-check conditions since state may have changed
+        if (!state.activeTurn && state.activeSession && state.jobNotificationQueue.length > 0) {
+          void runPromptInternal!([]);
+        }
+      });
+    }
   };
 
   /**
@@ -1991,6 +2010,26 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       const childPeer = new JsonRpcPeer(childTransport, { idPrefix: 'c_' });
       job.childPeer = childPeer;
 
+      // Buffer for collecting stderr output
+      let stderrBuffer = '';
+
+      // Capture stderr from child process for debugging
+      childProc.stderr?.on('data', (chunk: Buffer) => {
+        stderrBuffer += chunk.toString('utf8');
+      });
+
+      // Log if child process exits with error
+      childProc.on('exit', (code, signal) => {
+        if (code !== 0 && code !== null) {
+          logger.debug('job.subagent.child_exit', {
+            jobId: job.jobId,
+            exitCode: code,
+            signal,
+            stderrLength: stderrBuffer.length,
+          });
+        }
+      });
+
       const appendJobOutput = async (text: string) => {
         if (!state.activeSession) return;
         await runExclusive(() => {
@@ -2338,9 +2377,33 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         if (job.status !== 'cancelled') job.status = 'completed';
       } catch (error) {
         if (job.status !== 'cancelled') job.status = 'failed';
+
+        // Extract detailed error information
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorCode =
+          error && typeof error === 'object' && 'code' in error ? (error as any).code : undefined;
+        const errorData =
+          error && typeof error === 'object' && 'data' in error ? (error as any).data : undefined;
+
+        // Build detailed error output
+        const errorDetails = [
+          `\n[SUBAGENT ERROR]`,
+          `Message: ${errorMessage}`,
+          ...(errorCode !== undefined ? [`Code: ${errorCode}`] : []),
+          ...(errorData ? [`Data: ${JSON.stringify(errorData)}`] : []),
+          ...(stderrBuffer.trim() ? [`Stderr: ${stderrBuffer.trim()}`] : []),
+          ...(error instanceof Error && error.stack ? [`Stack: ${error.stack}`] : []),
+        ].join('\n');
+
+        // Write error details to job output file so they're visible via ent/job/output
+        await appendJobOutput(errorDetails);
+
         logger.error('job.subagent.failed', {
           jobId: job.jobId,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMessage,
+          code: errorCode,
+          data: errorData,
+          stderr: stderrBuffer.trim() || undefined,
         });
       } finally {
         try {
@@ -4599,7 +4662,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
   });
 
-  peer.onRequest('session/prompt', async (params: unknown) => {
+  // Core prompt handling logic, extracted to allow internal triggering of turns
+  // for notification processing when the agent is idle.
+  const handlePrompt = async (params: { content: unknown[]; outputFormat?: unknown }) => {
     assertInitialized(state);
     if (!state.activeSession)
       throw {
@@ -4618,7 +4683,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       ? { ...state.config, ...state.activeSession.state.config }
       : state.config;
 
-    const parsed = params as { content: unknown[]; outputFormat?: unknown };
+    const parsed = params;
     const turnId = `turn_${randomUUID()}`;
     const startedAt = new Date().toISOString();
     const abortController = new AbortController();
@@ -5952,6 +6017,21 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       // Ensure activeTurn is cleared even if an exception is thrown
       state.activeTurn = null;
     }
+  };
+
+  // Assign the internal prompt runner for use by queueJobNotification
+  runPromptInternal = async (content: unknown[]) => {
+    try {
+      await handlePrompt({ content });
+    } catch {
+      // Silently ignore errors from internally-triggered turns
+      // (e.g., SessionBusy if a turn started between check and execution)
+    }
+  };
+
+  // Register the RPC handler
+  peer.onRequest('session/prompt', async (params: unknown) => {
+    return handlePrompt(params as { content: unknown[]; outputFormat?: unknown });
   });
 
   peer.onRequest('ent/workspace/info', async (params: unknown) => {

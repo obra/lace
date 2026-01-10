@@ -756,4 +756,93 @@ describe('async job workflow (E2E)', () => {
 
     expect(promptWithFailureNotification).toBeDefined();
   });
+
+  it(
+    'automatically triggers a turn when job completes and agent is idle',
+    { timeout: 30_000 },
+    async () => {
+      agent = spawnAgentProcess({ laceDir });
+
+      let jobId: string | undefined;
+      let initialTurnId: string | undefined;
+      const updates: Array<Record<string, unknown>> = [];
+      const turnStarts: string[] = [];
+
+      agent.peer.onRequest('session/update', async (params) => {
+        const p = params as Record<string, unknown>;
+        updates.push(p);
+        if (p.type === 'job_started' && typeof p.jobId === 'string') {
+          jobId = p.jobId;
+        }
+        if (p.type === 'turn_start' && typeof p.turnId === 'string') {
+          turnStarts.push(p.turnId);
+        }
+        return undefined;
+      });
+
+      agent.peer.onRequest('session/request_permission', async () => {
+        return { decision: 'allow' };
+      });
+
+      await withTimeout(
+        agent.peer.request(
+          'initialize',
+          defaultInitializeParams({ config: { approvalMode: 'allow' } })
+        ),
+        2_000,
+        'initialize'
+      );
+
+      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+
+      // Start a quick background job - this triggers the first turn
+      await withTimeout(
+        agent.peer.request('session/prompt', {
+          content: [{ type: 'text', text: 'job: echo "quick output"' }],
+        }),
+        5_000,
+        'session/prompt (start job)'
+      );
+
+      // Record the initial turn ID
+      initialTurnId = turnStarts[0];
+      expect(initialTurnId).toBeDefined();
+
+      // Wait for job to finish
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          const interval = setInterval(() => {
+            if (!jobId) return;
+            const finished = updates.find((u) => u.type === 'job_finished' && u.jobId === jobId);
+            if (finished) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 10);
+        }),
+        5_000,
+        'job_finished update'
+      );
+
+      // The agent should automatically trigger a new turn to process the notification
+      // Wait for a second turn_start (different from the initial one)
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          const interval = setInterval(() => {
+            // Look for a turn_start that's different from the initial turn
+            if (turnStarts.length > 1 && turnStarts[turnStarts.length - 1] !== initialTurnId) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 10);
+        }),
+        5_000,
+        'auto-triggered turn_start'
+      );
+
+      // Verify a second turn was started (for processing the notification)
+      expect(turnStarts.length).toBeGreaterThanOrEqual(2);
+      expect(turnStarts[turnStarts.length - 1]).not.toBe(initialTurnId);
+    }
+  );
 });
