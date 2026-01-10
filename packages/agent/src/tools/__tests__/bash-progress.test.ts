@@ -157,3 +157,68 @@ describe('DelegateTool progressIntervalMs schema', () => {
     }
   });
 });
+
+describe('DelegateTool connectionId/modelId schema', () => {
+  const tool = new DelegateTool();
+
+  it('accepts connectionId parameter', () => {
+    const result = tool.schema.safeParse({
+      prompt: 'Do something',
+      connectionId: 'conn_12345',
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.connectionId).toBe('conn_12345');
+    }
+  });
+
+  it('accepts modelId parameter', () => {
+    const result = tool.schema.safeParse({
+      prompt: 'Do something',
+      modelId: 'claude-3-sonnet',
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.modelId).toBe('claude-3-sonnet');
+    }
+  });
+
+  it('accepts both connectionId and modelId together', () => {
+    const result = tool.schema.safeParse({
+      prompt: 'Do something',
+      connectionId: 'conn_12345',
+      modelId: 'claude-3-sonnet',
+      background: true,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.connectionId).toBe('conn_12345');
+      expect(result.data.modelId).toBe('claude-3-sonnet');
+    }
+  });
+
+  it('allows omitting connectionId and modelId', () => {
+    const result = tool.schema.safeParse({
+      prompt: 'Do something',
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.connectionId).toBeUndefined();
+      expect(result.data.modelId).toBeUndefined();
+    }
+  });
+
+  it('accepts empty string connectionId (will be undefined after processing)', () => {
+    // Schema accepts empty strings - they're filtered by toNonEmptyString in server
+    const result = tool.schema.safeParse({
+      prompt: 'Do something',
+      connectionId: '',
+    });
+
+    expect(result.success).toBe(true);
+  });
+});

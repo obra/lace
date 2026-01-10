@@ -217,6 +217,9 @@ type JobState = {
   lastProgressAt?: number;
   lastProgressBytes?: number;
   progressTimer?: ReturnType<typeof setInterval>;
+  // Subagent provider/model configuration
+  connectionId?: string;
+  modelId?: string;
 };
 
 type JobNotificationType = 'completed' | 'failed' | 'cancelled' | 'progress';
@@ -1368,6 +1371,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     turnContext?: { turnId: string; turnSeq: number };
     resumeSessionId?: string;
     progressIntervalMs?: number;
+    connectionId?: string;
+    modelId?: string;
   }): Promise<{ jobId: string }> => {
     if (!state.activeSession)
       throw {
@@ -1411,6 +1416,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       completion,
       resolveCompletion,
       progressIntervalMs: options.progressIntervalMs,
+      connectionId: options.connectionId,
+      modelId: options.modelId,
       // For resume: pre-set the subagentSessionId if resuming a previous session
       ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
     };
@@ -1985,6 +1992,14 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
             sessionState = nextState;
             writeSessionState(state.activeSession!.dir, sessionState);
             state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+          });
+        }
+
+        // Configure subagent session with provider/model if specified
+        if (job.connectionId || job.modelId) {
+          await childPeer.request('ent/session/configure', {
+            ...(job.connectionId ? { connectionId: job.connectionId } : {}),
+            ...(job.modelId ? { modelId: job.modelId } : {}),
           });
         }
 
@@ -4742,6 +4757,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                 const resumeJobId = toNonEmptyString(
                   (finalInput as Record<string, unknown>).resume
                 );
+                const connectionId =
+                  toNonEmptyString((finalInput as Record<string, unknown>).connectionId) ??
+                  undefined;
+                const modelId =
+                  toNonEmptyString((finalInput as Record<string, unknown>).modelId) ?? undefined;
 
                 // If resuming, look up the previous job's subagentSessionId
                 let resumeSessionId: string | undefined;
@@ -4771,6 +4791,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
                     description: description || 'Delegate',
                     turnContext: { turnId, turnSeq: toolTurnSeq },
                     resumeSessionId,
+                    connectionId,
+                    modelId,
                   });
 
                   if (background) {
