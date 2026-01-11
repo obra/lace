@@ -6,13 +6,17 @@ import type { AgentServerState } from '@lace/agent/server-types';
 import { EntErrorCodes } from '@lace/ent-protocol';
 
 // Create a minimal mock state for testing
-function createMockState(overrides: {
-  providerCatalogLoaded?: boolean;
-  loadCatalogsImpl?: () => Promise<void>;
-  getAvailableProvidersImpl?: () => { id: string }[];
-} = {}): AgentServerState {
+function createMockState(
+  overrides: {
+    providerCatalogLoaded?: boolean;
+    loadCatalogsImpl?: () => Promise<void>;
+    getAvailableProvidersImpl?: () => { id: string }[];
+  } = {}
+): AgentServerState {
   const loadCatalogs = vi.fn(overrides.loadCatalogsImpl ?? (() => Promise.resolve()));
-  const getAvailableProviders = vi.fn(overrides.getAvailableProvidersImpl ?? (() => [{ id: 'test-provider' }]));
+  const getAvailableProviders = vi.fn(
+    overrides.getAvailableProvidersImpl ?? (() => [{ id: 'test-provider' }])
+  );
 
   return {
     initialized: true,
