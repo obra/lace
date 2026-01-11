@@ -78,13 +78,20 @@ export class JobCreationError extends Error {
 }
 
 /**
- * Create a shell job that runs a command in the background.
- * Returns the job ID immediately; the job runs asynchronously.
+ * Common job scaffolding - validates session, checks limits, generates ID,
+ * creates completion promise. Used by both shell and subagent job creation.
  */
-export async function createShellJob(
-  options: CreateShellJobOptions,
-  deps: JobCreationDeps
-): Promise<{ jobId: string }> {
+function scaffoldJob(
+  deps: JobCreationDeps,
+  options: { parentJobId?: string; turnContext?: { turnId: string; turnSeq: number } }
+): {
+  activeSession: LoadedSession;
+  jobId: string;
+  startedAt: string;
+  outputPath: string;
+  completion: Promise<void>;
+  resolveCompletion: () => void;
+} {
   const activeSession = deps.getActiveSession();
   if (!activeSession) {
     throw new JobCreationError('No active session', -32001, 'session');
@@ -109,51 +116,88 @@ export async function createShellJob(
     resolveCompletion = resolve;
   });
 
+  return { activeSession, jobId, startedAt, outputPath, completion, resolveCompletion };
+}
+
+/**
+ * Persist and emit job_started event, then start the job process.
+ */
+async function finalizeJobCreation(
+  deps: JobCreationDeps,
+  job: JobState,
+  event: {
+    jobId: string;
+    parentJobId?: string;
+    jobType: JobType;
+    description?: string;
+    command?: string;
+    turnContext?: { turnId: string; turnSeq: number };
+  },
+  runJobProcess: (job: JobState) => void
+): Promise<{ jobId: string }> {
+  deps.getJobs().set(job.jobId, job);
+
+  await deps.persistJobStartedEvent(event);
+
+  await deps.emitSessionUpdate(
+    {
+      type: 'job_started',
+      jobId: event.jobId,
+      parentJobId: event.parentJobId,
+      jobType: event.jobType,
+      description: event.description,
+    },
+    event.turnContext
+      ? { turnId: event.turnContext.turnId, turnSeq: event.turnContext.turnSeq }
+      : undefined
+  );
+
+  deps.setupProgressTimer(job);
+  runJobProcess(job);
+
+  return { jobId: job.jobId };
+}
+
+/**
+ * Create a shell job that runs a command in the background.
+ * Returns the job ID immediately; the job runs asynchronously.
+ */
+export async function createShellJob(
+  options: CreateShellJobOptions,
+  deps: JobCreationDeps
+): Promise<{ jobId: string }> {
+  const scaffold = scaffoldJob(deps, options);
+
   const job: JobState = {
-    jobId,
+    jobId: scaffold.jobId,
     parentJobId: options.parentJobId,
     type: 'bash',
     status: 'running',
     description: options.description,
     command: options.command,
-    startedAt,
+    startedAt: scaffold.startedAt,
     originTurnId: options.turnContext?.turnId,
     originTurnSeq: options.turnContext?.turnSeq,
-    outputPath,
+    outputPath: scaffold.outputPath,
     finished: false,
-    completion,
-    resolveCompletion,
+    completion: scaffold.completion,
+    resolveCompletion: scaffold.resolveCompletion,
     progressIntervalMs: options.progressIntervalMs,
   };
 
-  jobs.set(jobId, job);
-
-  await deps.persistJobStartedEvent({
-    jobId,
-    parentJobId: options.parentJobId,
-    jobType: 'bash',
-    description: options.description,
-    command: options.command,
-    turnContext: options.turnContext,
-  });
-
-  await deps.emitSessionUpdate(
+  return finalizeJobCreation(
+    deps,
+    job,
     {
-      type: 'job_started',
-      jobId,
+      jobId: scaffold.jobId,
       parentJobId: options.parentJobId,
       jobType: 'bash',
       description: options.description,
+      command: options.command,
+      turnContext: options.turnContext,
     },
-    options.turnContext
-      ? { turnId: options.turnContext.turnId, turnSeq: options.turnContext.turnSeq }
-      : undefined
+    deps.runShellJobProcess
   );
-
-  deps.setupProgressTimer(job);
-  deps.runShellJobProcess(job);
-
-  return { jobId };
 }
 
 /**
@@ -164,77 +208,41 @@ export async function createSubagentJob(
   options: CreateSubagentJobOptions,
   deps: JobCreationDeps
 ): Promise<{ jobId: string }> {
-  const activeSession = deps.getActiveSession();
-  if (!activeSession) {
-    throw new JobCreationError('No active session', -32001, 'session');
-  }
-
-  const jobs = deps.getJobs();
-  const runningJobCount = [...jobs.values()].filter((j) => j.status === 'running').length;
-  if (runningJobCount >= MAX_CONCURRENT_JOBS) {
-    throw new JobCreationError(
-      `Maximum concurrent jobs (${MAX_CONCURRENT_JOBS}) exceeded`,
-      -32003,
-      'session'
-    );
-  }
-
-  const jobId = `job_${randomUUID()}`;
-  const startedAt = new Date().toISOString();
-  const outputPath = getJobOutputPath(activeSession.dir, jobId);
-
-  let resolveCompletion!: () => void;
-  const completion = new Promise<void>((resolve) => {
-    resolveCompletion = resolve;
-  });
+  const scaffold = scaffoldJob(deps, options);
+  const description = options.description ?? 'Subagent';
 
   const job: JobState = {
-    jobId,
+    jobId: scaffold.jobId,
     parentJobId: options.parentJobId,
     type: 'delegate',
     status: 'running',
-    description: options.description ?? 'Subagent',
+    description,
     command: options.prompt,
     subagentContent: [{ type: 'text', text: options.prompt }],
-    startedAt,
+    startedAt: scaffold.startedAt,
     originTurnId: options.turnContext?.turnId,
     originTurnSeq: options.turnContext?.turnSeq,
-    outputPath,
+    outputPath: scaffold.outputPath,
     finished: false,
-    completion,
-    resolveCompletion,
+    completion: scaffold.completion,
+    resolveCompletion: scaffold.resolveCompletion,
     progressIntervalMs: options.progressIntervalMs,
     connectionId: options.connectionId,
     modelId: options.modelId,
     ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
   };
 
-  jobs.set(jobId, job);
-
-  await deps.persistJobStartedEvent({
-    jobId,
-    parentJobId: options.parentJobId,
-    jobType: 'delegate',
-    description: job.description,
-    command: options.prompt,
-    turnContext: options.turnContext,
-  });
-
-  await deps.emitSessionUpdate(
+  return finalizeJobCreation(
+    deps,
+    job,
     {
-      type: 'job_started',
-      jobId,
+      jobId: scaffold.jobId,
       parentJobId: options.parentJobId,
       jobType: 'delegate',
-      description: job.description,
+      description,
+      command: options.prompt,
+      turnContext: options.turnContext,
     },
-    options.turnContext
-      ? { turnId: options.turnContext.turnId, turnSeq: options.turnContext.turnSeq }
-      : undefined
+    deps.runSubagentJobProcess
   );
-
-  deps.setupProgressTimer(job);
-  deps.runSubagentJobProcess(job);
-
-  return { jobId };
 }

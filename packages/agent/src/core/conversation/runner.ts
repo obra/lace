@@ -578,14 +578,16 @@ export class ConversationRunner {
     });
 
     const protocolResult = protocolToolResultFromCore(coreResult);
-    const terminalStatus =
-      protocolResult.outcome === 'completed'
-        ? 'completed'
-        : protocolResult.outcome === 'denied'
-          ? 'denied'
-          : protocolResult.outcome === 'cancelled'
-            ? 'cancelled'
-            : 'failed';
+    type TerminalStatus = 'completed' | 'denied' | 'cancelled' | 'failed';
+    function mapOutcomeToStatus(outcome: string): TerminalStatus {
+      switch (outcome) {
+        case 'completed': return 'completed';
+        case 'denied': return 'denied';
+        case 'cancelled': return 'cancelled';
+        default: return 'failed';
+      }
+    }
+    const terminalStatus = mapOutcomeToStatus(protocolResult.outcome);
 
     await this.deps.onUpdate(toolTurnSeq, {
       type: 'tool_use',

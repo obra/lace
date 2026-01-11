@@ -233,7 +233,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     }
   };
 
-  const startSubagentJob = async (options: CreateSubagentJobOptions): Promise<{ jobId: string }> => {
+  const _startSubagentJob = async (options: CreateSubagentJobOptions): Promise<{ jobId: string }> => {
     try {
       return await createSubagentJob(options, {
         getActiveSession: () => state.activeSession,
@@ -271,7 +271,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     requestPermissionFromClient: _requestPermissionFromClient,
     finalizeJob,
     startShellJob: _startShellJob,
-    startSubagentJob,
+    startSubagentJob: _startSubagentJob,
     runShellJobProcess,
     runSubagentJobProcess,
     runPromptInternalRef,

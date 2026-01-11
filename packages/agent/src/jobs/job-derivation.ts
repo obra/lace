@@ -33,6 +33,22 @@ type JobsCache = {
 };
 
 /**
+ * Apply running job status updates from in-memory state.
+ * Jobs marked as 'running' in events but not in the running jobs map are marked as 'failed'.
+ */
+function applyRunningJobStatus(
+  jobs: DerivedJob[],
+  runningJobs: Map<string, JobState>
+): DerivedJob[] {
+  return jobs.map((job) => {
+    if (job.status === 'running' && !runningJobs.has(job.jobId)) {
+      return { ...job, status: 'failed' as JobStatus };
+    }
+    return job;
+  });
+}
+
+/**
  * Creates a job derivation function with its own cache.
  * The cache avoids re-parsing events.jsonl on every call.
  */
@@ -70,13 +86,7 @@ export function createJobDerivation(deps: {
       cache.fileSize === fileSize &&
       cache.fileMtime === fileMtime
     ) {
-      // Cache hit - but still need to update running job status from in-memory state
-      return cache.result.map((job) => {
-        if (job.status === 'running' && !runningJobs.has(job.jobId)) {
-          return { ...job, status: 'failed' as JobStatus };
-        }
-        return job;
-      });
+      return applyRunningJobStatus(cache.result, runningJobs);
     }
 
     // Cache miss - read and parse the file
@@ -163,13 +173,6 @@ export function createJobDerivation(deps: {
       result: parsedResult,
     };
 
-    // Apply running job status updates from in-memory state
-    // Return a copy so we don't mutate the cache
-    return parsedResult.map((job) => {
-      if (job.status === 'running' && !runningJobs.has(job.jobId)) {
-        return { ...job, status: 'failed' as JobStatus };
-      }
-      return job;
-    });
+    return applyRunningJobStatus(parsedResult, runningJobs);
   };
 }
