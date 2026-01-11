@@ -10,6 +10,7 @@ import {
   throwInvalidParams,
   toNonEmptyString,
 } from '../utils';
+import { getConnectionInstance } from '../helpers/connection-lookup';
 import type { AgentServerState } from '../../server-types';
 
 /**
@@ -84,17 +85,7 @@ export function registerModelHandlers(peer: JsonRpcPeer, state: AgentServerState
     assertInitialized(state);
 
     const parsed = params as { connectionId: string };
-    const connectionId = toNonEmptyString(parsed?.connectionId);
-    if (!connectionId) throwInvalidParams('connectionId is required');
-
-    const instances = await state.providerInstances.loadInstances();
-    const instance = instances.instances[connectionId];
-    if (!instance)
-      throw {
-        code: EntErrorCodes.ConnectionNotFound,
-        message: 'ConnectionNotFound',
-        data: { category: 'provider' },
-      };
+    const { connectionId, instance } = await getConnectionInstance(state, parsed?.connectionId);
 
     await ensureProviderCatalogLoaded(state);
     const providerId = instance.catalogProviderId;
@@ -127,17 +118,7 @@ export function registerModelHandlers(peer: JsonRpcPeer, state: AgentServerState
     assertInitialized(state);
 
     const parsed = params as { connectionId: string };
-    const connectionId = toNonEmptyString(parsed?.connectionId);
-    if (!connectionId) throwInvalidParams('connectionId is required');
-
-    const instances = await state.providerInstances.loadInstances();
-    const instance = instances.instances[connectionId];
-    if (!instance)
-      throw {
-        code: EntErrorCodes.ConnectionNotFound,
-        message: 'ConnectionNotFound',
-        data: { category: 'provider' },
-      };
+    const { connectionId, instance } = await getConnectionInstance(state, parsed?.connectionId);
 
     await ensureProviderCatalogLoaded(state);
     const providerId = instance.catalogProviderId;

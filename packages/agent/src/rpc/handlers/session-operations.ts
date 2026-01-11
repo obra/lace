@@ -31,6 +31,7 @@ import {
   toNonEmptyString,
   recordsShallowEqual,
 } from '../utils';
+import { assertSessionReady } from '../helpers/session-guards';
 import { reconcileMcpServersForActiveSession } from './mcp-servers';
 import {
   buildProviderMessagesFromDurableEvents,
@@ -368,19 +369,7 @@ export function registerSessionOperationHandlers(
   });
 
   peer.onRequest('ent/session/compact', async (params: unknown) => {
-    assertInitialized(state);
-    if (!state.activeSession)
-      throw {
-        code: AcpErrorCodes.SessionNotFound,
-        message: 'SessionNotFound',
-        data: { category: 'session' },
-      };
-    if (state.activeTurn)
-      throw {
-        code: AcpErrorCodes.SessionBusy,
-        message: 'SessionBusy',
-        data: { category: 'session' },
-      };
+    assertSessionReady(state);
 
     const parsed = params as
       | {
