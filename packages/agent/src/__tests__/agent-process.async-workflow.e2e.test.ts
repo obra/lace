@@ -297,7 +297,6 @@ describe('async job workflow (E2E)', () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     let jobId: string | undefined;
-    let sessionId: string | undefined;
 
     ctx.agent.peer.onRequest('session/update', async (params) => {
       const p = params as Record<string, unknown>;
@@ -325,7 +324,7 @@ describe('async job workflow (E2E)', () => {
       2_000,
       'session/new'
     )) as { sessionId: string };
-    sessionId = created.sessionId;
+    const sessionId = created.sessionId;
 
     // Run a quick job
     await withTimeout(
@@ -492,7 +491,6 @@ describe('async job workflow (E2E)', () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     let jobId: string | undefined;
-    let session1Id: string | undefined;
 
     ctx.agent.peer.onRequest('session/update', async (params) => {
       const p = params as Record<string, unknown>;
@@ -521,7 +519,7 @@ describe('async job workflow (E2E)', () => {
       2_000,
       'session/new (1)'
     )) as { sessionId: string };
-    session1Id = session1.sessionId;
+    const session1Id = session1.sessionId;
 
     await withTimeout(
       ctx.agent.peer.request('session/prompt', {
@@ -774,7 +772,6 @@ describe('async job workflow (E2E)', () => {
       ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       let jobId: string | undefined;
-      let initialTurnId: string | undefined;
       const updates: Array<Record<string, unknown>> = [];
       const turnStarts: string[] = [];
 
@@ -819,7 +816,7 @@ describe('async job workflow (E2E)', () => {
       );
 
       // Record the initial turn ID
-      initialTurnId = turnStarts[0];
+      const initialTurnId = turnStarts[0];
       expect(initialTurnId).toBeDefined();
 
       // Wait for job to finish

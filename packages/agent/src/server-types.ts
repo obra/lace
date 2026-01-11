@@ -2,7 +2,7 @@
 // This module contains type definitions and configuration constants used across
 // the server implementation, including session updates, job state, and server configuration.
 
-import { spawn, type ChildProcess } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import type { z } from 'zod';
 import { SessionUpdateNotificationSchema } from '@lace/ent-protocol';
 import type { JsonRpcPeer } from '@lace/ent-protocol';

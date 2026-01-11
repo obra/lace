@@ -69,7 +69,7 @@ export class ConversationRunner {
    * 5. Emit session updates throughout
    */
   async run(params: RunParams): Promise<RunResult> {
-    const { content, maxTurns = 10, abortController, turnId, startedAt } = params;
+    const { content: _content, maxTurns = 10, abortController, turnId, startedAt } = params;
     const {
       sessionDir,
       cwd,
@@ -310,11 +310,12 @@ export class ConversationRunner {
       envOverlay,
       abortController,
       turnId,
-      startedAt,
+      startedAt: _startedAt,
       sessionId,
       writeAndAdvance,
     } = params;
-    let { streamTurnSeq, toolExecutor } = params;
+    const { toolExecutor } = params;
+    let { streamTurnSeq } = params;
 
     const toolCallId = toNonEmptyString(toolCall.id) ?? `tool_${randomUUID()}`;
     const toolName = toNonEmptyString(toolCall.name) ?? '';

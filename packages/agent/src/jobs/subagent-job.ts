@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { mkdirSync, existsSync, appendFileSync, statSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { dirname } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import {
   readSessionState,
@@ -63,7 +63,6 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
   const writeErrorToJobOutput = (errorText: string) => {
     try {
       // Ensure the job-logs directory exists
-      const logDir = join(dirname(job.outputPath), '.');
       if (!existsSync(dirname(job.outputPath))) {
         mkdirSync(dirname(job.outputPath), { recursive: true, mode: 0o700 });
       }

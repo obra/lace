@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ToolResult, ContextBreakdown, ThreadTokenUsage } from '@lace/ent-protocol';
+import type { ToolResult } from '@lace/ent-protocol';
 import type { ContentBlock, ProviderMessage } from '../providers/base-provider';
 import { toNonEmptyString, coreToolResultFromProtocol } from '../rpc/utils';
 import type { ToolCall as CoreToolCall } from '../tools/types';

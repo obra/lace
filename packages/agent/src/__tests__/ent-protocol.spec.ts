@@ -955,7 +955,7 @@ describe('Ent protocol contract (selected coverage)', () => {
         content: [
           {
             type: 'text',
-            text: 'job: i=0; while [ $i -lt 200 ]; do echo \"line-$i\"; i=$((i+1)); done',
+            text: 'job: i=0; while [ $i -lt 200 ]; do echo "line-$i"; i=$((i+1)); done',
           },
         ],
       },

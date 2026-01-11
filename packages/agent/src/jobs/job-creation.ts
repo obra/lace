@@ -83,7 +83,7 @@ export class JobCreationError extends Error {
  */
 function scaffoldJob(
   deps: JobCreationDeps,
-  options: { parentJobId?: string; turnContext?: { turnId: string; turnSeq: number } }
+  _options: { parentJobId?: string; turnContext?: { turnId: string; turnSeq: number } }
 ): {
   activeSession: LoadedSession;
   jobId: string;

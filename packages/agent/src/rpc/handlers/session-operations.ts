@@ -22,7 +22,7 @@ import {
   restoreCheckpointFiles,
 } from '../../storage/checkpoint-store';
 import { deriveCheckpointFilesFromDurableEvents } from '../../storage/files-from-events';
-import type { AIProvider, ProviderMessage, ContentBlock } from '../../providers/base-provider';
+import type { ProviderMessage, ContentBlock } from '../../providers/base-provider';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import type { AgentServerState } from '../../server-types';
 import {

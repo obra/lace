@@ -1,6 +1,6 @@
 // ABOUTME: Tests for connection lookup helper
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { getConnectionInstance, assertConnectionExists } from '../connection-lookup';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import type { AgentServerState } from '@lace/agent/server-types';

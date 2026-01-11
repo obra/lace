@@ -1,6 +1,5 @@
 // ABOUTME: Permission request handling for tool execution approvals
 
-import { randomUUID } from 'node:crypto';
 import type { JsonRpcPeer } from '@lace/ent-protocol';
 import { appendDurableEvent } from '../storage/event-log';
 import { readSessionState, writeSessionState, loadSession } from '../storage/session-store';
