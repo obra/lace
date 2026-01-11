@@ -97,6 +97,9 @@ vi.mock('server-only', () => {
   return {};
 });
 
+// Track pending timers from mocks so we can clean them up
+const pendingMockTimers: ReturnType<typeof setTimeout>[] = [];
+
 // Mock the Anthropic SDK globally to prevent real API calls in all tests
 vi.mock('@anthropic-ai/sdk', () => {
   // Create a proper mock stream type
@@ -144,11 +147,13 @@ vi.mock('@anthropic-ai/sdk', () => {
       stream: vi.fn().mockImplementation(() => {
         const mockStream = createMockStream();
 
-        setTimeout(() => {
+        // Track the timer so it can be cleaned up
+        const timerId = setTimeout(() => {
           mockStream.emit('text', 'Hello! ');
           mockStream.emit('text', 'This is a test response.');
           mockStream.emit('end');
         }, 10);
+        pendingMockTimers.push(timerId);
 
         return mockStream;
       }),
@@ -170,12 +175,21 @@ vi.mock('@anthropic-ai/sdk', () => {
   };
 });
 
+// Export for cleanup
+(globalThis as unknown as { pendingMockTimers: ReturnType<typeof setTimeout>[] }).pendingMockTimers =
+  pendingMockTimers;
+
 // Global cleanup after each test file
 afterAll(() => {
-  // Use Vitest fake timers instead of numeric sweeping:
-  // - Ensure `vi.useFakeTimers()` is enabled in tests that create timers.
-  // - Keep `vi.clearAllTimers()` in afterEach to reset all fake timers.
-  // - For any real handles you create here (e.g., SSE/mock streams), clear them explicitly.
+  // Clear any pending mock timers (real timers from Anthropic SDK mock)
+  const timers = (globalThis as unknown as { pendingMockTimers?: ReturnType<typeof setTimeout>[] })
+    .pendingMockTimers;
+  if (timers) {
+    timers.forEach((t) => clearTimeout(t));
+    timers.length = 0;
+  }
+
+  // Clear fake timers if any were created
   vi.clearAllTimers();
 
   // Force garbage collection to clean up any remaining references
@@ -214,6 +228,14 @@ vi.spyOn(console, 'info').mockImplementation(() => {});
 
 // Cleanup after each individual test
 afterEach(async () => {
+  // Clear any pending mock timers (real timers from Anthropic SDK mock)
+  const timers = (globalThis as unknown as { pendingMockTimers?: ReturnType<typeof setTimeout>[] })
+    .pendingMockTimers;
+  if (timers) {
+    timers.forEach((t) => clearTimeout(t));
+    timers.length = 0;
+  }
+
   // Reset all vitest mocks and timers
   vi.clearAllMocks();
   vi.clearAllTimers();

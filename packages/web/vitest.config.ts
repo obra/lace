@@ -12,10 +12,13 @@ export default defineConfig({
     reporters: [['default', { summary: false }]],
     testTimeout: 30000,
     hookTimeout: 20000,
+    // Use forks pool instead of threads for better cleanup/stability
+    // See: https://github.com/vitest-dev/vitest/issues/2008
+    pool: 'forks',
     poolOptions: {
-      threads: {
-        minThreads: 1,
-        maxThreads: 2,
+      forks: {
+        minForks: 1,
+        maxForks: 4,
       },
     },
     exclude: [
