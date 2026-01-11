@@ -3,6 +3,14 @@
 
 import type { Route } from './+types/api.projects.$projectId.environment';
 import { Project } from '@lace/web/lib/server/projects/project';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import {
+  requireProjectId,
+  throwNotFound,
+  throwMethodNotAllowed,
+  errorToResponse,
+} from '@lace/web/lib/server/route-helpers';
 import { z } from 'zod';
 
 const SetEnvironmentVariablesSchema = z.object({
@@ -10,52 +18,33 @@ const SetEnvironmentVariablesSchema = z.object({
   encrypt: z.array(z.string()).optional(),
 });
 
-function isError(error: unknown): error is Error {
-  return error instanceof Error;
+function requireProject(projectId: string): Project {
+  const project = Project.getById(projectId);
+  if (!project) {
+    throwNotFound('Project');
+  }
+  return project;
 }
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { projectId } = params as { projectId: string };
-    const project = Project.getById(projectId);
-    if (!project) {
-      return Response.json(
-        { error: 'Project not found', code: 'RESOURCE_NOT_FOUND' },
-        { status: 404 }
-      );
-    }
-
+    const projectId = requireProjectId(params as Record<string, string | undefined>);
+    const project = requireProject(projectId);
     const variables = project.getEnvironmentVariables();
-
-    return Response.json({ variables });
+    return createSuperjsonResponse({ variables });
   } catch (error: unknown) {
-    const errorMessage = isError(error) ? error.message : 'Failed to fetch environment variables';
-    return Response.json({ error: errorMessage, code: 'INTERNAL_SERVER_ERROR' }, { status: 500 });
+    return errorToResponse(error, 'Failed to fetch environment variables');
   }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  switch (request.method) {
-    case 'PUT':
-      try {
-        const { projectId } = params as { projectId: string };
-        const project = Project.getById(projectId);
-        if (!project) {
-          return Response.json(
-            { error: 'Project not found', code: 'RESOURCE_NOT_FOUND' },
-            { status: 404 }
-          );
-        }
+  try {
+    const projectId = requireProjectId(params as Record<string, string | undefined>);
+    const project = requireProject(projectId);
 
-        let body: unknown;
-        try {
-          body = await request.json();
-        } catch {
-          return Response.json(
-            { error: 'Invalid JSON', code: 'VALIDATION_FAILED' },
-            { status: 400 }
-          );
-        }
+    switch (request.method) {
+      case 'PUT': {
+        const body = (await request.json()) as unknown;
         const validatedData = SetEnvironmentVariablesSchema.parse(body);
 
         project.setEnvironmentVariables(
@@ -64,69 +53,33 @@ export async function action({ request, params }: Route.ActionArgs) {
         );
 
         const updatedVariables = project.getEnvironmentVariables();
-
-        return Response.json({ variables: updatedVariables });
-      } catch (error: unknown) {
-        if (error instanceof z.ZodError) {
-          return Response.json(
-            {
-              error: 'Invalid request data',
-              code: 'VALIDATION_FAILED',
-              details: error.errors,
-            },
-            { status: 400 }
-          );
-        }
-
-        const errorMessage = isError(error)
-          ? error.message
-          : 'Failed to update environment variables';
-        return Response.json(
-          { error: errorMessage, code: 'INTERNAL_SERVER_ERROR' },
-          { status: 500 }
-        );
+        return createSuperjsonResponse({ variables: updatedVariables });
       }
-      break;
 
-    case 'DELETE':
-      try {
-        const { projectId } = params as { projectId: string };
-        const project = Project.getById(projectId);
-        if (!project) {
-          return Response.json(
-            { error: 'Project not found', code: 'RESOURCE_NOT_FOUND' },
-            { status: 404 }
-          );
-        }
-
+      case 'DELETE': {
         const url = new URL(request.url);
         const key = url.searchParams.get('key');
 
         if (!key) {
-          return Response.json(
-            {
-              error: 'Environment variable key is required',
-              code: 'VALIDATION_FAILED',
-            },
-            { status: 400 }
-          );
+          return createErrorResponse('Environment variable key is required', 400, {
+            code: 'VALIDATION_FAILED',
+          });
         }
 
         project.deleteEnvironmentVariable(key);
-
-        return Response.json({ success: true });
-      } catch (error: unknown) {
-        const errorMessage = isError(error)
-          ? error.message
-          : 'Failed to delete environment variable';
-        return Response.json(
-          { error: errorMessage, code: 'INTERNAL_SERVER_ERROR' },
-          { status: 500 }
-        );
+        return createSuperjsonResponse({ success: true });
       }
-      break;
 
-    default:
-      return Response.json({ error: 'Method not allowed' }, { status: 405 });
+      default:
+        throwMethodNotAllowed();
+    }
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return createErrorResponse('Invalid request data', 400, {
+        code: 'VALIDATION_FAILED',
+        details: error.errors,
+      });
+    }
+    return errorToResponse(error, 'Failed to update environment variables');
   }
 }

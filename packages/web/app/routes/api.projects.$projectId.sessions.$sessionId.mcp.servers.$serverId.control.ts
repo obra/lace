@@ -5,18 +5,42 @@ import { Project } from '@lace/web/lib/server/projects/project';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
-import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
+import {
+  requireParam,
+  requireSessionId,
+  throwNotFound,
+  throwMethodNotAllowed,
+  errorToResponse,
+} from '@lace/web/lib/server/route-helpers';
 import { z } from 'zod';
-
-const RouteParamsSchema = z.object({
-  projectId: z.string().min(1),
-  sessionId: z.string().min(1),
-  serverId: z.string().min(1),
-});
+import type { MCPServerConfig } from '@lace/web/types/core';
 
 const ControlActionSchema = z.object({
   action: z.enum(['start', 'stop', 'restart']),
 });
+
+/**
+ * Build the mcpServers config payload for ent/session/configure.
+ * Extracts the repeated object construction from start/stop/restart cases.
+ */
+function buildMcpServerPayload(
+  serverId: string,
+  serverConfig: MCPServerConfig,
+  enabled: boolean
+): { mcpServers: Array<Record<string, unknown>> } {
+  return {
+    mcpServers: [
+      {
+        name: serverId,
+        command: serverConfig.command,
+        ...(serverConfig.args ? { args: serverConfig.args } : {}),
+        ...(serverConfig.env ? { env: serverConfig.env } : {}),
+        enabled,
+        tools: serverConfig.tools,
+      },
+    ],
+  };
+}
 
 export async function action({
   request,
@@ -26,157 +50,90 @@ export async function action({
   params: unknown;
   context: unknown;
 }) {
-  if (request.method !== 'POST') {
-    return createErrorResponse('Method not allowed', 405);
-  }
-
-  // Validate route parameters first
-  let projectId: string, sessionId: string, serverId: string;
   try {
-    const parsedParams = RouteParamsSchema.parse(
-      params as { projectId: string; sessionId: string; serverId: string }
-    );
-    projectId = parsedParams.projectId;
-    sessionId = parsedParams.sessionId;
-    serverId = parsedParams.serverId;
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid route parameters', 400, {
-        code: 'VALIDATION_FAILED',
-        details: error.errors,
-      });
+    if (request.method !== 'POST') {
+      throwMethodNotAllowed();
     }
-    throw error;
-  }
 
-  try {
-    const { action } = ControlActionSchema.parse(await request.json());
+    const typedParams = params as Record<string, string | undefined>;
+    const projectId = requireParam(typedParams, 'projectId');
+    const sessionId = requireSessionId(typedParams);
+    const serverId = requireParam(typedParams, 'serverId');
+
+    const { action: controlAction } = ControlActionSchema.parse(await request.json());
 
     // Verify project exists
     const project = Project.getById(projectId);
     if (!project) {
-      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      throwNotFound('Project');
     }
 
-    // Verify session exists
-    if (!isWorkspaceSessionId(sessionId)) {
-      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
-    }
-
+    // Verify session exists and belongs to project
     const supervisor = await getSupervisor();
     const workspaceSession = await supervisor.getWorkspaceSession(sessionId);
     if (!workspaceSession || workspaceSession.projectId !== projectId) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      throwNotFound('Session');
     }
 
     // Get server configuration from project
     const serverConfig = project.getMCPServer(serverId);
     if (!serverConfig) {
-      return createErrorResponse(`MCP server '${serverId}' not found`, 404);
+      return createErrorResponse(`MCP server '${serverId}' not found`, 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
     }
 
-    try {
-      // Perform the requested action
-      switch (action) {
-        case 'start':
-          await supervisor.agentRequest({
-            workspaceSessionId: sessionId,
-            method: 'ent/session/configure',
-            requestParams: {
-              mcpServers: [
-                {
-                  name: serverId,
-                  command: serverConfig.command,
-                  ...(serverConfig.args ? { args: serverConfig.args } : {}),
-                  ...(serverConfig.env ? { env: serverConfig.env } : {}),
-                  enabled: true,
-                  tools: serverConfig.tools,
-                },
-              ],
-            },
-          });
-          return createSuperjsonResponse({
-            message: `Server start initiated for '${serverId}'`,
-            serverId,
-            status: 'starting',
-          });
+    // Perform the requested action using the shared payload builder
+    switch (controlAction) {
+      case 'start':
+        await supervisor.agentRequest({
+          workspaceSessionId: sessionId,
+          method: 'ent/session/configure',
+          requestParams: buildMcpServerPayload(serverId, serverConfig, true),
+        });
+        return createSuperjsonResponse({
+          message: `Server start initiated for '${serverId}'`,
+          serverId,
+          status: 'starting',
+        });
 
-        case 'stop':
-          await supervisor.agentRequest({
-            workspaceSessionId: sessionId,
-            method: 'ent/session/configure',
-            requestParams: {
-              mcpServers: [
-                {
-                  name: serverId,
-                  command: serverConfig.command,
-                  ...(serverConfig.args ? { args: serverConfig.args } : {}),
-                  ...(serverConfig.env ? { env: serverConfig.env } : {}),
-                  enabled: false,
-                  tools: serverConfig.tools,
-                },
-              ],
-            },
-          });
-          return createSuperjsonResponse({
-            message: `Server stop initiated for '${serverId}'`,
-            serverId,
-            status: 'stopping',
-          });
+      case 'stop':
+        await supervisor.agentRequest({
+          workspaceSessionId: sessionId,
+          method: 'ent/session/configure',
+          requestParams: buildMcpServerPayload(serverId, serverConfig, false),
+        });
+        return createSuperjsonResponse({
+          message: `Server stop initiated for '${serverId}'`,
+          serverId,
+          status: 'stopping',
+        });
 
-        case 'restart':
-          // Stop then start
-          await supervisor.agentRequest({
-            workspaceSessionId: sessionId,
-            method: 'ent/session/configure',
-            requestParams: {
-              mcpServers: [
-                {
-                  name: serverId,
-                  command: serverConfig.command,
-                  ...(serverConfig.args ? { args: serverConfig.args } : {}),
-                  ...(serverConfig.env ? { env: serverConfig.env } : {}),
-                  enabled: false,
-                  tools: serverConfig.tools,
-                },
-              ],
-            },
-          });
-          await supervisor.agentRequest({
-            workspaceSessionId: sessionId,
-            method: 'ent/session/configure',
-            requestParams: {
-              mcpServers: [
-                {
-                  name: serverId,
-                  command: serverConfig.command,
-                  ...(serverConfig.args ? { args: serverConfig.args } : {}),
-                  ...(serverConfig.env ? { env: serverConfig.env } : {}),
-                  enabled: true,
-                  tools: serverConfig.tools,
-                },
-              ],
-            },
-          });
-          return createSuperjsonResponse({
-            message: `Server restart initiated for '${serverId}'`,
-            serverId,
-            status: 'restarting',
-          });
-
-        default:
-          return createErrorResponse('Invalid action', 400);
-      }
-    } catch (controlError) {
-      console.error(`Failed to ${action} MCP server ${serverId}:`, controlError);
-      return createErrorResponse('Server control operation failed', 500);
+      case 'restart':
+        // Stop then start
+        await supervisor.agentRequest({
+          workspaceSessionId: sessionId,
+          method: 'ent/session/configure',
+          requestParams: buildMcpServerPayload(serverId, serverConfig, false),
+        });
+        await supervisor.agentRequest({
+          workspaceSessionId: sessionId,
+          method: 'ent/session/configure',
+          requestParams: buildMcpServerPayload(serverId, serverConfig, true),
+        });
+        return createSuperjsonResponse({
+          message: `Server restart initiated for '${serverId}'`,
+          serverId,
+          status: 'restarting',
+        });
     }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid request data', 400, { details: error.errors });
+      return createErrorResponse('Invalid request data', 400, {
+        code: 'VALIDATION_FAILED',
+        details: error.errors,
+      });
     }
-
-    console.error('Failed to control session MCP server:', error);
-    return createErrorResponse('Server control operation failed', 500);
+    return errorToResponse(error, 'Server control operation failed');
   }
 }
