@@ -160,7 +160,9 @@ export class ConversationRunner {
           await this.deps.onUpdate(messageTurnSeq, { type: 'text_delta', text: assistantText });
         }
 
-        await writeAndAdvance({ type: 'message', data: { content: assistantText } });
+        // Store content in array format (standard content block format)
+        const contentBlocks = assistantText ? [{ type: 'text', text: assistantText }] : [];
+        await writeAndAdvance({ type: 'message', data: { content: contentBlocks } });
 
         const toolCalls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
         if (toolCalls.length === 0) {

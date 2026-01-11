@@ -189,6 +189,9 @@ describe('/api/agents/:agentId/history', () => {
     const assistantId = `ent_${assistantDurable!.eventSeq}_assistant`;
     const assistantEvent = events.find((e) => e.id === assistantId);
     expect(assistantEvent?.type).toBe('AGENT_MESSAGE');
-    expect((assistantEvent?.data as { content?: unknown } | undefined)?.content).toBe('hello');
+    // TestAgentProvider returns "Running <command>..." for bash commands
+    expect((assistantEvent?.data as { content?: unknown } | undefined)?.content).toBe(
+      'Running echo hi...'
+    );
   }, 15000);
 });
