@@ -3,8 +3,7 @@
 import { AcpErrorCodes, EntErrorCodes, type JsonRpcPeer } from '@lace/ent-protocol';
 import type { AgentServerState, JobStatus, JobType } from '../../server-types';
 import { assertInitialized, throwInvalidParams, toNonEmptyString } from '../utils';
-import { getJobOutputPath, readJobOutput } from '../../jobs';
-import { logger } from '../../utils/logger';
+import { getJobOutputPath, readJobOutput, killJob } from '../../jobs';
 
 /**
  * Register job management handlers with the peer.
@@ -148,42 +147,12 @@ export function registerJobHandlers(
     const job = state.jobs.get(jobId);
     if (!job || job.status !== 'running') return { success: false };
 
-    job.status = 'cancelled';
-
     if (job.proc) {
-      const proc = job.proc;
-      try {
-        // Kill the entire process group on POSIX so we don't leak child processes (e.g. `sleep`)
-        // that can keep the shell alive and prevent job completion/finalization.
-        if (process.platform !== 'win32' && typeof proc.pid === 'number') {
-          process.kill(-proc.pid, 'SIGTERM');
-        } else {
-          proc.kill('SIGTERM');
-        }
-      } catch {
-        return { success: false };
-      }
+      // Kill the process with SIGTERM, then SIGKILL if still running
+      await killJob(job, { waitMs: 500, forceKill: true });
 
-      // Best-effort: wait briefly for graceful shutdown; if still running, escalate.
-      await Promise.race([
-        job.completion,
-        new Promise<void>((resolve) => setTimeout(resolve, 500)),
-      ]);
-      if (!job.finished) {
-        try {
-          if (process.platform !== 'win32' && typeof proc.pid === 'number') {
-            process.kill(-proc.pid, 'SIGKILL');
-          } else {
-            proc.kill('SIGKILL');
-          }
-        } catch (error) {
-          // SIGTERM was already sent; process may have exited
-          logger.debug('job.kill.sigkill.failed', {
-            jobId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-
+      // Wait extra time after SIGKILL for stubborn processes
+      if (!job.finished && job.proc.exitCode === null) {
         await Promise.race([
           job.completion,
           new Promise<void>((resolve) => setTimeout(resolve, 1_500)),
@@ -194,10 +163,7 @@ export function registerJobHandlers(
     }
 
     // Job is awaiting permission or otherwise not yet started; finalize immediately.
-    if (job.permissionAbortController) {
-      job.permissionAbortController.abort();
-      job.permissionAbortController = undefined;
-    }
+    await killJob(job); // Sets status to cancelled and aborts permission controller
     await finalizeJob(job);
 
     return { success: true };

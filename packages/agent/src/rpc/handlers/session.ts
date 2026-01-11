@@ -29,6 +29,7 @@ import { assertInitialized, throwInvalidParams, toNonEmptyString } from '../util
 import { loadPromptConfig } from '../../config/prompts';
 import { logger } from '../../utils/logger';
 import { reconcileMcpServersForActiveSession } from './mcp-servers';
+import { killAllRunningJobs } from '../../jobs';
 
 /**
  * Register session lifecycle handlers with the peer.
@@ -59,36 +60,7 @@ export function registerSessionHandlers(
       };
 
     // Kill all running jobs before switching sessions
-    for (const job of state.jobs.values()) {
-      if (job.status === 'running') {
-        job.status = 'cancelled';
-        if (job.proc) {
-          try {
-            if (process.platform !== 'win32' && typeof job.proc.pid === 'number') {
-              process.kill(-job.proc.pid, 'SIGTERM');
-            } else {
-              job.proc.kill('SIGTERM');
-            }
-          } catch (error) {
-            logger.debug('session.new.job_kill.failed', {
-              jobId: job.jobId,
-              error: error instanceof Error ? error.message : String(error),
-            });
-          }
-        }
-        job.permissionAbortController?.abort();
-      }
-    }
-
-    // Wait briefly for processes to terminate
-    await Promise.all(
-      [...state.jobs.values()]
-        .filter((job) => job.proc && job.proc.exitCode === null)
-        .map((job) =>
-          Promise.race([job.completion, new Promise<void>((resolve) => setTimeout(resolve, 500))])
-        )
-    );
-
+    await killAllRunningJobs(state.jobs);
     state.pendingPermissionRequests.clear();
     state.jobs.clear();
 
@@ -203,36 +175,7 @@ export function registerSessionHandlers(
       state.activeSession && state.activeSession.meta.sessionId !== parsed.sessionId;
     if (switchingSessions) {
       // Kill all running jobs before switching sessions
-      for (const job of state.jobs.values()) {
-        if (job.status === 'running') {
-          job.status = 'cancelled';
-          if (job.proc) {
-            try {
-              if (process.platform !== 'win32' && typeof job.proc.pid === 'number') {
-                process.kill(-job.proc.pid, 'SIGTERM');
-              } else {
-                job.proc.kill('SIGTERM');
-              }
-            } catch (error) {
-              logger.debug('session.load.job_kill.failed', {
-                jobId: job.jobId,
-                error: error instanceof Error ? error.message : String(error),
-              });
-            }
-          }
-          job.permissionAbortController?.abort();
-        }
-      }
-
-      // Wait briefly for processes to terminate
-      await Promise.all(
-        [...state.jobs.values()]
-          .filter((job) => job.proc && job.proc.exitCode === null)
-          .map((job) =>
-            Promise.race([job.completion, new Promise<void>((resolve) => setTimeout(resolve, 500))])
-          )
-      );
-
+      await killAllRunningJobs(state.jobs);
       state.pendingPermissionRequests.clear();
       state.jobs.clear();
     }

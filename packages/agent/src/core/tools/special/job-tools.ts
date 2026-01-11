@@ -1,7 +1,7 @@
 // ABOUTME: Handlers for job management tools (job_output, jobs_list, job_kill)
 // These tools query and control background jobs (shell and delegate)
 
-import { getJobOutputPath, readJobOutput } from '@lace/agent/jobs';
+import { getJobOutputPath, readJobOutput, killJob } from '@lace/agent/jobs';
 import type { SpecialToolContext, SpecialToolResult } from './types';
 
 /**
@@ -139,29 +139,12 @@ export async function executeJobKill(
     };
   }
 
-  job.status = 'cancelled';
-
-  let killed = false;
-  if (job.proc) {
-    const proc = job.proc;
-    try {
-      // Kill the entire process group on POSIX so we don't leak child processes
-      if (process.platform !== 'win32' && typeof proc.pid === 'number') {
-        process.kill(-proc.pid, 'SIGTERM');
-      } else {
-        proc.kill('SIGTERM');
-      }
-      killed = true;
-    } catch {
-      killed = false;
-    }
-  } else {
-    // Subagent job - just mark as cancelled (completion promise will resolve)
-    killed = true;
-  }
+  // Kill the job (sets status to cancelled, sends SIGTERM, aborts permission requests)
+  // Use waitMs: 0 for quick response since this is a tool call
+  await killJob(job, { waitMs: 0 });
 
   return {
     status: 'completed',
-    content: [{ type: 'text', text: JSON.stringify({ success: killed }) }],
+    content: [{ type: 'text', text: JSON.stringify({ success: true }) }],
   };
 }

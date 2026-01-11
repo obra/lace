@@ -41,3 +41,6 @@ export {
 
 // Notification formatting
 export { formatJobNotification } from './format-notification';
+
+// Job control - killing and cancelling jobs
+export { killJob, killAllRunningJobs, type KillJobOptions } from './job-control';

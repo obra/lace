@@ -1,23 +1,10 @@
 // ABOUTME: Types for special tool handlers that bypass normal tool execution
 // These tools (delegate, job_output, jobs_list, job_kill) need access to runtime state
 
-import type { ChildProcess } from 'node:child_process';
+import type { JobState } from '../../../server-types';
 
-/**
- * Job state tracked at runtime
- */
-export interface JobState {
-  jobId: string;
-  type: 'shell' | 'delegate';
-  status: 'running' | 'completed' | 'failed' | 'cancelled';
-  description?: string;
-  command?: string;
-  startTime?: string;
-  exitCode?: number;
-  subagentSessionId?: string;
-  proc?: ChildProcess;
-  completion: Promise<void>;
-}
+// Re-export JobState for consumers
+export type { JobState };
 
 /**
  * Job record for listing/querying
