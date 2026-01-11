@@ -291,13 +291,18 @@ export class TestAgentProvider extends AIProvider {
 
   private extractRequestedTool(
     text: string
-  ): null | { name: 'delegate' | 'file_read' | 'file_write' | 'bash'; args: Record<string, unknown> } {
+  ): null | {
+    name: 'delegate' | 'file_read' | 'file_write' | 'bash';
+    args: Record<string, unknown>;
+  } {
     const delegateMatch = text.match(/delegate\s+(.+)\s*$/i);
     const delegatePrompt = delegateMatch?.[1]?.trim();
     if (delegatePrompt) return { name: 'delegate', args: { prompt: delegatePrompt } };
 
     // Handle "subagent config=connId,modelId: prompt" or "subagent: prompt" pattern
-    const subagentMatch = text.match(/subagent(?:\s+config=([^,\s]+)?,([^\s:]+)?)?\s*:\s*(.+)\s*$/i);
+    const subagentMatch = text.match(
+      /subagent(?:\s+config=([^,\s]+)?,([^\s:]+)?)?\s*:\s*(.+)\s*$/i
+    );
     if (subagentMatch) {
       const connectionId = subagentMatch[1]?.trim() || undefined;
       const modelId = subagentMatch[2]?.trim() || undefined;

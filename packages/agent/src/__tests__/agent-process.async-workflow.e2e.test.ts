@@ -44,7 +44,11 @@ describe('async job workflow (E2E)', () => {
         'initialize'
       );
 
-      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
       // Spawn a long-running job that we can kill
       await withTimeout(
@@ -132,7 +136,11 @@ describe('async job workflow (E2E)', () => {
         'initialize'
       );
 
-      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
       // Spawn multiple jobs
       await withTimeout(
@@ -240,7 +248,11 @@ describe('async job workflow (E2E)', () => {
         'initialize'
       );
 
-      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
       // Spawn a job that produces output
       await withTimeout(
@@ -419,7 +431,11 @@ describe('async job workflow (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // Spawn a job that fails
     await withTimeout(
@@ -530,7 +546,11 @@ describe('async job workflow (E2E)', () => {
     );
 
     // Switch to a new session
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new (2)');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new (2)'
+    );
 
     // Load back the first session and check job status
     await withTimeout(
@@ -580,7 +600,11 @@ describe('async job workflow (E2E)', () => {
         'initialize'
       );
 
-      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
       // Start a quick job that will complete
       await withTimeout(
@@ -674,7 +698,11 @@ describe('async job workflow (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // Start a job that will fail
     await withTimeout(
@@ -775,7 +803,11 @@ describe('async job workflow (E2E)', () => {
         'initialize'
       );
 
-      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
       // Start a quick background job - this triggers the first turn
       await withTimeout(

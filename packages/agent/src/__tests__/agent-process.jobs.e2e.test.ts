@@ -78,7 +78,11 @@ describe('lace-agent jobs (E2E over stdio)', () => {
     expect(output.status).toBe('completed');
     expect(output.output).toContain('hi');
 
-    const list = (await withTimeout(ctx.agent.peer.request('ent/job/list'), 2_000, 'ent/job/list')) as {
+    const list = (await withTimeout(
+      ctx.agent.peer.request('ent/job/list'),
+      2_000,
+      'ent/job/list'
+    )) as {
       jobs: Array<{ jobId: string; status: string }>;
     };
 
@@ -151,7 +155,11 @@ describe('lace-agent jobs (E2E over stdio)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     await withTimeout(
       ctx.agent.peer.request('session/prompt', {
@@ -225,7 +233,9 @@ describe('lace-agent jobs (E2E over stdio)', () => {
     )) as { sessionId: string };
 
     await withTimeout(
-      ctx.agent.peer.request('session/prompt', { content: [{ type: 'text', text: 'subagent: hi' }] }),
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'subagent: hi' }],
+      }),
       10_000,
       'session/prompt'
     );
@@ -251,7 +261,11 @@ describe('lace-agent jobs (E2E over stdio)', () => {
     expect(subagentJobId).toMatch(/^job_/);
 
     // Get job list and verify subagentSessionId is present
-    const list = (await withTimeout(ctx.agent.peer.request('ent/job/list'), 2_000, 'ent/job/list')) as {
+    const list = (await withTimeout(
+      ctx.agent.peer.request('ent/job/list'),
+      2_000,
+      'ent/job/list'
+    )) as {
       jobs: Array<{ jobId: string; type: string; subagentSessionId?: string }>;
     };
 

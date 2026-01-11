@@ -38,7 +38,11 @@ describe('agent retry behavior (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // Send a simple prompt - should retry and eventually succeed
     const result = (await withTimeout(
@@ -71,7 +75,11 @@ describe('agent retry behavior (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     const result = (await withTimeout(
       ctx.agent.peer.request('session/prompt', {
@@ -106,7 +114,11 @@ describe('agent retry behavior (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // The prompt should fail after exhausting retries (throws JSON-RPC error)
     await expect(
@@ -139,7 +151,11 @@ describe('agent retry behavior (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // Should fail immediately without retry on 400 error (throws JSON-RPC error)
     await expect(
@@ -172,7 +188,11 @@ describe('agent retry behavior (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     await withTimeout(
       ctx.agent.peer.request('session/prompt', {

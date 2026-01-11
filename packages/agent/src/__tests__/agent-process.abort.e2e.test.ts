@@ -38,7 +38,11 @@ describe('agent abort reliability (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // Start a prompt (will be delayed by streaming delay)
     const { requestId, result: promptPromise } = ctx.agent.peer.requestWithId('session/prompt', {
@@ -107,7 +111,11 @@ describe('agent abort reliability (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // Start a prompt that will run a slow bash command
     const { requestId, result: promptPromise } = ctx.agent.peer.requestWithId('session/prompt', {
@@ -186,7 +194,11 @@ describe('agent abort reliability (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // Start a prompt that requires permission
     const { requestId, result: promptPromise } = ctx.agent.peer.requestWithId('session/prompt', {
@@ -245,7 +257,11 @@ describe('agent abort reliability (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // Verify no turn is active
     const beforeStatus = (await withTimeout(
@@ -306,12 +322,19 @@ describe('agent abort reliability (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // First turn - abort it
-    const { requestId, result: firstPromptPromise } = ctx.agent.peer.requestWithId('session/prompt', {
-      content: [{ type: 'text', text: 'first message' }],
-    });
+    const { requestId, result: firstPromptPromise } = ctx.agent.peer.requestWithId(
+      'session/prompt',
+      {
+        content: [{ type: 'text', text: 'first message' }],
+      }
+    );
 
     await new Promise((resolve) => setTimeout(resolve, 200));
     ctx.agent.peer.notify('$/cancel_request', { requestId });

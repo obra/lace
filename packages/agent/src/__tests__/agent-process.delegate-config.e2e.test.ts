@@ -69,7 +69,11 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
       expect(credResult.ok).toBe(true);
 
       // Create a new session
-      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
       // Test with connectionId and modelId - use simpler hardcoded values
       await withTimeout(
@@ -155,7 +159,11 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // Send a prompt that triggers delegate tool with just modelId
     // The test provider syntax: "subagent config=,modelId: prompt" (empty connectionId)

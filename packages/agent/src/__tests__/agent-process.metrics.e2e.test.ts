@@ -2,56 +2,44 @@
 // ABOUTME: Verifies tokensUsed, costUsd, and turnCount are returned correctly
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
-import { defaultInitializeParams } from './helpers/initialize';
+import {
+  createE2EContext,
+  spawnAgentProcess,
+  withTimeout,
+  defaultInitializeParams,
+} from './helpers';
 
 describe('lace-agent session metrics (E2E)', () => {
-  let originalLaceDir: string | undefined;
-  let laceDir: string;
-  let workDir: string;
-  let agent: SpawnedAgent | undefined;
+  const ctx = createE2EContext({ prefix: 'lace-agent-metrics' });
 
-  beforeEach(() => {
-    originalLaceDir = process.env.LACE_DIR;
-    laceDir = mkdtempSync(join(tmpdir(), 'lace-agent-metrics-e2e-'));
-    workDir = mkdtempSync(join(tmpdir(), 'lace-agent-metrics-wd-'));
-  });
-
-  afterEach(async () => {
-    if (agent) {
-      await agent.shutdown();
-      agent = undefined;
-    }
-
-    if (originalLaceDir === undefined) delete process.env.LACE_DIR;
-    else process.env.LACE_DIR = originalLaceDir;
-
-    rmSync(laceDir, { recursive: true, force: true });
-    rmSync(workDir, { recursive: true, force: true });
-  });
+  beforeEach(() => ctx.setup());
+  afterEach(() => ctx.teardown());
 
   it(
     'returns actual token usage in ent/agent/status after prompt',
     { timeout: 15_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       await withTimeout(
-        agent.peer.request('initialize', defaultInitializeParams()),
+        ctx.agent.peer.request('initialize', defaultInitializeParams()),
         2_000,
         'initialize'
       );
 
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
-      writeFileSync(join(workDir, 'hello.txt'), 'hello world\n', 'utf8');
+      writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello world\n', 'utf8');
 
       // Send a prompt
       await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'read file hello.txt' }],
         }),
         10_000,
@@ -61,7 +49,7 @@ describe('lace-agent session metrics (E2E)', () => {
       // Check status - tokensUsed should be non-zero
       // Test provider returns 100 input + 50 output = 150 tokens per turn
       const status = (await withTimeout(
-        agent.peer.request('ent/agent/status'),
+        ctx.agent.peer.request('ent/agent/status'),
         2_000,
         'ent/agent/status'
       )) as { currentSession: { tokensUsed: number } };
@@ -74,21 +62,25 @@ describe('lace-agent session metrics (E2E)', () => {
   );
 
   it('returns actual cost in ent/agent/status after prompt', { timeout: 15_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
-    writeFileSync(join(workDir, 'hello.txt'), 'hello world\n', 'utf8');
+    writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello world\n', 'utf8');
 
     // Send a prompt
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'read file hello.txt' }],
       }),
       10_000,
@@ -97,7 +89,7 @@ describe('lace-agent session metrics (E2E)', () => {
 
     // Check status - costUsd should match budgetUsedUsd
     const status = (await withTimeout(
-      agent.peer.request('ent/agent/status'),
+      ctx.agent.peer.request('ent/agent/status'),
       2_000,
       'ent/agent/status'
     )) as { currentSession: { costUsd: number }; limits: { budgetUsedUsd: number } };
@@ -108,21 +100,25 @@ describe('lace-agent session metrics (E2E)', () => {
   });
 
   it('returns turnCount in ent/agent/status after prompts', { timeout: 20_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
-    writeFileSync(join(workDir, 'hello.txt'), 'hello world\n', 'utf8');
+    writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello world\n', 'utf8');
 
     // Check initial status - turnCount should be 0
     const statusBefore = (await withTimeout(
-      agent.peer.request('ent/agent/status'),
+      ctx.agent.peer.request('ent/agent/status'),
       2_000,
       'ent/agent/status before'
     )) as { currentSession: { turnCount: number } };
@@ -131,7 +127,7 @@ describe('lace-agent session metrics (E2E)', () => {
 
     // Send first prompt
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'read file hello.txt' }],
       }),
       10_000,
@@ -140,7 +136,7 @@ describe('lace-agent session metrics (E2E)', () => {
 
     // Check status after first prompt - turnCount should be 1
     const statusAfterFirst = (await withTimeout(
-      agent.peer.request('ent/agent/status'),
+      ctx.agent.peer.request('ent/agent/status'),
       2_000,
       'ent/agent/status after first'
     )) as { currentSession: { turnCount: number } };
@@ -149,7 +145,7 @@ describe('lace-agent session metrics (E2E)', () => {
 
     // Send second prompt
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'hi' }],
       }),
       10_000,
@@ -158,7 +154,7 @@ describe('lace-agent session metrics (E2E)', () => {
 
     // Check status after second prompt - turnCount should be 2
     const statusAfterSecond = (await withTimeout(
-      agent.peer.request('ent/agent/status'),
+      ctx.agent.peer.request('ent/agent/status'),
       2_000,
       'ent/agent/status after second'
     )) as { currentSession: { turnCount: number } };

@@ -80,6 +80,9 @@ describe('executeSpecialTool', () => {
   it('job_kill returns not running for unknown job', async () => {
     const result = await executeSpecialTool('job_kill', { jobId: 'unknown' }, mockContext);
     expect(result.status).toBe('completed');
-    expect(JSON.parse(result.content[0].text)).toEqual({ success: false, reason: 'Job not running' });
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      success: false,
+      reason: 'Job not running',
+    });
   });
 });

@@ -40,10 +40,16 @@ describe('lace-agent subagents (E2E over stdio)', () => {
         2_000,
         'initialize'
       );
-      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
       await withTimeout(
-        ctx.agent.peer.request('session/prompt', { content: [{ type: 'text', text: 'subagent: hi' }] }),
+        ctx.agent.peer.request('session/prompt', {
+          content: [{ type: 'text', text: 'subagent: hi' }],
+        }),
         10_000,
         'session/prompt'
       );
@@ -103,7 +109,11 @@ describe('lace-agent subagents (E2E over stdio)', () => {
       2_000,
       'initialize'
     );
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     await withTimeout(
       ctx.agent.peer.request('session/prompt', {

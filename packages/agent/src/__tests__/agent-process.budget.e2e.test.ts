@@ -26,7 +26,11 @@ describe('lace-agent token budget tracking (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello world\n', 'utf8');
 
@@ -53,7 +57,11 @@ describe('lace-agent token budget tracking (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // Configure a budget
     await withTimeout(
@@ -102,7 +110,11 @@ describe('lace-agent token budget tracking (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // Configure a very small budget that will be exceeded
     await withTimeout(
@@ -153,7 +165,11 @@ describe('lace-agent token budget tracking (E2E)', () => {
         'initialize'
       );
 
-      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
       // Configure budget to 0 (should disable budget enforcement)
       await withTimeout(
@@ -186,7 +202,11 @@ describe('lace-agent token budget tracking (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // Configure a generous budget
     await withTimeout(

@@ -26,7 +26,9 @@ export interface SessionConfig {
 }
 
 export interface PromptParams {
-  content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mediaType: string }>;
+  content: Array<
+    { type: 'text'; text: string } | { type: 'image'; data: string; mediaType: string }
+  >;
   outputFormat?: unknown;
 }
 

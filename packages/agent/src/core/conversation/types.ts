@@ -144,7 +144,9 @@ export interface RunnerDependencies {
  */
 export interface RunParams {
   /** Content blocks for the prompt */
-  content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mediaType: string }>;
+  content: Array<
+    { type: 'text'; text: string } | { type: 'image'; data: string; mediaType: string }
+  >;
   /** Optional output format constraint */
   outputFormat?: unknown;
   /** Maximum turns before stopping (default: 10) */

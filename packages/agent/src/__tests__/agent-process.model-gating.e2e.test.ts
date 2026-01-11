@@ -62,7 +62,10 @@ describe('ent/models enable/disable (provider-global gating)', () => {
     expect(initialIds).toEqual(expect.arrayContaining([MODEL_A, MODEL_B]));
 
     const disabled = (await withTimeout(
-      ctx.agent.peer.request('ent/models/disable', { providerId: PROVIDER_ID, modelIds: [MODEL_B] }),
+      ctx.agent.peer.request('ent/models/disable', {
+        providerId: PROVIDER_ID,
+        modelIds: [MODEL_B],
+      }),
       2_000,
       'ent/models/disable'
     )) as { disabled: string[] };

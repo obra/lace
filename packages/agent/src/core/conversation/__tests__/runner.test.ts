@@ -15,12 +15,16 @@ import { TestAgentProvider } from '@lace/agent/runtime/test-provider';
 function createMockDeps(overrides: Partial<RunnerDependencies> = {}): RunnerDependencies {
   const mockToolExecutor = {
     getTool: vi.fn().mockReturnValue(null),
-    execute: vi.fn().mockResolvedValue({ status: 'completed', content: [{ type: 'text', text: 'mock result' }] }),
+    execute: vi
+      .fn()
+      .mockResolvedValue({ status: 'completed', content: [{ type: 'text', text: 'mock result' }] }),
   };
 
   return {
     onUpdate: vi.fn().mockResolvedValue(undefined),
-    runExclusive: vi.fn().mockImplementation(<T>(fn: () => T | Promise<T>) => Promise.resolve(fn())),
+    runExclusive: vi
+      .fn()
+      .mockImplementation(<T>(fn: () => T | Promise<T>) => Promise.resolve(fn())),
     requestPermission: vi.fn().mockResolvedValue({ decision: 'allow' }),
     createToolExecutor: vi.fn().mockReturnValue({
       executor: mockToolExecutor,

@@ -36,7 +36,11 @@ describe('lace-agent error recovery (E2E)', () => {
         'initialize'
       );
 
-      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
       // Ask to read a non-existent file - this will fail with "file not found"
       // The key behavior: the turn should CONTINUE, allowing the model to see the error
@@ -119,7 +123,11 @@ describe('lace-agent error recovery (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     // Create a file so the test provider will try file_write (needs permission)
     const promptResult = (await withTimeout(
@@ -200,7 +208,11 @@ describe('lace-agent error recovery (E2E)', () => {
         'initialize'
       );
 
-      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
       // Create a fallback file that the model will try after the first one fails
       writeFileSync(join(ctx.workDir, 'fallback.txt'), 'fallback content\n', 'utf8');
