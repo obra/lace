@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createSupervisorServer } from '../http/server';
+import { createE2EContext } from './helpers';
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -52,45 +52,27 @@ async function httpJson(
 }
 
 describe('Supervisor HTTP permissions race conditions (E2E)', () => {
-  let laceDir: string;
-  let workDir: string;
+  const ctx = createE2EContext({ prefix: 'lace-supervisor-http-e2e' });
   let server: ReturnType<typeof createSupervisorServer> | undefined;
   let baseUrl: string | undefined;
-  let originalAgentLaceDir: string | undefined;
-  let originalTestProvider: string | undefined;
 
-  beforeEach(() => {
-    laceDir = mkdtempSync(join(tmpdir(), 'lace-supervisor-http-e2e-store-'));
-    workDir = mkdtempSync(join(tmpdir(), 'lace-supervisor-http-e2e-wd-'));
-    originalAgentLaceDir = process.env.LACE_DIR;
-    originalTestProvider = process.env.LACE_AGENT_TEST_PROVIDER;
-    process.env.LACE_DIR = laceDir;
-    process.env.LACE_AGENT_TEST_PROVIDER = '1';
-  });
-
+  beforeEach(() => ctx.setup());
   afterEach(async () => {
+    // Close server before context teardown
     if (server) {
       await server.close();
       server = undefined;
     }
-
-    rmSync(laceDir, { recursive: true, force: true });
-    rmSync(workDir, { recursive: true, force: true });
-
-    if (originalAgentLaceDir === undefined) delete process.env.LACE_DIR;
-    else process.env.LACE_DIR = originalAgentLaceDir;
-
-    if (originalTestProvider === undefined) delete process.env.LACE_AGENT_TEST_PROVIDER;
-    else process.env.LACE_AGENT_TEST_PROVIDER = originalTestProvider;
+    await ctx.teardown();
   });
 
   it('executes a tool exactly once despite repeated resolves for the same toolCallId', async () => {
-    server = createSupervisorServer({ storeDir: laceDir, host: '127.0.0.1', port: 0 });
+    server = createSupervisorServer({ storeDir: ctx.laceDir, host: '127.0.0.1', port: 0 });
     const listening = await withTimeout(server.listen(), 5_000, 'server.listen');
     baseUrl = listening.baseUrl;
 
     const createWs = await withTimeout(
-      httpJson('POST', `${baseUrl}/workspace-sessions`, { workDir }),
+      httpJson('POST', `${baseUrl}/workspace-sessions`, { workDir: ctx.workDir }),
       5_000,
       'POST /workspace-sessions'
     );
@@ -138,7 +120,7 @@ describe('Supervisor HTTP permissions race conditions (E2E)', () => {
     await waitFor(
       async () => {
         try {
-          const contents = readFileSync(join(workDir, 'counter.txt'), 'utf8');
+          const contents = readFileSync(join(ctx.workDir, 'counter.txt'), 'utf8');
           return contents.length > 0 ? contents : null;
         } catch {
           return null;
@@ -147,7 +129,7 @@ describe('Supervisor HTTP permissions race conditions (E2E)', () => {
       { timeoutMs: 5_000, intervalMs: 20, label: 'counter.txt written' }
     );
 
-    expect(readFileSync(join(workDir, 'counter.txt'), 'utf8')).toBe('x');
+    expect(readFileSync(join(ctx.workDir, 'counter.txt'), 'utf8')).toBe('x');
 
     const events = await waitFor(
       async () => {

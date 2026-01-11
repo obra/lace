@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { SupervisorAgentProcess } from '../supervisor-agent-process';
 import { Supervisor } from '../supervisor';
+import { createE2EContext } from './helpers';
 
 function defaultInitializeParams(config?: Record<string, unknown>): Record<string, unknown> {
   return {
@@ -29,35 +27,17 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
 }
 
 describe('SupervisorAgentProcess (E2E)', () => {
-  let laceDir: string;
-  let workDir: string;
+  const ctx = createE2EContext({ prefix: 'lace-supervisor-e2e' });
   let supervisor: SupervisorAgentProcess | undefined;
-  let originalAgentLaceDir: string | undefined;
-  let originalTestProvider: string | undefined;
 
-  beforeEach(() => {
-    laceDir = mkdtempSync(join(tmpdir(), 'lace-supervisor-e2e-store-'));
-    workDir = mkdtempSync(join(tmpdir(), 'lace-supervisor-e2e-wd-'));
-    originalAgentLaceDir = process.env.LACE_DIR;
-    originalTestProvider = process.env.LACE_AGENT_TEST_PROVIDER;
-    process.env.LACE_DIR = laceDir;
-    process.env.LACE_AGENT_TEST_PROVIDER = '1';
-  });
-
+  beforeEach(() => ctx.setup());
   afterEach(async () => {
+    // Shutdown supervisor before context teardown
     if (supervisor) {
       await supervisor.shutdown();
       supervisor = undefined;
     }
-
-    rmSync(laceDir, { recursive: true, force: true });
-    rmSync(workDir, { recursive: true, force: true });
-
-    if (originalAgentLaceDir === undefined) delete process.env.LACE_DIR;
-    else process.env.LACE_DIR = originalAgentLaceDir;
-
-    if (originalTestProvider === undefined) delete process.env.LACE_AGENT_TEST_PROVIDER;
-    else process.env.LACE_AGENT_TEST_PROVIDER = originalTestProvider;
+    await ctx.teardown();
   });
 
   it('spawns an agent process and handles permission requests', async () => {
@@ -77,7 +57,11 @@ describe('SupervisorAgentProcess (E2E)', () => {
       2_000,
       'initialize'
     );
-    await withTimeout(supervisor.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(
+      supervisor.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     await withTimeout(
       supervisor.peer.request('session/prompt', {
@@ -110,35 +94,17 @@ describe('SupervisorAgentProcess (E2E)', () => {
 });
 
 describe('Supervisor (E2E)', () => {
-  let laceDir: string;
-  let workDir: string;
+  const ctx = createE2EContext({ prefix: 'lace-supervisor2-e2e' });
   let supervisor: Supervisor | undefined;
-  let originalAgentLaceDir: string | undefined;
-  let originalTestProvider: string | undefined;
 
-  beforeEach(() => {
-    laceDir = mkdtempSync(join(tmpdir(), 'lace-supervisor2-e2e-store-'));
-    workDir = mkdtempSync(join(tmpdir(), 'lace-supervisor2-e2e-wd-'));
-    originalAgentLaceDir = process.env.LACE_DIR;
-    originalTestProvider = process.env.LACE_AGENT_TEST_PROVIDER;
-    process.env.LACE_DIR = laceDir;
-    process.env.LACE_AGENT_TEST_PROVIDER = '1';
-  });
-
+  beforeEach(() => ctx.setup());
   afterEach(async () => {
+    // Shutdown supervisor before context teardown
     if (supervisor) {
       await supervisor.shutdown();
       supervisor = undefined;
     }
-
-    rmSync(laceDir, { recursive: true, force: true });
-    rmSync(workDir, { recursive: true, force: true });
-
-    if (originalAgentLaceDir === undefined) delete process.env.LACE_DIR;
-    else process.env.LACE_DIR = originalAgentLaceDir;
-
-    if (originalTestProvider === undefined) delete process.env.LACE_AGENT_TEST_PROVIDER;
-    else process.env.LACE_AGENT_TEST_PROVIDER = originalTestProvider;
+    await ctx.teardown();
   });
 
   it('runs two workspace sessions as two agent processes', async () => {
@@ -149,7 +115,7 @@ describe('Supervisor (E2E)', () => {
     }> = [];
 
     supervisor = new Supervisor({
-      storeDir: laceDir,
+      storeDir: ctx.laceDir,
       onSessionUpdate: (workspaceSessionId, update) => updates.push({ workspaceSessionId, update }),
       onPermissionRequest: async (workspaceSessionId, params) => {
         permissionRequests.push({ workspaceSessionId, params });
@@ -157,8 +123,8 @@ describe('Supervisor (E2E)', () => {
       },
     });
 
-    const a = await supervisor.createWorkspaceSession(workDir);
-    const b = await supervisor.createWorkspaceSession(workDir);
+    const a = await supervisor.createWorkspaceSession(ctx.workDir);
+    const b = await supervisor.createWorkspaceSession(ctx.workDir);
 
     expect(a.workspaceSessionId).not.toBe(b.workspaceSessionId);
     expect(a.sessionId).not.toBe(b.sessionId);
@@ -212,14 +178,14 @@ describe('Supervisor (E2E)', () => {
     }> = [];
 
     supervisor = new Supervisor({
-      storeDir: laceDir,
+      storeDir: ctx.laceDir,
       onPermissionRequest: async (workspaceSessionId, params) => {
         permissionRequests.push({ workspaceSessionId, params });
         return { decision: 'allow' };
       },
     });
 
-    const ws = await supervisor.createWorkspaceSession(workDir);
+    const ws = await supervisor.createWorkspaceSession(ctx.workDir);
     const second = await supervisor.createAgentSession(ws.workspaceSessionId);
 
     expect(second.sessionId).not.toBe(ws.sessionId);
@@ -259,7 +225,7 @@ describe('Supervisor (E2E)', () => {
     }> = [];
 
     supervisor = new Supervisor({
-      storeDir: laceDir,
+      storeDir: ctx.laceDir,
       onSessionUpdate: (workspaceSessionId, update) => updates.push({ workspaceSessionId, update }),
       onPermissionRequest: async (workspaceSessionId, params) => {
         permissionRequests.push({ workspaceSessionId, params });
@@ -267,7 +233,7 @@ describe('Supervisor (E2E)', () => {
       },
     });
 
-    const ws = await supervisor.createWorkspaceSession(workDir);
+    const ws = await supervisor.createWorkspaceSession(ctx.workDir);
 
     supervisor.upsertAgentSessionMeta(ws.workspaceSessionId, {
       sessionId: ws.sessionId,
@@ -306,18 +272,18 @@ describe('Supervisor (E2E)', () => {
 
   it('persists workspace session metadata to laceDir', async () => {
     supervisor = new Supervisor({
-      storeDir: laceDir,
+      storeDir: ctx.laceDir,
       onPermissionRequest: async () => ({ decision: 'allow' }),
     });
 
-    const ws = await supervisor.createWorkspaceSession(workDir);
+    const ws = await supervisor.createWorkspaceSession(ctx.workDir);
     await supervisor.createAgentSession(ws.workspaceSessionId);
 
     await supervisor.shutdown();
     supervisor = undefined;
 
     supervisor = new Supervisor({
-      storeDir: laceDir,
+      storeDir: ctx.laceDir,
       onPermissionRequest: async () => ({ decision: 'allow' }),
     });
 
@@ -327,18 +293,18 @@ describe('Supervisor (E2E)', () => {
     expect(stored).toBeTruthy();
     expect(stored).toMatchObject({
       workspaceSessionId: ws.workspaceSessionId,
-      workDir,
+      workDir: ctx.workDir,
     });
     expect(stored?.agents.length).toBe(2);
   });
 
   it('can attach to an existing sessionId and read durable events', async () => {
     supervisor = new Supervisor({
-      storeDir: laceDir,
+      storeDir: ctx.laceDir,
       onPermissionRequest: async () => ({ decision: 'allow' }),
     });
 
-    const created = await supervisor.createWorkspaceSession(workDir);
+    const created = await supervisor.createWorkspaceSession(ctx.workDir);
     await withTimeout(
       supervisor.prompt(created.workspaceSessionId, [{ type: 'text', text: 'hi' }]),
       5_000,
@@ -349,7 +315,7 @@ describe('Supervisor (E2E)', () => {
     supervisor = undefined;
 
     supervisor = new Supervisor({
-      storeDir: laceDir,
+      storeDir: ctx.laceDir,
       onPermissionRequest: async () => ({ decision: 'allow' }),
     });
 
@@ -378,12 +344,12 @@ describe('Supervisor (E2E)', () => {
     const updates: Array<{ workspaceSessionId: string; update: Record<string, unknown> }> = [];
 
     supervisor = new Supervisor({
-      storeDir: laceDir,
+      storeDir: ctx.laceDir,
       onSessionUpdate: (workspaceSessionId, update) => updates.push({ workspaceSessionId, update }),
       onPermissionRequest: async () => ({ decision: 'allow' }),
     });
 
-    const ws = await supervisor.createWorkspaceSession(workDir);
+    const ws = await supervisor.createWorkspaceSession(ctx.workDir);
 
     const providers = await withTimeout(
       supervisor.listProviders(ws.workspaceSessionId),
