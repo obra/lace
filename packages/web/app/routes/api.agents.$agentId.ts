@@ -3,8 +3,13 @@
 
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import {
+  requireAgentId,
+  throwNotFound,
+  throwMethodNotAllowed,
+  errorToResponse,
+} from '@lace/web/lib/server/route-helpers';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
-import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { z } from 'zod';
 import { getProviderManagementAgent } from '@lace/web/lib/server/supervisor-service';
 import type { ThreadTokenUsage } from '@lace/ent-protocol';
@@ -37,20 +42,16 @@ async function findWorkspaceForAgentSession(agentSessionId: string) {
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { agentId } = params as { agentId: string };
-
-    if (!isAgentSessionId(agentId)) {
-      return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });
-    }
+    const agentId = requireAgentId(params);
 
     const { supervisor, record } = await findWorkspaceForAgentSession(agentId);
     if (!record) {
-      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      throwNotFound('Agent');
     }
 
     const meta = record.agents.find((a) => a.sessionId === agentId);
     if (!meta) {
-      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      throwNotFound('Agent');
     }
 
     const tokenUsage = (await supervisor.agentRequest({
@@ -70,51 +71,28 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       createdAt: meta.createdAt ? new Date(meta.createdAt) : undefined,
     });
   } catch (error: unknown) {
-    return createErrorResponse(
-      error instanceof Error ? error.message : 'Failed to fetch agent',
-      500,
-      {
-        code: 'INTERNAL_SERVER_ERROR',
-      }
-    );
+    return errorToResponse(error);
   }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if (request.method !== 'PUT') {
-    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
-  }
-
   try {
-    const { agentId } = params as { agentId: string };
-
-    if (!isAgentSessionId(agentId)) {
-      return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });
+    if (request.method !== 'PUT') {
+      throwMethodNotAllowed();
     }
 
+    const agentId = requireAgentId(params);
     const body = (await request.json()) as Record<string, unknown>;
-
-    let validatedData;
-    try {
-      validatedData = AgentUpdateSchema.parse(body);
-    } catch (zodError) {
-      if (zodError instanceof z.ZodError) {
-        return createErrorResponse('Invalid request data', 400, {
-          code: 'VALIDATION_FAILED',
-          details: zodError.errors,
-        });
-      }
-      throw zodError;
-    }
+    const validatedData = AgentUpdateSchema.parse(body);
 
     const { supervisor, record } = await findWorkspaceForAgentSession(agentId);
     if (!record) {
-      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      throwNotFound('Agent');
     }
 
     const meta = record.agents.find((a) => a.sessionId === agentId);
     if (!meta) {
-      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      throwNotFound('Agent');
     }
 
     if (validatedData.providerInstanceId) {
@@ -173,10 +151,12 @@ export async function action({ request, params }: Route.ActionArgs) {
       createdAt: updatedMeta?.createdAt ? new Date(updatedMeta.createdAt) : undefined,
     });
   } catch (error: unknown) {
-    return createErrorResponse(
-      error instanceof Error ? error.message : 'Failed to update agent',
-      500,
-      { code: 'INTERNAL_SERVER_ERROR' }
-    );
+    if (error instanceof z.ZodError) {
+      return createErrorResponse('Invalid request data', 400, {
+        code: 'VALIDATION_FAILED',
+        details: error.errors,
+      });
+    }
+    return errorToResponse(error);
   }
 }

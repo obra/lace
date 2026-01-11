@@ -4,14 +4,14 @@
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
+import {
+  requireSessionId,
+  throwNotFound,
+  throwMethodNotAllowed,
+  errorToResponse,
+} from '@lace/web/lib/server/route-helpers';
 import { z } from 'zod';
 import type { Route } from './+types/api.sessions.$sessionId';
-
-// Type guard for unknown error values
-function isError(error: unknown): error is Error {
-  return error instanceof Error;
-}
 
 // Schema for validating session update requests
 const UpdateSessionSchema = z.object({
@@ -22,19 +22,13 @@ const UpdateSessionSchema = z.object({
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { sessionId: sessionIdParam } = params as { sessionId: string };
-
-    if (!isWorkspaceSessionId(sessionIdParam)) {
-      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
-    }
-
-    const workspaceSessionId = sessionIdParam;
+    const workspaceSessionId = requireSessionId(params);
 
     const supervisor = await getSupervisor();
     const record = await supervisor.getWorkspaceSession(workspaceSessionId);
 
     if (!record) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      throwNotFound('Session');
     }
 
     const agentsWithStatus = await Promise.all(
@@ -98,32 +92,22 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     return createSuperjsonResponse(sessionData);
   } catch (error: unknown) {
-    const errorMessage = isError(error) ? error.message : 'Internal server error';
-    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
+    return errorToResponse(error);
   }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  switch (request.method) {
-    case 'PATCH':
-      break;
-    default:
-      return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
-  }
-
   try {
-    const { sessionId: sessionIdParam } = params as { sessionId: string };
-
-    if (!isWorkspaceSessionId(sessionIdParam)) {
-      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
+    if (request.method !== 'PATCH') {
+      throwMethodNotAllowed();
     }
 
-    const workspaceSessionId = sessionIdParam;
+    const workspaceSessionId = requireSessionId(params);
 
     const supervisor = await getSupervisor();
     const existing = await supervisor.getWorkspaceSession(workspaceSessionId);
     if (!existing) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      throwNotFound('Session');
     }
 
     // Parse and validate request body
@@ -166,7 +150,6 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     return createSuperjsonResponse(sessionData);
   } catch (error: unknown) {
-    const errorMessage = isError(error) ? error.message : 'Internal server error';
-    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
+    return errorToResponse(error);
   }
 }

@@ -2,9 +2,14 @@
 // ABOUTME: Handles session configuration retrieval and updates with validation and inheritance
 
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
-import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import {
+  requireSessionId,
+  throwNotFound,
+  throwMethodNotAllowed,
+  errorToResponse,
+} from '@lace/web/lib/server/route-helpers';
 import { z } from 'zod';
 import type { Route } from './+types/api.sessions.$sessionId.configuration';
 
@@ -24,17 +29,11 @@ const ConfigurationSchema = z
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { sessionId: sessionIdParam } = params as { sessionId: string };
-
-    if (!isWorkspaceSessionId(sessionIdParam)) {
-      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
-    }
-
-    const workspaceSessionId = sessionIdParam;
+    const workspaceSessionId = requireSessionId(params);
     const supervisor = await getSupervisor();
     const record = await supervisor.getWorkspaceSession(workspaceSessionId);
     if (!record) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      throwNotFound('Session');
     }
 
     const coordinator = record.agents[0];
@@ -59,37 +58,24 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       },
     });
   } catch (error: unknown) {
-    return createErrorResponse(
-      error instanceof Error ? error.message : 'Failed to fetch configuration',
-      500,
-      { code: 'INTERNAL_SERVER_ERROR' }
-    );
+    return errorToResponse(error);
   }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  switch (request.method) {
-    case 'PUT':
-      break;
-    default:
-      return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
-  }
-
   try {
-    const { sessionId: sessionIdParam } = params as { sessionId: string };
-
-    if (!isWorkspaceSessionId(sessionIdParam)) {
-      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
+    if (request.method !== 'PUT') {
+      throwMethodNotAllowed();
     }
 
-    const workspaceSessionId = sessionIdParam;
+    const workspaceSessionId = requireSessionId(params);
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = ConfigurationSchema.parse(body);
 
     const supervisor = await getSupervisor();
     const record = await supervisor.getWorkspaceSession(workspaceSessionId);
     if (!record) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      throwNotFound('Session');
     }
 
     const coordinator = record.agents[0];
@@ -155,15 +141,6 @@ export async function action({ request, params }: Route.ActionArgs) {
         details: error.errors,
       });
     }
-
-    if (error instanceof Error && error.message === 'Session not found') {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
-    }
-
-    return createErrorResponse(
-      error instanceof Error ? error.message : 'Failed to update configuration',
-      500,
-      { code: 'INTERNAL_SERVER_ERROR' }
-    );
+    return errorToResponse(error);
   }
 }

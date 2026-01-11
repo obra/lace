@@ -3,18 +3,18 @@
 
 import { CreateAgentRequest } from '@lace/web/types/api';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
-import { isWorkspaceSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import {
+  requireSessionId,
+  throwNotFound,
+  throwMethodNotAllowed,
+  errorToResponse,
+} from '@lace/web/lib/server/route-helpers';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import { getProviderManagementAgent } from '@lace/web/lib/server/supervisor-service';
 import type { Route } from './+types/api.sessions.$sessionId.agents';
 import type { PersonaInfo } from '@lace/ent-protocol';
-
-// Type guard for unknown error values
-function isError(error: unknown): error is Error {
-  return error instanceof Error;
-}
 
 // Type guard for CreateAgentRequest
 function isCreateAgentRequest(body: unknown): body is CreateAgentRequest {
@@ -34,17 +34,12 @@ function isCreateAgentRequest(body: unknown): body is CreateAgentRequest {
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { sessionId: sessionIdParam } = params as { sessionId: string };
-
-    if (!isWorkspaceSessionId(sessionIdParam)) {
-      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
-    }
-    const workspaceSessionId = sessionIdParam;
+    const workspaceSessionId = requireSessionId(params);
 
     const supervisor = await getSupervisor();
     const record = await supervisor.getWorkspaceSession(workspaceSessionId);
     if (!record) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      throwNotFound('Session');
     }
 
     return createSuperjsonResponse(
@@ -57,26 +52,18 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
         createdAt: new Date(a.createdAt),
       }))
     );
-  } catch (_error: unknown) {
-    return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
+  } catch (error: unknown) {
+    return errorToResponse(error);
   }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  switch (request.method) {
-    case 'POST':
-      break;
-    default:
-      return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
-  }
-
   try {
-    const { sessionId: sessionIdParam } = params as { sessionId: string };
-
-    if (!isWorkspaceSessionId(sessionIdParam)) {
-      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
+    if (request.method !== 'POST') {
+      throwMethodNotAllowed();
     }
-    const workspaceSessionId = sessionIdParam;
+
+    const workspaceSessionId = requireSessionId(params);
 
     // Parse and validate request body
     const bodyData: unknown = await request.json();
@@ -91,7 +78,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const ws = await supervisor.getWorkspaceSession(workspaceSessionId);
     if (!ws) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      throwNotFound('Session');
     }
 
     const nextAgentIndex = ws.agents.length;
@@ -125,7 +112,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       // Log full error for server debugging while keeping client response sanitized
       console.error('Failed to spawn agent:', error);
       return createErrorResponse(
-        `Failed to spawn agent: ${isError(error) ? error.message : 'Unknown error'}`,
+        `Failed to spawn agent: ${error instanceof Error ? error.message : 'Unknown error'}`,
         400,
         { code: 'VALIDATION_FAILED' }
       );
@@ -197,10 +184,6 @@ export async function action({ request, params }: Route.ActionArgs) {
       },
     });
   } catch (error: unknown) {
-    if (isError(error) && error.message === 'Session not found') {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
-    }
-
-    return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
+    return errorToResponse(error);
   }
 }
