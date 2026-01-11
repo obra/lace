@@ -82,6 +82,62 @@ export class OllamaProvider extends AIProvider {
     }
   }
 
+  /**
+   * Validates connection and model availability, then converts messages to Ollama format.
+   * Throws descriptive errors if connection fails or model is unavailable.
+   */
+  private async _prepareRequest(
+    messages: ProviderMessage[],
+    model: string
+  ): Promise<{ ollamaMessages: Array<{ role: string; content: string }> }> {
+    // Check connection and model availability
+    const diagnostics = await this.diagnose();
+
+    if (!diagnostics.connected) {
+      throw new Error(
+        `Cannot connect to Ollama server at ${this._host}.\n` +
+          `Make sure Ollama is running and accessible.\n\n` +
+          `To fix this:\n` +
+          `  - Start Ollama service: 'ollama serve'\n` +
+          `  - Ensure the server is running on ${this._host}\n` +
+          `  - Check firewall settings if using a remote server\n\n` +
+          `Connection error: ${diagnostics.error}`
+      );
+    }
+
+    if (!diagnostics.models.includes(model)) {
+      throw new Error(
+        `Model "${model}" is not available in Ollama.\n\n` +
+          `Available models: ${diagnostics.models.join(', ')}\n\n` +
+          `To fix this:\n` +
+          `  - Pull the model: 'ollama pull ${model}'\n` +
+          `  - Choose an available model from the list above\n` +
+          `  - Use --provider anthropic as fallback`
+      );
+    }
+
+    // Convert messages to Ollama format
+    const ollamaMessages: Array<{ role: string; content: string }> = [];
+
+    // Add system prompt if configured
+    if (this._systemPrompt) {
+      ollamaMessages.push({
+        role: 'system',
+        content: this._systemPrompt,
+      });
+    }
+
+    // Add conversation messages
+    ollamaMessages.push(
+      ...messages.map((msg) => ({
+        role: msg.role,
+        content: getTextContent(msg.content),
+      }))
+    );
+
+    return { ollamaMessages };
+  }
+
   async createResponse(
     messages: ProviderMessage[],
     tools: Tool[] = [],
@@ -90,51 +146,8 @@ export class OllamaProvider extends AIProvider {
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
-        // First check if we can connect and if the model exists
-        const diagnostics = await this.diagnose();
-
-        if (!diagnostics.connected) {
-          throw new Error(
-            `Cannot connect to Ollama server at ${this._host}.\n` +
-              `Make sure Ollama is running and accessible.\n\n` +
-              `To fix this:\n` +
-              `  - Start Ollama service: 'ollama serve'\n` +
-              `  - Ensure the server is running on ${this._host}\n` +
-              `  - Check firewall settings if using a remote server\n\n` +
-              `Connection error: ${diagnostics.error}`
-          );
-        }
-
-        // Check if our target model is available
-        if (!diagnostics.models.includes(model)) {
-          throw new Error(
-            `Model "${model}" is not available in Ollama.\n\n` +
-              `Available models: ${diagnostics.models.join(', ')}\n\n` +
-              `To fix this:\n` +
-              `  - Pull the model: 'ollama pull ${model}'\n` +
-              `  - Choose an available model from the list above\n` +
-              `  - Use --provider anthropic as fallback`
-          );
-        }
-
-        // Convert messages to Ollama format
-        const ollamaMessages = [];
-
-        // Add system prompt if configured
-        if (this._systemPrompt) {
-          ollamaMessages.push({
-            role: 'system',
-            content: this._systemPrompt,
-          });
-        }
-
-        // Add conversation messages
-        ollamaMessages.push(
-          ...messages.map((msg) => ({
-            role: msg.role,
-            content: getTextContent(msg.content),
-          }))
-        );
+        // Validate connection, model availability, and convert messages
+        const { ollamaMessages } = await this._prepareRequest(messages, model);
 
         // Prepare the request payload
         const requestPayload = {
@@ -220,51 +233,8 @@ export class OllamaProvider extends AIProvider {
 
     return this.withRetry(
       async () => {
-        // First check if we can connect and if the model exists
-        const diagnostics = await this.diagnose();
-
-        if (!diagnostics.connected) {
-          throw new Error(
-            `Cannot connect to Ollama server at ${this._host}.\n` +
-              `Make sure Ollama is running and accessible.\n\n` +
-              `To fix this:\n` +
-              `  - Start Ollama service: 'ollama serve'\n` +
-              `  - Ensure the server is running on ${this._host}\n` +
-              `  - Check firewall settings if using a remote server\n\n` +
-              `Connection error: ${diagnostics.error}`
-          );
-        }
-
-        // Check if our target model is available
-        if (!diagnostics.models.includes(model)) {
-          throw new Error(
-            `Model "${model}" is not available in Ollama.\n\n` +
-              `Available models: ${diagnostics.models.join(', ')}\n\n` +
-              `To fix this:\n` +
-              `  - Pull the model: 'ollama pull ${model}'\n` +
-              `  - Choose an available model from the list above\n` +
-              `  - Use --provider anthropic as fallback`
-          );
-        }
-
-        // Convert messages to Ollama format
-        const ollamaMessages = [];
-
-        // Add system prompt if configured
-        if (this._systemPrompt) {
-          ollamaMessages.push({
-            role: 'system',
-            content: this._systemPrompt,
-          });
-        }
-
-        // Add conversation messages
-        ollamaMessages.push(
-          ...messages.map((msg) => ({
-            role: msg.role,
-            content: getTextContent(msg.content),
-          }))
-        );
+        // Validate connection, model availability, and convert messages
+        const { ollamaMessages } = await this._prepareRequest(messages, model);
 
         // Prepare the request payload for streaming
         const requestPayload = {
