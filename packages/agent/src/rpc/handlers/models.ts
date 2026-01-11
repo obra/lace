@@ -13,6 +13,21 @@ import {
 import type { AgentServerState } from '../../server-types';
 
 /**
+ * Validates and parses a modelIds parameter into a non-empty array of strings.
+ * Throws InvalidParams if the input is not a non-empty array of non-empty strings.
+ */
+function parseModelIds(modelIds: unknown): string[] {
+  if (!Array.isArray(modelIds) || modelIds.length === 0) {
+    throwInvalidParams('modelIds must be a non-empty array of strings');
+  }
+  return modelIds.map((id) => {
+    const v = toNonEmptyString(id);
+    if (!v) throwInvalidParams('modelIds must be strings');
+    return v;
+  });
+}
+
+/**
  * Updates model gating (enable/disable status) for a provider.
  * Validates all model IDs exist in the provider and updates the catalog.
  */
@@ -158,14 +173,7 @@ export function registerModelHandlers(peer: JsonRpcPeer, state: AgentServerState
     const parsed = params as { providerId?: string; modelIds?: unknown };
     const providerId = toNonEmptyString(parsed.providerId);
     if (!providerId) throwInvalidParams('providerId is required');
-    if (!Array.isArray(parsed.modelIds) || parsed.modelIds.length === 0)
-      throwInvalidParams('modelIds must be a non-empty array of strings');
-    const modelIds: string[] = [];
-    for (const id of parsed.modelIds) {
-      const v = toNonEmptyString(id);
-      if (!v) throwInvalidParams('modelIds must be strings');
-      modelIds.push(v);
-    }
+    const modelIds = parseModelIds(parsed.modelIds);
 
     return await updateModelGating(state, providerId, modelIds, 'enable');
   });
@@ -175,14 +183,7 @@ export function registerModelHandlers(peer: JsonRpcPeer, state: AgentServerState
     const parsed = params as { providerId?: string; modelIds?: unknown };
     const providerId = toNonEmptyString(parsed.providerId);
     if (!providerId) throwInvalidParams('providerId is required');
-    if (!Array.isArray(parsed.modelIds) || parsed.modelIds.length === 0)
-      throwInvalidParams('modelIds must be a non-empty array of strings');
-    const modelIds: string[] = [];
-    for (const id of parsed.modelIds) {
-      const v = toNonEmptyString(id);
-      if (!v) throwInvalidParams('modelIds must be strings');
-      modelIds.push(v);
-    }
+    const modelIds = parseModelIds(parsed.modelIds);
 
     return await updateModelGating(state, providerId, modelIds, 'disable');
   });
