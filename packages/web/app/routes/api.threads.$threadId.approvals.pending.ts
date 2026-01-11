@@ -1,58 +1,25 @@
-// ABOUTME: Recovery API that uses core ThreadManager query methods
-// ABOUTME: Thin web layer over supervisor-backed approval system
+// ABOUTME: Thread-level pending approvals API
+// ABOUTME: Returns pending approvals for a specific agent/thread only
 
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
-import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
-import { getSupervisor, listPendingPermissions } from '@lace/web/lib/server/supervisor-service';
+import { getPendingApprovals } from '@lace/web/lib/server/approval-route-handlers';
+import {
+  requireThreadId,
+  errorToResponse,
+} from '@lace/web/lib/server/route-helpers';
 import type { Route } from './+types/api.threads.$threadId.approvals.pending';
 
-export async function loader({ request: _request, params }: Route.LoaderArgs) {
+export async function loader({ params }: Route.LoaderArgs) {
   try {
-    const { threadId: threadIdParam } = params as { threadId: string };
-    if (!isAgentSessionId(threadIdParam)) {
-      return createErrorResponse('Invalid thread ID format', 400, { code: 'VALIDATION_FAILED' });
-    }
+    const threadId = requireThreadId(params);
 
-    const supervisor = await getSupervisor();
-    const workspace = (await supervisor.listWorkspaceSessions()).find((ws) =>
-      ws.agents.some((a) => a.sessionId === threadIdParam)
-    );
-    if (!workspace) {
-      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
-    }
-
-    const pending = (await listPendingPermissions(workspace.workspaceSessionId))
-      .filter((p) => p.agentSessionId === threadIdParam)
-      .map((p) => {
-        const toolName =
-          typeof p.toolCall?.name === 'string'
-            ? p.toolCall.name
-            : typeof p.request.tool === 'string'
-              ? p.request.tool
-              : '';
-        const toolCall = { name: toolName, arguments: p.toolCall?.arguments ?? {} };
-
-        return {
-          toolCallId: p.toolCallId,
-          toolCall,
-          requestedAt: new Date(p.requestedAt),
-          requestData: {
-            requestId: p.toolCallId,
-            toolName: toolCall.name,
-            input: toolCall.arguments,
-            isReadOnly: false,
-            toolDescription: undefined,
-            toolAnnotations: undefined,
-            riskLevel: 'moderate' as const,
-          },
-        };
-      });
-
-    return createSuperjsonResponse(pending);
-  } catch (_error) {
-    return createErrorResponse('Failed to get pending approvals', 500, {
-      code: 'INTERNAL_SERVER_ERROR',
+    const approvals = await getPendingApprovals({
+      scope: 'thread',
+      threadId,
     });
+
+    return createSuperjsonResponse(approvals);
+  } catch (error) {
+    return errorToResponse(error, 'Failed to get pending approvals');
   }
 }

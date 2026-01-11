@@ -70,6 +70,19 @@ export function requireAgentId(params: Record<string, string | undefined>): stri
 }
 
 /**
+ * Extracts and validates a threadId parameter (agent session format).
+ * Thread IDs are agent session IDs accessed via the threadId URL parameter.
+ * Throws RouteValidationError if missing or invalid format.
+ */
+export function requireThreadId(params: Record<string, string | undefined>): string {
+  const threadId = requireParam(params, 'threadId');
+  if (!isAgentSessionId(threadId)) {
+    throw new RouteValidationError('Invalid thread ID format', 400, 'VALIDATION_FAILED');
+  }
+  return threadId;
+}
+
+/**
  * Throws a RouteValidationError for a missing resource.
  * @param entity - The type of entity that wasn't found (e.g., 'Session', 'Project', 'Agent')
  */
