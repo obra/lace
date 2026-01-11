@@ -2,52 +2,36 @@
 // ABOUTME: Verifies that token usage is tracked and budget limits are enforced
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
-import { defaultInitializeParams } from './helpers/initialize';
+import {
+  createE2EContext,
+  spawnAgentProcess,
+  withTimeout,
+  defaultInitializeParams,
+} from './helpers';
 
 describe('lace-agent token budget tracking (E2E)', () => {
-  let originalLaceDir: string | undefined;
-  let laceDir: string;
-  let workDir: string;
-  let agent: SpawnedAgent | undefined;
+  const ctx = createE2EContext({ prefix: 'lace-agent-budget' });
 
-  beforeEach(() => {
-    originalLaceDir = process.env.LACE_DIR;
-    laceDir = mkdtempSync(join(tmpdir(), 'lace-agent-budget-e2e-'));
-    workDir = mkdtempSync(join(tmpdir(), 'lace-agent-budget-wd-'));
-  });
-
-  afterEach(async () => {
-    if (agent) {
-      await agent.shutdown();
-      agent = undefined;
-    }
-
-    if (originalLaceDir === undefined) delete process.env.LACE_DIR;
-    else process.env.LACE_DIR = originalLaceDir;
-
-    rmSync(laceDir, { recursive: true, force: true });
-    rmSync(workDir, { recursive: true, force: true });
-  });
+  beforeEach(() => ctx.setup());
+  afterEach(() => ctx.teardown());
 
   it('returns token usage in prompt response', { timeout: 15_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
-    writeFileSync(join(workDir, 'hello.txt'), 'hello world\n', 'utf8');
+    writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello world\n', 'utf8');
 
     const promptResult = (await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'read file hello.txt' }],
       }),
       10_000,
@@ -61,26 +45,26 @@ describe('lace-agent token budget tracking (E2E)', () => {
   });
 
   it('tracks budgetUsedUsd in agent status', { timeout: 15_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
     // Configure a budget
     await withTimeout(
-      agent.peer.request('ent/session/configure', { maxBudgetUsd: 10.0 }),
+      ctx.agent.peer.request('ent/session/configure', { maxBudgetUsd: 10.0 }),
       2_000,
       'ent/session/configure'
     );
 
     // Check initial status - budgetUsedUsd should be 0
     const statusBefore = (await withTimeout(
-      agent.peer.request('ent/agent/status'),
+      ctx.agent.peer.request('ent/agent/status'),
       2_000,
       'ent/agent/status before'
     )) as { limits: { maxBudgetUsd?: number; budgetUsedUsd: number } };
@@ -89,9 +73,9 @@ describe('lace-agent token budget tracking (E2E)', () => {
     expect(statusBefore.limits.budgetUsedUsd).toBe(0);
 
     // Send a prompt
-    writeFileSync(join(workDir, 'hello.txt'), 'hello world\n', 'utf8');
+    writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello world\n', 'utf8');
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'read file hello.txt' }],
       }),
       10_000,
@@ -100,7 +84,7 @@ describe('lace-agent token budget tracking (E2E)', () => {
 
     // Check status after - budgetUsedUsd should be > 0
     const statusAfter = (await withTimeout(
-      agent.peer.request('ent/agent/status'),
+      ctx.agent.peer.request('ent/agent/status'),
       2_000,
       'ent/agent/status after'
     )) as { limits: { maxBudgetUsd?: number; budgetUsedUsd: number } };
@@ -110,28 +94,28 @@ describe('lace-agent token budget tracking (E2E)', () => {
   });
 
   it('stops turn with budget_exceeded when budget is exhausted', { timeout: 15_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
     // Configure a very small budget that will be exceeded
     await withTimeout(
-      agent.peer.request('ent/session/configure', { maxBudgetUsd: 0.0001 }),
+      ctx.agent.peer.request('ent/session/configure', { maxBudgetUsd: 0.0001 }),
       2_000,
       'ent/session/configure'
     );
 
-    writeFileSync(join(workDir, 'hello.txt'), 'hello world\n', 'utf8');
+    writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello world\n', 'utf8');
 
     // First prompt should work and consume budget
     const firstResult = (await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'read file hello.txt' }],
       }),
       10_000,
@@ -144,7 +128,7 @@ describe('lace-agent token budget tracking (E2E)', () => {
     if (firstResult.stopReason !== 'budget_exceeded') {
       // Try another prompt - it should fail with budget_exceeded
       const secondResult = (await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'hi' }],
         }),
         10_000,
@@ -161,27 +145,27 @@ describe('lace-agent token budget tracking (E2E)', () => {
     'continues normally when maxBudgetUsd is 0 (budget disabled)',
     { timeout: 15_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       await withTimeout(
-        agent.peer.request('initialize', defaultInitializeParams()),
+        ctx.agent.peer.request('initialize', defaultInitializeParams()),
         2_000,
         'initialize'
       );
 
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
       // Configure budget to 0 (should disable budget enforcement)
       await withTimeout(
-        agent.peer.request('ent/session/configure', { maxBudgetUsd: 0 }),
+        ctx.agent.peer.request('ent/session/configure', { maxBudgetUsd: 0 }),
         2_000,
         'ent/session/configure'
       );
 
-      writeFileSync(join(workDir, 'hello.txt'), 'hello world\n', 'utf8');
+      writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello world\n', 'utf8');
 
       const promptResult = (await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'read file hello.txt' }],
         }),
         10_000,
@@ -194,28 +178,28 @@ describe('lace-agent token budget tracking (E2E)', () => {
   );
 
   it('accumulates budgetUsedUsd across multiple prompts', { timeout: 20_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
     // Configure a generous budget
     await withTimeout(
-      agent.peer.request('ent/session/configure', { maxBudgetUsd: 100.0 }),
+      ctx.agent.peer.request('ent/session/configure', { maxBudgetUsd: 100.0 }),
       2_000,
       'ent/session/configure'
     );
 
-    writeFileSync(join(workDir, 'hello.txt'), 'hello world\n', 'utf8');
+    writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello world\n', 'utf8');
 
     // First prompt
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'read file hello.txt' }],
       }),
       10_000,
@@ -223,7 +207,7 @@ describe('lace-agent token budget tracking (E2E)', () => {
     );
 
     const statusAfterFirst = (await withTimeout(
-      agent.peer.request('ent/agent/status'),
+      ctx.agent.peer.request('ent/agent/status'),
       2_000,
       'ent/agent/status after first'
     )) as { limits: { budgetUsedUsd: number } };
@@ -233,7 +217,7 @@ describe('lace-agent token budget tracking (E2E)', () => {
 
     // Second prompt
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'read file hello.txt' }],
       }),
       10_000,
@@ -241,7 +225,7 @@ describe('lace-agent token budget tracking (E2E)', () => {
     );
 
     const statusAfterSecond = (await withTimeout(
-      agent.peer.request('ent/agent/status'),
+      ctx.agent.peer.request('ent/agent/status'),
       2_000,
       'ent/agent/status after second'
     )) as { limits: { budgetUsedUsd: number } };

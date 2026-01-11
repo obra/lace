@@ -1,47 +1,29 @@
 // ABOUTME: E2E tests for delegate tool connectionId/modelId configuration
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
-import { defaultInitializeParams } from './helpers/initialize';
+import {
+  createE2EContext,
+  spawnAgentProcess,
+  withTimeout,
+  defaultInitializeParams,
+} from './helpers';
 
 describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
-  let originalLaceDir: string | undefined;
-  let laceDir: string;
-  let workDir: string;
-  let agent: SpawnedAgent | undefined;
+  const ctx = createE2EContext({ prefix: 'lace-agent-delegate-config' });
 
-  beforeEach(() => {
-    originalLaceDir = process.env.LACE_DIR;
-    laceDir = mkdtempSync(join(tmpdir(), 'lace-agent-delegate-config-e2e-store-'));
-    workDir = mkdtempSync(join(tmpdir(), 'lace-agent-delegate-config-e2e-wd-'));
-  });
-
-  afterEach(async () => {
-    if (agent) {
-      await agent.shutdown();
-      agent = undefined;
-    }
-
-    if (originalLaceDir === undefined) delete process.env.LACE_DIR;
-    else process.env.LACE_DIR = originalLaceDir;
-
-    rmSync(laceDir, { recursive: true, force: true });
-    rmSync(workDir, { recursive: true, force: true });
-  });
+  beforeEach(() => ctx.setup());
+  afterEach(() => ctx.teardown());
 
   it(
     'spawns a subagent with connectionId and modelId configuration',
     { timeout: 30_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       const updates: Array<Record<string, unknown>> = [];
       let subagentJobId: string | undefined;
 
-      agent.peer.onRequest('session/update', async (params) => {
+      ctx.agent.peer.onRequest('session/update', async (params) => {
         const p = params as Record<string, unknown>;
         updates.push(p);
         if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
@@ -50,11 +32,11 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
         return undefined;
       });
 
-      agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+      ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
       // Initialize the agent
       await withTimeout(
-        agent.peer.request(
+        ctx.agent.peer.request(
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'ask' } })
         ),
@@ -64,7 +46,7 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
 
       // Create an OpenAI connection
       const created = (await withTimeout(
-        agent.peer.request('ent/connections/upsert', {
+        ctx.agent.peer.request('ent/connections/upsert', {
           providerId: 'openai',
           connection: { name: 'Test OpenAI Connection', config: {} },
         }),
@@ -76,7 +58,7 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
 
       // Submit credentials for the connection
       const credResult = (await withTimeout(
-        agent.peer.request('ent/connections/credentials/submit', {
+        ctx.agent.peer.request('ent/connections/credentials/submit', {
           connectionId: created.connectionId,
           values: { apiKey: 'sk-test-key-for-e2e' },
         }),
@@ -87,11 +69,11 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
       expect(credResult.ok).toBe(true);
 
       // Create a new session
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
       // Test with connectionId and modelId - use simpler hardcoded values
       await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [
             {
               type: 'text',
@@ -138,7 +120,7 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
 
       // Get the job output to verify it completed
       const output = (await withTimeout(
-        agent.peer.request('ent/job/output', { jobId: subagentJobId }),
+        ctx.agent.peer.request('ent/job/output', { jobId: subagentJobId }),
         2_000,
         'ent/job/output'
       )) as { status: string; output: string };
@@ -148,12 +130,12 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
   );
 
   it('spawns a subagent with only modelId (no connectionId)', { timeout: 30_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: Array<Record<string, unknown>> = [];
     let subagentJobId: string | undefined;
 
-    agent.peer.onRequest('session/update', async (params) => {
+    ctx.agent.peer.onRequest('session/update', async (params) => {
       const p = params as Record<string, unknown>;
       updates.push(p);
       if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
@@ -162,10 +144,10 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
       return undefined;
     });
 
-    agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+    ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
     await withTimeout(
-      agent.peer.request(
+      ctx.agent.peer.request(
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
@@ -173,12 +155,12 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
     // Send a prompt that triggers delegate tool with just modelId
     // The test provider syntax: "subagent config=,modelId: prompt" (empty connectionId)
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'subagent config=,gpt-4o-mini: say hi' }],
       }),
       15_000,
@@ -204,7 +186,7 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
     );
 
     const output = (await withTimeout(
-      agent.peer.request('ent/job/output', { jobId: subagentJobId }),
+      ctx.agent.peer.request('ent/job/output', { jobId: subagentJobId }),
       2_000,
       'ent/job/output'
     )) as { status: string; output: string };

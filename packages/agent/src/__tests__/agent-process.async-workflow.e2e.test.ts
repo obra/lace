@@ -1,46 +1,28 @@
 // ABOUTME: E2E tests for the complete async job workflow
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
-import { defaultInitializeParams } from './helpers/initialize';
+import {
+  createE2EContext,
+  spawnAgentProcess,
+  withTimeout,
+  defaultInitializeParams,
+} from './helpers';
 
 describe('async job workflow (E2E)', () => {
-  let originalLaceDir: string | undefined;
-  let laceDir: string;
-  let workDir: string;
-  let agent: SpawnedAgent | undefined;
+  const ctx = createE2EContext({ prefix: 'lace-async-workflow' });
 
-  beforeEach(() => {
-    originalLaceDir = process.env.LACE_DIR;
-    laceDir = mkdtempSync(join(tmpdir(), 'lace-async-workflow-'));
-    workDir = mkdtempSync(join(tmpdir(), 'lace-async-wd-'));
-  });
-
-  afterEach(async () => {
-    if (agent) {
-      await agent.shutdown();
-      agent = undefined;
-    }
-
-    if (originalLaceDir === undefined) delete process.env.LACE_DIR;
-    else process.env.LACE_DIR = originalLaceDir;
-
-    rmSync(laceDir, { recursive: true, force: true });
-    rmSync(workDir, { recursive: true, force: true });
-  });
+  beforeEach(() => ctx.setup());
+  afterEach(() => ctx.teardown());
 
   it(
     'complete async bash workflow: spawn, list, check output, kill',
     { timeout: 30_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       const updates: Array<Record<string, unknown>> = [];
       let shellJobId: string | undefined;
 
-      agent.peer.onRequest('session/update', async (params) => {
+      ctx.agent.peer.onRequest('session/update', async (params) => {
         const p = params as Record<string, unknown>;
         updates.push(p);
         if (p.type === 'job_started' && p.jobType === 'bash' && typeof p.jobId === 'string') {
@@ -49,12 +31,12 @@ describe('async job workflow (E2E)', () => {
         return undefined;
       });
 
-      agent.peer.onRequest('session/request_permission', async () => {
+      ctx.agent.peer.onRequest('session/request_permission', async () => {
         return { decision: 'allow' };
       });
 
       await withTimeout(
-        agent.peer.request(
+        ctx.agent.peer.request(
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'allow' } })
         ),
@@ -62,11 +44,11 @@ describe('async job workflow (E2E)', () => {
         'initialize'
       );
 
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
       // Spawn a long-running job that we can kill
       await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'job: sleep 60' }],
         }),
         5_000,
@@ -91,7 +73,7 @@ describe('async job workflow (E2E)', () => {
 
       // List jobs - should show running
       const list = (await withTimeout(
-        agent.peer.request('ent/job/list'),
+        ctx.agent.peer.request('ent/job/list'),
         2_000,
         'ent/job/list'
       )) as { jobs: Array<{ jobId: string; status: string }> };
@@ -101,7 +83,7 @@ describe('async job workflow (E2E)', () => {
 
       // Kill the job
       const killed = (await withTimeout(
-        agent.peer.request('ent/job/kill', { jobId: shellJobId }),
+        ctx.agent.peer.request('ent/job/kill', { jobId: shellJobId }),
         2_000,
         'ent/job/kill'
       )) as { success: boolean };
@@ -110,7 +92,7 @@ describe('async job workflow (E2E)', () => {
 
       // Check final status
       const output = (await withTimeout(
-        agent.peer.request('ent/job/output', { jobId: shellJobId }),
+        ctx.agent.peer.request('ent/job/output', { jobId: shellJobId }),
         2_000,
         'ent/job/output'
       )) as { status: string };
@@ -123,12 +105,12 @@ describe('async job workflow (E2E)', () => {
     'multiple concurrent jobs: spawn several, list all, verify statuses',
     { timeout: 30_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       const updates: Array<Record<string, unknown>> = [];
       const jobIds: string[] = [];
 
-      agent.peer.onRequest('session/update', async (params) => {
+      ctx.agent.peer.onRequest('session/update', async (params) => {
         const p = params as Record<string, unknown>;
         updates.push(p);
         if (p.type === 'job_started' && typeof p.jobId === 'string') {
@@ -137,12 +119,12 @@ describe('async job workflow (E2E)', () => {
         return undefined;
       });
 
-      agent.peer.onRequest('session/request_permission', async () => {
+      ctx.agent.peer.onRequest('session/request_permission', async () => {
         return { decision: 'allow' };
       });
 
       await withTimeout(
-        agent.peer.request(
+        ctx.agent.peer.request(
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'allow' } })
         ),
@@ -150,11 +132,11 @@ describe('async job workflow (E2E)', () => {
         'initialize'
       );
 
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
       // Spawn multiple jobs
       await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'job: sleep 30' }],
         }),
         5_000,
@@ -162,7 +144,7 @@ describe('async job workflow (E2E)', () => {
       );
 
       await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'job: sleep 30' }],
         }),
         5_000,
@@ -170,7 +152,7 @@ describe('async job workflow (E2E)', () => {
       );
 
       await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'job: sleep 30' }],
         }),
         5_000,
@@ -195,7 +177,7 @@ describe('async job workflow (E2E)', () => {
 
       // List jobs - should show all three running
       const list = (await withTimeout(
-        agent.peer.request('ent/job/list'),
+        ctx.agent.peer.request('ent/job/list'),
         2_000,
         'ent/job/list'
       )) as { jobs: Array<{ jobId: string; status: string }> };
@@ -206,7 +188,7 @@ describe('async job workflow (E2E)', () => {
       // Kill all jobs
       for (const jobId of jobIds) {
         const killed = (await withTimeout(
-          agent.peer.request('ent/job/kill', { jobId }),
+          ctx.agent.peer.request('ent/job/kill', { jobId }),
           2_000,
           `ent/job/kill (${jobId})`
         )) as { success: boolean };
@@ -215,7 +197,7 @@ describe('async job workflow (E2E)', () => {
 
       // Verify all are cancelled
       const finalList = (await withTimeout(
-        agent.peer.request('ent/job/list'),
+        ctx.agent.peer.request('ent/job/list'),
         2_000,
         'ent/job/list (final)'
       )) as { jobs: Array<{ jobId: string; status: string }> };
@@ -231,12 +213,12 @@ describe('async job workflow (E2E)', () => {
     'job completion: spawn short job, wait for completion, verify output',
     { timeout: 30_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       const updates: Array<Record<string, unknown>> = [];
       let jobId: string | undefined;
 
-      agent.peer.onRequest('session/update', async (params) => {
+      ctx.agent.peer.onRequest('session/update', async (params) => {
         const p = params as Record<string, unknown>;
         updates.push(p);
         if (p.type === 'job_started' && typeof p.jobId === 'string') {
@@ -245,12 +227,12 @@ describe('async job workflow (E2E)', () => {
         return undefined;
       });
 
-      agent.peer.onRequest('session/request_permission', async () => {
+      ctx.agent.peer.onRequest('session/request_permission', async () => {
         return { decision: 'allow' };
       });
 
       await withTimeout(
-        agent.peer.request(
+        ctx.agent.peer.request(
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'allow' } })
         ),
@@ -258,11 +240,11 @@ describe('async job workflow (E2E)', () => {
         'initialize'
       );
 
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
       // Spawn a job that produces output
       await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'job: echo "hello world"' }],
         }),
         5_000,
@@ -289,7 +271,7 @@ describe('async job workflow (E2E)', () => {
 
       // Check output
       const output = (await withTimeout(
-        agent.peer.request('ent/job/output', { jobId }),
+        ctx.agent.peer.request('ent/job/output', { jobId }),
         2_000,
         'ent/job/output'
       )) as { status: string; output: string };
@@ -300,12 +282,12 @@ describe('async job workflow (E2E)', () => {
   );
 
   it('job persistence: jobs survive agent restart', { timeout: 30_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     let jobId: string | undefined;
     let sessionId: string | undefined;
 
-    agent.peer.onRequest('session/update', async (params) => {
+    ctx.agent.peer.onRequest('session/update', async (params) => {
       const p = params as Record<string, unknown>;
       if (p.type === 'job_started' && typeof p.jobId === 'string') {
         jobId = p.jobId;
@@ -313,12 +295,12 @@ describe('async job workflow (E2E)', () => {
       return undefined;
     });
 
-    agent.peer.onRequest('session/request_permission', async () => {
+    ctx.agent.peer.onRequest('session/request_permission', async () => {
       return { decision: 'allow' };
     });
 
     await withTimeout(
-      agent.peer.request(
+      ctx.agent.peer.request(
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'allow' } })
       ),
@@ -327,7 +309,7 @@ describe('async job workflow (E2E)', () => {
     );
 
     const created = (await withTimeout(
-      agent.peer.request('session/new', { workDir }),
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
       2_000,
       'session/new'
     )) as { sessionId: string };
@@ -335,7 +317,7 @@ describe('async job workflow (E2E)', () => {
 
     // Run a quick job
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'job: echo test' }],
       }),
       5_000,
@@ -360,7 +342,7 @@ describe('async job workflow (E2E)', () => {
 
     // Wait for job to complete (blocking read)
     const outputBefore = (await withTimeout(
-      agent.peer.request('ent/job/output', { jobId, block: true, timeout: 5000 }),
+      ctx.agent.peer.request('ent/job/output', { jobId, block: true, timeout: 5000 }),
       6_000,
       'ent/job/output (before restart)'
     )) as { status: string; output: string };
@@ -369,27 +351,27 @@ describe('async job workflow (E2E)', () => {
     expect(outputBefore.output).toContain('test');
 
     // Shutdown and restart
-    await agent.shutdown();
-    agent = undefined;
+    await ctx.agent.shutdown();
+    ctx.agent = undefined;
 
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
-    agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+    ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize (restart)'
     );
 
     await withTimeout(
-      agent.peer.request('session/load', { sessionId }),
+      ctx.agent.peer.request('session/load', { sessionId }),
       2_000,
       'session/load (restart)'
     );
 
     // Verify job still exists and has same output
     const listAfterRestart = (await withTimeout(
-      agent.peer.request('ent/job/list'),
+      ctx.agent.peer.request('ent/job/list'),
       2_000,
       'ent/job/list (restart)'
     )) as { jobs: Array<{ jobId: string; status: string }> };
@@ -399,7 +381,7 @@ describe('async job workflow (E2E)', () => {
     expect(jobAfterRestart?.status).toBe('completed');
 
     const outputAfterRestart = (await withTimeout(
-      agent.peer.request('ent/job/output', { jobId }),
+      ctx.agent.peer.request('ent/job/output', { jobId }),
       2_000,
       'ent/job/output (restart)'
     )) as { status: string; output: string };
@@ -408,12 +390,12 @@ describe('async job workflow (E2E)', () => {
   });
 
   it('job error handling: job with non-zero exit code', { timeout: 30_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     let jobId: string | undefined;
     let jobFinished = false;
 
-    agent.peer.onRequest('session/update', async (params) => {
+    ctx.agent.peer.onRequest('session/update', async (params) => {
       const p = params as Record<string, unknown>;
       if (p.type === 'job_started' && typeof p.jobId === 'string') {
         jobId = p.jobId;
@@ -424,12 +406,12 @@ describe('async job workflow (E2E)', () => {
       return undefined;
     });
 
-    agent.peer.onRequest('session/request_permission', async () => {
+    ctx.agent.peer.onRequest('session/request_permission', async () => {
       return { decision: 'allow' };
     });
 
     await withTimeout(
-      agent.peer.request(
+      ctx.agent.peer.request(
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'allow' } })
       ),
@@ -437,11 +419,11 @@ describe('async job workflow (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
     // Spawn a job that fails
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'job: false' }],
       }),
       5_000,
@@ -480,7 +462,7 @@ describe('async job workflow (E2E)', () => {
 
     // Check that job is marked as having failed
     const output = (await withTimeout(
-      agent.peer.request('ent/job/output', { jobId }),
+      ctx.agent.peer.request('ent/job/output', { jobId }),
       2_000,
       'ent/job/output'
     )) as { status: string; exitCode?: number };
@@ -491,12 +473,12 @@ describe('async job workflow (E2E)', () => {
   });
 
   it('session switch kills running jobs', { timeout: 30_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     let jobId: string | undefined;
     let session1Id: string | undefined;
 
-    agent.peer.onRequest('session/update', async (params) => {
+    ctx.agent.peer.onRequest('session/update', async (params) => {
       const p = params as Record<string, unknown>;
       if (p.type === 'job_started' && typeof p.jobId === 'string') {
         jobId = p.jobId;
@@ -504,12 +486,12 @@ describe('async job workflow (E2E)', () => {
       return undefined;
     });
 
-    agent.peer.onRequest('session/request_permission', async () => {
+    ctx.agent.peer.onRequest('session/request_permission', async () => {
       return { decision: 'allow' };
     });
 
     await withTimeout(
-      agent.peer.request(
+      ctx.agent.peer.request(
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'allow' } })
       ),
@@ -519,14 +501,14 @@ describe('async job workflow (E2E)', () => {
 
     // Create first session and start a long-running job
     const session1 = (await withTimeout(
-      agent.peer.request('session/new', { workDir }),
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
       2_000,
       'session/new (1)'
     )) as { sessionId: string };
     session1Id = session1.sessionId;
 
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'job: sleep 60' }],
       }),
       5_000,
@@ -548,18 +530,18 @@ describe('async job workflow (E2E)', () => {
     );
 
     // Switch to a new session
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new (2)');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new (2)');
 
     // Load back the first session and check job status
     await withTimeout(
-      agent.peer.request('session/load', { sessionId: session1Id }),
+      ctx.agent.peer.request('session/load', { sessionId: session1Id }),
       2_000,
       'session/load'
     );
 
     // Job should have been killed (cancelled status)
     const output = (await withTimeout(
-      agent.peer.request('ent/job/output', { jobId }),
+      ctx.agent.peer.request('ent/job/output', { jobId }),
       2_000,
       'ent/job/output'
     )) as { status: string };
@@ -571,12 +553,12 @@ describe('async job workflow (E2E)', () => {
     'injects completion notification when background job finishes',
     { timeout: 30_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       let jobId: string | undefined;
       const updates: Array<Record<string, unknown>> = [];
 
-      agent.peer.onRequest('session/update', async (params) => {
+      ctx.agent.peer.onRequest('session/update', async (params) => {
         const p = params as Record<string, unknown>;
         updates.push(p);
         if (p.type === 'job_started' && typeof p.jobId === 'string') {
@@ -585,12 +567,12 @@ describe('async job workflow (E2E)', () => {
         return undefined;
       });
 
-      agent.peer.onRequest('session/request_permission', async () => {
+      ctx.agent.peer.onRequest('session/request_permission', async () => {
         return { decision: 'allow' };
       });
 
       await withTimeout(
-        agent.peer.request(
+        ctx.agent.peer.request(
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'allow' } })
         ),
@@ -598,11 +580,11 @@ describe('async job workflow (E2E)', () => {
         'initialize'
       );
 
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
       // Start a quick job that will complete
       await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'job: echo "test output"' }],
         }),
         5_000,
@@ -630,7 +612,7 @@ describe('async job workflow (E2E)', () => {
       // is injected before provider creation, so it will be in the events
       try {
         await withTimeout(
-          agent.peer.request('session/prompt', {
+          ctx.agent.peer.request('session/prompt', {
             content: [{ type: 'text', text: 'What was the previous output?' }],
           }),
           10_000,
@@ -642,7 +624,7 @@ describe('async job workflow (E2E)', () => {
 
       // Verify the session events show the notification was injected
       const events = (await withTimeout(
-        agent.peer.request('ent/session/events', { limit: 100 }),
+        ctx.agent.peer.request('ent/session/events', { limit: 100 }),
         2_000,
         'ent/session/events'
       )) as { events: Array<{ type: string; data?: Record<string, unknown> }> };
@@ -665,12 +647,12 @@ describe('async job workflow (E2E)', () => {
   );
 
   it('injects failure notification when background job fails', { timeout: 30_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     let jobId: string | undefined;
     const updates: Array<Record<string, unknown>> = [];
 
-    agent.peer.onRequest('session/update', async (params) => {
+    ctx.agent.peer.onRequest('session/update', async (params) => {
       const p = params as Record<string, unknown>;
       updates.push(p);
       if (p.type === 'job_started' && typeof p.jobId === 'string') {
@@ -679,12 +661,12 @@ describe('async job workflow (E2E)', () => {
       return undefined;
     });
 
-    agent.peer.onRequest('session/request_permission', async () => {
+    ctx.agent.peer.onRequest('session/request_permission', async () => {
       return { decision: 'allow' };
     });
 
     await withTimeout(
-      agent.peer.request(
+      ctx.agent.peer.request(
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'allow' } })
       ),
@@ -692,11 +674,11 @@ describe('async job workflow (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
     // Start a job that will fail
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'job: exit 1' }],
       }),
       5_000,
@@ -724,7 +706,7 @@ describe('async job workflow (E2E)', () => {
     // is injected before provider creation
     try {
       await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'What happened?' }],
         }),
         10_000,
@@ -736,7 +718,7 @@ describe('async job workflow (E2E)', () => {
 
     // Verify the notification was injected with 'failed' type
     const events = (await withTimeout(
-      agent.peer.request('ent/session/events', { limit: 100 }),
+      ctx.agent.peer.request('ent/session/events', { limit: 100 }),
       2_000,
       'ent/session/events'
     )) as { events: Array<{ type: string; data?: Record<string, unknown> }> };
@@ -761,14 +743,14 @@ describe('async job workflow (E2E)', () => {
     'automatically triggers a turn when job completes and agent is idle',
     { timeout: 30_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       let jobId: string | undefined;
       let initialTurnId: string | undefined;
       const updates: Array<Record<string, unknown>> = [];
       const turnStarts: string[] = [];
 
-      agent.peer.onRequest('session/update', async (params) => {
+      ctx.agent.peer.onRequest('session/update', async (params) => {
         const p = params as Record<string, unknown>;
         updates.push(p);
         if (p.type === 'job_started' && typeof p.jobId === 'string') {
@@ -780,12 +762,12 @@ describe('async job workflow (E2E)', () => {
         return undefined;
       });
 
-      agent.peer.onRequest('session/request_permission', async () => {
+      ctx.agent.peer.onRequest('session/request_permission', async () => {
         return { decision: 'allow' };
       });
 
       await withTimeout(
-        agent.peer.request(
+        ctx.agent.peer.request(
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'allow' } })
         ),
@@ -793,11 +775,11 @@ describe('async job workflow (E2E)', () => {
         'initialize'
       );
 
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
       // Start a quick background job - this triggers the first turn
       await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'job: echo "quick output"' }],
         }),
         5_000,
