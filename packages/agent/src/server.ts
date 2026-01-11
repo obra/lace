@@ -213,44 +213,35 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
   };
 
-  // Job creation wrappers - delegate to extracted library functions
-  const _startShellJob = async (options: CreateShellJobOptions): Promise<{ jobId: string }> => {
-    try {
-      return await createShellJob(options, {
-        getActiveSession: () => state.activeSession,
-        getJobs: () => state.jobs,
-        persistJobStartedEvent,
-        emitSessionUpdate,
-        setupProgressTimer,
-        runShellJobProcess: (job) => void runShellJobProcess(job),
-        runSubagentJobProcess: (job) => void runSubagentJobProcess(job),
-      });
-    } catch (err) {
-      if (err instanceof JobCreationError) {
-        throw { code: err.code, message: err.message, data: { category: err.category } };
-      }
-      throw err;
-    }
+  // Shared job creation dependencies
+  const jobCreationDeps = {
+    getActiveSession: () => state.activeSession,
+    getJobs: () => state.jobs,
+    persistJobStartedEvent,
+    emitSessionUpdate,
+    setupProgressTimer,
+    runShellJobProcess: (job: JobState) => void runShellJobProcess(job),
+    runSubagentJobProcess: (job: JobState) => void runSubagentJobProcess(job),
   };
 
-  const _startSubagentJob = async (options: CreateSubagentJobOptions): Promise<{ jobId: string }> => {
+  // Common error handling for job creation - converts JobCreationError to RPC error format
+  async function wrapJobCreation<T>(fn: () => Promise<T>): Promise<T> {
     try {
-      return await createSubagentJob(options, {
-        getActiveSession: () => state.activeSession,
-        getJobs: () => state.jobs,
-        persistJobStartedEvent,
-        emitSessionUpdate,
-        setupProgressTimer,
-        runShellJobProcess: (job) => void runShellJobProcess(job),
-        runSubagentJobProcess: (job) => void runSubagentJobProcess(job),
-      });
+      return await fn();
     } catch (err) {
       if (err instanceof JobCreationError) {
         throw { code: err.code, message: err.message, data: { category: err.category } };
       }
       throw err;
     }
-  };
+  }
+
+  // Job creation wrappers - delegate to extracted library functions
+  const _startShellJob = (options: CreateShellJobOptions): Promise<{ jobId: string }> =>
+    wrapJobCreation(() => createShellJob(options, jobCreationDeps));
+
+  const _startSubagentJob = (options: CreateSubagentJobOptions): Promise<{ jobId: string }> =>
+    wrapJobCreation(() => createSubagentJob(options, jobCreationDeps));
 
   // Job derivation - uses extracted library function with caching
   const deriveJobsForActiveSession = createJobDerivation({
