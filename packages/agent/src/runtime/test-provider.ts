@@ -289,9 +289,7 @@ export class TestAgentProvider extends AIProvider {
     return raw && raw.length > 0 ? raw : null;
   }
 
-  private extractRequestedTool(
-    text: string
-  ): null | {
+  private extractRequestedTool(text: string): null | {
     name: 'delegate' | 'file_read' | 'file_write' | 'bash';
     args: Record<string, unknown>;
   } {

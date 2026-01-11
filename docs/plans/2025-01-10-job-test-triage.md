@@ -1,10 +1,14 @@
 # Job Test Failure Triage and Handler Audit Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
+> implement this plan task-by-task.
 
-**Goal:** Fix the 10 failing job-related E2E tests and audit for any other handlers accidentally removed during refactoring.
+**Goal:** Fix the 10 failing job-related E2E tests and audit for any other
+handlers accidentally removed during refactoring.
 
-**Architecture:** The bug is in how `createRunShellJobProcess` receives state. It gets a snapshot of `state.activeSession` at creation time (null), but should use a getter pattern like `runSubagentJobProcess` does.
+**Architecture:** The bug is in how `createRunShellJobProcess` receives state.
+It gets a snapshot of `state.activeSession` at creation time (null), but should
+use a getter pattern like `runSubagentJobProcess` does.
 
 **Tech Stack:** TypeScript, Vitest
 
@@ -19,7 +23,7 @@ In `packages/agent/src/server.ts` lines 375-385:
 ```typescript
 const runShellJobProcess = createRunShellJobProcess({
   state: {
-    activeSession: state.activeSession,  // <-- CAPTURED AT CREATION TIME (null!)
+    activeSession: state.activeSession, // <-- CAPTURED AT CREATION TIME (null!)
     config: state.config,
     jobStreaming: state.jobStreaming,
   },
@@ -27,14 +31,16 @@ const runShellJobProcess = createRunShellJobProcess({
 });
 ```
 
-But `state.activeSession` is `null` when `registerAgentRpcMethods` is called. The value is captured as a snapshot, so when `runShellJobProcess` is called later (after a session is loaded), it still sees `null`.
+But `state.activeSession` is `null` when `registerAgentRpcMethods` is called.
+The value is captured as a snapshot, so when `runShellJobProcess` is called
+later (after a session is loaded), it still sees `null`.
 
 Compare with the correct pattern used for subagent jobs (lines 387-395):
 
 ```typescript
 const runSubagentJobProcess = (job: JobState) => {
   runSubagentJobProcessImpl(job, {
-    getState: () => state,  // <-- FUNCTION THAT RETURNS CURRENT STATE
+    getState: () => state, // <-- FUNCTION THAT RETURNS CURRENT STATE
     // ...
   });
 };
@@ -60,6 +66,7 @@ All 10 failing tests involve shell job execution that requires `activeSession`:
 ## Task 1: Write Failing Unit Test for Shell Job State Access
 
 **Files:**
+
 - Create: `packages/agent/src/jobs/__tests__/shell-job.test.ts`
 
 **Step 1: Write the failing test**
@@ -77,14 +84,19 @@ describe('createRunShellJobProcess', () => {
     // Simulate the pattern where activeSession starts null
     // and is later populated
     const mutableState = {
-      activeSession: null as { dir: string; meta: { sessionId: string; workDir: string } } | null,
+      activeSession: null as {
+        dir: string;
+        meta: { sessionId: string; workDir: string };
+      } | null,
       config: { approvalMode: 'dangerouslySkipPermissions' as const },
       jobStreaming: 'full' as const,
     };
 
     const mockEmitSessionUpdate = vi.fn().mockResolvedValue(undefined);
     const mockFinalizeJob = vi.fn().mockResolvedValue(undefined);
-    const mockRequestPermission = vi.fn().mockResolvedValue({ decision: 'allow' });
+    const mockRequestPermission = vi
+      .fn()
+      .mockResolvedValue({ decision: 'allow' });
     const mockRunExclusive = vi.fn().mockImplementation((fn) => fn());
 
     // Create the runner with null activeSession (like server.ts does)
@@ -130,7 +142,8 @@ describe('createRunShellJobProcess', () => {
 **Step 2: Run test to verify it fails**
 
 Run: `npm test -- --run packages/agent/src/jobs/__tests__/shell-job.test.ts`
-Expected: FAIL - the test should fail because the current code captures `activeSession` at creation time
+Expected: FAIL - the test should fail because the current code captures
+`activeSession` at creation time
 
 **Step 3: Commit the failing test**
 
@@ -144,12 +157,14 @@ git commit -m "test(jobs): add failing test for shell job state access pattern"
 ## Task 2: Fix Shell Job State Access Pattern
 
 **Files:**
+
 - Modify: `packages/agent/src/jobs/shell-job.ts`
 - Modify: `packages/agent/src/server.ts`
 
 **Step 1: Update ShellJobContext type to use getter pattern**
 
-In `packages/agent/src/jobs/shell-job.ts`, change the `state` property to a function:
+In `packages/agent/src/jobs/shell-job.ts`, change the `state` property to a
+function:
 
 ```typescript
 export type ShellJobContext = {
@@ -183,7 +198,10 @@ export type ShellJobContext = {
     input: Record<string, unknown>;
     signal: AbortSignal;
   }) => Promise<{ decision?: string; updatedInput?: Record<string, unknown> }>;
-  finalizeJob: (job: JobState, options?: { exitCode?: number }) => Promise<void>;
+  finalizeJob: (
+    job: JobState,
+    options?: { exitCode?: number }
+  ) => Promise<void>;
 };
 ```
 
@@ -234,7 +252,8 @@ Expected: PASS
 
 **Step 5: Run all job E2E tests**
 
-Run: `npm test -- --run src/__tests__/agent-process.async-workflow.e2e.test.ts src/__tests__/agent-process.jobs.e2e.test.ts`
+Run:
+`npm test -- --run src/__tests__/agent-process.async-workflow.e2e.test.ts src/__tests__/agent-process.jobs.e2e.test.ts`
 Expected: All tests should pass
 
 **Step 6: Commit the fix**
@@ -249,6 +268,7 @@ git commit -m "fix(jobs): use getState() pattern for shell jobs to get current a
 ## Task 3: Audit for Other Missing Handlers
 
 **Files:**
+
 - Read: Compare handler counts
 
 **Step 1: Verify all handlers are present**
@@ -280,7 +300,8 @@ Compare the two lists - they should be identical.
 
 **Step 3: Document findings**
 
-If any handlers are missing, add them to the appropriate handler file following the existing pattern.
+If any handlers are missing, add them to the appropriate handler file following
+the existing pattern.
 
 ---
 
@@ -313,8 +334,8 @@ git commit -m "docs: add job test triage plan with root cause analysis"
 
 ## Summary
 
-| Issue | Root Cause | Fix |
-|-------|-----------|-----|
-| 10 job tests timing out | `createRunShellJobProcess` captures `state.activeSession` snapshot (null) | Change to `getState()` function pattern |
-| Missing `ent/personas/list` | Accidentally removed in cleanup commit | Restored in `rpc/handlers/tools.ts` |
-| Handler audit | Potential for other missing handlers | Verified all 46 handlers present |
+| Issue                       | Root Cause                                                                | Fix                                     |
+| --------------------------- | ------------------------------------------------------------------------- | --------------------------------------- |
+| 10 job tests timing out     | `createRunShellJobProcess` captures `state.activeSession` snapshot (null) | Change to `getState()` function pattern |
+| Missing `ent/personas/list` | Accidentally removed in cleanup commit                                    | Restored in `rpc/handlers/tools.ts`     |
+| Handler audit               | Potential for other missing handlers                                      | Verified all 46 handlers present        |

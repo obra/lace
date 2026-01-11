@@ -1,12 +1,17 @@
 # Agent Codebase Deduplication Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
+> implement this plan task-by-task.
 
-**Goal:** Eliminate code duplication in the agent package by consolidating shared logic into appropriate modules, making rpc/ a thin facade.
+**Goal:** Eliminate code duplication in the agent package by consolidating
+shared logic into appropriate modules, making rpc/ a thin facade.
 
 **Architecture:**
-- `rpc/handlers/` becomes a thin delegation layer - param validation only, delegates to domain modules
-- `providers/` owns all provider-related code including catalog loading and provider creation
+
+- `rpc/handlers/` becomes a thin delegation layer - param validation only,
+  delegates to domain modules
+- `providers/` owns all provider-related code including catalog loading and
+  provider creation
 - `jobs/` owns all job-related code including output reading and job control
 - `core/session.ts` owns session configuration logic
 - `__tests__/helpers/` owns all shared test infrastructure
@@ -19,7 +24,9 @@
 
 ### Task 0.1: Create E2E test context helper
 
-**Problem:** Every E2E test file has ~20 lines of identical beforeEach/afterEach scaffolding:
+**Problem:** Every E2E test file has ~20 lines of identical beforeEach/afterEach
+scaffolding:
+
 - Temp directory creation (laceDir, workDir)
 - Environment variable save/restore (LACE_DIR, LACE_AGENT_TEST_PROVIDER)
 - Agent shutdown and cleanup
@@ -27,12 +34,13 @@
 This is copy-pasted across 23+ test files.
 
 **Files:**
+
 - Create: `src/__tests__/helpers/e2e-context.ts`
 - Modify: All E2E test files to use the new helper
 
 **Step 1: Write the helper**
 
-```typescript
+````typescript
 // src/__tests__/helpers/e2e-context.ts
 // ABOUTME: Shared E2E test context - handles temp dirs, env vars, cleanup
 
@@ -89,10 +97,18 @@ export function createE2EContext(options?: E2EContextOptions): E2ETestContext {
   } = {};
 
   return {
-    get laceDir() { return laceDir; },
-    get workDir() { return workDir; },
-    get agent() { return agent; },
-    set agent(a: SpawnedAgent | undefined) { agent = a; },
+    get laceDir() {
+      return laceDir;
+    },
+    get workDir() {
+      return workDir;
+    },
+    get agent() {
+      return agent;
+    },
+    set agent(a: SpawnedAgent | undefined) {
+      agent = a;
+    },
 
     setup() {
       // Save current env
@@ -126,7 +142,8 @@ export function createE2EContext(options?: E2EContextOptions): E2ETestContext {
       if (savedEnv.LACE_AGENT_TEST_PROVIDER === undefined) {
         delete process.env.LACE_AGENT_TEST_PROVIDER;
       } else {
-        process.env.LACE_AGENT_TEST_PROVIDER = savedEnv.LACE_AGENT_TEST_PROVIDER;
+        process.env.LACE_AGENT_TEST_PROVIDER =
+          savedEnv.LACE_AGENT_TEST_PROVIDER;
       }
 
       // Cleanup temp directories
@@ -135,20 +152,32 @@ export function createE2EContext(options?: E2EContextOptions): E2ETestContext {
     },
   };
 }
-```
+````
 
 **Step 2: Update helpers/index.ts to export**
 
 ```typescript
 // src/__tests__/helpers/index.ts
-export { spawnAgentProcess, withTimeout, type SpawnedAgent } from './agent-process';
-export { defaultInitializeParams, type InitializeOverrides } from './initialize';
-export { createE2EContext, type E2ETestContext, type E2EContextOptions } from './e2e-context';
+export {
+  spawnAgentProcess,
+  withTimeout,
+  type SpawnedAgent,
+} from './agent-process';
+export {
+  defaultInitializeParams,
+  type InitializeOverrides,
+} from './initialize';
+export {
+  createE2EContext,
+  type E2ETestContext,
+  type E2EContextOptions,
+} from './e2e-context';
 ```
 
 **Step 3: Migrate one test file as proof of concept**
 
 Before (agent-process.e2e.test.ts):
+
 ```typescript
 let originalLaceDir: string | undefined;
 let laceDir: string;
@@ -174,6 +203,7 @@ afterEach(async () => {
 ```
 
 After:
+
 ```typescript
 import { createE2EContext, spawnAgentProcess, withTimeout } from './helpers';
 
@@ -206,16 +236,19 @@ git add -A && git commit -m "test(agent): add createE2EContext helper for test s
 **Files:** All files in `src/__tests__/*.e2e.test.ts` and similar
 
 This is mechanical: for each test file:
+
 1. Import `createE2EContext` from helpers
 2. Replace the 4 variable declarations with `const ctx = createE2EContext()`
 3. Replace beforeEach body with `ctx.setup()`
 4. Replace afterEach body with `ctx.teardown()`
-5. Replace `laceDir` → `ctx.laceDir`, `workDir` → `ctx.workDir`, `agent` → `ctx.agent`
+5. Replace `laceDir` → `ctx.laceDir`, `workDir` → `ctx.workDir`, `agent` →
+   `ctx.agent`
 6. Run tests for that file
 
 **Batch approach:** Do 3-4 files at a time, run tests, commit.
 
 **Estimated commits:**
+
 - `test(agent): migrate agent-process tests to createE2EContext`
 - `test(agent): migrate job/subagent tests to createE2EContext`
 - `test(agent): migrate provider/model tests to createE2EContext`
@@ -228,7 +261,9 @@ This is mechanical: for each test file:
 **Problem:** Supervisor tests have the same duplication pattern.
 
 **Files:**
-- Create: `packages/supervisor/src/__tests__/helpers/e2e-context.ts` (copy from agent or extract to shared package)
+
+- Create: `packages/supervisor/src/__tests__/helpers/e2e-context.ts` (copy from
+  agent or extract to shared package)
 - Modify: `supervisor-agent-process.e2e.test.ts`
 - Modify: `supervisor-http.permission-race.e2e.test.ts`
 
@@ -240,9 +275,11 @@ Same migration pattern as Task 0.2.
 
 ### Task 1.1: Move `ensureProviderCatalogLoaded()` to providers/
 
-**Problem:** Identical ~20-line function exists in 3 RPC handlers: `connections.ts`, `models.ts`, `providers.ts`
+**Problem:** Identical ~20-line function exists in 3 RPC handlers:
+`connections.ts`, `models.ts`, `providers.ts`
 
 **Files:**
+
 - Create: `src/providers/catalog/loader.ts`
 - Modify: `src/rpc/handlers/connections.ts`
 - Modify: `src/rpc/handlers/models.ts`
@@ -309,7 +346,9 @@ import type { AgentServerState } from '@lace/agent/server-types';
  * Ensure the provider catalog is loaded into state.
  * Safe to call multiple times - only loads once.
  */
-export async function ensureProviderCatalogLoaded(state: AgentServerState): Promise<void> {
+export async function ensureProviderCatalogLoaded(
+  state: AgentServerState
+): Promise<void> {
   if (!state.providerCatalog.isLoaded()) {
     await state.providerCatalog.loadCatalogs();
   }
@@ -325,6 +364,7 @@ cd packages/agent && npx vitest run src/providers/catalog/__tests__/loader.test.
 **Step 6: Update catalog/index.ts to export**
 
 Add to `src/providers/catalog/index.ts`:
+
 ```typescript
 export { ensureProviderCatalogLoaded } from './loader';
 ```
@@ -332,8 +372,10 @@ export { ensureProviderCatalogLoaded } from './loader';
 **Step 7: Update RPC handlers to import from providers**
 
 In each of `connections.ts`, `models.ts`, `providers.ts`:
+
 - Remove local `ensureProviderCatalogLoaded` function
-- Add import: `import { ensureProviderCatalogLoaded } from '@lace/agent/providers/catalog';`
+- Add import:
+  `import { ensureProviderCatalogLoaded } from '@lace/agent/providers/catalog';`
 
 **Step 8: Run full test suite**
 
@@ -351,9 +393,12 @@ git add -A && git commit -m "refactor(agent): extract ensureProviderCatalogLoade
 
 ### Task 1.2: Move `createProviderForTurn()` to providers/
 
-**Problem:** Function exists in `conversation/provider-factory.ts` but also duplicated locally in `session-operations.ts`. Provider creation belongs in `providers/`.
+**Problem:** Function exists in `conversation/provider-factory.ts` but also
+duplicated locally in `session-operations.ts`. Provider creation belongs in
+`providers/`.
 
 **Files:**
+
 - Create: `src/providers/turn-factory.ts`
 - Modify: `src/conversation/provider-factory.ts` → re-export from providers
 - Modify: `src/rpc/handlers/session-operations.ts` → delete local copy
@@ -410,7 +455,11 @@ Move the implementation from `conversation/provider-factory.ts`:
 import { ProviderRegistry } from '@lace/agent/providers/registry';
 import { AIProvider } from '@lace/agent/providers/base-provider';
 import { TestAgentProvider } from '@lace/agent/runtime/test-provider';
-import { throwInvalidParams, toNonEmptyString, isTestProviderEnabled } from '@lace/agent/rpc/utils';
+import {
+  throwInvalidParams,
+  toNonEmptyString,
+  isTestProviderEnabled,
+} from '@lace/agent/rpc/utils';
 
 /**
  * Create an AI provider for a turn.
@@ -432,7 +481,10 @@ export async function createProviderForTurn(options: {
   }
 
   const registry = ProviderRegistry.getInstance();
-  return await registry.createProviderFromInstanceAndModel(connectionId, modelId);
+  return await registry.createProviderFromInstanceAndModel(
+    connectionId,
+    modelId
+  );
 }
 ```
 
@@ -445,6 +497,7 @@ cd packages/agent && npx vitest run src/providers/__tests__/turn-factory.test.ts
 **Step 5: Update providers/index.ts**
 
 Add export:
+
 ```typescript
 export { createProviderForTurn } from './turn-factory';
 ```
@@ -452,6 +505,7 @@ export { createProviderForTurn } from './turn-factory';
 **Step 6: Update conversation/provider-factory.ts to re-export**
 
 Replace the function with a re-export:
+
 ```typescript
 // src/conversation/provider-factory.ts
 // ABOUTME: Provider factory for creating AI providers for conversation turns
@@ -475,7 +529,8 @@ export async function getModelPricing(
 
 **Step 7: Delete duplicate in session-operations.ts**
 
-Remove the local `createProviderForTurn` function from `session-operations.ts` - it's no longer used (verify with grep first).
+Remove the local `createProviderForTurn` function from `session-operations.ts` -
+it's no longer used (verify with grep first).
 
 **Step 8: Run full test suite**
 
@@ -495,9 +550,11 @@ git add -A && git commit -m "refactor(agent): move createProviderForTurn to prov
 
 ### Task 2.1: Extract job output reading to jobs/job-output.ts
 
-**Problem:** Job output file reading logic duplicated in 3 places: `rpc/handlers/jobs.ts`, `core/tools/special/job-tools.ts`, `runner.ts`
+**Problem:** Job output file reading logic duplicated in 3 places:
+`rpc/handlers/jobs.ts`, `core/tools/special/job-tools.ts`, `runner.ts`
 
 **Files:**
+
 - Create: `src/jobs/job-output.ts`
 - Modify: `src/rpc/handlers/jobs.ts`
 - Modify: `src/core/tools/special/job-tools.ts`
@@ -506,7 +563,8 @@ git add -A && git commit -m "refactor(agent): move createProviderForTurn to prov
 
 **Step 1: Identify all output reading patterns**
 
-Search for patterns like `readFileSync(outputPath)`, `existsSync(outputPath)`, output truncation logic.
+Search for patterns like `readFileSync(outputPath)`, `existsSync(outputPath)`,
+output truncation logic.
 
 **Step 2: Write the failing test**
 
@@ -639,7 +697,8 @@ export function appendJobOutput(
   }
 
   const allowedBytes = maxSize - currentSize;
-  const toAppend = content.length > allowedBytes ? content.slice(0, allowedBytes) : content;
+  const toAppend =
+    content.length > allowedBytes ? content.slice(0, allowedBytes) : content;
   appendFileSync(outputPath, toAppend);
   return { appended: true };
 }
@@ -662,13 +721,20 @@ cd packages/agent && npx vitest run src/jobs/__tests__/job-output.test.ts
 **Step 6: Update jobs/index.ts**
 
 Add exports:
+
 ```typescript
-export { readJobOutput, appendJobOutput, getJobOutputSize, MAX_OUTPUT_SIZE } from './job-output';
+export {
+  readJobOutput,
+  appendJobOutput,
+  getJobOutputSize,
+  MAX_OUTPUT_SIZE,
+} from './job-output';
 ```
 
 **Step 7: Update rpc/handlers/jobs.ts**
 
 Replace inline reading with import:
+
 ```typescript
 import { readJobOutput } from '@lace/agent/jobs';
 // Replace manual readFileSync/existsSync with readJobOutput()
@@ -692,9 +758,11 @@ git add -A && git commit -m "refactor(agent): extract job output operations to j
 
 ### Task 2.2: Extract job kill logic to jobs/job-control.ts
 
-**Problem:** Job kill block (~35 lines) duplicated in `session.ts` lines 62-90 and 205-234. Also incomplete version in `job-tools.ts`.
+**Problem:** Job kill block (~35 lines) duplicated in `session.ts` lines 62-90
+and 205-234. Also incomplete version in `job-tools.ts`.
 
 **Files:**
+
 - Create: `src/jobs/job-control.ts`
 - Modify: `src/rpc/handlers/session.ts`
 - Modify: `src/rpc/handlers/jobs.ts`
@@ -724,7 +792,9 @@ describe('killJob', () => {
       permissionAbortController: new AbortController(),
     };
 
-    const processKill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    const processKill = vi
+      .spyOn(process, 'kill')
+      .mockImplementation(() => true);
 
     await killJob(job as JobState, { waitMs: 100 });
 
@@ -859,7 +929,9 @@ export async function killAllRunningJobs(
   jobs: Map<string, JobState>,
   options?: KillJobOptions
 ): Promise<void> {
-  const runningJobs = [...jobs.values()].filter((job) => job.status === 'running');
+  const runningJobs = [...jobs.values()].filter(
+    (job) => job.status === 'running'
+  );
 
   // Send SIGTERM to all
   for (const job of runningJobs) {
@@ -873,7 +945,9 @@ export async function killAllRunningJobs(
       .map((job) =>
         Promise.race([
           job.completion,
-          new Promise<void>((resolve) => setTimeout(resolve, options?.waitMs ?? 500)),
+          new Promise<void>((resolve) =>
+            setTimeout(resolve, options?.waitMs ?? 500)
+          ),
         ])
       )
   );
@@ -887,6 +961,7 @@ export async function killAllRunningJobs(
 **Step 6: Update session.ts to use killAllRunningJobs**
 
 Replace both duplicated blocks with:
+
 ```typescript
 import { killAllRunningJobs } from '@lace/agent/jobs';
 // ...
@@ -911,9 +986,11 @@ git add -A && git commit -m "refactor(agent): extract job control logic to jobs/
 
 ### Task 3.1: Extract getEffectiveConfig to core/session.ts
 
-**Problem:** Effective config merge logic duplicated in `prompt.ts:89`, `session-operations.ts:83`, `agent-status.ts:28`
+**Problem:** Effective config merge logic duplicated in `prompt.ts:89`,
+`session-operations.ts:83`, `agent-status.ts:28`
 
 **Files:**
+
 - Modify: `src/core/session.ts`
 - Modify: `src/rpc/handlers/prompt.ts`
 - Modify: `src/rpc/handlers/session-operations.ts`
@@ -1003,9 +1080,11 @@ git add -A && git commit -m "refactor(agent): extract getEffectiveConfig to core
 
 ### Task 4.1: Consolidate model validation in models.ts
 
-**Problem:** Model array validation duplicated at lines 187-194 and 204-211 in `models.ts`
+**Problem:** Model array validation duplicated at lines 187-194 and 204-211 in
+`models.ts`
 
 **Files:**
+
 - Modify: `src/rpc/handlers/models.ts`
 
 **Step 1: Extract helper function**
@@ -1031,22 +1110,26 @@ function parseModelIds(modelIds: unknown): string[] {
 
 ### Task 4.2: Simplify server.ts job wrappers
 
-**Problem:** `_startShellJob` and `_startSubagentJob` in `server.ts` (lines 219-255) are nearly identical wrapper functions
+**Problem:** `_startShellJob` and `_startSubagentJob` in `server.ts` (lines
+219-255) are nearly identical wrapper functions
 
 **Files:**
+
 - Modify: `src/server.ts`
 
 **Step 1: Extract common error handling**
 
 ```typescript
-async function wrapJobCreation<T>(
-  fn: () => Promise<T>
-): Promise<T> {
+async function wrapJobCreation<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (err) {
     if (err instanceof JobCreationError) {
-      throw { code: err.code, message: err.message, data: { category: err.category } };
+      throw {
+        code: err.code,
+        message: err.message,
+        data: { category: err.category },
+      };
     }
     throw err;
   }
@@ -1067,9 +1150,11 @@ const _startSubagentJob = (options: CreateSubagentJobOptions) =>
 
 ### Task 5.1: Add barrel export to conversation/
 
-**Problem:** `src/conversation/` has no `index.ts`, inconsistent with other modules
+**Problem:** `src/conversation/` has no `index.ts`, inconsistent with other
+modules
 
 **Files:**
+
 - Create: `src/conversation/index.ts`
 
 ```typescript
@@ -1084,9 +1169,12 @@ export { handleSlashCommand, type SlashCommandResult } from './slash-commands';
 
 ### Task 5.2: Consider merging conversation/ into core/conversation/
 
-**Decision point:** After completing the above tasks, evaluate whether `src/conversation/` (now just `slash-commands.ts` and a re-export) should be merged into `src/core/conversation/`.
+**Decision point:** After completing the above tasks, evaluate whether
+`src/conversation/` (now just `slash-commands.ts` and a re-export) should be
+merged into `src/core/conversation/`.
 
 Factors:
+
 - If `slash-commands.ts` has no RPC dependencies, merge
 - If it has RPC dependencies, keep separate
 
@@ -1098,7 +1186,8 @@ After completing all tasks:
 
 - [ ] All 221+ agent tests pass
 - [ ] All supervisor tests pass
-- [ ] No duplicate function definitions (run `jscpd` again, expect <5% duplication)
+- [ ] No duplicate function definitions (run `jscpd` again, expect <5%
+      duplication)
 - [ ] Test files use `createE2EContext` helper (no manual temp dir management)
 - [ ] `rpc/handlers/` files are thin (mostly delegation)
 - [ ] Provider-related code is in `providers/`
@@ -1110,26 +1199,27 @@ After completing all tasks:
 ## Estimated Commits
 
 **Phase 0 - Test Infrastructure:**
+
 1. `test(agent): add createE2EContext helper for test scaffolding`
 2. `test(agent): migrate agent-process tests to createE2EContext`
 3. `test(agent): migrate job/subagent tests to createE2EContext`
 4. `test(agent): migrate remaining tests to createE2EContext`
 5. `test(supervisor): migrate supervisor tests to shared context`
 
-**Phase 1 - Provider Consolidation:**
-6. `refactor(agent): extract ensureProviderCatalogLoaded to providers/catalog`
-7. `refactor(agent): move createProviderForTurn to providers/`
+**Phase 1 - Provider Consolidation:** 6.
+`refactor(agent): extract ensureProviderCatalogLoaded to providers/catalog` 7.
+`refactor(agent): move createProviderForTurn to providers/`
 
-**Phase 2 - Job Consolidation:**
-8. `refactor(agent): extract job output operations to jobs/job-output`
-9. `refactor(agent): extract job control logic to jobs/job-control`
+**Phase 2 - Job Consolidation:** 8.
+`refactor(agent): extract job output operations to jobs/job-output` 9.
+`refactor(agent): extract job control logic to jobs/job-control`
 
-**Phase 3 - Session Config:**
-10. `refactor(agent): extract getEffectiveConfig to core/session`
+**Phase 3 - Session Config:** 10.
+`refactor(agent): extract getEffectiveConfig to core/session`
 
-**Phase 4 - RPC Cleanup:**
-11. `refactor(agent): consolidate model validation in RPC handlers`
-12. `refactor(agent): simplify server.ts job wrappers`
+**Phase 4 - RPC Cleanup:** 11.
+`refactor(agent): consolidate model validation in RPC handlers` 12.
+`refactor(agent): simplify server.ts job wrappers`
 
-**Phase 5 - Directory Structure:**
-13. `refactor(agent): add conversation/ barrel export`
+**Phase 5 - Directory Structure:** 13.
+`refactor(agent): add conversation/ barrel export`

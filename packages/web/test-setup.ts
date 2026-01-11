@@ -176,8 +176,9 @@ vi.mock('@anthropic-ai/sdk', () => {
 });
 
 // Export for cleanup
-(globalThis as unknown as { pendingMockTimers: ReturnType<typeof setTimeout>[] }).pendingMockTimers =
-  pendingMockTimers;
+(
+  globalThis as unknown as { pendingMockTimers: ReturnType<typeof setTimeout>[] }
+).pendingMockTimers = pendingMockTimers;
 
 // Global cleanup after each test file
 afterAll(() => {
