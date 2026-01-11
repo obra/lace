@@ -1,40 +1,27 @@
 // ABOUTME: Project-scoped MCP server list API following Lace project hierarchy patterns
-// ABOUTME: Provides project MCP server configurations with inheritance from global config
+// ABOUTME: Thin wrapper around shared MCP route handlers for project context
 
-import { Project } from '@lace/web/lib/server/projects/project';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
-import type { MCPServerConfig } from '@lace/web/types/core';
-
-const ProjectIdSchema = z.string().min(1, 'Project ID is required');
-
-const CreateProjectServerSchema = z.object({
-  id: z.string().min(1, 'Server ID is required'),
-  command: z.string().min(1, 'Command is required'),
-  args: z.array(z.string()).optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  enabled: z.boolean().default(true),
-  tools: z.record(z.string(), z.string()).default({}),
-});
+import {
+  listMcpServers,
+  createMcpServer,
+  CreateServerSchema,
+  type McpRouteContext,
+} from '@lace/web/lib/server/mcp-route-handlers';
+import {
+  requireProjectId,
+  errorToResponse,
+  throwMethodNotAllowed,
+} from '@lace/web/lib/server/route-helpers';
 
 export async function loader({ params }: { params: unknown; context: unknown; request: Request }) {
   try {
-    const projectId = ProjectIdSchema.parse((params as { projectId: string }).projectId);
+    const projectId = requireProjectId(params as Record<string, string | undefined>);
+    const ctx: McpRouteContext = { projectId };
 
-    // Verify project exists and user has access (existing pattern)
-    const project = Project.getById(projectId);
-    if (!project) {
-      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
-    }
-
-    // Get effective MCP configuration (global + project merged)
-    const mcpServers = project.getMCPServers();
-
-    const servers = Object.entries(mcpServers).map(([serverId, serverConfig]) => ({
-      id: serverId,
-      ...serverConfig,
-    }));
+    const servers = await listMcpServers(ctx);
 
     return createSuperjsonResponse({
       projectId,
@@ -47,9 +34,7 @@ export async function loader({ params }: { params: unknown; context: unknown; re
         details: error.errors,
       });
     }
-
-    console.error('Failed to load project MCP servers:', error);
-    return createErrorResponse('Failed to load server configuration', 500);
+    return errorToResponse(error, 'Failed to load server configuration');
   }
 }
 
@@ -61,39 +46,25 @@ export async function action({
   params: unknown;
   context: unknown;
 }) {
-  if (request.method !== 'POST') {
-    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
-  }
-
   try {
-    const projectId = ProjectIdSchema.parse((params as { projectId: string }).projectId);
-
-    // Verify project exists
-    const project = Project.getById(projectId);
-    if (!project) {
-      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+    if (request.method !== 'POST') {
+      throwMethodNotAllowed();
     }
 
+    const projectId = requireProjectId(params as Record<string, string | undefined>);
+    const ctx: McpRouteContext = { projectId };
+
     const body = (await request.json()) as unknown;
-    const validatedData = CreateProjectServerSchema.parse(body);
+    const validatedData = CreateServerSchema.parse(body);
 
     const { id: serverId, ...serverConfig } = validatedData;
 
-    // Check for duplicate server ID in project
-    const existingServers = project.getMCPServers();
-    if (existingServers[serverId]) {
-      return createErrorResponse(`Server '${serverId}' already exists in project`, 400, {
-        code: 'DUPLICATE_SERVER',
-      });
-    }
-
-    // Add server to project using the existing method
-    await project.addMCPServer(serverId, serverConfig as MCPServerConfig);
+    const server = await createMcpServer(ctx, serverId, serverConfig);
 
     return createSuperjsonResponse(
       {
         message: 'Project MCP server created successfully',
-        server: { id: serverId, ...serverConfig },
+        server,
       },
       { status: 201 }
     );
@@ -111,10 +82,6 @@ export async function action({
       });
     }
 
-    return createErrorResponse(
-      error instanceof Error ? error.message : 'Failed to create project server',
-      500,
-      { code: 'INTERNAL_SERVER_ERROR' }
-    );
+    return errorToResponse(error, 'Failed to create project server');
   }
 }

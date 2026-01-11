@@ -110,7 +110,7 @@ describe('Project MCP Server List API', () => {
     const data = await parseResponse<ErrorResponse>(response);
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe('Invalid project ID');
+    expect(data.error).toBe('projectId is required');
   });
 
   it('should handle project MCP configuration errors', async () => {
@@ -128,6 +128,7 @@ describe('Project MCP Server List API', () => {
     const data = await parseResponse<ErrorResponse>(response);
 
     expect(response.status).toBe(500);
-    expect(data.error).toBe('Failed to load server configuration');
+    // errorToResponse passes through Error messages for debugging
+    expect(data.error).toBe('MCP config corrupted');
   });
 });

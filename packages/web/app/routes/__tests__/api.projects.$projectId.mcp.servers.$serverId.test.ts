@@ -311,7 +311,7 @@ describe('Individual Project MCP Server Management API', () => {
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid project ID');
+      expect(data.error).toBe('projectId is required');
     });
 
     it('should validate invalid server ID', async () => {
@@ -320,7 +320,7 @@ describe('Individual Project MCP Server Management API', () => {
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid server ID');
+      expect(data.error).toBe('serverId is required');
     });
 
     it('should validate invalid request data for POST', async () => {

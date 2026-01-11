@@ -1,21 +1,19 @@
 // ABOUTME: Global MCP server management API for listing and creating servers
-// ABOUTME: Provides CRUD operations for global MCP server configurations
+// ABOUTME: Thin wrapper around shared MCP route handlers for global context
 
-import { McpConfigStore } from '@lace/web/lib/server/mcp-config-store';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { logger } from '@lace/web/lib/logger';
 import { z } from 'zod';
-import type { MCPServerConfig } from '@lace/web/types/core';
+import {
+  listMcpServers,
+  createMcpServer,
+  CreateServerSchema,
+  type McpRouteContext,
+} from '@lace/web/lib/server/mcp-route-handlers';
+import { errorToResponse, throwMethodNotAllowed } from '@lace/web/lib/server/route-helpers';
 
-const CreateServerSchema = z.object({
-  id: z.string().min(1, 'Server ID is required'),
-  command: z.string().min(1, 'Command is required'),
-  args: z.array(z.string()).optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  enabled: z.boolean().default(true),
-  tools: z.record(z.string(), z.string()).default({}),
-});
+// Global context: no projectId
+const GLOBAL_CONTEXT: McpRouteContext = {};
 
 export async function loader({
   request: _request,
@@ -25,47 +23,29 @@ export async function loader({
   context: unknown;
 }) {
   try {
-    // Load global MCP configuration only (no project context)
-    const globalConfig = McpConfigStore.loadGlobalConfig();
-
-    // Return server list with just configuration (no runtime status)
-    const servers = Object.entries(globalConfig?.servers || {}).map(([serverId, serverConfig]) => ({
-      id: serverId,
-      ...serverConfig,
-    }));
-
+    const servers = await listMcpServers(GLOBAL_CONTEXT);
     return createSuperjsonResponse({ servers });
   } catch (error) {
-    logger.error('Failed to load global MCP configuration:', { error });
-    return createErrorResponse('Failed to load global MCP configuration', 500);
+    return errorToResponse(error, 'Failed to load global MCP configuration');
   }
 }
 
 export async function action({ request }: { request: Request; params: unknown; context: unknown }) {
-  if (request.method !== 'POST') {
-    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
-  }
-
   try {
+    if (request.method !== 'POST') {
+      throwMethodNotAllowed();
+    }
+
     const body = (await request.json()) as unknown;
     const validatedData = CreateServerSchema.parse(body);
 
     const { id, ...serverConfig } = validatedData;
 
-    // Check for duplicate server ID
-    const existingConfig = McpConfigStore.loadGlobalConfig();
-    if (existingConfig?.servers[id]) {
-      return createErrorResponse(`Server '${id}' already exists`, 400, {
-        code: 'DUPLICATE_SERVER',
-      });
-    }
-
-    // Save the new server to global configuration
-    McpConfigStore.updateServerConfig(id, serverConfig as MCPServerConfig);
+    const server = await createMcpServer(GLOBAL_CONTEXT, id, serverConfig);
 
     return createSuperjsonResponse({
       message: 'Server created successfully',
-      server: { id, ...serverConfig },
+      server,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -81,10 +61,6 @@ export async function action({ request }: { request: Request; params: unknown; c
       });
     }
 
-    return createErrorResponse(
-      error instanceof Error ? error.message : 'Failed to create server',
-      500,
-      { code: 'INTERNAL_SERVER_ERROR' }
-    );
+    return errorToResponse(error, 'Failed to create server');
   }
 }

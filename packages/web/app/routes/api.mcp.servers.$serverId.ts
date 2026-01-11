@@ -1,51 +1,37 @@
 // ABOUTME: Individual global MCP server management API with CRUD operations
-// ABOUTME: Handles GET, PUT, DELETE for specific global MCP servers
+// ABOUTME: Thin wrapper around shared MCP route handlers for global context
 
-import { McpConfigStore } from '@lace/web/lib/server/mcp-config-store';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
+import {
+  getMcpServer,
+  createMcpServer,
+  updateMcpServer,
+  deleteMcpServer,
+  CreateServerConfigSchema,
+  UpdateServerSchema,
+  type McpRouteContext,
+} from '@lace/web/lib/server/mcp-route-handlers';
+import {
+  requireParam,
+  errorToResponse,
+  throwMethodNotAllowed,
+} from '@lace/web/lib/server/route-helpers';
 
-const ServerIdSchema = z.string().min(1, 'Server ID is required');
-
-const UpdateServerSchema = z.object({
-  command: z.string().min(1).optional(),
-  args: z.array(z.string()).optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  enabled: z.boolean().optional(),
-  tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
-});
-
-const CreateServerSchema = z.object({
-  command: z.string().min(1, 'Command is required'),
-  args: z.array(z.string()).optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  enabled: z.boolean().default(true),
-  tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).default({}),
-});
+// Global context: no projectId
+const GLOBAL_CONTEXT: McpRouteContext = {};
 
 export async function loader({ params }: { params: unknown; context: unknown; request: Request }) {
   try {
-    const serverId = ServerIdSchema.parse((params as { serverId: string }).serverId);
-
-    const globalConfig = McpConfigStore.loadGlobalConfig();
-    const serverConfig = globalConfig?.servers[serverId];
-
-    if (!serverConfig) {
-      return createErrorResponse(`Global MCP server '${serverId}' not found`, 404);
-    }
-
-    return createSuperjsonResponse({
-      id: serverId,
-      ...serverConfig,
-    });
+    const serverId = requireParam(params as Record<string, string | undefined>, 'serverId');
+    const server = await getMcpServer(GLOBAL_CONTEXT, serverId);
+    return createSuperjsonResponse(server);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return createErrorResponse('Invalid server ID', 400, { details: error.errors });
     }
-
-    console.error('Failed to get global MCP server:', error);
-    return createErrorResponse('Failed to load server configuration', 500);
+    return errorToResponse(error, 'Failed to load server configuration');
   }
 }
 
@@ -58,88 +44,40 @@ export async function action({
   context: unknown;
 }) {
   try {
-    const serverId = ServerIdSchema.parse((params as { serverId: string }).serverId);
+    const serverId = requireParam(params as Record<string, string | undefined>, 'serverId');
 
     if (request.method === 'PUT') {
-      // Update existing global server
       const updates = UpdateServerSchema.parse(await request.json());
-
-      const globalConfig = McpConfigStore.loadGlobalConfig() || { servers: {} };
-      const currentServer = globalConfig.servers[serverId];
-
-      if (!currentServer) {
-        return createErrorResponse(`Global MCP server '${serverId}' not found`, 404);
-      }
-
-      // Merge updates with current configuration
-      const updatedServer = { ...currentServer, ...updates };
-      const updatedConfig = {
-        ...globalConfig,
-        servers: {
-          ...globalConfig.servers,
-          [serverId]: updatedServer,
-        },
-      };
-
-      McpConfigStore.saveGlobalConfig(updatedConfig);
+      const server = await updateMcpServer(GLOBAL_CONTEXT, serverId, updates);
 
       return createSuperjsonResponse({
         message: `Global MCP server '${serverId}' updated successfully`,
-        server: { id: serverId, ...updatedServer },
+        server,
       });
     } else if (request.method === 'POST') {
-      // Create new global server
-      const serverConfig = CreateServerSchema.parse(await request.json());
-
-      const globalConfig = McpConfigStore.loadGlobalConfig() || { servers: {} };
-
-      // Check for duplicates
-      if (globalConfig.servers[serverId]) {
-        return createErrorResponse(`Global MCP server '${serverId}' already exists`, 409);
-      }
-
-      // Add new server
-      const updatedConfig = {
-        ...globalConfig,
-        servers: {
-          ...globalConfig.servers,
-          [serverId]: serverConfig,
-        },
-      };
-
-      McpConfigStore.saveGlobalConfig(updatedConfig);
+      const serverConfig = CreateServerConfigSchema.parse(await request.json());
+      const server = await createMcpServer(GLOBAL_CONTEXT, serverId, serverConfig);
 
       return createSuperjsonResponse(
         {
           message: `Global MCP server '${serverId}' created successfully`,
-          server: { id: serverId, ...serverConfig },
+          server,
         },
         { status: 201 }
       );
     } else if (request.method === 'DELETE') {
-      // Delete global server
-      const globalConfig = McpConfigStore.loadGlobalConfig();
-      if (!globalConfig?.servers[serverId]) {
-        return createErrorResponse(`Global MCP server '${serverId}' not found`, 404);
-      }
-
-      const updatedConfig = { ...globalConfig };
-      delete updatedConfig.servers[serverId];
-
-      McpConfigStore.saveGlobalConfig(updatedConfig);
+      await deleteMcpServer(GLOBAL_CONTEXT, serverId);
 
       return createSuperjsonResponse({
         message: `Global MCP server '${serverId}' deleted successfully`,
       });
     }
 
-    return createErrorResponse('Method not allowed', 405);
+    throwMethodNotAllowed();
   } catch (error) {
     if (error instanceof z.ZodError) {
       return createErrorResponse('Invalid request data', 400, { details: error.errors });
     }
-
-    console.error('Failed to manage global MCP server:', error);
-    return createErrorResponse('Server management failed', 500);
+    return errorToResponse(error, 'Server management failed');
   }
 }

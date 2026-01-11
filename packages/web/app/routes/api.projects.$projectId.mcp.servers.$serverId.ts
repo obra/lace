@@ -1,52 +1,34 @@
 // ABOUTME: Individual project MCP server management following established project API patterns
-// ABOUTME: Handles CRUD operations for project-specific MCP server configurations
+// ABOUTME: Thin wrapper around shared MCP route handlers for project context
 
-import { Project } from '@lace/web/lib/server/projects/project';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
-
-const RouteParamsSchema = z.object({
-  projectId: z.string().min(1, 'Project ID is required'),
-  serverId: z.string().min(1, 'Server ID is required'),
-});
-
-const UpdateServerSchema = z.object({
-  command: z.string().min(1).optional(),
-  args: z.array(z.string()).optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  enabled: z.boolean().optional(),
-  tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
-});
-
-const CreateServerSchema = z.object({
-  command: z.string().min(1, 'Command is required'),
-  args: z.array(z.string()).optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  enabled: z.boolean().default(true),
-  tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).default({}),
-});
+import {
+  getMcpServer,
+  createMcpServer,
+  updateMcpServer,
+  deleteMcpServer,
+  CreateServerConfigSchema,
+  UpdateServerSchema,
+  type McpRouteContext,
+} from '@lace/web/lib/server/mcp-route-handlers';
+import {
+  requireProjectId,
+  requireParam,
+  errorToResponse,
+  throwMethodNotAllowed,
+} from '@lace/web/lib/server/route-helpers';
 
 export async function loader({ params }: { params: unknown; context: unknown; request: Request }) {
   try {
-    const { projectId, serverId } = RouteParamsSchema.parse(
-      params as { projectId: string; serverId: string }
-    );
+    const typedParams = params as Record<string, string | undefined>;
+    const projectId = requireProjectId(typedParams);
+    const serverId = requireParam(typedParams, 'serverId');
+    const ctx: McpRouteContext = { projectId };
 
-    const project = Project.getById(projectId);
-    if (!project) {
-      return createErrorResponse('Project not found', 404);
-    }
-
-    const serverConfig = project.getMCPServer(serverId);
-    if (!serverConfig) {
-      return createErrorResponse(`MCP server '${serverId}' not found`, 404);
-    }
-
-    return createSuperjsonResponse({
-      id: serverId,
-      ...serverConfig,
-    });
+    const server = await getMcpServer(ctx, serverId);
+    return createSuperjsonResponse(server);
   } catch (error) {
     if (error instanceof z.ZodError) {
       const firstError = error.errors[0];
@@ -58,9 +40,7 @@ export async function loader({ params }: { params: unknown; context: unknown; re
       }
       return createErrorResponse('Invalid request parameters', 400, { details: error.errors });
     }
-
-    console.error('Failed to get project MCP server:', error);
-    return createErrorResponse('Failed to load server configuration', 500);
+    return errorToResponse(error, 'Failed to load server configuration');
   }
 }
 
@@ -73,73 +53,43 @@ export async function action({
   context: unknown;
 }) {
   try {
-    const { projectId, serverId } = RouteParamsSchema.parse(
-      params as { projectId: string; serverId: string }
-    );
-
-    const project = Project.getById(projectId);
-    if (!project) {
-      return createErrorResponse('Project not found', 404);
-    }
+    const typedParams = params as Record<string, string | undefined>;
+    const projectId = requireProjectId(typedParams);
+    const serverId = requireParam(typedParams, 'serverId');
+    const ctx: McpRouteContext = { projectId };
 
     if (request.method === 'PUT') {
-      // Update existing project MCP server
       const updates = UpdateServerSchema.parse(await request.json());
-
-      const currentServer = project.getMCPServer(serverId);
-      if (!currentServer) {
-        return createErrorResponse(`MCP server '${serverId}' not found`, 404);
-      }
-
-      // Merge updates with current configuration
-      const updatedServer = { ...currentServer, ...updates };
-      project.updateMCPServer(serverId, updatedServer);
+      const server = await updateMcpServer(ctx, serverId, updates);
 
       return createSuperjsonResponse({
         message: `Project MCP server '${serverId}' updated successfully`,
-        server: { id: serverId, ...updatedServer },
+        server,
       });
     } else if (request.method === 'POST') {
-      // Create new project MCP server
-      const serverConfig = CreateServerSchema.parse(await request.json());
-
-      // Check for duplicates
-      const existingServer = project.getMCPServer(serverId);
-      if (existingServer) {
-        return createErrorResponse(`Project MCP server '${serverId}' already exists`, 409);
-      }
-
-      // Add new server
-      project.addMCPServer(serverId, serverConfig);
+      const serverConfig = CreateServerConfigSchema.parse(await request.json());
+      const server = await createMcpServer(ctx, serverId, serverConfig);
 
       return createSuperjsonResponse(
         {
           message: `Project MCP server '${serverId}' created successfully`,
-          server: { id: serverId, ...serverConfig },
+          server,
         },
         { status: 201 }
       );
     } else if (request.method === 'DELETE') {
-      // Delete project MCP server
-      const existingServer = project.getMCPServer(serverId);
-      if (!existingServer) {
-        return createErrorResponse(`MCP server '${serverId}' not found`, 404);
-      }
-
-      project.deleteMCPServer(serverId);
+      await deleteMcpServer(ctx, serverId);
 
       return createSuperjsonResponse({
         message: `Project MCP server '${serverId}' deleted successfully`,
       });
     }
 
-    return createErrorResponse('Method not allowed', 405);
+    throwMethodNotAllowed();
   } catch (error) {
     if (error instanceof z.ZodError) {
       return createErrorResponse('Invalid request data', 400, { details: error.errors });
     }
-
-    console.error('Failed to manage project MCP server:', error);
-    return createErrorResponse('Server management failed', 500);
+    return errorToResponse(error, 'Server management failed');
   }
 }
