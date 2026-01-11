@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
-import { defaultInitializeParams } from './helpers/initialize';
+import { createE2EContext, defaultInitializeParams } from './helpers';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -22,31 +21,10 @@ function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
 }
 
 describe('session/set_mode', () => {
-  let originalLaceDir: string | undefined;
-  let originalTestProvider: string | undefined;
-  let laceDir: string;
-  let workDir: string;
+  const ctx = createE2EContext({ prefix: 'lace-agent-set-mode' });
 
-  beforeEach(() => {
-    originalLaceDir = process.env.LACE_DIR;
-    originalTestProvider = process.env.LACE_AGENT_TEST_PROVIDER;
-
-    laceDir = mkdtempSync(join(tmpdir(), 'lace-agent-test-'));
-    workDir = mkdtempSync(join(tmpdir(), 'lace-agent-workdir-'));
-    process.env.LACE_DIR = laceDir;
-    process.env.LACE_AGENT_TEST_PROVIDER = '1';
-  });
-
-  afterEach(() => {
-    if (originalLaceDir === undefined) delete process.env.LACE_DIR;
-    else process.env.LACE_DIR = originalLaceDir;
-
-    if (originalTestProvider === undefined) delete process.env.LACE_AGENT_TEST_PROVIDER;
-    else process.env.LACE_AGENT_TEST_PROVIDER = originalTestProvider;
-
-    rmSync(laceDir, { recursive: true, force: true });
-    rmSync(workDir, { recursive: true, force: true });
-  });
+  beforeEach(() => ctx.setup());
+  afterEach(() => ctx.teardown());
 
   it('switches tool availability between plan and execute', async () => {
     const state = createAgentServerState();
@@ -57,7 +35,7 @@ describe('session/set_mode', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'approve' } })
       );
-      await client.request('session/new', { workDir });
+      await client.request('session/new', { workDir: ctx.workDir });
 
       const setPlan = await client.request('session/set_mode', { mode: 'plan' });
       expect(setPlan).toEqual({ mode: 'plan', previousMode: 'execute' });
@@ -86,7 +64,7 @@ describe('session/set_mode', () => {
         content: [{ type: 'text', text: 'write file foo.txt' }],
       });
 
-      const content = readFileSync(join(workDir, 'foo.txt'), 'utf8');
+      const content = readFileSync(join(ctx.workDir, 'foo.txt'), 'utf8');
       expect(content).toBe('written by test provider\n');
     } finally {
       client.close();

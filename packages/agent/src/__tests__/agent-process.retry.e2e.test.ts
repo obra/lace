@@ -2,41 +2,23 @@
 // ABOUTME: Tests that the agent properly retries on transient errors and fails on non-retryable ones
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
-import { defaultInitializeParams } from './helpers/initialize';
+import {
+  createE2EContext,
+  spawnAgentProcess,
+  withTimeout,
+  defaultInitializeParams,
+} from './helpers';
 
 describe('agent retry behavior (E2E)', () => {
-  let originalLaceDir: string | undefined;
-  let laceDir: string;
-  let workDir: string;
-  let agent: SpawnedAgent | undefined;
+  const ctx = createE2EContext({ prefix: 'lace-agent-retry' });
 
-  beforeEach(() => {
-    originalLaceDir = process.env.LACE_DIR;
-    laceDir = mkdtempSync(join(tmpdir(), 'lace-agent-retry-e2e-'));
-    workDir = mkdtempSync(join(tmpdir(), 'lace-agent-retry-wd-'));
-  });
-
-  afterEach(async () => {
-    if (agent) {
-      await agent.shutdown();
-      agent = undefined;
-    }
-
-    if (originalLaceDir === undefined) delete process.env.LACE_DIR;
-    else process.env.LACE_DIR = originalLaceDir;
-
-    rmSync(laceDir, { recursive: true, force: true });
-    rmSync(workDir, { recursive: true, force: true });
-  });
+  beforeEach(() => ctx.setup());
+  afterEach(() => ctx.teardown());
 
   it('retries on provider rate limit error (429) and succeeds', { timeout: 30_000 }, async () => {
     // Setup: Fail first 2 calls with 429, then succeed
-    agent = spawnAgentProcess({
-      laceDir,
+    ctx.agent = spawnAgentProcess({
+      laceDir: ctx.laceDir,
       env: {
         LACE_AGENT_TEST_PROVIDER: '1',
         LACE_TEST_PROVIDER_FAIL_COUNT: '2',
@@ -45,22 +27,22 @@ describe('agent retry behavior (E2E)', () => {
     });
 
     const updates: unknown[] = [];
-    agent.peer.onRequest('session/update', async (params) => {
+    ctx.agent.peer.onRequest('session/update', async (params) => {
       updates.push(params);
       return undefined;
     });
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
     // Send a simple prompt - should retry and eventually succeed
     const result = (await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'hello' }],
       }),
       25_000,
@@ -74,8 +56,8 @@ describe('agent retry behavior (E2E)', () => {
 
   it('retries on provider temporary error (500) and succeeds', { timeout: 30_000 }, async () => {
     // Setup: Fail first call with 500, then succeed
-    agent = spawnAgentProcess({
-      laceDir,
+    ctx.agent = spawnAgentProcess({
+      laceDir: ctx.laceDir,
       env: {
         LACE_AGENT_TEST_PROVIDER: '1',
         LACE_TEST_PROVIDER_FAIL_COUNT: '1',
@@ -84,15 +66,15 @@ describe('agent retry behavior (E2E)', () => {
     });
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
     const result = (await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'hello' }],
       }),
       25_000,
@@ -107,8 +89,8 @@ describe('agent retry behavior (E2E)', () => {
   it('fails after max retries exceeded on persistent 429', { timeout: 30_000 }, async () => {
     // Setup: Always fail with 429 (more failures than max retries)
     // Use very low retry delays for faster test execution
-    agent = spawnAgentProcess({
-      laceDir,
+    ctx.agent = spawnAgentProcess({
+      laceDir: ctx.laceDir,
       env: {
         LACE_AGENT_TEST_PROVIDER: '1',
         LACE_TEST_PROVIDER_FAIL_COUNT: '100', // More than max retries (10)
@@ -119,17 +101,17 @@ describe('agent retry behavior (E2E)', () => {
     });
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
     // The prompt should fail after exhausting retries (throws JSON-RPC error)
     await expect(
       withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'hello' }],
         }),
         25_000,
@@ -142,8 +124,8 @@ describe('agent retry behavior (E2E)', () => {
 
   it('does not retry on non-retryable errors (400)', { timeout: 15_000 }, async () => {
     // Setup: Fail with 400 (client error - not retryable)
-    agent = spawnAgentProcess({
-      laceDir,
+    ctx.agent = spawnAgentProcess({
+      laceDir: ctx.laceDir,
       env: {
         LACE_AGENT_TEST_PROVIDER: '1',
         LACE_TEST_PROVIDER_FAIL_COUNT: '1',
@@ -152,17 +134,17 @@ describe('agent retry behavior (E2E)', () => {
     });
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
     // Should fail immediately without retry on 400 error (throws JSON-RPC error)
     await expect(
       withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'hello' }],
         }),
         10_000,
@@ -175,8 +157,8 @@ describe('agent retry behavior (E2E)', () => {
 
   it('preserves conversation state after successful retry', { timeout: 30_000 }, async () => {
     // Setup: Fail first call with 500, then succeed
-    agent = spawnAgentProcess({
-      laceDir,
+    ctx.agent = spawnAgentProcess({
+      laceDir: ctx.laceDir,
       env: {
         LACE_AGENT_TEST_PROVIDER: '1',
         LACE_TEST_PROVIDER_FAIL_COUNT: '1',
@@ -185,15 +167,15 @@ describe('agent retry behavior (E2E)', () => {
     });
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'hello' }],
       }),
       25_000,
@@ -202,7 +184,7 @@ describe('agent retry behavior (E2E)', () => {
 
     // Fetch durable events to verify correct sequencing
     const durable = (await withTimeout(
-      agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+      ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
       2_000,
       'ent/session/events'
     )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };

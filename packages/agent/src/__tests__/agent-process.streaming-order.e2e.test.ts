@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
-import { defaultInitializeParams } from './helpers/initialize';
+import {
+  createE2EContext,
+  spawnAgentProcess,
+  withTimeout,
+  defaultInitializeParams,
+} from './helpers';
 
 type SessionUpdateParams = {
   sessionId: string;
@@ -27,35 +28,16 @@ async function waitFor(
 }
 
 describe('lace-agent streaming update ordering (E2E over stdio)', () => {
-  let originalLaceDir: string | undefined;
-  let laceDir: string;
-  let workDir: string;
-  let agent: SpawnedAgent | undefined;
+  const ctx = createE2EContext({ prefix: 'lace-agent-stream-order' });
 
-  beforeEach(() => {
-    originalLaceDir = process.env.LACE_DIR;
-    laceDir = mkdtempSync(join(tmpdir(), 'lace-agent-stream-order-e2e-store-'));
-    workDir = mkdtempSync(join(tmpdir(), 'lace-agent-stream-order-e2e-wd-'));
-  });
-
-  afterEach(async () => {
-    if (agent) {
-      await agent.shutdown();
-      agent = undefined;
-    }
-
-    if (originalLaceDir === undefined) delete process.env.LACE_DIR;
-    else process.env.LACE_DIR = originalLaceDir;
-
-    rmSync(laceDir, { recursive: true, force: true });
-    rmSync(workDir, { recursive: true, force: true });
-  });
+  beforeEach(() => ctx.setup());
+  afterEach(() => ctx.teardown());
 
   it('does not emit text_delta after turn_end for a turn', { timeout: 20_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: SessionUpdateParams[] = [];
-    agent.peer.onRequest('session/update', async (params: unknown) => {
+    ctx.agent.peer.onRequest('session/update', async (params: unknown) => {
       if (params && typeof params === 'object') {
         const p = params as SessionUpdateParams;
         if (typeof p.type === 'string') updates.push(p);
@@ -63,17 +45,21 @@ describe('lace-agent streaming update ordering (E2E over stdio)', () => {
       return undefined;
     });
 
-    agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+    ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     const promptResult = (await withTimeout(
-      agent.peer.request('session/prompt', { content: [{ type: 'text', text: 'hi' }] }),
+      ctx.agent.peer.request('session/prompt', { content: [{ type: 'text', text: 'hi' }] }),
       10_000,
       'session/prompt'
     )) as { turnId: string };
