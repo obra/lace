@@ -3,65 +3,46 @@
 // while fatal errors (denied/cancelled/aborted) stop the turn.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
-import { defaultInitializeParams } from './helpers/initialize';
+import {
+  createE2EContext,
+  spawnAgentProcess,
+  withTimeout,
+  defaultInitializeParams,
+} from './helpers';
 
 describe('lace-agent error recovery (E2E)', () => {
-  let originalLaceDir: string | undefined;
-  let laceDir: string;
-  let workDir: string;
-  let agent: SpawnedAgent | undefined;
+  const ctx = createE2EContext({ prefix: 'lace-agent-error-recovery' });
 
-  beforeEach(() => {
-    originalLaceDir = process.env.LACE_DIR;
-    laceDir = mkdtempSync(join(tmpdir(), 'lace-agent-error-recovery-'));
-    workDir = mkdtempSync(join(tmpdir(), 'lace-agent-error-recovery-wd-'));
-  });
-
-  afterEach(async () => {
-    if (agent) {
-      await agent.shutdown();
-      agent = undefined;
-    }
-
-    if (originalLaceDir === undefined) delete process.env.LACE_DIR;
-    else process.env.LACE_DIR = originalLaceDir;
-
-    rmSync(laceDir, { recursive: true, force: true });
-    rmSync(workDir, { recursive: true, force: true });
-  });
+  beforeEach(() => ctx.setup());
+  afterEach(() => ctx.teardown());
 
   it(
     'continues turn after recoverable tool error (file not found), model sees error and responds',
     { timeout: 15_000 },
     async () => {
-      agent = spawnAgentProcess({
-        laceDir,
-        env: { LACE_AGENT_TEST_PROVIDER: '1' },
-      });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       const updates: unknown[] = [];
-      agent.peer.onRequest('session/update', async (params) => {
+      ctx.agent.peer.onRequest('session/update', async (params) => {
         updates.push(params);
         return undefined;
       });
 
       await withTimeout(
-        agent.peer.request('initialize', defaultInitializeParams()),
+        ctx.agent.peer.request('initialize', defaultInitializeParams()),
         2_000,
         'initialize'
       );
 
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
       // Ask to read a non-existent file - this will fail with "file not found"
       // The key behavior: the turn should CONTINUE, allowing the model to see the error
       // and respond (instead of stopping the turn on failure)
       const promptResult = (await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'read file nonexistent.txt' }],
         }),
         10_000,
@@ -88,7 +69,7 @@ describe('lace-agent error recovery (E2E)', () => {
 
       // Get events to verify the sequence
       const durable = (await withTimeout(
-        agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+        ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
         2_000,
         'ent/session/events'
       )) as { events: Array<{ eventSeq: number; type: string; data?: unknown }>; hasMore: boolean };
@@ -116,21 +97,21 @@ describe('lace-agent error recovery (E2E)', () => {
   );
 
   it('stops turn immediately on permission denied (fatal error)', { timeout: 15_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: unknown[] = [];
-    agent.peer.onRequest('session/update', async (params) => {
+    ctx.agent.peer.onRequest('session/update', async (params) => {
       updates.push(params);
       return undefined;
     });
 
     // Deny all permission requests
-    agent.peer.onRequest('session/request_permission', async () => {
+    ctx.agent.peer.onRequest('session/request_permission', async () => {
       return { decision: 'deny' };
     });
 
     await withTimeout(
-      agent.peer.request(
+      ctx.agent.peer.request(
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
@@ -138,11 +119,11 @@ describe('lace-agent error recovery (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
     // Create a file so the test provider will try file_write (needs permission)
     const promptResult = (await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'write file test.txt' }],
       }),
       10_000,
@@ -169,7 +150,7 @@ describe('lace-agent error recovery (E2E)', () => {
 
     // Get events to verify the sequence
     const durable = (await withTimeout(
-      agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+      ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
       2_000,
       'ent/session/events'
     )) as { events: Array<{ eventSeq: number; type: string; data?: unknown }>; hasMore: boolean };
@@ -199,35 +180,34 @@ describe('lace-agent error recovery (E2E)', () => {
     'model can retry with corrected parameters after seeing recoverable error',
     { timeout: 15_000 },
     async () => {
-      agent = spawnAgentProcess({
-        laceDir,
+      ctx.agent = spawnAgentProcess({
+        laceDir: ctx.laceDir,
         env: {
-          LACE_AGENT_TEST_PROVIDER: '1',
           // Enable retry behavior: test provider will retry with fallback.txt after seeing error
           LACE_TEST_PROVIDER_RETRY_ON_ERROR: '1',
         },
       });
 
       const updates: unknown[] = [];
-      agent.peer.onRequest('session/update', async (params) => {
+      ctx.agent.peer.onRequest('session/update', async (params) => {
         updates.push(params);
         return undefined;
       });
 
       await withTimeout(
-        agent.peer.request('initialize', defaultInitializeParams()),
+        ctx.agent.peer.request('initialize', defaultInitializeParams()),
         2_000,
         'initialize'
       );
 
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
       // Create a fallback file that the model will try after the first one fails
-      writeFileSync(join(workDir, 'fallback.txt'), 'fallback content\n', 'utf8');
+      writeFileSync(join(ctx.workDir, 'fallback.txt'), 'fallback content\n', 'utf8');
 
       // First file doesn't exist - model will try it, see error, retry with fallback.txt
       const promptResult = (await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'read file wrong.txt' }],
         }),
         10_000,
@@ -254,7 +234,7 @@ describe('lace-agent error recovery (E2E)', () => {
 
       // Get events to verify the sequence
       const durable = (await withTimeout(
-        agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+        ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
         2_000,
         'ent/session/events'
       )) as { events: Array<{ eventSeq: number; type: string; data?: unknown }>; hasMore: boolean };

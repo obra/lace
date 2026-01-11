@@ -1,43 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
-import { defaultInitializeParams } from './helpers/initialize';
+import {
+  createE2EContext,
+  spawnAgentProcess,
+  withTimeout,
+  defaultInitializeParams,
+} from './helpers';
 
 describe('lace-agent delegate tool (E2E over stdio)', () => {
-  let originalLaceDir: string | undefined;
-  let laceDir: string;
-  let workDir: string;
-  let agent: SpawnedAgent | undefined;
+  const ctx = createE2EContext({ prefix: 'lace-agent-delegate' });
 
-  beforeEach(() => {
-    originalLaceDir = process.env.LACE_DIR;
-    laceDir = mkdtempSync(join(tmpdir(), 'lace-agent-delegate-e2e-store-'));
-    workDir = mkdtempSync(join(tmpdir(), 'lace-agent-delegate-e2e-wd-'));
-  });
-
-  afterEach(async () => {
-    if (agent) {
-      await agent.shutdown();
-      agent = undefined;
-    }
-
-    if (originalLaceDir === undefined) delete process.env.LACE_DIR;
-    else process.env.LACE_DIR = originalLaceDir;
-
-    rmSync(laceDir, { recursive: true, force: true });
-    rmSync(workDir, { recursive: true, force: true });
-  });
+  beforeEach(() => ctx.setup());
+  afterEach(() => ctx.teardown());
 
   it('spawns a subagent job via delegate and returns its report', { timeout: 20_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: Array<Record<string, unknown>> = [];
     let delegateJobId: string | undefined;
     let delegateToolCompleted: Record<string, unknown> | undefined;
 
-    agent.peer.onRequest('session/update', async (params) => {
+    ctx.agent.peer.onRequest('session/update', async (params) => {
       const p = params as Record<string, unknown>;
       updates.push(p);
 
@@ -58,20 +40,20 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       return undefined;
     });
 
-    agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+    ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
     await withTimeout(
-      agent.peer.request(
+      ctx.agent.peer.request(
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
       2_000,
       'initialize'
     );
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'delegate hi' }],
       }),
       10_000,
@@ -106,7 +88,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
     expect(text).toContain('No tool result found');
 
     const output = (await withTimeout(
-      agent.peer.request('ent/job/output', { jobId: delegateJobId }),
+      ctx.agent.peer.request('ent/job/output', { jobId: delegateJobId }),
       2_000,
       'ent/job/output'
     )) as { status: string; output: string };
@@ -119,12 +101,12 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
     'flattens nested delegate subagents with correct parentJobId',
     { timeout: 20_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       const started: Array<{ jobId: string; parentJobId?: string; jobType: string }> = [];
       const finished = new Set<string>();
 
-      agent.peer.onRequest('session/update', async (params) => {
+      ctx.agent.peer.onRequest('session/update', async (params) => {
         const p = params as Record<string, unknown>;
         if (
           p.type === 'job_started' &&
@@ -143,20 +125,20 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
         return undefined;
       });
 
-      agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+      ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
       await withTimeout(
-        agent.peer.request(
+        ctx.agent.peer.request(
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'ask' } })
         ),
         2_000,
         'initialize'
       );
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(ctx.agent.peer.request('session/new', { workDir: ctx.workDir }), 2_000, 'session/new');
 
       await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'delegate delegate write file nested.txt' }],
         }),
         10_000,
