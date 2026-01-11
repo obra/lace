@@ -13,7 +13,13 @@ import {
 } from '@lace/agent/storage/session-store';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
 import { deriveFilesReadFromDurableEvents } from '@lace/agent/storage/files-from-events';
-import { getJobOutputPath, readJobOutput, readJobOutputTail } from '@lace/agent/jobs';
+import { getJobOutputPath, readJobOutputTail } from '@lace/agent/jobs';
+import {
+  executeJobOutput,
+  executeJobsList,
+  executeJobKill,
+} from '@lace/agent/core/tools/special/job-tools';
+import type { SpecialToolContext } from '@lace/agent/core/tools/special/types';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import {
   toNonEmptyString,
@@ -682,6 +688,38 @@ export class ConversationRunner {
   }
 
   /**
+   * Create a SpecialToolContext for job tool handlers.
+   * Adapts the runner's dependencies to the context interface expected by job-tools.ts.
+   */
+  private createJobToolContext(params: {
+    turnId: string;
+    turnSeq: number;
+    abortSignal: AbortSignal;
+  }): SpecialToolContext {
+    const jobs = new Map<string, import('@lace/agent/server-types').JobState>();
+    // Build a Map from individual job lookups for the context interface
+    // The deriveJobs returns all jobs, but getJobs needs a Map
+    for (const record of this.deps.deriveJobs()) {
+      const job = this.deps.getJob(record.jobId);
+      if (job) {
+        jobs.set(record.jobId, job);
+      }
+    }
+
+    return {
+      sessionDir: this.config.sessionDir,
+      turnId: params.turnId,
+      turnSeq: params.turnSeq,
+      abortSignal: params.abortSignal,
+      getJobs: () => jobs,
+      deriveJobs: () => this.deps.deriveJobs(),
+      startShellJob: this.deps.startShellJob,
+      startSubagentJob: this.deps.startSubagentJob,
+      finalizeJob: this.deps.finalizeJob,
+    };
+  }
+
+  /**
    * Execute a tool by name, handling special built-in tools.
    */
   private async executeToolByName(params: {
@@ -716,19 +754,33 @@ export class ConversationRunner {
       return await this.executeDelegateTool({ finalInput, toolTurnSeq, abortController, turnId });
     }
 
-    // Handle job_output tool
-    if (toolName === 'job_output') {
-      return await this.executeJobOutputTool({ finalInput });
-    }
+    // Handle job tools via shared job-tools.ts handlers
+    if (toolName === 'job_output' || toolName === 'jobs_list' || toolName === 'job_kill') {
+      const context = this.createJobToolContext({
+        turnId,
+        turnSeq: toolTurnSeq,
+        abortSignal: abortController.signal,
+      });
 
-    // Handle jobs_list tool
-    if (toolName === 'jobs_list') {
-      return this.executeJobsListTool({ finalInput });
-    }
-
-    // Handle job_kill tool
-    if (toolName === 'job_kill') {
-      return this.executeJobKillTool({ finalInput });
+      if (toolName === 'job_output') {
+        return await executeJobOutput(
+          finalInput as {
+            jobId?: string;
+            block?: boolean;
+            timeoutMs?: number;
+            byteOffset?: number;
+          },
+          context
+        );
+      }
+      if (toolName === 'jobs_list') {
+        return await executeJobsList(
+          finalInput as { status?: string[]; type?: string[]; limit?: number },
+          context
+        );
+      }
+      // job_kill
+      return await executeJobKill(finalInput as { jobId?: string }, context);
     }
 
     // Default: execute through tool executor
@@ -832,150 +884,6 @@ export class ConversationRunner {
             (truncated ? '\n\n(truncated)' : ''),
         },
       ],
-    };
-  }
-
-  /**
-   * Execute the job_output tool.
-   */
-  private async executeJobOutputTool(params: {
-    finalInput: Record<string, unknown>;
-  }): Promise<CoreToolResult> {
-    const { finalInput } = params;
-
-    const jobId = toNonEmptyString(finalInput.jobId);
-    if (!jobId) {
-      return {
-        status: 'failed',
-        content: [{ type: 'text', text: 'job_output.jobId is required' }],
-      };
-    }
-
-    const block = finalInput.block !== false;
-    const timeoutMs = typeof finalInput.timeoutMs === 'number' ? finalInput.timeoutMs : 30_000;
-    const byteOffset = typeof finalInput.byteOffset === 'number' ? finalInput.byteOffset : 0;
-
-    // Block until job completion if requested
-    const runningJob = this.deps.getJob(jobId);
-    if (block && runningJob?.status === 'running') {
-      await Promise.race([
-        runningJob.completion,
-        timeoutMs > 0
-          ? new Promise<void>((resolve) => setTimeout(resolve, timeoutMs))
-          : new Promise<void>(() => {}),
-      ]);
-    }
-
-    // Look up job from derived list (includes persisted jobs)
-    const jobs = this.deps.deriveJobs();
-    const record = jobs.find((j) => j.jobId === jobId);
-
-    if (!record) {
-      return { status: 'failed', content: [{ type: 'text', text: `Job not found: ${jobId}` }] };
-    }
-
-    const outputPath = getJobOutputPath(this.config.sessionDir, jobId);
-    const { output, totalBytes } = readJobOutput(outputPath, { afterOffset: byteOffset });
-
-    const result = {
-      jobId,
-      status: record.status,
-      output,
-      ...(record.exitCode !== undefined ? { exitCode: record.exitCode } : {}),
-      byteOffset: totalBytes,
-    };
-
-    return {
-      status: 'completed',
-      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-    };
-  }
-
-  /**
-   * Execute the jobs_list tool.
-   */
-  private executeJobsListTool(params: { finalInput: Record<string, unknown> }): CoreToolResult {
-    const { finalInput } = params;
-
-    const statusFilter = Array.isArray(finalInput.status)
-      ? (finalInput.status as string[])
-      : undefined;
-    const typeFilter = Array.isArray(finalInput.type) ? (finalInput.type as string[]) : undefined;
-    const limit = typeof finalInput.limit === 'number' ? finalInput.limit : 50;
-
-    let jobs = this.deps.deriveJobs().map((j) => ({
-      jobId: j.jobId,
-      parentJobId: j.parentJobId,
-      type: j.type,
-      status: j.status,
-      description: j.description,
-      command: j.command,
-      startTime: j.startTime,
-      ...(j.subagentSessionId ? { subagentSessionId: j.subagentSessionId } : {}),
-    }));
-
-    // Apply filters
-    if (statusFilter && statusFilter.length > 0) {
-      jobs = jobs.filter((j) => statusFilter.includes(j.status));
-    }
-    if (typeFilter && typeFilter.length > 0) {
-      jobs = jobs.filter((j) => typeFilter.includes(j.type));
-    }
-
-    // Apply limit
-    jobs = jobs.slice(0, limit);
-
-    return {
-      status: 'completed',
-      content: [{ type: 'text', text: JSON.stringify({ jobs }, null, 2) }],
-    };
-  }
-
-  /**
-   * Execute the job_kill tool.
-   */
-  private executeJobKillTool(params: { finalInput: Record<string, unknown> }): CoreToolResult {
-    const { finalInput } = params;
-
-    const jobId = toNonEmptyString(finalInput.jobId);
-    if (!jobId) {
-      return { status: 'failed', content: [{ type: 'text', text: 'job_kill.jobId is required' }] };
-    }
-
-    const job = this.deps.getJob(jobId);
-    if (!job || job.status !== 'running') {
-      return {
-        status: 'completed',
-        content: [
-          { type: 'text', text: JSON.stringify({ success: false, reason: 'Job not running' }) },
-        ],
-      };
-    }
-
-    job.status = 'cancelled';
-
-    let killed = false;
-    if (job.proc) {
-      const proc = job.proc;
-      try {
-        // Kill the entire process group on POSIX so we don't leak child processes
-        if (process.platform !== 'win32' && typeof proc.pid === 'number') {
-          process.kill(-proc.pid, 'SIGTERM');
-        } else {
-          proc.kill('SIGTERM');
-        }
-        killed = true;
-      } catch {
-        killed = false;
-      }
-    } else {
-      // Subagent job - just mark as cancelled (completion promise will resolve)
-      killed = true;
-    }
-
-    return {
-      status: 'completed',
-      content: [{ type: 'text', text: JSON.stringify({ success: killed }) }],
     };
   }
 
