@@ -476,10 +476,28 @@ server.ts
 - [x] Phase 2: Extract utilities to rpc/utils.ts (commit 57bd54edf)
 - [x] Phase 3a: Extract job-manager.ts (commit 9569bcba4)
 - [x] Phase 3b: Extract shell-job.ts (commit 2c87262c1)
-- [ ] Phase 3c: Extract subagent-job.ts
-- [ ] Phase 3d: Extract job-notifications.ts
+- [x] Phase 3c: Extract subagent-job.ts (commit 1b4269504)
+- [x] Phase 3d: Extract job-notifications.ts (commit 8d8c02a73)
 - [x] Phase 4: Extract permissions.ts (commit 16b883edf)
 - [x] Phase 5: Extract message-builder.ts (commit 894377464)
-- [ ] Phase 6a-l: Extract RPC handlers
-- [ ] Phase 7: Create register-handlers.ts
-- [ ] Phase 8: Clean up server.ts
+- [x] Phase 6a: Extract initialize handler
+- [x] Phase 6b: Extract agent-status handlers
+- [x] Phase 6c: Extract providers handlers
+- [x] Phase 6d: Extract connections handlers
+- [x] Phase 6e: Extract models handlers
+- [x] Phase 6f: Extract tools handlers
+- [x] Phase 6g: Extract mcp-servers handlers
+- [x] Phase 6h: Extract jobs handlers
+- [x] Phase 6i: Extract session handlers
+- [x] Phase 6j: Extract session-operations handlers
+- [x] Phase 6k: Extract prompt handler
+- [x] Phase 6l: Extract workspace handlers
+- [x] Phase 7: Create register-handlers.ts (commit 52bf95ca7)
+- [x] Phase 8: Clean up server.ts
+
+## Final Results
+
+- **Original server.ts**: ~6000 lines
+- **Final server.ts**: ~560 lines (91% reduction)
+- **Unit tests**: 74/74 passing
+- **E2E tests**: Pre-existing timeout issues unrelated to refactoring
