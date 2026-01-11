@@ -2,7 +2,12 @@
 
 import { randomUUID } from 'node:crypto';
 import { AcpErrorCodes, type JsonRpcPeer } from '@lace/ent-protocol';
-import { loadSession, readSessionState, writeSessionState, type SessionState } from '@lace/agent/storage/session-store';
+import {
+  loadSession,
+  readSessionState,
+  writeSessionState,
+  type SessionState,
+} from '@lace/agent/storage/session-store';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
 import { findUserCommand } from '@lace/agent/user-commands';
 import type { SessionUpdate, AgentServerState, JobState } from '@lace/agent/server-types';
@@ -12,6 +17,7 @@ import { createProviderForTurn, getModelPricing } from '@lace/agent/conversation
 import { ConversationRunner } from '@lace/agent/core/conversation/runner';
 import type { MCPServerManager } from '@lace/agent/mcp/server-manager';
 import type { RunnerConfig, RunnerDependencies } from '@lace/agent/core/conversation/types';
+import { getEffectiveConfig } from '@lace/agent/core/session';
 
 /**
  * Register the session/prompt RPC handler.
@@ -39,7 +45,13 @@ export function registerPromptHandler(
   createToolExecutorForMode: (
     executionMode: 'plan' | 'execute',
     mcpServerManager?: MCPServerManager
-  ) => { executor: { getTool: (name: string) => unknown; execute: (...args: unknown[]) => Promise<unknown> }; toolsForProvider: unknown[] },
+  ) => {
+    executor: {
+      getTool: (name: string) => unknown;
+      execute: (...args: unknown[]) => Promise<unknown>;
+    };
+    toolsForProvider: unknown[];
+  },
   startShellJob: (options: {
     command: string;
     description?: string;
@@ -86,9 +98,7 @@ export function registerPromptHandler(
       };
     }
 
-    const effectiveConfig = state.activeSession.state.config
-      ? { ...state.config, ...state.activeSession.state.config }
-      : state.config;
+    const effectiveConfig = getEffectiveConfig(state.config, state.activeSession.state.config);
 
     const parsed = params;
     const turnId = `turn_${randomUUID()}`;
@@ -289,7 +299,9 @@ export function registerPromptHandler(
 
       const runner = new ConversationRunner(config, deps);
       const result = await runner.run({
-        content: promptContent as RunnerDependencies extends { content: infer C } ? C : { type: 'text'; text: string }[],
+        content: promptContent as RunnerDependencies extends { content: infer C }
+          ? C
+          : { type: 'text'; text: string }[],
         maxTurns,
         abortController,
         turnId,

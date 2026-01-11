@@ -13,6 +13,7 @@ import { compactDroppedMessagesWithCore } from '@lace/agent/compaction/compact-d
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import { type SessionUpdate, type AgentServerState } from '@lace/agent/server-types';
 import { createProviderForTurn } from './provider-factory';
+import { getEffectiveConfig } from '@lace/agent/core/session';
 
 export type SlashCommandResult = {
   turnId: string;
@@ -137,9 +138,7 @@ export async function handleSlashCommand(
         }
 
         // Get effective config for provider creation
-        const effectiveConfig = state.activeSession.state.config
-          ? { ...state.config, ...state.activeSession.state.config }
-          : state.config;
+        const effectiveConfig = getEffectiveConfig(state.config, state.activeSession.state.config);
 
         const provider = await createProviderForTurn({
           connectionId: effectiveConfig.connectionId,

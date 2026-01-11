@@ -25,7 +25,12 @@ import { deriveCheckpointFilesFromDurableEvents } from '../../storage/files-from
 import type { AIProvider, ProviderMessage, ContentBlock } from '../../providers/base-provider';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import type { AgentServerState } from '../../server-types';
-import { assertInitialized, throwInvalidParams, toNonEmptyString, recordsShallowEqual } from '../utils';
+import {
+  assertInitialized,
+  throwInvalidParams,
+  toNonEmptyString,
+  recordsShallowEqual,
+} from '../utils';
 import { reconcileMcpServersForActiveSession } from './mcp-servers';
 import {
   buildProviderMessagesFromDurableEvents,
@@ -33,6 +38,7 @@ import {
 } from '../../message-building/message-builder';
 import { compactDroppedMessagesWithCore } from '../../compaction/compact-dropped-messages';
 import { createProviderForTurn } from '../../providers/turn-factory';
+import { getEffectiveConfig } from '@lace/agent/core/session';
 
 /**
  * Compute context breakdown for the active session
@@ -50,9 +56,7 @@ async function computeContextBreakdownForActiveSession(
   const DEFAULT_CONTEXT_LIMIT = 200_000;
   const RESERVED_FOR_RESPONSE_TOKENS = 4096;
 
-  const effectiveConfig = state.activeSession?.state.config
-    ? { ...state.config, ...state.activeSession.state.config }
-    : state.config;
+  const effectiveConfig = getEffectiveConfig(state.config, state.activeSession?.state.config);
 
   const _connectionId = effectiveConfig.connectionId;
   const modelId = effectiveConfig.modelId ?? 'unknown-model';
@@ -225,7 +229,7 @@ export function registerSessionOperationHandlers(
 
     const currentState = readSessionState(state.activeSession.dir);
     const currentConfig = currentState.config || {};
-    const effectiveBefore = { ...state.config, ...currentConfig };
+    const effectiveBefore = getEffectiveConfig(state.config, currentConfig);
     const nextConfig = { ...currentConfig };
     const applied: string[] = [];
 
@@ -345,7 +349,7 @@ export function registerSessionOperationHandlers(
     writeSessionState(state.activeSession.dir, nextState);
     state.activeSession = { ...state.activeSession, state: nextState } as any;
 
-    const effectiveAfter = { ...state.config, ...(state.activeSession!.state.config || {}) };
+    const effectiveAfter = getEffectiveConfig(state.config, state.activeSession!.state.config);
     await reconcileMcpServersForActiveSession(state);
 
     return {
@@ -421,9 +425,7 @@ export function registerSessionOperationHandlers(
       const previousTokens = estimateProviderTokens(beforeMessages);
 
       const sessionStateForConfig = readSessionState(state.activeSession!.dir);
-      const effectiveConfig = sessionStateForConfig.config
-        ? { ...state.config, ...sessionStateForConfig.config }
-        : state.config;
+      const effectiveConfig = getEffectiveConfig(state.config, sessionStateForConfig.config);
 
       if (targetTokens !== undefined) {
         while (

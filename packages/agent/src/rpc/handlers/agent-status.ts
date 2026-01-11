@@ -6,6 +6,7 @@ import { derivePendingPermissionsFromDurableEvents } from '../../storage/permiss
 import type { PermissionRequest } from '@lace/ent-protocol';
 import { assertInitialized } from '../utils';
 import type { AgentServerState } from '../../server-types';
+import { getEffectiveConfig } from '@lace/agent/core/session';
 
 /**
  * Register agent status and health check handlers with the peer.
@@ -25,9 +26,7 @@ export function registerAgentStatusHandlers(
   peer.onRequest('ent/agent/status', async (_params: unknown) => {
     assertInitialized(state);
 
-    const effectiveConfig = state.activeSession?.state.config
-      ? { ...state.config, ...state.activeSession.state.config }
-      : state.config;
+    const effectiveConfig = getEffectiveConfig(state.config, state.activeSession?.state.config);
 
     const sessionSummary = state.activeSession
       ? summarizeDurableEvents(state.activeSession.dir)

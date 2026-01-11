@@ -12,7 +12,26 @@ import {
   type SessionMeta,
   type SessionState,
 } from '@lace/agent/storage/session-store';
+import type { AgentServerState } from '@lace/agent/server-types';
 import type { SessionConfig, PromptParams, TurnResult, SessionUpdateHandler } from './types';
+
+/** Server-level config type (from AgentServerState) */
+export type ServerConfig = AgentServerState['config'];
+
+/** Session-level config type (from SessionState) */
+export type SessionLevelConfig = SessionState['config'];
+
+/**
+ * Merge server-level config with session-level overrides.
+ * Session config takes precedence where defined.
+ */
+export function getEffectiveConfig(
+  serverConfig: ServerConfig,
+  sessionConfig?: SessionLevelConfig
+): ServerConfig {
+  if (!sessionConfig) return serverConfig;
+  return { ...serverConfig, ...sessionConfig };
+}
 
 export class Session {
   readonly sessionId: string;
@@ -97,10 +116,7 @@ export class Session {
    * @param _params - Prompt parameters including content
    * @param _onUpdate - Optional callback for streaming updates
    */
-  async prompt(
-    _params: PromptParams,
-    _onUpdate?: SessionUpdateHandler
-  ): Promise<TurnResult> {
+  async prompt(_params: PromptParams, _onUpdate?: SessionUpdateHandler): Promise<TurnResult> {
     throw new Error(
       'Session.prompt() is not yet implemented for direct library usage. ' +
         'Use the RPC interface (session/prompt) for now.'

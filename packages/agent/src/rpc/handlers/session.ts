@@ -30,6 +30,7 @@ import { loadPromptConfig } from '../../config/prompts';
 import { logger } from '../../utils/logger';
 import { reconcileMcpServersForActiveSession } from './mcp-servers';
 import { killAllRunningJobs } from '../../jobs';
+import { getEffectiveConfig } from '@lace/agent/core/session';
 
 /**
  * Register session lifecycle handlers with the peer.
@@ -317,7 +318,7 @@ export function registerSessionHandlers(
 
       const currentState = readSessionState(state.activeSession.dir);
       const currentConfig = currentState.config || {};
-      const effectiveBefore = { ...state.config, ...currentConfig };
+      const effectiveBefore = getEffectiveConfig(state.config, currentConfig);
       const previousMode =
         effectiveBefore.executionMode === 'plan' ? ('plan' as const) : ('execute' as const);
 

@@ -8,6 +8,7 @@ import { MAX_JOB_OUTPUT_BYTES } from '../server-types';
 import { toolKindFromName, shouldAskPermission } from '../rpc/utils';
 import { readSessionState, type LoadedSession } from '../storage/session-store';
 import type { ToolResult } from '@lace/ent-protocol';
+import { getEffectiveConfig } from '@lace/agent/core/session';
 
 export type ShellJobContext = {
   getState: () => {
@@ -52,9 +53,7 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
       if (job.proc || job.finished) return;
 
       const sessionState = readSessionState(state.activeSession.dir);
-      const effectiveConfig = sessionState.config
-        ? { ...state.config, ...sessionState.config }
-        : state.config;
+      const effectiveConfig = getEffectiveConfig(state.config, sessionState.config);
 
       const toolName = 'bash';
       const kind = toolKindFromName(toolName);
