@@ -4,8 +4,18 @@
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
-import { getProviderManagementAgent, getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import type { Route } from './+types/api.provider.instances';
+import {
+  throwMethodNotAllowed,
+  errorToResponse,
+} from '@lace/web/lib/server/route-helpers';
+import {
+  getProviderContext,
+  listProviderInstances,
+  requireProviderInCatalog,
+  requireInstanceNotExists,
+  type ConfiguredInstance,
+} from '@lace/web/lib/server/provider-route-handlers';
 
 export interface InstancesResponse {
   instances: ConfiguredInstance[];
@@ -16,16 +26,7 @@ export interface CreateInstanceResponse {
   instanceId: string;
 }
 
-export interface ConfiguredInstance {
-  id: string;
-  displayName: string;
-  catalogProviderId: string;
-  endpoint?: string;
-  timeout?: number;
-  retryPolicy?: string;
-  modelConfig?: unknown;
-  hasCredentials: boolean;
-}
+export type { ConfiguredInstance };
 
 const CreateInstanceSchema = z.object({
   instanceId: z
@@ -48,54 +49,20 @@ const CreateInstanceSchema = z.object({
 
 export async function loader({ request: _request }: Route.LoaderArgs) {
   try {
-    const supervisor = await getSupervisor();
-    const { workspaceSessionId, agentSessionId } = await getProviderManagementAgent();
-
-    const { connections } = (await supervisor.agentRequest({
-      workspaceSessionId,
-      sessionId: agentSessionId,
-      method: 'ent/connections/list',
-    })) as {
-      connections: Array<{
-        connectionId: string;
-        providerId: string;
-        name: string;
-        endpoint?: string;
-        timeout?: number;
-        retryPolicy?: string;
-        modelConfig?: unknown;
-        hasCredentials?: boolean;
-        credentialState?: string;
-      }>;
-    };
-
-    const instances: ConfiguredInstance[] = connections.map((c) => ({
-      id: c.connectionId,
-      displayName: c.name,
-      catalogProviderId: c.providerId,
-      endpoint: c.endpoint,
-      timeout: c.timeout,
-      retryPolicy: c.retryPolicy,
-      modelConfig: c.modelConfig,
-      hasCredentials: c.hasCredentials ?? c.credentialState === 'ready',
-    }));
-
+    const ctx = await getProviderContext();
+    const instances = await listProviderInstances(ctx);
     return createSuperjsonResponse({ instances } as InstancesResponse);
   } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to load provider instances';
-    return createErrorResponse(errorMessage, 500, {
-      code: 'INSTANCES_LOAD_FAILED',
-    });
+    return errorToResponse(error, 'Failed to load provider instances');
   }
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  if (request.method !== 'POST') {
-    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
-  }
-
   try {
+    if (request.method !== 'POST') {
+      throwMethodNotAllowed();
+    }
+
     const body = (await request.json()) as unknown;
     const validatedData = CreateInstanceSchema.parse(body);
 
@@ -108,39 +75,18 @@ export async function action({ request }: Route.ActionArgs) {
       });
     }
 
-    const supervisor = await getSupervisor();
-    const { workspaceSessionId, agentSessionId } = await getProviderManagementAgent();
-
-    const { providers } = (await supervisor.agentRequest({
-      workspaceSessionId,
-      sessionId: agentSessionId,
-      method: 'ent/providers/list',
-    })) as { providers: Array<{ providerId: string }> };
-    if (!providers.some((p) => p.providerId === validatedData.catalogProviderId)) {
-      return createErrorResponse(`Provider not found: ${validatedData.catalogProviderId}`, 400, {
-        code: 'PROVIDER_NOT_FOUND',
-      });
-    }
-
-    const { connections } = (await supervisor.agentRequest({
-      workspaceSessionId,
-      sessionId: agentSessionId,
-      method: 'ent/connections/list',
-    })) as { connections: Array<{ connectionId: string }> };
-    if (connections.some((c) => c.connectionId === validatedData.instanceId)) {
-      return createErrorResponse(`Instance ID already exists: ${validatedData.instanceId}`, 400, {
-        code: 'DUPLICATE_INSTANCE_ID',
-      });
-    }
+    const ctx = await getProviderContext();
+    await requireProviderInCatalog(ctx, validatedData.catalogProviderId);
+    await requireInstanceNotExists(ctx, validatedData.instanceId);
 
     const config: Record<string, unknown> = {};
     if (validatedData.endpoint) config.endpoint = validatedData.endpoint;
     if (validatedData.timeout !== undefined) config.timeout = validatedData.timeout;
     if (validatedData.retryPolicy) config.retryPolicy = validatedData.retryPolicy;
 
-    await supervisor.agentRequest({
-      workspaceSessionId,
-      sessionId: agentSessionId,
+    await ctx.supervisor.agentRequest({
+      workspaceSessionId: ctx.workspaceSessionId,
+      sessionId: ctx.agentSessionId,
       method: 'ent/connections/upsert',
       requestParams: {
         providerId: validatedData.catalogProviderId,
@@ -152,9 +98,9 @@ export async function action({ request }: Route.ActionArgs) {
       },
     });
 
-    const credentialResult = (await supervisor.agentRequest({
-      workspaceSessionId,
-      sessionId: agentSessionId,
+    const credentialResult = (await ctx.supervisor.agentRequest({
+      workspaceSessionId: ctx.workspaceSessionId,
+      sessionId: ctx.agentSessionId,
       method: 'ent/connections/credentials/submit',
       requestParams: {
         connectionId: validatedData.instanceId,
@@ -197,10 +143,6 @@ export async function action({ request }: Route.ActionArgs) {
       });
     }
 
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to create provider instance';
-    return createErrorResponse(errorMessage, 500, {
-      code: 'INSTANCE_CREATION_FAILED',
-    });
+    return errorToResponse(error, 'Failed to create provider instance');
   }
 }

@@ -4,29 +4,19 @@
 import type { Route } from './+types/api.provider.instances.$instanceId.config';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { getProviderManagementAgent, getSupervisor } from '@lace/web/lib/server/supervisor-service';
-import { z } from 'zod';
-
-const ModelConfigSchema = z
-  .object({
-    enableNewModels: z.boolean().default(true),
-    disabledModels: z.array(z.string()).default([]),
-    disabledProviders: z.array(z.string()).default([]),
-    filters: z
-      .object({
-        requiredParameters: z.array(z.string()).optional(),
-        maxPromptCostPerMillion: z.number().nonnegative().optional(),
-        maxCompletionCostPerMillion: z.number().nonnegative().optional(),
-        minContextLength: z.number().int().positive().optional(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
+import {
+  requireParam,
+  errorToResponse,
+} from '@lace/web/lib/server/route-helpers';
+import {
+  getProviderContext,
+  requireProviderInstance,
+  ModelConfigSchema,
+} from '@lace/web/lib/server/provider-route-handlers';
 
 export async function action({ params, request }: Route.ActionArgs) {
   try {
-    const { instanceId } = params;
+    const instanceId = requireParam(params as Record<string, string | undefined>, 'instanceId');
 
     if (request.method !== 'PATCH') {
       return createErrorResponse('Method not allowed', 405);
@@ -43,28 +33,17 @@ export async function action({ params, request }: Route.ActionArgs) {
       });
     }
 
-    const supervisor = await getSupervisor();
-    const { workspaceSessionId, agentSessionId } = await getProviderManagementAgent();
+    const ctx = await getProviderContext();
+    const existing = await requireProviderInstance(ctx, instanceId);
 
-    const { connections } = (await supervisor.agentRequest({
-      workspaceSessionId,
-      sessionId: agentSessionId,
-      method: 'ent/connections/list',
-    })) as { connections: Array<{ connectionId: string; name: string }> };
-
-    const existing = connections.find((c) => c.connectionId === instanceId);
-    if (!existing) {
-      return createErrorResponse(`Instance not found: ${instanceId}`, 404);
-    }
-
-    await supervisor.agentRequest({
-      workspaceSessionId,
-      sessionId: agentSessionId,
+    await ctx.supervisor.agentRequest({
+      workspaceSessionId: ctx.workspaceSessionId,
+      sessionId: ctx.agentSessionId,
       method: 'ent/connections/upsert',
       requestParams: {
         connection: {
           connectionId: instanceId,
-          name: existing.name,
+          name: existing.displayName,
           config: { modelConfig: parseResult.data },
         },
       },
@@ -75,7 +54,6 @@ export async function action({ params, request }: Route.ActionArgs) {
       message: 'Configuration saved successfully',
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update configuration';
-    return createErrorResponse(errorMessage, 500);
+    return errorToResponse(error, 'Failed to update configuration');
   }
 }
