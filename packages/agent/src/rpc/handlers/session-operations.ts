@@ -25,44 +25,14 @@ import { deriveCheckpointFilesFromDurableEvents } from '../../storage/files-from
 import type { AIProvider, ProviderMessage, ContentBlock } from '../../providers/base-provider';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import type { AgentServerState } from '../../server-types';
-import {
-  assertInitialized,
-  throwInvalidParams,
-  toNonEmptyString,
-  recordsShallowEqual,
-  isTestProviderEnabled,
-} from '../utils';
+import { assertInitialized, throwInvalidParams, toNonEmptyString, recordsShallowEqual } from '../utils';
 import { reconcileMcpServersForActiveSession } from './mcp-servers';
 import {
   buildProviderMessagesFromDurableEvents,
   estimateProviderTokens,
 } from '../../message-building/message-builder';
 import { compactDroppedMessagesWithCore } from '../../compaction/compact-dropped-messages';
-import { ProviderRegistry } from '../../providers/registry';
-import { TestAgentProvider } from '../../runtime/test-provider';
-
-/**
- * Helper function to create a provider instance for a turn
- */
-async function createProviderForTurn(options: {
-  connectionId?: string;
-  modelId?: string;
-}): Promise<AIProvider> {
-  if (isTestProviderEnabled()) {
-    return new TestAgentProvider();
-  }
-
-  const _connectionId = toNonEmptyString(options.connectionId);
-  const _modelId = toNonEmptyString(options.modelId);
-  if (!_connectionId || !_modelId) {
-    throwInvalidParams(
-      'connectionId and modelId are required before prompting; call ent/session/configure'
-    );
-  }
-
-  const registry = ProviderRegistry.getInstance();
-  return await registry.createProviderFromInstanceAndModel(_connectionId, _modelId);
-}
+import { createProviderForTurn } from '../../providers/turn-factory';
 
 /**
  * Compute context breakdown for the active session

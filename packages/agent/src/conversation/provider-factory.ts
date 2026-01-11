@@ -1,33 +1,11 @@
-// ABOUTME: Provider factory for creating AI providers for conversation turns
+// ABOUTME: Provider factory functions for conversation turns and model pricing
 
-import { ProviderRegistry } from '@lace/agent/providers/registry';
-import { AIProvider } from '@lace/agent/providers/base-provider';
 import { TestAgentProvider } from '@lace/agent/runtime/test-provider';
-import { throwInvalidParams, toNonEmptyString, isTestProviderEnabled } from '@lace/agent/rpc/utils';
+import { isTestProviderEnabled } from '@lace/agent/rpc/utils';
 import type { AgentServerState } from '@lace/agent/server-types';
 
-/**
- * Create an AI provider for a turn.
- */
-export async function createProviderForTurn(options: {
-  connectionId?: string;
-  modelId?: string;
-}): Promise<AIProvider> {
-  if (isTestProviderEnabled()) {
-    return new TestAgentProvider();
-  }
-
-  const connectionId = toNonEmptyString(options.connectionId);
-  const modelId = toNonEmptyString(options.modelId);
-  if (!connectionId || !modelId) {
-    throwInvalidParams(
-      'connectionId and modelId are required before prompting; call ent/session/configure'
-    );
-  }
-
-  const registry = ProviderRegistry.getInstance();
-  return await registry.createProviderFromInstanceAndModel(connectionId, modelId);
-}
+// Re-export createProviderForTurn from its canonical location in providers/
+export { createProviderForTurn } from '@lace/agent/providers/turn-factory';
 
 /**
  * Get model pricing from the catalog.
