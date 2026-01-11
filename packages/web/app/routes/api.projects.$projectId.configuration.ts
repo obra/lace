@@ -7,6 +7,12 @@ import type { ToolPolicy } from '@lace/web/types/core';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { getProviderManagementAgent, getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import {
+  requireProjectId,
+  throwNotFound,
+  throwMethodNotAllowed,
+  errorToResponse,
+} from '@lace/web/lib/server/route-helpers';
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.configuration';
 
@@ -22,10 +28,11 @@ const ConfigurationSchema = z.object({
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const project = Project.getById((params as { projectId: string }).projectId);
+    const projectId = requireProjectId(params as Record<string, string | undefined>);
+    const project = Project.getById(projectId);
 
     if (!project) {
-      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      throwNotFound('Project');
     }
 
     const configuration = project.getConfiguration();
@@ -59,27 +66,24 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       },
     });
   } catch (error: unknown) {
-    return createErrorResponse(
-      error instanceof Error ? error.message : 'Failed to fetch configuration',
-      500,
-      { code: 'INTERNAL_SERVER_ERROR' }
-    );
+    return errorToResponse(error, 'Failed to fetch configuration');
   }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if (request.method !== 'PUT') {
-    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
-  }
-
   try {
+    if (request.method !== 'PUT') {
+      throwMethodNotAllowed();
+    }
+
+    const projectId = requireProjectId(params as Record<string, string | undefined>);
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = ConfigurationSchema.parse(body);
 
-    const project = Project.getById((params as { projectId: string }).projectId);
+    const project = Project.getById(projectId);
 
     if (!project) {
-      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      throwNotFound('Project');
     }
 
     // Validate provider instance if provided
@@ -153,10 +157,6 @@ export async function action({ request, params }: Route.ActionArgs) {
       });
     }
 
-    return createErrorResponse(
-      error instanceof Error ? error.message : 'Failed to update configuration',
-      500,
-      { code: 'INTERNAL_SERVER_ERROR' }
-    );
+    return errorToResponse(error, 'Failed to update configuration');
   }
 }
