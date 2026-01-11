@@ -43,10 +43,13 @@ export async function action({ request }: { request: Request; params: unknown; c
 
     const server = await createMcpServer(GLOBAL_CONTEXT, id, serverConfig);
 
-    return createSuperjsonResponse({
-      message: 'Server created successfully',
-      server,
-    });
+    return createSuperjsonResponse(
+      {
+        message: 'Server created successfully',
+        server,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
       const fieldErrors: Record<string, string> = {};

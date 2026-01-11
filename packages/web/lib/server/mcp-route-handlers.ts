@@ -2,6 +2,7 @@
 // ABOUTME: Abstracts storage layer differences to reduce duplication across route files
 
 import { z } from 'zod';
+import type { MCPServerConfig } from '@lace/web/types/core';
 import { McpConfigStore } from '@lace/web/lib/server/mcp-config-store';
 import { Project } from '@lace/web/lib/server/projects/project';
 import { RouteValidationError, throwNotFound } from './route-helpers';
@@ -80,6 +81,9 @@ export const UpdateServerSchema = z.object({
 // ============================================================================
 // Handler Functions
 // ============================================================================
+// Note: These handlers are async for API consistency even though current
+// implementations are synchronous. This allows for future async operations
+// (e.g., database calls, network requests) without breaking the interface.
 
 /**
  * Gets the project instance, throwing RouteValidationError if not found.
@@ -153,7 +157,7 @@ export async function createMcpServer(
       );
     }
     // Cast to MCPServerConfig as the Zod schema has already validated the config
-    project.addMCPServer(serverId, config as import('@lace/web/types/core').MCPServerConfig);
+    project.addMCPServer(serverId, config as MCPServerConfig);
     return { id: serverId, ...config };
   }
 
@@ -193,7 +197,7 @@ export async function updateMcpServer(
     }
     const mergedConfig = { ...existingConfig, ...updates };
     // Cast to MCPServerConfig as the merged config is validated
-    project.updateMCPServer(serverId, mergedConfig as import('@lace/web/types/core').MCPServerConfig);
+    project.updateMCPServer(serverId, mergedConfig as MCPServerConfig);
     return { id: serverId, ...mergedConfig };
   }
 
