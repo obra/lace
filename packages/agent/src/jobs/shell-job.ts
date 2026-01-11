@@ -8,7 +8,6 @@ import { MAX_JOB_OUTPUT_BYTES } from '../server-types';
 import { toolKindFromName, shouldAskPermission } from '../rpc/utils';
 import { readSessionState, type LoadedSession } from '../storage/session-store';
 import type { ToolResult } from '@lace/ent-protocol';
-import { getEffectiveConfig } from '@lace/agent/core/session';
 
 export type ShellJobContext = {
   getState: () => {
@@ -53,13 +52,14 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
       if (job.proc || job.finished) return;
 
       const sessionState = readSessionState(state.activeSession.dir);
-      const effectiveConfig = getEffectiveConfig(state.config, sessionState.config);
+      // Merge server and session approval modes (session takes precedence)
+      const approvalMode = sessionState.config?.approvalMode ?? state.config.approvalMode;
 
       const toolName = 'bash';
       const kind = toolKindFromName(toolName);
-      const requiresPermission = shouldAskPermission(effectiveConfig.approvalMode, kind);
+      const requiresPermission = shouldAskPermission(approvalMode, kind);
 
-      if (effectiveConfig.approvalMode === 'deny') {
+      if (approvalMode === 'deny') {
         job.status = 'cancelled';
         await context.finalizeJob(job);
         return;
