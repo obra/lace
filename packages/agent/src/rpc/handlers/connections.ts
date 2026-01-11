@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import type { JsonRpcPeer } from '@lace/ent-protocol';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import { SUPPORTED_PROVIDER_TYPES } from '../../server-types';
+import { ensureProviderCatalogLoaded } from '../../providers/catalog';
 import { logger } from '../../utils/logger';
 import {
   assertInitialized,
@@ -13,32 +14,6 @@ import {
   parseProviderInstanceOverridesFromConnectionConfig,
 } from '../utils';
 import type { AgentServerState } from '../../server-types';
-
-/**
- * Ensures the provider catalog is loaded into state.
- * Attempts to load catalogs and validates that at least one provider is available.
- * Throws an error if loading fails.
- */
-async function ensureProviderCatalogLoaded(state: AgentServerState): Promise<void> {
-  if (state.providerCatalogLoaded) return;
-  try {
-    await state.providerCatalog.loadCatalogs();
-    if (state.providerCatalog.getAvailableProviders().length === 0) {
-      throw new Error('provider catalog empty after load');
-    }
-    state.providerCatalogLoaded = true;
-  } catch (error) {
-    logger.error('catalog.load.failed', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    state.providerCatalogLoaded = false;
-    throw {
-      code: EntErrorCodes.ProviderError,
-      message: 'Provider catalog unavailable',
-      data: { category: 'provider', reason: 'CatalogLoadFailed' },
-    };
-  }
-}
 
 /**
  * Register connection management handlers with the peer.
