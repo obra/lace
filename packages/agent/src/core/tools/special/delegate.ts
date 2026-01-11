@@ -1,8 +1,7 @@
 // ABOUTME: Handler for delegate tool - spawns subagent jobs
 // Delegate runs a prompt in a new agent session, optionally in background
 
-import { readFileSync } from 'node:fs';
-import { getJobOutputPath } from '@lace/agent/jobs/job-manager';
+import { getJobOutputPath, readJobOutputTail } from '@lace/agent/jobs';
 import type { SpecialToolContext, SpecialToolResult } from './types';
 
 export interface DelegateInput {
@@ -21,8 +20,14 @@ export async function executeDelegate(
   input: DelegateInput,
   context: SpecialToolContext
 ): Promise<SpecialToolResult> {
-  const { prompt, description, background = false, resume: resumeJobId, connectionId, modelId } =
-    input;
+  const {
+    prompt,
+    description,
+    background = false,
+    resume: resumeJobId,
+    connectionId,
+    modelId,
+  } = input;
 
   // Validate prompt
   if (!prompt) {
@@ -40,7 +45,9 @@ export async function executeDelegate(
     if (!previousJob?.subagentSessionId) {
       return {
         status: 'failed',
-        content: [{ type: 'text', text: `Cannot resume job ${resumeJobId}: no subagentSessionId found` }],
+        content: [
+          { type: 'text', text: `Cannot resume job ${resumeJobId}: no subagentSessionId found` },
+        ],
       };
     }
     resumeSessionId = previousJob.subagentSessionId;
@@ -87,17 +94,10 @@ export async function executeDelegate(
     }
   }
 
-  // Read output
-  let output = '';
-  try {
-    output = readFileSync(getJobOutputPath(context.sessionDir, jobId), 'utf8');
-  } catch {
-    output = '';
-  }
-
-  const tailLimit = 64 * 1024;
-  const truncated = output.length > tailLimit;
-  const reportText = truncated ? output.slice(-tailLimit) : output;
+  // Read output with tail-based truncation
+  const { output: reportText, truncated } = readJobOutputTail(
+    getJobOutputPath(context.sessionDir, jobId)
+  );
 
   const status = job?.status ?? 'failed';
   return {

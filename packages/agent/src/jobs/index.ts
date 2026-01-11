@@ -21,6 +21,17 @@ export { runSubagentJobProcess } from './subagent-job';
 // Job utilities
 export { getJobOutputPath, ensureJobLogDir, getLastLines } from './job-manager';
 
+// Job output reading
+export {
+  readJobOutput,
+  readJobOutputTail,
+  MAX_OUTPUT_SIZE,
+  DEFAULT_TAIL_LIMIT,
+  type JobOutputResult,
+  type JobOutputTailResult,
+  type ReadJobOutputOptions,
+} from './job-output';
+
 // Job notifications
 export {
   createQueueJobNotification,

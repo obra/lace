@@ -3,16 +3,24 @@
 // calls, tool execution, permission handling, and event persistence.
 
 import { randomUUID } from 'node:crypto';
-import { readFileSync, statSync, openSync, readSync, closeSync } from 'node:fs';
 import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
 import type { ToolResult } from '@lace/ent-protocol';
 import type { ToolResult as CoreToolResult } from '@lace/agent/tools/types';
-import { readSessionState, writeSessionState, type SessionState } from '@lace/agent/storage/session-store';
+import {
+  readSessionState,
+  writeSessionState,
+  type SessionState,
+} from '@lace/agent/storage/session-store';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
 import { deriveFilesReadFromDurableEvents } from '@lace/agent/storage/files-from-events';
-import { getJobOutputPath } from '@lace/agent/jobs/job-manager';
+import { getJobOutputPath, readJobOutput, readJobOutputTail } from '@lace/agent/jobs';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
-import { toNonEmptyString, toolKindFromName, protocolToolResultFromCore, shouldAskPermission } from '@lace/agent/rpc/utils';
+import {
+  toNonEmptyString,
+  toolKindFromName,
+  protocolToolResultFromCore,
+  shouldAskPermission,
+} from '@lace/agent/rpc/utils';
 import type { RunnerConfig, RunnerDependencies, RunParams, RunResult, ApprovalMode } from './types';
 
 /**
@@ -56,14 +64,20 @@ export class ConversationRunner {
    */
   async run(params: RunParams): Promise<RunResult> {
     const { content, maxTurns = 10, abortController, turnId, startedAt } = params;
-    const { sessionDir, cwd, executionMode, approvalMode, modelId, environment, maxBudgetUsd, sessionId } = this.config;
+    const {
+      sessionDir,
+      cwd,
+      executionMode,
+      approvalMode,
+      modelId,
+      environment,
+      maxBudgetUsd,
+      sessionId,
+    } = this.config;
 
     const filesRead = deriveFilesReadFromDurableEvents(sessionDir, cwd);
 
-    const envOverlay =
-      environment && typeof environment === 'object'
-        ? environment
-        : undefined;
+    const envOverlay = environment && typeof environment === 'object' ? environment : undefined;
 
     const { executor: toolExecutor, toolsForProvider } = this.deps.createToolExecutor(
       executionMode,
@@ -142,8 +156,10 @@ export class ConversationRunner {
 
           // Calculate cost for this response if pricing is available
           if (modelPricing) {
-            const inputCost = ((response.usage.promptTokens ?? 0) / 1_000_000) * modelPricing.costPer1mIn;
-            const outputCost = ((response.usage.completionTokens ?? 0) / 1_000_000) * modelPricing.costPer1mOut;
+            const inputCost =
+              ((response.usage.promptTokens ?? 0) / 1_000_000) * modelPricing.costPer1mIn;
+            const outputCost =
+              ((response.usage.completionTokens ?? 0) / 1_000_000) * modelPricing.costPer1mOut;
             sessionCostUsd += inputCost + outputCost;
           }
         }
@@ -203,7 +219,10 @@ export class ConversationRunner {
           });
 
           streamTurnSeq = result.streamTurnSeq;
-          providerMessages = [...providerMessages, { role: 'user', content: '', toolResults: [result.coreResult] }];
+          providerMessages = [
+            ...providerMessages,
+            { role: 'user', content: '', toolResults: [result.coreResult] },
+          ];
 
           if (!result.shouldContinue) {
             shouldContinue = false;
@@ -243,9 +262,10 @@ export class ConversationRunner {
     return {
       turnId,
       stopReason,
-      content: finalAssistantContent.length > 0
-        ? [{ type: 'text' as const, text: finalAssistantContent }]
-        : [],
+      content:
+        finalAssistantContent.length > 0
+          ? [{ type: 'text' as const, text: finalAssistantContent }]
+          : [],
       usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
     };
   }
@@ -256,7 +276,10 @@ export class ConversationRunner {
   private async executeToolCall(params: {
     toolCall: { id?: string; name?: string; arguments?: unknown };
     streamTurnSeq: number;
-    toolExecutor: { getTool: (name: string) => unknown; execute: (...args: unknown[]) => Promise<CoreToolResult> };
+    toolExecutor: {
+      getTool: (name: string) => unknown;
+      execute: (...args: unknown[]) => Promise<CoreToolResult>;
+    };
     executionMode: 'plan' | 'execute';
     approvalMode: ApprovalMode;
     cwd: string;
@@ -273,8 +296,17 @@ export class ConversationRunner {
     shouldContinue: boolean;
   }> {
     const {
-      toolCall, executionMode, approvalMode, cwd, filesRead, envOverlay,
-      abortController, turnId, startedAt, sessionId, writeAndAdvance,
+      toolCall,
+      executionMode,
+      approvalMode,
+      cwd,
+      filesRead,
+      envOverlay,
+      abortController,
+      turnId,
+      startedAt,
+      sessionId,
+      writeAndAdvance,
     } = params;
     let { streamTurnSeq, toolExecutor } = params;
 
@@ -350,7 +382,10 @@ export class ConversationRunner {
 
       return {
         streamTurnSeq,
-        coreResult: { status: 'denied', content: [{ type: 'text', text: 'Tool denied in plan mode' }] },
+        coreResult: {
+          status: 'denied',
+          content: [{ type: 'text', text: 'Tool denied in plan mode' }],
+        },
         shouldContinue: false,
       };
     }
@@ -380,7 +415,10 @@ export class ConversationRunner {
 
       return {
         streamTurnSeq,
-        coreResult: { status: 'failed', content: [{ type: 'text', text: `Tool not found: ${toolName}` }] },
+        coreResult: {
+          status: 'failed',
+          content: [{ type: 'text', text: `Tool not found: ${toolName}` }],
+        },
         shouldContinue: false,
       };
     }
@@ -410,7 +448,10 @@ export class ConversationRunner {
         });
         return {
           streamTurnSeq,
-          coreResult: { status: 'failed', content: [{ type: 'text', text: 'bash.command is required' }] },
+          coreResult: {
+            status: 'failed',
+            content: [{ type: 'text', text: 'bash.command is required' }],
+          },
           shouldContinue: false,
         };
       }
@@ -440,7 +481,10 @@ export class ConversationRunner {
       });
       return {
         streamTurnSeq,
-        coreResult: { status: 'completed', content: [{ type: 'text', text: JSON.stringify({ jobId, status: 'started' }) }] },
+        coreResult: {
+          status: 'completed',
+          content: [{ type: 'text', text: JSON.stringify({ jobId, status: 'started' }) }],
+        },
         shouldContinue: true,
       };
     }
@@ -466,7 +510,9 @@ export class ConversationRunner {
         status: 'awaiting_permission',
       });
 
-      let permissionResponse: { decision?: string; updatedInput?: Record<string, unknown> } | undefined;
+      let permissionResponse:
+        | { decision?: string; updatedInput?: Record<string, unknown> }
+        | undefined;
 
       // Compute a meaningful resource for the permission request:
       // - For bash: use the command
@@ -583,10 +629,14 @@ export class ConversationRunner {
     type TerminalStatus = 'completed' | 'denied' | 'cancelled' | 'failed';
     function mapOutcomeToStatus(outcome: string): TerminalStatus {
       switch (outcome) {
-        case 'completed': return 'completed';
-        case 'denied': return 'denied';
-        case 'cancelled': return 'cancelled';
-        default: return 'failed';
+        case 'completed':
+          return 'completed';
+        case 'denied':
+          return 'denied';
+        case 'cancelled':
+          return 'cancelled';
+        default:
+          return 'failed';
       }
     }
     const terminalStatus = mapOutcomeToStatus(protocolResult.outcome);
@@ -646,7 +696,18 @@ export class ConversationRunner {
     abortController: AbortController;
     turnId: string;
   }): Promise<CoreToolResult> {
-    const { toolName, toolCallId, finalInput, toolTurnSeq, toolExecutor, cwd, filesRead, envOverlay, abortController, turnId } = params;
+    const {
+      toolName,
+      toolCallId,
+      finalInput,
+      toolTurnSeq,
+      toolExecutor,
+      cwd,
+      filesRead,
+      envOverlay,
+      abortController,
+      turnId,
+    } = params;
 
     // Note: bash with background=true is handled before permission check and never reaches here.
 
@@ -741,7 +802,9 @@ export class ConversationRunner {
     const job = this.deps.getJob(jobId);
     if (job) {
       const abortPromise = new Promise<never>((_, reject) => {
-        abortController.signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true });
+        abortController.signal.addEventListener('abort', () => reject(new Error('cancelled')), {
+          once: true,
+        });
       });
 
       try {
@@ -752,16 +815,10 @@ export class ConversationRunner {
       }
     }
 
-    let output = '';
-    try {
-      output = readFileSync(getJobOutputPath(this.config.sessionDir, jobId), 'utf8');
-    } catch {
-      output = '';
-    }
-
-    const tailLimit = 64 * 1024;
-    const truncated = output.length > tailLimit;
-    const reportText = truncated ? output.slice(-tailLimit) : output;
+    // Read output with tail-based truncation
+    const { output: reportText, truncated } = readJobOutputTail(
+      getJobOutputPath(this.config.sessionDir, jobId)
+    );
 
     const status = job?.status ?? 'failed';
     return {
@@ -781,12 +838,17 @@ export class ConversationRunner {
   /**
    * Execute the job_output tool.
    */
-  private async executeJobOutputTool(params: { finalInput: Record<string, unknown> }): Promise<CoreToolResult> {
+  private async executeJobOutputTool(params: {
+    finalInput: Record<string, unknown>;
+  }): Promise<CoreToolResult> {
     const { finalInput } = params;
 
     const jobId = toNonEmptyString(finalInput.jobId);
     if (!jobId) {
-      return { status: 'failed', content: [{ type: 'text', text: 'job_output.jobId is required' }] };
+      return {
+        status: 'failed',
+        content: [{ type: 'text', text: 'job_output.jobId is required' }],
+      };
     }
 
     const block = finalInput.block !== false;
@@ -798,7 +860,9 @@ export class ConversationRunner {
     if (block && runningJob?.status === 'running') {
       await Promise.race([
         runningJob.completion,
-        timeoutMs > 0 ? new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)) : new Promise<void>(() => {}),
+        timeoutMs > 0
+          ? new Promise<void>((resolve) => setTimeout(resolve, timeoutMs))
+          : new Promise<void>(() => {}),
       ]);
     }
 
@@ -811,28 +875,7 @@ export class ConversationRunner {
     }
 
     const outputPath = getJobOutputPath(this.config.sessionDir, jobId);
-
-    let totalBytes = 0;
-    try {
-      totalBytes = statSync(outputPath).size;
-    } catch {
-      totalBytes = 0;
-    }
-
-    const clampedOffset = Math.min(byteOffset, totalBytes);
-    const bytesToRead = Math.max(0, totalBytes - clampedOffset);
-
-    let output = '';
-    if (bytesToRead > 0) {
-      const fd = openSync(outputPath, 'r');
-      try {
-        const buf = Buffer.allocUnsafe(bytesToRead);
-        const read = readSync(fd, buf, 0, bytesToRead, clampedOffset);
-        output = buf.subarray(0, read).toString('utf8');
-      } finally {
-        closeSync(fd);
-      }
-    }
+    const { output, totalBytes } = readJobOutput(outputPath, { afterOffset: byteOffset });
 
     const result = {
       jobId,
@@ -842,7 +885,10 @@ export class ConversationRunner {
       byteOffset: totalBytes,
     };
 
-    return { status: 'completed', content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    return {
+      status: 'completed',
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    };
   }
 
   /**
@@ -851,7 +897,9 @@ export class ConversationRunner {
   private executeJobsListTool(params: { finalInput: Record<string, unknown> }): CoreToolResult {
     const { finalInput } = params;
 
-    const statusFilter = Array.isArray(finalInput.status) ? (finalInput.status as string[]) : undefined;
+    const statusFilter = Array.isArray(finalInput.status)
+      ? (finalInput.status as string[])
+      : undefined;
     const typeFilter = Array.isArray(finalInput.type) ? (finalInput.type as string[]) : undefined;
     const limit = typeof finalInput.limit === 'number' ? finalInput.limit : 50;
 
@@ -877,7 +925,10 @@ export class ConversationRunner {
     // Apply limit
     jobs = jobs.slice(0, limit);
 
-    return { status: 'completed', content: [{ type: 'text', text: JSON.stringify({ jobs }, null, 2) }] };
+    return {
+      status: 'completed',
+      content: [{ type: 'text', text: JSON.stringify({ jobs }, null, 2) }],
+    };
   }
 
   /**
@@ -895,7 +946,9 @@ export class ConversationRunner {
     if (!job || job.status !== 'running') {
       return {
         status: 'completed',
-        content: [{ type: 'text', text: JSON.stringify({ success: false, reason: 'Job not running' }) }],
+        content: [
+          { type: 'text', text: JSON.stringify({ success: false, reason: 'Job not running' }) },
+        ],
       };
     }
 
@@ -920,7 +973,10 @@ export class ConversationRunner {
       killed = true;
     }
 
-    return { status: 'completed', content: [{ type: 'text', text: JSON.stringify({ success: killed }) }] };
+    return {
+      status: 'completed',
+      content: [{ type: 'text', text: JSON.stringify({ success: killed }) }],
+    };
   }
 
   /**

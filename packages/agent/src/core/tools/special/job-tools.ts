@@ -1,8 +1,7 @@
 // ABOUTME: Handlers for job management tools (job_output, jobs_list, job_kill)
 // These tools query and control background jobs (shell and delegate)
 
-import { openSync, readSync, closeSync, statSync } from 'node:fs';
-import { getJobOutputPath } from '@lace/agent/jobs/job-manager';
+import { getJobOutputPath, readJobOutput } from '@lace/agent/jobs';
 import type { SpecialToolContext, SpecialToolResult } from './types';
 
 /**
@@ -50,28 +49,7 @@ export async function executeJobOutput(
   }
 
   const outputPath = getJobOutputPath(context.sessionDir, jobId);
-
-  let totalBytes = 0;
-  try {
-    totalBytes = statSync(outputPath).size;
-  } catch {
-    totalBytes = 0;
-  }
-
-  const clampedOffset = Math.min(byteOffset, totalBytes);
-  const bytesToRead = Math.max(0, totalBytes - clampedOffset);
-
-  let output = '';
-  if (bytesToRead > 0) {
-    const fd = openSync(outputPath, 'r');
-    try {
-      const buf = Buffer.allocUnsafe(bytesToRead);
-      const read = readSync(fd, buf, 0, bytesToRead, clampedOffset);
-      output = buf.subarray(0, read).toString('utf8');
-    } finally {
-      closeSync(fd);
-    }
-  }
+  const { output, totalBytes } = readJobOutput(outputPath, { afterOffset: byteOffset });
 
   const result = {
     jobId,

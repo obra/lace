@@ -1,11 +1,9 @@
 // ABOUTME: Background job management RPC handlers for listing, monitoring, and controlling jobs
 
-import { closeSync, openSync, readFileSync, readSync, statSync } from 'node:fs';
-import { join } from 'node:path';
 import { AcpErrorCodes, EntErrorCodes, type JsonRpcPeer } from '@lace/ent-protocol';
 import type { AgentServerState, JobStatus, JobType } from '../../server-types';
 import { assertInitialized, throwInvalidParams, toNonEmptyString } from '../utils';
-import { getJobOutputPath } from '../../jobs/job-manager';
+import { getJobOutputPath, readJobOutput } from '../../jobs';
 import { logger } from '../../utils/logger';
 
 /**
@@ -99,44 +97,26 @@ export function registerJobHandlers(
     const sessionDir = state.activeSession.dir;
     const outputPath = getJobOutputPath(sessionDir, jobId);
 
-    let totalBytes = 0;
-    try {
-      totalBytes = statSync(outputPath).size;
-    } catch {
-      totalBytes = 0;
-    }
-
     const afterOffset =
       typeof parsed.afterOffset === 'number' && parsed.afterOffset >= 0 ? parsed.afterOffset : 0;
     const tailBytes =
       typeof parsed.tailBytes === 'number' && parsed.tailBytes > 0 ? parsed.tailBytes : 0;
 
-    const clampedAfter = Math.min(afterOffset, totalBytes);
-    const startOffset =
-      tailBytes > 0 ? Math.max(clampedAfter, totalBytes - tailBytes) : clampedAfter;
-    const bytesToRead = Math.max(0, totalBytes - startOffset);
-
-    let output = '';
-    if (bytesToRead > 0) {
-      const fd = openSync(outputPath, 'r');
-      try {
-        const buf = Buffer.allocUnsafe(bytesToRead);
-        const read = readSync(fd, buf, 0, bytesToRead, startOffset);
-        output = buf.subarray(0, read).toString('utf8');
-      } finally {
-        closeSync(fd);
-      }
-    }
+    const result = readJobOutput(outputPath, {
+      afterOffset,
+      tailBytes: tailBytes > 0 ? tailBytes : undefined,
+    });
 
     return {
       status: record.status,
-      output,
+      output: result.output,
       ...(record.exitCode !== undefined ? { exitCode: record.exitCode } : {}),
       outputMeta: {
-        totalBytes,
-        returnedOffset: startOffset,
-        returnedBytes: Buffer.byteLength(output, 'utf8'),
-        truncated: startOffset > 0,
+        totalBytes: result.totalBytes,
+        returnedOffset: result.returnedOffset,
+        returnedBytes: result.returnedBytes,
+        // RPC API defines truncated as "didn't return from start" for backward compatibility
+        truncated: result.returnedOffset > 0,
       },
       report: {
         summary:
