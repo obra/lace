@@ -1,42 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { EntErrorCodes } from '@lace/ent-protocol';
-import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
-import { defaultInitializeParams } from './helpers/initialize';
+import {
+  createE2EContext,
+  spawnAgentProcess,
+  withTimeout,
+  defaultInitializeParams,
+} from './helpers';
 
 describe('lace-agent process (E2E over stdio)', () => {
-  let originalLaceDir: string | undefined;
-  let laceDir: string;
-  let workDir: string;
-  let agent: SpawnedAgent | undefined;
+  const ctx = createE2EContext({ prefix: 'lace-agent-e2e' });
 
-  beforeEach(() => {
-    originalLaceDir = process.env.LACE_DIR;
-    laceDir = mkdtempSync(join(tmpdir(), 'lace-agent-e2e-store-'));
-    workDir = mkdtempSync(join(tmpdir(), 'lace-agent-e2e-wd-'));
-  });
-
-  afterEach(async () => {
-    if (agent) {
-      await agent.shutdown();
-      agent = undefined;
-    }
-
-    if (originalLaceDir === undefined) delete process.env.LACE_DIR;
-    else process.env.LACE_DIR = originalLaceDir;
-
-    rmSync(laceDir, { recursive: true, force: true });
-    rmSync(workDir, { recursive: true, force: true });
-  });
+  beforeEach(() => ctx.setup());
+  afterEach(() => ctx.teardown());
 
   it('rejects initialize without required clientInfo/capabilities', async () => {
-    agent = spawnAgentProcess({ laceDir });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await expect(
       withTimeout(
-        agent.peer.request('initialize', { protocolVersion: '1.0' } as any),
+        ctx.agent.peer.request('initialize', { protocolVersion: '1.0' } as any),
         2_000,
         'initialize'
       )
@@ -44,17 +28,17 @@ describe('lace-agent process (E2E over stdio)', () => {
   });
 
   it('returns AlreadyInitialized for repeated initialize', async () => {
-    agent = spawnAgentProcess({ laceDir });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
 
     await expect(
       withTimeout(
-        agent.peer.request('initialize', defaultInitializeParams()),
+        ctx.agent.peer.request('initialize', defaultInitializeParams()),
         2_000,
         'initialize again'
       )
@@ -68,30 +52,30 @@ describe('lace-agent process (E2E over stdio)', () => {
     'initializes, creates a session, streams updates, and persists durable events',
     { timeout: 15_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       const updates: unknown[] = [];
-      agent.peer.onRequest('session/update', async (params) => {
+      ctx.agent.peer.onRequest('session/update', async (params) => {
         updates.push(params);
         return undefined;
       });
 
       await withTimeout(
-        agent.peer.request('initialize', defaultInitializeParams()),
+        ctx.agent.peer.request('initialize', defaultInitializeParams()),
         2_000,
         'initialize'
       );
 
       const created = (await withTimeout(
-        agent.peer.request('session/new', { workDir }),
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
         2_000,
         'session/new'
       )) as { sessionId: string };
 
-      writeFileSync(join(workDir, 'hello.txt'), 'hi from disk\n', 'utf8');
+      writeFileSync(join(ctx.workDir, 'hello.txt'), 'hi from disk\n', 'utf8');
 
       const promptResult = (await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'read file hello.txt' }],
         }),
         10_000,
@@ -121,7 +105,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
 
       const durable = (await withTimeout(
-        agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+        ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
         2_000,
         'ent/session/events'
       )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
@@ -140,7 +124,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7]);
 
       const list = (await withTimeout(
-        agent.peer.request('session/list', { workDir }),
+        ctx.agent.peer.request('session/list', { workDir: ctx.workDir }),
         2_000,
         'session/list'
       )) as { sessions: Array<{ sessionId: string }> };
@@ -150,47 +134,47 @@ describe('lace-agent process (E2E over stdio)', () => {
   );
 
   it('keeps JSONL session history across agent restarts', { timeout: 15_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
 
     const created = (await withTimeout(
-      agent.peer.request('session/new', { workDir }),
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
       2_000,
       'session/new'
     )) as { sessionId: string };
 
-    writeFileSync(join(workDir, 'hello.txt'), 'hi from disk\n', 'utf8');
+    writeFileSync(join(ctx.workDir, 'hello.txt'), 'hi from disk\n', 'utf8');
 
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'read file hello.txt' }],
       }),
       10_000,
       'session/prompt'
     );
 
-    await agent.shutdown();
-    agent = undefined;
+    await ctx.agent.shutdown();
+    ctx.agent = undefined;
 
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize (restart)'
     );
 
     await withTimeout(
-      agent.peer.request('session/load', { sessionId: created.sessionId }),
+      ctx.agent.peer.request('session/load', { sessionId: created.sessionId }),
       2_000,
       'session/load (restart)'
     );
 
     const durable = (await withTimeout(
-      agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+      ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
       2_000,
       'ent/session/events (restart)'
     )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
@@ -209,17 +193,21 @@ describe('lace-agent process (E2E over stdio)', () => {
   });
 
   it('reports currentSession.messageCount in ent/agent/status', { timeout: 15_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'hi' }],
       }),
       10_000,
@@ -227,7 +215,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     );
 
     const status = (await withTimeout(
-      agent.peer.request('ent/agent/status'),
+      ctx.agent.peer.request('ent/agent/status'),
       2_000,
       'ent/agent/status'
     )) as { currentSession?: { messageCount: number } };
@@ -239,22 +227,22 @@ describe('lace-agent process (E2E over stdio)', () => {
     'requests permission before running bash and records a tool_use event',
     { timeout: 15_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       const updates: unknown[] = [];
-      agent.peer.onRequest('session/update', async (params) => {
+      ctx.agent.peer.onRequest('session/update', async (params) => {
         updates.push(params);
         return undefined;
       });
 
       let lastPermissionParams: Record<string, unknown> | undefined;
-      agent.peer.onRequest('session/request_permission', async (params) => {
+      ctx.agent.peer.onRequest('session/request_permission', async (params) => {
         lastPermissionParams = params as Record<string, unknown>;
         return { decision: 'allow' };
       });
 
       await withTimeout(
-        agent.peer.request(
+        ctx.agent.peer.request(
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'ask' } })
         ),
@@ -262,10 +250,14 @@ describe('lace-agent process (E2E over stdio)', () => {
         'initialize'
       );
 
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
       const promptResult = (await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'run: echo hi' }],
         }),
         10_000,
@@ -303,7 +295,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       });
 
       const durable = (await withTimeout(
-        agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+        ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
         2_000,
         'ent/session/events'
       )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
@@ -331,14 +323,14 @@ describe('lace-agent process (E2E over stdio)', () => {
     'requests permission before running file_write and exposes pending permissions via ent/agent/status',
     { timeout: 20_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       let permissionParams: Record<string, unknown> | undefined;
       let resolvePermission:
         | ((value: { decision: string; updatedInput?: Record<string, unknown> }) => void)
         | undefined;
 
-      agent.peer.onRequest('session/request_permission', async (params) => {
+      ctx.agent.peer.onRequest('session/request_permission', async (params) => {
         permissionParams = params as Record<string, unknown>;
         return await new Promise((resolve) => {
           resolvePermission = resolve as any;
@@ -346,7 +338,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       });
 
       await withTimeout(
-        agent.peer.request(
+        ctx.agent.peer.request(
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'ask' } })
         ),
@@ -354,9 +346,13 @@ describe('lace-agent process (E2E over stdio)', () => {
         'initialize'
       );
 
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
-      const promptPromise = agent.peer.request('session/prompt', {
+      const promptPromise = ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'write file out.txt' }],
       });
 
@@ -381,7 +377,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       });
 
       const status = (await withTimeout(
-        agent.peer.request('ent/agent/status', {}),
+        ctx.agent.peer.request('ent/agent/status', {}),
         2_000,
         'ent/agent/status'
       )) as { pendingPermissions: Array<{ tool: string }> };
@@ -392,8 +388,10 @@ describe('lace-agent process (E2E over stdio)', () => {
 
       await withTimeout(promptPromise, 10_000, 'session/prompt (write)');
 
-      expect(existsSync(join(workDir, 'out.txt'))).toBe(true);
-      expect(readFileSync(join(workDir, 'out.txt'), 'utf8')).toContain('written by test provider');
+      expect(existsSync(join(ctx.workDir, 'out.txt'))).toBe(true);
+      expect(readFileSync(join(ctx.workDir, 'out.txt'), 'utf8')).toContain(
+        'written by test provider'
+      );
     }
   );
 
@@ -401,16 +399,16 @@ describe('lace-agent process (E2E over stdio)', () => {
     'reissues pending permission prompts after agent restart (derived from events.jsonl)',
     { timeout: 25_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       let sawPermissionRequest = false;
-      agent.peer.onRequest('session/request_permission', async () => {
+      ctx.agent.peer.onRequest('session/request_permission', async () => {
         sawPermissionRequest = true;
         return await new Promise(() => undefined);
       });
 
       await withTimeout(
-        agent.peer.request(
+        ctx.agent.peer.request(
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'ask' } })
         ),
@@ -419,12 +417,12 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
 
       const created = (await withTimeout(
-        agent.peer.request('session/new', { workDir }),
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
         2_000,
         'session/new'
       )) as { sessionId: string };
 
-      const promptPromise = agent.peer.request('session/prompt', {
+      const promptPromise = ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'run: echo pending' }],
       });
 
@@ -442,7 +440,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
 
       const beforeCrash = (await withTimeout(
-        agent.peer.request('ent/agent/status'),
+        ctx.agent.peer.request('ent/agent/status'),
         2_000,
         'ent/agent/status (before crash)'
       )) as { pendingPermissions: Array<{ requestId: string; toolCallId: string }> };
@@ -453,38 +451,38 @@ describe('lace-agent process (E2E over stdio)', () => {
       expect(toolCallId).toEqual(expect.any(String));
 
       const stateRaw = readFileSync(
-        join(laceDir, 'agent-sessions', created.sessionId, 'state.json'),
+        join(ctx.laceDir, 'agent-sessions', created.sessionId, 'state.json'),
         'utf8'
       );
       expect((JSON.parse(stateRaw) as any).pendingPermissions).toBeUndefined();
 
       const eventsRaw = readFileSync(
-        join(laceDir, 'agent-sessions', created.sessionId, 'events.jsonl'),
+        join(ctx.laceDir, 'agent-sessions', created.sessionId, 'events.jsonl'),
         'utf8'
       );
       expect(eventsRaw).toContain('"permission_requested"');
       expect(eventsRaw).not.toContain('"permission_decided"');
 
-      agent.proc.kill('SIGKILL');
+      ctx.agent.proc.kill('SIGKILL');
       await withTimeout(
-        new Promise<void>((resolve) => agent!.proc.once('exit', () => resolve())),
+        new Promise<void>((resolve) => ctx.agent!.proc.once('exit', () => resolve())),
         2_000,
         'agent process exit'
       );
-      agent.peer.close();
-      agent = undefined;
+      ctx.agent.peer.close();
+      ctx.agent = undefined;
 
       await expect(
         withTimeout(promptPromise as Promise<unknown>, 2_000, 'prompt crashed')
       ).rejects.toBeDefined();
 
-      agent = spawnAgentProcess({ laceDir });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       const reissued: Array<Record<string, unknown>> = [];
       let resolveReissue:
         | ((value: { decision: string; updatedInput?: Record<string, unknown> }) => void)
         | undefined;
-      agent.peer.onRequest('session/request_permission', async (params) => {
+      ctx.agent.peer.onRequest('session/request_permission', async (params) => {
         reissued.push(params as Record<string, unknown>);
         return await new Promise((resolve) => {
           resolveReissue = resolve as any;
@@ -492,7 +490,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       });
 
       await withTimeout(
-        agent.peer.request(
+        ctx.agent.peer.request(
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'ask' } })
         ),
@@ -500,7 +498,7 @@ describe('lace-agent process (E2E over stdio)', () => {
         'initialize (restart)'
       );
       await withTimeout(
-        agent.peer.request('session/load', { sessionId: created.sessionId }),
+        ctx.agent.peer.request('session/load', { sessionId: created.sessionId }),
         2_000,
         'session/load (restart)'
       );
@@ -521,7 +519,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       expect(reissued[0]).toMatchObject({ toolCallId });
 
       const afterRestart = (await withTimeout(
-        agent.peer.request('ent/agent/status'),
+        ctx.agent.peer.request('ent/agent/status'),
         2_000,
         'ent/agent/status (after restart)'
       )) as { pendingPermissions: Array<{ requestId: string; toolCallId: string }> };
@@ -535,8 +533,8 @@ describe('lace-agent process (E2E over stdio)', () => {
       await withTimeout(
         new Promise<void>((resolve, reject) => {
           const interval = setInterval(() => {
-            void agent!.peer
-              .request('ent/agent/status')
+            void ctx
+              .agent!.peer.request('ent/agent/status')
               .then((status) => {
                 const p = status as { pendingPermissions?: unknown[] };
                 if ((p.pendingPermissions ?? []).length === 0) {
@@ -555,7 +553,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
 
       const durable = (await withTimeout(
-        agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+        ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
         2_000,
         'ent/session/events (after restart)'
       )) as { events: Array<{ type: string }> };
@@ -567,10 +565,10 @@ describe('lace-agent process (E2E over stdio)', () => {
   );
 
   it('supports ent/session/configure and reports config via ent/agent/status', async () => {
-    agent = spawnAgentProcess({ laceDir });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(
-      agent.peer.request(
+      ctx.agent.peer.request(
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
@@ -578,10 +576,14 @@ describe('lace-agent process (E2E over stdio)', () => {
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     const configured = (await withTimeout(
-      agent.peer.request('ent/session/configure', {
+      ctx.agent.peer.request('ent/session/configure', {
         approvalMode: 'approve',
         maxBudgetUsd: 1.25,
         environment: { TEST_KEY: 'test-value' },
@@ -598,7 +600,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     expect((configured.config as any).environment).toMatchObject({ TEST_KEY: 'test-value' });
 
     const status = (await withTimeout(
-      agent.peer.request('ent/agent/status'),
+      ctx.agent.peer.request('ent/agent/status'),
       2_000,
       'ent/agent/status'
     )) as { limits: { maxBudgetUsd?: number } };
@@ -607,22 +609,26 @@ describe('lace-agent process (E2E over stdio)', () => {
   });
 
   it('emits a context_injected update and durable event for ent/session/inject', async () => {
-    agent = spawnAgentProcess({ laceDir });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: unknown[] = [];
-    agent.peer.onRequest('session/update', async (params) => {
+    ctx.agent.peer.onRequest('session/update', async (params) => {
       updates.push(params);
       return undefined;
     });
 
     await withTimeout(
-      agent.peer.request('initialize', defaultInitializeParams()),
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
       2_000,
       'initialize'
     );
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
-    agent.peer.notify('ent/session/inject', {
+    ctx.agent.peer.notify('ent/session/inject', {
       content: [{ type: 'text', text: 'Injected' }],
       priority: 'normal',
     });
@@ -642,7 +648,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     );
 
     const durable = (await withTimeout(
-      agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+      ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
       2_000,
       'ent/session/events'
     )) as { events: Array<{ eventSeq: number; type: string; data: Record<string, unknown> }> };
@@ -652,22 +658,22 @@ describe('lace-agent process (E2E over stdio)', () => {
   });
 
   it('can cancel a turn that is awaiting permission', { timeout: 15_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: unknown[] = [];
-    agent.peer.onRequest('session/update', async (params) => {
+    ctx.agent.peer.onRequest('session/update', async (params) => {
       updates.push(params);
       return undefined;
     });
 
     let sawPermissionRequest = false;
-    agent.peer.onRequest('session/request_permission', async () => {
+    ctx.agent.peer.onRequest('session/request_permission', async () => {
       sawPermissionRequest = true;
       return await new Promise(() => undefined);
     });
 
     await withTimeout(
-      agent.peer.request(
+      ctx.agent.peer.request(
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
@@ -675,9 +681,13 @@ describe('lace-agent process (E2E over stdio)', () => {
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
-    const { requestId, result: promptPromise } = agent.peer.requestWithId('session/prompt', {
+    const { requestId, result: promptPromise } = ctx.agent.peer.requestWithId('session/prompt', {
       content: [{ type: 'text', text: 'run: echo will-not-run' }],
     });
 
@@ -694,7 +704,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       'permission request received'
     );
 
-    agent.peer.notify('$/cancel_request', { requestId });
+    ctx.agent.peer.notify('$/cancel_request', { requestId });
 
     const cancelled = (await withTimeout(promptPromise, 5_000, 'prompt cancelled')) as {
       stopReason: string;
@@ -719,7 +729,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     );
 
     const status = (await withTimeout(
-      agent.peer.request('ent/agent/status'),
+      ctx.agent.peer.request('ent/agent/status'),
       2_000,
       'ent/agent/status'
     )) as { pendingPermissions: unknown[]; currentTurn?: unknown };
@@ -729,33 +739,37 @@ describe('lace-agent process (E2E over stdio)', () => {
   });
 
   it('creates a checkpoint and can rewind files', { timeout: 15_000 }, async () => {
-    agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-    agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+    ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
     await withTimeout(
-      agent.peer.request(
+      ctx.agent.peer.request(
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
       2_000,
       'initialize'
     );
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
 
     await withTimeout(
-      agent.peer.request('session/prompt', {
+      ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'write file foo.txt' }],
       }),
       10_000,
       'session/prompt write foo.txt'
     );
 
-    const original = readFileSync(join(workDir, 'foo.txt'), 'utf8');
+    const original = readFileSync(join(ctx.workDir, 'foo.txt'), 'utf8');
     expect(original).toBe('written by test provider\n');
 
     const checkpoint = (await withTimeout(
-      agent.peer.request('ent/session/checkpoint', { label: 'first' }),
+      ctx.agent.peer.request('ent/session/checkpoint', { label: 'first' }),
       2_000,
       'ent/session/checkpoint'
     )) as { checkpointId: string; eventSeq: number; files: string[] };
@@ -764,40 +778,44 @@ describe('lace-agent process (E2E over stdio)', () => {
     expect(checkpoint.eventSeq).toBeGreaterThan(0);
     expect(checkpoint.files).toContain('foo.txt');
 
-    writeFileSync(join(workDir, 'foo.txt'), 'modified\n', 'utf8');
-    expect(readFileSync(join(workDir, 'foo.txt'), 'utf8')).toBe('modified\n');
+    writeFileSync(join(ctx.workDir, 'foo.txt'), 'modified\n', 'utf8');
+    expect(readFileSync(join(ctx.workDir, 'foo.txt'), 'utf8')).toBe('modified\n');
 
     const rewind = (await withTimeout(
-      agent.peer.request('ent/session/rewind', { toEventSeq: checkpoint.eventSeq }),
+      ctx.agent.peer.request('ent/session/rewind', { toEventSeq: checkpoint.eventSeq }),
       5_000,
       'ent/session/rewind'
     )) as { filesRestored: string[]; eventSeq: number };
 
     expect(rewind.eventSeq).toBe(checkpoint.eventSeq);
     expect(rewind.filesRestored).toContain('foo.txt');
-    expect(readFileSync(join(workDir, 'foo.txt'), 'utf8')).toBe(original);
+    expect(readFileSync(join(ctx.workDir, 'foo.txt'), 'utf8')).toBe(original);
   });
 
   it(
     'returns CheckpointNotFound for ent/session/rewind without a checkpoint',
     { timeout: 15_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-      agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+      ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
       await withTimeout(
-        agent.peer.request(
+        ctx.agent.peer.request(
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'ask' } })
         ),
         2_000,
         'initialize'
       );
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
       await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'write file foo.txt' }],
         }),
         10_000,
@@ -805,7 +823,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
 
       await expect(
-        agent.peer.request('ent/session/rewind', { toEventSeq: 1 })
+        ctx.agent.peer.request('ent/session/rewind', { toEventSeq: 1 })
       ).rejects.toMatchObject({
         code: EntErrorCodes.CheckpointNotFound,
         message: 'CheckpointNotFound',
@@ -817,23 +835,27 @@ describe('lace-agent process (E2E over stdio)', () => {
     'supports ent/session/compact truncate and trims tool results in provider context',
     { timeout: 15_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       await withTimeout(
-        agent.peer.request('initialize', defaultInitializeParams()),
+        ctx.agent.peer.request('initialize', defaultInitializeParams()),
         2_000,
         'initialize'
       );
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
       writeFileSync(
-        join(workDir, 'hello.txt'),
+        join(ctx.workDir, 'hello.txt'),
         ['line1', 'line2', 'line3', 'line4', 'line5', ''].join('\n'),
         'utf8'
       );
 
       await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'read file hello.txt' }],
         }),
         10_000,
@@ -841,14 +863,14 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
 
       const compact = (await withTimeout(
-        agent.peer.request('ent/session/compact', { strategy: 'truncate', preserveRecent: 0 }),
+        ctx.agent.peer.request('ent/session/compact', { strategy: 'truncate', preserveRecent: 0 }),
         2_000,
         'ent/session/compact'
       )) as { messagesCompacted: number };
       expect(compact.messagesCompacted).toBeGreaterThan(0);
 
       const after = (await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'hello' }],
         }),
         10_000,
@@ -866,19 +888,23 @@ describe('lace-agent process (E2E over stdio)', () => {
     'supports ent/session/compact summarize and returns summary text',
     { timeout: 15_000 },
     async () => {
-      agent = spawnAgentProcess({ laceDir, env: { LACE_AGENT_TEST_PROVIDER: '1' } });
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       await withTimeout(
-        agent.peer.request('initialize', defaultInitializeParams()),
+        ctx.agent.peer.request('initialize', defaultInitializeParams()),
         2_000,
         'initialize'
       );
-      await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      );
 
-      writeFileSync(join(workDir, 'hello.txt'), 'hello from disk\n', 'utf8');
+      writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello from disk\n', 'utf8');
 
       await withTimeout(
-        agent.peer.request('session/prompt', {
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'read file hello.txt' }],
         }),
         10_000,
@@ -886,7 +912,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
 
       const compact = (await withTimeout(
-        agent.peer.request('ent/session/compact', { strategy: 'summarize', preserveRecent: 0 }),
+        ctx.agent.peer.request('ent/session/compact', { strategy: 'summarize', preserveRecent: 0 }),
         10_000,
         'ent/session/compact summarize'
       )) as { messagesCompacted: number; summary?: string };
