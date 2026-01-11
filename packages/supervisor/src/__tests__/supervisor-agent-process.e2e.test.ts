@@ -33,12 +33,15 @@ describe('SupervisorAgentProcess (E2E)', () => {
   let workDir: string;
   let supervisor: SupervisorAgentProcess | undefined;
   let originalAgentLaceDir: string | undefined;
+  let originalTestProvider: string | undefined;
 
   beforeEach(() => {
     laceDir = mkdtempSync(join(tmpdir(), 'lace-supervisor-e2e-store-'));
     workDir = mkdtempSync(join(tmpdir(), 'lace-supervisor-e2e-wd-'));
     originalAgentLaceDir = process.env.LACE_DIR;
+    originalTestProvider = process.env.LACE_AGENT_TEST_PROVIDER;
     process.env.LACE_DIR = laceDir;
+    process.env.LACE_AGENT_TEST_PROVIDER = '1';
   });
 
   afterEach(async () => {
@@ -52,6 +55,9 @@ describe('SupervisorAgentProcess (E2E)', () => {
 
     if (originalAgentLaceDir === undefined) delete process.env.LACE_DIR;
     else process.env.LACE_DIR = originalAgentLaceDir;
+
+    if (originalTestProvider === undefined) delete process.env.LACE_AGENT_TEST_PROVIDER;
+    else process.env.LACE_AGENT_TEST_PROVIDER = originalTestProvider;
   });
 
   it('spawns an agent process and handles permission requests', async () => {
@@ -108,12 +114,15 @@ describe('Supervisor (E2E)', () => {
   let workDir: string;
   let supervisor: Supervisor | undefined;
   let originalAgentLaceDir: string | undefined;
+  let originalTestProvider: string | undefined;
 
   beforeEach(() => {
     laceDir = mkdtempSync(join(tmpdir(), 'lace-supervisor2-e2e-store-'));
     workDir = mkdtempSync(join(tmpdir(), 'lace-supervisor2-e2e-wd-'));
     originalAgentLaceDir = process.env.LACE_DIR;
+    originalTestProvider = process.env.LACE_AGENT_TEST_PROVIDER;
     process.env.LACE_DIR = laceDir;
+    process.env.LACE_AGENT_TEST_PROVIDER = '1';
   });
 
   afterEach(async () => {
@@ -127,6 +136,9 @@ describe('Supervisor (E2E)', () => {
 
     if (originalAgentLaceDir === undefined) delete process.env.LACE_DIR;
     else process.env.LACE_DIR = originalAgentLaceDir;
+
+    if (originalTestProvider === undefined) delete process.env.LACE_AGENT_TEST_PROVIDER;
+    else process.env.LACE_AGENT_TEST_PROVIDER = originalTestProvider;
   });
 
   it('runs two workspace sessions as two agent processes', async () => {
@@ -321,53 +333,45 @@ describe('Supervisor (E2E)', () => {
   });
 
   it('can attach to an existing sessionId and read durable events', async () => {
-    const originalTestProvider = process.env.LACE_AGENT_TEST_PROVIDER;
-    process.env.LACE_AGENT_TEST_PROVIDER = '1';
+    supervisor = new Supervisor({
+      storeDir: laceDir,
+      onPermissionRequest: async () => ({ decision: 'allow' }),
+    });
+
+    const created = await supervisor.createWorkspaceSession(workDir);
+    await withTimeout(
+      supervisor.prompt(created.workspaceSessionId, [{ type: 'text', text: 'hi' }]),
+      5_000,
+      'prompt (created)'
+    );
+
+    await supervisor.shutdown();
+    supervisor = undefined;
 
     supervisor = new Supervisor({
       storeDir: laceDir,
       onPermissionRequest: async () => ({ decision: 'allow' }),
     });
 
-    try {
-      const created = await supervisor.createWorkspaceSession(workDir);
-      await withTimeout(
-        supervisor.prompt(created.workspaceSessionId, [{ type: 'text', text: 'hi' }]),
-        5_000,
-        'prompt (created)'
-      );
+    const attached = await supervisor.attachWorkspaceSession(created.sessionId);
+    const peer = await supervisor.getPeer(attached.workspaceSessionId);
+    const events = (await withTimeout(
+      peer.request('ent/session/events', {
+        afterEventSeq: 0,
+        limit: 100,
+      }),
+      2_000,
+      'ent/session/events (attached)'
+    )) as { events: Array<{ type: string; eventSeq: number }>; hasMore: boolean };
 
-      await supervisor.shutdown();
-      supervisor = undefined;
-
-      supervisor = new Supervisor({
-        storeDir: laceDir,
-        onPermissionRequest: async () => ({ decision: 'allow' }),
-      });
-
-      const attached = await supervisor.attachWorkspaceSession(created.sessionId);
-      const peer = await supervisor.getPeer(attached.workspaceSessionId);
-      const events = (await withTimeout(
-        peer.request('ent/session/events', {
-          afterEventSeq: 0,
-          limit: 100,
-        }),
-        2_000,
-        'ent/session/events (attached)'
-      )) as { events: Array<{ type: string; eventSeq: number }>; hasMore: boolean };
-
-      expect(events.events.map((e) => e.type)).toEqual([
-        'context_injected',
-        'prompt',
-        'turn_start',
-        'message',
-        'turn_end',
-      ]);
-      expect(events.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5]);
-    } finally {
-      if (originalTestProvider === undefined) delete process.env.LACE_AGENT_TEST_PROVIDER;
-      else process.env.LACE_AGENT_TEST_PROVIDER = originalTestProvider;
-    }
+    expect(events.events.map((e) => e.type)).toEqual([
+      'context_injected',
+      'prompt',
+      'turn_start',
+      'message',
+      'turn_end',
+    ]);
+    expect(events.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it('surfaces provider config and jobs via Supervisor wrappers', async () => {

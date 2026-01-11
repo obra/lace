@@ -57,12 +57,15 @@ describe('Supervisor HTTP permissions race conditions (E2E)', () => {
   let server: ReturnType<typeof createSupervisorServer> | undefined;
   let baseUrl: string | undefined;
   let originalAgentLaceDir: string | undefined;
+  let originalTestProvider: string | undefined;
 
   beforeEach(() => {
     laceDir = mkdtempSync(join(tmpdir(), 'lace-supervisor-http-e2e-store-'));
     workDir = mkdtempSync(join(tmpdir(), 'lace-supervisor-http-e2e-wd-'));
     originalAgentLaceDir = process.env.LACE_DIR;
+    originalTestProvider = process.env.LACE_AGENT_TEST_PROVIDER;
     process.env.LACE_DIR = laceDir;
+    process.env.LACE_AGENT_TEST_PROVIDER = '1';
   });
 
   afterEach(async () => {
@@ -76,6 +79,9 @@ describe('Supervisor HTTP permissions race conditions (E2E)', () => {
 
     if (originalAgentLaceDir === undefined) delete process.env.LACE_DIR;
     else process.env.LACE_DIR = originalAgentLaceDir;
+
+    if (originalTestProvider === undefined) delete process.env.LACE_AGENT_TEST_PROVIDER;
+    else process.env.LACE_AGENT_TEST_PROVIDER = originalTestProvider;
   });
 
   it('executes a tool exactly once despite repeated resolves for the same toolCallId', async () => {
