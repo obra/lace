@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createSupervisorServer } from '../http/server';
+import { SupervisorClient, SupervisorHttpError } from '../http/client';
 import { createE2EContext } from './helpers';
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -40,7 +41,7 @@ async function httpJson(
   method: string,
   url: string,
   body?: unknown
-): Promise<{ status: number; json: any }> {
+): Promise<{ status: number; json: any; contentType: string | null }> {
   const res = await fetch(url, {
     method,
     headers: { 'content-type': 'application/json' },
@@ -48,7 +49,7 @@ async function httpJson(
   });
   const text = await res.text();
   const json = text ? JSON.parse(text) : null;
-  return { status: res.status, json };
+  return { status: res.status, json, contentType: res.headers.get('content-type') };
 }
 
 describe('Supervisor HTTP permissions race conditions (E2E)', () => {
@@ -64,6 +65,92 @@ describe('Supervisor HTTP permissions race conditions (E2E)', () => {
       server = undefined;
     }
     await ctx.teardown();
+  });
+
+  it('returns structured JSON-RPC errors over HTTP (code/message/data)', async () => {
+    server = createSupervisorServer({ storeDir: ctx.laceDir, host: '127.0.0.1', port: 0 });
+    const listening = await withTimeout(server.listen(), 5_000, 'server.listen');
+    baseUrl = listening.baseUrl;
+
+    const createWs = await withTimeout(
+      httpJson('POST', `${baseUrl}/workspace-sessions`, { workDir: ctx.workDir }),
+      5_000,
+      'POST /workspace-sessions'
+    );
+    expect(createWs.status).toBe(201);
+
+    const workspaceSessionId = createWs.json.workspaceSessionId as string;
+    expect(typeof workspaceSessionId).toBe('string');
+
+    // Trigger a known JSON-RPC error from the agent by calling ent/connections/upsert
+    // with a config containing a credentials field. The agent enforces that connection
+    // config MUST NOT include credentials and throws an InvalidParams error with data.
+    const res = await withTimeout(
+      httpJson(
+        'POST',
+        `${baseUrl}/workspace-sessions/${encodeURIComponent(workspaceSessionId)}/agent/request`,
+        {
+          method: 'ent/connections/upsert',
+          params: {
+            providerId: 'openai',
+            connection: {
+              name: 'bad',
+              config: { apiKey: 'should-not-be-here' },
+            },
+          },
+        }
+      ),
+      10_000,
+      'POST /workspace-sessions/:id/agent/request'
+    );
+
+    expect(res.status).toBe(500);
+    expect(res.contentType).toContain('application/json');
+
+    // Supervisor must preserve JSON-RPC structured error fields across HTTP.
+    expect(res.json).toMatchObject({
+      error: {
+        code: -32602,
+        message: 'InvalidParams',
+      },
+    });
+    // data is optional; ensure the key exists and is an object in this case
+    expect(typeof res.json.error.data).toBe('object');
+  });
+
+  it('SupervisorClient preserves JSON-RPC error code/data (not just message)', async () => {
+    server = createSupervisorServer({ storeDir: ctx.laceDir, host: '127.0.0.1', port: 0 });
+    const listening = await withTimeout(server.listen(), 5_000, 'server.listen');
+    baseUrl = listening.baseUrl;
+
+    const client = new SupervisorClient({ baseUrl });
+
+    const ws = await withTimeout(client.createWorkspaceSession(ctx.workDir), 5_000, 'createWorkspaceSession');
+
+    const err = await withTimeout(
+      client.agentRequest({
+        workspaceSessionId: ws.workspaceSessionId,
+        method: 'ent/connections/upsert',
+        requestParams: {
+          providerId: 'openai',
+          connection: {
+            name: 'bad',
+            config: { apiKey: 'should-not-be-here' },
+          },
+        },
+      }).then(
+        () => null,
+        (e) => e
+      ),
+      10_000,
+      'client.agentRequest fails'
+    );
+
+    expect(err).toBeInstanceOf(SupervisorHttpError);
+    expect((err as SupervisorHttpError).status).toBe(500);
+    expect((err as SupervisorHttpError).code).toBe(-32602);
+    expect((err as SupervisorHttpError).message).toBe('InvalidParams');
+    expect((err as SupervisorHttpError).data).toBeDefined();
   });
 
   it('executes a tool exactly once despite repeated resolves for the same toolCallId', async () => {
