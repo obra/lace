@@ -11,10 +11,34 @@ type SupervisorClientOptions = {
   baseUrl: string;
 };
 
+export class SupervisorHttpError extends Error {
+  readonly status: number;
+  readonly code?: number;
+  readonly data?: unknown;
+  readonly raw?: unknown;
+
+  constructor(params: { status: number; message: string; code?: number; data?: unknown; raw?: unknown }) {
+    super(params.message);
+    this.name = 'SupervisorHttpError';
+    this.status = params.status;
+    this.code = params.code;
+    this.data = params.data;
+    this.raw = params.raw;
+  }
+}
+
 function asUrl(baseUrl: string, path: string): string {
   const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${normalizedBase}${normalizedPath}`;
+}
+
+type JsonRpcErrorLike = { code: number; message: string; data?: unknown };
+
+function isJsonRpcErrorLike(value: unknown): value is JsonRpcErrorLike {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.code === 'number' && typeof v.message === 'string';
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -22,11 +46,37 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const text = await res.text();
   const parsed = text ? (JSON.parse(text) as unknown) : undefined;
   if (!res.ok) {
-    const msg =
+    const errorValue =
       parsed && typeof parsed === 'object' && parsed !== null && 'error' in parsed
-        ? String((parsed as { error?: unknown }).error)
-        : `HTTP ${res.status}`;
-    throw new Error(msg);
+        ? (parsed as { error?: unknown }).error
+        : undefined;
+
+    // Preserve existing behavior for string errors.
+    if (typeof errorValue === 'string') {
+      throw new Error(errorValue);
+    }
+
+    // Preserve structured JSON-RPC errors across the HTTP client boundary.
+    if (isJsonRpcErrorLike(errorValue)) {
+      throw new SupervisorHttpError({
+        status: res.status,
+        code: errorValue.code,
+        message: errorValue.message,
+        data: errorValue.data,
+        raw: parsed,
+      });
+    }
+
+    // Preserve existing behavior for other object-shaped errors.
+    if (errorValue && typeof errorValue === 'object') {
+      const errObj = errorValue as { message?: unknown; code?: unknown };
+      const msg = typeof errObj.message === 'string' ? errObj.message : `HTTP ${res.status}`;
+      const code = typeof errObj.code === 'number' ? errObj.code : undefined;
+      const full = code !== undefined ? `${msg} (code ${code})` : msg;
+      throw new Error(full);
+    }
+
+    throw new Error(`HTTP ${res.status}`);
   }
   return parsed as T;
 }
@@ -58,6 +108,7 @@ export class SupervisorClient {
         asUrl(this.baseUrl, `/workspace-sessions/${encodeURIComponent(workspaceSessionId)}`)
       );
     } catch (error) {
+      if (error instanceof SupervisorHttpError && error.status === 404) return undefined;
       if (error instanceof Error && error.message.includes('Session not found')) return undefined;
       if (error instanceof Error && error.message.includes('HTTP 404')) return undefined;
       throw error;
