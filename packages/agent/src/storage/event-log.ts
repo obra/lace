@@ -88,8 +88,31 @@ export function appendDurableEvent(
 ): { nextState: SessionState; written: DurableEvent } {
   const eventsPath = path.join(sessionDir, 'events.jsonl');
 
+  // Derive from the durable log in case state.json was stale/corrupted.
+  const eventSeq = deriveNextEventSeqFromEventLog(sessionDir);
+
+  // Ensure we never accidentally join JSON objects when the previous write was truncated
+  // and did not end with a newline.
+  try {
+    const stat = fs.statSync(eventsPath);
+    if (stat.size > 0) {
+      const fd = fs.openSync(eventsPath, 'r');
+      try {
+        const buf = Buffer.alloc(1);
+        fs.readSync(fd, buf, 0, 1, stat.size - 1);
+        if (buf.toString('utf8') !== '\n') {
+          fs.appendFileSync(eventsPath, '\n', { encoding: 'utf8' });
+        }
+      } finally {
+        fs.closeSync(fd);
+      }
+    }
+  } catch {
+    // If the file doesn't exist or can't be read, we'll let appendFileSync below create it.
+  }
+
   const written: DurableEvent = {
-    eventSeq: state.nextEventSeq,
+    eventSeq,
     timestamp: new Date().toISOString(),
     ...event,
   };
