@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import * as path from 'node:path';
 import { join } from 'node:path';
 import {
   ensureSessionFiles,
@@ -12,6 +13,7 @@ import {
   writeSessionState,
 } from '../session-store';
 import { deriveNextEventSeqFromEventLog } from '../event-log';
+import { fsOps } from '../atomic-write';
 
 // Valid session ID format: sess_<uuid>
 const TEST_SESSION_ID = 'sess_550e8400-e29b-41d4-a716-446655440000';
@@ -27,6 +29,7 @@ describe('storage/session-store', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     if (originalLaceDir === undefined) delete process.env.LACE_DIR;
     else process.env.LACE_DIR = originalLaceDir;
     rmSync(tempDir, { recursive: true, force: true });
@@ -74,6 +77,58 @@ describe('storage/session-store', () => {
     expect(roundTrip.nextEventSeq).toBe(7);
     expect(roundTrip.nextStreamSeq).toBe(9);
     expect(roundTrip.config).toMatchObject({ approvalMode: 'ask' });
+  });
+
+  it('writes state.json atomically (temp file + rename; no partial writes to target)', () => {
+    const sessionDir = getSessionDir(TEST_SESSION_ID);
+
+    // Start with an existing valid file so we can ensure it's not modified
+    // until the final rename step.
+    const statePath = join(sessionDir, 'state.json');
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(statePath, JSON.stringify({ nextEventSeq: 1, nextStreamSeq: 1 }, null, 2), 'utf8');
+
+    const writes: string[] = [];
+    const renames: Array<{ from: string; to: string }> = [];
+
+    const originalWriteFileSync = fsOps.writeFileSync;
+    vi.spyOn(fsOps, 'writeFileSync').mockImplementation((file, data, options) => {
+      const filePath = String(file);
+      writes.push(filePath);
+
+      // If we ever attempt to write directly to the final file path,
+      // fail the test. Atomic writes must write to a temp file in the same dir.
+      if (path.resolve(filePath) === path.resolve(statePath)) {
+        throw new Error(`Non-atomic write: attempted writeFileSync(${filePath})`);
+      }
+
+      return (originalWriteFileSync as any)(file as any, data as any, options as any);
+    });
+
+    const originalRenameSync = fsOps.renameSync;
+    vi.spyOn(fsOps, 'renameSync').mockImplementation((from, to) => {
+      renames.push({ from: String(from), to: String(to) });
+
+      // The existing state.json should remain parseable right up until we swap it.
+      expect(() => JSON.parse(readFileSync(statePath, 'utf8'))).not.toThrow();
+
+      return (originalRenameSync as any)(from as any, to as any);
+    });
+
+    writeSessionState(sessionDir, {
+      nextEventSeq: 2,
+      nextStreamSeq: 3,
+      config: { approvalMode: 'ask' },
+    });
+
+    expect(writes.length).toBeGreaterThan(0);
+    expect(writes.some((p) => path.resolve(p) === path.resolve(statePath))).toBe(false);
+
+    expect(renames).toHaveLength(1);
+    expect(path.resolve(renames[0].to)).toBe(path.resolve(statePath));
+
+    const finalState = JSON.parse(readFileSync(statePath, 'utf8'));
+    expect(finalState).toMatchObject({ nextEventSeq: 2, nextStreamSeq: 3 });
   });
 
   it('writes meta, ensures events.jsonl, lists and loads sessions', () => {
