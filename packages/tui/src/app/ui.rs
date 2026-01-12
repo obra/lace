@@ -1027,6 +1027,31 @@ pub(crate) fn all_slash_commands(state: &AppState) -> Vec<crate::app::SlashComma
     let mut all: Vec<crate::app::SlashCommand> = state.slash_commands.clone();
     all.extend(local_commands());
     all.extend(permission_commands(state));
+    // Expand commands that list options in their description "(a|b|c)" into synthetic subcommands
+    let mut expanded: Vec<crate::app::SlashCommand> = Vec::new();
+    for cmd in &all {
+        if let Some(start) = cmd.description.find('(') {
+            if let Some(end_rel) = cmd.description[start..].find(')') {
+                let inside = &cmd.description[start + 1..start + end_rel];
+                let opts: Vec<String> = inside
+                    .split('|')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                if !opts.is_empty() {
+                    for opt in opts {
+                        expanded.push(crate::app::SlashCommand {
+                            name: format!("{} {}", cmd.name, opt),
+                            description: format!("{} ({opt})", cmd.description),
+                            input_hint: None,
+                            source: cmd.source.clone(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+    all.extend(expanded);
     all
 }
 
