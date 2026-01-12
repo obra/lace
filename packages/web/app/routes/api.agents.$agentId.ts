@@ -9,7 +9,7 @@ import {
   throwMethodNotAllowed,
   errorToResponse,
 } from '@lace/web/lib/server/route-helpers';
-import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { findWorkspaceForAgentSession } from '@lace/web/lib/server/agent-utils';
 import { z } from 'zod';
 import { getProviderManagementAgent } from '@lace/web/lib/server/supervisor-service';
 import type { ThreadTokenUsage } from '@lace/ent-protocol';
@@ -30,15 +30,6 @@ const AgentUpdateSchema = z
     },
     { message: 'Both providerInstanceId and modelId must be provided together' }
   );
-
-async function findWorkspaceForAgentSession(agentSessionId: string) {
-  const supervisor = await getSupervisor();
-  const record = (await supervisor.listWorkspaceSessions()).find((ws) =>
-    ws.agents.some((a) => a.sessionId === agentSessionId)
-  );
-
-  return { supervisor, record };
-}
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {

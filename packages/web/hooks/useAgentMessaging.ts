@@ -5,12 +5,12 @@ import { useState, useCallback } from 'react';
 import type { ThreadId } from '@lace/web/types/core';
 import { api } from '@lace/web/lib/api-client';
 
-interface AgentAPIState {
+interface AgentMessagingState {
   error: string | null;
 }
 
-export function useAgentAPI() {
-  const [state, setState] = useState<AgentAPIState>({
+export function useAgentMessaging() {
+  const [state, setState] = useState<AgentMessagingState>({
     error: null,
   });
 

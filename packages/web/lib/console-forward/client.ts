@@ -7,6 +7,7 @@
 
 import superjson from 'superjson';
 import type { ConsoleForwardConfig, ConsoleLogEntry } from './index';
+import { safeStringify } from '@lace/web/lib/utils/safeStringify';
 
 /**
  * Console forwarding class that patches browser console methods
@@ -85,9 +86,10 @@ class ConsoleForwarder {
       return superjson.serialize(args);
     } catch (_error) {
       // If SuperJSON fails, fall back to individual serialization with error handling
+      // Uses shared safeStringify utility which handles circular refs and other edge cases
       return args.map((arg) => {
         try {
-          return this.safeStringify(arg);
+          return safeStringify(arg);
         } catch {
           // Final fallback: create error metadata object
           return {
@@ -99,25 +101,6 @@ class ConsoleForwarder {
         }
       });
     }
-  }
-
-  /**
-   * Safe JSON.stringify that handles circular references
-   * Used as fallback when SuperJSON fails
-   */
-  private safeStringify(obj: unknown): string {
-    const seen = new WeakSet<object>();
-    return JSON.stringify(
-      obj,
-      (key, val: unknown) => {
-        if (val != null && typeof val === 'object') {
-          if (seen.has(val)) return '[Circular Reference]';
-          seen.add(val);
-        }
-        return val as unknown;
-      },
-      2
-    );
   }
 
   /**

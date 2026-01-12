@@ -3,18 +3,9 @@
 
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { findWorkspaceForAgentSession } from '@lace/web/lib/server/agent-utils';
 import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import type { Route } from './+types/api.agents.$agentId.context';
-
-async function findWorkspaceForAgentSession(agentSessionId: string) {
-  const supervisor = await getSupervisor();
-  const record = (await supervisor.listWorkspaceSessions()).find((ws) =>
-    ws.agents.some((a) => a.sessionId === agentSessionId)
-  );
-
-  return { supervisor, record };
-}
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {

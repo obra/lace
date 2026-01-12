@@ -23,13 +23,13 @@ vi.mock('@lace/web/lib/serialization', () => ({
 }));
 
 vi.mock('@lace/web/types/api', () => ({
-  isApiError: vi.fn(),
+  isApiErrorResponse: vi.fn(),
 }));
 
 import { parseResponse } from '@lace/web/lib/serialization';
-import { isApiError } from '@lace/web/types/api';
+import { isApiErrorResponse } from '@lace/web/types/api';
 const mockParseResponse = vi.mocked(parseResponse);
-const mockIsApiError = vi.mocked(isApiError);
+const mockIsApiErrorResponse = vi.mocked(isApiErrorResponse);
 
 // Test data factories
 const createMockApproval = (overrides?: Partial<PendingApproval>): PendingApproval => ({
@@ -135,7 +135,7 @@ describe('ToolApprovalProvider', () => {
     vi.clearAllMocks();
     global.fetch = vi.fn() as unknown as typeof global.fetch;
     mockParseResponse.mockResolvedValue([]);
-    mockIsApiError.mockReturnValue(false);
+    mockIsApiErrorResponse.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -568,7 +568,7 @@ describe('ToolApprovalProvider', () => {
     it('handles API errors after successful HTTP response', async () => {
       const errorResponse = { error: 'Agent not found' };
       mockParseResponse.mockResolvedValue(errorResponse);
-      mockIsApiError.mockReturnValue(true);
+      mockIsApiErrorResponse.mockReturnValue(true);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         status: 200,
@@ -600,9 +600,9 @@ describe('ToolApprovalProvider', () => {
       consoleSpy.mockRestore();
     });
 
-    it('handles HTTP errors without isApiError response', async () => {
+    it('handles HTTP errors with non-error response body', async () => {
       mockParseResponse.mockResolvedValue({ some: 'data' });
-      mockIsApiError.mockReturnValue(false);
+      mockIsApiErrorResponse.mockReturnValue(false);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: false,
         status: 500,

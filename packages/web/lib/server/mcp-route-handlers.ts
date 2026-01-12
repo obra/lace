@@ -4,8 +4,7 @@
 import { z } from 'zod';
 import type { MCPServerConfig } from '@lace/web/types/core';
 import { McpConfigStore } from '@lace/web/lib/server/mcp-config-store';
-import { Project } from '@lace/web/lib/server/projects/project';
-import { RouteValidationError, throwNotFound } from './route-helpers';
+import { RouteValidationError, requireProject } from './route-helpers';
 
 /**
  * Context for MCP route operations.
@@ -85,16 +84,7 @@ export const UpdateServerSchema = z.object({
 // implementations are synchronous. This allows for future async operations
 // (e.g., database calls, network requests) without breaking the interface.
 
-/**
- * Gets the project instance, throwing RouteValidationError if not found.
- */
-function requireProject(projectId: string): Project {
-  const project = Project.getById(projectId);
-  if (!project) {
-    throwNotFound('Project');
-  }
-  return project;
-}
+// Note: requireProject is imported from route-helpers
 
 /**
  * Lists all MCP servers for the given context.

@@ -8,6 +8,7 @@ import type express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ServerBuild } from 'react-router';
+import { findAvailablePort } from '@lace/web/lib/server/port-utils';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -191,58 +192,6 @@ async function startLaceServer() {
     // eslint-disable-next-line no-console -- Port/URL signaling required for parent process communication
     console.log(`LACE_SERVER_URL:${url}`);
   });
-}
-
-// Function to find available port (preserved from original)
-async function findAvailablePort(
-  startPort: number,
-  userSpecified: boolean,
-  hostname: string
-): Promise<number> {
-  const { createServer } = await import('http');
-
-  // Function to test if a port is available
-  const testPort = (port: number): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const server = createServer();
-
-      server.once('error', (err: NodeJS.ErrnoException) => {
-        if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
-          resolve(false);
-        } else {
-          console.error(`Server error on port ${port} (${err.code || 'unknown'}):`, err.message);
-          process.exit(1);
-        }
-      });
-
-      server.once('listening', () => {
-        server.close(() => resolve(true));
-      });
-
-      server.listen(port, hostname);
-    });
-  };
-
-  // If user specified port, only try that one
-  if (userSpecified) {
-    const available = await testPort(startPort);
-    if (!available) {
-      console.error(`Error: Port ${startPort} is already in use`);
-      process.exit(1);
-    }
-    return startPort;
-  }
-
-  // Try ports starting from the requested port
-  for (let port = startPort; port <= startPort + 100; port++) {
-    const available = await testPort(port);
-    if (available) {
-      return port;
-    }
-  }
-
-  console.error(`Error: Could not find an available port starting from ${startPort}`);
-  process.exit(1);
 }
 
 startLaceServer().catch((err) => {

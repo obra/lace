@@ -2,12 +2,11 @@
 // ABOUTME: Uses Project class environment manager for business logic and secure handling
 
 import type { Route } from './+types/api.projects.$projectId.environment';
-import { Project } from '@lace/web/lib/server/projects/project';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import {
   requireProjectId,
-  throwNotFound,
+  requireProject,
   throwMethodNotAllowed,
   errorToResponse,
 } from '@lace/web/lib/server/route-helpers';
@@ -17,14 +16,6 @@ const SetEnvironmentVariablesSchema = z.object({
   variables: z.record(z.string()),
   encrypt: z.array(z.string()).optional(),
 });
-
-function requireProject(projectId: string): Project {
-  const project = Project.getById(projectId);
-  if (!project) {
-    throwNotFound('Project');
-  }
-  return project;
-}
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {

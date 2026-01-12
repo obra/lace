@@ -91,7 +91,7 @@ export interface ApiErrorResponse {
 }
 
 // Helper type guards for API responses
-export function isApiError(response: unknown): response is ApiErrorResponse {
+export function isApiErrorResponse(response: unknown): response is ApiErrorResponse {
   return typeof response === 'object' && response !== null && 'error' in response;
 }
 

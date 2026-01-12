@@ -2,7 +2,7 @@
 // ABOUTME: Prevents JSON parsing of HTML error pages by checking HTTP status first
 
 import { parseResponse } from '@lace/web/lib/serialization';
-import { isApiError } from '@lace/web/types/api';
+import { isApiErrorResponse } from '@lace/web/types/api';
 import { HttpError, NetworkError, AbortError, ParseError, BusinessError } from './api-errors';
 import { withRetry } from './retry-logic';
 
@@ -118,7 +118,7 @@ async function makeRequest<T>(
     }
 
     // Check for API business logic errors
-    if (isApiError(data)) {
+    if (isApiErrorResponse(data)) {
       throw new BusinessError(data.error || 'API returned error', data.code);
     }
 

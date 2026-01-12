@@ -14,7 +14,7 @@ import React, {
 import { useAgentEvents as useAgentEventsHook } from '@lace/web/hooks/useAgentEvents';
 import { useEventStream as useEventStreamHook } from '@lace/web/hooks/useEventStream';
 import { useSessionAPI as useSessionAPIHook } from '@lace/web/hooks/useSessionAPI';
-import { useAgentAPI as useAgentAPIHook } from '@lace/web/hooks/useAgentAPI';
+import { useAgentMessaging } from '@lace/web/hooks/useAgentMessaging';
 import { useToolApprovalContext } from './ToolApprovalProvider';
 import { useSessionContext } from './SessionProvider';
 import type { ThreadId, WorkspaceSessionId } from '@lace/web/types/core';
@@ -94,7 +94,7 @@ export function EventStreamProvider({
 
   // API hooks
   const sessionAPI = useSessionAPIHook();
-  const agentAPIBase = useAgentAPIHook();
+  const agentAPIBase = useAgentMessaging();
 
   // Wrap sendMessage to add optimistic USER_MESSAGE events
   const sendMessageWithOptimisticUpdate = useCallback(

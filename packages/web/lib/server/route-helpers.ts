@@ -6,6 +6,7 @@ import {
   isWorkspaceSessionId,
   isAgentSessionId,
 } from '@lace/web/lib/validation/session-id-validation';
+import { Project } from '@lace/web/lib/server/projects/project';
 
 /**
  * Custom error class for route validation errors.
@@ -88,6 +89,18 @@ export function requireThreadId(params: Record<string, string | undefined>): str
  */
 export function throwNotFound(entity: string): never {
   throw new RouteValidationError(`${entity} not found`, 404, 'RESOURCE_NOT_FOUND');
+}
+
+/**
+ * Gets a project by ID, throwing RouteValidationError if not found.
+ * Use when a route requires a valid project to proceed.
+ */
+export function requireProject(projectId: string): Project {
+  const project = Project.getById(projectId);
+  if (!project) {
+    throwNotFound('Project');
+  }
+  return project;
 }
 
 /**
