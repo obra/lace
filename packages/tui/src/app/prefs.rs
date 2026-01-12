@@ -55,7 +55,7 @@ impl Default for Preferences {
             keybind_mode: KeybindMode::Default,
             theme: Theme::Dark,
             render_markdown: true,
-            input_multiline: false,
+            input_multiline: true,
             last_connection_id: None,
             last_model_id: None,
             environment: None,

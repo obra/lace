@@ -31,6 +31,9 @@ use serde_json::Value;
 use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
+fn input_text(state: &AppState) -> String {
+    state.input.lines().join("\n")
+}
 
 /// Returns an animated spinner character based on the current time.
 /// The spinner cycles through a set of braille characters every 100ms.
@@ -55,6 +58,7 @@ pub fn run_tui(args: Args) -> io::Result<()> {
         bootstrap_session(&transport, &workdir, args.load_session_id.as_deref())?;
 
     let mut state = AppState::new();
+    state.focus = Focus::Input; // Ensure typing works immediately on launch
     state.session_id = Some(bootstrap_result.session_id);
     state.slash_commands = bootstrap_result.slash_commands;
     state.messages = bootstrap_result.history;
@@ -144,6 +148,10 @@ fn run_loop(
     state: &mut AppState,
     timeout_ms: u64,
 ) -> io::Result<()> {
+    let log_keys = std::env::var("LACE_TUI_KEYLOG")
+        .map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false);
+
     loop {
         expire_timeouts(state, now_ms());
 
@@ -165,7 +173,21 @@ fn run_loop(
 
         if event::poll(Duration::from_millis(50))? {
             match event::read()? {
-                Event::Key(key) if key.kind == KeyEventKind::Press => {
+                Event::Key(key)
+                    if matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) =>
+                {
+                    // Record last key event for UI display
+                    state.last_key_event = Some(format!(
+                        "{:?} {:?} ({:?})",
+                        key.code, key.modifiers, key.kind
+                    ));
+
+                    if log_keys {
+                        state.push_debug_line(format!(
+                            "key: code={:?} mods={:?} kind={:?}",
+                            key.code, key.modifiers, key.kind
+                        ));
+                    }
                     if key.modifiers.contains(KeyModifiers::CONTROL)
                         && key.code == KeyCode::Char('c')
                     {
@@ -570,8 +592,8 @@ fn run_loop(
                             KeyCode::Down => Some(UiAction::SlashPickerNext),
                             KeyCode::Backspace => {
                                 // Backspace in picker: update input and close if no longer starts with /
-                                state.input_buffer.pop();
-                                if !state.input_buffer.starts_with('/') {
+                                state.input.delete_char();
+                                if !input_text(state).starts_with('/') {
                                     state.slash_picker_open = false;
                                 } else {
                                     // Re-filter and reset selection
@@ -581,7 +603,7 @@ fn run_loop(
                             }
                             KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
                                 // Type into input while picker is open
-                                state.input_buffer.push(ch);
+                                state.input.insert_char(ch);
                                 state.slash_picker_selected = 0;
                                 // Close picker if space is typed (user is done with command name)
                                 if ch == ' ' {
@@ -598,6 +620,15 @@ fn run_loop(
                         continue;
                     }
 
+                    // If user types a character while focus is elsewhere (and no modal is open),
+                    // jump focus back to Input so typing always works from a blank screen.
+                    if state.focus != Focus::Input
+                        && !key.modifiers.contains(KeyModifiers::CONTROL)
+                        && matches!(key.code, KeyCode::Char(_) | KeyCode::Backspace)
+                    {
+                        state.focus = Focus::Input;
+                    }
+
                     if key.modifiers.contains(KeyModifiers::CONTROL) {
                         match key.code {
                             KeyCode::Char('k') => {
@@ -606,10 +637,6 @@ fn run_loop(
                             }
                             KeyCode::Char('f') => {
                                 let _ = apply_ui_action(state, UiAction::OpenSearch);
-                                continue;
-                            }
-                            KeyCode::Char('e') => {
-                                let _ = apply_ui_action(state, UiAction::ToggleMultilineInput);
                                 continue;
                             }
                             KeyCode::Char('d') => {
@@ -640,7 +667,7 @@ fn run_loop(
                     let action = match code {
                         // Tab opens slash picker for autocomplete when in input with "/"
                         KeyCode::Tab if state.focus == Focus::Input => {
-                            if state.input_buffer.starts_with('/')
+                            if input_text(state).starts_with('/')
                                 && !state.slash_commands.is_empty()
                             {
                                 Some(UiAction::SlashPickerOpen)
@@ -658,7 +685,8 @@ fn run_loop(
                         KeyCode::Up => match state.focus {
                             Focus::Input => {
                                 // In multi-line: up on first line goes to history, else moves cursor
-                                let on_first_line = !state.input_buffer[..state.input_cursor].contains('\n');
+                                let (row, _) = state.input.cursor();
+                                let on_first_line = row == 0;
                                 if on_first_line {
                                     Some(UiAction::HistoryPrev)
                                 } else {
@@ -671,7 +699,9 @@ fn run_loop(
                         KeyCode::Down => match state.focus {
                             Focus::Input => {
                                 // In multi-line: down on last line goes to history, else moves cursor
-                                let on_last_line = !state.input_buffer[state.input_cursor..].contains('\n');
+                                let (row, _) = state.input.cursor();
+                                let last_line = state.input.lines().len().saturating_sub(1);
+                                let on_last_line = row >= last_line;
                                 if on_last_line {
                                     Some(UiAction::HistoryNext)
                                 } else {
@@ -682,17 +712,15 @@ fn run_loop(
                             _ => Some(UiAction::ScrollDown),
                         },
                         KeyCode::Enter => match state.focus {
-                            // Shift+Enter always inserts a newline
-                            Focus::Input if key.modifiers.contains(KeyModifiers::SHIFT) => {
+                            // Alt+Enter inserts newline (Terminal.app sends Alt, not Shift)
+                            Focus::Input if key.modifiers.contains(KeyModifiers::ALT) => {
                                 Some(UiAction::InsertNewline)
                             }
-                            // Ctrl+Enter sends in multiline mode
-                            Focus::Input
-                                if state.prefs.input_multiline
-                                    && key.modifiers.contains(KeyModifiers::CONTROL) =>
-                            {
+                            // Ctrl+Enter sends
+                            Focus::Input if key.modifiers.contains(KeyModifiers::CONTROL) => {
                                 Some(UiAction::SendInput)
                             }
+                            // Plain Enter sends
                             Focus::Input => Some(UiAction::Enter),
                             Focus::Activity => Some(UiAction::ActivityToggleExpanded),
                             _ => None,
@@ -1228,20 +1256,27 @@ fn handle_session_update(state: &mut AppState, params: &Value) {
     }
 }
 
+fn input_lines_with_cursor(state: &AppState) -> Vec<String> {
+    let mut lines: Vec<String> = state.input.lines().to_vec();
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    let (row, _) = state.input.cursor();
+    if row >= lines.len() {
+        lines.resize(row + 1, String::new());
+    }
+    lines
+}
+
 /// Count how many visual lines the input buffer will take when wrapped.
 /// Accounts for the prompt prefix ("> " or "  ") on each line.
-fn count_input_wrapped_lines(input: &str, content_width: usize) -> usize {
+fn count_input_wrapped_lines(lines: &[String], cursor_row: usize, content_width: usize) -> usize {
     if content_width == 0 {
         return 1;
     }
 
-    let lines: Vec<&str> = input.lines().collect();
-    let lines = if lines.is_empty() { vec![""] } else { lines };
-
-    let has_trailing_newline = !input.is_empty() && input.ends_with('\n');
-
     let mut total = 0;
-    for line in &lines {
+    for line in lines {
         // Each logical line takes at least 1 visual line
         // Additional lines are needed if the content wraps
         let line_len = line.chars().count();
@@ -1253,10 +1288,7 @@ fn count_input_wrapped_lines(input: &str, content_width: usize) -> usize {
         }
     }
 
-    // Add line for trailing newline (continuation line with cursor)
-    if has_trailing_newline {
-        total += 1;
-    }
+    total = total.max(cursor_row + 1);
 
     total.max(1)
 }
@@ -1265,7 +1297,9 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     // Dynamic input height based on content, accounting for wrapped lines
     // Input width is roughly the terminal width minus prompt prefix ("> ")
     let input_content_width = f.area().width.saturating_sub(3) as usize; // "> " prefix + cursor
-    let mut input_line_count = count_input_wrapped_lines(&state.input_buffer, input_content_width);
+    let lines = input_lines_with_cursor(state);
+    let (cursor_row, _) = state.input.cursor();
+    let mut input_line_count = count_input_wrapped_lines(&lines, cursor_row, input_content_width);
     // Add line for image attachment indicator
     if !state.pending_images.is_empty() {
         input_line_count += 1;
@@ -1277,14 +1311,14 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(1),               // main area (first)
+            Constraint::Length(1),            // status ABOVE input
             Constraint::Length(input_height), // input
-            Constraint::Length(1),            // status at BOTTOM
         ])
         .split(f.area());
 
     let main_area = root[0];
-    let input_area = root[1];
-    let status_area = root[2];
+    let status_area = root[1];
+    let input_area = root[2];
 
     // Split status area into left (info) and right (progress indicator)
     let right_width = status_right_width(state);
@@ -1307,7 +1341,7 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     } else {
         render_main(f, state, main_area);
     }
-    f.render_widget(render_input(state), input_area);
+    render_input(f, state, input_area);
 
     // Slash command picker appears just above the input area
     if state.slash_picker_open {
@@ -1503,6 +1537,17 @@ fn render_status_right(state: &AppState) -> Paragraph<'static> {
             format!("{} Thinking... ", spinning_char()),
             Style::default().fg(colors.spinner),
         ));
+    } else {
+        spans.push(Span::styled(
+            "Alt+Enter: newline   Enter/Ctrl+Enter: send",
+            Style::default().fg(colors.fg_muted),
+        ));
+        if let Some(ref key) = state.last_key_event {
+            spans.push(Span::styled(
+                format!("  Key {}", key),
+                Style::default().fg(colors.fg_muted),
+            ));
+        }
     }
 
     let text = Line::from(spans);
@@ -1527,6 +1572,14 @@ fn status_right_width(state: &AppState) -> u16 {
         }
     } else if state.is_thinking() {
         return 15; // "⠋ Thinking... " is about 14-15 chars
+    } else {
+        // Hint + optional key
+        let base = "Alt+Enter: newline   Enter/Ctrl+Enter: send";
+        let mut width = base.len();
+        if let Some(ref key) = state.last_key_event {
+            width += 2 + 4 + key.len(); // "  Key " + key
+        }
+        return width as u16;
     }
     0
 }
@@ -2367,8 +2420,7 @@ fn render_slash_picker(state: &AppState) -> Paragraph<'static> {
     let mut lines: Vec<Line> = Vec::new();
 
     // Filter slash commands based on current input
-    let query = state
-        .input_buffer
+    let query = input_text(state)
         .strip_prefix('/')
         .unwrap_or("")
         .to_lowercase();
@@ -2921,65 +2973,106 @@ fn render_activity_overlay(state: &AppState) -> Paragraph<'static> {
         .scroll((state.activity_scroll, 0))
 }
 
-fn render_input(state: &AppState) -> Paragraph<'static> {
+fn render_input(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout::Rect) {
     let styles = theme_styles(state.prefs.theme);
     let colors = &styles.colors;
 
-    let prompt = "> ";
-    let continuation = "  ";
-    let mut lines: Vec<Line> = Vec::new();
-
-    // Show pending images indicator
-    if !state.pending_images.is_empty() {
+    // Optional pending image indicator occupies first line if present
+    let mut input_area = area;
+    if !state.pending_images.is_empty() && input_area.height > 0 {
         let count = state.pending_images.len();
         let label = if count == 1 {
             "[1 image attached]".to_string()
         } else {
             format!("[{} images attached]", count)
         };
-        lines.push(Line::from(vec![
+        let indicator = Paragraph::new(Text::from(vec![Line::from(vec![
             Span::styled("  ", Style::default()),
-            Span::styled(label, Style::default().fg(colors.accent).add_modifier(Modifier::DIM)),
-        ]));
+            Span::styled(
+                label,
+                Style::default()
+                    .fg(colors.accent)
+                    .add_modifier(Modifier::DIM),
+            ),
+        ])]))
+        .style(Style::default().bg(colors.bg_base));
+        let indicator_area = ratatui::layout::Rect {
+            x: input_area.x,
+            y: input_area.y,
+            width: input_area.width,
+            height: 1,
+        };
+        f.render_widget(indicator, indicator_area);
+        input_area = ratatui::layout::Rect {
+            x: input_area.x,
+            y: input_area.y.saturating_add(1),
+            width: input_area.width,
+            height: input_area.height.saturating_sub(1),
+        };
     }
 
-    let input_lines: Vec<&str> = state.input_buffer.lines().collect();
-    let input_lines = if input_lines.is_empty() {
-        vec![""]
-    } else {
-        input_lines
-    };
+    let input_lines = input_lines_with_cursor(state);
+    let line_count = input_lines.len() as u16;
 
-    // Handle trailing newline by adding empty continuation line
-    let has_trailing_newline = !state.input_buffer.is_empty() && state.input_buffer.ends_with('\n');
-    let total_lines = input_lines.len() + if has_trailing_newline { 1 } else { 0 };
+    // Split area into prompt/text rows and a hint row below
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Length(1)])
+        .split(input_area);
 
-    for (i, line) in input_lines.iter().enumerate() {
-        let prefix = if i == 0 { prompt } else { continuation };
-        let is_last = i == total_lines - 1 && !has_trailing_newline;
-        lines.push(Line::from(vec![
-            Span::styled(prefix, Style::default().fg(colors.accent)),
-            Span::styled(line.to_string(), Style::default().fg(colors.fg_primary)),
-            if is_last {
-                Span::styled("▌", Style::default().fg(colors.accent))
-            } else {
-                Span::raw("")
-            },
-        ]));
+    // Within the main input rows, split prompt/text columns
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(2), Constraint::Min(1)])
+        .split(rows[0]);
+
+    // Render prompts ("> " then continuations)
+    let mut prompt_lines: Vec<Line> = Vec::new();
+    for i in 0..line_count {
+        let prefix = if i == 0 { "> " } else { "  " };
+        prompt_lines.push(Line::from(Span::styled(
+            prefix,
+            Style::default().fg(colors.accent),
+        )));
     }
-
-    // Add continuation line with cursor if there's a trailing newline
-    if has_trailing_newline {
-        lines.push(Line::from(vec![
-            Span::styled(continuation, Style::default().fg(colors.accent)),
-            Span::styled("▌", Style::default().fg(colors.accent)),
-        ]));
-    }
-
-    Paragraph::new(Text::from(lines))
+    let prompts = Paragraph::new(Text::from(prompt_lines))
         .style(Style::default().bg(colors.bg_base))
-        .wrap(Wrap { trim: false })
-        .scroll((state.input_scroll, 0))
+        .wrap(Wrap { trim: false });
+    f.render_widget(prompts, columns[0]);
+
+    // Render text lines manually (no inline cursor glyph to avoid double cursor)
+    let mut content_lines: Vec<Line> = Vec::new();
+    for line in input_lines.iter() {
+        content_lines.push(Line::from(Span::styled(
+            line.clone(),
+            Style::default().fg(colors.fg_primary),
+        )));
+    }
+    let content = Paragraph::new(Text::from(content_lines))
+        .style(Style::default().bg(colors.bg_base))
+        .wrap(Wrap { trim: false });
+    f.render_widget(content, columns[1]);
+
+    // Terminal cursor
+    if state.focus == crate::app::Focus::Input && rows[0].height > 0 {
+        let (row, col) = state.input.cursor();
+        let cursor_y = columns[1].y + row as u16;
+        let cursor_x = columns[1].x + col as u16;
+        // Clamp inside area to avoid crossterm panic on narrow widths
+        let cx = cursor_x.min(columns[1].right().saturating_sub(1));
+        let cy = cursor_y.min(columns[1].bottom().saturating_sub(1));
+        f.set_cursor_position((cx, cy));
+    }
+
+    // Render input hint line (Alt+Enter newline, Enter/Ctrl+Enter send)
+    let hint = Paragraph::new(Text::from(vec![Line::from(vec![
+        Span::styled(
+            "Alt+Enter: newline   Enter: send   Ctrl+Enter: send",
+            Style::default().fg(colors.fg_muted),
+        ),
+    ])]))
+    .style(Style::default().bg(colors.bg_surface));
+    f.render_widget(hint, rows[1]);
 }
 
 /// Renders permission request inline in the conversation flow.
@@ -3198,13 +3291,12 @@ fn render_help_modal() -> Paragraph<'static> {
         Line::from("Ctrl+V   Paste image from clipboard (macOS)"),
         Line::from("Ctrl+A   Toggle activity overlay"),
         Line::from("Ctrl+D   Toggle debug overlay"),
-        Line::from("Ctrl+E   Toggle multiline input"),
         Line::from("Tab      Cycle focus"),
         Line::from("Up/Down  Scroll or history (depends on focus)"),
-        Line::from("PgUp/Dn  Scroll focused pane (incl. multiline input)"),
+        Line::from("PgUp/Dn  Scroll focused pane"),
         Line::from("Enter    Send message / Toggle expand (Activity)"),
         Line::from("Shift+Enter  Insert newline in input"),
-        Line::from("Ctrl+Enter   Send (multiline input mode)"),
+        Line::from("Ctrl+Enter   Send"),
         Line::from("g        Jump to turn (Activity)"),
         Line::from("y        Copy selected activity (Activity)"),
         Line::from("e        Jump last error (non-input panes)"),
@@ -3431,7 +3523,10 @@ fn compute_chat_rect(
 ) -> Option<ratatui::layout::Rect> {
     // Dynamic input height based on content, accounting for wrapped lines
     let input_content_width = area.width.saturating_sub(3) as usize;
-    let mut input_line_count = count_input_wrapped_lines(&state.input_buffer, input_content_width);
+    let lines = input_lines_with_cursor(state);
+    let (cursor_row, _) = state.input.cursor();
+    let mut input_line_count =
+        count_input_wrapped_lines(&lines, cursor_row, input_content_width);
     // Add line for image attachment indicator
     if !state.pending_images.is_empty() {
         input_line_count += 1;

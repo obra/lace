@@ -14,6 +14,7 @@ pub mod ui;
 use crate::app::config_panels::{ContextViewerState, EnvEditorState, McpPanelState};
 use crate::app::connections::ConnectionsState;
 use serde_json::Value;
+use tui_textarea::TextArea;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Role {
@@ -73,7 +74,7 @@ pub struct SlashCommand {
     pub source: Option<String>, // "builtin" or "user"
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct AppState {
     pub session_id: Option<String>,
     pub workdir: String,
@@ -85,9 +86,7 @@ pub struct AppState {
     pub permission_queue: std::collections::VecDeque<PermissionRequest>,
     pub active_prompt_request_ids: std::collections::HashSet<String>,
 
-    pub input_buffer: String,
-    pub input_cursor: usize, // Byte position in input_buffer
-    pub input_scroll: u16,
+    pub input: tui_textarea::TextArea<'static>,
     pub input_history: Vec<String>,
     pub input_history_index: Option<usize>,
     pub pending_images: Vec<String>, // Paths to images pending attachment
@@ -155,6 +154,8 @@ pub struct AppState {
 
     /// Last time Ctrl+C was pressed (for double-press detection)
     pub last_ctrl_c_ms: Option<u64>,
+
+    pub last_key_event: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -178,13 +179,18 @@ impl AppState {
     ) -> Self {
         let session_aliases = sessions::load_aliases(aliases_path.as_deref()).unwrap_or_default();
         let prefs = prefs::load(prefs_path.as_deref()).unwrap_or_default();
+        // Input is always multiline for consistent UX.
+        let mut prefs = prefs;
+        prefs.input_multiline = true;
 
         let environment = prefs
             .environment
             .clone()
             .unwrap_or_else(std::collections::BTreeMap::new);
 
-        Self {
+        let input = TextArea::default();
+
+        let state = Self {
             session_id: None,
             workdir: String::new(),
             connection_id: None,
@@ -195,9 +201,7 @@ impl AppState {
             permission_queue: std::collections::VecDeque::new(),
             active_prompt_request_ids: std::collections::HashSet::new(),
 
-            input_buffer: String::new(),
-            input_cursor: 0,
-            input_scroll: 0,
+            input,
             input_history: Vec::new(),
             input_history_index: None,
             pending_images: Vec::new(),
@@ -259,7 +263,10 @@ impl AppState {
             slash_picker_selected: 0,
 
             last_ctrl_c_ms: None,
-        }
+            last_key_event: None,
+        };
+
+        state
     }
 
     pub fn next_client_id(&mut self) -> String {

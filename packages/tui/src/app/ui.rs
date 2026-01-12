@@ -1,6 +1,23 @@
 use crate::app::reducer::{decide_permission, Outbound};
 use crate::app::{AppState, ChatMessage, Role};
 use serde_json::json;
+use tui_textarea::{CursorMove, TextArea};
+
+fn input_text(state: &AppState) -> String {
+    state.input.lines().join("\n")
+}
+
+fn set_input_text(state: &mut AppState, text: &str) {
+    let lines: Vec<String> = if text.is_empty() {
+        vec![String::new()]
+    } else {
+        text.lines().map(|s| s.to_string()).collect()
+    };
+    let mut ta = TextArea::new(lines);
+    ta.move_cursor(CursorMove::Bottom);
+    ta.move_cursor(CursorMove::End);
+    state.input = ta;
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UiAction {
@@ -53,7 +70,6 @@ pub enum UiAction {
     JumpLastToolUse,
     JumpLastTurnEnd,
 
-    ToggleMultilineInput,
     SetTheme(crate::app::prefs::Theme),
     SetKeybindMode(crate::app::prefs::KeybindMode),
     SendInput,
@@ -151,182 +167,57 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
     match action {
         UiAction::InputChar(ch) => {
             // Open slash picker when / is typed as first character
-            if ch == '/' && state.input_buffer.is_empty() && !state.slash_commands.is_empty() {
-                state.input_buffer.insert(state.input_cursor, ch);
-                state.input_cursor += ch.len_utf8();
+            if ch == '/' && input_text(state).is_empty() && !state.slash_commands.is_empty() {
+                state.input.insert_char(ch);
                 state.slash_picker_open = true;
                 state.slash_picker_selected = 0;
             } else {
-                state.input_buffer.insert(state.input_cursor, ch);
-                state.input_cursor += ch.len_utf8();
+                state.input.insert_char(ch);
             }
             Vec::new()
         }
         UiAction::Backspace => {
-            if state.input_cursor > 0 {
-                // Find the previous character boundary
-                let prev_boundary = state.input_buffer[..state.input_cursor]
-                    .char_indices()
-                    .last()
-                    .map(|(i, _)| i)
-                    .unwrap_or(0);
-                state.input_buffer.remove(prev_boundary);
-                state.input_cursor = prev_boundary;
-            }
+            state.input.delete_char();
             Vec::new()
         }
         UiAction::Delete => {
-            if state.input_cursor < state.input_buffer.len() {
-                state.input_buffer.remove(state.input_cursor);
-            }
+            state.input.delete_next_char();
             Vec::new()
         }
         UiAction::CursorLeft => {
-            if state.input_cursor > 0 {
-                // Find the previous character boundary
-                state.input_cursor = state.input_buffer[..state.input_cursor]
-                    .char_indices()
-                    .last()
-                    .map(|(i, _)| i)
-                    .unwrap_or(0);
-            }
+            state.input.move_cursor(CursorMove::Back);
             Vec::new()
         }
         UiAction::CursorRight => {
-            if state.input_cursor < state.input_buffer.len() {
-                // Find the next character boundary
-                state.input_cursor = state.input_buffer[state.input_cursor..]
-                    .char_indices()
-                    .nth(1)
-                    .map(|(i, _)| state.input_cursor + i)
-                    .unwrap_or(state.input_buffer.len());
-            }
+            state.input.move_cursor(CursorMove::Forward);
             Vec::new()
         }
         UiAction::CursorUp => {
-            // Move cursor up one line, trying to maintain column position
-            let before = &state.input_buffer[..state.input_cursor];
-            let current_line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
-
-            if current_line_start == 0 {
-                // Already on first line, can't go up
-                return Vec::new();
-            }
-
-            // Column position in current line (in chars, not bytes)
-            let col = before[current_line_start..].chars().count();
-
-            // Find start of previous line
-            let prev_line_end = current_line_start - 1; // position of the newline
-            let prev_line_start = state.input_buffer[..prev_line_end]
-                .rfind('\n')
-                .map(|i| i + 1)
-                .unwrap_or(0);
-
-            // Move to same column in previous line (or end if line is shorter)
-            let prev_line = &state.input_buffer[prev_line_start..prev_line_end];
-            let prev_line_len = prev_line.chars().count();
-            let target_col = col.min(prev_line_len);
-
-            // Convert char position to byte position
-            state.input_cursor = prev_line_start
-                + prev_line
-                    .char_indices()
-                    .nth(target_col)
-                    .map(|(i, _)| i)
-                    .unwrap_or(prev_line.len());
-
+            state.input.move_cursor(CursorMove::Up);
             Vec::new()
         }
         UiAction::CursorDown => {
-            // Move cursor down one line, trying to maintain column position
-            let before = &state.input_buffer[..state.input_cursor];
-            let current_line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
-
-            // Find end of current line
-            let current_line_end = state.input_buffer[state.input_cursor..]
-                .find('\n')
-                .map(|i| state.input_cursor + i);
-
-            let Some(line_end) = current_line_end else {
-                // Already on last line, can't go down
-                return Vec::new();
-            };
-
-            // Column position in current line (in chars, not bytes)
-            let col = before[current_line_start..].chars().count();
-
-            // Find end of next line
-            let next_line_start = line_end + 1;
-            let next_line_end = state.input_buffer[next_line_start..]
-                .find('\n')
-                .map(|i| next_line_start + i)
-                .unwrap_or(state.input_buffer.len());
-
-            // Move to same column in next line (or end if line is shorter)
-            let next_line = &state.input_buffer[next_line_start..next_line_end];
-            let next_line_len = next_line.chars().count();
-            let target_col = col.min(next_line_len);
-
-            // Convert char position to byte position
-            state.input_cursor = next_line_start
-                + next_line
-                    .char_indices()
-                    .nth(target_col)
-                    .map(|(i, _)| i)
-                    .unwrap_or(next_line.len());
-
+            state.input.move_cursor(CursorMove::Down);
             Vec::new()
         }
         UiAction::CursorHome => {
-            // Move to start of current line
-            state.input_cursor = state.input_buffer[..state.input_cursor]
-                .rfind('\n')
-                .map(|i| i + 1)
-                .unwrap_or(0);
+            state.input.move_cursor(CursorMove::Head);
             Vec::new()
         }
         UiAction::CursorEnd => {
-            // Move to end of current line
-            state.input_cursor = state.input_buffer[state.input_cursor..]
-                .find('\n')
-                .map(|i| state.input_cursor + i)
-                .unwrap_or(state.input_buffer.len());
+            state.input.move_cursor(CursorMove::End);
             Vec::new()
         }
         UiAction::KillToEnd => {
-            // Ctrl+K: kill from cursor to end of line
-            let line_end = state.input_buffer[state.input_cursor..]
-                .find('\n')
-                .map(|i| state.input_cursor + i)
-                .unwrap_or(state.input_buffer.len());
-            state.input_buffer.drain(state.input_cursor..line_end);
+            state.input.delete_line_by_end();
             Vec::new()
         }
         UiAction::KillToStart => {
-            // Ctrl+U: kill from cursor to start of line
-            let line_start = state.input_buffer[..state.input_cursor]
-                .rfind('\n')
-                .map(|i| i + 1)
-                .unwrap_or(0);
-            state.input_buffer.drain(line_start..state.input_cursor);
-            state.input_cursor = line_start;
+            state.input.delete_line_by_head();
             Vec::new()
         }
         UiAction::KillWordBack => {
-            // Ctrl+W: kill word backward
-            if state.input_cursor > 0 {
-                let before = &state.input_buffer[..state.input_cursor];
-                // Skip trailing whitespace
-                let trimmed_end = before.trim_end().len();
-                // Find start of word
-                let word_start = before[..trimmed_end]
-                    .rfind(|c: char| c.is_whitespace())
-                    .map(|i| i + 1)
-                    .unwrap_or(0);
-                state.input_buffer.drain(word_start..state.input_cursor);
-                state.input_cursor = word_start;
-            }
+            state.input.delete_word();
             Vec::new()
         }
         UiAction::HistoryPrev => {
@@ -340,8 +231,8 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 Some(i) => i - 1,
             });
             let idx = state.input_history_index.unwrap();
-            state.input_buffer = state.input_history[idx].clone();
-            state.input_cursor = state.input_buffer.len();
+            let line = state.input_history[idx].clone();
+            set_input_text(state, &line);
             Vec::new()
         }
         UiAction::HistoryNext => {
@@ -351,13 +242,12 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
 
             if i + 1 >= state.input_history.len() {
                 state.input_history_index = None;
-                state.input_buffer.clear();
-                state.input_cursor = 0;
+                set_input_text(state, "");
             } else {
                 let next = i + 1;
                 state.input_history_index = Some(next);
-                state.input_buffer = state.input_history[next].clone();
-                state.input_cursor = state.input_buffer.len();
+                let line = state.input_history[next].clone();
+                set_input_text(state, &line);
             }
             Vec::new()
         }
@@ -507,12 +397,6 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             crate::app::search::jump_last_turn_end(state);
             Vec::new()
         }
-        UiAction::ToggleMultilineInput => {
-            state.prefs.input_multiline = !state.prefs.input_multiline;
-            state.input_scroll = 0;
-            let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
-            Vec::new()
-        }
         UiAction::SetTheme(theme) => {
             state.prefs.theme = theme;
             let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
@@ -588,24 +472,15 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             }
             Vec::new()
         }
-        UiAction::Enter => {
-            if state.prefs.input_multiline {
-                state.input_buffer.push('\n');
-                Vec::new()
-            } else {
-                send_input(state)
-            }
-        }
+        UiAction::Enter => send_input(state),
         UiAction::InsertNewline => {
             // Always insert a newline at cursor position
-            state.input_buffer.insert(state.input_cursor, '\n');
-            state.input_cursor += 1;
+            state.input.insert_newline();
             Vec::new()
         }
         UiAction::PasteText(text) => {
             // Insert pasted text at cursor position without triggering submit
-            state.input_buffer.insert_str(state.input_cursor, &text);
-            state.input_cursor += text.len();
+            state.input.insert_str(&text);
             Vec::new()
         }
         UiAction::PasteImage => {
@@ -738,9 +613,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 Focus::Activity => state.activity_scroll = state.activity_scroll.saturating_sub(1),
                 Focus::Debug => state.debug_scroll = state.debug_scroll.saturating_sub(1),
                 Focus::Input => {
-                    if state.prefs.input_multiline {
-                        state.input_scroll = state.input_scroll.saturating_sub(1);
-                    }
+                    // TextArea handles its own vertical scroll with cursor movement.
                 }
             }
             Vec::new()
@@ -760,9 +633,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 Focus::Activity => state.activity_scroll = state.activity_scroll.saturating_add(1),
                 Focus::Debug => state.debug_scroll = state.debug_scroll.saturating_add(1),
                 Focus::Input => {
-                    if state.prefs.input_multiline {
-                        state.input_scroll = state.input_scroll.saturating_add(1);
-                    }
+                    // TextArea handles its own vertical scroll with cursor movement.
                 }
             }
             Vec::new()
@@ -851,9 +722,6 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 }
                 PaletteCommand::Sessions => {
                     out.extend(crate::app::sessions::open_sessions(state));
-                }
-                PaletteCommand::ToggleMultilineInput => {
-                    let _ = apply_ui_action(state, UiAction::ToggleMultilineInput);
                 }
                 PaletteCommand::ThemeDark => {
                     let _ =
@@ -1062,11 +930,11 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             drop(filtered);
 
             if let Some((name, has_hint)) = selected_cmd {
-                state.input_buffer = format!("/{}", name);
+                let mut line = format!("/{}", name);
                 if has_hint {
-                    state.input_buffer.push(' ');
+                    line.push(' ');
                 }
-                state.input_cursor = state.input_buffer.len();
+                set_input_text(state, &line);
             }
             state.slash_picker_open = false;
             Vec::new()
@@ -1146,7 +1014,9 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
 /// Returns slash commands filtered by current input (after the `/`)
 fn filtered_slash_commands(state: &AppState) -> Vec<&crate::app::SlashCommand> {
     let query = state
-        .input_buffer
+        .input
+        .lines()
+        .join("\n")
         .strip_prefix('/')
         .unwrap_or("")
         .to_lowercase();
@@ -1170,11 +1040,9 @@ fn should_remember_permission_decision(decision: &str) -> bool {
 }
 
 fn send_input(state: &mut AppState) -> Vec<Outbound> {
-    let line = state.input_buffer.trim_end().to_string();
+    let line = input_text(state).trim_end().to_string();
     let images = std::mem::take(&mut state.pending_images);
-    state.input_buffer.clear();
-    state.input_cursor = 0;
-    state.input_scroll = 0;
+    set_input_text(state, "");
     state.input_history_index = None;
     state.chat_follow = true;
 
@@ -1258,7 +1126,6 @@ enum PaletteCommand {
     NewSession,
     Configure,
     Sessions,
-    ToggleMultilineInput,
     ThemeDark,
     ThemeLight,
     ThemeHighContrast,
@@ -1291,10 +1158,6 @@ fn palette_items(query: &str) -> Vec<PaletteItem> {
         PaletteItem {
             label: "Sessions...",
             command: PaletteCommand::Sessions,
-        },
-        PaletteItem {
-            label: "Toggle Multiline Input",
-            command: PaletteCommand::ToggleMultilineInput,
         },
         PaletteItem {
             label: "Theme: Dark",
@@ -1370,13 +1233,36 @@ mod tests {
     use super::*;
     use crate::app::prefs::{KeybindMode, Theme};
     use crate::app::reducer::{reduce, AppEvent};
+    use crate::app::SlashCommand;
+
+    fn input_str(state: &AppState) -> String {
+        input_text(state)
+    }
+
+    fn set_input(state: &mut AppState, text: &str) {
+        set_input_text(state, text);
+    }
+
+    fn cursor_pos(state: &AppState) -> (usize, usize) {
+        state.input.cursor()
+    }
+
+    fn slash_cmd(name: &str, desc: &str) -> SlashCommand {
+        SlashCommand {
+            name: name.to_string(),
+            description: desc.to_string(),
+            input_hint: None,
+            source: None,
+        }
+    }
 
     #[test]
     fn enter_sends_prompt_and_adds_user_message() {
         let mut state = AppState::new();
         state.next_client_seq = 3;
+        state.prefs.input_multiline = true;
 
-        state.input_buffer = "hi".to_string();
+        set_input(&mut state, "hi");
         let out = apply_ui_action(&mut state, UiAction::Enter);
 
         assert_eq!(state.messages.len(), 1);
@@ -1451,16 +1337,16 @@ mod tests {
         state.input_history = vec!["one".to_string(), "two".to_string()];
 
         apply_ui_action(&mut state, UiAction::HistoryPrev);
-        assert_eq!(state.input_buffer, "two");
+        assert_eq!(input_str(&state), "two");
 
         apply_ui_action(&mut state, UiAction::HistoryPrev);
-        assert_eq!(state.input_buffer, "one");
+        assert_eq!(input_str(&state), "one");
 
         apply_ui_action(&mut state, UiAction::HistoryNext);
-        assert_eq!(state.input_buffer, "two");
+        assert_eq!(input_str(&state), "two");
 
         apply_ui_action(&mut state, UiAction::HistoryNext);
-        assert_eq!(state.input_buffer, "");
+        assert_eq!(input_str(&state), "");
     }
 
     #[test]
@@ -1815,19 +1701,21 @@ mod tests {
     }
 
     #[test]
-    fn multiline_enter_inserts_newline_and_ctrl_enter_sends() {
+    fn multiline_enter_sends_and_shift_enter_inserts_newline() {
         let mut state = AppState::new_with_paths(None, None);
         state.next_client_seq = 3;
         state.prefs.input_multiline = true;
-        state.input_buffer = "a".to_string();
+        set_input(&mut state, "hello");
 
+        // Bare Enter submits
         let out = apply_ui_action(&mut state, UiAction::Enter);
-        assert!(out.is_empty());
-        assert_eq!(state.input_buffer, "a\n");
-
-        state.input_buffer.push_str("b");
-        let out = apply_ui_action(&mut state, UiAction::SendInput);
         assert_eq!(out.len(), 1);
+
+        // Reset state to test Shift+Enter newline
+        set_input(&mut state, "hi");
+        let out = apply_ui_action(&mut state, UiAction::InsertNewline);
+        assert!(out.is_empty());
+        assert_eq!(input_str(&state), "hi\n");
     }
 
     #[test]
@@ -1874,173 +1762,257 @@ mod tests {
     #[test]
     fn cursor_left_right_navigation() {
         let mut state = AppState::new_with_paths(None, None);
-        state.input_buffer = "hello".to_string();
-        state.input_cursor = 5;
+        set_input(&mut state, "hello");
 
         // Move left
         apply_ui_action(&mut state, UiAction::CursorLeft);
-        assert_eq!(state.input_cursor, 4);
+        assert_eq!(cursor_pos(&state), (0, 4));
 
         apply_ui_action(&mut state, UiAction::CursorLeft);
-        assert_eq!(state.input_cursor, 3);
+        assert_eq!(cursor_pos(&state), (0, 3));
 
         // Move right
         apply_ui_action(&mut state, UiAction::CursorRight);
-        assert_eq!(state.input_cursor, 4);
+        assert_eq!(cursor_pos(&state), (0, 4));
 
         // Move left to beginning
         apply_ui_action(&mut state, UiAction::CursorLeft);
         apply_ui_action(&mut state, UiAction::CursorLeft);
         apply_ui_action(&mut state, UiAction::CursorLeft);
         apply_ui_action(&mut state, UiAction::CursorLeft);
-        assert_eq!(state.input_cursor, 0);
+        assert_eq!(cursor_pos(&state), (0, 0));
 
         // Can't go past beginning
         apply_ui_action(&mut state, UiAction::CursorLeft);
-        assert_eq!(state.input_cursor, 0);
+        assert_eq!(cursor_pos(&state), (0, 0));
     }
 
     #[test]
     fn cursor_home_end() {
         let mut state = AppState::new_with_paths(None, None);
-        state.input_buffer = "line1\nline2\nline3".to_string();
-        state.input_cursor = 8; // middle of "line2"
+        set_input(&mut state, "line1\nline2\nline3");
+        // Move cursor to middle of line2 (row 1 col 2)
+        state.input.move_cursor(CursorMove::Up); // start at end row2 col5? Actually end row2 col5; easier: move to top then down.
+        state.input.move_cursor(CursorMove::Head);
+        state.input.move_cursor(CursorMove::Down);
+        state.input.move_cursor(CursorMove::Forward);
+        state.input.move_cursor(CursorMove::Forward);
 
         // Home goes to start of current line
         apply_ui_action(&mut state, UiAction::CursorHome);
-        assert_eq!(state.input_cursor, 6); // start of "line2"
+        assert_eq!(cursor_pos(&state), (1, 0)); // start of "line2"
 
         // End goes to end of current line
         apply_ui_action(&mut state, UiAction::CursorEnd);
-        assert_eq!(state.input_cursor, 11); // end of "line2" (before \n)
+        assert_eq!(cursor_pos(&state), (1, 5)); // end of "line2" (before \n)
 
         // Move to first line and test
-        state.input_cursor = 2;
+        state.input.move_cursor(CursorMove::Head);
+        state.input.move_cursor(CursorMove::Up);
+        state.input.move_cursor(CursorMove::Forward);
+        state.input.move_cursor(CursorMove::Forward);
         apply_ui_action(&mut state, UiAction::CursorHome);
-        assert_eq!(state.input_cursor, 0);
+        assert_eq!(cursor_pos(&state), (0, 0));
 
         apply_ui_action(&mut state, UiAction::CursorEnd);
-        assert_eq!(state.input_cursor, 5); // end of "line1"
+        assert_eq!(cursor_pos(&state), (0, 5)); // end of "line1"
     }
 
     #[test]
     fn cursor_up_down_multiline() {
         let mut state = AppState::new_with_paths(None, None);
-        state.input_buffer = "line1\nline2\nline3".to_string();
-        state.input_cursor = 8; // middle of "line2" (col 2)
+        set_input(&mut state, "line1\nline2\nline3");
+        // Move to middle of line2 (row1 col2)
+        state.input.move_cursor(CursorMove::Up); // to row1 end
+        state.input.move_cursor(CursorMove::Head);
+        state.input.move_cursor(CursorMove::Forward);
+        state.input.move_cursor(CursorMove::Forward);
 
         // Move up maintains column
         apply_ui_action(&mut state, UiAction::CursorUp);
-        assert_eq!(state.input_cursor, 2); // col 2 of "line1"
+        assert_eq!(cursor_pos(&state), (0, 2)); // col 2 of "line1"
 
         // Can't go up from first line
         apply_ui_action(&mut state, UiAction::CursorUp);
-        assert_eq!(state.input_cursor, 2); // stays at col 2 of "line1"
+        assert_eq!(cursor_pos(&state), (0, 2)); // stays at col 2 of "line1"
 
         // Move down
-        state.input_cursor = 8; // back to middle of "line2"
+        set_input(&mut state, "line1\nline2\nline3");
+        state.input.move_cursor(CursorMove::Up);
+        state.input.move_cursor(CursorMove::Head);
+        state.input.move_cursor(CursorMove::Forward);
+        state.input.move_cursor(CursorMove::Forward);
         apply_ui_action(&mut state, UiAction::CursorDown);
-        assert_eq!(state.input_cursor, 14); // col 2 of "line3"
+        assert_eq!(cursor_pos(&state), (2, 2)); // col 2 of "line3"
 
         // Can't go down from last line
         apply_ui_action(&mut state, UiAction::CursorDown);
-        assert_eq!(state.input_cursor, 14); // stays at col 2 of "line3"
+        assert_eq!(cursor_pos(&state), (2, 2)); // stays at col 2 of "line3"
     }
 
     #[test]
     fn cursor_up_down_short_lines() {
         let mut state = AppState::new_with_paths(None, None);
-        state.input_buffer = "long line here\nhi\nx".to_string();
-        state.input_cursor = 10; // col 10 of first line
+        set_input(&mut state, "long line here\nhi\nx");
+        // move to col10 of first line
+        for _ in 0..3 {
+            state.input.move_cursor(CursorMove::Back);
+        }
 
         // Move down to shorter line - cursor goes to end
         apply_ui_action(&mut state, UiAction::CursorDown);
-        assert_eq!(state.input_cursor, 17); // end of "hi" (which is at byte 15+2=17)
+        assert_eq!(cursor_pos(&state), (1, 2)); // end of "hi"
 
         // Move down again - goes to end of "x"
         apply_ui_action(&mut state, UiAction::CursorDown);
-        assert_eq!(state.input_cursor, 19); // end of "x"
+        assert_eq!(cursor_pos(&state), (2, 1)); // end of "x"
     }
 
     #[test]
     fn kill_to_end_and_start() {
         let mut state = AppState::new_with_paths(None, None);
-        state.input_buffer = "hello world".to_string();
-        state.input_cursor = 6; // at 'w'
+        set_input(&mut state, "hello world");
+        state.input.move_cursor(CursorMove::Head);
+        for _ in 0..6 {
+            state.input.move_cursor(CursorMove::Forward);
+        }
 
         // Kill to end (Ctrl+K)
         apply_ui_action(&mut state, UiAction::KillToEnd);
-        assert_eq!(state.input_buffer, "hello ");
-        assert_eq!(state.input_cursor, 6);
+        assert_eq!(input_str(&state), "hello ");
+        assert_eq!(cursor_pos(&state), (0, 6));
 
         // Reset
-        state.input_buffer = "hello world".to_string();
-        state.input_cursor = 6;
+        set_input(&mut state, "hello world");
+        state.input.move_cursor(CursorMove::Head);
+        for _ in 0..6 {
+            state.input.move_cursor(CursorMove::Forward);
+        }
 
         // Kill to start (Ctrl+U)
         apply_ui_action(&mut state, UiAction::KillToStart);
-        assert_eq!(state.input_buffer, "world");
-        assert_eq!(state.input_cursor, 0);
+        assert_eq!(input_str(&state), "world");
+        assert_eq!(cursor_pos(&state), (0, 0));
     }
 
     #[test]
     fn kill_word_back() {
         let mut state = AppState::new_with_paths(None, None);
-        state.input_buffer = "hello world foo".to_string();
-        state.input_cursor = 15; // at end
+        set_input(&mut state, "hello world foo");
 
         // Kill word back (Ctrl+W)
         apply_ui_action(&mut state, UiAction::KillWordBack);
-        assert_eq!(state.input_buffer, "hello world ");
-        assert_eq!(state.input_cursor, 12);
+        assert_eq!(input_str(&state), "hello world ");
+        assert_eq!(cursor_pos(&state), (0, 12));
 
         apply_ui_action(&mut state, UiAction::KillWordBack);
-        assert_eq!(state.input_buffer, "hello ");
-        assert_eq!(state.input_cursor, 6);
+        assert_eq!(input_str(&state), "hello ");
+        assert_eq!(cursor_pos(&state), (0, 6));
     }
 
     #[test]
     fn insert_and_delete_at_cursor() {
         let mut state = AppState::new_with_paths(None, None);
-        state.input_buffer = "helo".to_string();
-        state.input_cursor = 3; // after "hel"
+        set_input(&mut state, "helo");
+        state.input.move_cursor(CursorMove::Head);
+        for _ in 0..3 {
+            state.input.move_cursor(CursorMove::Forward);
+        }
 
         // Insert at cursor
         apply_ui_action(&mut state, UiAction::InputChar('l'));
-        assert_eq!(state.input_buffer, "hello");
-        assert_eq!(state.input_cursor, 4);
+        assert_eq!(input_str(&state), "hello");
+        assert_eq!(cursor_pos(&state), (0, 4));
 
         // Delete at cursor
-        state.input_cursor = 2; // at first 'l'
+        state.input.move_cursor(CursorMove::Head);
+        state.input.move_cursor(CursorMove::Forward);
+        state.input.move_cursor(CursorMove::Forward);
         apply_ui_action(&mut state, UiAction::Delete);
-        assert_eq!(state.input_buffer, "helo");
-        assert_eq!(state.input_cursor, 2);
+        assert_eq!(input_str(&state), "helo");
+        assert_eq!(cursor_pos(&state), (0, 2));
 
         // Backspace
         apply_ui_action(&mut state, UiAction::Backspace);
-        assert_eq!(state.input_buffer, "hlo");
-        assert_eq!(state.input_cursor, 1);
+        assert_eq!(input_str(&state), "hlo");
+        assert_eq!(cursor_pos(&state), (0, 1));
     }
 
     #[test]
     fn paste_text_at_cursor() {
         let mut state = AppState::new_with_paths(None, None);
-        state.input_buffer = "hello world".to_string();
-        state.input_cursor = 6; // at 'w'
+        set_input(&mut state, "hello world");
+        state.input.move_cursor(CursorMove::Head);
+        for _ in 0..6 {
+            state.input.move_cursor(CursorMove::Forward);
+        }
 
         apply_ui_action(&mut state, UiAction::PasteText("beautiful ".to_string()));
-        assert_eq!(state.input_buffer, "hello beautiful world");
-        assert_eq!(state.input_cursor, 16); // after pasted text
+        assert_eq!(input_str(&state), "hello beautiful world");
+        assert_eq!(cursor_pos(&state), (0, 16)); // after pasted text
     }
 
     #[test]
     fn insert_newline_at_cursor() {
         let mut state = AppState::new_with_paths(None, None);
-        state.input_buffer = "hello world".to_string();
-        state.input_cursor = 5; // after "hello"
+        set_input(&mut state, "hello world");
+        state.input.move_cursor(CursorMove::Head);
+        for _ in 0..5 {
+            state.input.move_cursor(CursorMove::Forward);
+        }
 
         apply_ui_action(&mut state, UiAction::InsertNewline);
-        assert_eq!(state.input_buffer, "hello\n world");
-        assert_eq!(state.input_cursor, 6); // after newline
+        assert_eq!(input_str(&state), "hello\n world");
+        assert_eq!(cursor_pos(&state), (1, 1)); // after newline
+    }
+
+    #[test]
+    fn slash_picker_open_and_selects_command() {
+        let mut state = AppState::new_with_paths(None, None);
+        state.slash_commands = vec![slash_cmd("ping", "Ping the agent")];
+
+        // Typing '/' opens picker and inserts the slash
+        apply_ui_action(&mut state, UiAction::InputChar('/'));
+        assert!(state.slash_picker_open);
+        assert_eq!(input_str(&state), "/");
+
+        // Narrow to command and select
+        set_input(&mut state, "/pi");
+        state.slash_picker_open = true;
+        state.slash_picker_selected = 0;
+        apply_ui_action(&mut state, UiAction::SlashPickerSelect);
+
+        assert!(!state.slash_picker_open);
+        assert_eq!(input_str(&state), "/ping ");
+    }
+
+    #[test]
+    fn slash_picker_respects_input_hint_spacing() {
+        let mut state = AppState::new_with_paths(None, None);
+        let mut cmd = slash_cmd("deploy", "Deploy stuff");
+        cmd.input_hint = Some("env".to_string());
+        state.slash_commands = vec![cmd];
+
+        set_input(&mut state, "/dep");
+        state.slash_picker_open = true;
+        state.slash_picker_selected = 0;
+        apply_ui_action(&mut state, UiAction::SlashPickerSelect);
+
+        // Trailing space added when command has an input hint
+        assert_eq!(input_str(&state), "/deploy ");
+    }
+
+    #[test]
+    fn multiline_shift_enter_preserves_blank_lines_and_text() {
+        let mut state = AppState::new_with_paths(None, None);
+        set_input(&mut state, "hi");
+
+        apply_ui_action(&mut state, UiAction::InsertNewline); // shift+enter
+        apply_ui_action(&mut state, UiAction::InsertNewline); // shift+enter
+        apply_ui_action(&mut state, UiAction::InputChar('f'));
+        apply_ui_action(&mut state, UiAction::InputChar('f'));
+
+        assert_eq!(input_str(&state), "hi\n\nff");
+        assert_eq!(state.input.cursor(), (2, 2)); // row 2 col 2
     }
 }
