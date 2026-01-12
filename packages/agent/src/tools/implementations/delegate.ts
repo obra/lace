@@ -31,7 +31,7 @@ Parameters:
 - connectionId: Provider connection to use for the subagent (optional, defaults to parent session's connection)
 - modelId: Model to use for the subagent (optional, defaults to parent session's model)
 
-When background=true, returns { jobId, status: "started" }. Use non-blocking `job_output(jobId)` tool to check status when needed.
+When background=true, returns { jobId, status: "started" }. Use non-blocking \`job_output(jobId)\` tool to check status when needed.
 You will receive a notification upon completion. Progress notifications sent every 5 minutes by default.
 Default (sync): Blocks until subagent completes and returns full output.`;
   schema = delegateSchema;
