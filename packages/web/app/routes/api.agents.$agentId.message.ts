@@ -3,6 +3,7 @@
 
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
+import { SupervisorHttpError } from '@lace/supervisor';
 import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
@@ -56,9 +57,28 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const messageId = randomUUID();
 
-    await supervisor.promptSession(workspace.workspaceSessionId, agentId, [
-      { type: 'text', text: parsedBody.data.message },
-    ]);
+    try {
+      await supervisor.promptSession(workspace.workspaceSessionId, agentId, [
+        { type: 'text', text: parsedBody.data.message },
+      ]);
+    } catch (error: unknown) {
+      if (error instanceof SupervisorHttpError) {
+        // Keep mapping simple: pass through upstream status + JSON-RPC error fields.
+        return createSuperjsonResponse(
+          {
+            message: error.message,
+            error: {
+              code: error.code,
+              message: error.message,
+              data: error.data,
+            },
+          },
+          { status: error.status }
+        );
+      }
+
+      throw error;
+    }
 
     return createSuperjsonResponse(
       { status: 'accepted' as const, threadId: agentId, messageId },
