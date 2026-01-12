@@ -98,7 +98,6 @@ impl ConnectionModelsState {
 }
 
 pub fn open_connections(state: &mut AppState) -> Vec<Outbound> {
-    state.palette_open = false;
     state.help_open = false;
     state.connections.open = true;
     state.connections.loading = true;

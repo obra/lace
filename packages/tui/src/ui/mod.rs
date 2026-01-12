@@ -150,7 +150,7 @@ fn run_loop(
     state: &mut AppState,
     timeout_ms: u64,
 ) -> io::Result<()> {
-    let log_keys = std::env::var("LACE_TUI_KEYLOG")
+    let _log_keys = std::env::var("LACE_TUI_KEYLOG")
         .map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
         .unwrap_or(false);
 
@@ -184,12 +184,6 @@ fn run_loop(
                         key.code, key.modifiers, key.kind
                     ));
 
-                    if log_keys {
-                        state.push_debug_line(format!(
-                            "key: code={:?} mods={:?} kind={:?}",
-                            key.code, key.modifiers, key.kind
-                        ));
-                    }
                     if key.modifiers.contains(KeyModifiers::CONTROL)
                         && key.code == KeyCode::Char('c')
                     {
@@ -666,14 +660,19 @@ fn run_loop(
                         // Tab cycles options for slash commands, fallback to picker
                         KeyCode::Tab if state.focus == Focus::Input => {
                             if input_text(state).starts_with('/') {
-                                let stripped = input_text(state)
-                                    .trim_start_matches('/')
-                                    .to_string();
-                                let head = stripped.split_whitespace().next().unwrap_or("");
+                                let stripped =
+                                    input_text(state).trim_start_matches('/').to_string();
+                                let head = stripped
+                                    .split_whitespace()
+                                    .next()
+                                    .unwrap_or("")
+                                    .to_lowercase();
                                 let has_option_set = !head.is_empty()
-                                    && all_slash_commands(state)
-                                        .into_iter()
-                                        .any(|cmd| cmd.name.starts_with(&format!("{head} ")));
+                                    && all_slash_commands(state).into_iter().any(|cmd| {
+                                        cmd.name
+                                            .to_lowercase()
+                                            .starts_with(&format!("{head} "))
+                                    });
                                 if has_option_set {
                                     Some(UiAction::SlashCycleOption)
                                 } else if !state.slash_commands.is_empty() {

@@ -84,7 +84,7 @@ Overlays:
 
 Vim-ish mode:
 
-- When `Keybinds: Vim` is enabled (palette), `j/k` behave like `Down/Up` when
+- When `Keybinds: Vim` is enabled, `j/k` behave like `Down/Up` when
   not focused on input.
 
 Permission modal:

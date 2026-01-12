@@ -82,7 +82,6 @@ pub fn save_aliases(
 }
 
 pub fn open_sessions(state: &mut AppState) -> Vec<Outbound> {
-    state.palette_open = false;
     state.help_open = false;
     state.sessions.open = true;
     state.sessions.loading = true;

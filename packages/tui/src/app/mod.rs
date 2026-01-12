@@ -107,10 +107,6 @@ pub struct AppState {
     pub active_permission_selected: usize,
     pub permission_guidance_input: String,
 
-    pub palette_open: bool,
-    pub palette_query: String,
-    pub palette_selected: usize,
-
     pub help_open: bool,
     pub config_wizard: config_wizard::ConfigWizardState,
     pub connections: ConnectionsState,
@@ -222,10 +218,6 @@ impl AppState {
             active_permission: None,
             active_permission_selected: 0,
             permission_guidance_input: String::new(),
-
-            palette_open: false,
-            palette_query: String::new(),
-            palette_selected: 0,
 
             help_open: false,
             config_wizard: config_wizard::ConfigWizardState::new(),

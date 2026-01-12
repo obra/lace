@@ -119,14 +119,8 @@ pub enum UiAction {
     ConnectionsModelsClose,
     ConnectionsClose,
 
-    OpenPalette,
     CloseOverlay,
     ToggleHelp,
-    PaletteChar(char),
-    PaletteBackspace,
-    PalettePrev,
-    PaletteNext,
-    PaletteSubmit,
 
     SlashPickerOpen,
     SlashPickerClose,
@@ -640,18 +634,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             }
             Vec::new()
         }
-        UiAction::OpenPalette => {
-            if state.active_permission.is_some() {
-                return Vec::new();
-            }
-            state.palette_open = true;
-            state.help_open = false;
-            state.palette_query.clear();
-            state.palette_selected = 0;
-            Vec::new()
-        }
         UiAction::CloseOverlay => {
-            state.palette_open = false;
             state.help_open = false;
             state.search.open = false;
             Vec::new()
@@ -661,126 +644,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 return Vec::new();
             }
             state.help_open = !state.help_open;
-            if state.help_open {
-                state.palette_open = false;
-            }
             Vec::new()
-        }
-        UiAction::PaletteChar(ch) => {
-            if !state.palette_open {
-                return Vec::new();
-            }
-            state.palette_query.push(ch);
-            state.palette_selected = 0;
-            Vec::new()
-        }
-        UiAction::PaletteBackspace => {
-            if !state.palette_open {
-                return Vec::new();
-            }
-            state.palette_query.pop();
-            state.palette_selected = 0;
-            Vec::new()
-        }
-        UiAction::PalettePrev => {
-            if !state.palette_open {
-                return Vec::new();
-            }
-            state.palette_selected = state.palette_selected.saturating_sub(1);
-            Vec::new()
-        }
-        UiAction::PaletteNext => {
-            if !state.palette_open {
-                return Vec::new();
-            }
-            let items = palette_items(&state.palette_query);
-            let max = items.len().saturating_sub(1);
-            state.palette_selected = (state.palette_selected.saturating_add(1)).min(max);
-            Vec::new()
-        }
-        UiAction::PaletteSubmit => {
-            if !state.palette_open {
-                return Vec::new();
-            }
-            let items = palette_items(&state.palette_query);
-            if items.is_empty() {
-                return Vec::new();
-            }
-            let idx = state.palette_selected.min(items.len() - 1);
-            let mut out: Vec<Outbound> = Vec::new();
-            match items[idx].command {
-                PaletteCommand::NewSession => {
-                    let id = state.next_client_id();
-                    crate::app::sessions::prepare_for_session_switch(state, None);
-                    state.session_id = None;
-                    out.push(Outbound::JsonRpcRequest {
-                        id,
-                        method: "session/new".to_string(),
-                        params: Some(json!({ "workDir": state.workdir.clone() })),
-                    });
-                }
-                PaletteCommand::Configure => {
-                    out.extend(crate::app::config_wizard::open(state));
-                }
-                PaletteCommand::Sessions => {
-                    out.extend(crate::app::sessions::open_sessions(state));
-                }
-                PaletteCommand::ThemeDark => {
-                    let _ =
-                        apply_ui_action(state, UiAction::SetTheme(crate::app::prefs::Theme::Dark));
-                }
-                PaletteCommand::ThemeLight => {
-                    let _ =
-                        apply_ui_action(state, UiAction::SetTheme(crate::app::prefs::Theme::Light));
-                }
-                PaletteCommand::ThemeHighContrast => {
-                    let _ = apply_ui_action(
-                        state,
-                        UiAction::SetTheme(crate::app::prefs::Theme::HighContrast),
-                    );
-                }
-                PaletteCommand::KeybindDefault => {
-                    let _ = apply_ui_action(
-                        state,
-                        UiAction::SetKeybindMode(crate::app::prefs::KeybindMode::Default),
-                    );
-                }
-                PaletteCommand::KeybindVim => {
-                    let _ = apply_ui_action(
-                        state,
-                        UiAction::SetKeybindMode(crate::app::prefs::KeybindMode::Vim),
-                    );
-                }
-                PaletteCommand::OpenEnvEditorCmd => {
-                    let _ = apply_ui_action(state, UiAction::OpenEnvEditor);
-                }
-                PaletteCommand::OpenConnectionsCmd => {
-                    let out_connections = apply_ui_action(state, UiAction::OpenConnections);
-                    out.extend(out_connections);
-                }
-                PaletteCommand::McpServers => {
-                    let out_mcp = apply_ui_action(state, UiAction::OpenMcpPanel);
-                    out.extend(out_mcp);
-                }
-                PaletteCommand::ContextViewer => {
-                    let out_context = apply_ui_action(state, UiAction::OpenContextViewer);
-                    out.extend(out_context);
-                }
-                PaletteCommand::CompactContext => {
-                    let id = state.next_client_id();
-                    state.push_activity_line("Compacting context...".to_string());
-                    out.push(Outbound::JsonRpcRequest {
-                        id,
-                        method: "ent/session/compact".to_string(),
-                        params: Some(json!({})),
-                    });
-                }
-                PaletteCommand::Quit => {
-                    state.should_exit = true;
-                }
-            }
-            state.palette_open = false;
-            out
         }
         UiAction::PermissionPrev => {
             if state.active_permission.is_some() {
@@ -938,15 +802,20 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 return Vec::new();
             };
             let mut parts = stripped.split_whitespace();
-            let Some(head) = parts.next() else {
+            let Some(head_raw) = parts.next() else {
                 return Vec::new();
             };
+            let head = head_raw.to_lowercase();
             let suffix: String = parts.collect::<Vec<_>>().join(" ");
 
             let options: Vec<String> = all_slash_commands(state)
                 .into_iter()
-                .filter(|cmd| cmd.name.starts_with(&format!("{head} ")))
-                .filter_map(|cmd| cmd.name.split_once(' ').map(|(_, tail)| tail.to_string()))
+                .filter_map(|cmd| {
+                    let lower = cmd.name.to_lowercase();
+                    lower
+                        .split_once(' ')
+                        .and_then(|(h, t)| if h == head { Some(t.to_string()) } else { None })
+                })
                 .collect::<std::collections::BTreeSet<_>>()
                 .into_iter()
                 .collect();
@@ -964,7 +833,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 None => 0,
             }]
             .clone();
-            let new_input = format!("/{head} {next}");
+            let new_input = format!("/{} {}", head_raw, next);
             set_input_text(state, &new_input);
             state.slash_picker_open = false;
             Vec::new()
@@ -1504,103 +1373,6 @@ fn copy_text_or_fallback(state: &mut AppState, label: &str, text: &str) {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PaletteCommand {
-    NewSession,
-    Configure,
-    Sessions,
-    ThemeDark,
-    ThemeLight,
-    ThemeHighContrast,
-    KeybindDefault,
-    KeybindVim,
-    OpenEnvEditorCmd,
-    OpenConnectionsCmd,
-    McpServers,
-    ContextViewer,
-    CompactContext,
-    Quit,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct PaletteItem {
-    label: &'static str,
-    command: PaletteCommand,
-}
-
-fn palette_items(query: &str) -> Vec<PaletteItem> {
-    let all = [
-        PaletteItem {
-            label: "New Session",
-            command: PaletteCommand::NewSession,
-        },
-        PaletteItem {
-            label: "Configure...",
-            command: PaletteCommand::Configure,
-        },
-        PaletteItem {
-            label: "Sessions...",
-            command: PaletteCommand::Sessions,
-        },
-        PaletteItem {
-            label: "Theme: Dark",
-            command: PaletteCommand::ThemeDark,
-        },
-        PaletteItem {
-            label: "Theme: Light",
-            command: PaletteCommand::ThemeLight,
-        },
-        PaletteItem {
-            label: "Theme: High Contrast",
-            command: PaletteCommand::ThemeHighContrast,
-        },
-        PaletteItem {
-            label: "Keybinds: Default",
-            command: PaletteCommand::KeybindDefault,
-        },
-        PaletteItem {
-            label: "Keybinds: Vim",
-            command: PaletteCommand::KeybindVim,
-        },
-        PaletteItem {
-            label: "Environment...",
-            command: PaletteCommand::OpenEnvEditorCmd,
-        },
-        PaletteItem {
-            label: "Connections...",
-            command: PaletteCommand::OpenConnectionsCmd,
-        },
-        PaletteItem {
-            label: "MCP Servers...",
-            command: PaletteCommand::McpServers,
-        },
-        PaletteItem {
-            label: "Context Usage...",
-            command: PaletteCommand::ContextViewer,
-        },
-        PaletteItem {
-            label: "Compact Context...",
-            command: PaletteCommand::CompactContext,
-        },
-        PaletteItem {
-            label: "Quit",
-            command: PaletteCommand::Quit,
-        },
-    ];
-
-    let q = query.trim().to_lowercase();
-    if q.is_empty() {
-        return all.to_vec();
-    }
-    all.into_iter()
-        .filter(|i| i.label.to_lowercase().contains(&q))
-        .collect()
-}
-
-pub fn palette_labels(query: &str) -> Vec<&'static str> {
-    palette_items(query).into_iter().map(|i| i.label).collect()
-}
-
 fn chat_start_line_for_message_index(messages: &[ChatMessage], idx: usize) -> u16 {
     let mut lines: u64 = 0;
     for m in messages.iter().take(idx) {
@@ -2081,15 +1853,6 @@ mod tests {
     }
 
     #[test]
-    fn palette_filters_and_submits() {
-        let mut state = AppState::new_with_paths(None, None);
-        apply_ui_action(&mut state, UiAction::OpenPalette);
-        apply_ui_action(&mut state, UiAction::PaletteChar('q'));
-        apply_ui_action(&mut state, UiAction::PaletteSubmit);
-        assert!(state.should_exit);
-    }
-
-    #[test]
     fn multiline_enter_sends_and_shift_enter_inserts_newline() {
         let mut state = AppState::new_with_paths(None, None);
         state.next_client_seq = 3;
@@ -2105,29 +1868,6 @@ mod tests {
         let out = apply_ui_action(&mut state, UiAction::InsertNewline);
         assert!(out.is_empty());
         assert_eq!(input_str(&state), "hi\n");
-    }
-
-    #[test]
-    fn palette_new_session_emits_request() {
-        let mut state = AppState::new_with_paths(None, None);
-        state.workdir = "/tmp".to_string();
-        state.next_client_seq = 10;
-
-        apply_ui_action(&mut state, UiAction::OpenPalette);
-        apply_ui_action(&mut state, UiAction::PaletteChar('n'));
-        apply_ui_action(&mut state, UiAction::PaletteChar('e'));
-        apply_ui_action(&mut state, UiAction::PaletteChar('w'));
-        let out = apply_ui_action(&mut state, UiAction::PaletteSubmit);
-
-        assert_eq!(out.len(), 1);
-        match &out[0] {
-            Outbound::JsonRpcRequest { id, method, params } => {
-                assert_eq!(id, "c_10");
-                assert_eq!(method, "session/new");
-                assert!(params.is_some());
-            }
-            _ => panic!("expected request"),
-        }
     }
 
     #[test]

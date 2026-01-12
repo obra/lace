@@ -91,7 +91,6 @@ impl ConfigWizardState {
 }
 
 pub fn open(state: &mut AppState) -> Vec<Outbound> {
-    state.palette_open = false;
     state.help_open = false;
     state.config_wizard.open = true;
     state.config_wizard.step = ConfigWizardStep::LoadingConnections;
@@ -133,7 +132,6 @@ pub fn open_for_connection(state: &mut AppState) -> Vec<Outbound> {
     state.connections.rename_input.clear();
     state.connections.confirm_delete = false;
 
-    state.palette_open = false;
     state.help_open = false;
     state.config_wizard.open = true;
     state.config_wizard.step = ConfigWizardStep::LoadingConnections;
