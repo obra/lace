@@ -792,10 +792,19 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         }
         UiAction::SlashPickerOpen => {
             let mut out = Vec::new();
-            if input_text(state).trim_start().starts_with("/model")
-                && state.connections.models.models.is_empty()
-            {
-                out.extend(crate::app::connections::request_models_for_current_connection(state));
+            // Prefetch subcommand data when needed (e.g., /model)
+            let input_copy = input_text(state);
+            let trimmed = input_copy.trim_start();
+            if let Some(head) = trimmed.strip_prefix('/') {
+                let head = head.split_whitespace().next().unwrap_or("");
+                if head == "model"
+                    && state.connections.models.models.is_empty()
+                    && !state.connections.models.loading
+                {
+                    out.extend(crate::app::connections::request_models_for_current_connection(
+                        state,
+                    ));
+                }
             }
             if !filtered_slash_commands(state).is_empty() {
                 state.slash_picker_open = true;
@@ -815,6 +824,17 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             };
             let head = head_raw.to_lowercase();
             let suffix: String = parts.collect::<Vec<_>>().join(" ");
+
+            // Prefetch model options if needed
+            let mut out = Vec::new();
+            if head == "model"
+                && state.connections.models.models.is_empty()
+                && !state.connections.models.loading
+            {
+                out.extend(crate::app::connections::request_models_for_current_connection(
+                    state,
+                ));
+            }
 
             let options: Vec<String> = all_slash_commands(state)
                 .into_iter()
@@ -844,7 +864,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             let new_input = format!("/{} {}", head_raw, next);
             set_input_text(state, &new_input);
             state.slash_picker_open = false;
-            Vec::new()
+            out
         }
         UiAction::SlashPickerClose => {
             state.slash_picker_open = false;
@@ -1041,7 +1061,7 @@ pub(crate) fn all_slash_commands(state: &AppState) -> Vec<crate::app::SlashComma
     all.extend(local_commands());
     all.extend(permission_commands(state));
 
-    // Expand /model with known model IDs for quick selection
+    // Subcommand options helper (e.g., /model)
     let mut expanded: Vec<crate::app::SlashCommand> = Vec::new();
     let model_options: Vec<String> = if !state.connections.models.models.is_empty() {
         state

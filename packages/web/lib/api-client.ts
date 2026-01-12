@@ -95,11 +95,6 @@ async function makeRequest<T>(
             errorData.details &&
             typeof errorData.details === 'object'
           ) {
-          } else if (
-            'details' in errorData &&
-            errorData.details &&
-            typeof errorData.details === 'object'
-          ) {
             // Handle detailed validation errors
             const details = errorData.details as Record<string, unknown>;
             if ('summary' in details && typeof details.summary === 'string') {

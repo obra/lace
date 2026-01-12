@@ -2481,10 +2481,21 @@ fn render_slash_picker(state: &AppState) -> Paragraph<'static> {
     }
 
     if filtered.is_empty() {
-        lines.push(Line::from(Span::styled(
-            "  No matching commands",
-            Style::default().fg(colors.fg_muted),
-        )));
+        if input_text(state)
+            .trim_start()
+            .starts_with("/model")
+            && state.connections.models.loading
+        {
+            lines.push(Line::from(Span::styled(
+                "  Loading models…",
+                Style::default().fg(colors.fg_muted),
+            )));
+        } else {
+            lines.push(Line::from(Span::styled(
+                "  No matching commands",
+                Style::default().fg(colors.fg_muted),
+            )));
+        }
     }
 
     // Legend
