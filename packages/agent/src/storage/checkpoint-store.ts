@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { atomicWriteJson } from './atomic-write';
 
 export type CheckpointMeta = {
   checkpointId: string;
@@ -77,14 +78,7 @@ export function writeCheckpoint(
     files: files.sort(),
   };
 
-  fs.writeFileSync(
-    checkpointMetaPath(sessionDir, options.checkpointId),
-    JSON.stringify(meta, null, 2),
-    {
-      encoding: 'utf8',
-      mode: 0o600,
-    }
-  );
+  atomicWriteJson(checkpointMetaPath(sessionDir, options.checkpointId), meta, { mode: 0o600 });
 
   return meta;
 }
