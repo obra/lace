@@ -61,7 +61,7 @@ describe('Supervisor-backed agent compaction/token usage (supported)', () => {
     const messageResponse = await sendMessage(
       createActionArgs(messageRequest, { agentId: created.sessionId })
     );
-    expect(messageResponse.status).toBe(202);
+    expect(messageResponse.status).toBe(200);
 
     const getEvents = async (): Promise<DurableEvent[]> => {
       const result = (await supervisor.agentRequest({

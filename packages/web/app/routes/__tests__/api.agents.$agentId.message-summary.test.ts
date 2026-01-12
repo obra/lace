@@ -68,7 +68,7 @@ describe('Agent Message Endpoint (supervisor-backed)', () => {
       context: Record<string, unknown>;
     });
 
-    expect(response.status).toBe(202);
+    expect(response.status).toBe(200);
 
     const getEvents = async (): Promise<DurableEvent[]> => {
       const result = (await supervisor.agentRequest({

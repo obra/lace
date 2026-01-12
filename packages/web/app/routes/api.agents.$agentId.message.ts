@@ -56,17 +56,13 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const messageId = randomUUID();
 
-    void supervisor
-      .promptSession(workspace.workspaceSessionId, agentId, [
-        { type: 'text', text: parsedBody.data.message },
-      ])
-      .catch((error: unknown) => {
-        console.error('Failed to send agent message:', error);
-      });
+    await supervisor.promptSession(workspace.workspaceSessionId, agentId, [
+      { type: 'text', text: parsedBody.data.message },
+    ]);
 
     return createSuperjsonResponse(
       { status: 'accepted' as const, threadId: agentId, messageId },
-      { status: 202 }
+      { status: 200 }
     );
   } catch (error: unknown) {
     return createErrorResponse(
