@@ -252,8 +252,17 @@ export function registerSessionHandlers(
     writeSessionState(forkedSessionDir, forkedState);
     ensureSessionFiles(forkedSessionDir);
 
-    // Copy all events from source session to forked session
-    const { events: sourceEvents } = readDurableEvents(sourceSession.dir, {});
+    // Copy all events from source session to forked session.
+    // NOTE: readDurableEvents has a default limit of 100, so we must page until exhausted.
+    const sourceEvents = [] as ReturnType<typeof readDurableEvents>['events'];
+    let afterEventSeq = 0;
+    while (true) {
+      const page = readDurableEvents(sourceSession.dir, { afterEventSeq, limit: 1000 });
+      sourceEvents.push(...page.events);
+      if (!page.hasMore || page.events.length === 0) break;
+      afterEventSeq = page.events[page.events.length - 1]!.eventSeq;
+    }
+
     const forkedEventsPath = join(forkedSessionDir, 'events.jsonl');
     for (const event of sourceEvents) {
       appendFileSync(forkedEventsPath, JSON.stringify(event) + '\n', { encoding: 'utf8' });
