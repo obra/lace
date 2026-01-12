@@ -5,6 +5,33 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SessionState } from './session-store';
 
+export function deriveNextEventSeqFromEventLog(sessionDir: string): number {
+  const eventsPath = path.join(sessionDir, 'events.jsonl');
+
+  let raw = '';
+  try {
+    raw = fs.readFileSync(eventsPath, 'utf8');
+  } catch {
+    return 1;
+  }
+
+  let maxSeq: number | undefined;
+  const lines = raw.split('\n');
+  for (const line of lines) {
+    if (!line) continue;
+    try {
+      const parsed = JSON.parse(line) as Partial<DurableEvent>;
+      const seq = parsed.eventSeq;
+      if (typeof seq !== 'number' || !Number.isInteger(seq)) continue;
+      if (maxSeq === undefined || seq > maxSeq) maxSeq = seq;
+    } catch {
+      // Ignore malformed line (e.g. partial write)
+    }
+  }
+
+  return (maxSeq ?? 0) + 1;
+}
+
 export type DurableEvent = {
   eventSeq: number;
   timestamp: string;

@@ -11,6 +11,7 @@ import {
   writeSessionMeta,
   writeSessionState,
 } from '../session-store';
+import { deriveNextEventSeqFromEventLog } from '../event-log';
 
 // Valid session ID format: sess_<uuid>
 const TEST_SESSION_ID = 'sess_550e8400-e29b-41d4-a716-446655440000';
@@ -136,5 +137,43 @@ describe('storage/session-store', () => {
         updatedAt: '2026-01-04T00:00:03Z',
       },
     ]);
+  });
+
+  it('derives nextEventSeq from durable event log even when final JSONL line is truncated', () => {
+    const sessionDir = getSessionDir(TEST_SESSION_ID);
+    writeSessionMeta(sessionDir, {
+      sessionId: TEST_SESSION_ID,
+      workDir: '/tmp',
+      created: '2026-01-04T00:00:00Z',
+    });
+    ensureSessionFiles(sessionDir);
+
+    const eventsPath = join(sessionDir, 'events.jsonl');
+
+    const lines = [
+      {
+        eventSeq: 1,
+        timestamp: '2026-01-04T00:00:01Z',
+        type: 'prompt',
+        data: { content: [{ type: 'text', text: 'hi' }] },
+      },
+      {
+        eventSeq: 2,
+        timestamp: '2026-01-04T00:00:02Z',
+        type: 'message',
+        data: { content: 'hello' },
+      },
+      {
+        eventSeq: 3,
+        timestamp: '2026-01-04T00:00:03Z',
+        type: 'turn_end',
+        data: { stopReason: 'end_turn' },
+      },
+    ];
+
+    const truncatedLine = '{"eventSeq":4,"timestamp":"2026-01-04T00:00:04Z","type":"message","data":';
+    writeFileSync(eventsPath, `${lines.map((l) => JSON.stringify(l)).join('\n')}\n${truncatedLine}`, 'utf8');
+
+    expect(deriveNextEventSeqFromEventLog(sessionDir)).toBe(4);
   });
 });
