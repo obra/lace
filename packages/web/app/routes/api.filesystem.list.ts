@@ -6,6 +6,7 @@ import { join, resolve, relative, sep } from 'path';
 import { homedir } from 'os';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { isPathInsideHome } from '@lace/web/lib/server/filesystem-security';
 import { ListDirectoryRequestSchema } from '@lace/web/types/filesystem';
 import type { DirectoryEntry, ListDirectoryResponse } from '@lace/web/types/filesystem';
 import type { Route } from './+types/api.filesystem.list';
@@ -50,15 +51,8 @@ export async function loader({ request }: Route.LoaderArgs) {
       });
     }
 
-    // Allow exact home or any descendant. Use separator-aware prefix check.
-    const isInsideHome =
-      realAbsolutePath === realHomeDir ||
-      (realAbsolutePath.startsWith(realHomeDir) &&
-        (realAbsolutePath[realHomeDir.length] === sep ||
-          realHomeDir.endsWith(sep) ||
-          realHomeDir === sep));
-
-    if (!isInsideHome) {
+    // Allow exact home or any descendant
+    if (!isPathInsideHome(realAbsolutePath, realHomeDir)) {
       return createErrorResponse('Access denied: path outside home directory', 403, {
         code: 'PATH_ACCESS_DENIED',
       });
@@ -83,16 +77,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
         // Exclude entries resolving outside of home directory (symlink escape)
         const realEntryPath = await fs.realpath(entryPath).catch(() => null);
-        if (!realEntryPath) {
-          continue;
-        }
-        const entryInsideHome =
-          realEntryPath === realHomeDir ||
-          (realEntryPath.startsWith(realHomeDir) &&
-            (realEntryPath[realHomeDir.length] === sep ||
-              realHomeDir.endsWith(sep) ||
-              realHomeDir === sep));
-        if (!entryInsideHome) {
+        if (!realEntryPath || !isPathInsideHome(realEntryPath, realHomeDir)) {
           continue;
         }
 

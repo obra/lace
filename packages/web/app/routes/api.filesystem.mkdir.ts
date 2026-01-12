@@ -2,10 +2,11 @@
 // ABOUTME: Enforces home directory security boundary and validates directory names
 
 import { promises as fs } from 'fs';
-import { join, resolve, sep } from 'path';
+import { join, resolve } from 'path';
 import { homedir } from 'os';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { isPathInsideHome } from '@lace/web/lib/server/filesystem-security';
 import { CreateDirectoryRequestSchema } from '@lace/web/types/filesystem';
 import type { CreateDirectoryResponse } from '@lace/web/types/filesystem';
 import type { Route } from './+types/api.filesystem.mkdir';
@@ -56,14 +57,7 @@ export async function action({ request }: Route.ActionArgs) {
       });
     }
 
-    const isInsideHome =
-      realParentPath === realHomeDir ||
-      (realParentPath.startsWith(realHomeDir) &&
-        (realParentPath[realHomeDir.length] === sep ||
-          realHomeDir.endsWith(sep) ||
-          realHomeDir === sep));
-
-    if (!isInsideHome) {
+    if (!isPathInsideHome(realParentPath, realHomeDir)) {
       return createErrorResponse('Access denied: path outside home directory', 403, {
         code: 'PATH_ACCESS_DENIED',
       });
@@ -95,14 +89,7 @@ export async function action({ request }: Route.ActionArgs) {
       });
     }
 
-    const newDirInsideHome =
-      realNewDirPath === realHomeDir ||
-      (realNewDirPath.startsWith(realHomeDir) &&
-        (realNewDirPath[realHomeDir.length] === sep ||
-          realHomeDir.endsWith(sep) ||
-          realHomeDir === sep));
-
-    if (!newDirInsideHome) {
+    if (!isPathInsideHome(realNewDirPath, realHomeDir)) {
       // Created directory ended up outside home - delete it and fail
       await fs.rmdir(newDirPath).catch(() => {
         /* ignore cleanup errors */
