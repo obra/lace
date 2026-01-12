@@ -229,6 +229,7 @@ dependencies = [
  "ratatui",
  "serde",
  "serde_json",
+ "strsim",
  "tempfile",
  "tui-textarea",
 ]

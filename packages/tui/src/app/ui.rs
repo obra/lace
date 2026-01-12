@@ -2,6 +2,7 @@ use crate::app::reducer::{decide_permission, Outbound};
 use crate::app::{AppState, ChatMessage, Role};
 use serde_json::json;
 use tui_textarea::{CursorMove, TextArea};
+use strsim::normalized_levenshtein;
 
 fn input_text(state: &AppState) -> String {
     state.input.lines().join("\n")
@@ -936,7 +937,11 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             drop(filtered);
 
             if let Some((name, has_hint, source)) = selected_cmd {
-                if source == "local" {
+                if source == "permission" {
+                    let out = execute_permission_slash_command(state, &name);
+                    state.slash_picker_open = false;
+                    return out;
+                } else if source == "local" {
                     let out = execute_local_slash_command(state, &name);
                     state.slash_picker_open = false;
                     return out;
@@ -1050,11 +1055,45 @@ pub fn filtered_slash_commands(state: &AppState) -> Vec<crate::app::SlashCommand
             input_hint: None,
             source: Some("local".to_string()),
         })
-        .collect()
+            .collect()
+    }
+
+    fn permission_commands(state: &AppState) -> Vec<crate::app::SlashCommand> {
+        let mut cmds = Vec::new();
+        if let Some(req) = &state.active_permission {
+            for opt in &req.options {
+                let label = opt.label.to_lowercase();
+                cmds.push(crate::app::SlashCommand {
+                    name: format!("permission {}", label),
+                    description: format!(
+                        "Decide permission: {} (resource: {})",
+                        opt.label,
+                        req.resource.clone().unwrap_or_else(|| "n/a".to_string())
+                    ),
+                    input_hint: None,
+                    source: Some("permission".to_string()),
+                });
+            }
+            // Convenience aliases
+            cmds.push(crate::app::SlashCommand {
+                name: "permission allow".to_string(),
+                description: "Allow current permission request".to_string(),
+                input_hint: None,
+                source: Some("permission".to_string()),
+            });
+            cmds.push(crate::app::SlashCommand {
+                name: "permission deny".to_string(),
+                description: "Deny current permission request".to_string(),
+                input_hint: None,
+                source: Some("permission".to_string()),
+            });
+        }
+        cmds
     }
 
     let mut all: Vec<crate::app::SlashCommand> = state.slash_commands.clone();
     all.extend(local_commands());
+    all.extend(permission_commands(state));
 
     let query = state
         .input
@@ -1063,16 +1102,33 @@ pub fn filtered_slash_commands(state: &AppState) -> Vec<crate::app::SlashCommand
         .strip_prefix('/')
         .unwrap_or("")
         .to_lowercase();
-    all.into_iter()
-        .filter(|cmd| {
+    let mut filtered: Vec<(i32, crate::app::SlashCommand)> = all
+        .into_iter()
+        .filter_map(|cmd| {
             if query.is_empty() {
-                true
+                Some((0, cmd))
             } else {
-                cmd.name.to_lowercase().contains(&query)
-                    || cmd.description.to_lowercase().contains(&query)
+                let name = cmd.name.to_lowercase();
+                let desc = cmd.description.to_lowercase();
+                if name.contains(&query) || desc.contains(&query) {
+                    // simple relevance score: startswith > contains > fuzzy
+                    let mut score = 1;
+                    if name.starts_with(&query) {
+                        score += 3;
+                    } else if desc.starts_with(&query) {
+                        score += 2;
+                    }
+                    let fuzzy = (normalized_levenshtein(&name, &query) * 100.0) as i32;
+                    score += fuzzy / 20; // small bonus
+                    Some((score, cmd))
+                } else {
+                    None
+                }
             }
         })
-        .collect()
+        .collect();
+    filtered.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.name.cmp(&b.1.name)));
+    filtered.into_iter().map(|(_, cmd)| cmd).collect()
 }
 
 fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound> {
@@ -1161,6 +1217,40 @@ fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound
         }
         _ => Vec::new(),
     }
+}
+
+fn execute_permission_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound> {
+    let Some(req) = state.active_permission.clone() else {
+        return Vec::new();
+    };
+    let target = name.strip_prefix("permission ").unwrap_or("").trim().to_lowercase();
+    let mut selected_idx: Option<usize> = None;
+
+    for (idx, opt) in req.options.iter().enumerate() {
+        if opt.label.to_lowercase() == target || opt.option_id.to_lowercase() == target {
+            selected_idx = Some(idx);
+            break;
+        }
+    }
+
+    if selected_idx.is_none() {
+        if target == "allow" {
+            selected_idx = req
+                .options
+                .iter()
+                .position(|o| o.option_id.to_lowercase().contains("allow"));
+        } else if target == "deny" {
+            selected_idx = req
+                .options
+                .iter()
+                .position(|o| o.option_id.to_lowercase().contains("deny"));
+        }
+    }
+
+    let Some(idx) = selected_idx else { return Vec::new() };
+    state.active_permission = Some(req);
+    state.active_permission_selected = idx;
+    apply_ui_action(state, UiAction::PermissionSubmit)
 }
 
 fn should_remember_permission_decision(decision: &str) -> bool {
