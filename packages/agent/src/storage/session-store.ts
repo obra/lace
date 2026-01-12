@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { getLaceDir } from '../config/lace-dir';
 import { asSessionId } from '@lace/ent-protocol';
-import { summarizeDurableEvents } from './event-log';
+import { deriveNextEventSeqFromEventLog, summarizeDurableEvents } from './event-log';
 
 export type SessionMeta = {
   sessionId: string;
@@ -188,5 +188,13 @@ export function loadSession(sessionId: string): LoadedSession {
   const meta = readSessionMeta(sessionDir);
   const state = readSessionState(sessionDir);
   ensureSessionFiles(sessionDir);
+
+  // events.jsonl is the durable source of truth; repair state.nextEventSeq on load.
+  const repairedNextEventSeq = deriveNextEventSeqFromEventLog(sessionDir);
+  if (state.nextEventSeq !== repairedNextEventSeq) {
+    state.nextEventSeq = repairedNextEventSeq;
+    writeSessionState(sessionDir, state);
+  }
+
   return { meta, dir: sessionDir, state };
 }
