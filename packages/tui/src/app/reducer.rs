@@ -129,7 +129,10 @@ pub fn reduce(state: &mut AppState, event: AppEvent) -> Vec<Outbound> {
 
 fn auto_permission_decision(state: &AppState, req: &PermissionRequest) -> Option<String> {
     let key = permission_allow_key(req)?;
-    let decision = state.permission_allowlist.get(&key)?;
+    let decision = state
+        .permission_allowlist_global
+        .get(&key)
+        .or_else(|| state.permission_allowlist.get(&key))?;
     if req.options.iter().any(|o| o.option_id == *decision) {
         Some(decision.clone())
     } else {

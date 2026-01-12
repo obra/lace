@@ -56,18 +56,16 @@ your PATH.
 Global:
 
 - `Ctrl+C`: quit
-- `Ctrl+K`: command palette
 - `Ctrl+F`: search
 - `Ctrl+1/2/3`: toggle Chat/Activity/Debug panes
-- `Tab`: cycle focus
+- `Tab`: slash autocomplete / cycle options
 - `PgUp/PgDn`: scroll focused pane
 - `?` / `F1`: help
 
 Input:
 
-- `Enter`: send (single-line mode)
-- `Ctrl+E`: toggle multiline
-- multiline: `Enter` newline, `Ctrl+Enter` send
+- `Enter` / `Ctrl+Enter`: send
+- `Alt+Enter`: newline
 - `Up/Down`: input history (when input is focused)
 
 Activity pane:

@@ -123,6 +123,7 @@ pub struct AppState {
     pub pending_requests: std::collections::HashMap<String, PendingRequest>,
 
     pub permission_allowlist: std::collections::HashMap<PermissionAllowKey, String>,
+    pub permission_allowlist_global: std::collections::HashMap<PermissionAllowKey, String>,
 
     pub session_aliases: std::collections::HashMap<String, String>,
     pub aliases_path: Option<std::path::PathBuf>,
@@ -238,6 +239,7 @@ impl AppState {
             pending_requests: std::collections::HashMap::new(),
 
             permission_allowlist: std::collections::HashMap::new(),
+            permission_allowlist_global: std::collections::HashMap::new(),
 
             session_aliases,
             aliases_path,

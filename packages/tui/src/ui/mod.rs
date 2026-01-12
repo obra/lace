@@ -7,7 +7,9 @@ use crate::app::connections;
 use crate::app::prefs::{KeybindMode, Theme};
 use crate::app::reducer::{reduce, AppEvent, Outbound};
 use crate::app::sessions;
-use crate::app::ui::{apply_ui_action, palette_labels, UiAction};
+use crate::app::ui::{
+    all_slash_commands, apply_ui_action, permission_choices, PermissionChoice, UiAction,
+};
 use crate::app::AppState;
 use crate::app::{Focus, Role};
 use crate::args::Args;
@@ -513,6 +515,28 @@ fn run_loop(
                         continue;
                     }
 
+                    if state.active_permission.is_some() {
+                        let action = match key.code {
+                            KeyCode::Esc => Some(UiAction::PermissionCancel),
+                            KeyCode::Enter => Some(UiAction::PermissionSubmit),
+                            KeyCode::Up => Some(UiAction::PermissionPrev),
+                            KeyCode::Down => Some(UiAction::PermissionNext),
+                            KeyCode::Backspace => Some(UiAction::PermissionGuidanceBackspace),
+                            KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                Some(UiAction::PermissionGuidanceChar(ch))
+                            }
+                            _ => None,
+                        };
+                        if let Some(action) = action {
+                            let out = apply_ui_action(state, action);
+                            send_outbound(transport, state, out, timeout_ms)?;
+                        }
+                        if state.should_exit {
+                            break;
+                        }
+                        continue;
+                    }
+
                     if state.debug_overlay_open {
                         match key.code {
                             KeyCode::Esc => {
@@ -554,28 +578,6 @@ fn run_loop(
                                 let _ = apply_ui_action(state, UiAction::ToggleHelp);
                             }
                             _ => {}
-                        }
-                        if state.should_exit {
-                            break;
-                        }
-                        continue;
-                    }
-
-                    if state.palette_open {
-                        let action = match key.code {
-                            KeyCode::Esc => Some(UiAction::CloseOverlay),
-                            KeyCode::Enter => Some(UiAction::PaletteSubmit),
-                            KeyCode::Up => Some(UiAction::PalettePrev),
-                            KeyCode::Down => Some(UiAction::PaletteNext),
-                            KeyCode::Backspace => Some(UiAction::PaletteBackspace),
-                            KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                Some(UiAction::PaletteChar(ch))
-                            }
-                            _ => None,
-                        };
-                        if let Some(action) = action {
-                            let out = apply_ui_action(state, action);
-                            send_outbound(transport, state, out, timeout_ms)?;
                         }
                         if state.should_exit {
                             break;
@@ -631,10 +633,6 @@ fn run_loop(
 
                     if key.modifiers.contains(KeyModifiers::CONTROL) {
                         match key.code {
-                            KeyCode::Char('k') => {
-                                let _ = apply_ui_action(state, UiAction::OpenPalette);
-                                continue;
-                            }
                             KeyCode::Char('f') => {
                                 let _ = apply_ui_action(state, UiAction::OpenSearch);
                                 continue;
@@ -665,12 +663,24 @@ fn run_loop(
                         key.modifiers,
                     );
                     let action = match code {
-                        // Tab opens slash picker for autocomplete when in input with "/"
+                        // Tab cycles options for slash commands, fallback to picker
                         KeyCode::Tab if state.focus == Focus::Input => {
-                            if input_text(state).starts_with('/')
-                                && !state.slash_commands.is_empty()
-                            {
-                                Some(UiAction::SlashPickerOpen)
+                            if input_text(state).starts_with('/') {
+                                let stripped = input_text(state)
+                                    .trim_start_matches('/')
+                                    .to_string();
+                                let head = stripped.split_whitespace().next().unwrap_or("");
+                                let has_option_set = !head.is_empty()
+                                    && all_slash_commands(state)
+                                        .into_iter()
+                                        .any(|cmd| cmd.name.starts_with(&format!("{head} ")));
+                                if has_option_set {
+                                    Some(UiAction::SlashCycleOption)
+                                } else if !state.slash_commands.is_empty() {
+                                    Some(UiAction::SlashPickerOpen)
+                                } else {
+                                    None
+                                }
                             } else {
                                 None // Tab does nothing without "/" prefix
                             }
@@ -1391,14 +1401,14 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
         let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
         f.render_widget(render_search_modal(state), area);
-    } else if state.palette_open {
-        let area = centered_rect(70, 60, f.area());
+    } else if state.active_permission.is_some() {
+        let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
-        f.render_widget(render_palette_modal(state), area);
+        f.render_widget(render_permission_modal(state), area);
     } else if state.help_open {
         let area = centered_rect(70, 70, f.area());
         f.render_widget(Clear, area);
-        f.render_widget(render_help_modal(), area);
+        f.render_widget(render_help_modal(state), area);
     }
 }
 
@@ -2495,6 +2505,132 @@ fn render_slash_picker(state: &AppState) -> Paragraph<'static> {
         )
 }
 
+fn render_permission_modal(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
+
+    let Some(req) = state.active_permission.as_ref() else {
+        return Paragraph::new(Text::from(""));
+    };
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Header
+    lines.push(Line::from(Span::styled(
+        "Permission Request",
+        Style::default()
+            .fg(colors.fg_primary)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(""));
+
+    // Tool and resource
+    let tool = req.tool.clone().unwrap_or_else(|| "unknown tool".to_string());
+    lines.push(Line::from(vec![
+        Span::styled("Tool: ", Style::default().fg(colors.fg_muted)),
+        Span::styled(tool, Style::default().fg(colors.fg_primary)),
+    ]));
+
+    if let Some(resource) = &req.resource {
+        lines.push(Line::from(vec![
+            Span::styled("Resource: ", Style::default().fg(colors.fg_muted)),
+            Span::styled(resource.clone(), Style::default().fg(colors.fg_secondary)),
+        ]));
+    }
+
+    // Tool input preview if available
+    if let Some(tool_call_id) = &req.tool_call_id {
+        if let Some(input) = state.tool_inputs_by_tool_call_id.get(tool_call_id) {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "Request:",
+                Style::default().fg(colors.fg_muted),
+            )));
+            let pretty =
+                serde_json::to_string_pretty(input).unwrap_or_else(|_| input.to_string());
+            for l in pretty.lines().take(6) {
+                lines.push(Line::from(Span::styled(
+                    format!("  {l}"),
+                    Style::default().fg(colors.fg_secondary),
+                )));
+            }
+            if pretty.lines().count() > 6 {
+                lines.push(Line::from(Span::styled(
+                    "  ...",
+                    Style::default().fg(colors.fg_muted),
+                )));
+            }
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "Allow this action?",
+        Style::default().fg(colors.fg_primary),
+    )));
+    lines.push(Line::from(""));
+
+    let choices: Vec<PermissionChoice> = permission_choices(state);
+    let guidance_index = choices.len();
+
+    for (i, choice) in choices.iter().enumerate() {
+        let selected = i == state.active_permission_selected;
+        let marker = if selected { "▸" } else { " " };
+        let style = if selected {
+            Style::default()
+                .fg(colors.fg_primary)
+                .bg(colors.bg_surface)
+        } else {
+            Style::default().fg(colors.fg_secondary)
+        };
+        lines.push(Line::from(vec![
+            Span::styled(format!("{marker} "), style),
+            Span::styled(choice.label.clone(), style),
+        ]));
+    }
+
+    // Guidance input row
+    let guidance_selected = state.active_permission_selected == guidance_index;
+    lines.push(Line::from(""));
+    let mut guidance_spans = Vec::new();
+    let g_marker = if guidance_selected { "▸" } else { " " };
+    guidance_spans.push(Span::styled(
+        format!("{g_marker} Guidance: "),
+        Style::default().fg(colors.fg_muted),
+    ));
+    if state.permission_guidance_input.is_empty() {
+        guidance_spans.push(Span::styled(
+            "Type guidance…",
+            Style::default().fg(colors.fg_muted),
+        ));
+    } else {
+        guidance_spans.push(Span::styled(
+            state.permission_guidance_input.clone(),
+            Style::default().fg(colors.fg_primary),
+        ));
+    }
+    if guidance_selected {
+        guidance_spans.push(Span::styled("▌", Style::default().fg(colors.accent)));
+    }
+    lines.push(Line::from(guidance_spans));
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "↑/↓ select • Enter confirm • Esc deny",
+        Style::default().fg(colors.fg_muted),
+    )));
+
+    Paragraph::new(Text::from(lines))
+        .style(Style::default().bg(colors.bg_elevated))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.border_subtle))
+                .border_type(BorderType::Rounded),
+        )
+        .wrap(Wrap { trim: true })
+}
+
 fn render_connections_modal(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
     let colors = &styles.colors;
@@ -2788,11 +2924,6 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
 
     // Thinking indicator is now shown in the status bar
 
-    // Show permission request inline
-    if state.active_permission.is_some() {
-        lines.extend(render_permission_inline(state, colors));
-    }
-
     Paragraph::new(Text::from(lines))
         .style(Style::default().bg(colors.bg_base))
         .wrap(Wrap { trim: false })
@@ -3062,133 +3193,6 @@ fn render_input(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout:
 
 /// Renders permission request inline in the conversation flow.
 /// Returns lines to be appended to the conversation view.
-fn render_permission_inline(state: &AppState, colors: &theme::ThemeColors) -> Vec<Line<'static>> {
-    let Some(req) = state.active_permission.as_ref() else {
-        return Vec::new();
-    };
-
-    let mut lines = Vec::new();
-    lines.push(Line::from("")); // spacing
-
-    // Tool name with indicator
-    let tool = req.tool.clone().unwrap_or_else(|| "unknown".to_string());
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!("{} ", '\u{25B6}'), // play triangle
-            Style::default().fg(colors.warning),
-        ),
-        Span::styled(
-            tool,
-            Style::default()
-                .fg(colors.fg_primary)
-                .add_modifier(Modifier::BOLD),
-        ),
-    ]));
-
-    // Resource summary (e.g., file path or command)
-    if let Some(resource) = &req.resource {
-        lines.push(Line::from(Span::styled(
-            format!("  {}", resource),
-            Style::default().fg(colors.fg_secondary),
-        )));
-    }
-
-    // Show tool input if available
-    if let Some(tool_call_id) = &req.tool_call_id {
-        if let Some(input) = state.tool_inputs_by_tool_call_id.get(tool_call_id) {
-            let pretty =
-                serde_json::to_string_pretty(input).unwrap_or_else(|_| input.to_string());
-            // Limit input preview to avoid overwhelming the UI
-            let preview_lines: Vec<&str> = pretty.lines().take(6).collect();
-            for l in &preview_lines {
-                lines.push(Line::from(Span::styled(
-                    format!("  {}", l),
-                    Style::default().fg(colors.fg_muted),
-                )));
-            }
-            if pretty.lines().count() > 6 {
-                lines.push(Line::from(Span::styled(
-                    "  ...".to_string(),
-                    Style::default().fg(colors.fg_muted),
-                )));
-            }
-        }
-    }
-
-    lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "  Allow this action?",
-        Style::default().fg(colors.fg_primary),
-    )));
-    lines.push(Line::from(""));
-
-    // Options - one per line with selection indicator
-    for (i, opt) in req.options.iter().enumerate() {
-        let selected = i == state.active_permission_selected;
-        let marker = if selected { "\u{25B8} " } else { "  " }; // right-pointing triangle
-        let style = if selected {
-            Style::default()
-                .fg(colors.fg_primary)
-                .bg(colors.bg_surface)
-        } else {
-            Style::default().fg(colors.fg_secondary)
-        };
-        lines.push(Line::from(Span::styled(
-            format!("  {}{}", marker, opt.label),
-            style,
-        )));
-    }
-
-    // Guidance input row (after regular options)
-    let guidance_selected = state.active_permission_selected == req.options.len();
-    lines.push(Line::from(Span::styled(
-        "  ──────────────────────",
-        Style::default().fg(colors.border_subtle),
-    )));
-
-    let guidance_marker = if guidance_selected { "\u{25B8} " } else { "  " };
-    let guidance_style = if guidance_selected {
-        Style::default()
-            .fg(colors.fg_primary)
-            .bg(colors.bg_surface)
-    } else {
-        Style::default().fg(colors.fg_muted)
-    };
-
-    if state.permission_guidance_input.is_empty() {
-        lines.push(Line::from(vec![
-            Span::styled(format!("  {}", guidance_marker), guidance_style),
-            Span::styled("Type guidance...", Style::default().fg(colors.fg_muted)),
-            if guidance_selected {
-                Span::styled("\u{258C}", Style::default().fg(colors.accent))
-            } else {
-                Span::raw("")
-            },
-        ]));
-    } else {
-        lines.push(Line::from(vec![
-            Span::styled(format!("  {}", guidance_marker), guidance_style),
-            Span::styled(
-                state.permission_guidance_input.clone(),
-                Style::default().fg(colors.fg_primary),
-            ),
-            if guidance_selected {
-                Span::styled("\u{258C}", Style::default().fg(colors.accent))
-            } else {
-                Span::raw("")
-            },
-        ]));
-    }
-
-    lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "  Up/Down to select, Enter to confirm, Esc to deny",
-        Style::default().fg(colors.fg_muted),
-    )));
-
-    lines
-}
-
 fn focused_block(title: &'static str, focused: bool, theme: Theme) -> Block<'static> {
     let base = Block::default().title(title).borders(Borders::ALL);
     if focused {
@@ -3199,98 +3203,80 @@ fn focused_block(title: &'static str, focused: bool, theme: Theme) -> Block<'sta
     }
 }
 
-fn render_palette_modal(state: &AppState) -> Paragraph<'static> {
+fn render_help_modal(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
     let colors = &styles.colors;
-    let mut lines: Vec<Line> = Vec::new();
 
-    // Search input with prompt
-    lines.push(Line::from(vec![
-        Span::styled("> ", Style::default().fg(colors.accent)),
-        Span::styled(
-            state.palette_query.clone(),
-            Style::default().fg(colors.fg_primary),
-        ),
-        Span::styled("▌", Style::default().fg(colors.accent)),
-    ]));
-    lines.push(Line::from(""));
-
-    // Filter and display palette items
-    let items = palette_labels(&state.palette_query);
-    if items.is_empty() {
-        lines.push(Line::from(Span::styled(
-            "(no matches)",
-            Style::default().fg(colors.fg_muted),
-        )));
-    } else {
-        let idx = state.palette_selected.min(items.len() - 1);
-        let window = 12usize;
-        let start = idx.saturating_sub(window / 2);
-        let end = (start + window).min(items.len());
-        for i in start..end {
-            let selected = i == idx;
-            let marker = if selected { "▸ " } else { "  " };
-            let style = if selected {
-                Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
-            } else {
-                Style::default().fg(colors.fg_secondary)
-            };
-            lines.push(Line::from(Span::styled(
-                format!("{}{}", marker, items[i]),
-                style,
-            )));
-        }
-        if end < items.len() {
-            lines.push(Line::from(Span::styled(
-                format!("... (+{} more)", items.len() - end),
-                Style::default().fg(colors.fg_muted),
-            )));
-        }
-    }
-
-    lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "Esc to close",
-        Style::default().fg(colors.fg_muted),
-    )));
-
-    Paragraph::new(Text::from(lines))
-        .style(Style::default().bg(colors.bg_elevated))
-        .block(
-            Block::default()
-                .title("Palette")
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(colors.border_subtle))
-                .border_type(BorderType::Rounded),
-        )
-        .wrap(Wrap { trim: true })
-}
-
-fn render_help_modal() -> Paragraph<'static> {
-    let lines = vec![
-        Line::from("Help"),
+    let mut lines: Vec<Line> = vec![
+        Line::from(Span::styled(
+            "Help",
+            Style::default()
+                .fg(colors.fg_primary)
+                .add_modifier(Modifier::BOLD),
+        )),
         Line::from(""),
         Line::from("Ctrl+C   Cancel request / double to quit"),
-        Line::from("Ctrl+K   Command palette"),
         Line::from("Ctrl+F   Search"),
         Line::from("Ctrl+V   Paste image from clipboard (macOS)"),
         Line::from("Ctrl+A   Toggle activity overlay"),
         Line::from("Ctrl+D   Toggle debug overlay"),
-        Line::from("Tab      Cycle focus"),
-        Line::from("Up/Down  Scroll or history (depends on focus)"),
+        Line::from("Tab      Cycle slash options or open picker"),
+        Line::from("Alt+Enter  Newline in input"),
+        Line::from("Enter/Ctrl+Enter  Send message"),
+        Line::from("Up/Down  Scroll or history (in input)"),
         Line::from("PgUp/Dn  Scroll focused pane"),
-        Line::from("Enter    Send message / Toggle expand (Activity)"),
-        Line::from("Shift+Enter  Insert newline in input"),
-        Line::from("Ctrl+Enter   Send"),
-        Line::from("g        Jump to turn (Activity)"),
-        Line::from("y        Copy selected activity (Activity)"),
-        Line::from("e        Jump last error (non-input panes)"),
-        Line::from("t        Jump last tool_use (non-input panes)"),
-        Line::from("n        Jump last turn_end (non-input panes)"),
         Line::from("F1       Toggle help"),
         Line::from(""),
-        Line::from("Permission modal: Up/Down select, Enter decide"),
+        Line::from("Permission: ↑/↓ select, Enter confirm, Esc deny"),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Slash commands",
+            Style::default()
+                .fg(colors.fg_primary)
+                .add_modifier(Modifier::BOLD),
+        )),
     ];
+
+    // Group slash commands by first token for compact help
+    let mut grouped: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
+    for cmd in all_slash_commands(state) {
+        if cmd.source.as_deref() == Some("permission") {
+            continue;
+        }
+        let mut parts = cmd.name.split_whitespace();
+        let head = parts.next().unwrap_or("").to_string();
+        let tail = parts.collect::<Vec<_>>().join(" ");
+        if head.is_empty() {
+            continue;
+        }
+        if tail.is_empty() {
+            grouped.entry(head).or_default();
+        } else {
+            grouped.entry(head).or_default().push(tail);
+        }
+    }
+
+    for (head, tails) in grouped {
+        if tails.is_empty() {
+            lines.push(Line::from(vec![
+                Span::styled("/", Style::default().fg(colors.fg_muted)),
+                Span::styled(head, Style::default().fg(colors.fg_primary)),
+            ]));
+        } else {
+            let opts = tails
+                .into_iter()
+                .filter(|t| !t.is_empty())
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
+            let opts_str = opts.join(" | ");
+            lines.push(Line::from(vec![
+                Span::styled("/", Style::default().fg(colors.fg_muted)),
+                Span::styled(head.clone(), Style::default().fg(colors.fg_primary)),
+                Span::styled(format!(" ({opts_str})"), Style::default().fg(colors.fg_secondary)),
+            ]));
+        }
+    }
 
     Paragraph::new(Text::from(lines))
         .block(Block::default().title("Help").borders(Borders::ALL))
@@ -3442,57 +3428,7 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
 
     // Thinking indicator is now in the status bar, not the chat
 
-    // Add lines for inline permission UI if showing
-    if let Some(req) = state.active_permission.as_ref() {
-        total += permission_inline_line_count(state, req);
-    }
-
     total
-}
-
-/// Calculates the number of lines the inline permission UI will take.
-fn permission_inline_line_count(
-    state: &AppState,
-    req: &crate::app::PermissionRequest,
-) -> usize {
-    let mut count = 0;
-
-    count += 1; // spacing
-    count += 1; // tool name line
-
-    // Resource line
-    if req.resource.is_some() {
-        count += 1;
-    }
-
-    // Tool input preview (up to 6 lines + possible "..." line)
-    if let Some(tool_call_id) = &req.tool_call_id {
-        if let Some(input) = state.tool_inputs_by_tool_call_id.get(tool_call_id) {
-            let pretty =
-                serde_json::to_string_pretty(input).unwrap_or_else(|_| input.to_string());
-            let line_count = pretty.lines().count();
-            count += line_count.min(6);
-            if line_count > 6 {
-                count += 1; // "..." line
-            }
-        }
-    }
-
-    count += 1; // blank line
-    count += 1; // "Allow this action?" line
-    count += 1; // blank line
-
-    // Options
-    count += req.options.len();
-
-    // Guidance input (separator + input row)
-    count += 1; // separator line
-    count += 1; // guidance input line
-
-    count += 1; // blank line
-    count += 1; // help text line
-
-    count
 }
 
 fn wrapped_line_count(width: usize, line: &str) -> usize {
@@ -3596,7 +3532,7 @@ mod tests {
         let mut state = AppState::new_with_paths(None, None);
         state.prefs.show_activity = false;
         state.prefs.show_debug = false;
-        state.palette_open = true;
+        state.help_open = true;
         state.messages.push(crate::app::ChatMessage {
             role: Role::Assistant,
             text: "X".repeat(200),

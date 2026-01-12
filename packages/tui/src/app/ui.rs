@@ -133,6 +133,7 @@ pub enum UiAction {
     SlashPickerPrev,
     SlashPickerNext,
     SlashPickerSelect,
+    SlashCycleOption,
 
     OpenMcpPanel,
     McpClose,
@@ -789,10 +790,11 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             Vec::new()
         }
         UiAction::PermissionNext => {
-            if let Some(req) = &state.active_permission {
-                // Max is options.len() to include the guidance row as the last selectable item
-                let max = req.options.len();
-                state.active_permission_selected = (state.active_permission_selected + 1).min(max);
+            if state.active_permission.is_some() {
+                // guidance row is choices.len()
+                let max = permission_choices(state).len();
+                state.active_permission_selected =
+                    (state.active_permission_selected + 1).min(max);
             }
             Vec::new()
         }
@@ -802,25 +804,27 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             };
 
             let has_guidance = !state.permission_guidance_input.is_empty();
+            let choices = permission_choices(state);
+            let guidance_index = choices.len();
 
             // When guidance is provided, always deny (guidance = "no, do this instead")
-            // When guidance row is selected (index == options.len()), default to first option
+            // When guidance row is selected (index == choices.len()), default to first option
             let decision = if has_guidance {
                 // Find a deny option, or fall back to "deny" string
-                req.options
+                choices
                     .iter()
-                    .find(|o| o.option_id.to_lowercase().contains("deny"))
-                    .map(|o| o.option_id.clone())
+                    .find(|c| c.option_id.to_lowercase().contains("deny"))
+                    .map(|c| c.option_id.clone())
                     .unwrap_or_else(|| "deny".to_string())
             } else {
-                let selected_idx = if state.active_permission_selected >= req.options.len() {
+                let selected_idx = if state.active_permission_selected >= guidance_index {
                     0
                 } else {
                     state.active_permission_selected
                 };
-                req.options
+                choices
                     .get(selected_idx)
-                    .map(|o| o.option_id.clone())
+                    .map(|c| c.option_id.clone())
                     .unwrap_or_default()
             };
 
@@ -830,9 +834,27 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             }
 
             // Only remember decisions when not providing guidance (guidance = rejection)
-            if !has_guidance && should_remember_permission_decision(&decision) {
-                if let Some(key) = crate::app::reducer::permission_allow_key(&req) {
-                    state.permission_allowlist.insert(key, decision.clone());
+            if !has_guidance {
+                if let Some(choice) = choices.get(
+                    if state.active_permission_selected >= guidance_index {
+                        0
+                    } else {
+                        state.active_permission_selected
+                    },
+                ) {
+                    if let Some(key) = crate::app::reducer::permission_allow_key(&req) {
+                        match choice.remember {
+                            PermissionRemember::None => {}
+                            PermissionRemember::Session => {
+                                state.permission_allowlist.insert(key, decision.clone());
+                            }
+                            PermissionRemember::Always => {
+                                state
+                                    .permission_allowlist_global
+                                    .insert(key, decision.clone());
+                            }
+                        }
+                    }
                 }
             }
 
@@ -879,19 +901,20 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             }
         }
         UiAction::PermissionCancel => {
-            let Some(req) = state.active_permission.clone() else {
+            if state.active_permission.is_none() {
                 return Vec::new();
-            };
-            let Some((idx, _)) = req
-                .options
+            }
+            let choices = permission_choices(state);
+            if let Some((idx, _)) = choices
                 .iter()
                 .enumerate()
-                .find(|(_, o)| o.option_id.to_lowercase().contains("deny"))
-            else {
-                return Vec::new();
-            };
-            state.active_permission_selected = idx;
-            apply_ui_action(state, UiAction::PermissionSubmit)
+                .find(|(_, c)| c.option_id.to_lowercase().contains("deny"))
+            {
+                state.active_permission_selected = idx;
+                apply_ui_action(state, UiAction::PermissionSubmit)
+            } else {
+                Vec::new()
+            }
         }
         UiAction::PermissionGuidanceChar(ch) => {
             state.permission_guidance_input.push(ch);
@@ -906,6 +929,44 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 state.slash_picker_open = true;
                 state.slash_picker_selected = 0;
             }
+            Vec::new()
+        }
+        UiAction::SlashCycleOption => {
+            // Cycle options for commands like "/mode", "/theme", etc.
+            let input = input_text(state);
+            let Some(stripped) = input.strip_prefix('/') else {
+                return Vec::new();
+            };
+            let mut parts = stripped.split_whitespace();
+            let Some(head) = parts.next() else {
+                return Vec::new();
+            };
+            let suffix: String = parts.collect::<Vec<_>>().join(" ");
+
+            let options: Vec<String> = all_slash_commands(state)
+                .into_iter()
+                .filter(|cmd| cmd.name.starts_with(&format!("{head} ")))
+                .filter_map(|cmd| cmd.name.split_once(' ').map(|(_, tail)| tail.to_string()))
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .collect();
+
+            if options.is_empty() {
+                return Vec::new();
+            }
+
+            let suffix_norm = suffix.to_lowercase().trim().to_string();
+            let idx = options
+                .iter()
+                .position(|o| o.to_lowercase() == suffix_norm);
+            let next = options[match idx {
+                Some(i) => (i + 1) % options.len(),
+                None => 0,
+            }]
+            .clone();
+            let new_input = format!("/{head} {next}");
+            set_input_text(state, &new_input);
+            state.slash_picker_open = false;
             Vec::new()
         }
         UiAction::SlashPickerClose => {
@@ -1028,8 +1089,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
     }
 }
 
-/// Returns slash commands filtered by current input (after the `/`)
-pub fn filtered_slash_commands(state: &AppState) -> Vec<crate::app::SlashCommand> {
+pub(crate) fn all_slash_commands(state: &AppState) -> Vec<crate::app::SlashCommand> {
     fn local_commands() -> Vec<crate::app::SlashCommand> {
         vec![
             ("theme dark", "Switch to dark theme"),
@@ -1041,9 +1101,13 @@ pub fn filtered_slash_commands(state: &AppState) -> Vec<crate::app::SlashCommand
             ("toggle activity", "Toggle activity overlay"),
             ("help", "Toggle help"),
             ("search", "Open search"),
+            ("configure", "Run quick setup"),
+            ("sessions", "Switch sessions"),
             ("connections", "Open connections panel"),
             ("env", "Open environment editor"),
             ("context", "Open context viewer"),
+            ("mcp servers", "Manage MCP servers"),
+            ("compact context", "Compact current context"),
             ("new session", "Start a new session"),
             ("export transcript", "Export chat transcript"),
             ("quit", "Quit the TUI"),
@@ -1094,6 +1158,12 @@ pub fn filtered_slash_commands(state: &AppState) -> Vec<crate::app::SlashCommand
     let mut all: Vec<crate::app::SlashCommand> = state.slash_commands.clone();
     all.extend(local_commands());
     all.extend(permission_commands(state));
+    all
+}
+
+/// Returns slash commands filtered by current input (after the `/`)
+pub fn filtered_slash_commands(state: &AppState) -> Vec<crate::app::SlashCommand> {
+    let all = all_slash_commands(state);
 
     let query = state
         .input
@@ -1184,6 +1254,8 @@ fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound
             let _ = apply_ui_action(state, UiAction::OpenSearch);
             Vec::new()
         }
+        "configure" => crate::app::config_wizard::open(state),
+        "sessions" => crate::app::sessions::open_sessions(state),
         "connections" => {
             apply_ui_action(state, UiAction::OpenConnections)
         }
@@ -1194,6 +1266,16 @@ fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound
         "context" => {
             let _ = apply_ui_action(state, UiAction::OpenContextViewer);
             Vec::new()
+        }
+        "mcp servers" => crate::app::config_panels::mcp_open(state),
+        "compact context" => {
+            let id = state.next_client_id();
+            state.push_activity_line("Compacting context...".to_string());
+            vec![Outbound::JsonRpcRequest {
+                id,
+                method: "ent/session/compact".to_string(),
+                params: Some(json!({})),
+            }]
         }
         "new session" => {
             let mut out = Vec::new();
@@ -1253,9 +1335,91 @@ fn execute_permission_slash_command(state: &mut AppState, name: &str) -> Vec<Out
     apply_ui_action(state, UiAction::PermissionSubmit)
 }
 
-fn should_remember_permission_decision(decision: &str) -> bool {
-    let d = decision.to_lowercase();
-    d.contains("allow") && d.contains("session")
+#[derive(Clone, Copy)]
+pub(crate) enum PermissionRemember {
+    None,
+    Session,
+    Always,
+}
+
+#[derive(Clone)]
+pub(crate) struct PermissionChoice {
+    pub(crate) label: String,
+    pub(crate) option_id: String,
+    pub(crate) remember: PermissionRemember,
+}
+
+pub(crate) fn permission_choices(state: &AppState) -> Vec<PermissionChoice> {
+    let Some(req) = state.active_permission.as_ref() else {
+        return Vec::new();
+    };
+
+    let mut allow_opt: Option<String> = None;
+    let mut deny_opt: Option<String> = None;
+    let mut extra: Vec<(String, String)> = Vec::new(); // (label, id)
+
+    for opt in &req.options {
+        let id_lower = opt.option_id.to_lowercase();
+        let label_lower = opt.label.to_lowercase();
+        if allow_opt.is_none() && (id_lower.contains("allow") || label_lower.contains("allow")) {
+            allow_opt = Some(opt.option_id.clone());
+        } else if deny_opt.is_none()
+            && (id_lower.contains("deny") || label_lower.contains("deny"))
+        {
+            deny_opt = Some(opt.option_id.clone());
+        } else {
+            extra.push((opt.label.clone(), opt.option_id.clone()));
+        }
+    }
+
+    let mut choices: Vec<PermissionChoice> = Vec::new();
+
+    if let Some(id) = allow_opt.clone() {
+        choices.push(PermissionChoice {
+            label: "Allow once".to_string(),
+            option_id: id.clone(),
+            remember: PermissionRemember::None,
+        });
+        choices.push(PermissionChoice {
+            label: "Allow for this session".to_string(),
+            option_id: id.clone(),
+            remember: PermissionRemember::Session,
+        });
+        choices.push(PermissionChoice {
+            label: "Always allow".to_string(),
+            option_id: id,
+            remember: PermissionRemember::Always,
+        });
+    }
+
+    if let Some(id) = deny_opt.clone() {
+        choices.push(PermissionChoice {
+            label: "Deny".to_string(),
+            option_id: id,
+            remember: PermissionRemember::None,
+        });
+    }
+
+    for (label, id) in extra {
+        choices.push(PermissionChoice {
+            label,
+            option_id: id,
+            remember: PermissionRemember::None,
+        });
+    }
+
+    // If no allow/deny detected, fall back to the raw options
+    if choices.is_empty() {
+        for opt in &req.options {
+            choices.push(PermissionChoice {
+                label: opt.label.clone(),
+                option_id: opt.option_id.clone(),
+                remember: PermissionRemember::None,
+            });
+        }
+    }
+
+    choices
 }
 
 fn send_input(state: &mut AppState) -> Vec<Outbound> {
@@ -1778,13 +1942,19 @@ mod tests {
         apply_ui_action(&mut state, UiAction::PermissionNext);
         assert_eq!(state.active_permission_selected, 1);
 
-        // Navigate to the guidance row (index 2, which is options.len())
+        // Navigate to the guidance row (index 4, which is choices.len())
         apply_ui_action(&mut state, UiAction::PermissionNext);
         assert_eq!(state.active_permission_selected, 2);
 
+        apply_ui_action(&mut state, UiAction::PermissionNext);
+        assert_eq!(state.active_permission_selected, 3);
+
+        apply_ui_action(&mut state, UiAction::PermissionNext);
+        assert_eq!(state.active_permission_selected, 4);
+
         // Should not go past guidance row
         apply_ui_action(&mut state, UiAction::PermissionNext);
-        assert_eq!(state.active_permission_selected, 2);
+        assert_eq!(state.active_permission_selected, 4);
     }
 
     #[test]
@@ -1814,8 +1984,8 @@ mod tests {
                 },
             ],
         });
-        // Select guidance row (index 2)
-        state.active_permission_selected = 2;
+        // Select guidance row (index 4)
+        state.active_permission_selected = 4;
         state.permission_guidance_input = "test guidance".to_string();
 
         let out = apply_ui_action(&mut state, UiAction::PermissionSubmit);
@@ -1870,8 +2040,8 @@ mod tests {
                 },
             ],
         });
-        // Select guidance row (index 2) but no guidance text
-        state.active_permission_selected = 2;
+        // Select guidance row (index 4) but no guidance text
+        state.active_permission_selected = 4;
         state.permission_guidance_input.clear();
 
         let out = apply_ui_action(&mut state, UiAction::PermissionSubmit);
