@@ -979,13 +979,18 @@ pub(crate) fn all_slash_commands(state: &AppState) -> Vec<crate::app::SlashComma
             ("compact context", "Compact current context"),
             ("new session", "Start a new session"),
             ("export transcript", "Export chat transcript"),
+            ("model", "Switch model (current connection)"),
             ("quit", "Quit the TUI"),
         ]
         .into_iter()
         .map(|(name, desc)| crate::app::SlashCommand {
             name: name.to_string(),
             description: desc.to_string(),
-            input_hint: None,
+            input_hint: if name == "model" {
+                Some("<modelId>".to_string())
+            } else {
+                None
+            },
             source: Some("local".to_string()),
         })
             .collect()
@@ -1027,8 +1032,39 @@ pub(crate) fn all_slash_commands(state: &AppState) -> Vec<crate::app::SlashComma
     let mut all: Vec<crate::app::SlashCommand> = state.slash_commands.clone();
     all.extend(local_commands());
     all.extend(permission_commands(state));
-    // Expand commands that list options in their description "(a|b|c)" into synthetic subcommands
+
+    // Expand /model with known model IDs for quick selection
     let mut expanded: Vec<crate::app::SlashCommand> = Vec::new();
+    let model_options: Vec<String> = if !state.connections.models.models.is_empty() {
+        state
+            .connections
+            .models
+            .models
+            .iter()
+            .map(|m| m.model_id.clone())
+            .collect()
+    } else if !state.config_wizard.models.is_empty() {
+        state
+            .config_wizard
+            .models
+            .iter()
+            .map(|m| m.model_id.clone())
+            .collect()
+    } else if let Some(last) = &state.prefs.last_model_id {
+        vec![last.clone()]
+    } else {
+        Vec::new()
+    };
+    for m in model_options {
+        expanded.push(crate::app::SlashCommand {
+            name: format!("model {}", m),
+            description: format!("Switch model to {m}"),
+            input_hint: None,
+            source: Some("local".to_string()),
+        });
+    }
+
+    // Expand commands that list options in their description "(a|b|c)" into synthetic subcommands
     for cmd in &all {
         if let Some(start) = cmd.description.find('(') {
             if let Some(end_rel) = cmd.description[start..].find(')') {
@@ -1162,6 +1198,11 @@ fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound
             Vec::new()
         }
         "mcp servers" => crate::app::config_panels::mcp_open(state),
+        name if name.starts_with("model ") => {
+            let target = name.trim_start_matches("model ").trim();
+            switch_model(state, target)
+        }
+        "model" => Vec::new(),
         "compact context" => {
             let id = state.next_client_id();
             state.push_activity_line("Compacting context...".to_string());
@@ -1193,6 +1234,36 @@ fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound
         }
         _ => Vec::new(),
     }
+}
+
+fn switch_model(state: &mut AppState, model_id: &str) -> Vec<Outbound> {
+    let model_id = model_id.trim();
+    if model_id.is_empty() {
+        state.push_debug_line("model: missing model id".to_string());
+        return Vec::new();
+    }
+    let connection_id = state
+        .connection_id
+        .clone()
+        .or_else(|| state.prefs.last_connection_id.clone());
+    let Some(connection_id) = connection_id else {
+        state.push_debug_line("model: no active connection".to_string());
+        return Vec::new();
+    };
+
+    state.model_id = Some(model_id.to_string());
+    state.prefs.last_model_id = state.model_id.clone();
+    let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
+
+    let id = state.next_client_id();
+    vec![Outbound::JsonRpcRequest {
+        id,
+        method: "ent/session/configure".to_string(),
+        params: Some(json!({
+            "connectionId": connection_id,
+            "modelId": model_id,
+        })),
+    }]
 }
 
 fn execute_permission_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound> {
