@@ -71,7 +71,7 @@ pub struct SlashCommand {
     pub name: String,
     pub description: String,
     pub input_hint: Option<String>,
-    pub source: Option<String>, // "builtin" or "user"
+    pub source: Option<String>, // "builtin", "user", or "local"
 }
 
 #[derive(Debug, Clone)]

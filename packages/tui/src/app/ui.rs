@@ -901,7 +901,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             Vec::new()
         }
         UiAction::SlashPickerOpen => {
-            if !state.slash_commands.is_empty() {
+            if !filtered_slash_commands(state).is_empty() {
                 state.slash_picker_open = true;
                 state.slash_picker_selected = 0;
             }
@@ -926,15 +926,27 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             // Clone needed values before modifying state
             let selected_cmd = filtered
                 .get(state.slash_picker_selected)
-                .map(|cmd| (cmd.name.clone(), cmd.input_hint.is_some()));
+                .map(|cmd| {
+                    (
+                        cmd.name.clone(),
+                        cmd.input_hint.is_some(),
+                        cmd.source.clone().unwrap_or_else(|| "builtin".to_string()),
+                    )
+                });
             drop(filtered);
 
-            if let Some((name, has_hint)) = selected_cmd {
-                let mut line = format!("/{}", name);
-                if has_hint {
-                    line.push(' ');
+            if let Some((name, has_hint, source)) = selected_cmd {
+                if source == "local" {
+                    let out = execute_local_slash_command(state, &name);
+                    state.slash_picker_open = false;
+                    return out;
+                } else {
+                    let mut line = format!("/{}", name);
+                    if has_hint {
+                        line.push(' ');
+                    }
+                    set_input_text(state, &line);
                 }
-                set_input_text(state, &line);
             }
             state.slash_picker_open = false;
             Vec::new()
@@ -1012,7 +1024,38 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
 }
 
 /// Returns slash commands filtered by current input (after the `/`)
-fn filtered_slash_commands(state: &AppState) -> Vec<&crate::app::SlashCommand> {
+pub fn filtered_slash_commands(state: &AppState) -> Vec<crate::app::SlashCommand> {
+    fn local_commands() -> Vec<crate::app::SlashCommand> {
+        vec![
+            ("theme dark", "Switch to dark theme"),
+            ("theme light", "Switch to light theme"),
+            ("theme high-contrast", "Switch to high contrast theme"),
+            ("keybind default", "Use default keybindings"),
+            ("keybind vim", "Use Vim keybindings"),
+            ("toggle debug", "Toggle debug overlay"),
+            ("toggle activity", "Toggle activity overlay"),
+            ("help", "Toggle help"),
+            ("search", "Open search"),
+            ("connections", "Open connections panel"),
+            ("env", "Open environment editor"),
+            ("context", "Open context viewer"),
+            ("new session", "Start a new session"),
+            ("export transcript", "Export chat transcript"),
+            ("quit", "Quit the TUI"),
+        ]
+        .into_iter()
+        .map(|(name, desc)| crate::app::SlashCommand {
+            name: name.to_string(),
+            description: desc.to_string(),
+            input_hint: None,
+            source: Some("local".to_string()),
+        })
+        .collect()
+    }
+
+    let mut all: Vec<crate::app::SlashCommand> = state.slash_commands.clone();
+    all.extend(local_commands());
+
     let query = state
         .input
         .lines()
@@ -1020,9 +1063,7 @@ fn filtered_slash_commands(state: &AppState) -> Vec<&crate::app::SlashCommand> {
         .strip_prefix('/')
         .unwrap_or("")
         .to_lowercase();
-    state
-        .slash_commands
-        .iter()
+    all.into_iter()
         .filter(|cmd| {
             if query.is_empty() {
                 true
@@ -1032,6 +1073,94 @@ fn filtered_slash_commands(state: &AppState) -> Vec<&crate::app::SlashCommand> {
             }
         })
         .collect()
+}
+
+fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound> {
+    match name {
+        "theme dark" => {
+            let _ = apply_ui_action(state, UiAction::SetTheme(crate::app::prefs::Theme::Dark));
+            Vec::new()
+        }
+        "theme light" => {
+            let _ = apply_ui_action(state, UiAction::SetTheme(crate::app::prefs::Theme::Light));
+            Vec::new()
+        }
+        "theme high-contrast" => {
+            let _ = apply_ui_action(
+                state,
+                UiAction::SetTheme(crate::app::prefs::Theme::HighContrast),
+            );
+            Vec::new()
+        }
+        "keybind default" => {
+            let _ = apply_ui_action(
+                state,
+                UiAction::SetKeybindMode(crate::app::prefs::KeybindMode::Default),
+            );
+            Vec::new()
+        }
+        "keybind vim" => {
+            let _ = apply_ui_action(
+                state,
+                UiAction::SetKeybindMode(crate::app::prefs::KeybindMode::Vim),
+            );
+            Vec::new()
+        }
+        "toggle debug" => {
+            state.debug_overlay_open = !state.debug_overlay_open;
+            if state.debug_overlay_open {
+                state.activity_overlay_open = false;
+            }
+            Vec::new()
+        }
+        "toggle activity" => {
+            state.activity_overlay_open = !state.activity_overlay_open;
+            if state.activity_overlay_open {
+                state.debug_overlay_open = false;
+            }
+            Vec::new()
+        }
+        "help" => {
+            let _ = apply_ui_action(state, UiAction::ToggleHelp);
+            Vec::new()
+        }
+        "search" => {
+            let _ = apply_ui_action(state, UiAction::OpenSearch);
+            Vec::new()
+        }
+        "connections" => {
+            apply_ui_action(state, UiAction::OpenConnections)
+        }
+        "env" => {
+            let _ = apply_ui_action(state, UiAction::OpenEnvEditor);
+            Vec::new()
+        }
+        "context" => {
+            let _ = apply_ui_action(state, UiAction::OpenContextViewer);
+            Vec::new()
+        }
+        "new session" => {
+            let mut out = Vec::new();
+            let id = state.next_client_id();
+            crate::app::sessions::prepare_for_session_switch(state, None);
+            state.session_id = None;
+            out.push(Outbound::JsonRpcRequest {
+                id,
+                method: "session/new".to_string(),
+                params: Some(json!({ "workDir": state.workdir.clone() })),
+            });
+            out
+        }
+        "export transcript" => {
+            let _ = apply_ui_action(state, UiAction::ExportTranscript);
+            Vec::new()
+        }
+        "quit" => {
+            state.should_exit = true;
+            Vec::new()
+        }
+        _ => Vec::new(),
+    }
 }
 
 fn should_remember_permission_decision(decision: &str) -> bool {

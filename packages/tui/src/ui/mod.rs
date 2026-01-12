@@ -2419,23 +2419,8 @@ fn render_slash_picker(state: &AppState) -> Paragraph<'static> {
     let colors = &styles.colors;
     let mut lines: Vec<Line> = Vec::new();
 
-    // Filter slash commands based on current input
-    let query = input_text(state)
-        .strip_prefix('/')
-        .unwrap_or("")
-        .to_lowercase();
-    let filtered: Vec<_> = state
-        .slash_commands
-        .iter()
-        .filter(|cmd| {
-            if query.is_empty() {
-                true
-            } else {
-                cmd.name.to_lowercase().contains(&query)
-                    || cmd.description.to_lowercase().contains(&query)
-            }
-        })
-        .collect();
+    // Filter slash commands (agent + local) based on current input
+    let filtered = crate::app::ui::filtered_slash_commands(state);
 
     // Show commands with selection
     let max = 8usize;
