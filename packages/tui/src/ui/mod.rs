@@ -662,18 +662,21 @@ fn run_loop(
                             if input_text(state).starts_with('/') {
                                 let stripped =
                                     input_text(state).trim_start_matches('/').to_string();
-                                let head = stripped
-                                    .split_whitespace()
-                                    .next()
-                                    .unwrap_or("")
-                                    .to_lowercase();
+                                let mut parts = stripped.split_whitespace();
+                                let head_raw = parts.next().unwrap_or("");
+                                let head = head_raw.to_lowercase();
                                 let has_option_set = !head.is_empty()
                                     && all_slash_commands(state).into_iter().any(|cmd| {
                                         cmd.name
                                             .to_lowercase()
                                             .starts_with(&format!("{head} "))
                                     });
-                                if has_option_set {
+
+                                let suffix = parts.collect::<Vec<_>>().join(" ");
+                                if has_option_set && suffix.is_empty() {
+                                    // Show picker with sub-options instead of closing on space
+                                    Some(UiAction::SlashPickerOpen)
+                                } else if has_option_set {
                                     Some(UiAction::SlashCycleOption)
                                 } else if !state.slash_commands.is_empty() {
                                     Some(UiAction::SlashPickerOpen)

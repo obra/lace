@@ -1056,10 +1056,8 @@ pub(crate) fn all_slash_commands(state: &AppState) -> Vec<crate::app::SlashComma
     all.extend(permission_commands(state));
 
     // Expand commands with sub-options into synthetic subcommands, so picker + Tab can show them.
-    // Sources:
-    //  1) Inline description "(a|b|c)" pattern
-    //  2) Dynamic providers like /model using fetched model list
-    let mut expanded: Vec<crate::app::SlashCommand> = Vec::new();
+    // We keep track of which primary command each subcommand belongs to.
+    let mut expanded: Vec<(String, crate::app::SlashCommand)> = Vec::new();
 
     // Dynamic: /model options from fetched models / wizard / last model
     let model_options: Vec<String> = if !state.connections.models.models.is_empty() {
@@ -1083,12 +1081,15 @@ pub(crate) fn all_slash_commands(state: &AppState) -> Vec<crate::app::SlashComma
         Vec::new()
     };
     for m in model_options {
-        expanded.push(crate::app::SlashCommand {
-            name: format!("model {}", m),
-            description: format!("Switch model to {m}"),
-            input_hint: None,
-            source: Some("local".to_string()),
-        });
+        expanded.push((
+            "model".to_string(),
+            crate::app::SlashCommand {
+                name: format!("model {}", m),
+                description: format!("Switch model to {m}"),
+                input_hint: None,
+                source: Some("local".to_string()),
+            },
+        ));
     }
 
     // Static inline "(a|b|c)" expansion
@@ -1103,18 +1104,33 @@ pub(crate) fn all_slash_commands(state: &AppState) -> Vec<crate::app::SlashComma
                     .collect();
                 if !opts.is_empty() {
                     for opt in opts {
-                        expanded.push(crate::app::SlashCommand {
-                            name: format!("{} {}", cmd.name, opt),
-                            description: format!("{} ({opt})", cmd.description),
-                            input_hint: None,
-                            source: cmd.source.clone(),
-                        });
+                        expanded.push((
+                            cmd.name.clone(),
+                            crate::app::SlashCommand {
+                                name: format!("{} {}", cmd.name, opt),
+                                description: format!("{} ({opt})", cmd.description),
+                                input_hint: None,
+                                source: cmd.source.clone(),
+                            },
+                        ));
                     }
                 }
             }
         }
     }
-    all.extend(expanded);
+    // Only include subcommands when input head matches, to avoid clutter.
+    let input_head = state
+        .input
+        .lines()
+        .join("\n")
+        .strip_prefix('/')
+        .and_then(|s| s.split_whitespace().next())
+        .map(|s| s.to_string());
+    if let Some(head) = input_head {
+        for (_primary, sub) in expanded.into_iter().filter(|(p, _)| p == &head) {
+            all.push(sub);
+        }
+    }
     all
 }
 
