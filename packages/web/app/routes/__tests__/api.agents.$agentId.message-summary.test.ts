@@ -96,4 +96,56 @@ describe('Agent Message Endpoint (supervisor-backed)', () => {
 
     expect(text).toContain('Hello from test');
   });
+
+  it('surfaces supervisor prompt rejections (no ghost send)', async () => {
+    // Regression test for the original "ghost send" bug:
+    // the route used to return 202 even if promptSession failed.
+
+    const { SupervisorHttpError } = await import('@lace/supervisor');
+
+    const supervisor = await getSupervisor();
+    const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+
+    vi.spyOn(supervisor, 'promptSession').mockRejectedValue(
+      new SupervisorHttpError({
+        status: 400,
+        code: -32602,
+        message: 'Invalid params',
+        data: { field: 'content' },
+      })
+    );
+
+    const request = new Request(`http://localhost:3000/api/agents/${created.sessionId}/message`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'Hello from test' }),
+    });
+
+    const response = await action({
+      request,
+      params: { agentId: created.sessionId },
+    } as unknown as {
+      request: Request;
+      params: { agentId: string };
+      context: Record<string, unknown>;
+    });
+
+    expect(response.status).toBe(400);
+
+    const { parseResponse } = await import('@lace/web/lib/serialization');
+
+    const payload = await parseResponse<{
+      error: { code?: number; message: string; data?: unknown };
+      message?: string;
+    }>(response);
+
+    expect(payload).toMatchObject({
+      error: {
+        code: -32602,
+        message: 'Invalid params',
+        data: { field: 'content' },
+      },
+    });
+  });
+
 });
