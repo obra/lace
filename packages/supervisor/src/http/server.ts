@@ -81,6 +81,18 @@ const ResolvePermissionSchema = z
   })
   .strict();
 
+type JsonRpcErrorLike = {
+  code: number;
+  message: string;
+  data?: unknown;
+};
+
+function isJsonRpcErrorLike(value: unknown): value is JsonRpcErrorLike {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.code === 'number' && typeof v.message === 'string';
+}
+
 function asJson(res: ServerResponse, status: number, body: unknown) {
   const payload = JSON.stringify(body);
   res.statusCode = status;
@@ -359,15 +371,19 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
         return asJson(res, 400, { error: 'Invalid JSON' });
       }
 
-      // Handle JSON-RPC error objects (from peer.request rejections)
-      // These have { code, message } but are not Error instances
-      const errorObj = error as { message?: string; code?: number };
-      const message =
-        error instanceof Error
-          ? error.message
-          : typeof errorObj?.message === 'string'
-            ? errorObj.message
-            : 'Internal error';
+      // Preserve JSON-RPC error objects (from peer.request rejections)
+      // These have structured fields { code, message, data? } but are not Error instances.
+      if (isJsonRpcErrorLike(error)) {
+        return asJson(res, 500, {
+          error: {
+            code: error.code,
+            message: error.message,
+            ...(error.data !== undefined ? { data: error.data } : {}),
+          },
+        });
+      }
+
+      const message = error instanceof Error ? error.message : 'Internal error';
       return asJson(res, 500, { error: message });
     }
   });
