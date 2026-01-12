@@ -118,6 +118,7 @@ pub enum UiAction {
     ConnectionsModelsRefresh,
     ConnectionsModelsClose,
     ConnectionsClose,
+    ModelFetchOptions,
 
     CloseOverlay,
     ToggleHelp,
@@ -580,6 +581,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             crate::app::connections::close_models(state);
             Vec::new()
         }
+        UiAction::ModelFetchOptions => crate::app::connections::request_models_for_current_connection(state),
         UiAction::ConnectionsSubmit => {
             if state.connections.confirm_delete {
                 crate::app::connections::confirm_delete_selected(state)
@@ -789,11 +791,17 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             Vec::new()
         }
         UiAction::SlashPickerOpen => {
+            let mut out = Vec::new();
+            if input_text(state).trim_start().starts_with("/model")
+                && state.connections.models.models.is_empty()
+            {
+                out.extend(crate::app::connections::request_models_for_current_connection(state));
+            }
             if !filtered_slash_commands(state).is_empty() {
                 state.slash_picker_open = true;
                 state.slash_picker_selected = 0;
             }
-            Vec::new()
+            out
         }
         UiAction::SlashCycleOption => {
             // Cycle options for commands like "/mode", "/theme", etc.
@@ -1202,7 +1210,10 @@ fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound
             let target = name.trim_start_matches("model ").trim();
             switch_model(state, target)
         }
-        "model" => Vec::new(),
+        "model" => {
+            let out = crate::app::connections::open_models_for_current_connection(state);
+            out
+        }
         "compact context" => {
             let id = state.next_client_id();
             state.push_activity_line("Compacting context...".to_string());
@@ -1242,11 +1253,7 @@ fn switch_model(state: &mut AppState, model_id: &str) -> Vec<Outbound> {
         state.push_debug_line("model: missing model id".to_string());
         return Vec::new();
     }
-    let connection_id = state
-        .connection_id
-        .clone()
-        .or_else(|| state.prefs.last_connection_id.clone());
-    let Some(connection_id) = connection_id else {
+    let Some(connection_id) = crate::app::connections::current_connection_id(state) else {
         state.push_debug_line("model: no active connection".to_string());
         return Vec::new();
     };
@@ -1390,13 +1397,34 @@ pub(crate) fn permission_choices(state: &AppState) -> Vec<PermissionChoice> {
 fn send_input(state: &mut AppState) -> Vec<Outbound> {
     let line = input_text(state).trim_end().to_string();
     let images = std::mem::take(&mut state.pending_images);
-    set_input_text(state, "");
-    state.input_history_index = None;
-    state.chat_follow = true;
 
     if line.is_empty() && images.is_empty() {
         return Vec::new();
     }
+
+    // Handle local slash commands directly (no agent roundtrip)
+    if images.is_empty() && line.starts_with('/') {
+        let cmd_text = line.trim_start_matches('/').trim();
+        if !cmd_text.is_empty() {
+            if let Some(cmd) = all_slash_commands(state)
+                .into_iter()
+                .find(|c| c.name == cmd_text)
+            {
+                let out = match cmd.source.as_deref() {
+                    Some("local") => execute_local_slash_command(state, &cmd.name),
+                    Some("permission") => execute_permission_slash_command(state, &cmd.name),
+                    _ => Vec::new(),
+                };
+                set_input_text(state, "");
+                state.input_history_index = None;
+                return out;
+            }
+        }
+    }
+
+    set_input_text(state, "");
+    state.input_history_index = None;
+    state.chat_follow = true;
 
     // Build display text for chat (show image indicators)
     let display_text = if images.is_empty() {

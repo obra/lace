@@ -112,6 +112,62 @@ pub fn open_connections(state: &mut AppState) -> Vec<Outbound> {
     request_list(state)
 }
 
+pub fn current_connection_id(state: &AppState) -> Option<String> {
+    state
+        .connection_id
+        .clone()
+        .or_else(|| state.prefs.last_connection_id.clone())
+}
+
+pub fn open_models_for_current_connection(state: &mut AppState) -> Vec<Outbound> {
+    let Some(conn_id) = current_connection_id(state) else {
+        state.connections.error = Some("No active connection".to_string());
+        return Vec::new();
+    };
+    open_models_for_connection(state, &conn_id, None)
+}
+
+pub fn open_models_for_connection(
+    state: &mut AppState,
+    connection_id: &str,
+    connection_name: Option<String>,
+) -> Vec<Outbound> {
+    state.connections.models.open = true;
+    state.connections.models.loading = true;
+    state.connections.models.error = None;
+    state.connections.models.provider_id = None;
+    state.connections.models.connection_id = Some(connection_id.to_string());
+    state.connections.models.connection_name =
+        connection_name.or_else(|| Some(connection_id.to_string()));
+    state.connections.models.selected = 0;
+    state.connections.models.models.clear();
+    state.connections.models.disabled_models.clear();
+
+    let id = state.next_client_id();
+    vec![Outbound::JsonRpcRequest {
+        id,
+        method: "ent/models/list".to_string(),
+        params: Some(json!({ "connectionId": connection_id })),
+    }]
+}
+
+pub fn request_models_for_current_connection(state: &mut AppState) -> Vec<Outbound> {
+    let Some(conn_id) = current_connection_id(state) else {
+        return Vec::new();
+    };
+    // Do not open modal; just fetch and cache for autocomplete
+    state.connections.models.loading = true;
+    state.connections.models.connection_id = Some(conn_id.clone());
+    state.connections.models.models.clear();
+    state.connections.models.disabled_models.clear();
+    let id = state.next_client_id();
+    vec![Outbound::JsonRpcRequest {
+        id,
+        method: "ent/models/list".to_string(),
+        params: Some(json!({ "connectionId": conn_id })),
+    }]
+}
+
 pub fn close_connections(state: &mut AppState) {
     state.connections.open = false;
     state.connections.loading = false;
