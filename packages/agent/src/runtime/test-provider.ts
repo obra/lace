@@ -2,19 +2,10 @@ import {
   AIProvider,
   type ProviderMessage,
   type ProviderResponse,
-  type ContentBlock,
 } from '../providers/base-provider';
 import type { Tool } from '@lace/agent/tools/tool';
 import type { ToolCall, ToolResult } from '@lace/agent/tools/types';
-
-/** Helper to extract text from string or content blocks */
-function getTextContent(content: string | ContentBlock[]): string {
-  if (typeof content === 'string') return content;
-  return content
-    .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
-    .map((b) => b.text)
-    .join('\n');
-}
+import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 
 type TestProviderState = {
   phase: 'needs_tool' | 'awaiting_retry' | 'final';

@@ -5,6 +5,7 @@ import { ProviderMessage, ContentBlock } from './base-provider';
 import { ToolCall } from '@lace/agent/tools/types';
 import Anthropic from '@anthropic-ai/sdk';
 import type { Content, Part } from '@google/genai';
+import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 
 /**
  * Helper to convert our ContentBlock to Anthropic's content block format
@@ -38,17 +39,6 @@ function hasContent(content: string | ContentBlock[]): boolean {
     return content.trim().length > 0;
   }
   return content.length > 0;
-}
-
-/**
- * Helper to get text from content (for cases where we need string only)
- */
-function getTextContent(content: string | ContentBlock[]): string {
-  if (typeof content === 'string') return content;
-  return content
-    .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
-    .map((b) => b.text)
-    .join('\n');
 }
 
 /**

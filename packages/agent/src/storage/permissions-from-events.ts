@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { toNonEmptyString } from '@lace/agent/rpc/utils';
 
 export type PendingPermissionRecord = {
   toolCallId: string;
@@ -20,12 +21,6 @@ type DurableEventLine = {
   turnSeq?: unknown;
   data?: Record<string, unknown>;
 };
-
-function toNonEmptyString(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
 
 function toFiniteNumber(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;

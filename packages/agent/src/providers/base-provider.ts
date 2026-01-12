@@ -6,6 +6,7 @@ import { ToolResult, ToolCall } from '@lace/agent/tools/types';
 import { Tool } from '@lace/agent/tools/tool';
 import type { CatalogProvider } from './catalog/types';
 import { logger } from '@lace/agent/utils/logger';
+import { estimateTokens as estimateTokensUtil } from '@lace/agent/utils/token-estimation';
 
 export interface ProviderConfig {
   maxTokens?: number;
@@ -295,9 +296,9 @@ export abstract class AIProvider extends EventEmitter {
     return false;
   }
 
-  // Token estimation utility for streaming
+  // Token estimation utility for streaming - delegates to shared utility
   protected estimateTokens(text: string): number {
-    return Math.ceil(text.length / 4);
+    return estimateTokensUtil(text);
   }
 
   // Provider-specific token counting - providers can override for accurate counts

@@ -3,6 +3,7 @@
 
 import type { LaceEvent } from '@lace/agent/threads/types';
 import type { CompactionStrategy, CompactionContext, CompactionResult } from './types';
+import { generateEventId } from '@lace/agent/utils/generate-event-id';
 
 export class SummarizeCompactionStrategy implements CompactionStrategy {
   id = 'summarize';
@@ -168,7 +169,7 @@ Provide ONLY the summary, no preamble or explanation.`;
     originalEventCount: number
   ): CompactionResult {
     const compactionEvent: LaceEvent = {
-      id: this.generateEventId(),
+      id: generateEventId(),
       type: 'COMPACTION',
       timestamp: new Date(),
       context: { threadId: context.threadId },
@@ -189,9 +190,5 @@ Provide ONLY the summary, no preamble or explanation.`;
       compactionEvent,
       compactedEvents,
     };
-  }
-
-  private generateEventId(): string {
-    return `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 }

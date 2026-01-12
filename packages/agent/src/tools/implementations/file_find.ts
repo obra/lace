@@ -7,6 +7,7 @@ import { join } from 'path';
 import { Tool } from '../tool';
 import { NonEmptyString, FilePath } from '../schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
+import { formatFileSize } from '@lace/agent/tools/utils/format-file-size';
 
 const MIN_DEPTH = 1;
 const MAX_DEPTH = 20;
@@ -205,23 +206,10 @@ export class FileFindTool extends Tool {
     mtime: Date;
     isDirectory: boolean;
   }): string {
-    const sizeStr = this.formatFileSize(entry.size);
+    const sizeStr = formatFileSize(entry.size);
     const timeStr = this.formatRelativeTime(entry.mtime);
     const typeIndicator = entry.isDirectory ? '/' : '';
     return `${entry.path}${typeIndicator} (${sizeStr}) - ${timeStr}`;
-  }
-
-  private formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 bytes';
-    if (bytes === 1) return '1 byte';
-    if (bytes < 1024) return `${bytes} bytes`;
-
-    const k = 1024;
-    const sizes = ['bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    const size = parseFloat((bytes / Math.pow(k, i)).toFixed(1));
-
-    return `${size} ${sizes[i]}`;
   }
 
   private formatRelativeTime(date: Date): string {

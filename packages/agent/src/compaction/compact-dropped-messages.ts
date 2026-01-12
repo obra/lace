@@ -2,21 +2,12 @@ import {
   AIProvider,
   type ConversationState,
   type ProviderMessage,
-  type ContentBlock,
 } from '../providers/base-provider';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { LaceEvent } from '@lace/agent/threads/types';
 import type { CompactionStrategy } from './types';
 import { registerDefaultStrategies } from './registry';
-
-/** Helper to extract text from string or content blocks */
-function getTextContent(content: string | ContentBlock[]): string {
-  if (typeof content === 'string') return content;
-  return content
-    .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
-    .map((b) => b.text)
-    .join('\n');
-}
+import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 
 class ModelPinnedProvider extends AIProvider {
   constructor(

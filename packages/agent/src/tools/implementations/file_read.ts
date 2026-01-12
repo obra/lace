@@ -7,6 +7,7 @@ import { Tool } from '../tool';
 import { FilePath, LineNumber } from '../schemas/common';
 import type { ToolResult, ToolContext } from '../types';
 import { findSimilarPaths } from '../utils/file-suggestions';
+import { formatFileSize } from '@lace/agent/tools/utils/format-file-size';
 
 const MAX_FILE_SIZE = 64 * 1024; // 64KB limit for whole file reads
 const MAX_RANGE_SIZE = 2000; // Maximum lines in a ranged read
@@ -122,7 +123,7 @@ export class FileReadTool extends Tool {
         totalLines: lines.length,
         linesReturned,
         range: { start: startLineNum, end: endLineNum },
-        fileSize: this.formatFileSize(content.length),
+        fileSize: formatFileSize(content.length),
       };
 
       if (wasTruncated && requestedRange) {
@@ -176,8 +177,8 @@ export class FileReadTool extends Tool {
     try {
       const fileStats = await stat(filePath);
       if (fileStats.size > MAX_FILE_SIZE) {
-        const fileSizeFormatted = this.formatFileSize(fileStats.size);
-        return `File is too large (${fileSizeFormatted}) for whole-file read. Use startLine and endLine parameters for ranged reads (e.g., startLine: 1, endLine: 100). File size limit is ${this.formatFileSize(
+        const fileSizeFormatted = formatFileSize(fileStats.size);
+        return `File is too large (${fileSizeFormatted}) for whole-file read. Use startLine and endLine parameters for ranged reads (e.g., startLine: 1, endLine: 100). File size limit is ${formatFileSize(
           MAX_FILE_SIZE
         )} for whole-file reads.`;
       }
@@ -186,13 +187,5 @@ export class FileReadTool extends Tool {
       // If we can't stat the file, let the main read operation handle the error
       return null;
     }
-  }
-
-  private formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 bytes';
-    const k = 1024;
-    const sizes = ['bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
   }
 }

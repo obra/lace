@@ -7,6 +7,7 @@ import { dirname } from 'path';
 import { Tool } from '../tool';
 import { FilePath } from '../schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
+import { formatFileSize } from '@lace/agent/tools/utils/format-file-size';
 
 const fileWriteSchema = z.object({
   path: FilePath,
@@ -67,7 +68,7 @@ Creates parent directories automatically if needed. Returns file size written.`;
 
       const byteLength = Buffer.byteLength(content, 'utf8');
       const result = this.createResult(
-        `Successfully wrote ${this.formatFileSize(byteLength)} to ${resolvedPath}`
+        `Successfully wrote ${formatFileSize(byteLength)} to ${resolvedPath}`
       );
       result.metadata = { path: resolvedPath, bytesWritten: byteLength };
       return result;
@@ -137,18 +138,5 @@ Creates parent directories automatically if needed. Returns file size written.`;
     return this.createError(
       `Failed to write file due to unknown error. Check the file path and permissions, then try again.`
     );
-  }
-
-  private formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 bytes';
-    if (bytes === 1) return '1 byte';
-    if (bytes < 1024) return `${bytes} bytes`;
-
-    const k = 1024;
-    const sizes = ['bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    const size = parseFloat((bytes / Math.pow(k, i)).toFixed(1));
-
-    return `${size} ${sizes[i]}`;
   }
 }

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { isAbsolute as isAbsolutePath, join, resolve as resolvePath } from 'node:path';
+import { toNonEmptyString } from '@lace/agent/rpc/utils';
 
 type ToolUseEvent = {
   type?: string;
@@ -9,12 +10,6 @@ type ToolUseEvent = {
     result?: { outcome?: string };
   };
 };
-
-function toNonEmptyString(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
 
 function absolutePath(workDir: string, raw: string): string {
   return isAbsolutePath(raw) ? raw : resolvePath(workDir, raw);

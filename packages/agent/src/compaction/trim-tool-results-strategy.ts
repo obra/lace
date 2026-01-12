@@ -4,6 +4,7 @@
 import type { LaceEvent } from '@lace/agent/threads/types';
 import type { CompactionStrategy, CompactionContext, CompactionResult } from './types';
 import type { ToolResult, ContentBlock } from '@lace/agent/tools/types';
+import { generateEventId } from '@lace/agent/utils/generate-event-id';
 
 export class TrimToolResultsStrategy implements CompactionStrategy {
   id = 'trim-tool-results';
@@ -40,7 +41,7 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
 
     // Create the compaction event (metadata only)
     const compactionEvent: LaceEvent = {
-      id: this.generateEventId(),
+      id: generateEventId(),
       type: 'COMPACTION',
       timestamp: new Date(),
       context: { threadId: context.threadId },
@@ -60,10 +61,6 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
       compactionEvent,
       compactedEvents,
     });
-  }
-
-  private generateEventId(): string {
-    return `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   private trimToolResult(event: LaceEvent): LaceEvent {
