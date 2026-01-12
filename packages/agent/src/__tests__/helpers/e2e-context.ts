@@ -50,6 +50,7 @@ export function createE2EContext(options?: E2EContextOptions): E2ETestContext {
   let savedEnv: {
     LACE_DIR?: string;
     LACE_AGENT_TEST_PROVIDER?: string;
+    LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG?: string;
   } = {};
 
   return {
@@ -71,6 +72,7 @@ export function createE2EContext(options?: E2EContextOptions): E2ETestContext {
       savedEnv = {
         LACE_DIR: process.env.LACE_DIR,
         LACE_AGENT_TEST_PROVIDER: process.env.LACE_AGENT_TEST_PROVIDER,
+        LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG: process.env.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG,
       };
 
       // Create temp directories
@@ -99,6 +101,12 @@ export function createE2EContext(options?: E2EContextOptions): E2ETestContext {
         delete process.env.LACE_AGENT_TEST_PROVIDER;
       } else {
         process.env.LACE_AGENT_TEST_PROVIDER = savedEnv.LACE_AGENT_TEST_PROVIDER;
+      }
+
+      if (savedEnv.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG === undefined) {
+        delete process.env.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG;
+      } else {
+        process.env.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG = savedEnv.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG;
       }
 
       // Cleanup temp directories

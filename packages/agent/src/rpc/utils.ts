@@ -199,6 +199,10 @@ export function isTestProviderEnabled(): boolean {
   return process.env.LACE_AGENT_TEST_PROVIDER === '1';
 }
 
+export function isTestProviderStrictConfigEnabled(): boolean {
+  return process.env.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG === '1';
+}
+
 export function assertInitialized(state: AgentServerState): void {
   if (!state.initialized)
     throw {

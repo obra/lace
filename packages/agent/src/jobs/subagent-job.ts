@@ -10,6 +10,7 @@ import {
   writeSessionState,
   loadSession,
 } from '@lace/agent/storage/session-store';
+import { getEffectiveConfig } from '@lace/agent/core/session';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
 import { getJobOutputPath } from './job-manager';
 import { logger } from '@lace/agent/utils/logger';
@@ -505,6 +506,16 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           const stateAfterWrite = getState();
           stateAfterWrite.activeSession = loadSession(updatedState.activeSession!.meta.sessionId);
         });
+      }
+
+      // If the delegate tool didn't specify connection/model, inherit from the parent effective config.
+      if (!job.connectionId && !job.modelId) {
+        const effective = getEffectiveConfig(
+          currentState.config,
+          currentState.activeSession?.state.config
+        );
+        job.connectionId = effective.connectionId;
+        job.modelId = effective.modelId;
       }
 
       // Configure subagent session with provider/model if specified
