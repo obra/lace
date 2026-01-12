@@ -158,6 +158,8 @@ pub fn request_models_for_current_connection(state: &mut AppState) -> Vec<Outbou
     // Do not open modal; just fetch and cache for autocomplete
     state.connections.models.loading = true;
     state.connections.models.connection_id = Some(conn_id.clone());
+    state.connections.models.connection_name =
+        state.connections.items.iter().find(|c| c.connection_id == conn_id).map(|c| c.name.clone());
     state.connections.models.models.clear();
     state.connections.models.disabled_models.clear();
     let id = state.next_client_id();

@@ -797,13 +797,10 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             let trimmed = input_copy.trim_start();
             if let Some(head) = trimmed.strip_prefix('/') {
                 let head = head.split_whitespace().next().unwrap_or("");
-                if head == "model"
-                    && state.connections.models.models.is_empty()
-                    && !state.connections.models.loading
-                {
-                    out.extend(crate::app::connections::request_models_for_current_connection(
-                        state,
-                    ));
+                if head == "model" && !state.connections.models.loading {
+                    out.extend(
+                        crate::app::connections::request_models_for_current_connection(state),
+                    );
                 }
             }
             if !filtered_slash_commands(state).is_empty() {
@@ -827,10 +824,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
 
             // Prefetch model options if needed
             let mut out = Vec::new();
-            if head == "model"
-                && state.connections.models.models.is_empty()
-                && !state.connections.models.loading
-            {
+            if head == "model" && !state.connections.models.loading {
                 out.extend(crate::app::connections::request_models_for_current_connection(
                     state,
                 ));
@@ -1061,8 +1055,13 @@ pub(crate) fn all_slash_commands(state: &AppState) -> Vec<crate::app::SlashComma
     all.extend(local_commands());
     all.extend(permission_commands(state));
 
-    // Subcommand options helper (e.g., /model)
+    // Expand commands with sub-options into synthetic subcommands, so picker + Tab can show them.
+    // Sources:
+    //  1) Inline description "(a|b|c)" pattern
+    //  2) Dynamic providers like /model using fetched model list
     let mut expanded: Vec<crate::app::SlashCommand> = Vec::new();
+
+    // Dynamic: /model options from fetched models / wizard / last model
     let model_options: Vec<String> = if !state.connections.models.models.is_empty() {
         state
             .connections
@@ -1092,7 +1091,7 @@ pub(crate) fn all_slash_commands(state: &AppState) -> Vec<crate::app::SlashComma
         });
     }
 
-    // Expand commands that list options in their description "(a|b|c)" into synthetic subcommands
+    // Static inline "(a|b|c)" expansion
     for cmd in &all {
         if let Some(start) = cmd.description.find('(') {
             if let Some(end_rel) = cmd.description[start..].find(')') {
