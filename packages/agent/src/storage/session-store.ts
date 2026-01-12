@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import { getLaceDir } from '../config/lace-dir';
 import { asSessionId } from '@lace/ent-protocol';
 import { deriveNextEventSeqFromEventLog, summarizeDurableEvents } from './event-log';
+import { atomicWriteJson } from './atomic-write';
 
 export type SessionMeta = {
   sessionId: string;
@@ -101,10 +102,7 @@ export function readSessionMeta(sessionDir: string): SessionMeta {
 
 export function writeSessionMeta(sessionDir: string, meta: SessionMeta): void {
   fs.mkdirSync(sessionDir, { recursive: true });
-  fs.writeFileSync(path.join(sessionDir, 'meta.json'), JSON.stringify(meta, null, 2), {
-    encoding: 'utf8',
-    mode: 0o600,
-  });
+  atomicWriteJson(path.join(sessionDir, 'meta.json'), meta, { mode: 0o600 });
 }
 
 export function readSessionState(sessionDir: string): SessionState {
@@ -131,10 +129,7 @@ export function readSessionState(sessionDir: string): SessionState {
 
 export function writeSessionState(sessionDir: string, state: SessionState): void {
   fs.mkdirSync(sessionDir, { recursive: true });
-  fs.writeFileSync(path.join(sessionDir, 'state.json'), JSON.stringify(state, null, 2), {
-    encoding: 'utf8',
-    mode: 0o600,
-  });
+  atomicWriteJson(path.join(sessionDir, 'state.json'), state, { mode: 0o600 });
 }
 
 export function ensureSessionFiles(sessionDir: string): void {
