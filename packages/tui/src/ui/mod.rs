@@ -1106,8 +1106,15 @@ fn handle_agent_line(
                         let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
                     }
                 }
-                if method == "ent/models/list" && state.connections.models.open {
-                    crate::app::connections::handle_models_list_response(state, &result, error_message);
+                if method == "ent/models/list" {
+                    // Always cache models for autocomplete; also update panel if open.
+                    crate::app::connections::handle_models_list_response(
+                        state,
+                        &result,
+                        error_message,
+                    );
+                    state.connections.models.loading = false;
+                    state.models_prefetched = true;
                 }
                 // Note: Model toggling now uses ent/connections/upsert instead of
                 // ent/models/enable/disable, which operates at the connection level
