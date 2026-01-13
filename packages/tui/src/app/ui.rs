@@ -1078,14 +1078,21 @@ pub(crate) fn all_slash_commands(state: &AppState) -> Vec<crate::app::SlashComma
     } else if let Some(last) = &state.prefs.last_model_id {
         vec![last.clone()]
     } else {
-        Vec::new()
+        // No models known yet; show a placeholder entry to instruct user.
+        vec!["current connection".to_string()]
     };
     for m in model_options {
+        // Skip duplicate placeholder
+        let desc = if m == "current connection" {
+            "Switch model to current connection (load models)".to_string()
+        } else {
+            format!("Switch model to {}", m)
+        };
         expanded.push((
             "model".to_string(),
             crate::app::SlashCommand {
                 name: format!("model {}", m),
-                description: format!("Switch model to {m}"),
+                description: desc,
                 input_hint: None,
                 source: Some("local".to_string()),
             },
