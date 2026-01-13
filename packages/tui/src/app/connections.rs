@@ -221,6 +221,9 @@ pub fn handle_list_response(state: &mut AppState, result: &Option<Value>, error_
         return;
     };
 
+    // Reset cached models on new list
+    state.connections.models = ConnectionModelsState::new();
+
     let mut items: Vec<ConnectionListItem> = Vec::new();
     for c in arr {
         let Some(cobj) = c.as_object() else { continue };
@@ -256,6 +259,15 @@ pub fn handle_list_response(state: &mut AppState, result: &Option<Value>, error_
         state.connections.selected = state.connections.items.len().saturating_sub(1);
     }
     state.connections.error = None;
+
+    // If no active connection is set yet, default to the first listed connection.
+    if state.connection_id.is_none() {
+        if let Some(first) = state.connections.items.first() {
+            state.connection_id = Some(first.connection_id.clone());
+            state.prefs.last_connection_id = state.connection_id.clone();
+            let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
+        }
+    }
 }
 
 pub fn open_models(state: &mut AppState) -> Vec<Outbound> {
