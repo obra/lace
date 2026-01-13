@@ -37,6 +37,24 @@ fn input_text(state: &AppState) -> String {
     state.input.lines().join("\n")
 }
 
+fn prefetch_models_if_needed(
+    transport: &AgentTransport,
+    state: &mut AppState,
+    timeout_ms: u64,
+) -> io::Result<()> {
+    if state.models_prefetched || state.connections.models.loading {
+        return Ok(());
+    }
+    if let Some(_) = crate::app::connections::current_connection_id(state) {
+        let out = crate::app::connections::request_models_for_current_connection(state);
+        if !out.is_empty() {
+            state.models_prefetched = true;
+            send_outbound(transport, state, out, timeout_ms)?;
+        }
+    }
+    Ok(())
+}
+
 /// Returns an animated spinner character based on the current time.
 /// The spinner cycles through a set of braille characters every 100ms.
 fn spinning_char() -> char {
@@ -97,6 +115,8 @@ pub fn run_tui(args: Args) -> io::Result<()> {
         params: Some(serde_json::json!({})),
     }];
     send_outbound(&transport, &mut state, connections_req, args.timeout_ms)?;
+    // Prefetch models if we already know a connection (from prefs/status)
+    let _ = prefetch_models_if_needed(&transport, &mut state, args.timeout_ms);
 
     let mut terminal = TerminalGuard::init()?;
     let res = run_loop(
@@ -1016,6 +1036,7 @@ fn handle_agent_line(
                     if model.is_some() {
                         state.model_id = model;
                     }
+                    let _ = prefetch_models_if_needed(transport, state, timeout_ms);
                 }
                 if method == "ent/connections/list" {
                     clear_invalid_active_connection_from_list(state, &result);
@@ -1034,6 +1055,7 @@ fn handle_agent_line(
                             let out = config_wizard::open(state);
                             send_outbound(transport, state, out, timeout_ms)?;
                         }
+                        let _ = prefetch_models_if_needed(transport, state, timeout_ms);
                     }
                 }
                 if method == "ent/connections/test" && state.connections.open {

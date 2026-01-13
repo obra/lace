@@ -107,6 +107,8 @@ pub struct AppState {
     pub active_permission_selected: usize,
     pub permission_guidance_input: String,
 
+    pub models_prefetched: bool,
+
     pub help_open: bool,
     pub config_wizard: config_wizard::ConfigWizardState,
     pub connections: ConnectionsState,
@@ -190,7 +192,7 @@ impl AppState {
         let state = Self {
             session_id: None,
             workdir: String::new(),
-            connection_id: None,
+            connection_id: prefs.last_connection_id.clone(),
             model_id: None,
             last_activity_ms: None,
             messages: Vec::new(),
@@ -218,6 +220,8 @@ impl AppState {
             active_permission: None,
             active_permission_selected: 0,
             permission_guidance_input: String::new(),
+
+            models_prefetched: false,
 
             help_open: false,
             config_wizard: config_wizard::ConfigWizardState::new(),

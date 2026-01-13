@@ -741,7 +741,13 @@ fn on_session_configure(state: &mut AppState, result: &Option<Value>) -> Vec<Out
     state.prefs.last_connection_id = state.connection_id.clone();
     state.prefs.last_model_id = state.model_id.clone();
     let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
-    Vec::new()
+
+    let mut out = Vec::new();
+    out.extend(crate::app::connections::request_models_for_current_connection(
+        state,
+    ));
+    state.models_prefetched = true;
+    out
 }
 
 fn is_method_not_found(message: &str) -> bool {
