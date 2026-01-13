@@ -1145,9 +1145,32 @@ pub fn filtered_slash_commands(state: &AppState) -> Vec<crate::app::SlashCommand
         .strip_prefix('/')
         .unwrap_or("")
         .to_lowercase();
+    let input_head = state
+        .input
+        .lines()
+        .join("\n")
+        .strip_prefix('/')
+        .and_then(|s| s.split_whitespace().next())
+        .map(|s| s.to_string());
+    let has_space = state
+        .input
+        .lines()
+        .join("\n")
+        .strip_prefix('/')
+        .map(|s| s.contains(' '))
+        .unwrap_or(false);
+
     let mut filtered: Vec<(i32, crate::app::SlashCommand)> = all
         .into_iter()
         .filter_map(|cmd| {
+            // When inside a head (e.g., "/mode ..."), hide the bare head entry
+            if has_space {
+                if let Some(ref head) = input_head {
+                    if cmd.name == *head {
+                        return None;
+                    }
+                }
+            }
             if query.is_empty() {
                 Some((0, cmd))
             } else {

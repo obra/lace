@@ -597,16 +597,12 @@ fn run_loop(
                                 }
                                 None
                             }
-                            KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                // Type into input while picker is open
-                                state.input.insert_char(ch);
-                                state.slash_picker_selected = 0;
-                                // Close picker if space is typed (user is done with command name)
-                                if ch == ' ' {
-                                    state.slash_picker_open = false;
-                                }
-                                None
-                            }
+                        KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            // Type into input while picker is open
+                            state.input.insert_char(ch);
+                            state.slash_picker_selected = 0;
+                            None
+                        }
                             _ => None,
                         };
                         if let Some(action) = action {
@@ -1360,10 +1356,20 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
         // Calculate picker area: above the input, same width, 12 lines tall
         let picker_height = 12u16;
         let picker_y = input_area.y.saturating_sub(picker_height);
+        // Dynamic width: use longest line up to input width
+        let max_line = crate::app::ui::filtered_slash_commands(state)
+            .iter()
+            .map(|c| c.name.len() + c.description.len() + 6) // rough estimate with markers
+            .max()
+            .unwrap_or(20) as u16;
+        let picker_width = max_line
+            .saturating_add(4)
+            .min(input_area.width)
+            .max(30);
         let picker_area = ratatui::layout::Rect {
             x: input_area.x,
             y: picker_y,
-            width: input_area.width.min(60), // Cap width for readability
+            width: picker_width,
             height: picker_height,
         };
         f.render_widget(Clear, picker_area);
