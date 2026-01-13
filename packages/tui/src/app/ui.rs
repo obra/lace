@@ -1276,7 +1276,16 @@ fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound
             switch_model(state, target)
         }
         "model" => {
-            let out = crate::app::connections::open_models_for_current_connection(state);
+            // Prepare input for subcommand selection and open picker
+            set_input_text(state, "/model ");
+            let mut out = Vec::new();
+            if !state.connections.models.loading {
+                out.extend(crate::app::connections::request_models_for_current_connection(
+                    state,
+                ));
+            }
+            state.slash_picker_open = true;
+            state.slash_picker_selected = 0;
             out
         }
         "compact context" => {
