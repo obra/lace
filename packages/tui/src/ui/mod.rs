@@ -3019,6 +3019,21 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
     let mut lines: Vec<Line> = Vec::new();
     let mut prev_role: Option<&Role> = None;
 
+    // Build a map of turn_seq -> tool calls for quick lookup so we can render
+    // tool calls inline with the assistant messages that invoked them
+    let completed_tools = state.completed_tool_calls();
+    let mut tools_by_turn: std::collections::HashMap<i64, Vec<(usize, &activity::ActivityItem)>> =
+        std::collections::HashMap::new();
+    for (i, tool) in completed_tools.iter().enumerate() {
+        if let Some(seq) = tool.turn_seq {
+            tools_by_turn.entry(seq).or_default().push((i, tool));
+        }
+    }
+
+    // Track which tools we've rendered (for any without turn_seq, render at end)
+    let mut rendered_tool_indices: std::collections::HashSet<usize> =
+        std::collections::HashSet::new();
+
     for m in &state.messages {
         // Add spacing only when the role changes (not between consecutive same-role messages)
         if let Some(prev) = prev_role {
@@ -3058,20 +3073,38 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
             };
             lines.push(line);
         }
+
+        // After assistant message, render any tool calls from this turn inline
+        if m.role == Role::Assistant {
+            if let Some(turn_seq) = m.turn_seq {
+                if let Some(turn_tools) = tools_by_turn.get(&turn_seq) {
+                    for (idx, tool) in turn_tools {
+                        let is_selected = state.chat_selected_tool_idx == Some(*idx);
+                        let is_expanded = is_selected && state.chat_tool_expanded;
+                        lines.extend(render_tool_call_line(tool, colors, is_selected, is_expanded));
+                        rendered_tool_indices.insert(*idx);
+                    }
+                }
+            }
+        }
     }
 
-    // Show completed tool calls (selectable when chat is focused)
-    let completed_tools = state.completed_tool_calls();
-    if !completed_tools.is_empty() {
+    // Render any remaining completed tools (without turn_seq or orphaned) at the end
+    let orphaned_tools: Vec<_> = completed_tools
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !rendered_tool_indices.contains(i))
+        .collect();
+    if !orphaned_tools.is_empty() {
         lines.push(Line::from(""));
-        for (i, item) in completed_tools.iter().enumerate() {
+        for (i, item) in orphaned_tools {
             let is_selected = state.chat_selected_tool_idx == Some(i);
             let is_expanded = is_selected && state.chat_tool_expanded;
             lines.extend(render_tool_call_line(item, colors, is_selected, is_expanded));
         }
     }
 
-    // Show in-progress tool calls inline (not selectable)
+    // Show in-progress tool calls at the end (not selectable)
     let pending_tools = state.pending_tool_calls();
     if !pending_tools.is_empty() {
         lines.push(Line::from(""));
