@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  chmodSync,
+  mkdirSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { join } from 'node:path';
@@ -86,7 +94,11 @@ describe('storage/session-store', () => {
     // until the final rename step.
     const statePath = join(sessionDir, 'state.json');
     mkdirSync(sessionDir, { recursive: true });
-    writeFileSync(statePath, JSON.stringify({ nextEventSeq: 1, nextStreamSeq: 1 }, null, 2), 'utf8');
+    writeFileSync(
+      statePath,
+      JSON.stringify({ nextEventSeq: 1, nextStreamSeq: 1 }, null, 2),
+      'utf8'
+    );
 
     const writes: string[] = [];
     const renames: Array<{ from: string; to: string }> = [];
@@ -226,8 +238,13 @@ describe('storage/session-store', () => {
       },
     ];
 
-    const truncatedLine = '{"eventSeq":4,"timestamp":"2026-01-04T00:00:04Z","type":"message","data":';
-    writeFileSync(eventsPath, `${lines.map((l) => JSON.stringify(l)).join('\n')}\n${truncatedLine}`, 'utf8');
+    const truncatedLine =
+      '{"eventSeq":4,"timestamp":"2026-01-04T00:00:04Z","type":"message","data":';
+    writeFileSync(
+      eventsPath,
+      `${lines.map((l) => JSON.stringify(l)).join('\n')}\n${truncatedLine}`,
+      'utf8'
+    );
 
     expect(deriveNextEventSeqFromEventLog(sessionDir)).toBe(4);
   });

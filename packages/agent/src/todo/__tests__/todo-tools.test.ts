@@ -4,12 +4,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import {
-  executeTodoRead,
-  executeTodoAdd,
-  executeTodoUpdate,
-  executeTodoRemove,
-} from '../todo-tools';
+import { executeTodoRead, executeTodoWrite } from '../todo-tools';
 
 describe('todo tools execution', () => {
   let sessionDir: string;
@@ -48,21 +43,21 @@ describe('todo tools execution', () => {
       expect(data.items).toHaveLength(2);
       expect(data.items[0]).toEqual({
         id: 't_aaa',
-        done: false,
+        status: 'pending',
         title: 'First task',
         description: 'Description one.',
       });
       expect(data.items[1]).toEqual({
         id: 't_bbb',
-        done: true,
+        status: 'done',
         title: 'Second task',
       });
     });
   });
 
-  describe('executeTodoAdd', () => {
+  describe('executeTodoWrite - create', () => {
     it('creates todo file and adds first item', async () => {
-      const result = await executeTodoAdd(
+      const result = await executeTodoWrite(
         { title: 'New task', description: 'Task details' },
         { sessionDir }
       );
@@ -83,7 +78,7 @@ describe('todo tools execution', () => {
       const todoPath = join(sessionDir, 'todo.md');
       writeFileSync(todoPath, `- [ ] **Existing task** \`t_old\`\n`);
 
-      const result = await executeTodoAdd({ title: 'Second task' }, { sessionDir });
+      const result = await executeTodoWrite({ title: 'Second task' }, { sessionDir });
 
       expect(result.status).toBe('completed');
       const content = readFileSync(todoPath, 'utf-8');
@@ -92,16 +87,35 @@ describe('todo tools execution', () => {
     });
 
     it('adds item without description', async () => {
-      const result = await executeTodoAdd({ title: 'Quick task' }, { sessionDir });
+      const result = await executeTodoWrite({ title: 'Quick task' }, { sessionDir });
 
       expect(result.status).toBe('completed');
       const todoPath = join(sessionDir, 'todo.md');
       const content = readFileSync(todoPath, 'utf-8');
       expect(content).toContain('**Quick task**');
     });
+
+    it('creates item with custom status', async () => {
+      const result = await executeTodoWrite(
+        { title: 'Already done', status: 'done' },
+        { sessionDir }
+      );
+
+      expect(result.status).toBe('completed');
+      const todoPath = join(sessionDir, 'todo.md');
+      const content = readFileSync(todoPath, 'utf-8');
+      expect(content).toContain('- [x] **Already done**');
+    });
+
+    it('fails when title missing for new item', async () => {
+      const result = await executeTodoWrite({ description: 'no title' }, { sessionDir });
+
+      expect(result.status).toBe('failed');
+      expect(result.content[0].text).toContain('requires title');
+    });
   });
 
-  describe('executeTodoUpdate', () => {
+  describe('executeTodoWrite - update', () => {
     beforeEach(() => {
       const todoPath = join(sessionDir, 'todo.md');
       writeFileSync(
@@ -115,7 +129,7 @@ describe('todo tools execution', () => {
     });
 
     it('marks item as done', async () => {
-      const result = await executeTodoUpdate({ id: 't_aaa', done: true }, { sessionDir });
+      const result = await executeTodoWrite({ id: 't_aaa', status: 'done' }, { sessionDir });
 
       expect(result.status).toBe('completed');
       const todoPath = join(sessionDir, 'todo.md');
@@ -123,12 +137,12 @@ describe('todo tools execution', () => {
       expect(content).toContain('- [x] **Task one**');
     });
 
-    it('marks item as not done', async () => {
+    it('marks item as pending', async () => {
       // First mark as done
       const todoPath = join(sessionDir, 'todo.md');
       writeFileSync(todoPath, `- [x] **Done task** \`t_ccc\`\n`);
 
-      const result = await executeTodoUpdate({ id: 't_ccc', done: false }, { sessionDir });
+      const result = await executeTodoWrite({ id: 't_ccc', status: 'pending' }, { sessionDir });
 
       expect(result.status).toBe('completed');
       const content = readFileSync(todoPath, 'utf-8');
@@ -136,7 +150,7 @@ describe('todo tools execution', () => {
     });
 
     it('updates title', async () => {
-      const result = await executeTodoUpdate(
+      const result = await executeTodoWrite(
         { id: 't_aaa', title: 'Updated title' },
         { sessionDir }
       );
@@ -149,7 +163,7 @@ describe('todo tools execution', () => {
     });
 
     it('updates description', async () => {
-      const result = await executeTodoUpdate(
+      const result = await executeTodoWrite(
         { id: 't_aaa', description: 'New description' },
         { sessionDir }
       );
@@ -162,8 +176,8 @@ describe('todo tools execution', () => {
     });
 
     it('updates multiple fields at once', async () => {
-      const result = await executeTodoUpdate(
-        { id: 't_aaa', done: true, title: 'New title', description: 'New desc' },
+      const result = await executeTodoWrite(
+        { id: 't_aaa', status: 'done', title: 'New title', description: 'New desc' },
         { sessionDir }
       );
 
@@ -175,14 +189,14 @@ describe('todo tools execution', () => {
     });
 
     it('fails for non-existent id', async () => {
-      const result = await executeTodoUpdate({ id: 't_xxx', done: true }, { sessionDir });
+      const result = await executeTodoWrite({ id: 't_xxx', status: 'done' }, { sessionDir });
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('not found');
     });
 
     it('preserves other items unchanged', async () => {
-      await executeTodoUpdate({ id: 't_aaa', done: true }, { sessionDir });
+      await executeTodoWrite({ id: 't_aaa', status: 'done' }, { sessionDir });
 
       const todoPath = join(sessionDir, 'todo.md');
       const content = readFileSync(todoPath, 'utf-8');
@@ -191,7 +205,7 @@ describe('todo tools execution', () => {
     });
   });
 
-  describe('executeTodoRemove', () => {
+  describe('executeTodoWrite - remove', () => {
     beforeEach(() => {
       const todoPath = join(sessionDir, 'todo.md');
       writeFileSync(
@@ -205,8 +219,8 @@ describe('todo tools execution', () => {
       );
     });
 
-    it('removes item by id', async () => {
-      const result = await executeTodoRemove({ id: 't_bbb' }, { sessionDir });
+    it('removes item by setting status to removed', async () => {
+      const result = await executeTodoWrite({ id: 't_bbb', status: 'removed' }, { sessionDir });
 
       expect(result.status).toBe('completed');
       const todoPath = join(sessionDir, 'todo.md');
@@ -216,8 +230,8 @@ describe('todo tools execution', () => {
       expect(content).toContain('Task three');
     });
 
-    it('fails for non-existent id', async () => {
-      const result = await executeTodoRemove({ id: 't_xxx' }, { sessionDir });
+    it('fails for non-existent id when removing', async () => {
+      const result = await executeTodoWrite({ id: 't_xxx', status: 'removed' }, { sessionDir });
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('not found');
@@ -227,7 +241,7 @@ describe('todo tools execution', () => {
       const todoPath = join(sessionDir, 'todo.md');
       writeFileSync(todoPath, `- [ ] **Only task** \`t_only\`\n`);
 
-      const result = await executeTodoRemove({ id: 't_only' }, { sessionDir });
+      const result = await executeTodoWrite({ id: 't_only', status: 'removed' }, { sessionDir });
 
       expect(result.status).toBe('completed');
       const content = readFileSync(todoPath, 'utf-8');

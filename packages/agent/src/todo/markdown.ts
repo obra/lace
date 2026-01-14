@@ -1,7 +1,7 @@
 // ABOUTME: Markdown parsing and serialization for todo lists
 // ABOUTME: Format: - [ ] **Title** `id`\n  Description
 
-import type { TodoItem } from './types';
+import type { TodoItem, TodoStatus } from './types';
 
 /**
  * Parse markdown todo list into TodoItem array
@@ -45,7 +45,7 @@ function parseItemBlock(block: string): TodoItem | null {
   }
 
   const [, checkbox, title, id] = headerMatch;
-  const done = checkbox.toLowerCase() === 'x';
+  const status: TodoStatus = checkbox.toLowerCase() === 'x' ? 'done' : 'pending';
 
   // Description is remaining lines, stripped of leading 2-space indent
   const descriptionLines = lines
@@ -66,19 +66,23 @@ function parseItemBlock(block: string): TodoItem | null {
   // Join non-empty description lines
   const description = descriptionLines.join('\n').trim() || undefined;
 
-  return { id, done, title, description };
+  return { id, status, title, description };
 }
 
 /**
  * Serialize TodoItem array to markdown
+ * Items with status 'removed' are filtered out (not written to file)
  */
 export function serializeTodoMarkdown(items: TodoItem[]): string {
-  if (items.length === 0) {
+  // Filter out removed items - they don't get persisted
+  const activeItems = items.filter((item) => item.status !== 'removed');
+
+  if (activeItems.length === 0) {
     return '';
   }
 
-  const blocks = items.map((item, index) => {
-    const checkbox = item.done ? 'x' : ' ';
+  const blocks = activeItems.map((item, index) => {
+    const checkbox = item.status === 'done' ? 'x' : ' ';
     let block = `- [${checkbox}] **${item.title}** \`${item.id}\`\n`;
 
     if (item.description) {
@@ -91,7 +95,7 @@ export function serializeTodoMarkdown(items: TodoItem[]): string {
     }
 
     // Add blank line between items (but not after last)
-    if (index < items.length - 1) {
+    if (index < activeItems.length - 1) {
       block += '\n';
     }
 

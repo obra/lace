@@ -20,12 +20,7 @@ import {
   executeJobsList,
   executeJobKill,
 } from '@lace/agent/core/tools/special/job-tools';
-import {
-  executeTodoRead,
-  executeTodoAdd,
-  executeTodoUpdate,
-  executeTodoRemove,
-} from '@lace/agent/todo/todo-tools';
+import { executeTodoRead, executeTodoWrite } from '@lace/agent/todo/todo-tools';
 import type { SpecialToolContext } from '@lace/agent/core/tools/special/types';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import {
@@ -792,31 +787,17 @@ export class ConversationRunner {
     }
 
     // Handle todo tools
-    if (
-      toolName === 'todo_read' ||
-      toolName === 'todo_add' ||
-      toolName === 'todo_update' ||
-      toolName === 'todo_remove'
-    ) {
+    if (toolName === 'todo_read' || toolName === 'todo_write') {
       const todoContext = { sessionDir: this.config.sessionDir };
 
       if (toolName === 'todo_read') {
         return await executeTodoRead(finalInput, todoContext);
       }
-      if (toolName === 'todo_add') {
-        return await executeTodoAdd(
-          finalInput as { title?: string; description?: string },
-          todoContext
-        );
-      }
-      if (toolName === 'todo_update') {
-        return await executeTodoUpdate(
-          finalInput as { id?: string; done?: boolean; title?: string; description?: string },
-          todoContext
-        );
-      }
-      // todo_remove
-      return await executeTodoRemove(finalInput as { id?: string }, todoContext);
+      // todo_write
+      return await executeTodoWrite(
+        finalInput as { id?: string; title?: string; description?: string; status?: 'pending' | 'done' | 'removed' },
+        todoContext
+      );
     }
 
     // Default: execute through tool executor

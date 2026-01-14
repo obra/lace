@@ -2,19 +2,27 @@
 // ABOUTME: Simple task tracking with unique IDs, stored as markdown
 
 /**
+ * Trinary status for todo items
+ * - pending: task not yet done
+ * - done: task completed
+ * - removed: task should be removed from list (filtered out on save)
+ */
+export type TodoStatus = 'pending' | 'done' | 'removed';
+
+/**
  * A single todo item with unique ID
  */
 export interface TodoItem {
   id: string;
-  done: boolean;
+  status: TodoStatus;
   title: string;
   description?: string;
 }
 
 /**
- * Result from todo_add containing the new item's ID
+ * Result from todo_write containing the item's ID
  */
-export interface TodoAddResult {
+export interface TodoWriteResult {
   id: string;
 }
 

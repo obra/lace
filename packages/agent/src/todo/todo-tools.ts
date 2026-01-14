@@ -4,7 +4,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { parseTodoMarkdown, serializeTodoMarkdown } from './markdown';
-import { generateTodoId, type TodoItem } from './types';
+import { generateTodoId, type TodoItem, type TodoStatus } from './types';
 
 const TODO_FILENAME = 'todo.md';
 
@@ -64,7 +64,7 @@ export async function executeTodoRead(
   const cleanItems = items.map((item) => {
     const clean: Record<string, unknown> = {
       id: item.id,
-      done: item.done,
+      status: item.status,
       title: item.title,
     };
     if (item.description !== undefined) {
@@ -80,53 +80,45 @@ export async function executeTodoRead(
 }
 
 /**
- * Execute todo_add - add a new item to the list
+ * Execute todo_write - add a new item or update an existing one
+ *
+ * - No `id` provided → create new item (generate ID, status defaults to 'pending')
+ * - `id` provided → update existing item
+ * - `status: 'removed'` → item will be filtered out when saved
  */
-export async function executeTodoAdd(
-  input: { title?: string; description?: string },
+export async function executeTodoWrite(
+  input: { id?: string; title?: string; description?: string; status?: TodoStatus },
   context: TodoToolContext
 ): Promise<TodoToolResult> {
-  if (!input.title) {
-    return {
-      status: 'failed',
-      content: [{ type: 'text', text: 'todo_add.title is required' }],
-    };
-  }
-
   const items = readTodoList(context.sessionDir);
-  const id = generateTodoId();
 
-  const newItem: TodoItem = {
-    id,
-    done: false,
-    title: input.title,
-    description: input.description,
-  };
-
-  items.push(newItem);
-  writeTodoList(context.sessionDir, items);
-
-  return {
-    status: 'completed',
-    content: [{ type: 'text', text: JSON.stringify({ id }) }],
-  };
-}
-
-/**
- * Execute todo_update - update an existing item
- */
-export async function executeTodoUpdate(
-  input: { id?: string; done?: boolean; title?: string; description?: string },
-  context: TodoToolContext
-): Promise<TodoToolResult> {
+  // CREATE: No id provided - add new item
   if (!input.id) {
+    if (!input.title) {
+      return {
+        status: 'failed',
+        content: [{ type: 'text', text: 'todo_write requires title when creating new item' }],
+      };
+    }
+
+    const id = generateTodoId();
+    const newItem: TodoItem = {
+      id,
+      status: input.status ?? 'pending',
+      title: input.title,
+      description: input.description,
+    };
+
+    items.push(newItem);
+    writeTodoList(context.sessionDir, items);
+
     return {
-      status: 'failed',
-      content: [{ type: 'text', text: 'todo_update.id is required' }],
+      status: 'completed',
+      content: [{ type: 'text', text: JSON.stringify({ id }) }],
     };
   }
 
-  const items = readTodoList(context.sessionDir);
+  // UPDATE: id provided - update existing item
   const itemIndex = items.findIndex((item) => item.id === input.id);
 
   if (itemIndex === -1) {
@@ -139,8 +131,8 @@ export async function executeTodoUpdate(
   const item = items[itemIndex];
 
   // Update only provided fields
-  if (input.done !== undefined) {
-    item.done = input.done;
+  if (input.status !== undefined) {
+    item.status = input.status;
   }
   if (input.title !== undefined) {
     item.title = input.title;
@@ -153,39 +145,6 @@ export async function executeTodoUpdate(
 
   return {
     status: 'completed',
-    content: [{ type: 'text', text: JSON.stringify({ updated: true }) }],
-  };
-}
-
-/**
- * Execute todo_remove - remove an item from the list
- */
-export async function executeTodoRemove(
-  input: { id?: string },
-  context: TodoToolContext
-): Promise<TodoToolResult> {
-  if (!input.id) {
-    return {
-      status: 'failed',
-      content: [{ type: 'text', text: 'todo_remove.id is required' }],
-    };
-  }
-
-  const items = readTodoList(context.sessionDir);
-  const itemIndex = items.findIndex((item) => item.id === input.id);
-
-  if (itemIndex === -1) {
-    return {
-      status: 'failed',
-      content: [{ type: 'text', text: `Item not found: ${input.id}` }],
-    };
-  }
-
-  items.splice(itemIndex, 1);
-  writeTodoList(context.sessionDir, items);
-
-  return {
-    status: 'completed',
-    content: [{ type: 'text', text: JSON.stringify({ removed: true }) }],
+    content: [{ type: 'text', text: JSON.stringify({ id: input.id }) }],
   };
 }

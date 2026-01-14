@@ -10,7 +10,7 @@ describe('parseTodoMarkdown', () => {
     expect(parseTodoMarkdown('   \n\n  ')).toEqual([]);
   });
 
-  it('parses a single incomplete item', () => {
+  it('parses a single pending item', () => {
     const md = `- [ ] **Write tests** \`t_abc\`
   Need to write comprehensive tests.`;
 
@@ -18,14 +18,14 @@ describe('parseTodoMarkdown', () => {
     expect(items).toEqual([
       {
         id: 't_abc',
-        done: false,
+        status: 'pending',
         title: 'Write tests',
         description: 'Need to write comprehensive tests.',
       },
     ]);
   });
 
-  it('parses a single completed item', () => {
+  it('parses a single done item', () => {
     const md = `- [x] **Deploy to prod** \`t_xyz\`
   Deployed successfully.`;
 
@@ -33,7 +33,7 @@ describe('parseTodoMarkdown', () => {
     expect(items).toEqual([
       {
         id: 't_xyz',
-        done: true,
+        status: 'done',
         title: 'Deploy to prod',
         description: 'Deployed successfully.',
       },
@@ -47,7 +47,7 @@ describe('parseTodoMarkdown', () => {
     expect(items).toEqual([
       {
         id: 't_123',
-        done: false,
+        status: 'pending',
         title: 'Quick task',
         description: undefined,
       },
@@ -67,19 +67,19 @@ describe('parseTodoMarkdown', () => {
     expect(items).toHaveLength(3);
     expect(items[0]).toEqual({
       id: 't_aaa',
-      done: false,
+      status: 'pending',
       title: 'First task',
       description: 'Do the first thing.',
     });
     expect(items[1]).toEqual({
       id: 't_bbb',
-      done: true,
+      status: 'done',
       title: 'Second task',
       description: 'Already done.',
     });
     expect(items[2]).toEqual({
       id: 't_ccc',
-      done: false,
+      status: 'pending',
       title: 'Third task',
       description: undefined,
     });
@@ -101,7 +101,7 @@ describe('parseTodoMarkdown', () => {
     const md = `- [X] **Done item** \`t_upp\``;
 
     const items = parseTodoMarkdown(md);
-    expect(items[0].done).toBe(true);
+    expect(items[0].status).toBe('done');
   });
 });
 
@@ -110,11 +110,11 @@ describe('serializeTodoMarkdown', () => {
     expect(serializeTodoMarkdown([])).toBe('');
   });
 
-  it('serializes single incomplete item', () => {
+  it('serializes single pending item', () => {
     const items: TodoItem[] = [
       {
         id: 't_abc',
-        done: false,
+        status: 'pending',
         title: 'Write tests',
         description: 'Need to write comprehensive tests.',
       },
@@ -126,11 +126,11 @@ describe('serializeTodoMarkdown', () => {
 `);
   });
 
-  it('serializes single completed item', () => {
+  it('serializes single done item', () => {
     const items: TodoItem[] = [
       {
         id: 't_xyz',
-        done: true,
+        status: 'done',
         title: 'Deploy to prod',
         description: 'Deployed successfully.',
       },
@@ -146,7 +146,7 @@ describe('serializeTodoMarkdown', () => {
     const items: TodoItem[] = [
       {
         id: 't_123',
-        done: false,
+        status: 'pending',
         title: 'Quick task',
       },
     ];
@@ -158,8 +158,8 @@ describe('serializeTodoMarkdown', () => {
 
   it('serializes multiple items with blank lines between', () => {
     const items: TodoItem[] = [
-      { id: 't_aaa', done: false, title: 'First', description: 'Do first.' },
-      { id: 't_bbb', done: true, title: 'Second' },
+      { id: 't_aaa', status: 'pending', title: 'First', description: 'Do first.' },
+      { id: 't_bbb', status: 'done', title: 'Second' },
     ];
 
     const md = serializeTodoMarkdown(items);
@@ -174,7 +174,7 @@ describe('serializeTodoMarkdown', () => {
     const items: TodoItem[] = [
       {
         id: 't_mul',
-        done: false,
+        status: 'pending',
         title: 'Complex task',
         description: 'Line one\nLine two\nLine three',
       },
@@ -188,11 +188,24 @@ describe('serializeTodoMarkdown', () => {
 `);
   });
 
+  it('filters out removed items', () => {
+    const items: TodoItem[] = [
+      { id: 't_aaa', status: 'pending', title: 'Keep me' },
+      { id: 't_bbb', status: 'removed', title: 'Delete me' },
+      { id: 't_ccc', status: 'done', title: 'Also keep' },
+    ];
+
+    const md = serializeTodoMarkdown(items);
+    expect(md).toContain('Keep me');
+    expect(md).not.toContain('Delete me');
+    expect(md).toContain('Also keep');
+  });
+
   it('round-trips correctly', () => {
     const original: TodoItem[] = [
-      { id: 't_aaa', done: false, title: 'First task', description: 'Details here.' },
-      { id: 't_bbb', done: true, title: 'Second task', description: 'Multi\nline\ndesc' },
-      { id: 't_ccc', done: false, title: 'Third task' },
+      { id: 't_aaa', status: 'pending', title: 'First task', description: 'Details here.' },
+      { id: 't_bbb', status: 'done', title: 'Second task', description: 'Multi\nline\ndesc' },
+      { id: 't_ccc', status: 'pending', title: 'Third task' },
     ];
 
     const md = serializeTodoMarkdown(original);

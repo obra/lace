@@ -1,4 +1,4 @@
-// ABOUTME: E2E tests for todo tools (todo_add, todo_read, todo_update, todo_remove)
+// ABOUTME: E2E tests for todo tools (todo_read, todo_write)
 // ABOUTME: Tests verify todo.md persistence in session directory
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -25,19 +25,19 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     return join(ctx.laceDir, 'agent-sessions', sessionId);
   }
 
-  it('creates todo.md when agent uses todo_add', { timeout: 20_000 }, async () => {
+  it('creates todo.md when agent uses todo_write', { timeout: 20_000 }, async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: Array<Record<string, unknown>> = [];
-    let todoAddCompleted = false;
+    let todoWriteCompleted = false;
 
     ctx.agent.peer.onRequest('session/update', async (params) => {
       const p = params as Record<string, unknown>;
       updates.push(p);
 
-      // Check for todo_add tool completion
-      if (p.type === 'tool_use' && p.name === 'todo_add' && p.status === 'completed') {
-        todoAddCompleted = true;
+      // Check for todo_write tool completion
+      if (p.type === 'tool_use' && p.name === 'todo_write' && p.status === 'completed') {
+        todoWriteCompleted = true;
       }
 
       return undefined;
@@ -68,18 +68,18 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
       'session/prompt'
     );
 
-    // Wait for todo_add to complete
+    // Wait for todo_write to complete
     await withTimeout(
       new Promise<void>((resolve) => {
         const interval = setInterval(() => {
-          if (todoAddCompleted) {
+          if (todoWriteCompleted) {
             clearInterval(interval);
             resolve();
           }
         }, 10);
       }),
       10_000,
-      'todo_add completion'
+      'todo_write completion'
     );
 
     // Verify todo.md was created in session directory
@@ -167,18 +167,18 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     expect(textContent).toContain('t_xyz');
   });
 
-  it('marks tasks done with todo_update', { timeout: 20_000 }, async () => {
+  it('marks tasks done with todo_write', { timeout: 20_000 }, async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: Array<Record<string, unknown>> = [];
-    let todoUpdateCompleted = false;
+    let todoWriteCompleted = false;
 
     ctx.agent.peer.onRequest('session/update', async (params) => {
       const p = params as Record<string, unknown>;
       updates.push(p);
 
-      if (p.type === 'tool_use' && p.name === 'todo_update' && p.status === 'completed') {
-        todoUpdateCompleted = true;
+      if (p.type === 'tool_use' && p.name === 'todo_write' && p.status === 'completed') {
+        todoWriteCompleted = true;
       }
 
       return undefined;
@@ -215,18 +215,18 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
       'session/prompt'
     );
 
-    // Wait for todo_update to complete
+    // Wait for todo_write to complete
     await withTimeout(
       new Promise<void>((resolve) => {
         const interval = setInterval(() => {
-          if (todoUpdateCompleted) {
+          if (todoWriteCompleted) {
             clearInterval(interval);
             resolve();
           }
         }, 10);
       }),
       10_000,
-      'todo_update completion'
+      'todo_write completion'
     );
 
     // Verify the todo.md now has [x] checkbox
