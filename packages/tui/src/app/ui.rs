@@ -1051,6 +1051,7 @@ pub(crate) fn all_slash_commands(state: &AppState) -> Vec<crate::app::SlashComma
             ("context", "Open context viewer"),
             ("mcp servers", "Manage MCP servers"),
             ("compact context", "Compact current context"),
+            ("clear", "Clear conversation and start new session"),
             ("new session", "Start a new session"),
             ("export transcript", "Export chat transcript"),
             ("model", "Switch model (current connection)"),
@@ -1349,7 +1350,7 @@ fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound
                 params: Some(json!({})),
             }]
         }
-        "new session" => {
+        "clear" | "new session" => {
             let mut out = Vec::new();
             let id = state.next_client_id();
             crate::app::sessions::prepare_for_session_switch(state, None);

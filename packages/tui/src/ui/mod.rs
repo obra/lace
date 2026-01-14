@@ -1303,16 +1303,11 @@ fn handle_session_update(state: &mut AppState, params: &Value) {
     let mut saw_turn_end = false;
     for ev in ent::decode_session_update(params) {
         match &ev {
-            AppEvent::TextDelta {
-                turn_id, turn_seq, ..
-            } => {
-                // Debug: log turn context for text delta events (first delta only per message)
-                if state.messages.last().map_or(true, |m| !m.streaming) {
-                    state.push_debug_line(format!(
-                        "text_delta (new msg) turn_id={:?} turn_seq={:?}",
-                        turn_id, turn_seq
-                    ));
-                }
+            AppEvent::TurnStart { .. } => {
+                // TurnStart is handled by reduce() which updates current_turn_id/seq
+            }
+            AppEvent::TextDelta { .. } => {
+                // TextDelta is handled by reduce() which appends to streaming message
             }
             AppEvent::ToolUse {
                 tool_call_id,
@@ -1325,14 +1320,12 @@ fn handle_session_update(state: &mut AppState, params: &Value) {
                 turn_seq,
                 ..
             } => {
-                // Debug: log turn context for tool use events
-                state.push_debug_line(format!(
-                    "tool_use {} status={:?} turn_id={:?} turn_seq={:?}",
-                    name.as_deref().unwrap_or("?"),
-                    status,
-                    turn_id,
-                    turn_seq
-                ));
+                // Use current turn context as fallback when event doesn't have turn_id
+                let effective_turn_id = turn_id
+                    .clone()
+                    .or_else(|| state.current_turn_id.clone());
+                let effective_turn_seq = turn_seq.or(state.current_turn_seq);
+
                 activity::upsert_tool_use(
                     state,
                     tool_call_id.clone(),
@@ -1341,8 +1334,8 @@ fn handle_session_update(state: &mut AppState, params: &Value) {
                     input.clone(),
                     result.clone(),
                     job_id.clone(),
-                    turn_id.clone(),
-                    *turn_seq,
+                    effective_turn_id,
+                    effective_turn_seq,
                 );
             }
             AppEvent::JobStarted { job_id, job_type } => {
@@ -2966,10 +2959,33 @@ fn render_main(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout::
     f.render_widget(render_chat(state), area);
 }
 
+/// Extracts items array from a todo_read result.
+/// The result structure is: { content: [{ type: "text", text: "{\"items\": [...]}" }] }
+fn extract_todo_items(result: &Value) -> Option<Vec<Value>> {
+    // Try direct items field first (for tests and simpler cases)
+    if let Some(items) = result.get("items").and_then(|v| v.as_array()) {
+        return Some(items.clone());
+    }
+
+    // Extract from content array: content[].text is a JSON string containing { items: [...] }
+    let content = result.get("content")?.as_array()?;
+    let text_content = content.iter().find_map(|c| {
+        if c.get("type").and_then(|t| t.as_str()) == Some("text") {
+            c.get("text").and_then(|t| t.as_str())
+        } else {
+            None
+        }
+    })?;
+
+    // Parse the JSON string
+    let parsed: Value = serde_json::from_str(text_content).ok()?;
+    parsed.get("items")?.as_array().cloned()
+}
+
 /// Formats todo_read result as pretty-printed lines.
 /// Returns None if the result doesn't look like a todo list.
 fn format_todo_read_result(result: &Value, colors: &theme::ThemeColors) -> Option<Vec<Line<'static>>> {
-    let items = result.get("items")?.as_array()?;
+    let items = extract_todo_items(result)?;
     if items.is_empty() {
         return Some(vec![Line::from(Span::styled(
             "  (no items)",
@@ -2978,16 +2994,25 @@ fn format_todo_read_result(result: &Value, colors: &theme::ThemeColors) -> Optio
     }
 
     let mut lines = Vec::new();
-    for item in items {
-        let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("?");
+    for item in &items {
         let status = item.get("status").and_then(|v| v.as_str()).unwrap_or("pending");
-        let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("(untitled)");
+        // Support both "title" and "content" field names (Claude Code uses "content")
+        let title = item
+            .get("content")
+            .or_else(|| item.get("title"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("(untitled)");
 
-        let checkbox = if status == "done" { "[x]" } else { "[ ]" };
-        let status_color = if status == "done" {
-            colors.success
+        // Support both "done"/"completed" for done state
+        let is_done = status == "done" || status == "completed";
+        let is_in_progress = status == "in_progress";
+
+        let (checkbox, status_color) = if is_done {
+            ("[x]", colors.success)
+        } else if is_in_progress {
+            ("[>]", colors.accent) // in-progress indicator
         } else {
-            colors.fg_muted
+            ("[ ]", colors.fg_muted)
         };
 
         lines.push(Line::from(vec![
@@ -2995,15 +3020,14 @@ fn format_todo_read_result(result: &Value, colors: &theme::ThemeColors) -> Optio
             Span::styled(checkbox, Style::default().fg(status_color)),
             Span::styled(" ", Style::default()),
             Span::styled(title.to_string(), Style::default().fg(colors.fg_primary)),
-            Span::styled(format!(" `{id}`"), Style::default().fg(colors.fg_muted)),
         ]));
 
-        // Add description if present (indented)
-        if let Some(desc) = item.get("description").and_then(|v| v.as_str()) {
-            for desc_line in desc.lines() {
+        // Add activeForm if present (shows what's currently happening)
+        if let Some(active_form) = item.get("activeForm").and_then(|v| v.as_str()) {
+            if is_in_progress {
                 lines.push(Line::from(Span::styled(
-                    format!("      {desc_line}"),
-                    Style::default().fg(colors.fg_muted),
+                    format!("      {active_form}"),
+                    Style::default().fg(colors.accent),
                 )));
             }
         }
@@ -3012,44 +3036,107 @@ fn format_todo_read_result(result: &Value, colors: &theme::ThemeColors) -> Optio
 }
 
 /// Formats todo_write input/result as a summary line.
-fn format_todo_write_summary(input: &Value, result: Option<&Value>) -> String {
-    // Check if this is an update (has id) or create (has title but no id)
-    if let Some(id) = input.get("id").and_then(|v| v.as_str()) {
-        // Update operation
-        if let Some(status) = input.get("status").and_then(|v| v.as_str()) {
-            if status == "removed" {
-                return format!("remove {id}");
-            } else if status == "done" {
-                return format!("done {id}");
-            } else {
-                return format!("update {id} → {status}");
+fn format_todo_write_summary(input: &Value, _result: Option<&Value>) -> String {
+    // Claude Code TodoWrite takes { todos: [{content, status, activeForm}] }
+    if let Some(todos) = input.get("todos").and_then(|v| v.as_array()) {
+        if todos.is_empty() {
+            return "clear all".to_string();
+        }
+
+        // Count items by status
+        let mut pending = 0;
+        let mut in_progress = 0;
+        let mut completed = 0;
+
+        for todo in todos {
+            match todo.get("status").and_then(|v| v.as_str()) {
+                Some("completed") | Some("done") => completed += 1,
+                Some("in_progress") => in_progress += 1,
+                _ => pending += 1,
             }
         }
-        if let Some(title) = input.get("title").and_then(|v| v.as_str()) {
-            let truncated = if title.len() > 30 {
-                format!("{}...", &title[..27])
-            } else {
-                title.to_string()
-            };
-            return format!("update {id}: {truncated}");
+
+        // Build summary
+        let mut parts = Vec::new();
+        if in_progress > 0 {
+            parts.push(format!("{} active", in_progress));
         }
-        format!("update {id}")
-    } else if let Some(title) = input.get("title").and_then(|v| v.as_str()) {
-        // Create operation
-        let truncated = if title.len() > 40 {
-            format!("{}...", &title[..37])
+        if pending > 0 {
+            parts.push(format!("{} pending", pending));
+        }
+        if completed > 0 {
+            parts.push(format!("{} done", completed));
+        }
+
+        if parts.is_empty() {
+            format!("{} items", todos.len())
         } else {
-            title.to_string()
-        };
-        if let Some(res) = result {
-            if let Some(new_id) = res.get("id").and_then(|v| v.as_str()) {
-                return format!("add \"{truncated}\" → {new_id}");
+            parts.join(", ")
+        }
+    } else {
+        // Fallback for legacy single-item format
+        "update".to_string()
+    }
+}
+
+/// Counts the number of lines a tool call will render to.
+/// This mirrors the logic of `render_tool_call_line` but only counts lines.
+/// Used by `chat_total_rendered_lines` to calculate scroll height.
+fn tool_call_line_count(item: &activity::ActivityItem, selected: bool, expanded: bool) -> usize {
+    let mut count = 1; // Always one base line for tool summary
+
+    let tool_name = item
+        .tool_name
+        .as_ref()
+        .map(|s| s.as_str())
+        .unwrap_or("unknown");
+    let is_complete =
+        item.status.as_deref() == Some("completed") || item.status.as_deref() == Some("success");
+
+    if selected && expanded {
+        // When expanded: up to 16 detail lines (15 JSON lines + maybe truncation)
+        if let Some(details) = &item.details {
+            let pretty =
+                serde_json::to_string_pretty(details).unwrap_or_else(|_| details.to_string());
+            let line_count = pretty.lines().count();
+            if line_count > 15 {
+                count += 16; // 15 lines + truncation indicator
+            } else {
+                count += line_count;
             }
         }
-        format!("add \"{truncated}\"")
-    } else {
-        "write".to_string()
+    } else if is_complete {
+        // Folded result preview for completed tools
+        if tool_name == "todo_read" {
+            // Count todo items (each item = 1 line, +1 for activeForm if in_progress)
+            let result = item.details.as_ref().and_then(|d| d.get("result"));
+            if let Some(res) = result {
+                if let Some(items) = extract_todo_items(res) {
+                    if items.is_empty() {
+                        count += 1; // "(no items)" line
+                    } else {
+                        for todo_item in &items {
+                            count += 1; // content line
+                            // Add line for activeForm if in_progress
+                            let status = todo_item
+                                .get("status")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("pending");
+                            if status == "in_progress"
+                                && todo_item.get("activeForm").is_some()
+                            {
+                                count += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        } else if item.result_preview.is_some() {
+            count += 1; // Result preview line
+        }
     }
+
+    count
 }
 
 /// Renders a tool call with status indicator and optional folded result.
@@ -3107,7 +3194,8 @@ fn render_tool_call_line(
     } else if tool_name == "todo_read" {
         // For todo_read, just show "reading..." or item count
         if let Some(res) = result {
-            if let Some(items) = res.get("items").and_then(|v| v.as_array()) {
+            // Use extract_todo_items to handle both direct and protocol formats
+            if let Some(items) = extract_todo_items(res) {
                 format!(" ({} items)", items.len())
             } else {
                 String::new()
@@ -3264,6 +3352,21 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
         }
         prev_role = Some(&m.role);
 
+        // For assistant messages, render tool calls FIRST (before message text)
+        // This ensures the tool header appears before any tool output in the message
+        if m.role == Role::Assistant {
+            if let Some(turn_id) = &m.turn_id {
+                if let Some(tools) = tools_by_turn_id.get(turn_id) {
+                    for (idx, tool) in tools {
+                        let is_selected = state.chat_selected_tool_idx == Some(*idx);
+                        let is_expanded = is_selected && state.chat_tool_expanded;
+                        lines.extend(render_tool_call_line(tool, colors, is_selected, is_expanded));
+                        rendered_tool_indices.insert(*idx);
+                    }
+                }
+            }
+        }
+
         // Message content with streaming cursor if applicable
         let mut text = m.text.clone();
         if m.role == Role::Assistant && m.streaming {
@@ -3287,21 +3390,6 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
             }
 
             lines.push(Line::from(spans));
-        }
-
-        // After assistant message, render any tool calls from this turn inline
-        // Match by turn_id (same for all events in a turn)
-        if m.role == Role::Assistant {
-            if let Some(turn_id) = &m.turn_id {
-                if let Some(tools) = tools_by_turn_id.get(turn_id) {
-                    for (idx, tool) in tools {
-                        let is_selected = state.chat_selected_tool_idx == Some(*idx);
-                        let is_expanded = is_selected && state.chat_tool_expanded;
-                        lines.extend(render_tool_call_line(tool, colors, is_selected, is_expanded));
-                        rendered_tool_indices.insert(*idx);
-                    }
-                }
-            }
         }
     }
 
@@ -3894,6 +3982,21 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
 
     let mut total: usize = 0;
     let mut prev_role: Option<&Role> = None;
+
+    // Build map of turn_id -> tools for matching (same as render_chat)
+    let completed_tools = state.completed_tool_calls();
+    let mut tools_by_turn_id: std::collections::HashMap<String, Vec<(usize, &activity::ActivityItem)>> =
+        std::collections::HashMap::new();
+    for (i, tool) in completed_tools.iter().enumerate() {
+        if let Some(id) = &tool.turn_id {
+            tools_by_turn_id.entry(id.clone()).or_default().push((i, tool));
+        }
+    }
+
+    // Track which tools we've counted (for orphaned tools at end)
+    let mut counted_tool_indices: std::collections::HashSet<usize> =
+        std::collections::HashSet::new();
+
     for m in &state.messages {
         // Blank line only on role change (matching render_chat's grouping logic)
         if let Some(prev) = prev_role {
@@ -3902,6 +4005,20 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
             }
         }
         prev_role = Some(&m.role);
+
+        // For assistant messages, count inline tools FIRST (before message text)
+        if m.role == Role::Assistant {
+            if let Some(turn_id) = &m.turn_id {
+                if let Some(tools) = tools_by_turn_id.get(turn_id) {
+                    for (idx, tool) in tools {
+                        let is_selected = state.chat_selected_tool_idx == Some(*idx);
+                        let is_expanded = is_selected && state.chat_tool_expanded;
+                        total += tool_call_line_count(tool, is_selected, is_expanded);
+                        counted_tool_indices.insert(*idx);
+                    }
+                }
+            }
+        }
 
         let mut text = m.text.clone();
         if m.role == Role::Assistant && m.streaming {
@@ -3919,11 +4036,29 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
         }
     }
 
+    // Count orphaned completed tools (without turn_id or not matched)
+    let orphaned_tools: Vec<_> = completed_tools
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !counted_tool_indices.contains(i))
+        .collect();
+    if !orphaned_tools.is_empty() {
+        total += 1; // blank line before orphaned tools
+        for (i, tool) in orphaned_tools {
+            let is_selected = state.chat_selected_tool_idx == Some(i);
+            let is_expanded = is_selected && state.chat_tool_expanded;
+            total += tool_call_line_count(tool, is_selected, is_expanded);
+        }
+    }
+
     // Add lines for pending tool calls
     let pending_tools = state.pending_tool_calls();
     if !pending_tools.is_empty() {
-        total += 1; // blank line before tool calls
-        total += pending_tools.len(); // one line per tool call
+        total += 1; // blank line before pending tools
+        for tool in pending_tools {
+            // Pending tools are never selected/expanded
+            total += tool_call_line_count(tool, false, false);
+        }
     }
 
     // Thinking indicator is now in the status bar, not the chat
@@ -4706,47 +4841,56 @@ mod tests {
     }
 
     #[test]
-    fn format_todo_write_summary_create_with_result() {
-        let input = json!({ "title": "Write unit tests" });
-        let result = json!({ "id": "t_abc" });
-        let summary = format_todo_write_summary(&input, Some(&result));
-        assert_eq!(summary, "add \"Write unit tests\" → t_abc");
+    fn format_todo_write_summary_with_mixed_statuses() {
+        // Claude Code format: todos array with content/status/activeForm
+        let input = json!({
+            "todos": [
+                { "content": "Task 1", "status": "completed", "activeForm": "Done" },
+                { "content": "Task 2", "status": "in_progress", "activeForm": "Working on task 2" },
+                { "content": "Task 3", "status": "pending", "activeForm": "Adding task 3" }
+            ]
+        });
+        let summary = format_todo_write_summary(&input, None);
+        assert_eq!(summary, "1 active, 1 pending, 1 done");
     }
 
     #[test]
-    fn format_todo_write_summary_create_without_result() {
-        let input = json!({ "title": "Write unit tests" });
+    fn format_todo_write_summary_all_pending() {
+        let input = json!({
+            "todos": [
+                { "content": "Task 1", "status": "pending", "activeForm": "Adding task 1" },
+                { "content": "Task 2", "status": "pending", "activeForm": "Adding task 2" }
+            ]
+        });
         let summary = format_todo_write_summary(&input, None);
-        assert_eq!(summary, "add \"Write unit tests\"");
+        assert_eq!(summary, "2 pending");
     }
 
     #[test]
-    fn format_todo_write_summary_mark_done() {
-        let input = json!({ "id": "t_abc", "status": "done" });
+    fn format_todo_write_summary_all_completed() {
+        let input = json!({
+            "todos": [
+                { "content": "Task 1", "status": "completed", "activeForm": "Done" },
+                { "content": "Task 2", "status": "completed", "activeForm": "Done" }
+            ]
+        });
         let summary = format_todo_write_summary(&input, None);
-        assert_eq!(summary, "done t_abc");
+        assert_eq!(summary, "2 done");
     }
 
     #[test]
-    fn format_todo_write_summary_remove() {
-        let input = json!({ "id": "t_xyz", "status": "removed" });
+    fn format_todo_write_summary_empty_clears() {
+        let input = json!({ "todos": [] });
         let summary = format_todo_write_summary(&input, None);
-        assert_eq!(summary, "remove t_xyz");
+        assert_eq!(summary, "clear all");
     }
 
     #[test]
-    fn format_todo_write_summary_update_title() {
-        let input = json!({ "id": "t_abc", "title": "New title" });
+    fn format_todo_write_summary_legacy_fallback() {
+        // Legacy format without todos array falls back gracefully
+        let input = json!({ "title": "Some task" });
         let summary = format_todo_write_summary(&input, None);
-        assert_eq!(summary, "update t_abc: New title");
-    }
-
-    #[test]
-    fn format_todo_write_summary_truncates_long_title() {
-        let input = json!({ "title": "This is a very long task title that should be truncated" });
-        let summary = format_todo_write_summary(&input, None);
-        assert!(summary.len() <= 50); // add "" + truncated + ...
-        assert!(summary.ends_with("...\""));
+        assert_eq!(summary, "update");
     }
 
     #[test]
@@ -4775,22 +4919,22 @@ mod tests {
     }
 
     #[test]
-    fn format_todo_read_result_with_description() {
+    fn format_todo_read_result_with_active_form() {
+        // Claude Code format: in_progress items show activeForm line
         let colors = theme::ThemeColors::dark();
         let result = json!({
             "items": [
                 {
-                    "id": "t_aaa",
-                    "status": "pending",
-                    "title": "Task with desc",
-                    "description": "Line 1\nLine 2"
+                    "content": "Task in progress",
+                    "status": "in_progress",
+                    "activeForm": "Working on this task"
                 }
             ]
         });
         let lines = format_todo_read_result(&result, &colors);
         assert!(lines.is_some());
         let lines = lines.unwrap();
-        assert_eq!(lines.len(), 3); // 1 item + 2 description lines
+        assert_eq!(lines.len(), 2); // 1 item + 1 activeForm line
     }
 
     #[test]
@@ -4799,5 +4943,317 @@ mod tests {
         let result = json!({ "error": "something went wrong" });
         let lines = format_todo_read_result(&result, &colors);
         assert!(lines.is_none());
+    }
+
+    #[test]
+    fn format_todo_read_result_with_protocol_format() {
+        // Test the actual format from the protocol: content array with JSON string
+        let colors = theme::ThemeColors::dark();
+        let result = json!({
+            "content": [{
+                "type": "text",
+                "text": "{\"items\":[{\"id\":\"t_abc\",\"status\":\"pending\",\"title\":\"Test task\"}]}"
+            }]
+        });
+        let lines = format_todo_read_result(&result, &colors);
+        assert!(lines.is_some());
+        let lines = lines.unwrap();
+        assert_eq!(lines.len(), 1);
+    }
+
+    #[test]
+    fn extract_todo_items_from_protocol_format() {
+        let result = json!({
+            "content": [{
+                "type": "text",
+                "text": "{\"items\":[{\"id\":\"t_xyz\",\"status\":\"done\",\"title\":\"Completed\"}]}"
+            }]
+        });
+        let items = extract_todo_items(&result);
+        assert!(items.is_some());
+        let items = items.unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].get("id").unwrap(), "t_xyz");
+    }
+
+    #[test]
+    fn tools_render_inline_with_matching_turn_id() {
+        use ratatui::buffer::Buffer;
+        use ratatui::layout::Rect;
+        use ratatui::widgets::Widget;
+
+        let mut state = AppState::new_with_paths(None, None);
+
+        // Add an assistant message with a turn_id
+        state.messages.push(crate::app::ChatMessage {
+            role: Role::Assistant,
+            text: "I'll read that file.".to_string(),
+            streaming: false,
+            turn_id: Some("turn_abc123".to_string()),
+            turn_seq: Some(0),
+        });
+
+        // Add a completed tool call with the SAME turn_id
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_1".to_string(),
+            Some("file_read".to_string()),
+            Some("completed".to_string()),
+            json!({"path": "/test/file.txt"}),
+            Some(json!({"content": "file contents"})),
+            None,
+            Some("turn_abc123".to_string()), // Same turn_id as the message
+            Some(1),
+        );
+
+        let paragraph = render_chat(&state);
+
+        // Render to a buffer to inspect the output
+        let area = Rect::new(0, 0, 80, 20);
+        let mut buffer = Buffer::empty(area);
+        paragraph.render(area, &mut buffer);
+
+        // Extract the rendered lines
+        let mut lines: Vec<String> = Vec::new();
+        for y in 0..area.height {
+            let line: String = (0..area.width)
+                .map(|x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+                .collect::<String>()
+                .trim_end()
+                .to_string();
+            lines.push(line);
+        }
+
+        // Remove trailing empty lines
+        while lines.last().map(|l| l.is_empty()).unwrap_or(false) {
+            lines.pop();
+        }
+
+        // Tool call should appear BEFORE the message text (inline header first)
+        // NOT after a blank line (which would indicate orphaned/at-end rendering)
+        assert!(
+            lines.len() >= 2,
+            "Expected at least 2 lines (tool + message), got {}",
+            lines.len()
+        );
+
+        // Line 0 should be the tool call header (before message text)
+        assert!(
+            lines[0].contains("file_read"),
+            "Line 0 should be the tool call header, got: {:?}",
+            lines[0]
+        );
+
+        // Line 1 should contain the message text (after tool header)
+        assert!(
+            lines[1].contains("read that file"),
+            "Line 1 should be the message text, got: {:?}.\nAll lines:\n{}",
+            lines[1],
+            lines.iter().enumerate().map(|(i, l)| format!("{}: {:?}", i, l)).collect::<Vec<_>>().join("\n")
+        );
+    }
+
+    #[test]
+    fn tools_render_at_end_without_matching_turn_id() {
+        use ratatui::buffer::Buffer;
+        use ratatui::layout::Rect;
+        use ratatui::widgets::Widget;
+
+        let mut state = AppState::new_with_paths(None, None);
+
+        // Add an assistant message with a turn_id
+        state.messages.push(crate::app::ChatMessage {
+            role: Role::Assistant,
+            text: "I'll read that file.".to_string(),
+            streaming: false,
+            turn_id: Some("turn_abc123".to_string()),
+            turn_seq: Some(0),
+        });
+
+        // Add a completed tool call with a DIFFERENT turn_id (orphaned)
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_1".to_string(),
+            Some("file_read".to_string()),
+            Some("completed".to_string()),
+            json!({"path": "/test/file.txt"}),
+            Some(json!({"content": "file contents"})),
+            None,
+            Some("turn_different".to_string()), // Different turn_id
+            Some(1),
+        );
+
+        let paragraph = render_chat(&state);
+
+        // Render to a buffer to inspect the output
+        let area = Rect::new(0, 0, 80, 20);
+        let mut buffer = Buffer::empty(area);
+        paragraph.render(area, &mut buffer);
+
+        // Extract the rendered lines
+        let mut lines: Vec<String> = Vec::new();
+        for y in 0..area.height {
+            let line: String = (0..area.width)
+                .map(|x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+                .collect::<String>()
+                .trim_end()
+                .to_string();
+            lines.push(line);
+        }
+
+        // Remove trailing empty lines
+        while lines.last().map(|l| l.is_empty()).unwrap_or(false) {
+            lines.pop();
+        }
+
+        // With mismatched turn_ids, the tool should be orphaned and rendered at the end
+        // There should be a blank line between the message and the orphaned tools
+        assert!(
+            lines.len() >= 3,
+            "Expected at least 3 lines (message, blank, tool), got {}",
+            lines.len()
+        );
+
+        // Line 0 should contain the message text
+        assert!(
+            lines[0].contains("read that file"),
+            "Line 0 should be the message, got: {:?}",
+            lines[0]
+        );
+
+        // Line 1 should be blank (separator before orphaned tools)
+        assert!(
+            lines[1].is_empty(),
+            "Line 1 should be blank (orphaned tool separator), got: {:?}",
+            lines[1]
+        );
+
+        // Line 2 should be the orphaned tool call
+        assert!(
+            lines[2].contains("file_read"),
+            "Line 2 should be the orphaned tool call, got: {:?}",
+            lines[2]
+        );
+    }
+
+    #[test]
+    fn full_event_flow_preserves_turn_ids() {
+        use ratatui::buffer::Buffer;
+        use ratatui::layout::Rect;
+        use ratatui::widgets::Widget;
+        use serde_json::json;
+
+        let mut state = AppState::new_with_paths(None, None);
+
+        // Simulate the full flow of events as they would arrive from the agent:
+        // 1. turn_start with turnId
+        // 2. text_delta with turnId
+        // 3. tool_use (pending) with turnId
+        // 4. tool_use (completed) with turnId
+
+        // Parse and apply events as they would be in handle_session_update
+        let events = vec![
+            json!({"type": "turn_start", "turnId": "turn_test_123", "turnSeq": 0}),
+            json!({"type": "text_delta", "text": "I'll read the config file.", "turnId": "turn_test_123", "turnSeq": 1}),
+            json!({"type": "tool_use", "toolCallId": "tool_read_1", "name": "file_read", "status": "running", "input": {"path": "/etc/config"}, "turnId": "turn_test_123", "turnSeq": 2}),
+            json!({"type": "tool_use", "toolCallId": "tool_read_1", "name": "file_read", "status": "completed", "input": {"path": "/etc/config"}, "result": {"content": "config data"}, "turnId": "turn_test_123", "turnSeq": 3}),
+        ];
+
+        for event_json in events {
+            for ev in crate::protocol::ent::decode_session_update(&event_json) {
+                match &ev {
+                    crate::app::reducer::AppEvent::ToolUse {
+                        tool_call_id,
+                        name,
+                        status,
+                        input,
+                        result,
+                        job_id,
+                        turn_id,
+                        turn_seq,
+                        ..
+                    } => {
+                        activity::upsert_tool_use(
+                            &mut state,
+                            tool_call_id.clone(),
+                            name.clone(),
+                            status.clone(),
+                            input.clone(),
+                            result.clone(),
+                            job_id.clone(),
+                            turn_id.clone(),
+                            *turn_seq,
+                        );
+                    }
+                    _ => {}
+                }
+                crate::app::reducer::reduce(&mut state, ev);
+            }
+        }
+
+        // Verify state is correct
+        assert_eq!(state.messages.len(), 1, "Should have 1 assistant message");
+        assert_eq!(
+            state.messages[0].turn_id,
+            Some("turn_test_123".to_string()),
+            "Message should have turn_id"
+        );
+
+        let completed = state.completed_tool_calls();
+        assert_eq!(completed.len(), 1, "Should have 1 completed tool");
+        assert_eq!(
+            completed[0].turn_id,
+            Some("turn_test_123".to_string()),
+            "Tool should have matching turn_id"
+        );
+
+        // Now render and verify the tool is inline with the message
+        let paragraph = render_chat(&state);
+
+        let area = Rect::new(0, 0, 80, 20);
+        let mut buffer = Buffer::empty(area);
+        paragraph.render(area, &mut buffer);
+
+        let mut lines: Vec<String> = Vec::new();
+        for y in 0..area.height {
+            let line: String = (0..area.width)
+                .map(|x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+                .collect::<String>()
+                .trim_end()
+                .to_string();
+            lines.push(line);
+        }
+
+        while lines.last().map(|l| l.is_empty()).unwrap_or(false) {
+            lines.pop();
+        }
+
+        // Tool call should appear BEFORE message text (inline header first)
+        assert!(
+            lines.len() >= 2,
+            "Expected at least 2 lines (tool + message), got {}: {:?}",
+            lines.len(),
+            lines
+        );
+
+        // Line 0 should be the tool call header (before message text)
+        assert!(
+            lines[0].contains("file_read"),
+            "Line 0 should be the tool call header, got: {:?}",
+            lines[0]
+        );
+
+        // Line 1 should contain message text (after tool header)
+        assert!(
+            lines[1].contains("config file"),
+            "Line 1 should be the message text, got: {:?}\nAll lines:\n{}",
+            lines[1],
+            lines
+                .iter()
+                .enumerate()
+                .map(|(i, l)| format!("{}: {:?}", i, l))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
     }
 }
