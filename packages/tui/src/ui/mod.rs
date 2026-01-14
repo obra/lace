@@ -679,6 +679,15 @@ fn run_loop(
                                 state.debug_overlay_open = false; // Close debug if opening activity
                                 continue;
                             }
+                            KeyCode::Char('`') => {
+                                // Cycle focus: Input -> Chat -> Input
+                                // (Activity and Debug are overlays, not focus targets)
+                                state.focus = match state.focus {
+                                    Focus::Input => Focus::Chat,
+                                    Focus::Chat | Focus::Activity | Focus::Debug => Focus::Input,
+                                };
+                                continue;
+                            }
                             _ => {}
                         }
                     }
@@ -3560,6 +3569,7 @@ fn render_help_modal(state: &AppState) -> Paragraph<'static> {
         Line::from("Ctrl+V   Paste image from clipboard (macOS)"),
         Line::from("Ctrl+A   Toggle activity overlay"),
         Line::from("Ctrl+D   Toggle debug overlay"),
+        Line::from("Ctrl+`   Switch focus (Input/Chat)"),
         Line::from("Tab      Cycle slash options or open picker"),
         Line::from("Alt+Enter  Newline in input"),
         Line::from("Enter/Ctrl+Enter  Send message"),
