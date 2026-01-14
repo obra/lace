@@ -674,11 +674,6 @@ fn run_loop(
                                 state.activity_overlay_open = false; // Close activity if opening debug
                                 continue;
                             }
-                            KeyCode::Char('a') => {
-                                state.activity_overlay_open = !state.activity_overlay_open;
-                                state.debug_overlay_open = false; // Close debug if opening activity
-                                continue;
-                            }
                             KeyCode::Char('`') => {
                                 // Cycle focus: Input -> Chat -> Input
                                 // (Activity and Debug are overlays, not focus targets)
@@ -694,6 +689,13 @@ fn run_loop(
 
                     if is_help_toggle_key(key.code, key.modifiers) {
                         let _ = apply_ui_action(state, UiAction::ToggleHelp);
+                        continue;
+                    }
+
+                    // F2 toggles activity overlay
+                    if key.code == KeyCode::F(2) && key.modifiers.is_empty() {
+                        state.activity_overlay_open = !state.activity_overlay_open;
+                        state.debug_overlay_open = false;
                         continue;
                     }
 
@@ -3302,7 +3304,7 @@ fn render_debug_overlay(state: &AppState) -> Paragraph<'static> {
 }
 
 /// Renders a full-screen activity overlay.
-/// Toggled with Ctrl+A, closed with Esc.
+/// Toggled with F2, closed with Esc.
 fn render_activity_overlay(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
     let colors = &styles.colors;
@@ -3567,7 +3569,7 @@ fn render_help_modal(state: &AppState) -> Paragraph<'static> {
         Line::from("Ctrl+C   Cancel request / double to quit"),
         Line::from("Ctrl+F   Search"),
         Line::from("Ctrl+V   Paste image from clipboard (macOS)"),
-        Line::from("Ctrl+A   Toggle activity overlay"),
+        Line::from("F2       Toggle activity overlay"),
         Line::from("Ctrl+D   Toggle debug overlay"),
         Line::from("Ctrl+`   Switch focus (Input/Chat)"),
         Line::from("Tab      Cycle slash options or open picker"),
