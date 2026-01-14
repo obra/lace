@@ -81,6 +81,21 @@ pub fn run_tui(args: Args) -> io::Result<()> {
     state.slash_commands = bootstrap_result.slash_commands;
     state.messages = bootstrap_result.history;
     state.workdir = workdir.to_string_lossy().to_string();
+
+    // Apply tool use history to activity list (for session reload)
+    for tool in bootstrap_result.tool_history {
+        activity::upsert_tool_use(
+            &mut state,
+            tool.tool_call_id,
+            tool.name,
+            tool.status,
+            tool.input,
+            tool.result,
+            tool.job_id,
+            tool.turn_id,
+            tool.turn_seq,
+        );
+    }
     state.next_client_seq = 4; // Updated since we now send c_history request
     state.push_activity_line(format!("timeout-ms={}", args.timeout_ms));
 

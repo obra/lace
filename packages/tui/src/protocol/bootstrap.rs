@@ -6,6 +6,19 @@ use std::io;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+/// Tool use event from session history
+#[derive(Debug, Clone)]
+pub struct HistoryToolUse {
+    pub tool_call_id: String,
+    pub name: Option<String>,
+    pub status: Option<String>,
+    pub input: Value,
+    pub result: Option<Value>,
+    pub job_id: Option<String>,
+    pub turn_id: Option<String>,
+    pub turn_seq: Option<i64>,
+}
+
 /// Result from bootstrapping an agent session
 #[derive(Debug, Clone)]
 pub struct BootstrapResult {
@@ -13,6 +26,8 @@ pub struct BootstrapResult {
     pub slash_commands: Vec<SlashCommand>,
     /// Conversation history loaded from an existing session
     pub history: Vec<ChatMessage>,
+    /// Tool use history from an existing session
+    pub tool_history: Vec<HistoryToolUse>,
 }
 
 pub fn bootstrap_session(
@@ -105,16 +120,17 @@ pub fn bootstrap_session(
         if init_ok {
             if let Some(sid) = session_id.clone() {
                 // If we loaded an existing session, fetch history
-                let history = if load_session_id.is_some() {
+                let (history, tool_history) = if load_session_id.is_some() {
                     fetch_session_history(transport)?
                 } else {
-                    Vec::new()
+                    (Vec::new(), Vec::new())
                 };
 
                 return Ok(BootstrapResult {
                     session_id: sid,
                     slash_commands,
                     history,
+                    tool_history,
                 });
             }
         }
@@ -126,8 +142,10 @@ pub fn bootstrap_session(
     ))
 }
 
-/// Fetch session history via ent/session/events and convert to ChatMessages
-fn fetch_session_history(transport: &AgentTransport) -> io::Result<Vec<ChatMessage>> {
+/// Fetch session history via ent/session/events and convert to ChatMessages and ToolUse history
+fn fetch_session_history(
+    transport: &AgentTransport,
+) -> io::Result<(Vec<ChatMessage>, Vec<HistoryToolUse>)> {
     // Send request for events
     transport
         .send_line(jsonrpc::encode_request(
@@ -164,7 +182,7 @@ fn fetch_session_history(transport: &AgentTransport) -> io::Result<Vec<ChatMessa
                     if let Some(error) = error {
                         // Log error but don't fail - just return empty history
                         eprintln!("Warning: failed to fetch history: {}", error.message);
-                        return Ok(Vec::new());
+                        return Ok((Vec::new(), Vec::new()));
                     }
                     return Ok(parse_history_events(&result));
                 }
@@ -178,7 +196,7 @@ fn fetch_session_history(transport: &AgentTransport) -> io::Result<Vec<ChatMessa
     }
 
     // Timeout - return empty history rather than failing
-    Ok(Vec::new())
+    Ok((Vec::new(), Vec::new()))
 }
 
 fn extract_session_id(result: Option<Value>) -> Option<String> {
@@ -233,16 +251,17 @@ fn extract_slash_commands(result: &Option<Value>) -> Vec<SlashCommand> {
         .collect()
 }
 
-/// Parse ent/session/events response into ChatMessage list
-fn parse_history_events(result: &Option<Value>) -> Vec<ChatMessage> {
+/// Parse ent/session/events response into ChatMessage list and ToolUse history
+fn parse_history_events(result: &Option<Value>) -> (Vec<ChatMessage>, Vec<HistoryToolUse>) {
     let Some(Value::Object(obj)) = result else {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     };
     let Some(Value::Array(events)) = obj.get("events") else {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     };
 
     let mut messages: Vec<ChatMessage> = Vec::new();
+    let mut tool_history: Vec<HistoryToolUse> = Vec::new();
 
     for event in events {
         let Some(event_obj) = event.as_object() else {
@@ -272,12 +291,34 @@ fn parse_history_events(result: &Option<Value>) -> Vec<ChatMessage> {
                 }
             }
             "message" => {
-                // Assistant message: data.content is a string
-                if let Some(text) = data
+                // Assistant message: data.content may be a string or array of content blocks
+                let text = data
                     .and_then(|d| d.get("content"))
-                    .and_then(|c| c.as_str())
-                    .map(|s| s.to_string())
-                {
+                    .and_then(|c| {
+                        // Try as string first (legacy or simple format)
+                        if let Some(s) = c.as_str() {
+                            return Some(s.to_string());
+                        }
+                        // Try as array of content blocks
+                        if let Some(arr) = c.as_array() {
+                            let text_parts: Vec<String> = arr
+                                .iter()
+                                .filter_map(|block| {
+                                    let obj = block.as_object()?;
+                                    if obj.get("type").and_then(|v| v.as_str()) == Some("text") {
+                                        obj.get("text").and_then(|v| v.as_str()).map(|s| s.to_string())
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+                            if !text_parts.is_empty() {
+                                return Some(text_parts.join("\n"));
+                            }
+                        }
+                        None
+                    });
+                if let Some(text) = text {
                     messages.push(ChatMessage {
                         role: Role::Assistant,
                         text,
@@ -287,12 +328,62 @@ fn parse_history_events(result: &Option<Value>) -> Vec<ChatMessage> {
                     });
                 }
             }
-            // Skip other event types (turn_start, turn_end, tool_use, etc.)
+            "tool_use" => {
+                // Tool use event: extract tool call details from data object
+                if let Some(data_obj) = data.and_then(|d| d.as_object()) {
+                    if let Some(tool_call_id) = data_obj
+                        .get("toolCallId")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                    {
+                        let name = data_obj
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+
+                        // Status may be directly available or derived from result.outcome
+                        let status = data_obj
+                            .get("status")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())
+                            .or_else(|| {
+                                // Derive status from result.outcome for durable events
+                                data_obj
+                                    .get("result")
+                                    .and_then(|r| r.get("outcome"))
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string())
+                            });
+
+                        let input = data_obj
+                            .get("input")
+                            .cloned()
+                            .unwrap_or(Value::Null);
+                        let result = data_obj.get("result").cloned();
+                        let job_id = data_obj
+                            .get("jobId")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+
+                        tool_history.push(HistoryToolUse {
+                            tool_call_id,
+                            name,
+                            status,
+                            input,
+                            result,
+                            job_id,
+                            turn_id,
+                            turn_seq,
+                        });
+                    }
+                }
+            }
+            // Skip other event types (turn_start, turn_end, etc.)
             _ => {}
         }
     }
 
-    messages
+    (messages, tool_history)
 }
 
 /// Extract text from a content array (used for prompt events)
@@ -324,6 +415,7 @@ mod tests {
 
     #[test]
     fn parses_history_events_into_messages() {
+        // Test with actual durable event structure (content as array of content blocks)
         let result = Some(json!({
             "events": [
                 {
@@ -349,7 +441,7 @@ mod tests {
                     "type": "message",
                     "turnId": "turn_1",
                     "turnSeq": 1,
-                    "data": { "content": "Hi there!" }
+                    "data": { "content": [{ "type": "text", "text": "Hi there!" }] }
                 },
                 {
                     "eventSeq": 5,
@@ -361,8 +453,9 @@ mod tests {
             "hasMore": false
         }));
 
-        let messages = parse_history_events(&result);
+        let (messages, tool_history) = parse_history_events(&result);
         assert_eq!(messages.len(), 2);
+        assert!(tool_history.is_empty());
 
         assert_eq!(messages[0].role, Role::User);
         assert_eq!(messages[0].text, "Hello world");
@@ -376,15 +469,90 @@ mod tests {
     }
 
     #[test]
+    fn parses_message_with_string_content_legacy() {
+        // Test legacy format where content is a plain string
+        let result = Some(json!({
+            "events": [
+                {
+                    "eventSeq": 1,
+                    "type": "message",
+                    "turnId": "turn_1",
+                    "turnSeq": 1,
+                    "data": { "content": "Plain string content" }
+                }
+            ],
+            "hasMore": false
+        }));
+
+        let (messages, _) = parse_history_events(&result);
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].text, "Plain string content");
+    }
+
+    #[test]
+    fn parses_tool_use_history() {
+        // Test with actual durable event structure (status derived from result.outcome)
+        let result = Some(json!({
+            "events": [
+                {
+                    "eventSeq": 1,
+                    "type": "prompt",
+                    "turnId": "turn_1",
+                    "turnSeq": 0,
+                    "data": { "content": [{ "type": "text", "text": "Read a file" }] }
+                },
+                {
+                    "eventSeq": 2,
+                    "type": "tool_use",
+                    "turnId": "turn_1",
+                    "turnSeq": 1,
+                    "data": {
+                        "toolCallId": "tool_1",
+                        "name": "Read",
+                        "kind": "read",
+                        "input": { "path": "/tmp/test.txt" },
+                        "result": { "outcome": "completed", "content": [{"type": "text", "text": "hello world"}] }
+                    }
+                },
+                {
+                    "eventSeq": 3,
+                    "type": "message",
+                    "turnId": "turn_1",
+                    "turnSeq": 2,
+                    "data": { "content": [{ "type": "text", "text": "The file contains: hello world" }] }
+                }
+            ],
+            "hasMore": false
+        }));
+
+        let (messages, tool_history) = parse_history_events(&result);
+        assert_eq!(messages.len(), 2);
+        assert_eq!(tool_history.len(), 1);
+
+        let tool = &tool_history[0];
+        assert_eq!(tool.tool_call_id, "tool_1");
+        assert_eq!(tool.name, Some("Read".to_string()));
+        // Status derived from result.outcome
+        assert_eq!(tool.status, Some("completed".to_string()));
+        assert_eq!(tool.turn_id, Some("turn_1".to_string()));
+        assert_eq!(tool.turn_seq, Some(1));
+        assert!(tool.result.is_some());
+        // Verify input was captured
+        assert_eq!(tool.input.get("path").and_then(|v| v.as_str()), Some("/tmp/test.txt"));
+    }
+
+    #[test]
     fn parses_empty_history() {
         let result = Some(json!({ "events": [], "hasMore": false }));
-        let messages = parse_history_events(&result);
+        let (messages, tool_history) = parse_history_events(&result);
         assert!(messages.is_empty());
+        assert!(tool_history.is_empty());
     }
 
     #[test]
     fn handles_missing_result() {
-        let messages = parse_history_events(&None);
+        let (messages, tool_history) = parse_history_events(&None);
         assert!(messages.is_empty());
+        assert!(tool_history.is_empty());
     }
 }
