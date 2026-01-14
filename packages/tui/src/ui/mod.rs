@@ -196,12 +196,6 @@ fn run_loop(
                 Event::Key(key)
                     if matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) =>
                 {
-                    // Record last key event for UI display
-                    state.last_key_event = Some(format!(
-                        "{:?} {:?} ({:?})",
-                        key.code, key.modifiers, key.kind
-                    ));
-
                     if key.modifiers.contains(KeyModifiers::CONTROL)
                         && key.code == KeyCode::Char('c')
                     {
@@ -1631,55 +1625,29 @@ fn render_status_left(state: &AppState) -> Paragraph<'static> {
 fn render_status_right(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
     let colors = &styles.colors;
-
     let mut spans: Vec<Span> = Vec::new();
 
-    // Check for pending tool calls first (more specific than "thinking")
     let pending_tools = state.pending_tool_calls();
     if !pending_tools.is_empty() {
-        // Show the first pending tool with spinner
         if let Some(tool) = pending_tools.first() {
             let tool_name = tool
                 .tool_name
                 .clone()
-                .unwrap_or_else(|| "tool".to_string());
+                .unwrap_or_else(|| "working".to_string());
             spans.push(Span::styled(
-                format!("{} ", spinning_char()),
+                format!("{} {} ", spinning_char(), tool_name),
                 Style::default().fg(colors.spinner),
             ));
-            spans.push(Span::styled(
-                tool_name,
-                Style::default().fg(colors.accent),
-            ));
-            if pending_tools.len() > 1 {
-                spans.push(Span::styled(
-                    format!(" +{}", pending_tools.len() - 1),
-                    Style::default().fg(colors.fg_muted),
-                ));
-            }
-            spans.push(Span::raw(" "));
         }
     } else if state.is_thinking() {
-        // Show thinking indicator
         spans.push(Span::styled(
-            format!("{} Thinking... ", spinning_char()),
+            format!("{} ", spinning_char()),
             Style::default().fg(colors.spinner),
         ));
-    } else {
-        spans.push(Span::styled(
-            "Alt+Enter: newline   Enter/Ctrl+Enter: send",
-            Style::default().fg(colors.fg_muted),
-        ));
-        if let Some(ref key) = state.last_key_event {
-            spans.push(Span::styled(
-                format!("  Key {}", key),
-                Style::default().fg(colors.fg_muted),
-            ));
-        }
     }
+    // No hints or key display when idle - keep it clean
 
-    let text = Line::from(spans);
-    Paragraph::new(text).style(Style::default().bg(colors.bg_surface))
+    Paragraph::new(Line::from(spans)).style(Style::default().bg(colors.bg_surface))
 }
 
 /// Calculate the width needed for the right status bar section
@@ -1690,26 +1658,17 @@ fn status_right_width(state: &AppState) -> u16 {
             let tool_name = tool
                 .tool_name
                 .clone()
-                .unwrap_or_else(|| "tool".to_string());
-            let mut width = 2 + tool_name.len(); // spinner + space + name
-            if pending_tools.len() > 1 {
-                width += format!(" +{}", pending_tools.len() - 1).len();
-            }
-            width += 1; // trailing space
-            return width as u16;
+                .unwrap_or_else(|| "working".to_string());
+            // "⠋ tool_name " = spinner(1) + space(1) + name + space(1)
+            (3 + tool_name.len()) as u16
+        } else {
+            0
         }
     } else if state.is_thinking() {
-        return 15; // "⠋ Thinking... " is about 14-15 chars
+        2 // "⠋ " = spinner + space
     } else {
-        // Hint + optional key
-        let base = "Alt+Enter: newline   Enter/Ctrl+Enter: send";
-        let mut width = base.len();
-        if let Some(ref key) = state.last_key_event {
-            width += 2 + 4 + key.len(); // "  Key " + key
-        }
-        return width as u16;
+        0 // Nothing when idle
     }
-    0
 }
 
 fn render_sessions_modal(state: &AppState) -> Paragraph<'static> {

@@ -155,8 +155,6 @@ pub struct AppState {
     /// Last time Ctrl+C was pressed (for double-press detection)
     pub last_ctrl_c_ms: Option<u64>,
 
-    pub last_key_event: Option<String>,
-
     /// Index of selected tool in conversation (None = no selection)
     pub chat_selected_tool_idx: Option<usize>,
     /// Whether the selected tool is expanded to show details
@@ -272,7 +270,6 @@ impl AppState {
             slash_picker_selected: 0,
 
             last_ctrl_c_ms: None,
-            last_key_event: None,
 
             chat_selected_tool_idx: None,
             chat_tool_expanded: false,
