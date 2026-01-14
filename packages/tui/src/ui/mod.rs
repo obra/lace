@@ -2960,8 +2960,8 @@ fn render_main(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout::
     f.render_widget(render_chat(state), area);
 }
 
-/// Renders a single tool call line with status indicator.
-fn render_tool_call_line(item: &activity::ActivityItem, colors: &theme::ThemeColors) -> Line<'static> {
+/// Renders a tool call with status indicator and optional folded result.
+fn render_tool_call_line(item: &activity::ActivityItem, colors: &theme::ThemeColors) -> Vec<Line<'static>> {
     let status_char = match item.status.as_deref() {
         Some("completed") | Some("success") => '\u{2713}', // checkmark
         Some("error") => '\u{2717}',                       // X mark
@@ -2978,13 +2978,38 @@ fn render_tool_call_line(item: &activity::ActivityItem, colors: &theme::ThemeCol
         .clone()
         .unwrap_or_else(|| "unknown".to_string());
 
-    Line::from(vec![
+    let mut lines = Vec::new();
+
+    // Main tool line
+    lines.push(Line::from(vec![
         Span::styled(
             format!("{} ", status_char),
             Style::default().fg(status_color),
         ),
         Span::styled(tool_name, Style::default().fg(colors.fg_primary)),
-    ])
+    ]));
+
+    // Folded result preview (if completed and has preview)
+    if item.status.as_deref() == Some("completed") || item.status.as_deref() == Some("success") {
+        if let Some(preview) = &item.result_preview {
+            lines.push(Line::from(vec![
+                Span::styled("  \u{2514}\u{2500} ", Style::default().fg(colors.border_subtle)),
+                Span::styled(truncate_preview(preview, 50), Style::default().fg(colors.fg_muted)),
+            ]));
+        }
+    }
+
+    lines
+}
+
+/// Truncates a preview string to max_len characters, taking the first line only.
+fn truncate_preview(s: &str, max_len: usize) -> String {
+    let first_line = s.lines().next().unwrap_or(s);
+    if first_line.len() > max_len {
+        format!("{}...", &first_line[..max_len - 3])
+    } else {
+        first_line.to_string()
+    }
 }
 
 fn render_chat(state: &AppState) -> Paragraph<'static> {
@@ -3039,7 +3064,7 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
     if !pending_tools.is_empty() {
         lines.push(Line::from(""));
         for item in pending_tools {
-            lines.push(render_tool_call_line(item, colors));
+            lines.extend(render_tool_call_line(item, colors));
         }
     }
 

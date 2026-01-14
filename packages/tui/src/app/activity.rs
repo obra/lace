@@ -30,6 +30,9 @@ pub struct ActivityItem {
     pub job_id: Option<String>,
     pub turn_id: Option<String>,
     pub turn_seq: Option<i64>,
+
+    /// Compact result preview for folded display (e.g., first line of tool output)
+    pub result_preview: Option<String>,
 }
 
 pub fn push_log_line(state: &mut AppState, summary: String) {
@@ -48,6 +51,7 @@ pub fn push_log_line(state: &mut AppState, summary: String) {
             job_id: None,
             turn_id: None,
             turn_seq: None,
+            result_preview: None,
         },
     );
 }
@@ -68,6 +72,7 @@ pub fn push_rpc_sent(state: &mut AppState, method: String) {
             job_id: None,
             turn_id: None,
             turn_seq: None,
+            result_preview: None,
         },
     );
 }
@@ -88,6 +93,7 @@ pub fn push_rpc_error(state: &mut AppState, message: String, details: Option<Val
             job_id: None,
             turn_id: None,
             turn_seq: None,
+            result_preview: None,
         },
     );
 }
@@ -108,6 +114,7 @@ pub fn push_timeout(state: &mut AppState, id: String, method: String) {
             job_id: None,
             turn_id: None,
             turn_seq: None,
+            result_preview: None,
         },
     );
 }
@@ -131,6 +138,7 @@ pub fn push_job_started(state: &mut AppState, job_id: String, job_type: Option<S
             job_id: Some(job_id),
             turn_id: None,
             turn_seq: None,
+            result_preview: None,
         },
     );
 }
@@ -154,6 +162,7 @@ pub fn push_job_finished(state: &mut AppState, job_id: String, outcome: Option<S
             job_id: Some(job_id),
             turn_id: None,
             turn_seq: None,
+            result_preview: None,
         },
     );
 }
@@ -182,6 +191,7 @@ pub fn push_turn_end(
             job_id: None,
             turn_id,
             turn_seq,
+            result_preview: None,
         },
     );
 }
@@ -257,6 +267,7 @@ pub fn upsert_tool_use(
                     job_id,
                     turn_id,
                     turn_seq,
+                    result_preview: None,
                 },
             );
         }
@@ -315,6 +326,7 @@ pub fn attach_permission_details(
                     job_id: None,
                     turn_id: None,
                     turn_seq: None,
+                    result_preview: None,
                 },
             );
         }
