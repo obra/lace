@@ -235,6 +235,13 @@ interface AgentCapabilities {
   'ent/backgroundJobs': boolean;
   'ent/fileCheckpointing': boolean;
   'ent/structuredOutput': boolean;
+  'ent/toolPolicies'?: boolean; // Per-tool allow/ask/deny/disable via ent/session/configure
+  'ent/extensions'?: {
+    // Extension/plugin management exposed by the agent
+    list: boolean; // ent/extensions/list
+    enable?: boolean; // ent/extensions/enable
+    disable?: boolean; // ent/extensions/disable
+  };
   'ent/providers'?: {
     // Provider/config management the agent exposes
     list: boolean; // ent/providers/list
@@ -586,6 +593,8 @@ Dynamic configuration changes. Covers Claude SDK's `setModel()`,
     maxBudgetUsd?: number,
     environment?: Record<string, string>, // Session-scoped env overlay (strings only, not persisted)
     mcpServers?: McpServerConfig[],
+
+    // Permission policy
     approvalMode?: "ask" | "approveReads" | "approveEdits" | "approve" | "deny" | "dangerouslySkipPermissions"
     // ask: Prompt for everything (default)
     // approveReads: Auto-approve reads/search, prompt for writes
@@ -593,6 +602,14 @@ Dynamic configuration changes. Covers Claude SDK's `setModel()`,
     // approve: Auto-approve all tool executions
     // deny: Reject all tool executions
     // dangerouslySkipPermissions: Skip permission system entirely
+
+    // Per-tool overrides (session-scoped; not persisted)
+    toolPolicies?: Record<string, "allow" | "ask" | "deny" | "disable">
+    // Policy values:
+    // - allow: auto-approve this tool even if approvalMode would prompt
+    // - ask: always prompt for this tool even if approvalMode would auto-approve
+    // - deny: deny this tool even if approvalMode would allow
+    // - disable: hide/disable this tool for the session (stronger than deny)
   }
 }
 
@@ -609,6 +626,10 @@ Dynamic configuration changes. Covers Claude SDK's `setModel()`,
 
 - Env overlays are applied in-memory for this session and MUST NOT be written to
   disk by the agent.
+- `toolPolicies` are applied in-memory for this session and MUST NOT be written
+  to disk by the agent.
+- Precedence: `approvalMode` is the baseline. If a tool name appears in
+  `toolPolicies`, that per-tool policy overrides the baseline for that tool.
 
 ### 6.4 `ent/session/rewind`
 
@@ -1374,6 +1395,98 @@ interface PersonaInfo {
   path: string;
 }
 ```
+
+### 6.28.1 `ent/extensions/list` (extension)
+
+List available extensions/plugins supported by the agent runtime.
+
+Extensions are an optional, agent-defined mechanism for grouping additional
+capabilities (tools, slash commands, subagents, hooks, MCP servers, etc.).
+
+This is intentionally generic ("extensions"), so different agent runtimes can
+map their own packaging systems (e.g., plugins) onto the same protocol surface.
+
+```typescript
+// Request
+{
+  method: "ent/extensions/list"
+}
+
+// Response
+{
+  result: {
+    extensions: ExtensionInfo[]
+  }
+}
+
+interface ExtensionInfo {
+  extensionId: string; // stable, unique within the agent runtime
+  name: string;
+  version?: string;
+  description?: string;
+  enabled: boolean;
+}
+```
+
+### 6.28.2 `ent/extensions/enable` (extension)
+
+Enable an extension/plugin for the current agent process.
+
+**Persistence**: This is session/process-scoped and MUST NOT be persisted to disk
+by the agent.
+
+```typescript
+// Request
+{
+  method: "ent/extensions/enable",
+  params: {
+    extensionId: string
+  }
+}
+
+// Response
+{
+  result: {
+    ok: boolean,
+    extensionId: string,
+    enabled: true
+  }
+}
+```
+
+### 6.28.3 `ent/extensions/disable` (extension)
+
+Disable an extension/plugin for the current agent process.
+
+**Persistence**: This is session/process-scoped and MUST NOT be persisted to disk
+by the agent.
+
+```typescript
+// Request
+{
+  method: "ent/extensions/disable",
+  params: {
+    extensionId: string
+  }
+}
+
+// Response
+{
+  result: {
+    ok: boolean,
+    extensionId: string,
+    enabled: false
+  }
+}
+```
+
+**Behavior**
+
+- After enable/disable, clients SHOULD refresh discovery surfaces:
+  - `ent/tools/list`
+  - `ent/mcp/servers/list` and `ent/mcp/tools/list`
+  - `ent/personas/list`
+  - the `slashCommands` list returned by `initialize`/`session/new`
 
 ### 6.29 `ent/mcp/servers/list`
 
@@ -2301,6 +2414,9 @@ interface ModelConfig {
 | `ent/models/*`                  | 🔧 Extension        | Connection-scoped catalog            |
 | `ent/tools/list`                | 🔧 Extension        | Tool discovery                       |
 | `ent/personas/list`             | 🔧 Extension        | Persona discovery                    |
+| `ent/extensions/list`           | 🔧 Extension        | Extension discovery                  |
+| `ent/extensions/enable`         | 🔧 Extension        | Enable extensions/plugins            |
+| `ent/extensions/disable`        | 🔧 Extension        | Disable extensions/plugins           |
 | `ent/mcp/servers/list`          | 🔧 Extension        | MCP server management                |
 | `ent/mcp/servers/upsert`        | 🔧 Extension        | MCP server management                |
 | `ent/mcp/servers/delete`        | 🔧 Extension        | MCP server management                |
@@ -2323,7 +2439,7 @@ interface ModelConfig {
 | Session persist/resume   | ✅ `session/new`, `session/load`                                             |
 | Session forking          | ✅ `session/load` with fork                                                  |
 | Subagents                | ✅ `ent/job/*` + updates                                                     |
-| Tool whitelist/blacklist | ✅ `initialize` config                                                       |
+| Tool whitelist/blacklist | ✅ `ent/session/configure` (`toolPolicies`)                                   |
 | Execution modes          | ✅ `session/set_mode` (plan/execute)                                         |
 | Approval modes           | ✅ `ent/session/configure` (ask/approveReads/approveEdits/approve/deny/skip) |
 | Permission callbacks     | ✅ `session/request_permission`                                              |

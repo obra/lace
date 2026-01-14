@@ -2960,11 +2960,24 @@ fn render_tool_call_line(
         Style::default()
     };
 
-    // Main tool line
+    // Main tool line with command/summary
+    let summary = if item.summary.is_empty() {
+        String::new()
+    } else {
+        // Truncate long summaries
+        let s = &item.summary;
+        if s.len() > 60 {
+            format!(" {}...", &s[..57])
+        } else {
+            format!(" {}", s)
+        }
+    };
+
     lines.push(Line::from(vec![
         Span::styled(sel_prefix, base_style.fg(colors.accent)),
         Span::styled(format!("{} ", status_char), base_style.fg(status_color)),
         Span::styled(tool_name, base_style.fg(colors.fg_primary)),
+        Span::styled(summary, base_style.fg(colors.fg_muted)),
     ]));
 
     // When expanded and selected, show detailed JSON (up to 15 lines)
