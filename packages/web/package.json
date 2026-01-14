@@ -20,7 +20,7 @@
     "lint": "NODE_ENV=development eslint; tsc --noEmit",
     "lint:fix": "eslint --fix",
     "format": "prettier --ignore-path ../../.prettierignore --write \"**/*.{ts,tsx,js,jsx,json,md,css,scss,html,yml,yaml}\"",
-    "pretest": "cd ../.. && npm run build --workspace=packages/ent-protocol && npm run build --workspace=packages/agent && npm run build --workspace=packages/supervisor",
+    "pretest": "cd ../.. && npm run build --workspace=packages/ent-protocol && npm run build --workspace=packages/agent && npm run build --workspace=packages/supervisor && npm run build --workspace=packages/web",
     "test": "vitest run --silent",
     "test:run": "npm run test",
     "test:watch": "vitest",

@@ -58,9 +58,11 @@ async function isPortAvailable(port: number): Promise<boolean> {
   });
 }
 
-// Helper to find an available port
-async function findAvailablePort(startPort: number = 31337): Promise<number> {
-  for (let port = startPort; port <= startPort + 100; port++) {
+// Helper to find an available port using random high ports to avoid conflicts
+async function findAvailablePort(startPort?: number): Promise<number> {
+  // Use random port in ephemeral range (49152-65535) to avoid conflicts with docker/services
+  const basePort = startPort ?? 49152 + Math.floor(Math.random() * 10000);
+  for (let port = basePort; port <= basePort + 100; port++) {
     if (await isPortAvailable(port)) {
       return port;
     }
@@ -440,6 +442,8 @@ describe.sequential('LACE_WEB_DIR initialization', () => {
   test('should create LACE_WEB_DIR when development server starts', async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-dev-test-'));
     const testLaceDir = path.join(tempDir, 'nonexistent-lace-dir');
+    // Use random high port to avoid conflicts with docker/services
+    const testPort = 49152 + Math.floor(Math.random() * 10000);
 
     try {
       // Ensure the test LACE_WEB_DIR doesn't exist
@@ -448,7 +452,7 @@ describe.sequential('LACE_WEB_DIR initialization', () => {
       // Start development server with the non-existent LACE_WEB_DIR
       const cleanEnv = createCleanEnv();
 
-      const serverProcess = spawn('npm', ['run', 'dev'], {
+      const serverProcess = spawn('npm', ['run', 'dev', '--', '--port', String(testPort)], {
         env: { ...cleanEnv, LACE_WEB_DIR: testLaceDir, NODE_ENV: 'development' },
         cwd: process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -494,6 +498,8 @@ describe.sequential('LACE_WEB_DIR initialization', () => {
   test('should create LACE_WEB_DIR when production server starts', async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-prod-test-'));
     const testLaceDir = path.join(tempDir, 'nonexistent-lace-dir');
+    // Use random high port to avoid conflicts with docker/services
+    const testPort = 49152 + Math.floor(Math.random() * 10000);
 
     try {
       // Ensure the test LACE_WEB_DIR doesn't exist
@@ -502,7 +508,7 @@ describe.sequential('LACE_WEB_DIR initialization', () => {
       // Start production server with the non-existent LACE_WEB_DIR
       const cleanEnv = createCleanEnv();
 
-      const serverProcess = spawn('npm', ['start'], {
+      const serverProcess = spawn('npm', ['start', '--', '--port', String(testPort)], {
         env: { ...cleanEnv, LACE_WEB_DIR: testLaceDir, NODE_ENV: 'production' },
         cwd: process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe'],
