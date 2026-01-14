@@ -156,6 +156,11 @@ pub struct AppState {
     pub last_ctrl_c_ms: Option<u64>,
 
     pub last_key_event: Option<String>,
+
+    /// Index of selected tool in conversation (None = no selection)
+    pub chat_selected_tool_idx: Option<usize>,
+    /// Whether the selected tool is expanded to show details
+    pub chat_tool_expanded: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -264,6 +269,9 @@ impl AppState {
 
             last_ctrl_c_ms: None,
             last_key_event: None,
+
+            chat_selected_tool_idx: None,
+            chat_tool_expanded: false,
         };
 
         state
@@ -382,6 +390,20 @@ impl AppState {
             })
             .collect()
     }
+
+    /// Returns completed tool calls for selection in the chat pane.
+    /// These are tool_use items that are completed, success, or error.
+    pub fn completed_tool_calls(&self) -> Vec<&activity::ActivityItem> {
+        self.activity
+            .iter()
+            .filter(|item| {
+                item.kind == activity::ActivityKind::ToolUse
+                    && (item.status.as_deref() == Some("completed")
+                        || item.status.as_deref() == Some("success")
+                        || item.status.as_deref() == Some("error"))
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -473,5 +495,87 @@ mod tests {
         // Should NOT include completed or error
         assert!(!pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_2")));
         assert!(!pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_3")));
+    }
+
+    #[test]
+    fn completed_tool_calls_filters_by_status() {
+        let mut state = AppState::new();
+
+        // Add a tool call that is running (not completed)
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_1".to_string(),
+            Some("shell.exec".to_string()),
+            Some("running".to_string()),
+            json!({"command": "echo hello"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        // Add a tool call that is completed
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_2".to_string(),
+            Some("file.read".to_string()),
+            Some("completed".to_string()),
+            json!({"path": "/tmp/file.txt"}),
+            Some(json!({"content": "file contents"})),
+            None,
+            None,
+            None,
+        );
+
+        // Add a tool call with success status
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_3".to_string(),
+            Some("file.read".to_string()),
+            Some("success".to_string()),
+            json!({"path": "/tmp/other.txt"}),
+            Some(json!({"content": "other contents"})),
+            None,
+            None,
+            None,
+        );
+
+        // Add a tool call with error status
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_4".to_string(),
+            Some("file.write".to_string()),
+            Some("error".to_string()),
+            json!({"path": "/etc/passwd"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        // Add a tool call that is awaiting permission (not completed)
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_5".to_string(),
+            Some("shell.exec".to_string()),
+            Some("awaiting_permission".to_string()),
+            json!({"command": "rm -rf /"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let completed = state.completed_tool_calls();
+
+        // Should include tool_2 (completed), tool_3 (success), and tool_4 (error)
+        assert_eq!(completed.len(), 3);
+        assert!(completed.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_2")));
+        assert!(completed.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_3")));
+        assert!(completed.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_4")));
+
+        // Should NOT include running or awaiting_permission
+        assert!(!completed.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_1")));
+        assert!(!completed.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_5")));
     }
 }

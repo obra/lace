@@ -159,6 +159,11 @@ pub enum UiAction {
     PermissionGuidanceChar(char),
     PermissionGuidanceBackspace,
     PermissionToggleDetails,
+
+    ChatToolPrev,
+    ChatToolNext,
+    ChatToolToggleExpanded,
+    ChatToolClearSelection,
 }
 
 pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> {
@@ -980,6 +985,41 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         }
         UiAction::ContextViewerScrollDown => {
             crate::app::config_panels::context_scroll_down(state);
+            Vec::new()
+        }
+
+        // === Chat Tool Selection ===
+        UiAction::ChatToolPrev => {
+            let tools = state.completed_tool_calls();
+            if !tools.is_empty() {
+                state.chat_selected_tool_idx = match state.chat_selected_tool_idx {
+                    None => Some(tools.len() - 1),
+                    Some(0) => Some(tools.len() - 1),
+                    Some(i) => Some(i - 1),
+                };
+            }
+            Vec::new()
+        }
+        UiAction::ChatToolNext => {
+            let tools = state.completed_tool_calls();
+            if !tools.is_empty() {
+                state.chat_selected_tool_idx = match state.chat_selected_tool_idx {
+                    None => Some(0),
+                    Some(i) if i >= tools.len() - 1 => Some(0),
+                    Some(i) => Some(i + 1),
+                };
+            }
+            Vec::new()
+        }
+        UiAction::ChatToolToggleExpanded => {
+            if state.chat_selected_tool_idx.is_some() {
+                state.chat_tool_expanded = !state.chat_tool_expanded;
+            }
+            Vec::new()
+        }
+        UiAction::ChatToolClearSelection => {
+            state.chat_selected_tool_idx = None;
+            state.chat_tool_expanded = false;
             Vec::new()
         }
     }
@@ -2360,5 +2400,108 @@ mod tests {
 
         assert_eq!(input_str(&state), "hi\n\nff");
         assert_eq!(state.input.cursor(), (2, 2)); // row 2 col 2
+    }
+
+    #[test]
+    fn chat_tool_selection_navigates_completed_tools() {
+        use crate::app::activity;
+        let mut state = AppState::new_with_paths(None, None);
+
+        // Add some completed tool calls
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_1".to_string(),
+            Some("file.read".to_string()),
+            Some("completed".to_string()),
+            serde_json::json!({"path": "/tmp/file.txt"}),
+            None,
+            None,
+            None,
+            None,
+        );
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_2".to_string(),
+            Some("shell.exec".to_string()),
+            Some("success".to_string()),
+            serde_json::json!({"command": "echo hi"}),
+            None,
+            None,
+            None,
+            None,
+        );
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_3".to_string(),
+            Some("file.write".to_string()),
+            Some("error".to_string()),
+            serde_json::json!({"path": "/etc/passwd"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        // Initially no selection
+        assert_eq!(state.chat_selected_tool_idx, None);
+        assert!(!state.chat_tool_expanded);
+
+        // Navigate down - should start at 0
+        apply_ui_action(&mut state, UiAction::ChatToolNext);
+        assert_eq!(state.chat_selected_tool_idx, Some(0));
+
+        // Navigate down again
+        apply_ui_action(&mut state, UiAction::ChatToolNext);
+        assert_eq!(state.chat_selected_tool_idx, Some(1));
+
+        // Navigate down to last
+        apply_ui_action(&mut state, UiAction::ChatToolNext);
+        assert_eq!(state.chat_selected_tool_idx, Some(2));
+
+        // Wrap around to first
+        apply_ui_action(&mut state, UiAction::ChatToolNext);
+        assert_eq!(state.chat_selected_tool_idx, Some(0));
+
+        // Navigate up wraps to last
+        apply_ui_action(&mut state, UiAction::ChatToolPrev);
+        assert_eq!(state.chat_selected_tool_idx, Some(2));
+
+        // Toggle expanded
+        apply_ui_action(&mut state, UiAction::ChatToolToggleExpanded);
+        assert!(state.chat_tool_expanded);
+
+        // Toggle again to collapse
+        apply_ui_action(&mut state, UiAction::ChatToolToggleExpanded);
+        assert!(!state.chat_tool_expanded);
+
+        // Clear selection
+        apply_ui_action(&mut state, UiAction::ChatToolClearSelection);
+        assert_eq!(state.chat_selected_tool_idx, None);
+        assert!(!state.chat_tool_expanded);
+    }
+
+    #[test]
+    fn chat_tool_selection_toggle_requires_selection() {
+        let mut state = AppState::new_with_paths(None, None);
+
+        // No tools, no selection
+        assert_eq!(state.chat_selected_tool_idx, None);
+        assert!(!state.chat_tool_expanded);
+
+        // Toggle does nothing when nothing is selected
+        apply_ui_action(&mut state, UiAction::ChatToolToggleExpanded);
+        assert!(!state.chat_tool_expanded);
+    }
+
+    #[test]
+    fn chat_tool_selection_empty_list_no_crash() {
+        let mut state = AppState::new_with_paths(None, None);
+
+        // No completed tools - these should be no-ops
+        apply_ui_action(&mut state, UiAction::ChatToolNext);
+        assert_eq!(state.chat_selected_tool_idx, None);
+
+        apply_ui_action(&mut state, UiAction::ChatToolPrev);
+        assert_eq!(state.chat_selected_tool_idx, None);
     }
 }

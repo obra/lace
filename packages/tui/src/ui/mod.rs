@@ -755,7 +755,8 @@ fn run_loop(
                                 }
                             }
                             Focus::Activity => Some(UiAction::ActivityPrev),
-                            _ => Some(UiAction::ScrollUp),
+                            Focus::Chat => Some(UiAction::ChatToolPrev),
+                            Focus::Debug => Some(UiAction::ScrollUp),
                         },
                         KeyCode::Down => match state.focus {
                             Focus::Input => {
@@ -770,7 +771,8 @@ fn run_loop(
                                 }
                             }
                             Focus::Activity => Some(UiAction::ActivityNext),
-                            _ => Some(UiAction::ScrollDown),
+                            Focus::Chat => Some(UiAction::ChatToolNext),
+                            Focus::Debug => Some(UiAction::ScrollDown),
                         },
                         KeyCode::Enter => match state.focus {
                             // Alt+Enter inserts newline (Terminal.app sends Alt, not Shift)
@@ -784,7 +786,8 @@ fn run_loop(
                             // Plain Enter sends
                             Focus::Input => Some(UiAction::Enter),
                             Focus::Activity => Some(UiAction::ActivityToggleExpanded),
-                            _ => None,
+                            Focus::Chat => Some(UiAction::ChatToolToggleExpanded),
+                            Focus::Debug => None,
                         },
                         KeyCode::Backspace => match state.focus {
                             Focus::Input => Some(UiAction::Backspace),
@@ -850,6 +853,9 @@ fn run_loop(
                                 && !key.modifiers.contains(KeyModifiers::CONTROL) =>
                         {
                             Some(UiAction::JumpLastTurnEnd)
+                        }
+                        KeyCode::Esc if state.focus == Focus::Chat => {
+                            Some(UiAction::ChatToolClearSelection)
                         }
                         KeyCode::Char(ch)
                             if state.focus == Focus::Input
@@ -2961,7 +2967,14 @@ fn render_main(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout::
 }
 
 /// Renders a tool call with status indicator and optional folded result.
-fn render_tool_call_line(item: &activity::ActivityItem, colors: &theme::ThemeColors) -> Vec<Line<'static>> {
+/// When `selected` is true, adds a selection marker and background.
+/// When `expanded` is true (and selected), shows detailed JSON output.
+fn render_tool_call_line(
+    item: &activity::ActivityItem,
+    colors: &theme::ThemeColors,
+    selected: bool,
+    expanded: bool,
+) -> Vec<Line<'static>> {
     let status_char = match item.status.as_deref() {
         Some("completed") | Some("success") => '\u{2713}', // checkmark
         Some("error") => '\u{2717}',                       // X mark
@@ -2980,22 +2993,53 @@ fn render_tool_call_line(item: &activity::ActivityItem, colors: &theme::ThemeCol
 
     let mut lines = Vec::new();
 
+    // Selection prefix
+    let sel_prefix = if selected { "\u{25B8} " } else { "  " }; // ▸ when selected
+
+    // Base style with optional background for selection
+    let base_style = if selected {
+        Style::default().bg(colors.bg_surface)
+    } else {
+        Style::default()
+    };
+
     // Main tool line
     lines.push(Line::from(vec![
-        Span::styled(
-            format!("{} ", status_char),
-            Style::default().fg(status_color),
-        ),
-        Span::styled(tool_name, Style::default().fg(colors.fg_primary)),
+        Span::styled(sel_prefix, base_style.fg(colors.accent)),
+        Span::styled(format!("{} ", status_char), base_style.fg(status_color)),
+        Span::styled(tool_name, base_style.fg(colors.fg_primary)),
     ]));
 
-    // Folded result preview (if completed and has preview)
-    if item.status.as_deref() == Some("completed") || item.status.as_deref() == Some("success") {
-        if let Some(preview) = &item.result_preview {
-            lines.push(Line::from(vec![
-                Span::styled("  \u{2514}\u{2500} ", Style::default().fg(colors.border_subtle)),
-                Span::styled(truncate_preview(preview, 50), Style::default().fg(colors.fg_muted)),
-            ]));
+    // When expanded and selected, show detailed JSON (up to 15 lines)
+    if selected && expanded {
+        if let Some(details) = &item.details {
+            let pretty =
+                serde_json::to_string_pretty(details).unwrap_or_else(|_| details.to_string());
+            for (i, line) in pretty.lines().enumerate() {
+                if i >= 15 {
+                    lines.push(Line::from(vec![Span::styled(
+                        "    ... (truncated)",
+                        base_style.fg(colors.fg_muted),
+                    )]));
+                    break;
+                }
+                lines.push(Line::from(vec![Span::styled(
+                    format!("    {line}"),
+                    base_style.fg(colors.fg_muted),
+                )]));
+            }
+        }
+    } else {
+        // Folded result preview (if completed and has preview)
+        let is_complete = item.status.as_deref() == Some("completed")
+            || item.status.as_deref() == Some("success");
+        if is_complete {
+            if let Some(preview) = &item.result_preview {
+                lines.push(Line::from(vec![
+                    Span::styled("  \u{2514}\u{2500} ", base_style.fg(colors.border_subtle)),
+                    Span::styled(truncate_preview(preview, 50), base_style.fg(colors.fg_muted)),
+                ]));
+            }
         }
     }
 
@@ -3059,12 +3103,23 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
         }
     }
 
-    // Show in-progress tool calls inline
+    // Show completed tool calls (selectable when chat is focused)
+    let completed_tools = state.completed_tool_calls();
+    if !completed_tools.is_empty() {
+        lines.push(Line::from(""));
+        for (i, item) in completed_tools.iter().enumerate() {
+            let is_selected = state.chat_selected_tool_idx == Some(i);
+            let is_expanded = is_selected && state.chat_tool_expanded;
+            lines.extend(render_tool_call_line(item, colors, is_selected, is_expanded));
+        }
+    }
+
+    // Show in-progress tool calls inline (not selectable)
     let pending_tools = state.pending_tool_calls();
     if !pending_tools.is_empty() {
         lines.push(Line::from(""));
         for item in pending_tools {
-            lines.extend(render_tool_call_line(item, colors));
+            lines.extend(render_tool_call_line(item, colors, false, false));
         }
     }
 
