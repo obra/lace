@@ -1443,7 +1443,6 @@ pub(crate) enum PermissionRemember {
 
 #[derive(Clone)]
 pub(crate) struct PermissionChoice {
-    pub(crate) label: String,
     pub(crate) option_id: String,
     pub(crate) remember: PermissionRemember,
 }
@@ -1455,7 +1454,7 @@ pub(crate) fn permission_choices(state: &AppState) -> Vec<PermissionChoice> {
 
     let mut allow_opt: Option<String> = None;
     let mut deny_opt: Option<String> = None;
-    let mut extra: Vec<(String, String)> = Vec::new(); // (label, id)
+    let mut extra: Vec<String> = Vec::new();
 
     for opt in &req.options {
         let id_lower = opt.option_id.to_lowercase();
@@ -1467,7 +1466,7 @@ pub(crate) fn permission_choices(state: &AppState) -> Vec<PermissionChoice> {
         {
             deny_opt = Some(opt.option_id.clone());
         } else {
-            extra.push((opt.label.clone(), opt.option_id.clone()));
+            extra.push(opt.option_id.clone());
         }
     }
 
@@ -1475,17 +1474,14 @@ pub(crate) fn permission_choices(state: &AppState) -> Vec<PermissionChoice> {
 
     if let Some(id) = allow_opt.clone() {
         choices.push(PermissionChoice {
-            label: "Allow once".to_string(),
             option_id: id.clone(),
             remember: PermissionRemember::None,
         });
         choices.push(PermissionChoice {
-            label: "Allow for this session".to_string(),
             option_id: id.clone(),
             remember: PermissionRemember::Session,
         });
         choices.push(PermissionChoice {
-            label: "Always allow".to_string(),
             option_id: id,
             remember: PermissionRemember::Always,
         });
@@ -1493,15 +1489,13 @@ pub(crate) fn permission_choices(state: &AppState) -> Vec<PermissionChoice> {
 
     if let Some(id) = deny_opt.clone() {
         choices.push(PermissionChoice {
-            label: "Deny".to_string(),
             option_id: id,
             remember: PermissionRemember::None,
         });
     }
 
-    for (label, id) in extra {
+    for id in extra {
         choices.push(PermissionChoice {
-            label,
             option_id: id,
             remember: PermissionRemember::None,
         });
@@ -1511,7 +1505,6 @@ pub(crate) fn permission_choices(state: &AppState) -> Vec<PermissionChoice> {
     if choices.is_empty() {
         for opt in &req.options {
             choices.push(PermissionChoice {
-                label: opt.label.clone(),
                 option_id: opt.option_id.clone(),
                 remember: PermissionRemember::None,
             });
