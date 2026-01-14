@@ -61,7 +61,7 @@ pub fn render_markdownish_lines(input: &str) -> Vec<MarkdownLine> {
         let trimmed = raw_line.trim_start();
 
         // Handle code fence toggles
-        if let Some(rest) = trimmed.strip_prefix("```") {
+        if let Some(_rest) = trimmed.strip_prefix("```") {
             if in_code {
                 out.push(MarkdownLine::single(
                     "└─".to_string(),

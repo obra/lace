@@ -3079,18 +3079,23 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
     let mut lines: Vec<Line> = Vec::new();
     let mut prev_role: Option<&Role> = None;
 
-    // Build a map of turn_seq -> tool calls for quick lookup so we can render
-    // tool calls inline with the assistant messages that invoked them
+    // Build maps for matching tool calls to messages:
+    // 1. turn_seq -> tools (preferred, numeric sequence)
+    // 2. turn_id -> tools (fallback, string identifier)
     let completed_tools = state.completed_tool_calls();
-    let mut tools_by_turn: std::collections::HashMap<i64, Vec<(usize, &activity::ActivityItem)>> =
+    let mut tools_by_seq: std::collections::HashMap<i64, Vec<(usize, &activity::ActivityItem)>> =
+        std::collections::HashMap::new();
+    let mut tools_by_id: std::collections::HashMap<String, Vec<(usize, &activity::ActivityItem)>> =
         std::collections::HashMap::new();
     for (i, tool) in completed_tools.iter().enumerate() {
         if let Some(seq) = tool.turn_seq {
-            tools_by_turn.entry(seq).or_default().push((i, tool));
+            tools_by_seq.entry(seq).or_default().push((i, tool));
+        } else if let Some(id) = &tool.turn_id {
+            tools_by_id.entry(id.clone()).or_default().push((i, tool));
         }
     }
 
-    // Track which tools we've rendered (for any without turn_seq, render at end)
+    // Track which tools we've rendered (for any without turn_seq/id, render at end)
     let mut rendered_tool_indices: std::collections::HashSet<usize> =
         std::collections::HashSet::new();
 
@@ -3129,15 +3134,18 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
         }
 
         // After assistant message, render any tool calls from this turn inline
+        // Try turn_seq first, then fall back to turn_id
         if m.role == Role::Assistant {
-            if let Some(turn_seq) = m.turn_seq {
-                if let Some(turn_tools) = tools_by_turn.get(&turn_seq) {
-                    for (idx, tool) in turn_tools {
-                        let is_selected = state.chat_selected_tool_idx == Some(*idx);
-                        let is_expanded = is_selected && state.chat_tool_expanded;
-                        lines.extend(render_tool_call_line(tool, colors, is_selected, is_expanded));
-                        rendered_tool_indices.insert(*idx);
-                    }
+            let turn_tools: Option<&Vec<(usize, &activity::ActivityItem)>> =
+                m.turn_seq.and_then(|seq| tools_by_seq.get(&seq)).or_else(|| {
+                    m.turn_id.as_ref().and_then(|id| tools_by_id.get(id))
+                });
+            if let Some(tools) = turn_tools {
+                for (idx, tool) in tools {
+                    let is_selected = state.chat_selected_tool_idx == Some(*idx);
+                    let is_expanded = is_selected && state.chat_tool_expanded;
+                    lines.extend(render_tool_call_line(tool, colors, is_selected, is_expanded));
+                    rendered_tool_indices.insert(*idx);
                 }
             }
         }
