@@ -164,6 +164,7 @@ pub enum UiAction {
     ChatToolNext,
     ChatToolToggleExpanded,
     ChatToolClearSelection,
+    ChatToolOpenDetails,
 }
 
 pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> {
@@ -1020,6 +1021,13 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         UiAction::ChatToolClearSelection => {
             state.chat_selected_tool_idx = None;
             state.chat_tool_expanded = false;
+            Vec::new()
+        }
+        UiAction::ChatToolOpenDetails => {
+            if state.chat_selected_tool_idx.is_some() {
+                state.tool_details_overlay_open = true;
+                state.tool_details_overlay_scroll = 0;
+            }
             Vec::new()
         }
     }
@@ -2503,5 +2511,48 @@ mod tests {
 
         apply_ui_action(&mut state, UiAction::ChatToolPrev);
         assert_eq!(state.chat_selected_tool_idx, None);
+    }
+
+    #[test]
+    fn chat_tool_open_details_requires_selection() {
+        let mut state = AppState::new_with_paths(None, None);
+
+        // No selection - open details does nothing
+        assert_eq!(state.chat_selected_tool_idx, None);
+        assert!(!state.tool_details_overlay_open);
+
+        apply_ui_action(&mut state, UiAction::ChatToolOpenDetails);
+        assert!(!state.tool_details_overlay_open);
+    }
+
+    #[test]
+    fn chat_tool_open_details_opens_overlay_with_selection() {
+        use crate::app::activity;
+
+        let mut state = AppState::new_with_paths(None, None);
+
+        // Add some completed tool calls
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_1".to_string(),
+            Some("file.read".to_string()),
+            Some("completed".to_string()),
+            serde_json::json!({"path": "/tmp/file.txt"}),
+            Some(serde_json::json!({"content": "file contents"})),
+            None,
+            None,
+            None,
+        );
+
+        // Select a tool
+        apply_ui_action(&mut state, UiAction::ChatToolNext);
+        assert_eq!(state.chat_selected_tool_idx, Some(0));
+        assert!(!state.tool_details_overlay_open);
+        assert_eq!(state.tool_details_overlay_scroll, 0);
+
+        // Open details overlay
+        apply_ui_action(&mut state, UiAction::ChatToolOpenDetails);
+        assert!(state.tool_details_overlay_open);
+        assert_eq!(state.tool_details_overlay_scroll, 0);
     }
 }

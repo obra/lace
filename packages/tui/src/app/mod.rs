@@ -161,6 +161,10 @@ pub struct AppState {
     pub chat_selected_tool_idx: Option<usize>,
     /// Whether the selected tool is expanded to show details
     pub chat_tool_expanded: bool,
+    /// Whether the full-screen tool details overlay is open
+    pub tool_details_overlay_open: bool,
+    /// Scroll position in the tool details overlay
+    pub tool_details_overlay_scroll: u16,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -272,6 +276,8 @@ impl AppState {
 
             chat_selected_tool_idx: None,
             chat_tool_expanded: false,
+            tool_details_overlay_open: false,
+            tool_details_overlay_scroll: 0,
         };
 
         state

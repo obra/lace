@@ -584,6 +584,32 @@ fn run_loop(
                         continue;
                     }
 
+                    if state.tool_details_overlay_open {
+                        match key.code {
+                            KeyCode::Esc => {
+                                state.tool_details_overlay_open = false;
+                            }
+                            KeyCode::Up | KeyCode::Char('k') => {
+                                state.tool_details_overlay_scroll =
+                                    state.tool_details_overlay_scroll.saturating_sub(1);
+                            }
+                            KeyCode::Down | KeyCode::Char('j') => {
+                                state.tool_details_overlay_scroll =
+                                    state.tool_details_overlay_scroll.saturating_add(1);
+                            }
+                            KeyCode::PageUp => {
+                                state.tool_details_overlay_scroll =
+                                    state.tool_details_overlay_scroll.saturating_sub(20);
+                            }
+                            KeyCode::PageDown => {
+                                state.tool_details_overlay_scroll =
+                                    state.tool_details_overlay_scroll.saturating_add(20);
+                            }
+                            _ => {}
+                        }
+                        continue;
+                    }
+
                     if state.debug_overlay_open {
                         match key.code {
                             KeyCode::Esc => {
@@ -856,6 +882,13 @@ fn run_loop(
                         }
                         KeyCode::Esc if state.focus == Focus::Chat => {
                             Some(UiAction::ChatToolClearSelection)
+                        }
+                        KeyCode::Char('d') | KeyCode::Char('D')
+                            if state.focus == Focus::Chat
+                                && state.chat_selected_tool_idx.is_some()
+                                && !key.modifiers.contains(KeyModifiers::CONTROL) =>
+                        {
+                            Some(UiAction::ChatToolOpenDetails)
                         }
                         KeyCode::Char(ch)
                             if state.focus == Focus::Input
@@ -1415,7 +1448,9 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     f.render_widget(render_status_right(state), status_layout[1]);
 
     // Main area: show overlays if open, otherwise conversation
-    if state.debug_overlay_open {
+    if state.tool_details_overlay_open {
+        f.render_widget(render_tool_details_overlay(state), main_area);
+    } else if state.debug_overlay_open {
         f.render_widget(render_debug_overlay(state), main_area);
     } else if state.activity_overlay_open {
         f.render_widget(render_activity_overlay(state), main_area);
@@ -3288,6 +3323,116 @@ fn render_activity_overlay(state: &AppState) -> Paragraph<'static> {
         .style(Style::default().bg(colors.bg_base))
         .wrap(Wrap { trim: false })
         .scroll((state.activity_scroll, 0))
+}
+
+/// Renders a full-screen tool details overlay.
+/// Opened with D when a tool is selected in Chat, closed with Esc.
+fn render_tool_details_overlay(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Header
+    lines.push(Line::from(Span::styled(
+        "Tool Details                                     [Esc to close]",
+        Style::default().fg(colors.fg_muted),
+    )));
+    lines.push(Line::from(""));
+
+    // Get the selected tool
+    let tools = state.completed_tool_calls();
+    let selected_tool = state
+        .chat_selected_tool_idx
+        .and_then(|idx| tools.get(idx).copied());
+
+    if let Some(tool) = selected_tool {
+        // Tool name and status
+        let tool_name = tool.tool_name.clone().unwrap_or_else(|| "unknown".to_string());
+        let status = tool.status.clone().unwrap_or_else(|| "unknown".to_string());
+        let status_color = match status.as_str() {
+            "completed" | "success" => colors.success,
+            "error" => colors.error,
+            _ => colors.fg_muted,
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled("Tool: ", Style::default().fg(colors.fg_muted)),
+            Span::styled(tool_name, Style::default().fg(colors.fg_primary).add_modifier(Modifier::BOLD)),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("Status: ", Style::default().fg(colors.fg_muted)),
+            Span::styled(status, Style::default().fg(status_color)),
+        ]));
+        lines.push(Line::from(""));
+
+        // Input section
+        lines.push(Line::from(Span::styled(
+            "\u{2500}\u{2500}\u{2500} Input \u{2500}\u{2500}\u{2500}",
+            Style::default().fg(colors.fg_secondary),
+        )));
+        lines.push(Line::from(""));
+
+        // Get input from tool_inputs_by_tool_call_id or from details
+        let input_json = tool
+            .tool_call_id
+            .as_ref()
+            .and_then(|id| state.tool_inputs_by_tool_call_id.get(id))
+            .or_else(|| {
+                tool.details.as_ref().and_then(|d| d.get("input"))
+            });
+
+        if let Some(input) = input_json {
+            let pretty = serde_json::to_string_pretty(input).unwrap_or_else(|_| input.to_string());
+            for line in pretty.lines() {
+                lines.push(Line::from(Span::styled(
+                    line.to_string(),
+                    Style::default().fg(colors.fg_primary),
+                )));
+            }
+        } else {
+            lines.push(Line::from(Span::styled(
+                "(no input available)",
+                Style::default().fg(colors.fg_muted),
+            )));
+        }
+
+        lines.push(Line::from(""));
+
+        // Result section
+        lines.push(Line::from(Span::styled(
+            "\u{2500}\u{2500}\u{2500} Result \u{2500}\u{2500}\u{2500}",
+            Style::default().fg(colors.fg_secondary),
+        )));
+        lines.push(Line::from(""));
+
+        // Get result from details
+        let result_json = tool.details.as_ref().and_then(|d| d.get("result"));
+
+        if let Some(result) = result_json {
+            let pretty = serde_json::to_string_pretty(result).unwrap_or_else(|_| result.to_string());
+            for line in pretty.lines() {
+                lines.push(Line::from(Span::styled(
+                    line.to_string(),
+                    Style::default().fg(colors.fg_primary),
+                )));
+            }
+        } else {
+            lines.push(Line::from(Span::styled(
+                "(no result available)",
+                Style::default().fg(colors.fg_muted),
+            )));
+        }
+    } else {
+        lines.push(Line::from(Span::styled(
+            "(no tool selected)",
+            Style::default().fg(colors.fg_muted),
+        )));
+    }
+
+    Paragraph::new(Text::from(lines))
+        .style(Style::default().bg(colors.bg_base))
+        .wrap(Wrap { trim: false })
+        .scroll((state.tool_details_overlay_scroll, 0))
 }
 
 fn render_input(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout::Rect) {
