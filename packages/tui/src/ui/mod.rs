@@ -3343,7 +3343,18 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
     let mut rendered_tool_indices: std::collections::HashSet<usize> =
         std::collections::HashSet::new();
 
-    for m in &state.messages {
+    // Find the LAST message index for each turn_id (tools should render with the final message)
+    let mut last_message_for_turn: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    for (i, m) in state.messages.iter().enumerate() {
+        if m.role == Role::Assistant {
+            if let Some(turn_id) = &m.turn_id {
+                last_message_for_turn.insert(turn_id.clone(), i);
+            }
+        }
+    }
+
+    for (msg_idx, m) in state.messages.iter().enumerate() {
         // Add spacing only when the role changes (not between consecutive same-role messages)
         if let Some(prev) = prev_role {
             if prev != &m.role {
@@ -3353,15 +3364,18 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
         prev_role = Some(&m.role);
 
         // For assistant messages, render tool calls FIRST (before message text)
-        // This ensures the tool header appears before any tool output in the message
+        // Only render tools on the LAST message with this turn_id (has complete content)
         if m.role == Role::Assistant {
             if let Some(turn_id) = &m.turn_id {
-                if let Some(tools) = tools_by_turn_id.get(turn_id) {
-                    for (idx, tool) in tools {
-                        let is_selected = state.chat_selected_tool_idx == Some(*idx);
-                        let is_expanded = is_selected && state.chat_tool_expanded;
-                        lines.extend(render_tool_call_line(tool, colors, is_selected, is_expanded));
-                        rendered_tool_indices.insert(*idx);
+                let is_last_for_turn = last_message_for_turn.get(turn_id) == Some(&msg_idx);
+                if is_last_for_turn {
+                    if let Some(tools) = tools_by_turn_id.get(turn_id) {
+                        for (idx, tool) in tools {
+                            let is_selected = state.chat_selected_tool_idx == Some(*idx);
+                            let is_expanded = is_selected && state.chat_tool_expanded;
+                            lines.extend(render_tool_call_line(tool, colors, is_selected, is_expanded));
+                            rendered_tool_indices.insert(*idx);
+                        }
                     }
                 }
             }
@@ -3997,7 +4011,18 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
     let mut counted_tool_indices: std::collections::HashSet<usize> =
         std::collections::HashSet::new();
 
-    for m in &state.messages {
+    // Find the LAST message index for each turn_id (same as render_chat)
+    let mut last_message_for_turn: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    for (i, m) in state.messages.iter().enumerate() {
+        if m.role == Role::Assistant {
+            if let Some(turn_id) = &m.turn_id {
+                last_message_for_turn.insert(turn_id.clone(), i);
+            }
+        }
+    }
+
+    for (msg_idx, m) in state.messages.iter().enumerate() {
         // Blank line only on role change (matching render_chat's grouping logic)
         if let Some(prev) = prev_role {
             if prev != &m.role {
@@ -4007,14 +4032,18 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
         prev_role = Some(&m.role);
 
         // For assistant messages, count inline tools FIRST (before message text)
+        // Only count tools on the LAST message with this turn_id (same as render_chat)
         if m.role == Role::Assistant {
             if let Some(turn_id) = &m.turn_id {
-                if let Some(tools) = tools_by_turn_id.get(turn_id) {
-                    for (idx, tool) in tools {
-                        let is_selected = state.chat_selected_tool_idx == Some(*idx);
-                        let is_expanded = is_selected && state.chat_tool_expanded;
-                        total += tool_call_line_count(tool, is_selected, is_expanded);
-                        counted_tool_indices.insert(*idx);
+                let is_last_for_turn = last_message_for_turn.get(turn_id) == Some(&msg_idx);
+                if is_last_for_turn {
+                    if let Some(tools) = tools_by_turn_id.get(turn_id) {
+                        for (idx, tool) in tools {
+                            let is_selected = state.chat_selected_tool_idx == Some(*idx);
+                            let is_expanded = is_selected && state.chat_tool_expanded;
+                            total += tool_call_line_count(tool, is_selected, is_expanded);
+                            counted_tool_indices.insert(*idx);
+                        }
                     }
                 }
             }
