@@ -2925,12 +2925,16 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
     let colors = &styles.colors;
     let mut lines: Vec<Line> = Vec::new();
+    let mut prev_role: Option<&Role> = None;
 
     for m in &state.messages {
-        // Add spacing before message (except for first message)
-        if !lines.is_empty() {
-            lines.push(Line::from(""));
+        // Add spacing only when the role changes (not between consecutive same-role messages)
+        if let Some(prev) = prev_role {
+            if prev != &m.role {
+                lines.push(Line::from(""));
+            }
         }
+        prev_role = Some(&m.role);
 
         // Message content with streaming cursor if applicable
         let mut text = m.text.clone();
@@ -3916,6 +3920,129 @@ mod tests {
             !buffer_str.contains("you"),
             "Old 'you' label should not appear. Buffer content:\n{}",
             buffer_str
+        );
+    }
+
+    #[test]
+    fn consecutive_same_role_messages_grouped_without_separator() {
+        use ratatui::buffer::Buffer;
+        use ratatui::layout::Rect;
+        use ratatui::widgets::Widget;
+
+        let mut state = AppState::new_with_paths(None, None);
+
+        // Add two consecutive user messages
+        state.messages.push(crate::app::ChatMessage {
+            role: Role::User,
+            text: "First".to_string(),
+            streaming: false,
+            turn_id: None,
+            turn_seq: None,
+        });
+        state.messages.push(crate::app::ChatMessage {
+            role: Role::User,
+            text: "Second".to_string(),
+            streaming: false,
+            turn_id: None,
+            turn_seq: None,
+        });
+
+        // Add an assistant message (should have blank line before it)
+        state.messages.push(crate::app::ChatMessage {
+            role: Role::Assistant,
+            text: "Response".to_string(),
+            streaming: false,
+            turn_id: None,
+            turn_seq: None,
+        });
+
+        // Add another assistant message (should NOT have blank line before it)
+        state.messages.push(crate::app::ChatMessage {
+            role: Role::Assistant,
+            text: "More response".to_string(),
+            streaming: false,
+            turn_id: None,
+            turn_seq: None,
+        });
+
+        let paragraph = render_chat(&state);
+
+        // Render to a buffer to inspect the output
+        let area = Rect::new(0, 0, 80, 20);
+        let mut buffer = Buffer::empty(area);
+        paragraph.render(area, &mut buffer);
+
+        // Extract the rendered lines
+        let mut lines: Vec<String> = Vec::new();
+        for y in 0..area.height {
+            let line: String = (0..area.width)
+                .map(|x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+                .collect::<String>()
+                .trim_end()
+                .to_string();
+            lines.push(line);
+        }
+
+        // Remove trailing empty lines from the buffer
+        while lines.last().map(|l| l.is_empty()).unwrap_or(false) {
+            lines.pop();
+        }
+
+        // Expected output (only blank line on role change):
+        // Line 0: "┃ First"
+        // Line 1: "┃ Second"       (no blank line - same role as previous)
+        // Line 2: ""               (blank line - role changed from User to Assistant)
+        // Line 3: "Response"
+        // Line 4: "More response"  (no blank line - same role as previous)
+        //
+        // Total: 5 lines
+
+        // If the bug exists (blank line between ALL messages), we'd have:
+        // Line 0: "┃ First"
+        // Line 1: ""               (unwanted blank line)
+        // Line 2: "┃ Second"
+        // Line 3: ""               (blank line)
+        // Line 4: "Response"
+        // Line 5: ""               (unwanted blank line)
+        // Line 6: "More response"
+        //
+        // Total: 7 lines
+
+        assert_eq!(
+            lines.len(),
+            5,
+            "Expected 5 lines (only blank lines on role change), got {}.\nActual lines:\n{}",
+            lines.len(),
+            lines
+                .iter()
+                .enumerate()
+                .map(|(i, l)| format!("{}: {:?}", i, l))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+
+        // Also verify the structure:
+        // - Line 0 should be user message "First"
+        // - Line 1 should be user message "Second" (no blank between consecutive user)
+        // - Line 2 should be blank (role change)
+        // - Line 3 should be assistant message "Response"
+        // - Line 4 should be assistant message "More response" (no blank between consecutive assistant)
+        assert!(lines[0].contains("First"), "Line 0 should contain 'First'");
+        assert!(
+            lines[1].contains("Second"),
+            "Line 1 should contain 'Second' (no blank line between consecutive user messages)"
+        );
+        assert!(
+            lines[2].is_empty(),
+            "Line 2 should be blank (role change from user to assistant)"
+        );
+        assert!(
+            lines[3].contains("Response"),
+            "Line 3 should contain 'Response'"
+        );
+        assert!(
+            lines[4].contains("More response"),
+            "Line 4 should contain 'More response' (no blank line between consecutive assistant messages)"
         );
     }
 }
