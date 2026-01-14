@@ -1388,15 +1388,15 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
         .constraints([
             Constraint::Min(1),                    // main area
             Constraint::Length(permission_height), // permission bar (when active)
-            Constraint::Length(input_height),      // input
-            Constraint::Length(1),                 // status at BOTTOM
+            Constraint::Length(1),                 // status (above input)
+            Constraint::Length(input_height),      // input at BOTTOM
         ])
         .split(f.area());
 
     let main_area = root[0];
     let permission_area = root[1];
-    let input_area = root[2];
-    let status_area = root[3];
+    let status_area = root[2];
+    let input_area = root[3];
 
     // Split status area into left (info) and right (progress indicator)
     let right_width = status_right_width(state);
@@ -2950,6 +2950,9 @@ fn render_tool_call_line(
 
     let mut lines = Vec::new();
 
+    // Subagent/job indent: add visual nesting for delegated tool calls
+    let job_indent = if item.job_id.is_some() { "  " } else { "" };
+
     // Selection prefix
     let sel_prefix = if selected { "\u{25B8} " } else { "  " }; // ▸ when selected
 
@@ -2974,11 +2977,15 @@ fn render_tool_call_line(
     };
 
     lines.push(Line::from(vec![
+        Span::styled(job_indent, base_style),
         Span::styled(sel_prefix, base_style.fg(colors.accent)),
         Span::styled(format!("{} ", status_char), base_style.fg(status_color)),
         Span::styled(tool_name, base_style.fg(colors.fg_primary)),
         Span::styled(summary, base_style.fg(colors.fg_muted)),
     ]));
+
+    // Detail indent includes the job indent
+    let detail_indent = format!("{job_indent}    ");
 
     // When expanded and selected, show detailed JSON (up to 15 lines)
     if selected && expanded {
@@ -2988,13 +2995,13 @@ fn render_tool_call_line(
             for (i, line) in pretty.lines().enumerate() {
                 if i >= 15 {
                     lines.push(Line::from(vec![Span::styled(
-                        "    ... (truncated)",
+                        format!("{detail_indent}... (truncated)"),
                         base_style.fg(colors.fg_muted),
                     )]));
                     break;
                 }
                 lines.push(Line::from(vec![Span::styled(
-                    format!("    {line}"),
+                    format!("{detail_indent}{line}"),
                     base_style.fg(colors.fg_muted),
                 )]));
             }
@@ -3006,7 +3013,10 @@ fn render_tool_call_line(
         if is_complete {
             if let Some(preview) = &item.result_preview {
                 lines.push(Line::from(vec![
-                    Span::styled("  \u{2514}\u{2500} ", base_style.fg(colors.border_subtle)),
+                    Span::styled(
+                        format!("{job_indent}  \u{2514}\u{2500} "),
+                        base_style.fg(colors.border_subtle),
+                    ),
                     Span::styled(truncate_preview(preview, 50), base_style.fg(colors.fg_muted)),
                 ]));
             }
@@ -3023,6 +3033,43 @@ fn truncate_preview(s: &str, max_len: usize) -> String {
         format!("{}...", &first_line[..max_len - 3])
     } else {
         first_line.to_string()
+    }
+}
+
+/// Converts a markdown style hint to a ratatui Style.
+fn markdown_span_style(
+    md_style: &markdown::MarkdownStyle,
+    is_code_block: bool,
+    colors: &theme::ThemeColors,
+) -> Style {
+    use markdown::MarkdownStyle;
+
+    // Code blocks always get a surface background
+    let base = if is_code_block {
+        Style::default().bg(colors.bg_surface)
+    } else {
+        Style::default()
+    };
+
+    match md_style {
+        MarkdownStyle::Normal => base.fg(colors.fg_primary),
+        MarkdownStyle::Bold => base.fg(colors.fg_primary).add_modifier(Modifier::BOLD),
+        MarkdownStyle::InlineCode => Style::default()
+            .fg(colors.accent)
+            .bg(colors.bg_surface),
+        MarkdownStyle::Header(level) => {
+            // Headers get bold, with h1 being brighter
+            let fg = if *level == 1 {
+                colors.fg_primary
+            } else {
+                colors.fg_secondary
+            };
+            base.fg(fg).add_modifier(Modifier::BOLD)
+        }
+        MarkdownStyle::BulletMarker => base.fg(colors.accent),
+        MarkdownStyle::BulletContent => base.fg(colors.fg_primary),
+        MarkdownStyle::CodeBlock => base.fg(colors.fg_primary),
+        MarkdownStyle::CodeBorder => base.fg(colors.border_subtle),
     }
 }
 
@@ -3064,27 +3111,21 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
 
         // Markdown rendering is always enabled
         // User messages get a colored left border; assistant messages have no border
-        for l in markdown::render_markdownish_lines(&text) {
-            let content_style = if l.is_code {
-                Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
-            } else {
-                Style::default().fg(colors.fg_primary)
-            };
+        for md_line in markdown::render_markdownish_lines(&text) {
+            let mut spans: Vec<Span> = Vec::new();
 
-            let line = match m.role {
-                Role::User => {
-                    // Blue/accent border prefix for user messages
-                    Line::from(vec![
-                        Span::styled("┃ ", Style::default().fg(colors.accent)),
-                        Span::styled(l.text, content_style),
-                    ])
-                }
-                Role::Assistant => {
-                    // No border for assistant messages
-                    Line::from(Span::styled(l.text, content_style))
-                }
-            };
-            lines.push(line);
+            // Add user message border prefix
+            if m.role == Role::User {
+                spans.push(Span::styled("┃ ", Style::default().fg(colors.accent)));
+            }
+
+            // Convert markdown spans to styled ratatui spans
+            for md_span in &md_line.spans {
+                let style = markdown_span_style(&md_span.style, md_line.is_code_block, colors);
+                spans.push(Span::styled(md_span.text.clone(), style));
+            }
+
+            lines.push(Line::from(spans));
         }
 
         // After assistant message, render any tool calls from this turn inline
@@ -3711,7 +3752,7 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
             Role::Assistant => content_width,
         };
         for l in markdown::render_markdownish_lines(&text) {
-            total += wrapped_line_count(effective_width.max(1), &l.text);
+            total += wrapped_line_count(effective_width.max(1), &l.text());
         }
     }
 
@@ -3756,8 +3797,8 @@ fn compute_chat_rect(
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(1),               // main area (chat)
-            Constraint::Length(input_height), // input
-            Constraint::Length(1),            // status at BOTTOM
+            Constraint::Length(1),            // status (above input)
+            Constraint::Length(input_height), // input at BOTTOM
         ])
         .split(area);
 
