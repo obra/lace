@@ -251,7 +251,12 @@ fn extract_slash_commands(result: &Option<Value>) -> Vec<SlashCommand> {
         .collect()
 }
 
-/// Parse ent/session/events response into ChatMessage list and ToolUse history
+/// Parse ent/session/events response into ChatMessage list and ToolUse history.
+///
+/// Uses a two-pass approach:
+/// 1. First pass: collect all events, noting which turn_ids have tool_use events
+/// 2. Second pass: create messages, including empty assistant messages only if
+///    their turn has associated tool calls (needed for inline rendering)
 fn parse_history_events(result: &Option<Value>) -> (Vec<ChatMessage>, Vec<HistoryToolUse>) {
     let Some(Value::Object(obj)) = result else {
         return (Vec::new(), Vec::new());
@@ -260,6 +265,21 @@ fn parse_history_events(result: &Option<Value>) -> (Vec<ChatMessage>, Vec<Histor
         return (Vec::new(), Vec::new());
     };
 
+    // First pass: collect turn_ids that have tool_use events
+    let mut turns_with_tools: std::collections::HashSet<String> =
+        std::collections::HashSet::new();
+    for event in events {
+        let Some(event_obj) = event.as_object() else {
+            continue;
+        };
+        if event_obj.get("type").and_then(|v| v.as_str()) == Some("tool_use") {
+            if let Some(turn_id) = event_obj.get("turnId").and_then(|v| v.as_str()) {
+                turns_with_tools.insert(turn_id.to_string());
+            }
+        }
+    }
+
+    // Second pass: create messages and tool history
     let mut messages: Vec<ChatMessage> = Vec::new();
     let mut tool_history: Vec<HistoryToolUse> = Vec::new();
 
@@ -318,10 +338,17 @@ fn parse_history_events(result: &Option<Value>) -> (Vec<ChatMessage>, Vec<Histor
                         }
                         None
                     });
-                if let Some(text) = text {
+
+                // Create message if: has text content OR turn has tool calls (for inline rendering)
+                let has_tools = turn_id
+                    .as_ref()
+                    .map(|id| turns_with_tools.contains(id))
+                    .unwrap_or(false);
+
+                if text.is_some() || has_tools {
                     messages.push(ChatMessage {
                         role: Role::Assistant,
-                        text,
+                        text: text.unwrap_or_default(),
                         streaming: false,
                         turn_id,
                         turn_seq,
@@ -528,6 +555,10 @@ mod tests {
         let (messages, tool_history) = parse_history_events(&result);
         assert_eq!(messages.len(), 2);
         assert_eq!(tool_history.len(), 1);
+
+        // Verify messages preserve turn context for matching with tools
+        assert_eq!(messages[0].turn_id, Some("turn_1".to_string()));
+        assert_eq!(messages[1].turn_id, Some("turn_1".to_string()));
 
         let tool = &tool_history[0];
         assert_eq!(tool.tool_call_id, "tool_1");
