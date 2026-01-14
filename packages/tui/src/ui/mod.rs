@@ -2927,22 +2927,10 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
     let mut lines: Vec<Line> = Vec::new();
 
     for m in &state.messages {
-        let prefix_style = match m.role {
-            Role::User => Style::default().fg(colors.accent).add_modifier(Modifier::BOLD),
-            Role::Assistant => Style::default().fg(colors.fg_secondary),
-        };
-
         // Add spacing before message (except for first message)
         if !lines.is_empty() {
             lines.push(Line::from(""));
         }
-
-        // Role indicator - use friendly labels
-        let role_text = match m.role {
-            Role::User => "you",
-            Role::Assistant => "assistant",
-        };
-        lines.push(Line::from(Span::styled(role_text, prefix_style)));
 
         // Message content with streaming cursor if applicable
         let mut text = m.text.clone();
@@ -2951,13 +2939,28 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
         }
 
         // Markdown rendering is always enabled
+        // User messages get a colored left border; assistant messages have no border
         for l in markdown::render_markdownish_lines(&text) {
-            let style = if l.is_code {
+            let content_style = if l.is_code {
                 Style::default().fg(colors.fg_primary).bg(colors.bg_surface)
             } else {
                 Style::default().fg(colors.fg_primary)
             };
-            lines.push(Line::from(Span::styled(l.text, style)));
+
+            let line = match m.role {
+                Role::User => {
+                    // Blue/accent border prefix for user messages
+                    Line::from(vec![
+                        Span::styled("┃ ", Style::default().fg(colors.accent)),
+                        Span::styled(l.text, content_style),
+                    ])
+                }
+                Role::Assistant => {
+                    // No border for assistant messages
+                    Line::from(Span::styled(l.text, content_style))
+                }
+            };
+            lines.push(line);
         }
     }
 
@@ -3863,6 +3866,58 @@ mod tests {
             buffer_str_after.contains("Enter/Space toggle"),
             "Legend should be visible with many models after toggle. Buffer:\n{}",
             buffer_str_after
+        );
+    }
+
+    #[test]
+    fn user_messages_render_with_border_prefix() {
+        let mut state = AppState::new_with_paths(None, None);
+        state.prefs.show_activity = false;
+        state.prefs.show_debug = false;
+        state.messages.push(crate::app::ChatMessage {
+            role: Role::User,
+            text: "hello".to_string(),
+            streaming: false,
+            turn_id: None,
+            turn_seq: None,
+        });
+        state.messages.push(crate::app::ChatMessage {
+            role: Role::Assistant,
+            text: "world".to_string(),
+            streaming: false,
+            turn_id: None,
+            turn_seq: None,
+        });
+
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|f| draw(f, &state)).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let buffer_str: String = (0..buffer.area.height)
+            .flat_map(|y| {
+                (0..buffer.area.width)
+                    .map(move |x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+            })
+            .collect();
+
+        // User message should have border prefix
+        assert!(
+            buffer_str.contains("┃ hello"),
+            "User message should have border prefix. Buffer content:\n{}",
+            buffer_str
+        );
+        // Assistant message should not have border prefix
+        assert!(
+            !buffer_str.contains("┃ world"),
+            "Assistant message should not have border prefix. Buffer content:\n{}",
+            buffer_str
+        );
+        // Old labels should not appear
+        assert!(
+            !buffer_str.contains("you"),
+            "Old 'you' label should not appear. Buffer content:\n{}",
+            buffer_str
         );
     }
 }
