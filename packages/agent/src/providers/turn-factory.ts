@@ -3,11 +3,7 @@
 import { ProviderRegistry } from '@lace/agent/providers/registry';
 import type { AIProvider } from '@lace/agent/providers/base-provider';
 import { TestAgentProvider } from '@lace/agent/runtime/test-provider';
-import {
-  throwInvalidParams,
-  toNonEmptyString,
-  isTestProviderEnabled,
-} from '@lace/agent/rpc/utils';
+import { throwInvalidParams, toNonEmptyString, isTestProviderEnabled } from '@lace/agent/rpc/utils';
 
 /**
  * Create an AI provider for a turn.

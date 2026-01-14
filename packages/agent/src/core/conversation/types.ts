@@ -71,7 +71,7 @@ export interface RunnerDependencies {
     mcpServerManager?: unknown
   ) => {
     executor: {
-      getTool: (name: string) => unknown;
+      getTool: (name: string) => CoreTool | undefined;
       execute: (...args: unknown[]) => Promise<CoreToolResult>;
     };
     toolsForProvider: CoreTool[];

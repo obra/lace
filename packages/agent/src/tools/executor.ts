@@ -17,6 +17,10 @@ import { DelegateTool } from './implementations/delegate';
 import { JobOutputTool } from './implementations/job_output';
 import { JobsListTool } from './implementations/jobs_list';
 import { JobKillTool } from './implementations/job_kill';
+import { TodoReadTool } from './implementations/todo_read';
+import { TodoAddTool } from './implementations/todo_add';
+import { TodoUpdateTool } from './implementations/todo_update';
+import { TodoRemoveTool } from './implementations/todo_remove';
 import { MCPServerManager } from '../mcp/server-manager';
 import type { MCPServerConnection } from '@lace/agent/config/mcp-types';
 import { MCPToolAdapter } from '../mcp/tool-adapter';
@@ -236,6 +240,10 @@ export class ToolExecutor {
       new JobOutputTool(),
       new JobsListTool(),
       new JobKillTool(),
+      new TodoReadTool(),
+      new TodoAddTool(),
+      new TodoUpdateTool(),
+      new TodoRemoveTool(),
     ];
 
     this.registerTools(tools);

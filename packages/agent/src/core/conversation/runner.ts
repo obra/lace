@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
 import type { ToolResult } from '@lace/ent-protocol';
 import type { ToolResult as CoreToolResult } from '@lace/agent/tools/types';
+import type { Tool } from '@lace/agent/tools/tool';
 import {
   readSessionState,
   writeSessionState,
@@ -19,6 +20,12 @@ import {
   executeJobsList,
   executeJobKill,
 } from '@lace/agent/core/tools/special/job-tools';
+import {
+  executeTodoRead,
+  executeTodoAdd,
+  executeTodoUpdate,
+  executeTodoRemove,
+} from '@lace/agent/todo/todo-tools';
 import type { SpecialToolContext } from '@lace/agent/core/tools/special/types';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import {
@@ -283,7 +290,7 @@ export class ConversationRunner {
     toolCall: { id?: string; name?: string; arguments?: unknown };
     streamTurnSeq: number;
     toolExecutor: {
-      getTool: (name: string) => unknown;
+      getTool: (name: string) => Tool | undefined;
       execute: (...args: unknown[]) => Promise<CoreToolResult>;
     };
     executionMode: 'plan' | 'execute';
@@ -782,6 +789,34 @@ export class ConversationRunner {
       }
       // job_kill
       return await executeJobKill(finalInput as { jobId?: string }, context);
+    }
+
+    // Handle todo tools
+    if (
+      toolName === 'todo_read' ||
+      toolName === 'todo_add' ||
+      toolName === 'todo_update' ||
+      toolName === 'todo_remove'
+    ) {
+      const todoContext = { sessionDir: this.config.sessionDir };
+
+      if (toolName === 'todo_read') {
+        return await executeTodoRead(finalInput, todoContext);
+      }
+      if (toolName === 'todo_add') {
+        return await executeTodoAdd(
+          finalInput as { title?: string; description?: string },
+          todoContext
+        );
+      }
+      if (toolName === 'todo_update') {
+        return await executeTodoUpdate(
+          finalInput as { id?: string; done?: boolean; title?: string; description?: string },
+          todoContext
+        );
+      }
+      // todo_remove
+      return await executeTodoRemove(finalInput as { id?: string }, todoContext);
     }
 
     // Default: execute through tool executor
