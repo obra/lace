@@ -3452,21 +3452,19 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
         }
         first_message = false;
 
-        // Role label line ("you" or "assistant")
-        let role_text = match m.role {
-            Role::User => "you",
-            Role::Assistant => "assistant",
-        };
-        total += wrapped_line_count(content_width, role_text);
-
         let mut text = m.text.clone();
         if m.role == Role::Assistant && m.streaming {
             text.push_str(" ▌");
         }
 
         // Markdown rendering is always enabled
+        // User messages have a "┃ " border prefix (2 chars), so effective width is reduced
+        let effective_width = match m.role {
+            Role::User => content_width.saturating_sub(2),
+            Role::Assistant => content_width,
+        };
         for l in markdown::render_markdownish_lines(&text) {
-            total += wrapped_line_count(content_width, &l.text);
+            total += wrapped_line_count(effective_width.max(1), &l.text);
         }
     }
 
