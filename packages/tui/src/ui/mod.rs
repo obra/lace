@@ -1377,12 +1377,8 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     let max_input_height = f.area().height / 3;
     let input_height = (input_line_count as u16).min(max_input_height).max(1);
 
-    // Permission bar: 3 lines when active, 0 otherwise
-    let permission_height = if state.active_permission.is_some() {
-        3
-    } else {
-        0
-    };
+    // Permission bar: dynamic height based on expanded state
+    let permission_height = permission_bar_height(state);
 
     let root = Layout::default()
         .direction(Direction::Vertical)
@@ -2596,8 +2592,32 @@ fn render_slash_picker(state: &AppState) -> Paragraph<'static> {
         )
 }
 
+/// Calculate permission bar height (for layout)
+fn permission_bar_height(state: &AppState) -> u16 {
+    if state.active_permission.is_none() {
+        return 0;
+    }
+    if state.permission_details_expanded {
+        // Base (3) + detail lines (up to 10)
+        let detail_lines = state
+            .active_permission
+            .as_ref()
+            .and_then(|req| req.tool_call_id.as_ref())
+            .and_then(|id| state.tool_inputs_by_tool_call_id.get(id))
+            .map(|input| {
+                let pretty = serde_json::to_string_pretty(input).unwrap_or_default();
+                pretty.lines().count().min(9) + 2 // +2 for resource and ... line
+            })
+            .unwrap_or(1) as u16;
+        3 + detail_lines
+    } else {
+        3 // Compact: top border, shortcuts, bottom border
+    }
+}
+
 /// Renders a compact permission bar for bottom-anchored display.
 /// Shows tool name, resource preview, and keyboard shortcuts.
+/// When expanded, shows full resource and tool input JSON.
 fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
     let colors = &styles.colors;
@@ -2608,10 +2628,12 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
 
     let tool = req.tool.clone().unwrap_or_else(|| "unknown".to_string());
     let resource = req.resource.clone().unwrap_or_default();
-    let resource_preview = if resource.len() > 40 {
+    let resource_preview = if state.permission_details_expanded {
+        resource.clone() // Show full resource when expanded
+    } else if resource.len() > 40 {
         format!("{}...", &resource[..37])
     } else {
-        resource
+        resource.clone()
     };
 
     let mut lines: Vec<Line> = Vec::new();
@@ -2637,7 +2659,12 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
         ),
     ]));
 
-    // Shortcut line
+    // Shortcut line - change [D] label based on expanded state
+    let details_label = if state.permission_details_expanded {
+        " Hide"
+    } else {
+        " Details"
+    };
     lines.push(Line::from(vec![
         Span::styled("│  ", Style::default().fg(colors.warning)),
         Span::styled(
@@ -2662,10 +2689,52 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
         ),
         Span::styled(" Deny   ", Style::default().fg(colors.fg_secondary)),
         Span::styled("[D]", Style::default().fg(colors.fg_muted)),
-        Span::styled(" Details", Style::default().fg(colors.fg_muted)),
+        Span::styled(details_label, Style::default().fg(colors.fg_muted)),
         Span::raw("                          "),
         Span::styled("│", Style::default().fg(colors.warning)),
     ]));
+
+    // When expanded, show resource and tool input details
+    if state.permission_details_expanded {
+        // Resource line (full, not truncated)
+        lines.push(Line::from(vec![
+            Span::styled("│  ", Style::default().fg(colors.warning)),
+            Span::styled("Resource: ", Style::default().fg(colors.fg_secondary)),
+            Span::styled(resource, Style::default().fg(colors.fg_primary)),
+        ]));
+
+        // Tool input JSON from tool_inputs_by_tool_call_id
+        if let Some(tool_call_id) = &req.tool_call_id {
+            if let Some(input) = state.tool_inputs_by_tool_call_id.get(tool_call_id) {
+                let pretty = serde_json::to_string_pretty(input).unwrap_or_default();
+                let input_lines: Vec<&str> = pretty.lines().collect();
+                let max_lines = 8;
+                let show_truncation = input_lines.len() > max_lines;
+
+                for (i, line) in input_lines.iter().take(max_lines).enumerate() {
+                    let prefix = if i == 0 { "Input: " } else { "       " };
+                    lines.push(Line::from(vec![
+                        Span::styled("│  ", Style::default().fg(colors.warning)),
+                        Span::styled(prefix, Style::default().fg(colors.fg_secondary)),
+                        Span::styled(
+                            (*line).to_string(),
+                            Style::default().fg(colors.fg_muted),
+                        ),
+                    ]));
+                }
+
+                if show_truncation {
+                    lines.push(Line::from(vec![
+                        Span::styled("│  ", Style::default().fg(colors.warning)),
+                        Span::styled(
+                            "       ... (truncated)",
+                            Style::default().fg(colors.fg_muted),
+                        ),
+                    ]));
+                }
+            }
+        }
+    }
 
     // Bottom border
     lines.push(Line::from(vec![Span::styled(
@@ -4121,6 +4190,138 @@ mod tests {
             buffer_str.contains("[D]"),
             "Should show [D] shortcut. Buffer: {}",
             buffer_str
+        );
+    }
+
+    #[test]
+    fn permission_bar_expanded_shows_details() {
+        use crate::app::{PermissionOption, PermissionRequest};
+        use ratatui::layout::Rect;
+
+        let mut state = AppState::new_with_paths(None, None);
+        state.active_permission = Some(PermissionRequest {
+            id: json!("test"),
+            tool: Some("bash".to_string()),
+            kind: None,
+            resource: Some("npm test --verbose --coverage".to_string()),
+            tool_call_id: Some("tool_123".to_string()),
+            turn_id: None,
+            turn_seq: None,
+            job_id: None,
+            options: vec![
+                PermissionOption {
+                    option_id: "allow".to_string(),
+                    label: "Allow once".to_string(),
+                },
+                PermissionOption {
+                    option_id: "deny".to_string(),
+                    label: "Deny".to_string(),
+                },
+            ],
+        });
+
+        // Add tool input for the tool call
+        state.tool_inputs_by_tool_call_id.insert(
+            "tool_123".to_string(),
+            json!({
+                "command": "npm test --verbose --coverage",
+                "timeout": 30000
+            }),
+        );
+
+        // Expand the details
+        state.permission_details_expanded = true;
+
+        let widget = render_permission_bar(&state);
+
+        // Render to a test backend with enough height for expanded content
+        let backend = TestBackend::new(80, 15);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| {
+                f.render_widget(widget, Rect::new(0, 0, 80, 15));
+            })
+            .unwrap();
+
+        // Extract buffer content
+        let buffer = terminal.backend().buffer();
+        let buffer_str: String = (0..buffer.area.height)
+            .flat_map(|y| {
+                (0..buffer.area.width)
+                    .map(move |x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+            })
+            .collect();
+
+        // Verify expanded state shows "Hide" instead of "Details"
+        assert!(
+            buffer_str.contains("Hide"),
+            "Should show 'Hide' when expanded. Buffer: {}",
+            buffer_str
+        );
+
+        // Verify resource line is shown
+        assert!(
+            buffer_str.contains("Resource:"),
+            "Should show 'Resource:' label when expanded. Buffer: {}",
+            buffer_str
+        );
+
+        // Verify tool input JSON is shown
+        assert!(
+            buffer_str.contains("Input:"),
+            "Should show 'Input:' label when expanded. Buffer: {}",
+            buffer_str
+        );
+        assert!(
+            buffer_str.contains("command"),
+            "Should show tool input JSON when expanded. Buffer: {}",
+            buffer_str
+        );
+    }
+
+    #[test]
+    fn permission_bar_height_calculates_correctly() {
+        use crate::app::{PermissionOption, PermissionRequest};
+
+        let mut state = AppState::new_with_paths(None, None);
+
+        // No permission = height 0
+        assert_eq!(permission_bar_height(&state), 0);
+
+        // Active permission, not expanded = height 3
+        state.active_permission = Some(PermissionRequest {
+            id: json!("test"),
+            tool: Some("bash".to_string()),
+            kind: None,
+            resource: Some("npm test".to_string()),
+            tool_call_id: Some("tool_123".to_string()),
+            turn_id: None,
+            turn_seq: None,
+            job_id: None,
+            options: vec![PermissionOption {
+                option_id: "allow".to_string(),
+                label: "Allow".to_string(),
+            }],
+        });
+        assert_eq!(permission_bar_height(&state), 3);
+
+        // Expanded without tool input = 3 + 1 (resource line)
+        state.permission_details_expanded = true;
+        assert_eq!(permission_bar_height(&state), 4);
+
+        // Expanded with tool input = 3 + resource + input lines
+        state.tool_inputs_by_tool_call_id.insert(
+            "tool_123".to_string(),
+            json!({
+                "command": "npm test"
+            }),
+        );
+        let height = permission_bar_height(&state);
+        // Should be at least 3 + 2 (resource + some input lines)
+        assert!(
+            height >= 5,
+            "Height should be at least 5 with tool input, got {}",
+            height
         );
     }
 }
