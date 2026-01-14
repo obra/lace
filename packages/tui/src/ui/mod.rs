@@ -248,13 +248,11 @@ fn run_loop(
                         continue;
                     }
 
-                    // Debug: log key events when in input focus
-                    if state.focus == Focus::Input {
-                        state.push_debug_line(format!(
-                            "key: {:?} modifiers: {:?}",
-                            key.code, key.modifiers
-                        ));
-                    }
+                    // Debug: log all key events
+                    state.push_debug_line(format!(
+                        "key: {:?} mod: {:?} focus: {:?}",
+                        key.code, key.modifiers, state.focus
+                    ));
 
                     // Ctrl+V for image paste when in Input focus
                     if key.modifiers.contains(KeyModifiers::CONTROL)

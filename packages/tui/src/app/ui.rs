@@ -611,22 +611,21 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         UiAction::ScrollUp => {
             use crate::app::Focus;
             match state.focus {
-                Focus::Chat => {
+                // PageUp scrolls chat even when focus is Input
+                Focus::Chat | Focus::Input => {
                     state.chat_follow = false;
                     state.chat_scroll = state.chat_scroll.saturating_sub(1);
                 }
                 Focus::Activity => state.activity_scroll = state.activity_scroll.saturating_sub(1),
                 Focus::Debug => state.debug_scroll = state.debug_scroll.saturating_sub(1),
-                Focus::Input => {
-                    // TextArea handles its own vertical scroll with cursor movement.
-                }
             }
             Vec::new()
         }
         UiAction::ScrollDown => {
             use crate::app::Focus;
             match state.focus {
-                Focus::Chat => {
+                // PageDown scrolls chat even when focus is Input
+                Focus::Chat | Focus::Input => {
                     state.chat_scroll = state
                         .chat_scroll
                         .saturating_add(1)
@@ -637,9 +636,6 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 }
                 Focus::Activity => state.activity_scroll = state.activity_scroll.saturating_add(1),
                 Focus::Debug => state.debug_scroll = state.debug_scroll.saturating_add(1),
-                Focus::Input => {
-                    // TextArea handles its own vertical scroll with cursor movement.
-                }
             }
             Vec::new()
         }
