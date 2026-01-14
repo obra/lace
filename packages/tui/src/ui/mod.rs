@@ -3500,9 +3500,22 @@ fn render_help_modal(state: &AppState) -> Paragraph<'static> {
         Line::from("Enter/Ctrl+Enter  Send message"),
         Line::from("Up/Down  Scroll or history (in input)"),
         Line::from("PgUp/Dn  Scroll focused pane"),
+        Line::from("j/k      Navigate tool calls in chat"),
+        Line::from("D        Show tool details (when tool selected)"),
         Line::from("F1       Toggle help"),
         Line::from(""),
-        Line::from("Permission: ↑/↓ select, Enter confirm, Esc deny"),
+        Line::from(Span::styled(
+            "Permissions",
+            Style::default()
+                .fg(colors.fg_primary)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from("Y        Allow once"),
+        Line::from("S        Allow for session"),
+        Line::from("N        Deny"),
+        Line::from("↑/↓      Select option"),
+        Line::from("Enter    Confirm selection"),
+        Line::from("Esc      Deny"),
         Line::from(""),
         Line::from(Span::styled(
             "Slash commands",
