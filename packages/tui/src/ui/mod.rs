@@ -2966,6 +2966,92 @@ fn render_main(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout::
     f.render_widget(render_chat(state), area);
 }
 
+/// Formats todo_read result as pretty-printed lines.
+/// Returns None if the result doesn't look like a todo list.
+fn format_todo_read_result(result: &Value, colors: &theme::ThemeColors) -> Option<Vec<Line<'static>>> {
+    let items = result.get("items")?.as_array()?;
+    if items.is_empty() {
+        return Some(vec![Line::from(Span::styled(
+            "  (no items)",
+            Style::default().fg(colors.fg_muted),
+        ))]);
+    }
+
+    let mut lines = Vec::new();
+    for item in items {
+        let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("?");
+        let status = item.get("status").and_then(|v| v.as_str()).unwrap_or("pending");
+        let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("(untitled)");
+
+        let checkbox = if status == "done" { "[x]" } else { "[ ]" };
+        let status_color = if status == "done" {
+            colors.success
+        } else {
+            colors.fg_muted
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(checkbox, Style::default().fg(status_color)),
+            Span::styled(" ", Style::default()),
+            Span::styled(title.to_string(), Style::default().fg(colors.fg_primary)),
+            Span::styled(format!(" `{id}`"), Style::default().fg(colors.fg_muted)),
+        ]));
+
+        // Add description if present (indented)
+        if let Some(desc) = item.get("description").and_then(|v| v.as_str()) {
+            for desc_line in desc.lines() {
+                lines.push(Line::from(Span::styled(
+                    format!("      {desc_line}"),
+                    Style::default().fg(colors.fg_muted),
+                )));
+            }
+        }
+    }
+    Some(lines)
+}
+
+/// Formats todo_write input/result as a summary line.
+fn format_todo_write_summary(input: &Value, result: Option<&Value>) -> String {
+    // Check if this is an update (has id) or create (has title but no id)
+    if let Some(id) = input.get("id").and_then(|v| v.as_str()) {
+        // Update operation
+        if let Some(status) = input.get("status").and_then(|v| v.as_str()) {
+            if status == "removed" {
+                return format!("remove {id}");
+            } else if status == "done" {
+                return format!("done {id}");
+            } else {
+                return format!("update {id} → {status}");
+            }
+        }
+        if let Some(title) = input.get("title").and_then(|v| v.as_str()) {
+            let truncated = if title.len() > 30 {
+                format!("{}...", &title[..27])
+            } else {
+                title.to_string()
+            };
+            return format!("update {id}: {truncated}");
+        }
+        format!("update {id}")
+    } else if let Some(title) = input.get("title").and_then(|v| v.as_str()) {
+        // Create operation
+        let truncated = if title.len() > 40 {
+            format!("{}...", &title[..37])
+        } else {
+            title.to_string()
+        };
+        if let Some(res) = result {
+            if let Some(new_id) = res.get("id").and_then(|v| v.as_str()) {
+                return format!("add \"{truncated}\" → {new_id}");
+            }
+        }
+        format!("add \"{truncated}\"")
+    } else {
+        "write".to_string()
+    }
+}
+
 /// Renders a tool call with status indicator and optional folded result.
 /// When `selected` is true, adds a selection marker and background.
 /// When `expanded` is true (and selected), shows detailed JSON output.
@@ -3006,8 +3092,30 @@ fn render_tool_call_line(
         Style::default()
     };
 
+    // Extract input/result for special tool handling
+    let input = item.details.as_ref().and_then(|d| d.get("input"));
+    let result = item.details.as_ref().and_then(|d| d.get("result"));
+
     // Main tool line with command/summary
-    let summary = if item.summary.is_empty() {
+    let summary = if tool_name == "todo_write" {
+        // Use custom summary for todo_write
+        if let Some(inp) = input {
+            format!(" {}", format_todo_write_summary(inp, result))
+        } else {
+            String::new()
+        }
+    } else if tool_name == "todo_read" {
+        // For todo_read, just show "reading..." or item count
+        if let Some(res) = result {
+            if let Some(items) = res.get("items").and_then(|v| v.as_array()) {
+                format!(" ({} items)", items.len())
+            } else {
+                String::new()
+            }
+        } else {
+            " reading...".to_string()
+        }
+    } else if item.summary.is_empty() {
         String::new()
     } else {
         // Truncate long summaries
@@ -3023,7 +3131,7 @@ fn render_tool_call_line(
         Span::styled(job_indent, base_style),
         Span::styled(sel_prefix, base_style.fg(colors.accent)),
         Span::styled(format!("{} ", status_char), base_style.fg(status_color)),
-        Span::styled(tool_name, base_style.fg(colors.fg_primary)),
+        Span::styled(tool_name.clone(), base_style.fg(colors.fg_primary)),
         Span::styled(summary, base_style.fg(colors.fg_muted)),
     ]));
 
@@ -3050,11 +3158,20 @@ fn render_tool_call_line(
             }
         }
     } else {
-        // Folded result preview (if completed and has preview)
+        // Folded result preview (if completed)
         let is_complete = item.status.as_deref() == Some("completed")
             || item.status.as_deref() == Some("success");
         if is_complete {
-            if let Some(preview) = &item.result_preview {
+            // Special handling for todo_read: show pretty-printed todo list
+            if tool_name == "todo_read" {
+                if let Some(res) = result {
+                    if let Some(todo_lines) = format_todo_read_result(res, colors) {
+                        for todo_line in todo_lines {
+                            lines.push(todo_line);
+                        }
+                    }
+                }
+            } else if let Some(preview) = &item.result_preview {
                 lines.push(Line::from(vec![
                     Span::styled(
                         format!("{job_indent}  \u{2514}\u{2500} "),
@@ -4586,5 +4703,101 @@ mod tests {
             "Height should be at least 5 with tool input, got {}",
             height
         );
+    }
+
+    #[test]
+    fn format_todo_write_summary_create_with_result() {
+        let input = json!({ "title": "Write unit tests" });
+        let result = json!({ "id": "t_abc" });
+        let summary = format_todo_write_summary(&input, Some(&result));
+        assert_eq!(summary, "add \"Write unit tests\" → t_abc");
+    }
+
+    #[test]
+    fn format_todo_write_summary_create_without_result() {
+        let input = json!({ "title": "Write unit tests" });
+        let summary = format_todo_write_summary(&input, None);
+        assert_eq!(summary, "add \"Write unit tests\"");
+    }
+
+    #[test]
+    fn format_todo_write_summary_mark_done() {
+        let input = json!({ "id": "t_abc", "status": "done" });
+        let summary = format_todo_write_summary(&input, None);
+        assert_eq!(summary, "done t_abc");
+    }
+
+    #[test]
+    fn format_todo_write_summary_remove() {
+        let input = json!({ "id": "t_xyz", "status": "removed" });
+        let summary = format_todo_write_summary(&input, None);
+        assert_eq!(summary, "remove t_xyz");
+    }
+
+    #[test]
+    fn format_todo_write_summary_update_title() {
+        let input = json!({ "id": "t_abc", "title": "New title" });
+        let summary = format_todo_write_summary(&input, None);
+        assert_eq!(summary, "update t_abc: New title");
+    }
+
+    #[test]
+    fn format_todo_write_summary_truncates_long_title() {
+        let input = json!({ "title": "This is a very long task title that should be truncated" });
+        let summary = format_todo_write_summary(&input, None);
+        assert!(summary.len() <= 50); // add "" + truncated + ...
+        assert!(summary.ends_with("...\""));
+    }
+
+    #[test]
+    fn format_todo_read_result_empty_list() {
+        let colors = theme::ThemeColors::dark();
+        let result = json!({ "items": [] });
+        let lines = format_todo_read_result(&result, &colors);
+        assert!(lines.is_some());
+        let lines = lines.unwrap();
+        assert_eq!(lines.len(), 1);
+    }
+
+    #[test]
+    fn format_todo_read_result_with_items() {
+        let colors = theme::ThemeColors::dark();
+        let result = json!({
+            "items": [
+                { "id": "t_aaa", "status": "pending", "title": "First task" },
+                { "id": "t_bbb", "status": "done", "title": "Second task" }
+            ]
+        });
+        let lines = format_todo_read_result(&result, &colors);
+        assert!(lines.is_some());
+        let lines = lines.unwrap();
+        assert_eq!(lines.len(), 2); // 2 items, no descriptions
+    }
+
+    #[test]
+    fn format_todo_read_result_with_description() {
+        let colors = theme::ThemeColors::dark();
+        let result = json!({
+            "items": [
+                {
+                    "id": "t_aaa",
+                    "status": "pending",
+                    "title": "Task with desc",
+                    "description": "Line 1\nLine 2"
+                }
+            ]
+        });
+        let lines = format_todo_read_result(&result, &colors);
+        assert!(lines.is_some());
+        let lines = lines.unwrap();
+        assert_eq!(lines.len(), 3); // 1 item + 2 description lines
+    }
+
+    #[test]
+    fn format_todo_read_result_invalid_returns_none() {
+        let colors = theme::ThemeColors::dark();
+        let result = json!({ "error": "something went wrong" });
+        let lines = format_todo_read_result(&result, &colors);
+        assert!(lines.is_none());
     }
 }
