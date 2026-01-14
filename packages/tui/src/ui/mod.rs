@@ -7,9 +7,7 @@ use crate::app::connections;
 use crate::app::prefs::{KeybindMode, Theme};
 use crate::app::reducer::{reduce, AppEvent, Outbound};
 use crate::app::sessions;
-use crate::app::ui::{
-    all_slash_commands, apply_ui_action, permission_choices, PermissionChoice, UiAction,
-};
+use crate::app::ui::{all_slash_commands, apply_ui_action, UiAction};
 use crate::app::AppState;
 use crate::app::{Focus, Role};
 use crate::args::Args;
@@ -1344,18 +1342,27 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     let max_input_height = f.area().height / 3;
     let input_height = (input_line_count as u16).min(max_input_height).max(1);
 
+    // Permission bar: 3 lines when active, 0 otherwise
+    let permission_height = if state.active_permission.is_some() {
+        3
+    } else {
+        0
+    };
+
     let root = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(1),               // main area (first)
-            Constraint::Length(1),            // status ABOVE input
-            Constraint::Length(input_height), // input
+            Constraint::Min(1),                    // main area (first)
+            Constraint::Length(1),                 // status ABOVE input
+            Constraint::Length(permission_height), // permission bar (when active)
+            Constraint::Length(input_height),      // input
         ])
         .split(f.area());
 
     let main_area = root[0];
     let status_area = root[1];
-    let input_area = root[2];
+    let permission_area = root[2];
+    let input_area = root[3];
 
     // Split status area into left (info) and right (progress indicator)
     let right_width = status_right_width(state);
@@ -1379,6 +1386,11 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
         render_main(f, state, main_area);
     }
     render_input(f, state, input_area);
+
+    // Render permission bar when active (above input area)
+    if state.active_permission.is_some() {
+        f.render_widget(render_permission_bar(state), permission_area);
+    }
 
     // Slash command picker appears just above the input area
     if state.slash_picker_open {
@@ -1405,7 +1417,7 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
         f.render_widget(render_slash_picker(state), picker_area);
     }
 
-    // Permission is now rendered inline in the conversation, not as a modal overlay
+    // Centered modal overlays (permission is now rendered as a bottom bar, not here)
     if state.context_viewer.open {
         let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
@@ -1438,10 +1450,6 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
         let area = centered_rect(80, 70, f.area());
         f.render_widget(Clear, area);
         f.render_widget(render_search_modal(state), area);
-    } else if state.active_permission.is_some() {
-        let area = centered_rect(80, 70, f.area());
-        f.render_widget(Clear, area);
-        f.render_widget(render_permission_modal(state), area);
     } else if state.help_open {
         let area = centered_rect(70, 70, f.area());
         f.render_widget(Clear, area);
@@ -2551,132 +2559,6 @@ fn render_slash_picker(state: &AppState) -> Paragraph<'static> {
                 .border_style(Style::default().fg(colors.border_subtle))
                 .border_type(BorderType::Rounded),
         )
-}
-
-fn render_permission_modal(state: &AppState) -> Paragraph<'static> {
-    let styles = theme_styles(state.prefs.theme);
-    let colors = &styles.colors;
-
-    let Some(req) = state.active_permission.as_ref() else {
-        return Paragraph::new(Text::from(""));
-    };
-
-    let mut lines: Vec<Line> = Vec::new();
-
-    // Header
-    lines.push(Line::from(Span::styled(
-        "Permission Request",
-        Style::default()
-            .fg(colors.fg_primary)
-            .add_modifier(Modifier::BOLD),
-    )));
-    lines.push(Line::from(""));
-
-    // Tool and resource
-    let tool = req.tool.clone().unwrap_or_else(|| "unknown tool".to_string());
-    lines.push(Line::from(vec![
-        Span::styled("Tool: ", Style::default().fg(colors.fg_muted)),
-        Span::styled(tool, Style::default().fg(colors.fg_primary)),
-    ]));
-
-    if let Some(resource) = &req.resource {
-        lines.push(Line::from(vec![
-            Span::styled("Resource: ", Style::default().fg(colors.fg_muted)),
-            Span::styled(resource.clone(), Style::default().fg(colors.fg_secondary)),
-        ]));
-    }
-
-    // Tool input preview if available
-    if let Some(tool_call_id) = &req.tool_call_id {
-        if let Some(input) = state.tool_inputs_by_tool_call_id.get(tool_call_id) {
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                "Request:",
-                Style::default().fg(colors.fg_muted),
-            )));
-            let pretty =
-                serde_json::to_string_pretty(input).unwrap_or_else(|_| input.to_string());
-            for l in pretty.lines().take(6) {
-                lines.push(Line::from(Span::styled(
-                    format!("  {l}"),
-                    Style::default().fg(colors.fg_secondary),
-                )));
-            }
-            if pretty.lines().count() > 6 {
-                lines.push(Line::from(Span::styled(
-                    "  ...",
-                    Style::default().fg(colors.fg_muted),
-                )));
-            }
-        }
-    }
-
-    lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "Allow this action?",
-        Style::default().fg(colors.fg_primary),
-    )));
-    lines.push(Line::from(""));
-
-    let choices: Vec<PermissionChoice> = permission_choices(state);
-    let guidance_index = choices.len();
-
-    for (i, choice) in choices.iter().enumerate() {
-        let selected = i == state.active_permission_selected;
-        let marker = if selected { "▸" } else { " " };
-        let style = if selected {
-            Style::default()
-                .fg(colors.fg_primary)
-                .bg(colors.bg_surface)
-        } else {
-            Style::default().fg(colors.fg_secondary)
-        };
-        lines.push(Line::from(vec![
-            Span::styled(format!("{marker} "), style),
-            Span::styled(choice.label.clone(), style),
-        ]));
-    }
-
-    // Guidance input row
-    let guidance_selected = state.active_permission_selected == guidance_index;
-    lines.push(Line::from(""));
-    let mut guidance_spans = Vec::new();
-    let g_marker = if guidance_selected { "▸" } else { " " };
-    guidance_spans.push(Span::styled(
-        format!("{g_marker} Guidance: "),
-        Style::default().fg(colors.fg_muted),
-    ));
-    if state.permission_guidance_input.is_empty() {
-        guidance_spans.push(Span::styled(
-            "Type guidance…",
-            Style::default().fg(colors.fg_muted),
-        ));
-    } else {
-        guidance_spans.push(Span::styled(
-            state.permission_guidance_input.clone(),
-            Style::default().fg(colors.fg_primary),
-        ));
-    }
-    if guidance_selected {
-        guidance_spans.push(Span::styled("▌", Style::default().fg(colors.accent)));
-    }
-    lines.push(Line::from(guidance_spans));
-
-    lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "↑/↓ select • Enter confirm • Esc deny",
-        Style::default().fg(colors.fg_muted),
-    )));
-
-    Paragraph::new(Text::from(lines))
-        .style(Style::default().bg(colors.bg_elevated))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(colors.border_subtle))
-                .border_type(BorderType::Rounded),
-        )
-        .wrap(Wrap { trim: true })
 }
 
 /// Renders a compact permission bar for bottom-anchored display.
