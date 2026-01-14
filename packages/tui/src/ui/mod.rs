@@ -1290,6 +1290,17 @@ fn handle_session_update(state: &mut AppState, params: &Value) {
     let mut saw_turn_end = false;
     for ev in ent::decode_session_update(params) {
         match &ev {
+            AppEvent::TextDelta {
+                turn_id, turn_seq, ..
+            } => {
+                // Debug: log turn context for text delta events (first delta only per message)
+                if state.messages.last().map_or(true, |m| !m.streaming) {
+                    state.push_debug_line(format!(
+                        "text_delta (new msg) turn_id={:?} turn_seq={:?}",
+                        turn_id, turn_seq
+                    ));
+                }
+            }
             AppEvent::ToolUse {
                 tool_call_id,
                 name,
@@ -3098,23 +3109,19 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
     let mut lines: Vec<Line> = Vec::new();
     let mut prev_role: Option<&Role> = None;
 
-    // Build maps for matching tool calls to messages:
-    // 1. turn_seq -> tools (preferred, numeric sequence)
-    // 2. turn_id -> tools (fallback, string identifier)
+    // Build map of turn_id -> tools for matching tool calls to messages.
+    // turn_id is the same for all events in a turn, unlike turn_seq which is
+    // a sequence counter within the turn (text_delta gets 0, tool_use gets 1, etc.)
     let completed_tools = state.completed_tool_calls();
-    let mut tools_by_seq: std::collections::HashMap<i64, Vec<(usize, &activity::ActivityItem)>> =
-        std::collections::HashMap::new();
-    let mut tools_by_id: std::collections::HashMap<String, Vec<(usize, &activity::ActivityItem)>> =
+    let mut tools_by_turn_id: std::collections::HashMap<String, Vec<(usize, &activity::ActivityItem)>> =
         std::collections::HashMap::new();
     for (i, tool) in completed_tools.iter().enumerate() {
-        if let Some(seq) = tool.turn_seq {
-            tools_by_seq.entry(seq).or_default().push((i, tool));
-        } else if let Some(id) = &tool.turn_id {
-            tools_by_id.entry(id.clone()).or_default().push((i, tool));
+        if let Some(id) = &tool.turn_id {
+            tools_by_turn_id.entry(id.clone()).or_default().push((i, tool));
         }
     }
 
-    // Track which tools we've rendered (for any without turn_seq/id, render at end)
+    // Track which tools we've rendered (for any without turn_id, render at end)
     let mut rendered_tool_indices: std::collections::HashSet<usize> =
         std::collections::HashSet::new();
 
@@ -3153,24 +3160,22 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
         }
 
         // After assistant message, render any tool calls from this turn inline
-        // Try turn_seq first, then fall back to turn_id
+        // Match by turn_id (same for all events in a turn)
         if m.role == Role::Assistant {
-            let turn_tools: Option<&Vec<(usize, &activity::ActivityItem)>> =
-                m.turn_seq.and_then(|seq| tools_by_seq.get(&seq)).or_else(|| {
-                    m.turn_id.as_ref().and_then(|id| tools_by_id.get(id))
-                });
-            if let Some(tools) = turn_tools {
-                for (idx, tool) in tools {
-                    let is_selected = state.chat_selected_tool_idx == Some(*idx);
-                    let is_expanded = is_selected && state.chat_tool_expanded;
-                    lines.extend(render_tool_call_line(tool, colors, is_selected, is_expanded));
-                    rendered_tool_indices.insert(*idx);
+            if let Some(turn_id) = &m.turn_id {
+                if let Some(tools) = tools_by_turn_id.get(turn_id) {
+                    for (idx, tool) in tools {
+                        let is_selected = state.chat_selected_tool_idx == Some(*idx);
+                        let is_expanded = is_selected && state.chat_tool_expanded;
+                        lines.extend(render_tool_call_line(tool, colors, is_selected, is_expanded));
+                        rendered_tool_indices.insert(*idx);
+                    }
                 }
             }
         }
     }
 
-    // Render any remaining completed tools (without turn_seq or orphaned) at the end
+    // Render any remaining completed tools (without turn_id or orphaned) at the end
     let orphaned_tools: Vec<_> = completed_tools
         .iter()
         .enumerate()
