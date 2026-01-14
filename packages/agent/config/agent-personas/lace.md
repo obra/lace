@@ -8,6 +8,8 @@
 
 {{include:sections/tools.md}}
 
+{{include:sections/task-tracking.md}}
+
 {{include:sections/workflows.md}}
 
 {{include:sections/code-quality.md}}
