@@ -132,11 +132,7 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     const sessionDir = getSessionDir(created.sessionId);
     mkdirSync(sessionDir, { recursive: true });
     const todoPath = join(sessionDir, 'todo.md');
-    writeFileSync(
-      todoPath,
-      '- [ ] **Existing task from before** `t_xyz`\n',
-      'utf-8'
-    );
+    writeFileSync(todoPath, '- [ ] **Existing task from before** `t_xyz`\n', 'utf-8');
 
     await withTimeout(
       ctx.agent.peer.request('session/prompt', {
@@ -161,7 +157,9 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     );
 
     // Verify the result contains the existing task
-    const result = todoReadCompleted?.result as { outcome?: string; content?: Array<{ type: string; text?: string }> } | undefined;
+    const result = todoReadCompleted?.result as
+      | { outcome?: string; content?: Array<{ type: string; text?: string }> }
+      | undefined;
     expect(result?.outcome).toBe('completed');
 
     const textContent = result?.content?.find((c) => c.type === 'text')?.text ?? '';
@@ -207,11 +205,7 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     const sessionDir = getSessionDir(created.sessionId);
     mkdirSync(sessionDir, { recursive: true });
     const todoPath = join(sessionDir, 'todo.md');
-    writeFileSync(
-      todoPath,
-      '- [ ] **Task to complete** `t_abc`\n',
-      'utf-8'
-    );
+    writeFileSync(todoPath, '- [ ] **Task to complete** `t_abc`\n', 'utf-8');
 
     await withTimeout(
       ctx.agent.peer.request('session/prompt', {
@@ -266,7 +260,10 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     });
 
     await withTimeout(
-      ctx.agent.peer.request('initialize', defaultInitializeParams({ config: { approvalMode: 'ask' } })),
+      ctx.agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
       2_000,
       'initialize'
     );
@@ -290,7 +287,8 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
       new Promise<void>((resolve) => {
         const interval = setInterval(() => {
           const todoTool = toolUses.find(
-            (u) => typeof u.name === 'string' && u.name.startsWith('todo_') && u.status === 'completed'
+            (u) =>
+              typeof u.name === 'string' && u.name.startsWith('todo_') && u.status === 'completed'
           );
           if (todoTool) {
             clearInterval(interval);

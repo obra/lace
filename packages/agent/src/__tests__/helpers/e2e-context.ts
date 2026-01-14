@@ -106,7 +106,8 @@ export function createE2EContext(options?: E2EContextOptions): E2ETestContext {
       if (savedEnv.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG === undefined) {
         delete process.env.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG;
       } else {
-        process.env.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG = savedEnv.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG;
+        process.env.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG =
+          savedEnv.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG;
       }
 
       // Cleanup temp directories
