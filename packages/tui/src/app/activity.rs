@@ -246,9 +246,10 @@ pub fn upsert_tool_use(
                 item.tool_name = name;
                 item.status = status;
                 item.details = merge_details(item.details.take(), details);
-                item.job_id = job_id;
-                item.turn_id = turn_id;
-                item.turn_seq = turn_seq;
+                item.job_id = job_id.or_else(|| item.job_id.clone());
+                // Preserve existing turn_id/turn_seq if new value is None
+                item.turn_id = turn_id.or_else(|| item.turn_id.clone());
+                item.turn_seq = turn_seq.or(item.turn_seq);
             }
         }
         None => {
@@ -427,6 +428,42 @@ mod tests {
         assert!(item.summary.contains("completed"));
         let details = item.details.clone().unwrap();
         assert_eq!(details.get("result"), Some(&json!({"ok":true})));
+    }
+
+    #[test]
+    fn upsert_tool_use_preserves_turn_id_on_update() {
+        let mut state = AppState::new();
+
+        // First call sets turn_id
+        upsert_tool_use(
+            &mut state,
+            "tool_1".to_string(),
+            Some("shell.exec".to_string()),
+            Some("awaiting_permission".to_string()),
+            json!({"command":"echo hi"}),
+            None,
+            None,
+            Some("turn_abc".to_string()),
+            Some(1),
+        );
+
+        // Second call with None turn_id should preserve the existing one
+        upsert_tool_use(
+            &mut state,
+            "tool_1".to_string(),
+            Some("shell.exec".to_string()),
+            Some("completed".to_string()),
+            json!({"command":"echo hi"}),
+            Some(json!({"ok":true})),
+            None,
+            None, // No turn_id in update
+            None, // No turn_seq in update
+        );
+
+        assert_eq!(state.activity.len(), 1);
+        let item = state.activity.front().unwrap();
+        assert_eq!(item.turn_id, Some("turn_abc".to_string()));
+        assert_eq!(item.turn_seq, Some(1));
     }
 
     #[test]

@@ -33,7 +33,10 @@ export interface SubagentJobDependencies {
   /** Run work exclusively with lock */
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>;
   /** Emit session update to clients */
-  emitSessionUpdate: (update: SessionUpdate) => Promise<void>;
+  emitSessionUpdate: (
+    update: SessionUpdate,
+    context?: { turnId?: string; turnSeq?: number; jobId?: string }
+  ) => Promise<void>;
   /** Request permission from client */
   requestPermissionFromClient: (request: {
     sessionId: string;
@@ -355,66 +358,78 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           update.toolCallId = `${mappedJobId}:${update.toolCallId}`;
         }
 
-        await emitSessionUpdate({
-          type: 'job_update',
-          jobId: mappedJobId,
-          parentJobId: mappedParentJobId,
-          jobType: record.type,
-          channel,
-          // Forwarded update from child job - trusted after runtime checks above
-          update: update as JobInnerUpdate,
-        });
+        await emitSessionUpdate(
+          {
+            type: 'job_update',
+            jobId: mappedJobId,
+            parentJobId: mappedParentJobId,
+            jobType: record.type,
+            channel,
+            // Forwarded update from child job - trusted after runtime checks above
+            update: update as JobInnerUpdate,
+          },
+          { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+        );
 
         return undefined;
       }
 
       if (type === 'text_delta' && typeof p.text === 'string') {
         await appendJobOutput(p.text);
-        await emitSessionUpdate({
-          type: 'job_update',
-          jobId: job.jobId,
-          parentJobId: job.parentJobId,
-          jobType: 'delegate',
-          channel: 'internal',
-          update: { type: 'text_delta', text: p.text },
-        });
+        await emitSessionUpdate(
+          {
+            type: 'job_update',
+            jobId: job.jobId,
+            parentJobId: job.parentJobId,
+            jobType: 'delegate',
+            channel: 'internal',
+            update: { type: 'text_delta', text: p.text },
+          },
+          { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+        );
         return undefined;
       }
 
       if (type === 'tool_use' && typeof p.toolCallId === 'string' && typeof p.name === 'string') {
         const namespacedToolCallId = `${job.jobId}:${p.toolCallId}`;
-        await emitSessionUpdate({
-          type: 'job_update',
-          jobId: job.jobId,
-          parentJobId: job.parentJobId,
-          jobType: 'delegate',
-          channel: 'internal',
-          update: {
-            type: 'tool_use',
-            toolCallId: namespacedToolCallId,
-            name: p.name,
-            kind: typeof p.kind === 'string' ? (p.kind as any) : undefined,
-            input: (typeof p.input === 'object' && p.input ? (p.input as any) : {}) as Record<
-              string,
-              unknown
-            >,
-            status: p.status as any,
-            ...(p.result ? { result: p.result as any } : {}),
+        await emitSessionUpdate(
+          {
+            type: 'job_update',
+            jobId: job.jobId,
+            parentJobId: job.parentJobId,
+            jobType: 'delegate',
+            channel: 'internal',
+            update: {
+              type: 'tool_use',
+              toolCallId: namespacedToolCallId,
+              name: p.name,
+              kind: typeof p.kind === 'string' ? (p.kind as any) : undefined,
+              input: (typeof p.input === 'object' && p.input ? (p.input as any) : {}) as Record<
+                string,
+                unknown
+              >,
+              status: p.status as any,
+              ...(p.result ? { result: p.result as any } : {}),
+            },
           },
-        });
+          { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+        );
         return undefined;
       }
 
       if (type === 'context_injected') {
-        await emitSessionUpdate({
-          type: 'job_update',
-          jobId: job.jobId,
-          parentJobId: job.parentJobId,
-          jobType: 'delegate',
-          channel: 'internal',
-          // Forwarded context_injected from child job
-          update: p as JobInnerUpdate,
-        });
+        await emitSessionUpdate(
+          {
+            type: 'job_update',
+            jobId: job.jobId,
+            parentJobId: job.parentJobId,
+            jobType: 'delegate',
+            channel: 'internal',
+            // Forwarded context_injected from child job
+            update: p as JobInnerUpdate,
+          },
+          { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+        );
         return undefined;
       }
 

@@ -163,6 +163,12 @@ pub struct AppState {
     pub tool_details_overlay_open: bool,
     /// Scroll position in the tool details overlay
     pub tool_details_overlay_scroll: u16,
+
+    /// Current turn context for associating events with turns.
+    /// Set on TurnStart, cleared on TurnEnd.
+    /// Used as fallback when events don't include their own turn_id.
+    pub current_turn_id: Option<String>,
+    pub current_turn_seq: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -275,6 +281,9 @@ impl AppState {
             chat_tool_expanded: false,
             tool_details_overlay_open: false,
             tool_details_overlay_scroll: 0,
+
+            current_turn_id: None,
+            current_turn_seq: None,
         };
 
         state

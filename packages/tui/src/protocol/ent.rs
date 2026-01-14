@@ -43,6 +43,12 @@ fn decode_session_update_inner(
         .or(parent_turn_seq);
 
     match t {
+        "turn_start" => {
+            // Create a placeholder assistant message for this turn.
+            // This ensures tools can be matched to a message even if
+            // the agent responds with only tool calls (no text).
+            out.push(AppEvent::TurnStart { turn_id, turn_seq });
+        }
         "text_delta" => {
             if let Some(text) = obj.get("text").and_then(|v| v.as_str()) {
                 out.push(AppEvent::TextDelta {
@@ -399,5 +405,79 @@ mod tests {
         // Empty result
         let usage = extract_prompt_usage(&None);
         assert_eq!(usage, None);
+    }
+
+    #[test]
+    fn decodes_turn_id_and_turn_seq_from_events() {
+        // turn_start should extract turnId/turnSeq from top-level
+        let events = decode_session_update(&json!({
+            "type": "turn_start",
+            "turnId": "turn_abc",
+            "turnSeq": 0
+        }));
+        assert_eq!(
+            events,
+            vec![AppEvent::TurnStart {
+                turn_id: Some("turn_abc".to_string()),
+                turn_seq: Some(0),
+            }]
+        );
+
+        // text_delta should extract turnId/turnSeq
+        let events = decode_session_update(&json!({
+            "type": "text_delta",
+            "text": "Hello",
+            "turnId": "turn_abc",
+            "turnSeq": 1
+        }));
+        assert_eq!(
+            events,
+            vec![AppEvent::TextDelta {
+                text: "Hello".to_string(),
+                turn_id: Some("turn_abc".to_string()),
+                turn_seq: Some(1),
+            }]
+        );
+
+        // tool_use should extract turnId/turnSeq
+        let events = decode_session_update(&json!({
+            "type": "tool_use",
+            "toolCallId": "tool_1",
+            "name": "file_read",
+            "status": "completed",
+            "input": {"path": "test.txt"},
+            "turnId": "turn_abc",
+            "turnSeq": 2
+        }));
+        assert_eq!(
+            events,
+            vec![AppEvent::ToolUse {
+                tool_call_id: "tool_1".to_string(),
+                name: Some("file_read".to_string()),
+                kind: None,
+                status: Some("completed".to_string()),
+                input: json!({"path": "test.txt"}),
+                result: None,
+                job_id: None,
+                turn_id: Some("turn_abc".to_string()),
+                turn_seq: Some(2),
+            }]
+        );
+
+        // turn_end should extract turnId/turnSeq
+        let events = decode_session_update(&json!({
+            "type": "turn_end",
+            "data": {"stopReason": "end_turn"},
+            "turnId": "turn_abc",
+            "turnSeq": 3
+        }));
+        assert_eq!(
+            events,
+            vec![AppEvent::TurnEnd {
+                stop_reason: Some("end_turn".to_string()),
+                turn_id: Some("turn_abc".to_string()),
+                turn_seq: Some(3),
+            }]
+        );
     }
 }

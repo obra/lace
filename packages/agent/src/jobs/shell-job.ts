@@ -25,7 +25,8 @@ export type ShellJobContext = {
   };
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>;
   emitSessionUpdate: (
-    update: SessionUpdate & { sessionId?: string; streamSeq?: number }
+    update: SessionUpdate & { sessionId?: string; streamSeq?: number },
+    context?: { turnId?: string; turnSeq?: number; jobId?: string }
   ) => Promise<void>;
   requestPermissionFromClient: (request: {
     sessionId: string;
@@ -72,21 +73,24 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
         const permissionTurnSeq = job.originTurnSeq ?? 0;
         job.permissionAbortController = new AbortController();
 
-        await context.emitSessionUpdate({
-          type: 'job_update',
-          jobId: job.jobId,
-          parentJobId: job.parentJobId,
-          jobType: 'bash' as const,
-          channel: 'internal',
-          update: {
-            type: 'tool_use',
-            toolCallId,
-            name: toolName,
-            kind,
-            input: toolInput,
-            status: 'awaiting_permission',
+        await context.emitSessionUpdate(
+          {
+            type: 'job_update',
+            jobId: job.jobId,
+            parentJobId: job.parentJobId,
+            jobType: 'bash' as const,
+            channel: 'internal',
+            update: {
+              type: 'tool_use',
+              toolCallId,
+              name: toolName,
+              kind,
+              input: toolInput,
+              status: 'awaiting_permission',
+            },
           },
-        });
+          { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+        );
 
         let decision: { decision?: string; updatedInput?: Record<string, unknown> };
         try {
@@ -124,22 +128,25 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
             content: [{ type: 'error', message: 'Denied by user' }],
           };
 
-          await context.emitSessionUpdate({
-            type: 'job_update',
-            jobId: job.jobId,
-            parentJobId: job.parentJobId,
-            jobType: 'bash' as const,
-            channel: 'internal',
-            update: {
-              type: 'tool_use',
-              toolCallId,
-              name: toolName,
-              kind,
-              input: toolInput,
-              status: 'denied',
-              result: denied,
+          await context.emitSessionUpdate(
+            {
+              type: 'job_update',
+              jobId: job.jobId,
+              parentJobId: job.parentJobId,
+              jobType: 'bash' as const,
+              channel: 'internal',
+              update: {
+                type: 'tool_use',
+                toolCallId,
+                name: toolName,
+                kind,
+                input: toolInput,
+                status: 'denied',
+                result: denied,
+              },
             },
-          });
+            { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+          );
 
           job.status = 'cancelled';
           await context.finalizeJob(job);
@@ -173,27 +180,33 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
       const onStdout = async (chunk: string) => {
         await appendOutput(chunk);
         if (state.jobStreaming === 'none') return;
-        await context.emitSessionUpdate({
-          type: 'job_update',
-          jobId: job.jobId,
-          parentJobId: job.parentJobId,
-          jobType: 'bash' as const,
-          channel: 'stdout',
-          update: { type: 'text_delta', text: chunk },
-        });
+        await context.emitSessionUpdate(
+          {
+            type: 'job_update',
+            jobId: job.jobId,
+            parentJobId: job.parentJobId,
+            jobType: 'bash' as const,
+            channel: 'stdout',
+            update: { type: 'text_delta', text: chunk },
+          },
+          { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+        );
       };
 
       const onStderr = async (chunk: string) => {
         await appendOutput(chunk);
         if (state.jobStreaming === 'none') return;
-        await context.emitSessionUpdate({
-          type: 'job_update',
-          jobId: job.jobId,
-          parentJobId: job.parentJobId,
-          jobType: 'bash' as const,
-          channel: 'stderr',
-          update: { type: 'text_delta', text: chunk },
-        });
+        await context.emitSessionUpdate(
+          {
+            type: 'job_update',
+            jobId: job.jobId,
+            parentJobId: job.parentJobId,
+            jobType: 'bash' as const,
+            channel: 'stderr',
+            update: { type: 'text_delta', text: chunk },
+          },
+          { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+        );
       };
 
       proc.stdout!.on('data', (chunk) => void onStdout(chunk as string));

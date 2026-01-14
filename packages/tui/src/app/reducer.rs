@@ -3,6 +3,10 @@ use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppEvent {
+    TurnStart {
+        turn_id: Option<String>,
+        turn_seq: Option<i64>,
+    },
     TextDelta {
         text: String,
         turn_id: Option<String>,
@@ -62,6 +66,17 @@ pub enum Outbound {
 
 pub fn reduce(state: &mut AppState, event: AppEvent) -> Vec<Outbound> {
     match event {
+        AppEvent::TurnStart { turn_id, turn_seq } => {
+            // Track current turn for associating subsequent events
+            state.current_turn_id = turn_id.clone();
+            state.current_turn_seq = turn_seq;
+
+            // Create an empty streaming assistant message placeholder for this turn.
+            // This ensures there's a message with the turn_id even if the agent
+            // responds with only tool calls (no text).
+            start_assistant_turn(state, turn_id.as_deref(), turn_seq);
+            Vec::new()
+        }
         AppEvent::TextDelta {
             text,
             turn_id,
@@ -71,6 +86,10 @@ pub fn reduce(state: &mut AppState, event: AppEvent) -> Vec<Outbound> {
             Vec::new()
         }
         AppEvent::TurnEnd { .. } => {
+            // Clear current turn context
+            state.current_turn_id = None;
+            state.current_turn_seq = None;
+
             end_assistant_stream(state);
             Vec::new()
         }
@@ -214,6 +233,48 @@ fn end_assistant_stream(state: &mut AppState) {
             msg.streaming = false;
         }
     }
+}
+
+/// Creates an empty streaming assistant message for a new turn.
+/// This ensures there's a message with the turn_id even if the agent
+/// responds with only tool calls (no text content).
+fn start_assistant_turn(state: &mut AppState, turn_id: Option<&str>, turn_seq: Option<i64>) {
+    // Only create if the last message isn't already a streaming assistant message
+    // with the same turn_id (or no turn_id yet to be filled in).
+    match state.messages.last() {
+        Some(ChatMessage {
+            role: Role::Assistant,
+            streaming: true,
+            turn_id: existing_turn_id,
+            ..
+        }) => {
+            // If there's already a streaming assistant message, check if turn_ids match
+            // or if the existing message has no turn_id yet (it will be filled in by text_delta)
+            if existing_turn_id.is_none() || existing_turn_id.as_deref() == turn_id {
+                // Update the existing message's turn_id if it's missing
+                if let Some(msg) = state.messages.last_mut() {
+                    if msg.turn_id.is_none() {
+                        msg.turn_id = turn_id.map(|s| s.to_string());
+                    }
+                    if msg.turn_seq.is_none() {
+                        msg.turn_seq = turn_seq;
+                    }
+                }
+                return;
+            }
+            // Different turn_id means this is a new turn - create new message
+        }
+        _ => {}
+    }
+
+    // Create a new empty streaming assistant message for this turn
+    state.messages.push(ChatMessage {
+        role: Role::Assistant,
+        text: String::new(),
+        streaming: true,
+        turn_id: turn_id.map(|s| s.to_string()),
+        turn_seq,
+    });
 }
 
 #[cfg(test)]
@@ -451,5 +512,77 @@ mod tests {
             },
         );
         assert_eq!(state.token_count, Some(350));
+    }
+
+    #[test]
+    fn turn_start_creates_empty_message_placeholder() {
+        let mut state = AppState::new();
+
+        reduce(
+            &mut state,
+            AppEvent::TurnStart {
+                turn_id: Some("turn_abc".to_string()),
+                turn_seq: Some(0),
+            },
+        );
+
+        assert_eq!(state.messages.len(), 1);
+        assert_eq!(state.messages[0].role, Role::Assistant);
+        assert_eq!(state.messages[0].text, "");
+        assert!(state.messages[0].streaming);
+        assert_eq!(state.messages[0].turn_id, Some("turn_abc".to_string()));
+    }
+
+    #[test]
+    fn turn_start_followed_by_text_delta_appends_to_placeholder() {
+        let mut state = AppState::new();
+
+        // turn_start creates placeholder
+        reduce(
+            &mut state,
+            AppEvent::TurnStart {
+                turn_id: Some("turn_xyz".to_string()),
+                turn_seq: Some(0),
+            },
+        );
+
+        // text_delta appends to the placeholder
+        reduce(
+            &mut state,
+            AppEvent::TextDelta {
+                text: "Hello".to_string(),
+                turn_id: Some("turn_xyz".to_string()),
+                turn_seq: Some(1),
+            },
+        );
+
+        // Should still be just one message
+        assert_eq!(state.messages.len(), 1);
+        assert_eq!(state.messages[0].text, "Hello");
+        assert_eq!(state.messages[0].turn_id, Some("turn_xyz".to_string()));
+    }
+
+    #[test]
+    fn turn_start_enables_tool_matching_without_text() {
+        let mut state = AppState::new();
+
+        // turn_start creates placeholder with turn_id
+        reduce(
+            &mut state,
+            AppEvent::TurnStart {
+                turn_id: Some("turn_tools_only".to_string()),
+                turn_seq: Some(0),
+            },
+        );
+
+        // No text_delta - agent responds with only tool calls
+        // The placeholder message still has the turn_id for matching
+
+        assert_eq!(state.messages.len(), 1);
+        assert_eq!(
+            state.messages[0].turn_id,
+            Some("turn_tools_only".to_string())
+        );
+        // This turn_id can be used to match tool calls in render_chat
     }
 }
