@@ -3476,17 +3476,11 @@ fn render_input(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout:
     let input_lines = input_lines_with_cursor(state);
     let line_count = input_lines.len() as u16;
 
-    // Split area into prompt/text rows and a hint row below
-    let rows = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(1), Constraint::Length(1)])
-        .split(input_area);
-
-    // Within the main input rows, split prompt/text columns
+    // Split prompt column and text column
     let columns = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Length(2), Constraint::Min(1)])
-        .split(rows[0]);
+        .split(input_area);
 
     // Render prompts ("> " then continuations)
     let mut prompt_lines: Vec<Line> = Vec::new();
@@ -3516,7 +3510,7 @@ fn render_input(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout:
     f.render_widget(content, columns[1]);
 
     // Terminal cursor
-    if state.focus == crate::app::Focus::Input && rows[0].height > 0 {
+    if state.focus == crate::app::Focus::Input && input_area.height > 0 {
         let (row, col) = state.input.cursor();
         let cursor_y = columns[1].y + row as u16;
         let cursor_x = columns[1].x + col as u16;
@@ -3525,16 +3519,6 @@ fn render_input(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout:
         let cy = cursor_y.min(columns[1].bottom().saturating_sub(1));
         f.set_cursor_position((cx, cy));
     }
-
-    // Render input hint line (Alt+Enter newline, Enter/Ctrl+Enter send)
-    let hint = Paragraph::new(Text::from(vec![Line::from(vec![
-        Span::styled(
-            "Alt+Enter: newline   Enter: send   Ctrl+Enter: send",
-            Style::default().fg(colors.fg_muted),
-        ),
-    ])]))
-    .style(Style::default().bg(colors.bg_surface));
-    f.render_widget(hint, rows[1]);
 }
 
 /// Renders permission request inline in the conversation flow.
