@@ -158,6 +158,7 @@ pub enum UiAction {
     PermissionCancel,
     PermissionGuidanceChar(char),
     PermissionGuidanceBackspace,
+    PermissionToggleDetails,
 }
 
 pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> {
@@ -788,6 +789,10 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         }
         UiAction::PermissionGuidanceBackspace => {
             state.permission_guidance_input.pop();
+            Vec::new()
+        }
+        UiAction::PermissionToggleDetails => {
+            state.permission_details_expanded = !state.permission_details_expanded;
             Vec::new()
         }
         UiAction::SlashPickerOpen => {
@@ -1878,6 +1883,20 @@ mod tests {
 
         apply_ui_action(&mut state, UiAction::PermissionGuidanceBackspace);
         assert!(state.permission_guidance_input.is_empty());
+    }
+
+    #[test]
+    fn permission_toggle_details_toggles_expanded_state() {
+        let mut state = AppState::new();
+        assert!(!state.permission_details_expanded);
+
+        // Toggle on
+        apply_ui_action(&mut state, UiAction::PermissionToggleDetails);
+        assert!(state.permission_details_expanded);
+
+        // Toggle off
+        apply_ui_action(&mut state, UiAction::PermissionToggleDetails);
+        assert!(!state.permission_details_expanded);
     }
 
     #[test]

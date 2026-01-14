@@ -528,16 +528,51 @@ fn run_loop(
                     }
 
                     if state.active_permission.is_some() {
-                        let action = match key.code {
-                            KeyCode::Esc => Some(UiAction::PermissionCancel),
-                            KeyCode::Enter => Some(UiAction::PermissionSubmit),
-                            KeyCode::Up => Some(UiAction::PermissionPrev),
-                            KeyCode::Down => Some(UiAction::PermissionNext),
-                            KeyCode::Backspace => Some(UiAction::PermissionGuidanceBackspace),
-                            KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                Some(UiAction::PermissionGuidanceChar(ch))
+                        // Single-key shortcuts: Y/S/N/D for quick permission responses
+                        // These only activate when the guidance input is empty
+                        let action = if state.permission_guidance_input.is_empty()
+                            && !key.modifiers.contains(KeyModifiers::CONTROL)
+                        {
+                            match key.code {
+                                KeyCode::Char('y') | KeyCode::Char('Y') => {
+                                    // Allow once (index 0)
+                                    state.active_permission_selected = 0;
+                                    Some(UiAction::PermissionSubmit)
+                                }
+                                KeyCode::Char('s') | KeyCode::Char('S') => {
+                                    // Allow for session (index 1)
+                                    state.active_permission_selected = 1;
+                                    Some(UiAction::PermissionSubmit)
+                                }
+                                KeyCode::Char('n') | KeyCode::Char('N') => {
+                                    Some(UiAction::PermissionCancel)
+                                }
+                                KeyCode::Char('d') | KeyCode::Char('D') => {
+                                    Some(UiAction::PermissionToggleDetails)
+                                }
+                                KeyCode::Esc => Some(UiAction::PermissionCancel),
+                                KeyCode::Enter => Some(UiAction::PermissionSubmit),
+                                KeyCode::Up => Some(UiAction::PermissionPrev),
+                                KeyCode::Down => Some(UiAction::PermissionNext),
+                                KeyCode::Backspace => Some(UiAction::PermissionGuidanceBackspace),
+                                KeyCode::Char(ch) => Some(UiAction::PermissionGuidanceChar(ch)),
+                                _ => None,
                             }
-                            _ => None,
+                        } else {
+                            // When guidance is being typed, process all keys normally
+                            match key.code {
+                                KeyCode::Esc => Some(UiAction::PermissionCancel),
+                                KeyCode::Enter => Some(UiAction::PermissionSubmit),
+                                KeyCode::Up => Some(UiAction::PermissionPrev),
+                                KeyCode::Down => Some(UiAction::PermissionNext),
+                                KeyCode::Backspace => Some(UiAction::PermissionGuidanceBackspace),
+                                KeyCode::Char(ch)
+                                    if !key.modifiers.contains(KeyModifiers::CONTROL) =>
+                                {
+                                    Some(UiAction::PermissionGuidanceChar(ch))
+                                }
+                                _ => None,
+                            }
                         };
                         if let Some(action) = action {
                             let out = apply_ui_action(state, action);

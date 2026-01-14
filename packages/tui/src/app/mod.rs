@@ -106,6 +106,7 @@ pub struct AppState {
     pub active_permission: Option<PermissionRequest>,
     pub active_permission_selected: usize,
     pub permission_guidance_input: String,
+    pub permission_details_expanded: bool,
 
     pub models_prefetched: bool,
 
@@ -220,6 +221,7 @@ impl AppState {
             active_permission: None,
             active_permission_selected: 0,
             permission_guidance_input: String::new(),
+            permission_details_expanded: false,
 
             models_prefetched: false,
 
