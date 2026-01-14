@@ -873,7 +873,16 @@ mod tests {
             None,
         );
 
-        assert!(out.is_empty());
+        // After configuration, models are prefetched for autocomplete
+        assert_eq!(out.len(), 1);
+        match &out[0] {
+            Outbound::JsonRpcRequest { method, params, .. } => {
+                assert_eq!(method, "ent/models/list");
+                let p = params.as_ref().unwrap();
+                assert_eq!(p.get("connectionId").and_then(|v| v.as_str()), Some("c1"));
+            }
+            _ => panic!("expected models list request"),
+        }
         assert_eq!(state.prefs.last_connection_id, Some("c1".to_string()));
         assert_eq!(state.prefs.last_model_id, Some("m1".to_string()));
     }

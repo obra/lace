@@ -672,13 +672,16 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             Vec::new()
         }
         UiAction::PermissionSubmit => {
+            // Compute choices BEFORE taking the permission, since permission_choices
+            // requires active_permission to be present
+            let choices = permission_choices(state);
+            let guidance_index = choices.len();
+
             let Some(req) = state.active_permission.take() else {
                 return Vec::new();
             };
 
             let has_guidance = !state.permission_guidance_input.is_empty();
-            let choices = permission_choices(state);
-            let guidance_index = choices.len();
 
             // When guidance is provided, always deny (guidance = "no, do this instead")
             // When guidance row is selected (index == choices.len()), default to first option
@@ -1774,7 +1777,10 @@ mod tests {
                 },
             ],
         });
-        state.active_permission_selected = 1;
+        // With allow/deny options, permission_choices creates:
+        // 0: allow (None), 1: allow (Session), 2: allow (Always), 3: deny (None)
+        // Select index 3 to choose "deny"
+        state.active_permission_selected = 3;
 
         let out = apply_ui_action(&mut state, UiAction::PermissionSubmit);
         assert_eq!(out.len(), 1);
@@ -2179,9 +2185,9 @@ mod tests {
         let mut state = AppState::new_with_paths(None, None);
         set_input(&mut state, "line1\nline2\nline3");
         // Move cursor to middle of line2 (row 1 col 2)
-        state.input.move_cursor(CursorMove::Up); // start at end row2 col5? Actually end row2 col5; easier: move to top then down.
+        // Start at end of input (row 2, col 5), go up to row 1, then head to col 0, then forward twice
+        state.input.move_cursor(CursorMove::Up);
         state.input.move_cursor(CursorMove::Head);
-        state.input.move_cursor(CursorMove::Down);
         state.input.move_cursor(CursorMove::Forward);
         state.input.move_cursor(CursorMove::Forward);
 
@@ -2241,16 +2247,19 @@ mod tests {
     fn cursor_up_down_short_lines() {
         let mut state = AppState::new_with_paths(None, None);
         set_input(&mut state, "long line here\nhi\nx");
-        // move to col10 of first line
-        for _ in 0..3 {
-            state.input.move_cursor(CursorMove::Back);
+        // Move cursor to first line at high column
+        // Start at end of input (2, 1), go to top/head, then move forward to col 10
+        state.input.move_cursor(CursorMove::Top);
+        for _ in 0..10 {
+            state.input.move_cursor(CursorMove::Forward);
         }
+        // Now at (0, 10) - middle of "long line here"
 
-        // Move down to shorter line - cursor goes to end
+        // Move down to shorter line - cursor clamps to end of "hi" (length 2)
         apply_ui_action(&mut state, UiAction::CursorDown);
         assert_eq!(cursor_pos(&state), (1, 2)); // end of "hi"
 
-        // Move down again - goes to end of "x"
+        // Move down again - goes to end of "x" (length 1)
         apply_ui_action(&mut state, UiAction::CursorDown);
         assert_eq!(cursor_pos(&state), (2, 1)); // end of "x"
     }
@@ -2350,7 +2359,8 @@ mod tests {
 
         apply_ui_action(&mut state, UiAction::InsertNewline);
         assert_eq!(input_str(&state), "hello\n world");
-        assert_eq!(cursor_pos(&state), (1, 1)); // after newline
+        // Cursor is at start of new line (row 1, col 0)
+        assert_eq!(cursor_pos(&state), (1, 0));
     }
 
     #[test]
@@ -2370,7 +2380,8 @@ mod tests {
         apply_ui_action(&mut state, UiAction::SlashPickerSelect);
 
         assert!(!state.slash_picker_open);
-        assert_eq!(input_str(&state), "/ping ");
+        // No trailing space since command has no input_hint
+        assert_eq!(input_str(&state), "/ping");
     }
 
     #[test]
