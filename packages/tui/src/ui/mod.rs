@@ -1423,17 +1423,17 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     let root = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(1),                    // main area (first)
-            Constraint::Length(1),                 // status ABOVE input
+            Constraint::Min(1),                    // main area
             Constraint::Length(permission_height), // permission bar (when active)
             Constraint::Length(input_height),      // input
+            Constraint::Length(1),                 // status at BOTTOM
         ])
         .split(f.area());
 
     let main_area = root[0];
-    let status_area = root[1];
-    let permission_area = root[2];
-    let input_area = root[3];
+    let permission_area = root[1];
+    let input_area = root[2];
+    let status_area = root[3];
 
     // Split status area into left (info) and right (progress indicator)
     let right_width = status_right_width(state);
