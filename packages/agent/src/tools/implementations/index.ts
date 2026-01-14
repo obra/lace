@@ -12,3 +12,7 @@ export { DelegateTool } from './delegate';
 export { JobOutputTool } from './job_output';
 export { JobsListTool } from './jobs_list';
 export { JobKillTool } from './job_kill';
+export { TodoReadTool } from './todo_read';
+export { TodoAddTool } from './todo_add';
+export { TodoUpdateTool } from './todo_update';
+export { TodoRemoveTool } from './todo_remove';
