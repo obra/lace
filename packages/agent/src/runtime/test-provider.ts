@@ -238,6 +238,18 @@ export class TestAgentProvider extends AIProvider {
             case 'bash':
               content = `Running ${(requested.args as Record<string, unknown>).command as string}...`;
               break;
+            case 'todo_add':
+              content = `Adding todo: ${(requested.args as Record<string, unknown>).title as string}...`;
+              break;
+            case 'todo_read':
+              content = 'Reading todos...';
+              break;
+            case 'todo_update':
+              content = `Updating todo: ${(requested.args as Record<string, unknown>).id as string}...`;
+              break;
+            case 'todo_remove':
+              content = `Removing todo: ${(requested.args as Record<string, unknown>).id as string}...`;
+              break;
             default:
               content = `Writing ${(requested.args as Record<string, unknown>).path as string}...`;
           }
@@ -281,9 +293,36 @@ export class TestAgentProvider extends AIProvider {
   }
 
   private extractRequestedTool(text: string): null | {
-    name: 'delegate' | 'file_read' | 'file_write' | 'bash';
+    name:
+      | 'delegate'
+      | 'file_read'
+      | 'file_write'
+      | 'bash'
+      | 'todo_add'
+      | 'todo_read'
+      | 'todo_update'
+      | 'todo_remove';
     args: Record<string, unknown>;
   } {
+    // Handle "add todo: <title>" or "todo add: <title>" pattern
+    const todoAddMatch = text.match(/(?:add\s+todo|todo\s+add)[:\s]\s*(.+)\s*$/i);
+    const todoTitle = todoAddMatch?.[1]?.trim();
+    if (todoTitle) return { name: 'todo_add', args: { title: todoTitle } };
+
+    // Handle "read todos" or "list todos" or "show todos" pattern
+    const todoReadMatch = text.match(/(?:read|list|show)\s+todos?\s*$/i);
+    if (todoReadMatch) return { name: 'todo_read', args: {} };
+
+    // Handle "mark done: <id>" or "complete todo: <id>" pattern
+    const todoUpdateMatch = text.match(/(?:mark\s+done|complete\s+todo)[:\s]\s*(t_\w+)\s*$/i);
+    const todoId = todoUpdateMatch?.[1]?.trim();
+    if (todoId) return { name: 'todo_update', args: { id: todoId, done: true } };
+
+    // Handle "remove todo: <id>" or "delete todo: <id>" pattern
+    const todoRemoveMatch = text.match(/(?:remove|delete)\s+todo[:\s]\s*(t_\w+)\s*$/i);
+    const removeId = todoRemoveMatch?.[1]?.trim();
+    if (removeId) return { name: 'todo_remove', args: { id: removeId } };
+
     const delegateMatch = text.match(/delegate\s+(.+)\s*$/i);
     const delegatePrompt = delegateMatch?.[1]?.trim();
     if (delegatePrompt) return { name: 'delegate', args: { prompt: delegatePrompt } };
