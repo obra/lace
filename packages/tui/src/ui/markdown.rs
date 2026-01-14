@@ -70,10 +70,9 @@ pub fn render_markdownish_lines(input: &str) -> Vec<MarkdownLine> {
                 ));
                 in_code = false;
             } else {
-                let label = rest.trim();
-                let title = if label.is_empty() { "code" } else { label };
+                // Just show a simple top border, no language label
                 out.push(MarkdownLine::single(
-                    format!("┌─ {title} ─"),
+                    "┌─".to_string(),
                     MarkdownStyle::CodeBorder,
                     true,
                 ));
@@ -315,8 +314,8 @@ mod tests {
         assert_eq!(lines[0].text(), "hello");
         assert!(!lines[0].is_code_block);
 
-        // Code fence open
-        assert_eq!(lines[1].text(), "┌─ js ─");
+        // Code fence open (no language label shown)
+        assert_eq!(lines[1].text(), "┌─");
         assert!(lines[1].is_code_block);
 
         // Code content

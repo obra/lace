@@ -25,8 +25,8 @@ Returns: { status: "running"|"completed"|"failed"|"cancelled", output: string, e
   schema = jobOutputSchema;
   annotations: ToolAnnotations = {
     title: 'Get Job Output',
-    destructiveHint: false,
-    openWorldHint: false,
+    // Internal job management - queries job state without side effects
+    safeInternal: true,
     readOnlySafe: true,
   };
 

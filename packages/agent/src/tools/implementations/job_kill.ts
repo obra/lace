@@ -18,9 +18,10 @@ After killing, status becomes "cancelled". For subagent jobs, the session is pre
   schema = jobKillSchema;
   annotations: ToolAnnotations = {
     title: 'Kill Job',
-    destructiveHint: true,
-    openWorldHint: false,
-    readOnlySafe: false,
+    // Internal job management - cancels jobs without external side effects
+    // The job itself may have been doing dangerous things, but killing it
+    // just stops work rather than causing harm
+    safeInternal: true,
   };
 
   protected executeValidated(

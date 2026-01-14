@@ -22,8 +22,8 @@ Returns: [{ jobId, type, status, description, startTime }]`;
   schema = jobsListSchema;
   annotations: ToolAnnotations = {
     title: 'List Jobs',
-    destructiveHint: false,
-    openWorldHint: false,
+    // Internal job management - queries job state without side effects
+    safeInternal: true,
     readOnlySafe: true,
   };
 

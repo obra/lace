@@ -178,8 +178,13 @@ export function coreToolResultFromProtocol(result: ToolResult, toolCallId: strin
 
 export function shouldAskPermission(
   approvalMode: AgentServerState['config']['approvalMode'],
-  toolKind: ReturnType<typeof toolKindFromName>
+  toolKind: ReturnType<typeof toolKindFromName>,
+  annotations?: { safeInternal?: boolean }
 ): boolean {
+  // Safe internal tools never require permission - they're pure control flow
+  // (e.g., delegate, job_output, jobs_list, job_kill)
+  if (annotations?.safeInternal) return false;
+
   if (approvalMode === 'dangerouslySkipPermissions' || approvalMode === 'approve') return false;
   if (approvalMode === 'deny') return false;
 

@@ -37,9 +37,9 @@ Default (sync): Blocks until subagent completes and returns full output.`;
   schema = delegateSchema;
   annotations: ToolAnnotations = {
     title: 'Delegate',
-    destructiveHint: true,
-    openWorldHint: true,
-    readOnlySafe: false,
+    // Delegation itself is safe internal control flow - the subagent
+    // handles its own permissions for any destructive operations
+    safeInternal: true,
   };
 
   protected executeValidated(

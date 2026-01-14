@@ -499,7 +499,7 @@ export class ConversationRunner {
     let finalInput = toolInput;
 
     // Handle permission request
-    const needsPermission = shouldAskPermission(approvalMode, kind);
+    const needsPermission = shouldAskPermission(approvalMode, kind, tool?.annotations);
     if (needsPermission) {
       this.deps.setActiveTurnStatus('awaiting_permission', abortController);
 

@@ -48,16 +48,17 @@ describe('ToolExecutor job tools registration', () => {
     const executor = new ToolExecutor();
     executor.registerAllAvailableTools();
 
+    // All job management tools are safeInternal - they're pure internal control
+    // flow that doesn't interact with the filesystem or external systems
     const jobOutputTool = executor.getTool('job_output');
+    expect(jobOutputTool?.annotations?.safeInternal).toBe(true);
     expect(jobOutputTool?.annotations?.readOnlySafe).toBe(true);
-    expect(jobOutputTool?.annotations?.destructiveHint).toBe(false);
 
     const jobsListTool = executor.getTool('jobs_list');
+    expect(jobsListTool?.annotations?.safeInternal).toBe(true);
     expect(jobsListTool?.annotations?.readOnlySafe).toBe(true);
-    expect(jobsListTool?.annotations?.destructiveHint).toBe(false);
 
     const jobKillTool = executor.getTool('job_kill');
-    expect(jobKillTool?.annotations?.readOnlySafe).toBe(false);
-    expect(jobKillTool?.annotations?.destructiveHint).toBe(true);
+    expect(jobKillTool?.annotations?.safeInternal).toBe(true);
   });
 });
