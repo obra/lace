@@ -241,4 +241,68 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     expect(todoContent).toContain('Task to complete');
     expect(todoContent).toContain('t_abc');
   });
+
+  it('does not prompt for permission when using todo tools', { timeout: 20_000 }, async () => {
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+
+    let permissionRequested = false;
+    const toolUses: Array<Record<string, unknown>> = [];
+
+    ctx.agent.peer.onRequest('session/update', async (params) => {
+      const p = params as Record<string, unknown>;
+      if (p.type === 'tool_use' && typeof p.name === 'string') {
+        toolUses.push(p);
+      }
+      return undefined;
+    });
+
+    ctx.agent.peer.onRequest('session/request_permission', async (params) => {
+      const p = params as Record<string, unknown>;
+      // Track if permission was requested for any todo tool
+      if (typeof p.tool === 'string' && p.tool.startsWith('todo_')) {
+        permissionRequested = true;
+      }
+      return { decision: 'allow' };
+    });
+
+    await withTimeout(
+      ctx.agent.peer.request('initialize', defaultInitializeParams({ config: { approvalMode: 'ask' } })),
+      2_000,
+      'initialize'
+    );
+
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
+
+    await withTimeout(
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'add todo: Test safeInternal behavior' }],
+      }),
+      10_000,
+      'session/prompt'
+    );
+
+    // Wait for todo tool to complete
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          const todoTool = toolUses.find(
+            (u) => typeof u.name === 'string' && u.name.startsWith('todo_') && u.status === 'completed'
+          );
+          if (todoTool) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 50);
+      }),
+      8_000,
+      'todo tool completion'
+    );
+
+    // Verify no permission was requested for todo tools
+    expect(permissionRequested).toBe(false);
+  });
 });
