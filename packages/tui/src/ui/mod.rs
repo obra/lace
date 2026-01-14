@@ -1404,15 +1404,16 @@ fn count_input_wrapped_lines(lines: &[String], cursor_row: usize, content_width:
 
 fn draw(f: &mut ratatui::Frame, state: &AppState) {
     // Dynamic input height based on content, accounting for wrapped lines
-    // Input width is roughly the terminal width minus prompt prefix ("> ")
-    let input_content_width = f.area().width.saturating_sub(3) as usize; // "> " prefix + cursor
+    // Input width is roughly the terminal width minus prompt prefix ("> " or "N> " for images)
+    let prompt_width = if state.pending_images.is_empty() {
+        2 // "> "
+    } else {
+        state.pending_images.len().to_string().len() + 2 // "N> "
+    };
+    let input_content_width = f.area().width.saturating_sub(prompt_width as u16 + 1) as usize;
     let lines = input_lines_with_cursor(state);
     let (cursor_row, _) = state.input.cursor();
-    let mut input_line_count = count_input_wrapped_lines(&lines, cursor_row, input_content_width);
-    // Add line for image attachment indicator
-    if !state.pending_images.is_empty() {
-        input_line_count += 1;
-    }
+    let input_line_count = count_input_wrapped_lines(&lines, cursor_row, input_content_width);
     let max_input_height = f.area().height / 3;
     let input_height = (input_line_count as u16).min(max_input_height).max(1);
 
@@ -3439,57 +3440,42 @@ fn render_input(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout:
     let styles = theme_styles(state.prefs.theme);
     let colors = &styles.colors;
 
-    // Optional pending image indicator occupies first line if present
-    let mut input_area = area;
-    if !state.pending_images.is_empty() && input_area.height > 0 {
-        let count = state.pending_images.len();
-        let label = if count == 1 {
-            "[1 image attached]".to_string()
-        } else {
-            format!("[{} images attached]", count)
-        };
-        let indicator = Paragraph::new(Text::from(vec![Line::from(vec![
-            Span::styled("  ", Style::default()),
-            Span::styled(
-                label,
-                Style::default()
-                    .fg(colors.accent)
-                    .add_modifier(Modifier::DIM),
-            ),
-        ])]))
-        .style(Style::default().bg(colors.bg_base));
-        let indicator_area = ratatui::layout::Rect {
-            x: input_area.x,
-            y: input_area.y,
-            width: input_area.width,
-            height: 1,
-        };
-        f.render_widget(indicator, indicator_area);
-        input_area = ratatui::layout::Rect {
-            x: input_area.x,
-            y: input_area.y.saturating_add(1),
-            width: input_area.width,
-            height: input_area.height.saturating_sub(1),
-        };
-    }
-
     let input_lines = input_lines_with_cursor(state);
     let line_count = input_lines.len() as u16;
+
+    // Determine prompt prefix based on pending images
+    let image_count = state.pending_images.len();
+    let (first_prefix, prompt_width) = if image_count > 0 {
+        // Show count in prompt: "2> " for 2 images
+        let prefix = format!("{}> ", image_count);
+        let width = prefix.len() as u16;
+        (prefix, width)
+    } else {
+        ("> ".to_string(), 2)
+    };
 
     // Split prompt column and text column
     let columns = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Length(2), Constraint::Min(1)])
-        .split(input_area);
+        .constraints([Constraint::Length(prompt_width), Constraint::Min(1)])
+        .split(area);
 
-    // Render prompts ("> " then continuations)
+    // Render prompts (first line shows image count if any, then continuations)
     let mut prompt_lines: Vec<Line> = Vec::new();
     for i in 0..line_count {
-        let prefix = if i == 0 { "> " } else { "  " };
-        prompt_lines.push(Line::from(Span::styled(
-            prefix,
-            Style::default().fg(colors.accent),
-        )));
+        let (prefix, style) = if i == 0 {
+            // First line: use accent color, styled differently when images attached
+            let style = if image_count > 0 {
+                Style::default().fg(colors.accent).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(colors.accent)
+            };
+            (first_prefix.clone(), style)
+        } else {
+            // Continuation lines: spaces to match width
+            (" ".repeat(prompt_width as usize), Style::default().fg(colors.accent))
+        };
+        prompt_lines.push(Line::from(Span::styled(prefix, style)));
     }
     let prompts = Paragraph::new(Text::from(prompt_lines))
         .style(Style::default().bg(colors.bg_base))
@@ -3510,7 +3496,7 @@ fn render_input(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout:
     f.render_widget(content, columns[1]);
 
     // Terminal cursor
-    if state.focus == crate::app::Focus::Input && input_area.height > 0 {
+    if state.focus == crate::app::Focus::Input && area.height > 0 {
         let (row, col) = state.input.cursor();
         let cursor_y = columns[1].y + row as u16;
         let cursor_x = columns[1].x + col as u16;
@@ -3773,15 +3759,16 @@ fn compute_chat_rect(
     area: ratatui::layout::Rect,
 ) -> Option<ratatui::layout::Rect> {
     // Dynamic input height based on content, accounting for wrapped lines
-    let input_content_width = area.width.saturating_sub(3) as usize;
+    // Prompt width varies: "> " normally, "N> " when images are attached
+    let prompt_width = if state.pending_images.is_empty() {
+        2 // "> "
+    } else {
+        state.pending_images.len().to_string().len() + 2 // "N> "
+    };
+    let input_content_width = area.width.saturating_sub(prompt_width as u16 + 1) as usize;
     let lines = input_lines_with_cursor(state);
     let (cursor_row, _) = state.input.cursor();
-    let mut input_line_count =
-        count_input_wrapped_lines(&lines, cursor_row, input_content_width);
-    // Add line for image attachment indicator
-    if !state.pending_images.is_empty() {
-        input_line_count += 1;
-    }
+    let input_line_count = count_input_wrapped_lines(&lines, cursor_row, input_content_width);
     let max_input_height = area.height / 3;
     let input_height = (input_line_count as u16).min(max_input_height).max(1);
 
