@@ -1290,6 +1290,14 @@ fn handle_session_update(state: &mut AppState, params: &Value) {
                 turn_seq,
                 ..
             } => {
+                // Debug: log turn context for tool use events
+                state.push_debug_line(format!(
+                    "tool_use {} status={:?} turn_id={:?} turn_seq={:?}",
+                    name.as_deref().unwrap_or("?"),
+                    status,
+                    turn_id,
+                    turn_seq
+                ));
                 activity::upsert_tool_use(
                     state,
                     tool_call_id.clone(),

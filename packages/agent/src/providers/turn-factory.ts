@@ -7,7 +7,6 @@ import {
   throwInvalidParams,
   toNonEmptyString,
   isTestProviderEnabled,
-  isTestProviderStrictConfigEnabled,
 } from '@lace/agent/rpc/utils';
 
 /**

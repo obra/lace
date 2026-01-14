@@ -13,11 +13,17 @@ pub fn initialize_params() -> Value {
 
 pub fn decode_session_update(params: &Value) -> Vec<AppEvent> {
     let mut out = Vec::new();
-    decode_session_update_inner(params, &mut out, None);
+    decode_session_update_inner(params, &mut out, None, None, None);
     out
 }
 
-fn decode_session_update_inner(params: &Value, out: &mut Vec<AppEvent>, job_id: Option<String>) {
+fn decode_session_update_inner(
+    params: &Value,
+    out: &mut Vec<AppEvent>,
+    job_id: Option<String>,
+    parent_turn_id: Option<String>,
+    parent_turn_seq: Option<i64>,
+) {
     let Some(obj) = params.as_object() else {
         return;
     };
@@ -25,11 +31,16 @@ fn decode_session_update_inner(params: &Value, out: &mut Vec<AppEvent>, job_id: 
         return;
     };
 
+    // Try to get turn_id/turn_seq from this object, fall back to parent context
     let turn_id = obj
         .get("turnId")
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    let turn_seq = obj.get("turnSeq").and_then(|v| v.as_i64());
+        .map(|s| s.to_string())
+        .or(parent_turn_id);
+    let turn_seq = obj
+        .get("turnSeq")
+        .and_then(|v| v.as_i64())
+        .or(parent_turn_seq);
 
     match t {
         "text_delta" => {
@@ -90,7 +101,8 @@ fn decode_session_update_inner(params: &Value, out: &mut Vec<AppEvent>, job_id: 
                 .map(|s| s.to_string())
                 .or(job_id);
             if let Some(inner) = obj.get("update") {
-                decode_session_update_inner(inner, out, job_id);
+                // Pass turn context to inner update since it may not have its own
+                decode_session_update_inner(inner, out, job_id, turn_id, turn_seq);
             }
         }
         "job_started" => {
