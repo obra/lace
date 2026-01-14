@@ -2679,6 +2679,86 @@ fn render_permission_modal(state: &AppState) -> Paragraph<'static> {
         .wrap(Wrap { trim: true })
 }
 
+/// Renders a compact permission bar for bottom-anchored display.
+/// Shows tool name, resource preview, and keyboard shortcuts.
+fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
+
+    let Some(req) = &state.active_permission else {
+        return Paragraph::new(Text::from(""));
+    };
+
+    let tool = req.tool.clone().unwrap_or_else(|| "unknown".to_string());
+    let resource = req.resource.clone().unwrap_or_default();
+    let resource_preview = if resource.len() > 40 {
+        format!("{}...", &resource[..37])
+    } else {
+        resource
+    };
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Top border with tool name
+    lines.push(Line::from(vec![
+        Span::styled("╞═ ", Style::default().fg(colors.warning)),
+        Span::styled("Allow ", Style::default().fg(colors.fg_primary)),
+        Span::styled(
+            tool,
+            Style::default()
+                .fg(colors.accent)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!(" {} ", resource_preview),
+            Style::default().fg(colors.fg_muted),
+        ),
+        Span::styled("?", Style::default().fg(colors.fg_primary)),
+        Span::styled(
+            " ═══════════════════════════════════════════╡",
+            Style::default().fg(colors.warning),
+        ),
+    ]));
+
+    // Shortcut line
+    lines.push(Line::from(vec![
+        Span::styled("│  ", Style::default().fg(colors.warning)),
+        Span::styled(
+            "[Y]",
+            Style::default()
+                .fg(colors.success)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Allow   ", Style::default().fg(colors.fg_secondary)),
+        Span::styled(
+            "[S]",
+            Style::default()
+                .fg(colors.accent)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Session   ", Style::default().fg(colors.fg_secondary)),
+        Span::styled(
+            "[N]",
+            Style::default()
+                .fg(colors.error)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Deny   ", Style::default().fg(colors.fg_secondary)),
+        Span::styled("[D]", Style::default().fg(colors.fg_muted)),
+        Span::styled(" Details", Style::default().fg(colors.fg_muted)),
+        Span::raw("                          "),
+        Span::styled("│", Style::default().fg(colors.warning)),
+    ]));
+
+    // Bottom border
+    lines.push(Line::from(vec![Span::styled(
+        "╘═══════════════════════════════════════════════════════════════════╛",
+        Style::default().fg(colors.warning),
+    )]));
+
+    Paragraph::new(Text::from(lines)).style(Style::default().bg(colors.bg_elevated))
+}
+
 fn render_connections_modal(state: &AppState) -> Paragraph<'static> {
     let styles = theme_styles(state.prefs.theme);
     let colors = &styles.colors;
@@ -3448,13 +3528,15 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
     }
 
     let mut total: usize = 0;
-    let mut first_message = true;
+    let mut prev_role: Option<&Role> = None;
     for m in &state.messages {
-        // Blank line before message (except first)
-        if !first_message {
-            total += 1;
+        // Blank line only on role change (matching render_chat's grouping logic)
+        if let Some(prev) = prev_role {
+            if prev != &m.role {
+                total += 1;
+            }
         }
-        first_message = false;
+        prev_role = Some(&m.role);
 
         let mut text = m.text.clone();
         if m.role == Role::Assistant && m.streaming {
@@ -4043,6 +4125,85 @@ mod tests {
         assert!(
             lines[4].contains("More response"),
             "Line 4 should contain 'More response' (no blank line between consecutive assistant messages)"
+        );
+    }
+
+    #[test]
+    fn permission_bar_shows_tool_and_shortcuts() {
+        use crate::app::{PermissionOption, PermissionRequest};
+        use ratatui::layout::Rect;
+
+        let mut state = AppState::new_with_paths(None, None);
+        state.active_permission = Some(PermissionRequest {
+            id: json!("test"),
+            tool: Some("bash".to_string()),
+            kind: None,
+            resource: Some("npm test".to_string()),
+            tool_call_id: None,
+            turn_id: None,
+            turn_seq: None,
+            job_id: None,
+            options: vec![
+                PermissionOption {
+                    option_id: "allow".to_string(),
+                    label: "Allow once".to_string(),
+                },
+                PermissionOption {
+                    option_id: "session".to_string(),
+                    label: "Allow for session".to_string(),
+                },
+                PermissionOption {
+                    option_id: "deny".to_string(),
+                    label: "Deny".to_string(),
+                },
+            ],
+        });
+
+        let widget = render_permission_bar(&state);
+
+        // Render to a test backend to verify the content
+        let backend = TestBackend::new(80, 5);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| {
+                f.render_widget(widget, Rect::new(0, 0, 80, 5));
+            })
+            .unwrap();
+
+        // Extract buffer content to verify expected text is present
+        let buffer = terminal.backend().buffer();
+        let buffer_str: String = (0..buffer.area.height)
+            .flat_map(|y| {
+                (0..buffer.area.width)
+                    .map(move |x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+            })
+            .collect();
+
+        // Verify tool name and shortcuts are rendered
+        assert!(
+            buffer_str.contains("bash"),
+            "Should show tool name 'bash'. Buffer: {}",
+            buffer_str
+        );
+        assert!(
+            buffer_str.contains("[Y]"),
+            "Should show [Y] shortcut. Buffer: {}",
+            buffer_str
+        );
+        assert!(
+            buffer_str.contains("[S]"),
+            "Should show [S] shortcut. Buffer: {}",
+            buffer_str
+        );
+        assert!(
+            buffer_str.contains("[N]"),
+            "Should show [N] shortcut. Buffer: {}",
+            buffer_str
+        );
+        assert!(
+            buffer_str.contains("[D]"),
+            "Should show [D] shortcut. Buffer: {}",
+            buffer_str
         );
     }
 }
