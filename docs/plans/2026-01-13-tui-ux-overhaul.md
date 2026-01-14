@@ -4,7 +4,7 @@
 
 **Goal:** Transform lace-tui from a workmanlike debug tool into a polished, joyful conversation interface by eliminating visual clutter and making interactions feel seamless.
 
-**Architecture:** Replace text labels with color and line-drawing characters for visual hierarchy. Move permissions inline into the conversation flow. Group consecutive messages to reduce noise. Fold tool outputs by default. Remove redundant UI elements.
+**Architecture:** Replace text labels with color and line-drawing characters for visual hierarchy. Redesign permission modal to be bottom-anchored with single-key shortcuts (still modal, but less disruptive). Group consecutive messages to reduce noise. Fold tool outputs by default with progressive expansion. Remove redundant UI elements.
 
 **Tech Stack:** Rust, ratatui 0.29, crossterm 0.28, Unicode box-drawing characters
 
@@ -395,247 +395,213 @@ git commit -m "feat(tui): group consecutive same-role messages without separator
 
 ---
 
-## Phase 2: Inline Permissions
+## Phase 2: Bottom-Anchored Permission Modal
 
-### Task 2.1: Create Inline Permission Renderer
+Permissions must be modal (agent is blocked waiting for decision), but we can make the modal less disruptive by anchoring it at the bottom where it doesn't hide conversation context.
+
+### Task 2.1: Create Bottom-Anchored Permission Bar Renderer
 
 **Files:**
-- Create: `packages/tui/src/ui/permission.rs`
-- Modify: `packages/tui/src/ui/mod.rs` (add module, integrate)
+- Modify: `packages/tui/src/ui/mod.rs` (new render_permission_bar function)
 
 **Step 1: Write the failing test**
 
-Create `packages/tui/src/ui/permission.rs`:
+Add to a test module in `packages/tui/src/ui/mod.rs`:
 
 ```rust
-// ABOUTME: Inline permission UI rendering - shows permission requests
-// within the conversation flow instead of blocking modals.
-
-use crate::app::{AppState, PermissionRequest};
-use crate::ui::theme::ThemeColors;
-use ratatui::style::{Modifier, Style};
-use ratatui::text::{Line, Span};
-
-/// Renders a permission request as lines to be inserted into the conversation.
-/// Returns empty vec if no active permission.
-pub fn render_permission_inline(state: &AppState) -> Vec<Line<'static>> {
-    let Some(req) = &state.active_permission else {
-        return Vec::new();
-    };
-
-    let colors = crate::ui::theme::ThemeColors::from_pref(state.prefs.theme);
-    render_permission_lines(req, state, &colors)
-}
-
-fn render_permission_lines(
-    req: &PermissionRequest,
-    state: &AppState,
-    colors: &ThemeColors,
-) -> Vec<Line<'static>> {
-    let mut lines = Vec::new();
-
-    // Tool info line with visual indicator
-    let tool = req.tool.clone().unwrap_or_else(|| "unknown".to_string());
-    lines.push(Line::from(vec![
-        Span::styled("▶ ", Style::default().fg(colors.warning)),
-        Span::styled(
-            tool,
-            Style::default().fg(colors.fg_primary).add_modifier(Modifier::BOLD),
-        ),
-    ]));
-
-    // Resource/command preview
-    if let Some(resource) = &req.resource {
-        lines.push(Line::from(vec![
-            Span::styled("  ", Style::default()),
-            Span::styled(resource.clone(), Style::default().fg(colors.fg_secondary)),
-        ]));
-    }
-
-    // Tool input preview (truncated)
-    if let Some(tool_call_id) = &req.tool_call_id {
-        if let Some(input) = state.tool_inputs_by_tool_call_id.get(tool_call_id) {
-            let preview = serde_json::to_string(input)
-                .unwrap_or_else(|_| input.to_string());
-            let truncated = if preview.len() > 60 {
-                format!("{}...", &preview[..57])
-            } else {
-                preview
-            };
-            lines.push(Line::from(vec![
-                Span::styled("  ", Style::default()),
-                Span::styled(truncated, Style::default().fg(colors.fg_muted)),
-            ]));
-        }
-    }
-
-    // Compact approval line with keyboard shortcuts
-    lines.push(Line::from(""));
-    lines.push(Line::from(vec![
-        Span::styled("  ╭─ ", Style::default().fg(colors.border_subtle)),
-        Span::styled("[Y]", Style::default().fg(colors.success)),
-        Span::styled(" Allow  ", Style::default().fg(colors.fg_secondary)),
-        Span::styled("[S]", Style::default().fg(colors.accent)),
-        Span::styled(" Session  ", Style::default().fg(colors.fg_secondary)),
-        Span::styled("[N]", Style::default().fg(colors.error)),
-        Span::styled(" Deny  ", Style::default().fg(colors.fg_secondary)),
-        Span::styled("[?]", Style::default().fg(colors.fg_muted)),
-        Span::styled(" Details", Style::default().fg(colors.fg_muted)),
-    ]));
-    lines.push(Line::from(vec![
-        Span::styled("  ╰─────────────────────────────────────────╯",
-            Style::default().fg(colors.border_subtle)),
-    ]));
-
-    lines
-}
-
 #[cfg(test)]
-mod tests {
+mod permission_bar_tests {
     use super::*;
     use crate::app::{AppState, PermissionOption, PermissionRequest};
     use serde_json::json;
 
-    #[test]
-    fn renders_empty_when_no_permission() {
-        let state = AppState::new();
-        let lines = render_permission_inline(&state);
-        assert!(lines.is_empty());
-    }
-
-    #[test]
-    fn renders_tool_name_with_indicator() {
-        let mut state = AppState::new();
-        state.active_permission = Some(PermissionRequest {
+    fn make_permission_request(tool: &str, resource: Option<&str>) -> PermissionRequest {
+        PermissionRequest {
             id: json!("test"),
-            tool: Some("bash".to_string()),
+            tool: Some(tool.to_string()),
             kind: None,
-            resource: Some("npm test".to_string()),
+            resource: resource.map(|s| s.to_string()),
             tool_call_id: None,
             turn_id: None,
             turn_seq: None,
             job_id: None,
-            options: vec![],
-        });
-
-        let lines = render_permission_inline(&state);
-
-        // Should have tool line, resource line, blank, shortcut line, close line
-        assert!(lines.len() >= 4);
-
-        // First line should contain tool name
-        let first_line_text: String = lines[0].spans.iter()
-            .map(|s| s.content.to_string())
-            .collect();
-        assert!(first_line_text.contains("bash"));
+            options: vec![
+                PermissionOption { option_id: "allow".to_string(), label: "Allow once".to_string() },
+                PermissionOption { option_id: "session".to_string(), label: "Allow for session".to_string() },
+                PermissionOption { option_id: "deny".to_string(), label: "Deny".to_string() },
+            ],
+        }
     }
 
     #[test]
-    fn shows_keyboard_shortcuts() {
+    fn permission_bar_shows_tool_and_shortcuts() {
         let mut state = AppState::new();
-        state.active_permission = Some(PermissionRequest {
-            id: json!("test"),
-            tool: Some("file_read".to_string()),
-            kind: None,
-            resource: None,
-            tool_call_id: None,
-            turn_id: None,
-            turn_seq: None,
-            job_id: None,
-            options: vec![],
-        });
+        state.active_permission = Some(make_permission_request("bash", Some("npm test")));
 
-        let lines = render_permission_inline(&state);
-
-        // Should contain Y, S, N shortcuts
-        let all_text: String = lines.iter()
-            .flat_map(|l| l.spans.iter())
-            .map(|s| s.content.to_string())
-            .collect();
-        assert!(all_text.contains("[Y]"));
-        assert!(all_text.contains("[S]"));
-        assert!(all_text.contains("[N]"));
+        let widget = render_permission_bar(&state);
+        // Widget should be renderable (not panic)
+        assert!(true);
     }
 }
 ```
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd packages/tui && cargo test permission::tests -v`
+Run: `cd packages/tui && cargo test permission_bar_tests -v`
 
-Expected: FAIL - module doesn't exist
+Expected: FAIL - function doesn't exist
 
-**Step 3: Add module to ui/mod.rs**
+**Step 3: Implement render_permission_bar**
 
-At top of `packages/tui/src/ui/mod.rs`:
+Add new function to `packages/tui/src/ui/mod.rs`:
 
 ```rust
-mod markdown;
-mod permission;
-pub mod theme;
+/// Renders a compact permission bar for bottom-anchored display.
+/// Shows tool name, resource preview, and keyboard shortcuts.
+fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
+
+    let Some(req) = &state.active_permission else {
+        return Paragraph::new(Text::from(""));
+    };
+
+    let tool = req.tool.clone().unwrap_or_else(|| "unknown".to_string());
+    let resource = req.resource.clone().unwrap_or_default();
+    let resource_preview = if resource.len() > 40 {
+        format!("{}...", &resource[..37])
+    } else {
+        resource
+    };
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Top border with tool name
+    lines.push(Line::from(vec![
+        Span::styled("╞═ ", Style::default().fg(colors.warning)),
+        Span::styled("Allow ", Style::default().fg(colors.fg_primary)),
+        Span::styled(
+            tool,
+            Style::default().fg(colors.accent).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!(" {} ", resource_preview),
+            Style::default().fg(colors.fg_muted),
+        ),
+        Span::styled("?", Style::default().fg(colors.fg_primary)),
+        Span::styled(" ═══════════════════════════════════════════╡",
+            Style::default().fg(colors.warning)),
+    ]));
+
+    // Shortcut line
+    lines.push(Line::from(vec![
+        Span::styled("│  ", Style::default().fg(colors.warning)),
+        Span::styled("[Y]", Style::default().fg(colors.success).add_modifier(Modifier::BOLD)),
+        Span::styled(" Allow   ", Style::default().fg(colors.fg_secondary)),
+        Span::styled("[S]", Style::default().fg(colors.accent).add_modifier(Modifier::BOLD)),
+        Span::styled(" Session   ", Style::default().fg(colors.fg_secondary)),
+        Span::styled("[N]", Style::default().fg(colors.error).add_modifier(Modifier::BOLD)),
+        Span::styled(" Deny   ", Style::default().fg(colors.fg_secondary)),
+        Span::styled("[D]", Style::default().fg(colors.fg_muted)),
+        Span::styled(" Details", Style::default().fg(colors.fg_muted)),
+        Span::raw("                          "),
+        Span::styled("│", Style::default().fg(colors.warning)),
+    ]));
+
+    // Bottom border
+    lines.push(Line::from(vec![
+        Span::styled("╘═══════════════════════════════════════════════════════════════════╛",
+            Style::default().fg(colors.warning)),
+    ]));
+
+    Paragraph::new(Text::from(lines))
+        .style(Style::default().bg(colors.bg_elevated))
+}
 ```
 
-**Step 4: Run tests to verify they pass**
+**Step 4: Run test to verify it passes**
 
-Run: `cd packages/tui && cargo test permission::tests -v`
+Run: `cd packages/tui && cargo test permission_bar_tests -v`
 
-Expected: All 3 tests PASS
+Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add packages/tui/src/ui/permission.rs packages/tui/src/ui/mod.rs
-git commit -m "feat(tui): add inline permission renderer with keyboard shortcuts"
+git add packages/tui/src/ui/mod.rs
+git commit -m "feat(tui): add bottom-anchored permission bar renderer"
 ```
 
 ---
 
-### Task 2.2: Integrate Inline Permission into Conversation
+### Task 2.2: Integrate Permission Bar into Layout
 
 **Files:**
-- Modify: `packages/tui/src/ui/mod.rs:2924-2979` (render_chat)
-- Modify: `packages/tui/src/ui/mod.rs:1441-1444` (remove modal rendering)
+- Modify: `packages/tui/src/ui/mod.rs:1333-1450` (draw function)
 
-**Step 1: Update render_chat to include permission inline**
+**Step 1: Update draw() layout to include permission bar**
 
-In the `render_chat` function, after tool calls and before creating the Paragraph:
+When permission is active, insert a 3-line permission bar between chat and input:
 
 ```rust
-fn render_chat(state: &AppState) -> Paragraph<'static> {
-    let styles = theme_styles(state.prefs.theme);
-    let colors = &styles.colors;
+fn draw(f: &mut ratatui::Frame, state: &AppState) {
+    // Dynamic input height
+    let input_content_width = f.area().width.saturating_sub(3) as usize;
+    let lines = input_lines_with_cursor(state);
+    let (cursor_row, _) = state.input.cursor();
+    let mut input_line_count = count_input_wrapped_lines(&lines, cursor_row, input_content_width);
+    if !state.pending_images.is_empty() {
+        input_line_count += 1;
+    }
+    let max_input_height = f.area().height / 3;
+    let input_height = (input_line_count as u16).min(max_input_height).max(1);
 
-    let mut lines = render_chat_lines(state);
+    // Permission bar height (only when active)
+    let permission_height = if state.active_permission.is_some() { 3 } else { 0 };
 
-    // Show in-progress tool calls inline
-    let pending_tools = state.pending_tool_calls();
-    if !pending_tools.is_empty() {
-        lines.push(Line::from(""));
-        for item in pending_tools {
-            lines.push(render_tool_call_line(item, colors));
-        }
+    let root = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(1),                       // main area
+            Constraint::Length(permission_height),   // permission bar (0 if inactive)
+            Constraint::Length(1),                   // status
+            Constraint::Length(input_height),        // input
+        ])
+        .split(f.area());
+
+    let main_area = root[0];
+    let permission_area = root[1];
+    let status_area = root[2];
+    let input_area = root[3];
+
+    // ... existing status bar rendering ...
+
+    // Main area
+    if state.debug_overlay_open {
+        f.render_widget(render_debug_overlay(state), main_area);
+    } else if state.activity_overlay_open {
+        f.render_widget(render_activity_overlay(state), main_area);
+    } else {
+        render_main(f, state, main_area);
     }
 
-    // Show active permission inline (not as modal)
-    let permission_lines = permission::render_permission_inline(state);
-    if !permission_lines.is_empty() {
-        lines.push(Line::from(""));
-        lines.extend(permission_lines);
+    // Permission bar (only when active)
+    if state.active_permission.is_some() {
+        f.render_widget(render_permission_bar(state), permission_area);
     }
 
-    Paragraph::new(Text::from(lines))
-        .style(Style::default().bg(colors.bg_base))
-        .wrap(Wrap { trim: false })
-        .scroll((state.chat_scroll, 0))
+    render_input(f, state, input_area);
+
+    // ... rest of modal overlays (remove permission from the modal chain) ...
 }
 ```
 
-**Step 2: Remove modal permission rendering from draw()**
+**Step 2: Remove permission from centered modal chain**
 
-In `packages/tui/src/ui/mod.rs`, in the `draw()` function around line 1441, remove or comment out:
+In the modal overlay section of draw(), remove:
 
 ```rust
-// REMOVE these lines from the modal chain:
+// DELETE this block:
 } else if state.active_permission.is_some() {
     let area = centered_rect(80, 70, f.area());
     f.render_widget(Clear, area);
@@ -647,13 +613,13 @@ In `packages/tui/src/ui/mod.rs`, in the `draw()` function around line 1441, remo
 
 Run: `cd packages/tui && cargo run -- --workdir .`
 
-Test: Send a message that triggers a tool requiring permission. Verify it appears inline in the conversation, not as a centered modal.
+Test: Trigger a permission. Verify it appears as a 3-line bar above the input, not as a centered overlay. Conversation should still be visible above.
 
 **Step 4: Commit**
 
 ```bash
 git add packages/tui/src/ui/mod.rs
-git commit -m "feat(tui): show permissions inline in conversation, remove modal"
+git commit -m "feat(tui): render permission bar in layout instead of centered modal"
 ```
 
 ---
@@ -662,58 +628,46 @@ git commit -m "feat(tui): show permissions inline in conversation, remove modal"
 
 **Files:**
 - Modify: `packages/tui/src/ui/mod.rs:278-307` (permission key handling)
-- Modify: `packages/tui/src/app/ui.rs` (add new UiAction variants if needed)
 
-**Step 1: Update permission key handling**
+**Step 1: Update permission key handling with Y/S/N shortcuts**
 
-In `packages/tui/src/ui/mod.rs`, replace the permission key handling block:
+In `packages/tui/src/ui/mod.rs`, update the permission key handling block:
 
 ```rust
 if let Some(req) = &state.active_permission {
     let action = match key.code {
-        // Single-key shortcuts (work regardless of guidance focus)
+        // Single-key shortcuts
         KeyCode::Char('y') | KeyCode::Char('Y') => {
-            // Select first option (usually "Allow once")
-            state.active_permission_selected = 0;
+            // Find "allow" option (usually first)
+            if let Some(idx) = req.options.iter().position(|o|
+                o.option_id.contains("allow") && !o.option_id.contains("session")
+            ) {
+                state.active_permission_selected = idx;
+            } else {
+                state.active_permission_selected = 0;
+            }
             Some(UiAction::PermissionSubmit)
         }
         KeyCode::Char('s') | KeyCode::Char('S') => {
-            // Select second option (usually "Allow for session")
-            if req.options.len() > 1 {
-                state.active_permission_selected = 1;
+            // Find "session" option
+            if let Some(idx) = req.options.iter().position(|o|
+                o.option_id.contains("session") || o.label.to_lowercase().contains("session")
+            ) {
+                state.active_permission_selected = idx;
             }
             Some(UiAction::PermissionSubmit)
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-            // Deny/cancel
             Some(UiAction::PermissionCancel)
         }
-        KeyCode::Char('?') => {
-            // Toggle details view (future enhancement)
-            // For now, just cycle to show more info
-            Some(UiAction::PermissionNext)
+        KeyCode::Char('d') | KeyCode::Char('D') => {
+            // Toggle details (expand/collapse tool input view)
+            Some(UiAction::PermissionToggleDetails)
         }
         // Arrow key navigation still works
         KeyCode::Up => Some(UiAction::PermissionPrev),
         KeyCode::Down => Some(UiAction::PermissionNext),
         KeyCode::Enter => Some(UiAction::PermissionSubmit),
-        // Guidance input when in guidance mode
-        KeyCode::Backspace => {
-            let options_count = req.options.len();
-            if state.active_permission_selected == options_count {
-                Some(UiAction::PermissionGuidanceBackspace)
-            } else {
-                None
-            }
-        }
-        KeyCode::Char(ch) => {
-            let options_count = req.options.len();
-            if state.active_permission_selected == options_count {
-                Some(UiAction::PermissionGuidanceChar(ch))
-            } else {
-                None
-            }
-        }
         _ => None,
     };
     if let Some(action) = action {
@@ -724,7 +678,37 @@ if let Some(req) = &state.active_permission {
 }
 ```
 
-**Step 2: Test keyboard shortcuts**
+**Step 2: Add PermissionToggleDetails action**
+
+In `packages/tui/src/app/ui.rs`, add the new action variant:
+
+```rust
+pub enum UiAction {
+    // ... existing variants ...
+    PermissionToggleDetails,
+}
+```
+
+And handle it in `apply_ui_action`:
+
+```rust
+UiAction::PermissionToggleDetails => {
+    state.permission_details_expanded = !state.permission_details_expanded;
+    Vec::new()
+}
+```
+
+**Step 3: Add permission_details_expanded to AppState**
+
+In `packages/tui/src/app/mod.rs`, add:
+
+```rust
+pub permission_details_expanded: bool,
+```
+
+Initialize to `false` in `new()`.
+
+**Step 4: Test keyboard shortcuts**
 
 Run: `cd packages/tui && cargo run -- --workdir .`
 
@@ -733,12 +717,154 @@ Test:
 - Press `Y` - should approve immediately
 - Trigger another, press `N` - should deny
 - Trigger another, press `S` - should approve for session
+- Press `D` - should toggle details view
 
-**Step 3: Commit**
+**Step 5: Commit**
+
+```bash
+git add packages/tui/src/app/mod.rs packages/tui/src/app/ui.rs packages/tui/src/ui/mod.rs
+git commit -m "feat(tui): add Y/S/N/D single-key shortcuts for permissions"
+```
+
+---
+
+### Task 2.4: Permission Details Expansion
+
+**Files:**
+- Modify: `packages/tui/src/ui/mod.rs` (render_permission_bar)
+
+**Step 1: Update render_permission_bar to handle expanded state**
+
+```rust
+fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
+
+    let Some(req) = &state.active_permission else {
+        return Paragraph::new(Text::from(""));
+    };
+
+    let tool = req.tool.clone().unwrap_or_else(|| "unknown".to_string());
+    let resource = req.resource.clone().unwrap_or_default();
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Top border with tool name
+    lines.push(Line::from(vec![
+        Span::styled("╞═ ", Style::default().fg(colors.warning)),
+        Span::styled("Allow ", Style::default().fg(colors.fg_primary)),
+        Span::styled(
+            &tool,
+            Style::default().fg(colors.accent).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" ?", Style::default().fg(colors.fg_primary)),
+        // Fill rest of line
+        Span::styled(
+            format!(" {:═<width$}╡", "", width = 50),
+            Style::default().fg(colors.warning)
+        ),
+    ]));
+
+    // Show details when expanded
+    if state.permission_details_expanded {
+        // Resource line
+        if !resource.is_empty() {
+            lines.push(Line::from(vec![
+                Span::styled("│  ", Style::default().fg(colors.warning)),
+                Span::styled(&resource, Style::default().fg(colors.fg_secondary)),
+            ]));
+        }
+
+        // Tool input preview
+        if let Some(tool_call_id) = &req.tool_call_id {
+            if let Some(input) = state.tool_inputs_by_tool_call_id.get(tool_call_id) {
+                let pretty = serde_json::to_string_pretty(input)
+                    .unwrap_or_else(|_| input.to_string());
+                for (i, line) in pretty.lines().take(8).enumerate() {
+                    lines.push(Line::from(vec![
+                        Span::styled("│  ", Style::default().fg(colors.warning)),
+                        Span::styled(line.to_string(), Style::default().fg(colors.fg_muted)),
+                    ]));
+                }
+                if pretty.lines().count() > 8 {
+                    lines.push(Line::from(vec![
+                        Span::styled("│  ", Style::default().fg(colors.warning)),
+                        Span::styled("...", Style::default().fg(colors.fg_muted)),
+                    ]));
+                }
+            }
+        }
+        lines.push(Line::from(vec![
+            Span::styled("│", Style::default().fg(colors.warning)),
+        ]));
+    }
+
+    // Shortcut line
+    lines.push(Line::from(vec![
+        Span::styled("│ ", Style::default().fg(colors.warning)),
+        Span::styled("[Y]", Style::default().fg(colors.success).add_modifier(Modifier::BOLD)),
+        Span::styled(" Allow  ", Style::default().fg(colors.fg_secondary)),
+        Span::styled("[S]", Style::default().fg(colors.accent).add_modifier(Modifier::BOLD)),
+        Span::styled(" Session  ", Style::default().fg(colors.fg_secondary)),
+        Span::styled("[N]", Style::default().fg(colors.error).add_modifier(Modifier::BOLD)),
+        Span::styled(" Deny  ", Style::default().fg(colors.fg_secondary)),
+        Span::styled("[D]", Style::default().fg(colors.fg_muted)),
+        Span::styled(
+            if state.permission_details_expanded { " Hide" } else { " Details" },
+            Style::default().fg(colors.fg_muted)
+        ),
+    ]));
+
+    // Bottom border
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!("╘{:═<width$}╛", "", width = 60),
+            Style::default().fg(colors.warning)
+        ),
+    ]));
+
+    Paragraph::new(Text::from(lines))
+        .style(Style::default().bg(colors.bg_elevated))
+}
+
+/// Calculate permission bar height (for layout)
+fn permission_bar_height(state: &AppState) -> u16 {
+    if state.active_permission.is_none() {
+        return 0;
+    }
+    if state.permission_details_expanded {
+        // Base (3) + detail lines (up to 10)
+        let detail_lines = state.active_permission.as_ref()
+            .and_then(|req| req.tool_call_id.as_ref())
+            .and_then(|id| state.tool_inputs_by_tool_call_id.get(id))
+            .map(|input| {
+                let pretty = serde_json::to_string_pretty(input).unwrap_or_default();
+                pretty.lines().count().min(9) + 2 // +2 for resource and ... line
+            })
+            .unwrap_or(1) as u16;
+        3 + detail_lines
+    } else {
+        3 // Compact: top border, shortcuts, bottom border
+    }
+}
+```
+
+**Step 2: Update draw() to use dynamic permission height**
+
+Replace `let permission_height = if state.active_permission.is_some() { 3 } else { 0 };`
+with `let permission_height = permission_bar_height(state);`
+
+**Step 3: Test details toggle**
+
+Run: `cd packages/tui && cargo run -- --workdir .`
+
+Test: Trigger permission, press `D` to expand, verify details shown, press `D` again to collapse.
+
+**Step 4: Commit**
 
 ```bash
 git add packages/tui/src/ui/mod.rs
-git commit -m "feat(tui): add Y/S/N single-key shortcuts for permissions"
+git commit -m "feat(tui): add expandable details in permission bar"
 ```
 
 ---
@@ -862,6 +988,364 @@ if !pending_tools.is_empty() {
 ```bash
 git add packages/tui/src/app/activity.rs packages/tui/src/ui/mod.rs
 git commit -m "feat(tui): add folded tool result preview with tree connector"
+```
+
+---
+
+### Task 3.2: Selectable Tool Calls in Conversation
+
+**Files:**
+- Modify: `packages/tui/src/app/mod.rs` (add chat_selected_tool_idx)
+- Modify: `packages/tui/src/ui/mod.rs` (render selected state, handle keys)
+
+**Step 1: Add tool selection state to AppState**
+
+In `packages/tui/src/app/mod.rs`, add:
+
+```rust
+/// Index of selected tool in conversation (None = no selection)
+pub chat_selected_tool_idx: Option<usize>,
+```
+
+Initialize to `None` in `new()`.
+
+**Step 2: Track completed tools in conversation**
+
+Create a helper that returns tools in conversation order:
+
+```rust
+impl AppState {
+    /// Returns completed tool calls in conversation order for selection
+    pub fn completed_tool_calls(&self) -> Vec<&activity::ActivityItem> {
+        self.activity
+            .iter()
+            .filter(|item| {
+                item.kind == activity::ActivityKind::ToolUse
+                    && (item.status.as_deref() == Some("completed")
+                        || item.status.as_deref() == Some("success")
+                        || item.status.as_deref() == Some("error"))
+            })
+            .collect()
+    }
+}
+```
+
+**Step 3: Update render_tool_call_line to show selected state**
+
+```rust
+fn render_tool_call_line(
+    item: &activity::ActivityItem,
+    colors: &theme::ThemeColors,
+    selected: bool,
+    expanded: bool,
+) -> Vec<Line<'static>> {
+    let status_char = match item.status.as_deref() {
+        Some("completed") | Some("success") => '✓',
+        Some("error") => '✗',
+        _ => '▶',
+    };
+    let status_color = match item.status.as_deref() {
+        Some("completed") | Some("success") => colors.success,
+        Some("error") => colors.error,
+        _ => colors.accent,
+    };
+
+    let tool_name = item.tool_name.clone().unwrap_or_else(|| "unknown".to_string());
+
+    let mut lines = Vec::new();
+
+    // Selection indicator
+    let prefix = if selected { "▸ " } else { "  " };
+    let bg = if selected { Some(colors.bg_surface) } else { None };
+
+    // Main tool line
+    let mut spans = vec![
+        Span::styled(prefix, Style::default().fg(colors.accent)),
+        Span::styled(format!("{} ", status_char), Style::default().fg(status_color)),
+        Span::styled(&tool_name, Style::default().fg(colors.fg_primary)),
+        Span::styled(format!(" {}", item.summary), Style::default().fg(colors.fg_muted)),
+    ];
+
+    let mut style = Style::default();
+    if let Some(bg_color) = bg {
+        style = style.bg(bg_color);
+    }
+    lines.push(Line::from(spans).style(style));
+
+    // Show expanded details when selected and expanded
+    if selected && expanded {
+        // Show full result
+        if let Some(details) = &item.details {
+            let pretty = serde_json::to_string_pretty(details)
+                .unwrap_or_else(|_| details.to_string());
+            for line in pretty.lines().take(15) {
+                lines.push(Line::from(vec![
+                    Span::styled("    ", Style::default()),
+                    Span::styled(line.to_string(), Style::default().fg(colors.fg_muted)),
+                ]));
+            }
+            if pretty.lines().count() > 15 {
+                lines.push(Line::from(vec![
+                    Span::styled("    ", Style::default()),
+                    Span::styled("... (more)", Style::default().fg(colors.fg_muted)),
+                ]));
+            }
+        }
+    } else if !expanded {
+        // Folded preview (non-selected or collapsed)
+        if let Some(preview) = &item.result_preview {
+            lines.push(Line::from(vec![
+                Span::styled("    └─ ", Style::default().fg(colors.border_subtle)),
+                Span::styled(
+                    truncate_preview(preview, 50),
+                    Style::default().fg(colors.fg_muted),
+                ),
+            ]));
+        }
+    }
+
+    lines
+}
+```
+
+**Step 4: Add keyboard handling for tool selection**
+
+In `packages/tui/src/ui/mod.rs`, when focus is on Chat and no permission is active:
+
+```rust
+// Tool selection in chat (when focused on chat pane)
+if state.focus == Focus::Chat {
+    match key.code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            // Move selection up through tools
+            let tools = state.completed_tool_calls();
+            if !tools.is_empty() {
+                state.chat_selected_tool_idx = match state.chat_selected_tool_idx {
+                    None => Some(tools.len() - 1),
+                    Some(0) => Some(tools.len() - 1),
+                    Some(i) => Some(i - 1),
+                };
+            }
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            // Move selection down through tools
+            let tools = state.completed_tool_calls();
+            if !tools.is_empty() {
+                state.chat_selected_tool_idx = match state.chat_selected_tool_idx {
+                    None => Some(0),
+                    Some(i) if i >= tools.len() - 1 => Some(0),
+                    Some(i) => Some(i + 1),
+                };
+            }
+        }
+        KeyCode::Enter => {
+            // Toggle expansion of selected tool
+            if state.chat_selected_tool_idx.is_some() {
+                state.chat_tool_expanded = !state.chat_tool_expanded;
+            }
+        }
+        KeyCode::Esc => {
+            // Clear selection
+            state.chat_selected_tool_idx = None;
+            state.chat_tool_expanded = false;
+        }
+        _ => {}
+    }
+}
+```
+
+**Step 5: Add chat_tool_expanded to AppState**
+
+```rust
+pub chat_tool_expanded: bool,
+```
+
+Initialize to `false`.
+
+**Step 6: Update render_chat to pass selection state**
+
+```rust
+// In render_chat:
+let completed_tools = state.completed_tool_calls();
+for (idx, item) in completed_tools.iter().enumerate() {
+    let selected = state.chat_selected_tool_idx == Some(idx);
+    let expanded = selected && state.chat_tool_expanded;
+    lines.extend(render_tool_call_line(item, colors, selected, expanded));
+}
+```
+
+**Step 7: Visual verification**
+
+Run: `cd packages/tui && cargo run -- --workdir .`
+
+Test:
+- Tab to focus on Chat pane
+- Press j/k or arrows to select tools
+- Press Enter to expand selected tool
+- Press Esc to clear selection
+
+**Step 8: Commit**
+
+```bash
+git add packages/tui/src/app/mod.rs packages/tui/src/ui/mod.rs
+git commit -m "feat(tui): add selectable and expandable tool calls in conversation"
+```
+
+---
+
+### Task 3.3: Full-Screen Tool Details Overlay
+
+For very long tool outputs, provide a full-screen overlay (like debug/activity).
+
+**Files:**
+- Modify: `packages/tui/src/app/mod.rs` (add tool_details_overlay state)
+- Modify: `packages/tui/src/ui/mod.rs` (render overlay, handle keys)
+
+**Step 1: Add overlay state**
+
+In `packages/tui/src/app/mod.rs`:
+
+```rust
+pub tool_details_overlay_open: bool,
+pub tool_details_overlay_scroll: u16,
+```
+
+**Step 2: Add keyboard shortcut to open overlay**
+
+When a tool is selected, press `d` to open full details overlay:
+
+```rust
+KeyCode::Char('d') | KeyCode::Char('D') => {
+    if state.chat_selected_tool_idx.is_some() {
+        state.tool_details_overlay_open = true;
+        state.tool_details_overlay_scroll = 0;
+    }
+}
+```
+
+**Step 3: Create render_tool_details_overlay**
+
+```rust
+fn render_tool_details_overlay(state: &AppState) -> Paragraph<'static> {
+    let styles = theme_styles(state.prefs.theme);
+    let colors = &styles.colors;
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(Span::styled(
+        "Tool Details                                     [Esc to close]",
+        Style::default().fg(colors.fg_muted),
+    )));
+    lines.push(Line::from(""));
+
+    let tools = state.completed_tool_calls();
+    if let Some(idx) = state.chat_selected_tool_idx {
+        if let Some(item) = tools.get(idx) {
+            // Tool name and status
+            lines.push(Line::from(vec![
+                Span::styled("Tool: ", Style::default().fg(colors.fg_muted)),
+                Span::styled(
+                    item.tool_name.clone().unwrap_or_default(),
+                    Style::default().fg(colors.accent).add_modifier(Modifier::BOLD),
+                ),
+            ]));
+
+            lines.push(Line::from(vec![
+                Span::styled("Status: ", Style::default().fg(colors.fg_muted)),
+                Span::styled(
+                    item.status.clone().unwrap_or_default(),
+                    Style::default().fg(colors.fg_primary),
+                ),
+            ]));
+
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "─── Input ───",
+                Style::default().fg(colors.border_subtle),
+            )));
+
+            // Show input
+            if let Some(tool_call_id) = &item.tool_call_id {
+                if let Some(input) = state.tool_inputs_by_tool_call_id.get(tool_call_id) {
+                    let pretty = serde_json::to_string_pretty(input)
+                        .unwrap_or_else(|_| input.to_string());
+                    for line in pretty.lines() {
+                        lines.push(Line::from(Span::styled(
+                            line.to_string(),
+                            Style::default().fg(colors.fg_secondary),
+                        )));
+                    }
+                }
+            }
+
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "─── Result ───",
+                Style::default().fg(colors.border_subtle),
+            )));
+
+            // Show result
+            if let Some(details) = &item.details {
+                let pretty = serde_json::to_string_pretty(details)
+                    .unwrap_or_else(|_| details.to_string());
+                for line in pretty.lines() {
+                    lines.push(Line::from(Span::styled(
+                        line.to_string(),
+                        Style::default().fg(colors.fg_primary),
+                    )));
+                }
+            }
+        }
+    }
+
+    Paragraph::new(Text::from(lines))
+        .style(Style::default().bg(colors.bg_base))
+        .scroll((state.tool_details_overlay_scroll, 0))
+}
+```
+
+**Step 4: Add to draw() overlay chain**
+
+```rust
+if state.tool_details_overlay_open {
+    f.render_widget(render_tool_details_overlay(state), main_area);
+} else if state.debug_overlay_open {
+    // ... rest of chain
+}
+```
+
+**Step 5: Handle Esc to close overlay**
+
+In key handling:
+
+```rust
+if state.tool_details_overlay_open {
+    match key.code {
+        KeyCode::Esc => {
+            state.tool_details_overlay_open = false;
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            state.tool_details_overlay_scroll = state.tool_details_overlay_scroll.saturating_sub(1);
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            state.tool_details_overlay_scroll += 1;
+        }
+        KeyCode::PageUp => {
+            state.tool_details_overlay_scroll = state.tool_details_overlay_scroll.saturating_sub(20);
+        }
+        KeyCode::PageDown => {
+            state.tool_details_overlay_scroll += 20;
+        }
+        _ => {}
+    }
+    continue;
+}
+```
+
+**Step 6: Commit**
+
+```bash
+git add packages/tui/src/app/mod.rs packages/tui/src/ui/mod.rs
+git commit -m "feat(tui): add full-screen tool details overlay"
 ```
 
 ---
@@ -1200,16 +1684,24 @@ git commit -m "feat(tui): complete UX overhaul - visual hierarchy, inline permis
 
 ## Summary
 
-**Total Tasks:** 14 tasks across 6 phases
+**Total Tasks:** 18 tasks across 6 phases
 
 **Key Changes:**
 
 1. **Visual Hierarchy** - Replace "you"/"assistant" labels with colored `┃` border for user messages
 2. **Message Grouping** - Consecutive same-role messages grouped without separators
-3. **Inline Permissions** - Permission requests appear in conversation flow with `Y/S/N` shortcuts
-4. **Tool Folding** - Tool results show compact preview with `└─` connector
-5. **Clean Input** - Remove redundant hint line, compact image indicator
-6. **Status Bar** - Move to bottom, remove debug clutter
+3. **Bottom-Anchored Permissions** - Permission bar appears above input (still modal, less disruptive) with `Y/S/N/D` shortcuts
+4. **Tool Result Folding** - Compact `└─` preview, selectable/expandable with j/k/Enter
+5. **Tool Details Overlay** - Press `D` on selected tool for full-screen scrollable details
+6. **Clean Input** - Remove redundant hint line, compact image indicator
+7. **Status Bar** - Move to bottom, remove debug clutter
+
+**Progressive Tool Disclosure:**
+
+1. **Folded** (default): `✓ bash npm test` with one-line preview
+2. **Selected**: Highlighted with `▸`, background tint
+3. **Expanded**: Press Enter to show 15 lines inline
+4. **Full overlay**: Press D for complete scrollable output
 
 **Testing Approach:**
 
@@ -1217,13 +1709,3 @@ git commit -m "feat(tui): complete UX overhaul - visual hierarchy, inline permis
 - Visual verification for layout changes
 - Manual testing of keyboard shortcuts
 - Clippy for dead code detection
-
----
-
-Plan complete and saved to `docs/plans/2026-01-13-tui-ux-overhaul.md`. Two execution options:
-
-**1. Subagent-Driven (this session)** - I dispatch fresh subagent per task, review between tasks, fast iteration
-
-**2. Parallel Session (separate)** - Open new session in worktree with executing-plans, batch execution with checkpoints
-
-Which approach?
