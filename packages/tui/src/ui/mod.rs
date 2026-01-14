@@ -267,37 +267,6 @@ fn run_loop(
                         continue;
                     }
 
-                    if let Some(req) = &state.active_permission {
-                        let options_count = req.options.len();
-                        let guidance_selected = state.active_permission_selected == options_count;
-
-                        let action = if guidance_selected {
-                            // When guidance row is selected, handle typing
-                            match key.code {
-                                KeyCode::Up => Some(UiAction::PermissionPrev),
-                                KeyCode::Down => Some(UiAction::PermissionNext),
-                                KeyCode::Enter => Some(UiAction::PermissionSubmit),
-                                KeyCode::Esc => Some(UiAction::PermissionCancel),
-                                KeyCode::Backspace => Some(UiAction::PermissionGuidanceBackspace),
-                                KeyCode::Char(ch) => Some(UiAction::PermissionGuidanceChar(ch)),
-                                _ => None,
-                            }
-                        } else {
-                            match key.code {
-                                KeyCode::Up => Some(UiAction::PermissionPrev),
-                                KeyCode::Down => Some(UiAction::PermissionNext),
-                                KeyCode::Enter => Some(UiAction::PermissionSubmit),
-                                KeyCode::Esc => Some(UiAction::PermissionCancel),
-                                _ => None,
-                            }
-                        };
-                        if let Some(action) = action {
-                            let out = apply_ui_action(state, action);
-                            send_outbound(transport, state, out, timeout_ms)?;
-                        }
-                        continue;
-                    }
-
                     if state.mcp_panel.open {
                         use crate::app::config_panels::McpPanelView;
                         let action = match state.mcp_panel.view {
@@ -2639,10 +2608,15 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
 
     let mut lines: Vec<Line> = Vec::new();
 
-    // Top border with tool name
+    // Subtle top border line
+    lines.push(Line::from(vec![Span::styled(
+        "────────────────────────────────────────────────────────────────────",
+        Style::default().fg(colors.border_subtle),
+    )]));
+
+    // Tool name line with colored background
     lines.push(Line::from(vec![
-        Span::styled("╞═ ", Style::default().fg(colors.warning)),
-        Span::styled("Allow ", Style::default().fg(colors.fg_primary)),
+        Span::styled("  Allow ", Style::default().fg(colors.fg_primary)),
         Span::styled(
             tool,
             Style::default()
@@ -2654,10 +2628,6 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
             Style::default().fg(colors.fg_muted),
         ),
         Span::styled("?", Style::default().fg(colors.fg_primary)),
-        Span::styled(
-            " ═══════════════════════════════════════════╡",
-            Style::default().fg(colors.warning),
-        ),
     ]));
 
     // Shortcut line - change [D] label based on expanded state
@@ -2667,7 +2637,7 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
         " Details"
     };
     lines.push(Line::from(vec![
-        Span::styled("│  ", Style::default().fg(colors.warning)),
+        Span::styled("  ", Style::default()),
         Span::styled(
             "[Y]",
             Style::default()
@@ -2691,15 +2661,13 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
         Span::styled(" Deny   ", Style::default().fg(colors.fg_secondary)),
         Span::styled("[D]", Style::default().fg(colors.fg_muted)),
         Span::styled(details_label, Style::default().fg(colors.fg_muted)),
-        Span::raw("                          "),
-        Span::styled("│", Style::default().fg(colors.warning)),
     ]));
 
     // When expanded, show resource and tool input details
     if state.permission_details_expanded {
         // Resource line (full, not truncated)
         lines.push(Line::from(vec![
-            Span::styled("│  ", Style::default().fg(colors.warning)),
+            Span::styled("  ", Style::default()),
             Span::styled("Resource: ", Style::default().fg(colors.fg_secondary)),
             Span::styled(resource, Style::default().fg(colors.fg_primary)),
         ]));
@@ -2715,7 +2683,7 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
                 for (i, line) in input_lines.iter().take(max_lines).enumerate() {
                     let prefix = if i == 0 { "Input: " } else { "       " };
                     lines.push(Line::from(vec![
-                        Span::styled("│  ", Style::default().fg(colors.warning)),
+                        Span::styled("  ", Style::default()),
                         Span::styled(prefix, Style::default().fg(colors.fg_secondary)),
                         Span::styled(
                             (*line).to_string(),
@@ -2726,7 +2694,7 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
 
                 if show_truncation {
                     lines.push(Line::from(vec![
-                        Span::styled("│  ", Style::default().fg(colors.warning)),
+                        Span::styled("  ", Style::default()),
                         Span::styled(
                             "       ... (truncated)",
                             Style::default().fg(colors.fg_muted),
@@ -2737,13 +2705,7 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
         }
     }
 
-    // Bottom border
-    lines.push(Line::from(vec![Span::styled(
-        "╘═══════════════════════════════════════════════════════════════════╛",
-        Style::default().fg(colors.warning),
-    )]));
-
-    Paragraph::new(Text::from(lines)).style(Style::default().bg(colors.bg_elevated))
+    Paragraph::new(Text::from(lines)).style(Style::default().bg(colors.bg_surface))
 }
 
 fn render_connections_modal(state: &AppState) -> Paragraph<'static> {
