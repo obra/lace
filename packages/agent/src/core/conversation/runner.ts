@@ -837,12 +837,24 @@ export class ConversationRunner {
     const modelId = toNonEmptyString(finalInput.modelId) ?? undefined;
 
     // If resuming, look up the previous job's subagentSessionId
+    // Use deriveJobs() which recovers sessionId from events (getJob() clears it on finalization)
     let resumeSessionId: string | undefined;
     let resumeError: string | undefined;
     if (resumeJobId) {
-      const previousJob = this.deps.getJob(resumeJobId);
+      const derivedJobs = this.deps.deriveJobs();
+      const previousJob = derivedJobs.find((j) => j.jobId === resumeJobId);
       if (!previousJob?.subagentSessionId) {
-        resumeError = `Cannot resume job ${resumeJobId}: no subagentSessionId found`;
+        // Build detailed error for debugging
+        const jobIds = derivedJobs.map((j) => j.jobId).join(', ');
+        const withSession = derivedJobs
+          .filter((j) => j.subagentSessionId)
+          .map((j) => `${j.jobId}=${j.subagentSessionId}`)
+          .join(', ');
+        resumeError =
+          `Cannot resume job ${resumeJobId}: no subagentSessionId found.\n` +
+          `Derived ${derivedJobs.length} jobs: [${jobIds}]\n` +
+          `Jobs with sessionId: [${withSession || 'none'}]\n` +
+          `previousJob=${previousJob ? JSON.stringify(previousJob) : 'not found'}`;
       } else {
         resumeSessionId = previousJob.subagentSessionId;
       }

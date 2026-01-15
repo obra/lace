@@ -44,10 +44,22 @@ export async function executeDelegate(
     const derivedJobs = context.deriveJobs();
     const previousJob = derivedJobs.find((j) => j.jobId === resumeJobId);
     if (!previousJob?.subagentSessionId) {
+      // Build detailed error for debugging
+      const jobIds = derivedJobs.map((j) => j.jobId).join(', ');
+      const withSession = derivedJobs
+        .filter((j) => j.subagentSessionId)
+        .map((j) => `${j.jobId}=${j.subagentSessionId}`)
+        .join(', ');
       return {
         status: 'failed',
         content: [
-          { type: 'text', text: `Cannot resume job ${resumeJobId}: no subagentSessionId found` },
+          {
+            type: 'text',
+            text: `Cannot resume job ${resumeJobId}: no subagentSessionId found.\n` +
+              `Derived ${derivedJobs.length} jobs: [${jobIds}]\n` +
+              `Jobs with sessionId: [${withSession || 'none'}]\n` +
+              `previousJob=${previousJob ? JSON.stringify(previousJob) : 'not found'}`,
+          },
         ],
       };
     }

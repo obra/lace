@@ -14,8 +14,8 @@
   },
   "scripts": {
     "prebuild": "cd ../.. && npm run build --workspace=packages/ent-protocol",
-    "build": "tsc && tsc-alias -p tsconfig.json -f -fe .js && cp -r src/providers/catalog/data dist/providers/catalog/ 2>/dev/null || true",
-    "build:clean": "rm -rf dist && npm run build",
+    "build": "rm -f tsconfig.tsbuildinfo && tsc && tsc-alias -p tsconfig.json -f -fe .js && mkdir -p dist/providers/catalog && cp -r src/providers/catalog/data dist/providers/catalog/",
+    "build:clean": "rm -rf dist tsconfig.tsbuildinfo && npm run build",
     "pretest": "cd ../.. && npm run build --workspace=packages/ent-protocol && npm run build --workspace=packages/agent",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
