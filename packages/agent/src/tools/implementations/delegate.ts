@@ -1,5 +1,5 @@
-// ABOUTME: Delegate tool schema stub for subagent execution
-// ABOUTME: Executed by lace-agent runtime (not via ToolExecutor)
+// ABOUTME: Delegate tool - spawns subagent jobs using JobManager
+// Uses JobManager from ToolContext for all job operations
 
 import { z } from 'zod';
 import { Tool } from '../tool';
@@ -47,18 +47,99 @@ The subagent receives your message with its full conversation history intact.`;
     safeInternal: true,
   };
 
-  protected executeValidated(
-    _args: z.infer<typeof delegateSchema>,
-    _context: ToolContext
+  protected async executeValidated(
+    args: z.infer<typeof delegateSchema>,
+    context: ToolContext
   ): Promise<ToolResult> {
-    return Promise.resolve({
-      status: 'failed',
+    const { jobManager } = context;
+
+    if (!jobManager) {
+      return {
+        status: 'failed',
+        content: [{ type: 'text', text: 'delegate requires jobManager in context' }],
+      };
+    }
+
+    const { prompt, description, background, resume, progressIntervalMs, connectionId, modelId } =
+      args;
+
+    // Handle resume - look up previous job's session
+    let resumeSessionId: string | undefined;
+    if (resume) {
+      const jobs = jobManager.listJobs();
+      const previousJob = jobs.find((j) => j.jobId === resume);
+      if (!previousJob?.subagentSessionId) {
+        const jobIds = jobs.map((j) => j.jobId).join(', ');
+        const withSession = jobs
+          .filter((j) => j.subagentSessionId)
+          .map((j) => `${j.jobId}=${j.subagentSessionId}`)
+          .join(', ');
+        return {
+          status: 'failed',
+          content: [
+            {
+              type: 'text',
+              text:
+                `Cannot resume job ${resume}: no subagentSessionId found.\n` +
+                `Available jobs: [${jobIds}]\n` +
+                `Jobs with sessionId: [${withSession || 'none'}]`,
+            },
+          ],
+        };
+      }
+      resumeSessionId = previousJob.subagentSessionId;
+    }
+
+    // Create the job
+    const { jobId, job } = await jobManager.createJob('delegate', {
+      prompt,
+      description,
+      resumeSessionId,
+      progressIntervalMs,
+      connectionId,
+      modelId,
+      turnContext:
+        context.turnId && context.turnSeq !== undefined
+          ? { turnId: context.turnId, turnSeq: context.turnSeq }
+          : undefined,
+    });
+
+    // Background mode - return immediately
+    if (background) {
+      return {
+        status: 'completed',
+        content: [{ type: 'text', text: JSON.stringify({ jobId, status: 'started' }) }],
+      };
+    }
+
+    // Sync mode - wait for completion
+    const abortPromise = new Promise<never>((_, reject) => {
+      context.signal.addEventListener('abort', () => reject(new Error('cancelled')), {
+        once: true,
+      });
+    });
+
+    try {
+      await Promise.race([job.completion, abortPromise]);
+    } catch {
+      job.status = 'cancelled';
+      await jobManager.finalizeJob(job);
+    }
+
+    // Read output
+    const output = jobManager.getJobOutput(jobId);
+
+    const status = job.status ?? 'failed';
+    return {
+      status: status === 'completed' ? 'completed' : status === 'cancelled' ? 'aborted' : 'failed',
       content: [
         {
           type: 'text',
-          text: 'delegate is executed by the lace-agent runtime (should not be executed via ToolExecutor).',
+          text:
+            `delegate jobId=${jobId}\n\n` +
+            (output.trim().length > 0 ? output.trim() : '(no output)'),
         },
       ],
-    });
+    };
   }
 }
