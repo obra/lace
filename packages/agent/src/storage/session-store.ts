@@ -83,7 +83,10 @@ function agentSessionsDir(): string {
   }
 
   const msg = lastError instanceof Error ? lastError.message : String(lastError);
-  const e: any = new Error(`Session storage unavailable: ${msg}`);
+  const e = new Error(`Session storage unavailable: ${msg}`) as Error & {
+    code: string;
+    path: string;
+  };
   e.code = 'SessionStorageUnavailable';
   e.path = candidates[0];
   throw e;

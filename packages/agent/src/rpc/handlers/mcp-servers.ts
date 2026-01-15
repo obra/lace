@@ -167,7 +167,9 @@ export function registerMcpHandlers(
         : [];
 
       // Find and replace or add the server config
-      const updatedServers = existingMcpServers.filter((s: any) => s.name !== serverId);
+      const updatedServers = existingMcpServers.filter(
+        (s: { name: string }) => s.name !== serverId
+      );
       updatedServers.push({
         name: serverId,
         command: config.command,
@@ -221,7 +223,9 @@ export function registerMcpHandlers(
         ? sessionState.config.mcpServers
         : [];
 
-      const updatedServers = existingMcpServers.filter((s: any) => s.name !== serverId);
+      const updatedServers = existingMcpServers.filter(
+        (s: { name: string }) => s.name !== serverId
+      );
 
       writeSessionState(state.activeSession!.dir, {
         ...sessionState,

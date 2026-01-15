@@ -5,7 +5,7 @@ import {
 } from '../providers/base-provider';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { LaceEvent } from '@lace/agent/threads/types';
-import type { CompactionStrategy } from './types';
+import type { CompactionContext, CompactionStrategy } from './types';
 import { registerDefaultStrategies } from './registry';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 
@@ -194,7 +194,7 @@ export async function compactDroppedMessagesWithCore(options: {
 
   const events = laceEventsFromProviderMessages(options.dropped, options.threadId);
 
-  let context: any = { threadId: options.threadId };
+  let context: CompactionContext = { threadId: options.threadId };
   if (options.strategyId === 'summarize') {
     if (!options.provider || !options.modelId) {
       throw new Error('summarize compaction requires provider + modelId');
