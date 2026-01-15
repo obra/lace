@@ -42,6 +42,37 @@ pub fn parse_file_edit_input(input: &Value) -> Option<FileEditInput> {
     Some(FileEditInput { path, edits })
 }
 
+/// Renders a file_edit tool input as a unified diff view.
+/// Returns styled lines ready for ratatui, or None if input is not a file_edit.
+pub fn render_file_edit_diff(
+    input: &Value,
+    colors: &crate::ui::theme::ThemeColors,
+) -> Option<Vec<Line<'static>>> {
+    let parsed = parse_file_edit_input(input)?;
+
+    let mut all_lines = Vec::new();
+
+    for (i, edit) in parsed.edits.iter().enumerate() {
+        if i > 0 {
+            all_lines.push(Line::from(""));
+        }
+
+        let diff_lines = generate_diff_lines(
+            &parsed.path,
+            &edit.old_text,
+            &edit.new_text,
+            colors.success,
+            colors.error,
+            colors.fg_muted,
+            colors.fg_secondary,
+        );
+
+        all_lines.extend(diff_lines);
+    }
+
+    Some(all_lines)
+}
+
 /// Generates styled unified diff lines from old and new text.
 ///
 /// This is intentionally minimal: it emits file headers, then a unified diff body
@@ -107,7 +138,38 @@ pub fn generate_diff_lines(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ui::theme::ThemeColors;
     use serde_json::json;
+
+    #[test]
+    fn render_file_edit_diff_produces_lines() {
+        let colors = ThemeColors::dark();
+        let input = json!({
+            "path": "test.rs",
+            "edits": [{"old_text": "old", "new_text": "new"}]
+        });
+
+        let lines = render_file_edit_diff(&input, &colors).unwrap();
+        assert!(!lines.is_empty());
+
+        let text = lines
+            .iter()
+            .map(|l| l.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(text.contains("test.rs"));
+        assert!(text.contains("-old"));
+        assert!(text.contains("+new"));
+    }
+
+    #[test]
+    fn render_file_edit_diff_returns_none_for_non_edit() {
+        let colors = ThemeColors::dark();
+        let input = json!({"command": "ls"});
+
+        assert!(render_file_edit_diff(&input, &colors).is_none());
+    }
 
     #[test]
     fn parses_file_edit_input() {
