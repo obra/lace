@@ -23,17 +23,27 @@ import { MCPServerManager } from '../mcp/server-manager';
 import type { MCPServerConnection } from '@lace/agent/config/mcp-types';
 import { MCPToolAdapter } from '../mcp/tool-adapter';
 import { logger } from '@lace/agent/utils/logger';
+import type { JobManager } from '@lace/agent/jobs/job-manager';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
   private envManager: ProjectEnvironmentManager;
   private permissionOverrideMode: PermissionOverrideMode = 'normal';
+  private jobManager?: JobManager;
 
   // Constants for temp directory naming
   private static readonly TOOL_CALL_TEMP_PREFIX = 'tool-call-';
 
   constructor() {
     this.envManager = new ProjectEnvironmentManager();
+  }
+
+  /**
+   * Set the JobManager for job-related tools.
+   * Called during executor setup when a session has an active JobManager.
+   */
+  setJobManager(jobManager: JobManager): void {
+    this.jobManager = jobManager;
   }
 
   registerTool(name: string, tool: Tool): void {
@@ -273,6 +283,11 @@ export class ToolExecutor {
         ...toolContext,
         processEnv: { ...process.env, ...projectEnv, ...(toolContext.processEnv || {}) },
       };
+    }
+
+    // Inject jobManager for job-related tools (if not already in context)
+    if (this.jobManager && !toolContext.jobManager) {
+      toolContext = { ...toolContext, jobManager: this.jobManager };
     }
 
     const result = await tool.execute(toolCall.arguments, toolContext);
