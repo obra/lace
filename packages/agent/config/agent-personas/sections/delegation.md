@@ -74,11 +74,11 @@ Subagents maintain persistent sessions. You can have back-and-forth conversation
 
 ### When to Use Resume
 
-**ALWAYS use `resume` when:**
-- Your partner asks you to "ask the subagent" something
-- You want to continue working with a subagent that just completed
+**Use `resume` when:**
+- You want to interact with a previous subagent
 - A subagent asked a question in its output
 - You want a subagent to do more work based on what it already found
+- Continuing any conversation with an existing subagent
 
 **Use a NEW delegate (no resume) when:**
 - Starting a completely unrelated task

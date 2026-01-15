@@ -31,14 +31,14 @@ Parameters:
 - connectionId: Provider connection to use for the subagent (optional, defaults to parent session's connection)
 - modelId: Model to use for the subagent (optional, defaults to parent session's model)
 
-**Sync mode (default):** Blocks until subagent completes and returns full output.
+**Sync mode (default):** Blocks until subagent completes. Returns output prefixed with "delegate jobId=<id>" - save this jobId for resume.
 
-**Background mode:** Returns { jobId, status: "started" } immediately. Use job_output(jobId) to check status. You receive a notification upon completion.
+**Background mode:** Returns { jobId, status: "started" } immediately. Save the jobId for resume or job_output.
 
-**Conversing with subagents:**
-If a subagent asks a question or you want to continue working with it, use the resume parameter:
-  delegate(resume="<jobId>", prompt="your response")
-The subagent's session is preserved - it sees your message as a continuation of the conversation.`;
+**Resuming subagents:**
+To interact with a previous subagent, use resume with its jobId:
+  delegate(resume="<jobId>", prompt="your message")
+The subagent's full conversation history is preserved.`;
   schema = delegateSchema;
   annotations: ToolAnnotations = {
     title: 'Delegate',
