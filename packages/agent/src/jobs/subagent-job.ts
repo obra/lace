@@ -504,24 +504,25 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           workDir: currentState.activeSession!.meta.workDir,
         })) as { sessionId: string };
         job.subagentSessionId = created.sessionId;
-
-        // Persist subagentSessionId for resume functionality
-        await runExclusive(() => {
-          const updatedState = getState();
-          let sessionState = readSessionState(updatedState.activeSession!.dir);
-          const { nextState } = appendDurableEvent(updatedState.activeSession!.dir, sessionState, {
-            type: 'job_session_assigned',
-            data: {
-              jobId: job.jobId,
-              subagentSessionId: created.sessionId,
-            },
-          });
-          sessionState = nextState;
-          writeSessionState(updatedState.activeSession!.dir, sessionState);
-          const stateAfterWrite = getState();
-          stateAfterWrite.activeSession = loadSession(updatedState.activeSession!.meta.sessionId);
-        });
       }
+
+      // Persist subagentSessionId for resume functionality
+      // This is needed even for resumed jobs so that future resumes can find THIS job's sessionId
+      await runExclusive(() => {
+        const updatedState = getState();
+        let sessionState = readSessionState(updatedState.activeSession!.dir);
+        const { nextState } = appendDurableEvent(updatedState.activeSession!.dir, sessionState, {
+          type: 'job_session_assigned',
+          data: {
+            jobId: job.jobId,
+            subagentSessionId: job.subagentSessionId,
+          },
+        });
+        sessionState = nextState;
+        writeSessionState(updatedState.activeSession!.dir, sessionState);
+        const stateAfterWrite = getState();
+        stateAfterWrite.activeSession = loadSession(updatedState.activeSession!.meta.sessionId);
+      });
 
       // If the delegate tool didn't specify connection/model, inherit from the parent effective config.
       if (!job.connectionId && !job.modelId) {
