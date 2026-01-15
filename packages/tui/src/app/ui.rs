@@ -1932,15 +1932,15 @@ mod tests {
     #[test]
     fn permission_toggle_details_toggles_expanded_state() {
         let mut state = AppState::new();
-        assert!(!state.permission_details_expanded);
-
-        // Toggle on
-        apply_ui_action(&mut state, UiAction::PermissionToggleDetails);
         assert!(state.permission_details_expanded);
 
         // Toggle off
         apply_ui_action(&mut state, UiAction::PermissionToggleDetails);
         assert!(!state.permission_details_expanded);
+
+        // Toggle on
+        apply_ui_action(&mut state, UiAction::PermissionToggleDetails);
+        assert!(state.permission_details_expanded);
     }
 
     #[test]

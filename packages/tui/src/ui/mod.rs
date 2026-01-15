@@ -4832,7 +4832,7 @@ mod tests {
         // No permission = height 0
         assert_eq!(permission_bar_height(&state), 0);
 
-        // Active permission, not expanded = height 3
+        // Active permission, expanded by default = 3 + 1 (resource line)
         state.active_permission = Some(PermissionRequest {
             id: json!("test"),
             tool: Some("bash".to_string()),
@@ -4847,6 +4847,10 @@ mod tests {
                 label: "Allow".to_string(),
             }],
         });
+        assert_eq!(permission_bar_height(&state), 4);
+
+        // Not expanded = height 3
+        state.permission_details_expanded = false;
         assert_eq!(permission_bar_height(&state), 3);
 
         // Expanded without tool input = 3 + 1 (resource line)

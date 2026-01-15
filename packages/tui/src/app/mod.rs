@@ -234,7 +234,7 @@ impl AppState {
             active_permission: None,
             active_permission_selected: 0,
             permission_guidance_input: String::new(),
-            permission_details_expanded: false,
+            permission_details_expanded: true,
 
             models_prefetched: false,
 
