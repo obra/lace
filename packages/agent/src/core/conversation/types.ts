@@ -2,8 +2,14 @@
 
 import type { AIProvider } from '@lace/agent/providers/base-provider';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
-import type { ToolResult as CoreToolResult } from '@lace/agent/tools/types';
-import type { SessionUpdate, JobState } from '@lace/agent/server-types';
+import type {
+  ToolResult as CoreToolResult,
+  ToolCall,
+  ToolContext,
+} from '@lace/agent/tools/types';
+import type { SessionUpdate } from '@lace/agent/server-types';
+import type { JobManager } from '@lace/agent/jobs/job-manager';
+import type { MCPServerManager } from '@lace/agent/mcp/server-manager';
 
 /**
  * Approval mode for tool permissions.
@@ -68,11 +74,12 @@ export interface RunnerDependencies {
   /** Create a tool executor for the given execution mode */
   createToolExecutor: (
     executionMode: 'plan' | 'execute',
-    mcpServerManager?: unknown
+    mcpServerManager?: MCPServerManager,
+    jobManager?: JobManager
   ) => {
     executor: {
       getTool: (name: string) => CoreTool | undefined;
-      execute: (...args: unknown[]) => Promise<CoreToolResult>;
+      execute: (toolCall: ToolCall, context: ToolContext) => Promise<CoreToolResult>;
     };
     toolsForProvider: CoreTool[];
   };
@@ -83,44 +90,18 @@ export interface RunnerDependencies {
   /** Get model pricing for cost calculation */
   getModelPricing: () => Promise<{ costPer1mIn: number; costPer1mOut: number } | null>;
 
-  /** Start a background shell job */
+  /** Start a background shell job (used for bash with background=true) */
   startShellJob: (options: {
     command: string;
     description?: string;
     turnContext: { turnId: string; turnSeq: number };
   }) => Promise<{ jobId: string }>;
 
-  /** Start a subagent job */
-  startSubagentJob: (options: {
-    prompt: string;
-    description?: string;
-    turnContext: { turnId: string; turnSeq: number };
-    resumeSessionId?: string;
-    connectionId?: string;
-    modelId?: string;
-  }) => Promise<{ jobId: string }>;
-
-  /** Derive jobs for the active session */
-  deriveJobs: () => Array<{
-    jobId: string;
-    parentJobId?: string;
-    type: string;
-    status: string;
-    description?: string;
-    command?: string;
-    startTime?: string;
-    subagentSessionId?: string;
-    exitCode?: number;
-  }>;
-
-  /** Finalize a job (mark as completed/failed) */
-  finalizeJob: (job: JobState) => Promise<void>;
-
-  /** Get a running job by ID */
-  getJob: (jobId: string) => JobState | undefined;
-
   /** MCP server manager (optional) */
-  mcpServerManager?: unknown;
+  mcpServerManager?: MCPServerManager;
+
+  /** Job manager for job-related tools */
+  jobManager: JobManager;
 
   /** Update the active turn status */
   setActiveTurnStatus: (
