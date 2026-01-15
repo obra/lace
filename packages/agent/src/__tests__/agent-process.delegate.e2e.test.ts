@@ -179,4 +179,111 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       expect(outerJobId).not.toBe(innerJobId);
     }
   );
+
+  it('can resume a completed delegate job', { timeout: 20_000 }, async () => {
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+
+    const updates: Array<Record<string, unknown>> = [];
+    let firstJobId: string | undefined;
+    let resumeJobId: string | undefined;
+
+    ctx.agent.peer.onRequest('session/update', async (params) => {
+      const p = params as Record<string, unknown>;
+      updates.push(p);
+
+      if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
+        if (!firstJobId) {
+          firstJobId = p.jobId;
+        } else if (!resumeJobId) {
+          resumeJobId = p.jobId;
+        }
+      }
+
+      return undefined;
+    });
+
+    ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+
+    await withTimeout(
+      ctx.agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
+      2_000,
+      'initialize'
+    );
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      2_000,
+      'session/new'
+    );
+
+    // First delegate: ask subagent to say hello
+    await withTimeout(
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'delegate say hello' }],
+      }),
+      10_000,
+      'first delegate'
+    );
+
+    // Wait for first job to complete
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          if (!firstJobId) return;
+          const finished = updates.find(
+            (u) => u.type === 'job_finished' && u.jobId === firstJobId
+          );
+          if (finished) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      10_000,
+      'first job completion'
+    );
+
+    expect(firstJobId).toBeDefined();
+
+    // Now resume that job and ask a follow-up
+    const resumePrompt = await withTimeout(
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: `delegate resume=${firstJobId} now say goodbye` }],
+      }),
+      10_000,
+      'resume delegate'
+    );
+
+    // The resumed delegate should have started a new job
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          if (!resumeJobId) return;
+          const finished = updates.find(
+            (u) => u.type === 'job_finished' && u.jobId === resumeJobId
+          );
+          if (finished) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      10_000,
+      'resume job completion'
+    );
+
+    expect(resumeJobId).toBeDefined();
+    expect(resumeJobId).not.toBe(firstJobId);
+
+    // Verify the resumed job got output
+    const output = (await withTimeout(
+      ctx.agent.peer.request('ent/job/output', { jobId: resumeJobId }),
+      2_000,
+      'ent/job/output for resumed job'
+    )) as { status: string; output: string };
+
+    expect(output.status).toBe('completed');
+  });
 });

@@ -70,12 +70,55 @@ When a subagent returns:
 
 ## Conversing with Subagents
 
-Subagents can ask questions. When a subagent needs clarification, it will ask in its output and complete. To continue the conversation:
+Subagents maintain persistent sessions. You can have back-and-forth conversations with them using the `resume` parameter.
+
+### When to Use Resume
+
+**ALWAYS use `resume` when:**
+- Your partner asks you to "ask the subagent" something
+- You want to continue working with a subagent that just completed
+- A subagent asked a question in its output
+- You want a subagent to do more work based on what it already found
+
+**Use a NEW delegate (no resume) when:**
+- Starting a completely unrelated task
+- The previous subagent's context isn't relevant
+
+### How to Resume
+
+When a delegate job completes, the notification includes the jobId:
 
 ```
-delegate(resume="<jobId>", prompt="your answer")
+<background-job-notification job-id="job_abc123" type="completed">
+...
+To continue the conversation: delegate(resume="job_abc123", prompt="your message")
+</background-job-notification>
 ```
 
-The subagent's session is preserved - your response appears as a continuation of the conversation.
+Use that jobId to continue:
 
-**For subagents:** If you need input from the parent, clearly state your question and stop. The parent will see your question and can resume you with the answer.
+```
+delegate(resume="job_abc123", prompt="Now find the largest file")
+```
+
+The subagent receives your message with its full conversation history intact.
+
+### Examples
+
+**Partner says:** "Use a subagent to list files, then ask it which is biggest"
+
+1. First: `delegate(prompt="List all files in the current directory")`
+2. Subagent completes with jobId `job_xyz`
+3. Resume: `delegate(resume="job_xyz", prompt="Which file from that list is the biggest?")`
+
+**Subagent asks a question:**
+
+If a subagent's output ends with a question like "Should I use PostgreSQL or SQLite?", resume with:
+
+```
+delegate(resume="<jobId>", prompt="Use PostgreSQL")
+```
+
+### For Subagents
+
+If you need input from the parent agent, clearly state your question and stop. The parent will see your question and can resume you with the answer. Your session is preserved.
