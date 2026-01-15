@@ -20,25 +20,25 @@ const delegateSchema = z
 
 export class DelegateTool extends Tool {
   name = 'delegate';
-  description = `Spawn a subagent to handle a task autonomously.
+  description = `Spawn a subagent to handle a task autonomously. ALL delegate jobs are resumable - the subagent session persists after completion.
 
 Parameters:
 - prompt: The task or message for the subagent (required)
 - description: Label shown in job listings (optional)
 - background: Set to true to return immediately with jobId (default: false)
-- resume: JobId of a previous job to continue its session
+- resume: JobId of a previous delegate job to continue its session
 - progressIntervalMs: For background jobs, interval in ms for progress notifications (5000-600000, default 300000)
 - connectionId: Provider connection to use for the subagent (optional, defaults to parent session's connection)
 - modelId: Model to use for the subagent (optional, defaults to parent session's model)
 
-**Sync mode (default):** Blocks until subagent completes. Returns output prefixed with "delegate jobId=<id>" - save this jobId for resume.
+**Sync mode (default):** Blocks until subagent completes. Output is prefixed with "delegate jobId=<id>". This jobId can be used with resume.
 
-**Background mode:** Returns { jobId, status: "started" } immediately. Save the jobId for resume or job_output.
+**Background mode:** Returns { jobId, status: "started" } immediately. This jobId can be used with resume.
 
-**Resuming subagents:**
-To interact with a previous subagent, use resume with its jobId:
-  delegate(resume="<jobId>", prompt="your message")
-The subagent's full conversation history is preserved.`;
+**Resuming (works for BOTH sync and background jobs):**
+To continue a conversation with a previous subagent:
+  delegate(resume="<jobId>", prompt="your follow-up message")
+The subagent receives your message with its full conversation history intact.`;
   schema = delegateSchema;
   annotations: ToolAnnotations = {
     title: 'Delegate',

@@ -70,7 +70,7 @@ When a subagent returns:
 
 ## Conversing with Subagents
 
-Subagents maintain persistent sessions. You can have back-and-forth conversations with them using the `resume` parameter.
+**ALL delegate jobs are resumable** - whether sync (default) or background. Subagents maintain persistent sessions that survive after completion.
 
 ### When to Use Resume
 
@@ -86,16 +86,7 @@ Subagents maintain persistent sessions. You can have back-and-forth conversation
 
 ### How to Resume
 
-When a delegate job completes, the notification includes the jobId:
-
-```
-<background-job-notification job-id="job_abc123" type="completed">
-...
-To continue the conversation: delegate(resume="job_abc123", prompt="your message")
-</background-job-notification>
-```
-
-Use that jobId to continue:
+Every delegate job output includes its jobId. For sync mode, the output starts with "delegate jobId=...". Use that jobId to continue:
 
 ```
 delegate(resume="job_abc123", prompt="Now find the largest file")
@@ -108,7 +99,7 @@ The subagent receives your message with its full conversation history intact.
 **Partner says:** "Use a subagent to list files, then ask it which is biggest"
 
 1. First: `delegate(prompt="List all files in the current directory")`
-2. Subagent completes with jobId `job_xyz`
+2. Subagent completes, output shows: "delegate jobId=job_xyz\n..."
 3. Resume: `delegate(resume="job_xyz", prompt="Which file from that list is the biggest?")`
 
 **Subagent asks a question:**
