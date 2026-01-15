@@ -234,9 +234,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       new Promise<void>((resolve) => {
         const interval = setInterval(() => {
           if (!firstJobId) return;
-          const finished = updates.find(
-            (u) => u.type === 'job_finished' && u.jobId === firstJobId
-          );
+          const finished = updates.find((u) => u.type === 'job_finished' && u.jobId === firstJobId);
           if (finished) {
             clearInterval(interval);
             resolve();
@@ -416,79 +414,92 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
     expect(output.status).toBe('completed');
   });
 
-  it('persists job_session_assigned event and exposes subagentSessionId via ent/job/list', { timeout: 20_000 }, async () => {
-    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+  it(
+    'persists job_session_assigned event and exposes subagentSessionId via ent/job/list',
+    { timeout: 20_000 },
+    async () => {
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-    let delegateJobId: string | undefined;
-    let sessionId: string | undefined;
+      let delegateJobId: string | undefined;
+      let sessionId: string | undefined;
 
-    ctx.agent.peer.onRequest('session/update', async (params) => {
-      const p = params as Record<string, unknown>;
-      if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
-        delegateJobId = p.jobId;
-      }
-      return undefined;
-    });
+      ctx.agent.peer.onRequest('session/update', async (params) => {
+        const p = params as Record<string, unknown>;
+        if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
+          delegateJobId = p.jobId;
+        }
+        return undefined;
+      });
 
-    ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+      ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
-    await withTimeout(
-      ctx.agent.peer.request(
-        'initialize',
-        defaultInitializeParams({ config: { approvalMode: 'ask' } })
-      ),
-      2_000,
-      'initialize'
-    );
-    const sessionResult = await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
-      2_000,
-      'session/new'
-    ) as { sessionId: string };
-    sessionId = sessionResult.sessionId;
+      await withTimeout(
+        ctx.agent.peer.request(
+          'initialize',
+          defaultInitializeParams({ config: { approvalMode: 'ask' } })
+        ),
+        2_000,
+        'initialize'
+      );
+      const sessionResult = (await withTimeout(
+        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        2_000,
+        'session/new'
+      )) as { sessionId: string };
+      sessionId = sessionResult.sessionId;
 
-    // Run a delegate
-    await withTimeout(
-      ctx.agent.peer.request('session/prompt', {
-        content: [{ type: 'text', text: 'delegate say hi' }],
-      }),
-      10_000,
-      'delegate prompt'
-    );
+      // Run a delegate
+      await withTimeout(
+        ctx.agent.peer.request('session/prompt', {
+          content: [{ type: 'text', text: 'delegate say hi' }],
+        }),
+        10_000,
+        'delegate prompt'
+      );
 
-    // Wait for job to complete
-    await withTimeout(
-      new Promise<void>((resolve) => {
-        const interval = setInterval(async () => {
-          if (!delegateJobId) return;
-          const jobs = await ctx.agent!.peer.request('ent/job/list', {}) as { jobs: Array<{ jobId: string; status: string }> };
-          const job = jobs.jobs.find((j) => j.jobId === delegateJobId);
-          if (job && job.status !== 'running') {
-            clearInterval(interval);
-            resolve();
-          }
-        }, 50);
-      }),
-      10_000,
-      'job completion'
-    );
+      // Wait for job to complete
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          const interval = setInterval(async () => {
+            if (!delegateJobId) return;
+            const jobs = (await ctx.agent!.peer.request('ent/job/list', {})) as {
+              jobs: Array<{ jobId: string; status: string }>;
+            };
+            const job = jobs.jobs.find((j) => j.jobId === delegateJobId);
+            if (job && job.status !== 'running') {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 50);
+        }),
+        10_000,
+        'job completion'
+      );
 
-    // Check events.jsonl for job_session_assigned
-    const sessionsDir = join(ctx.laceDir, 'agent-sessions');
-    const sessionDir = join(sessionsDir, sessionId!);
-    const eventsPath = join(sessionDir, 'events.jsonl');
-    const eventsContent = readFileSync(eventsPath, 'utf8');
-    const events = eventsContent.split('\n').filter(Boolean).map((line) => JSON.parse(line));
+      // Check events.jsonl for job_session_assigned
+      const sessionsDir = join(ctx.laceDir, 'agent-sessions');
+      const sessionDir = join(sessionsDir, sessionId!);
+      const eventsPath = join(sessionDir, 'events.jsonl');
+      const eventsContent = readFileSync(eventsPath, 'utf8');
+      const events = eventsContent
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
 
-    const sessionAssignedEvent = events.find((e) => e.type === 'job_session_assigned' && e.data?.jobId === delegateJobId);
-    expect(sessionAssignedEvent).toBeDefined();
-    expect(sessionAssignedEvent.data.subagentSessionId).toBeDefined();
-    expect(typeof sessionAssignedEvent.data.subagentSessionId).toBe('string');
+      const sessionAssignedEvent = events.find(
+        (e) => e.type === 'job_session_assigned' && e.data?.jobId === delegateJobId
+      );
+      expect(sessionAssignedEvent).toBeDefined();
+      expect(sessionAssignedEvent.data.subagentSessionId).toBeDefined();
+      expect(typeof sessionAssignedEvent.data.subagentSessionId).toBe('string');
 
-    // Verify ent/job/list returns the subagentSessionId
-    const jobList = await ctx.agent.peer.request('ent/job/list', {}) as { jobs: Array<{ jobId: string; subagentSessionId?: string }> };
-    const job = jobList.jobs.find((j) => j.jobId === delegateJobId);
-    expect(job).toBeDefined();
-    expect(job!.subagentSessionId).toBe(sessionAssignedEvent.data.subagentSessionId);
-  });
+      // Verify ent/job/list returns the subagentSessionId
+      const jobList = (await ctx.agent.peer.request('ent/job/list', {})) as {
+        jobs: Array<{ jobId: string; subagentSessionId?: string }>;
+      };
+      const job = jobList.jobs.find((j) => j.jobId === delegateJobId);
+      expect(job).toBeDefined();
+      expect(job!.subagentSessionId).toBe(sessionAssignedEvent.data.subagentSessionId);
+    }
+  );
 });

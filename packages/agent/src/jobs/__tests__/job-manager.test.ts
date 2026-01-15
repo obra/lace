@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { JobManager, JobCreationError } from '../job-manager';
-import type { JobState } from '../../server-types';
+import type { JobState, PendingJobNotification } from '../../server-types';
 import type { JobManagerDeps } from '../job-manager';
 
 describe('JobManager', () => {
@@ -978,6 +978,128 @@ describe('JobManager', () => {
       const output = manager.getJobOutput('job_nonexistent');
 
       expect(output).toBe('');
+    });
+  });
+
+  describe('notification queue', () => {
+    it('starts with empty queue', () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      expect(manager.getNotificationQueue()).toEqual([]);
+    });
+
+    it('can queue notifications', () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const notification: PendingJobNotification = {
+        jobId: 'job_123',
+        type: 'completed',
+        content: 'Job completed successfully',
+        createdAt: Date.now(),
+      };
+
+      manager.queueNotification(notification);
+
+      expect(manager.getNotificationQueue()).toHaveLength(1);
+      expect(manager.getNotificationQueue()[0]).toBe(notification);
+    });
+
+    it('preserves order of queued notifications', () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const n1: PendingJobNotification = {
+        jobId: 'job_1',
+        type: 'progress',
+        content: 'First',
+        createdAt: 1000,
+      };
+      const n2: PendingJobNotification = {
+        jobId: 'job_2',
+        type: 'completed',
+        content: 'Second',
+        createdAt: 2000,
+      };
+      const n3: PendingJobNotification = {
+        jobId: 'job_1',
+        type: 'failed',
+        content: 'Third',
+        createdAt: 3000,
+      };
+
+      manager.queueNotification(n1);
+      manager.queueNotification(n2);
+      manager.queueNotification(n3);
+
+      const queue = manager.getNotificationQueue();
+      expect(queue).toHaveLength(3);
+      expect(queue[0].content).toBe('First');
+      expect(queue[1].content).toBe('Second');
+      expect(queue[2].content).toBe('Third');
+    });
+
+    it('flushNotifications returns all notifications and clears queue', () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const n1: PendingJobNotification = {
+        jobId: 'job_1',
+        type: 'progress',
+        content: 'Progress update',
+        createdAt: Date.now(),
+      };
+      const n2: PendingJobNotification = {
+        jobId: 'job_2',
+        type: 'completed',
+        content: 'Completed',
+        createdAt: Date.now(),
+      };
+
+      manager.queueNotification(n1);
+      manager.queueNotification(n2);
+
+      const flushed = manager.flushNotifications();
+
+      // Returns the notifications
+      expect(flushed).toHaveLength(2);
+      expect(flushed[0]).toBe(n1);
+      expect(flushed[1]).toBe(n2);
+
+      // Queue is now empty
+      expect(manager.getNotificationQueue()).toEqual([]);
+    });
+
+    it('flushNotifications returns empty array when no notifications', () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const flushed = manager.flushNotifications();
+
+      expect(flushed).toEqual([]);
+    });
+
+    it('getNotificationQueue returns reference to actual queue', () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const notification: PendingJobNotification = {
+        jobId: 'job_123',
+        type: 'completed',
+        content: 'Done',
+        createdAt: Date.now(),
+      };
+
+      manager.queueNotification(notification);
+
+      // First call
+      const queue1 = manager.getNotificationQueue();
+      // Second call
+      const queue2 = manager.getNotificationQueue();
+
+      // Should be the same reference for checking length
+      expect(queue1).toBe(queue2);
     });
   });
 });

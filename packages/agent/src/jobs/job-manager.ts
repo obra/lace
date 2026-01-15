@@ -298,6 +298,29 @@ export class JobManager {
   }
 
   /**
+   * Queue a notification for delivery to the agent.
+   */
+  queueNotification(notification: PendingJobNotification): void {
+    this.notificationQueue.push(notification);
+  }
+
+  /**
+   * Flush all queued notifications, returning them and clearing the queue.
+   * Used when injecting notifications before a prompt.
+   */
+  flushNotifications(): PendingJobNotification[] {
+    return this.notificationQueue.splice(0);
+  }
+
+  /**
+   * Get the current notification queue.
+   * Returns a reference to the actual queue for checking length.
+   */
+  getNotificationQueue(): PendingJobNotification[] {
+    return this.notificationQueue;
+  }
+
+  /**
    * Create a new job (shell or delegate) and start it.
    * Returns the job ID immediately; the job runs asynchronously.
    */

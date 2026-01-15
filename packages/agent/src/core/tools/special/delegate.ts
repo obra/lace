@@ -55,7 +55,8 @@ export async function executeDelegate(
         content: [
           {
             type: 'text',
-            text: `Cannot resume job ${resumeJobId}: no subagentSessionId found.\n` +
+            text:
+              `Cannot resume job ${resumeJobId}: no subagentSessionId found.\n` +
               `Derived ${derivedJobs.length} jobs: [${jobIds}]\n` +
               `Jobs with sessionId: [${withSession || 'none'}]\n` +
               `previousJob=${previousJob ? JSON.stringify(previousJob) : 'not found'}`,
