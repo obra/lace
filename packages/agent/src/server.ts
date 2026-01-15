@@ -37,7 +37,8 @@ export {
 
 export function createToolExecutorForMode(
   executionMode: 'plan' | 'execute',
-  mcpServerManager?: MCPServerManager
+  mcpServerManager?: MCPServerManager,
+  jobManager?: JobManager
 ): {
   executor: ToolExecutor;
   toolsForProvider: CoreTool[];
@@ -47,6 +48,10 @@ export function createToolExecutorForMode(
 
   if (mcpServerManager) {
     executor.registerMCPTools(mcpServerManager);
+  }
+
+  if (jobManager) {
+    executor.setJobManager(jobManager);
   }
 
   const allTools = executor.getAllTools();
@@ -284,13 +289,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     runExclusive,
     emitSessionUpdate,
     reissuePendingPermissions: () => _reissuePendingPermissionRequests(),
-    deriveJobsForActiveSession,
     requestPermissionFromClient: _requestPermissionFromClient,
-    finalizeJob,
     startShellJob: _startShellJob,
-    startSubagentJob: _startSubagentJob,
-    runShellJobProcess,
-    runSubagentJobProcess,
     runPromptInternalRef,
   });
 }

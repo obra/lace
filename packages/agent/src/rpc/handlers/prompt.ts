@@ -10,12 +10,11 @@ import {
 } from '@lace/agent/storage/session-store';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
 import { findUserCommand } from '@lace/agent/user-commands';
-import type { SessionUpdate, AgentServerState, JobState } from '@lace/agent/server-types';
+import type { SessionUpdate, AgentServerState, CreateToolExecutorFn } from '@lace/agent/server-types';
 import { throwInvalidParams, assertInitialized } from '@lace/agent/rpc/utils';
 import { handleSlashCommand } from '@lace/agent/conversation/slash-commands';
 import { createProviderForTurn, getModelPricing } from '@lace/agent/conversation/provider-factory';
 import { ConversationRunner } from '@lace/agent/core/conversation/runner';
-import type { MCPServerManager } from '@lace/agent/mcp/server-manager';
 import type { RunnerConfig, RunnerDependencies } from '@lace/agent/core/conversation/types';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 
@@ -42,43 +41,12 @@ export function registerPromptHandler(
     input: Record<string, unknown>;
     signal: AbortSignal;
   }) => Promise<{ decision?: string; updatedInput?: Record<string, unknown> } | undefined>,
-  createToolExecutorForMode: (
-    executionMode: 'plan' | 'execute',
-    mcpServerManager?: MCPServerManager
-  ) => {
-    executor: {
-      getTool: (name: string) => unknown;
-      execute: (...args: unknown[]) => Promise<unknown>;
-    };
-    toolsForProvider: unknown[];
-  },
+  createToolExecutorForMode: CreateToolExecutorFn,
   startShellJob: (options: {
     command: string;
     description?: string;
     turnContext: { turnId: string; turnSeq: number };
   }) => Promise<{ jobId: string }>,
-  startSubagentJob: (options: {
-    prompt: string;
-    description?: string;
-    turnContext: { turnId: string; turnSeq: number };
-    resumeSessionId?: string;
-    connectionId?: string;
-    modelId?: string;
-  }) => Promise<{ jobId: string }>,
-  deriveJobsForActiveSession: () => Array<{
-    jobId: string;
-    parentJobId?: string;
-    type: string;
-    status: string;
-    description?: string;
-    command?: string;
-    startTime?: string;
-    subagentSessionId?: string;
-    exitCode?: number;
-  }>,
-  _runShellJobProcess: (job: JobState) => void,
-  _runSubagentJobProcess: (job: JobState) => void,
-  finalizeJob: (job: JobState) => Promise<void>,
   runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null }
 ) {
   const handlePrompt = async (params: { content: unknown[]; outputFormat?: unknown }) => {
@@ -259,10 +227,7 @@ export function registerPromptHandler(
         getModelPricing: () =>
           getModelPricing(state, effectiveConfig.connectionId, effectiveConfig.modelId),
         startShellJob,
-        startSubagentJob,
-        deriveJobs: deriveJobsForActiveSession,
-        finalizeJob,
-        getJob: (jobId: string) => state.jobManager.getJob(jobId),
+        jobManager: state.jobManager,
         mcpServerManager: state.mcpServerManager,
         setActiveTurnStatus: (status, ac) => {
           if (status === null) {

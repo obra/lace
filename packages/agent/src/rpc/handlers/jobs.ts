@@ -1,7 +1,7 @@
 // ABOUTME: Background job management RPC handlers for listing, monitoring, and controlling jobs
 
 import { AcpErrorCodes, EntErrorCodes, type JsonRpcPeer } from '@lace/ent-protocol';
-import type { AgentServerState, JobStatus, JobType } from '../../server-types';
+import type { AgentServerState } from '../../server-types';
 import { assertInitialized, throwInvalidParams, toNonEmptyString } from '../utils';
 import { getJobOutputPath, readJobOutput, killJob } from '../../jobs';
 
@@ -12,22 +12,7 @@ import { getJobOutputPath, readJobOutput, killJob } from '../../jobs';
  * - kill: Terminates a running job
  * - inject: Injects content into a delegate job
  */
-export function registerJobHandlers(
-  peer: JsonRpcPeer,
-  state: AgentServerState,
-  deriveJobsForActiveSession: () => Array<{
-    jobId: string;
-    parentJobId?: string;
-    type: JobType;
-    status: JobStatus;
-    description?: string;
-    command?: string;
-    startTime: string;
-    exitCode?: number;
-    subagentSessionId?: string;
-  }>,
-  finalizeJob: (job: any) => Promise<void>
-): void {
+export function registerJobHandlers(peer: JsonRpcPeer, state: AgentServerState): void {
   peer.onRequest('ent/job/list', async (_params: unknown) => {
     assertInitialized(state);
     if (!state.activeSession)
@@ -37,7 +22,7 @@ export function registerJobHandlers(
         data: { category: 'session' },
       };
 
-    const jobs = deriveJobsForActiveSession().map((j) => ({
+    const jobs = state.jobManager.listJobs().map((j) => ({
       jobId: j.jobId,
       parentJobId: j.parentJobId,
       type: j.type,
@@ -84,7 +69,7 @@ export function registerJobHandlers(
       ]);
     }
 
-    const jobs = deriveJobsForActiveSession();
+    const jobs = state.jobManager.listJobs();
     const record = jobs.find((j) => j.jobId === jobId);
     if (!record)
       throw {
@@ -164,7 +149,7 @@ export function registerJobHandlers(
 
     // Job is awaiting permission or otherwise not yet started; finalize immediately.
     await killJob(job); // Sets status to cancelled and aborts permission controller
-    await finalizeJob(job);
+    await state.jobManager.finalizeJob(job);
 
     return { success: true };
   });

@@ -18,14 +18,9 @@ export type {
 // Conversation types
 export type { RunnerConfig, RunParams, RunResult } from './core/conversation/types';
 
-// Special tools
-export { isSpecialTool, executeSpecialTool } from './core/tools/special';
-export type {
-  SpecialToolContext,
-  SpecialToolResult,
-  JobState,
-  JobRecord,
-} from './core/tools/special';
+// Job management types (exported from their canonical locations)
+export type { JobState } from './server-types';
+export type { JobRecord } from './jobs/job-manager';
 
 // RPC server (for JSON-RPC usage)
 export * from './server';

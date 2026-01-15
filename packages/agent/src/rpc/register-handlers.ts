@@ -13,40 +13,19 @@ import { registerSessionOperationHandlers } from './handlers/session-operations'
 import { registerMcpHandlers } from './handlers/mcp-servers';
 import { registerPromptHandler } from './handlers/prompt';
 import { registerWorkspaceHandlers } from './handlers/workspace';
-import type {
-  AgentServerState,
-  JobState,
-  SessionUpdate,
-  JobType,
-  JobStatus,
-} from '../server-types';
-import type { MCPServerManager } from '../mcp/server-manager';
+import type { AgentServerState, SessionUpdate, CreateToolExecutorFn } from '../server-types';
 
 /**
  * Dependencies passed to handler registration functions
  */
 interface HandlerDependencies {
-  createToolExecutorForMode: (
-    mode: 'plan' | 'execute',
-    mcpServerManager?: MCPServerManager
-  ) => { executor: any; toolsForProvider: any[] };
+  createToolExecutorForMode: CreateToolExecutorFn;
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>;
   emitSessionUpdate: (
     update: SessionUpdate,
     context?: { turnId?: string; turnSeq?: number; jobId?: string }
   ) => Promise<void>;
   reissuePendingPermissions: () => Promise<void>;
-  deriveJobsForActiveSession: () => Array<{
-    jobId: string;
-    parentJobId?: string;
-    type: JobType;
-    status: JobStatus;
-    description?: string;
-    command?: string;
-    startTime: string;
-    exitCode?: number;
-    subagentSessionId?: string;
-  }>;
   requestPermissionFromClient: (request: {
     sessionId: string;
     turnId: string;
@@ -60,7 +39,6 @@ interface HandlerDependencies {
     input: Record<string, unknown>;
     signal?: AbortSignal;
   }) => Promise<{ decision?: string; updatedInput?: Record<string, unknown> }>;
-  finalizeJob: (job: JobState, options?: { exitCode?: number }) => Promise<void>;
   startShellJob: (options: {
     command: string;
     description?: string;
@@ -68,18 +46,6 @@ interface HandlerDependencies {
     turnContext?: { turnId: string; turnSeq: number };
     progressIntervalMs?: number;
   }) => Promise<{ jobId: string }>;
-  startSubagentJob: (options: {
-    prompt: string;
-    description?: string;
-    parentJobId?: string;
-    turnContext?: { turnId: string; turnSeq: number };
-    resumeSessionId?: string;
-    progressIntervalMs?: number;
-    connectionId?: string;
-    modelId?: string;
-  }) => Promise<{ jobId: string }>;
-  runShellJobProcess: (job: JobState) => void;
-  runSubagentJobProcess: (job: JobState) => void;
   runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null };
 }
 
@@ -118,7 +84,7 @@ export function registerAllHandlers(
   registerMcpHandlers(peer, state, deps.runExclusive);
 
   // Job management
-  registerJobHandlers(peer, state, deps.deriveJobsForActiveSession, deps.finalizeJob);
+  registerJobHandlers(peer, state);
 
   // Prompt/agent execution
   registerPromptHandler(
@@ -129,11 +95,6 @@ export function registerAllHandlers(
     deps.requestPermissionFromClient,
     deps.createToolExecutorForMode,
     deps.startShellJob,
-    deps.startSubagentJob,
-    deps.deriveJobsForActiveSession,
-    deps.runShellJobProcess,
-    deps.runSubagentJobProcess,
-    deps.finalizeJob,
     deps.runPromptInternalRef
   );
 
