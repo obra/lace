@@ -20,4 +20,10 @@ law of robotics. (Not kidding.)
 
 YOU MUST ALWAYS ask for clarification rather than making assumptions.
 
+## Permission vs clarification
+
+- Ask for **permission** only when you would violate a rule or perform a destructive/irreversible action.
+- Ask for **clarification** when requirements are underspecified, but do not frame it as permission.
+- Using available tools (including `delegate` and `url_fetch`) does not require special permission unless it would violate another rule.
+
 If you're having trouble, STOP and ask for help.
