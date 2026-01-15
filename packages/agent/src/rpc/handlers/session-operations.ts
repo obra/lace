@@ -8,6 +8,7 @@ import {
   type JsonRpcPeer,
   type ContextBreakdown,
   type ThreadTokenUsage,
+  type McpServerConfig,
 } from '@lace/ent-protocol';
 import {
   readSessionState,
@@ -24,7 +25,8 @@ import {
 import { deriveCheckpointFilesFromDurableEvents } from '../../storage/files-from-events';
 import type { ProviderMessage, ContentBlock } from '../../providers/base-provider';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
-import type { AgentServerState } from '../../server-types';
+import type { AgentServerState, CreateToolExecutorFn } from '../../server-types';
+import type { Tool } from '../../tools/tool';
 import {
   assertInitialized,
   throwInvalidParams,
@@ -46,10 +48,7 @@ import { getEffectiveConfig } from '@lace/agent/core/session';
  */
 async function computeContextBreakdownForActiveSession(
   state: AgentServerState,
-  createToolExecutorForMode: (
-    mode: 'plan' | 'execute',
-    mcpServerManager?: any
-  ) => { executor: any; toolsForProvider: any[] }
+  createToolExecutorForMode: CreateToolExecutorFn
 ): Promise<{
   breakdown: ContextBreakdown;
   tokenUsage: ThreadTokenUsage;
@@ -84,11 +83,11 @@ async function computeContextBreakdownForActiveSession(
     if (message.role === 'user') userTokens += estimateTokens(contentText);
     if (message.role === 'assistant') assistantTokens += estimateTokens(contentText);
 
-    if ((message as any).toolCalls) {
-      toolCallTokens += estimateTokens(JSON.stringify((message as any).toolCalls));
+    if (message.toolCalls) {
+      toolCallTokens += estimateTokens(JSON.stringify(message.toolCalls));
     }
-    if ((message as any).toolResults) {
-      toolResultTokens += estimateTokens(JSON.stringify((message as any).toolResults));
+    if (message.toolResults) {
+      toolResultTokens += estimateTokens(JSON.stringify(message.toolResults));
     }
   }
 
@@ -96,7 +95,7 @@ async function computeContextBreakdownForActiveSession(
   const { executor: allExecutor } = createToolExecutorForMode('execute', state.mcpServerManager);
 
   const coreTools = coreExecutor.getAllTools();
-  const coreToolNames = new Set(coreTools.map((t: any) => t.name));
+  const coreToolNames = new Set(coreTools.map((t: Tool) => t.name));
   const allTools = allExecutor.getAllTools();
 
   const coreToolItems: Array<{ name: string; tokens: number }> = [];
@@ -198,10 +197,7 @@ export function registerSessionOperationHandlers(
   peer: JsonRpcPeer,
   state: AgentServerState,
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
-  createToolExecutorForMode: (
-    mode: 'plan' | 'execute',
-    mcpServerManager?: any
-  ) => { executor: any; toolsForProvider: any[] }
+  createToolExecutorForMode: CreateToolExecutorFn
 ): void {
   peer.onRequest('ent/session/configure', async (params: unknown) => {
     assertInitialized(state);
@@ -317,13 +313,14 @@ export function registerSessionOperationHandlers(
         }
       }
 
-      const existing = Array.isArray((currentConfig as any).mcpServers)
-        ? McpServerConfigSchema.array().safeParse((currentConfig as any).mcpServers)
-        : { success: true as const, data: [] as Array<any> };
+      const configWithServers = currentConfig as { mcpServers?: unknown };
+      const existing = Array.isArray(configWithServers.mcpServers)
+        ? McpServerConfigSchema.array().safeParse(configWithServers.mcpServers)
+        : { success: true as const, data: [] as McpServerConfig[] };
       const existingServers = existing.success ? existing.data : [];
 
       const incomingByName = new Map(mcpParsed.data.map((s) => [s.name, s]));
-      const merged: any[] = [];
+      const merged: McpServerConfig[] = [];
       const seen = new Set<string>();
 
       for (const oldServer of existingServers) {
@@ -342,15 +339,15 @@ export function registerSessionOperationHandlers(
         merged.push(server);
       }
 
-      (nextConfig as any).mcpServers = merged;
+      (nextConfig as { mcpServers?: McpServerConfig[] }).mcpServers = merged;
       applied.push('mcpServers');
     }
 
-    const nextState = { ...currentState, config: nextConfig };
+    const nextState: SessionState = { ...currentState, config: nextConfig };
     writeSessionState(state.activeSession.dir, nextState);
-    state.activeSession = { ...state.activeSession, state: nextState } as any;
+    state.activeSession = { ...state.activeSession!, state: nextState };
 
-    const effectiveAfter = getEffectiveConfig(state.config, state.activeSession!.state.config);
+    const effectiveAfter = getEffectiveConfig(state.config, state.activeSession.state.config);
     await reconcileMcpServersForActiveSession(state);
 
     return {
@@ -362,8 +359,8 @@ export function registerSessionOperationHandlers(
         maxThinkingTokens: effectiveAfter.maxThinkingTokens,
         maxBudgetUsd: effectiveAfter.maxBudgetUsd,
         approvalMode: effectiveAfter.approvalMode,
-        environment: (state.activeSession!.state.config as any)?.environment,
-        mcpServers: (state.activeSession!.state.config as any)?.mcpServers,
+        environment: state.activeSession.state.config?.environment,
+        mcpServers: state.activeSession.state.config?.mcpServers,
       },
     };
   });
@@ -481,8 +478,8 @@ export function registerSessionOperationHandlers(
       const serializedPreserved = nextProviderMessages.map((m) => ({
         role: m.role,
         content: typeof m.content === 'string' ? m.content : '',
-        ...(Array.isArray((m as any).toolCalls) ? { toolCalls: (m as any).toolCalls } : {}),
-        ...(Array.isArray((m as any).toolResults) ? { toolResults: (m as any).toolResults } : {}),
+        ...(Array.isArray(m.toolCalls) ? { toolCalls: m.toolCalls } : {}),
+        ...(Array.isArray(m.toolResults) ? { toolResults: m.toolResults } : {}),
       }));
 
       let sessionState = readSessionState(state.activeSession!.dir);
@@ -634,10 +631,10 @@ export function registerSessionOperationHandlers(
     });
     sessionState = nextState;
     writeSessionState(state.activeSession.dir, sessionState);
-    state.activeSession = { ...state.activeSession, state: sessionState } as any;
+    state.activeSession = { ...state.activeSession!, state: sessionState };
 
     peer.notify('session/update', {
-      sessionId: state.activeSession!.meta.sessionId,
+      sessionId: state.activeSession.meta.sessionId,
       streamSeq: sessionState.nextStreamSeq,
       turnId: state.activeTurn?.turnId,
       turnSeq: state.activeTurn ? 0 : undefined,
@@ -646,15 +643,15 @@ export function registerSessionOperationHandlers(
       messageCount: 0,
     });
 
-    writeSessionState(state.activeSession!.dir, {
+    writeSessionState(state.activeSession.dir, {
       ...sessionState,
       nextStreamSeq: sessionState.nextStreamSeq + 1,
     });
 
     state.activeSession = {
-      ...state.activeSession!,
-      state: readSessionState(state.activeSession!.dir),
-    } as any;
+      ...state.activeSession,
+      state: readSessionState(state.activeSession.dir),
+    };
     return undefined;
   });
 

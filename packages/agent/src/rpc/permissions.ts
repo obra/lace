@@ -97,9 +97,11 @@ export async function requestPermissionFromClient(
       })
     : null;
 
-  let response: any;
+  let response: { decision?: string; updatedInput?: Record<string, unknown> } | undefined;
   try {
-    response = abortPromise ? await Promise.race([result, abortPromise]) : await result;
+    response = (abortPromise ? await Promise.race([result, abortPromise]) : await result) as
+      | { decision?: string; updatedInput?: Record<string, unknown> }
+      | undefined;
   } catch {
     peer.abandonRequest(rpcId);
     state.pendingPermissionRequests.delete(request.toolCallId);
@@ -185,11 +187,14 @@ export async function reissuePendingPermissionRequests(
 
     void (async () => {
       try {
-        const response = (await result) as any;
+        const response = (await result) as {
+          decision?: string;
+          updatedInput?: Record<string, unknown>;
+        } | null;
         const decision = toNonEmptyString(response?.decision) ?? undefined;
         const updatedInput =
           response?.updatedInput && typeof response.updatedInput === 'object'
-            ? (response.updatedInput as Record<string, unknown>)
+            ? response.updatedInput
             : undefined;
 
         state.pendingPermissionRequests.delete(record.toolCallId);

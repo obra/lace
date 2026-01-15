@@ -1,17 +1,10 @@
 // ABOUTME: Tool and persona management RPC handlers
 
 import type { JsonRpcPeer, ToolInfo, PersonaInfo } from '@lace/ent-protocol';
-import type { AgentServerState } from '../../server-types';
+import type { AgentServerState, CreateToolExecutorFn } from '../../server-types';
 import { protocolToolInfoForCoreTool } from '../utils';
 import { assertInitialized } from '../utils';
 import { personaRegistry } from '../../config/persona-registry';
-
-export type CreateToolExecutorForMode = (
-  executionMode: 'plan' | 'execute',
-  mcpServerManager?: any
-) => {
-  toolsForProvider: any[];
-};
 
 /**
  * Register tool management handlers with the peer.
@@ -20,7 +13,7 @@ export type CreateToolExecutorForMode = (
 export function registerToolHandlers(
   peer: JsonRpcPeer,
   state: AgentServerState,
-  createToolExecutorForMode: CreateToolExecutorForMode
+  createToolExecutorForMode: CreateToolExecutorFn
 ): void {
   peer.onRequest('ent/tools/list', async (_params: unknown) => {
     assertInitialized(state);

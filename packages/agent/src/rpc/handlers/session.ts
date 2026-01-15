@@ -24,7 +24,7 @@ import {
   readDurableEvents,
   summarizeDurableEvents,
 } from '../../storage/event-log';
-import type { AgentServerState } from '../../server-types';
+import type { AgentServerState, CreateToolExecutorFn } from '../../server-types';
 import { assertInitialized, throwInvalidParams, toNonEmptyString } from '../utils';
 import { loadPromptConfig } from '../../config/prompts';
 import { logger } from '../../utils/logger';
@@ -44,10 +44,7 @@ import { getEffectiveConfig } from '@lace/agent/core/session';
 export function registerSessionHandlers(
   peer: JsonRpcPeer,
   state: AgentServerState,
-  createToolExecutorForMode: (
-    mode: 'plan' | 'execute',
-    mcpServerManager?: any
-  ) => { toolsForProvider: any[] },
+  createToolExecutorForMode: CreateToolExecutorFn,
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
   reissuePendingPermissionRequests: () => Promise<void>
 ): void {

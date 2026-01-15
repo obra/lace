@@ -4,8 +4,7 @@ import type { JsonRpcPeer, ToolInfo } from '@lace/ent-protocol';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import { getUserSlashCommands } from '../../user-commands';
 import { protocolToolInfoForCoreTool } from '../utils';
-import type { AgentServerState } from '../../server-types';
-import type { MCPServerManager } from '../../mcp/server-manager';
+import type { AgentServerState, CreateToolExecutorFn } from '../../server-types';
 
 /**
  * Register the initialize RPC handler with the peer.
@@ -14,10 +13,7 @@ import type { MCPServerManager } from '../../mcp/server-manager';
 export function registerInitializeHandler(
   peer: JsonRpcPeer,
   state: AgentServerState,
-  createToolExecutorForMode: (
-    mode: 'plan' | 'execute',
-    mcpServerManager?: MCPServerManager
-  ) => { toolsForProvider: any[] }
+  createToolExecutorForMode: CreateToolExecutorFn
 ): void {
   peer.onRequest('initialize', async (params: unknown) => {
     if (state.initialized)
