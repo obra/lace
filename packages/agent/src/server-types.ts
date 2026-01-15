@@ -12,6 +12,21 @@ import { ProviderCatalogManager } from './providers/catalog/manager';
 import { ProviderInstanceManager } from './providers/instance/manager';
 import { MCPServerManager } from './mcp/server-manager';
 import type { JobManager } from './jobs/job-manager';
+import type { ToolExecutor } from './tools/executor';
+import type { Tool } from './tools/tool';
+
+/**
+ * Factory function type for creating tool executors.
+ * Used by RPC handlers to create executors with the appropriate mode and dependencies.
+ */
+export type CreateToolExecutorFn = (
+  mode: 'plan' | 'execute',
+  mcpServerManager?: MCPServerManager,
+  jobManager?: JobManager
+) => {
+  executor: ToolExecutor;
+  toolsForProvider: Tool[];
+};
 
 // Configuration Constants
 export const SUPPORTED_PROVIDER_TYPES = new Set([
