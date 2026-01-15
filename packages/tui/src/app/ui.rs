@@ -1329,14 +1329,8 @@ fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound
         "connections" => {
             apply_ui_action(state, UiAction::OpenConnections)
         }
-        "env" => {
-            let _ = apply_ui_action(state, UiAction::OpenEnvEditor);
-            Vec::new()
-        }
-        "context" => {
-            let _ = apply_ui_action(state, UiAction::OpenContextViewer);
-            Vec::new()
-        }
+        "env" => apply_ui_action(state, UiAction::OpenEnvEditor),
+        "context" => apply_ui_action(state, UiAction::OpenContextViewer),
         "mcp servers" => crate::app::config_panels::mcp_open(state),
         name if name.starts_with("model ") => {
             let target = name.trim_start_matches("model ").trim();
