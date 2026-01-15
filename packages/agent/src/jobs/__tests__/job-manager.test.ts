@@ -460,19 +460,214 @@ describe('JobManager', () => {
     });
   });
 
-  describe('createJob', () => {
-    function createDeps(overrides: Partial<JobManagerDeps> = {}): JobManagerDeps {
-      return {
-        getActiveSession: vi
-          .fn()
-          .mockReturnValue({ sessionId: 'sess_1', dir: '/tmp/test-session' }),
-        persistEvent: vi.fn().mockResolvedValue(undefined),
-        emitUpdate: vi.fn().mockResolvedValue(undefined),
-        runShellProcess: vi.fn(),
-        runSubagentProcess: vi.fn(),
-        ...overrides,
+  function createDeps(overrides: Partial<JobManagerDeps> = {}): JobManagerDeps {
+    return {
+      getActiveSession: vi
+        .fn()
+        .mockReturnValue({ sessionId: 'sess_1', dir: '/tmp/test-session' }),
+      persistEvent: vi.fn().mockResolvedValue(undefined),
+      emitUpdate: vi.fn().mockResolvedValue(undefined),
+      runShellProcess: vi.fn(),
+      runSubagentProcess: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  describe('finalizeJob', () => {
+    it('persists job_finished event and removes from running jobs', async () => {
+      const persistEvent = vi.fn().mockResolvedValue(undefined);
+      const emitUpdate = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ persistEvent, emitUpdate });
+      const manager = new JobManager(deps);
+
+      const job: JobState = {
+        jobId: 'job_123',
+        type: 'bash',
+        status: 'completed',
+        exitCode: 0,
+        startedAt: new Date().toISOString(),
+        outputPath: '/tmp/job.log',
+        finished: false,
+        completion: Promise.resolve(),
+        resolveCompletion: vi.fn(),
       };
-    }
+
+      manager.addJob(job);
+      await manager.finalizeJob(job);
+
+      // Verify: persistEvent called with job_finished
+      expect(persistEvent).toHaveBeenCalledOnce();
+      const eventArg = persistEvent.mock.calls[0][0] as {
+        type: string;
+        data: Record<string, unknown>;
+      };
+      expect(eventArg.type).toBe('job_finished');
+      expect(eventArg.data.jobId).toBe('job_123');
+      expect(eventArg.data.outcome).toBe('completed');
+      expect(eventArg.data.exitCode).toBe(0);
+
+      // Verify: job removed from map
+      expect(manager.getJob('job_123')).toBeUndefined();
+    });
+
+    it('does nothing if job already finished', async () => {
+      const persistEvent = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ persistEvent });
+      const manager = new JobManager(deps);
+
+      const job: JobState = {
+        jobId: 'job_123',
+        type: 'bash',
+        status: 'completed',
+        startedAt: new Date().toISOString(),
+        outputPath: '/tmp/job.log',
+        finished: true, // Already finished
+        completion: Promise.resolve(),
+        resolveCompletion: vi.fn(),
+      };
+
+      manager.addJob(job);
+      await manager.finalizeJob(job);
+
+      // Verify: persistEvent not called
+      expect(persistEvent).not.toHaveBeenCalled();
+    });
+
+    it('emits job_finished update', async () => {
+      const emitUpdate = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ emitUpdate });
+      const manager = new JobManager(deps);
+
+      const job: JobState = {
+        jobId: 'job_456',
+        type: 'delegate',
+        status: 'failed',
+        exitCode: 1,
+        startedAt: new Date().toISOString(),
+        outputPath: '/tmp/job.log',
+        finished: false,
+        completion: Promise.resolve(),
+        resolveCompletion: vi.fn(),
+      };
+
+      manager.addJob(job);
+      await manager.finalizeJob(job);
+
+      // Verify emitUpdate called with type: job_finished
+      expect(emitUpdate).toHaveBeenCalledOnce();
+      const updateArg = emitUpdate.mock.calls[0][0] as {
+        type: string;
+        jobId: string;
+        outcome: string;
+        exitCode?: number;
+      };
+      expect(updateArg.type).toBe('job_finished');
+      expect(updateArg.jobId).toBe('job_456');
+      expect(updateArg.outcome).toBe('failed');
+      expect(updateArg.exitCode).toBe(1);
+    });
+
+    it('resolves completion promise', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const resolveCompletion = vi.fn();
+      const job: JobState = {
+        jobId: 'job_789',
+        type: 'bash',
+        status: 'completed',
+        startedAt: new Date().toISOString(),
+        outputPath: '/tmp/job.log',
+        finished: false,
+        completion: Promise.resolve(),
+        resolveCompletion,
+      };
+
+      manager.addJob(job);
+      await manager.finalizeJob(job);
+
+      // Verify job.resolveCompletion() is called
+      expect(resolveCompletion).toHaveBeenCalledOnce();
+    });
+
+    it('includes parentJobId when present', async () => {
+      const persistEvent = vi.fn().mockResolvedValue(undefined);
+      const emitUpdate = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ persistEvent, emitUpdate });
+      const manager = new JobManager(deps);
+
+      const job: JobState = {
+        jobId: 'job_child',
+        parentJobId: 'job_parent',
+        type: 'bash',
+        status: 'completed',
+        startedAt: new Date().toISOString(),
+        outputPath: '/tmp/job.log',
+        finished: false,
+        completion: Promise.resolve(),
+        resolveCompletion: vi.fn(),
+      };
+
+      manager.addJob(job);
+      await manager.finalizeJob(job);
+
+      // Verify parentJobId is included in event
+      const eventArg = persistEvent.mock.calls[0][0] as { data: Record<string, unknown> };
+      expect(eventArg.data.parentJobId).toBe('job_parent');
+
+      // Verify parentJobId is included in update
+      const updateArg = emitUpdate.mock.calls[0][0] as { parentJobId?: string };
+      expect(updateArg.parentJobId).toBe('job_parent');
+    });
+  });
+
+  describe('cancelJob', () => {
+    it('sets job status to cancelled and finalizes', async () => {
+      const persistEvent = vi.fn().mockResolvedValue(undefined);
+      const emitUpdate = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ persistEvent, emitUpdate });
+      const manager = new JobManager(deps);
+
+      const job: JobState = {
+        jobId: 'job_running',
+        type: 'bash',
+        status: 'running',
+        startedAt: new Date().toISOString(),
+        outputPath: '/tmp/job.log',
+        finished: false,
+        completion: Promise.resolve(),
+        resolveCompletion: vi.fn(),
+      };
+
+      manager.addJob(job);
+      await manager.cancelJob('job_running');
+
+      // Verify: status changed to cancelled
+      expect(job.status).toBe('cancelled');
+
+      // Verify: finalizeJob was called (persistEvent should have been called)
+      expect(persistEvent).toHaveBeenCalledOnce();
+      const eventArg = persistEvent.mock.calls[0][0] as { data: Record<string, unknown> };
+      expect(eventArg.data.outcome).toBe('cancelled');
+
+      // Job should be removed from map
+      expect(manager.getJob('job_running')).toBeUndefined();
+    });
+
+    it('does nothing for non-existent job', async () => {
+      const persistEvent = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ persistEvent });
+      const manager = new JobManager(deps);
+
+      // Call cancelJob with unknown jobId - should not throw
+      await manager.cancelJob('job_nonexistent');
+
+      // No persistEvent call
+      expect(persistEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createJob', () => {
 
     it('throws JobCreationError when no active session', async () => {
       const deps = createDeps({

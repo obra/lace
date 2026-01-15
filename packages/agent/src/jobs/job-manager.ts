@@ -241,6 +241,47 @@ export class JobManager {
   }
 
   /**
+   * Finalize a job - mark as finished, persist event, emit update, and remove from running jobs.
+   * This is called when a job completes, fails, or is cancelled.
+   */
+  async finalizeJob(job: JobState): Promise<void> {
+    if (job.finished) return;
+    job.finished = true;
+
+    await this.deps.persistEvent({
+      type: 'job_finished',
+      data: {
+        jobId: job.jobId,
+        ...(job.parentJobId ? { parentJobId: job.parentJobId } : {}),
+        outcome: job.status,
+        ...(typeof job.exitCode === 'number' ? { exitCode: job.exitCode } : {}),
+      },
+    });
+
+    await this.deps.emitUpdate({
+      type: 'job_finished',
+      jobId: job.jobId,
+      ...(job.parentJobId ? { parentJobId: job.parentJobId } : {}),
+      outcome: job.status,
+      ...(typeof job.exitCode === 'number' ? { exitCode: job.exitCode } : {}),
+    });
+
+    job.resolveCompletion?.();
+    this.jobs.delete(job.jobId);
+  }
+
+  /**
+   * Cancel a job by ID - sets status to cancelled and finalizes it.
+   */
+  async cancelJob(jobId: string): Promise<void> {
+    const job = this.jobs.get(jobId);
+    if (!job) return;
+
+    job.status = 'cancelled';
+    await this.finalizeJob(job);
+  }
+
+  /**
    * Create a new job (shell or delegate) and start it.
    * Returns the job ID immediately; the job runs asynchronously.
    */
