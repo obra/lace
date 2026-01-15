@@ -3,6 +3,7 @@
 
 import type { CombinedTokenUsage } from '@lace/agent/token-management/types';
 import type { IWorkspaceManager } from '@lace/agent/workspace/workspace-manager';
+import type { JobManager } from '@lace/agent/jobs/job-manager';
 
 export interface ToolContext {
   // Execution control - required for cancellation
@@ -38,6 +39,13 @@ export interface ToolContext {
 
   // Implemented by the agent runtime from its history
   hasFileBeenRead?: (path: string) => boolean;
+
+  // Job management (provided by runner for job-related tools)
+  jobManager?: JobManager;
+
+  // Turn context for job creation
+  turnId?: string;
+  turnSeq?: number;
 }
 
 export interface ToolAnnotations {
