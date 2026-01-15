@@ -31,4 +31,24 @@ export class JobManager {
   getStreamingMode(): 'full' | 'coalesced' | 'none' {
     return this.streamingMode;
   }
+
+  setStreamingMode(mode: 'full' | 'coalesced' | 'none'): void {
+    this.streamingMode = mode;
+  }
+
+  addJob(job: JobState): void {
+    this.jobs.set(job.jobId, job);
+  }
+
+  getJob(jobId: string): JobState | undefined {
+    return this.jobs.get(jobId);
+  }
+
+  removeJob(jobId: string): void {
+    this.jobs.delete(jobId);
+  }
+
+  getRunningJobs(): Map<string, JobState> {
+    return this.jobs;
+  }
 }
