@@ -694,5 +694,41 @@ describe('JobManager', () => {
       const job = manager.getJob(result.jobId);
       expect(job!.description).toBe('Subagent');
     });
+
+    it('includes progressIntervalMs in job state', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const result = await manager.createJob('shell', {
+        command: 'echo hello',
+        progressIntervalMs: 60000,
+      });
+
+      const job = manager.getJob(result.jobId);
+      expect(job!.progressIntervalMs).toBe(60000);
+    });
+
+    it('calls setupProgressTimer if provided', async () => {
+      const setupProgressTimer = vi.fn();
+      const deps = createDeps({ setupProgressTimer });
+      const manager = new JobManager(deps);
+
+      await manager.createJob('shell', { command: 'echo hello' });
+
+      expect(setupProgressTimer).toHaveBeenCalledOnce();
+      const jobArg = setupProgressTimer.mock.calls[0][0] as JobState;
+      expect(jobArg.type).toBe('bash');
+    });
+
+    it('works without setupProgressTimer', async () => {
+      // Deps without setupProgressTimer - should not throw
+      const deps = createDeps();
+      delete (deps as Partial<JobManagerDeps>).setupProgressTimer;
+      const manager = new JobManager(deps);
+
+      const result = await manager.createJob('shell', { command: 'echo hello' });
+
+      expect(result.jobId).toMatch(/^job_/);
+    });
   });
 });

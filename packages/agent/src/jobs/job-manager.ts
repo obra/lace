@@ -15,6 +15,7 @@ export type JobManagerDeps = {
   emitUpdate: (update: { type: string; [key: string]: unknown }) => Promise<void>;
   runShellProcess: (job: JobState) => void;
   runSubagentProcess: (job: JobState) => void;
+  setupProgressTimer?: (job: JobState) => void;
 };
 
 /**
@@ -29,6 +30,7 @@ export type CreateJobOptions = {
   resumeSessionId?: string; // for delegate resume
   connectionId?: string;
   modelId?: string;
+  progressIntervalMs?: number;
 };
 
 /**
@@ -290,6 +292,7 @@ export class JobManager {
       finished: false,
       completion,
       resolveCompletion,
+      progressIntervalMs: options.progressIntervalMs,
       connectionId: options.connectionId,
       modelId: options.modelId,
       ...(type === 'delegate'
@@ -325,14 +328,17 @@ export class JobManager {
       description,
     });
 
-    // 7. Call runShellProcess or runSubagentProcess
+    // 7. Set up progress timer if configured
+    this.deps.setupProgressTimer?.(job);
+
+    // 8. Call runShellProcess or runSubagentProcess
     if (type === 'shell') {
       this.deps.runShellProcess(job);
     } else {
       this.deps.runSubagentProcess(job);
     }
 
-    // 8. Return { jobId, job }
+    // 9. Return { jobId, job }
     return { jobId, job };
   }
 }
