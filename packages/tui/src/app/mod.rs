@@ -400,24 +400,36 @@ impl AppState {
             .iter()
             .filter(|item| {
                 item.kind == activity::ActivityKind::ToolUse
-                    && item.status.as_deref() != Some("completed")
-                    && item.status.as_deref() != Some("error")
+                    && !Self::is_terminal_tool_status(item.status.as_deref())
             })
             .collect()
     }
 
     /// Returns completed tool calls for selection in the chat pane.
-    /// These are tool_use items that are completed, success, or error.
+    /// These are tool_use items that have reached a terminal state.
     pub fn completed_tool_calls(&self) -> Vec<&activity::ActivityItem> {
         self.activity
             .iter()
             .filter(|item| {
                 item.kind == activity::ActivityKind::ToolUse
-                    && (item.status.as_deref() == Some("completed")
-                        || item.status.as_deref() == Some("success")
-                        || item.status.as_deref() == Some("error"))
+                    && Self::is_terminal_tool_status(item.status.as_deref())
             })
             .collect()
+    }
+
+    /// Check if a tool status represents a terminal (finished) state.
+    /// Terminal states include: completed, success, error, failed, aborted, denied, cancelled
+    fn is_terminal_tool_status(status: Option<&str>) -> bool {
+        matches!(
+            status,
+            Some("completed")
+                | Some("success")
+                | Some("error")
+                | Some("failed")
+                | Some("aborted")
+                | Some("denied")
+                | Some("cancelled")
+        )
     }
 }
 
@@ -500,6 +512,55 @@ mod tests {
             None,
         );
 
+        // Add tool calls with other terminal statuses that should NOT be pending
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_5".to_string(),
+            Some("file.read".to_string()),
+            Some("failed".to_string()),
+            json!({"path": "/nonexistent.txt"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_6".to_string(),
+            Some("shell.exec".to_string()),
+            Some("aborted".to_string()),
+            json!({"command": "long-running"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_7".to_string(),
+            Some("shell.exec".to_string()),
+            Some("denied".to_string()),
+            json!({"command": "rm -rf /"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_8".to_string(),
+            Some("shell.exec".to_string()),
+            Some("cancelled".to_string()),
+            json!({"command": "slow-command"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
         let pending = state.pending_tool_calls();
 
         // Should only include tool_1 (running) and tool_4 (awaiting_permission)
@@ -507,9 +568,13 @@ mod tests {
         assert!(pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_1")));
         assert!(pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_4")));
 
-        // Should NOT include completed or error
-        assert!(!pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_2")));
-        assert!(!pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_3")));
+        // Should NOT include any terminal statuses
+        assert!(!pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_2"))); // completed
+        assert!(!pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_3"))); // error
+        assert!(!pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_5"))); // failed
+        assert!(!pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_6"))); // aborted
+        assert!(!pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_7"))); // denied
+        assert!(!pending.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_8"))); // cancelled
     }
 
     #[test]
@@ -581,13 +646,68 @@ mod tests {
             None,
         );
 
+        // Add tool calls with other terminal statuses
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_6".to_string(),
+            Some("file.read".to_string()),
+            Some("failed".to_string()),
+            json!({"path": "/nonexistent.txt"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_7".to_string(),
+            Some("shell.exec".to_string()),
+            Some("aborted".to_string()),
+            json!({"command": "long-running"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_8".to_string(),
+            Some("shell.exec".to_string()),
+            Some("denied".to_string()),
+            json!({"command": "rm -rf /"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_9".to_string(),
+            Some("shell.exec".to_string()),
+            Some("cancelled".to_string()),
+            json!({"command": "slow-command"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
         let completed = state.completed_tool_calls();
 
-        // Should include tool_2 (completed), tool_3 (success), and tool_4 (error)
-        assert_eq!(completed.len(), 3);
+        // Should include all terminal statuses:
+        // tool_2 (completed), tool_3 (success), tool_4 (error),
+        // tool_6 (failed), tool_7 (aborted), tool_8 (denied), tool_9 (cancelled)
+        assert_eq!(completed.len(), 7);
         assert!(completed.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_2")));
         assert!(completed.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_3")));
         assert!(completed.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_4")));
+        assert!(completed.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_6")));
+        assert!(completed.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_7")));
+        assert!(completed.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_8")));
+        assert!(completed.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_9")));
 
         // Should NOT include running or awaiting_permission
         assert!(!completed.iter().any(|i| i.tool_call_id.as_deref() == Some("tool_1")));
