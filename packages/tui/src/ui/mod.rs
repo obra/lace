@@ -2605,20 +2605,52 @@ fn permission_bar_height(state: &AppState) -> u16 {
         return 0;
     }
     if state.permission_details_expanded {
-        // Base (3) + detail lines (up to 10)
         let detail_lines = state
             .active_permission
             .as_ref()
-            .and_then(|req| req.tool_call_id.as_ref())
-            .and_then(|id| state.tool_inputs_by_tool_call_id.get(id))
-            .map(|input| {
-                let pretty = serde_json::to_string_pretty(input).unwrap_or_default();
-                pretty.lines().count().min(9) + 2 // +2 for resource and ... line
+            .and_then(|req| {
+                let tool = req.tool.as_deref().unwrap_or("");
+                let tool_call_id = req.tool_call_id.as_ref()?;
+                let input = state.tool_inputs_by_tool_call_id.get(tool_call_id)?;
+
+                if tool == "file_edit" {
+                    let colors = &theme_styles(state.prefs.theme).colors;
+                    crate::ui::diff::render_file_edit_diff(input, colors)
+                        .map(|lines| lines.len() + 2) // +2 for resource line and spacing
+                } else {
+                    let pretty = serde_json::to_string_pretty(input).unwrap_or_default();
+                    Some(pretty.lines().count().min(9) + 2) // +2 for resource and ... line
+                }
             })
             .unwrap_or(1) as u16;
+
         3 + detail_lines
     } else {
         3 // Compact: top border, shortcuts, bottom border
+    }
+}
+
+/// Renders tool input as formatted JSON lines
+fn render_json_input(lines: &mut Vec<Line<'static>>, input: &Value, colors: &theme::ThemeColors) {
+    let pretty = serde_json::to_string_pretty(input).unwrap_or_default();
+    let input_lines: Vec<&str> = pretty.lines().collect();
+    let max_lines = 8;
+    let show_truncation = input_lines.len() > max_lines;
+
+    for (i, line) in input_lines.iter().take(max_lines).enumerate() {
+        let prefix = if i == 0 { "Input: " } else { "       " };
+        lines.push(Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(prefix, Style::default().fg(colors.fg_secondary)),
+            Span::styled((*line).to_string(), Style::default().fg(colors.fg_muted)),
+        ]));
+    }
+
+    if show_truncation {
+        lines.push(Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled("       ... (truncated)", Style::default().fg(colors.fg_muted)),
+        ]));
     }
 }
 
@@ -2634,6 +2666,7 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
     };
 
     let tool = req.tool.clone().unwrap_or_else(|| "unknown".to_string());
+    let tool_name = tool.clone();
     let resource = req.resource.clone().unwrap_or_default();
     let resource_preview = if state.permission_details_expanded {
         resource.clone() // Show full resource when expanded
@@ -2655,7 +2688,7 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
     lines.push(Line::from(vec![
         Span::styled("  Allow ", Style::default().fg(colors.fg_primary)),
         Span::styled(
-            tool,
+            tool_name,
             Style::default()
                 .fg(colors.accent)
                 .add_modifier(Modifier::BOLD),
@@ -2709,34 +2742,18 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
             Span::styled(resource, Style::default().fg(colors.fg_primary)),
         ]));
 
-        // Tool input JSON from tool_inputs_by_tool_call_id
         if let Some(tool_call_id) = &req.tool_call_id {
             if let Some(input) = state.tool_inputs_by_tool_call_id.get(tool_call_id) {
-                let pretty = serde_json::to_string_pretty(input).unwrap_or_default();
-                let input_lines: Vec<&str> = pretty.lines().collect();
-                let max_lines = 8;
-                let show_truncation = input_lines.len() > max_lines;
-
-                for (i, line) in input_lines.iter().take(max_lines).enumerate() {
-                    let prefix = if i == 0 { "Input: " } else { "       " };
-                    lines.push(Line::from(vec![
-                        Span::styled("  ", Style::default()),
-                        Span::styled(prefix, Style::default().fg(colors.fg_secondary)),
-                        Span::styled(
-                            (*line).to_string(),
-                            Style::default().fg(colors.fg_muted),
-                        ),
-                    ]));
-                }
-
-                if show_truncation {
-                    lines.push(Line::from(vec![
-                        Span::styled("  ", Style::default()),
-                        Span::styled(
-                            "       ... (truncated)",
-                            Style::default().fg(colors.fg_muted),
-                        ),
-                    ]));
+                // Tool-specific rendering
+                if tool == "file_edit" {
+                    if let Some(diff_lines) = crate::ui::diff::render_file_edit_diff(input, colors) {
+                        lines.push(Line::from(""));
+                        lines.extend(diff_lines);
+                    } else {
+                        render_json_input(&mut lines, input, colors);
+                    }
+                } else {
+                    render_json_input(&mut lines, input, colors);
                 }
             }
         }
@@ -4739,6 +4756,62 @@ mod tests {
     }
 
     #[test]
+    fn permission_bar_shows_diff_for_file_edit() {
+        use crate::app::{PermissionOption, PermissionRequest};
+        use ratatui::layout::Rect;
+
+        let mut state = AppState::new_with_paths(None, None);
+        state.active_permission = Some(PermissionRequest {
+            id: json!("test"),
+            tool: Some("file_edit".to_string()),
+            kind: Some("write".to_string()),
+            resource: Some("src/main.rs".to_string()),
+            tool_call_id: Some("tool_456".to_string()),
+            turn_id: None,
+            turn_seq: None,
+            job_id: None,
+            options: vec![PermissionOption {
+                option_id: "allow".to_string(),
+                label: "Allow".to_string(),
+            }],
+        });
+
+        state.tool_inputs_by_tool_call_id.insert(
+            "tool_456".to_string(),
+            json!({
+                "path": "src/main.rs",
+                "edits": [{"old_text": "return 1;", "new_text": "return 2;"}]
+            }),
+        );
+
+        state.permission_details_expanded = true;
+
+        let widget = render_permission_bar(&state);
+
+        let backend = TestBackend::new(80, 20);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| {
+                f.render_widget(widget, Rect::new(0, 0, 80, 20));
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer().clone();
+        let content: String = (0..20)
+            .map(|y| {
+                (0..80)
+                    .map(|x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(content.contains("--- a/src/main.rs"), "Got:\n{}", content);
+        assert!(content.contains("-return 1;"), "Got:\n{}", content);
+        assert!(content.contains("+return 2;"), "Got:\n{}", content);
+    }
+
+    #[test]
     fn permission_bar_expanded_shows_details() {
         use crate::app::{PermissionOption, PermissionRequest};
         use ratatui::layout::Rect;
@@ -4822,6 +4895,40 @@ mod tests {
             "Should show tool input JSON when expanded. Buffer: {}",
             buffer_str
         );
+    }
+
+    #[test]
+    fn permission_bar_height_accounts_for_diff_lines() {
+        use crate::app::{PermissionOption, PermissionRequest};
+
+        let mut state = AppState::new_with_paths(None, None);
+        state.active_permission = Some(PermissionRequest {
+            id: json!("req_1"),
+            tool: Some("file_edit".to_string()),
+            kind: Some("write".to_string()),
+            resource: Some("test.rs".to_string()),
+            tool_call_id: Some("tool_789".to_string()),
+            turn_id: None,
+            turn_seq: None,
+            job_id: None,
+            options: vec![PermissionOption {
+                option_id: "allow".to_string(),
+                label: "Allow".to_string(),
+            }],
+        });
+
+        state.tool_inputs_by_tool_call_id.insert(
+            "tool_789".to_string(),
+            json!({
+                "path": "test.rs",
+                "edits": [{"old_text": "a\nb\nc", "new_text": "x\ny\nz"}]
+            }),
+        );
+
+        state.permission_details_expanded = true;
+
+        let height = permission_bar_height(&state);
+        assert!(height > 5, "Height should include diff lines, got {}", height);
     }
 
     #[test]
