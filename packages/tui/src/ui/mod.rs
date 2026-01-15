@@ -1,4 +1,5 @@
 mod markdown;
+pub mod diff;
 pub mod theme;
 
 use crate::app::activity;
