@@ -23,17 +23,22 @@ export class DelegateTool extends Tool {
   description = `Spawn a subagent to handle a task autonomously.
 
 Parameters:
-- prompt: The task for the subagent (required)
+- prompt: The task or message for the subagent (required)
 - description: Label shown in job listings (optional)
 - background: Set to true to return immediately with jobId (default: false)
-- resume: JobId of a failed/cancelled job to continue from where it left off
+- resume: JobId of a previous job to continue its session
 - progressIntervalMs: For background jobs, interval in ms for progress notifications (5000-600000, default 300000)
 - connectionId: Provider connection to use for the subagent (optional, defaults to parent session's connection)
 - modelId: Model to use for the subagent (optional, defaults to parent session's model)
 
-When background=true, returns { jobId, status: "started" }. Use non-blocking \`job_output(jobId)\` tool to check status when needed.
-You will receive a notification upon completion. Progress notifications sent every 5 minutes by default.
-Default (sync): Blocks until subagent completes and returns full output.`;
+**Sync mode (default):** Blocks until subagent completes and returns full output.
+
+**Background mode:** Returns { jobId, status: "started" } immediately. Use job_output(jobId) to check status. You receive a notification upon completion.
+
+**Conversing with subagents:**
+If a subagent asks a question or you want to continue working with it, use the resume parameter:
+  delegate(resume="<jobId>", prompt="your response")
+The subagent's session is preserved - it sees your message as a continuation of the conversation.`;
   schema = delegateSchema;
   annotations: ToolAnnotations = {
     title: 'Delegate',

@@ -35,12 +35,15 @@ export function createQueueJobNotification(
   ) => {
     const outputBytes = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
     const durationMs = Date.now() - new Date(job.startedAt).getTime();
-    // For completed jobs show just the last line, for others show last 3
-    const lastLines = getLastLines(job.outputPath, type === 'completed' ? 1 : 3);
+    // For delegate jobs show more context (last 8 lines) so parent can see questions
+    // For bash jobs: completed shows 1 line, others show 3
+    const lastLineCount = job.type === 'delegate' ? 8 : type === 'completed' ? 1 : 3;
+    const lastLines = getLastLines(job.outputPath, lastLineCount);
 
     const content = formatJobNotification({
       jobId: job.jobId,
       type,
+      jobType: job.type,
       exitCode: job.exitCode,
       durationMs,
       outputBytes,

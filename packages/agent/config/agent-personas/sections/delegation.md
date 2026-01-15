@@ -67,3 +67,15 @@ When a subagent returns:
 2. Summarize the key points for your partner
 3. Decide next steps based on what they found
 4. Update your task list if needed
+
+## Conversing with Subagents
+
+Subagents can ask questions. When a subagent needs clarification, it will ask in its output and complete. To continue the conversation:
+
+```
+delegate(resume="<jobId>", prompt="your answer")
+```
+
+The subagent's session is preserved - your response appears as a continuation of the conversation.
+
+**For subagents:** If you need input from the parent, clearly state your question and stop. The parent will see your question and can resume you with the answer.

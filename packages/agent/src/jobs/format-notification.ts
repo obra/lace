@@ -1,10 +1,12 @@
 // ABOUTME: Formats job notifications for injection into agent conversations
 
 type JobNotificationType = 'completed' | 'failed' | 'cancelled' | 'progress';
+type JobType = 'bash' | 'delegate';
 
 export type FormatJobNotificationOptions = {
   jobId: string;
   type: JobNotificationType;
+  jobType?: JobType;
   exitCode?: number;
   durationMs: number;
   outputBytes: number;
@@ -77,7 +79,8 @@ function getOutputVerb(type: JobNotificationType): string {
  * Format a job notification as an XML-like message for injection into the agent conversation.
  */
 export function formatJobNotification(options: FormatJobNotificationOptions): string {
-  const { jobId, type, exitCode, durationMs, outputBytes, deltaBytes, lastLines, reason } = options;
+  const { jobId, type, jobType, exitCode, durationMs, outputBytes, deltaBytes, lastLines, reason } =
+    options;
 
   const statusText = getStatusText(type);
   const lines: string[] = [];
@@ -123,9 +126,14 @@ export function formatJobNotification(options: FormatJobNotificationOptions): st
     }
   }
 
-  // Hint about job_output tool
+  // Hints
   lines.push('');
-  lines.push(`Use job_output tool with jobId "${jobId}" to ${getOutputVerb(type)}.`);
+  lines.push(`Use job_output(jobId="${jobId}") to ${getOutputVerb(type)}.`);
+
+  // For delegate jobs, add resume hint
+  if (jobType === 'delegate' && (type === 'completed' || type === 'failed')) {
+    lines.push(`To continue the conversation: delegate(resume="${jobId}", prompt="your message")`);
+  }
 
   // Closing tag
   lines.push('</background-job-notification>');

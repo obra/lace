@@ -795,7 +795,12 @@ export class ConversationRunner {
       }
       // todo_write
       return await executeTodoWrite(
-        finalInput as { id?: string; title?: string; description?: string; status?: 'pending' | 'done' | 'removed' },
+        finalInput as {
+          id?: string;
+          title?: string;
+          description?: string;
+          status?: 'pending' | 'done' | 'removed';
+        },
         todoContext
       );
     }
