@@ -5,7 +5,11 @@
 import { randomUUID } from 'node:crypto';
 import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
 import type { ToolResult } from '@lace/ent-protocol';
-import type { ToolResult as CoreToolResult } from '@lace/agent/tools/types';
+import type {
+  ToolResult as CoreToolResult,
+  ToolCall,
+  ToolContext,
+} from '@lace/agent/tools/types';
 import type { Tool } from '@lace/agent/tools/tool';
 import {
   readSessionState,
@@ -14,14 +18,7 @@ import {
 } from '@lace/agent/storage/session-store';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
 import { deriveFilesReadFromDurableEvents } from '@lace/agent/storage/files-from-events';
-import { getJobOutputPath, readJobOutputTail } from '@lace/agent/jobs';
-import {
-  executeJobOutput,
-  executeJobsList,
-  executeJobKill,
-} from '@lace/agent/core/tools/special/job-tools';
 import { executeTodoRead, executeTodoWrite } from '@lace/agent/todo/todo-tools';
-import type { SpecialToolContext } from '@lace/agent/core/tools/special/types';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import {
   toNonEmptyString,
@@ -89,7 +86,8 @@ export class ConversationRunner {
 
     const { executor: toolExecutor, toolsForProvider } = this.deps.createToolExecutor(
       executionMode,
-      this.deps.mcpServerManager
+      this.deps.mcpServerManager,
+      this.deps.jobManager
     );
 
     const provider = await this.deps.createProvider();
@@ -286,7 +284,7 @@ export class ConversationRunner {
     streamTurnSeq: number;
     toolExecutor: {
       getTool: (name: string) => Tool | undefined;
-      execute: (...args: unknown[]) => Promise<CoreToolResult>;
+      execute: (toolCall: ToolCall, context: ToolContext) => Promise<CoreToolResult>;
     };
     executionMode: 'plan' | 'execute';
     approvalMode: ApprovalMode;
@@ -691,38 +689,6 @@ export class ConversationRunner {
   }
 
   /**
-   * Create a SpecialToolContext for job tool handlers.
-   * Adapts the runner's dependencies to the context interface expected by job-tools.ts.
-   */
-  private createJobToolContext(params: {
-    turnId: string;
-    turnSeq: number;
-    abortSignal: AbortSignal;
-  }): SpecialToolContext {
-    const jobs = new Map<string, import('@lace/agent/server-types').JobState>();
-    // Build a Map from individual job lookups for the context interface
-    // The deriveJobs returns all jobs, but getJobs needs a Map
-    for (const record of this.deps.deriveJobs()) {
-      const job = this.deps.getJob(record.jobId);
-      if (job) {
-        jobs.set(record.jobId, job);
-      }
-    }
-
-    return {
-      sessionDir: this.config.sessionDir,
-      turnId: params.turnId,
-      turnSeq: params.turnSeq,
-      abortSignal: params.abortSignal,
-      getJobs: () => jobs,
-      deriveJobs: () => this.deps.deriveJobs(),
-      startShellJob: this.deps.startShellJob,
-      startSubagentJob: this.deps.startSubagentJob,
-      finalizeJob: this.deps.finalizeJob,
-    };
-  }
-
-  /**
    * Execute a tool by name, handling special built-in tools.
    */
   private async executeToolByName(params: {
@@ -730,7 +696,7 @@ export class ConversationRunner {
     toolCallId: string;
     finalInput: Record<string, unknown>;
     toolTurnSeq: number;
-    toolExecutor: { execute: (...args: unknown[]) => Promise<CoreToolResult> };
+    toolExecutor: { execute: (toolCall: ToolCall, context: ToolContext) => Promise<CoreToolResult> };
     cwd: string;
     filesRead: Set<string>;
     envOverlay?: Record<string, string>;
@@ -752,41 +718,7 @@ export class ConversationRunner {
 
     // Note: bash with background=true is handled before permission check and never reaches here.
 
-    // Handle delegate tool
-    if (toolName === 'delegate') {
-      return await this.executeDelegateTool({ finalInput, toolTurnSeq, abortController, turnId });
-    }
-
-    // Handle job tools via shared job-tools.ts handlers
-    if (toolName === 'job_output' || toolName === 'jobs_list' || toolName === 'job_kill') {
-      const context = this.createJobToolContext({
-        turnId,
-        turnSeq: toolTurnSeq,
-        abortSignal: abortController.signal,
-      });
-
-      if (toolName === 'job_output') {
-        return await executeJobOutput(
-          finalInput as {
-            jobId?: string;
-            block?: boolean;
-            timeoutMs?: number;
-            byteOffset?: number;
-          },
-          context
-        );
-      }
-      if (toolName === 'jobs_list') {
-        return await executeJobsList(
-          finalInput as { status?: string[]; type?: string[]; limit?: number },
-          context
-        );
-      }
-      // job_kill
-      return await executeJobKill(finalInput as { jobId?: string }, context);
-    }
-
-    // Handle todo tools
+    // Handle todo tools (still use runtime handling - todo tools need sessionDir)
     if (toolName === 'todo_read' || toolName === 'todo_write') {
       const todoContext = { sessionDir: this.config.sessionDir };
 
@@ -814,111 +746,10 @@ export class ConversationRunner {
         toolTempRoot: join(this.config.sessionDir, 'tool-temp'),
         processEnv: envOverlay,
         hasFileBeenRead: (p: string) => filesRead.has(isAbsolutePath(p) ? p : resolvePath(cwd, p)),
+        turnId,
+        turnSeq: toolTurnSeq,
       }
     );
-  }
-
-  /**
-   * Execute the delegate tool.
-   */
-  private async executeDelegateTool(params: {
-    finalInput: Record<string, unknown>;
-    toolTurnSeq: number;
-    abortController: AbortController;
-    turnId: string;
-  }): Promise<CoreToolResult> {
-    const { finalInput, toolTurnSeq, abortController, turnId } = params;
-
-    const prompt = toNonEmptyString(finalInput.prompt);
-    const background = finalInput.background === true;
-    const description = toNonEmptyString(finalInput.description);
-    const resumeJobId = toNonEmptyString(finalInput.resume);
-    const connectionId = toNonEmptyString(finalInput.connectionId) ?? undefined;
-    const modelId = toNonEmptyString(finalInput.modelId) ?? undefined;
-
-    // If resuming, look up the previous job's subagentSessionId
-    // Use deriveJobs() which recovers sessionId from events (getJob() clears it on finalization)
-    let resumeSessionId: string | undefined;
-    let resumeError: string | undefined;
-    if (resumeJobId) {
-      const derivedJobs = this.deps.deriveJobs();
-      const previousJob = derivedJobs.find((j) => j.jobId === resumeJobId);
-      if (!previousJob?.subagentSessionId) {
-        // Build detailed error for debugging
-        const jobIds = derivedJobs.map((j) => j.jobId).join(', ');
-        const withSession = derivedJobs
-          .filter((j) => j.subagentSessionId)
-          .map((j) => `${j.jobId}=${j.subagentSessionId}`)
-          .join(', ');
-        resumeError =
-          `Cannot resume job ${resumeJobId}: no subagentSessionId found.\n` +
-          `Derived ${derivedJobs.length} jobs: [${jobIds}]\n` +
-          `Jobs with sessionId: [${withSession || 'none'}]\n` +
-          `previousJob=${previousJob ? JSON.stringify(previousJob) : 'not found'}`;
-      } else {
-        resumeSessionId = previousJob.subagentSessionId;
-      }
-    }
-
-    if (!prompt) {
-      return { status: 'failed', content: [{ type: 'text', text: 'delegate.prompt is required' }] };
-    }
-
-    if (resumeError) {
-      return { status: 'failed', content: [{ type: 'text', text: resumeError }] };
-    }
-
-    const { jobId } = await this.deps.startSubagentJob({
-      prompt,
-      description: description || 'Delegate',
-      turnContext: { turnId, turnSeq: toolTurnSeq },
-      resumeSessionId,
-      connectionId,
-      modelId,
-    });
-
-    if (background) {
-      return {
-        status: 'completed',
-        content: [{ type: 'text', text: JSON.stringify({ jobId, status: 'started' }) }],
-      };
-    }
-
-    // Wait for job completion
-    const job = this.deps.getJob(jobId);
-    if (job) {
-      const abortPromise = new Promise<never>((_, reject) => {
-        abortController.signal.addEventListener('abort', () => reject(new Error('cancelled')), {
-          once: true,
-        });
-      });
-
-      try {
-        await Promise.race([job.completion, abortPromise]);
-      } catch {
-        job.status = 'cancelled';
-        await this.deps.finalizeJob(job);
-      }
-    }
-
-    // Read output with tail-based truncation
-    const { output: reportText, truncated } = readJobOutputTail(
-      getJobOutputPath(this.config.sessionDir, jobId)
-    );
-
-    const status = job?.status ?? 'failed';
-    return {
-      status: status === 'completed' ? 'completed' : status === 'cancelled' ? 'aborted' : 'failed',
-      content: [
-        {
-          type: 'text',
-          text:
-            `delegate jobId=${jobId}\n\n` +
-            (reportText.trim().length > 0 ? reportText.trim() : '(no output)') +
-            (truncated ? '\n\n(truncated)' : ''),
-        },
-      ],
-    };
   }
 
   /**

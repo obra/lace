@@ -20,6 +20,21 @@ function createMockDeps(overrides: Partial<RunnerDependencies> = {}): RunnerDepe
       .mockResolvedValue({ status: 'completed', content: [{ type: 'text', text: 'mock result' }] }),
   };
 
+  const mockJobManager = {
+    getJob: vi.fn().mockReturnValue(undefined),
+    listJobs: vi.fn().mockReturnValue([]),
+    getJobOutput: vi.fn().mockReturnValue(''),
+    createJob: vi.fn().mockResolvedValue({ jobId: 'job_test', job: { completion: Promise.resolve() } }),
+    cancelJob: vi.fn().mockResolvedValue(undefined),
+    finalizeJob: vi.fn().mockResolvedValue(undefined),
+    getStreamingMode: vi.fn().mockReturnValue('full'),
+    setStreamingMode: vi.fn(),
+    queueNotification: vi.fn(),
+    flushNotifications: vi.fn().mockReturnValue([]),
+    getNotificationQueue: vi.fn().mockReturnValue([]),
+    getRunningJobs: vi.fn().mockReturnValue([]),
+  };
+
   return {
     onUpdate: vi.fn().mockResolvedValue(undefined),
     runExclusive: vi
@@ -37,6 +52,7 @@ function createMockDeps(overrides: Partial<RunnerDependencies> = {}): RunnerDepe
     deriveJobs: vi.fn().mockReturnValue([]),
     finalizeJob: vi.fn().mockResolvedValue(undefined),
     getJob: vi.fn().mockReturnValue(undefined),
+    jobManager: mockJobManager as unknown as RunnerDependencies['jobManager'],
     mcpServerManager: undefined,
     setActiveTurnStatus: vi.fn(),
     getSessionCostUsd: vi.fn().mockReturnValue(0),
