@@ -35,6 +35,102 @@ pub struct ActivityItem {
     pub result_preview: Option<String>,
 }
 
+/// Extracts a useful summary from tool input based on tool type.
+/// Returns a human-readable description of what the tool is doing.
+fn extract_tool_summary(tool_name: Option<&str>, input: &Value) -> String {
+    let tool = tool_name.unwrap_or("unknown");
+
+    match tool {
+        // File operations - show path
+        "file_read" | "file_write" | "file_find" => {
+            if let Some(path) = input.get("path").and_then(|v| v.as_str()) {
+                path.to_string()
+            } else if let Some(pattern) = input.get("pattern").and_then(|v| v.as_str()) {
+                pattern.to_string()
+            } else {
+                String::new()
+            }
+        }
+        "file_edit" => {
+            if let Some(path) = input.get("path").and_then(|v| v.as_str()) {
+                let edit_count = input
+                    .get("edits")
+                    .and_then(|v| v.as_array())
+                    .map(|a| a.len())
+                    .unwrap_or(0);
+                if edit_count > 1 {
+                    format!("{} ({} edits)", path, edit_count)
+                } else {
+                    path.to_string()
+                }
+            } else {
+                String::new()
+            }
+        }
+        // Shell commands - show command (truncated)
+        "bash" | "shell" | "shell.exec" => {
+            if let Some(cmd) = input.get("command").and_then(|v| v.as_str()) {
+                // Truncate long commands
+                if cmd.len() > 60 {
+                    format!("{}...", &cmd[..57])
+                } else {
+                    cmd.to_string()
+                }
+            } else {
+                String::new()
+            }
+        }
+        // Search - show pattern
+        "ripgrep_search" | "grep" | "search" => {
+            if let Some(pattern) = input.get("pattern").and_then(|v| v.as_str()) {
+                format!("/{}/", pattern)
+            } else {
+                String::new()
+            }
+        }
+        // Delegation - show description
+        "delegate" | "task" => {
+            if let Some(desc) = input
+                .get("description")
+                .or_else(|| input.get("prompt"))
+                .and_then(|v| v.as_str())
+            {
+                if desc.len() > 60 {
+                    format!("{}...", &desc[..57])
+                } else {
+                    desc.to_string()
+                }
+            } else {
+                String::new()
+            }
+        }
+        // URL fetch - show URL
+        "url_fetch" | "web_fetch" => {
+            if let Some(url) = input.get("url").and_then(|v| v.as_str()) {
+                url.to_string()
+            } else {
+                String::new()
+            }
+        }
+        // Todo operations have special handling in render
+        "todo_read" | "todo_write" => String::new(),
+        // Default - try common field names
+        _ => {
+            // Try path, command, query, url in order
+            for field in ["path", "command", "query", "url", "pattern", "name"] {
+                if let Some(val) = input.get(field).and_then(|v| v.as_str()) {
+                    if val.len() > 60 {
+                        return format!("{}...", &val[..57]);
+                    } else {
+                        return val.to_string();
+                    }
+                }
+            }
+            String::new()
+        }
+    }
+}
+
 pub fn push_log_line(state: &mut AppState, summary: String) {
     let seq = next_seq(state);
     push_item(
@@ -211,11 +307,8 @@ pub fn upsert_tool_use(
         i.kind == ActivityKind::ToolUse && i.tool_call_id.as_deref() == Some(&tool_call_id)
     });
 
-    let summary = {
-        let status_str = status.clone().unwrap_or_else(|| "?".to_string());
-        let name_str = name.clone().unwrap_or_else(|| "?".to_string());
-        format!("tool_use {status_str} {name_str} ({tool_call_id})")
-    };
+    // Generate useful summary from input based on tool type
+    let summary = extract_tool_summary(name.as_deref(), &input);
 
     let details = Some({
         let mut map: Map<String, Value> = Map::new();
@@ -425,7 +518,9 @@ mod tests {
 
         assert_eq!(state.activity.len(), 1);
         let item = state.activity.front().unwrap();
-        assert!(item.summary.contains("completed"));
+        // Summary now shows the command, not status
+        assert!(item.summary.contains("echo hi"));
+        assert_eq!(item.status.as_deref(), Some("completed"));
         let details = item.details.clone().unwrap();
         assert_eq!(details.get("result"), Some(&json!({"ok":true})));
     }

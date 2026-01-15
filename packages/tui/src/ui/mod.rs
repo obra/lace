@@ -3132,6 +3132,10 @@ fn tool_call_line_count(item: &activity::ActivityItem, selected: bool, expanded:
         .unwrap_or("unknown");
     let is_complete =
         item.status.as_deref() == Some("completed") || item.status.as_deref() == Some("success");
+    let is_failed = matches!(
+        item.status.as_deref(),
+        Some("failed") | Some("error") | Some("aborted") | Some("denied")
+    );
 
     if selected && expanded {
         // When expanded: up to 16 detail lines (15 JSON lines + maybe truncation)
@@ -3144,6 +3148,12 @@ fn tool_call_line_count(item: &activity::ActivityItem, selected: bool, expanded:
             } else {
                 count += line_count;
             }
+        }
+    } else if is_failed {
+        // Error line for failed tools
+        let result = item.details.as_ref().and_then(|d| d.get("result"));
+        if extract_error_message(result).is_some() {
+            count += 1;
         }
     } else if is_complete {
         // Folded result preview for completed tools
@@ -3189,13 +3199,17 @@ fn render_tool_call_line(
     expanded: bool,
 ) -> Vec<Line<'static>> {
     let status_char = match item.status.as_deref() {
-        Some("completed") | Some("success") => '\u{2713}', // checkmark
-        Some("error") => '\u{2717}',                       // X mark
-        _ => '\u{25B6}',                                   // play/running triangle
+        Some("completed") | Some("success") => '\u{2713}', // checkmark ✓
+        Some("error") | Some("failed") | Some("aborted") | Some("denied") | Some("cancelled") => {
+            '\u{2717}' // X mark ✗
+        }
+        _ => '\u{25B6}', // play/running triangle ▶
     };
     let status_color = match item.status.as_deref() {
         Some("completed") | Some("success") => colors.success,
-        Some("error") => colors.error,
+        Some("error") | Some("failed") | Some("aborted") | Some("denied") | Some("cancelled") => {
+            colors.error
+        }
         _ => colors.accent,
     };
 
@@ -3286,10 +3300,30 @@ fn render_tool_call_line(
             }
         }
     } else {
-        // Folded result preview (if completed)
+        // Folded result preview (if completed) or error (if failed)
         let is_complete = item.status.as_deref() == Some("completed")
             || item.status.as_deref() == Some("success");
-        if is_complete {
+        let is_failed = matches!(
+            item.status.as_deref(),
+            Some("failed") | Some("error") | Some("aborted") | Some("denied")
+        );
+
+        if is_failed {
+            // Show error message for failed tools
+            let error_msg = extract_error_message(result);
+            if let Some(err) = error_msg {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        format!("{job_indent}  \u{2514}\u{2500} "),
+                        base_style.fg(colors.error),
+                    ),
+                    Span::styled(
+                        truncate_preview(&err, 70),
+                        base_style.fg(colors.error),
+                    ),
+                ]));
+            }
+        } else if is_complete {
             // Special handling for todo_read: show pretty-printed todo list
             if tool_name == "todo_read" {
                 if let Some(res) = result {
@@ -3322,6 +3356,49 @@ fn truncate_preview(s: &str, max_len: usize) -> String {
     } else {
         first_line.to_string()
     }
+}
+
+/// Extracts error message from a tool result for failed tools.
+fn extract_error_message(result: Option<&serde_json::Value>) -> Option<String> {
+    let res = result?;
+
+    // Try common error field patterns
+    // Pattern 1: { "error": "message" }
+    if let Some(err) = res.get("error").and_then(|v| v.as_str()) {
+        return Some(err.to_string());
+    }
+
+    // Pattern 2: { "error": { "message": "..." } }
+    if let Some(err_obj) = res.get("error") {
+        if let Some(msg) = err_obj.get("message").and_then(|v| v.as_str()) {
+            return Some(msg.to_string());
+        }
+    }
+
+    // Pattern 3: { "message": "..." }
+    if let Some(msg) = res.get("message").and_then(|v| v.as_str()) {
+        return Some(msg.to_string());
+    }
+
+    // Pattern 4: { "content": [{ "type": "error", "message": "..." }] }
+    if let Some(content) = res.get("content").and_then(|v| v.as_array()) {
+        for item in content {
+            if item.get("type").and_then(|v| v.as_str()) == Some("error") {
+                if let Some(msg) = item.get("message").and_then(|v| v.as_str()) {
+                    return Some(msg.to_string());
+                }
+            }
+        }
+    }
+
+    // Pattern 5: Plain string result that looks like an error
+    if let Some(s) = res.as_str() {
+        if s.to_lowercase().contains("error") || s.to_lowercase().contains("failed") {
+            return Some(s.to_string());
+        }
+    }
+
+    None
 }
 
 /// Converts a markdown style hint to a ratatui Style.
