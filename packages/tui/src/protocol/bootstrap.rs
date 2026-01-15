@@ -410,6 +410,32 @@ fn parse_history_events(result: &Option<Value>) -> (Vec<ChatMessage>, Vec<Histor
         }
     }
 
+    // Third pass: create placeholder assistant messages for turns that have tools
+    // but no message event (e.g., tool-only responses or failed turns)
+    let turns_with_messages: std::collections::HashSet<String> = messages
+        .iter()
+        .filter(|m| m.role == Role::Assistant)
+        .filter_map(|m| m.turn_id.clone())
+        .collect();
+
+    for turn_id in &turns_with_tools {
+        if !turns_with_messages.contains(turn_id) {
+            // Find the turn_seq for this turn from the tool history
+            let turn_seq = tool_history
+                .iter()
+                .find(|t| t.turn_id.as_deref() == Some(turn_id))
+                .and_then(|t| t.turn_seq);
+
+            messages.push(ChatMessage {
+                role: Role::Assistant,
+                text: String::new(),
+                streaming: false,
+                turn_id: Some(turn_id.clone()),
+                turn_seq,
+            });
+        }
+    }
+
     (messages, tool_history)
 }
 
@@ -585,5 +611,53 @@ mod tests {
         let (messages, tool_history) = parse_history_events(&None);
         assert!(messages.is_empty());
         assert!(tool_history.is_empty());
+    }
+
+    #[test]
+    fn creates_placeholder_for_tool_only_turn() {
+        // Turn with tool_use but no message event (failed before any text)
+        let result = Some(json!({
+            "events": [
+                {
+                    "eventSeq": 1,
+                    "type": "prompt",
+                    "turnId": "turn_user",
+                    "turnSeq": 0,
+                    "data": { "content": [{ "type": "text", "text": "Read a file" }] }
+                },
+                {
+                    "eventSeq": 2,
+                    "type": "tool_use",
+                    "turnId": "turn_tool_only",
+                    "turnSeq": 1,
+                    "data": {
+                        "toolCallId": "tool_1",
+                        "name": "file_read",
+                        "status": "failed",
+                        "input": { "path": "/nonexistent.txt" },
+                        "result": { "error": "File not found" }
+                    }
+                }
+            ],
+            "hasMore": false
+        }));
+
+        let (messages, tool_history) = parse_history_events(&result);
+
+        // Should have user message + placeholder assistant message for tool turn
+        assert_eq!(messages.len(), 2);
+        assert_eq!(tool_history.len(), 1);
+
+        // User message
+        assert_eq!(messages[0].role, Role::User);
+        assert_eq!(messages[0].turn_id, Some("turn_user".to_string()));
+
+        // Placeholder assistant message for tool-only turn
+        assert_eq!(messages[1].role, Role::Assistant);
+        assert_eq!(messages[1].turn_id, Some("turn_tool_only".to_string()));
+        assert!(messages[1].text.is_empty()); // No text, just placeholder
+
+        // Tool should have matching turn_id
+        assert_eq!(tool_history[0].turn_id, Some("turn_tool_only".to_string()));
     }
 }
