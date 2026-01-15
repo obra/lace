@@ -1,16 +1,49 @@
 // ABOUTME: Unified job management - state, operations, and notifications
 // Consolidates scattered job code into single session-scoped service
 
+import { randomUUID } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { JobState, JobStatus, JobType, PendingJobNotification } from '../server-types';
+import { MAX_CONCURRENT_JOBS } from '../server-types';
 import { toNonEmptyString } from '../rpc/utils';
+import { getJobOutputPath } from './job-file-utils';
 
 export type JobManagerDeps = {
   getActiveSession: () => { sessionId: string; dir: string } | null;
   persistEvent: (event: { type: string; data: Record<string, unknown> }) => Promise<void>;
   emitUpdate: (update: { type: string; [key: string]: unknown }) => Promise<void>;
+  runShellProcess: (job: JobState) => void;
+  runSubagentProcess: (job: JobState) => void;
 };
+
+/**
+ * Options for creating a job via createJob().
+ */
+export type CreateJobOptions = {
+  command?: string; // for shell
+  prompt?: string; // for delegate
+  description?: string;
+  parentJobId?: string;
+  turnContext?: { turnId: string; turnSeq: number };
+  resumeSessionId?: string; // for delegate resume
+  connectionId?: string;
+  modelId?: string;
+};
+
+/**
+ * Error thrown when job creation fails.
+ */
+export class JobCreationError extends Error {
+  constructor(
+    message: string,
+    public code: number,
+    public category: string
+  ) {
+    super(message);
+    this.name = 'JobCreationError';
+  }
+}
 
 /**
  * A job record derived from events.
@@ -203,5 +236,103 @@ export class JobManager {
 
   getRunningJobs(): Map<string, JobState> {
     return this.jobs;
+  }
+
+  /**
+   * Create a new job (shell or delegate) and start it.
+   * Returns the job ID immediately; the job runs asynchronously.
+   */
+  async createJob(
+    type: 'shell' | 'delegate',
+    options: CreateJobOptions
+  ): Promise<{ jobId: string; job: JobState }> {
+    // 1. Check for active session
+    const activeSession = this.deps.getActiveSession();
+    if (!activeSession) {
+      throw new JobCreationError('No active session', -32001, 'session');
+    }
+
+    // 2. Check max concurrent jobs limit
+    const runningJobCount = [...this.jobs.values()].filter((j) => j.status === 'running').length;
+    if (runningJobCount >= MAX_CONCURRENT_JOBS) {
+      throw new JobCreationError(
+        `Maximum concurrent jobs (${MAX_CONCURRENT_JOBS}) exceeded`,
+        -32003,
+        'session'
+      );
+    }
+
+    // 3. Generate jobId and create JobState
+    const jobId = `job_${randomUUID()}`;
+    const startedAt = new Date().toISOString();
+    const outputPath = getJobOutputPath(activeSession.dir, jobId);
+
+    let resolveCompletion!: () => void;
+    const completion = new Promise<void>((resolve) => {
+      resolveCompletion = resolve;
+    });
+
+    const jobType: JobType = type === 'shell' ? 'bash' : 'delegate';
+    const command = type === 'shell' ? options.command : options.prompt;
+    const description = options.description ?? (type === 'delegate' ? 'Subagent' : undefined);
+
+    const job: JobState = {
+      jobId,
+      parentJobId: options.parentJobId,
+      type: jobType,
+      status: 'running',
+      description,
+      command,
+      startedAt,
+      originTurnId: options.turnContext?.turnId,
+      originTurnSeq: options.turnContext?.turnSeq,
+      outputPath,
+      finished: false,
+      completion,
+      resolveCompletion,
+      connectionId: options.connectionId,
+      modelId: options.modelId,
+      ...(type === 'delegate'
+        ? {
+            subagentContent: [{ type: 'text', text: options.prompt }],
+            ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
+          }
+        : {}),
+    };
+
+    // 4. Add to jobs map
+    this.jobs.set(jobId, job);
+
+    // 5. Persist job_started event
+    await this.deps.persistEvent({
+      type: 'job_started',
+      data: {
+        jobId,
+        parentJobId: options.parentJobId,
+        jobType,
+        description,
+        command,
+        turnContext: options.turnContext,
+      },
+    });
+
+    // 6. Emit job_started update
+    await this.deps.emitUpdate({
+      type: 'job_started',
+      jobId,
+      parentJobId: options.parentJobId,
+      jobType,
+      description,
+    });
+
+    // 7. Call runShellProcess or runSubagentProcess
+    if (type === 'shell') {
+      this.deps.runShellProcess(job);
+    } else {
+      this.deps.runSubagentProcess(job);
+    }
+
+    // 8. Return { jobId, job }
+    return { jobId, job };
   }
 }

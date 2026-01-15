@@ -5,8 +5,9 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { JobManager } from '../job-manager';
+import { JobManager, JobCreationError } from '../job-manager';
 import type { JobState } from '../../server-types';
+import type { JobManagerDeps } from '../job-manager';
 
 describe('JobManager', () => {
   describe('construction', () => {
@@ -456,6 +457,242 @@ describe('JobManager', () => {
       // Should still parse the valid job
       expect(jobs).toHaveLength(1);
       expect(jobs[0].jobId).toBe('job_1');
+    });
+  });
+
+  describe('createJob', () => {
+    function createDeps(overrides: Partial<JobManagerDeps> = {}): JobManagerDeps {
+      return {
+        getActiveSession: vi
+          .fn()
+          .mockReturnValue({ sessionId: 'sess_1', dir: '/tmp/test-session' }),
+        persistEvent: vi.fn().mockResolvedValue(undefined),
+        emitUpdate: vi.fn().mockResolvedValue(undefined),
+        runShellProcess: vi.fn(),
+        runSubagentProcess: vi.fn(),
+        ...overrides,
+      };
+    }
+
+    it('throws JobCreationError when no active session', async () => {
+      const deps = createDeps({
+        getActiveSession: vi.fn().mockReturnValue(null),
+      });
+      const manager = new JobManager(deps);
+
+      await expect(manager.createJob('shell', { command: 'echo hello' })).rejects.toThrow(
+        JobCreationError
+      );
+
+      await expect(manager.createJob('shell', { command: 'echo hello' })).rejects.toMatchObject({
+        code: -32001,
+        category: 'session',
+      });
+    });
+
+    it('creates shell job with correct type', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const result = await manager.createJob('shell', {
+        command: 'echo hello',
+        description: 'Test shell job',
+      });
+
+      expect(result.jobId).toMatch(/^job_/);
+      const job = manager.getJob(result.jobId);
+      expect(job).toBeDefined();
+      expect(job!.type).toBe('bash');
+      expect(job!.command).toBe('echo hello');
+      expect(job!.description).toBe('Test shell job');
+      expect(job!.status).toBe('running');
+    });
+
+    it('creates delegate job with correct type', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const result = await manager.createJob('delegate', {
+        prompt: 'Do something helpful',
+        description: 'Test delegate job',
+      });
+
+      expect(result.jobId).toMatch(/^job_/);
+      const job = manager.getJob(result.jobId);
+      expect(job).toBeDefined();
+      expect(job!.type).toBe('delegate');
+      expect(job!.command).toBe('Do something helpful');
+      expect(job!.description).toBe('Test delegate job');
+      expect(job!.status).toBe('running');
+    });
+
+    it('persists job_started event', async () => {
+      const persistEvent = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ persistEvent });
+      const manager = new JobManager(deps);
+
+      await manager.createJob('shell', { command: 'echo hello', description: 'Test' });
+
+      expect(persistEvent).toHaveBeenCalledOnce();
+      const eventArg = persistEvent.mock.calls[0][0] as {
+        type: string;
+        data: Record<string, unknown>;
+      };
+      expect(eventArg.type).toBe('job_started');
+      expect(eventArg.data.jobType).toBe('bash');
+      expect(eventArg.data.command).toBe('echo hello');
+      expect(eventArg.data.description).toBe('Test');
+      expect(eventArg.data.jobId).toMatch(/^job_/);
+    });
+
+    it('emits job_started update', async () => {
+      const emitUpdate = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ emitUpdate });
+      const manager = new JobManager(deps);
+
+      await manager.createJob('shell', { command: 'echo hello' });
+
+      expect(emitUpdate).toHaveBeenCalledOnce();
+      const updateArg = emitUpdate.mock.calls[0][0] as {
+        type: string;
+        jobId: string;
+        jobType: string;
+      };
+      expect(updateArg.type).toBe('job_started');
+      expect(updateArg.jobType).toBe('bash');
+      expect(updateArg.jobId).toMatch(/^job_/);
+    });
+
+    it('calls runShellProcess for shell jobs', async () => {
+      const runShellProcess = vi.fn();
+      const deps = createDeps({ runShellProcess });
+      const manager = new JobManager(deps);
+
+      await manager.createJob('shell', { command: 'echo hello' });
+
+      expect(runShellProcess).toHaveBeenCalledOnce();
+      const jobArg = runShellProcess.mock.calls[0][0] as JobState;
+      expect(jobArg.type).toBe('bash');
+      expect(jobArg.command).toBe('echo hello');
+    });
+
+    it('calls runSubagentProcess for delegate jobs', async () => {
+      const runSubagentProcess = vi.fn();
+      const deps = createDeps({ runSubagentProcess });
+      const manager = new JobManager(deps);
+
+      await manager.createJob('delegate', { prompt: 'Do something' });
+
+      expect(runSubagentProcess).toHaveBeenCalledOnce();
+      const jobArg = runSubagentProcess.mock.calls[0][0] as JobState;
+      expect(jobArg.type).toBe('delegate');
+    });
+
+    it('throws when max concurrent jobs exceeded', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      // Add 10 running jobs (MAX_CONCURRENT_JOBS)
+      for (let i = 0; i < 10; i++) {
+        manager.addJob({
+          jobId: `job_existing_${i}`,
+          type: 'bash',
+          status: 'running',
+          startedAt: new Date().toISOString(),
+          outputPath: '/tmp/job.log',
+          finished: false,
+          completion: Promise.resolve(),
+          resolveCompletion: () => {},
+        });
+      }
+
+      await expect(manager.createJob('shell', { command: 'echo hello' })).rejects.toThrow(
+        JobCreationError
+      );
+
+      await expect(manager.createJob('shell', { command: 'echo hello' })).rejects.toMatchObject({
+        code: -32003,
+        category: 'session',
+      });
+    });
+
+    it('includes parentJobId in job state', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const result = await manager.createJob('shell', {
+        command: 'echo hello',
+        parentJobId: 'job_parent_123',
+      });
+
+      const job = manager.getJob(result.jobId);
+      expect(job!.parentJobId).toBe('job_parent_123');
+    });
+
+    it('includes turnContext in job state', async () => {
+      const persistEvent = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ persistEvent });
+      const manager = new JobManager(deps);
+
+      await manager.createJob('shell', {
+        command: 'echo hello',
+        turnContext: { turnId: 'turn_abc', turnSeq: 5 },
+      });
+
+      const eventArg = persistEvent.mock.calls[0][0] as { data: Record<string, unknown> };
+      expect(eventArg.data.turnContext).toEqual({ turnId: 'turn_abc', turnSeq: 5 });
+    });
+
+    it('includes resumeSessionId for delegate jobs', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const result = await manager.createJob('delegate', {
+        prompt: 'Resume work',
+        resumeSessionId: 'sess_resume_123',
+      });
+
+      const job = manager.getJob(result.jobId);
+      expect(job!.subagentSessionId).toBe('sess_resume_123');
+    });
+
+    it('includes connectionId and modelId for delegate jobs', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const result = await manager.createJob('delegate', {
+        prompt: 'Use specific model',
+        connectionId: 'conn_123',
+        modelId: 'gpt-4',
+      });
+
+      const job = manager.getJob(result.jobId);
+      expect(job!.connectionId).toBe('conn_123');
+      expect(job!.modelId).toBe('gpt-4');
+    });
+
+    it('sets subagentContent for delegate jobs', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const result = await manager.createJob('delegate', {
+        prompt: 'The task prompt',
+      });
+
+      const job = manager.getJob(result.jobId);
+      expect(job!.subagentContent).toEqual([{ type: 'text', text: 'The task prompt' }]);
+    });
+
+    it('defaults description to "Subagent" for delegate jobs without description', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const result = await manager.createJob('delegate', {
+        prompt: 'Some task',
+      });
+
+      const job = manager.getJob(result.jobId);
+      expect(job!.description).toBe('Subagent');
     });
   });
 });
