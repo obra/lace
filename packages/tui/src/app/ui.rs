@@ -159,6 +159,8 @@ pub enum UiAction {
     PermissionGuidanceChar(char),
     PermissionGuidanceBackspace,
     PermissionToggleDetails,
+    PermissionScrollUp,
+    PermissionScrollDown,
 
     ChatToolPrev,
     ChatToolNext,
@@ -800,6 +802,18 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             state.permission_details_expanded = !state.permission_details_expanded;
             Vec::new()
         }
+        UiAction::PermissionScrollUp => {
+            if state.permission_details_expanded {
+                state.permission_details_scroll = state.permission_details_scroll.saturating_sub(1);
+            }
+            Vec::new()
+        }
+        UiAction::PermissionScrollDown => {
+            if state.permission_details_expanded {
+                state.permission_details_scroll = state.permission_details_scroll.saturating_add(1);
+            }
+            Vec::new()
+        }
         UiAction::SlashPickerOpen => {
             let mut out = Vec::new();
             // Prefetch subcommand data when needed (e.g., /model)
@@ -1430,6 +1444,7 @@ fn execute_permission_slash_command(state: &mut AppState, name: &str) -> Vec<Out
 
     let Some(idx) = selected_idx else { return Vec::new() };
     state.active_permission = Some(req);
+    state.permission_details_scroll = 0;
     state.active_permission_selected = idx;
     apply_ui_action(state, UiAction::PermissionSubmit)
 }
@@ -1932,15 +1947,50 @@ mod tests {
     #[test]
     fn permission_toggle_details_toggles_expanded_state() {
         let mut state = AppState::new();
+        state.permission_details_scroll = 3;
         assert!(state.permission_details_expanded);
 
         // Toggle off
         apply_ui_action(&mut state, UiAction::PermissionToggleDetails);
         assert!(!state.permission_details_expanded);
+        assert_eq!(state.permission_details_scroll, 3, "Scroll is preserved");
 
         // Toggle on
         apply_ui_action(&mut state, UiAction::PermissionToggleDetails);
         assert!(state.permission_details_expanded);
+        assert_eq!(state.permission_details_scroll, 3, "Scroll is preserved");
+    }
+
+    #[test]
+    fn permission_scroll_up_down_changes_scroll_when_expanded() {
+        let mut state = AppState::new();
+        state.permission_details_expanded = true;
+        state.permission_details_scroll = 1;
+
+        apply_ui_action(&mut state, UiAction::PermissionScrollDown);
+        assert_eq!(state.permission_details_scroll, 2);
+
+        apply_ui_action(&mut state, UiAction::PermissionScrollUp);
+        assert_eq!(state.permission_details_scroll, 1);
+
+        apply_ui_action(&mut state, UiAction::PermissionScrollUp);
+        assert_eq!(state.permission_details_scroll, 0);
+
+        apply_ui_action(&mut state, UiAction::PermissionScrollUp);
+        assert_eq!(state.permission_details_scroll, 0);
+    }
+
+    #[test]
+    fn permission_scroll_up_down_noop_when_collapsed() {
+        let mut state = AppState::new();
+        state.permission_details_expanded = false;
+        state.permission_details_scroll = 5;
+
+        apply_ui_action(&mut state, UiAction::PermissionScrollDown);
+        assert_eq!(state.permission_details_scroll, 5);
+
+        apply_ui_action(&mut state, UiAction::PermissionScrollUp);
+        assert_eq!(state.permission_details_scroll, 5);
     }
 
     #[test]

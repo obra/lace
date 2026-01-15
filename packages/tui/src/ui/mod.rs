@@ -506,6 +506,7 @@ fn run_loop(
 
                     if state.active_permission.is_some() {
                         // Single-key shortcuts: Y/S/N/D for quick permission responses
+                        // When details are expanded, Up/Down (or k/j) scroll the details.
                         // These only activate when the guidance input is empty
                         let action = if state.permission_guidance_input.is_empty()
                             && !key.modifiers.contains(KeyModifiers::CONTROL)
@@ -529,6 +530,16 @@ fn run_loop(
                                 }
                                 KeyCode::Esc => Some(UiAction::PermissionCancel),
                                 KeyCode::Enter => Some(UiAction::PermissionSubmit),
+                                KeyCode::Up | KeyCode::Char('k')
+                                    if state.permission_details_expanded =>
+                                {
+                                    Some(UiAction::PermissionScrollUp)
+                                }
+                                KeyCode::Down | KeyCode::Char('j')
+                                    if state.permission_details_expanded =>
+                                {
+                                    Some(UiAction::PermissionScrollDown)
+                                }
                                 KeyCode::Up => Some(UiAction::PermissionPrev),
                                 KeyCode::Down => Some(UiAction::PermissionNext),
                                 KeyCode::Backspace => Some(UiAction::PermissionGuidanceBackspace),
@@ -540,6 +551,16 @@ fn run_loop(
                             match key.code {
                                 KeyCode::Esc => Some(UiAction::PermissionCancel),
                                 KeyCode::Enter => Some(UiAction::PermissionSubmit),
+                                KeyCode::Up | KeyCode::Char('k')
+                                    if state.permission_details_expanded =>
+                                {
+                                    Some(UiAction::PermissionScrollUp)
+                                }
+                                KeyCode::Down | KeyCode::Char('j')
+                                    if state.permission_details_expanded =>
+                                {
+                                    Some(UiAction::PermissionScrollDown)
+                                }
                                 KeyCode::Up => Some(UiAction::PermissionPrev),
                                 KeyCode::Down => Some(UiAction::PermissionNext),
                                 KeyCode::Backspace => Some(UiAction::PermissionGuidanceBackspace),
@@ -2748,7 +2769,8 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
                 if tool == "file_edit" {
                     if let Some(diff_lines) = crate::ui::diff::render_file_edit_diff(input, colors) {
                         lines.push(Line::from(""));
-                        lines.extend(diff_lines);
+                        let scroll = state.permission_details_scroll as usize;
+                        lines.extend(diff_lines.into_iter().skip(scroll));
                     } else {
                         render_json_input(&mut lines, input, colors);
                     }

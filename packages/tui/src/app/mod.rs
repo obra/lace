@@ -340,6 +340,7 @@ impl AppState {
             self.active_permission = Some(next);
             self.active_permission_selected = 0;
             self.permission_guidance_input.clear();
+            self.permission_details_scroll = 0;
         }
     }
 
