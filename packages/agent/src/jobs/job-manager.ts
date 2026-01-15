@@ -1,29 +1,34 @@
-// ABOUTME: Job directory and output file management utilities
-// This module provides functions to manage job log directories and output files.
+// ABOUTME: Unified job management - state, operations, and notifications
+// Consolidates scattered job code into single session-scoped service
 
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { JOB_LOG_DIR } from '../server-types';
+import type { JobState, JobStatus, JobType, PendingJobNotification } from '../server-types';
 
-export function ensureJobLogDir(sessionDir: string): string {
-  const dir = join(sessionDir, JOB_LOG_DIR);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
-  return dir;
-}
+export type JobManagerDeps = {
+  getActiveSession: () => { sessionId: string; dir: string } | null;
+  persistEvent: (event: { type: string; data: Record<string, unknown> }) => Promise<void>;
+  emitUpdate: (update: { type: string; [key: string]: unknown }) => Promise<void>;
+};
 
-export function getJobOutputPath(sessionDir: string, jobId: string): string {
-  return join(ensureJobLogDir(sessionDir), `${jobId}.log`);
-}
+export class JobManager {
+  private jobs = new Map<string, JobState>();
+  private streamingMode: 'full' | 'coalesced' | 'none' = 'full';
+  private notificationQueue: PendingJobNotification[] = [];
+  private deps: JobManagerDeps;
 
-/**
- * Get the last N lines from a job output file.
- */
-export function getLastLines(outputPath: string, n: number): string[] {
-  try {
-    const content = readFileSync(outputPath, 'utf8');
-    const lines = content.split('\n').filter((line) => line.length > 0);
-    return lines.slice(-n);
-  } catch {
+  constructor(deps: JobManagerDeps) {
+    this.deps = deps;
+  }
+
+  listJobs(): Array<{
+    jobId: string;
+    type: JobType;
+    status: JobStatus;
+    description?: string;
+  }> {
     return [];
+  }
+
+  getStreamingMode(): 'full' | 'coalesced' | 'none' {
+    return this.streamingMode;
   }
 }

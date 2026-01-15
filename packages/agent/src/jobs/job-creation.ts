@@ -5,7 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import type { JobState, JobType, SessionUpdate } from '../server-types';
 import { MAX_CONCURRENT_JOBS } from '../server-types';
-import { getJobOutputPath } from './job-manager';
+import { getJobOutputPath } from './job-file-utils';
 import type { LoadedSession } from '../storage/session-store';
 
 /**

@@ -12,7 +12,7 @@ import {
 } from '@lace/agent/storage/session-store';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
-import { getJobOutputPath } from './job-manager';
+import { getJobOutputPath } from './job-file-utils';
 import { logger } from '@lace/agent/utils/logger';
 import {
   MAX_JOB_OUTPUT_BYTES,

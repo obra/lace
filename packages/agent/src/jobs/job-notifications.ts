@@ -4,7 +4,7 @@
 
 import { existsSync, statSync } from 'node:fs';
 import { formatJobNotification } from './format-notification';
-import { getLastLines } from './job-manager';
+import { getLastLines } from './job-file-utils';
 import { DEFAULT_PROGRESS_INTERVAL_MS } from '../server-types';
 import { appendDurableEvent } from '../storage/event-log';
 import { readSessionState, writeSessionState, loadSession } from '../storage/session-store';

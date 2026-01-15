@@ -19,7 +19,7 @@ export { createRunShellJobProcess, type ShellJobContext } from './shell-job';
 export { runSubagentJobProcess } from './subagent-job';
 
 // Job utilities
-export { getJobOutputPath, ensureJobLogDir, getLastLines } from './job-manager';
+export { getJobOutputPath, ensureJobLogDir, getLastLines } from './job-file-utils';
 
 // Job output reading
 export {
