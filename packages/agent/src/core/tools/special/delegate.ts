@@ -38,10 +38,11 @@ export async function executeDelegate(
   }
 
   // If resuming, look up the previous job's subagentSessionId
+  // Use deriveJobs() which recovers sessionId from events (getJobs() clears it on finalization)
   let resumeSessionId: string | undefined;
   if (resumeJobId) {
-    const jobs = context.getJobs();
-    const previousJob = jobs.get(resumeJobId);
+    const derivedJobs = context.deriveJobs();
+    const previousJob = derivedJobs.find((j) => j.jobId === resumeJobId);
     if (!previousJob?.subagentSessionId) {
       return {
         status: 'failed',
