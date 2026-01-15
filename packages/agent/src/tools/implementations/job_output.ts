@@ -1,5 +1,5 @@
-// ABOUTME: Job output retrieval tool schema stub
-// ABOUTME: Executed by lace-agent runtime (not via ToolExecutor)
+// ABOUTME: Job output retrieval tool using JobManager
+// Uses JobManager from ToolContext for all job operations
 
 import { z } from 'zod';
 import { Tool } from '../tool';
@@ -30,18 +30,52 @@ Returns: { status: "running"|"completed"|"failed"|"cancelled", output: string, e
     readOnlySafe: true,
   };
 
-  protected executeValidated(
-    _args: z.infer<typeof jobOutputSchema>,
-    _context: ToolContext
+  protected async executeValidated(
+    args: z.infer<typeof jobOutputSchema>,
+    context: ToolContext
   ): Promise<ToolResult> {
-    return Promise.resolve({
-      status: 'failed',
-      content: [
-        {
-          type: 'text',
-          text: 'job_output is executed by the lace-agent runtime (should not be executed via ToolExecutor).',
-        },
-      ],
-    });
+    const { jobManager } = context;
+
+    if (!jobManager) {
+      return {
+        status: 'failed',
+        content: [{ type: 'text', text: 'job_output requires jobManager in context' }],
+      };
+    }
+
+    const { jobId, block, timeoutMs } = args;
+
+    const job = jobManager.getJob(jobId);
+    if (!job) {
+      return {
+        status: 'failed',
+        content: [{ type: 'text', text: `Job ${jobId} not found` }],
+      };
+    }
+
+    // If blocking mode and job is still running, wait for completion
+    if (block && job.status === 'running') {
+      const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, timeoutMs));
+      await Promise.race([job.completion, timeoutPromise]);
+    }
+
+    // Re-fetch job state after potential wait
+    const currentJob = jobManager.getJob(jobId);
+    const output = jobManager.getJobOutput(jobId);
+
+    const status = currentJob?.status ?? job.status;
+    const exitCode = currentJob?.exitCode ?? job.exitCode;
+
+    const result = {
+      jobId,
+      status,
+      output: output.trim() || '(no output)',
+      ...(typeof exitCode === 'number' ? { exitCode } : {}),
+    };
+
+    return {
+      status: 'completed',
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    };
   }
 }

@@ -1,5 +1,5 @@
-// ABOUTME: Job cancellation tool schema stub
-// ABOUTME: Executed by lace-agent runtime (not via ToolExecutor)
+// ABOUTME: Job cancellation tool using JobManager
+// Uses JobManager from ToolContext for all job operations
 
 import { z } from 'zod';
 import { Tool } from '../tool';
@@ -24,18 +24,41 @@ After killing, status becomes "cancelled". For subagent jobs, the session is pre
     safeInternal: true,
   };
 
-  protected executeValidated(
-    _args: z.infer<typeof jobKillSchema>,
-    _context: ToolContext
+  protected async executeValidated(
+    args: z.infer<typeof jobKillSchema>,
+    context: ToolContext
   ): Promise<ToolResult> {
-    return Promise.resolve({
-      status: 'failed',
-      content: [
-        {
-          type: 'text',
-          text: 'job_kill is executed by the lace-agent runtime (should not be executed via ToolExecutor).',
-        },
-      ],
-    });
+    const { jobManager } = context;
+
+    if (!jobManager) {
+      return {
+        status: 'failed',
+        content: [{ type: 'text', text: 'job_kill requires jobManager in context' }],
+      };
+    }
+
+    const { jobId } = args;
+
+    const job = jobManager.getJob(jobId);
+    if (!job) {
+      return {
+        status: 'failed',
+        content: [{ type: 'text', text: `Job ${jobId} not found` }],
+      };
+    }
+
+    if (job.status !== 'running') {
+      return {
+        status: 'failed',
+        content: [{ type: 'text', text: `Job ${jobId} is not running (status: ${job.status})` }],
+      };
+    }
+
+    await jobManager.cancelJob(jobId);
+
+    return {
+      status: 'completed',
+      content: [{ type: 'text', text: `Job ${jobId} cancelled` }],
+    };
   }
 }

@@ -1,5 +1,5 @@
-// ABOUTME: Job listing tool schema stub
-// ABOUTME: Executed by lace-agent runtime (not via ToolExecutor)
+// ABOUTME: Job listing tool using JobManager
+// Uses JobManager from ToolContext for all job operations
 
 import { z } from 'zod';
 import { Tool } from '../tool';
@@ -28,17 +28,47 @@ Returns: [{ jobId, type, status, description, startTime }]`;
   };
 
   protected executeValidated(
-    _args: z.infer<typeof jobsListSchema>,
-    _context: ToolContext
+    args: z.infer<typeof jobsListSchema>,
+    context: ToolContext
   ): Promise<ToolResult> {
+    const { jobManager } = context;
+
+    if (!jobManager) {
+      return Promise.resolve({
+        status: 'failed',
+        content: [{ type: 'text', text: 'jobs_list requires jobManager in context' }],
+      });
+    }
+
+    const { status: statusFilter, type: typeFilter, limit } = args;
+
+    let jobs = jobManager.listJobs();
+
+    // Apply status filter
+    if (statusFilter && statusFilter.length > 0) {
+      jobs = jobs.filter((j) => statusFilter.includes(j.status));
+    }
+
+    // Apply type filter
+    if (typeFilter && typeFilter.length > 0) {
+      jobs = jobs.filter((j) => typeFilter.includes(j.type));
+    }
+
+    // Apply limit
+    jobs = jobs.slice(0, limit);
+
+    // Format output
+    const formatted = jobs.map((j) => ({
+      jobId: j.jobId,
+      type: j.type,
+      status: j.status,
+      description: j.description,
+      startTime: j.startTime,
+    }));
+
     return Promise.resolve({
-      status: 'failed',
-      content: [
-        {
-          type: 'text',
-          text: 'jobs_list is executed by the lace-agent runtime (should not be executed via ToolExecutor).',
-        },
-      ],
+      status: 'completed',
+      content: [{ type: 'text', text: JSON.stringify(formatted, null, 2) }],
     });
   }
 }
