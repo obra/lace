@@ -3,7 +3,44 @@
 
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
+use serde_json::Value;
 use similar::TextDiff;
+
+/// Parsed file_edit tool input
+#[derive(Debug, Clone)]
+pub struct FileEditInput {
+    pub path: String,
+    pub edits: Vec<EditOperation>,
+}
+
+#[derive(Debug, Clone)]
+pub struct EditOperation {
+    pub old_text: String,
+    pub new_text: String,
+}
+
+/// Parse file_edit tool input JSON into structured form.
+/// Returns None if the input doesn't match expected format.
+pub fn parse_file_edit_input(input: &Value) -> Option<FileEditInput> {
+    let path = input.get("path")?.as_str()?.to_string();
+    let edits_array = input.get("edits")?.as_array()?;
+
+    let edits: Vec<EditOperation> = edits_array
+        .iter()
+        .filter_map(|edit| {
+            Some(EditOperation {
+                old_text: edit.get("old_text")?.as_str()?.to_string(),
+                new_text: edit.get("new_text")?.as_str()?.to_string(),
+            })
+        })
+        .collect();
+
+    if edits.is_empty() {
+        return None;
+    }
+
+    Some(FileEditInput { path, edits })
+}
 
 /// Generates styled unified diff lines from old and new text.
 ///
@@ -70,6 +107,36 @@ pub fn generate_diff_lines(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn parses_file_edit_input() {
+        let input = json!({
+            "path": "src/main.rs",
+            "edits": [
+                {"old_text": "foo", "new_text": "bar"},
+                {"old_text": "baz", "new_text": "qux"}
+            ]
+        });
+
+        let parsed = parse_file_edit_input(&input).unwrap();
+        assert_eq!(parsed.path, "src/main.rs");
+        assert_eq!(parsed.edits.len(), 2);
+        assert_eq!(parsed.edits[0].old_text, "foo");
+        assert_eq!(parsed.edits[0].new_text, "bar");
+    }
+
+    #[test]
+    fn returns_none_for_invalid_input() {
+        let input = json!({"command": "echo hi"});
+        assert!(parse_file_edit_input(&input).is_none());
+
+        let input = json!({"path": "foo.txt"}); // missing edits
+        assert!(parse_file_edit_input(&input).is_none());
+
+        let input = json!({"path": "foo.txt", "edits": []}); // empty edits
+        assert!(parse_file_edit_input(&input).is_none());
+    }
 
     #[test]
     fn generates_diff_for_simple_change() {
