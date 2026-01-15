@@ -61,9 +61,9 @@ export function registerSessionHandlers(
       };
 
     // Kill all running jobs before switching sessions
-    await killAllRunningJobs(state.jobs);
+    await killAllRunningJobs(state.jobManager.getRunningJobs());
     state.pendingPermissionRequests.clear();
-    state.jobs.clear();
+    state.jobManager.clearJobs();
 
     const parsed = params as { workDir: string; persona?: string; systemPrompt?: unknown };
     if (!parsed?.workDir) throwInvalidParams('workDir is required');
@@ -176,9 +176,9 @@ export function registerSessionHandlers(
       state.activeSession && state.activeSession.meta.sessionId !== parsed.sessionId;
     if (switchingSessions) {
       // Kill all running jobs before switching sessions
-      await killAllRunningJobs(state.jobs);
+      await killAllRunningJobs(state.jobManager.getRunningJobs());
       state.pendingPermissionRequests.clear();
-      state.jobs.clear();
+      state.jobManager.clearJobs();
     }
 
     let loaded;

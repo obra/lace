@@ -79,7 +79,7 @@ export function registerInitializeHandler(
 
     const jobStreaming = capabilities['ent/jobStreaming'];
     if (jobStreaming === 'full' || jobStreaming === 'coalesced' || jobStreaming === 'none') {
-      state.jobStreaming = jobStreaming;
+      state.jobManager.setStreamingMode(jobStreaming);
     }
 
     const { toolsForProvider } = createToolExecutorForMode('execute', state.mcpServerManager);

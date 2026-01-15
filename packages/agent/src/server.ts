@@ -23,6 +23,7 @@ import {
   type CreateSubagentJobOptions,
 } from './jobs/job-creation';
 import { createJobDerivation } from './jobs/job-derivation';
+import { JobManager } from './jobs/job-manager';
 import { type SessionUpdate, type JobState, type AgentServerState } from './server-types';
 import { toolKindFromName } from './rpc/utils';
 import { requestPermissionFromClient, reissuePendingPermissionRequests } from './rpc/permissions';
@@ -64,6 +65,8 @@ export function createToolExecutorForMode(
 }
 
 export function createAgentServerState(): AgentServerState {
+  // JobManager is created as a placeholder here and properly initialized
+  // in registerAgentRpcMethods once we have the peer and other dependencies
   return {
     initialized: false,
     activeSession: null,
@@ -73,11 +76,9 @@ export function createAgentServerState(): AgentServerState {
     providerCatalogLoaded: false,
     providerInstances: new ProviderInstanceManager(),
     mcpServerManager: new MCPServerManager(),
-    jobs: new Map(),
+    jobManager: null as unknown as JobManager, // Initialized in registerAgentRpcMethods
     pendingPermissionRequests: new Map(),
     sessionMutex: Promise.resolve(),
-    jobStreaming: 'full',
-    jobNotificationQueue: [],
   };
 }
 
@@ -130,6 +131,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   };
 
   // Create job notification functions using factories
+  // These still use state.jobManager internally
   const queueJobNotification = createQueueJobNotification(state, runPromptInternalRef);
   const setupProgressTimer = createSetupProgressTimer(
     state,
@@ -166,7 +168,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     getState: () => ({
       activeSession: state.activeSession,
       config: state.config,
-      jobStreaming: state.jobStreaming,
+      jobStreaming: state.jobManager.getStreamingMode(),
     }),
     runExclusive,
     emitSessionUpdate,
@@ -183,6 +185,30 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       finalizeJob,
     });
   };
+
+  // Create JobManager with all dependencies now available
+  state.jobManager = new JobManager({
+    getActiveSession: () =>
+      state.activeSession
+        ? { sessionId: state.activeSession.meta.sessionId, dir: state.activeSession.dir }
+        : null,
+    persistEvent: async (event) => {
+      if (!state.activeSession) return;
+      await runExclusive(() => {
+        let sessionState = readSessionState(state.activeSession!.dir);
+        const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, event);
+        sessionState = nextState;
+        writeSessionState(state.activeSession!.dir, sessionState);
+        state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+      });
+    },
+    emitUpdate: async (update) => {
+      await emitSessionUpdate(update as SessionUpdate);
+    },
+    runShellProcess: (job) => void runShellJobProcess(job),
+    runSubagentProcess: (job) => void runSubagentJobProcess(job),
+    setupProgressTimer: (job) => setupProgressTimer(job),
+  });
 
   // Persist job_started event to session storage
   const persistJobStartedEvent = async (event: {
@@ -216,7 +242,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   // Shared job creation dependencies
   const jobCreationDeps = {
     getActiveSession: () => state.activeSession,
-    getJobs: () => state.jobs,
+    getJobs: () => state.jobManager.getRunningJobs(),
     persistJobStartedEvent,
     emitSessionUpdate,
     setupProgressTimer,
@@ -249,7 +275,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       state.activeSession
         ? { sessionId: state.activeSession.meta.sessionId, dir: state.activeSession.dir }
         : null,
-    getRunningJobs: () => state.jobs,
+    getRunningJobs: () => state.jobManager.getRunningJobs(),
   });
 
   // Register all RPC handlers with dependencies

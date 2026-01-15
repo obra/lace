@@ -241,6 +241,14 @@ export class JobManager {
   }
 
   /**
+   * Clear all running jobs from the in-memory map.
+   * Used when closing a session.
+   */
+  clearJobs(): void {
+    this.jobs.clear();
+  }
+
+  /**
    * Finalize a job - mark as finished, persist event, emit update, and remove from running jobs.
    * This is called when a job completes, fails, or is cancelled.
    */

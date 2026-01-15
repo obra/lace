@@ -196,7 +196,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       description?: string;
     }): JobState => {
       const currentState = getState();
-      const existing = currentState.jobs.get(options.jobId);
+      const existing = currentState.jobManager.getJob(options.jobId);
       if (existing) return existing;
 
       let resolveCompletion!: () => void;
@@ -217,7 +217,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         resolveCompletion,
       };
 
-      currentState.jobs.set(options.jobId, record);
+      currentState.jobManager.addJob(record);
       return record;
     };
 
@@ -487,7 +487,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         capabilities: {
           streaming: true,
           permissions: true,
-          'ent/jobStreaming': currentState.jobStreaming,
+          'ent/jobStreaming': currentState.jobManager.getStreamingMode(),
         },
         config: { approvalMode: 'ask' },
       });

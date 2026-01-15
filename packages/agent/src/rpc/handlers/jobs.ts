@@ -74,7 +74,7 @@ export function registerJobHandlers(
     const block = !!parsed.block;
     const timeout = typeof parsed.timeout === 'number' && parsed.timeout > 0 ? parsed.timeout : 0;
 
-    const runningJob = state.jobs.get(jobId);
+    const runningJob = state.jobManager.getJob(jobId);
     if (block && runningJob?.status === 'running') {
       await Promise.race([
         runningJob.completion,
@@ -144,7 +144,7 @@ export function registerJobHandlers(
     const jobId = toNonEmptyString(parsed?.jobId);
     if (!jobId) throwInvalidParams('jobId is required');
 
-    const job = state.jobs.get(jobId);
+    const job = state.jobManager.getJob(jobId);
     if (!job || job.status !== 'running') return { success: false };
 
     if (job.proc) {
@@ -174,7 +174,7 @@ export function registerJobHandlers(
     const jobId = toNonEmptyString(parsed?.jobId);
     if (!jobId) return undefined;
 
-    const job = state.jobs.get(jobId);
+    const job = state.jobManager.getJob(jobId);
     if (!job || job.type !== 'delegate' || job.finished) return undefined;
     if (!job.childPeer) return undefined;
 

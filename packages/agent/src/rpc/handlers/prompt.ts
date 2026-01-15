@@ -127,8 +127,8 @@ export function registerPromptHandler(
 
       // Inject any pending job notifications before the user's prompt
       let promptContent = parsed.content as unknown[];
-      if (state.jobNotificationQueue.length > 0) {
-        const notifications = state.jobNotificationQueue.splice(0);
+      if (state.jobManager.getNotificationQueue().length > 0) {
+        const notifications = state.jobManager.flushNotifications();
         const notificationBlocks = notifications.map((n) => ({
           type: 'text' as const,
           text: n.content,
@@ -262,7 +262,7 @@ export function registerPromptHandler(
         startSubagentJob,
         deriveJobs: deriveJobsForActiveSession,
         finalizeJob,
-        getJob: (jobId: string) => state.jobs.get(jobId),
+        getJob: (jobId: string) => state.jobManager.getJob(jobId),
         mcpServerManager: state.mcpServerManager,
         setActiveTurnStatus: (status, ac) => {
           if (status === null) {

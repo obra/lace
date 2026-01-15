@@ -11,6 +11,7 @@ import type { PendingPermissionRecord } from './storage/permissions-from-events'
 import { ProviderCatalogManager } from './providers/catalog/manager';
 import { ProviderInstanceManager } from './providers/instance/manager';
 import { MCPServerManager } from './mcp/server-manager';
+import type { JobManager } from './jobs/job-manager';
 
 // Configuration Constants
 export const SUPPORTED_PROVIDER_TYPES = new Set([
@@ -105,7 +106,7 @@ export type AgentServerState = {
   providerCatalogLoaded: boolean;
   providerInstances: ProviderInstanceManager;
   mcpServerManager: MCPServerManager;
-  jobs: Map<string, JobState>;
+  jobManager: JobManager; // Replaces: jobs, jobStreaming, jobNotificationQueue
   pendingPermissionRequests: Map<
     string,
     {
@@ -116,6 +117,4 @@ export type AgentServerState = {
     }
   >;
   sessionMutex: Promise<void>;
-  jobStreaming: 'full' | 'coalesced' | 'none';
-  jobNotificationQueue: PendingJobNotification[];
 };

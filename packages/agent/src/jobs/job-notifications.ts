@@ -52,7 +52,7 @@ export function createQueueJobNotification(
       reason: options?.reason,
     });
 
-    state.jobNotificationQueue.push({
+    state.jobManager.queueNotification({
       jobId: job.jobId,
       type,
       content,
@@ -68,7 +68,7 @@ export function createQueueJobNotification(
         if (
           !state.activeTurn &&
           state.activeSession &&
-          state.jobNotificationQueue.length > 0 &&
+          state.jobManager.getNotificationQueue().length > 0 &&
           runPromptInternalRef.current
         ) {
           void runPromptInternalRef.current([]);

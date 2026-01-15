@@ -21,7 +21,7 @@ export type ShellJobContext = {
         | 'deny'
         | 'dangerouslySkipPermissions';
     };
-    jobStreaming: 'none' | 'all' | string;
+    jobStreaming: 'full' | 'coalesced' | 'none';
   };
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>;
   emitSessionUpdate: (
