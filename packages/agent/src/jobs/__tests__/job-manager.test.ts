@@ -926,4 +926,58 @@ describe('JobManager', () => {
       expect(result.jobId).toMatch(/^job_/);
     });
   });
+
+  describe('getJobOutput', () => {
+    let testDir: string | null = null;
+
+    afterEach(() => {
+      if (testDir) {
+        rmSync(testDir, { recursive: true });
+        testDir = null;
+      }
+    });
+
+    it('reads output from job file', () => {
+      testDir = join(tmpdir(), `job-manager-test-${Date.now()}`);
+      mkdirSync(testDir, { recursive: true });
+      const jobsDir = join(testDir, 'jobs');
+      mkdirSync(jobsDir, { recursive: true });
+      writeFileSync(join(jobsDir, 'job_123.log'), 'hello world\nline 2');
+
+      const deps = createDeps({
+        getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: testDir }),
+      });
+      const manager = new JobManager(deps);
+
+      const output = manager.getJobOutput('job_123');
+
+      expect(output).toBe('hello world\nline 2');
+    });
+
+    it('returns empty string when no session', () => {
+      const deps = createDeps({
+        getActiveSession: vi.fn().mockReturnValue(null),
+      });
+      const manager = new JobManager(deps);
+
+      const output = manager.getJobOutput('job_123');
+
+      expect(output).toBe('');
+    });
+
+    it('returns empty string when file does not exist', () => {
+      testDir = join(tmpdir(), `job-manager-test-${Date.now()}`);
+      mkdirSync(testDir, { recursive: true });
+      // No jobs directory or log file
+
+      const deps = createDeps({
+        getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: testDir }),
+      });
+      const manager = new JobManager(deps);
+
+      const output = manager.getJobOutput('job_nonexistent');
+
+      expect(output).toBe('');
+    });
+  });
 });

@@ -282,6 +282,22 @@ export class JobManager {
   }
 
   /**
+   * Read the output from a job's log file.
+   * Returns empty string if no active session or file doesn't exist.
+   */
+  getJobOutput(jobId: string): string {
+    const activeSession = this.deps.getActiveSession();
+    if (!activeSession) return '';
+
+    const outputPath = getJobOutputPath(activeSession.dir, jobId);
+    try {
+      return readFileSync(outputPath, 'utf8');
+    } catch {
+      return '';
+    }
+  }
+
+  /**
    * Create a new job (shell or delegate) and start it.
    * Returns the job ID immediately; the job runs asynchronously.
    */
