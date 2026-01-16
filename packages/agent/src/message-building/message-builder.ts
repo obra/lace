@@ -214,10 +214,12 @@ export function estimateProviderTokens(messages: ProviderMessage[]): number {
         .join('\n');
       total += estimateTokens(textContent);
     }
-    if ((message as any).toolCalls)
-      total += estimateTokens(JSON.stringify((message as any).toolCalls));
-    if ((message as any).toolResults)
-      total += estimateTokens(JSON.stringify((message as any).toolResults));
+    if (message.toolCalls) {
+      total += estimateTokens(JSON.stringify(message.toolCalls));
+    }
+    if (message.toolResults) {
+      total += estimateTokens(JSON.stringify(message.toolResults));
+    }
   }
   return total;
 }
