@@ -5,6 +5,7 @@ import type { AgentServerState, CreateToolExecutorFn } from '../../server-types'
 import { protocolToolInfoForCoreTool } from '../utils';
 import { assertInitialized } from '../utils';
 import { personaRegistry } from '../../config/persona-registry';
+import { SkillRegistry, getSkillDirectories } from '../../skills';
 
 /**
  * Register tool management handlers with the peer.
@@ -18,9 +19,18 @@ export function registerToolHandlers(
   peer.onRequest('ent/tools/list', async (_params: unknown) => {
     assertInitialized(state);
 
+    // Create skill registry if there's an active session
+    let skillRegistry: SkillRegistry | undefined;
+    if (state.activeSession) {
+      const skillDirs = getSkillDirectories(state.activeSession.meta.workDir);
+      skillRegistry = new SkillRegistry({ skillDirs });
+    }
+
     const { toolsForProvider } = createToolExecutorForMode(
       state.config.executionMode,
-      state.mcpServerManager
+      state.mcpServerManager,
+      undefined, // jobManager
+      skillRegistry
     );
 
     const seenToolNames = new Set<string>();
