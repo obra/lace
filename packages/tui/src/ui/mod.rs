@@ -1,6 +1,7 @@
 mod markdown;
 pub mod diff;
 pub mod theme;
+pub mod tool_renderers;
 
 use crate::app::activity;
 use crate::app::config_wizard;
@@ -2638,7 +2639,13 @@ fn permission_bar_height(state: &AppState) -> u16 {
                     let colors = &theme_styles(state.prefs.theme).colors;
                     crate::ui::diff::render_file_edit_diff(input, colors)
                         .map(|lines| lines.len() + 2) // +2 for resource line and spacing
+                } else if let Some(height) =
+                    crate::ui::tool_renderers::tool_input_height(tool, input)
+                {
+                    // Use tool-specific renderer height
+                    Some(height + 1) // +1 for resource line
                 } else {
+                    // Fall back to JSON height calculation
                     let pretty = serde_json::to_string_pretty(input).unwrap_or_default();
                     Some(pretty.lines().count().min(9) + 2) // +2 for resource and ... line
                 }
@@ -2774,7 +2781,13 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
                     } else {
                         render_json_input(&mut lines, input, colors);
                     }
+                } else if let Some(tool_lines) =
+                    crate::ui::tool_renderers::render_tool_input(&tool, input, colors)
+                {
+                    // Use tool-specific renderer if available
+                    lines.extend(tool_lines);
                 } else {
+                    // Fall back to JSON for unknown tools
                     render_json_input(&mut lines, input, colors);
                 }
             }
