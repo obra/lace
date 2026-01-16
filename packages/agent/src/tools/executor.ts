@@ -19,7 +19,9 @@ import { JobsListTool } from './implementations/jobs_list';
 import { JobKillTool } from './implementations/job_kill';
 import { TodoReadTool } from './implementations/todo_read';
 import { TodoWriteTool } from './implementations/todo_write';
+import { UseSkillTool } from './implementations/use-skill-tool';
 import { MCPServerManager } from '../mcp/server-manager';
+import type { SkillRegistry } from '@lace/agent/skills';
 import type { MCPServerConnection } from '@lace/agent/config/mcp-types';
 import { MCPToolAdapter } from '../mcp/tool-adapter';
 import { logger } from '@lace/agent/utils/logger';
@@ -235,8 +237,8 @@ export class ToolExecutor {
     return this.envManager;
   }
 
-  registerAllAvailableTools(): void {
-    const tools = [
+  registerAllAvailableTools(skillRegistry?: SkillRegistry): void {
+    const tools: Tool[] = [
       new BashTool(),
       new FileReadTool(), // Schema-based file read tool
       new FileWriteTool(),
@@ -251,6 +253,11 @@ export class ToolExecutor {
       new TodoReadTool(),
       new TodoWriteTool(),
     ];
+
+    // Add skill tool if registry is provided
+    if (skillRegistry) {
+      tools.push(new UseSkillTool(skillRegistry));
+    }
 
     this.registerTools(tools);
   }
