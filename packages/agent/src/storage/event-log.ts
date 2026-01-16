@@ -165,3 +165,6 @@ export function readDurableEvents(
 
   return { events, hasMore };
 }
+
+// Export typed versions for callers that want type safety
+export type { TypedDurableEvent, DurableEventData } from './event-types';
