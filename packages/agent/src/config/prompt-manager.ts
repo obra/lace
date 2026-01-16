@@ -16,12 +16,15 @@ import {
 import { getLaceDir } from './lace-dir';
 import { personaRegistry } from './persona-registry';
 import { logger } from '@lace/agent/utils/logger';
+import type { SkillRegistry } from '@lace/agent/skills';
+import { SkillVariableProvider } from '@lace/agent/skills';
 
 interface PromptManagerOptions {
   tools?: Array<{ name: string; description: string }>;
   templateDirs?: string[];
   session?: { getWorkingDirectory(): string };
   project?: { getWorkingDirectory(): string };
+  skillRegistry?: SkillRegistry;
 }
 
 export class PromptManager {
@@ -45,6 +48,11 @@ export class PromptManager {
     // Add tool provider if tools are provided
     if (options.tools && options.tools.length > 0) {
       this.variableManager.addProvider(new ToolVariableProvider(options.tools));
+    }
+
+    // Add skill provider if skill registry is provided
+    if (options.skillRegistry) {
+      this.variableManager.addProvider(new SkillVariableProvider(options.skillRegistry));
     }
 
     logger.debug('PromptManager initialized with template directories', {
