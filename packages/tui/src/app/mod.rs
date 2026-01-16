@@ -208,7 +208,7 @@ impl AppState {
             session_id: None,
             workdir: String::new(),
             connection_id: prefs.last_connection_id.clone(),
-            model_id: None,
+            model_id: prefs.last_model_id.clone(),
             last_activity_ms: None,
             messages: Vec::new(),
             tool_inputs_by_tool_call_id: std::collections::HashMap::new(),
