@@ -5,8 +5,22 @@ import { join } from 'node:path';
 import type { ToolResult } from '@lace/ent-protocol';
 import type { ContentBlock, ProviderMessage } from '../providers/base-provider';
 import { toNonEmptyString, coreToolResultFromProtocol } from '../rpc/utils';
-import type { ToolCall as CoreToolCall } from '../tools/types';
+import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
+
+// Typed shapes for parsing event data
+type TextBlock = { type: 'text'; text: string };
+type ContentBlockShape = { type?: unknown; text?: unknown };
+type ContextInjectedData = { content?: unknown[] };
+type ContextCompactedData = { summary?: string; preserved?: unknown[] };
+type MessageData = { content?: string | unknown[] };
+type ToolUseData = { toolCallId?: unknown; name?: unknown; input?: unknown; result?: ToolResult };
+type PreservedMessage = {
+  role?: unknown;
+  content?: unknown;
+  toolCalls?: CoreToolCall[];
+  toolResults?: CoreToolResult[];
+};
 
 /**
  * Extracts text content from an array of content blocks.
@@ -15,14 +29,12 @@ import { estimateTokens } from '@lace/agent/utils/token-estimation';
 function extractTextFromContentBlocks(content: unknown[]): string {
   if (!Array.isArray(content)) return '';
   return content
-    .filter(
-      (b) =>
-        b &&
-        typeof b === 'object' &&
-        (b as any).type === 'text' &&
-        typeof (b as any).text === 'string'
-    )
-    .map((b) => String((b as any).text))
+    .filter((b): b is TextBlock => {
+      if (!b || typeof b !== 'object') return false;
+      const block = b as ContentBlockShape;
+      return block.type === 'text' && typeof block.text === 'string';
+    })
+    .map((b) => b.text)
     .join('\n');
 }
 
@@ -109,31 +121,31 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Prov
       }
 
       if (type === 'context_injected') {
-        const content = extractTextFromContentBlocks((data as any).content);
+        const eventData = data as ContextInjectedData;
+        const contentArr = Array.isArray(eventData.content) ? eventData.content : [];
+        const content = extractTextFromContentBlocks(contentArr);
         if (content.trim()) messages.push({ role: 'system', content });
         continue;
       }
 
       if (type === 'context_compacted') {
-        const summary = typeof (data as any).summary === 'string' ? (data as any).summary : '';
-        const preserved = Array.isArray((data as any).preserved) ? (data as any).preserved : [];
+        const eventData = data as ContextCompactedData;
+        const summary = typeof eventData.summary === 'string' ? eventData.summary : '';
+        const preserved = Array.isArray(eventData.preserved) ? eventData.preserved : [];
 
         messages.length = 0;
         if (summary.trim()) messages.push({ role: 'system', content: summary });
 
         for (const msg of preserved) {
           if (!msg || typeof msg !== 'object') continue;
-          const role = (msg as any).role;
-          const content = (msg as any).content;
+          const msgObj = msg as PreservedMessage;
+          const role = msgObj.role;
+          const content = msgObj.content;
           if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
           if (typeof content !== 'string') continue;
 
-          const toolCalls = Array.isArray((msg as any).toolCalls)
-            ? (msg as any).toolCalls
-            : undefined;
-          const toolResults = Array.isArray((msg as any).toolResults)
-            ? (msg as any).toolResults
-            : undefined;
+          const toolCalls = Array.isArray(msgObj.toolCalls) ? msgObj.toolCalls : undefined;
+          const toolResults = Array.isArray(msgObj.toolResults) ? msgObj.toolResults : undefined;
 
           messages.push({
             role,
@@ -147,25 +159,29 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Prov
       }
 
       if (type === 'message') {
+        const eventData = data as MessageData;
         const content =
-          typeof (data as any).content === 'string'
-            ? (data as any).content
-            : extractTextFromContentBlocks((data as any).content);
+          typeof eventData.content === 'string'
+            ? eventData.content
+            : extractTextFromContentBlocks(
+                Array.isArray(eventData.content) ? eventData.content : []
+              );
         messages.push({ role: 'assistant', content: content ?? '' });
         continue;
       }
 
       if (type === 'tool_use') {
-        const toolCallId = toNonEmptyString((data as any).toolCallId);
-        const name = toNonEmptyString((data as any).name);
-        const input = (data as any).input;
-        const result = (data as any).result as ToolResult | undefined;
+        const eventData = data as ToolUseData;
+        const toolCallId = toNonEmptyString(eventData.toolCallId);
+        const name = toNonEmptyString(eventData.name);
+        const input = eventData.input;
+        const result = eventData.result;
         if (!toolCallId || !name) continue;
 
         const toolCall: CoreToolCall = {
           id: toolCallId,
           name,
-          arguments: typeof input === 'object' && input ? (input as any) : {},
+          arguments: typeof input === 'object' && input ? (input as Record<string, unknown>) : {},
         };
 
         if (messages.length === 0 || messages[messages.length - 1]!.role !== 'assistant') {
