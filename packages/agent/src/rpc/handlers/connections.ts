@@ -255,10 +255,12 @@ export function registerConnectionHandlers(peer: JsonRpcPeer, state: AgentServer
     const values = parsed?.values;
     if (!values || typeof values !== 'object') return { ok: false, error: 'values is required' };
 
+    // values is Record<string, string> per the handler type
+    const credentialValues = values as Record<string, unknown>;
     const apiKey =
-      toNonEmptyString((values as any).apiKey) ??
-      toNonEmptyString((values as any).api_key) ??
-      toNonEmptyString((values as any).key);
+      toNonEmptyString(credentialValues.apiKey) ??
+      toNonEmptyString(credentialValues.api_key) ??
+      toNonEmptyString(credentialValues.key);
 
     if (!apiKey) return { ok: false, error: 'apiKey is required' };
 
