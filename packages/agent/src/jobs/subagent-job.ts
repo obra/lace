@@ -14,6 +14,7 @@ import { getEffectiveConfig } from '@lace/agent/core/session';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
 import { getJobOutputPath } from './job-file-utils';
 import { logger } from '@lace/agent/utils/logger';
+import type { ToolResult } from '@lace/ent-protocol';
 import {
   MAX_JOB_OUTPUT_BYTES,
   type SessionUpdate,
@@ -22,6 +23,39 @@ import {
   type JobState,
   type AgentServerState,
 } from '../server-types';
+
+// Types for tool_use update payloads from child processes
+type ToolKind = 'read' | 'edit' | 'delete' | 'search' | 'execute' | 'think' | 'fetch' | 'other';
+type ToolStatus =
+  | 'pending'
+  | 'awaiting_permission'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'denied'
+  | 'timeout'
+  | 'cancelled';
+
+// Type for permission options from child processes
+type PermissionOption = { optionId: string; label: string };
+
+// Type guard for validating permission options array
+function isPermissionOptionsArray(value: unknown): value is PermissionOption[] {
+  if (!Array.isArray(value)) return false;
+  return value.every(
+    (item) =>
+      item &&
+      typeof item === 'object' &&
+      typeof (item as Record<string, unknown>).optionId === 'string' &&
+      typeof (item as Record<string, unknown>).label === 'string'
+  );
+}
+
+// Type for extracting error properties from RPC errors
+interface RpcErrorLike {
+  code?: number | string;
+  data?: Record<string, unknown>;
+}
 
 /**
  * Server-level dependencies that runSubagentJobProcess needs.
@@ -392,6 +426,46 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
 
       if (type === 'tool_use' && typeof p.toolCallId === 'string' && typeof p.name === 'string') {
         const namespacedToolCallId = `${job.jobId}:${p.toolCallId}`;
+        // Extract and validate kind - must be a valid ToolKind or undefined
+        const kindStr = typeof p.kind === 'string' ? p.kind : undefined;
+        const validKinds: ToolKind[] = [
+          'read',
+          'edit',
+          'delete',
+          'search',
+          'execute',
+          'think',
+          'fetch',
+          'other',
+        ];
+        const kind: ToolKind | undefined =
+          kindStr && validKinds.includes(kindStr as ToolKind) ? (kindStr as ToolKind) : undefined;
+
+        // Extract and validate status - must be a valid ToolStatus
+        const statusStr = typeof p.status === 'string' ? p.status : 'pending';
+        const validStatuses: ToolStatus[] = [
+          'pending',
+          'awaiting_permission',
+          'running',
+          'completed',
+          'failed',
+          'denied',
+          'timeout',
+          'cancelled',
+        ];
+        const status: ToolStatus = validStatuses.includes(statusStr as ToolStatus)
+          ? (statusStr as ToolStatus)
+          : 'pending';
+
+        // Extract input as Record<string, unknown>
+        const input: Record<string, unknown> =
+          typeof p.input === 'object' && p.input !== null
+            ? (p.input as Record<string, unknown>)
+            : {};
+
+        // Extract result - validated by protocol, trusted from child process
+        const result = p.result as ToolResult | undefined;
+
         await emitSessionUpdate(
           {
             type: 'job_update',
@@ -403,13 +477,10 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
               type: 'tool_use',
               toolCallId: namespacedToolCallId,
               name: p.name,
-              kind: typeof p.kind === 'string' ? (p.kind as any) : undefined,
-              input: (typeof p.input === 'object' && p.input ? (p.input as any) : {}) as Record<
-                string,
-                unknown
-              >,
-              status: p.status as any,
-              ...(p.result ? { result: p.result as any } : {}),
+              kind,
+              input,
+              status,
+              ...(result ? { result } : {}),
             },
           },
           { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
@@ -450,6 +521,21 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       const turnSeq = typeof p.turnSeq === 'number' ? p.turnSeq : (job.originTurnSeq ?? 0);
 
       const currentState = getState();
+
+      // Validate options array or use default
+      const options: PermissionOption[] = isPermissionOptionsArray(p.options)
+        ? p.options
+        : [
+            { optionId: 'allow', label: 'Allow' },
+            { optionId: 'deny', label: 'Deny' },
+          ];
+
+      // Extract input as Record<string, unknown>
+      const input: Record<string, unknown> =
+        typeof p.input === 'object' && p.input !== null
+          ? (p.input as Record<string, unknown>)
+          : {};
+
       const decision = await requestPermissionFromClient({
         sessionId: currentState.activeSession!.meta.sessionId,
         turnId,
@@ -459,16 +545,8 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         tool: typeof p.tool === 'string' ? p.tool : 'unknown',
         kind: typeof p.kind === 'string' ? p.kind : undefined,
         resource: typeof p.resource === 'string' ? p.resource : '',
-        options: Array.isArray(p.options)
-          ? (p.options as any)
-          : [
-              { optionId: 'allow', label: 'Allow' },
-              { optionId: 'deny', label: 'Deny' },
-            ],
-        input: (typeof p.input === 'object' && p.input ? (p.input as any) : {}) as Record<
-          string,
-          unknown
-        >,
+        options,
+        input,
       });
 
       if (job.finished || job.status === 'cancelled') {
@@ -550,10 +628,11 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
 
       // Extract detailed error information
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorCode =
-        error && typeof error === 'object' && 'code' in error ? (error as any).code : undefined;
-      const errorData =
-        error && typeof error === 'object' && 'data' in error ? (error as any).data : undefined;
+      // Cast to RpcErrorLike after checking it's an object with the expected properties
+      const isErrorObject = error !== null && typeof error === 'object';
+      const errorObj = isErrorObject ? (error as RpcErrorLike) : undefined;
+      const errorCode = errorObj && 'code' in errorObj ? errorObj.code : undefined;
+      const errorData = errorObj && 'data' in errorObj ? errorObj.data : undefined;
 
       // Build detailed error output
       const errorDetails = [
