@@ -5,6 +5,7 @@ import { getLaceDir } from '../config/lace-dir';
 import { asSessionId } from '@lace/ent-protocol';
 import { deriveNextEventSeqFromEventLog, summarizeDurableEvents } from './event-log';
 import { atomicWriteJson } from './atomic-write';
+import { SessionStorageError } from '../errors/agent-errors';
 
 export type SessionMeta = {
   sessionId: string;
@@ -83,13 +84,7 @@ function agentSessionsDir(): string {
   }
 
   const msg = lastError instanceof Error ? lastError.message : String(lastError);
-  const e = new Error(`Session storage unavailable: ${msg}`) as Error & {
-    code: string;
-    path: string;
-  };
-  e.code = 'SessionStorageUnavailable';
-  e.path = candidates[0];
-  throw e;
+  throw new SessionStorageError(`Session storage unavailable: ${msg}`, candidates[0]);
 }
 
 export function getSessionDir(sessionId: string): string {
