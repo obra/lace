@@ -12,6 +12,7 @@ import { ProviderInstanceManager } from './instance/manager';
 import type { CatalogProvider, CatalogModel, ModelConfig } from './catalog/types';
 import { OpenRouterDynamicProvider } from './openrouter/dynamic-provider';
 import { OpenAIDynamicProvider } from './openai/dynamic-provider';
+import { AnthropicDynamicProvider } from './anthropic/dynamic-provider';
 import { logger } from '@lace/agent/utils/logger';
 
 /**
@@ -138,7 +139,25 @@ export class ProviderRegistry {
     }
 
     // Handle different provider types with dynamic catalogs
-    if (instance.catalogProviderId === 'openai') {
+    if (instance.catalogProviderId === 'anthropic') {
+      const provider = new AnthropicDynamicProvider(instanceId, instance.endpoint);
+      const staticCatalog = this.catalogManager.getProvider('anthropic');
+
+      if (staticCatalog) {
+        try {
+          logger.debug('Fetching dynamic catalog for Anthropic instance', {
+            instanceId,
+            endpoint: instance.endpoint || 'https://api.anthropic.com/v1',
+          });
+          return await provider.getCatalog(credential.apiKey, staticCatalog, forceRefresh);
+        } catch (error) {
+          logger.warn('Failed to fetch Anthropic dynamic catalog for instance, using static', {
+            instanceId,
+            error,
+          });
+        }
+      }
+    } else if (instance.catalogProviderId === 'openai') {
       const provider = new OpenAIDynamicProvider(instanceId, instance.endpoint);
       const staticCatalog = this.catalogManager.getProvider('openai');
 
@@ -184,6 +203,38 @@ export class ProviderRegistry {
     forceRefresh = false
   ): Promise<CatalogProvider | null> {
     await this.ensureInitialized();
+
+    // Special handling for Anthropic
+    if (providerId === 'anthropic') {
+      // Skip dynamic catalog if explicitly disabled
+      if (process.env.LACE_DISABLE_DYNAMIC_CATALOGS === '1') {
+        return this.catalogManager.getProvider('anthropic');
+      }
+
+      // Check if we have an instance with API key
+      const instances = await this.instanceManager.loadInstances();
+      const anthropicInstance = Object.entries(instances.instances).find(
+        ([_, inst]) => inst.catalogProviderId === 'anthropic'
+      );
+
+      if (anthropicInstance) {
+        const [instanceId, instance] = anthropicInstance;
+        const credential = this.instanceManager.loadCredential(instanceId);
+
+        if (credential?.apiKey) {
+          const provider = new AnthropicDynamicProvider(instanceId, instance.endpoint);
+          const staticCatalog = this.catalogManager.getProvider('anthropic');
+
+          if (staticCatalog) {
+            try {
+              return await provider.getCatalog(credential.apiKey, staticCatalog, forceRefresh);
+            } catch (error) {
+              logger.warn('Failed to fetch Anthropic dynamic catalog, using static', { error });
+            }
+          }
+        }
+      }
+    }
 
     // Special handling for OpenRouter
     if (providerId === 'openrouter') {
