@@ -19,6 +19,7 @@ import {
   writeSessionState,
   type SessionState,
 } from '../../storage/session-store';
+import { SessionStorageError } from '../../errors/agent-errors';
 import {
   appendDurableEvent,
   readDurableEvents,
@@ -87,9 +88,10 @@ export function registerSessionHandlers(
       ensureSessionFiles(sessionDir);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      const errorPath = err instanceof SessionStorageError ? err.path : undefined;
       logger.error('session.new.storage_unavailable', {
         error: message,
-        ...((err as any)?.path ? { path: (err as any).path } : {}),
+        ...(errorPath ? { path: errorPath } : {}),
       });
       throw {
         code: AcpErrorCodes.SessionNotFound,
