@@ -2,7 +2,7 @@
 
 ## Test-Driven Development (MANDATORY)
 
-**NO EXCEPTIONS**: ALL features and bug fixes MUST follow TDD:
+Default to TDD for features and bug fixes:
 
 1. Write a failing test that validates the desired functionality
 2. Run the test to confirm it fails as expected
@@ -10,11 +10,12 @@
 4. Run the test to confirm success
 5. Refactor if needed while keeping tests green
 
+For tiny or non-behavioral changes (formatting, config, docs), skip tests and state why.
+
 **Testing Requirements**:
 
-- ALL projects MUST have unit tests, integration tests, AND end-to-end tests
-- NEVER write tests that test mocked behavior
-- NEVER use mocks in end-to-end tests
+- When adding features or fixing bugs, add the most appropriate test type(s). If the repo lacks a layer, note it and proceed with what exists.
+- Prefer real behavior in tests. Avoid mocks in end-to-end tests. In unit tests, mocks are acceptable only when external dependencies make real behavior impractical.
 - Test output MUST be pristine to pass
 
 ## Bug Fixing
@@ -52,13 +53,15 @@
 
 ## Version Control (MANDATORY CHECKS)
 
-**Before Starting Work**:
+**Before Starting Code Changes**:
 
 - MUST check for uncommitted changes or untracked files
 - MUST ask how to handle them (suggest committing first)
 - MUST create a WIP branch if no clear branch exists
 - MUST track all non-trivial changes in git
 - NEVER skip, evade, or disable pre-commit hooks
+
+For analysis-only tasks, no git workflow is required.
 
 ## Git Workflow
 

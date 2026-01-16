@@ -37,7 +37,7 @@ Write task titles that are:
 ## Critical Rules
 
 1. **Update status in real-time** - Mark tasks complete IMMEDIATELY after finishing
-2. **Only one in_progress** - Exactly one task should be in_progress at any time
+2. **Only one in_progress** - Exactly one primary task should be in_progress at any time
 3. **Complete before starting** - Finish current tasks before starting new ones
 4. **Never mark incomplete work as completed** - If you hit errors, blockers, or can't finish, keep it as in_progress and create a new task for what needs resolution
 5. **NEVER discard tasks without your partner's explicit approval**
