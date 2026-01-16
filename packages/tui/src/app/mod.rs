@@ -20,6 +20,7 @@ use tui_textarea::TextArea;
 pub enum Role {
     User,
     Assistant,
+    System, // For errors and system messages
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

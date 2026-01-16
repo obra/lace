@@ -215,6 +215,9 @@ fn append_assistant_text(
         | Some(ChatMessage {
             role: Role::User, ..
         })
+        | Some(ChatMessage {
+            role: Role::System, ..
+        })
         | None => {
             state.messages.push(ChatMessage {
                 role: Role::Assistant,

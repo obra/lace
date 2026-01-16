@@ -26,6 +26,7 @@ pub fn to_markdown(state: &AppState) -> String {
         let role = match m.role {
             Role::User => "user",
             Role::Assistant => "assistant",
+            Role::System => "system",
         };
         out.push_str(&format!("### {role}\n\n"));
         out.push_str(&m.text);

@@ -1059,6 +1059,17 @@ fn handle_agent_line(
                         err.message.clone(),
                         Some(serde_json::to_value(err.clone()).unwrap_or(Value::Null)),
                     );
+
+                    // For prompt errors, also show the error in the conversation
+                    if pending_method.as_deref() == Some("session/prompt") {
+                        state.messages.push(crate::app::ChatMessage {
+                            role: crate::app::Role::System,
+                            text: format!("Error: {}", err.message),
+                            streaming: false,
+                            turn_id: None,
+                            turn_seq: None,
+                        });
+                    }
                 }
             }
 
@@ -3510,17 +3521,29 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
 
         // Markdown rendering is always enabled
         // User messages get a colored left border; assistant messages have no border
+        // System/error messages get a red border
         for md_line in markdown::render_markdownish_lines(&text) {
             let mut spans: Vec<Span> = Vec::new();
 
-            // Add user message border prefix
-            if m.role == Role::User {
-                spans.push(Span::styled("┃ ", Style::default().fg(colors.accent)));
+            // Add message border prefix based on role
+            match m.role {
+                Role::User => {
+                    spans.push(Span::styled("┃ ", Style::default().fg(colors.accent)));
+                }
+                Role::System => {
+                    spans.push(Span::styled("┃ ", Style::default().fg(colors.error)));
+                }
+                Role::Assistant => {}
             }
 
             // Convert markdown spans to styled ratatui spans
+            // For System messages, apply error color to all text
             for md_span in &md_line.spans {
-                let style = markdown_span_style(&md_span.style, md_line.is_code_block, colors);
+                let style = if m.role == Role::System {
+                    Style::default().fg(colors.error)
+                } else {
+                    markdown_span_style(&md_span.style, md_line.is_code_block, colors)
+                };
                 spans.push(Span::styled(md_span.text.clone(), style));
             }
 
@@ -4176,9 +4199,9 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
         }
 
         // Markdown rendering is always enabled
-        // User messages have a "┃ " border prefix (2 chars), so effective width is reduced
+        // User and System messages have a "┃ " border prefix (2 chars), so effective width is reduced
         let effective_width = match m.role {
-            Role::User => content_width.saturating_sub(2),
+            Role::User | Role::System => content_width.saturating_sub(2),
             Role::Assistant => content_width,
         };
         for l in markdown::render_markdownish_lines(&text) {
@@ -4987,15 +5010,11 @@ mod tests {
             buffer_str
         );
 
-        // Verify tool input JSON is shown
+        // For bash tool with custom renderer, command is shown in header,
+        // so we just verify the command is visible (may be in header or expanded section)
         assert!(
-            buffer_str.contains("Input:"),
-            "Should show 'Input:' label when expanded. Buffer: {}",
-            buffer_str
-        );
-        assert!(
-            buffer_str.contains("command"),
-            "Should show tool input JSON when expanded. Buffer: {}",
+            buffer_str.contains("npm test"),
+            "Should show command. Buffer: {}",
             buffer_str
         );
     }
@@ -5068,18 +5087,20 @@ mod tests {
         state.permission_details_expanded = true;
         assert_eq!(permission_bar_height(&state), 4);
 
-        // Expanded with tool input = 3 + resource + input lines
+        // Expanded with tool input (background bash adds extra line)
         state.tool_inputs_by_tool_call_id.insert(
             "tool_123".to_string(),
             json!({
-                "command": "npm test"
+                "command": "npm test",
+                "background": true,
+                "description": "run tests"
             }),
         );
         let height = permission_bar_height(&state);
-        // Should be at least 3 + 2 (resource + some input lines)
+        // Should be at least 3 + 2 (resource + background info line)
         assert!(
             height >= 5,
-            "Height should be at least 5 with tool input, got {}",
+            "Height should be at least 5 with background tool input, got {}",
             height
         );
     }

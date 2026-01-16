@@ -142,6 +142,7 @@ fn recompute(state: &mut AppState) {
         let prefix = match m.role {
             Role::User => "user",
             Role::Assistant => "assistant",
+            Role::System => "system",
         };
         state.search.results.push(SearchResult {
             label: format!("{prefix}: {}", first_line(&m.text)),
