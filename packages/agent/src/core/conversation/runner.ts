@@ -42,6 +42,12 @@ export class ConversationRunner {
   private readonly config: RunnerConfig;
   private readonly deps: RunnerDependencies;
 
+  // Interval at which to inject a reminder to check for stuck loops
+  private static readonly LOOP_CHECK_INTERVAL = 50;
+
+  // Default maximum turns - set very high since we use reminders instead of hard cutoffs
+  static readonly DEFAULT_MAX_TURNS = 10000;
+
   constructor(config: RunnerConfig, deps: RunnerDependencies) {
     this.config = config;
     this.deps = deps;
@@ -65,7 +71,13 @@ export class ConversationRunner {
    * 5. Emit session updates throughout
    */
   async run(params: RunParams): Promise<RunResult> {
-    const { content: _content, maxTurns = 10, abortController, turnId, startedAt } = params;
+    const {
+      content: _content,
+      maxTurns = ConversationRunner.DEFAULT_MAX_TURNS,
+      abortController,
+      turnId,
+      startedAt,
+    } = params;
     const {
       sessionDir,
       cwd,
@@ -121,6 +133,18 @@ export class ConversationRunner {
 
     try {
       for (; completedTurns < maxTurns; completedTurns++) {
+        // Inject a reminder every LOOP_CHECK_INTERVAL turns to help detect stuck loops
+        if (
+          completedTurns > 0 &&
+          completedTurns % ConversationRunner.LOOP_CHECK_INTERVAL === 0
+        ) {
+          const reminder = `<system-reminder>You have completed ${completedTurns} agentic turns. If you believe you are stuck in a loop or not making progress, stop and ask the user for guidance. Otherwise, continue.</system-reminder>`;
+          providerMessages = [
+            ...providerMessages,
+            { role: 'user' as const, content: reminder },
+          ];
+        }
+
         const messageTurnSeq = streamTurnSeq++;
         let streamedAny = false;
         let tokenQueue: Promise<void> = Promise.resolve();

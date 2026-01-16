@@ -203,7 +203,7 @@ export function registerPromptHandler(
         typeof (params as { maxTurns?: number })?.maxTurns === 'number' &&
         Number.isFinite((params as { maxTurns?: number }).maxTurns)
           ? Math.max(1, Math.trunc((params as { maxTurns?: number }).maxTurns!))
-          : 10;
+          : ConversationRunner.DEFAULT_MAX_TURNS;
 
       // Create skill registry for this session's working directory
       const skillDirs = getSkillDirectories(state.activeSession.meta.workDir);

@@ -131,7 +131,7 @@ export interface RunParams {
   >;
   /** Optional output format constraint */
   outputFormat?: unknown;
-  /** Maximum turns before stopping (default: 10) */
+  /** Maximum turns before stopping (default: 10000, see ConversationRunner.DEFAULT_MAX_TURNS) */
   maxTurns?: number;
   /** Pre-created abort controller */
   abortController: AbortController;
