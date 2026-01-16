@@ -102,7 +102,9 @@ export function validateSkillDescription(description: string): ValidationResult 
     return { valid: false, error: 'Skill description must be a non-empty string' };
   }
 
-  if (description.length > MAX_DESCRIPTION_LENGTH) {
+  const trimmed = description.trim();
+
+  if (trimmed.length > MAX_DESCRIPTION_LENGTH) {
     return {
       valid: false,
       error: `Skill description exceeds ${MAX_DESCRIPTION_LENGTH} character limit`,

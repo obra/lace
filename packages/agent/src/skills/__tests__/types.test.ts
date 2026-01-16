@@ -39,6 +39,11 @@ describe('validateSkillName', () => {
     expect(result.error).toContain('consecutive');
   });
 
+  it('accepts names at exactly 64 characters', () => {
+    const name = 'a'.repeat(64);
+    expect(validateSkillName(name)).toEqual({ valid: true });
+  });
+
   it('rejects names over 64 characters', () => {
     const longName = 'a'.repeat(65);
     const result = validateSkillName(longName);
