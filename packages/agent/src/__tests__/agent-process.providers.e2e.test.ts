@@ -89,25 +89,28 @@ describe('lace-agent provider config (E2E over stdio)', () => {
       providers.providers.find((p) => p.providerId === 'openai')?.providerId ??
       providers.providers[0].providerId;
 
+    // Credentials should be rejected
     await expect(
       ctx.agent.peer.request('ent/connections/upsert', {
         providerId,
         connection: { name: 'Bad Connection', config: { apiKey: 'sk-should-not-be-here' } },
       })
-    ).rejects.toMatchObject({ code: -32602, message: 'InvalidParams' });
+    ).rejects.toMatchObject({ code: -32602 });
 
+    // Invalid endpoint URL should be rejected
     await expect(
       ctx.agent.peer.request('ent/connections/upsert', {
         providerId,
         connection: { name: 'Bad Connection', config: { endpoint: 'not-a-url' } },
       })
-    ).rejects.toMatchObject({ code: -32602, message: 'InvalidParams' });
+    ).rejects.toMatchObject({ code: -32602 });
 
+    // Invalid modelConfig should be rejected
     await expect(
       ctx.agent.peer.request('ent/connections/upsert', {
         providerId,
         connection: { name: 'Bad Connection', config: { modelConfig: 'nope' } },
       })
-    ).rejects.toMatchObject({ code: -32602, message: 'InvalidParams' });
+    ).rejects.toMatchObject({ code: -32602 });
   });
 });

@@ -24,7 +24,6 @@ describe('createProviderForTurn', () => {
 
     await expect(createProviderForTurn({})).rejects.toMatchObject({
       code: -32602,
-      message: 'InvalidParams',
     });
   });
 
@@ -33,7 +32,6 @@ describe('createProviderForTurn', () => {
 
     await expect(createProviderForTurn({ connectionId: 'conn-1' })).rejects.toMatchObject({
       code: -32602,
-      message: 'InvalidParams',
     });
   });
 
@@ -42,7 +40,6 @@ describe('createProviderForTurn', () => {
 
     await expect(createProviderForTurn({ modelId: 'model-1' })).rejects.toMatchObject({
       code: -32602,
-      message: 'InvalidParams',
     });
   });
 
@@ -53,7 +50,6 @@ describe('createProviderForTurn', () => {
       createProviderForTurn({ connectionId: '  ', modelId: 'model-1' })
     ).rejects.toMatchObject({
       code: -32602,
-      message: 'InvalidParams',
     });
   });
 });

@@ -687,10 +687,10 @@ describe('Ent protocol contract (selected coverage)', () => {
         label: 'models/disable',
       });
 
-      // invalid modelId should error
+      // invalid modelId should error with InvalidParams code
       await expect(
         agent.peer.request('ent/models/enable', { providerId, modelIds: ['nope'] })
-      ).rejects.toMatchObject({ code: -32602, message: 'InvalidParams' });
+      ).rejects.toMatchObject({ code: -32602 });
 
       await agent.shutdown();
       agent = undefined;

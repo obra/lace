@@ -27,6 +27,7 @@ import {
   shouldAskPermission,
 } from '@lace/agent/rpc/utils';
 import type { RunnerConfig, RunnerDependencies, RunParams, RunResult, ApprovalMode } from './types';
+import { EntErrorCodes } from '@lace/ent-protocol';
 
 /**
  * ConversationRunner executes prompts through the agentic loop.
@@ -141,12 +142,31 @@ export class ConversationRunner {
         };
 
         provider.on('token', onToken);
-        const response = await provider.createStreamingResponse(
-          providerMessages,
-          toolsForProvider,
-          modelId || 'unknown-model',
-          abortController.signal
-        );
+        let response;
+        try {
+          response = await provider.createStreamingResponse(
+            providerMessages,
+            toolsForProvider,
+            modelId || 'unknown-model',
+            abortController.signal
+          );
+        } catch (providerError) {
+          provider.off('token', onToken);
+          // Wrap provider errors with proper error code for RPC layer
+          const errorMessage =
+            providerError instanceof Error
+              ? providerError.message
+              : typeof providerError === 'object' &&
+                  providerError !== null &&
+                  'message' in providerError
+                ? String((providerError as { message: unknown }).message)
+                : 'Provider request failed';
+          throw {
+            code: EntErrorCodes.ProviderError,
+            message: errorMessage,
+            data: { category: 'provider' },
+          };
+        }
         provider.off('token', onToken);
         await tokenQueue;
 

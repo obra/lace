@@ -78,6 +78,50 @@ export class OpenAIDynamicProvider {
     }
   }
 
+  /**
+   * Determines if a model supports chat-style APIs (Chat Completions or Responses API).
+   * Filters out known non-chat models (embeddings, audio, image, legacy completions).
+   * Unknown models are included by default - if a new model appears, let users try it.
+   */
+  private isChatCompatibleModel(modelId: string): boolean {
+    // Explicit exclusion patterns - these never work with chat APIs
+    const excludePatterns = [
+      /^text-embedding-/, // Embedding models
+      /^whisper/, // Speech-to-text
+      /^tts-/, // Text-to-speech
+      /^dall-e/, // Image generation
+      /-embed-/, // Any embed model
+      /^babbage/, // Legacy completion models
+      /^davinci/, // Legacy completion models (without gpt prefix)
+      /^curie/, // Legacy completion models
+      /^ada$/, // Legacy ada model (exact match)
+      /^gpt-3\.5-turbo-instruct/, // Completion-only instruct model
+      /^ft:davinci/, // Fine-tuned legacy models
+      /^ft:babbage/, // Fine-tuned legacy models
+      /^ft:curie/, // Fine-tuned legacy models
+      /^ft:ada/, // Fine-tuned legacy models
+      /^text-davinci/, // Legacy text completion models
+      /^text-curie/, // Legacy text completion models
+      /^text-babbage/, // Legacy text completion models
+      /^text-ada/, // Legacy text completion models
+      /^code-davinci/, // Legacy code completion models
+      /^code-cushman/, // Legacy code completion models
+      /-search-/, // Search/embedding models
+      /-similarity-/, // Similarity models
+      /^moderation/, // Content moderation models
+      /^omni-moderation/, // Content moderation models
+    ];
+
+    for (const pattern of excludePatterns) {
+      if (pattern.test(modelId)) {
+        return false;
+      }
+    }
+
+    // Unknown models are included by default - let users try new models
+    return true;
+  }
+
   private filterStaticCatalog(
     staticCatalog: CatalogProvider,
     availableModels: OpenAIModel[]
@@ -85,10 +129,17 @@ export class OpenAIDynamicProvider {
     // Create lookup map for static catalog models
     const staticModelsMap = new Map(staticCatalog.models.map((m) => [m.id, m]));
 
-    // Discovery design: include all API models
-    // - Use rich metadata from static catalog when available
-    // - Infer metadata for unknown models
-    const discoveredModels = availableModels.map((apiModel) => {
+    // Filter to only chat-compatible models, then enrich with metadata
+    const chatCompatibleModels = availableModels.filter((apiModel) => {
+      // If it's in the static catalog, it's been manually verified as chat-compatible
+      if (staticModelsMap.has(apiModel.id)) {
+        return true;
+      }
+      // Otherwise, use heuristic detection
+      return this.isChatCompatibleModel(apiModel.id);
+    });
+
+    const discoveredModels = chatCompatibleModels.map((apiModel) => {
       const staticModel = staticModelsMap.get(apiModel.id);
 
       if (staticModel) {
@@ -100,9 +151,12 @@ export class OpenAIDynamicProvider {
       return this.inferModelMetadata(apiModel);
     });
 
-    logger.info('Discovered OpenAI models with static catalog enrichment', {
+    const filteredCount = availableModels.length - chatCompatibleModels.length;
+
+    logger.info('Discovered OpenAI models with chat-compatibility filtering', {
       staticCount: staticCatalog.models.length,
       availableCount: availableModels.length,
+      filteredOutCount: filteredCount,
       enrichedCount: discoveredModels.filter((m) => staticModelsMap.has(m.id)).length,
       inferredCount: discoveredModels.filter((m) => !staticModelsMap.has(m.id)).length,
       totalCount: discoveredModels.length,

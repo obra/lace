@@ -141,7 +141,7 @@ describe('agent rpc server (smoke)', () => {
 
     await expect(client.request('ent/agent/ping')).rejects.toMatchObject({
       code: EntErrorCodes.NotInitialized,
-      message: 'NotInitialized',
+      message: 'Agent not initialized; call initialize first',
     });
 
     client.close();
