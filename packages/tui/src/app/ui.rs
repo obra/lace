@@ -2,6 +2,7 @@ use crate::app::reducer::{decide_permission, Outbound};
 use crate::app::{AppState, ChatMessage, Role};
 use serde_json::json;
 use tui_textarea::{CursorMove, TextArea};
+use strsim::normalized_levenshtein;
 
 fn input_text(state: &AppState) -> String {
     state.input.lines().join("\n")
@@ -117,21 +118,17 @@ pub enum UiAction {
     ConnectionsModelsRefresh,
     ConnectionsModelsClose,
     ConnectionsClose,
+    ModelFetchOptions,
 
-    OpenPalette,
     CloseOverlay,
     ToggleHelp,
-    PaletteChar(char),
-    PaletteBackspace,
-    PalettePrev,
-    PaletteNext,
-    PaletteSubmit,
 
     SlashPickerOpen,
     SlashPickerClose,
     SlashPickerPrev,
     SlashPickerNext,
     SlashPickerSelect,
+    SlashCycleOption,
 
     OpenMcpPanel,
     McpClose,
@@ -161,6 +158,15 @@ pub enum UiAction {
     PermissionCancel,
     PermissionGuidanceChar(char),
     PermissionGuidanceBackspace,
+    PermissionToggleDetails,
+    PermissionScrollUp,
+    PermissionScrollDown,
+
+    ChatToolPrev,
+    ChatToolNext,
+    ChatToolToggleExpanded,
+    ChatToolClearSelection,
+    ChatToolOpenDetails,
 }
 
 pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> {
@@ -584,6 +590,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             crate::app::connections::close_models(state);
             Vec::new()
         }
+        UiAction::ModelFetchOptions => crate::app::connections::request_models_for_current_connection(state),
         UiAction::ConnectionsSubmit => {
             if state.connections.confirm_delete {
                 crate::app::connections::confirm_delete_selected(state)
@@ -606,22 +613,21 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         UiAction::ScrollUp => {
             use crate::app::Focus;
             match state.focus {
-                Focus::Chat => {
+                // PageUp scrolls chat even when focus is Input
+                Focus::Chat | Focus::Input => {
                     state.chat_follow = false;
                     state.chat_scroll = state.chat_scroll.saturating_sub(1);
                 }
                 Focus::Activity => state.activity_scroll = state.activity_scroll.saturating_sub(1),
                 Focus::Debug => state.debug_scroll = state.debug_scroll.saturating_sub(1),
-                Focus::Input => {
-                    // TextArea handles its own vertical scroll with cursor movement.
-                }
             }
             Vec::new()
         }
         UiAction::ScrollDown => {
             use crate::app::Focus;
             match state.focus {
-                Focus::Chat => {
+                // PageDown scrolls chat even when focus is Input
+                Focus::Chat | Focus::Input => {
                     state.chat_scroll = state
                         .chat_scroll
                         .saturating_add(1)
@@ -632,24 +638,10 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 }
                 Focus::Activity => state.activity_scroll = state.activity_scroll.saturating_add(1),
                 Focus::Debug => state.debug_scroll = state.debug_scroll.saturating_add(1),
-                Focus::Input => {
-                    // TextArea handles its own vertical scroll with cursor movement.
-                }
             }
-            Vec::new()
-        }
-        UiAction::OpenPalette => {
-            if state.active_permission.is_some() {
-                return Vec::new();
-            }
-            state.palette_open = true;
-            state.help_open = false;
-            state.palette_query.clear();
-            state.palette_selected = 0;
             Vec::new()
         }
         UiAction::CloseOverlay => {
-            state.palette_open = false;
             state.help_open = false;
             state.search.open = false;
             Vec::new()
@@ -659,25 +651,6 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                 return Vec::new();
             }
             state.help_open = !state.help_open;
-            if state.help_open {
-                state.palette_open = false;
-            }
-            Vec::new()
-        }
-        UiAction::PaletteChar(ch) => {
-            if !state.palette_open {
-                return Vec::new();
-            }
-            state.palette_query.push(ch);
-            state.palette_selected = 0;
-            Vec::new()
-        }
-        UiAction::PaletteBackspace => {
-            if !state.palette_open {
-                return Vec::new();
-            }
-            state.palette_query.pop();
-            state.palette_selected = 0;
             Vec::new()
         }
         UiAction::PermissionPrev => {
@@ -688,14 +661,20 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             Vec::new()
         }
         UiAction::PermissionNext => {
-            if let Some(req) = &state.active_permission {
-                // Max is options.len() to include the guidance row as the last selectable item
-                let max = req.options.len();
-                state.active_permission_selected = (state.active_permission_selected + 1).min(max);
+            if state.active_permission.is_some() {
+                // guidance row is choices.len()
+                let max = permission_choices(state).len();
+                state.active_permission_selected =
+                    (state.active_permission_selected + 1).min(max);
             }
             Vec::new()
         }
         UiAction::PermissionSubmit => {
+            // Compute choices BEFORE taking the permission, since permission_choices
+            // requires active_permission to be present
+            let choices = permission_choices(state);
+            let guidance_index = choices.len();
+
             let Some(req) = state.active_permission.take() else {
                 return Vec::new();
             };
@@ -703,23 +682,23 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             let has_guidance = !state.permission_guidance_input.is_empty();
 
             // When guidance is provided, always deny (guidance = "no, do this instead")
-            // When guidance row is selected (index == options.len()), default to first option
+            // When guidance row is selected (index == choices.len()), default to first option
             let decision = if has_guidance {
                 // Find a deny option, or fall back to "deny" string
-                req.options
+                choices
                     .iter()
-                    .find(|o| o.option_id.to_lowercase().contains("deny"))
-                    .map(|o| o.option_id.clone())
+                    .find(|c| c.option_id.to_lowercase().contains("deny"))
+                    .map(|c| c.option_id.clone())
                     .unwrap_or_else(|| "deny".to_string())
             } else {
-                let selected_idx = if state.active_permission_selected >= req.options.len() {
+                let selected_idx = if state.active_permission_selected >= guidance_index {
                     0
                 } else {
                     state.active_permission_selected
                 };
-                req.options
+                choices
                     .get(selected_idx)
-                    .map(|o| o.option_id.clone())
+                    .map(|c| c.option_id.clone())
                     .unwrap_or_default()
             };
 
@@ -729,9 +708,27 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             }
 
             // Only remember decisions when not providing guidance (guidance = rejection)
-            if !has_guidance && should_remember_permission_decision(&decision) {
-                if let Some(key) = crate::app::reducer::permission_allow_key(&req) {
-                    state.permission_allowlist.insert(key, decision.clone());
+            if !has_guidance {
+                if let Some(choice) = choices.get(
+                    if state.active_permission_selected >= guidance_index {
+                        0
+                    } else {
+                        state.active_permission_selected
+                    },
+                ) {
+                    if let Some(key) = crate::app::reducer::permission_allow_key(&req) {
+                        match choice.remember {
+                            PermissionRemember::None => {}
+                            PermissionRemember::Session => {
+                                state.permission_allowlist.insert(key, decision.clone());
+                            }
+                            PermissionRemember::Always => {
+                                state
+                                    .permission_allowlist_global
+                                    .insert(key, decision.clone());
+                            }
+                        }
+                    }
                 }
             }
 
@@ -778,19 +775,20 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             }
         }
         UiAction::PermissionCancel => {
-            let Some(req) = state.active_permission.clone() else {
+            if state.active_permission.is_none() {
                 return Vec::new();
-            };
-            let Some((idx, _)) = req
-                .options
+            }
+            let choices = permission_choices(state);
+            if let Some((idx, _)) = choices
                 .iter()
                 .enumerate()
-                .find(|(_, o)| o.option_id.to_lowercase().contains("deny"))
-            else {
-                return Vec::new();
-            };
-            state.active_permission_selected = idx;
-            apply_ui_action(state, UiAction::PermissionSubmit)
+                .find(|(_, c)| c.option_id.to_lowercase().contains("deny"))
+            {
+                state.active_permission_selected = idx;
+                apply_ui_action(state, UiAction::PermissionSubmit)
+            } else {
+                Vec::new()
+            }
         }
         UiAction::PermissionGuidanceChar(ch) => {
             state.permission_guidance_input.push(ch);
@@ -800,12 +798,91 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             state.permission_guidance_input.pop();
             Vec::new()
         }
+        UiAction::PermissionToggleDetails => {
+            state.permission_details_expanded = !state.permission_details_expanded;
+            Vec::new()
+        }
+        UiAction::PermissionScrollUp => {
+            if state.permission_details_expanded {
+                state.permission_details_scroll = state.permission_details_scroll.saturating_sub(1);
+            }
+            Vec::new()
+        }
+        UiAction::PermissionScrollDown => {
+            if state.permission_details_expanded {
+                state.permission_details_scroll = state.permission_details_scroll.saturating_add(1);
+            }
+            Vec::new()
+        }
         UiAction::SlashPickerOpen => {
+            let mut out = Vec::new();
+            // Prefetch subcommand data when needed (e.g., /model)
+            let input_copy = input_text(state);
+            let trimmed = input_copy.trim_start();
+            if let Some(head) = trimmed.strip_prefix('/') {
+                let head = head.split_whitespace().next().unwrap_or("");
+                if head == "model" && !state.connections.models.loading {
+                    out.extend(
+                        crate::app::connections::request_models_for_current_connection(state),
+                    );
+                }
+            }
             if !filtered_slash_commands(state).is_empty() {
                 state.slash_picker_open = true;
                 state.slash_picker_selected = 0;
             }
-            Vec::new()
+            out
+        }
+        UiAction::SlashCycleOption => {
+            // Cycle options for commands like "/mode", "/theme", etc.
+            let input = input_text(state);
+            let Some(stripped) = input.strip_prefix('/') else {
+                return Vec::new();
+            };
+            let mut parts = stripped.split_whitespace();
+            let Some(head_raw) = parts.next() else {
+                return Vec::new();
+            };
+            let head = head_raw.to_lowercase();
+            let suffix: String = parts.collect::<Vec<_>>().join(" ");
+
+            // Prefetch model options if needed
+            let mut out = Vec::new();
+            if head == "model" && !state.connections.models.loading {
+                out.extend(crate::app::connections::request_models_for_current_connection(
+                    state,
+                ));
+            }
+
+            let options: Vec<String> = all_slash_commands(state)
+                .into_iter()
+                .filter_map(|cmd| {
+                    let lower = cmd.name.to_lowercase();
+                    lower
+                        .split_once(' ')
+                        .and_then(|(h, t)| if h == head { Some(t.to_string()) } else { None })
+                })
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .collect();
+
+            if options.is_empty() {
+                return Vec::new();
+            }
+
+            let suffix_norm = suffix.to_lowercase().trim().to_string();
+            let idx = options
+                .iter()
+                .position(|o| o.to_lowercase() == suffix_norm);
+            let next = options[match idx {
+                Some(i) => (i + 1) % options.len(),
+                None => 0,
+            }]
+            .clone();
+            let new_input = format!("/{} {}", head_raw, next);
+            set_input_text(state, &new_input);
+            state.slash_picker_open = false;
+            out
         }
         UiAction::SlashPickerClose => {
             state.slash_picker_open = false;
@@ -836,7 +913,11 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             drop(filtered);
 
             if let Some((name, has_hint, source)) = selected_cmd {
-                if source == "local" {
+                if source == "permission" {
+                    let out = execute_permission_slash_command(state, &name);
+                    state.slash_picker_open = false;
+                    return out;
+                } else if source == "local" {
                     let out = execute_local_slash_command(state, &name);
                     state.slash_picker_open = false;
                     return out;
@@ -920,11 +1001,52 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             crate::app::config_panels::context_scroll_down(state);
             Vec::new()
         }
+
+        // === Chat Tool Selection ===
+        UiAction::ChatToolPrev => {
+            let tools = state.completed_tool_calls();
+            if !tools.is_empty() {
+                state.chat_selected_tool_idx = match state.chat_selected_tool_idx {
+                    None => Some(tools.len() - 1),
+                    Some(0) => Some(tools.len() - 1),
+                    Some(i) => Some(i - 1),
+                };
+            }
+            Vec::new()
+        }
+        UiAction::ChatToolNext => {
+            let tools = state.completed_tool_calls();
+            if !tools.is_empty() {
+                state.chat_selected_tool_idx = match state.chat_selected_tool_idx {
+                    None => Some(0),
+                    Some(i) if i >= tools.len() - 1 => Some(0),
+                    Some(i) => Some(i + 1),
+                };
+            }
+            Vec::new()
+        }
+        UiAction::ChatToolToggleExpanded => {
+            if state.chat_selected_tool_idx.is_some() {
+                state.chat_tool_expanded = !state.chat_tool_expanded;
+            }
+            Vec::new()
+        }
+        UiAction::ChatToolClearSelection => {
+            state.chat_selected_tool_idx = None;
+            state.chat_tool_expanded = false;
+            Vec::new()
+        }
+        UiAction::ChatToolOpenDetails => {
+            if state.chat_selected_tool_idx.is_some() {
+                state.tool_details_overlay_open = true;
+                state.tool_details_overlay_scroll = 0;
+            }
+            Vec::new()
+        }
     }
 }
 
-/// Returns slash commands filtered by current input (after the `/`)
-pub fn filtered_slash_commands(state: &AppState) -> Vec<crate::app::SlashCommand> {
+pub(crate) fn all_slash_commands(state: &AppState) -> Vec<crate::app::SlashCommand> {
     fn local_commands() -> Vec<crate::app::SlashCommand> {
         vec![
             ("theme dark", "Switch to dark theme"),
@@ -936,25 +1058,159 @@ pub fn filtered_slash_commands(state: &AppState) -> Vec<crate::app::SlashCommand
             ("toggle activity", "Toggle activity overlay"),
             ("help", "Toggle help"),
             ("search", "Open search"),
+            ("configure", "Run quick setup"),
+            ("sessions", "Switch sessions"),
             ("connections", "Open connections panel"),
             ("env", "Open environment editor"),
             ("context", "Open context viewer"),
+            ("mcp servers", "Manage MCP servers"),
+            ("compact context", "Compact current context"),
+            ("clear", "Clear conversation and start new session"),
             ("new session", "Start a new session"),
             ("export transcript", "Export chat transcript"),
+            ("model", "Switch model (current connection)"),
             ("quit", "Quit the TUI"),
         ]
         .into_iter()
         .map(|(name, desc)| crate::app::SlashCommand {
             name: name.to_string(),
             description: desc.to_string(),
-            input_hint: None,
+            input_hint: if name == "model" {
+                Some("<modelId>".to_string())
+            } else {
+                None
+            },
             source: Some("local".to_string()),
         })
-        .collect()
+            .collect()
+    }
+
+    fn permission_commands(state: &AppState) -> Vec<crate::app::SlashCommand> {
+        let mut cmds = Vec::new();
+        if let Some(req) = &state.active_permission {
+            for opt in &req.options {
+                let label = opt.label.to_lowercase();
+                cmds.push(crate::app::SlashCommand {
+                    name: format!("permission {}", label),
+                    description: format!(
+                        "Decide permission: {} (resource: {})",
+                        opt.label,
+                        req.resource.clone().unwrap_or_else(|| "n/a".to_string())
+                    ),
+                    input_hint: None,
+                    source: Some("permission".to_string()),
+                });
+            }
+            // Convenience aliases
+            cmds.push(crate::app::SlashCommand {
+                name: "permission allow".to_string(),
+                description: "Allow current permission request".to_string(),
+                input_hint: None,
+                source: Some("permission".to_string()),
+            });
+            cmds.push(crate::app::SlashCommand {
+                name: "permission deny".to_string(),
+                description: "Deny current permission request".to_string(),
+                input_hint: None,
+                source: Some("permission".to_string()),
+            });
+        }
+        cmds
     }
 
     let mut all: Vec<crate::app::SlashCommand> = state.slash_commands.clone();
     all.extend(local_commands());
+    all.extend(permission_commands(state));
+
+    // Expand commands with sub-options into synthetic subcommands, so picker + Tab can show them.
+    // We keep track of which primary command each subcommand belongs to.
+    let mut expanded: Vec<(String, crate::app::SlashCommand)> = Vec::new();
+
+    // Dynamic: /model options from fetched models / wizard / last model
+    let model_options: Vec<String> = if !state.connections.models.models.is_empty() {
+        state
+            .connections
+            .models
+            .models
+            .iter()
+            .map(|m| m.model_id.clone())
+            .collect()
+    } else if !state.config_wizard.models.is_empty() {
+        state
+            .config_wizard
+            .models
+            .iter()
+            .map(|m| m.model_id.clone())
+            .collect()
+    } else if let Some(last) = &state.prefs.last_model_id {
+        vec![last.clone()]
+    } else {
+        // No models known yet; show a placeholder entry to instruct user.
+        vec!["current connection".to_string()]
+    };
+    for m in model_options {
+        // Skip duplicate placeholder
+        let desc = if m == "current connection" {
+            "Switch model to current connection (load models)".to_string()
+        } else {
+            format!("Switch model to {}", m)
+        };
+        expanded.push((
+            "model".to_string(),
+            crate::app::SlashCommand {
+                name: format!("model {}", m),
+                description: desc,
+                input_hint: None,
+                source: Some("local".to_string()),
+            },
+        ));
+    }
+
+    // Static inline "(a|b|c)" expansion
+    for cmd in &all {
+        if let Some(start) = cmd.description.find('(') {
+            if let Some(end_rel) = cmd.description[start..].find(')') {
+                let inside = &cmd.description[start + 1..start + end_rel];
+                let opts: Vec<String> = inside
+                    .split('|')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                if !opts.is_empty() {
+                    for opt in opts {
+                        expanded.push((
+                            cmd.name.clone(),
+                            crate::app::SlashCommand {
+                                name: format!("{} {}", cmd.name, opt),
+                                description: format!("{} ({opt})", cmd.description),
+                                input_hint: None,
+                                source: cmd.source.clone(),
+                            },
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    // Only include subcommands when input head matches, to avoid clutter.
+    let input_head = state
+        .input
+        .lines()
+        .join("\n")
+        .strip_prefix('/')
+        .and_then(|s| s.split_whitespace().next())
+        .map(|s| s.to_string());
+    if let Some(head) = input_head {
+        for (_primary, sub) in expanded.into_iter().filter(|(p, _)| p == &head) {
+            all.push(sub);
+        }
+    }
+    all
+}
+
+/// Returns slash commands filtered by current input (after the `/`)
+pub fn filtered_slash_commands(state: &AppState) -> Vec<crate::app::SlashCommand> {
+    let all = all_slash_commands(state);
 
     let query = state
         .input
@@ -963,16 +1219,56 @@ pub fn filtered_slash_commands(state: &AppState) -> Vec<crate::app::SlashCommand
         .strip_prefix('/')
         .unwrap_or("")
         .to_lowercase();
-    all.into_iter()
-        .filter(|cmd| {
+    let input_head = state
+        .input
+        .lines()
+        .join("\n")
+        .strip_prefix('/')
+        .and_then(|s| s.split_whitespace().next())
+        .map(|s| s.to_string());
+    let has_space = state
+        .input
+        .lines()
+        .join("\n")
+        .strip_prefix('/')
+        .map(|s| s.contains(' '))
+        .unwrap_or(false);
+
+    let mut filtered: Vec<(i32, crate::app::SlashCommand)> = all
+        .into_iter()
+        .filter_map(|cmd| {
+            // When inside a head (e.g., "/mode ..."), hide the bare head entry
+            if has_space {
+                if let Some(ref head) = input_head {
+                    if cmd.name == *head {
+                        return None;
+                    }
+                }
+            }
             if query.is_empty() {
-                true
+                Some((0, cmd))
             } else {
-                cmd.name.to_lowercase().contains(&query)
-                    || cmd.description.to_lowercase().contains(&query)
+                let name = cmd.name.to_lowercase();
+                let desc = cmd.description.to_lowercase();
+                if name.contains(&query) || desc.contains(&query) {
+                    // simple relevance score: startswith > contains > fuzzy
+                    let mut score = 1;
+                    if name.starts_with(&query) {
+                        score += 3;
+                    } else if desc.starts_with(&query) {
+                        score += 2;
+                    }
+                    let fuzzy = (normalized_levenshtein(&name, &query) * 100.0) as i32;
+                    score += fuzzy / 20; // small bonus
+                    Some((score, cmd))
+                } else {
+                    None
+                }
             }
         })
-        .collect()
+        .collect();
+    filtered.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.name.cmp(&b.1.name)));
+    filtered.into_iter().map(|(_, cmd)| cmd).collect()
 }
 
 fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound> {
@@ -1028,18 +1324,41 @@ fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound
             let _ = apply_ui_action(state, UiAction::OpenSearch);
             Vec::new()
         }
+        "configure" => crate::app::config_wizard::open(state),
+        "sessions" => crate::app::sessions::open_sessions(state),
         "connections" => {
             apply_ui_action(state, UiAction::OpenConnections)
         }
-        "env" => {
-            let _ = apply_ui_action(state, UiAction::OpenEnvEditor);
-            Vec::new()
+        "env" => apply_ui_action(state, UiAction::OpenEnvEditor),
+        "context" => apply_ui_action(state, UiAction::OpenContextViewer),
+        "mcp servers" => crate::app::config_panels::mcp_open(state),
+        name if name.starts_with("model ") => {
+            let target = name.trim_start_matches("model ").trim();
+            switch_model(state, target)
         }
-        "context" => {
-            let _ = apply_ui_action(state, UiAction::OpenContextViewer);
-            Vec::new()
+        "model" => {
+            // Prepare input for subcommand selection and open picker
+            set_input_text(state, "/model ");
+            let mut out = Vec::new();
+            if !state.connections.models.loading {
+                out.extend(crate::app::connections::request_models_for_current_connection(
+                    state,
+                ));
+            }
+            state.slash_picker_open = true;
+            state.slash_picker_selected = 0;
+            out
         }
-        "new session" => {
+        "compact context" => {
+            let id = state.next_client_id();
+            state.push_activity_line("Compacting context...".to_string());
+            vec![Outbound::JsonRpcRequest {
+                id,
+                method: "ent/session/compact".to_string(),
+                params: Some(json!({})),
+            }]
+        }
+        "clear" | "new session" => {
             let mut out = Vec::new();
             let id = state.next_client_id();
             crate::app::sessions::prepare_for_session_switch(state, None);
@@ -1063,21 +1382,178 @@ fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound
     }
 }
 
-fn should_remember_permission_decision(decision: &str) -> bool {
-    let d = decision.to_lowercase();
-    d.contains("allow") && d.contains("session")
+fn switch_model(state: &mut AppState, model_id: &str) -> Vec<Outbound> {
+    let model_id = model_id.trim();
+    if model_id.is_empty() {
+        state.push_debug_line("model: missing model id".to_string());
+        return Vec::new();
+    }
+    let Some(connection_id) = crate::app::connections::current_connection_id(state) else {
+        state.push_debug_line("model: no active connection".to_string());
+        return Vec::new();
+    };
+
+    state.model_id = Some(model_id.to_string());
+    state.prefs.last_model_id = state.model_id.clone();
+    let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
+
+    let id = state.next_client_id();
+    vec![Outbound::JsonRpcRequest {
+        id,
+        method: "ent/session/configure".to_string(),
+        params: Some(json!({
+            "connectionId": connection_id,
+            "modelId": model_id,
+        })),
+    }]
+}
+
+fn execute_permission_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound> {
+    let Some(req) = state.active_permission.clone() else {
+        return Vec::new();
+    };
+    let target = name.strip_prefix("permission ").unwrap_or("").trim().to_lowercase();
+    let mut selected_idx: Option<usize> = None;
+
+    for (idx, opt) in req.options.iter().enumerate() {
+        if opt.label.to_lowercase() == target || opt.option_id.to_lowercase() == target {
+            selected_idx = Some(idx);
+            break;
+        }
+    }
+
+    if selected_idx.is_none() {
+        if target == "allow" {
+            selected_idx = req
+                .options
+                .iter()
+                .position(|o| o.option_id.to_lowercase().contains("allow"));
+        } else if target == "deny" {
+            selected_idx = req
+                .options
+                .iter()
+                .position(|o| o.option_id.to_lowercase().contains("deny"));
+        }
+    }
+
+    let Some(idx) = selected_idx else { return Vec::new() };
+    state.active_permission = Some(req);
+    state.permission_details_scroll = 0;
+    state.active_permission_selected = idx;
+    apply_ui_action(state, UiAction::PermissionSubmit)
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum PermissionRemember {
+    None,
+    Session,
+    Always,
+}
+
+#[derive(Clone)]
+pub(crate) struct PermissionChoice {
+    pub(crate) option_id: String,
+    pub(crate) remember: PermissionRemember,
+}
+
+pub(crate) fn permission_choices(state: &AppState) -> Vec<PermissionChoice> {
+    let Some(req) = state.active_permission.as_ref() else {
+        return Vec::new();
+    };
+
+    let mut allow_opt: Option<String> = None;
+    let mut deny_opt: Option<String> = None;
+    let mut extra: Vec<String> = Vec::new();
+
+    for opt in &req.options {
+        let id_lower = opt.option_id.to_lowercase();
+        let label_lower = opt.label.to_lowercase();
+        if allow_opt.is_none() && (id_lower.contains("allow") || label_lower.contains("allow")) {
+            allow_opt = Some(opt.option_id.clone());
+        } else if deny_opt.is_none()
+            && (id_lower.contains("deny") || label_lower.contains("deny"))
+        {
+            deny_opt = Some(opt.option_id.clone());
+        } else {
+            extra.push(opt.option_id.clone());
+        }
+    }
+
+    let mut choices: Vec<PermissionChoice> = Vec::new();
+
+    if let Some(id) = allow_opt.clone() {
+        choices.push(PermissionChoice {
+            option_id: id.clone(),
+            remember: PermissionRemember::None,
+        });
+        choices.push(PermissionChoice {
+            option_id: id.clone(),
+            remember: PermissionRemember::Session,
+        });
+        choices.push(PermissionChoice {
+            option_id: id,
+            remember: PermissionRemember::Always,
+        });
+    }
+
+    if let Some(id) = deny_opt.clone() {
+        choices.push(PermissionChoice {
+            option_id: id,
+            remember: PermissionRemember::None,
+        });
+    }
+
+    for id in extra {
+        choices.push(PermissionChoice {
+            option_id: id,
+            remember: PermissionRemember::None,
+        });
+    }
+
+    // If no allow/deny detected, fall back to the raw options
+    if choices.is_empty() {
+        for opt in &req.options {
+            choices.push(PermissionChoice {
+                option_id: opt.option_id.clone(),
+                remember: PermissionRemember::None,
+            });
+        }
+    }
+
+    choices
 }
 
 fn send_input(state: &mut AppState) -> Vec<Outbound> {
     let line = input_text(state).trim_end().to_string();
     let images = std::mem::take(&mut state.pending_images);
-    set_input_text(state, "");
-    state.input_history_index = None;
-    state.chat_follow = true;
 
     if line.is_empty() && images.is_empty() {
         return Vec::new();
     }
+
+    // Handle local slash commands directly (no agent roundtrip)
+    if images.is_empty() && line.starts_with('/') {
+        let cmd_text = line.trim_start_matches('/').trim();
+        if !cmd_text.is_empty() {
+            if let Some(cmd) = all_slash_commands(state)
+                .into_iter()
+                .find(|c| c.name == cmd_text)
+            {
+                let out = match cmd.source.as_deref() {
+                    Some("local") => execute_local_slash_command(state, &cmd.name),
+                    Some("permission") => execute_permission_slash_command(state, &cmd.name),
+                    _ => Vec::new(),
+                };
+                set_input_text(state, "");
+                state.input_history_index = None;
+                return out;
+            }
+        }
+    }
+
+    set_input_text(state, "");
+    state.input_history_index = None;
+    state.chat_follow = true;
 
     // Build display text for chat (show image indicators)
     let display_text = if images.is_empty() {
@@ -1149,11 +1625,6 @@ fn copy_text_or_fallback(state: &mut AppState, label: &str, text: &str) {
         Err(_) => state.push_debug_line(format!("copy {label}:\n{text}")),
     }
 }
-
-    // Palette deprecated; labels list is empty to maintain interface
-    pub fn palette_labels(_query: &str) -> Vec<&'static str> {
-        Vec::new()
-    }
 
 fn chat_start_line_for_message_index(messages: &[ChatMessage], idx: usize) -> u16 {
     let mut lines: u64 = 0;
@@ -1312,7 +1783,10 @@ mod tests {
                 },
             ],
         });
-        state.active_permission_selected = 1;
+        // With allow/deny options, permission_choices creates:
+        // 0: allow (None), 1: allow (Session), 2: allow (Always), 3: deny (None)
+        // Select index 3 to choose "deny"
+        state.active_permission_selected = 3;
 
         let out = apply_ui_action(&mut state, UiAction::PermissionSubmit);
         assert_eq!(out.len(), 1);
@@ -1465,6 +1939,55 @@ mod tests {
     }
 
     #[test]
+    fn permission_toggle_details_toggles_expanded_state() {
+        let mut state = AppState::new();
+        state.permission_details_scroll = 3;
+        assert!(state.permission_details_expanded);
+
+        // Toggle off
+        apply_ui_action(&mut state, UiAction::PermissionToggleDetails);
+        assert!(!state.permission_details_expanded);
+        assert_eq!(state.permission_details_scroll, 3, "Scroll is preserved");
+
+        // Toggle on
+        apply_ui_action(&mut state, UiAction::PermissionToggleDetails);
+        assert!(state.permission_details_expanded);
+        assert_eq!(state.permission_details_scroll, 3, "Scroll is preserved");
+    }
+
+    #[test]
+    fn permission_scroll_up_down_changes_scroll_when_expanded() {
+        let mut state = AppState::new();
+        state.permission_details_expanded = true;
+        state.permission_details_scroll = 1;
+
+        apply_ui_action(&mut state, UiAction::PermissionScrollDown);
+        assert_eq!(state.permission_details_scroll, 2);
+
+        apply_ui_action(&mut state, UiAction::PermissionScrollUp);
+        assert_eq!(state.permission_details_scroll, 1);
+
+        apply_ui_action(&mut state, UiAction::PermissionScrollUp);
+        assert_eq!(state.permission_details_scroll, 0);
+
+        apply_ui_action(&mut state, UiAction::PermissionScrollUp);
+        assert_eq!(state.permission_details_scroll, 0);
+    }
+
+    #[test]
+    fn permission_scroll_up_down_noop_when_collapsed() {
+        let mut state = AppState::new();
+        state.permission_details_expanded = false;
+        state.permission_details_scroll = 5;
+
+        apply_ui_action(&mut state, UiAction::PermissionScrollDown);
+        assert_eq!(state.permission_details_scroll, 5);
+
+        apply_ui_action(&mut state, UiAction::PermissionScrollUp);
+        assert_eq!(state.permission_details_scroll, 5);
+    }
+
+    #[test]
     fn permission_next_includes_guidance_row() {
         use crate::app::{PermissionOption, PermissionRequest};
         use serde_json::json;
@@ -1496,13 +2019,19 @@ mod tests {
         apply_ui_action(&mut state, UiAction::PermissionNext);
         assert_eq!(state.active_permission_selected, 1);
 
-        // Navigate to the guidance row (index 2, which is options.len())
+        // Navigate to the guidance row (index 4, which is choices.len())
         apply_ui_action(&mut state, UiAction::PermissionNext);
         assert_eq!(state.active_permission_selected, 2);
 
+        apply_ui_action(&mut state, UiAction::PermissionNext);
+        assert_eq!(state.active_permission_selected, 3);
+
+        apply_ui_action(&mut state, UiAction::PermissionNext);
+        assert_eq!(state.active_permission_selected, 4);
+
         // Should not go past guidance row
         apply_ui_action(&mut state, UiAction::PermissionNext);
-        assert_eq!(state.active_permission_selected, 2);
+        assert_eq!(state.active_permission_selected, 4);
     }
 
     #[test]
@@ -1532,8 +2061,8 @@ mod tests {
                 },
             ],
         });
-        // Select guidance row (index 2)
-        state.active_permission_selected = 2;
+        // Select guidance row (index 4)
+        state.active_permission_selected = 4;
         state.permission_guidance_input = "test guidance".to_string();
 
         let out = apply_ui_action(&mut state, UiAction::PermissionSubmit);
@@ -1588,8 +2117,8 @@ mod tests {
                 },
             ],
         });
-        // Select guidance row (index 2) but no guidance text
-        state.active_permission_selected = 2;
+        // Select guidance row (index 4) but no guidance text
+        state.active_permission_selected = 4;
         state.permission_guidance_input.clear();
 
         let out = apply_ui_action(&mut state, UiAction::PermissionSubmit);
@@ -1629,13 +2158,6 @@ mod tests {
     }
 
     #[test]
-    // Palette removed; keep placeholder to avoid unused warnings
-    #[test]
-    fn palette_removed_placeholder() {
-        assert!(true);
-    }
-
-    #[test]
     fn multiline_enter_sends_and_shift_enter_inserts_newline() {
         let mut state = AppState::new_with_paths(None, None);
         state.next_client_seq = 3;
@@ -1651,13 +2173,6 @@ mod tests {
         let out = apply_ui_action(&mut state, UiAction::InsertNewline);
         assert!(out.is_empty());
         assert_eq!(input_str(&state), "hi\n");
-    }
-
-    #[test]
-    // Palette removed; keep placeholder
-    #[test]
-    fn palette_new_session_placeholder() {
-        assert!(true);
     }
 
     #[test]
@@ -1711,9 +2226,9 @@ mod tests {
         let mut state = AppState::new_with_paths(None, None);
         set_input(&mut state, "line1\nline2\nline3");
         // Move cursor to middle of line2 (row 1 col 2)
-        state.input.move_cursor(CursorMove::Up); // start at end row2 col5? Actually end row2 col5; easier: move to top then down.
+        // Start at end of input (row 2, col 5), go up to row 1, then head to col 0, then forward twice
+        state.input.move_cursor(CursorMove::Up);
         state.input.move_cursor(CursorMove::Head);
-        state.input.move_cursor(CursorMove::Down);
         state.input.move_cursor(CursorMove::Forward);
         state.input.move_cursor(CursorMove::Forward);
 
@@ -1773,16 +2288,19 @@ mod tests {
     fn cursor_up_down_short_lines() {
         let mut state = AppState::new_with_paths(None, None);
         set_input(&mut state, "long line here\nhi\nx");
-        // move to col10 of first line
-        for _ in 0..3 {
-            state.input.move_cursor(CursorMove::Back);
+        // Move cursor to first line at high column
+        // Start at end of input (2, 1), go to top/head, then move forward to col 10
+        state.input.move_cursor(CursorMove::Top);
+        for _ in 0..10 {
+            state.input.move_cursor(CursorMove::Forward);
         }
+        // Now at (0, 10) - middle of "long line here"
 
-        // Move down to shorter line - cursor goes to end
+        // Move down to shorter line - cursor clamps to end of "hi" (length 2)
         apply_ui_action(&mut state, UiAction::CursorDown);
         assert_eq!(cursor_pos(&state), (1, 2)); // end of "hi"
 
-        // Move down again - goes to end of "x"
+        // Move down again - goes to end of "x" (length 1)
         apply_ui_action(&mut state, UiAction::CursorDown);
         assert_eq!(cursor_pos(&state), (2, 1)); // end of "x"
     }
@@ -1882,7 +2400,8 @@ mod tests {
 
         apply_ui_action(&mut state, UiAction::InsertNewline);
         assert_eq!(input_str(&state), "hello\n world");
-        assert_eq!(cursor_pos(&state), (1, 1)); // after newline
+        // Cursor is at start of new line (row 1, col 0)
+        assert_eq!(cursor_pos(&state), (1, 0));
     }
 
     #[test]
@@ -1902,7 +2421,8 @@ mod tests {
         apply_ui_action(&mut state, UiAction::SlashPickerSelect);
 
         assert!(!state.slash_picker_open);
-        assert_eq!(input_str(&state), "/ping ");
+        // No trailing space since command has no input_hint
+        assert_eq!(input_str(&state), "/ping");
     }
 
     #[test]
@@ -1933,5 +2453,151 @@ mod tests {
 
         assert_eq!(input_str(&state), "hi\n\nff");
         assert_eq!(state.input.cursor(), (2, 2)); // row 2 col 2
+    }
+
+    #[test]
+    fn chat_tool_selection_navigates_completed_tools() {
+        use crate::app::activity;
+        let mut state = AppState::new_with_paths(None, None);
+
+        // Add some completed tool calls
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_1".to_string(),
+            Some("file.read".to_string()),
+            Some("completed".to_string()),
+            serde_json::json!({"path": "/tmp/file.txt"}),
+            None,
+            None,
+            None,
+            None,
+        );
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_2".to_string(),
+            Some("shell.exec".to_string()),
+            Some("success".to_string()),
+            serde_json::json!({"command": "echo hi"}),
+            None,
+            None,
+            None,
+            None,
+        );
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_3".to_string(),
+            Some("file.write".to_string()),
+            Some("error".to_string()),
+            serde_json::json!({"path": "/etc/passwd"}),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        // Initially no selection
+        assert_eq!(state.chat_selected_tool_idx, None);
+        assert!(!state.chat_tool_expanded);
+
+        // Navigate down - should start at 0
+        apply_ui_action(&mut state, UiAction::ChatToolNext);
+        assert_eq!(state.chat_selected_tool_idx, Some(0));
+
+        // Navigate down again
+        apply_ui_action(&mut state, UiAction::ChatToolNext);
+        assert_eq!(state.chat_selected_tool_idx, Some(1));
+
+        // Navigate down to last
+        apply_ui_action(&mut state, UiAction::ChatToolNext);
+        assert_eq!(state.chat_selected_tool_idx, Some(2));
+
+        // Wrap around to first
+        apply_ui_action(&mut state, UiAction::ChatToolNext);
+        assert_eq!(state.chat_selected_tool_idx, Some(0));
+
+        // Navigate up wraps to last
+        apply_ui_action(&mut state, UiAction::ChatToolPrev);
+        assert_eq!(state.chat_selected_tool_idx, Some(2));
+
+        // Toggle expanded
+        apply_ui_action(&mut state, UiAction::ChatToolToggleExpanded);
+        assert!(state.chat_tool_expanded);
+
+        // Toggle again to collapse
+        apply_ui_action(&mut state, UiAction::ChatToolToggleExpanded);
+        assert!(!state.chat_tool_expanded);
+
+        // Clear selection
+        apply_ui_action(&mut state, UiAction::ChatToolClearSelection);
+        assert_eq!(state.chat_selected_tool_idx, None);
+        assert!(!state.chat_tool_expanded);
+    }
+
+    #[test]
+    fn chat_tool_selection_toggle_requires_selection() {
+        let mut state = AppState::new_with_paths(None, None);
+
+        // No tools, no selection
+        assert_eq!(state.chat_selected_tool_idx, None);
+        assert!(!state.chat_tool_expanded);
+
+        // Toggle does nothing when nothing is selected
+        apply_ui_action(&mut state, UiAction::ChatToolToggleExpanded);
+        assert!(!state.chat_tool_expanded);
+    }
+
+    #[test]
+    fn chat_tool_selection_empty_list_no_crash() {
+        let mut state = AppState::new_with_paths(None, None);
+
+        // No completed tools - these should be no-ops
+        apply_ui_action(&mut state, UiAction::ChatToolNext);
+        assert_eq!(state.chat_selected_tool_idx, None);
+
+        apply_ui_action(&mut state, UiAction::ChatToolPrev);
+        assert_eq!(state.chat_selected_tool_idx, None);
+    }
+
+    #[test]
+    fn chat_tool_open_details_requires_selection() {
+        let mut state = AppState::new_with_paths(None, None);
+
+        // No selection - open details does nothing
+        assert_eq!(state.chat_selected_tool_idx, None);
+        assert!(!state.tool_details_overlay_open);
+
+        apply_ui_action(&mut state, UiAction::ChatToolOpenDetails);
+        assert!(!state.tool_details_overlay_open);
+    }
+
+    #[test]
+    fn chat_tool_open_details_opens_overlay_with_selection() {
+        use crate::app::activity;
+
+        let mut state = AppState::new_with_paths(None, None);
+
+        // Add some completed tool calls
+        activity::upsert_tool_use(
+            &mut state,
+            "tool_1".to_string(),
+            Some("file.read".to_string()),
+            Some("completed".to_string()),
+            serde_json::json!({"path": "/tmp/file.txt"}),
+            Some(serde_json::json!({"content": "file contents"})),
+            None,
+            None,
+            None,
+        );
+
+        // Select a tool
+        apply_ui_action(&mut state, UiAction::ChatToolNext);
+        assert_eq!(state.chat_selected_tool_idx, Some(0));
+        assert!(!state.tool_details_overlay_open);
+        assert_eq!(state.tool_details_overlay_scroll, 0);
+
+        // Open details overlay
+        apply_ui_action(&mut state, UiAction::ChatToolOpenDetails);
+        assert!(state.tool_details_overlay_open);
+        assert_eq!(state.tool_details_overlay_scroll, 0);
     }
 }
