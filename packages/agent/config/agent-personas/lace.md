@@ -6,6 +6,16 @@
 
 {{include:sections/tools.md}}
 
+{{#availableSkills}}
+## Available Skills
+
+The following skills are available. Use the `use_skill` tool to activate a skill
+when it's relevant to your task. Skills provide expert guidance for specific
+workflows.
+
+{{{availableSkills}}}
+{{/availableSkills}}
+
 {{include:sections/delegation.md}}
 
 {{include:sections/task-tracking.md}}
