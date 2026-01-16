@@ -2,7 +2,7 @@
 // ABOUTME: Tests error classification, backoff calculation, and retry logic
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ProviderMessage, ProviderResponse } from './base-provider';
+import { ProviderMessage, ProviderResponse } from '../base-provider';
 import { Tool } from '@lace/agent/tools/tool';
 import { BaseMockProvider } from '@lace/agent/test-utils/base-mock-provider';
 
@@ -451,6 +451,36 @@ describe('AIProvider retry functionality', () => {
       expect(callCount).toBe(2);
       // In fake timer mode, we can't measure actual delay, but we can verify the sequence
       expect(retryDelayMeasured).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('thinking events', () => {
+    it('should emit thinking_start event', async () => {
+      const provider = new TestProvider({});
+      const events: string[] = [];
+      provider.on('thinking_start', () => events.push('thinking_start'));
+      provider.emit('thinking_start', {});
+      expect(events).toContain('thinking_start');
+    });
+
+    it('should emit thinking_delta event with text', async () => {
+      const provider = new TestProvider({});
+      let receivedText = '';
+      provider.on('thinking_delta', ({ text }: { text: string }) => {
+        receivedText = text;
+      });
+      provider.emit('thinking_delta', { text: 'reasoning about the problem' });
+      expect(receivedText).toBe('reasoning about the problem');
+    });
+
+    it('should emit thinking_end event with token count', async () => {
+      const provider = new TestProvider({});
+      let receivedTokens = 0;
+      provider.on('thinking_end', ({ tokens }: { tokens: number }) => {
+        receivedTokens = tokens;
+      });
+      provider.emit('thinking_end', { tokens: 1234 });
+      expect(receivedTokens).toBe(1234);
     });
   });
 });

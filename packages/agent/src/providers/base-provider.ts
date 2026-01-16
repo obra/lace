@@ -55,6 +55,15 @@ export interface ConversationState {
   openaiResponseId?: string; // Last response.id from OpenAI Responses API (for conversation chaining)
 }
 
+/**
+ * Event types emitted by providers:
+ * - 'token': { token: string } - Streaming text token
+ * - 'token_usage_update': { inputTokens, outputTokens } - Token usage update
+ * - 'complete': { response: ProviderResponse } - Response complete
+ * - 'thinking_start': {} - Extended thinking has started
+ * - 'thinking_delta': { text: string } - Streaming thinking content
+ * - 'thinking_end': { tokens: number } - Extended thinking complete with token count
+ */
 export abstract class AIProvider extends EventEmitter {
   protected readonly _config: ProviderConfig;
   protected _systemPrompt: string = '';
