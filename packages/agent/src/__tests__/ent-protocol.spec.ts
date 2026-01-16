@@ -803,8 +803,8 @@ describe('Ent protocol contract (selected coverage)', () => {
       agent.peer.request('session/prompt', { content: [{ type: 'text', text: 'hi' }] })
     ).rejects.toMatchObject({
       code: -32602,
-      message: 'InvalidParams',
-      data: { category: 'protocol', reason: expect.stringContaining('connectionId') },
+      message: expect.stringContaining('connectionId'),
+      data: { category: 'protocol' },
     });
   });
 

@@ -13,8 +13,8 @@ import type { AgentServerState } from '../server-types';
 export function throwInvalidParams(reason?: string): never {
   throw {
     code: -32602,
-    message: 'InvalidParams',
-    data: { category: 'protocol', ...(reason ? { reason } : {}) },
+    message: reason || 'Invalid parameters',
+    data: { category: 'protocol' },
   };
 }
 
@@ -222,7 +222,7 @@ export function assertInitialized(state: AgentServerState): void {
   if (!state.initialized)
     throw {
       code: EntErrorCodes.NotInitialized,
-      message: 'NotInitialized',
+      message: 'Agent not initialized; call initialize first',
       data: { category: 'agent_internal' },
     };
 }

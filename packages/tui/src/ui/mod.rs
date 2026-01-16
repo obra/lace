@@ -1034,12 +1034,6 @@ fn handle_agent_line(
             }
 
             let error_message = error.as_ref().map(|e| e.message.as_str());
-            let error_reason: Option<String> = error
-                .as_ref()
-                .and_then(|e| e.data.as_ref())
-                .and_then(|d| d.get("reason"))
-                .and_then(|r| r.as_str())
-                .map(|s| s.to_string());
             let suppress_method_not_found =
                 matches!(pending_method.as_deref(), Some("ent/agent/status"))
                     && error_message
@@ -1053,9 +1047,6 @@ fn handle_agent_line(
                         "rpc error method={} code={} message={}",
                         method_label, err.code, err.message
                     );
-                    if let Some(r) = error_reason.as_ref() {
-                        dbg.push_str(&format!(" reason={r}"));
-                    }
                     if let Some(params) = pending_params.clone() {
                         dbg.push_str(&format!(" params={}", params));
                     }
@@ -1075,7 +1066,6 @@ fn handle_agent_line(
                 state,
                 pending_method.as_deref(),
                 error_message,
-                error_reason.as_deref(),
             );
             if !out.is_empty() {
                 send_outbound(transport, state, out, timeout_ms)?;
@@ -1267,16 +1257,14 @@ fn maybe_open_config_wizard_for_prompt_error(
     state: &mut AppState,
     pending_method: Option<&str>,
     error_message: Option<&str>,
-    error_reason: Option<&str>,
 ) -> Vec<Outbound> {
     if pending_method != Some("session/prompt") {
         return Vec::new();
     }
-    if error_message.is_none() {
+    let Some(err) = error_message else {
         return Vec::new();
-    }
-    // Check both message and reason for the configuration error indicator
-    if !is_missing_provider_configuration_error(error_message, error_reason) {
+    };
+    if !is_missing_provider_configuration_error(err) {
         return Vec::new();
     }
     if state.connection_id.is_some() && state.model_id.is_some() {
@@ -1290,24 +1278,10 @@ fn maybe_open_config_wizard_for_prompt_error(
     config_wizard::open(state)
 }
 
-fn is_missing_provider_configuration_error(message: Option<&str>, reason: Option<&str>) -> bool {
-    // Check message field
-    if let Some(m) = message {
-        let m = m.to_lowercase();
-        if m.contains("missing provider configuration")
-            || m.contains("connectionid and modelid are required")
-        {
-            return true;
-        }
-    }
-    // Check reason field (in error.data.reason)
-    if let Some(r) = reason {
-        let r = r.to_lowercase();
-        if r.contains("connectionid and modelid are required") {
-            return true;
-        }
-    }
-    false
+fn is_missing_provider_configuration_error(message: &str) -> bool {
+    let m = message.to_lowercase();
+    m.contains("missing provider configuration")
+        || m.contains("connectionid and modelid are required")
 }
 
 fn extract_session_id(result: &Option<Value>) -> Option<String> {
@@ -4375,7 +4349,6 @@ mod tests {
             &mut state,
             Some("session/prompt"),
             Some("Missing provider configuration: connectionId and modelId are required"),
-            None,
         );
 
         assert!(state.config_wizard.open);
@@ -4388,23 +4361,6 @@ mod tests {
             Outbound::JsonRpcRequest { method, .. } => assert_eq!(method, "ent/connections/list"),
             _ => panic!("expected request"),
         }
-    }
-
-    #[test]
-    fn auto_opens_config_wizard_when_error_reason_indicates_missing_config() {
-        let mut state = AppState::new_with_paths(None, None);
-        assert!(!state.config_wizard.open);
-
-        // Error message is generic "InvalidParams" but reason has the details
-        let out = maybe_open_config_wizard_for_prompt_error(
-            &mut state,
-            Some("session/prompt"),
-            Some("InvalidParams"),
-            Some("connectionId and modelId are required before prompting"),
-        );
-
-        assert!(state.config_wizard.open);
-        assert_eq!(out.len(), 1);
     }
 
     #[test]
