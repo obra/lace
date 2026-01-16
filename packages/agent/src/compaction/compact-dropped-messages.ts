@@ -118,6 +118,11 @@ function laceEventsFromProviderMessages(
   return events;
 }
 
+import type { ToolCall, ToolResult } from '@lace/agent/tools/types';
+
+// Typed shapes for LaceEvent data - these allow proper narrowing
+type AgentMessageData = { content?: string } | string;
+
 function providerMessagesFromLaceEvents(events: LaceEvent[]): ProviderMessage[] {
   const messages: ProviderMessage[] = [];
 
@@ -137,7 +142,7 @@ function providerMessagesFromLaceEvents(events: LaceEvent[]): ProviderMessage[] 
     }
 
     if (event.type === 'AGENT_MESSAGE') {
-      const data = event.data as any;
+      const data = event.data as AgentMessageData;
       const content =
         typeof data === 'string' ? data : typeof data?.content === 'string' ? data.content : '';
       messages.push({ role: 'assistant', content });
@@ -145,7 +150,8 @@ function providerMessagesFromLaceEvents(events: LaceEvent[]): ProviderMessage[] 
     }
 
     if (event.type === 'TOOL_CALL') {
-      const toolCall = event.data as any;
+      // Cast to ToolCall - LaceEvent data is assumed to have correct shape at runtime
+      const toolCall = event.data as ToolCall;
       if (!toolCall || typeof toolCall !== 'object') continue;
 
       if (messages.length === 0 || messages[messages.length - 1]!.role !== 'assistant') {
@@ -159,7 +165,8 @@ function providerMessagesFromLaceEvents(events: LaceEvent[]): ProviderMessage[] 
     }
 
     if (event.type === 'TOOL_RESULT') {
-      const toolResult = event.data as any;
+      // Cast to ToolResult - LaceEvent data is assumed to have correct shape at runtime
+      const toolResult = event.data as ToolResult;
       if (!toolResult || typeof toolResult !== 'object') continue;
 
       const last = messages[messages.length - 1];
@@ -207,7 +214,11 @@ export async function compactDroppedMessagesWithCore(options: {
 
   const result = await strategy.compact(events, context);
   const messages = providerMessagesFromLaceEvents(result.compactedEvents);
-  const meta = (result.compactionEvent.data as any)?.metadata;
+
+  // Extract summary from compaction event metadata
+  type CompactionEventMeta = { metadata?: { summary?: string } };
+  const eventData = result.compactionEvent.data as CompactionEventMeta | undefined;
+  const meta = eventData?.metadata;
   const summary = typeof meta?.summary === 'string' ? meta.summary : undefined;
   return { messages, summary };
 }
