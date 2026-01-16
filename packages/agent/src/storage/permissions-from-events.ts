@@ -27,13 +27,17 @@ function toFiniteNumber(value: unknown): number | null {
   return value;
 }
 
+// Define the expected shape for option items
+type OptionItem = { optionId?: unknown; label?: unknown };
+
 function toOptions(value: unknown): Array<{ optionId: string; label: string }> | null {
   if (!Array.isArray(value)) return null;
   const parsed: Array<{ optionId: string; label: string }> = [];
   for (const item of value) {
     if (!item || typeof item !== 'object') return null;
-    const optionId = toNonEmptyString((item as any).optionId);
-    const label = typeof (item as any).label === 'string' ? (item as any).label : null;
+    const itemObj = item as OptionItem;
+    const optionId = toNonEmptyString(itemObj.optionId);
+    const label = typeof itemObj.label === 'string' ? itemObj.label : null;
     if (!optionId || label === null) return null;
     parsed.push({ optionId, label });
   }
