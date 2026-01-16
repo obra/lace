@@ -1,10 +1,16 @@
 # Permission Dialog Rich Diff View Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
+> implement this plan task-by-task.
 
-**Goal:** Show syntax-highlighted unified diffs in the permission dialog for file_edit tools, expanded by default.
+**Goal:** Show syntax-highlighted unified diffs in the permission dialog for
+file_edit tools, expanded by default.
 
-**Architecture:** Tool-specific rendering in the permission bar - detect tool type and render appropriate preview (diff for file_edit, content for file_write, command for bash). Use the `similar` crate for diff generation. Diff colors (red/green) provide immediate value; syntax highlighting can be added later with `syntect`.
+**Architecture:** Tool-specific rendering in the permission bar - detect tool
+type and render appropriate preview (diff for file_edit, content for file_write,
+command for bash). Use the `similar` crate for diff generation. Diff colors
+(red/green) provide immediate value; syntax highlighting can be added later with
+`syntect`.
 
 **Tech Stack:** Rust, ratatui, similar (diff crate)
 
@@ -13,6 +19,7 @@
 ## Task 1: Add `similar` dependency
 
 **Files:**
+
 - Modify: `packages/tui/Cargo.toml`
 
 **Step 1: Add the dependency**
@@ -33,8 +40,7 @@ strsim = "0.11"
 
 **Step 2: Verify it compiles**
 
-Run: `cd packages/tui && cargo check`
-Expected: Compiles without errors
+Run: `cd packages/tui && cargo check` Expected: Compiles without errors
 
 **Step 3: Commit**
 
@@ -48,12 +54,14 @@ git commit -m "chore(tui): add similar crate for diff generation"
 ## Task 2: Default permission_details_expanded to true
 
 **Files:**
+
 - Modify: `packages/tui/src/app/mod.rs:237`
 - Modify: `packages/tui/src/ui/mod.rs` (tests)
 
 **Step 1: Find and update the test that will fail**
 
-In `packages/tui/src/app/ui.rs`, find the test `permission_toggle_details_works`:
+In `packages/tui/src/app/ui.rs`, find the test
+`permission_toggle_details_works`:
 
 ```rust
 #[test]
@@ -93,12 +101,14 @@ fn permission_toggle_details_works() {
 
 **Step 3: Run test to verify it fails**
 
-Run: `cd packages/tui && cargo test permission_toggle_details_works`
-Expected: FAIL - assertion failed: `state.permission_details_expanded` expected true, got false
+Run: `cd packages/tui && cargo test permission_toggle_details_works` Expected:
+FAIL - assertion failed: `state.permission_details_expanded` expected true, got
+false
 
 **Step 4: Change the default in AppState::new()**
 
-In `packages/tui/src/app/mod.rs`, find the `impl AppState` block and change line ~237:
+In `packages/tui/src/app/mod.rs`, find the `impl AppState` block and change line
+~237:
 
 ```rust
 // Before:
@@ -110,13 +120,13 @@ permission_details_expanded: true,
 
 **Step 5: Run test to verify it passes**
 
-Run: `cd packages/tui && cargo test permission_toggle_details_works`
-Expected: PASS
+Run: `cd packages/tui && cargo test permission_toggle_details_works` Expected:
+PASS
 
 **Step 6: Run all tests to check for other failures**
 
-Run: `cd packages/tui && cargo test --lib`
-Expected: All tests pass (or note any that need updating)
+Run: `cd packages/tui && cargo test --lib` Expected: All tests pass (or note any
+that need updating)
 
 **Step 7: Commit**
 
@@ -130,11 +140,13 @@ git commit -m "feat(tui): expand permission details by default"
 ## Task 3: Add diff scroll state to AppState
 
 **Files:**
+
 - Modify: `packages/tui/src/app/mod.rs`
 
 **Step 1: Add the field to AppState struct**
 
-In `packages/tui/src/app/mod.rs`, find the `AppState` struct (around line 80-170) and add after `permission_details_expanded`:
+In `packages/tui/src/app/mod.rs`, find the `AppState` struct (around line
+80-170) and add after `permission_details_expanded`:
 
 ```rust
 pub permission_details_expanded: bool,
@@ -144,7 +156,8 @@ pub permission_details_scroll: u16,
 
 **Step 2: Initialize in AppState::new()**
 
-In the `AppState::new()` function, add after `permission_details_expanded: true,`:
+In the `AppState::new()` function, add after
+`permission_details_expanded: true,`:
 
 ```rust
 permission_details_expanded: true,
@@ -153,8 +166,7 @@ permission_details_scroll: 0,
 
 **Step 3: Verify it compiles**
 
-Run: `cd packages/tui && cargo check`
-Expected: Compiles without errors
+Run: `cd packages/tui && cargo check` Expected: Compiles without errors
 
 **Step 4: Commit**
 
@@ -168,6 +180,7 @@ git commit -m "feat(tui): add permission_details_scroll state"
 ## Task 4: Create diff rendering module
 
 **Files:**
+
 - Create: `packages/tui/src/ui/diff.rs`
 - Modify: `packages/tui/src/ui/mod.rs` (add module)
 
@@ -314,7 +327,8 @@ mod tests {
 
 **Step 2: Add module to mod.rs**
 
-In `packages/tui/src/ui/mod.rs`, add near the top with other module declarations:
+In `packages/tui/src/ui/mod.rs`, add near the top with other module
+declarations:
 
 ```rust
 pub mod markdown;
@@ -323,8 +337,7 @@ pub mod diff;
 
 **Step 3: Run tests to verify**
 
-Run: `cd packages/tui && cargo test diff::`
-Expected: All 3 tests pass
+Run: `cd packages/tui && cargo test diff::` Expected: All 3 tests pass
 
 **Step 4: Commit**
 
@@ -338,6 +351,7 @@ git commit -m "feat(tui): add diff rendering module"
 ## Task 5: Create file_edit input parser
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/diff.rs`
 
 **Step 1: Add test for parsing file_edit input**
@@ -423,8 +437,7 @@ fn returns_none_for_invalid_input() {
 
 **Step 3: Run tests**
 
-Run: `cd packages/tui && cargo test diff::`
-Expected: All tests pass
+Run: `cd packages/tui && cargo test diff::` Expected: All tests pass
 
 **Step 4: Commit**
 
@@ -438,6 +451,7 @@ git commit -m "feat(tui): add file_edit input parser"
 ## Task 6: Create render_file_edit_diff function
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/diff.rs`
 
 **Step 1: Add the rendering function**
@@ -512,8 +526,7 @@ fn render_file_edit_diff_returns_none_for_non_edit() {
 
 **Step 3: Run tests**
 
-Run: `cd packages/tui && cargo test diff::`
-Expected: All tests pass
+Run: `cd packages/tui && cargo test diff::` Expected: All tests pass
 
 **Step 4: Commit**
 
@@ -527,11 +540,13 @@ git commit -m "feat(tui): add render_file_edit_diff function"
 ## Task 7: Integrate diff view into permission bar
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/mod.rs`
 
 **Step 1: Add test for diff rendering in permission bar**
 
-Find the test `permission_bar_expanded_shows_details` in `packages/tui/src/ui/mod.rs` and add a new test after it:
+Find the test `permission_bar_expanded_shows_details` in
+`packages/tui/src/ui/mod.rs` and add a new test after it:
 
 ```rust
 #[test]
@@ -601,7 +616,9 @@ Expected: FAIL - diff markers not found (currently shows raw JSON)
 
 **Step 3: Modify render_permission_bar to use diff view**
 
-In `packages/tui/src/ui/mod.rs`, find the `render_permission_bar` function. Locate the section that renders tool input JSON when expanded (around line 2711-2741). Replace it with tool-specific rendering:
+In `packages/tui/src/ui/mod.rs`, find the `render_permission_bar` function.
+Locate the section that renders tool input JSON when expanded (around line
+2711-2741). Replace it with tool-specific rendering:
 
 ```rust
 // When expanded, show resource and tool input details
@@ -679,8 +696,7 @@ Expected: PASS
 
 **Step 6: Run all permission bar tests**
 
-Run: `cd packages/tui && cargo test permission_bar`
-Expected: All tests pass
+Run: `cd packages/tui && cargo test permission_bar` Expected: All tests pass
 
 **Step 7: Commit**
 
@@ -694,6 +710,7 @@ git commit -m "feat(tui): show diff view for file_edit in permission bar"
 ## Task 8: Update permission_bar_height for diff content
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/mod.rs`
 
 **Step 1: Add test for height calculation with diff**
@@ -739,12 +756,14 @@ fn permission_bar_height_accounts_for_diff_lines() {
 
 **Step 2: Run test to see current behavior**
 
-Run: `cd packages/tui && cargo test permission_bar_height_accounts_for_diff_lines`
+Run:
+`cd packages/tui && cargo test permission_bar_height_accounts_for_diff_lines`
 Expected: May pass or fail depending on current implementation
 
 **Step 3: Update permission_bar_height function**
 
-Find `permission_bar_height` function in `packages/tui/src/ui/mod.rs` (around line 2600). Update the expanded height calculation:
+Find `permission_bar_height` function in `packages/tui/src/ui/mod.rs` (around
+line 2600). Update the expanded height calculation:
 
 ```rust
 fn permission_bar_height(state: &AppState) -> u16 {
@@ -785,8 +804,8 @@ fn permission_bar_height(state: &AppState) -> u16 {
 
 **Step 4: Run test to verify**
 
-Run: `cd packages/tui && cargo test permission_bar_height`
-Expected: All tests pass
+Run: `cd packages/tui && cargo test permission_bar_height` Expected: All tests
+pass
 
 **Step 5: Commit**
 
@@ -800,6 +819,7 @@ git commit -m "fix(tui): calculate permission bar height correctly for diff view
 ## Task 9: Add scroll support for diff view
 
 **Files:**
+
 - Modify: `packages/tui/src/app/ui.rs`
 - Modify: `packages/tui/src/ui/mod.rs`
 
@@ -836,7 +856,9 @@ UiAction::PermissionScrollDown => {
 
 **Step 3: Map keys to scroll actions**
 
-Find the key handling section that processes permission-related keys (where Y/N/S/D are handled). Add scroll key mappings when permission is active and expanded:
+Find the key handling section that processes permission-related keys (where
+Y/N/S/D are handled). Add scroll key mappings when permission is active and
+expanded:
 
 ```rust
 // In the permission key handling section, add:
@@ -850,7 +872,8 @@ KeyCode::Down | KeyCode::Char('j') if state.active_permission.is_some() && state
 
 **Step 4: Apply scroll offset in render_permission_bar**
 
-In `packages/tui/src/ui/mod.rs`, modify the diff rendering section to apply scroll:
+In `packages/tui/src/ui/mod.rs`, modify the diff rendering section to apply
+scroll:
 
 ```rust
 if tool == "file_edit" {
@@ -868,7 +891,8 @@ if tool == "file_edit" {
 
 **Step 5: Reset scroll when permission changes**
 
-In `packages/tui/src/app/reducer.rs`, find where `active_permission` is set and reset scroll:
+In `packages/tui/src/app/reducer.rs`, find where `active_permission` is set and
+reset scroll:
 
 ```rust
 // When setting new permission request:
@@ -877,8 +901,7 @@ state.permission_details_scroll = 0;
 
 **Step 6: Run all tests**
 
-Run: `cd packages/tui && cargo test --lib`
-Expected: All tests pass
+Run: `cd packages/tui && cargo test --lib` Expected: All tests pass
 
 **Step 7: Commit**
 
@@ -900,6 +923,7 @@ cd packages/tui && cargo build
 **Step 2: Test with actual file_edit**
 
 Run the TUI and trigger a file_edit operation. Verify:
+
 - [ ] Permission dialog shows expanded by default
 - [ ] Diff view shows with red (removed) and green (added) colors
 - [ ] File path header is visible
@@ -910,6 +934,7 @@ Run the TUI and trigger a file_edit operation. Verify:
 **Step 3: Fix any visual issues**
 
 Common issues to check:
+
 - Line wrapping for long lines
 - Color contrast in both light and dark themes
 - Scroll bounds (don't scroll past content)
@@ -926,6 +951,7 @@ git commit -m "feat(tui): complete permission diff view implementation"
 ## Summary
 
 This implementation adds:
+
 1. Rich diff view for `file_edit` tool permissions
 2. Permissions expanded by default
 3. Scroll support for large diffs
@@ -933,6 +959,7 @@ This implementation adds:
 5. Proper height calculation for dynamic content
 
 Future enhancements (not in scope):
+
 - `file_write` content preview
 - Syntax highlighting with `syntect`
 - Side-by-side diff view

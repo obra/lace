@@ -3,10 +3,7 @@
 
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { getPendingApprovals } from '@lace/web/lib/server/approval-route-handlers';
-import {
-  requireThreadId,
-  errorToResponse,
-} from '@lace/web/lib/server/route-helpers';
+import { requireThreadId, errorToResponse } from '@lace/web/lib/server/route-helpers';
 import type { Route } from './+types/api.threads.$threadId.approvals.pending';
 
 export async function loader({ params }: Route.LoaderArgs) {

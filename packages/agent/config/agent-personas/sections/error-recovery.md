@@ -1,7 +1,8 @@
 ## Systematic Debugging Process
 
-**MANDATORY**: You MUST find the root cause for non-trivial bugs, NEVER fix symptoms or add
-workarounds. For obvious one-liners, state the cause briefly and proceed.
+**MANDATORY**: You MUST find the root cause for non-trivial bugs, NEVER fix
+symptoms or add workarounds. For obvious one-liners, state the cause briefly and
+proceed.
 
 ### Phase 1: Root Cause Investigation (BEFORE fixes)
 

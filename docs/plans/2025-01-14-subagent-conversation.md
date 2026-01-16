@@ -1,8 +1,10 @@
 # Subagent Conversation Feature Specification
 
-**Goal:** Enable parent agent to have back-and-forth conversation with subagents.
+**Goal:** Enable parent agent to have back-and-forth conversation with
+subagents.
 
-**Architecture:** Subagent outputs question and stops. Parent sees output, resumes with answer using `delegate(resume=jobId, prompt=answer)`.
+**Architecture:** Subagent outputs question and stops. Parent sees output,
+resumes with answer using `delegate(resume=jobId, prompt=answer)`.
 
 ---
 
@@ -19,7 +21,8 @@ Everything we need already exists:
 ## What's Missing
 
 1. **Notifications don't show enough context** - parent should see the question
-2. **Prompts don't explain this** - agents don't know they can converse with subagents
+2. **Prompts don't explain this** - agents don't know they can converse with
+   subagents
 
 ---
 
@@ -28,6 +31,7 @@ Everything we need already exists:
 ### Task 1: Enhanced Job Notifications
 
 **Files:**
+
 - Modify: `packages/agent/src/jobs/job-notifications.ts`
 - Modify: `packages/agent/src/jobs/format-notification.ts`
 
@@ -48,6 +52,7 @@ To continue: delegate(resume="job_abc123", prompt="your response")
 ### Task 2: Update delegate Tool Description
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/implementations/delegate.ts`
 
 Update description to explain conversation flow:
@@ -75,6 +80,7 @@ as a continuation of the conversation.`;
 ### Task 3: Update System Prompts
 
 **Files:**
+
 - Modify: `packages/agent/config/agent-personas/sections/delegation.md`
 
 Add guidance:
@@ -89,8 +95,8 @@ Subagents can ask questions. The conversation flow:
 3. You respond: `delegate(resume="<jobId>", prompt="your answer")`
 4. Subagent resumes with your answer in context
 
-**For subagents:** If you need input from the parent, clearly state
-your question and stop. The parent can resume you with the answer.
+**For subagents:** If you need input from the parent, clearly state your
+question and stop. The parent can resume you with the answer.
 ```
 
 ---

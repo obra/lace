@@ -114,7 +114,11 @@ export async function getMcpServer(ctx: McpRouteContext, serverId: string): Prom
     const project = requireProject(ctx.projectId);
     const serverConfig = project.getMCPServer(serverId);
     if (!serverConfig) {
-      throw new RouteValidationError(`MCP server '${serverId}' not found`, 404, 'RESOURCE_NOT_FOUND');
+      throw new RouteValidationError(
+        `MCP server '${serverId}' not found`,
+        404,
+        'RESOURCE_NOT_FOUND'
+      );
     }
     return { id: serverId, ...serverConfig };
   }
@@ -183,7 +187,11 @@ export async function updateMcpServer(
     const project = requireProject(ctx.projectId);
     const existingConfig = project.getMCPServer(serverId);
     if (!existingConfig) {
-      throw new RouteValidationError(`MCP server '${serverId}' not found`, 404, 'RESOURCE_NOT_FOUND');
+      throw new RouteValidationError(
+        `MCP server '${serverId}' not found`,
+        404,
+        'RESOURCE_NOT_FOUND'
+      );
     }
     const mergedConfig = { ...existingConfig, ...updates };
     // Cast to MCPServerConfig as the merged config is validated
@@ -217,7 +225,11 @@ export async function deleteMcpServer(ctx: McpRouteContext, serverId: string): P
     const project = requireProject(ctx.projectId);
     const existingConfig = project.getMCPServer(serverId);
     if (!existingConfig) {
-      throw new RouteValidationError(`MCP server '${serverId}' not found`, 404, 'RESOURCE_NOT_FOUND');
+      throw new RouteValidationError(
+        `MCP server '${serverId}' not found`,
+        404,
+        'RESOURCE_NOT_FOUND'
+      );
     }
     project.deleteMCPServer(serverId);
     return;

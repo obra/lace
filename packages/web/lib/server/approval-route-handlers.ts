@@ -143,7 +143,11 @@ export async function getPendingApprovals(
 ): Promise<SessionPendingApproval[] | PendingApproval[]> {
   if (ctx.scope === 'session') {
     if (!ctx.workspaceSessionId) {
-      throw new RouteValidationError('workspaceSessionId is required for session scope', 400, 'VALIDATION_FAILED');
+      throw new RouteValidationError(
+        'workspaceSessionId is required for session scope',
+        400,
+        'VALIDATION_FAILED'
+      );
     }
 
     const supervisor = await getSupervisor();
@@ -158,7 +162,11 @@ export async function getPendingApprovals(
 
   // Thread scope
   if (!ctx.threadId) {
-    throw new RouteValidationError('threadId is required for thread scope', 400, 'VALIDATION_FAILED');
+    throw new RouteValidationError(
+      'threadId is required for thread scope',
+      400,
+      'VALIDATION_FAILED'
+    );
   }
 
   const workspace = await findWorkspaceForThread(ctx.threadId);
@@ -190,7 +198,11 @@ export async function submitApprovalDecision(
 
   if (ctx.scope === 'session') {
     if (!ctx.workspaceSessionId) {
-      throw new RouteValidationError('workspaceSessionId is required for session scope', 400, 'VALIDATION_FAILED');
+      throw new RouteValidationError(
+        'workspaceSessionId is required for session scope',
+        400,
+        'VALIDATION_FAILED'
+      );
     }
 
     const supervisor = await getSupervisor();
@@ -225,7 +237,11 @@ export async function submitApprovalDecision(
 
   // Thread scope
   if (!ctx.threadId) {
-    throw new RouteValidationError('threadId is required for thread scope', 400, 'VALIDATION_FAILED');
+    throw new RouteValidationError(
+      'threadId is required for thread scope',
+      400,
+      'VALIDATION_FAILED'
+    );
   }
 
   const workspace = await findWorkspaceForThread(ctx.threadId);
@@ -234,7 +250,9 @@ export async function submitApprovalDecision(
   }
 
   const pending = await listPendingPermissions(workspace.workspaceSessionId);
-  const match = pending.find((p) => p.toolCallId === toolCallId && p.agentSessionId === ctx.threadId);
+  const match = pending.find(
+    (p) => p.toolCallId === toolCallId && p.agentSessionId === ctx.threadId
+  );
 
   if (!match) {
     throw new RouteValidationError('Tool call not found', 404, 'RESOURCE_NOT_FOUND');

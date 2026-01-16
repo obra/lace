@@ -8,10 +8,7 @@ import type { JobState } from '@lace/agent/server-types';
 describe('DelegateTool', () => {
   it('returns error when jobManager not in context', async () => {
     const tool = new DelegateTool();
-    const result = await tool.execute(
-      { prompt: 'test' },
-      { signal: new AbortController().signal }
-    );
+    const result = await tool.execute({ prompt: 'test' }, { signal: new AbortController().signal });
 
     expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('jobManager');

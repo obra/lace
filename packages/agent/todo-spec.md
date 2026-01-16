@@ -2,20 +2,26 @@
 
 ## Overview
 
-Internal task management tools for the Lace agent to track its own work during sessions. These are NOT user-facing todo apps - they're for the agent's self-organization.
+Internal task management tools for the Lace agent to track its own work during
+sessions. These are NOT user-facing todo apps - they're for the agent's
+self-organization.
 
 ## Design Decisions
 
 ### Single List (Not Multiple)
+
 - One todo list per session stored as `todo.md` in the session directory
-- Punted on multiple named lists (e.g., "failed-approaches") - can add later if needed
+- Punted on multiple named lists (e.g., "failed-approaches") - can add later if
+  needed
 
 ### Unique IDs (Not Indices)
+
 - Each item gets a stable ID like `t_a1b` (3 alphanumeric chars)
 - IDs don't shift when items are removed (unlike array indices)
 - Agent references items by ID for updates/removes
 
 ### Atomic Operations (Not Full Replacement)
+
 - `todo_add` - add single item
 - `todo_update` - update single item by ID
 - `todo_remove` - remove single item by ID
@@ -23,6 +29,7 @@ Internal task management tools for the Lace agent to track its own work during s
 - No full-list replacement needed - simpler for the agent
 
 ### Safe Internal Tools
+
 - All four tools marked `safeInternal: true`
 - No permission prompts - these are pure internal control flow
 - Don't touch filesystem or external systems (beyond the todo.md file)
@@ -32,12 +39,10 @@ Internal task management tools for the Lace agent to track its own work during s
 Location: `<sessionDir>/todo.md`
 
 ```markdown
-- [ ] **Task title here** `t_a1b`
-  Optional description that can span
-  multiple lines with details.
+- [ ] **Task title here** `t_a1b` Optional description that can span multiple
+      lines with details.
 
-- [x] **Completed task** `t_c2d`
-  This one is done.
+- [x] **Completed task** `t_c2d` This one is done.
 ```
 
 - Checkbox: `[ ]` = incomplete, `[x]` = complete
@@ -48,11 +53,13 @@ Location: `<sessionDir>/todo.md`
 ## API
 
 ### todo_read()
+
 - Parameters: none
 - Returns: `{ items: [{ id, done, title, description? }, ...] }`
 - Purpose: Check current tasks, find IDs for updates
 
 ### todo_add(title, description?)
+
 - Parameters:
   - `title`: string (required) - action-oriented, 3-10 words
   - `description`: string (optional) - details, acceptance criteria
@@ -60,6 +67,7 @@ Location: `<sessionDir>/todo.md`
 - Purpose: Add new task when starting multi-step work
 
 ### todo_update(id, { done?, title?, description? })
+
 - Parameters:
   - `id`: string (required) - the task's unique ID
   - `done`: boolean (optional) - true=complete, false=incomplete
@@ -69,6 +77,7 @@ Location: `<sessionDir>/todo.md`
 - Purpose: Mark tasks done, rarely update text
 
 ### todo_remove(id)
+
 - Parameters:
   - `id`: string (required) - the task's unique ID
 - Returns: `{ removed: true }`
@@ -98,6 +107,7 @@ packages/agent/src/
 ## Tool Descriptions (Prompt Engineered)
 
 ### todo_read
+
 ```
 Read your current task list to see what work is pending or completed.
 
@@ -116,6 +126,7 @@ Example response:
 ```
 
 ### todo_add
+
 ```
 Add a task to YOUR internal task list for tracking YOUR work in this session.
 
@@ -139,6 +150,7 @@ Returns JSON: { id: "t_xxx" } - Save this ID to mark the task done later.
 ```
 
 ### todo_update
+
 ```
 Update a task in your list - most commonly to mark it done.
 
@@ -157,6 +169,7 @@ Only fields you provide are changed; others stay the same.
 ```
 
 ### todo_remove
+
 ```
 Remove a task from your list entirely.
 
@@ -173,11 +186,14 @@ should never have existed or is cluttering your list.
 ## Testing Results
 
 ### Unit Tests (29 total)
+
 - `markdown.test.ts`: 14 tests - parsing/serialization round-trips
 - `todo-tools.test.ts`: 15 tests - execution logic CRUD operations
 
 ### Prompt Engineering Tests (Haiku 4.5)
+
 All 10/10 pass:
+
 1. ✅ Uses todo_add when asked to plan a task
 2. ✅ Uses todo_read when asked about current tasks
 3. ✅ Uses todo_update with correct ID and done:true
@@ -192,17 +208,25 @@ All 10/10 pass:
 ## Integration Points
 
 ### Runner (runner.ts)
+
 Tools are handled as special tools alongside job tools:
+
 ```typescript
-if (toolName === 'todo_read' || toolName === 'todo_add' ||
-    toolName === 'todo_update' || toolName === 'todo_remove') {
+if (
+  toolName === 'todo_read' ||
+  toolName === 'todo_add' ||
+  toolName === 'todo_update' ||
+  toolName === 'todo_remove'
+) {
   const todoContext = { sessionDir: this.config.sessionDir };
   // dispatch to appropriate execute function
 }
 ```
 
 ### Tool Executor (executor.ts)
+
 Tools registered in `registerAllAvailableTools()`:
+
 ```typescript
 new TodoReadTool(),
 new TodoAddTool(),
@@ -211,11 +235,14 @@ new TodoRemoveTool(),
 ```
 
 ### Permission System (rpc/utils.ts)
-All todo tools have `safeInternal: true` annotation, which bypasses permission checks via `shouldAskPermission()`.
+
+All todo tools have `safeInternal: true` annotation, which bypasses permission
+checks via `shouldAskPermission()`.
 
 ## Current Status
 
 **IMPLEMENTED:**
+
 - [x] Types and ID generation
 - [x] Markdown parsing/serialization
 - [x] All four tool stubs with prompt-engineered descriptions
@@ -227,6 +254,7 @@ All todo tools have `safeInternal: true` annotation, which bypasses permission c
 - [x] All 349 existing tests still pass
 
 **NOT YET DONE:**
+
 - [ ] E2E test with actual agent session
 - [ ] Integration with system prompt (telling agent to use todo tools)
 - [ ] UI display of todo list (if desired)

@@ -473,12 +473,12 @@ describe('Approval Route Handlers', () => {
         };
         mockGetSupervisor.mockResolvedValue(mockSupervisor as never);
 
-        await expect(
-          submitApprovalDecision(threadContext, 'tool-1', 'allow_once')
-        ).rejects.toThrow(RouteValidationError);
-        await expect(
-          submitApprovalDecision(threadContext, 'tool-1', 'allow_once')
-        ).rejects.toThrow('Agent not found');
+        await expect(submitApprovalDecision(threadContext, 'tool-1', 'allow_once')).rejects.toThrow(
+          RouteValidationError
+        );
+        await expect(submitApprovalDecision(threadContext, 'tool-1', 'allow_once')).rejects.toThrow(
+          'Agent not found'
+        );
       });
 
       it('throws RouteValidationError when tool call not found for this agent', async () => {
@@ -498,12 +498,12 @@ describe('Approval Route Handlers', () => {
           }),
         ]);
 
-        await expect(
-          submitApprovalDecision(threadContext, 'tool-1', 'allow_once')
-        ).rejects.toThrow(RouteValidationError);
-        await expect(
-          submitApprovalDecision(threadContext, 'tool-1', 'allow_once')
-        ).rejects.toThrow('Tool call not found');
+        await expect(submitApprovalDecision(threadContext, 'tool-1', 'allow_once')).rejects.toThrow(
+          RouteValidationError
+        );
+        await expect(submitApprovalDecision(threadContext, 'tool-1', 'allow_once')).rejects.toThrow(
+          'Tool call not found'
+        );
       });
 
       it('resolves pending permission for the correct agent', async () => {

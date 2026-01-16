@@ -462,9 +462,7 @@ describe('JobManager', () => {
 
   function createDeps(overrides: Partial<JobManagerDeps> = {}): JobManagerDeps {
     return {
-      getActiveSession: vi
-        .fn()
-        .mockReturnValue({ sessionId: 'sess_1', dir: '/tmp/test-session' }),
+      getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: '/tmp/test-session' }),
       persistEvent: vi.fn().mockResolvedValue(undefined),
       emitUpdate: vi.fn().mockResolvedValue(undefined),
       runShellProcess: vi.fn(),
@@ -668,7 +666,6 @@ describe('JobManager', () => {
   });
 
   describe('createJob', () => {
-
     it('throws JobCreationError when no active session', async () => {
       const deps = createDeps({
         getActiveSession: vi.fn().mockReturnValue(null),

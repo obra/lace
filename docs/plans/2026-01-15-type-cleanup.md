@@ -1,10 +1,14 @@
 # Type Cleanup Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
+> implement this plan task-by-task.
 
-**Goal:** Eliminate all `as any` type assertions and inline imports from production code in `packages/agent/src/`.
+**Goal:** Eliminate all `as any` type assertions and inline imports from
+production code in `packages/agent/src/`.
 
-**Architecture:** Create discriminated union types for durable events, typed error classes, and proper permission types. Replace ad-hoc type casts with type-safe accessors and type guards.
+**Architecture:** Create discriminated union types for durable events, typed
+error classes, and proper permission types. Replace ad-hoc type casts with
+type-safe accessors and type guards.
 
 **Tech Stack:** TypeScript 5.6+, Zod for runtime validation
 
@@ -13,6 +17,7 @@
 ## Task 1: Create DurableEventData Discriminated Union
 
 **Files:**
+
 - Create: `packages/agent/src/storage/event-types.ts`
 - Modify: `packages/agent/src/storage/event-log.ts:35-42`
 - Test: `packages/agent/src/storage/__tests__/event-types.test.ts`
@@ -85,7 +90,8 @@ describe('DurableEventData', () => {
 
 **Step 1.2: Run test to verify it fails**
 
-Run: `npm test -- --run packages/agent/src/storage/__tests__/event-types.test.ts`
+Run:
+`npm test -- --run packages/agent/src/storage/__tests__/event-types.test.ts`
 Expected: FAIL with module not found error
 
 **Step 1.3: Create the event-types.ts file with discriminated union**
@@ -101,7 +107,10 @@ import type { ToolResult } from '@lace/ent-protocol';
 // Content block types used in prompts and messages
 export type ContentBlock =
   | { type: 'text'; text: string }
-  | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
+  | {
+      type: 'image';
+      source: { type: 'base64'; media_type: string; data: string };
+    };
 
 // Individual event data types
 export type PromptEventData = {
@@ -254,7 +263,8 @@ export function isEventDataOfType<T extends DurableEventData['type']>(
 
 **Step 1.4: Run test to verify it passes**
 
-Run: `npm test -- --run packages/agent/src/storage/__tests__/event-types.test.ts`
+Run:
+`npm test -- --run packages/agent/src/storage/__tests__/event-types.test.ts`
 Expected: PASS
 
 **Step 1.5: Update event-log.ts to use new types**
@@ -281,8 +291,7 @@ export type { TypedDurableEvent, DurableEventData } from './event-types';
 
 **Step 1.6: Run full test suite**
 
-Run: `npm test -- --run packages/agent/src/storage/`
-Expected: All tests PASS
+Run: `npm test -- --run packages/agent/src/storage/` Expected: All tests PASS
 
 **Step 1.7: Commit**
 
@@ -303,6 +312,7 @@ EOF
 ## Task 2: Create Error Classes
 
 **Files:**
+
 - Create: `packages/agent/src/errors/agent-errors.ts`
 - Modify: `packages/agent/src/storage/session-store.ts:85-92`
 - Modify: `packages/agent/src/rpc/handlers/session.ts:92`
@@ -320,7 +330,10 @@ import { SessionStorageError, RpcError } from '../agent-errors';
 
 describe('SessionStorageError', () => {
   it('has correct code property', () => {
-    const error = new SessionStorageError('Storage failed', '/path/to/sessions');
+    const error = new SessionStorageError(
+      'Storage failed',
+      '/path/to/sessions'
+    );
     expect(error.code).toBe('SessionStorageUnavailable');
     expect(error.path).toBe('/path/to/sessions');
     expect(error.message).toBe('Storage failed');
@@ -353,8 +366,8 @@ describe('RpcError', () => {
 
 **Step 2.2: Run test to verify it fails**
 
-Run: `npm test -- --run packages/agent/src/errors/`
-Expected: FAIL with module not found error
+Run: `npm test -- --run packages/agent/src/errors/` Expected: FAIL with module
+not found error
 
 **Step 2.3: Create the error classes**
 
@@ -399,8 +412,7 @@ export class RpcError extends Error {
 
 **Step 2.4: Run test to verify it passes**
 
-Run: `npm test -- --run packages/agent/src/errors/`
-Expected: PASS
+Run: `npm test -- --run packages/agent/src/errors/` Expected: PASS
 
 **Step 2.5: Update session-store.ts to use SessionStorageError**
 
@@ -422,14 +434,16 @@ import { SessionStorageError } from '../errors/agent-errors';
 //   throw e;
 
 // After:
-  const msg = lastError instanceof Error ? lastError.message : String(lastError);
-  throw new SessionStorageError(`Session storage unavailable: ${msg}`, candidates[0]);
+const msg = lastError instanceof Error ? lastError.message : String(lastError);
+throw new SessionStorageError(
+  `Session storage unavailable: ${msg}`,
+  candidates[0]
+);
 ```
 
 **Step 2.6: Run tests to verify storage still works**
 
-Run: `npm test -- --run packages/agent/src/storage/`
-Expected: PASS
+Run: `npm test -- --run packages/agent/src/storage/` Expected: PASS
 
 **Step 2.7: Commit**
 
@@ -449,12 +463,14 @@ EOF
 ## Task 3: Fix ProviderMessage Property Access
 
 **Files:**
+
 - Modify: `packages/agent/src/message-building/message-builder.ts:217-220`
 - Test: Existing tests should cover this
 
 **Step 3.1: Read and understand current code**
 
 The issue is at lines 217-220 in message-builder.ts:
+
 ```typescript
 if ((message as any).toolCalls)
   total += estimateTokens(JSON.stringify((message as any).toolCalls));
@@ -462,11 +478,13 @@ if ((message as any).toolResults)
   total += estimateTokens(JSON.stringify((message as any).toolResults));
 ```
 
-But `ProviderMessage` already has `toolCalls?: ToolCall[]` and `toolResults?: ToolResult[]` defined.
+But `ProviderMessage` already has `toolCalls?: ToolCall[]` and
+`toolResults?: ToolResult[]` defined.
 
 **Step 3.2: Fix the type assertions**
 
-In `packages/agent/src/message-building/message-builder.ts`, replace lines 217-220:
+In `packages/agent/src/message-building/message-builder.ts`, replace lines
+217-220:
 
 ```typescript
 // Before:
@@ -476,18 +494,17 @@ In `packages/agent/src/message-building/message-builder.ts`, replace lines 217-2
 //       total += estimateTokens(JSON.stringify((message as any).toolResults));
 
 // After:
-    if (message.toolCalls) {
-      total += estimateTokens(JSON.stringify(message.toolCalls));
-    }
-    if (message.toolResults) {
-      total += estimateTokens(JSON.stringify(message.toolResults));
-    }
+if (message.toolCalls) {
+  total += estimateTokens(JSON.stringify(message.toolCalls));
+}
+if (message.toolResults) {
+  total += estimateTokens(JSON.stringify(message.toolResults));
+}
 ```
 
 **Step 3.3: Run tests to verify**
 
-Run: `npm test -- --run packages/agent/src/message-building/`
-Expected: PASS
+Run: `npm test -- --run packages/agent/src/message-building/` Expected: PASS
 
 **Step 3.4: Commit**
 
@@ -507,18 +524,22 @@ EOF
 ## Task 4: Fix permissions-from-events.ts Type Assertions
 
 **Files:**
+
 - Modify: `packages/agent/src/storage/permissions-from-events.ts:35-36`
 - Test: Run existing tests
 
 **Step 4.1: Fix toOptions function type assertions**
 
-In `packages/agent/src/storage/permissions-from-events.ts`, replace the `toOptions` function (lines 30-41):
+In `packages/agent/src/storage/permissions-from-events.ts`, replace the
+`toOptions` function (lines 30-41):
 
 ```typescript
 // Define the expected shape explicitly
 type OptionItem = { optionId?: unknown; label?: unknown };
 
-function toOptions(value: unknown): Array<{ optionId: string; label: string }> | null {
+function toOptions(
+  value: unknown
+): Array<{ optionId: string; label: string }> | null {
   if (!Array.isArray(value)) return null;
   const parsed: Array<{ optionId: string; label: string }> = [];
   for (const item of value) {
@@ -535,8 +556,7 @@ function toOptions(value: unknown): Array<{ optionId: string; label: string }> |
 
 **Step 4.2: Run tests to verify**
 
-Run: `npm test -- --run packages/agent/src/storage/`
-Expected: PASS
+Run: `npm test -- --run packages/agent/src/storage/` Expected: PASS
 
 **Step 4.3: Commit**
 
@@ -553,6 +573,7 @@ EOF
 ## Task 5: Fix rpc/utils.ts Config Access
 
 **Files:**
+
 - Modify: `packages/agent/src/rpc/utils.ts:67-74`
 - Test: `packages/agent/src/rpc/__tests__/utils.test.ts`
 
@@ -565,11 +586,14 @@ export function parseProviderInstanceOverridesFromConnectionConfig(options: {
   displayName: string;
   catalogProviderId: string;
   config: Record<string, unknown>;
-}): Partial<Pick<ProviderInstance, 'endpoint' | 'timeout' | 'retryPolicy' | 'modelConfig'>> {
+}): Partial<
+  Pick<ProviderInstance, 'endpoint' | 'timeout' | 'retryPolicy' | 'modelConfig'>
+> {
   const endpoint = getEndpointFromConfig(options.config);
 
   const timeoutInput = options.config.timeout;
-  const timeout = timeoutInput === undefined ? undefined : toPositiveInt(timeoutInput);
+  const timeout =
+    timeoutInput === undefined ? undefined : toPositiveInt(timeoutInput);
   if (timeoutInput !== undefined && timeout === null) {
     throwInvalidParams('timeout must be a positive integer');
   }
@@ -583,18 +607,28 @@ export function parseProviderInstanceOverridesFromConnectionConfig(options: {
     ...(endpoint ? { endpoint } : {}),
     ...(timeout !== undefined ? { timeout } : {}),
     ...(retryPolicy ? { retryPolicy } : {}),
-    ...(modelConfigInput !== undefined ? { modelConfig: modelConfigInput } : {}),
+    ...(modelConfigInput !== undefined
+      ? { modelConfig: modelConfigInput }
+      : {}),
   });
 
   if (!parsed.success) {
-    throwInvalidParams(parsed.error.issues[0]?.message ?? 'Invalid connection config');
+    throwInvalidParams(
+      parsed.error.issues[0]?.message ?? 'Invalid connection config'
+    );
   }
 
   return {
     ...(parsed.data.endpoint ? { endpoint: parsed.data.endpoint } : {}),
-    ...(parsed.data.timeout !== undefined ? { timeout: parsed.data.timeout } : {}),
-    ...(parsed.data.retryPolicy ? { retryPolicy: parsed.data.retryPolicy } : {}),
-    ...(parsed.data.modelConfig ? { modelConfig: parsed.data.modelConfig } : {}),
+    ...(parsed.data.timeout !== undefined
+      ? { timeout: parsed.data.timeout }
+      : {}),
+    ...(parsed.data.retryPolicy
+      ? { retryPolicy: parsed.data.retryPolicy }
+      : {}),
+    ...(parsed.data.modelConfig
+      ? { modelConfig: parsed.data.modelConfig }
+      : {}),
   };
 }
 ```
@@ -622,6 +656,7 @@ EOF
 ## Task 6: Fix rpc/handlers/connections.ts Credential Values
 
 **Files:**
+
 - Modify: `packages/agent/src/rpc/handlers/connections.ts:258-261`
 - Test: Run existing tests
 
@@ -634,20 +669,20 @@ In `packages/agent/src/rpc/handlers/connections.ts`, replace lines 255-263:
 type CredentialValues = Record<string, unknown>;
 
 // ... inside the handler:
-    const values = parsed?.values;
-    if (!values || typeof values !== 'object') return { ok: false, error: 'values is required' };
+const values = parsed?.values;
+if (!values || typeof values !== 'object')
+  return { ok: false, error: 'values is required' };
 
-    const credentialValues = values as CredentialValues;
-    const apiKey =
-      toNonEmptyString(credentialValues.apiKey) ??
-      toNonEmptyString(credentialValues.api_key) ??
-      toNonEmptyString(credentialValues.key);
+const credentialValues = values as CredentialValues;
+const apiKey =
+  toNonEmptyString(credentialValues.apiKey) ??
+  toNonEmptyString(credentialValues.api_key) ??
+  toNonEmptyString(credentialValues.key);
 ```
 
 **Step 6.2: Run tests to verify**
 
-Run: `npm test -- --run packages/agent/src/rpc/`
-Expected: PASS
+Run: `npm test -- --run packages/agent/src/rpc/` Expected: PASS
 
 **Step 6.3: Commit**
 
@@ -664,6 +699,7 @@ EOF
 ## Task 7: Fix rpc/handlers/models.ts Return Type
 
 **Files:**
+
 - Modify: `packages/agent/src/rpc/utils.ts:97-107` (mapCatalogModelToModelInfo)
 - Modify: `packages/agent/src/rpc/handlers/models.ts:106`
 - Test: Run existing tests
@@ -685,7 +721,10 @@ export type ModelInfo = {
   disabledState?: 'enabled' | 'disabled';
 };
 
-export function mapCatalogModelToModelInfo(model: CatalogModel, providerId: string): ModelInfo {
+export function mapCatalogModelToModelInfo(
+  model: CatalogModel,
+  providerId: string
+): ModelInfo {
   return {
     modelId: model.id,
     name: model.name,
@@ -713,22 +752,22 @@ In `packages/agent/src/rpc/handlers/models.ts`, replace lines 105-112:
 //     });
 
 // After:
-    const models = provider.models.map((m) => {
-      const info = mapCatalogModelToModelInfo(m, providerId);
-      const isDisabled =
-        (enabledSet && !enabledSet.has(m.id)) || (disabledSet.size > 0 && disabledSet.has(m.id));
-      return {
-        ...info,
-        disabled: isDisabled,
-        disabledState: isDisabled ? 'disabled' as const : 'enabled' as const,
-      };
-    });
+const models = provider.models.map((m) => {
+  const info = mapCatalogModelToModelInfo(m, providerId);
+  const isDisabled =
+    (enabledSet && !enabledSet.has(m.id)) ||
+    (disabledSet.size > 0 && disabledSet.has(m.id));
+  return {
+    ...info,
+    disabled: isDisabled,
+    disabledState: isDisabled ? ('disabled' as const) : ('enabled' as const),
+  };
+});
 ```
 
 **Step 7.3: Run tests to verify**
 
-Run: `npm test -- --run packages/agent/src/rpc/`
-Expected: PASS
+Run: `npm test -- --run packages/agent/src/rpc/` Expected: PASS
 
 **Step 7.4: Commit**
 
@@ -748,20 +787,29 @@ EOF
 ## Task 8: Fix compact-dropped-messages.ts Type Assertions
 
 **Files:**
-- Modify: `packages/agent/src/compaction/compact-dropped-messages.ts:140, 148, 162, 210`
+
+- Modify:
+  `packages/agent/src/compaction/compact-dropped-messages.ts:140, 148, 162, 210`
 - Test: Run existing tests
 
 **Step 8.1: Fix event.data type assertions in providerMessagesFromLaceEvents**
 
-In `packages/agent/src/compaction/compact-dropped-messages.ts`, update the function at line 121:
+In `packages/agent/src/compaction/compact-dropped-messages.ts`, update the
+function at line 121:
 
 ```typescript
 // Add a type for LaceEvent data shapes
 type AgentMessageData = { content?: string } | string;
-type ToolCallData = { id?: string; name?: string; arguments?: Record<string, unknown> };
+type ToolCallData = {
+  id?: string;
+  name?: string;
+  arguments?: Record<string, unknown>;
+};
 type ToolResultData = { id?: string; content?: unknown[]; status?: string };
 
-function providerMessagesFromLaceEvents(events: LaceEvent[]): ProviderMessage[] {
+function providerMessagesFromLaceEvents(
+  events: LaceEvent[]
+): ProviderMessage[] {
   const messages: ProviderMessage[] = [];
 
   for (const event of events) {
@@ -795,8 +843,15 @@ function providerMessagesFromLaceEvents(events: LaceEvent[]): ProviderMessage[] 
       const toolCall = event.data as ToolCallData;
       if (!toolCall || typeof toolCall !== 'object') continue;
 
-      if (messages.length === 0 || messages[messages.length - 1]!.role !== 'assistant') {
-        messages.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
+      if (
+        messages.length === 0 ||
+        messages[messages.length - 1]!.role !== 'assistant'
+      ) {
+        messages.push({
+          role: 'assistant',
+          content: '',
+          toolCalls: [toolCall],
+        });
       } else {
         const last = messages[messages.length - 1]!;
         last.toolCalls = [...(last.toolCalls || []), toolCall];
@@ -811,7 +866,10 @@ function providerMessagesFromLaceEvents(events: LaceEvent[]): ProviderMessage[] 
 
       const last = messages[messages.length - 1];
       const canAppendToUser =
-        last && last.role === 'user' && last.toolResults && last.toolResults.length > 0;
+        last &&
+        last.role === 'user' &&
+        last.toolResults &&
+        last.toolResults.length > 0;
       if (canAppendToUser) {
         last.toolResults!.push(toolResult);
       } else {
@@ -833,16 +891,17 @@ function providerMessagesFromLaceEvents(events: LaceEvent[]): ProviderMessage[] 
 //   const meta = (result.compactionEvent.data as any)?.metadata;
 
 // After (add type guard):
-  type CompactionEventMeta = { metadata?: { summary?: string } };
-  const eventData = result.compactionEvent.data as CompactionEventMeta | undefined;
-  const meta = eventData?.metadata;
-  const summary = typeof meta?.summary === 'string' ? meta.summary : undefined;
+type CompactionEventMeta = { metadata?: { summary?: string } };
+const eventData = result.compactionEvent.data as
+  | CompactionEventMeta
+  | undefined;
+const meta = eventData?.metadata;
+const summary = typeof meta?.summary === 'string' ? meta.summary : undefined;
 ```
 
 **Step 8.3: Run tests to verify**
 
-Run: `npm test -- --run packages/agent/src/compaction/`
-Expected: PASS
+Run: `npm test -- --run packages/agent/src/compaction/` Expected: PASS
 
 **Step 8.4: Commit**
 
@@ -859,12 +918,14 @@ EOF
 ## Task 9: Fix message-builder.ts Event Data Access
 
 **Files:**
+
 - Modify: `packages/agent/src/message-building/message-builder.ts:112-168`
 - Test: Run existing tests
 
 **Step 9.1: Add typed event data access helpers**
 
-In `packages/agent/src/message-building/message-builder.ts`, add after the imports:
+In `packages/agent/src/message-building/message-builder.ts`, add after the
+imports:
 
 ```typescript
 // Typed event data shapes for parsing
@@ -881,119 +942,150 @@ type ToolUseData = {
 
 **Step 9.2: Update event parsing to use typed shapes**
 
-Replace the event parsing in `buildProviderMessagesFromDurableEvents` (lines 96-191):
+Replace the event parsing in `buildProviderMessagesFromDurableEvents` (lines
+96-191):
 
 ```typescript
-  for (const line of lines) {
-    if (!line) continue;
-    try {
-      const parsed = JSON.parse(line) as { type?: string; data?: Record<string, unknown> };
-      const type = typeof parsed.type === 'string' ? parsed.type : '';
-      const data = typeof parsed.data === 'object' && parsed.data ? parsed.data : {};
+for (const line of lines) {
+  if (!line) continue;
+  try {
+    const parsed = JSON.parse(line) as {
+      type?: string;
+      data?: Record<string, unknown>;
+    };
+    const type = typeof parsed.type === 'string' ? parsed.type : '';
+    const data =
+      typeof parsed.data === 'object' && parsed.data ? parsed.data : {};
 
-      if (type === 'prompt') {
-        const content = extractContentBlocks(data.content);
-        const hasContent = typeof content === 'string' ? content.trim() : content.length > 0;
-        if (hasContent) messages.push({ role: 'user', content });
-        continue;
+    if (type === 'prompt') {
+      const content = extractContentBlocks(data.content);
+      const hasContent =
+        typeof content === 'string' ? content.trim() : content.length > 0;
+      if (hasContent) messages.push({ role: 'user', content });
+      continue;
+    }
+
+    if (type === 'context_injected') {
+      const eventData = data as ContextInjectedData;
+      const contentArr = Array.isArray(eventData.content)
+        ? eventData.content
+        : [];
+      const content = extractTextFromContentBlocks(contentArr);
+      if (content.trim()) messages.push({ role: 'system', content });
+      continue;
+    }
+
+    if (type === 'context_compacted') {
+      const eventData = data as ContextCompactedData;
+      const summary =
+        typeof eventData.summary === 'string' ? eventData.summary : '';
+      const preserved = Array.isArray(eventData.preserved)
+        ? eventData.preserved
+        : [];
+
+      messages.length = 0;
+      if (summary.trim()) messages.push({ role: 'system', content: summary });
+
+      for (const msg of preserved) {
+        if (!msg || typeof msg !== 'object') continue;
+        const msgObj = msg as Record<string, unknown>;
+        const role = msgObj.role;
+        const content = msgObj.content;
+        if (role !== 'user' && role !== 'assistant' && role !== 'system')
+          continue;
+        if (typeof content !== 'string') continue;
+
+        const toolCalls = Array.isArray(msgObj.toolCalls)
+          ? msgObj.toolCalls
+          : undefined;
+        const toolResults = Array.isArray(msgObj.toolResults)
+          ? msgObj.toolResults
+          : undefined;
+
+        messages.push({
+          role: role as 'user' | 'assistant' | 'system',
+          content,
+          ...(toolCalls ? { toolCalls } : {}),
+          ...(toolResults ? { toolResults } : {}),
+        });
       }
 
-      if (type === 'context_injected') {
-        const eventData = data as ContextInjectedData;
-        const contentArr = Array.isArray(eventData.content) ? eventData.content : [];
-        const content = extractTextFromContentBlocks(contentArr);
-        if (content.trim()) messages.push({ role: 'system', content });
-        continue;
+      continue;
+    }
+
+    if (type === 'message') {
+      const eventData = data as MessageData;
+      const content =
+        typeof eventData.content === 'string'
+          ? eventData.content
+          : extractTextFromContentBlocks(
+              Array.isArray(eventData.content) ? eventData.content : []
+            );
+      messages.push({ role: 'assistant', content: content ?? '' });
+      continue;
+    }
+
+    if (type === 'tool_use') {
+      const eventData = data as ToolUseData;
+      const toolCallId = toNonEmptyString(eventData.toolCallId);
+      const name = toNonEmptyString(eventData.name);
+      const input = eventData.input;
+      const result = eventData.result;
+      if (!toolCallId || !name) continue;
+
+      const toolCall: CoreToolCall = {
+        id: toolCallId,
+        name,
+        arguments:
+          typeof input === 'object' && input
+            ? (input as Record<string, unknown>)
+            : {},
+      };
+
+      if (
+        messages.length === 0 ||
+        messages[messages.length - 1]!.role !== 'assistant'
+      ) {
+        messages.push({
+          role: 'assistant',
+          content: '',
+          toolCalls: [toolCall],
+        });
+      } else {
+        const last = messages[messages.length - 1]!;
+        last.toolCalls = [...(last.toolCalls || []), toolCall];
       }
 
-      if (type === 'context_compacted') {
-        const eventData = data as ContextCompactedData;
-        const summary = typeof eventData.summary === 'string' ? eventData.summary : '';
-        const preserved = Array.isArray(eventData.preserved) ? eventData.preserved : [];
-
-        messages.length = 0;
-        if (summary.trim()) messages.push({ role: 'system', content: summary });
-
-        for (const msg of preserved) {
-          if (!msg || typeof msg !== 'object') continue;
-          const msgObj = msg as Record<string, unknown>;
-          const role = msgObj.role;
-          const content = msgObj.content;
-          if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
-          if (typeof content !== 'string') continue;
-
-          const toolCalls = Array.isArray(msgObj.toolCalls) ? msgObj.toolCalls : undefined;
-          const toolResults = Array.isArray(msgObj.toolResults) ? msgObj.toolResults : undefined;
-
+      if (result) {
+        const coreResult = coreToolResultFromProtocol(result, toolCallId);
+        const last = messages[messages.length - 1];
+        const canAppendToUser =
+          last &&
+          last.role === 'user' &&
+          last.toolResults &&
+          last.toolResults.length > 0;
+        if (canAppendToUser) {
+          last.toolResults!.push(coreResult);
+        } else {
           messages.push({
-            role: role as 'user' | 'assistant' | 'system',
-            content,
-            ...(toolCalls ? { toolCalls } : {}),
-            ...(toolResults ? { toolResults } : {}),
+            role: 'user',
+            content: '',
+            toolResults: [coreResult],
           });
         }
-
-        continue;
       }
 
-      if (type === 'message') {
-        const eventData = data as MessageData;
-        const content =
-          typeof eventData.content === 'string'
-            ? eventData.content
-            : extractTextFromContentBlocks(
-                Array.isArray(eventData.content) ? eventData.content : []
-              );
-        messages.push({ role: 'assistant', content: content ?? '' });
-        continue;
-      }
-
-      if (type === 'tool_use') {
-        const eventData = data as ToolUseData;
-        const toolCallId = toNonEmptyString(eventData.toolCallId);
-        const name = toNonEmptyString(eventData.name);
-        const input = eventData.input;
-        const result = eventData.result;
-        if (!toolCallId || !name) continue;
-
-        const toolCall: CoreToolCall = {
-          id: toolCallId,
-          name,
-          arguments:
-            typeof input === 'object' && input ? (input as Record<string, unknown>) : {},
-        };
-
-        if (messages.length === 0 || messages[messages.length - 1]!.role !== 'assistant') {
-          messages.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
-        } else {
-          const last = messages[messages.length - 1]!;
-          last.toolCalls = [...(last.toolCalls || []), toolCall];
-        }
-
-        if (result) {
-          const coreResult = coreToolResultFromProtocol(result, toolCallId);
-          const last = messages[messages.length - 1];
-          const canAppendToUser =
-            last && last.role === 'user' && last.toolResults && last.toolResults.length > 0;
-          if (canAppendToUser) {
-            last.toolResults!.push(coreResult);
-          } else {
-            messages.push({ role: 'user', content: '', toolResults: [coreResult] });
-          }
-        }
-
-        continue;
-      }
-    } catch {
-      // Ignore malformed lines.
+      continue;
     }
+  } catch {
+    // Ignore malformed lines.
   }
+}
 ```
 
 **Step 9.3: Run tests to verify**
 
-Run: `npm test -- --run packages/agent/src/message-building/`
-Expected: PASS
+Run: `npm test -- --run packages/agent/src/message-building/` Expected: PASS
 
 **Step 9.4: Commit**
 
@@ -1014,26 +1106,28 @@ EOF
 
 **Step 10.1: Check for remaining `as any` in production code**
 
-Run: `grep -r "as any" packages/agent/src/ --include="*.ts" | grep -v ".test.ts" | grep -v "__tests__"`
+Run:
+`grep -r "as any" packages/agent/src/ --include="*.ts" | grep -v ".test.ts" | grep -v "__tests__"`
 
 Expected: Should only show:
-- `rpc/utils.ts:150` (meta in protocolToolResultFromCore - acceptable, comes from external)
+
+- `rpc/utils.ts:150` (meta in protocolToolResultFromCore - acceptable, comes
+  from external)
 
 **Step 10.2: Check for inline imports**
 
-Run: `grep -r "import(" packages/agent/src/ --include="*.ts" | grep -v ".test.ts" | grep -v "__tests__" | grep -v "// inline import OK"`
+Run:
+`grep -r "import(" packages/agent/src/ --include="*.ts" | grep -v ".test.ts" | grep -v "__tests__" | grep -v "// inline import OK"`
 
 Expected: No results
 
 **Step 10.3: Run full test suite**
 
-Run: `npm test -- --run`
-Expected: All tests PASS
+Run: `npm test -- --run` Expected: All tests PASS
 
 **Step 10.4: Run build**
 
-Run: `npm run build`
-Expected: Build succeeds with no type errors
+Run: `npm run build` Expected: Build succeeds with no type errors
 
 **Step 10.5: Final commit**
 
@@ -1054,9 +1148,12 @@ EOF
 
 After completing all tasks, verify:
 
-1. `grep -r "as any" packages/agent/src/ --include="*.ts" | grep -v ".test.ts" | grep -v "__tests__" | wc -l` returns 1 or 0
-2. `grep -r ": any" packages/agent/src/ --include="*.ts" | grep -v ".test.ts" | grep -v "__tests__" | wc -l` returns 0
-3. `grep -r "import(" packages/agent/src/ --include="*.ts" | grep -v ".test.ts" | wc -l` returns 0
+1. `grep -r "as any" packages/agent/src/ --include="*.ts" | grep -v ".test.ts" | grep -v "__tests__" | wc -l`
+   returns 1 or 0
+2. `grep -r ": any" packages/agent/src/ --include="*.ts" | grep -v ".test.ts" | grep -v "__tests__" | wc -l`
+   returns 0
+3. `grep -r "import(" packages/agent/src/ --include="*.ts" | grep -v ".test.ts" | wc -l`
+   returns 0
 4. `npm run build` succeeds
 5. `npm test -- --run` passes all tests
 
@@ -1067,4 +1164,5 @@ After completing all tasks, verify:
 - Tasks 1-2 create foundational types that unblock later fixes
 - Tasks 3-9 are independent and can be parallelized with subagents
 - Task 10 is a verification step to ensure completeness
-- Test file cleanup (Priority 5 from original plan) is deferred - test files are allowed to have `as any` for mocking
+- Test file cleanup (Priority 5 from original plan) is deferred - test files are
+  allowed to have `as any` for mocking

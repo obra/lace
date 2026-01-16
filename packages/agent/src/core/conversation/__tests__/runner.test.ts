@@ -24,7 +24,9 @@ function createMockDeps(overrides: Partial<RunnerDependencies> = {}): RunnerDepe
     getJob: vi.fn().mockReturnValue(undefined),
     listJobs: vi.fn().mockReturnValue([]),
     getJobOutput: vi.fn().mockReturnValue(''),
-    createJob: vi.fn().mockResolvedValue({ jobId: 'job_test', job: { completion: Promise.resolve() } }),
+    createJob: vi
+      .fn()
+      .mockResolvedValue({ jobId: 'job_test', job: { completion: Promise.resolve() } }),
     cancelJob: vi.fn().mockResolvedValue(undefined),
     finalizeJob: vi.fn().mockResolvedValue(undefined),
     getStreamingMode: vi.fn().mockReturnValue('full'),

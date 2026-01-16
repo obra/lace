@@ -1,18 +1,27 @@
 # Agent Skills Integration Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
+> implement this plan task-by-task.
 
-**Goal:** Integrate support for Agent Skills (agentskills.io spec) into the Lace agent, allowing skills to be discovered, listed in the system prompt, and activated via a `use_skill` tool.
+**Goal:** Integrate support for Agent Skills (agentskills.io spec) into the Lace
+agent, allowing skills to be discovered, listed in the system prompt, and
+activated via a `use_skill` tool.
 
-**Architecture:** Skills are discovered from 4 directories with precedence (project-level shadows user-level, lace shadows claude). A `SkillVariableProvider` injects `<available_skills>` XML into the system prompt containing name + description. The `use_skill` tool returns the full SKILL.md body content plus the skill's directory path for resource access.
+**Architecture:** Skills are discovered from 4 directories with precedence
+(project-level shadows user-level, lace shadows claude). A
+`SkillVariableProvider` injects `<available_skills>` XML into the system prompt
+containing name + description. The `use_skill` tool returns the full SKILL.md
+body content plus the skill's directory path for resource access.
 
-**Tech Stack:** TypeScript, Zod for schema validation, YAML frontmatter parsing (gray-matter or similar)
+**Tech Stack:** TypeScript, Zod for schema validation, YAML frontmatter parsing
+(gray-matter or similar)
 
 ---
 
 ## Task 1: Add gray-matter dependency
 
 **Files:**
+
 - Modify: `packages/agent/package.json`
 
 **Step 1: Add the dependency**
@@ -23,8 +32,8 @@ cd packages/agent && npm install gray-matter
 
 **Step 2: Verify installation**
 
-Run: `cd packages/agent && npm ls gray-matter`
-Expected: Shows gray-matter in dependency tree
+Run: `cd packages/agent && npm ls gray-matter` Expected: Shows gray-matter in
+dependency tree
 
 **Step 3: Commit**
 
@@ -38,6 +47,7 @@ git commit -m "chore: add gray-matter for YAML frontmatter parsing"
 ## Task 2: Create SkillProperties type and validation
 
 **Files:**
+
 - Create: `packages/agent/src/skills/types.ts`
 - Create: `packages/agent/src/skills/types.test.ts`
 
@@ -48,7 +58,11 @@ git commit -m "chore: add gray-matter for YAML frontmatter parsing"
 // ABOUTME: Tests for skill type definitions and validation
 
 import { describe, it, expect } from 'vitest';
-import { validateSkillName, validateSkillDescription, type SkillProperties } from './types';
+import {
+  validateSkillName,
+  validateSkillDescription,
+  type SkillProperties,
+} from './types';
 
 describe('validateSkillName', () => {
   it('accepts valid kebab-case names', () => {
@@ -96,7 +110,9 @@ describe('validateSkillName', () => {
 
 describe('validateSkillDescription', () => {
   it('accepts valid descriptions', () => {
-    expect(validateSkillDescription('Extract text from PDFs')).toEqual({ valid: true });
+    expect(validateSkillDescription('Extract text from PDFs')).toEqual({
+      valid: true,
+    });
   });
 
   it('rejects empty descriptions', () => {
@@ -115,8 +131,8 @@ describe('validateSkillDescription', () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd packages/agent && npx vitest run src/skills/types.test.ts`
-Expected: FAIL - module not found
+Run: `cd packages/agent && npx vitest run src/skills/types.test.ts` Expected:
+FAIL - module not found
 
 **Step 3: Write minimal implementation**
 
@@ -155,7 +171,10 @@ export function validateSkillName(name: string): ValidationResult {
   const trimmed = name.trim();
 
   if (trimmed.length > MAX_NAME_LENGTH) {
-    return { valid: false, error: `Skill name exceeds ${MAX_NAME_LENGTH} character limit` };
+    return {
+      valid: false,
+      error: `Skill name exceeds ${MAX_NAME_LENGTH} character limit`,
+    };
   }
 
   if (trimmed !== trimmed.toLowerCase()) {
@@ -171,23 +190,42 @@ export function validateSkillName(name: string): ValidationResult {
   }
 
   if (trimmed.includes('--')) {
-    return { valid: false, error: 'Skill name cannot contain consecutive hyphens' };
+    return {
+      valid: false,
+      error: 'Skill name cannot contain consecutive hyphens',
+    };
   }
 
   if (!/^[a-z0-9-]+$/.test(trimmed)) {
-    return { valid: false, error: 'Skill name can only contain lowercase letters, numbers, and hyphens' };
+    return {
+      valid: false,
+      error:
+        'Skill name can only contain lowercase letters, numbers, and hyphens',
+    };
   }
 
   return { valid: true };
 }
 
-export function validateSkillDescription(description: string): ValidationResult {
-  if (!description || typeof description !== 'string' || description.trim().length === 0) {
-    return { valid: false, error: 'Skill description must be a non-empty string' };
+export function validateSkillDescription(
+  description: string
+): ValidationResult {
+  if (
+    !description ||
+    typeof description !== 'string' ||
+    description.trim().length === 0
+  ) {
+    return {
+      valid: false,
+      error: 'Skill description must be a non-empty string',
+    };
   }
 
   if (description.length > MAX_DESCRIPTION_LENGTH) {
-    return { valid: false, error: `Skill description exceeds ${MAX_DESCRIPTION_LENGTH} character limit` };
+    return {
+      valid: false,
+      error: `Skill description exceeds ${MAX_DESCRIPTION_LENGTH} character limit`,
+    };
   }
 
   return { valid: true };
@@ -196,8 +234,8 @@ export function validateSkillDescription(description: string): ValidationResult 
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd packages/agent && npx vitest run src/skills/types.test.ts`
-Expected: PASS
+Run: `cd packages/agent && npx vitest run src/skills/types.test.ts` Expected:
+PASS
 
 **Step 5: Commit**
 
@@ -211,6 +249,7 @@ git commit -m "feat(skills): add skill type definitions and validation"
 ## Task 3: Create skill parser
 
 **Files:**
+
 - Create: `packages/agent/src/skills/parser.ts`
 - Create: `packages/agent/src/skills/parser.test.ts`
 
@@ -292,11 +331,16 @@ Body content.`;
     const result = parseSkillMd(content);
     expect(result.properties.license).toBe('MIT');
     expect(result.properties.compatibility).toBe('Requires git');
-    expect(result.properties.metadata).toEqual({ author: 'test-org', version: '1.0' });
+    expect(result.properties.metadata).toEqual({
+      author: 'test-org',
+      version: '1.0',
+    });
   });
 
   it('throws on missing frontmatter', () => {
-    expect(() => parseSkillMd('No frontmatter here')).toThrow('must start with');
+    expect(() => parseSkillMd('No frontmatter here')).toThrow(
+      'must start with'
+    );
   });
 
   it('throws on missing name', () => {
@@ -328,8 +372,8 @@ Body`;
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd packages/agent && npx vitest run src/skills/parser.test.ts`
-Expected: FAIL - module not found
+Run: `cd packages/agent && npx vitest run src/skills/parser.test.ts` Expected:
+FAIL - module not found
 
 **Step 3: Write minimal implementation**
 
@@ -340,7 +384,11 @@ Expected: FAIL - module not found
 import * as fs from 'fs';
 import * as path from 'path';
 import matter from 'gray-matter';
-import { validateSkillName, validateSkillDescription, type SkillProperties } from './types';
+import {
+  validateSkillName,
+  validateSkillDescription,
+  type SkillProperties,
+} from './types';
 
 export interface ParsedSkill {
   properties: SkillProperties;
@@ -373,7 +421,9 @@ export function findSkillMd(skillDir: string): string | null {
  */
 export function parseSkillMd(content: string): ParsedSkill {
   if (!content.startsWith('---')) {
-    throw new SkillParseError('SKILL.md must start with YAML frontmatter (---)');
+    throw new SkillParseError(
+      'SKILL.md must start with YAML frontmatter (---)'
+    );
   }
 
   const parsed = matter(content);
@@ -397,7 +447,9 @@ export function parseSkillMd(content: string): ParsedSkill {
   // Validate description format
   const descValidation = validateSkillDescription(data.description);
   if (!descValidation.valid) {
-    throw new SkillParseError(`Invalid skill description: ${descValidation.error}`);
+    throw new SkillParseError(
+      `Invalid skill description: ${descValidation.error}`
+    );
   }
 
   // Build properties object
@@ -414,9 +466,16 @@ export function parseSkillMd(content: string): ParsedSkill {
     properties.compatibility = data.compatibility;
   }
 
-  if (data.metadata && typeof data.metadata === 'object' && data.metadata !== null) {
+  if (
+    data.metadata &&
+    typeof data.metadata === 'object' &&
+    data.metadata !== null
+  ) {
     properties.metadata = Object.fromEntries(
-      Object.entries(data.metadata as Record<string, unknown>).map(([k, v]) => [k, String(v)])
+      Object.entries(data.metadata as Record<string, unknown>).map(([k, v]) => [
+        k,
+        String(v),
+      ])
     );
   }
 
@@ -442,8 +501,8 @@ export function readSkillFromDir(skillDir: string): ParsedSkill {
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd packages/agent && npx vitest run src/skills/parser.test.ts`
-Expected: PASS
+Run: `cd packages/agent && npx vitest run src/skills/parser.test.ts` Expected:
+PASS
 
 **Step 5: Commit**
 
@@ -457,6 +516,7 @@ git commit -m "feat(skills): add SKILL.md parser with frontmatter extraction"
 ## Task 4: Create SkillRegistry
 
 **Files:**
+
 - Create: `packages/agent/src/skills/registry.ts`
 - Create: `packages/agent/src/skills/registry.test.ts`
 
@@ -513,7 +573,9 @@ describe('SkillRegistry', () => {
     createSkill(laceSkillsDir, 'commit', 'Lace commit skill');
     createSkill(claudeSkillsDir, 'review', 'Claude review skill');
 
-    const registry = new SkillRegistry({ skillDirs: [laceSkillsDir, claudeSkillsDir] });
+    const registry = new SkillRegistry({
+      skillDirs: [laceSkillsDir, claudeSkillsDir],
+    });
     const skills = registry.listSkills();
 
     expect(skills).toHaveLength(2);
@@ -525,7 +587,9 @@ describe('SkillRegistry', () => {
     createSkill(claudeSkillsDir, 'commit', 'Claude version');
 
     // laceSkillsDir first = higher priority
-    const registry = new SkillRegistry({ skillDirs: [laceSkillsDir, claudeSkillsDir] });
+    const registry = new SkillRegistry({
+      skillDirs: [laceSkillsDir, claudeSkillsDir],
+    });
     const skills = registry.listSkills();
 
     expect(skills).toHaveLength(1);
@@ -607,8 +671,8 @@ describe('SkillRegistry', () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd packages/agent && npx vitest run src/skills/registry.test.ts`
-Expected: FAIL - module not found
+Run: `cd packages/agent && npx vitest run src/skills/registry.test.ts` Expected:
+FAIL - module not found
 
 **Step 3: Write minimal implementation**
 
@@ -761,8 +825,8 @@ export class SkillRegistry {
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd packages/agent && npx vitest run src/skills/registry.test.ts`
-Expected: PASS
+Run: `cd packages/agent && npx vitest run src/skills/registry.test.ts` Expected:
+PASS
 
 **Step 5: Commit**
 
@@ -776,6 +840,7 @@ git commit -m "feat(skills): add SkillRegistry for skill discovery"
 ## Task 5: Create skill directory resolver
 
 **Files:**
+
 - Create: `packages/agent/src/skills/directories.ts`
 - Create: `packages/agent/src/skills/directories.test.ts`
 
@@ -891,6 +956,7 @@ git commit -m "feat(skills): add skill directory resolver with precedence"
 ## Task 6: Create index export for skills module
 
 **Files:**
+
 - Create: `packages/agent/src/skills/index.ts`
 
 **Step 1: Create the exports file**
@@ -899,17 +965,25 @@ git commit -m "feat(skills): add skill directory resolver with precedence"
 // packages/agent/src/skills/index.ts
 // ABOUTME: Public exports for the skills module
 
-export { SkillRegistry, type SkillRegistryOptions, type SkillContent } from './registry';
+export {
+  SkillRegistry,
+  type SkillRegistryOptions,
+  type SkillContent,
+} from './registry';
 export { getSkillDirectories } from './directories';
 export type { SkillProperties, SkillMetadata, ValidationResult } from './types';
 export { validateSkillName, validateSkillDescription } from './types';
-export { parseSkillMd, findSkillMd, readSkillFromDir, SkillParseError } from './parser';
+export {
+  parseSkillMd,
+  findSkillMd,
+  readSkillFromDir,
+  SkillParseError,
+} from './parser';
 ```
 
 **Step 2: Verify exports compile**
 
-Run: `cd packages/agent && npx tsc --noEmit`
-Expected: No errors
+Run: `cd packages/agent && npx tsc --noEmit` Expected: No errors
 
 **Step 3: Commit**
 
@@ -923,6 +997,7 @@ git commit -m "feat(skills): add module index exports"
 ## Task 7: Create SkillVariableProvider
 
 **Files:**
+
 - Create: `packages/agent/src/skills/variable-provider.ts`
 - Create: `packages/agent/src/skills/variable-provider.test.ts`
 
@@ -987,7 +1062,9 @@ describe('SkillVariableProvider', () => {
     const provider = new SkillVariableProvider(registry);
     const variables = provider.getVariables();
 
-    expect(variables.availableSkills).toBe('<available_skills>\n</available_skills>');
+    expect(variables.availableSkills).toBe(
+      '<available_skills>\n</available_skills>'
+    );
   });
 
   it('escapes HTML entities in name and description', () => {
@@ -1077,6 +1154,7 @@ git commit -m "feat(skills): add SkillVariableProvider for system prompt injecti
 ## Task 8: Create UseSkillTool
 
 **Files:**
+
 - Create: `packages/agent/src/tools/implementations/use-skill-tool.ts`
 - Create: `packages/agent/src/tools/implementations/use-skill-tool.test.ts`
 
@@ -1118,30 +1196,50 @@ describe('UseSkillTool', () => {
   }
 
   it('returns skill content and location', async () => {
-    createSkill('commit', 'Create git commits', '# Commit Skill\n\nFollow these steps...');
+    createSkill(
+      'commit',
+      'Create git commits',
+      '# Commit Skill\n\nFollow these steps...'
+    );
     registry = new SkillRegistry({ skillDirs: [skillsDir] });
     const tool = new UseSkillTool(registry);
 
-    const result = await tool.execute({ skill: 'commit' }, { signal: new AbortController().signal });
+    const result = await tool.execute(
+      { skill: 'commit' },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.status).toBe('completed');
     const text = result.content[0];
     expect(text.type).toBe('text');
-    expect((text as { type: 'text'; text: string }).text).toContain('Skill: commit');
-    expect((text as { type: 'text'; text: string }).text).toContain(`Location: ${path.join(skillsDir, 'commit')}`);
-    expect((text as { type: 'text'; text: string }).text).toContain('# Commit Skill');
-    expect((text as { type: 'text'; text: string }).text).toContain('Follow these steps...');
+    expect((text as { type: 'text'; text: string }).text).toContain(
+      'Skill: commit'
+    );
+    expect((text as { type: 'text'; text: string }).text).toContain(
+      `Location: ${path.join(skillsDir, 'commit')}`
+    );
+    expect((text as { type: 'text'; text: string }).text).toContain(
+      '# Commit Skill'
+    );
+    expect((text as { type: 'text'; text: string }).text).toContain(
+      'Follow these steps...'
+    );
   });
 
   it('returns error for unknown skill', async () => {
     registry = new SkillRegistry({ skillDirs: [skillsDir] });
     const tool = new UseSkillTool(registry);
 
-    const result = await tool.execute({ skill: 'nonexistent' }, { signal: new AbortController().signal });
+    const result = await tool.execute(
+      { skill: 'nonexistent' },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.status).toBe('failed');
     const text = result.content[0];
-    expect((text as { type: 'text'; text: string }).text).toContain('not found');
+    expect((text as { type: 'text'; text: string }).text).toContain(
+      'not found'
+    );
   });
 
   it('has correct metadata', () => {
@@ -1157,7 +1255,8 @@ describe('UseSkillTool', () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd packages/agent && npx vitest run src/tools/implementations/use-skill-tool.test.ts`
+Run:
+`cd packages/agent && npx vitest run src/tools/implementations/use-skill-tool.test.ts`
 Expected: FAIL - module not found
 
 **Step 3: Write minimal implementation**
@@ -1172,7 +1271,10 @@ import type { ToolResult, ToolContext } from '../types';
 import type { SkillRegistry } from '@lace/agent/skills';
 
 const useSkillSchema = z.object({
-  skill: z.string().min(1, 'Skill name is required').describe('Name of the skill to activate'),
+  skill: z
+    .string()
+    .min(1, 'Skill name is required')
+    .describe('Name of the skill to activate'),
 });
 
 export class UseSkillTool extends Tool {
@@ -1199,7 +1301,9 @@ export class UseSkillTool extends Tool {
 
     const content = this.registry.getSkillContent(skillName);
     if (!content) {
-      return this.createError(`Skill '${skillName}' not found. Check available skills in your system prompt.`);
+      return this.createError(
+        `Skill '${skillName}' not found. Check available skills in your system prompt.`
+      );
     }
 
     const output = [
@@ -1218,7 +1322,8 @@ export class UseSkillTool extends Tool {
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd packages/agent && npx vitest run src/tools/implementations/use-skill-tool.test.ts`
+Run:
+`cd packages/agent && npx vitest run src/tools/implementations/use-skill-tool.test.ts`
 Expected: PASS
 
 **Step 5: Commit**
@@ -1233,15 +1338,18 @@ git commit -m "feat(skills): add use_skill tool for skill activation"
 ## Task 9: Integrate skills into ToolExecutor
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/executor.ts`
 
 **Step 1: Read the current executor.ts to understand integration points**
 
-Find where `registerAllAvailableTools()` is defined and where tools are instantiated.
+Find where `registerAllAvailableTools()` is defined and where tools are
+instantiated.
 
 **Step 2: Update ToolExecutor to accept SkillRegistry**
 
-Add SkillRegistry as an optional constructor parameter and register UseSkillTool:
+Add SkillRegistry as an optional constructor parameter and register
+UseSkillTool:
 
 ```typescript
 // In executor.ts constructor or registerAllAvailableTools:
@@ -1264,8 +1372,8 @@ registerAllAvailableTools(skillRegistry?: SkillRegistry): void {
 
 **Step 3: Run existing executor tests**
 
-Run: `cd packages/agent && npx vitest run src/tools/executor.test.ts`
-Expected: PASS (no regressions)
+Run: `cd packages/agent && npx vitest run src/tools/executor.test.ts` Expected:
+PASS (no regressions)
 
 **Step 4: Commit**
 
@@ -1279,6 +1387,7 @@ git commit -m "feat(skills): integrate UseSkillTool into ToolExecutor"
 ## Task 10: Integrate skills into PromptManager
 
 **Files:**
+
 - Modify: `packages/agent/src/config/prompt-manager.ts`
 
 **Step 1: Update PromptManager to accept SkillRegistry**
@@ -1295,7 +1404,9 @@ interface PromptManagerOptions {
 
 // In constructor:
 if (options.skillRegistry) {
-  this.variableManager.addProvider(new SkillVariableProvider(options.skillRegistry));
+  this.variableManager.addProvider(
+    new SkillVariableProvider(options.skillRegistry)
+  );
 }
 ```
 
@@ -1316,22 +1427,26 @@ git commit -m "feat(skills): integrate SkillVariableProvider into PromptManager"
 ## Task 11: Add skills section to system prompt template
 
 **Files:**
-- Modify: `packages/agent/config/agent-personas/lace.md` (or appropriate template file)
+
+- Modify: `packages/agent/config/agent-personas/lace.md` (or appropriate
+  template file)
 
 **Step 1: Find where to add the skills section**
 
-Look for the template structure and find appropriate location (likely near tools section).
+Look for the template structure and find appropriate location (likely near tools
+section).
 
 **Step 2: Add conditional skills section**
 
 ```markdown
 {{#availableSkills}}
+
 ## Available Skills
 
-The following skills are available. Use the `use_skill` tool to activate a skill when it's relevant to your task.
+The following skills are available. Use the `use_skill` tool to activate a skill
+when it's relevant to your task.
 
-{{{availableSkills}}}
-{{/availableSkills}}
+{{{availableSkills}}} {{/availableSkills}}
 ```
 
 **Step 3: Verify template renders correctly**
@@ -1350,7 +1465,9 @@ git commit -m "feat(skills): add available skills section to system prompt templ
 ## Task 12: Wire up skills in server/session initialization
 
 **Files:**
-- Modify: Where ConversationRunner or session is initialized (likely `packages/agent/src/rpc/register-handlers.ts` or similar)
+
+- Modify: Where ConversationRunner or session is initialized (likely
+  `packages/agent/src/rpc/register-handlers.ts` or similar)
 
 **Step 1: Find session/runner initialization**
 
@@ -1377,8 +1494,7 @@ toolExecutor.registerAllAvailableTools(skillRegistry);
 
 **Step 3: Run integration tests**
 
-Run: `cd packages/agent && npm test`
-Expected: PASS
+Run: `cd packages/agent && npm test` Expected: PASS
 
 **Step 4: Commit**
 
@@ -1392,6 +1508,7 @@ git commit -m "feat(skills): wire up SkillRegistry in session initialization"
 ## Task 13: Add end-to-end test
 
 **Files:**
+
 - Create: `packages/agent/src/skills/integration.test.ts`
 
 **Step 1: Write integration test**
@@ -1422,7 +1539,12 @@ describe('Skills Integration', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  function createSkill(baseDir: string, name: string, description: string, body: string): void {
+  function createSkill(
+    baseDir: string,
+    name: string,
+    description: string,
+    body: string
+  ): void {
     const skillDir = path.join(baseDir, name);
     fs.mkdirSync(skillDir, { recursive: true });
     fs.writeFileSync(
@@ -1435,7 +1557,12 @@ describe('Skills Integration', () => {
     // Setup: Create skills in project directory
     const projectSkillsDir = path.join(projectDir, '.lace', 'skills');
     fs.mkdirSync(projectSkillsDir, { recursive: true });
-    createSkill(projectSkillsDir, 'commit', 'Create well-structured commits', '# Commit Guide\n\n1. Stage changes\n2. Write message');
+    createSkill(
+      projectSkillsDir,
+      'commit',
+      'Create well-structured commits',
+      '# Commit Guide\n\n1. Stage changes\n2. Write message'
+    );
 
     // 1. Create registry with project skills
     const registry = new SkillRegistry({ skillDirs: [projectSkillsDir] });
@@ -1454,7 +1581,10 @@ describe('Skills Integration', () => {
 
     // 4. Activate skill via tool
     const tool = new UseSkillTool(registry);
-    const result = await tool.execute({ skill: 'commit' }, { signal: new AbortController().signal });
+    const result = await tool.execute(
+      { skill: 'commit' },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.status).toBe('completed');
     const text = (result.content[0] as { type: 'text'; text: string }).text;
@@ -1482,6 +1612,7 @@ git commit -m "test(skills): add end-to-end integration test"
 ## Task 14: Update module exports
 
 **Files:**
+
 - Modify: `packages/agent/src/skills/index.ts`
 
 **Step 1: Ensure all public APIs are exported**
@@ -1490,18 +1621,26 @@ git commit -m "test(skills): add end-to-end integration test"
 // packages/agent/src/skills/index.ts
 // ABOUTME: Public exports for the skills module
 
-export { SkillRegistry, type SkillRegistryOptions, type SkillContent } from './registry';
+export {
+  SkillRegistry,
+  type SkillRegistryOptions,
+  type SkillContent,
+} from './registry';
 export { getSkillDirectories } from './directories';
 export { SkillVariableProvider } from './variable-provider';
 export type { SkillProperties, SkillMetadata, ValidationResult } from './types';
 export { validateSkillName, validateSkillDescription } from './types';
-export { parseSkillMd, findSkillMd, readSkillFromDir, SkillParseError } from './parser';
+export {
+  parseSkillMd,
+  findSkillMd,
+  readSkillFromDir,
+  SkillParseError,
+} from './parser';
 ```
 
 **Step 2: Verify exports**
 
-Run: `cd packages/agent && npx tsc --noEmit`
-Expected: No errors
+Run: `cd packages/agent && npx tsc --noEmit` Expected: No errors
 
 **Step 3: Commit**
 
@@ -1517,16 +1656,20 @@ git commit -m "feat(skills): finalize module exports"
 After all tasks are complete, verify the full integration:
 
 1. **Unit tests pass:**
+
    ```bash
    cd packages/agent && npm test
    ```
 
 2. **TypeScript compiles:**
+
    ```bash
    cd packages/agent && npx tsc --noEmit
    ```
 
-3. **Manual test:** Create a test skill and verify it appears in the system prompt and can be activated:
+3. **Manual test:** Create a test skill and verify it appears in the system
+   prompt and can be activated:
+
    ```bash
    mkdir -p ~/.lace/skills/test-skill
    cat > ~/.lace/skills/test-skill/SKILL.md << 'EOF'

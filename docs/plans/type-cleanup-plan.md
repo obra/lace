@@ -1,20 +1,25 @@
 # Type Cleanup Plan
 
-This document outlines the remaining type issues in the agent package and a prioritized plan to fix them.
+This document outlines the remaining type issues in the agent package and a
+prioritized plan to fix them.
 
 ## Priority 1: Foundational Types (Unblocks Other Fixes)
 
 ### 1.1 Create Discriminated Union for Durable Event Data
 
-**Problem:** Event data is parsed with ad-hoc `(event.data as any)` casts throughout the codebase. Each event type has different data shapes but there's no type system enforcement.
+**Problem:** Event data is parsed with ad-hoc `(event.data as any)` casts
+throughout the codebase. Each event type has different data shapes but there's
+no type system enforcement.
 
 **Files affected:**
+
 - `message-building/message-builder.ts` (lines 112-168)
 - `compaction/compact-dropped-messages.ts` (lines 140, 148, 162, 210)
 - `storage/permissions-from-events.ts` (lines 35-36)
 - `jobs/subagent-job.ts` (various)
 
 **Solution:**
+
 ```typescript
 // In storage/event-types.ts (new file)
 export type DurableEventData =
@@ -50,12 +55,16 @@ export interface DurableEvent {
 
 ### 1.2 Clean Up ProviderMessage Property Access
 
-**Problem:** `ProviderMessage` already defines `toolCalls` and `toolResults` as optional properties, but code still uses `(message as any).toolCalls` pattern.
+**Problem:** `ProviderMessage` already defines `toolCalls` and `toolResults` as
+optional properties, but code still uses `(message as any).toolCalls` pattern.
 
 **Files affected:**
+
 - `message-building/message-builder.ts` (lines 217-220)
 
-**Solution:** Simply remove the unnecessary `as any` casts and use optional chaining:
+**Solution:** Simply remove the unnecessary `as any` casts and use optional
+chaining:
+
 ```typescript
 // Before
 if ((message as any).toolCalls) { ... }
@@ -72,13 +81,17 @@ if (message.toolCalls) { ... }
 
 ### 2.1 Strengthen SessionState.config Type
 
-**Problem:** `SessionState.config` is optional with all optional properties, leading to defensive `as any` casts when accessing nested properties like `mcpServers`, `environment`.
+**Problem:** `SessionState.config` is optional with all optional properties,
+leading to defensive `as any` casts when accessing nested properties like
+`mcpServers`, `environment`.
 
 **Files affected:**
+
 - `rpc/handlers/session-operations.ts` (various)
 - `rpc/utils.ts` (lines 67, 73-74)
 
 **Solution:** Create a non-optional config type with defaults:
+
 ```typescript
 // In storage/session-store.ts
 export type SessionConfig = {
@@ -113,19 +126,25 @@ export function getSessionConfig(state: SessionState): SessionConfig {
 
 ### 2.2 Create Proper Error Classes
 
-**Problem:** Custom errors add properties like `code`, `path` using ad-hoc type assertions.
+**Problem:** Custom errors add properties like `code`, `path` using ad-hoc type
+assertions.
 
 **Files affected:**
+
 - `storage/session-store.ts` (line 86)
 - `jobs/subagent-job.ts` (lines 554-556)
 - `rpc/handlers/session.ts` (line 92)
 
 **Solution:**
+
 ```typescript
 // In errors/agent-errors.ts (new file)
 export class SessionStorageError extends Error {
   readonly code = 'SessionStorageUnavailable';
-  constructor(message: string, public readonly path: string) {
+  constructor(
+    message: string,
+    public readonly path: string
+  ) {
     super(message);
     this.name = 'SessionStorageError';
   }
@@ -152,11 +171,13 @@ export class RpcError extends Error {
 **Problem:** Permission payloads are typed ad-hoc in multiple places.
 
 **Files affected:**
+
 - `rpc/permissions.ts`
 - `jobs/subagent-job.ts` (lines 406-412, 463-468)
 - `storage/permissions-from-events.ts`
 
 **Solution:**
+
 ```typescript
 // In rpc/permission-types.ts (new file)
 export interface PermissionRequestPayload {
@@ -183,7 +204,14 @@ export interface PermissionUpdatePayload {
   name: string;
   kind?: string;
   input: Record<string, unknown>;
-  status: 'pending' | 'awaiting_permission' | 'running' | 'completed' | 'denied' | 'cancelled' | 'failed';
+  status:
+    | 'pending'
+    | 'awaiting_permission'
+    | 'running'
+    | 'completed'
+    | 'denied'
+    | 'cancelled'
+    | 'failed';
   result?: ToolResult;
   options?: Array<{ optionId: string; label: string }>;
 }
@@ -197,14 +225,17 @@ export interface PermissionUpdatePayload {
 
 ### 3.1 Move Todo Tools to Standard Execution Path
 
-**Problem:** `todo_read` and `todo_write` are special-cased in runner.ts because they need `sessionDir` which isn't in ToolContext.
+**Problem:** `todo_read` and `todo_write` are special-cased in runner.ts because
+they need `sessionDir` which isn't in ToolContext.
 
 **Files affected:**
+
 - `core/conversation/runner.ts` (executeToolByName method)
 - `tools/implementations/todo_read.ts`
 - `tools/implementations/todo_write.ts`
 
 **Solution:** Add `sessionDir` to ToolContext and update todo tools to use it:
+
 ```typescript
 // In tools/types.ts - add to ToolContext
 sessionDir?: string;
@@ -221,13 +252,17 @@ toolContext = { ...toolContext, sessionDir: this.config.sessionDir };
 
 ### 3.2 Implement Background Mode in BashTool
 
-**Problem:** `bash` with `background=true` is special-cased in runner.ts before the permission check. BashTool.executeValidated() doesn't handle background mode.
+**Problem:** `bash` with `background=true` is special-cased in runner.ts before
+the permission check. BashTool.executeValidated() doesn't handle background
+mode.
 
 **Files affected:**
+
 - `core/conversation/runner.ts` (lines 431-493)
 - `tools/implementations/bash.ts`
 
 **Solution:** Move background job creation into BashTool.executeValidated():
+
 ```typescript
 // BashTool needs access to JobManager (already in context)
 // and needs to create jobs instead of executing directly
@@ -270,7 +305,8 @@ protected async executeValidated(args: BashArgs, context: ToolContext): Promise<
 
 **Problem:** `mapCatalogModelToModelInfo(m, providerId) as any`
 
-**Solution:** Fix return type of `mapCatalogModelToModelInfo` to match expected interface.
+**Solution:** Fix return type of `mapCatalogModelToModelInfo` to match expected
+interface.
 
 **Effort:** Low
 
@@ -303,6 +339,7 @@ protected async executeValidated(args: BashArgs, context: ToolContext): Promise<
 **Problem:** Test files use inline `as any` casts for mocks.
 
 **Files affected:**
+
 - `mcp/tool-registry.test.ts`
 - `tools/executor.test.ts`
 - `tools/tool-catalog.test.ts`
@@ -310,6 +347,7 @@ protected async executeValidated(args: BashArgs, context: ToolContext): Promise<
 - Various e2e tests
 
 **Solution:** Create typed mock factories:
+
 ```typescript
 // In test-utils/mock-factories.ts
 export function createMockTool(overrides?: Partial<Tool>): Tool {

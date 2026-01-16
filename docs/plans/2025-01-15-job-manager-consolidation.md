@@ -1,10 +1,15 @@
 # JobManager Consolidation Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
+> implement this plan task-by-task.
 
-**Goal:** Consolidate scattered job management code into a unified JobManager class and route all tools through ToolExecutor.
+**Goal:** Consolidate scattered job management code into a unified JobManager
+class and route all tools through ToolExecutor.
 
-**Architecture:** Create JobManager as a session-scoped service that owns all job state and operations. Pass JobManager through ToolContext so tools can use it directly. Remove special-case tool handling from runner.ts so ALL tools flow through toolExecutor.execute().
+**Architecture:** Create JobManager as a session-scoped service that owns all
+job state and operations. Pass JobManager through ToolContext so tools can use
+it directly. Remove special-case tool handling from runner.ts so ALL tools flow
+through toolExecutor.execute().
 
 **Tech Stack:** TypeScript, Vitest for testing
 
@@ -15,11 +20,14 @@
 Currently, job-related code is scattered across multiple locations:
 
 1. **State in AgentServerState:** `jobs`, `jobStreaming`, `jobNotificationQueue`
-2. **Operations in jobs/*.ts:** `job-creation.ts`, `job-derivation.ts`, `job-control.ts`, `job-output.ts`, `job-notifications.ts`
-3. **Tool execution split:** Runner.ts has inline implementations for delegate/job_output/jobs_list/job_kill, bypassing ToolExecutor
+2. **Operations in jobs/\*.ts:** `job-creation.ts`, `job-derivation.ts`,
+   `job-control.ts`, `job-output.ts`, `job-notifications.ts`
+3. **Tool execution split:** Runner.ts has inline implementations for
+   delegate/job_output/jobs_list/job_kill, bypassing ToolExecutor
 4. **Dead code:** `core/tools/special/` is never called
 
 This refactor:
+
 - Consolidates all job state and operations into `JobManager`
 - Makes tool implementations live in their Tool classes
 - Ensures ONE code path through `toolExecutor.execute()` for all tools
@@ -30,13 +38,16 @@ This refactor:
 ## Task 1: Create JobManager Class with State
 
 **Files:**
-- Create: `packages/agent/src/jobs/job-manager.ts` (replace existing file which is just utils)
+
+- Create: `packages/agent/src/jobs/job-manager.ts` (replace existing file which
+  is just utils)
 - Rename: `packages/agent/src/jobs/job-file-utils.ts` (move existing utils here)
 - Test: `packages/agent/src/jobs/__tests__/job-manager.test.ts`
 
 **Step 1: Rename existing job-manager.ts to job-file-utils.ts**
 
-The current `job-manager.ts` only has file utilities. Rename it to make room for the real JobManager.
+The current `job-manager.ts` only has file utilities. Rename it to make room for
+the real JobManager.
 
 ```bash
 cd packages/agent
@@ -93,12 +104,23 @@ Expected: FAIL with "Cannot find module '../job-manager'"
 // ABOUTME: Unified job management - state, operations, and notifications
 // Consolidates scattered job code into single session-scoped service
 
-import type { JobState, JobStatus, JobType, PendingJobNotification } from '../server-types';
+import type {
+  JobState,
+  JobStatus,
+  JobType,
+  PendingJobNotification,
+} from '../server-types';
 
 export type JobManagerDeps = {
   getActiveSession: () => { sessionId: string; dir: string } | null;
-  persistEvent: (event: { type: string; data: Record<string, unknown> }) => Promise<void>;
-  emitUpdate: (update: { type: string; [key: string]: unknown }) => Promise<void>;
+  persistEvent: (event: {
+    type: string;
+    data: Record<string, unknown>;
+  }) => Promise<void>;
+  emitUpdate: (update: {
+    type: string;
+    [key: string]: unknown;
+  }) => Promise<void>;
 };
 
 export class JobManager {
@@ -153,6 +175,7 @@ EOF
 ## Task 2: Move Job State Management to JobManager
 
 **Files:**
+
 - Modify: `packages/agent/src/jobs/job-manager.ts`
 - Test: `packages/agent/src/jobs/__tests__/job-manager.test.ts`
 
@@ -163,7 +186,9 @@ EOF
 describe('job state', () => {
   it('can add and retrieve a job', () => {
     const deps = {
-      getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: '/tmp/sess' }),
+      getActiveSession: vi
+        .fn()
+        .mockReturnValue({ sessionId: 'sess_1', dir: '/tmp/sess' }),
       persistEvent: vi.fn(),
       emitUpdate: vi.fn(),
     };
@@ -188,7 +213,9 @@ describe('job state', () => {
 
   it('can remove a job', () => {
     const deps = {
-      getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: '/tmp/sess' }),
+      getActiveSession: vi
+        .fn()
+        .mockReturnValue({ sessionId: 'sess_1', dir: '/tmp/sess' }),
       persistEvent: vi.fn(),
       emitUpdate: vi.fn(),
     };
@@ -279,6 +306,7 @@ git commit -m "feat(agent): add job state management to JobManager"
 ## Task 3: Move listJobs (formerly deriveJobs) to JobManager
 
 **Files:**
+
 - Modify: `packages/agent/src/jobs/job-manager.ts`
 - Reference: `packages/agent/src/jobs/job-derivation.ts` (will be deleted later)
 - Test: `packages/agent/src/jobs/__tests__/job-manager.test.ts`
@@ -309,13 +337,26 @@ describe('listJobs', () => {
 
     // Write test events
     const events = [
-      { type: 'job_started', timestamp: '2025-01-15T10:00:00Z', data: { jobId: 'job_1', jobType: 'bash', description: 'test job' } },
-      { type: 'job_finished', timestamp: '2025-01-15T10:01:00Z', data: { jobId: 'job_1', outcome: 'completed', exitCode: 0 } },
+      {
+        type: 'job_started',
+        timestamp: '2025-01-15T10:00:00Z',
+        data: { jobId: 'job_1', jobType: 'bash', description: 'test job' },
+      },
+      {
+        type: 'job_finished',
+        timestamp: '2025-01-15T10:01:00Z',
+        data: { jobId: 'job_1', outcome: 'completed', exitCode: 0 },
+      },
     ];
-    writeFileSync(join(testDir, 'events.jsonl'), events.map(e => JSON.stringify(e)).join('\n'));
+    writeFileSync(
+      join(testDir, 'events.jsonl'),
+      events.map((e) => JSON.stringify(e)).join('\n')
+    );
 
     const deps = {
-      getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: testDir }),
+      getActiveSession: vi
+        .fn()
+        .mockReturnValue({ sessionId: 'sess_1', dir: testDir }),
       persistEvent: vi.fn(),
       emitUpdate: vi.fn(),
     };
@@ -337,14 +378,31 @@ describe('listJobs', () => {
     mkdirSync(testDir, { recursive: true });
 
     const events = [
-      { type: 'job_started', timestamp: '2025-01-15T10:00:00Z', data: { jobId: 'job_1', jobType: 'delegate', description: 'subagent' } },
-      { type: 'job_session_assigned', timestamp: '2025-01-15T10:00:01Z', data: { jobId: 'job_1', subagentSessionId: 'sess_sub_123' } },
-      { type: 'job_finished', timestamp: '2025-01-15T10:01:00Z', data: { jobId: 'job_1', outcome: 'completed' } },
+      {
+        type: 'job_started',
+        timestamp: '2025-01-15T10:00:00Z',
+        data: { jobId: 'job_1', jobType: 'delegate', description: 'subagent' },
+      },
+      {
+        type: 'job_session_assigned',
+        timestamp: '2025-01-15T10:00:01Z',
+        data: { jobId: 'job_1', subagentSessionId: 'sess_sub_123' },
+      },
+      {
+        type: 'job_finished',
+        timestamp: '2025-01-15T10:01:00Z',
+        data: { jobId: 'job_1', outcome: 'completed' },
+      },
     ];
-    writeFileSync(join(testDir, 'events.jsonl'), events.map(e => JSON.stringify(e)).join('\n'));
+    writeFileSync(
+      join(testDir, 'events.jsonl'),
+      events.map((e) => JSON.stringify(e)).join('\n')
+    );
 
     const deps = {
-      getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: testDir }),
+      getActiveSession: vi
+        .fn()
+        .mockReturnValue({ sessionId: 'sess_1', dir: testDir }),
       persistEvent: vi.fn(),
       emitUpdate: vi.fn(),
     };
@@ -369,7 +427,8 @@ Expected: FAIL - listJobs returns empty array
 
 **Step 3: Implement listJobs**
 
-Copy the logic from `job-derivation.ts` into `JobManager.listJobs()`, adapting it to use instance state:
+Copy the logic from `job-derivation.ts` into `JobManager.listJobs()`, adapting
+it to use instance state:
 
 ```typescript
 // Add to job-manager.ts
@@ -528,6 +587,7 @@ git commit -m "feat(agent): implement listJobs in JobManager (was deriveJobs)"
 ## Task 4: Move createJob to JobManager
 
 **Files:**
+
 - Modify: `packages/agent/src/jobs/job-manager.ts`
 - Reference: `packages/agent/src/jobs/job-creation.ts` (will be deleted later)
 - Test: `packages/agent/src/jobs/__tests__/job-manager.test.ts`
@@ -538,8 +598,14 @@ git commit -m "feat(agent): implement listJobs in JobManager (was deriveJobs)"
 // Update JobManagerDeps in job-manager.ts
 export type JobManagerDeps = {
   getActiveSession: () => { sessionId: string; dir: string } | null;
-  persistEvent: (event: { type: string; data: Record<string, unknown> }) => Promise<void>;
-  emitUpdate: (update: { type: string; [key: string]: unknown }) => Promise<void>;
+  persistEvent: (event: {
+    type: string;
+    data: Record<string, unknown>;
+  }) => Promise<void>;
+  emitUpdate: (update: {
+    type: string;
+    [key: string]: unknown;
+  }) => Promise<void>;
   runShellProcess: (job: JobState) => void;
   runSubagentProcess: (job: JobState) => void;
 };
@@ -561,7 +627,9 @@ describe('createJob', () => {
     const runShellProcess = vi.fn();
 
     const deps = {
-      getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: testDir }),
+      getActiveSession: vi
+        .fn()
+        .mockReturnValue({ sessionId: 'sess_1', dir: testDir }),
       persistEvent,
       emitUpdate,
       runShellProcess,
@@ -579,10 +647,12 @@ describe('createJob', () => {
     expect(job.status).toBe('running');
     expect(job.command).toBe('echo hello');
     expect(manager.getJob(jobId)).toBe(job);
-    expect(persistEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'job_started',
-      data: expect.objectContaining({ jobId, jobType: 'bash' }),
-    }));
+    expect(persistEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'job_started',
+        data: expect.objectContaining({ jobId, jobType: 'bash' }),
+      })
+    );
     expect(runShellProcess).toHaveBeenCalledWith(job);
 
     rmSync(testDir, { recursive: true });
@@ -598,7 +668,9 @@ describe('createJob', () => {
     const runSubagentProcess = vi.fn();
 
     const deps = {
-      getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: testDir }),
+      getActiveSession: vi
+        .fn()
+        .mockReturnValue({ sessionId: 'sess_1', dir: testDir }),
       persistEvent,
       emitUpdate: vi.fn(),
       runShellProcess: vi.fn(),
@@ -629,8 +701,9 @@ describe('createJob', () => {
     };
     const manager = new JobManager(deps);
 
-    await expect(manager.createJob('shell', { command: 'test' }))
-      .rejects.toThrow('No active session');
+    await expect(
+      manager.createJob('shell', { command: 'test' })
+    ).rejects.toThrow('No active session');
   });
 });
 ```
@@ -781,6 +854,7 @@ git commit -m "feat(agent): implement createJob in JobManager (unifies shell and
 ## Task 5: Move finalizeJob and cancelJob to JobManager
 
 **Files:**
+
 - Modify: `packages/agent/src/jobs/job-manager.ts`
 - Reference: `packages/agent/src/jobs/job-control.ts`
 - Test: `packages/agent/src/jobs/__tests__/job-manager.test.ts`
@@ -795,7 +869,9 @@ describe('finalizeJob', () => {
     const emitUpdate = vi.fn();
 
     const deps = {
-      getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: '/tmp' }),
+      getActiveSession: vi
+        .fn()
+        .mockReturnValue({ sessionId: 'sess_1', dir: '/tmp' }),
       persistEvent,
       emitUpdate,
       runShellProcess: vi.fn(),
@@ -811,7 +887,9 @@ describe('finalizeJob', () => {
       startedAt: new Date().toISOString(),
       outputPath: '/tmp/job.log',
       finished: false,
-      completion: new Promise((r) => { resolver = r; }),
+      completion: new Promise((r) => {
+        resolver = r;
+      }),
       resolveCompletion: () => resolver(),
       exitCode: 0,
     };
@@ -819,10 +897,16 @@ describe('finalizeJob', () => {
     manager.addJob(job);
     await manager.finalizeJob(job);
 
-    expect(persistEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'job_finished',
-      data: expect.objectContaining({ jobId: 'job_123', outcome: 'completed', exitCode: 0 }),
-    }));
+    expect(persistEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'job_finished',
+        data: expect.objectContaining({
+          jobId: 'job_123',
+          outcome: 'completed',
+          exitCode: 0,
+        }),
+      })
+    );
     expect(manager.getJob('job_123')).toBeUndefined();
   });
 });
@@ -833,7 +917,9 @@ describe('cancelJob', () => {
     const emitUpdate = vi.fn();
 
     const deps = {
-      getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: '/tmp' }),
+      getActiveSession: vi
+        .fn()
+        .mockReturnValue({ sessionId: 'sess_1', dir: '/tmp' }),
       persistEvent,
       emitUpdate,
       runShellProcess: vi.fn(),
@@ -849,7 +935,9 @@ describe('cancelJob', () => {
       startedAt: new Date().toISOString(),
       outputPath: '/tmp/job.log',
       finished: false,
-      completion: new Promise((r) => { resolver = r; }),
+      completion: new Promise((r) => {
+        resolver = r;
+      }),
       resolveCompletion: () => resolver(),
     };
 
@@ -924,6 +1012,7 @@ git commit -m "feat(agent): implement finalizeJob and cancelJob in JobManager"
 ## Task 6: Move getJobOutput to JobManager
 
 **Files:**
+
 - Modify: `packages/agent/src/jobs/job-manager.ts`
 - Reference: `packages/agent/src/jobs/job-output.ts`
 - Test: `packages/agent/src/jobs/__tests__/job-manager.test.ts`
@@ -940,7 +1029,9 @@ describe('getJobOutput', () => {
     writeFileSync(join(jobsDir, 'job_123.log'), 'hello world\nline 2');
 
     const deps = {
-      getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: testDir }),
+      getActiveSession: vi
+        .fn()
+        .mockReturnValue({ sessionId: 'sess_1', dir: testDir }),
       persistEvent: vi.fn(),
       emitUpdate: vi.fn(),
       runShellProcess: vi.fn(),
@@ -1012,6 +1103,7 @@ git commit -m "feat(agent): implement getJobOutput in JobManager"
 ## Task 7: Move Notification Queue to JobManager
 
 **Files:**
+
 - Modify: `packages/agent/src/jobs/job-manager.ts`
 - Reference: `packages/agent/src/jobs/job-notifications.ts`
 - Test: `packages/agent/src/jobs/__tests__/job-manager.test.ts`
@@ -1087,6 +1179,7 @@ git commit -m "feat(agent): implement notification queue in JobManager"
 ## Task 8: Add JobManager to ToolContext
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/types.ts`
 - Test: `packages/agent/src/tools/types.test.ts`
 
@@ -1121,6 +1214,7 @@ git commit -m "feat(agent): add jobManager to ToolContext interface"
 ## Task 9: Wire JobManager into AgentServerState
 
 **Files:**
+
 - Modify: `packages/agent/src/server-types.ts`
 - Modify: `packages/agent/src/server.ts`
 
@@ -1195,6 +1289,7 @@ state.jobManager = jobManager;
 **Step 3: Update all references from state.jobs to state.jobManager**
 
 Search for `state.jobs` and update:
+
 - `state.jobs.get(...)` → `state.jobManager.getJob(...)`
 - `state.jobs.set(...)` → `state.jobManager.addJob(...)`
 - `state.jobs.delete(...)` → `state.jobManager.removeJob(...)`
@@ -1219,6 +1314,7 @@ git commit -m "refactor(agent): wire JobManager into AgentServerState"
 ## Task 10: Implement DelegateTool.executeValidated()
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/implementations/delegate.ts`
 - Test: `packages/agent/src/tools/implementations/__tests__/delegate.test.ts`
 
@@ -1246,7 +1342,9 @@ describe('DelegateTool', () => {
     const tool = new DelegateTool();
 
     let resolveJob: () => void;
-    const completion = new Promise<void>((r) => { resolveJob = r; });
+    const completion = new Promise<void>((r) => {
+      resolveJob = r;
+    });
 
     const mockJob = {
       jobId: 'job_123',
@@ -1271,9 +1369,12 @@ describe('DelegateTool', () => {
       { signal: new AbortController().signal, jobManager }
     );
 
-    expect(jobManager.createJob).toHaveBeenCalledWith('delegate', expect.objectContaining({
-      prompt: 'do something',
-    }));
+    expect(jobManager.createJob).toHaveBeenCalledWith(
+      'delegate',
+      expect.objectContaining({
+        prompt: 'do something',
+      })
+    );
     expect(result.status).toBe('completed');
     expect(result.content[0].text).toContain('job_123');
   });
@@ -1307,7 +1408,9 @@ describe('DelegateTool', () => {
     const tool = new DelegateTool();
 
     let resolveJob: () => void;
-    const completion = new Promise<void>((r) => { resolveJob = r; });
+    const completion = new Promise<void>((r) => {
+      resolveJob = r;
+    });
     const mockJob = {
       jobId: 'job_789',
       completion,
@@ -1316,9 +1419,11 @@ describe('DelegateTool', () => {
 
     const jobManager = {
       createJob: vi.fn().mockResolvedValue({ jobId: 'job_789', job: mockJob }),
-      listJobs: vi.fn().mockReturnValue([
-        { jobId: 'job_prev', subagentSessionId: 'sess_sub_abc' },
-      ]),
+      listJobs: vi
+        .fn()
+        .mockReturnValue([
+          { jobId: 'job_prev', subagentSessionId: 'sess_sub_abc' },
+        ]),
       getJobOutput: vi.fn().mockReturnValue('resumed output'),
       finalizeJob: vi.fn(),
     } as unknown as JobManager;
@@ -1330,10 +1435,13 @@ describe('DelegateTool', () => {
       { signal: new AbortController().signal, jobManager }
     );
 
-    expect(jobManager.createJob).toHaveBeenCalledWith('delegate', expect.objectContaining({
-      prompt: 'continue',
-      resumeSessionId: 'sess_sub_abc',
-    }));
+    expect(jobManager.createJob).toHaveBeenCalledWith(
+      'delegate',
+      expect.objectContaining({
+        prompt: 'continue',
+        resumeSessionId: 'sess_sub_abc',
+      })
+    );
   });
 });
 ```
@@ -1401,11 +1509,14 @@ Parameters:
     if (!jobManager) {
       return {
         status: 'failed',
-        content: [{ type: 'text', text: 'delegate requires jobManager in context' }],
+        content: [
+          { type: 'text', text: 'delegate requires jobManager in context' },
+        ],
       };
     }
 
-    const { prompt, description, background, resume, connectionId, modelId } = args;
+    const { prompt, description, background, resume, connectionId, modelId } =
+      args;
 
     // Handle resume - look up previous job's session
     let resumeSessionId: string | undefined;
@@ -1420,12 +1531,15 @@ Parameters:
           .join(', ');
         return {
           status: 'failed',
-          content: [{
-            type: 'text',
-            text: `Cannot resume job ${resume}: no subagentSessionId found.\n` +
-              `Available jobs: [${jobIds}]\n` +
-              `Jobs with sessionId: [${withSession || 'none'}]`,
-          }],
+          content: [
+            {
+              type: 'text',
+              text:
+                `Cannot resume job ${resume}: no subagentSessionId found.\n` +
+                `Available jobs: [${jobIds}]\n` +
+                `Jobs with sessionId: [${withSession || 'none'}]`,
+            },
+          ],
         };
       }
       resumeSessionId = previousJob.subagentSessionId;
@@ -1438,22 +1552,29 @@ Parameters:
       resumeSessionId,
       connectionId,
       modelId,
-      turnContext: context.turnId && context.turnSeq !== undefined
-        ? { turnId: context.turnId, turnSeq: context.turnSeq }
-        : undefined,
+      turnContext:
+        context.turnId && context.turnSeq !== undefined
+          ? { turnId: context.turnId, turnSeq: context.turnSeq }
+          : undefined,
     });
 
     // Background mode - return immediately
     if (background) {
       return {
         status: 'completed',
-        content: [{ type: 'text', text: JSON.stringify({ jobId, status: 'started' }) }],
+        content: [
+          { type: 'text', text: JSON.stringify({ jobId, status: 'started' }) },
+        ],
       };
     }
 
     // Sync mode - wait for completion
     const abortPromise = new Promise<never>((_, reject) => {
-      context.signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true });
+      context.signal.addEventListener(
+        'abort',
+        () => reject(new Error('cancelled')),
+        { once: true }
+      );
     });
 
     try {
@@ -1472,13 +1593,21 @@ Parameters:
 
     const status = job.status ?? 'failed';
     return {
-      status: status === 'completed' ? 'completed' : status === 'cancelled' ? 'aborted' : 'failed',
-      content: [{
-        type: 'text',
-        text: `delegate jobId=${jobId}\n\n` +
-          (output.trim().length > 0 ? output.trim() : '(no output)') +
-          (truncated ? '\n\n(truncated)' : ''),
-      }],
+      status:
+        status === 'completed'
+          ? 'completed'
+          : status === 'cancelled'
+            ? 'aborted'
+            : 'failed',
+      content: [
+        {
+          type: 'text',
+          text:
+            `delegate jobId=${jobId}\n\n` +
+            (output.trim().length > 0 ? output.trim() : '(no output)') +
+            (truncated ? '\n\n(truncated)' : ''),
+        },
+      ],
     };
   }
 }
@@ -1502,14 +1631,17 @@ git commit -m "feat(agent): implement DelegateTool.executeValidated() using JobM
 ## Task 11: Implement Job Tool executeValidated() Methods
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/implementations/job_output.ts`
 - Modify: `packages/agent/src/tools/implementations/jobs_list.ts`
 - Modify: `packages/agent/src/tools/implementations/job_kill.ts`
 - Test: `packages/agent/src/tools/implementations/__tests__/job-tools.test.ts`
 
-Follow the same pattern as Task 10 - implement `executeValidated()` for each tool using `context.jobManager`. These are simpler than delegate:
+Follow the same pattern as Task 10 - implement `executeValidated()` for each
+tool using `context.jobManager`. These are simpler than delegate:
 
-- **JobOutputTool**: Call `jobManager.getJob()` to check status, `jobManager.getJobOutput()` to read output
+- **JobOutputTool**: Call `jobManager.getJob()` to check status,
+  `jobManager.getJobOutput()` to read output
 - **JobsListTool**: Call `jobManager.listJobs()` with filtering
 - **JobKillTool**: Call `jobManager.cancelJob()`
 
@@ -1600,6 +1732,7 @@ git commit -m "feat(agent): implement job tool executeValidated() methods"
 ## Task 12: Update Runner to Pass JobManager via Context
 
 **Files:**
+
 - Modify: `packages/agent/src/core/conversation/runner.ts`
 
 **Step 1: Update executeToolByName to pass jobManager in context**
@@ -1615,8 +1748,9 @@ return await toolExecutor.execute(
     workingDirectory: cwd,
     toolTempRoot: join(this.config.sessionDir, 'tool-temp'),
     processEnv: envOverlay,
-    hasFileBeenRead: (p: string) => filesRead.has(isAbsolutePath(p) ? p : resolvePath(cwd, p)),
-    jobManager: this.deps.jobManager,  // Add this
+    hasFileBeenRead: (p: string) =>
+      filesRead.has(isAbsolutePath(p) ? p : resolvePath(cwd, p)),
+    jobManager: this.deps.jobManager, // Add this
     turnId,
     turnSeq: toolTurnSeq,
   }
@@ -1647,6 +1781,7 @@ git commit -m "feat(agent): pass jobManager through ToolContext in runner"
 ## Task 13: Remove Special Tool Handling from Runner
 
 **Files:**
+
 - Modify: `packages/agent/src/core/conversation/runner.ts`
 
 **Step 1: Delete executeDelegateTool method**
@@ -1660,11 +1795,20 @@ Remove these blocks from `executeToolByName`:
 ```typescript
 // DELETE THIS:
 if (toolName === 'delegate') {
-  return await this.executeDelegateTool({ finalInput, toolTurnSeq, abortController, turnId });
+  return await this.executeDelegateTool({
+    finalInput,
+    toolTurnSeq,
+    abortController,
+    turnId,
+  });
 }
 
 // DELETE THIS:
-if (toolName === 'job_output' || toolName === 'jobs_list' || toolName === 'job_kill') {
+if (
+  toolName === 'job_output' ||
+  toolName === 'jobs_list' ||
+  toolName === 'job_kill'
+) {
   // ... all of this
 }
 
@@ -1701,6 +1845,7 @@ All tools now flow through toolExecutor.execute() with jobManager in context.
 ## Task 14: Delete Dead Code
 
 **Files:**
+
 - Delete: `packages/agent/src/core/tools/special/` (entire directory)
 - Modify: `packages/agent/src/index.ts` (remove exports)
 - Delete: `packages/agent/src/jobs/job-creation.ts` (replaced by JobManager)
@@ -1764,6 +1909,7 @@ git commit -m "refactor(agent): delete dead code after JobManager consolidation
 ## Task 15: Update All Callers of Old Job APIs
 
 **Files:**
+
 - Various files that imported from deleted modules
 
 **Step 1: Find all broken imports**
@@ -1775,7 +1921,9 @@ npm run build 2>&1 | grep "Cannot find module"
 **Step 2: Update each file to use JobManager**
 
 For each broken import:
-- If it was using `createShellJob`/`createSubagentJob` → use `jobManager.createJob()`
+
+- If it was using `createShellJob`/`createSubagentJob` → use
+  `jobManager.createJob()`
 - If it was using `createJobDerivation` → use `jobManager.listJobs()`
 - If it was using functions from `job-control.ts` → use `jobManager` methods
 
@@ -1803,6 +1951,7 @@ git commit -m "refactor(agent): update all callers to use JobManager"
 ## Task 16: Final Cleanup and Documentation
 
 **Files:**
+
 - Update: `packages/agent/src/jobs/index.ts`
 - Update any relevant documentation
 
@@ -1812,8 +1961,18 @@ git commit -m "refactor(agent): update all callers to use JobManager"
 // packages/agent/src/jobs/index.ts
 // ABOUTME: Job management exports
 
-export { JobManager, type JobManagerDeps, type JobRecord, type CreateJobOptions, JobCreationError } from './job-manager';
-export { getJobOutputPath, ensureJobLogDir, getLastLines } from './job-file-utils';
+export {
+  JobManager,
+  type JobManagerDeps,
+  type JobRecord,
+  type CreateJobOptions,
+  JobCreationError,
+} from './job-manager';
+export {
+  getJobOutputPath,
+  ensureJobLogDir,
+  getLastLines,
+} from './job-file-utils';
 export { readJobOutputTail } from './job-output';
 export { formatJobNotification } from './format-notification';
 ```
@@ -1853,16 +2012,20 @@ Deleted ~500 lines of dead/duplicate code.
 
 ## Summary
 
-This plan consolidates scattered job management into a unified `JobManager` class:
+This plan consolidates scattered job management into a unified `JobManager`
+class:
 
 1. **Tasks 1-7:** Build JobManager with all state and operations
-2. **Tasks 8-9:** Wire JobManager into the system (ToolContext, AgentServerState)
+2. **Tasks 8-9:** Wire JobManager into the system (ToolContext,
+   AgentServerState)
 3. **Tasks 10-11:** Implement real `executeValidated()` in tool classes
 4. **Tasks 12-13:** Update runner to pass context and remove special handling
 5. **Tasks 14-16:** Delete dead code and clean up
 
 **Result:**
+
 - One place for job state and operations (`JobManager`)
 - One code path for tool execution (`toolExecutor.execute()`)
 - ~500 lines of dead/duplicate code deleted
-- Clear separation: JobManager is session-scoped service, tools use it via context
+- Clear separation: JobManager is session-scoped service, tools use it via
+  context

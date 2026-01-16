@@ -125,23 +125,29 @@ describe('Supervisor HTTP permissions race conditions (E2E)', () => {
 
     const client = new SupervisorClient({ baseUrl });
 
-    const ws = await withTimeout(client.createWorkspaceSession(ctx.workDir), 5_000, 'createWorkspaceSession');
+    const ws = await withTimeout(
+      client.createWorkspaceSession(ctx.workDir),
+      5_000,
+      'createWorkspaceSession'
+    );
 
     const err = await withTimeout(
-      client.agentRequest({
-        workspaceSessionId: ws.workspaceSessionId,
-        method: 'ent/connections/upsert',
-        requestParams: {
-          providerId: 'openai',
-          connection: {
-            name: 'bad',
-            config: { apiKey: 'should-not-be-here' },
+      client
+        .agentRequest({
+          workspaceSessionId: ws.workspaceSessionId,
+          method: 'ent/connections/upsert',
+          requestParams: {
+            providerId: 'openai',
+            connection: {
+              name: 'bad',
+              config: { apiKey: 'should-not-be-here' },
+            },
           },
-        },
-      }).then(
-        () => null,
-        (e) => e
-      ),
+        })
+        .then(
+          () => null,
+          (e) => e
+        ),
       10_000,
       'client.agentRequest fails'
     );

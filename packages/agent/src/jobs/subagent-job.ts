@@ -532,9 +532,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
 
       // Extract input as Record<string, unknown>
       const input: Record<string, unknown> =
-        typeof p.input === 'object' && p.input !== null
-          ? (p.input as Record<string, unknown>)
-          : {};
+        typeof p.input === 'object' && p.input !== null ? (p.input as Record<string, unknown>) : {};
 
       const decision = await requestPermissionFromClient({
         sessionId: currentState.activeSession!.meta.sessionId,

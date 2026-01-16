@@ -4,10 +4,7 @@
 import type { Route } from './+types/api.provider.instances.$instanceId.config';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
-import {
-  requireParam,
-  errorToResponse,
-} from '@lace/web/lib/server/route-helpers';
+import { requireParam, errorToResponse } from '@lace/web/lib/server/route-helpers';
 import {
   getProviderContext,
   requireProviderInstance,

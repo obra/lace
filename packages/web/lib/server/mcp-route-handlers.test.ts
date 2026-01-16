@@ -214,12 +214,12 @@ describe('MCP Route Handlers', () => {
           servers: { 'existing-server': { command: 'cmd', enabled: true } },
         });
 
-        await expect(createMcpServer(globalContext, 'existing-server', newServerConfig)).rejects.toThrow(
-          RouteValidationError
-        );
-        await expect(createMcpServer(globalContext, 'existing-server', newServerConfig)).rejects.toThrow(
-          "MCP server 'existing-server' already exists"
-        );
+        await expect(
+          createMcpServer(globalContext, 'existing-server', newServerConfig)
+        ).rejects.toThrow(RouteValidationError);
+        await expect(
+          createMcpServer(globalContext, 'existing-server', newServerConfig)
+        ).rejects.toThrow("MCP server 'existing-server' already exists");
       });
 
       it('creates server when it does not exist', async () => {
@@ -251,9 +251,9 @@ describe('MCP Route Handlers', () => {
       it('throws RouteValidationError when project not found', async () => {
         mockProject.getById.mockReturnValue(null);
 
-        await expect(createMcpServer(projectContext, 'new-server', newServerConfig)).rejects.toThrow(
-          RouteValidationError
-        );
+        await expect(
+          createMcpServer(projectContext, 'new-server', newServerConfig)
+        ).rejects.toThrow(RouteValidationError);
       });
 
       it('throws RouteValidationError when server already exists in project', async () => {
@@ -262,12 +262,12 @@ describe('MCP Route Handlers', () => {
         };
         mockProject.getById.mockReturnValue(mockProjectInstance as unknown as Project);
 
-        await expect(createMcpServer(projectContext, 'existing-server', newServerConfig)).rejects.toThrow(
-          RouteValidationError
-        );
-        await expect(createMcpServer(projectContext, 'existing-server', newServerConfig)).rejects.toThrow(
-          "MCP server 'existing-server' already exists"
-        );
+        await expect(
+          createMcpServer(projectContext, 'existing-server', newServerConfig)
+        ).rejects.toThrow(RouteValidationError);
+        await expect(
+          createMcpServer(projectContext, 'existing-server', newServerConfig)
+        ).rejects.toThrow("MCP server 'existing-server' already exists");
       });
 
       it('creates server in project when it does not exist', async () => {
@@ -280,7 +280,10 @@ describe('MCP Route Handlers', () => {
         const result = await createMcpServer(projectContext, 'new-server', newServerConfig);
 
         expect(result).toEqual({ id: 'new-server', ...newServerConfig });
-        expect(mockProjectInstance.addMCPServer).toHaveBeenCalledWith('new-server', newServerConfig);
+        expect(mockProjectInstance.addMCPServer).toHaveBeenCalledWith(
+          'new-server',
+          newServerConfig
+        );
       });
     });
   });

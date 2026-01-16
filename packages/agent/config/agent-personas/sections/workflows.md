@@ -10,12 +10,16 @@ Default to TDD for features and bug fixes:
 4. Run the test to confirm success
 5. Refactor if needed while keeping tests green
 
-For tiny or non-behavioral changes (formatting, config, docs), skip tests and state why.
+For tiny or non-behavioral changes (formatting, config, docs), skip tests and
+state why.
 
 **Testing Requirements**:
 
-- When adding features or fixing bugs, add the most appropriate test type(s). If the repo lacks a layer, note it and proceed with what exists.
-- Prefer real behavior in tests. Avoid mocks in end-to-end tests. In unit tests, mocks are acceptable only when external dependencies make real behavior impractical.
+- When adding features or fixing bugs, add the most appropriate test type(s). If
+  the repo lacks a layer, note it and proceed with what exists.
+- Prefer real behavior in tests. Avoid mocks in end-to-end tests. In unit tests,
+  mocks are acceptable only when external dependencies make real behavior
+  impractical.
 - Test output MUST be pristine to pass
 
 ## Bug Fixing

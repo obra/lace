@@ -1432,8 +1432,8 @@ interface ExtensionInfo {
 
 Enable an extension/plugin for the current agent process.
 
-**Persistence**: This is session/process-scoped and MUST NOT be persisted to disk
-by the agent.
+**Persistence**: This is session/process-scoped and MUST NOT be persisted to
+disk by the agent.
 
 ```typescript
 // Request
@@ -1458,8 +1458,8 @@ by the agent.
 
 Disable an extension/plugin for the current agent process.
 
-**Persistence**: This is session/process-scoped and MUST NOT be persisted to disk
-by the agent.
+**Persistence**: This is session/process-scoped and MUST NOT be persisted to
+disk by the agent.
 
 ```typescript
 // Request
@@ -2439,7 +2439,7 @@ interface ModelConfig {
 | Session persist/resume   | ✅ `session/new`, `session/load`                                             |
 | Session forking          | ✅ `session/load` with fork                                                  |
 | Subagents                | ✅ `ent/job/*` + updates                                                     |
-| Tool whitelist/blacklist | ✅ `ent/session/configure` (`toolPolicies`)                                   |
+| Tool whitelist/blacklist | ✅ `ent/session/configure` (`toolPolicies`)                                  |
 | Execution modes          | ✅ `session/set_mode` (plan/execute)                                         |
 | Approval modes           | ✅ `ent/session/configure` (ask/approveReads/approveEdits/approve/deny/skip) |
 | Permission callbacks     | ✅ `session/request_permission`                                              |

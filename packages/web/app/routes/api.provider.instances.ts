@@ -5,10 +5,7 @@ import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
 import type { Route } from './+types/api.provider.instances';
-import {
-  throwMethodNotAllowed,
-  errorToResponse,
-} from '@lace/web/lib/server/route-helpers';
+import { throwMethodNotAllowed, errorToResponse } from '@lace/web/lib/server/route-helpers';
 import {
   getProviderContext,
   listProviderInstances,

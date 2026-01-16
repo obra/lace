@@ -1,12 +1,20 @@
 # TUI UX Overhaul Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
+> implement this plan task-by-task.
 
-**Goal:** Transform lace-tui from a workmanlike debug tool into a polished, joyful conversation interface by eliminating visual clutter and making interactions feel seamless.
+**Goal:** Transform lace-tui from a workmanlike debug tool into a polished,
+joyful conversation interface by eliminating visual clutter and making
+interactions feel seamless.
 
-**Architecture:** Replace text labels with color and line-drawing characters for visual hierarchy. Redesign permission modal to be bottom-anchored with single-key shortcuts (still modal, but less disruptive). Group consecutive messages to reduce noise. Fold tool outputs by default with progressive expansion. Remove redundant UI elements.
+**Architecture:** Replace text labels with color and line-drawing characters for
+visual hierarchy. Redesign permission modal to be bottom-anchored with
+single-key shortcuts (still modal, but less disruptive). Group consecutive
+messages to reduce noise. Fold tool outputs by default with progressive
+expansion. Remove redundant UI elements.
 
-**Tech Stack:** Rust, ratatui 0.29, crossterm 0.28, Unicode box-drawing characters
+**Tech Stack:** Rust, ratatui 0.29, crossterm 0.28, Unicode box-drawing
+characters
 
 ---
 
@@ -55,6 +63,7 @@ Instead of "you" and "assistant" text labels:
 ### Task 1.1: Add Message Border Rendering
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/mod.rs:2924-2979` (render_chat function)
 
 **Step 1: Write the failing test**
@@ -110,7 +119,8 @@ Expected: FAIL - module doesn't exist or function not found
 
 **Step 3: Extract render_chat_lines helper**
 
-In `packages/tui/src/ui/mod.rs`, extract the line-building logic into a testable function:
+In `packages/tui/src/ui/mod.rs`, extract the line-building logic into a testable
+function:
 
 ```rust
 /// Renders chat messages into lines with visual hierarchy.
@@ -216,6 +226,7 @@ git commit -m "feat(tui): replace text labels with colored border for user messa
 ### Task 1.2: Remove "you" and "assistant" Labels
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/mod.rs:2924-2979`
 
 **Step 1: Verify current state has labels**
@@ -224,7 +235,8 @@ Run TUI and confirm "you" and "assistant" labels appear before messages.
 
 **Step 2: Remove label rendering**
 
-The changes in Task 1.1 already remove the labels. Verify by checking the `render_chat_lines` function no longer includes:
+The changes in Task 1.1 already remove the labels. Verify by checking the
+`render_chat_lines` function no longer includes:
 
 ```rust
 // REMOVE these lines:
@@ -239,7 +251,8 @@ lines.push(Line::from(Span::styled(role_text, prefix_style)));
 
 Run: `cd packages/tui && cargo run -- --workdir .`
 
-Verify: Messages no longer show "you" or "assistant" labels. User messages have a colored `┃` border instead.
+Verify: Messages no longer show "you" or "assistant" labels. User messages have
+a colored `┃` border instead.
 
 **Step 4: Commit**
 
@@ -253,6 +266,7 @@ git commit -m "refactor(tui): remove you/assistant text labels, use visual disti
 ### Task 1.3: Message Grouping for Consecutive Same-Role Messages
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/mod.rs` (render_chat_lines)
 
 **Step 1: Write the failing test**
@@ -397,11 +411,14 @@ git commit -m "feat(tui): group consecutive same-role messages without separator
 
 ## Phase 2: Bottom-Anchored Permission Modal
 
-Permissions must be modal (agent is blocked waiting for decision), but we can make the modal less disruptive by anchoring it at the bottom where it doesn't hide conversation context.
+Permissions must be modal (agent is blocked waiting for decision), but we can
+make the modal less disruptive by anchoring it at the bottom where it doesn't
+hide conversation context.
 
 ### Task 2.1: Create Bottom-Anchored Permission Bar Renderer
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/mod.rs` (new render_permission_bar function)
 
 **Step 1: Write the failing test**
@@ -537,11 +554,13 @@ git commit -m "feat(tui): add bottom-anchored permission bar renderer"
 ### Task 2.2: Integrate Permission Bar into Layout
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/mod.rs:1333-1450` (draw function)
 
 **Step 1: Update draw() layout to include permission bar**
 
-When permission is active, insert a 3-line permission bar between chat and input:
+When permission is active, insert a 3-line permission bar between chat and
+input:
 
 ```rust
 fn draw(f: &mut ratatui::Frame, state: &AppState) {
@@ -613,7 +632,8 @@ In the modal overlay section of draw(), remove:
 
 Run: `cd packages/tui && cargo run -- --workdir .`
 
-Test: Trigger a permission. Verify it appears as a 3-line bar above the input, not as a centered overlay. Conversation should still be visible above.
+Test: Trigger a permission. Verify it appears as a 3-line bar above the input,
+not as a centered overlay. Conversation should still be visible above.
 
 **Step 4: Commit**
 
@@ -627,6 +647,7 @@ git commit -m "feat(tui): render permission bar in layout instead of centered mo
 ### Task 2.3: Add Single-Key Permission Shortcuts
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/mod.rs:278-307` (permission key handling)
 
 **Step 1: Update permission key handling with Y/S/N shortcuts**
@@ -713,6 +734,7 @@ Initialize to `false` in `new()`.
 Run: `cd packages/tui && cargo run -- --workdir .`
 
 Test:
+
 - Trigger a permission request
 - Press `Y` - should approve immediately
 - Trigger another, press `N` - should deny
@@ -731,6 +753,7 @@ git commit -m "feat(tui): add Y/S/N/D single-key shortcuts for permissions"
 ### Task 2.4: Permission Details Expansion
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/mod.rs` (render_permission_bar)
 
 **Step 1: Update render_permission_bar to handle expanded state**
@@ -851,14 +874,16 @@ fn permission_bar_height(state: &AppState) -> u16 {
 
 **Step 2: Update draw() to use dynamic permission height**
 
-Replace `let permission_height = if state.active_permission.is_some() { 3 } else { 0 };`
+Replace
+`let permission_height = if state.active_permission.is_some() { 3 } else { 0 };`
 with `let permission_height = permission_bar_height(state);`
 
 **Step 3: Test details toggle**
 
 Run: `cd packages/tui && cargo run -- --workdir .`
 
-Test: Trigger permission, press `D` to expand, verify details shown, press `D` again to collapse.
+Test: Trigger permission, press `D` to expand, verify details shown, press `D`
+again to collapse.
 
 **Step 4: Commit**
 
@@ -874,6 +899,7 @@ git commit -m "feat(tui): add expandable details in permission bar"
 ### Task 3.1: Add Folded Tool Result Display
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/mod.rs:2897-2922` (render_tool_call_line)
 - Modify: `packages/tui/src/app/activity.rs` (add result_preview field)
 
@@ -995,6 +1021,7 @@ git commit -m "feat(tui): add folded tool result preview with tree connector"
 ### Task 3.2: Selectable Tool Calls in Conversation
 
 **Files:**
+
 - Modify: `packages/tui/src/app/mod.rs` (add chat_selected_tool_idx)
 - Modify: `packages/tui/src/ui/mod.rs` (render selected state, handle keys)
 
@@ -1110,7 +1137,8 @@ fn render_tool_call_line(
 
 **Step 4: Add keyboard handling for tool selection**
 
-In `packages/tui/src/ui/mod.rs`, when focus is on Chat and no permission is active:
+In `packages/tui/src/ui/mod.rs`, when focus is on Chat and no permission is
+active:
 
 ```rust
 // Tool selection in chat (when focused on chat pane)
@@ -1179,6 +1207,7 @@ for (idx, item) in completed_tools.iter().enumerate() {
 Run: `cd packages/tui && cargo run -- --workdir .`
 
 Test:
+
 - Tab to focus on Chat pane
 - Press j/k or arrows to select tools
 - Press Enter to expand selected tool
@@ -1198,6 +1227,7 @@ git commit -m "feat(tui): add selectable and expandable tool calls in conversati
 For very long tool outputs, provide a full-screen overlay (like debug/activity).
 
 **Files:**
+
 - Modify: `packages/tui/src/app/mod.rs` (add tool_details_overlay state)
 - Modify: `packages/tui/src/ui/mod.rs` (render overlay, handle keys)
 
@@ -1355,6 +1385,7 @@ git commit -m "feat(tui): add full-screen tool details overlay"
 ### Task 4.1: Remove Redundant Hint Line
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/mod.rs:3140-3239` (render_input)
 
 **Step 1: Identify the hint line code**
@@ -1427,7 +1458,9 @@ git commit -m "refactor(tui): remove redundant input hint line, cleaner input ar
 ### Task 4.2: Simplify Image Attachment Indicator
 
 **Files:**
-- Modify: `packages/tui/src/ui/mod.rs:3144-3176` (image indicator in render_input)
+
+- Modify: `packages/tui/src/ui/mod.rs:3144-3176` (image indicator in
+  render_input)
 
 **Step 1: Make indicator more compact**
 
@@ -1492,6 +1525,7 @@ git commit -m "refactor(tui): compact image attachment indicator in prompt"
 ### Task 5.1: Move Status Bar Below Input
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/mod.rs:1347-1358` (draw function layout)
 
 **Step 1: Reorder layout constraints**
@@ -1546,7 +1580,9 @@ git commit -m "feat(tui): move status bar to bottom of screen"
 ### Task 5.2: Clean Up Status Bar Content
 
 **Files:**
-- Modify: `packages/tui/src/ui/mod.rs:1499-1598` (render_status_left and render_status_right)
+
+- Modify: `packages/tui/src/ui/mod.rs:1499-1598` (render_status_left and
+  render_status_right)
 
 **Step 1: Simplify status_right to just show activity**
 
@@ -1582,7 +1618,8 @@ fn render_status_right(state: &AppState) -> Paragraph<'static> {
 
 **Step 2: Remove last_key_event display**
 
-Delete the code that shows the last key pressed - it's debug info that clutters the UI.
+Delete the code that shows the last key pressed - it's debug info that clutters
+the UI.
 
 **Step 3: Commit**
 
@@ -1598,11 +1635,13 @@ git commit -m "refactor(tui): clean up status bar, remove debug clutter"
 ### Task 6.1: Update Help Text
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/mod.rs` (render_help_modal)
 
 **Step 1: Find and update help modal**
 
-Search for `render_help_modal` and update the keyboard shortcuts to reflect new behavior:
+Search for `render_help_modal` and update the keyboard shortcuts to reflect new
+behavior:
 
 - Add: `Y/S/N` for permission shortcuts
 - Remove: References to removed features
@@ -1620,6 +1659,7 @@ git commit -m "docs(tui): update help text with new keyboard shortcuts"
 ### Task 6.2: Remove Dead Code
 
 **Files:**
+
 - Modify: `packages/tui/src/ui/mod.rs`
 
 **Step 1: Remove render_permission_modal function**
@@ -1688,11 +1728,16 @@ git commit -m "feat(tui): complete UX overhaul - visual hierarchy, inline permis
 
 **Key Changes:**
 
-1. **Visual Hierarchy** - Replace "you"/"assistant" labels with colored `┃` border for user messages
-2. **Message Grouping** - Consecutive same-role messages grouped without separators
-3. **Bottom-Anchored Permissions** - Permission bar appears above input (still modal, less disruptive) with `Y/S/N/D` shortcuts
-4. **Tool Result Folding** - Compact `└─` preview, selectable/expandable with j/k/Enter
-5. **Tool Details Overlay** - Press `D` on selected tool for full-screen scrollable details
+1. **Visual Hierarchy** - Replace "you"/"assistant" labels with colored `┃`
+   border for user messages
+2. **Message Grouping** - Consecutive same-role messages grouped without
+   separators
+3. **Bottom-Anchored Permissions** - Permission bar appears above input (still
+   modal, less disruptive) with `Y/S/N/D` shortcuts
+4. **Tool Result Folding** - Compact `└─` preview, selectable/expandable with
+   j/k/Enter
+5. **Tool Details Overlay** - Press `D` on selected tool for full-screen
+   scrollable details
 6. **Clean Input** - Remove redundant hint line, compact image indicator
 7. **Status Bar** - Move to bottom, remove debug clutter
 

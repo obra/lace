@@ -770,7 +770,13 @@ export class OpenAIProvider extends AIProvider {
 
     // For real OpenAI: try Responses API first, fall back to Chat Completions if not supported
     try {
-      return await this._createResponsesAPIResponse(messages, tools, model, signal, conversationState);
+      return await this._createResponsesAPIResponse(
+        messages,
+        tools,
+        model,
+        signal,
+        conversationState
+      );
     } catch (error) {
       if (this.isResponsesAPINotSupportedError(error)) {
         logger.info('Model does not support Responses API, falling back to Chat Completions', {
@@ -953,10 +959,13 @@ export class OpenAIProvider extends AIProvider {
       );
     } catch (error) {
       if (this.isResponsesAPINotSupportedError(error)) {
-        logger.info('Model does not support Responses API streaming, falling back to Chat Completions', {
-          model,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        logger.info(
+          'Model does not support Responses API streaming, falling back to Chat Completions',
+          {
+            model,
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
         return this._createChatCompletionsStreamingResponse(messages, tools, model, signal);
       }
       throw error;

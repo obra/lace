@@ -124,9 +124,7 @@ describe('Agent Creation API - Persona System Prompt Generation', () => {
     const defaultInjectedPrompt = await getInjectedText(workspaceSessionId, defaultAgent.threadId);
     const summaryInjectedPrompt = await getInjectedText(workspaceSessionId, summaryAgent.threadId);
 
-    expect(defaultInjectedPrompt).toContain(
-      'You are Lace, a pragmatic AI partner.'
-    );
+    expect(defaultInjectedPrompt).toContain('You are Lace, a pragmatic AI partner.');
     expect(defaultInjectedPrompt).not.toContain('You are a specialized summary agent');
 
     expect(summaryInjectedPrompt).toContain('You are a specialized summary agent');

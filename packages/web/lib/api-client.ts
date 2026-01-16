@@ -87,7 +87,12 @@ async function makeRequest<T>(
             const err = (errorData as { error?: unknown }).error;
             if (typeof err === 'string') {
               errorMessage = err;
-            } else if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
+            } else if (
+              err &&
+              typeof err === 'object' &&
+              'message' in err &&
+              typeof (err as { message?: unknown }).message === 'string'
+            ) {
               errorMessage = (err as { message: string }).message;
             }
           } else if (

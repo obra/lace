@@ -17,7 +17,13 @@ export class SupervisorHttpError extends Error {
   readonly data?: unknown;
   readonly raw?: unknown;
 
-  constructor(params: { status: number; message: string; code?: number; data?: unknown; raw?: unknown }) {
+  constructor(params: {
+    status: number;
+    message: string;
+    code?: number;
+    data?: unknown;
+    raw?: unknown;
+  }) {
     super(params.message);
     this.name = 'SupervisorHttpError';
     this.status = params.status;
