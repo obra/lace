@@ -103,12 +103,14 @@ export function registerModelHandlers(peer: JsonRpcPeer, state: AgentServerState
     const disabledSet = new Set(gating.disabled ?? []);
 
     const models = provider.models.map((m) => {
-      const info = mapCatalogModelToModelInfo(m, providerId) as any;
+      const info = mapCatalogModelToModelInfo(m, providerId);
       const isDisabled =
         (enabledSet && !enabledSet.has(m.id)) || (disabledSet.size > 0 && disabledSet.has(m.id));
-      info.disabled = isDisabled;
-      info.disabledState = isDisabled ? 'disabled' : 'enabled';
-      return info;
+      return {
+        ...info,
+        disabled: isDisabled,
+        disabledState: isDisabled ? ('disabled' as const) : ('enabled' as const),
+      };
     });
 
     return { providerId, connectionId, models };

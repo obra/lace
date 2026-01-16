@@ -94,7 +94,17 @@ export function parseProviderInstanceOverridesFromConnectionConfig(options: {
   };
 }
 
-export function mapCatalogModelToModelInfo(model: CatalogModel, providerId: string) {
+export type ModelInfo = {
+  modelId: string;
+  name: string;
+  providerId: string;
+  contextWindow?: number;
+  maxOutput?: number;
+  supportsThinking: boolean;
+  supportsImages: boolean;
+};
+
+export function mapCatalogModelToModelInfo(model: CatalogModel, providerId: string): ModelInfo {
   return {
     modelId: model.id,
     name: model.name,
