@@ -401,50 +401,6 @@ export class OpenAIProvider extends AIProvider {
   private static readonly MAX_TOOL_NAME_LENGTH = 64;
   private static readonly COLLISION_SUFFIX_RESERVE = 4;
 
-  // Models that REQUIRE the Responses API (cannot use Chat Completions)
-  private static readonly RESPONSES_API_ONLY_MODELS = new Set([
-    // o-series pro/deep-research models
-    'o1-pro',
-    'o1-pro-2025-03-19',
-    'o3-pro',
-    'o3-pro-2025-06-10',
-    'o3-deep-research',
-    'o3-deep-research-2025-06-26',
-    'o4-mini-deep-research',
-    'o4-mini-deep-research-2025-06-26',
-    // Special capabilities models
-    'computer-use-preview',
-    'computer-use-preview-2025-03-11',
-    // gpt-5 specialized models
-    'gpt-5-codex',
-    'gpt-5-pro',
-    'gpt-5-pro-2025-10-06',
-  ]);
-
-  /**
-   * Determines if a model requires the Responses API endpoint
-   * The Responses API is required for newer reasoning models and specialized capabilities
-   */
-  private requiresResponsesAPI(model: string): boolean {
-    // Check exact match first
-    if (OpenAIProvider.RESPONSES_API_ONLY_MODELS.has(model)) {
-      return true;
-    }
-
-    // Check prefix patterns for custom/fine-tuned models
-    const prefixPatterns = [
-      'o1-pro-',
-      'o3-pro-',
-      'o3-deep-research-',
-      'o4-mini-deep-research-',
-      'gpt-5-pro-',
-      'gpt-5-codex-',
-      'computer-use-preview-',
-    ];
-
-    return prefixPatterns.some((prefix) => model.startsWith(prefix));
-  }
-
   /**
    * Builds OpenAI tools with sanitized names and returns mapping
    * Request-scoped to prevent concurrent request interference
@@ -764,6 +720,42 @@ export class OpenAIProvider extends AIProvider {
     };
   }
 
+  /**
+   * Checks if we're using a custom OpenAI-compatible endpoint (not the real OpenAI API).
+   * Custom endpoints may not support the Responses API.
+   */
+  private isCustomEndpoint(): boolean {
+    const config = this._config as OpenAIProviderConfig;
+    const baseURL = config.baseURL as string | undefined;
+    return !!baseURL && !baseURL.includes('api.openai.com');
+  }
+
+  /**
+   * Checks if an error indicates the model doesn't support the Responses API.
+   * This allows us to fall back to Chat Completions for older models.
+   */
+  private isResponsesAPINotSupportedError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false;
+
+    const errorObj = error as { status?: number; message?: string; code?: string };
+
+    // 404 typically means endpoint/model not found
+    // Check for specific error messages that indicate Responses API isn't supported
+    if (errorObj.status === 404) {
+      const message = errorObj.message?.toLowerCase() || '';
+      // These patterns indicate the model doesn't support Responses API
+      if (
+        message.includes('not found') ||
+        message.includes('does not exist') ||
+        message.includes('not supported')
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   async createResponse(
     messages: ProviderMessage[],
     tools: Tool[] = [],
@@ -771,13 +763,24 @@ export class OpenAIProvider extends AIProvider {
     signal?: AbortSignal,
     conversationState?: ConversationState
   ): Promise<ProviderResponse> {
-    // Route to appropriate API based on model
-    if (this.requiresResponsesAPI(model)) {
-      return this._createResponsesAPIResponse(messages, tools, model, signal, conversationState);
+    // For custom OpenAI-compatible endpoints, use Chat Completions (they may not support Responses API)
+    if (this.isCustomEndpoint()) {
+      return this._createChatCompletionsResponse(messages, tools, model, signal);
     }
 
-    // Use Chat Completions API for all other models
-    return this._createChatCompletionsResponse(messages, tools, model, signal);
+    // For real OpenAI: try Responses API first, fall back to Chat Completions if not supported
+    try {
+      return await this._createResponsesAPIResponse(messages, tools, model, signal, conversationState);
+    } catch (error) {
+      if (this.isResponsesAPINotSupportedError(error)) {
+        logger.info('Model does not support Responses API, falling back to Chat Completions', {
+          model,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return this._createChatCompletionsResponse(messages, tools, model, signal);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -934,19 +937,30 @@ export class OpenAIProvider extends AIProvider {
     signal?: AbortSignal,
     conversationState?: ConversationState
   ): Promise<ProviderResponse> {
-    // Route to appropriate API based on model
-    if (this.requiresResponsesAPI(model)) {
-      return this._createResponsesAPIStreamingResponse(
+    // For custom OpenAI-compatible endpoints, use Chat Completions (they may not support Responses API)
+    if (this.isCustomEndpoint()) {
+      return this._createChatCompletionsStreamingResponse(messages, tools, model, signal);
+    }
+
+    // For real OpenAI: try Responses API first, fall back to Chat Completions if not supported
+    try {
+      return await this._createResponsesAPIStreamingResponse(
         messages,
         tools,
         model,
         signal,
         conversationState
       );
+    } catch (error) {
+      if (this.isResponsesAPINotSupportedError(error)) {
+        logger.info('Model does not support Responses API streaming, falling back to Chat Completions', {
+          model,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return this._createChatCompletionsStreamingResponse(messages, tools, model, signal);
+      }
+      throw error;
     }
-
-    // Use Chat Completions streaming for all other models
-    return this._createChatCompletionsStreamingResponse(messages, tools, model, signal);
   }
 
   /**
