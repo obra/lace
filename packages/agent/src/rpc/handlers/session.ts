@@ -30,6 +30,7 @@ import { assertInitialized, throwInvalidParams, toNonEmptyString } from '../util
 import { loadPromptConfig } from '../../config/prompts';
 import { logger } from '../../utils/logger';
 import { reconcileMcpServersForActiveSession } from './mcp-servers';
+import { SkillRegistry, getSkillDirectories } from '../../skills';
 import { killAllRunningJobs } from '../../jobs';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 
@@ -106,17 +107,28 @@ export function registerSessionHandlers(
     // Inject system prompt as context_injected event
     const persona = toNonEmptyString(parsed.persona) ?? 'lace';
 
+    // Create skill registry for this session's working directory
+    const skillDirs = getSkillDirectories(parsed.workDir);
+    const skillRegistry = new SkillRegistry({ skillDirs });
+
     // Get available tools for system prompt context
     const { toolsForProvider } = createToolExecutorForMode(
       state.config.executionMode,
-      state.mcpServerManager
+      state.mcpServerManager,
+      undefined, // jobManager
+      skillRegistry
     );
     const tools = toolsForProvider.map((t) => ({ name: t.name, description: t.description }));
 
     // Create session context for working directory
     const sessionContext = { getWorkingDirectory: () => parsed.workDir };
 
-    const promptConfig = await loadPromptConfig({ persona, tools, session: sessionContext });
+    const promptConfig = await loadPromptConfig({
+      persona,
+      tools,
+      session: sessionContext,
+      skillRegistry,
+    });
     let sessionState: SessionState = readSessionState(sessionDir);
     const { nextState } = appendDurableEvent(sessionDir, sessionState, {
       type: 'context_injected',

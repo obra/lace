@@ -2,14 +2,11 @@
 
 import type { AIProvider } from '@lace/agent/providers/base-provider';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
-import type {
-  ToolResult as CoreToolResult,
-  ToolCall,
-  ToolContext,
-} from '@lace/agent/tools/types';
+import type { ToolResult as CoreToolResult, ToolCall, ToolContext } from '@lace/agent/tools/types';
 import type { SessionUpdate } from '@lace/agent/server-types';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { MCPServerManager } from '@lace/agent/mcp/server-manager';
+import type { SkillRegistry } from '@lace/agent/skills';
 
 /**
  * Approval mode for tool permissions.
@@ -75,7 +72,8 @@ export interface RunnerDependencies {
   createToolExecutor: (
     executionMode: 'plan' | 'execute',
     mcpServerManager?: MCPServerManager,
-    jobManager?: JobManager
+    jobManager?: JobManager,
+    skillRegistry?: SkillRegistry
   ) => {
     executor: {
       getTool: (name: string) => CoreTool | undefined;
@@ -102,6 +100,9 @@ export interface RunnerDependencies {
 
   /** Job manager for job-related tools */
   jobManager: JobManager;
+
+  /** Skill registry for skill-related tools (optional) */
+  skillRegistry?: SkillRegistry;
 
   /** Update the active turn status */
   setActiveTurnStatus: (

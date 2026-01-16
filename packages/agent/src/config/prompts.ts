@@ -6,6 +6,7 @@ import * as path from 'path';
 import { getLaceDir, ensureLaceDir } from './lace-dir';
 import { PromptManager } from './prompt-manager';
 import { logger } from '@lace/agent/utils/logger';
+import type { SkillRegistry } from '@lace/agent/skills';
 
 export interface PromptConfig {
   systemPrompt: string;
@@ -18,6 +19,7 @@ interface PromptOptions {
   session?: { getWorkingDirectory(): string };
   project?: { getWorkingDirectory(): string };
   persona?: string;
+  skillRegistry?: SkillRegistry;
 }
 
 // Default user instructions - empty by default
@@ -62,6 +64,7 @@ export async function loadPromptConfig(options: PromptOptions = {}): Promise<Pro
     tools: options.tools,
     session: options.session,
     project: options.project,
+    skillRegistry: options.skillRegistry,
   });
   const systemPrompt = await promptManager.generateSystemPrompt(options.persona);
   const userInstructions = loadUserInstructions();

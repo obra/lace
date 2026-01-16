@@ -5,11 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
 import type { ToolResult } from '@lace/ent-protocol';
-import type {
-  ToolResult as CoreToolResult,
-  ToolCall,
-  ToolContext,
-} from '@lace/agent/tools/types';
+import type { ToolResult as CoreToolResult, ToolCall, ToolContext } from '@lace/agent/tools/types';
 import type { Tool } from '@lace/agent/tools/tool';
 import {
   readSessionState,
@@ -88,7 +84,8 @@ export class ConversationRunner {
     const { executor: toolExecutor, toolsForProvider } = this.deps.createToolExecutor(
       executionMode,
       this.deps.mcpServerManager,
-      this.deps.jobManager
+      this.deps.jobManager,
+      this.deps.skillRegistry
     );
 
     const provider = await this.deps.createProvider();
@@ -732,7 +729,9 @@ export class ConversationRunner {
     toolCallId: string;
     finalInput: Record<string, unknown>;
     toolTurnSeq: number;
-    toolExecutor: { execute: (toolCall: ToolCall, context: ToolContext) => Promise<CoreToolResult> };
+    toolExecutor: {
+      execute: (toolCall: ToolCall, context: ToolContext) => Promise<CoreToolResult>;
+    };
     cwd: string;
     filesRead: Set<string>;
     envOverlay?: Record<string, string>;

@@ -10,13 +10,18 @@ import {
 } from '@lace/agent/storage/session-store';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
 import { findUserCommand } from '@lace/agent/user-commands';
-import type { SessionUpdate, AgentServerState, CreateToolExecutorFn } from '@lace/agent/server-types';
+import type {
+  SessionUpdate,
+  AgentServerState,
+  CreateToolExecutorFn,
+} from '@lace/agent/server-types';
 import { throwInvalidParams, assertInitialized } from '@lace/agent/rpc/utils';
 import { handleSlashCommand } from '@lace/agent/conversation/slash-commands';
 import { createProviderForTurn, getModelPricing } from '@lace/agent/conversation/provider-factory';
 import { ConversationRunner } from '@lace/agent/core/conversation/runner';
 import type { RunnerConfig, RunnerDependencies } from '@lace/agent/core/conversation/types';
 import { getEffectiveConfig } from '@lace/agent/core/session';
+import { SkillRegistry, getSkillDirectories } from '@lace/agent/skills';
 
 /**
  * Register the session/prompt RPC handler.
@@ -200,6 +205,10 @@ export function registerPromptHandler(
           ? Math.max(1, Math.trunc((params as { maxTurns?: number }).maxTurns!))
           : 10;
 
+      // Create skill registry for this session's working directory
+      const skillDirs = getSkillDirectories(state.activeSession.meta.workDir);
+      const skillRegistry = new SkillRegistry({ skillDirs });
+
       // Build runner config
       const config: RunnerConfig = {
         sessionDir: state.activeSession.dir,
@@ -229,6 +238,7 @@ export function registerPromptHandler(
         startShellJob,
         jobManager: state.jobManager,
         mcpServerManager: state.mcpServerManager,
+        skillRegistry,
         setActiveTurnStatus: (status, ac) => {
           if (status === null) {
             state.activeTurn = null;

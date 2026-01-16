@@ -14,6 +14,7 @@ import { MCPServerManager } from './mcp/server-manager';
 import type { JobManager } from './jobs/job-manager';
 import type { ToolExecutor } from './tools/executor';
 import type { Tool } from './tools/tool';
+import type { SkillRegistry } from './skills';
 
 /**
  * Factory function type for creating tool executors.
@@ -22,7 +23,8 @@ import type { Tool } from './tools/tool';
 export type CreateToolExecutorFn = (
   mode: 'plan' | 'execute',
   mcpServerManager?: MCPServerManager,
-  jobManager?: JobManager
+  jobManager?: JobManager,
+  skillRegistry?: SkillRegistry
 ) => {
   executor: ToolExecutor;
   toolsForProvider: Tool[];

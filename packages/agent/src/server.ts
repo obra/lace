@@ -8,6 +8,7 @@ import { ProviderInstanceManager } from './providers/instance/manager';
 import { MCPServerManager } from './mcp/server-manager';
 import { ToolExecutor } from './tools/executor';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
+import type { SkillRegistry } from '@lace/agent/skills';
 import { createRunShellJobProcess } from './jobs/shell-job';
 import { runSubagentJobProcess as runSubagentJobProcessImpl } from './jobs/subagent-job';
 import {
@@ -38,13 +39,14 @@ export {
 export function createToolExecutorForMode(
   executionMode: 'plan' | 'execute',
   mcpServerManager?: MCPServerManager,
-  jobManager?: JobManager
+  jobManager?: JobManager,
+  skillRegistry?: SkillRegistry
 ): {
   executor: ToolExecutor;
   toolsForProvider: CoreTool[];
 } {
   const executor = new ToolExecutor();
-  executor.registerAllAvailableTools();
+  executor.registerAllAvailableTools(skillRegistry);
 
   if (mcpServerManager) {
     executor.registerMCPTools(mcpServerManager);
