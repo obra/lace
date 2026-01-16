@@ -681,41 +681,27 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
 
             let has_guidance = !state.permission_guidance_input.is_empty();
 
-            // When guidance is provided, always deny (guidance = "no, do this instead")
-            // When guidance row is selected (index == choices.len()), default to first option
-            let decision = if has_guidance {
-                // Find a deny option, or fall back to "deny" string
-                choices
-                    .iter()
-                    .find(|c| c.option_id.to_lowercase().contains("deny"))
-                    .map(|c| c.option_id.clone())
-                    .unwrap_or_else(|| "deny".to_string())
+            // Use the selected option regardless of whether guidance is provided
+            // Guidance just adds a follow-up message to explain the decision
+            let selected_idx = if state.active_permission_selected >= guidance_index {
+                0
             } else {
-                let selected_idx = if state.active_permission_selected >= guidance_index {
-                    0
-                } else {
-                    state.active_permission_selected
-                };
-                choices
-                    .get(selected_idx)
-                    .map(|c| c.option_id.clone())
-                    .unwrap_or_default()
+                state.active_permission_selected
             };
+            let decision = choices
+                .get(selected_idx)
+                .map(|c| c.option_id.clone())
+                .unwrap_or_default();
 
             if decision.is_empty() {
                 state.push_debug_line("permission: no options available".to_string());
                 return Vec::new();
             }
 
-            // Only remember decisions when not providing guidance (guidance = rejection)
+            // Only remember decisions when not providing guidance
+            // (guidance implies a one-off instruction, not a general preference)
             if !has_guidance {
-                if let Some(choice) = choices.get(
-                    if state.active_permission_selected >= guidance_index {
-                        0
-                    } else {
-                        state.active_permission_selected
-                    },
-                ) {
+                if let Some(choice) = choices.get(selected_idx) {
                     if let Some(key) = crate::app::reducer::permission_allow_key(&req) {
                         match choice.remember {
                             PermissionRemember::None => {}
@@ -746,7 +732,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             match decide_permission(req, &decision) {
                 Ok(mut out) => {
                     // If guidance was provided, send it as a follow-up user message
-                    // This way the agent gets: 1) permission denied, 2) guidance as user input
+                    // e.g. "yes, but use X instead" or "no, do Y instead"
                     if has_guidance {
                         let guidance_text = std::mem::take(&mut state.permission_guidance_input);
                         let id = state.next_client_id();
@@ -1840,7 +1826,7 @@ mod tests {
     }
 
     #[test]
-    fn permission_submit_with_guidance_denies_and_sends_prompt() {
+    fn permission_submit_with_guidance_uses_selected_option_and_sends_prompt() {
         use crate::app::{PermissionOption, PermissionRequest};
         use serde_json::json;
 
@@ -1866,22 +1852,22 @@ mod tests {
                 },
             ],
         });
-        // Even with "allow" selected, guidance should cause denial
+        // With "allow" selected, guidance should allow + send follow-up
         state.active_permission_selected = 0;
         state.permission_guidance_input = "be careful with output".to_string();
 
         let out = apply_ui_action(&mut state, UiAction::PermissionSubmit);
-        // Should produce 2 outputs: deny response + prompt request
+        // Should produce 2 outputs: allow response + prompt request
         assert_eq!(out.len(), 2);
         assert!(state.active_permission.is_none());
         // Guidance should be cleared after submission
         assert!(state.permission_guidance_input.is_empty());
 
-        // First output: plain deny (no guidance field)
+        // First output: allow (uses selected option)
         match &out[0] {
             Outbound::JsonRpcResponse { id, result } => {
                 assert_eq!(id, &json!("a_1"));
-                assert_eq!(result, &json!({"decision":"deny"}));
+                assert_eq!(result, &json!({"decision":"allow"}));
             }
             _ => panic!("expected response"),
         }
@@ -2035,7 +2021,7 @@ mod tests {
     }
 
     #[test]
-    fn permission_submit_from_guidance_row_denies_and_sends_prompt() {
+    fn permission_submit_from_guidance_row_uses_first_option_and_sends_prompt() {
         use crate::app::{PermissionOption, PermissionRequest};
         use serde_json::json;
 
@@ -2061,19 +2047,19 @@ mod tests {
                 },
             ],
         });
-        // Select guidance row (index 4)
+        // Select guidance row (index 4) - falls back to first option (allow)
         state.active_permission_selected = 4;
         state.permission_guidance_input = "test guidance".to_string();
 
         let out = apply_ui_action(&mut state, UiAction::PermissionSubmit);
-        // Should produce 2 outputs: deny response + prompt request
+        // Should produce 2 outputs: allow response + prompt request
         assert_eq!(out.len(), 2);
 
-        // First output: plain deny (no guidance field)
+        // First output: allow (falls back to first option when guidance row selected)
         match &out[0] {
             Outbound::JsonRpcResponse { id, result } => {
                 assert_eq!(id, &json!("a_1"));
-                assert_eq!(result, &json!({"decision":"deny"}));
+                assert_eq!(result, &json!({"decision":"allow"}));
             }
             _ => panic!("expected response"),
         }

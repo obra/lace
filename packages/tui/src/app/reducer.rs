@@ -42,7 +42,7 @@ pub enum AppEvent {
     },
     RpcResponse {
         id: Value,
-        /// Token usage from session/prompt response (inputTokens + outputTokens)
+        /// Token usage from session/prompt response (inputTokens = current context size)
         usage_tokens: Option<u64>,
     },
     SessionChanged {
@@ -125,9 +125,9 @@ pub fn reduce(state: &mut AppState, event: AppEvent) -> Vec<Outbound> {
                     end_assistant_stream(state);
                 }
             }
-            // Accumulate token usage if provided
+            // Update token count to current context size (not accumulated)
             if let Some(tokens) = usage_tokens {
-                state.token_count = Some(state.token_count.unwrap_or(0) + tokens);
+                state.token_count = Some(tokens);
             }
             Vec::new()
         }
@@ -482,7 +482,7 @@ mod tests {
     }
 
     #[test]
-    fn rpc_response_accumulates_token_usage() {
+    fn rpc_response_updates_token_count_to_latest() {
         let mut state = AppState::new();
         assert_eq!(state.token_count, None);
 
@@ -496,7 +496,7 @@ mod tests {
         );
         assert_eq!(state.token_count, Some(150));
 
-        // Second response adds to the total
+        // Second response replaces (not accumulates) - this is the current context size
         reduce(
             &mut state,
             AppEvent::RpcResponse {
@@ -504,7 +504,7 @@ mod tests {
                 usage_tokens: Some(200),
             },
         );
-        assert_eq!(state.token_count, Some(350));
+        assert_eq!(state.token_count, Some(200));
 
         // Response without usage doesn't change the count
         reduce(
@@ -514,7 +514,7 @@ mod tests {
                 usage_tokens: None,
             },
         );
-        assert_eq!(state.token_count, Some(350));
+        assert_eq!(state.token_count, Some(200));
     }
 
     #[test]

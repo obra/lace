@@ -252,7 +252,8 @@ pub fn extract_session_configure_config(result: &Option<Value>) -> (Option<Strin
 }
 
 /// Extract token usage from a session/prompt response.
-/// Returns the sum of inputTokens + outputTokens if present.
+/// Returns just the inputTokens, which represents the current context size.
+/// (outputTokens are not included since inputTokens already contains the full context)
 pub fn extract_prompt_usage(result: &Option<Value>) -> Option<u64> {
     let Some(Value::Object(obj)) = result else {
         return None;
@@ -261,16 +262,7 @@ pub fn extract_prompt_usage(result: &Option<Value>) -> Option<u64> {
         return None;
     };
 
-    let input = usage
-        .get("inputTokens")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0);
-    let output = usage
-        .get("outputTokens")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0);
-
-    Some(input + output)
+    usage.get("inputTokens").and_then(|v| v.as_u64())
 }
 
 #[cfg(test)]
@@ -391,12 +383,13 @@ mod tests {
 
     #[test]
     fn extracts_prompt_usage() {
+        // Returns only inputTokens (current context size), not the sum
         let usage = extract_prompt_usage(&Some(json!({
             "turnId": "turn_test",
             "stopReason": "end_turn",
             "usage": { "inputTokens": 100, "outputTokens": 50 }
         })));
-        assert_eq!(usage, Some(150));
+        assert_eq!(usage, Some(100));
 
         // Missing usage field
         let usage = extract_prompt_usage(&Some(json!({"turnId": "turn_test"})));

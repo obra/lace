@@ -507,11 +507,10 @@ fn run_loop(
 
                     if state.active_permission.is_some() {
                         // Single-key shortcuts: Y/S/N/D for quick permission responses
-                        // When details are expanded, Up/Down (or k/j) scroll the details.
-                        // These only activate when the guidance input is empty
-                        let action = if state.permission_guidance_input.is_empty()
-                            && !key.modifiers.contains(KeyModifiers::CONTROL)
-                        {
+                        // These shortcuts ALWAYS work, even if guidance text exists.
+                        // This ensures users can respond even if they were typing when
+                        // the permission prompt appeared.
+                        let action = if !key.modifiers.contains(KeyModifiers::CONTROL) {
                             match key.code {
                                 KeyCode::Char('y') | KeyCode::Char('Y') => {
                                     // Allow once (index 0)
@@ -544,32 +543,14 @@ fn run_loop(
                                 KeyCode::Up => Some(UiAction::PermissionPrev),
                                 KeyCode::Down => Some(UiAction::PermissionNext),
                                 KeyCode::Backspace => Some(UiAction::PermissionGuidanceBackspace),
+                                // Other chars go to guidance input (for "deny with explanation")
                                 KeyCode::Char(ch) => Some(UiAction::PermissionGuidanceChar(ch)),
                                 _ => None,
                             }
                         } else {
-                            // When guidance is being typed, process all keys normally
+                            // Ctrl+key combinations
                             match key.code {
                                 KeyCode::Esc => Some(UiAction::PermissionCancel),
-                                KeyCode::Enter => Some(UiAction::PermissionSubmit),
-                                KeyCode::Up | KeyCode::Char('k')
-                                    if state.permission_details_expanded =>
-                                {
-                                    Some(UiAction::PermissionScrollUp)
-                                }
-                                KeyCode::Down | KeyCode::Char('j')
-                                    if state.permission_details_expanded =>
-                                {
-                                    Some(UiAction::PermissionScrollDown)
-                                }
-                                KeyCode::Up => Some(UiAction::PermissionPrev),
-                                KeyCode::Down => Some(UiAction::PermissionNext),
-                                KeyCode::Backspace => Some(UiAction::PermissionGuidanceBackspace),
-                                KeyCode::Char(ch)
-                                    if !key.modifiers.contains(KeyModifiers::CONTROL) =>
-                                {
-                                    Some(UiAction::PermissionGuidanceChar(ch))
-                                }
                                 _ => None,
                             }
                         };
@@ -2763,6 +2744,19 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
         Span::styled(details_label, Style::default().fg(colors.fg_muted)),
     ]));
 
+    // Show guidance input if user is typing additional instructions
+    if !state.permission_guidance_input.is_empty() {
+        lines.push(Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled("Comment: ", Style::default().fg(colors.accent)),
+            Span::styled(
+                state.permission_guidance_input.clone(),
+                Style::default().fg(colors.fg_primary),
+            ),
+            Span::styled("█", Style::default().fg(colors.accent)), // cursor
+        ]));
+    }
+
     // When expanded, show resource and tool input details
     if state.permission_details_expanded {
         // Resource line (full, not truncated)
@@ -3495,24 +3489,6 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
         }
         prev_role = Some(&m.role);
 
-        // For assistant messages, render tool calls FIRST (before message text)
-        // Only render tools on the LAST message with this turn_id (has complete content)
-        if m.role == Role::Assistant {
-            if let Some(turn_id) = &m.turn_id {
-                let is_last_for_turn = last_message_for_turn.get(turn_id) == Some(&msg_idx);
-                if is_last_for_turn {
-                    if let Some(tools) = tools_by_turn_id.get(turn_id) {
-                        for (idx, tool) in tools {
-                            let is_selected = state.chat_selected_tool_idx == Some(*idx);
-                            let is_expanded = is_selected && state.chat_tool_expanded;
-                            lines.extend(render_tool_call_line(tool, colors, is_selected, is_expanded));
-                            rendered_tool_indices.insert(*idx);
-                        }
-                    }
-                }
-            }
-        }
-
         // Message content with streaming cursor if applicable
         let mut text = m.text.clone();
         if m.role == Role::Assistant && m.streaming {
@@ -3548,6 +3524,24 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
             }
 
             lines.push(Line::from(spans));
+        }
+
+        // For assistant messages, render tool calls AFTER the message text
+        // Only render tools on the LAST message with this turn_id (has complete content)
+        if m.role == Role::Assistant {
+            if let Some(turn_id) = &m.turn_id {
+                let is_last_for_turn = last_message_for_turn.get(turn_id) == Some(&msg_idx);
+                if is_last_for_turn {
+                    if let Some(tools) = tools_by_turn_id.get(turn_id) {
+                        for (idx, tool) in tools {
+                            let is_selected = state.chat_selected_tool_idx == Some(*idx);
+                            let is_expanded = is_selected && state.chat_tool_expanded;
+                            lines.extend(render_tool_call_line(tool, colors, is_selected, is_expanded));
+                            rendered_tool_indices.insert(*idx);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -5294,25 +5288,25 @@ mod tests {
             lines.pop();
         }
 
-        // Tool call should appear BEFORE the message text (inline header first)
+        // Tool call should appear AFTER the message text (tools come after streaming text)
         // NOT after a blank line (which would indicate orphaned/at-end rendering)
         assert!(
             lines.len() >= 2,
-            "Expected at least 2 lines (tool + message), got {}",
+            "Expected at least 2 lines (message + tool), got {}",
             lines.len()
         );
 
-        // Line 0 should be the tool call header (before message text)
+        // Line 0 should be the message text
         assert!(
-            lines[0].contains("file_read"),
-            "Line 0 should be the tool call header, got: {:?}",
+            lines[0].contains("read that file"),
+            "Line 0 should be the message text, got: {:?}",
             lines[0]
         );
 
-        // Line 1 should contain the message text (after tool header)
+        // Line 1 should be the tool call header (after message text)
         assert!(
-            lines[1].contains("read that file"),
-            "Line 1 should be the message text, got: {:?}.\nAll lines:\n{}",
+            lines[1].contains("file_read"),
+            "Line 1 should be the tool call header, got: {:?}.\nAll lines:\n{}",
             lines[1],
             lines.iter().enumerate().map(|(i, l)| format!("{}: {:?}", i, l)).collect::<Vec<_>>().join("\n")
         );
@@ -5493,25 +5487,25 @@ mod tests {
             lines.pop();
         }
 
-        // Tool call should appear BEFORE message text (inline header first)
+        // Tool call should appear AFTER message text (tools come after streaming text)
         assert!(
             lines.len() >= 2,
-            "Expected at least 2 lines (tool + message), got {}: {:?}",
+            "Expected at least 2 lines (message + tool), got {}: {:?}",
             lines.len(),
             lines
         );
 
-        // Line 0 should be the tool call header (before message text)
+        // Line 0 should be the message text
         assert!(
-            lines[0].contains("file_read"),
-            "Line 0 should be the tool call header, got: {:?}",
+            lines[0].contains("config file"),
+            "Line 0 should be the message text, got: {:?}",
             lines[0]
         );
 
-        // Line 1 should contain message text (after tool header)
+        // Line 1 should be the tool call header (after message text)
         assert!(
-            lines[1].contains("config file"),
-            "Line 1 should be the message text, got: {:?}\nAll lines:\n{}",
+            lines[1].contains("file_read"),
+            "Line 1 should be the tool call header, got: {:?}\nAll lines:\n{}",
             lines[1],
             lines
                 .iter()
