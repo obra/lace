@@ -64,14 +64,14 @@ export function parseProviderInstanceOverridesFromConnectionConfig(options: {
 }): Partial<Pick<ProviderInstance, 'endpoint' | 'timeout' | 'retryPolicy' | 'modelConfig'>> {
   const endpoint = getEndpointFromConfig(options.config);
 
-  const timeoutInput = (options.config as any).timeout;
+  const timeoutInput = options.config.timeout;
   const timeout = timeoutInput === undefined ? undefined : toPositiveInt(timeoutInput);
   if (timeoutInput !== undefined && timeout === null) {
     throwInvalidParams('timeout must be a positive integer');
   }
 
-  const retryPolicy = toNonEmptyString((options.config as any).retryPolicy) ?? undefined;
-  const modelConfigInput = (options.config as any).modelConfig;
+  const retryPolicy = toNonEmptyString(options.config.retryPolicy) ?? undefined;
+  const modelConfigInput = options.config.modelConfig;
 
   const parsed = ProviderInstanceSchema.safeParse({
     displayName: options.displayName,
