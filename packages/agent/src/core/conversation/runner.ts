@@ -380,7 +380,11 @@ export class ConversationRunner {
 
       return {
         streamTurnSeq,
-        coreResult: { status: 'denied', content: [{ type: 'text', text: 'Denied by policy' }] },
+        coreResult: {
+          id: toolCallId,
+          status: 'denied',
+          content: [{ type: 'text', text: 'Denied by policy' }],
+        },
         shouldContinue: false,
       };
     }
@@ -410,6 +414,7 @@ export class ConversationRunner {
       return {
         streamTurnSeq,
         coreResult: {
+          id: toolCallId,
           status: 'denied',
           content: [{ type: 'text', text: 'Tool denied in plan mode' }],
         },
@@ -443,6 +448,7 @@ export class ConversationRunner {
       return {
         streamTurnSeq,
         coreResult: {
+          id: toolCallId,
           status: 'failed',
           content: [{ type: 'text', text: `Tool not found: ${toolName}` }],
         },
@@ -476,6 +482,7 @@ export class ConversationRunner {
         return {
           streamTurnSeq,
           coreResult: {
+            id: toolCallId,
             status: 'failed',
             content: [{ type: 'text', text: 'bash.command is required' }],
           },
@@ -509,6 +516,7 @@ export class ConversationRunner {
       return {
         streamTurnSeq,
         coreResult: {
+          id: toolCallId,
           status: 'completed',
           content: [{ type: 'text', text: JSON.stringify({ jobId, status: 'started' }) }],
         },
@@ -588,7 +596,11 @@ export class ConversationRunner {
 
         return {
           streamTurnSeq,
-          coreResult: { status: 'aborted', content: [{ type: 'text', text: 'Cancelled' }] },
+          coreResult: {
+            id: toolCallId,
+            status: 'aborted',
+            content: [{ type: 'text', text: 'Cancelled' }],
+          },
           shouldContinue: false,
         };
       }
@@ -623,7 +635,11 @@ export class ConversationRunner {
 
         return {
           streamTurnSeq,
-          coreResult: { status: 'denied', content: [{ type: 'text', text: 'Denied by user' }] },
+          coreResult: {
+            id: toolCallId,
+            status: 'denied',
+            content: [{ type: 'text', text: 'Denied by user' }],
+          },
           shouldContinue: false,
         };
       }
@@ -743,10 +759,11 @@ export class ConversationRunner {
       const todoContext = { sessionDir: this.config.sessionDir };
 
       if (toolName === 'todo_read') {
-        return await executeTodoRead(finalInput, todoContext);
+        const result = await executeTodoRead(finalInput, todoContext);
+        return { ...result, id: toolCallId };
       }
       // todo_write
-      return await executeTodoWrite(
+      const result = await executeTodoWrite(
         finalInput as {
           id?: string;
           title?: string;
@@ -755,6 +772,7 @@ export class ConversationRunner {
         },
         todoContext
       );
+      return { ...result, id: toolCallId };
     }
 
     // Default: execute through tool executor
