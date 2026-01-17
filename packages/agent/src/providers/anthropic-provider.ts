@@ -2,6 +2,12 @@
 // ABOUTME: Wraps Anthropic SDK in the common provider interface
 
 import Anthropic from '@anthropic-ai/sdk';
+import type {
+  MessageStreamEvent,
+  RawContentBlockStartEvent,
+  RawContentBlockDeltaEvent,
+  ThinkingDelta,
+} from '@anthropic-ai/sdk/resources/messages';
 import { AIProvider } from './base-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderInfo } from './base-provider';
 import { ToolCall } from '@lace/agent/tools/types';
@@ -308,8 +314,11 @@ export class AnthropicProvider extends AIProvider {
           // Track progressive token estimation
           let estimatedOutputTokens = 0;
 
-          // Listen for progressive token usage updates during streaming
-          stream.on('streamEvent', (event) => {
+          // Track current block type for thinking event emission
+          let currentBlockType: string | null = null;
+
+          // Listen for progressive token usage updates and thinking blocks during streaming
+          stream.on('streamEvent', (event: MessageStreamEvent) => {
             if (event.type === 'message_delta' && event.usage) {
               const usage = event.usage;
               this.emit('token_usage_update', {
@@ -319,6 +328,30 @@ export class AnthropicProvider extends AIProvider {
                   totalTokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
                 },
               });
+            }
+
+            // Handle thinking block events
+            if (event.type === 'content_block_start') {
+              const startEvent = event as RawContentBlockStartEvent;
+              currentBlockType = startEvent.content_block.type;
+              if (currentBlockType === 'thinking') {
+                this.emit('thinking_start', {});
+              }
+            }
+
+            if (event.type === 'content_block_delta') {
+              const deltaEvent = event as RawContentBlockDeltaEvent;
+              if (deltaEvent.delta.type === 'thinking_delta') {
+                const thinkingDelta = deltaEvent.delta as ThinkingDelta;
+                this.emit('thinking_delta', { text: thinkingDelta.thinking });
+              }
+            }
+
+            if (event.type === 'content_block_stop') {
+              if (currentBlockType === 'thinking') {
+                this.emit('thinking_end', {});
+              }
+              currentBlockType = null;
             }
           });
 
