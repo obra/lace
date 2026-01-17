@@ -5595,4 +5595,136 @@ mod tests {
                 .join("\n")
         );
     }
+
+    #[test]
+    fn thinking_blocks_render_before_text() {
+        use crate::app::reducer::{reduce, AppEvent};
+        use ratatui::buffer::Buffer;
+        use ratatui::layout::Rect;
+        use ratatui::widgets::Widget;
+
+        let mut state = AppState::new();
+
+        // Simulate a turn with thinking followed by text
+        reduce(
+            &mut state,
+            AppEvent::TurnStart {
+                turn_id: Some("turn_thinking_test".to_string()),
+                turn_seq: Some(0),
+            },
+        );
+
+        reduce(
+            &mut state,
+            AppEvent::ThinkingStart {
+                turn_id: Some("turn_thinking_test".to_string()),
+                turn_seq: Some(1),
+            },
+        );
+
+        reduce(
+            &mut state,
+            AppEvent::ThinkingDelta {
+                text: "Let me analyze this problem...".to_string(),
+                turn_id: Some("turn_thinking_test".to_string()),
+                turn_seq: Some(1),
+            },
+        );
+
+        reduce(
+            &mut state,
+            AppEvent::ThinkingEnd {
+                tokens: 50,
+                turn_id: Some("turn_thinking_test".to_string()),
+                turn_seq: Some(2),
+            },
+        );
+
+        reduce(
+            &mut state,
+            AppEvent::TextDelta {
+                text: "Here's my answer...".to_string(),
+                turn_id: Some("turn_thinking_test".to_string()),
+                turn_seq: Some(3),
+            },
+        );
+
+        reduce(
+            &mut state,
+            AppEvent::TurnEnd {
+                stop_reason: Some("end_turn".to_string()),
+                turn_id: Some("turn_thinking_test".to_string()),
+                turn_seq: Some(4),
+            },
+        );
+
+        // Verify thinking block was created
+        assert_eq!(state.thinking_blocks.len(), 1);
+        assert_eq!(
+            state.thinking_blocks[0].text,
+            "Let me analyze this problem..."
+        );
+        assert!(!state.thinking_blocks[0].streaming);
+        assert_eq!(state.thinking_blocks[0].tokens, Some(50));
+
+        // Verify message was created
+        assert_eq!(state.messages.len(), 1);
+        assert_eq!(state.messages[0].text, "Here's my answer...");
+
+        // Now render and verify thinking block appears BEFORE text
+        let paragraph = render_chat(&state);
+
+        let area = Rect::new(0, 0, 80, 20);
+        let mut buffer = Buffer::empty(area);
+        paragraph.render(area, &mut buffer);
+
+        let mut lines: Vec<String> = Vec::new();
+        for y in 0..area.height {
+            let line: String = (0..area.width)
+                .map(|x| buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+                .collect::<String>()
+                .trim_end()
+                .to_string();
+            lines.push(line);
+        }
+
+        while lines.last().map(|l| l.is_empty()).unwrap_or(false) {
+            lines.pop();
+        }
+
+        // Find positions of key elements
+        let thinking_header_line = lines.iter().position(|l| l.contains("Thinking"));
+        let thinking_content_line = lines.iter().position(|l| l.contains("analyze this"));
+        let answer_line = lines.iter().position(|l| l.contains("Here's my answer"));
+
+        assert!(
+            thinking_header_line.is_some(),
+            "Should render thinking header. Lines:\n{}",
+            lines.join("\n")
+        );
+        assert!(
+            thinking_content_line.is_some(),
+            "Should render thinking content. Lines:\n{}",
+            lines.join("\n")
+        );
+        assert!(
+            answer_line.is_some(),
+            "Should render answer text. Lines:\n{}",
+            lines.join("\n")
+        );
+
+        // Thinking should appear before the answer
+        assert!(
+            thinking_header_line.unwrap() < answer_line.unwrap(),
+            "Thinking header (line {}) should appear before answer (line {})",
+            thinking_header_line.unwrap(),
+            answer_line.unwrap()
+        );
+        assert!(
+            thinking_content_line.unwrap() < answer_line.unwrap(),
+            "Thinking content (line {}) should appear before answer (line {})",
+            thinking_content_line.unwrap(),
+            answer_line.unwrap()
+        );
+    }
 }
