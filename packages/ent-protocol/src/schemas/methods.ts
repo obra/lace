@@ -1673,6 +1673,32 @@ const SessionUpdateThinkingSchema = z
   })
   .strict();
 
+const SessionUpdateThinkingStartSchema = z
+  .object({
+    type: z.literal('thinking_start'),
+    turnId: z.string(),
+    turnSeq: z.number(),
+  })
+  .strict();
+
+const SessionUpdateThinkingDeltaSchema = z
+  .object({
+    type: z.literal('thinking_delta'),
+    text: z.string(),
+    turnId: z.string(),
+    turnSeq: z.number(),
+  })
+  .strict();
+
+const SessionUpdateThinkingEndSchema = z
+  .object({
+    type: z.literal('thinking_end'),
+    tokens: z.number(),
+    turnId: z.string(),
+    turnSeq: z.number(),
+  })
+  .strict();
+
 const SessionUpdateUsageSchema = z
   .object({
     type: z.literal('usage'),
@@ -1875,6 +1901,9 @@ const SessionUpdateBaseParamsSchema = z
 const SessionUpdateInnerNonJobSchema = z.discriminatedUnion('type', [
   SessionUpdateTextDeltaSchema,
   SessionUpdateThinkingSchema,
+  SessionUpdateThinkingStartSchema,
+  SessionUpdateThinkingDeltaSchema,
+  SessionUpdateThinkingEndSchema,
   SessionUpdateUsageSchema,
   SessionUpdateModeChangeSchema,
   SessionUpdateContextInjectedSchema,
@@ -1906,6 +1935,9 @@ const SessionUpdateJobUpdateSchema = z
 const _SessionUpdateInnerSchema = z.discriminatedUnion('type', [
   SessionUpdateTextDeltaSchema,
   SessionUpdateThinkingSchema,
+  SessionUpdateThinkingStartSchema,
+  SessionUpdateThinkingDeltaSchema,
+  SessionUpdateThinkingEndSchema,
   SessionUpdateUsageSchema,
   SessionUpdateModeChangeSchema,
   SessionUpdateContextInjectedSchema,
@@ -1929,6 +1961,9 @@ const _SessionUpdateInnerSchema = z.discriminatedUnion('type', [
 const SessionUpdateParamsSchema = z.discriminatedUnion('type', [
   SessionUpdateBaseParamsSchema.merge(SessionUpdateTextDeltaSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateThinkingSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateThinkingStartSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateThinkingDeltaSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateThinkingEndSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateUsageSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateModeChangeSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateContextInjectedSchema),

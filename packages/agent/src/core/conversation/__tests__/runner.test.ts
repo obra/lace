@@ -8,6 +8,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ConversationRunner } from '../runner';
 import type { RunnerConfig, RunnerDependencies } from '../types';
 import { TestAgentProvider } from '@lace/agent/runtime/test-provider';
+import { AIProvider, type ProviderMessage, type ProviderResponse } from '@lace/agent/providers/base-provider';
+import type { Tool } from '@lace/agent/tools/tool';
 
 /**
  * Create mock dependencies for testing ConversationRunner
@@ -250,6 +252,273 @@ describe('ConversationRunner', () => {
 
       // updateSessionUsage should have been called
       expect(updateSessionUsage).toHaveBeenCalled();
+    });
+
+    describe('thinking events', () => {
+      /**
+       * A test provider that emits thinking events before the response.
+       */
+      class ThinkingTestProvider extends AIProvider {
+        get providerName(): string {
+          return 'thinking-test';
+        }
+
+        getProviderInfo() {
+          return {
+            name: 'thinking-test',
+            displayName: 'Thinking Test Provider',
+            requiresApiKey: false,
+          };
+        }
+
+        isConfigured(): boolean {
+          return true;
+        }
+
+        get supportsStreaming(): boolean {
+          return true;
+        }
+
+        async createResponse(
+          messages: ProviderMessage[],
+          tools: Tool[],
+          model: string,
+          signal?: AbortSignal
+        ): Promise<ProviderResponse> {
+          return this.createStreamingResponse(messages, tools, model, signal);
+        }
+
+        async createStreamingResponse(
+          _messages: ProviderMessage[],
+          _tools: Tool[],
+          _model: string,
+          _signal?: AbortSignal
+        ): Promise<ProviderResponse> {
+          // Emit thinking events
+          this.emit('thinking_start', {});
+          this.emit('thinking_delta', { text: 'Let me think about this...' });
+          this.emit('thinking_delta', { text: ' Considering the options...' });
+          this.emit('thinking_end', { tokens: 42 });
+
+          // Then emit the response
+          const content = 'Here is my response after thinking.';
+          this.emit('token', { token: content });
+          this.emit('complete', { response: { content, toolCalls: [], stopReason: 'stop' } });
+
+          return {
+            content,
+            toolCalls: [],
+            stopReason: 'stop',
+            usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+          };
+        }
+      }
+
+      it('forwards thinking_start events via onUpdate', async () => {
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+        const deps = createMockDeps({
+          onUpdate,
+          createProvider: vi.fn().mockImplementation(async () => new ThinkingTestProvider()),
+        });
+        const runner = new ConversationRunner(config, deps);
+        const turnId = `turn_${randomUUID()}`;
+
+        await runner.run({
+          content: [{ type: 'text', text: 'Hello' }],
+          abortController: new AbortController(),
+          turnId,
+          startedAt: new Date().toISOString(),
+        });
+
+        // Find the thinking_start update
+        const thinkingStartCalls = onUpdate.mock.calls.filter(
+          (call) => call[1]?.type === 'thinking_start'
+        );
+        expect(thinkingStartCalls.length).toBe(1);
+        expect(thinkingStartCalls[0][1]).toEqual(
+          expect.objectContaining({
+            type: 'thinking_start',
+            turnId,
+          })
+        );
+      });
+
+      it('forwards thinking_delta events via onUpdate', async () => {
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+        const deps = createMockDeps({
+          onUpdate,
+          createProvider: vi.fn().mockImplementation(async () => new ThinkingTestProvider()),
+        });
+        const runner = new ConversationRunner(config, deps);
+        const turnId = `turn_${randomUUID()}`;
+
+        await runner.run({
+          content: [{ type: 'text', text: 'Hello' }],
+          abortController: new AbortController(),
+          turnId,
+          startedAt: new Date().toISOString(),
+        });
+
+        // Find thinking_delta updates
+        const thinkingDeltaCalls = onUpdate.mock.calls.filter(
+          (call) => call[1]?.type === 'thinking_delta'
+        );
+        expect(thinkingDeltaCalls.length).toBe(2);
+        expect(thinkingDeltaCalls[0][1]).toEqual(
+          expect.objectContaining({
+            type: 'thinking_delta',
+            text: 'Let me think about this...',
+            turnId,
+          })
+        );
+        expect(thinkingDeltaCalls[1][1]).toEqual(
+          expect.objectContaining({
+            type: 'thinking_delta',
+            text: ' Considering the options...',
+            turnId,
+          })
+        );
+      });
+
+      it('forwards thinking_end events via onUpdate with token count', async () => {
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+        const deps = createMockDeps({
+          onUpdate,
+          createProvider: vi.fn().mockImplementation(async () => new ThinkingTestProvider()),
+        });
+        const runner = new ConversationRunner(config, deps);
+        const turnId = `turn_${randomUUID()}`;
+
+        await runner.run({
+          content: [{ type: 'text', text: 'Hello' }],
+          abortController: new AbortController(),
+          turnId,
+          startedAt: new Date().toISOString(),
+        });
+
+        // Find the thinking_end update
+        const thinkingEndCalls = onUpdate.mock.calls.filter(
+          (call) => call[1]?.type === 'thinking_end'
+        );
+        expect(thinkingEndCalls.length).toBe(1);
+        expect(thinkingEndCalls[0][1]).toEqual(
+          expect.objectContaining({
+            type: 'thinking_end',
+            tokens: 42,
+            turnId,
+          })
+        );
+      });
+
+      it('does not forward thinking events when aborted', async () => {
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+
+        // Create a provider that emits thinking events after abort
+        class AbortedThinkingProvider extends AIProvider {
+          get providerName(): string {
+            return 'aborted-thinking-test';
+          }
+
+          getProviderInfo() {
+            return {
+              name: 'aborted-thinking-test',
+              displayName: 'Aborted Thinking Test Provider',
+              requiresApiKey: false,
+            };
+          }
+
+          isConfigured(): boolean {
+            return true;
+          }
+
+          get supportsStreaming(): boolean {
+            return true;
+          }
+
+          async createResponse(
+            messages: ProviderMessage[],
+            tools: Tool[],
+            model: string,
+            signal?: AbortSignal
+          ): Promise<ProviderResponse> {
+            return this.createStreamingResponse(messages, tools, model, signal);
+          }
+
+          async createStreamingResponse(
+            _messages: ProviderMessage[],
+            _tools: Tool[],
+            _model: string,
+            signal?: AbortSignal
+          ): Promise<ProviderResponse> {
+            // Abort signal is already aborted, but emit events anyway
+            // The runner should ignore them
+            this.emit('thinking_start', {});
+            this.emit('thinking_delta', { text: 'Should not see this' });
+            this.emit('thinking_end', { tokens: 100 });
+
+            if (signal?.aborted) {
+              return { content: '', toolCalls: [], stopReason: 'error' };
+            }
+
+            return {
+              content: 'response',
+              toolCalls: [],
+              stopReason: 'stop',
+              usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+            };
+          }
+        }
+
+        const abortController = new AbortController();
+        abortController.abort(); // Abort before running
+
+        const deps = createMockDeps({
+          onUpdate,
+          createProvider: vi.fn().mockImplementation(async () => new AbortedThinkingProvider()),
+        });
+        const runner = new ConversationRunner(config, deps);
+
+        await runner.run({
+          content: [{ type: 'text', text: 'Hello' }],
+          abortController,
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+        });
+
+        // Should not have any thinking events since we were aborted
+        const thinkingCalls = onUpdate.mock.calls.filter((call) =>
+          ['thinking_start', 'thinking_delta', 'thinking_end'].includes(call[1]?.type)
+        );
+        expect(thinkingCalls.length).toBe(0);
+      });
     });
   });
 });

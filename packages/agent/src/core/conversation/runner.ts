@@ -162,7 +162,42 @@ export class ConversationRunner {
             .catch(() => undefined);
         };
 
+        let thinkingTurnSeq = streamTurnSeq;
+
+        const onThinkingStart = () => {
+          if (abortController.signal.aborted) return;
+          thinkingTurnSeq = streamTurnSeq++;
+          this.deps.onUpdate(thinkingTurnSeq, {
+            type: 'thinking_start',
+            turnId,
+            turnSeq: durableTurnSeq++,
+          });
+        };
+
+        const onThinkingDelta = ({ text }: { text: string }) => {
+          if (abortController.signal.aborted) return;
+          this.deps.onUpdate(thinkingTurnSeq, {
+            type: 'thinking_delta',
+            text,
+            turnId,
+            turnSeq: thinkingTurnSeq,
+          });
+        };
+
+        const onThinkingEnd = ({ tokens }: { tokens: number }) => {
+          if (abortController.signal.aborted) return;
+          this.deps.onUpdate(thinkingTurnSeq, {
+            type: 'thinking_end',
+            tokens,
+            turnId,
+            turnSeq: durableTurnSeq++,
+          });
+        };
+
         provider.on('token', onToken);
+        provider.on('thinking_start', onThinkingStart);
+        provider.on('thinking_delta', onThinkingDelta);
+        provider.on('thinking_end', onThinkingEnd);
         let response;
         try {
           response = await provider.createStreamingResponse(
@@ -173,6 +208,9 @@ export class ConversationRunner {
           );
         } catch (providerError) {
           provider.off('token', onToken);
+          provider.off('thinking_start', onThinkingStart);
+          provider.off('thinking_delta', onThinkingDelta);
+          provider.off('thinking_end', onThinkingEnd);
           // Wrap provider errors with proper error code for RPC layer
           const errorMessage =
             providerError instanceof Error
@@ -189,6 +227,9 @@ export class ConversationRunner {
           };
         }
         provider.off('token', onToken);
+        provider.off('thinking_start', onThinkingStart);
+        provider.off('thinking_delta', onThinkingDelta);
+        provider.off('thinking_end', onThinkingEnd);
         await tokenQueue;
 
         if (abortController.signal.aborted) {
