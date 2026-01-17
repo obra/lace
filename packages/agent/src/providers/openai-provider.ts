@@ -698,8 +698,22 @@ export class OpenAIProvider extends AIProvider {
           });
         }
       }
-      // Note: Reasoning items (type === 'reasoning') are not included in regular content
-      // They could be captured in metadata if needed in the future
+      // Process reasoning items for thinking events (o1/o3 models)
+      // Note: Reasoning items are emitted as events but not included in regular content
+      else if (item.type === 'reasoning') {
+        const reasoningItem = item as { summary: Array<{ text: string }> };
+        if (reasoningItem.summary && reasoningItem.summary.length > 0) {
+          this.emit('thinking_start', {});
+          for (const summaryPart of reasoningItem.summary) {
+            if (summaryPart.text) {
+              this.emit('thinking_delta', { text: summaryPart.text });
+            }
+          }
+          // Get reasoning tokens from usage if available
+          const reasoningTokens = (response.usage as { output_tokens_details?: { reasoning_tokens?: number } })?.output_tokens_details?.reasoning_tokens;
+          this.emit('thinking_end', { tokens: reasoningTokens });
+        }
+      }
     }
 
     // Use output_text convenience field as fallback
@@ -1261,6 +1275,7 @@ export class OpenAIProvider extends AIProvider {
           let estimatedOutputTokens = 0;
           let receivedCompletedEvent = false;
           let responseId: string | undefined;
+          let hasThinkingBlock = false;
 
           // Track tool calls by output index
           const toolCallsByIndex = new Map<
@@ -1308,6 +1323,11 @@ export class OpenAIProvider extends AIProvider {
                     arguments: '',
                   });
                 }
+                // Emit thinking_start when a reasoning item is added (o1/o3 models)
+                if (event.item.type === 'reasoning') {
+                  hasThinkingBlock = true;
+                  this.emit('thinking_start', {});
+                }
                 break;
 
               case 'response.function_call_arguments.delta': {
@@ -1322,6 +1342,21 @@ export class OpenAIProvider extends AIProvider {
                     toolName: toolCall.name,
                   });
                 }
+                break;
+              }
+
+              // Handle reasoning summary events for thinking (o1/o3 models)
+              case 'response.reasoning_summary.delta': {
+                const summaryDelta = event as { delta: string };
+                if (summaryDelta.delta) {
+                  this.emit('thinking_delta', { text: summaryDelta.delta });
+                }
+                break;
+              }
+
+              case 'response.reasoning_summary.done': {
+                // Reasoning summary complete - thinking_end will be emitted at response.completed
+                // with the actual token count from usage
                 break;
               }
 
@@ -1343,10 +1378,15 @@ export class OpenAIProvider extends AIProvider {
                       totalTokens: event.response.usage.total_tokens,
                     },
                   });
+                  // Emit thinking_end with reasoning tokens if we had a thinking block
+                  if (hasThinkingBlock) {
+                    const reasoningTokens = (event.response.usage as { output_tokens_details?: { reasoning_tokens?: number } })?.output_tokens_details?.reasoning_tokens;
+                    this.emit('thinking_end', { tokens: reasoningTokens });
+                  }
                 }
                 break;
 
-              // Ignore other event types (reasoning, etc.) for now
+              // Ignore other event types for now
             }
           }
 
