@@ -350,7 +350,7 @@ describe('ConversationRunner', () => {
         );
       });
 
-      it('forwards thinking_delta events via onUpdate', async () => {
+      it('forwards thinking_delta events via onUpdate (throttled)', async () => {
         const onUpdate = vi.fn().mockResolvedValue(undefined);
         const config: RunnerConfig = {
           sessionDir,
@@ -373,22 +373,25 @@ describe('ConversationRunner', () => {
           startedAt: new Date().toISOString(),
         });
 
-        // Find thinking_delta updates
+        // Find thinking_delta updates - with throttling, rapid deltas get batched
         const thinkingDeltaCalls = onUpdate.mock.calls.filter(
           (call) => call[1]?.type === 'thinking_delta'
         );
-        expect(thinkingDeltaCalls.length).toBe(2);
+        // Throttling batches rapid deltas together, so we get 1 combined event
+        // (flushed when thinking_end is called)
+        expect(thinkingDeltaCalls.length).toBeGreaterThanOrEqual(1);
+
+        // Verify the combined text includes both parts
+        const allDeltaText = thinkingDeltaCalls
+          .map((call) => call[1]?.text)
+          .join('');
+        expect(allDeltaText).toContain('Let me think about this...');
+        expect(allDeltaText).toContain(' Considering the options...');
+
+        // Verify turnId is included
         expect(thinkingDeltaCalls[0][1]).toEqual(
           expect.objectContaining({
             type: 'thinking_delta',
-            text: 'Let me think about this...',
-            turnId,
-          })
-        );
-        expect(thinkingDeltaCalls[1][1]).toEqual(
-          expect.objectContaining({
-            type: 'thinking_delta',
-            text: ' Considering the options...',
             turnId,
           })
         );

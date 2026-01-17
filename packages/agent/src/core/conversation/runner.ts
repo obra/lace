@@ -164,6 +164,23 @@ export class ConversationRunner {
 
         let thinkingTurnSeq = streamTurnSeq;
 
+        // Throttle thinking deltas to ~100ms batches to avoid overwhelming the client
+        let thinkingBuffer = '';
+        let thinkingFlushTimeout: ReturnType<typeof setTimeout> | null = null;
+
+        const flushThinkingBuffer = () => {
+          if (thinkingBuffer && !abortController.signal.aborted) {
+            this.deps.onUpdate(thinkingTurnSeq, {
+              type: 'thinking_delta',
+              text: thinkingBuffer,
+              turnId,
+              turnSeq: thinkingTurnSeq,
+            });
+            thinkingBuffer = '';
+          }
+          thinkingFlushTimeout = null;
+        };
+
         const onThinkingStart = () => {
           if (abortController.signal.aborted) return;
           thinkingTurnSeq = streamTurnSeq++;
@@ -176,15 +193,21 @@ export class ConversationRunner {
 
         const onThinkingDelta = ({ text }: { text: string }) => {
           if (abortController.signal.aborted) return;
-          this.deps.onUpdate(thinkingTurnSeq, {
-            type: 'thinking_delta',
-            text,
-            turnId,
-            turnSeq: thinkingTurnSeq,
-          });
+          thinkingBuffer += text;
+
+          if (!thinkingFlushTimeout) {
+            thinkingFlushTimeout = setTimeout(flushThinkingBuffer, 100);
+          }
         };
 
         const onThinkingEnd = ({ tokens }: { tokens: number }) => {
+          // Flush any remaining buffer before end
+          if (thinkingFlushTimeout) {
+            clearTimeout(thinkingFlushTimeout);
+            thinkingFlushTimeout = null;
+          }
+          flushThinkingBuffer();
+
           if (abortController.signal.aborted) return;
           this.deps.onUpdate(thinkingTurnSeq, {
             type: 'thinking_end',
