@@ -178,28 +178,53 @@ export class AnthropicProvider extends AIProvider {
     // Extract system message if present
     const systemPrompt = this.getEffectiveSystemPrompt(messages);
 
-    // Convert tools to Anthropic format
-    const anthropicTools: Anthropic.Tool[] = tools.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      input_schema: tool.inputSchema,
-    }));
+    // Format system prompt as array with cache_control for Anthropic's prompt caching
+    const systemWithCaching: Anthropic.TextBlockParam[] = [
+      {
+        type: 'text',
+        text: systemPrompt,
+        cache_control: { type: 'ephemeral' },
+      },
+    ];
+
+    // Convert tools to Anthropic format with cache_control on the last tool only
+    // Adding cache_control to the last tool enables caching of the entire tool list
+    const anthropicTools: Anthropic.Tool[] = tools.map((tool, index) => {
+      const baseTool: Anthropic.Tool = {
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.inputSchema,
+      };
+
+      // Add cache_control to the last tool only
+      if (index === tools.length - 1) {
+        return {
+          ...baseTool,
+          cache_control: { type: 'ephemeral' as const },
+        };
+      }
+
+      return baseTool;
+    });
 
     const payload = {
       model,
       max_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 8192),
       messages: anthropicMessages,
-      system: systemPrompt,
+      system: systemWithCaching,
       tools: anthropicTools,
     };
 
     // Comprehensive debug logging of request metadata (excluding message content)
+    const systemText = Array.isArray(payload.system)
+      ? payload.system.map((block) => block.text).join('')
+      : (payload.system as string | undefined);
     logger.info('🔍 ANTHROPIC REQUEST METADATA', {
       model: payload.model,
       maxTokens: payload.max_tokens,
       messageCount: payload.messages.length,
-      systemPromptLength: payload.system?.length || 0,
-      systemPromptPreview: payload.system?.substring(0, 100) + '...',
+      systemPromptLength: systemText?.length || 0,
+      systemPromptPreview: systemText?.substring(0, 100) + '...',
       toolCount: payload.tools?.length || 0,
       toolNames: payload.tools?.map((t) => t.name),
       configKeys: Object.keys(this._config),
