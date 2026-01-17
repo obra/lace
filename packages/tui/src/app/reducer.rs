@@ -1,4 +1,4 @@
-use crate::app::{AppState, ChatMessage, PermissionAllowKey, PermissionRequest, Role};
+use crate::app::{AppState, ChatMessage, PermissionAllowKey, PermissionRequest, Role, ThinkingBlock};
 use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,6 +14,20 @@ pub enum AppEvent {
     },
     TurnEnd {
         stop_reason: Option<String>,
+        turn_id: Option<String>,
+        turn_seq: Option<i64>,
+    },
+    ThinkingStart {
+        turn_id: Option<String>,
+        turn_seq: Option<i64>,
+    },
+    ThinkingDelta {
+        text: String,
+        turn_id: Option<String>,
+        turn_seq: Option<i64>,
+    },
+    ThinkingEnd {
+        tokens: u64,
         turn_id: Option<String>,
         turn_seq: Option<i64>,
     },
@@ -91,6 +105,34 @@ pub fn reduce(state: &mut AppState, event: AppEvent) -> Vec<Outbound> {
             state.current_turn_seq = None;
 
             end_assistant_stream(state);
+            Vec::new()
+        }
+        AppEvent::ThinkingStart { turn_id, turn_seq } => {
+            state.thinking_blocks.push(ThinkingBlock {
+                turn_id,
+                turn_seq,
+                text: String::new(),
+                tokens: None,
+                streaming: true,
+            });
+            Vec::new()
+        }
+        AppEvent::ThinkingDelta { text, turn_id, .. } => {
+            // Find the current streaming block matching turn_id
+            if let Some(block) = state.thinking_blocks.iter_mut().rev().find(|b| {
+                b.streaming && b.turn_id == turn_id
+            }) {
+                block.text.push_str(&text);
+            }
+            Vec::new()
+        }
+        AppEvent::ThinkingEnd { tokens, turn_id, .. } => {
+            if let Some(block) = state.thinking_blocks.iter_mut().rev().find(|b| {
+                b.streaming && b.turn_id == turn_id
+            }) {
+                block.tokens = Some(tokens);
+                block.streaming = false;
+            }
             Vec::new()
         }
         AppEvent::ToolUse {
@@ -587,5 +629,145 @@ mod tests {
             Some("turn_tools_only".to_string())
         );
         // This turn_id can be used to match tool calls in render_chat
+    }
+
+    #[test]
+    fn thinking_events_create_and_update_block() {
+        let mut state = AppState::new();
+
+        reduce(
+            &mut state,
+            AppEvent::ThinkingStart {
+                turn_id: Some("turn_1".to_string()),
+                turn_seq: Some(1),
+            },
+        );
+        assert_eq!(state.thinking_blocks.len(), 1);
+        assert!(state.thinking_blocks[0].streaming);
+        assert_eq!(state.thinking_blocks[0].text, "");
+
+        reduce(
+            &mut state,
+            AppEvent::ThinkingDelta {
+                text: "Let me think...".to_string(),
+                turn_id: Some("turn_1".to_string()),
+                turn_seq: Some(1),
+            },
+        );
+        assert_eq!(state.thinking_blocks[0].text, "Let me think...");
+
+        reduce(
+            &mut state,
+            AppEvent::ThinkingEnd {
+                tokens: 42,
+                turn_id: Some("turn_1".to_string()),
+                turn_seq: Some(2),
+            },
+        );
+        assert!(!state.thinking_blocks[0].streaming);
+        assert_eq!(state.thinking_blocks[0].tokens, Some(42));
+    }
+
+    #[test]
+    fn thinking_delta_appends_to_streaming_block() {
+        let mut state = AppState::new();
+
+        reduce(
+            &mut state,
+            AppEvent::ThinkingStart {
+                turn_id: Some("turn_1".to_string()),
+                turn_seq: Some(1),
+            },
+        );
+
+        reduce(
+            &mut state,
+            AppEvent::ThinkingDelta {
+                text: "First ".to_string(),
+                turn_id: Some("turn_1".to_string()),
+                turn_seq: Some(1),
+            },
+        );
+
+        reduce(
+            &mut state,
+            AppEvent::ThinkingDelta {
+                text: "second ".to_string(),
+                turn_id: Some("turn_1".to_string()),
+                turn_seq: Some(1),
+            },
+        );
+
+        reduce(
+            &mut state,
+            AppEvent::ThinkingDelta {
+                text: "third".to_string(),
+                turn_id: Some("turn_1".to_string()),
+                turn_seq: Some(1),
+            },
+        );
+
+        assert_eq!(state.thinking_blocks[0].text, "First second third");
+    }
+
+    #[test]
+    fn multiple_thinking_blocks_tracked_separately() {
+        let mut state = AppState::new();
+
+        // First thinking block
+        reduce(
+            &mut state,
+            AppEvent::ThinkingStart {
+                turn_id: Some("turn_1".to_string()),
+                turn_seq: Some(1),
+            },
+        );
+        reduce(
+            &mut state,
+            AppEvent::ThinkingDelta {
+                text: "Thinking about A".to_string(),
+                turn_id: Some("turn_1".to_string()),
+                turn_seq: Some(1),
+            },
+        );
+        reduce(
+            &mut state,
+            AppEvent::ThinkingEnd {
+                tokens: 100,
+                turn_id: Some("turn_1".to_string()),
+                turn_seq: Some(2),
+            },
+        );
+
+        // Second thinking block (different turn)
+        reduce(
+            &mut state,
+            AppEvent::ThinkingStart {
+                turn_id: Some("turn_2".to_string()),
+                turn_seq: Some(10),
+            },
+        );
+        reduce(
+            &mut state,
+            AppEvent::ThinkingDelta {
+                text: "Thinking about B".to_string(),
+                turn_id: Some("turn_2".to_string()),
+                turn_seq: Some(10),
+            },
+        );
+        reduce(
+            &mut state,
+            AppEvent::ThinkingEnd {
+                tokens: 200,
+                turn_id: Some("turn_2".to_string()),
+                turn_seq: Some(11),
+            },
+        );
+
+        assert_eq!(state.thinking_blocks.len(), 2);
+        assert_eq!(state.thinking_blocks[0].text, "Thinking about A");
+        assert_eq!(state.thinking_blocks[0].tokens, Some(100));
+        assert_eq!(state.thinking_blocks[1].text, "Thinking about B");
+        assert_eq!(state.thinking_blocks[1].tokens, Some(200));
     }
 }

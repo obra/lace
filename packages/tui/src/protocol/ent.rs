@@ -70,6 +70,26 @@ fn decode_session_update_inner(
                 turn_seq,
             });
         }
+        "thinking_start" => {
+            out.push(AppEvent::ThinkingStart { turn_id, turn_seq });
+        }
+        "thinking_delta" => {
+            if let Some(text) = obj.get("text").and_then(|v| v.as_str()) {
+                out.push(AppEvent::ThinkingDelta {
+                    text: text.to_string(),
+                    turn_id,
+                    turn_seq,
+                });
+            }
+        }
+        "thinking_end" => {
+            let tokens = obj.get("tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+            out.push(AppEvent::ThinkingEnd {
+                tokens,
+                turn_id,
+                turn_seq,
+            });
+        }
         "tool_use" => {
             let tool_call_id = obj.get("toolCallId").and_then(|v| v.as_str());
             let input = obj.get("input");
@@ -470,6 +490,76 @@ mod tests {
                 stop_reason: Some("end_turn".to_string()),
                 turn_id: Some("turn_abc".to_string()),
                 turn_seq: Some(3),
+            }]
+        );
+    }
+
+    #[test]
+    fn parses_thinking_start_event() {
+        let events = decode_session_update(&json!({
+            "type": "thinking_start",
+            "turnId": "turn_1",
+            "turnSeq": 1
+        }));
+        assert_eq!(
+            events,
+            vec![AppEvent::ThinkingStart {
+                turn_id: Some("turn_1".to_string()),
+                turn_seq: Some(1),
+            }]
+        );
+    }
+
+    #[test]
+    fn parses_thinking_delta_event() {
+        let events = decode_session_update(&json!({
+            "type": "thinking_delta",
+            "text": "Let me analyze this...",
+            "turnId": "turn_1",
+            "turnSeq": 1
+        }));
+        assert_eq!(
+            events,
+            vec![AppEvent::ThinkingDelta {
+                text: "Let me analyze this...".to_string(),
+                turn_id: Some("turn_1".to_string()),
+                turn_seq: Some(1),
+            }]
+        );
+    }
+
+    #[test]
+    fn parses_thinking_end_event() {
+        let events = decode_session_update(&json!({
+            "type": "thinking_end",
+            "tokens": 1500,
+            "turnId": "turn_1",
+            "turnSeq": 2
+        }));
+        assert_eq!(
+            events,
+            vec![AppEvent::ThinkingEnd {
+                tokens: 1500,
+                turn_id: Some("turn_1".to_string()),
+                turn_seq: Some(2),
+            }]
+        );
+    }
+
+    #[test]
+    fn parses_thinking_end_with_missing_tokens() {
+        // Tokens should default to 0 when not present
+        let events = decode_session_update(&json!({
+            "type": "thinking_end",
+            "turnId": "turn_1",
+            "turnSeq": 2
+        }));
+        assert_eq!(
+            events,
+            vec![AppEvent::ThinkingEnd {
+                tokens: 0,
+                turn_id: Some("turn_1".to_string()),
+                turn_seq: Some(2),
             }]
         );
     }

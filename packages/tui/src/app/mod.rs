@@ -41,6 +41,15 @@ pub struct ChatMessage {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThinkingBlock {
+    pub turn_id: Option<String>,
+    pub turn_seq: Option<i64>,
+    pub text: String,
+    pub tokens: Option<u64>,
+    pub streaming: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PermissionOption {
     pub option_id: String,
     pub label: String,
@@ -171,6 +180,9 @@ pub struct AppState {
     /// Used as fallback when events don't include their own turn_id.
     pub current_turn_id: Option<String>,
     pub current_turn_seq: Option<i64>,
+
+    /// Thinking blocks from extended thinking (reasoning) models
+    pub thinking_blocks: Vec<ThinkingBlock>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -287,6 +299,8 @@ impl AppState {
 
             current_turn_id: None,
             current_turn_seq: None,
+
+            thinking_blocks: Vec::new(),
         };
 
         state

@@ -3198,6 +3198,47 @@ fn tool_call_line_count(item: &activity::ActivityItem, selected: bool, expanded:
     count
 }
 
+/// Renders a thinking block with dimmed italic styling.
+/// Shows "Thinking..." while streaming, "Thinking (N tokens):" when complete.
+fn render_thinking_block(
+    block: &crate::app::ThinkingBlock,
+    colors: &theme::ThemeColors,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+
+    // Header line
+    let header = if block.streaming {
+        "Thinking...".to_string()
+    } else if let Some(tokens) = block.tokens {
+        format!("Thinking ({} tokens):", format_token_count(tokens))
+    } else {
+        "Thinking:".to_string()
+    };
+
+    lines.push(Line::from(Span::styled(
+        header,
+        Style::default().fg(colors.fg_muted),
+    )));
+
+    // Content lines - dimmed and italic
+    let style = Style::default()
+        .fg(colors.fg_muted)
+        .add_modifier(Modifier::ITALIC);
+
+    for line in block.text.lines() {
+        lines.push(Line::from(Span::styled(line.to_string(), style)));
+    }
+
+    // Add streaming cursor if still thinking
+    if block.streaming && !block.text.is_empty() {
+        if let Some(last) = lines.last_mut() {
+            last.spans.push(Span::styled(" ▌", Style::default().fg(colors.accent)));
+        }
+    }
+
+    lines
+}
+
 /// Renders a tool call with status indicator and optional folded result.
 /// When `selected` is true, adds a selection marker and background.
 /// When `expanded` is true (and selected), shows detailed JSON output.
@@ -3469,6 +3510,18 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
     let mut rendered_tool_indices: std::collections::HashSet<usize> =
         std::collections::HashSet::new();
 
+    // Build thinking blocks by turn_id
+    let mut thinking_by_turn_id: std::collections::HashMap<String, Vec<&crate::app::ThinkingBlock>> =
+        std::collections::HashMap::new();
+    for block in &state.thinking_blocks {
+        if let Some(turn_id) = &block.turn_id {
+            thinking_by_turn_id.entry(turn_id.clone()).or_default().push(block);
+        }
+    }
+    // Track which thinking blocks we've rendered
+    let mut rendered_thinking_turn_ids: std::collections::HashSet<String> =
+        std::collections::HashSet::new();
+
     // Find the LAST message index for each turn_id (tools should render with the final message)
     let mut last_message_for_turn: std::collections::HashMap<String, usize> =
         std::collections::HashMap::new();
@@ -3476,6 +3529,17 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
         if m.role == Role::Assistant {
             if let Some(turn_id) = &m.turn_id {
                 last_message_for_turn.insert(turn_id.clone(), i);
+            }
+        }
+    }
+
+    // Find the FIRST message index for each turn_id (thinking should render with the first message)
+    let mut first_message_for_turn: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    for (i, m) in state.messages.iter().enumerate() {
+        if m.role == Role::Assistant {
+            if let Some(turn_id) = &m.turn_id {
+                first_message_for_turn.entry(turn_id.clone()).or_insert(i);
             }
         }
     }
@@ -3488,6 +3552,22 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
             }
         }
         prev_role = Some(&m.role);
+
+        // For assistant messages, render thinking blocks BEFORE the message text
+        // Only render on the FIRST message with this turn_id
+        if m.role == Role::Assistant {
+            if let Some(turn_id) = &m.turn_id {
+                let is_first_for_turn = first_message_for_turn.get(turn_id) == Some(&msg_idx);
+                if is_first_for_turn && !rendered_thinking_turn_ids.contains(turn_id) {
+                    if let Some(blocks) = thinking_by_turn_id.get(turn_id) {
+                        for block in blocks {
+                            lines.extend(render_thinking_block(block, colors));
+                        }
+                        rendered_thinking_turn_ids.insert(turn_id.clone());
+                    }
+                }
+            }
+        }
 
         // Message content with streaming cursor if applicable
         let mut text = m.text.clone();
