@@ -80,13 +80,28 @@ export class GeminiProvider extends AIProvider {
     return requestPayload;
   }
 
-  private _parseResponse(response: GenerateContentResponse): ProviderResponse {
+  private _parseResponse(
+    response: GenerateContentResponse,
+    options: { emitThinkingEvents?: boolean } = {}
+  ): ProviderResponse {
+    const { emitThinkingEvents = true } = options;
     const candidate = response.candidates?.[0];
     if (!candidate) {
       throw new Error('No candidate in Gemini response');
     }
 
     const parts = candidate.content?.parts || [];
+
+    // Check for thinking/thought content in response parts
+    if (emitThinkingEvents) {
+      for (const part of parts) {
+        if ('thought' in part && typeof part.thought === 'string' && part.thought) {
+          this.emit('thinking_start', {});
+          this.emit('thinking_delta', { text: part.thought });
+          this.emit('thinking_end', { tokens: 0 }); // Gemini doesn't provide thinking token count
+        }
+      }
+    }
 
     // Extract text content
     const textParts = parts.filter((part) => 'text' in part && part.text);
@@ -190,6 +205,16 @@ export class GeminiProvider extends AIProvider {
           for await (const chunk of stream) {
             streamingStarted = true; // Mark that streaming has begun
 
+            // Check for thinking/thought content in streaming chunks
+            const parts = chunk.candidates?.[0]?.content?.parts || [];
+            for (const part of parts) {
+              if ('thought' in part && typeof part.thought === 'string' && part.thought) {
+                this.emit('thinking_start', {});
+                this.emit('thinking_delta', { text: part.thought });
+                this.emit('thinking_end', { tokens: 0 }); // Gemini doesn't provide thinking token count
+              }
+            }
+
             // Emit token events for real-time display
             if (chunk.text && typeof chunk.text === 'string') {
               _content += chunk.text;
@@ -203,7 +228,8 @@ export class GeminiProvider extends AIProvider {
             throw new Error('No data received from stream');
           }
 
-          const response = this._parseResponse(finalChunk);
+          // Skip thinking events here since we already emitted them during streaming
+          const response = this._parseResponse(finalChunk, { emitThinkingEvents: false });
 
           // Log streaming response with pretty formatting
           logProviderResponse('gemini', finalChunk, { streaming: true });
