@@ -1,5 +1,7 @@
 # Extended Thinking Reporting Design
 
+**Status:** ✅ Implemented
+
 ## Overview
 
 Display extended thinking/reasoning content from LLMs in the TUI. Shows what the model is thinking, with progressive disclosure: indicator while streaming, full content always visible when complete.
