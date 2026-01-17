@@ -2,12 +2,12 @@
 // ABOUTME: Tests streaming vs non-streaming responses, configuration, and error handling
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AnthropicProvider } from './anthropic-provider';
+import { AnthropicProvider } from '../anthropic-provider';
 import { Tool } from '@lace/agent/tools/tool';
 import { ToolResult, ToolContext } from '@lace/agent/tools/types';
 import { z } from 'zod';
 import type Anthropic from '@anthropic-ai/sdk';
-import { StreamingEvents } from './types';
+import { StreamingEvents } from '../types';
 
 // Mock external Anthropic SDK to avoid real API calls during tests
 // Tests focus on provider logic, not Anthropic API implementation
@@ -26,7 +26,7 @@ vi.mock('@anthropic-ai/sdk', () => {
 });
 
 // Mock logger to prevent test output noise and control log verification
-vi.mock('../../utils/logger.js', () => ({
+vi.mock('../../../utils/logger.js', () => ({
   logger: {
     debug: vi.fn(),
     error: vi.fn(),
@@ -150,7 +150,15 @@ describe('AnthropicProvider', () => {
         { role: 'user', content: 'User message' },
         { role: 'assistant', content: 'Assistant message' },
       ]);
-      expect(callArgs.system).toBe('System message');
+      // System prompt is now an array with cache_control for prompt caching
+      expect(Array.isArray(callArgs.system)).toBe(true);
+      const systemBlocks = callArgs.system as Array<{
+        type: string;
+        text: string;
+        cache_control?: { type: string };
+      }>;
+      expect(systemBlocks[0].text).toBe('System message');
+      expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral' });
     });
   });
 
@@ -366,7 +374,15 @@ describe('AnthropicProvider', () => {
 
       const callArgs = mockCreateResponse.mock
         .calls[0][0] as Anthropic.Messages.MessageCreateParams;
-      expect(callArgs.system).toBe('You are a helpful assistant.');
+      // System prompt is now an array with cache_control for prompt caching
+      expect(Array.isArray(callArgs.system)).toBe(true);
+      const systemBlocks = callArgs.system as Array<{
+        type: string;
+        text: string;
+        cache_control?: { type: string };
+      }>;
+      expect(systemBlocks[0].text).toBe('You are a helpful assistant.');
+      expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral' });
     });
   });
 
