@@ -6,8 +6,10 @@ echo "=== Installing lace ==="
 # Use apt-cacher-ng proxy on Docker host to avoid hammering upstream mirrors
 # when many containers install packages simultaneously.
 # Each harbor task gets its own Docker network, so detect the gateway dynamically.
-DOCKER_GW=$(ip route | awk '/default/ {print $3; exit}')
-if [ -n "$DOCKER_GW" ]; then
+# `ip` may not be installed in minimal containers, so parse /proc/net/route directly.
+GW_HEX=$(awk '$2 == "00000000" {print $3; exit}' /proc/net/route 2>/dev/null)
+if [ -n "$GW_HEX" ]; then
+    DOCKER_GW=$(printf "%d.%d.%d.%d" "0x${GW_HEX:6:2}" "0x${GW_HEX:4:2}" "0x${GW_HEX:2:2}" "0x${GW_HEX:0:2}")
     echo "Acquire::http::Proxy \"http://${DOCKER_GW}:3142\";" > /etc/apt/apt.conf.d/01proxy
 fi
 
