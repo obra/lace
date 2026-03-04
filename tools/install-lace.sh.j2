@@ -1,0 +1,45 @@
+#!/bin/bash
+set -euo pipefail
+
+echo "=== Installing lace ==="
+
+# Use apt-cacher-ng proxy on Docker host to avoid hammering upstream mirrors
+# when many containers install packages simultaneously.
+# Each harbor task gets its own Docker network, so detect the gateway dynamically.
+DOCKER_GW=$(ip route | awk '/default/ {print $3; exit}')
+if [ -n "$DOCKER_GW" ]; then
+    echo "Acquire::http::Proxy \"http://${DOCKER_GW}:3142\";" > /etc/apt/apt.conf.d/01proxy
+fi
+
+# Most terminal-bench containers already have Node.js.
+# Install if missing.
+if ! command -v node &>/dev/null; then
+    echo "Node.js not found, installing..."
+    apt-get update -qq
+    apt-get install -y -qq curl ca-certificates
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    apt-get install -y -qq nodejs
+fi
+
+echo "Node.js: $(node --version)"
+
+# Install ripgrep (lace uses it for search)
+if ! command -v rg &>/dev/null; then
+    apt-get update -qq 2>/dev/null || true
+    apt-get install -y -qq ripgrep 2>/dev/null || echo "ripgrep install failed (non-fatal)"
+fi
+
+# Copy pre-built lace bundle from /installed-agent/lace to /opt/lace.
+# The bundle was created by deploy-lace.sh and already has node_modules.
+cp -r /installed-agent/lace /opt/lace
+
+# Make the harness executable
+chmod +x /opt/lace/tools/lace-harness.mjs
+
+# Configure git for benchmark tasks (git may not be installed in all containers)
+if command -v git &>/dev/null; then
+    git config --global safe.directory '*'
+fi
+
+echo "=== lace installed ==="
+echo "Harness: /opt/lace/tools/lace-harness.mjs"
