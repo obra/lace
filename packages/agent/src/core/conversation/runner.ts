@@ -23,6 +23,7 @@ import {
   shouldAskPermission,
 } from '@lace/agent/rpc/utils';
 import type { RunnerConfig, RunnerDependencies, RunParams, RunResult, ApprovalMode } from './types';
+import type { RequestOptions } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
 
 /**
@@ -106,7 +107,8 @@ export class ConversationRunner {
     // Track token usage across the turn
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
-    let sessionCostUsd = this.deps.getSessionCostUsd();
+    const previousSessionCostUsd = this.deps.getSessionCostUsd();
+    let sessionCostUsd = previousSessionCostUsd;
 
     // Helper to write durable events
     let durableTurnSeq = 0;
@@ -131,18 +133,18 @@ export class ConversationRunner {
     let streamTurnSeq = 0;
     let completedTurns = 0;
 
+    // Bare text retry: when the model returns no tool calls, retry once with
+    // tool_choice=required to force a verification tool call (catches
+    // NEVER_SUBMITTED pattern where model says "Done" instead of verifying)
+    let retriedWithToolChoice = false;
+    let nextRequestOptions: RequestOptions | undefined;
+
     try {
       for (; completedTurns < maxTurns; completedTurns++) {
         // Inject a reminder every LOOP_CHECK_INTERVAL turns to help detect stuck loops
-        if (
-          completedTurns > 0 &&
-          completedTurns % ConversationRunner.LOOP_CHECK_INTERVAL === 0
-        ) {
+        if (completedTurns > 0 && completedTurns % ConversationRunner.LOOP_CHECK_INTERVAL === 0) {
           const reminder = `<system-reminder>You have completed ${completedTurns} agentic turns. If you believe you are stuck in a loop or not making progress, stop and ask the user for guidance. Otherwise, continue.</system-reminder>`;
-          providerMessages = [
-            ...providerMessages,
-            { role: 'user' as const, content: reminder },
-          ];
+          providerMessages = [...providerMessages, { role: 'user' as const, content: reminder }];
         }
 
         const messageTurnSeq = streamTurnSeq++;
@@ -227,8 +229,11 @@ export class ConversationRunner {
             providerMessages,
             toolsForProvider,
             modelId || 'unknown-model',
-            abortController.signal
+            abortController.signal,
+            undefined, // conversationState
+            nextRequestOptions
           );
+          nextRequestOptions = undefined; // Reset after use
         } catch (providerError) {
           provider.off('token', onToken);
           provider.off('thinking_start', onThinkingStart);
@@ -293,7 +298,27 @@ export class ConversationRunner {
 
         const toolCalls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
         if (toolCalls.length === 0) {
-          stopReason = response.stopReason === 'max_tokens' ? 'max_tokens' : 'end_turn';
+          if (response.stopReason === 'max_tokens') {
+            stopReason = 'max_tokens';
+            break;
+          }
+          // Retry once with tool_choice=required to force a verification tool call.
+          // This catches the NEVER_SUBMITTED pattern where the model produces "Done"
+          // text or empty responses instead of calling a verification tool.
+          if (!retriedWithToolChoice && completedTurns > 0) {
+            retriedWithToolChoice = true;
+            providerMessages = [
+              ...providerMessages,
+              {
+                role: 'user' as const,
+                content:
+                  '<system-reminder>You must use a tool to verify your work before stopping. Do not respond with text — call a tool.</system-reminder>',
+              },
+            ];
+            nextRequestOptions = { toolChoice: 'required' };
+            continue;
+          }
+          stopReason = 'end_turn';
           break;
         }
 
@@ -368,7 +393,17 @@ export class ConversationRunner {
       stopReason = 'max_turns';
     }
 
-    await writeAndAdvance({ type: 'turn_end', data: { stopReason } });
+    await writeAndAdvance({
+      type: 'turn_end',
+      data: {
+        stopReason,
+        usage: {
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+          costUsd: sessionCostUsd - previousSessionCostUsd,
+        },
+      },
+    });
 
     return {
       turnId,

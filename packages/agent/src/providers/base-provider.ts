@@ -55,6 +55,10 @@ export interface ConversationState {
   openaiResponseId?: string; // Last response.id from OpenAI Responses API (for conversation chaining)
 }
 
+export interface RequestOptions {
+  toolChoice?: 'auto' | 'required' | 'none';
+}
+
 /**
  * Event types emitted by providers:
  * - 'token': { token: string } - Streaming text token
@@ -160,7 +164,8 @@ export abstract class AIProvider extends EventEmitter {
     tools: Tool[],
     model: string,
     signal?: AbortSignal,
-    conversationState?: ConversationState
+    conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse>;
 
   // Optional streaming support - providers can override this
@@ -169,10 +174,11 @@ export abstract class AIProvider extends EventEmitter {
     tools: Tool[],
     model: string,
     signal?: AbortSignal,
-    conversationState?: ConversationState
+    conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
     // Default implementation: fall back to non-streaming
-    return this.createResponse(messages, tools, model, signal, conversationState);
+    return this.createResponse(messages, tools, model, signal, conversationState, options);
   }
 
   // Check if provider supports streaming
@@ -249,6 +255,18 @@ export abstract class AIProvider extends EventEmitter {
 
     const catalogModel = this._catalogData.models.find((m) => m.id === modelId);
     return catalogModel?.default_max_tokens || fallback;
+  }
+
+  // Get model reasoning effort from catalog (returns undefined if model doesn't support reasoning)
+  protected getModelReasoningEffort(modelId: string): string | undefined {
+    if (!this._catalogData) {
+      return undefined;
+    }
+
+    const catalogModel = this._catalogData.models.find((m) => m.id === modelId);
+    if (!catalogModel?.can_reason) return undefined;
+    // Allow env var override, fall back to catalog default
+    return process.env.LACE_REASONING_EFFORT || catalogModel.default_reasoning_effort || undefined;
   }
 
   // Helper method to create ModelInfo with fallback to hardcoded values

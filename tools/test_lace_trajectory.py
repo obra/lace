@@ -1,4 +1,4 @@
-"""Tests for lace_trajectory.py — ATIF v1.6 trajectory converter."""
+"""Tests for lace_trajectory.py — ATIF v1.7 trajectory converter."""
 
 import json
 import os
@@ -65,11 +65,19 @@ def _make_multi_session_state_dir(tmp_path, sessions):
     return state_dir
 
 
-def _run_convert(tmp_path, events, meta=None, model="test-model", provider="test"):
+def _run_convert(tmp_path, events, meta=None, model="test-model", provider="test",
+                  persona=None, reasoning_effort=None, state_json=None):
     """Run convert_lace_to_atif and return the parsed trajectory dict."""
     state_dir = _make_state_dir(tmp_path, events, meta)
+    # Optionally write state.json in the session dir
+    if state_json is not None:
+        session_dirs = list((state_dir / "agent-sessions").iterdir())
+        for sd in session_dirs:
+            with open(sd / "state.json", "w") as f:
+                json.dump(state_json, f)
     output_dir = tmp_path / "output"
-    convert_lace_to_atif(state_dir, output_dir, model=model, provider=provider)
+    convert_lace_to_atif(state_dir, output_dir, model=model, provider=provider,
+                          persona=persona, reasoning_effort=reasoning_effort)
     trajectory_path = output_dir / "trajectory.json"
     assert trajectory_path.is_file(), "trajectory.json was not created"
     with open(trajectory_path) as f:
@@ -186,12 +194,15 @@ def _job_finished(seq=7, job_id="job_xyz", outcome="completed", exit_code=0):
     }
 
 
-def _turn_end(seq=8, turn_id="turn_1", turn_seq=5):
+def _turn_end(seq=8, turn_id="turn_1", turn_seq=5, usage=None):
+    data = {"stopReason": "end_turn"}
+    if usage is not None:
+        data["usage"] = usage
     return {
         "eventSeq": seq,
         "timestamp": "2026-01-01T00:00:08Z",
         "type": "turn_end",
-        "data": {"stopReason": "end_turn"},
+        "data": data,
         "turnId": turn_id,
         "turnSeq": turn_seq,
     }
@@ -425,6 +436,37 @@ class TestBuildSteps:
         assert len(steps) == 1
         assert steps[0]["source"] == "agent"
 
+    def test_turn_end_usage_attached_to_last_agent_step(self):
+        """Usage from turn_end event should be attached to last agent step."""
+        usage = {"inputTokens": 5000, "outputTokens": 200, "costUsd": 0.05}
+        events = [
+            _turn_start(seq=1),
+            _tool_use(seq=2, call_id="call_1", name="bash",
+                      input_args={"command": "ls"}, result_text="files"),
+            _tool_use(seq=3, call_id="call_2", name="file_read",
+                      input_args={"path": "/app/f.txt"}, result_text="content"),
+            _turn_end(seq=4, usage=usage),
+        ]
+        steps = _build_steps(events)
+        assert len(steps) == 2
+        # Usage should be on the last step only
+        assert "usage" not in steps[0]
+        assert steps[1]["usage"] == {
+            "input_tokens": 5000,
+            "output_tokens": 200,
+            "cost_usd": 0.05,
+        }
+
+    def test_turn_end_without_usage_no_usage_field(self):
+        """Turn end without usage data should not add usage to steps."""
+        events = [
+            _turn_start(seq=1),
+            _tool_use(seq=2, call_id="call_1"),
+            _turn_end(seq=3),
+        ]
+        steps = _build_steps(events)
+        assert "usage" not in steps[0]
+
     def test_unknown_event_types_skipped(self):
         events = [
             {"eventSeq": 1, "timestamp": "2026-01-01T00:00:00Z", "type": "some_future_type", "data": {}},
@@ -608,6 +650,38 @@ class TestConvertLaceToAtif:
         # Check no None values in root
         for key, value in traj.items():
             assert value is not None, f"Root key '{key}' is None"
+
+    def test_persona_in_agent_metadata(self, tmp_path):
+        traj = _run_convert(tmp_path, [_context_injected()], persona="benchmark-h20")
+        assert traj["agent"]["persona"] == "benchmark-h20"
+
+    def test_no_persona_omits_field(self, tmp_path):
+        traj = _run_convert(tmp_path, [_context_injected()])
+        assert "persona" not in traj["agent"]
+
+    def test_reasoning_effort_in_config(self, tmp_path):
+        traj = _run_convert(tmp_path, [_context_injected()], reasoning_effort="high")
+        assert traj["agent"]["config"]["reasoning_effort"] == "high"
+
+    def test_no_reasoning_effort_omits_config(self, tmp_path):
+        traj = _run_convert(tmp_path, [_context_injected()])
+        assert "config" not in traj["agent"]
+
+    def test_state_json_final_metrics(self, tmp_path):
+        """Final metrics should include cost and tokens from state.json."""
+        state = {
+            "sessionCostUsd": 0.42,
+            "tokenUsage": {"totalInputTokens": 10000, "totalOutputTokens": 500},
+        }
+        traj = _run_convert(tmp_path, [_context_injected()], state_json=state)
+        assert traj["final_metrics"]["total_cost_usd"] == 0.42
+        assert traj["final_metrics"]["total_input_tokens"] == 10000
+        assert traj["final_metrics"]["total_output_tokens"] == 500
+
+    def test_no_state_json_omits_cost(self, tmp_path):
+        traj = _run_convert(tmp_path, [_context_injected()])
+        assert "total_cost_usd" not in traj["final_metrics"]
+        assert "total_input_tokens" not in traj["final_metrics"]
 
 
 # ---------------------------------------------------------------------------

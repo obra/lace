@@ -35,6 +35,11 @@ export type TurnStartEventData = {
 export type TurnEndEventData = {
   type: 'turn_end';
   stopReason: string;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: number;
+  };
 };
 
 export type ContextCompactedEventData = {

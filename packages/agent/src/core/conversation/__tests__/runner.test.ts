@@ -8,7 +8,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ConversationRunner } from '../runner';
 import type { RunnerConfig, RunnerDependencies } from '../types';
 import { TestAgentProvider } from '@lace/agent/runtime/test-provider';
-import { AIProvider, type ProviderMessage, type ProviderResponse } from '@lace/agent/providers/base-provider';
+import {
+  AIProvider,
+  type ProviderMessage,
+  type ProviderResponse,
+  type ConversationState,
+  type RequestOptions,
+} from '@lace/agent/providers/base-provider';
 import type { Tool } from '@lace/agent/tools/tool';
 
 /**
@@ -382,9 +388,7 @@ describe('ConversationRunner', () => {
         expect(thinkingDeltaCalls.length).toBeGreaterThanOrEqual(1);
 
         // Verify the combined text includes both parts
-        const allDeltaText = thinkingDeltaCalls
-          .map((call) => call[1]?.text)
-          .join('');
+        const allDeltaText = thinkingDeltaCalls.map((call) => call[1]?.text).join('');
         expect(allDeltaText).toContain('Let me think about this...');
         expect(allDeltaText).toContain(' Considering the options...');
 
@@ -521,6 +525,323 @@ describe('ConversationRunner', () => {
           ['thinking_start', 'thinking_delta', 'thinking_end'].includes(call[1]?.type)
         );
         expect(thinkingCalls.length).toBe(0);
+      });
+    });
+
+    // Mock tool executor that recognizes bash and file_read tools
+    function createToolAwareMockDeps(
+      providerFactory: () => AIProvider,
+      extraOverrides: Partial<RunnerDependencies> = {}
+    ): RunnerDependencies {
+      const mockTool = { name: 'mock', description: 'mock', schema: {} } as unknown as Tool;
+      const mockToolExecutor = {
+        getTool: vi.fn().mockImplementation((name: string) => {
+          if (['bash', 'file_read', 'file_write'].includes(name)) return mockTool;
+          return null;
+        }),
+        execute: vi.fn().mockResolvedValue({
+          status: 'completed',
+          content: [{ type: 'text', text: 'mock result' }],
+        }),
+      };
+      return createMockDeps({
+        createProvider: vi.fn().mockImplementation(async () => providerFactory()),
+        createToolExecutor: vi.fn().mockReturnValue({
+          executor: mockToolExecutor,
+          toolsForProvider: [],
+        }),
+        ...extraOverrides,
+      });
+    }
+
+    describe('bare text retry with tool_choice=required', () => {
+      /**
+       * Provider that returns bare text on first call, then a tool call when
+       * tool_choice=required is set. Tracks whether options were passed.
+       */
+      class BareTextRetryProvider extends AIProvider {
+        callCount = 0;
+        lastOptions: RequestOptions | undefined;
+
+        get providerName(): string {
+          return 'bare-text-retry-test';
+        }
+
+        getProviderInfo() {
+          return {
+            name: 'bare-text-retry-test',
+            displayName: 'Bare Text Retry Test',
+            requiresApiKey: false,
+          };
+        }
+
+        isConfigured(): boolean {
+          return true;
+        }
+
+        get supportsStreaming(): boolean {
+          return true;
+        }
+
+        async createResponse(
+          messages: ProviderMessage[],
+          tools: Tool[],
+          model: string,
+          signal?: AbortSignal,
+          conversationState?: ConversationState,
+          options?: RequestOptions
+        ): Promise<ProviderResponse> {
+          return this.createStreamingResponse(
+            messages,
+            tools,
+            model,
+            signal,
+            conversationState,
+            options
+          );
+        }
+
+        async createStreamingResponse(
+          _messages: ProviderMessage[],
+          _tools: Tool[],
+          _model: string,
+          _signal?: AbortSignal,
+          _conversationState?: ConversationState,
+          options?: RequestOptions
+        ): Promise<ProviderResponse> {
+          this.callCount++;
+          this.lastOptions = options;
+
+          // First call: return a tool call (agent does some work)
+          if (this.callCount === 1) {
+            return {
+              content: '',
+              toolCalls: [{ id: 'tc_1', name: 'bash', arguments: { command: 'echo hello' } }],
+              stopReason: 'tool_use',
+              usage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+            };
+          }
+
+          // Second call: bare text "Done" — triggers retry
+          if (this.callCount === 2) {
+            return {
+              content: 'Done. Task complete.',
+              toolCalls: [],
+              stopReason: 'stop',
+              usage: { promptTokens: 100, completionTokens: 10, totalTokens: 110 },
+            };
+          }
+
+          // Third call (retry with tool_choice=required): return verification tool call
+          if (this.callCount === 3) {
+            return {
+              content: '',
+              toolCalls: [
+                { id: 'tc_2', name: 'file_read', arguments: { path: '/app/output.txt' } },
+              ],
+              stopReason: 'tool_use',
+              usage: { promptTokens: 120, completionTokens: 30, totalTokens: 150 },
+            };
+          }
+
+          // Fourth call: done for real
+          return {
+            content: 'Verified.',
+            toolCalls: [],
+            stopReason: 'stop',
+            usage: { promptTokens: 100, completionTokens: 5, totalTokens: 105 },
+          };
+        }
+      }
+
+      it('retries with tool_choice=required when model returns bare text', async () => {
+        const provider = new BareTextRetryProvider();
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+        const deps = createToolAwareMockDeps(() => provider, { onUpdate });
+        const runner = new ConversationRunner(config, deps);
+
+        await runner.run({
+          content: [{ type: 'text', text: 'Build the project' }],
+          abortController: new AbortController(),
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+        });
+
+        // Should have made at least 3 calls:
+        // 1. Initial tool call (bash echo hello)
+        // 2. Bare text "Done" — triggers retry
+        // 3. Retry with tool_choice=required → file_read
+        expect(provider.callCount).toBeGreaterThanOrEqual(3);
+
+        // The retry call should have had tool_choice=required
+        // (callCount 3 is the retry — lastOptions captured there)
+        // After call 3 returns a tool call, call 4 happens without tool_choice
+        expect(provider.lastOptions).toBeUndefined(); // call 4 has no options
+      });
+
+      it('does not retry on max_tokens stop reason', async () => {
+        let callCount = 0;
+        class MaxTokensProvider extends AIProvider {
+          get providerName(): string {
+            return 'max-tokens-test';
+          }
+          getProviderInfo() {
+            return { name: 'max-tokens-test', displayName: 'Max Tokens', requiresApiKey: false };
+          }
+          isConfigured(): boolean {
+            return true;
+          }
+          get supportsStreaming(): boolean {
+            return true;
+          }
+          async createResponse(
+            messages: ProviderMessage[],
+            tools: Tool[],
+            model: string,
+            signal?: AbortSignal,
+            conversationState?: ConversationState,
+            options?: RequestOptions
+          ): Promise<ProviderResponse> {
+            return this.createStreamingResponse(
+              messages,
+              tools,
+              model,
+              signal,
+              conversationState,
+              options
+            );
+          }
+          async createStreamingResponse(
+            _messages: ProviderMessage[],
+            _tools: Tool[],
+            _model: string,
+            _signal?: AbortSignal,
+            _conversationState?: ConversationState,
+            _options?: RequestOptions
+          ): Promise<ProviderResponse> {
+            callCount++;
+            if (callCount === 1) {
+              return {
+                content: '',
+                toolCalls: [{ id: 'tc_1', name: 'bash', arguments: { command: 'ls' } }],
+                stopReason: 'tool_use',
+                usage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+              };
+            }
+            // max_tokens stop — should NOT trigger retry
+            return {
+              content: 'partial output...',
+              toolCalls: [],
+              stopReason: 'max_tokens',
+              usage: { promptTokens: 100, completionTokens: 4096, totalTokens: 4196 },
+            };
+          }
+        }
+
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+        const deps = createToolAwareMockDeps(() => new MaxTokensProvider(), { onUpdate });
+        const runner = new ConversationRunner(config, deps);
+
+        const result = await runner.run({
+          content: [{ type: 'text', text: 'Do something' }],
+          abortController: new AbortController(),
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+        });
+
+        expect(result.stopReason).toBe('max_tokens');
+        expect(callCount).toBe(2); // No retry
+      });
+
+      it('does not retry bare text on first turn (completedTurns === 0)', async () => {
+        let callCount = 0;
+        class FirstTurnBareTextProvider extends AIProvider {
+          get providerName(): string {
+            return 'first-turn-bare-text';
+          }
+          getProviderInfo() {
+            return {
+              name: 'first-turn-bare-text',
+              displayName: 'First Turn',
+              requiresApiKey: false,
+            };
+          }
+          isConfigured(): boolean {
+            return true;
+          }
+          get supportsStreaming(): boolean {
+            return true;
+          }
+          async createResponse(
+            messages: ProviderMessage[],
+            tools: Tool[],
+            model: string,
+            signal?: AbortSignal,
+            conversationState?: ConversationState,
+            options?: RequestOptions
+          ): Promise<ProviderResponse> {
+            return this.createStreamingResponse(
+              messages,
+              tools,
+              model,
+              signal,
+              conversationState,
+              options
+            );
+          }
+          async createStreamingResponse(
+            _messages: ProviderMessage[],
+            _tools: Tool[],
+            _model: string,
+            _signal?: AbortSignal,
+            _conversationState?: ConversationState,
+            _options?: RequestOptions
+          ): Promise<ProviderResponse> {
+            callCount++;
+            // First turn bare text — should NOT retry (no work done yet)
+            return {
+              content: 'I can help with that!',
+              toolCalls: [],
+              stopReason: 'stop',
+              usage: { promptTokens: 100, completionTokens: 10, totalTokens: 110 },
+            };
+          }
+        }
+
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+        const deps = createToolAwareMockDeps(() => new FirstTurnBareTextProvider(), { onUpdate });
+        const runner = new ConversationRunner(config, deps);
+
+        const result = await runner.run({
+          content: [{ type: 'text', text: 'Hello' }],
+          abortController: new AbortController(),
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+        });
+
+        expect(result.stopReason).toBe('end_turn');
+        expect(callCount).toBe(1); // No retry on first turn
       });
     });
   });

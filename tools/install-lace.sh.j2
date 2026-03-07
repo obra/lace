@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# Prevent apt/dpkg from blocking on interactive prompts (e.g. tzdata).
+export DEBIAN_FRONTEND=noninteractive
+
 echo "=== Installing lace ==="
 
 # Use apt-cacher-ng proxy on Docker host to avoid hammering upstream mirrors
@@ -14,13 +17,10 @@ if [ -n "$GW_HEX" ]; then
 fi
 
 # Most terminal-bench containers already have Node.js.
-# Install if missing.
+# Install from pre-bundled binary tarball if missing (< 1s, no apt/network).
 if ! command -v node &>/dev/null; then
-    echo "Node.js not found, installing..."
-    apt-get update -qq
-    apt-get install -y -qq curl ca-certificates
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-    apt-get install -y -qq nodejs
+    echo "Node.js not found, installing from tarball..."
+    tar -xzf /installed-agent/node-v22-linux-x64.tar.gz -C /usr/local --strip-components=1
 fi
 
 echo "Node.js: $(node --version)"

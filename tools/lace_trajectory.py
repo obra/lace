@@ -1,7 +1,12 @@
-"""Convert lace events.jsonl session logs to ATIF v1.6 trajectory format.
+"""Convert lace events.jsonl session logs to ATIF v1.7 trajectory format.
 
 Reads lace's event-sourced session log and produces a trajectory.json file
 compatible with harbor's dashboard and trajectory validator.
+
+v1.7 additions over v1.6:
+  - Per-step token usage from enriched turn_end events
+  - Agent metadata: persona, config (reasoning_effort)
+  - Final metrics: total tokens and cost from state.json
 
 Usage as CLI:
     python lace_trajectory.py <state_dir> <output_dir> [--model MODEL] [--provider PROVIDER]
@@ -51,6 +56,9 @@ def _build_steps(events, subagent_events=None):
     contains events for that session, the subagent's events are recursively
     converted to steps and inlined at that point in the trajectory.
 
+    When a turn_end event includes usage data, it is attached to the last
+    agent step emitted during that turn.
+
     Args:
         events: List of event dicts from a single session's events.jsonl.
         subagent_events: Dict mapping session ID to list of events for that
@@ -69,6 +77,7 @@ def _build_steps(events, subagent_events=None):
     in_turn = False
     turn_timestamp = None
     pending_messages = []  # agent message texts before the next tool_use
+    turn_start_step_index = None  # index of first step in current turn
 
     def _emit_step(source, message="", timestamp=None,
                    tool_calls=None, observation=None):
@@ -112,6 +121,7 @@ def _build_steps(events, subagent_events=None):
             in_turn = True
             turn_timestamp = timestamp
             pending_messages = []
+            turn_start_step_index = len(steps)
 
         elif event_type == "message":
             if in_turn:
@@ -202,9 +212,23 @@ def _build_steps(events, subagent_events=None):
             if in_turn and pending_messages:
                 _emit_step("agent", "\n".join(pending_messages),
                            turn_timestamp)
+
+            # Attach turn usage to the last agent step in this turn.
+            usage = data.get("usage")
+            if usage and turn_start_step_index is not None:
+                for s in reversed(steps[turn_start_step_index:]):
+                    if s.get("source") == "agent":
+                        s["usage"] = {
+                            "input_tokens": usage.get("inputTokens", 0),
+                            "output_tokens": usage.get("outputTokens", 0),
+                            "cost_usd": usage.get("costUsd", 0),
+                        }
+                        break
+
             in_turn = False
             turn_timestamp = None
             pending_messages = []
+            turn_start_step_index = None
 
         else:
             logger.debug("Skipping unknown event type: %s", event_type)
@@ -233,6 +257,22 @@ def _read_events(events_path):
                 logger.warning("Skipping malformed event at line %d: %s",
                                line_num, e)
     return events
+
+
+def _read_session_state(session_dir):
+    """Read state.json from a session directory for final metrics.
+
+    Returns a dict with sessionCostUsd and tokenUsage, or empty dict.
+    """
+    state_path = session_dir / "state.json"
+    if not state_path.is_file():
+        return {}
+    try:
+        with open(state_path, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("Could not read state.json: %s", e)
+        return {}
 
 
 def _find_parent_session(session_dirs):
@@ -266,8 +306,9 @@ def _find_parent_session(session_dirs):
     return parent_dir, other_dirs
 
 
-def convert_lace_to_atif(state_dir, output_dir, model=None, provider=None):
-    """Convert lace session events to an ATIF v1.6 trajectory file.
+def convert_lace_to_atif(state_dir, output_dir, model=None, provider=None,
+                          persona=None, reasoning_effort=None):
+    """Convert lace session events to an ATIF v1.7 trajectory file.
 
     When delegation (subagents) is used, the state directory will contain
     multiple session directories. The parent session is identified by the
@@ -279,6 +320,8 @@ def convert_lace_to_atif(state_dir, output_dir, model=None, provider=None):
         output_dir: Path where trajectory.json will be written.
         model: Model name (e.g. "gpt-5.2-codex"). Used in agent metadata.
         provider: Provider name (e.g. "openai"). Used in agent metadata.
+        persona: Persona name (e.g. "benchmark-h20"). Stored in agent metadata.
+        reasoning_effort: Reasoning effort level (e.g. "high"). Stored in config.
     """
     state_dir = Path(state_dir)
     output_dir = Path(output_dir)
@@ -319,6 +362,9 @@ def convert_lace_to_atif(state_dir, output_dir, model=None, provider=None):
         logger.warning("No events found in %s", events_path)
         return
 
+    # Read session state for final metrics
+    session_state = _read_session_state(parent_dir)
+
     # Read subagent session events, keyed by session ID
     subagent_events = {}
     for d in other_dirs:
@@ -354,21 +400,43 @@ def convert_lace_to_atif(state_dir, output_dir, model=None, provider=None):
     elif model:
         model_name = model
 
+    # Assemble agent metadata
+    agent_info = {
+        "name": "lace",
+        "version": "0.1.0",
+    }
+    if model_name:
+        agent_info["model_name"] = model_name
+    if persona:
+        agent_info["persona"] = persona
+
+    # Build config from available metadata
+    config = {}
+    if reasoning_effort:
+        config["reasoning_effort"] = reasoning_effort
+    if config:
+        agent_info["config"] = config
+
+    # Build final metrics from session state
+    final_metrics = {
+        "total_steps": len(steps),
+    }
+    token_usage = session_state.get("tokenUsage")
+    if token_usage:
+        final_metrics["total_input_tokens"] = token_usage.get("totalInputTokens", 0)
+        final_metrics["total_output_tokens"] = token_usage.get("totalOutputTokens", 0)
+    cost = session_state.get("sessionCostUsd")
+    if cost is not None:
+        final_metrics["total_cost_usd"] = cost
+
     # Assemble trajectory
     trajectory = {
         "schema_version": "ATIF-v1.6",
         "session_id": session_id,
-        "agent": {
-            "name": "lace",
-            "version": "0.1.0",
-        },
+        "agent": agent_info,
         "steps": steps,
-        "final_metrics": {
-            "total_steps": len(steps),
-        },
+        "final_metrics": final_metrics,
     }
-    if model_name:
-        trajectory["agent"]["model_name"] = model_name
 
     # Write output
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -384,12 +452,14 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Convert lace events.jsonl to ATIF v1.6 trajectory format"
+        description="Convert lace events.jsonl to ATIF v1.7 trajectory format"
     )
     parser.add_argument("state_dir", help="Path to lace state directory")
     parser.add_argument("output_dir", help="Path to write trajectory.json")
     parser.add_argument("--model", default=None, help="Model name (e.g. gpt-5.2-codex)")
     parser.add_argument("--provider", default=None, help="Provider name (e.g. openai)")
+    parser.add_argument("--persona", default=None, help="Persona name (e.g. benchmark-h20)")
+    parser.add_argument("--reasoning-effort", default=None, help="Reasoning effort level")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
 
     args = parser.parse_args()
@@ -399,7 +469,8 @@ def main():
         format="%(levelname)s: %(message)s",
     )
 
-    convert_lace_to_atif(args.state_dir, args.output_dir, args.model, args.provider)
+    convert_lace_to_atif(args.state_dir, args.output_dir, args.model, args.provider,
+                          args.persona, args.reasoning_effort)
 
 
 if __name__ == "__main__":

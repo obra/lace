@@ -30,6 +30,7 @@ import {
   ProviderConfig,
   ProviderInfo,
   ConversationState,
+  RequestOptions,
 } from './base-provider';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 import { ToolCall } from '@lace/agent/tools/types';
@@ -483,7 +484,8 @@ export class OpenAIProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[],
     model: string,
-    stream: boolean
+    stream: boolean,
+    options?: RequestOptions
   ): {
     payload: OpenAI.Chat.ChatCompletionCreateParams;
     toolNameMapping: Map<string, string>;
@@ -511,6 +513,7 @@ export class OpenAIProvider extends AIProvider {
       max_completion_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 16384),
       stream,
       ...(tools.length > 0 && { tools: openaiTools }),
+      ...(options?.toolChoice && { tool_choice: options.toolChoice }),
     };
 
     return { payload: requestPayload, toolNameMapping: mapping };
@@ -579,7 +582,8 @@ export class OpenAIProvider extends AIProvider {
     tools: Tool[],
     model: string,
     stream: boolean,
-    previousResponseId?: string
+    previousResponseId?: string,
+    options?: RequestOptions
   ): {
     payload: ResponseCreateParams;
     toolNameMapping: Map<string, string>;
@@ -639,6 +643,9 @@ export class OpenAIProvider extends AIProvider {
       );
     }
 
+    // Set reasoning effort for reasoning-capable models
+    const reasoningEffort = this.getModelReasoningEffort(model);
+
     const requestPayload: ResponseCreateParams = {
       model,
       instructions,
@@ -648,6 +655,9 @@ export class OpenAIProvider extends AIProvider {
       stream,
       ...(previousResponseId && { previous_response_id: previousResponseId }),
       ...(tools.length > 0 && { tools: responsesTools }),
+      ...(options?.toolChoice && { tool_choice: options.toolChoice }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- reasoning effort not yet in SDK types
+      ...(reasoningEffort && ({ reasoning: { effort: reasoningEffort } } as any)),
       store: true, // Enable server-side storage for response chaining
     };
 
@@ -661,6 +671,7 @@ export class OpenAIProvider extends AIProvider {
       toolCount: tools.length,
       instructionsLength: instructions?.length || 0,
       hasStore: requestPayload.store,
+      reasoningEffort: reasoningEffort || 'none',
     });
 
     return { payload: requestPayload, toolNameMapping: mapping };
@@ -710,7 +721,9 @@ export class OpenAIProvider extends AIProvider {
             }
           }
           // Get reasoning tokens from usage if available
-          const reasoningTokens = (response.usage as { output_tokens_details?: { reasoning_tokens?: number } })?.output_tokens_details?.reasoning_tokens;
+          const reasoningTokens = (
+            response.usage as { output_tokens_details?: { reasoning_tokens?: number } }
+          )?.output_tokens_details?.reasoning_tokens;
           this.emit('thinking_end', { tokens: reasoningTokens });
         }
       }
@@ -775,11 +788,12 @@ export class OpenAIProvider extends AIProvider {
     tools: Tool[] = [],
     model: string,
     signal?: AbortSignal,
-    conversationState?: ConversationState
+    conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
     // For custom OpenAI-compatible endpoints, use Chat Completions (they may not support Responses API)
     if (this.isCustomEndpoint()) {
-      return this._createChatCompletionsResponse(messages, tools, model, signal);
+      return this._createChatCompletionsResponse(messages, tools, model, signal, options);
     }
 
     // For real OpenAI: try Responses API first, fall back to Chat Completions if not supported
@@ -789,7 +803,8 @@ export class OpenAIProvider extends AIProvider {
         tools,
         model,
         signal,
-        conversationState
+        conversationState,
+        options
       );
     } catch (error) {
       if (this.isResponsesAPINotSupportedError(error)) {
@@ -797,7 +812,7 @@ export class OpenAIProvider extends AIProvider {
           model,
           error: error instanceof Error ? error.message : String(error),
         });
-        return this._createChatCompletionsResponse(messages, tools, model, signal);
+        return this._createChatCompletionsResponse(messages, tools, model, signal, options);
       }
       throw error;
     }
@@ -810,7 +825,8 @@ export class OpenAIProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
@@ -818,7 +834,8 @@ export class OpenAIProvider extends AIProvider {
           messages,
           tools,
           model,
-          false
+          false,
+          options
         );
 
         // Log request with pretty formatting
@@ -902,7 +919,8 @@ export class OpenAIProvider extends AIProvider {
     tools: Tool[],
     model: string,
     signal?: AbortSignal,
-    conversationState?: ConversationState
+    conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
@@ -911,7 +929,8 @@ export class OpenAIProvider extends AIProvider {
           tools,
           model,
           false,
-          conversationState?.openaiResponseId
+          conversationState?.openaiResponseId,
+          options
         );
 
         // Log request with pretty formatting
@@ -955,11 +974,12 @@ export class OpenAIProvider extends AIProvider {
     tools: Tool[] = [],
     model: string,
     signal?: AbortSignal,
-    conversationState?: ConversationState
+    conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
     // For custom OpenAI-compatible endpoints, use Chat Completions (they may not support Responses API)
     if (this.isCustomEndpoint()) {
-      return this._createChatCompletionsStreamingResponse(messages, tools, model, signal);
+      return this._createChatCompletionsStreamingResponse(messages, tools, model, signal, options);
     }
 
     // For real OpenAI: try Responses API first, fall back to Chat Completions if not supported
@@ -969,7 +989,8 @@ export class OpenAIProvider extends AIProvider {
         tools,
         model,
         signal,
-        conversationState
+        conversationState,
+        options
       );
     } catch (error) {
       if (this.isResponsesAPINotSupportedError(error)) {
@@ -980,7 +1001,13 @@ export class OpenAIProvider extends AIProvider {
             error: error instanceof Error ? error.message : String(error),
           }
         );
-        return this._createChatCompletionsStreamingResponse(messages, tools, model, signal);
+        return this._createChatCompletionsStreamingResponse(
+          messages,
+          tools,
+          model,
+          signal,
+          options
+        );
       }
       throw error;
     }
@@ -993,7 +1020,8 @@ export class OpenAIProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
     let streamCreated = false;
@@ -1004,7 +1032,8 @@ export class OpenAIProvider extends AIProvider {
           messages,
           tools,
           model,
-          true
+          true,
+          options
         );
 
         // Log streaming request with pretty formatting
@@ -1241,7 +1270,8 @@ export class OpenAIProvider extends AIProvider {
     tools: Tool[],
     model: string,
     signal?: AbortSignal,
-    conversationState?: ConversationState
+    conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
     let streamCreated = false;
@@ -1253,7 +1283,8 @@ export class OpenAIProvider extends AIProvider {
           tools,
           model,
           true,
-          conversationState?.openaiResponseId
+          conversationState?.openaiResponseId,
+          options
         );
 
         // Log streaming request with pretty formatting
@@ -1276,6 +1307,9 @@ export class OpenAIProvider extends AIProvider {
           let receivedCompletedEvent = false;
           let responseId: string | undefined;
           let hasThinkingBlock = false;
+          let completionUsage:
+            | { input_tokens: number; output_tokens: number; total_tokens: number }
+            | undefined;
 
           // Track tool calls by output index
           const toolCallsByIndex = new Map<
@@ -1369,8 +1403,9 @@ export class OpenAIProvider extends AIProvider {
                   hasUsage: !!event.response.usage,
                   responseId,
                 });
-                // Final event - extract final usage if available
+                // Final event - capture and emit actual usage
                 if (event.response.usage) {
+                  completionUsage = event.response.usage;
                   this.emit('token_usage_update', {
                     usage: {
                       promptTokens: event.response.usage.input_tokens,
@@ -1380,7 +1415,11 @@ export class OpenAIProvider extends AIProvider {
                   });
                   // Emit thinking_end with reasoning tokens if we had a thinking block
                   if (hasThinkingBlock) {
-                    const reasoningTokens = (event.response.usage as { output_tokens_details?: { reasoning_tokens?: number } })?.output_tokens_details?.reasoning_tokens;
+                    const reasoningTokens = (
+                      event.response.usage as {
+                        output_tokens_details?: { reasoning_tokens?: number };
+                      }
+                    )?.output_tokens_details?.reasoning_tokens;
                     this.emit('thinking_end', { tokens: reasoningTokens });
                   }
                 }
@@ -1453,11 +1492,17 @@ export class OpenAIProvider extends AIProvider {
             content,
             toolCalls,
             stopReason: 'stop',
-            usage: {
-              promptTokens: estimatedPromptTokens,
-              completionTokens: estimatedOutputTokens,
-              totalTokens: estimatedPromptTokens + estimatedOutputTokens,
-            },
+            usage: completionUsage
+              ? {
+                  promptTokens: completionUsage.input_tokens,
+                  completionTokens: completionUsage.output_tokens,
+                  totalTokens: completionUsage.total_tokens,
+                }
+              : {
+                  promptTokens: estimatedPromptTokens,
+                  completionTokens: estimatedOutputTokens,
+                  totalTokens: estimatedPromptTokens + estimatedOutputTokens,
+                },
             responseId, // Include response ID for conversation chaining
           };
 
