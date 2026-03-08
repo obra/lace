@@ -112,16 +112,19 @@ describe('lace-agent process (E2E over stdio)', () => {
 
       expect(durable.hasMore).toBe(false);
       // context_injected is added on session creation with the system prompt
+      // After the tool result, the LLM returns bare text which triggers a
+      // tool_choice=required retry, producing an extra message event
       expect(durable.events.map((e) => e.type)).toEqual([
         'context_injected',
         'prompt',
         'turn_start',
         'message',
         'tool_use',
-        'message',
+        'message', // LLM's response after tool result (bare text)
+        'message', // bare text retry response
         'turn_end',
       ]);
-      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
 
       const list = (await withTimeout(
         ctx.agent.peer.request('session/list', { workDir: ctx.workDir }),
@@ -180,16 +183,19 @@ describe('lace-agent process (E2E over stdio)', () => {
     )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
 
     // context_injected is added on session creation with the system prompt
+    // After the tool result, the LLM returns bare text which triggers a
+    // tool_choice=required retry, producing an extra message event
     expect(durable.events.map((e) => e.type)).toEqual([
       'context_injected',
       'prompt',
       'turn_start',
       'message',
       'tool_use',
-      'message',
+      'message', // LLM's response after tool result (bare text)
+      'message', // bare text retry response
       'turn_end',
     ]);
-    expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
   it('reports currentSession.messageCount in ent/agent/status', { timeout: 15_000 }, async () => {
@@ -302,7 +308,9 @@ describe('lace-agent process (E2E over stdio)', () => {
 
       // context_injected is added on session creation with the system prompt
       // The LLM (test provider) emits a message before the tool call ("Running echo hi..."),
-      // so we expect an extra message event before permission_requested
+      // so we expect an extra message event before permission_requested.
+      // After the tool result, the LLM returns bare text which triggers a
+      // tool_choice=required retry, producing an extra message event.
       expect(durable.events.map((e) => e.type)).toEqual([
         'context_injected',
         'prompt',
@@ -311,11 +319,12 @@ describe('lace-agent process (E2E over stdio)', () => {
         'permission_requested',
         'permission_decided',
         'tool_use',
-        'message', // LLM's final response after tool result
+        'message', // LLM's response after tool result (bare text)
+        'message', // bare text retry response
         'turn_end',
       ]);
 
-      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     }
   );
 
