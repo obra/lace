@@ -596,15 +596,18 @@ export class OpenAIProvider extends AIProvider {
     const { openaiTools, mapping } = this.buildToolsWithMapping(tools);
 
     // Transform tools to Responses API format (flatter structure, not nested in 'function')
-    const responsesTools: ResponseTool[] = openaiTools.map((tool) => ({
-      type: 'function' as const,
-      name: tool.function.name,
-      description: tool.function.description,
-      parameters: (tool.function.parameters as Record<string, unknown>) || null,
-      // Note: strict mode disabled because our tool schemas have optional parameters
-      // With strict: true, ALL properties must be in required array
-      strict: false,
-    }));
+    // We only create function tools, so filter to that type
+    const responsesTools: ResponseTool[] = openaiTools
+      .filter((tool): tool is OpenAI.Chat.ChatCompletionFunctionTool => tool.type === 'function')
+      .map((tool) => ({
+        type: 'function' as const,
+        name: tool.function.name,
+        description: tool.function.description,
+        parameters: (tool.function.parameters as Record<string, unknown>) || null,
+        // Note: strict mode disabled because our tool schemas have optional parameters
+        // With strict: true, ALL properties must be in required array
+        strict: false,
+      }));
 
     // Convert ProviderMessages to Responses API input format
     // The Responses API uses a DIFFERENT format than Chat Completions:
@@ -656,8 +659,12 @@ export class OpenAIProvider extends AIProvider {
       ...(previousResponseId && { previous_response_id: previousResponseId }),
       ...(tools.length > 0 && { tools: responsesTools }),
       ...(options?.toolChoice && { tool_choice: options.toolChoice }),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- reasoning effort not yet in SDK types
-      ...(reasoningEffort && ({ reasoning: { effort: reasoningEffort } } as any)),
+      ...(reasoningEffort && {
+        reasoning: { effort: reasoningEffort } as ResponseCreateParams['reasoning'],
+      }),
+      ...(previousResponseId && {
+        context_management: [{ type: 'compaction', compact_threshold: 0.8 }],
+      }),
       store: true, // Enable server-side storage for response chaining
     };
 
@@ -671,6 +678,7 @@ export class OpenAIProvider extends AIProvider {
       toolCount: tools.length,
       instructionsLength: instructions?.length || 0,
       hasStore: requestPayload.store,
+      hasCompaction: !!requestPayload.context_management,
       reasoningEffort: reasoningEffort || 'none',
     });
 
@@ -856,9 +864,12 @@ export class OpenAIProvider extends AIProvider {
         const textContent = choice.message.content || '';
 
         const toolCalls: ToolCall[] =
-          choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) =>
-            this.parseToolCall(toolCall, toolNameMapping)
-          ) || [];
+          choice.message.tool_calls
+            ?.filter(
+              (tc): tc is OpenAI.Chat.ChatCompletionMessageFunctionToolCall =>
+                tc.type === 'function'
+            )
+            .map((toolCall) => this.parseToolCall(toolCall, toolNameMapping)) || [];
 
         logger.trace('Received response from OpenAI', {
           provider: 'openai',
@@ -1379,21 +1390,6 @@ export class OpenAIProvider extends AIProvider {
                 break;
               }
 
-              // Handle reasoning summary events for thinking (o1/o3 models)
-              case 'response.reasoning_summary.delta': {
-                const summaryDelta = event as { delta: string };
-                if (summaryDelta.delta) {
-                  this.emit('thinking_delta', { text: summaryDelta.delta });
-                }
-                break;
-              }
-
-              case 'response.reasoning_summary.done': {
-                // Reasoning summary complete - thinking_end will be emitted at response.completed
-                // with the actual token count from usage
-                break;
-              }
-
               case 'response.completed':
                 receivedCompletedEvent = true;
                 // Capture response ID for conversation chaining
@@ -1425,7 +1421,21 @@ export class OpenAIProvider extends AIProvider {
                 }
                 break;
 
-              // Ignore other event types for now
+              default: {
+                // Handle reasoning summary events (o1/o3 models)
+                // These types were removed from the SDK's ResponseStreamEvent union
+                // but are still sent at runtime
+                const eventType = (event as { type: string }).type;
+                if (eventType === 'response.reasoning_summary.delta') {
+                  const summaryDelta = event as { delta: string };
+                  if (summaryDelta.delta) {
+                    this.emit('thinking_delta', { text: summaryDelta.delta });
+                  }
+                }
+                // 'response.reasoning_summary.done' needs no action — thinking_end
+                // is emitted at response.completed with actual token count from usage
+                break;
+              }
             }
           }
 

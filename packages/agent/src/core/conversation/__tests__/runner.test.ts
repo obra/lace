@@ -844,5 +844,352 @@ describe('ConversationRunner', () => {
         expect(callCount).toBe(1); // No retry on first turn
       });
     });
+
+    describe('conversation chaining', () => {
+      /**
+       * Provider that records conversationState on each call and returns a responseId.
+       * Simulates a multi-turn conversation with tool calls.
+       */
+      class ChainingTrackingProvider extends AIProvider {
+        callCount = 0;
+        receivedStates: (ConversationState | undefined)[] = [];
+
+        get providerName(): string {
+          return 'chaining-tracking';
+        }
+        getProviderInfo() {
+          return { name: 'chaining-tracking', displayName: 'Chaining', requiresApiKey: false };
+        }
+        isConfigured(): boolean {
+          return true;
+        }
+        get supportsStreaming(): boolean {
+          return true;
+        }
+        async createResponse(
+          messages: ProviderMessage[],
+          tools: Tool[],
+          model: string,
+          signal?: AbortSignal,
+          conversationState?: ConversationState,
+          options?: RequestOptions
+        ): Promise<ProviderResponse> {
+          return this.createStreamingResponse(
+            messages,
+            tools,
+            model,
+            signal,
+            conversationState,
+            options
+          );
+        }
+        async createStreamingResponse(
+          _messages: ProviderMessage[],
+          _tools: Tool[],
+          _model: string,
+          _signal?: AbortSignal,
+          conversationState?: ConversationState,
+          _options?: RequestOptions
+        ): Promise<ProviderResponse> {
+          this.callCount++;
+          this.receivedStates.push(conversationState);
+
+          // First call: return a tool call with responseId
+          if (this.callCount === 1) {
+            return {
+              content: '',
+              toolCalls: [{ id: 'tc_1', name: 'bash', arguments: { command: 'echo hello' } }],
+              stopReason: 'tool_use',
+              usage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+              responseId: 'resp_first',
+            };
+          }
+
+          // Second call: another tool call with a new responseId
+          if (this.callCount === 2) {
+            return {
+              content: '',
+              toolCalls: [{ id: 'tc_2', name: 'file_read', arguments: { path: '/tmp/out' } }],
+              stopReason: 'tool_use',
+              usage: { promptTokens: 100, completionTokens: 30, totalTokens: 130 },
+              responseId: 'resp_second',
+            };
+          }
+
+          // Third call: end with text (triggers bare text retry since completedTurns > 0)
+          if (this.callCount === 3) {
+            return {
+              content: 'All done.',
+              toolCalls: [],
+              stopReason: 'stop',
+              usage: { promptTokens: 100, completionTokens: 10, totalTokens: 110 },
+              responseId: 'resp_third',
+            };
+          }
+
+          // Fourth call (bare text retry with tool_choice=required): end for real
+          return {
+            content: 'Verified.',
+            toolCalls: [],
+            stopReason: 'stop',
+            usage: { promptTokens: 100, completionTokens: 5, totalTokens: 105 },
+            responseId: 'resp_fourth',
+          };
+        }
+      }
+
+      it('passes undefined conversationState on first call, then chains responseId', async () => {
+        const provider = new ChainingTrackingProvider();
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+        const deps = createToolAwareMockDeps(() => provider, { onUpdate });
+        const runner = new ConversationRunner(config, deps);
+
+        await runner.run({
+          content: [{ type: 'text', text: 'Do some work' }],
+          abortController: new AbortController(),
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+        });
+
+        // 4 calls: tool call, tool call, bare text, bare text retry
+        expect(provider.callCount).toBe(4);
+
+        // First call: no conversation state
+        expect(provider.receivedStates[0]).toBeUndefined();
+
+        // Second call: should have the responseId from the first call
+        expect(provider.receivedStates[1]).toEqual({ openaiResponseId: 'resp_first' });
+
+        // Third call: should have the responseId from the second call
+        expect(provider.receivedStates[2]).toEqual({ openaiResponseId: 'resp_second' });
+
+        // Fourth call (bare text retry): should have the responseId from the third call
+        expect(provider.receivedStates[3]).toEqual({ openaiResponseId: 'resp_third' });
+      });
+
+      it('handles provider returning no responseId gracefully', async () => {
+        class NoResponseIdProvider extends AIProvider {
+          callCount = 0;
+          receivedStates: (ConversationState | undefined)[] = [];
+
+          get providerName(): string {
+            return 'no-response-id';
+          }
+          getProviderInfo() {
+            return { name: 'no-response-id', displayName: 'No ID', requiresApiKey: false };
+          }
+          isConfigured(): boolean {
+            return true;
+          }
+          get supportsStreaming(): boolean {
+            return true;
+          }
+          async createResponse(
+            messages: ProviderMessage[],
+            tools: Tool[],
+            model: string,
+            signal?: AbortSignal,
+            conversationState?: ConversationState,
+            options?: RequestOptions
+          ): Promise<ProviderResponse> {
+            return this.createStreamingResponse(
+              messages,
+              tools,
+              model,
+              signal,
+              conversationState,
+              options
+            );
+          }
+          async createStreamingResponse(
+            _messages: ProviderMessage[],
+            _tools: Tool[],
+            _model: string,
+            _signal?: AbortSignal,
+            conversationState?: ConversationState,
+            _options?: RequestOptions
+          ): Promise<ProviderResponse> {
+            this.callCount++;
+            this.receivedStates.push(conversationState);
+
+            if (this.callCount === 1) {
+              return {
+                content: '',
+                toolCalls: [{ id: 'tc_1', name: 'bash', arguments: { command: 'ls' } }],
+                stopReason: 'tool_use',
+                usage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+                // No responseId — e.g. non-OpenAI provider
+              };
+            }
+            // Subsequent calls: return a tool call so bare text retry doesn't interfere
+            if (this.callCount === 2) {
+              return {
+                content: '',
+                toolCalls: [{ id: 'tc_2', name: 'file_read', arguments: { path: '/tmp/x' } }],
+                stopReason: 'tool_use',
+                usage: { promptTokens: 100, completionTokens: 20, totalTokens: 120 },
+              };
+            }
+            return {
+              content: 'Done.',
+              toolCalls: [],
+              stopReason: 'stop',
+              usage: { promptTokens: 100, completionTokens: 10, totalTokens: 110 },
+            };
+          }
+        }
+
+        const provider = new NoResponseIdProvider();
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+        const deps = createToolAwareMockDeps(() => provider, { onUpdate });
+        const runner = new ConversationRunner(config, deps);
+
+        await runner.run({
+          content: [{ type: 'text', text: 'Do stuff' }],
+          abortController: new AbortController(),
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+        });
+
+        // All calls should have undefined state (no responseId to chain)
+        for (const state of provider.receivedStates) {
+          expect(state).toBeUndefined();
+        }
+      });
+
+      it('preserves chaining state through bare text retry', async () => {
+        class ChainingRetryProvider extends AIProvider {
+          callCount = 0;
+          receivedStates: (ConversationState | undefined)[] = [];
+
+          get providerName(): string {
+            return 'chaining-retry';
+          }
+          getProviderInfo() {
+            return { name: 'chaining-retry', displayName: 'Chain Retry', requiresApiKey: false };
+          }
+          isConfigured(): boolean {
+            return true;
+          }
+          get supportsStreaming(): boolean {
+            return true;
+          }
+          async createResponse(
+            messages: ProviderMessage[],
+            tools: Tool[],
+            model: string,
+            signal?: AbortSignal,
+            conversationState?: ConversationState,
+            options?: RequestOptions
+          ): Promise<ProviderResponse> {
+            return this.createStreamingResponse(
+              messages,
+              tools,
+              model,
+              signal,
+              conversationState,
+              options
+            );
+          }
+          async createStreamingResponse(
+            _messages: ProviderMessage[],
+            _tools: Tool[],
+            _model: string,
+            _signal?: AbortSignal,
+            conversationState?: ConversationState,
+            _options?: RequestOptions
+          ): Promise<ProviderResponse> {
+            this.callCount++;
+            this.receivedStates.push(conversationState);
+
+            // First call: tool call
+            if (this.callCount === 1) {
+              return {
+                content: '',
+                toolCalls: [{ id: 'tc_1', name: 'bash', arguments: { command: 'echo hi' } }],
+                stopReason: 'tool_use',
+                usage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+                responseId: 'resp_work',
+              };
+            }
+
+            // Second call: bare text (triggers retry)
+            if (this.callCount === 2) {
+              return {
+                content: 'Done!',
+                toolCalls: [],
+                stopReason: 'stop',
+                usage: { promptTokens: 100, completionTokens: 10, totalTokens: 110 },
+                responseId: 'resp_bare',
+              };
+            }
+
+            // Third call: retry with tool_choice=required
+            if (this.callCount === 3) {
+              return {
+                content: '',
+                toolCalls: [{ id: 'tc_2', name: 'file_read', arguments: { path: '/tmp/x' } }],
+                stopReason: 'tool_use',
+                usage: { promptTokens: 120, completionTokens: 30, totalTokens: 150 },
+                responseId: 'resp_retry',
+              };
+            }
+
+            // Fourth call: final
+            return {
+              content: 'Verified.',
+              toolCalls: [],
+              stopReason: 'stop',
+              usage: { promptTokens: 100, completionTokens: 5, totalTokens: 105 },
+              responseId: 'resp_final',
+            };
+          }
+        }
+
+        const provider = new ChainingRetryProvider();
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+        const deps = createToolAwareMockDeps(() => provider, { onUpdate });
+        const runner = new ConversationRunner(config, deps);
+
+        await runner.run({
+          content: [{ type: 'text', text: 'Build it' }],
+          abortController: new AbortController(),
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+        });
+
+        expect(provider.callCount).toBeGreaterThanOrEqual(3);
+
+        // First call: no state
+        expect(provider.receivedStates[0]).toBeUndefined();
+
+        // Second call: chained from first
+        expect(provider.receivedStates[1]).toEqual({ openaiResponseId: 'resp_work' });
+
+        // Third call (retry): chained from second (bare text response still has responseId)
+        expect(provider.receivedStates[2]).toEqual({ openaiResponseId: 'resp_bare' });
+      });
+    });
   });
 });

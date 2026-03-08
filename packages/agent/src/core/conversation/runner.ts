@@ -138,6 +138,7 @@ export class ConversationRunner {
     // NEVER_SUBMITTED pattern where model says "Done" instead of verifying)
     let retriedWithToolChoice = false;
     let nextRequestOptions: RequestOptions | undefined;
+    let lastResponseId: string | undefined;
 
     try {
       for (; completedTurns < maxTurns; completedTurns++) {
@@ -230,10 +231,11 @@ export class ConversationRunner {
             toolsForProvider,
             modelId || 'unknown-model',
             abortController.signal,
-            undefined, // conversationState
+            lastResponseId ? { openaiResponseId: lastResponseId } : undefined,
             nextRequestOptions
           );
           nextRequestOptions = undefined; // Reset after use
+          lastResponseId = response.responseId;
         } catch (providerError) {
           provider.off('token', onToken);
           provider.off('thinking_start', onThinkingStart);
@@ -309,6 +311,7 @@ export class ConversationRunner {
             retriedWithToolChoice = true;
             providerMessages = [
               ...providerMessages,
+              { role: 'assistant' as const, content: assistantText },
               {
                 role: 'user' as const,
                 content:
