@@ -663,7 +663,7 @@ export class OpenAIProvider extends AIProvider {
         reasoning: { effort: reasoningEffort } as ResponseCreateParams['reasoning'],
       }),
       ...(previousResponseId && {
-        context_management: [{ type: 'compaction', compact_threshold: 0.8 }],
+        context_management: [{ type: 'compaction', compact_threshold: 80 }],
       }),
       store: true, // Enable server-side storage for response chaining
     };
