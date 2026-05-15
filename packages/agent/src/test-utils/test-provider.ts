@@ -5,8 +5,8 @@ import {
   ProviderMessage,
   ProviderResponse,
   ProviderConfig,
+  type WireTool,
 } from '@lace/agent/providers/base-provider';
-import { Tool } from '@lace/agent/tools/tool';
 import { BaseMockProvider } from './base-mock-provider';
 
 interface TestProviderConfig extends ProviderConfig {
@@ -50,9 +50,9 @@ export class TestProvider extends BaseMockProvider {
     });
   }
 
-  async createResponse(
+  protected async _createResponseImpl(
     _messages: ProviderMessage[],
-    _tools: Tool[],
+    _tools: WireTool[],
     _model: string,
     _signal?: AbortSignal
   ): Promise<ProviderResponse> {
@@ -75,13 +75,13 @@ export class TestProvider extends BaseMockProvider {
     };
   }
 
-  async createStreamingResponse(
+  protected async _createStreamingResponseImpl(
     _messages: ProviderMessage[],
-    _tools: Tool[],
+    _tools: WireTool[],
     _model: string,
     _signal?: AbortSignal
   ): Promise<ProviderResponse> {
     // For test provider, just return the same as non-streaming
-    return await this.createResponse(_messages, _tools, _model, _signal);
+    return await this._createResponseImpl(_messages, _tools, _model, _signal);
   }
 }

@@ -3,7 +3,7 @@ import {
   type ProviderMessage,
   type ProviderResponse,
 } from '../providers/base-provider';
-import type { Tool } from '@lace/agent/tools/tool';
+import type { WireTool } from '@lace/agent/providers/base-provider';
 import type { ToolCall, ToolResult } from '@lace/agent/tools/types';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 
@@ -149,19 +149,19 @@ export class TestAgentProvider extends AIProvider {
     return true;
   }
 
-  async createResponse(
+  protected async _createResponseImpl(
     messages: ProviderMessage[],
-    _tools: Tool[],
+    _tools: WireTool[],
     _model: string,
     _signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    const response = await this.createStreamingResponse(messages, _tools, _model, _signal);
+    const response = await this._createStreamingResponseImpl(messages, _tools, _model, _signal);
     return response;
   }
 
-  async createStreamingResponse(
+  protected async _createStreamingResponseImpl(
     messages: ProviderMessage[],
-    _tools: Tool[],
+    _tools: WireTool[],
     _model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {

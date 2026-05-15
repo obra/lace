@@ -5,7 +5,7 @@ import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
 import { AIProvider } from './base-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderInfo } from './base-provider';
 import { ToolCall } from '@lace/agent/tools/types';
-import { Tool } from '@lace/agent/tools/tool';
+import type { WireTool } from './base-provider';
 import { logger } from '@lace/agent/utils/logger';
 import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
 import { convertToGeminiFormat } from './format-converters';
@@ -49,7 +49,7 @@ export class GeminiProvider extends AIProvider {
     return true;
   }
 
-  private _createRequestPayload(messages: ProviderMessage[], tools: Tool[], model: string) {
+  private _createRequestPayload(messages: ProviderMessage[], tools: WireTool[], model: string) {
     // Convert our enhanced generic messages to Gemini format
     const contents = convertToGeminiFormat(messages);
 
@@ -148,9 +148,9 @@ export class GeminiProvider extends AIProvider {
     };
   }
 
-  async createResponse(
+  protected async _createResponseImpl(
     messages: ProviderMessage[],
-    tools: Tool[] = [],
+    tools: WireTool[] = [],
     model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
@@ -172,9 +172,9 @@ export class GeminiProvider extends AIProvider {
     );
   }
 
-  async createStreamingResponse(
+  protected async _createStreamingResponseImpl(
     messages: ProviderMessage[],
-    tools: Tool[] = [],
+    tools: WireTool[] = [],
     model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {

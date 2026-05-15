@@ -12,7 +12,7 @@ import {
 } from './base-provider';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 import { ToolCall } from '@lace/agent/tools/types';
-import { Tool } from '@lace/agent/tools/tool';
+import type { WireTool } from './base-provider';
 import { logger } from '@lace/agent/utils/logger';
 import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
 
@@ -103,9 +103,9 @@ export class LMStudioProvider extends AIProvider {
     }
   }
 
-  async createResponse(
+  protected async _createResponseImpl(
     messages: ProviderMessage[],
-    tools: Tool[] = [],
+    tools: WireTool[] = [],
     model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
@@ -253,7 +253,7 @@ export class LMStudioProvider extends AIProvider {
 
   private async _createResponseWithNativeToolCalling(
     messages: ProviderMessage[],
-    tools: Tool[],
+    tools: WireTool[],
     modelId: string,
     signal?: AbortSignal,
     streamingStartedCallback?: () => void
@@ -635,9 +635,9 @@ export class LMStudioProvider extends AIProvider {
     });
   }
 
-  async createStreamingResponse(
+  protected async _createStreamingResponseImpl(
     messages: ProviderMessage[],
-    tools: Tool[] = [],
+    tools: WireTool[] = [],
     model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
