@@ -23,7 +23,7 @@ if (process.env.NODE_ENV !== 'test') {
 
 // Dynamic tiktoken import to handle WASM loading failures gracefully
 type Tiktoken = import('tiktoken').Tiktoken;
-import { AIProvider } from './base-provider';
+import { AIProvider, type WireTool } from './base-provider';
 import {
   ProviderMessage,
   ProviderResponse,
@@ -34,7 +34,6 @@ import {
 } from './base-provider';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 import { ToolCall } from '@lace/agent/tools/types';
-import { Tool } from '@lace/agent/tools/tool';
 import { logger } from '@lace/agent/utils/logger';
 import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
 import { convertToOpenAIFormat } from './format-converters';
@@ -180,7 +179,7 @@ export class OpenAIProvider extends AIProvider {
   private async countTokensExplicit(
     messages: ProviderMessage[],
     systemPrompt: string,
-    tools: Tool[],
+    tools: WireTool[],
     model: string
   ): Promise<number | null> {
     try {
@@ -262,9 +261,9 @@ export class OpenAIProvider extends AIProvider {
 
   // Provider-specific token counting using tiktoken for OpenAI-compatible models
   // Returns null when tiktoken WASM fails to load
-  async countTokens(
+  protected async _countTokensImpl(
     messages: ProviderMessage[],
-    tools: Tool[] = [],
+    tools: WireTool[] = [],
     model?: string
   ): Promise<number | null> {
     if (!model) {
@@ -276,31 +275,31 @@ export class OpenAIProvider extends AIProvider {
   }
 
   /**
-   * Parses OpenAI tool call and maps sanitized name back to original
-   * Shared by both streaming and non-streaming responses
+   * Parses OpenAI tool call into our common ToolCall shape. Tool-name un-sanitization
+   * is handled by AIProvider — this method just reports the wire-format name and the
+   * base class wrapper maps it back to the original.
    */
-  private parseToolCall(
-    toolCall: { id: string; function: { name: string; arguments: string } },
-    toolNameMapping: Map<string, string>
-  ): ToolCall {
-    const originalName = toolNameMapping.get(toolCall.function.name) || toolCall.function.name;
-
+  private parseToolCall(toolCall: {
+    id: string;
+    function: { name: string; arguments: string };
+  }): ToolCall {
     try {
       return {
         id: toolCall.id,
-        name: originalName,
+        name: toolCall.function.name,
         arguments: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
       };
     } catch (error) {
       logger.error('Failed to parse tool call arguments', {
         toolCallId: toolCall.id,
-        toolName: originalName,
-        sanitizedName: toolCall.function.name,
+        toolName: toolCall.function.name,
         arguments: toolCall.function.arguments,
         error: (error as Error).message,
       });
       throw new Error(
-        `Invalid JSON in tool call arguments for ${originalName}: ${(error as Error).message}`
+        `Invalid JSON in tool call arguments for ${toolCall.function.name}: ${
+          (error as Error).message
+        }`
       );
     }
   }
@@ -331,9 +330,9 @@ export class OpenAIProvider extends AIProvider {
    * Calibrates token costs for system prompt and individual tools
    * Uses tiktoken for precise local counting
    */
-  async calibrateTokenCosts(
+  protected async _calibrateTokenCostsImpl(
     messages: ProviderMessage[],
-    tools: Tool[],
+    tools: WireTool[],
     model: string
   ): Promise<{
     systemTokens: number;
@@ -399,97 +398,29 @@ export class OpenAIProvider extends AIProvider {
     }
   }
 
-  private static readonly MAX_TOOL_NAME_LENGTH = 64;
-  private static readonly COLLISION_SUFFIX_RESERVE = 4;
-
   /**
-   * Builds OpenAI tools with sanitized names and returns mapping
-   * Request-scoped to prevent concurrent request interference
-   * Enforces OpenAI's 64-character limit on tool names
+   * Builds OpenAI's tool-shape from a list of already-sanitized WireTools.
+   * Sanitization itself lives in AIProvider — we just adapt name/description/inputSchema
+   * into OpenAI's {type:'function', function:{...}} envelope.
    */
-  private buildToolsWithMapping(tools: Tool[]): {
-    openaiTools: OpenAI.Chat.ChatCompletionTool[];
-    mapping: Map<string, string>;
-  } {
-    const mapping = new Map<string, string>();
-    const openaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map((tool) => {
-      const sanitized = tool.name.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_'); // Collapse consecutive underscores
-
-      // Validate tool name is not empty or underscore-only after sanitization
-      if (!sanitized || /^_+$/.test(sanitized)) {
-        throw new Error(
-          `Tool name "${tool.name}" is invalid - sanitizes to empty or underscore-only string`
-        );
-      }
-
-      // Reserve space for potential collision suffix
-      const maxBaseLength =
-        OpenAIProvider.MAX_TOOL_NAME_LENGTH - OpenAIProvider.COLLISION_SUFFIX_RESERVE;
-
-      // Truncate base name if needed to leave room for suffix
-      let baseName = sanitized;
-      if (baseName.length > maxBaseLength) {
-        baseName = baseName.substring(0, maxBaseLength);
-      }
-
-      // Check if sanitized name is already used (handles both collisions and duplicates)
-      let sanitizedName = baseName;
-
-      if (mapping.has(sanitizedName)) {
-        // Name already used - append suffix to make unique
-        let suffix = 2;
-        sanitizedName = `${baseName}_${suffix}`;
-
-        // Ensure final name doesn't exceed 64 chars and is unique
-        while (
-          mapping.has(sanitizedName) ||
-          sanitizedName.length > OpenAIProvider.MAX_TOOL_NAME_LENGTH
-        ) {
-          suffix++;
-          sanitizedName = `${baseName}_${suffix}`;
-
-          // If suffix grows too large, truncate base name further
-          if (sanitizedName.length > OpenAIProvider.MAX_TOOL_NAME_LENGTH) {
-            const suffixStr = `_${suffix}`;
-            baseName = baseName.substring(
-              0,
-              OpenAIProvider.MAX_TOOL_NAME_LENGTH - suffixStr.length
-            );
-            sanitizedName = `${baseName}${suffixStr}`;
-          }
-        }
-      }
-
-      // Final length check (should never exceed, but defensive)
-      if (sanitizedName.length > OpenAIProvider.MAX_TOOL_NAME_LENGTH) {
-        sanitizedName = sanitizedName.substring(0, OpenAIProvider.MAX_TOOL_NAME_LENGTH);
-      }
-
-      mapping.set(sanitizedName, tool.name);
-
-      return {
-        type: 'function' as const,
-        function: {
-          name: sanitizedName,
-          description: tool.description,
-          parameters: tool.inputSchema,
-        },
-      };
-    });
-
-    return { openaiTools, mapping };
+  private buildOpenAITools(tools: WireTool[]): OpenAI.Chat.ChatCompletionTool[] {
+    return tools.map((tool) => ({
+      type: 'function' as const,
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.inputSchema,
+      },
+    }));
   }
 
   private _createRequestPayload(
     messages: ProviderMessage[],
-    tools: Tool[],
+    tools: WireTool[],
     model: string,
     stream: boolean,
     options?: RequestOptions
-  ): {
-    payload: OpenAI.Chat.ChatCompletionCreateParams;
-    toolNameMapping: Map<string, string>;
-  } {
+  ): OpenAI.Chat.ChatCompletionCreateParams {
     // Convert our enhanced generic messages to OpenAI format
     const openaiMessages = convertToOpenAIFormat(
       messages
@@ -504,29 +435,21 @@ export class OpenAIProvider extends AIProvider {
       ...openaiMessages.filter((msg) => msg.role !== 'system'),
     ];
 
-    // Build tools with sanitized names and get mapping (request-scoped)
-    const { openaiTools, mapping } = this.buildToolsWithMapping(tools);
-
-    const requestPayload: OpenAI.Chat.ChatCompletionCreateParams = {
+    return {
       model,
       messages: messagesWithSystem,
       max_completion_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 16384),
       stream,
-      ...(tools.length > 0 && { tools: openaiTools }),
+      ...(tools.length > 0 && { tools: this.buildOpenAITools(tools) }),
       ...(options?.toolChoice && { tool_choice: options.toolChoice }),
     };
-
-    return { payload: requestPayload, toolNameMapping: mapping };
   }
 
   /**
    * Converts ProviderMessages to Responses API input items
    * Shared helper for both first turn (full history) and chained turns (incremental)
    */
-  private _convertMessagesToInputItems(
-    messages: ProviderMessage[],
-    toolNameMapping: Map<string, string>
-  ): Array<unknown> {
+  private _convertMessagesToInputItems(messages: ProviderMessage[]): Array<unknown> {
     const inputItems: Array<unknown> = [];
 
     for (const msg of messages) {
@@ -540,18 +463,14 @@ export class OpenAIProvider extends AIProvider {
           });
         }
 
-        // Add tool calls as separate items (assistant messages can have tool calls)
+        // Tool-call name sanitization is handled by AIProvider — by the time messages
+        // arrive here, msg.toolCalls[].name is already in wire form.
         if (msg.toolCalls) {
           for (const toolCall of msg.toolCalls) {
-            // Use sanitized name for API request
-            const sanitizedName =
-              Array.from(toolNameMapping.entries()).find(
-                ([_, orig]) => orig === toolCall.name
-              )?.[0] || toolCall.name;
             inputItems.push({
               type: 'function_call',
               call_id: toolCall.id,
-              name: sanitizedName,
+              name: toolCall.name,
               arguments: JSON.stringify(toolCall.arguments),
             });
           }
@@ -579,35 +498,26 @@ export class OpenAIProvider extends AIProvider {
    */
   private _createResponsesAPIPayload(
     messages: ProviderMessage[],
-    tools: Tool[],
+    tools: WireTool[],
     model: string,
     stream: boolean,
     previousResponseId?: string,
     options?: RequestOptions
-  ): {
-    payload: ResponseCreateParams;
-    toolNameMapping: Map<string, string>;
-  } {
+  ): ResponseCreateParams {
     // Extract system/developer instructions
     const systemMessages = messages.filter((m) => m.role === 'system');
     const instructions = systemMessages.map((m) => m.content).join('\n') || undefined;
 
-    // Build tools with sanitized names (same as Chat Completions)
-    const { openaiTools, mapping } = this.buildToolsWithMapping(tools);
-
     // Transform tools to Responses API format (flatter structure, not nested in 'function')
-    // We only create function tools, so filter to that type
-    const responsesTools: ResponseTool[] = openaiTools
-      .filter((tool): tool is OpenAI.Chat.ChatCompletionFunctionTool => tool.type === 'function')
-      .map((tool) => ({
-        type: 'function' as const,
-        name: tool.function.name,
-        description: tool.function.description,
-        parameters: (tool.function.parameters as Record<string, unknown>) || null,
-        // Note: strict mode disabled because our tool schemas have optional parameters
-        // With strict: true, ALL properties must be in required array
-        strict: false,
-      }));
+    const responsesTools: ResponseTool[] = tools.map((tool) => ({
+      type: 'function' as const,
+      name: tool.name,
+      description: tool.description,
+      parameters: (tool.inputSchema as Record<string, unknown>) || null,
+      // Note: strict mode disabled because our tool schemas have optional parameters.
+      // With strict: true, ALL properties must be in required array.
+      strict: false,
+    }));
 
     // Convert ProviderMessages to Responses API input format
     // The Responses API uses a DIFFERENT format than Chat Completions:
@@ -617,15 +527,12 @@ export class OpenAIProvider extends AIProvider {
 
     if (previousResponseId) {
       // Chained response: Only include messages AFTER the last assistant message
-      // Find the last assistant message (which should have been the previous response)
       const lastAgentMessageIndex = messages.findLastIndex((m) => m.role === 'assistant');
 
       if (lastAgentMessageIndex >= 0) {
-        // Take all messages after the last assistant message
         const newMessages = messages.slice(lastAgentMessageIndex + 1);
-        inputItems = this._convertMessagesToInputItems(newMessages, mapping);
+        inputItems = this._convertMessagesToInputItems(newMessages);
       } else {
-        // No assistant message found - this shouldn't happen with chaining, but be defensive
         logger.warn(
           'Responses API chaining: No assistant message found, falling back to full history',
           {
@@ -634,16 +541,12 @@ export class OpenAIProvider extends AIProvider {
           }
         );
         inputItems = this._convertMessagesToInputItems(
-          messages.filter((m) => m.role !== 'system'),
-          mapping
+          messages.filter((m) => m.role !== 'system')
         );
       }
     } else {
       // First turn: Include all non-system messages
-      inputItems = this._convertMessagesToInputItems(
-        messages.filter((m) => m.role !== 'system'),
-        mapping
-      );
+      inputItems = this._convertMessagesToInputItems(messages.filter((m) => m.role !== 'system'));
     }
 
     // Set reasoning effort for reasoning-capable models
@@ -682,7 +585,7 @@ export class OpenAIProvider extends AIProvider {
       reasoningEffort: reasoningEffort || 'none',
     });
 
-    return { payload: requestPayload, toolNameMapping: mapping };
+    return requestPayload;
   }
 
   /**
@@ -791,9 +694,9 @@ export class OpenAIProvider extends AIProvider {
     return false;
   }
 
-  async createResponse(
+  protected async _createResponseImpl(
     messages: ProviderMessage[],
-    tools: Tool[] = [],
+    tools: WireTool[] = [],
     model: string,
     signal?: AbortSignal,
     conversationState?: ConversationState,
@@ -831,20 +734,14 @@ export class OpenAIProvider extends AIProvider {
    */
   private async _createChatCompletionsResponse(
     messages: ProviderMessage[],
-    tools: Tool[],
+    tools: WireTool[],
     model: string,
     signal?: AbortSignal,
     options?: RequestOptions
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
-        const { payload: requestPayload, toolNameMapping } = this._createRequestPayload(
-          messages,
-          tools,
-          model,
-          false,
-          options
-        );
+        const requestPayload = this._createRequestPayload(messages, tools, model, false, options);
 
         // Log request with pretty formatting
         logProviderRequest('openai', requestPayload as unknown as Record<string, unknown>);
@@ -869,7 +766,7 @@ export class OpenAIProvider extends AIProvider {
               (tc): tc is OpenAI.Chat.ChatCompletionMessageFunctionToolCall =>
                 tc.type === 'function'
             )
-            .map((toolCall) => this.parseToolCall(toolCall, toolNameMapping)) || [];
+            .map((toolCall) => this.parseToolCall(toolCall)) || [];
 
         logger.trace('Received response from OpenAI', {
           provider: 'openai',
@@ -899,7 +796,7 @@ export class OpenAIProvider extends AIProvider {
           const promptText = systemPrompt + '\n' + messages.map((m) => m.content).join(' ');
           const toolsText = tools.length > 0 ? JSON.stringify(tools) : '';
 
-          const countedTokens = await this.countTokens(messages, tools, model);
+          const countedTokens = await this._countTokensImpl(messages, tools, model);
           const estimatedPromptTokens =
             countedTokens ?? this.estimateTokens(promptText + toolsText);
           const estimatedCompletionTokens = this.estimateTokens(textContent);
@@ -927,7 +824,7 @@ export class OpenAIProvider extends AIProvider {
    */
   private async _createResponsesAPIResponse(
     messages: ProviderMessage[],
-    tools: Tool[],
+    tools: WireTool[],
     model: string,
     signal?: AbortSignal,
     conversationState?: ConversationState,
@@ -935,7 +832,7 @@ export class OpenAIProvider extends AIProvider {
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
-        const { payload: requestPayload, toolNameMapping } = this._createResponsesAPIPayload(
+        const requestPayload = this._createResponsesAPIPayload(
           messages,
           tools,
           model,
@@ -956,33 +853,24 @@ export class OpenAIProvider extends AIProvider {
 
         const parsedResponse = this._parseResponsesAPIResponse(response);
 
-        // Map tool names back from sanitized to original
-        const toolCalls = parsedResponse.toolCalls.map((tc) => ({
-          ...tc,
-          name: toolNameMapping.get(tc.name) || tc.name,
-        }));
-
         logger.trace('Received response from OpenAI Responses API', {
           provider: 'openai',
           api: 'responses',
           contentLength: parsedResponse.content.length,
-          toolCallCount: toolCalls.length,
-          toolCallNames: toolCalls.map((tc) => tc.name),
+          toolCallCount: parsedResponse.toolCalls.length,
+          toolCallNames: parsedResponse.toolCalls.map((tc) => tc.name),
           usage: parsedResponse.usage,
         });
 
-        return {
-          ...parsedResponse,
-          toolCalls,
-        };
+        return parsedResponse;
       },
       { signal }
     );
   }
 
-  async createStreamingResponse(
+  protected async _createStreamingResponseImpl(
     messages: ProviderMessage[],
-    tools: Tool[] = [],
+    tools: WireTool[] = [],
     model: string,
     signal?: AbortSignal,
     conversationState?: ConversationState,
@@ -1029,7 +917,7 @@ export class OpenAIProvider extends AIProvider {
    */
   private async _createChatCompletionsStreamingResponse(
     messages: ProviderMessage[],
-    tools: Tool[],
+    tools: WireTool[],
     model: string,
     signal?: AbortSignal,
     options?: RequestOptions
@@ -1039,13 +927,7 @@ export class OpenAIProvider extends AIProvider {
 
     return this.withRetry(
       async () => {
-        const { payload: requestPayload, toolNameMapping } = this._createRequestPayload(
-          messages,
-          tools,
-          model,
-          true,
-          options
-        );
+        const requestPayload = this._createRequestPayload(messages, tools, model, true, options);
 
         // Log streaming request with pretty formatting
         logProviderRequest('openai', requestPayload as unknown as Record<string, unknown>, {
@@ -1148,13 +1030,10 @@ export class OpenAIProvider extends AIProvider {
           toolCalls = Array.from(partialToolCalls.values())
             .map((partial) => {
               try {
-                return this.parseToolCall(
-                  {
-                    id: partial.id,
-                    function: { name: partial.name, arguments: partial.arguments },
-                  },
-                  toolNameMapping
-                );
+                return this.parseToolCall({
+                  id: partial.id,
+                  function: { name: partial.name, arguments: partial.arguments },
+                });
               } catch (error) {
                 // If stream was aborted, incomplete tool calls are expected
                 if (signal?.aborted) {
@@ -1219,7 +1098,7 @@ export class OpenAIProvider extends AIProvider {
               completionText += partial.arguments;
             }
 
-            const countedTokens = await this.countTokens(messages, tools, model);
+            const countedTokens = await this._countTokensImpl(messages, tools, model);
             const estimatedPromptTokens =
               countedTokens ?? this.estimateTokens(promptText + toolsText);
             const estimatedCompletionTokens = this.estimateTokens(completionText);
@@ -1253,7 +1132,7 @@ export class OpenAIProvider extends AIProvider {
               { model }
             );
             // Fall back to non-streaming mode
-            return this.createResponse(messages, tools, model, signal);
+            return this._createResponseImpl(messages, tools, model, signal);
           }
 
           // If stream wasn't created yet, let error bubble up for retry handling
@@ -1278,7 +1157,7 @@ export class OpenAIProvider extends AIProvider {
    */
   private async _createResponsesAPIStreamingResponse(
     messages: ProviderMessage[],
-    tools: Tool[],
+    tools: WireTool[],
     model: string,
     signal?: AbortSignal,
     conversationState?: ConversationState,
@@ -1289,7 +1168,7 @@ export class OpenAIProvider extends AIProvider {
 
     return this.withRetry(
       async () => {
-        const { payload: requestPayload, toolNameMapping } = this._createResponsesAPIPayload(
+        const requestPayload = this._createResponsesAPIPayload(
           messages,
           tools,
           model,
@@ -1451,10 +1330,10 @@ export class OpenAIProvider extends AIProvider {
           // Handle incomplete tool calls gracefully (can occur if stream is aborted)
           for (const buffer of toolCallsByIndex.values()) {
             try {
-              const originalName = toolNameMapping.get(buffer.name) || buffer.name;
+              // Tool-name un-sanitization is handled by AIProvider — report the wire name.
               toolCalls.push({
                 id: buffer.call_id,
-                name: originalName,
+                name: buffer.name,
                 arguments: JSON.parse(buffer.arguments) as Record<string, unknown>,
               });
             } catch (error) {
@@ -1494,7 +1373,7 @@ export class OpenAIProvider extends AIProvider {
             systemPrompt + '\n' + nonSystemMessages.map((m) => m.content).join(' ');
           const toolsText = tools.length > 0 ? JSON.stringify(tools) : '';
 
-          const countedTokens = await this.countTokens(messages, tools, model);
+          const countedTokens = await this._countTokensImpl(messages, tools, model);
           const estimatedPromptTokens =
             countedTokens ?? this.estimateTokens(promptText + toolsText);
 

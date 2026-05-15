@@ -8,10 +8,9 @@ import type {
   RawContentBlockDeltaEvent,
   ThinkingDelta,
 } from '@anthropic-ai/sdk/resources/messages';
-import { AIProvider } from './base-provider';
+import { AIProvider, type WireTool } from './base-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderInfo } from './base-provider';
 import { ToolCall } from '@lace/agent/tools/types';
-import { Tool } from '@lace/agent/tools/tool';
 import { logger } from '@lace/agent/utils/logger';
 import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
 import { convertToAnthropicFormat } from './format-converters';
@@ -65,7 +64,7 @@ export class AnthropicProvider extends AIProvider {
   private async countTokensExplicit(
     messages: ProviderMessage[],
     systemPrompt: string,
-    tools: Tool[],
+    tools: WireTool[],
     model: string
   ): Promise<number | null> {
     try {
@@ -91,9 +90,9 @@ export class AnthropicProvider extends AIProvider {
   }
 
   // Provider-specific token counting using Anthropic's beta API
-  async countTokens(
+  protected async _countTokensImpl(
     messages: ProviderMessage[],
-    tools: Tool[] = [],
+    tools: WireTool[] = [],
     model?: string
   ): Promise<number | null> {
     if (!model) {
@@ -108,9 +107,9 @@ export class AnthropicProvider extends AIProvider {
    * Calibrates token costs for system prompt and individual tools
    * Makes separate API calls to measure each component precisely
    */
-  async calibrateTokenCosts(
+  protected async _calibrateTokenCostsImpl(
     messages: ProviderMessage[],
-    tools: Tool[],
+    tools: WireTool[],
     model: string
   ): Promise<{
     systemTokens: number;
@@ -169,7 +168,7 @@ export class AnthropicProvider extends AIProvider {
 
   private _createRequestPayload(
     messages: ProviderMessage[],
-    tools: Tool[],
+    tools: WireTool[],
     model: string
   ): Anthropic.Messages.MessageCreateParams {
     // Convert our enhanced generic messages to Anthropic format
@@ -234,9 +233,9 @@ export class AnthropicProvider extends AIProvider {
     return payload;
   }
 
-  async createResponse(
+  protected async _createResponseImpl(
     messages: ProviderMessage[],
-    tools: Tool[] = [],
+    tools: WireTool[] = [],
     model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
@@ -300,9 +299,9 @@ export class AnthropicProvider extends AIProvider {
     );
   }
 
-  async createStreamingResponse(
+  protected async _createStreamingResponseImpl(
     messages: ProviderMessage[],
-    tools: Tool[] = [],
+    tools: WireTool[] = [],
     model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {

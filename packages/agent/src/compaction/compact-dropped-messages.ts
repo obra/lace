@@ -2,6 +2,8 @@ import {
   AIProvider,
   type ConversationState,
   type ProviderMessage,
+  type WireTool,
+  type RequestOptions,
 } from '../providers/base-provider';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { LaceEvent } from '@lace/agent/threads/types';
@@ -9,6 +11,14 @@ import type { CompactionContext, CompactionStrategy } from './types';
 import { registerDefaultStrategies } from './registry';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 
+/**
+ * Wraps an inner AIProvider to force a specific model on every call. We override the
+ * `_createResponseImpl` / `_createStreamingResponseImpl` hooks so the wrapper participates
+ * in the base class's tool-name sanitization (sanitization happens once at the outer
+ * boundary), then forwards the already-sanitized payload straight to the inner
+ * provider's wire-level implementation via `inner._createResponseImpl` — the public
+ * `inner.createResponse` would re-sanitize redundantly.
+ */
 class ModelPinnedProvider extends AIProvider {
   constructor(
     private readonly inner: AIProvider,
@@ -33,35 +43,39 @@ class ModelPinnedProvider extends AIProvider {
     return this.inner.supportsStreaming;
   }
 
-  override async createResponse(
+  protected override async _createResponseImpl(
     messages: ProviderMessage[],
-    tools: CoreTool[],
+    tools: WireTool[],
     _model: string,
     signal?: AbortSignal,
-    conversationState?: ConversationState
+    conversationState?: ConversationState,
+    options?: RequestOptions
   ) {
-    return await this.inner.createResponse(
+    return await this.inner._invokeCreateResponseImpl(
       messages,
       tools,
       this.pinnedModelId,
       signal,
-      conversationState
+      conversationState,
+      options
     );
   }
 
-  override async createStreamingResponse(
+  protected override async _createStreamingResponseImpl(
     messages: ProviderMessage[],
-    tools: CoreTool[],
+    tools: WireTool[],
     _model: string,
     signal?: AbortSignal,
-    conversationState?: ConversationState
+    conversationState?: ConversationState,
+    options?: RequestOptions
   ) {
-    return await this.inner.createStreamingResponse(
+    return await this.inner._invokeCreateStreamingResponseImpl(
       messages,
       tools,
       this.pinnedModelId,
       signal,
-      conversationState
+      conversationState,
+      options
     );
   }
 }

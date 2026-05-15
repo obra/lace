@@ -2,11 +2,30 @@
 // ABOUTME: Defines the common interface and provides base functionality for providers
 
 import { EventEmitter } from 'events';
-import { ToolResult, ToolCall } from '@lace/agent/tools/types';
+import { ToolResult, ToolCall, ToolInputSchema } from '@lace/agent/tools/types';
 import { Tool } from '@lace/agent/tools/tool';
 import type { CatalogProvider } from './catalog/types';
 import { logger } from '@lace/agent/utils/logger';
 import { estimateTokens as estimateTokensUtil } from '@lace/agent/utils/token-estimation';
+import {
+  buildSanitizedToolNames,
+  sanitizeToolName as sanitizeToolNameStandalone,
+  unsanitizeToolName,
+} from './tool-name-sanitizer';
+
+/**
+ * The minimal duck-typed view of a tool that providers need to build a wire-format
+ * request. Every LLM API has a tool-name charset/length constraint stricter than what
+ * agent-side tool names (e.g. MCP tools named `<server>/<tool>`) can produce. The base
+ * AIProvider sanitizes tool names before any subclass sees them, then unsanitizes
+ * response tool calls before returning. Subclasses operate exclusively on `WireTool[]`
+ * — they never see the raw original names.
+ */
+export interface WireTool {
+  name: string;
+  description: string;
+  inputSchema: ToolInputSchema;
+}
 
 export interface ProviderConfig {
   maxTokens?: number;
@@ -159,16 +178,36 @@ export abstract class AIProvider extends EventEmitter {
     this._catalogData = config.catalogProvider;
   }
 
-  abstract createResponse(
+  /**
+   * Send a non-streaming request. Subclasses implement `_createResponseImpl`; this
+   * method handles tool-name sanitization (and inverse mapping on the response) so
+   * subclasses never have to worry about wire-protocol tool-name constraints.
+   */
+  async createResponse(
     messages: ProviderMessage[],
     tools: Tool[],
     model: string,
     signal?: AbortSignal,
     conversationState?: ConversationState,
     options?: RequestOptions
-  ): Promise<ProviderResponse>;
+  ): Promise<ProviderResponse> {
+    const { wireMessages, wireTools, mapping } = this._sanitizeForWire(messages, tools);
+    const response = await this._createResponseImpl(
+      wireMessages,
+      wireTools,
+      model,
+      signal,
+      conversationState,
+      options,
+    );
+    return this._unsanitizeResponse(response, mapping);
+  }
 
-  // Optional streaming support - providers can override this
+  /**
+   * Send a streaming request. Subclasses that support streaming override
+   * `_createStreamingResponseImpl`; the default delegates to `_createResponseImpl`
+   * via createResponse. Sanitization wrapping is identical to createResponse.
+   */
   async createStreamingResponse(
     messages: ProviderMessage[],
     tools: Tool[],
@@ -177,8 +216,131 @@ export abstract class AIProvider extends EventEmitter {
     conversationState?: ConversationState,
     options?: RequestOptions
   ): Promise<ProviderResponse> {
-    // Default implementation: fall back to non-streaming
-    return this.createResponse(messages, tools, model, signal, conversationState, options);
+    const { wireMessages, wireTools, mapping } = this._sanitizeForWire(messages, tools);
+    const response = await this._createStreamingResponseImpl(
+      wireMessages,
+      wireTools,
+      model,
+      signal,
+      conversationState,
+      options,
+    );
+    return this._unsanitizeResponse(response, mapping);
+  }
+
+  /**
+   * Subclass entry point. Receives tools with already-sanitized names; returns a
+   * ProviderResponse whose toolCalls still reference the sanitized names. The base
+   * class un-sanitizes them on the way out.
+   */
+  protected abstract _createResponseImpl(
+    messages: ProviderMessage[],
+    tools: WireTool[],
+    model: string,
+    signal?: AbortSignal,
+    conversationState?: ConversationState,
+    options?: RequestOptions
+  ): Promise<ProviderResponse>;
+
+  /**
+   * Escape hatch for wrapping providers (e.g. ModelPinnedProvider in compaction):
+   * call `_createResponseImpl` on this instance without re-running sanitization.
+   * Callers are responsible for passing already-sanitized WireTool[].
+   */
+  public _invokeCreateResponseImpl(
+    messages: ProviderMessage[],
+    tools: WireTool[],
+    model: string,
+    signal?: AbortSignal,
+    conversationState?: ConversationState,
+    options?: RequestOptions
+  ): Promise<ProviderResponse> {
+    return this._createResponseImpl(messages, tools, model, signal, conversationState, options);
+  }
+
+  public _invokeCreateStreamingResponseImpl(
+    messages: ProviderMessage[],
+    tools: WireTool[],
+    model: string,
+    signal?: AbortSignal,
+    conversationState?: ConversationState,
+    options?: RequestOptions
+  ): Promise<ProviderResponse> {
+    return this._createStreamingResponseImpl(
+      messages,
+      tools,
+      model,
+      signal,
+      conversationState,
+      options,
+    );
+  }
+
+  /**
+   * Streaming variant — default delegates to `_createResponseImpl`. Subclasses
+   * that support real streaming override this.
+   */
+  protected async _createStreamingResponseImpl(
+    messages: ProviderMessage[],
+    tools: WireTool[],
+    model: string,
+    signal?: AbortSignal,
+    conversationState?: ConversationState,
+    options?: RequestOptions
+  ): Promise<ProviderResponse> {
+    return this._createResponseImpl(messages, tools, model, signal, conversationState, options);
+  }
+
+  /**
+   * Sanitize both tools[] and any tool-call references inside the messages list using
+   * the same per-request mapping. Subclasses receive wireMessages whose
+   * `toolCalls[].name` fields are already in the sanitized form they should send on
+   * the wire — they never have to think about it.
+   */
+  private _sanitizeForWire(
+    messages: ProviderMessage[],
+    tools: Tool[],
+  ): {
+    wireMessages: ProviderMessage[];
+    wireTools: WireTool[];
+    mapping: Map<string, string>;
+  } {
+    const { names, mapping } = buildSanitizedToolNames(tools.map((t) => t.name));
+    const wireTools: WireTool[] = tools.map((tool, i) => ({
+      name: names[i]!,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+    }));
+    // Build a reverse lookup (originalName → sanitizedName) for rewriting message-attached
+    // tool calls. Fall back to standalone sanitization for names that aren't in this
+    // request's tools[] (rare, but possible when historical messages reference a tool
+    // that's no longer enabled).
+    const reverse = new Map<string, string>();
+    for (const [san, orig] of mapping) reverse.set(orig, san);
+    const sanitizeOne = (name: string): string =>
+      reverse.get(name) ?? sanitizeToolNameStandalone(name);
+    const wireMessages: ProviderMessage[] = messages.map((msg) => {
+      if (!msg.toolCalls?.length) return msg;
+      return {
+        ...msg,
+        toolCalls: msg.toolCalls.map((tc) => ({ ...tc, name: sanitizeOne(tc.name) })),
+      };
+    });
+    return { wireMessages, wireTools, mapping };
+  }
+
+  private _unsanitizeResponse(
+    response: ProviderResponse,
+    mapping: Map<string, string>,
+  ): ProviderResponse {
+    if (response.toolCalls.length === 0) return response;
+    return {
+      ...response,
+      toolCalls: response.toolCalls.map((tc) => ({
+        ...tc,
+        name: unsanitizeToolName(tc.name, mapping),
+      })),
+    };
   }
 
   // Check if provider supports streaming
@@ -328,10 +490,22 @@ export abstract class AIProvider extends EventEmitter {
     return estimateTokensUtil(text);
   }
 
-  // Provider-specific token counting - providers can override for accurate counts
-  countTokens(
+  /**
+   * Provider-specific token counting. Subclasses override `_countTokensImpl`; this
+   * method handles tool-name sanitization for any API call the subclass makes.
+   */
+  async countTokens(
     messages: ProviderMessage[],
-    _tools: Tool[] = [],
+    tools: Tool[] = [],
+    model?: string
+  ): Promise<number | null> {
+    const { wireMessages, wireTools } = this._sanitizeForWire(messages, tools);
+    return this._countTokensImpl(wireMessages, wireTools, model);
+  }
+
+  protected _countTokensImpl(
+    _messages: ProviderMessage[],
+    _tools: WireTool[],
     _model?: string
   ): Promise<number | null> | number | null {
     // Default implementation returns null to indicate estimation should be used
@@ -339,14 +513,35 @@ export abstract class AIProvider extends EventEmitter {
   }
 
   /**
-   * Calibrates token costs for system prompt and individual tools
-   * Makes separate API calls to measure each component precisely
-   * Providers should override this if they support accurate token counting
-   * Returns null if provider doesn't support calibration
+   * Calibrate token costs for system prompt and individual tools.
+   * Subclasses override `_calibrateTokenCostsImpl` with WireTool[]; this method
+   * sanitizes input names and un-sanitizes the toolDetails names on the way out so
+   * callers see their original (unsanitized) tool names.
    */
-  calibrateTokenCosts(
+  async calibrateTokenCosts(
+    messages: ProviderMessage[],
+    tools: Tool[],
+    model: string
+  ): Promise<{
+    systemTokens: number;
+    toolTokens: number;
+    toolDetails: Array<{ name: string; tokens: number }>;
+  } | null> {
+    const { wireMessages, wireTools, mapping } = this._sanitizeForWire(messages, tools);
+    const result = await this._calibrateTokenCostsImpl(wireMessages, wireTools, model);
+    if (!result) return null;
+    return {
+      ...result,
+      toolDetails: result.toolDetails.map((d) => ({
+        ...d,
+        name: unsanitizeToolName(d.name, mapping),
+      })),
+    };
+  }
+
+  protected _calibrateTokenCostsImpl(
     _messages: ProviderMessage[],
-    _tools: Tool[],
+    _tools: WireTool[],
     _model: string
   ): Promise<{
     systemTokens: number;
