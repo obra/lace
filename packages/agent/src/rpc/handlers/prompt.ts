@@ -22,6 +22,7 @@ import { ConversationRunner } from '@lace/agent/core/conversation/runner';
 import type { RunnerConfig, RunnerDependencies } from '@lace/agent/core/conversation/types';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { SkillRegistry, getSkillDirectories } from '@lace/agent/skills';
+import { getOrCreateSessionToolExecutor } from '@lace/agent/server';
 
 /**
  * Register the session/prompt RPC handler.
@@ -222,12 +223,26 @@ export function registerPromptHandler(
         maxBudgetUsd: effectiveConfig.maxBudgetUsd,
       };
 
+      const sessionIdForCache = state.activeSession.meta.sessionId;
+      const cachedCreateToolExecutor = ((
+        executionMode: 'plan' | 'execute',
+        mcpServerManager,
+        jobManager,
+        skillReg
+      ) =>
+        getOrCreateSessionToolExecutor(
+          state.toolExecutorCache,
+          sessionIdForCache,
+          executionMode,
+          () => createToolExecutorForMode(executionMode, mcpServerManager, jobManager, skillReg)
+        )) as RunnerDependencies['createToolExecutor'];
+
       // Build runner dependencies
       const deps: RunnerDependencies = {
         onUpdate: emitUpdate,
         runExclusive,
         requestPermission: requestPermissionFromClient,
-        createToolExecutor: createToolExecutorForMode as RunnerDependencies['createToolExecutor'],
+        createToolExecutor: cachedCreateToolExecutor,
         createProvider: () =>
           createProviderForTurn({
             connectionId: effectiveConfig.connectionId,

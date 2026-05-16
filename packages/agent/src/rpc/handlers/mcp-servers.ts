@@ -15,6 +15,7 @@ import {
 import { logger } from '../../utils/logger';
 import { readSessionState, writeSessionState } from '../../storage/session-store';
 import { loadSession } from '../../storage/session-store';
+import { invalidateSessionToolExecutor } from '../../server';
 
 /**
  * Reconcile MCP servers for the active session.
@@ -22,6 +23,9 @@ import { loadSession } from '../../storage/session-store';
  */
 export async function reconcileMcpServersForActiveSession(state: AgentServerState): Promise<void> {
   if (!state.activeSession) return;
+
+  // MCP changes invalidate the cached executor's tool list for this session.
+  invalidateSessionToolExecutor(state.toolExecutorCache, state.activeSession.meta.sessionId);
 
   const configured = state.activeSession.state.config?.mcpServers;
   const parsed = Array.isArray(configured)
@@ -197,6 +201,8 @@ export function registerMcpHandlers(
       });
     }
 
+    invalidateSessionToolExecutor(state.toolExecutorCache, state.activeSession.meta.sessionId);
+
     return { serverId, created };
   });
 
@@ -215,6 +221,8 @@ export function registerMcpHandlers(
 
     // Stop the server if running
     await state.mcpServerManager.stopServer(serverId);
+
+    invalidateSessionToolExecutor(state.toolExecutorCache, state.activeSession.meta.sessionId);
 
     // Remove from session config
     await runExclusive(() => {

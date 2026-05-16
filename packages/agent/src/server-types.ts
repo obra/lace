@@ -134,4 +134,7 @@ export type AgentServerState = {
     }
   >;
   sessionMutex: Promise<void>;
+  // Key: `${sessionId}|${executionMode}`. Holds Promises so concurrent calls
+  // for the same key share one in-flight build.
+  toolExecutorCache: Map<string, Promise<{ executor: ToolExecutor; toolsForProvider: Tool[] }>>;
 };

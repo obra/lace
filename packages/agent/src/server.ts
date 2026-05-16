@@ -88,7 +88,37 @@ export function createAgentServerState(): AgentServerState {
     jobManager: null as unknown as JobManager, // Initialized in registerAgentRpcMethods
     pendingPermissionRequests: new Map(),
     sessionMutex: Promise.resolve(),
+    toolExecutorCache: new Map(),
   };
+}
+
+type ToolExecutorCacheValue = { executor: ToolExecutor; toolsForProvider: CoreTool[] };
+type ToolExecutorCache = Map<string, Promise<ToolExecutorCacheValue>>;
+
+export function getOrCreateSessionToolExecutor(
+  cache: ToolExecutorCache,
+  sessionId: string,
+  executionMode: 'plan' | 'execute',
+  build: () => Promise<ToolExecutorCacheValue>
+): Promise<ToolExecutorCacheValue> {
+  const key = `${sessionId}|${executionMode}`;
+  const existing = cache.get(key);
+  if (existing) return existing;
+  // Insert the Promise synchronously so concurrent callers see the same in-flight build.
+  const pending = build();
+  cache.set(key, pending);
+  // If the build rejects, drop the entry so the next call retries.
+  pending.catch(() => {
+    if (cache.get(key) === pending) cache.delete(key);
+  });
+  return pending;
+}
+
+export function invalidateSessionToolExecutor(cache: ToolExecutorCache, sessionId: string): void {
+  const prefix = `${sessionId}|`;
+  for (const key of cache.keys()) {
+    if (key.startsWith(prefix)) cache.delete(key);
+  }
 }
 
 export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerState): void {
