@@ -25,10 +25,10 @@ export type CreateToolExecutorFn = (
   mcpServerManager?: MCPServerManager,
   jobManager?: JobManager,
   skillRegistry?: SkillRegistry
-) => {
+) => Promise<{
   executor: ToolExecutor;
   toolsForProvider: Tool[];
-};
+}>;
 
 // Configuration Constants
 export const SUPPORTED_PROVIDER_TYPES = new Set([

@@ -112,7 +112,7 @@ export function registerSessionHandlers(
     const skillRegistry = new SkillRegistry({ skillDirs });
 
     // Get available tools for system prompt context
-    const { toolsForProvider } = createToolExecutorForMode(
+    const { toolsForProvider } = await createToolExecutorForMode(
       state.config.executionMode,
       state.mcpServerManager,
       undefined, // jobManager

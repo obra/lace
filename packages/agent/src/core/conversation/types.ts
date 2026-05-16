@@ -74,13 +74,13 @@ export interface RunnerDependencies {
     mcpServerManager?: MCPServerManager,
     jobManager?: JobManager,
     skillRegistry?: SkillRegistry
-  ) => {
+  ) => Promise<{
     executor: {
       getTool: (name: string) => CoreTool | undefined;
       execute: (toolCall: ToolCall, context: ToolContext) => Promise<CoreToolResult>;
     };
     toolsForProvider: CoreTool[];
-  };
+  }>;
 
   /** Create an AI provider for this turn */
   createProvider: () => Promise<AIProvider>;

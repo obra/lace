@@ -94,7 +94,7 @@ export class ConversationRunner {
 
     const envOverlay = environment && typeof environment === 'object' ? environment : undefined;
 
-    const { executor: toolExecutor, toolsForProvider } = this.deps.createToolExecutor(
+    const { executor: toolExecutor, toolsForProvider } = await this.deps.createToolExecutor(
       executionMode,
       this.deps.mcpServerManager,
       this.deps.jobManager,

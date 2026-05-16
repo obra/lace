@@ -36,20 +36,22 @@ export {
   estimateProviderTokens,
 } from './message-building/message-builder';
 
-export function createToolExecutorForMode(
+export async function createToolExecutorForMode(
   executionMode: 'plan' | 'execute',
   mcpServerManager?: MCPServerManager,
   jobManager?: JobManager,
   skillRegistry?: SkillRegistry
-): {
+): Promise<{
   executor: ToolExecutor;
   toolsForProvider: CoreTool[];
-} {
+}> {
   const executor = new ToolExecutor();
   executor.registerAllAvailableTools(skillRegistry);
 
   if (mcpServerManager) {
     executor.registerMCPTools(mcpServerManager);
+    // Block until MCP discovery resolves so the returned tool list is complete.
+    await executor.ensureMCPToolsReady(10000);
   }
 
   if (jobManager) {

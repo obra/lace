@@ -91,8 +91,11 @@ async function computeContextBreakdownForActiveSession(
     }
   }
 
-  const { executor: coreExecutor } = createToolExecutorForMode('execute');
-  const { executor: allExecutor } = createToolExecutorForMode('execute', state.mcpServerManager);
+  const { executor: coreExecutor } = await createToolExecutorForMode('execute');
+  const { executor: allExecutor } = await createToolExecutorForMode(
+    'execute',
+    state.mcpServerManager
+  );
 
   const coreTools = coreExecutor.getAllTools();
   const coreToolNames = new Set(coreTools.map((t: Tool) => t.name));

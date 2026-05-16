@@ -78,7 +78,7 @@ export function registerInitializeHandler(
       state.jobManager.setStreamingMode(jobStreaming);
     }
 
-    const { toolsForProvider } = createToolExecutorForMode('execute', state.mcpServerManager);
+    const { toolsForProvider } = await createToolExecutorForMode('execute', state.mcpServerManager);
     const toolInfos: ToolInfo[] = [];
     const seenToolNames = new Set<string>();
     for (const tool of toolsForProvider) {

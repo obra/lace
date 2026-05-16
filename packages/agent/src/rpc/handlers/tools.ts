@@ -26,7 +26,7 @@ export function registerToolHandlers(
       skillRegistry = new SkillRegistry({ skillDirs });
     }
 
-    const { toolsForProvider } = createToolExecutorForMode(
+    const { toolsForProvider } = await createToolExecutorForMode(
       state.config.executionMode,
       state.mcpServerManager,
       undefined, // jobManager
