@@ -36,11 +36,8 @@ describe('createToolExecutorForMode', () => {
     };
 
     const mgr = new MCPServerManager();
-    // Bypass startServer (no real subprocess). Inject the connection directly.
-    (mgr as unknown as { servers: Map<string, MCPServerConnection> }).servers.set(
-      'mock',
-      fakeServer
-    );
+    // Bypass startServer (no real subprocess) via the public injection seam.
+    mgr.registerConnection('mock', fakeServer);
 
     const { executor } = await createToolExecutorForMode('execute', mgr);
 

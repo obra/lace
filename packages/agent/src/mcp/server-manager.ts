@@ -85,6 +85,21 @@ export class MCPServerManager extends EventEmitter {
   }
 
   /**
+   * Register a pre-built connection without spawning a subprocess.
+   *
+   * Intended for cases where the caller owns the underlying MCP client
+   * lifecycle (e.g., tests with stubbed clients, or in-process servers).
+   * Throws if a connection with the same id is already registered.
+   */
+  registerConnection(serverId: string, connection: MCPServerConnection): void {
+    if (this.servers.has(serverId)) {
+      throw new Error(`Server '${serverId}' is already registered`);
+    }
+    this.servers.set(serverId, connection);
+    this.emit('server-status-changed', serverId, connection.status);
+  }
+
+  /**
    * Stop a server
    */
   async stopServer(serverId: string): Promise<void> {
