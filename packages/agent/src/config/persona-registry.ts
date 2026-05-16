@@ -66,13 +66,22 @@ export class PersonaNotFoundError extends Error {
   }
 }
 
+export interface PersonaRegistryOptions {
+  bundledPersonasPath: string;
+  userPersonasPaths: readonly string[]; // ordered: earlier overrides later
+}
+
 export class PersonaRegistry {
   private bundledPersonasCache: Set<string> = new Set();
-  private userPersonasCache: Map<string, string> = new Map(); // name -> path
+  private userPersonasCache: Map<string, string> = new Map(); // name -> resolved path
   private userCacheExpiry = 0;
   private readonly USER_CACHE_TTL = 5000; // 5 seconds
+  private readonly bundledPersonasPath: string;
+  private readonly userPersonasPaths: readonly string[];
 
-  constructor(private readonly bundledPersonasPath: string) {
+  constructor(opts: PersonaRegistryOptions) {
+    this.bundledPersonasPath = opts.bundledPersonasPath;
+    this.userPersonasPaths = opts.userPersonasPaths;
     this.loadBundledPersonas();
   }
 
@@ -108,26 +117,24 @@ export class PersonaRegistry {
 
     this.userPersonasCache.clear();
 
-    try {
-      const userPersonasPath = path.join(getLaceDir(), 'agent-personas');
-      if (!fs.existsSync(userPersonasPath)) {
-        this.userCacheExpiry = now + this.USER_CACHE_TTL;
-        return;
-      }
-
-      const files = fs.readdirSync(userPersonasPath);
-      for (const file of files) {
-        if (file.endsWith('.md')) {
-          const name = file.slice(0, -3); // Remove .md extension
-          this.userPersonasCache.set(name, path.join(userPersonasPath, file));
+    // Earlier paths win: only set a persona name if not already mapped from an earlier path.
+    for (const userPersonasPath of this.userPersonasPaths) {
+      try {
+        if (!fs.existsSync(userPersonasPath)) continue;
+        const files = fs.readdirSync(userPersonasPath);
+        for (const file of files) {
+          if (!file.endsWith('.md')) continue;
+          const name = file.slice(0, -3);
+          if (!this.userPersonasCache.has(name)) {
+            this.userPersonasCache.set(name, path.join(userPersonasPath, file));
+          }
         }
+      } catch {
+        // Path may not exist or be readable; skip silently and continue with remaining paths.
       }
-
-      this.userCacheExpiry = now + this.USER_CACHE_TTL;
-    } catch (_error) {
-      // User directory may not exist, that's ok
-      this.userCacheExpiry = now + this.USER_CACHE_TTL;
     }
+
+    this.userCacheExpiry = now + this.USER_CACHE_TTL;
   }
 
   /**
@@ -272,7 +279,10 @@ function readEmbeddedFileSync(file: unknown): string {
   return content;
 }
 
-// Singleton instance - use resource resolver (same pattern as provider catalog)
+// Singleton convenience for non-embedder callers; embedders may construct their own registry.
 const bundledPersonasPath = resolveResourcePath(import.meta.url, 'agent-personas');
 
-export const personaRegistry = new PersonaRegistry(bundledPersonasPath);
+export const personaRegistry = new PersonaRegistry({
+  bundledPersonasPath,
+  userPersonasPaths: [path.join(getLaceDir(), 'agent-personas')],
+});
