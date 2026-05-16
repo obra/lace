@@ -4,7 +4,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { TemplateEngine } from './template-engine';
-import { resolveResourcePath } from '@lace/agent/utils/resource-resolver';
 import {
   VariableProviderManager,
   SystemVariableProvider,
@@ -13,8 +12,7 @@ import {
   ToolVariableProvider,
   ContextDisclaimerProvider,
 } from './variable-providers';
-import { getLaceDir } from './lace-dir';
-import { personaRegistry } from './persona-registry';
+import { personaRegistry as defaultPersonaRegistry, PersonaRegistry } from './persona-registry';
 import { logger } from '@lace/agent/utils/logger';
 import type { SkillRegistry } from '@lace/agent/skills';
 import { SkillVariableProvider } from '@lace/agent/skills';
@@ -25,14 +23,17 @@ interface PromptManagerOptions {
   session?: { getWorkingDirectory(): string };
   project?: { getWorkingDirectory(): string };
   skillRegistry?: SkillRegistry;
+  personaRegistry?: PersonaRegistry;
 }
 
 export class PromptManager {
   private templateEngine: TemplateEngine;
   private variableManager: VariableProviderManager;
   private templateDirs: string[];
+  private personaRegistry: PersonaRegistry;
 
   constructor(options: PromptManagerOptions = {}) {
+    this.personaRegistry = options.personaRegistry ?? defaultPersonaRegistry;
     // Set up template directories with user overlay support
     this.templateDirs = options.templateDirs || this.getTemplateDirsWithOverlay();
 
@@ -68,10 +69,10 @@ export class PromptManager {
       logger.debug('Generating system prompt using template system', { persona });
 
       // Validate persona exists
-      personaRegistry.validatePersona(persona);
+      this.personaRegistry.validatePersona(persona);
 
       // Get persona template path
-      const personaPath = personaRegistry.getPersonaPath(persona);
+      const personaPath = this.personaRegistry.getPersonaPath(persona);
       if (!personaPath) {
         throw new Error(`Persona '${persona}' not found`);
       }
@@ -96,28 +97,15 @@ export class PromptManager {
   }
 
   /**
-   * Get template directories with user overlay support
-   * User templates take priority over embedded templates
+   * Get template directories with user overlay support.
+   * Source of truth is the persona registry: its userPersonasPaths come first
+   * (earlier wins) and the bundled path serves as the embedded overlay.
    */
   private getTemplateDirsWithOverlay(): string[] {
-    const userTemplateDir = this.getUserTemplateDir();
-    const embeddedTemplateDir = this.getEmbeddedTemplateDir();
-    return [userTemplateDir, embeddedTemplateDir];
-  }
-
-  /**
-   * Get the user template directory path
-   */
-  private getUserTemplateDir(): string {
-    const laceDir = getLaceDir();
-    return path.join(laceDir, 'agent-personas');
-  }
-
-  /**
-   * Get the embedded template directory path
-   */
-  private getEmbeddedTemplateDir(): string {
-    return resolveResourcePath(import.meta.url, 'agent-personas');
+    return [
+      ...this.personaRegistry.getUserPersonasPaths(),
+      this.personaRegistry.getBundledPersonasPath(),
+    ];
   }
 
   /**

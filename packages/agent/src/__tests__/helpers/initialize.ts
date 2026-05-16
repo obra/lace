@@ -3,8 +3,13 @@ export type InitializeOverrides = {
   config?: Record<string, unknown>;
 };
 
+export type InitializeExtras = {
+  userPersonasPaths?: string[];
+};
+
 export function defaultInitializeParams(
-  overrides: InitializeOverrides = {}
+  overrides: InitializeOverrides = {},
+  extras: InitializeExtras = {}
 ): Record<string, unknown> {
   return {
     protocolVersion: '1.0',
@@ -15,5 +20,6 @@ export function defaultInitializeParams(
       ...(overrides.capabilities || {}),
     },
     ...(overrides.config ? { config: overrides.config } : {}),
+    ...(extras.userPersonasPaths ? { userPersonasPaths: extras.userPersonasPaths } : {}),
   };
 }

@@ -33,6 +33,7 @@ import { reconcileMcpServersForActiveSession } from './mcp-servers';
 import { SkillRegistry, getSkillDirectories } from '../../skills';
 import { killAllRunningJobs } from '../../jobs';
 import { getEffectiveConfig } from '@lace/agent/core/session';
+import { PersonaNotFoundError, PersonaParseError } from '../../config/persona-registry';
 
 /**
  * Register session lifecycle handlers with the peer.
@@ -64,8 +65,84 @@ export function registerSessionHandlers(
     state.pendingPermissionRequests.clear();
     state.jobManager.clearJobs();
 
-    const parsed = params as { workDir: string; persona?: string; systemPrompt?: unknown };
+    const parsed = params as {
+      workDir: string;
+      persona?: string;
+      systemPrompt?: unknown;
+      config?: {
+        connectionId?: string;
+        modelId?: string;
+        persona?: string;
+        mcpServers?: Array<{
+          name: string;
+          command: string;
+          args?: string[];
+          env?: Record<string, string>;
+          transport?: 'stdio' | 'sse' | 'http';
+          enabled?: boolean;
+          tools?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
+        }>;
+      };
+    };
     if (!parsed?.workDir) throwInvalidParams('workDir is required');
+
+    // Persona may arrive top-level (subagent/delegate path) or nested under config.
+    const requestedPersona =
+      toNonEmptyString(parsed.config?.persona) ?? toNonEmptyString(parsed.persona);
+
+    // Parse persona frontmatter before any storage writes so we fail fast on invalid input.
+    let personaDefaults: {
+      modelId?: string;
+      toolScope?: string[];
+      mcpServers?: Array<{
+        name: string;
+        command: string;
+        args?: string[];
+        env?: Record<string, string>;
+        enabled?: boolean;
+        tools?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
+      }>;
+    } = {};
+    if (requestedPersona) {
+      try {
+        const { config: personaConfig } = state.personaRegistry.parsePersona(requestedPersona);
+        if (personaConfig.model) personaDefaults.modelId = personaConfig.model;
+        if (personaConfig.tools) personaDefaults.toolScope = [...personaConfig.tools];
+        if (personaConfig.mcpServers) {
+          personaDefaults.mcpServers = Object.entries(personaConfig.mcpServers).map(
+            ([name, spec]) => ({
+              name,
+              command: spec.command,
+              ...(spec.args ? { args: spec.args } : {}),
+              ...(spec.env ? { env: spec.env } : {}),
+              ...(spec.enabled !== undefined ? { enabled: spec.enabled } : {}),
+              ...(spec.tools
+                ? {
+                    tools: spec.tools as Record<string, 'allow' | 'ask' | 'deny' | 'disable'>,
+                  }
+                : {}),
+            })
+          );
+        }
+      } catch (err) {
+        if (err instanceof PersonaNotFoundError || err instanceof PersonaParseError) {
+          throw {
+            code: -32602,
+            message: err.message,
+            data: { category: 'protocol', reason: 'PersonaInvalid' },
+          };
+        }
+        throw err;
+      }
+    }
+
+    // Request-level fields win over persona defaults.
+    const effectiveModelId =
+      toNonEmptyString(parsed.config?.modelId) ?? personaDefaults.modelId ?? state.config.modelId;
+    const effectiveConnectionId =
+      toNonEmptyString(parsed.config?.connectionId) ?? state.config.connectionId;
+    const effectiveMcpServers = parsed.config?.mcpServers ?? personaDefaults.mcpServers;
+    const effectiveToolScope = personaDefaults.toolScope;
 
     const sessionId = `sess_${randomUUID()}`;
     const created = new Date().toISOString();
@@ -80,10 +157,12 @@ export function registerSessionHandlers(
         config: {
           executionMode: state.config.executionMode,
           approvalMode: state.config.approvalMode,
-          connectionId: state.config.connectionId,
-          modelId: state.config.modelId,
+          connectionId: effectiveConnectionId,
+          modelId: effectiveModelId,
           maxBudgetUsd: state.config.maxBudgetUsd,
           maxThinkingTokens: state.config.maxThinkingTokens,
+          ...(effectiveMcpServers ? { mcpServers: effectiveMcpServers } : {}),
+          ...(effectiveToolScope ? { toolScope: effectiveToolScope } : {}),
         },
       });
       ensureSessionFiles(sessionDir);
@@ -105,7 +184,7 @@ export function registerSessionHandlers(
     await reconcileMcpServersForActiveSession(state);
 
     // Inject system prompt as context_injected event
-    const persona = toNonEmptyString(parsed.persona) ?? 'lace';
+    const persona = requestedPersona ?? 'lace';
 
     // Create skill registry for this session's working directory
     const skillDirs = getSkillDirectories(parsed.workDir);
@@ -128,6 +207,7 @@ export function registerSessionHandlers(
       tools,
       session: sessionContext,
       skillRegistry,
+      personaRegistry: state.personaRegistry,
     });
     let sessionState: SessionState = readSessionState(sessionDir);
     const { nextState } = appendDurableEvent(sessionDir, sessionState, {

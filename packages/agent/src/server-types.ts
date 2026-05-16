@@ -15,6 +15,7 @@ import type { JobManager } from './jobs/job-manager';
 import type { ToolExecutor } from './tools/executor';
 import type { Tool } from './tools/tool';
 import type { SkillRegistry } from './skills';
+import type { PersonaRegistry } from './config/persona-registry';
 
 /**
  * Per-build allowlist of tool names. `undefined` means "no scope filter" (all tools available).
@@ -156,4 +157,7 @@ export type AgentServerState = {
   // Key: `${sessionId}|${executionMode}`. Holds Promises so concurrent calls
   // for the same key share one in-flight build.
   toolExecutorCache: Map<string, Promise<{ executor: ToolExecutor; toolsForProvider: Tool[] }>>;
+  // Embedder-controlled persona resolver. Defaulted to the module singleton;
+  // initialize handler replaces it when the client supplies userPersonasPaths.
+  personaRegistry: PersonaRegistry;
 };

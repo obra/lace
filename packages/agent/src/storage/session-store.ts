@@ -46,6 +46,8 @@ export type SessionState = {
       enabled?: boolean;
       tools?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
     }>;
+    /** Allowlist of tool names for this session; undefined means no scope filter. */
+    toolScope?: string[];
   };
 };
 

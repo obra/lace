@@ -6,6 +6,7 @@ import { appendDurableEvent } from './storage/event-log';
 import { ProviderCatalogManager } from './providers/catalog/manager';
 import { ProviderInstanceManager } from './providers/instance/manager';
 import { MCPServerManager } from './mcp/server-manager';
+import { personaRegistry as defaultPersonaRegistry } from './config/persona-registry';
 import { ToolExecutor } from './tools/executor';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { SkillRegistry } from '@lace/agent/skills';
@@ -98,6 +99,7 @@ export function createAgentServerState(): AgentServerState {
     pendingPermissionRequests: new Map(),
     sessionMutex: Promise.resolve(),
     toolExecutorCache: new Map(),
+    personaRegistry: defaultPersonaRegistry,
   };
 }
 

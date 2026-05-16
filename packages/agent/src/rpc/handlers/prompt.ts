@@ -224,6 +224,7 @@ export function registerPromptHandler(
       };
 
       const sessionIdForCache = state.activeSession.meta.sessionId;
+      const sessionToolScope = state.activeSession.state.config?.toolScope;
       const cachedCreateToolExecutor = ((
         executionMode: 'plan' | 'execute',
         mcpServerManager,
@@ -234,7 +235,15 @@ export function registerPromptHandler(
           state.toolExecutorCache,
           sessionIdForCache,
           executionMode,
-          () => createToolExecutorForMode(executionMode, mcpServerManager, jobManager, skillReg)
+          () =>
+            createToolExecutorForMode(
+              executionMode,
+              mcpServerManager,
+              jobManager,
+              skillReg,
+              sessionToolScope
+            ),
+          sessionToolScope
         )) as RunnerDependencies['createToolExecutor'];
 
       // Build runner dependencies

@@ -118,6 +118,9 @@ const InitializeParamsSchema = z
       })
       .strict()
       .optional(),
+    // Ordered persona search paths (earlier paths win). When omitted, the
+    // agent uses its default user-persona directory under laceDir.
+    userPersonasPaths: z.array(NonEmptyStringSchema).optional(),
   })
   .strict();
 export type InitializeParams = z.infer<typeof InitializeParamsSchema>;
@@ -168,6 +171,17 @@ const SessionNewParamsSchema = z
           })
           .strict(),
       ])
+      .optional(),
+    // When supplied, persona's frontmatter populates session config defaults
+    // (model, tools, mcpServers); request-level fields override persona defaults.
+    config: z
+      .object({
+        connectionId: NonEmptyStringSchema.optional(),
+        modelId: NonEmptyStringSchema.optional(),
+        persona: NonEmptyStringSchema.optional(),
+        mcpServers: z.array(McpServerConfigSchema).optional(),
+      })
+      .strict()
       .optional(),
   })
   .strict();

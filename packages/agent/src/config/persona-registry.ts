@@ -85,6 +85,16 @@ export class PersonaRegistry {
     this.loadBundledPersonas();
   }
 
+  /** Ordered list of user persona search paths (earlier wins). */
+  getUserPersonasPaths(): readonly string[] {
+    return this.userPersonasPaths;
+  }
+
+  /** Filesystem path containing bundled personas (used as template overlay). */
+  getBundledPersonasPath(): string {
+    return this.bundledPersonasPath;
+  }
+
   private loadBundledPersonas(): void {
     try {
       // Use shared utility to scan for persona files

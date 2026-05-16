@@ -4,7 +4,6 @@ import type { JsonRpcPeer, ToolInfo, PersonaInfo } from '@lace/ent-protocol';
 import type { AgentServerState, CreateToolExecutorFn } from '../../server-types';
 import { protocolToolInfoForCoreTool } from '../utils';
 import { assertInitialized } from '../utils';
-import { personaRegistry } from '../../config/persona-registry';
 import { SkillRegistry, getSkillDirectories } from '../../skills';
 
 /**
@@ -47,7 +46,7 @@ export function registerToolHandlers(
 
   // Persona listing handler
   peer.onRequest('ent/personas/list', async (_params: unknown) => {
-    const personas: PersonaInfo[] = personaRegistry.listAvailablePersonas();
+    const personas: PersonaInfo[] = state.personaRegistry.listAvailablePersonas();
     return { personas };
   });
 }

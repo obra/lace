@@ -5,6 +5,8 @@ import { EntErrorCodes } from '@lace/ent-protocol';
 import { getUserSlashCommands } from '../../user-commands';
 import { protocolToolInfoForCoreTool } from '../utils';
 import type { AgentServerState, CreateToolExecutorFn } from '../../server-types';
+import { PersonaRegistry } from '../../config/persona-registry';
+import { resolveResourcePath } from '../../utils/resource-resolver';
 
 /**
  * Register the initialize RPC handler with the peer.
@@ -43,6 +45,21 @@ export function registerInitializeHandler(
       throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
 
     const config = (parsed.config as Record<string, unknown> | undefined) ?? undefined;
+
+    // Embedder-controlled persona search paths; ordered, earlier paths win.
+    if (Array.isArray(parsed.userPersonasPaths)) {
+      const userPaths: string[] = [];
+      for (const p of parsed.userPersonasPaths) {
+        if (typeof p !== 'string' || p.length === 0) {
+          throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+        }
+        userPaths.push(p);
+      }
+      state.personaRegistry = new PersonaRegistry({
+        bundledPersonasPath: resolveResourcePath(import.meta.url, 'agent-personas'),
+        userPersonasPaths: userPaths,
+      });
+    }
 
     state.initialized = true;
     if (config?.executionMode === 'plan') state.config.executionMode = 'plan';
