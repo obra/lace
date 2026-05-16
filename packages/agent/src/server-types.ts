@@ -17,6 +17,12 @@ import type { Tool } from './tools/tool';
 import type { SkillRegistry } from './skills';
 
 /**
+ * Per-build allowlist of tool names. `undefined` means "no scope filter" (all tools available).
+ * An empty array means "allow nothing".
+ */
+export type AgentToolScope = readonly string[] | undefined;
+
+/**
  * Factory function type for creating tool executors.
  * Used by RPC handlers to create executors with the appropriate mode and dependencies.
  */
@@ -24,7 +30,8 @@ export type CreateToolExecutorFn = (
   mode: 'plan' | 'execute',
   mcpServerManager?: MCPServerManager,
   jobManager?: JobManager,
-  skillRegistry?: SkillRegistry
+  skillRegistry?: SkillRegistry,
+  toolScope?: AgentToolScope
 ) => Promise<{
   executor: ToolExecutor;
   toolsForProvider: Tool[];

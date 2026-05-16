@@ -114,9 +114,9 @@ describe('invalidateSessionToolExecutor', () => {
 
     invalidateSessionToolExecutor(cache, 'sess_a');
 
-    expect(cache.has('sess_a|execute')).toBe(false);
-    expect(cache.has('sess_a|plan')).toBe(false);
-    expect(cache.has('sess_b|execute')).toBe(true);
+    expect(cache.has('sess_a|execute|*')).toBe(false);
+    expect(cache.has('sess_a|plan|*')).toBe(false);
+    expect(cache.has('sess_b|execute|*')).toBe(true);
   });
 
   it('does not drop entries for unrelated sessions whose ids share a prefix', async () => {
@@ -129,7 +129,7 @@ describe('invalidateSessionToolExecutor', () => {
 
     invalidateSessionToolExecutor(cache, 'sess_a');
 
-    expect(cache.has('sess_a|execute')).toBe(false);
-    expect(cache.has('sess_aa|execute')).toBe(true);
+    expect(cache.has('sess_a|execute|*')).toBe(false);
+    expect(cache.has('sess_aa|execute|*')).toBe(true);
   });
 });

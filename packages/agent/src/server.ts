@@ -25,7 +25,12 @@ import {
 } from './jobs/job-creation';
 import { createJobDerivation } from './jobs/job-derivation';
 import { JobManager } from './jobs/job-manager';
-import { type SessionUpdate, type JobState, type AgentServerState } from './server-types';
+import {
+  type SessionUpdate,
+  type JobState,
+  type AgentServerState,
+  type AgentToolScope,
+} from './server-types';
 import { toolKindFromName } from './rpc/utils';
 import { requestPermissionFromClient, reissuePendingPermissionRequests } from './rpc/permissions';
 import { registerAllHandlers } from './rpc/register-handlers';
@@ -40,7 +45,8 @@ export async function createToolExecutorForMode(
   executionMode: 'plan' | 'execute',
   mcpServerManager?: MCPServerManager,
   jobManager?: JobManager,
-  skillRegistry?: SkillRegistry
+  skillRegistry?: SkillRegistry,
+  toolScope?: AgentToolScope
 ): Promise<{
   executor: ToolExecutor;
   toolsForProvider: CoreTool[];
@@ -59,13 +65,16 @@ export async function createToolExecutorForMode(
   }
 
   const allTools = executor.getAllTools();
+  // Scope filter runs before plan-mode kind filter so plan still restricts to read/search.
+  const scoped =
+    toolScope === undefined ? allTools : allTools.filter((t) => toolScope.includes(t.name));
   const filteredTools =
     executionMode === 'plan'
-      ? allTools.filter((t) => {
+      ? scoped.filter((t) => {
           const kind = toolKindFromName(t.name);
           return kind === 'read' || kind === 'search';
         })
-      : allTools;
+      : scoped;
 
   // Cast to CoreTool[] for provider compatibility - providers still use core Tool type
   const toolsForProvider = filteredTools as unknown as CoreTool[];
@@ -99,9 +108,11 @@ export function getOrCreateSessionToolExecutor(
   cache: ToolExecutorCache,
   sessionId: string,
   executionMode: 'plan' | 'execute',
-  build: () => Promise<ToolExecutorCacheValue>
+  build: () => Promise<ToolExecutorCacheValue>,
+  toolScope?: AgentToolScope
 ): Promise<ToolExecutorCacheValue> {
-  const key = `${sessionId}|${executionMode}`;
+  const scopeKey = toolScope === undefined ? '*' : toolScope.slice().sort().join(',');
+  const key = `${sessionId}|${executionMode}|${scopeKey}`;
   const existing = cache.get(key);
   if (existing) return existing;
   // Insert the Promise synchronously so concurrent callers see the same in-flight build.
