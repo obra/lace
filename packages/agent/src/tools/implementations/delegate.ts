@@ -91,9 +91,7 @@ The subagent receives your message with its full conversation history intact.`;
     } = args;
 
     // Resolve persona bundle (if any) before any job creation so we fail fast.
-    let personaBody: string | undefined;
     let personaModelDefault: string | undefined;
-    let personaTools: readonly string[] | undefined;
     let personaMcpServers:
       | Record<
           string,
@@ -110,9 +108,7 @@ The subagent receives your message with its full conversation history intact.`;
     if (persona) {
       try {
         const parsed = this.personaRegistry.parsePersona(persona);
-        personaBody = parsed.body;
         personaModelDefault = parsed.config.model;
-        personaTools = parsed.config.tools;
         personaMcpServers = parsed.config.mcpServers;
       } catch (err) {
         if (err instanceof PersonaNotFoundError || err instanceof PersonaParseError) {
@@ -168,8 +164,6 @@ The subagent receives your message with its full conversation history intact.`;
           ? { turnId: context.turnId, turnSeq: context.turnSeq }
           : undefined,
       ...(persona ? { persona } : {}),
-      ...(personaBody ? { personaBody } : {}),
-      ...(personaTools ? { personaTools } : {}),
       ...(personaMcpServers ? { personaMcpServers } : {}),
     });
 

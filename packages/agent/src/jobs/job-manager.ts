@@ -33,8 +33,6 @@ export type CreateJobOptions = {
   progressIntervalMs?: number;
   // Persona-bundle support for delegate jobs
   persona?: string;
-  personaBody?: string;
-  personaTools?: readonly string[];
   personaMcpServers?: Record<
     string,
     {
@@ -402,8 +400,6 @@ export class JobManager {
             subagentContent: [{ type: 'text', text: options.prompt }],
             ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
             ...(options.persona ? { persona: options.persona } : {}),
-            ...(options.personaBody ? { personaBody: options.personaBody } : {}),
-            ...(options.personaTools ? { personaTools: options.personaTools } : {}),
             ...(options.personaMcpServers ? { personaMcpServers: options.personaMcpServers } : {}),
           }
         : {}),

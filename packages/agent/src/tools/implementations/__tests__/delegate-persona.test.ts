@@ -92,8 +92,6 @@ mcpServers:
         persona: 'librarian',
         modelId: 'claude-3-5-sonnet',
         personaMcpServers: { fs: { command: 'mcp-fs' } },
-        personaTools: ['file_read', 'bash'],
-        personaBody: expect.stringContaining('You are a librarian.'),
       })
     );
   });
@@ -154,13 +152,11 @@ mcpServers:
       'delegate',
       expect.objectContaining({
         persona: 'plain',
-        personaBody: expect.stringContaining('Just body'),
       })
     );
     const args = createJob.mock.calls[0]![1] as Record<string, unknown>;
     expect(args.modelId).toBeUndefined();
     expect(args.personaMcpServers).toBeUndefined();
-    expect(args.personaTools).toBeUndefined();
   });
 
   it('unknown persona returns failed result listing available personas', async () => {

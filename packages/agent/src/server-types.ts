@@ -94,8 +94,6 @@ export type JobState = {
   modelId?: string;
   // Persona-bundle defaults applied to subagent session (delegate jobs only)
   persona?: string;
-  personaBody?: string;
-  personaTools?: readonly string[];
   personaMcpServers?: Record<
     string,
     {
