@@ -4,6 +4,12 @@
 import { z } from 'zod';
 import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
+import {
+  PersonaRegistry,
+  personaRegistry as defaultPersonaRegistry,
+  PersonaNotFoundError,
+  PersonaParseError,
+} from '@lace/agent/config/persona-registry';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
 const delegateSchema = z
@@ -15,8 +21,13 @@ const delegateSchema = z
     progressIntervalMs: z.number().int().min(5000).max(600000).optional(),
     connectionId: z.string().optional(),
     modelId: z.string().optional(),
+    persona: z.string().optional(),
   })
   .strict();
+
+export interface DelegateToolOptions {
+  personaRegistry?: PersonaRegistry;
+}
 
 export class DelegateTool extends Tool {
   name = 'delegate';
@@ -29,7 +40,8 @@ Parameters:
 - resume: JobId of a previous delegate job to continue its session
 - progressIntervalMs: For background jobs, interval in ms for progress notifications (5000-600000, default 300000)
 - connectionId: Provider connection to use for the subagent (optional, defaults to parent session's connection)
-- modelId: Model to use for the subagent (optional, defaults to parent session's model)
+- modelId: Model to use for the subagent (optional, defaults to parent session's model or persona's model)
+- persona: Name of a persona bundle (e.g. "librarian"). Its frontmatter becomes subagent defaults; its body is the subagent's system prompt template. Per-call modelId/connectionId override the persona's defaults.
 
 **Sync mode (default):** Blocks until subagent completes. Output is prefixed with "delegate jobId=<id>". This jobId can be used with resume.
 
@@ -47,6 +59,13 @@ The subagent receives your message with its full conversation history intact.`;
     safeInternal: true,
   };
 
+  private readonly personaRegistry: PersonaRegistry;
+
+  constructor(opts: DelegateToolOptions = {}) {
+    super();
+    this.personaRegistry = opts.personaRegistry ?? defaultPersonaRegistry;
+  }
+
   protected async executeValidated(
     args: z.infer<typeof delegateSchema>,
     context: ToolContext
@@ -60,8 +79,54 @@ The subagent receives your message with its full conversation history intact.`;
       };
     }
 
-    const { prompt, description, background, resume, progressIntervalMs, connectionId, modelId } =
-      args;
+    const {
+      prompt,
+      description,
+      background,
+      resume,
+      progressIntervalMs,
+      connectionId,
+      modelId,
+      persona,
+    } = args;
+
+    // Resolve persona bundle (if any) before any job creation so we fail fast.
+    let personaBody: string | undefined;
+    let personaModelDefault: string | undefined;
+    let personaTools: readonly string[] | undefined;
+    let personaMcpServers:
+      | Record<
+          string,
+          {
+            command: string;
+            args?: string[];
+            env?: Record<string, string>;
+            enabled?: boolean;
+            tools?: Record<string, unknown>;
+          }
+        >
+      | undefined;
+
+    if (persona) {
+      try {
+        const parsed = this.personaRegistry.parsePersona(persona);
+        personaBody = parsed.body;
+        personaModelDefault = parsed.config.model;
+        personaTools = parsed.config.tools;
+        personaMcpServers = parsed.config.mcpServers;
+      } catch (err) {
+        if (err instanceof PersonaNotFoundError || err instanceof PersonaParseError) {
+          return {
+            status: 'failed',
+            content: [{ type: 'text', text: err.message }],
+          };
+        }
+        throw err;
+      }
+    }
+
+    // Per-call modelId wins; otherwise fall back to persona default (if any).
+    const effectiveModelId = modelId ?? personaModelDefault;
 
     // Handle resume - look up previous job's session
     let resumeSessionId: string | undefined;
@@ -97,11 +162,15 @@ The subagent receives your message with its full conversation history intact.`;
       resumeSessionId,
       progressIntervalMs,
       connectionId,
-      modelId,
+      modelId: effectiveModelId,
       turnContext:
         context.turnId && context.turnSeq !== undefined
           ? { turnId: context.turnId, turnSeq: context.turnSeq }
           : undefined,
+      ...(persona ? { persona } : {}),
+      ...(personaBody ? { personaBody } : {}),
+      ...(personaTools ? { personaTools } : {}),
+      ...(personaMcpServers ? { personaMcpServers } : {}),
     });
 
     // Background mode - return immediately

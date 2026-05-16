@@ -569,15 +569,18 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       });
 
       // Resume existing session or create a new one
-      if (job.subagentSessionId) {
+      const resumedSession = !!job.subagentSessionId;
+      if (resumedSession) {
         // Resume: load the existing session
         await childPeer.request('session/load', {
           sessionId: job.subagentSessionId,
         });
       } else {
-        // New session
+        // New session - thread persona through so subagent's system prompt
+        // template comes from the persona's body.
         const created = (await childPeer.request('session/new', {
           workDir: currentState.activeSession!.meta.workDir,
+          ...(job.persona ? { persona: job.persona } : {}),
         })) as { sessionId: string };
         job.subagentSessionId = created.sessionId;
       }
@@ -610,11 +613,29 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         job.modelId = effective.modelId;
       }
 
-      // Configure subagent session with provider/model if specified
-      if (job.connectionId || job.modelId) {
+      // Apply persona mcpServers on first creation only — resumed sessions
+      // already have their MCP config persisted from the original run.
+      const personaMcpServersList =
+        job.personaMcpServers && !resumedSession
+          ? Object.entries(job.personaMcpServers).map(([name, spec]) => ({
+              name,
+              command: spec.command,
+              ...(spec.args ? { args: spec.args } : {}),
+              ...(spec.env ? { env: spec.env } : {}),
+              ...(spec.enabled !== undefined ? { enabled: spec.enabled } : {}),
+            }))
+          : undefined;
+
+      // Configure subagent session with provider/model and any persona MCP defaults.
+      const hasConfigurable =
+        job.connectionId || job.modelId || (personaMcpServersList && personaMcpServersList.length);
+      if (hasConfigurable) {
         await childPeer.request('ent/session/configure', {
           ...(job.connectionId ? { connectionId: job.connectionId } : {}),
           ...(job.modelId ? { modelId: job.modelId } : {}),
+          ...(personaMcpServersList && personaMcpServersList.length
+            ? { mcpServers: personaMcpServersList }
+            : {}),
         });
       }
 

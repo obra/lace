@@ -31,6 +31,20 @@ export type CreateJobOptions = {
   connectionId?: string;
   modelId?: string;
   progressIntervalMs?: number;
+  // Persona-bundle support for delegate jobs
+  persona?: string;
+  personaBody?: string;
+  personaTools?: readonly string[];
+  personaMcpServers?: Record<
+    string,
+    {
+      command: string;
+      args?: string[];
+      env?: Record<string, string>;
+      enabled?: boolean;
+      tools?: Record<string, unknown>;
+    }
+  >;
 };
 
 /**
@@ -387,6 +401,10 @@ export class JobManager {
         ? {
             subagentContent: [{ type: 'text', text: options.prompt }],
             ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
+            ...(options.persona ? { persona: options.persona } : {}),
+            ...(options.personaBody ? { personaBody: options.personaBody } : {}),
+            ...(options.personaTools ? { personaTools: options.personaTools } : {}),
+            ...(options.personaMcpServers ? { personaMcpServers: options.personaMcpServers } : {}),
           }
         : {}),
     };

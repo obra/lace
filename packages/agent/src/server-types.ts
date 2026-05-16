@@ -92,6 +92,20 @@ export type JobState = {
   // Subagent provider/model configuration
   connectionId?: string;
   modelId?: string;
+  // Persona-bundle defaults applied to subagent session (delegate jobs only)
+  persona?: string;
+  personaBody?: string;
+  personaTools?: readonly string[];
+  personaMcpServers?: Record<
+    string,
+    {
+      command: string;
+      args?: string[];
+      env?: Record<string, string>;
+      enabled?: boolean;
+      tools?: Record<string, unknown>;
+    }
+  >;
 };
 
 export type PendingJobNotification = {
