@@ -26,6 +26,12 @@ import type { MCPServerConnection } from '@lace/agent/config/mcp-types';
 import { MCPToolAdapter } from '../mcp/tool-adapter';
 import { logger } from '@lace/agent/utils/logger';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
+import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
+
+export interface RegisterToolsOptions {
+  /** PersonaRegistry to wire into DelegateTool. Defaults to the global singleton. */
+  personaRegistry?: PersonaRegistry;
+}
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
@@ -237,7 +243,10 @@ export class ToolExecutor {
     return this.envManager;
   }
 
-  registerAllAvailableTools(skillRegistry?: SkillRegistry): void {
+  registerAllAvailableTools(
+    skillRegistry?: SkillRegistry,
+    options: RegisterToolsOptions = {}
+  ): void {
     const tools: Tool[] = [
       new BashTool(),
       new FileReadTool(), // Schema-based file read tool
@@ -246,7 +255,7 @@ export class ToolExecutor {
       new RipgrepSearchTool(),
       new FileFindTool(),
       new UrlFetchTool(),
-      new DelegateTool(),
+      new DelegateTool({ personaRegistry: options.personaRegistry }),
       new JobOutputTool(),
       new JobsListTool(),
       new JobKillTool(),

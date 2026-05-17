@@ -6,7 +6,10 @@ import { appendDurableEvent } from './storage/event-log';
 import { ProviderCatalogManager } from './providers/catalog/manager';
 import { ProviderInstanceManager } from './providers/instance/manager';
 import { MCPServerManager } from './mcp/server-manager';
-import { personaRegistry as defaultPersonaRegistry } from './config/persona-registry';
+import {
+  personaRegistry as defaultPersonaRegistry,
+  type PersonaRegistry,
+} from './config/persona-registry';
 import { ToolExecutor } from './tools/executor';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { SkillRegistry } from '@lace/agent/skills';
@@ -47,13 +50,14 @@ export async function createToolExecutorForMode(
   mcpServerManager?: MCPServerManager,
   jobManager?: JobManager,
   skillRegistry?: SkillRegistry,
-  toolScope?: AgentToolScope
+  toolScope?: AgentToolScope,
+  personaRegistry?: PersonaRegistry
 ): Promise<{
   executor: ToolExecutor;
   toolsForProvider: CoreTool[];
 }> {
   const executor = new ToolExecutor();
-  executor.registerAllAvailableTools(skillRegistry);
+  executor.registerAllAvailableTools(skillRegistry, { personaRegistry });
 
   if (mcpServerManager) {
     executor.registerMCPTools(mcpServerManager);

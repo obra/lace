@@ -195,7 +195,9 @@ export function registerSessionHandlers(
       state.config.executionMode,
       state.mcpServerManager,
       undefined, // jobManager
-      skillRegistry
+      skillRegistry,
+      undefined, // toolScope
+      state.personaRegistry
     );
     const tools = toolsForProvider.map((t) => ({ name: t.name, description: t.description }));
 

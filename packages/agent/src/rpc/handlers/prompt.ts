@@ -241,7 +241,8 @@ export function registerPromptHandler(
               mcpServerManager,
               jobManager,
               skillReg,
-              sessionToolScope
+              sessionToolScope,
+              state.personaRegistry
             ),
           sessionToolScope
         )) as RunnerDependencies['createToolExecutor'];

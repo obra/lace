@@ -29,7 +29,9 @@ export function registerToolHandlers(
       state.config.executionMode,
       state.mcpServerManager,
       undefined, // jobManager
-      skillRegistry
+      skillRegistry,
+      undefined, // toolScope
+      state.personaRegistry
     );
 
     const seenToolNames = new Set<string>();

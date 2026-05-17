@@ -32,7 +32,8 @@ export type CreateToolExecutorFn = (
   mcpServerManager?: MCPServerManager,
   jobManager?: JobManager,
   skillRegistry?: SkillRegistry,
-  toolScope?: AgentToolScope
+  toolScope?: AgentToolScope,
+  personaRegistry?: PersonaRegistry
 ) => Promise<{
   executor: ToolExecutor;
   toolsForProvider: Tool[];
