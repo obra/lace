@@ -109,7 +109,7 @@ A session is one conversation thread. It has an event log, a persona, a connecti
 Create a session:
 
 ```ts
-const { sessionId } = await peer.request('session/create', {
+const { sessionId } = await peer.request('session/new', {
   workDir: '/some/dir',
   config: {
     connectionId: 'anthropic-main',
