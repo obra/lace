@@ -91,7 +91,7 @@ export function registerSessionHandlers(
       toNonEmptyString(parsed.config?.persona) ?? toNonEmptyString(parsed.persona);
 
     // Parse persona frontmatter before any storage writes so we fail fast on invalid input.
-    let personaDefaults: {
+    const personaDefaults: {
       modelId?: string;
       toolScope?: string[];
       mcpServers?: Array<{
@@ -286,6 +286,20 @@ export function registerSessionHandlers(
       throw error;
     }
     state.activeSession = loaded;
+
+    // Rehydrate state.config from the persisted session's config so the next
+    // session/prompt works without an intervening ent/session/configure call.
+    // Without this, embedders see "connectionId and modelId are required
+    // before prompting" from the turn factory even though the loaded session
+    // was originally created with those values.
+    const loadedConfig = loaded.state.config;
+    if (loadedConfig?.connectionId) {
+      state.config.connectionId = loadedConfig.connectionId;
+    }
+    if (loadedConfig?.modelId) {
+      state.config.modelId = loadedConfig.modelId;
+    }
+
     await reconcileMcpServersForActiveSession(state);
     await reissuePendingPermissionRequests();
     const summary = summarizeDurableEvents(loaded.dir);
