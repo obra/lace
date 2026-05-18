@@ -226,11 +226,16 @@ export function registerPromptHandler(
 
       const sessionIdForCache = state.activeSession.meta.sessionId;
       const sessionToolScope = state.activeSession.state.config?.toolScope;
+      // Forwards personaRegistry through explicitly so the data flow from
+      // state.personaRegistry → DelegateTool is auditable (no closure capture
+      // hiding the wiring). Per-session toolScope is captured because it is
+      // not part of the runner's interface.
       const cachedCreateToolExecutor = ((
         executionMode: 'plan' | 'execute',
         mcpServerManager,
         jobManager,
-        skillReg
+        skillReg,
+        personaReg
       ) =>
         getOrCreateSessionToolExecutor(
           state.toolExecutorCache,
@@ -243,7 +248,7 @@ export function registerPromptHandler(
               jobManager,
               skillReg,
               sessionToolScope,
-              state.personaRegistry
+              personaReg
             ),
           sessionToolScope
         )) as RunnerDependencies['createToolExecutor'];
@@ -265,6 +270,7 @@ export function registerPromptHandler(
         jobManager: state.jobManager,
         mcpServerManager: state.mcpServerManager,
         skillRegistry,
+        personaRegistry: state.personaRegistry,
         setActiveTurnStatus: (status, ac) => {
           if (status === null) {
             state.activeTurn = null;

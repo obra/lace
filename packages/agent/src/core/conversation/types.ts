@@ -7,6 +7,7 @@ import type { SessionUpdate } from '@lace/agent/server-types';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { MCPServerManager } from '@lace/agent/mcp/server-manager';
 import type { SkillRegistry } from '@lace/agent/skills';
+import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
 
 /**
  * Approval mode for tool permissions.
@@ -73,7 +74,8 @@ export interface RunnerDependencies {
     executionMode: 'plan' | 'execute',
     mcpServerManager?: MCPServerManager,
     jobManager?: JobManager,
-    skillRegistry?: SkillRegistry
+    skillRegistry?: SkillRegistry,
+    personaRegistry?: PersonaRegistry
   ) => Promise<{
     executor: {
       getTool: (name: string) => CoreTool | undefined;
@@ -103,6 +105,14 @@ export interface RunnerDependencies {
 
   /** Skill registry for skill-related tools (optional) */
   skillRegistry?: SkillRegistry;
+
+  /**
+   * PersonaRegistry to thread into DelegateTool so embedder-supplied
+   * `userPersonasPaths` are visible from `delegate({persona})` calls.
+   * Optional: when omitted, DelegateTool falls back to the module-load
+   * default registry (which scans LACE_DIR/agent-personas).
+   */
+  personaRegistry?: PersonaRegistry;
 
   /** Update the active turn status */
   setActiveTurnStatus: (

@@ -161,11 +161,18 @@ export class PersonaRegistry {
 
     this.userPersonasCache.clear();
 
+    // Track whether any configured path was actually scannable. When none
+    // were (e.g. a Docker mount or symlink target had not appeared yet),
+    // we skip setting userCacheExpiry so the next call re-scans instead
+    // of locking in an empty result for USER_CACHE_TTL (kata #55).
+    let anyPathScanned = false;
+
     // Earlier paths win: only set a persona name if not already mapped from an earlier path.
     for (const userPersonasPath of this.userPersonasPaths) {
       try {
         if (!fs.existsSync(userPersonasPath)) continue;
         const files = fs.readdirSync(userPersonasPath);
+        anyPathScanned = true;
         for (const file of files) {
           if (!file.endsWith('.md')) continue;
           const name = file.slice(0, -3);
@@ -178,7 +185,9 @@ export class PersonaRegistry {
       }
     }
 
-    this.userCacheExpiry = now + this.USER_CACHE_TTL;
+    if (anyPathScanned || this.userPersonasPaths.length === 0) {
+      this.userCacheExpiry = now + this.USER_CACHE_TTL;
+    }
   }
 
   /**
