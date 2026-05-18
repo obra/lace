@@ -13,6 +13,7 @@ import {
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
 import { getJobOutputPath } from './job-file-utils';
+import { applyEffectiveJobConfig, rpcErrorMessage } from './subagent-job-helpers';
 import { logger } from '@lace/agent/utils/logger';
 import type { ToolResult } from '@lace/ent-protocol';
 import {
@@ -603,15 +604,15 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         stateAfterWrite.activeSession = loadSession(updatedState.activeSession!.meta.sessionId);
       });
 
-      // If the delegate tool didn't specify connection/model, inherit from the parent effective config.
-      if (!job.connectionId && !job.modelId) {
-        const effective = getEffectiveConfig(
-          currentState.config,
-          currentState.activeSession?.state.config
-        );
-        job.connectionId = effective.connectionId;
-        job.modelId = effective.modelId;
-      }
+      // Inherit any unset connectionId/modelId from the parent's effective config.
+      // The two fields are inherited independently: when a persona supplies a
+      // modelId but the delegate call provides no connectionId, the parent's
+      // connectionId must still flow through.
+      const effective = getEffectiveConfig(
+        currentState.config,
+        currentState.activeSession?.state.config
+      );
+      applyEffectiveJobConfig(job, effective);
 
       // Apply persona mcpServers on first creation only — resumed sessions
       // already have their MCP config persisted from the original run.
@@ -645,8 +646,10 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
     } catch (error) {
       if (job.status !== 'cancelled') job.status = 'failed';
 
-      // Extract detailed error information
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      // Extract detailed error information. JSON-RPC error responses arrive as
+      // plain objects with a string `message` field, but they are not Error
+      // instances — `String(error)` would collapse them to "[object Object]".
+      const errorMessage = rpcErrorMessage(error);
       // Cast to RpcErrorLike after checking it's an object with the expected properties
       const isErrorObject = error !== null && typeof error === 'object';
       const errorObj = isErrorObject ? (error as RpcErrorLike) : undefined;
