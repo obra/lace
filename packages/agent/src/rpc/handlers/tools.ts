@@ -18,10 +18,11 @@ export function registerToolHandlers(
   peer.onRequest('ent/tools/list', async (_params: unknown) => {
     assertInitialized(state);
 
-    // Create skill registry if there's an active session
+    // Create skill registry if there's an active session. Embedder-supplied
+    // skillDirs (set during initialize) override workDir-based discovery.
     let skillRegistry: SkillRegistry | undefined;
     if (state.activeSession) {
-      const skillDirs = getSkillDirectories(state.activeSession.meta.workDir);
+      const skillDirs = state.skillDirs ?? getSkillDirectories(state.activeSession.meta.workDir);
       skillRegistry = new SkillRegistry({ skillDirs });
     }
 

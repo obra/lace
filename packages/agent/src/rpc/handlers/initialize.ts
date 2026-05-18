@@ -61,6 +61,18 @@ export function registerInitializeHandler(
       });
     }
 
+    // Embedder-controlled skill directories; ordered, earlier paths win.
+    if (Array.isArray(parsed.skillDirs)) {
+      const skillDirs: string[] = [];
+      for (const p of parsed.skillDirs) {
+        if (typeof p !== 'string' || p.length === 0) {
+          throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+        }
+        skillDirs.push(p);
+      }
+      state.skillDirs = skillDirs;
+    }
+
     state.initialized = true;
     if (config?.executionMode === 'plan') state.config.executionMode = 'plan';
     if (config?.executionMode === 'execute') state.config.executionMode = 'execute';

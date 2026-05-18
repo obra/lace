@@ -26,6 +26,36 @@ describe('protocol shapes (representative examples)', () => {
       })
     ).not.toThrow();
 
+    // initialize with embedder-supplied skillDirs is accepted.
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'init-skilldirs',
+        method: 'initialize',
+        params: {
+          protocolVersion: '1.0',
+          clientInfo: { name: 'test-client', version: '0.0.0' },
+          capabilities: { streaming: true },
+          skillDirs: ['/tmp/knowledge/skills', '/tmp/school/skills'],
+        },
+      })
+    ).not.toThrow();
+
+    // empty string entries in skillDirs are rejected.
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'init-bad-skilldirs',
+        method: 'initialize',
+        params: {
+          protocolVersion: '1.0',
+          clientInfo: { name: 'test-client', version: '0.0.0' },
+          capabilities: { streaming: true },
+          skillDirs: [''],
+        },
+      })
+    ).toThrow();
+
     expect(() =>
       EntProtocolRequestSchema.parse({
         jsonrpc: '2.0',

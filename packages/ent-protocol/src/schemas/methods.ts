@@ -121,6 +121,11 @@ const InitializeParamsSchema = z
     // Ordered persona search paths (earlier paths win). When omitted, the
     // agent uses its default user-persona directory under laceDir.
     userPersonasPaths: z.array(NonEmptyStringSchema).optional(),
+    // Ordered skill directories (earlier paths win on name conflict). When
+    // omitted, the agent uses its default discovery (project + user level
+    // `.lace/skills` and `.claude/skills`). When provided, these directories
+    // are used exclusively — the embedder controls the skill search path.
+    skillDirs: z.array(NonEmptyStringSchema).optional(),
   })
   .strict();
 export type InitializeParams = z.infer<typeof InitializeParamsSchema>;

@@ -6,10 +6,7 @@ import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
 import type { SkillRegistry } from '@lace/agent/skills';
 
 const useSkillSchema = z.object({
-  skill: z
-    .string()
-    .min(1, 'Skill name is required')
-    .describe('Name of the skill to activate'),
+  skill: z.string().min(1, 'Skill name is required').describe('Name of the skill to activate'),
 });
 
 /**
@@ -44,7 +41,14 @@ export class UseSkillTool extends Tool {
   ): Promise<ToolResult> {
     const { skill: skillName } = args;
 
-    const content = this.registry.getSkillContent(skillName);
+    // Cache may be stale if a skill was authored after registry construction
+    // (e.g. via sen-core's create_skill tool). Refresh once on miss before
+    // declaring the skill not found.
+    let content = this.registry.getSkillContent(skillName);
+    if (!content) {
+      this.registry.refresh();
+      content = this.registry.getSkillContent(skillName);
+    }
     if (!content) {
       return this.createError(
         `Skill '${skillName}' not found. Check available skills in your system prompt.`

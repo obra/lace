@@ -196,8 +196,9 @@ export function registerSessionHandlers(
     // Inject system prompt as context_injected event
     const persona = requestedPersona ?? 'lace';
 
-    // Create skill registry for this session's working directory
-    const skillDirs = getSkillDirectories(parsed.workDir);
+    // Create skill registry for this session. Embedder-supplied skillDirs
+    // (set during initialize) override the default workDir-based discovery.
+    const skillDirs = state.skillDirs ?? getSkillDirectories(parsed.workDir);
     const skillRegistry = new SkillRegistry({ skillDirs });
 
     // Get available tools for system prompt context

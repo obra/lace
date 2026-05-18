@@ -87,6 +87,28 @@ describe('SkillVariableProvider', () => {
     expect(xml).toBe('<available_skills>\n</available_skills>');
   });
 
+  it('refreshes registry on each getVariables call to pick up new skills', async () => {
+    const skillsDir = join(testDir, 'skills');
+    await mkdir(skillsDir, { recursive: true });
+
+    const registry = new SkillRegistry({ skillDirs: [skillsDir] });
+    const provider = new SkillVariableProvider(registry);
+
+    // First call: no skills yet.
+    let xml = provider.getVariables().availableSkills as string;
+    expect(xml).toBe('<available_skills>\n</available_skills>');
+
+    // Add a skill on disk after the registry was built.
+    await createSkillDir(skillsDir, 'morning-checkin', {
+      description: 'Daily morning check-in routine',
+    });
+
+    // Second call: provider must refresh and surface the new skill.
+    xml = provider.getVariables().availableSkills as string;
+    expect(xml).toContain('<name>morning-checkin</name>');
+    expect(xml).toContain('<description>Daily morning check-in routine</description>');
+  });
+
   it('escapes HTML entities in name and description', async () => {
     const skillsDir = join(testDir, 'skills');
     await mkdir(skillsDir, { recursive: true });

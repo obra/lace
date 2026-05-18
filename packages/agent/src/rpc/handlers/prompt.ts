@@ -206,8 +206,9 @@ export function registerPromptHandler(
           ? Math.max(1, Math.trunc((params as { maxTurns?: number }).maxTurns!))
           : ConversationRunner.DEFAULT_MAX_TURNS;
 
-      // Create skill registry for this session's working directory
-      const skillDirs = getSkillDirectories(state.activeSession.meta.workDir);
+      // Create skill registry for this session. Embedder-supplied skillDirs
+      // (set during initialize) override the default workDir-based discovery.
+      const skillDirs = state.skillDirs ?? getSkillDirectories(state.activeSession.meta.workDir);
       const skillRegistry = new SkillRegistry({ skillDirs });
 
       // Build runner config

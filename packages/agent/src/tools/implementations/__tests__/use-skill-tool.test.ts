@@ -32,11 +32,7 @@ describe('UseSkillTool', () => {
   }
 
   it('returns skill content and location for existing skill', async () => {
-    createSkill(
-      'commit',
-      'Create git commits',
-      '# Commit Skill\n\nFollow these steps...'
-    );
+    createSkill('commit', 'Create git commits', '# Commit Skill\n\nFollow these steps...');
     registry = new SkillRegistry({ skillDirs: [skillsDir] });
     const tool = new UseSkillTool(registry);
 
@@ -76,10 +72,7 @@ describe('UseSkillTool', () => {
     registry = new SkillRegistry({ skillDirs: [skillsDir] });
     const tool = new UseSkillTool(registry);
 
-    const result = await tool.execute(
-      { skill: '' },
-      { signal: new AbortController().signal }
-    );
+    const result = await tool.execute({ skill: '' }, { signal: new AbortController().signal });
 
     expect(result.status).toBe('failed');
     // Zod validation should catch this
@@ -95,6 +88,36 @@ describe('UseSkillTool', () => {
     expect(tool.description).toContain('skill');
     expect(tool.annotations?.readOnlyHint).toBe(true);
     expect(tool.annotations?.idempotentHint).toBe(true);
+  });
+
+  it('refreshes registry on cache miss and finds newly-added skill', async () => {
+    // Registry built with an empty skillsDir, then a skill is added afterward.
+    // UseSkillTool should refresh on miss and discover it.
+    registry = new SkillRegistry({ skillDirs: [skillsDir] });
+    const tool = new UseSkillTool(registry);
+
+    createSkill('fresh', 'A freshly-authored skill', '# Fresh\n\nBody.');
+
+    const result = await tool.execute({ skill: 'fresh' }, { signal: new AbortController().signal });
+
+    expect(result.status).toBe('completed');
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('Skill: fresh');
+    expect(text).toContain('# Fresh');
+  });
+
+  it('still reports not-found after refresh when skill truly does not exist', async () => {
+    registry = new SkillRegistry({ skillDirs: [skillsDir] });
+    const tool = new UseSkillTool(registry);
+
+    const result = await tool.execute(
+      { skill: 'never-existed' },
+      { signal: new AbortController().signal }
+    );
+
+    expect(result.status).toBe('failed');
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('not found');
   });
 
   it('includes skill body exactly as written', async () => {

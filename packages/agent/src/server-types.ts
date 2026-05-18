@@ -161,4 +161,8 @@ export type AgentServerState = {
   // Embedder-controlled persona resolver. Defaulted to the module singleton;
   // initialize handler replaces it when the client supplies userPersonasPaths.
   personaRegistry: PersonaRegistry;
+  // Embedder-controlled skill directories (ordered, earlier wins). When unset,
+  // skill registry construction falls back to getSkillDirectories(workDir).
+  // Set by the initialize handler when the client supplies skillDirs.
+  skillDirs?: string[];
 };
