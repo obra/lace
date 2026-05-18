@@ -5,6 +5,7 @@ import { PassThrough, Writable } from 'stream';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './utils/logger';
+import { createContainerManagerForPlatform, runStartupReaper } from './containers/startup-reaper';
 
 const state = createAgentServerState();
 const laceDir = getLaceDir();
@@ -62,6 +63,12 @@ const writable = new Writable({
 
 const transport = createNdjsonStdioTransport({ readable, writable });
 const peer = new JsonRpcPeer(transport, { idPrefix: 'a_' });
+
+// Best-effort orphan reap at boot. Blocks RPC handler registration so that no
+// session work begins while leftover containers are still being torn down.
+// Failures inside the reaper are swallowed and logged; they never block boot.
+await runStartupReaper(createContainerManagerForPlatform());
+
 registerAgentRpcMethods(peer, state);
 
 let shuttingDown = false;
