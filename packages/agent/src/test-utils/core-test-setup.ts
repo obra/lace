@@ -1,9 +1,8 @@
 // ABOUTME: Shared test setup for agent tests
-// ABOUTME: Provides unified setup that handles temp LACE_DIR and workspace cleanup
+// ABOUTME: Provides unified setup that handles temp LACE_DIR and registered cleanup tasks
 
 import { useTempLaceDir, type TempLaceDirContext } from './temp-lace-dir';
 import { beforeEach, afterEach } from 'vitest';
-import { logger } from '@lace/agent/utils/logger';
 
 export interface EnhancedTempLaceDirContext extends TempLaceDirContext {
   /** Register a cleanup function to be called in afterEach */
@@ -28,7 +27,6 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
 
   // Run all registered cleanup tasks after each test
   afterEach(async () => {
-    // Run all registered cleanup tasks
     for (const cleanup of cleanupTasks) {
       try {
         await cleanup();
@@ -36,38 +34,6 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
         console.warn('Cleanup task failed:', error);
       }
     }
-
-    // Clean up workspaces before resetting factory
-    const { WorkspaceManagerFactory } = await import('@lace/agent/workspace/workspace-manager');
-    try {
-      // Only clean up worktree mode (default) - it's fast and reliable
-      // Container mode tests should handle their own cleanup
-      const worktreeManager = WorkspaceManagerFactory.get('worktree');
-      const workspaces = await worktreeManager.listWorkspaces();
-
-      for (const workspace of workspaces) {
-        try {
-          // Worktree cleanup should be fast - 3s timeout
-          await Promise.race([
-            worktreeManager.destroyWorkspace(workspace.sessionId),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Worktree cleanup timeout')), 3000)
-            ),
-          ]);
-        } catch (error) {
-          // Log but continue - best effort cleanup
-          logger.warn('Failed to cleanup worktree workspace', {
-            sessionId: workspace.sessionId,
-            error,
-          });
-        }
-      }
-    } catch {
-      // Ignore errors - workspace manager may not exist
-    }
-
-    // Reset workspace manager singletons
-    WorkspaceManagerFactory.reset();
   });
 
   return {
