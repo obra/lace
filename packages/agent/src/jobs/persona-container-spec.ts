@@ -5,16 +5,11 @@ import type { ContainerSpec } from '@lace/agent/containers/spec';
 import type { ContainerMount } from '@lace/agent/containers/types';
 import type { MountRegistryEntry } from '@lace/agent/server-types';
 
-// runtime.type === 'container' shape from PersonaConfig. Inlined to avoid a
-// brittle Zod-derived import chain across this module and the persona schema.
-export interface PersonaContainerRuntime {
-  type: 'container';
-  image: string;
-  workingDirectory: string;
-  mounts: Record<string, string>;
-  env?: Record<string, string>;
-  ports?: Array<{ host: number; container: number }>;
-}
+// Single source of truth for the persona container runtime shape: the
+// `type: 'container'` arm of the persona schema's discriminated union.
+// Other call sites (JobState, delegate, job-manager options) import this.
+import type { PersonaRuntime } from '@lace/agent/config/persona-registry';
+export type PersonaContainerRuntime = Extract<PersonaRuntime, { type: 'container' }>;
 
 // Spec-name components compose into a container name on the host; defend with
 // an allowlist before composing. Same shape on both sides keeps the rule

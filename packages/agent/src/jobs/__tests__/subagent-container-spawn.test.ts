@@ -135,6 +135,46 @@ describe('spawnSubagent', () => {
     expect(fakeManager.materialize.mock.calls[1][0].name).toBe('sess1-shell');
   });
 
+  it('kill() on a container-path handle routes to the exec stream (not the container)', async () => {
+    const execKill = vi.fn();
+    fakeManager.execStream.mockImplementationOnce(async () => {
+      const stdin = new PassThrough();
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      return {
+        stdin,
+        stdout,
+        stderr,
+        wait: () => new Promise(() => undefined),
+        kill: execKill,
+      };
+    });
+
+    const handle = await spawnSubagent({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      personaContainerRuntime: containerRuntime,
+      containerManager: fakeManager as unknown as ContainerManager,
+      containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
+    });
+
+    handle.kill('SIGTERM');
+    expect(execKill).toHaveBeenCalledWith('SIGTERM');
+  });
+
+  it('container runtime without a personaName throws before materialize', async () => {
+    await expect(
+      spawnSubagent({
+        parentSessionId: 'sess1',
+        personaName: undefined,
+        personaContainerRuntime: containerRuntime,
+        containerManager: fakeManager as unknown as ContainerManager,
+        containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
+      })
+    ).rejects.toThrow(SubagentSpawnError);
+    expect(fakeManager.materialize).not.toHaveBeenCalled();
+  });
+
   it('root persona path does not consult the container manager', async () => {
     // We do not actually spawn a real lace-agent here; spawn() will succeed but
     // the child process is killed immediately to avoid leaking subprocesses.

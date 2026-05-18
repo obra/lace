@@ -96,8 +96,10 @@ export interface SubagentJobDependencies {
 }
 
 /**
- * Runs a subagent job process by spawning a child lace-agent process
- * and communicating with it via JSON-RPC over stdio.
+ * Runs a subagent job process by spawning (or exec'ing into a persona
+ * container) a lace-agent process and communicating with it via JSON-RPC
+ * over stdio. Strategy is chosen by spawnSubagent based on the parent
+ * job's persona runtime.
  */
 export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependencies): void {
   const { getState, runExclusive, emitSessionUpdate, requestPermissionFromClient, finalizeJob } =

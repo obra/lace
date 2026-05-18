@@ -6,6 +6,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { JobState, JobStatus, JobType, PendingJobNotification } from '../server-types';
 import { MAX_CONCURRENT_JOBS } from '../server-types';
+import type { PersonaContainerRuntime } from './persona-container-spec';
 import { toNonEmptyString } from '../rpc/utils';
 import { getJobOutputPath } from './job-file-utils';
 
@@ -44,14 +45,7 @@ export type CreateJobOptions = {
     }
   >;
   // Parsed persona container runtime, forwarded to subagent-job when present.
-  personaContainerRuntime?: {
-    type: 'container';
-    image: string;
-    workingDirectory: string;
-    mounts: Record<string, string>;
-    env?: Record<string, string>;
-    ports?: Array<{ host: number; container: number }>;
-  };
+  personaContainerRuntime?: PersonaContainerRuntime;
 };
 
 /**

@@ -10,6 +10,7 @@ import {
   PersonaNotFoundError,
   PersonaParseError,
 } from '@lace/agent/config/persona-registry';
+import type { PersonaContainerRuntime } from '@lace/agent/jobs/persona-container-spec';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
 const delegateSchema = z
@@ -104,16 +105,7 @@ The subagent receives your message with its full conversation history intact.`;
           }
         >
       | undefined;
-    let personaContainerRuntime:
-      | {
-          type: 'container';
-          image: string;
-          workingDirectory: string;
-          mounts: Record<string, string>;
-          env?: Record<string, string>;
-          ports?: Array<{ host: number; container: number }>;
-        }
-      | undefined;
+    let personaContainerRuntime: PersonaContainerRuntime | undefined;
 
     if (persona) {
       try {

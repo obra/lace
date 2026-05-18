@@ -94,6 +94,9 @@ export async function killJob(job: JobState, options?: KillJobOptions): Promise<
       new Promise<void>((resolve) => setTimeout(resolve, waitMs)),
     ]);
 
+    // ExecStreamHandle does not expose an `exitCode` until `wait()` resolves,
+    // so use `job.finished` (set by finalizeJob on exit) as the signal that the
+    // process has terminated and force-kill is unnecessary.
     if (forceKill && !job.finished) {
       try {
         exec.kill('SIGKILL');
