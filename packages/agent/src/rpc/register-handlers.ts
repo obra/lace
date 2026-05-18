@@ -12,7 +12,6 @@ import { registerSessionHandlers } from './handlers/session';
 import { registerSessionOperationHandlers } from './handlers/session-operations';
 import { registerMcpHandlers } from './handlers/mcp-servers';
 import { registerPromptHandler } from './handlers/prompt';
-import { registerWorkspaceHandlers } from './handlers/workspace';
 import type { AgentServerState, SessionUpdate, CreateToolExecutorFn } from '../server-types';
 
 /**
@@ -97,7 +96,4 @@ export function registerAllHandlers(
     deps.startShellJob,
     deps.runPromptInternalRef
   );
-
-  // Workspace information
-  registerWorkspaceHandlers(peer, state);
 }
