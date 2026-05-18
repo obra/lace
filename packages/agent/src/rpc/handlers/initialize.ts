@@ -4,9 +4,40 @@ import type { JsonRpcPeer, ToolInfo } from '@lace/ent-protocol';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import { getUserSlashCommands } from '../../user-commands';
 import { protocolToolInfoForCoreTool } from '../utils';
-import type { AgentServerState, CreateToolExecutorFn } from '../../server-types';
+import type {
+  AgentServerState,
+  CreateToolExecutorFn,
+  MountRegistryEntry,
+} from '../../server-types';
 import { PersonaRegistry } from '../../config/persona-registry';
 import { resolveResourcePath } from '../../utils/resource-resolver';
+
+const MOUNT_NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
+
+function parseContainerMounts(raw: unknown): Record<string, MountRegistryEntry> {
+  if (raw === undefined) return {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+  }
+  const result: Record<string, MountRegistryEntry> = {};
+  for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!MOUNT_NAME_PATTERN.test(name)) {
+      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+    }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+    }
+    const entry = value as Record<string, unknown>;
+    if (typeof entry.hostPath !== 'string' || entry.hostPath.length === 0) {
+      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+    }
+    if (typeof entry.readonly !== 'boolean') {
+      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+    }
+    result[name] = { hostPath: entry.hostPath, readonly: entry.readonly };
+  }
+  return result;
+}
 
 /**
  * Register the initialize RPC handler with the peer.
@@ -60,6 +91,11 @@ export function registerInitializeHandler(
         userPersonasPaths: userPaths,
       });
     }
+
+    // Embedder-supplied named-mount registry. Persona containers resolve their
+    // `runtime.mounts[name]` against this map at materialization time. Always
+    // stored on state (defaults to {}).
+    state.containerMounts = parseContainerMounts(parsed.containerMounts);
 
     // Embedder-controlled skill directories; ordered, earlier paths win.
     if (Array.isArray(parsed.skillDirs)) {

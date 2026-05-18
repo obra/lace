@@ -5,6 +5,7 @@ export type InitializeOverrides = {
 
 export type InitializeExtras = {
   userPersonasPaths?: string[];
+  containerMounts?: Record<string, { hostPath: string; readonly: boolean }>;
 };
 
 export function defaultInitializeParams(
@@ -21,5 +22,6 @@ export function defaultInitializeParams(
     },
     ...(overrides.config ? { config: overrides.config } : {}),
     ...(extras.userPersonasPaths ? { userPersonasPaths: extras.userPersonasPaths } : {}),
+    ...(extras.containerMounts !== undefined ? { containerMounts: extras.containerMounts } : {}),
   };
 }
