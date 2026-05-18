@@ -32,11 +32,11 @@ export const SUBAGENT_USER_PERSONAS_TARGET = '/var/lace/user-personas';
 export const SUBAGENT_LACE_DATA_TARGET = '/var/lace/data';
 
 // Fixed in-container path where the embedder's credentials dir is exposed.
-// The embedder symlinks `${LACE_DIR}/credentials` → `../../credentials`, so
-// the subagent's lace-agent only finds provider credentials when that
-// relative path resolves inside the container — which requires the
-// credentials dir to be mounted at the parallel path.
-export const SUBAGENT_CREDENTIALS_TARGET = '/var/lace/credentials';
+// The embedder symlinks `${LACE_DIR}/credentials` → `../../credentials`.
+// With LACE_DIR=/var/lace/data, that relative symlink resolves to
+// `/var/credentials` (relative to the symlink's own directory
+// `/var/lace/data/`), so the credentials registry must mount there.
+export const SUBAGENT_CREDENTIALS_TARGET = '/var/credentials';
 
 export class PersonaContainerSpecError extends Error {
   constructor(message: string) {
