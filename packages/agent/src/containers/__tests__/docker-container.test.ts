@@ -314,10 +314,16 @@ describe('DockerContainerRuntime', () => {
       expect(() => runtime.translateToContainer('/anything', id)).toThrow(ContainerNotFoundError);
     });
 
-    it('throws ContainerNotFoundError on unknown container id', async () => {
+    it('start throws ContainerNotFoundError on unknown container id', async () => {
       await expect(runtime.start('lace-unknown')).rejects.toBeInstanceOf(ContainerNotFoundError);
-      await expect(runtime.stop('lace-unknown')).rejects.toBeInstanceOf(ContainerNotFoundError);
-      await expect(runtime.remove('lace-unknown')).rejects.toBeInstanceOf(ContainerNotFoundError);
+    });
+
+    it('stop and remove are idempotent when the in-process cache is empty', async () => {
+      // After a parent restart, the cache is empty but the daemon still owns
+      // the container. Destructive ops must go to the daemon so the startup
+      // reaper can reach existing containers.
+      await expect(runtime.stop('lace-unknown')).resolves.toBeUndefined();
+      await expect(runtime.remove('lace-unknown')).resolves.toBeUndefined();
     });
   });
 
