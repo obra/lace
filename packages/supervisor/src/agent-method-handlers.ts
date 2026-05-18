@@ -63,10 +63,6 @@ import {
   EntSessionTokenUsageResponseSchema,
   EntToolsListRequestSchema,
   EntToolsListResponseSchema,
-  EntWorkspaceCreateRequestSchema,
-  EntWorkspaceCreateResponseSchema,
-  EntWorkspaceInfoRequestSchema,
-  EntWorkspaceInfoResponseSchema,
   SessionPromptRequestSchema,
   SessionPromptResponseSchema,
   SessionSetModeRequestSchema,
@@ -253,15 +249,5 @@ export const agentMethodHandlers: Record<string, AgentMethodHandler> = {
     kind: 'request',
     paramsSchema: EntMcpToolsListRequestSchema.shape.params,
     resultSchema: EntMcpToolsListResponseSchema.shape.result,
-  },
-  'ent/workspace/info': {
-    kind: 'request',
-    paramsSchema: EntWorkspaceInfoRequestSchema.shape.params,
-    resultSchema: EntWorkspaceInfoResponseSchema.shape.result,
-  },
-  'ent/workspace/create': {
-    kind: 'request',
-    paramsSchema: EntWorkspaceCreateRequestSchema.shape.params,
-    resultSchema: EntWorkspaceCreateResponseSchema.shape.result,
   },
 };
