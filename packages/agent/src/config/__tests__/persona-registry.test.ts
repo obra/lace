@@ -41,13 +41,13 @@ describe('PersonaRegistry.parsePersona', () => {
     });
   }
 
-  it('returns empty config and full body when file has no frontmatter', () => {
+  it('returns config with runtime default and full body when file has no frontmatter', () => {
     const body = 'You are a helpful assistant.\n\nBe concise.';
     writeFileSync(path.join(tempBundledDir, 'plain.md'), body);
     registry = makeRegistry([userPersonaDir]);
 
     const result = registry.parsePersona('plain');
-    expect(result.config).toEqual({});
+    expect(result.config).toEqual({ runtime: { type: 'root' } });
     expect(result.body).toBe(body);
   });
 
@@ -55,7 +55,6 @@ describe('PersonaRegistry.parsePersona', () => {
     const content = `---
 model: claude-sonnet-4
 tools: [bash, file_read]
-workspace: worktree
 maxTurns: 20
 ---
 You are Lace.`;
@@ -65,9 +64,141 @@ You are Lace.`;
     const result = registry.parsePersona('lace');
     expect(result.config.model).toBe('claude-sonnet-4');
     expect(result.config.tools).toEqual(['bash', 'file_read']);
-    expect(result.config.workspace).toBe('worktree');
+    expect(result.config.runtime).toEqual({ type: 'root' });
     expect(result.config.maxTurns).toBe(20);
     expect(result.body.trim()).toBe('You are Lace.');
+  });
+
+  it('parses runtime.type=root explicitly', () => {
+    const content = `---
+runtime:
+  type: root
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'root-runtime.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    const result = registry.parsePersona('root-runtime');
+    expect(result.config.runtime).toEqual({ type: 'root' });
+  });
+
+  it('parses runtime.type=container with required fields', () => {
+    const content = `---
+runtime:
+  type: container
+  image: ghcr.io/example/lace-shell:latest
+  workingDirectory: /workspace
+  mounts:
+    scratch: /workspace/scratch
+    knowledge: /workspace/knowledge
+  env:
+    FOO: bar
+  ports:
+    - host: 8080
+      container: 80
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'container-runtime.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    const result = registry.parsePersona('container-runtime');
+    expect(result.config.runtime).toEqual({
+      type: 'container',
+      image: 'ghcr.io/example/lace-shell:latest',
+      workingDirectory: '/workspace',
+      mounts: { scratch: '/workspace/scratch', knowledge: '/workspace/knowledge' },
+      env: { FOO: 'bar' },
+      ports: [{ host: 8080, container: 80 }],
+    });
+  });
+
+  it('parses runtime.type=container with empty mounts and defaulted env', () => {
+    const content = `---
+runtime:
+  type: container
+  image: img:latest
+  workingDirectory: /w
+  mounts: {}
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'container-minimal.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    const result = registry.parsePersona('container-minimal');
+    expect(result.config.runtime).toEqual({
+      type: 'container',
+      image: 'img:latest',
+      workingDirectory: '/w',
+      mounts: {},
+      env: {},
+    });
+  });
+
+  it('throws when runtime.type=container is missing image', () => {
+    const content = `---
+runtime:
+  type: container
+  workingDirectory: /w
+  mounts: {}
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'no-image.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(() => registry.parsePersona('no-image')).toThrow(/image/i);
+  });
+
+  it('throws when runtime.type=container is missing mounts', () => {
+    const content = `---
+runtime:
+  type: container
+  image: img:latest
+  workingDirectory: /w
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'no-mounts.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(() => registry.parsePersona('no-mounts')).toThrow(/mounts/i);
+  });
+
+  it('rejects invalid mount names (uppercase / leading digit)', () => {
+    const upper = `---
+runtime:
+  type: container
+  image: img:latest
+  workingDirectory: /w
+  mounts:
+    Scratch: /w/scratch
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'bad-mount-upper.md'), upper);
+    registry = makeRegistry([userPersonaDir]);
+    expect(() => registry.parsePersona('bad-mount-upper')).toThrow(/mounts/i);
+
+    const leadingDigit = `---
+runtime:
+  type: container
+  image: img:latest
+  workingDirectory: /w
+  mounts:
+    1scratch: /w/scratch
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'bad-mount-digit.md'), leadingDigit);
+    registry = makeRegistry([userPersonaDir]);
+    expect(() => registry.parsePersona('bad-mount-digit')).toThrow(/mounts/i);
+  });
+
+  it('rejects unknown runtime discriminator', () => {
+    const content = `---
+runtime:
+  type: nonsense
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'bad-runtime-type.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+    expect(() => registry.parsePersona('bad-runtime-type')).toThrow(/runtime/i);
   });
 
   it('parses mcpServers block', () => {
@@ -101,17 +232,6 @@ Body.`;
     registry = makeRegistry([userPersonaDir]);
 
     expect(() => registry.parsePersona('bad-yaml')).toThrow(/yaml|parse/i);
-  });
-
-  it('throws on schema-mismatched frontmatter (invalid enum)', () => {
-    const content = `---
-workspace: invalid_value
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'bad-enum.md'), content);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(() => registry.parsePersona('bad-enum')).toThrow(/workspace/i);
   });
 
   it('throws on unknown top-level frontmatter key', () => {

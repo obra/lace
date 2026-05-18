@@ -16,6 +16,40 @@ export interface PersonaInfo {
   path: string;
 }
 
+// Mount names are lowercase alpha-leading, alphanumeric + hyphen thereafter.
+// They reference the embedder's named-mount registry supplied at ent/initialize.
+const mountNameSchema = z.string().regex(/^[a-z][a-z0-9-]*$/);
+
+const runtimeRootSchema = z
+  .object({
+    type: z.literal('root'),
+  })
+  .strict();
+
+const portMappingSchema = z
+  .object({
+    host: z.number().int().positive(),
+    container: z.number().int().positive(),
+  })
+  .strict();
+
+const runtimeContainerSchema = z
+  .object({
+    type: z.literal('container'),
+    image: z.string().min(1),
+    workingDirectory: z.string().min(1),
+    // mountName → containerTarget. Resolved against the embedder-provided
+    // containerMounts registry at materialization time.
+    mounts: z.record(mountNameSchema, z.string().min(1)),
+    env: z.record(z.string(), z.string()).optional().default({}),
+    ports: z.array(portMappingSchema).optional(),
+  })
+  .strict();
+
+const runtimeSchema = z.discriminatedUnion('type', [runtimeRootSchema, runtimeContainerSchema]);
+
+export type PersonaRuntime = z.infer<typeof runtimeSchema>;
+
 // Per-server MCP tool config is opaque to lace and forwarded to the MCP layer.
 const personaConfigSchema = z
   .object({
@@ -33,7 +67,7 @@ const personaConfigSchema = z
         })
       )
       .optional(),
-    workspace: z.enum(['local', 'worktree', 'container']).optional(),
+    runtime: runtimeSchema.optional().default({ type: 'root' }),
     maxTurns: z.number().int().positive().optional(),
   })
   .strict();

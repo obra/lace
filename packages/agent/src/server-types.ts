@@ -165,4 +165,15 @@ export type AgentServerState = {
   // skill registry construction falls back to getSkillDirectories(workDir).
   // Set by the initialize handler when the client supplies skillDirs.
   skillDirs?: string[];
+  // Embedder-supplied named-mount registry. Consulted at persona-container
+  // materialization to resolve persona `runtime.mounts[name]` into a host
+  // path + readonly flag. Always present; defaults to {} when initialize
+  // omits the param.
+  containerMounts: Record<string, MountRegistryEntry>;
+};
+
+// Single entry in the embedder-supplied containerMounts registry.
+export type MountRegistryEntry = {
+  hostPath: string;
+  readonly: boolean;
 };

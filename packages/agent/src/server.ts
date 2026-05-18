@@ -104,7 +104,20 @@ export function createAgentServerState(): AgentServerState {
     sessionMutex: Promise.resolve(),
     toolExecutorCache: new Map(),
     personaRegistry: defaultPersonaRegistry,
+    containerMounts: {},
   };
+}
+
+/**
+ * Read-only accessor for the embedder-supplied containerMounts registry.
+ * Returns the registry as set by the most recent initialize call (defaults to {}).
+ * Persona-container materialization (K-49e) consults this to resolve
+ * `runtime.mounts[name]` into a host path + readonly flag.
+ */
+export function getContainerMounts(
+  state: AgentServerState
+): Readonly<AgentServerState['containerMounts']> {
+  return state.containerMounts;
 }
 
 type ToolExecutorCacheValue = { executor: ToolExecutor; toolsForProvider: CoreTool[] };
