@@ -61,11 +61,12 @@ const writable = new Writable({
   },
 });
 
-// Best-effort orphan reap runs before we wire up JSON-RPC so that any inbound
-// requests during the (possibly slow) reap pause on the stdin tee buffer rather
-// than landing on a peer with no methods registered. Failures inside the reaper
-// are swallowed and logged; they never block boot.
-await runStartupReaper(createContainerManagerForPlatform());
+// Best-effort orphan reap is kicked off in the background. It runs its own
+// try/catch and never throws. Boot does not wait for it because the stdin
+// tee at line 34 is in flowing mode the moment the protocol-logging data
+// listener attaches — blocking startup here drops in-flight bytes from
+// early callers before the JSON-RPC peer is wired up.
+void runStartupReaper(createContainerManagerForPlatform());
 
 const transport = createNdjsonStdioTransport({ readable, writable });
 const peer = new JsonRpcPeer(transport, { idPrefix: 'a_' });
