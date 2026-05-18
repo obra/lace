@@ -664,8 +664,15 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       } else {
         // New session - thread persona through so subagent's system prompt
         // template comes from the persona's body.
+        // For container subagents the parent's host workDir does not exist
+        // inside the child's container, so use the persona's declared
+        // runtime.workingDirectory instead. Native subagents share the
+        // parent's filesystem and continue using the parent workDir.
+        const subagentWorkDir = job.personaContainerRuntime
+          ? job.personaContainerRuntime.workingDirectory
+          : currentState.activeSession!.meta.workDir;
         const created = (await childPeer.request('session/new', {
-          workDir: currentState.activeSession!.meta.workDir,
+          workDir: subagentWorkDir,
           ...(job.persona ? { persona: job.persona } : {}),
         })) as { sessionId: string };
         job.subagentSessionId = created.sessionId;
