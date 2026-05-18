@@ -148,7 +148,13 @@ export interface RunResult {
   /** Unique identifier for this turn */
   turnId: string;
   /** Reason the turn stopped */
-  stopReason: 'end_turn' | 'max_tokens' | 'max_turns' | 'cancelled' | 'budget_exceeded';
+  stopReason:
+    | 'end_turn'
+    | 'max_tokens'
+    | 'max_turns'
+    | 'cancelled'
+    | 'budget_exceeded'
+    | 'incomplete';
   /** Final assistant content */
   content: Array<{ type: 'text'; text: string }>;
   /** Token usage for this turn */

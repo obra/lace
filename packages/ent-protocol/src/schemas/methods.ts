@@ -368,7 +368,14 @@ const SessionPromptParamsSchema = z
 const SessionPromptResultSchema = z
   .object({
     turnId: NonEmptyStringSchema,
-    stopReason: z.enum(['end_turn', 'max_tokens', 'max_turns', 'cancelled', 'budget_exceeded']),
+    stopReason: z.enum([
+      'end_turn',
+      'max_tokens',
+      'max_turns',
+      'cancelled',
+      'budget_exceeded',
+      'incomplete',
+    ]),
     content: z.array(ContentBlockSchema),
     usage: UsageInfoSchema,
     structuredOutput: z.unknown().optional(),
@@ -1809,7 +1816,14 @@ const SessionUpdateTurnStartSchema = z
 const SessionUpdateTurnEndSchema = z
   .object({
     type: z.literal('turn_end'),
-    stopReason: z.enum(['end_turn', 'max_tokens', 'max_turns', 'cancelled', 'budget_exceeded']),
+    stopReason: z.enum([
+      'end_turn',
+      'max_tokens',
+      'max_turns',
+      'cancelled',
+      'budget_exceeded',
+      'incomplete',
+    ]),
     content: z.array(ContentBlockSchema),
     usage: UsageInfoSchema,
   })

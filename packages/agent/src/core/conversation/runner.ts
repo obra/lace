@@ -26,6 +26,19 @@ import type { RunnerConfig, RunnerDependencies, RunParams, RunResult, ApprovalMo
 import type { RequestOptions } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
 
+// First-person future-tense intent markers. When the model emits one of these
+// on a text-only turn following a tool round-trip, it has declared work it has
+// not actually performed (kata #31 round 2: production "I'll add a brief note"
+// pattern). Past-tense completion summaries ("Done. Updated successfully.") and
+// pure-answer text ("The answer is 42.") deliberately do NOT match.
+const FUTURE_TENSE_INTENT_PATTERN =
+  /\b(?:I'll|I will|I'm going to|I am going to|let me|let's|I shall|I'll just|I'll go ahead|going to add|going to write|going to update|going to create)\b/i;
+
+function hasFutureTenseIntent(text: string): boolean {
+  if (!text) return false;
+  return FUTURE_TENSE_INTENT_PATTERN.test(text);
+}
+
 /**
  * ConversationRunner executes prompts through the agentic loop.
  *
@@ -320,6 +333,15 @@ export class ConversationRunner {
             ];
             nextRequestOptions = { toolChoice: 'required' };
             continue;
+          }
+          // After a tool round-trip, if the model still returns only text and
+          // that text declares future-tense intent ("I'll add a note", "I will
+          // now apply the change"), the model has promised work it never
+          // performed. Surface 'incomplete' so the caller (subagent job, parent
+          // agent, scripts) can tell this apart from a clean completion summary.
+          if (completedTurns > 0 && hasFutureTenseIntent(assistantText)) {
+            stopReason = 'incomplete';
+            break;
           }
           stopReason = 'end_turn';
           break;
