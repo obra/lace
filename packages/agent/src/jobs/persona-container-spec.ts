@@ -23,6 +23,14 @@ const SPEC_NAME_COMPONENT_RE = /^[a-zA-Z0-9_-]+$/;
 // every container subagent can find its own persona definition.
 export const SUBAGENT_USER_PERSONAS_TARGET = '/var/lace/user-personas';
 
+// Fixed in-container path where the embedder's LACE_DIR is exposed. The
+// subagent's lace-agent reads provider instances, credentials, and sessions
+// from this dir and writes its own logs here too. Auto-injected when the
+// embedder registers a 'lace-data' entry in containerMounts; spec.env then
+// carries LACE_DIR pointing at this path so the child lace-agent picks it
+// up the normal way (no init-param plumbing needed).
+export const SUBAGENT_LACE_DATA_TARGET = '/var/lace/data';
+
 export class PersonaContainerSpecError extends Error {
   constructor(message: string) {
     super(message);
@@ -58,6 +66,13 @@ export function buildPersonaContainerSpec(input: {
           `containers. Remove it from the persona file's runtime.mounts.`
       );
     }
+    if (mountName === 'lace-data') {
+      throw new PersonaContainerSpecError(
+        `Persona '${personaName}' declares mount 'lace-data' — reserved for ` +
+          `lace's auto-injection of LACE_DIR into subagent containers. ` +
+          `Remove it from the persona file's runtime.mounts.`
+      );
+    }
     const entry = containerMounts[mountName];
     if (!entry) {
       throw new PersonaContainerSpecError(
@@ -85,12 +100,37 @@ export function buildPersonaContainerSpec(input: {
     });
   }
 
+  // Auto-inject the embedder's LACE_DIR at a fixed target so the subagent
+  // lace-agent finds providers, credentials, and sessions from disk like a
+  // normal lace-agent boot. The mount's readonly flag is honored from the
+  // registry (the embedder owns the trust decision); for sen-core today this
+  // is rw so the subagent can also write its own logs. Skipped silently
+  // when the embedder didn't register 'lace-data' — non-container deployments
+  // pass parent process env through subagent-spawn so LACE_DIR flows that way.
+  const laceDataRegistryEntry = containerMounts['lace-data'];
+  if (laceDataRegistryEntry) {
+    mounts.push({
+      source: laceDataRegistryEntry.hostPath,
+      target: SUBAGENT_LACE_DATA_TARGET,
+      readonly: laceDataRegistryEntry.readonly,
+    });
+  }
+
+  // Merge persona-declared env with auto-injected LACE_DIR. The auto-inject
+  // wins: the mount IS the source of truth for where LACE_DIR resolves
+  // inside the container, so a persona-supplied LACE_DIR pointing elsewhere
+  // would be inconsistent with the mounted directory.
+  const env: Record<string, string> = { ...(runtime.env ?? {}) };
+  if (laceDataRegistryEntry) {
+    env.LACE_DIR = SUBAGENT_LACE_DATA_TARGET;
+  }
+
   return {
     name: `${parentSessionId}-${personaName}`,
     image: runtime.image,
     workingDirectory: runtime.workingDirectory,
     mounts,
-    env: runtime.env ?? {},
+    env,
     ...(runtime.ports ? { ports: runtime.ports } : {}),
   };
 }
