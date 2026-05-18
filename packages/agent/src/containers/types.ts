@@ -6,6 +6,9 @@ export interface ContainerConfig {
   id?: string;
   name?: string;
 
+  // Image to run. Required: every container must know its image at create time.
+  image: string;
+
   // Filesystem configuration
   workingDirectory: string;
   mounts: ContainerMount[];

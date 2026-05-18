@@ -41,6 +41,7 @@ describe('AppleContainerRuntime', () => {
     it('should create a container with generated ID if not provided', () => {
       const config: ContainerConfig = {
         id: '',
+        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
         workingDirectory: testDir,
         mounts: [{ source: testDir, target: '/workspace', readonly: false }],
       };
@@ -58,6 +59,7 @@ describe('AppleContainerRuntime', () => {
     it('should use provided container ID with unique suffix', () => {
       const config: ContainerConfig = {
         id: 'test-container-123',
+        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
         workingDirectory: '/workspace',
         mounts: [],
       };
@@ -72,6 +74,7 @@ describe('AppleContainerRuntime', () => {
     it('should register mounts correctly', () => {
       const config: ContainerConfig = {
         id: 'mount-test',
+        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
         workingDirectory: testDir,
         mounts: [
           { source: testDir, target: '/workspace', readonly: false },
@@ -92,6 +95,7 @@ describe('AppleContainerRuntime', () => {
     it('should transition through states correctly', async () => {
       const config: ContainerConfig = {
         id: 'lifecycle-test',
+        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
         workingDirectory: testDir,
         mounts: [{ source: testDir, target: '/workspace' }],
       };
@@ -117,6 +121,7 @@ describe('AppleContainerRuntime', () => {
     it('should throw error when container is not running', async () => {
       const config: ContainerConfig = {
         id: 'exec-test',
+        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
         workingDirectory: testDir,
         mounts: [],
       };
@@ -141,6 +146,7 @@ describe('AppleContainerRuntime', () => {
 
       const config: ContainerConfig = {
         id: 'path-test',
+        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
         workingDirectory: '/workspace',
         mounts: [
           { source: projectDir, target: '/workspace', readonly: false },
@@ -180,11 +186,13 @@ describe('AppleContainerRuntime', () => {
 
       const config1: ContainerConfig = {
         id: 'list-test-1',
+        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
         workingDirectory: '/workspace',
         mounts: [],
       };
       const config2: ContainerConfig = {
         id: 'list-test-2',
+        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
         workingDirectory: '/workspace',
         mounts: [],
       };

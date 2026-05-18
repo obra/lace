@@ -48,7 +48,7 @@ describe.skipIf(!DOCKER_AVAILABLE)('DockerContainerRuntime Integration', () => {
 
   beforeAll(async () => {
     await pullImageIfMissing(TEST_IMAGE);
-    runtime = new DockerContainerRuntime(TEST_IMAGE);
+    runtime = new DockerContainerRuntime();
 
     testDir = join(tmpdir(), `lace-docker-integration-${uuidv4()}`);
     mkdirSync(testDir, { recursive: true });
@@ -56,6 +56,7 @@ describe.skipIf(!DOCKER_AVAILABLE)('DockerContainerRuntime Integration', () => {
 
     containerId = await runtime.create({
       name: `it-${uuidv4().slice(0, 8)}`,
+      image: TEST_IMAGE,
       workingDirectory: '/workspace',
       mounts: [{ source: testDir, target: '/workspace', readonly: false }],
       environment: { TEST_VAR: 'from_host' },
@@ -145,6 +146,7 @@ describe.skipIf(!DOCKER_AVAILABLE)('DockerContainerRuntime Integration', () => {
     mkdirSync(roDir, { recursive: true });
     const roId = await runtime.create({
       name: `ro-${uuidv4().slice(0, 8)}`,
+      image: TEST_IMAGE,
       workingDirectory: '/ro',
       mounts: [{ source: roDir, target: '/ro', readonly: true }],
     });
