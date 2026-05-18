@@ -72,6 +72,23 @@ function isRetryOnErrorEnabled(): boolean {
   return process.env.LACE_TEST_PROVIDER_RETRY_ON_ERROR === '1';
 }
 
+/**
+ * Intent-text-after-tool-result injection (kata #31 round 2).
+ *
+ * When LACE_TEST_PROVIDER_INTENT_AFTER_TOOL_RESULT is set to a non-empty string,
+ * any turn that comes after a tool result will emit that string as text-only
+ * content with no tool calls and stopReason='stop'. This faithfully reproduces
+ * the production "I'll add a brief note" pattern, where the model declares
+ * future-tense intent but never calls the tool that would do the work.
+ *
+ * Default unset preserves the existing "Result:\n<tool output>" fixture
+ * behaviour the rest of the suite relies on.
+ */
+function getIntentTextAfterToolResult(): string | null {
+  const value = process.env.LACE_TEST_PROVIDER_INTENT_AFTER_TOOL_RESULT;
+  return value && value.length > 0 ? value : null;
+}
+
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -295,6 +312,21 @@ export class TestAgentProvider extends AIProvider {
         }
 
         const toolResultText = toolResultInfo?.text ?? null;
+
+        // Kata #31 round 2: when an intent-text injection is configured AND
+        // the current turn follows a tool result, return that intent text
+        // instead of the usual "Result:\n…" summary. This reproduces the
+        // production therapist trace where the model declared "I'll add a
+        // brief note" without calling the tool that would do the work.
+        const intentText = getIntentTextAfterToolResult();
+        if (intentText && toolResultInfo) {
+          this.emit('token', { token: intentText });
+          this.emit('complete', {
+            response: { content: intentText, toolCalls: [], stopReason: 'stop' },
+          });
+          return { content: intentText, toolCalls: [], stopReason: 'stop', usage: mockUsage };
+        }
+
         const content = toolResultText ? `Result:\n${toolResultText}` : 'No tool result found.';
         this.emit('token', { token: content });
         this.emit('complete', { response: { content, toolCalls: [], stopReason: 'stop' } });
