@@ -19,6 +19,7 @@ import {
   rpcErrorMessage,
 } from './subagent-job-helpers';
 import { logger } from '@lace/agent/utils/logger';
+import { SUBAGENT_USER_PERSONAS_TARGET } from './persona-container-spec';
 import { spawnSubagent, type SubagentProcessHandle } from './subagent-spawn';
 import type { ToolResult } from '@lace/ent-protocol';
 import { logToolUpdateToJobLog } from './job-log-formatter';
@@ -632,6 +633,15 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         currentState.activeSession?.state.config
       );
 
+      // Subagent must be able to resolve user personas on its own session/new
+      // (delegate threads `persona: '<name>'` through). For container subagents,
+      // the user-personas dir is auto-mounted at a fixed in-container path. For
+      // native subagents, the child shares the parent's filesystem so the
+      // parent's host paths apply directly.
+      const subagentUserPersonasPaths: string[] = job.personaContainerRuntime
+        ? [SUBAGENT_USER_PERSONAS_TARGET]
+        : [...currentState.personaRegistry.getUserPersonasPaths()];
+
       await childPeer.request('initialize', {
         protocolVersion: '1.0',
         clientInfo: { name: 'lace-agent', version: '0.1.0' },
@@ -640,6 +650,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           permissions: true,
           'ent/jobStreaming': currentState.jobManager.getStreamingMode(),
         },
+        userPersonasPaths: subagentUserPersonasPaths,
         config: buildSubagentInitConfig(parentEffective),
       });
 

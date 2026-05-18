@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildPersonaContainerSpec,
   PersonaContainerSpecError,
+  SUBAGENT_USER_PERSONAS_TARGET,
 } from '@lace/agent/jobs/persona-container-spec';
 
 const baseRuntime = {
@@ -87,6 +88,50 @@ describe('buildPersonaContainerSpec', () => {
         containerMounts: {},
       })
     ).toThrow(/Invalid personaName/);
+  });
+
+  it('auto-injects the persona registry mount at the well-known target', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      runtime: baseRuntime,
+      containerMounts: {
+        persona: { hostPath: '/host/agent-personas', readonly: true },
+      },
+    });
+
+    expect(spec.mounts).toContainEqual({
+      source: '/host/agent-personas',
+      target: SUBAGENT_USER_PERSONAS_TARGET,
+      readonly: true,
+    });
+  });
+
+  it('does not inject the persona mount when the registry omits it', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      runtime: baseRuntime,
+      containerMounts: {},
+    });
+
+    expect(spec.mounts).toEqual([]);
+  });
+
+  it('rejects a persona file declaring runtime.mounts.persona — reserved name', () => {
+    expect(() =>
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess1',
+        personaName: 'shell',
+        runtime: {
+          ...baseRuntime,
+          mounts: { persona: '/somewhere' },
+        },
+        containerMounts: {
+          persona: { hostPath: '/host/agent-personas', readonly: true },
+        },
+      })
+    ).toThrow(/reserved/);
   });
 
   it('passes through env and ports when provided', () => {
