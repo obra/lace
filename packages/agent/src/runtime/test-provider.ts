@@ -223,10 +223,6 @@ export class TestAgentProvider extends AIProvider {
         const requested = this.extractRequestedTool(lastUserText ?? '');
 
         if (this.state.phase === 'needs_tool' && requested) {
-          const toolCallId = `test_tool_${this.state.nextToolCallId++}`;
-          const toolCalls: ToolCall[] = [
-            { id: toolCallId, name: requested.name, arguments: requested.args },
-          ];
           let content: string;
           switch (requested.name) {
             case 'file_read':
@@ -253,6 +249,28 @@ export class TestAgentProvider extends AIProvider {
             default:
               content = `Writing ${(requested.args as Record<string, unknown>).path as string}...`;
           }
+
+          // When LACE_TEST_PROVIDER_RESPECT_WIRE_TOOLS=1, faithfully model real
+          // provider behavior: a model can only call a tool that the runtime
+          // actually advertised in the wire payload. If the persona/toolScope
+          // filter removed the requested tool, the model declares intent in
+          // text and returns no tool call. Defaults off to preserve the long
+          // standing test fixture behavior where TestAgentProvider blindly
+          // emits any tool the prompt pattern matches.
+          if (process.env.LACE_TEST_PROVIDER_RESPECT_WIRE_TOOLS === '1') {
+            const toolIsAvailable = _tools.some((t) => t.name === requested.name);
+            if (!toolIsAvailable) {
+              this.emit('token', { token: content });
+              this.emit('complete', { response: { content, toolCalls: [], stopReason: 'stop' } });
+              this.state.phase = 'final';
+              return { content, toolCalls: [], stopReason: 'stop', usage: mockUsage };
+            }
+          }
+
+          const toolCallId = `test_tool_${this.state.nextToolCallId++}`;
+          const toolCalls: ToolCall[] = [
+            { id: toolCallId, name: requested.name, arguments: requested.args },
+          ];
           this.emit('token', { token: content });
           this.emit('complete', { response: { content, toolCalls, stopReason: 'tool_use' } });
           // If retry-on-error is enabled, transition to awaiting_retry so we can retry on failure
@@ -318,6 +336,19 @@ export class TestAgentProvider extends AIProvider {
     const delegateMatch = text.match(/delegate\s+(.+)\s*$/i);
     const delegatePrompt = delegateMatch?.[1]?.trim();
     if (delegatePrompt) return { name: 'delegate', args: { prompt: delegatePrompt } };
+
+    // Handle "subagent persona=name: prompt" pattern (persona thread to delegate)
+    const subagentPersonaMatch = text.match(/subagent\s+persona=([^\s:]+)\s*:\s*(.+)\s*$/i);
+    if (subagentPersonaMatch) {
+      const persona = subagentPersonaMatch[1]?.trim() || undefined;
+      const prompt = subagentPersonaMatch[2]?.trim();
+      if (prompt && persona) {
+        return {
+          name: 'delegate',
+          args: { prompt, persona },
+        };
+      }
+    }
 
     // Handle "subagent config=connId,modelId: prompt" or "subagent: prompt" pattern
     const subagentMatch = text.match(
