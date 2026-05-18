@@ -32,6 +32,11 @@ export function createContainerManagerForPlatform(): ContainerManager | null {
  *
  * Best-effort: a null manager (unsupported platform) or any thrown error logs
  * and returns. Reaper failure must never block agent startup.
+ *
+ * Snapshot semantics: reapOrphans calls runtime.list() once at the start and
+ * iterates that snapshot. Containers materialized after the snapshot (e.g. by
+ * a delegate spawned while the reaper is running in the background) are not
+ * candidates for destruction in this pass.
  */
 export async function runStartupReaper(manager: ContainerManager | null): Promise<void> {
   if (manager === null) {
