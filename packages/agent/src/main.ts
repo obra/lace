@@ -5,6 +5,7 @@ import { PassThrough, Writable } from 'stream';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './utils/logger';
+import { createContainerManagerForPlatform, runStartupReaper } from './containers/startup-reaper';
 
 const state = createAgentServerState();
 const laceDir = getLaceDir();
@@ -59,6 +60,12 @@ const writable = new Writable({
     process.stdout.write(chunk, cb);
   },
 });
+
+// Best-effort orphan reap runs before we wire up JSON-RPC so that any inbound
+// requests during the (possibly slow) reap pause on the stdin tee buffer rather
+// than landing on a peer with no methods registered. Failures inside the reaper
+// are swallowed and logged; they never block boot.
+await runStartupReaper(createContainerManagerForPlatform());
 
 const transport = createNdjsonStdioTransport({ readable, writable });
 const peer = new JsonRpcPeer(transport, { idPrefix: 'a_' });
