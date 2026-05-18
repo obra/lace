@@ -50,6 +50,20 @@ export interface ExecResult {
   exitCode: number;
 }
 
+export interface ExecStreamOptions {
+  command: string[];
+  workingDirectory?: string;
+  environment?: Record<string, string>;
+}
+
+export interface ExecStreamHandle {
+  stdin: NodeJS.WritableStream;
+  stdout: NodeJS.ReadableStream;
+  stderr: NodeJS.ReadableStream;
+  wait(): Promise<{ exitCode: number }>;
+  kill(signal?: NodeJS.Signals): void;
+}
+
 export interface ContainerRuntime {
   // Lifecycle management
   create(config: ContainerConfig): string | Promise<string>; // Returns container ID
@@ -59,6 +73,7 @@ export interface ContainerRuntime {
 
   // Execution
   exec(containerId: string, options: ExecOptions): Promise<ExecResult>;
+  execStream(containerId: string, options: ExecStreamOptions): Promise<ExecStreamHandle>;
 
   // Information
   inspect(containerId: string): ContainerInfo | Promise<ContainerInfo>;

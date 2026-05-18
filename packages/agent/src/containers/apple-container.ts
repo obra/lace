@@ -7,6 +7,8 @@ import {
   ContainerInfo,
   ExecOptions,
   ExecResult,
+  ExecStreamOptions,
+  ExecStreamHandle,
   ContainerError,
   ContainerExecError,
 } from './types';
@@ -342,6 +344,10 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
 
     const combinedMessage = `${errorMessage} ${stderr}`.toLowerCase();
     return notReadyPatterns.some((pattern) => combinedMessage.includes(pattern.toLowerCase()));
+  }
+
+  execStream(_containerId: string, _options: ExecStreamOptions): Promise<ExecStreamHandle> {
+    throw new Error('AppleContainerRuntime.execStream not yet implemented (kata #49a-i)');
   }
 
   async exec(containerId: string, options: ExecOptions): Promise<ExecResult> {

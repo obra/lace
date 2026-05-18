@@ -8,6 +8,8 @@ import {
   ContainerInfo,
   ExecOptions,
   ExecResult,
+  ExecStreamOptions,
+  ExecStreamHandle,
   ContainerNotFoundError,
 } from './types';
 
@@ -56,6 +58,10 @@ class MockContainerRuntime extends BaseContainerRuntime {
       stderr: '',
       exitCode: 0,
     };
+  }
+
+  execStream(_containerId: string, _options: ExecStreamOptions): Promise<ExecStreamHandle> {
+    throw new Error('MockContainerRuntime.execStream not implemented');
   }
 }
 

@@ -7,6 +7,8 @@ import {
   ContainerInfo,
   ExecOptions,
   ExecResult,
+  ExecStreamOptions,
+  ExecStreamHandle,
   ContainerState,
   ContainerNotFoundError,
 } from './types';
@@ -22,6 +24,7 @@ export abstract class BaseContainerRuntime implements ContainerRuntime {
   abstract stop(containerId: string, timeout?: number): Promise<void>;
   abstract remove(containerId: string): Promise<void>;
   abstract exec(containerId: string, options: ExecOptions): Promise<ExecResult>;
+  abstract execStream(containerId: string, options: ExecStreamOptions): Promise<ExecStreamHandle>;
 
   inspect(containerId: string): ContainerInfo {
     const info = this.containers.get(containerId);
