@@ -6,6 +6,7 @@ import {
   PersonaContainerSpecError,
   SUBAGENT_USER_PERSONAS_TARGET,
   SUBAGENT_LACE_DATA_TARGET,
+  SUBAGENT_CREDENTIALS_TARGET,
 } from '@lace/agent/jobs/persona-container-spec';
 
 const baseRuntime = {
@@ -197,6 +198,82 @@ describe('buildPersonaContainerSpec', () => {
 
     expect(spec.env.LACE_DIR).toBe(SUBAGENT_LACE_DATA_TARGET);
     expect(spec.env.OTHER).toBe('keep');
+  });
+
+  it('auto-injects the credentials registry mount at the well-known target', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      runtime: baseRuntime,
+      containerMounts: {
+        credentials: { hostPath: '/host/credentials', readonly: true },
+      },
+    });
+
+    expect(spec.mounts).toContainEqual({
+      source: '/host/credentials',
+      target: SUBAGENT_CREDENTIALS_TARGET,
+      readonly: true,
+    });
+    // Auto-inject does not touch env — the symlink in lace-data resolves it.
+    expect(spec.env).toEqual({});
+  });
+
+  it('does not inject the credentials mount when the registry omits it', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      runtime: baseRuntime,
+      containerMounts: {},
+    });
+
+    expect(spec.mounts).toEqual([]);
+  });
+
+  it('rejects a persona file declaring runtime.mounts.credentials — reserved name', () => {
+    expect(() =>
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess1',
+        personaName: 'shell',
+        runtime: {
+          ...baseRuntime,
+          mounts: { credentials: '/somewhere' },
+        },
+        containerMounts: {
+          credentials: { hostPath: '/host/credentials', readonly: true },
+        },
+      })
+    ).toThrow(/reserved/);
+  });
+
+  it('auto-injects persona + lace-data + credentials together when registry has all three', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      runtime: baseRuntime,
+      containerMounts: {
+        persona: { hostPath: '/host/agent-personas', readonly: true },
+        'lace-data': { hostPath: '/host/history/lace', readonly: false },
+        credentials: { hostPath: '/host/credentials', readonly: true },
+      },
+    });
+
+    expect(spec.mounts).toContainEqual({
+      source: '/host/agent-personas',
+      target: SUBAGENT_USER_PERSONAS_TARGET,
+      readonly: true,
+    });
+    expect(spec.mounts).toContainEqual({
+      source: '/host/history/lace',
+      target: SUBAGENT_LACE_DATA_TARGET,
+      readonly: false,
+    });
+    expect(spec.mounts).toContainEqual({
+      source: '/host/credentials',
+      target: SUBAGENT_CREDENTIALS_TARGET,
+      readonly: true,
+    });
+    expect(spec.env.LACE_DIR).toBe(SUBAGENT_LACE_DATA_TARGET);
   });
 
   it('passes through env and ports when provided', () => {

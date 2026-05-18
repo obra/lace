@@ -31,6 +31,13 @@ export const SUBAGENT_USER_PERSONAS_TARGET = '/var/lace/user-personas';
 // up the normal way (no init-param plumbing needed).
 export const SUBAGENT_LACE_DATA_TARGET = '/var/lace/data';
 
+// Fixed in-container path where the embedder's credentials dir is exposed.
+// The embedder symlinks `${LACE_DIR}/credentials` → `../../credentials`, so
+// the subagent's lace-agent only finds provider credentials when that
+// relative path resolves inside the container — which requires the
+// credentials dir to be mounted at the parallel path.
+export const SUBAGENT_CREDENTIALS_TARGET = '/var/lace/credentials';
+
 export class PersonaContainerSpecError extends Error {
   constructor(message: string) {
     super(message);
@@ -73,6 +80,13 @@ export function buildPersonaContainerSpec(input: {
           `Remove it from the persona file's runtime.mounts.`
       );
     }
+    if (mountName === 'credentials') {
+      throw new PersonaContainerSpecError(
+        `Persona '${personaName}' declares mount 'credentials' — reserved ` +
+          `for lace's auto-injection of the embedder's credentials dir into ` +
+          `subagent containers. Remove it from the persona file's runtime.mounts.`
+      );
+    }
     const entry = containerMounts[mountName];
     if (!entry) {
       throw new PersonaContainerSpecError(
@@ -113,6 +127,19 @@ export function buildPersonaContainerSpec(input: {
       source: laceDataRegistryEntry.hostPath,
       target: SUBAGENT_LACE_DATA_TARGET,
       readonly: laceDataRegistryEntry.readonly,
+    });
+  }
+
+  // Auto-inject the embedder's credentials dir at the fixed parallel path so
+  // the `${LACE_DIR}/credentials` symlink (→ `../../credentials`) resolves
+  // inside the container. No env var: the symlink in the lace-data mount is
+  // the indirection. Skipped silently when absent.
+  const credentialsRegistryEntry = containerMounts.credentials;
+  if (credentialsRegistryEntry) {
+    mounts.push({
+      source: credentialsRegistryEntry.hostPath,
+      target: SUBAGENT_CREDENTIALS_TARGET,
+      readonly: credentialsRegistryEntry.readonly,
     });
   }
 
