@@ -327,17 +327,22 @@ export class ProviderRegistry {
   async getModelFromCatalog(providerId: string, modelId: string): Promise<CatalogModel | null> {
     await this.ensureInitialized();
 
-    // Get dynamic catalog if available (includes discovered models)
+    // Resolve aliases against the live (dynamic) catalog first, falling back to
+    // the built-in static catalog. The live catalog may be missing alias-matching
+    // entries (cold cache, partial refresh) even when the static catalog has them.
+    const staticCatalog = this.catalogManager.getProvider(providerId);
     const catalog = await this.getCatalogProvider(providerId);
     if (catalog) {
-      const resolvedModelId = resolveModelAlias(modelId, catalog.models);
-      const model = catalog.models.find((m) => m.id === resolvedModelId);
+      const resolvedModelId = resolveModelAlias(modelId, catalog.models, staticCatalog?.models);
+      const model =
+        catalog.models.find((m) => m.id === resolvedModelId) ??
+        staticCatalog?.models.find((m) => m.id === resolvedModelId);
       if (model) {
         return model;
       }
     }
 
-    // Fall back to static catalog
+    // Fall back to static catalog with the original input (no alias resolution).
     return this.catalogManager.getModel(providerId, modelId);
   }
 
@@ -409,9 +414,17 @@ export class ProviderRegistry {
     // This triggers catalog discovery for instances like Apple FM that have custom endpoints
     const instanceCatalog = await this.getCatalogForInstance(instanceId);
 
-    // Verify model exists in instance-specific catalog (or fall back to static)
-    const catalog = instanceCatalog ?? this.catalogManager.getProvider(instance.catalogProviderId);
-    const resolvedModelId = resolveModelAlias(modelId, catalog?.models ?? []);
+    // Verify model exists in instance-specific catalog. Resolve aliases through the
+    // live catalog with the built-in static catalog as a fallback — the live catalog
+    // may lack alias-matching entries (cold cache, partial refresh) even when the
+    // static catalog has them. The resolved model can come from either source.
+    const staticCatalog = this.catalogManager.getProvider(instance.catalogProviderId);
+    const catalog = instanceCatalog ?? staticCatalog;
+    const resolvedModelId = resolveModelAlias(
+      modelId,
+      catalog?.models ?? [],
+      staticCatalog?.models
+    );
     if (resolvedModelId !== modelId) {
       logger.debug('Resolved model alias', {
         input: modelId,
@@ -419,7 +432,9 @@ export class ProviderRegistry {
         instanceId,
       });
     }
-    const model = catalog?.models.find((m) => m.id === resolvedModelId);
+    const model =
+      catalog?.models.find((m) => m.id === resolvedModelId) ??
+      staticCatalog?.models.find((m) => m.id === resolvedModelId);
 
     if (!model) {
       throw new Error(

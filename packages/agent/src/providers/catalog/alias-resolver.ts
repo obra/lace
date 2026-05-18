@@ -11,7 +11,11 @@ function dateScore(id: string): number {
   return match ? Number(match[1]) : 0;
 }
 
-export function resolveModelAlias(modelId: string, models: CatalogModel[]): string {
+export function resolveModelAlias(
+  modelId: string,
+  models: CatalogModel[],
+  fallbackModels?: CatalogModel[]
+): string {
   if (models.some((m) => m.id === modelId)) {
     return modelId;
   }
@@ -21,11 +25,26 @@ export function resolveModelAlias(modelId: string, models: CatalogModel[]): stri
     return modelId;
   }
 
-  const matches = models.filter((m) => m.id.toLowerCase().includes(aliasKey));
-  if (matches.length === 0) {
-    return modelId;
+  const primaryMatches = models.filter((m) => m.id.toLowerCase().includes(aliasKey));
+  if (primaryMatches.length > 0) {
+    return pickNewest(primaryMatches);
   }
 
+  // The primary catalog (typically a live/dynamic catalog) contains no entries that
+  // match this known alias. This happens in production when the dynamic catalog is
+  // cold, partial, or recently failed to refresh. Fall back to the static built-in
+  // catalog so bare aliases stay resolvable.
+  if (fallbackModels && fallbackModels.length > 0) {
+    const fallbackMatches = fallbackModels.filter((m) => m.id.toLowerCase().includes(aliasKey));
+    if (fallbackMatches.length > 0) {
+      return pickNewest(fallbackMatches);
+    }
+  }
+
+  return modelId;
+}
+
+function pickNewest(matches: CatalogModel[]): string {
   const sorted = [...matches].sort((a, b) => {
     const dateDiff = dateScore(b.id) - dateScore(a.id);
     if (dateDiff !== 0) return dateDiff;
@@ -33,6 +52,5 @@ export function resolveModelAlias(modelId: string, models: CatalogModel[]): stri
     if (a.id > b.id) return -1;
     return 0;
   });
-
   return sorted[0].id;
 }
