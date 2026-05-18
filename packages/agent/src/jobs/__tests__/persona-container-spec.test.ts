@@ -5,6 +5,7 @@ import {
   buildPersonaContainerSpec,
   PersonaContainerSpecError,
   SUBAGENT_USER_PERSONAS_TARGET,
+  SUBAGENT_LACE_DATA_TARGET,
 } from '@lace/agent/jobs/persona-container-spec';
 
 const baseRuntime = {
@@ -132,6 +133,70 @@ describe('buildPersonaContainerSpec', () => {
         },
       })
     ).toThrow(/reserved/);
+  });
+
+  it('auto-injects the lace-data registry mount and LACE_DIR env at the well-known target', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      runtime: baseRuntime,
+      containerMounts: {
+        'lace-data': { hostPath: '/host/history/lace', readonly: false },
+      },
+    });
+
+    expect(spec.mounts).toContainEqual({
+      source: '/host/history/lace',
+      target: SUBAGENT_LACE_DATA_TARGET,
+      readonly: false,
+    });
+    expect(spec.env).toEqual({ LACE_DIR: SUBAGENT_LACE_DATA_TARGET });
+  });
+
+  it('does not inject the lace-data mount or LACE_DIR when the registry omits it', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      runtime: baseRuntime,
+      containerMounts: {},
+    });
+
+    expect(spec.mounts).toEqual([]);
+    expect(spec.env).toEqual({});
+    expect(spec.env).not.toHaveProperty('LACE_DIR');
+  });
+
+  it('rejects a persona file declaring runtime.mounts["lace-data"] — reserved name', () => {
+    expect(() =>
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess1',
+        personaName: 'shell',
+        runtime: {
+          ...baseRuntime,
+          mounts: { 'lace-data': '/somewhere' },
+        },
+        containerMounts: {
+          'lace-data': { hostPath: '/host/history/lace', readonly: false },
+        },
+      })
+    ).toThrow(/reserved/);
+  });
+
+  it('LACE_DIR auto-inject overrides a persona-supplied LACE_DIR in runtime.env', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      runtime: {
+        ...baseRuntime,
+        env: { LACE_DIR: '/wrong/path', OTHER: 'keep' },
+      },
+      containerMounts: {
+        'lace-data': { hostPath: '/host/history/lace', readonly: false },
+      },
+    });
+
+    expect(spec.env.LACE_DIR).toBe(SUBAGENT_LACE_DATA_TARGET);
+    expect(spec.env.OTHER).toBe('keep');
   });
 
   it('passes through env and ports when provided', () => {
