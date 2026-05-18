@@ -149,9 +149,6 @@ A persona is a named bundle of agent configuration. As of [the persona-bundle fr
 ---
 model: haiku
 tools:
-  - bash
-  - file_read
-  - file_write
   - knowledge/grep
 mcpServers:
   knowledge:
@@ -168,6 +165,8 @@ glob expansion]
 ```
 
 Frontmatter is optional. If omitted, the persona is a template-only persona (just a system prompt; model/tools/MCPs come from session-level config or your delegate call).
+
+**`tools:` is additive over lace builtins.** Lace builtin tools (`bash`, `file_read`, `file_write`, `file_edit`, `ripgrep_search`, `file_find`, `url_fetch`, `delegate`, `job_output`, `jobs_list`, `job_kill`, `todo_read`, `todo_write`, `use_skill`) are platform tools and are always available to any persona-launched session. You only need to list the specialized additions your persona needs — typically MCP-namespaced tools like `knowledge/grep`. The effective `toolScope` is the union of builtins and the persona's `tools:` entries.
 
 Personas live in two places (user overrides bundled):
 

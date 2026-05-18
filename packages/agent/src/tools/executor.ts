@@ -33,6 +33,34 @@ export interface RegisterToolsOptions {
   personaRegistry?: PersonaRegistry;
 }
 
+/**
+ * Names of all lace builtin tools registered by `registerAllAvailableTools`.
+ *
+ * These are platform tools that should always be available to any persona —
+ * persona `tools:` frontmatter is an additive specialization layer, not a
+ * replacement allowlist. Keep in sync with the tool list in
+ * `registerAllAvailableTools` below.
+ *
+ * `use_skill` is included here because it is unconditionally registered
+ * when a SkillRegistry is wired in (always, for session/new).
+ */
+export const LACE_BUILTIN_TOOL_NAMES = [
+  'bash',
+  'file_read',
+  'file_write',
+  'file_edit',
+  'ripgrep_search',
+  'file_find',
+  'url_fetch',
+  'delegate',
+  'job_output',
+  'jobs_list',
+  'job_kill',
+  'todo_read',
+  'todo_write',
+  'use_skill',
+] as const;
+
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
   private envManager: ProjectEnvironmentManager;

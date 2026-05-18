@@ -90,7 +90,11 @@ You are a frontmatter persona.`
 
     const loaded = loadSession(created.sessionId);
     expect(loaded.state.config?.modelId).toBe('claude-3-5-sonnet');
-    expect(loaded.state.config?.toolScope).toEqual(['file_read', 'bash']);
+    // Persona tools are additive over lace builtins. file_read and bash are
+    // both builtins and persona-declared, so they appear once in the union.
+    expect(loaded.state.config?.toolScope).toContain('file_read');
+    expect(loaded.state.config?.toolScope).toContain('bash');
+    expect(loaded.state.config?.toolScope).toContain('ripgrep_search'); // builtin
     expect(loaded.state.config?.mcpServers).toEqual([
       { name: 'fs', command: 'mcp-fs', args: ['--root', '/tmp'], enabled: false },
     ]);
@@ -185,6 +189,51 @@ scoped persona`
     })) as { sessionId: string };
 
     const loaded = loadSession(created.sessionId);
-    expect(loaded.state.config?.toolScope).toEqual(['file_read']);
+    // Persona tools are additive over lace builtins — file_read is a builtin
+    // so it is already included; the scope is the union, deduplicated.
+    expect(loaded.state.config?.toolScope).toContain('file_read');
+    // Builtins are always present even when persona names only a subset.
+    expect(loaded.state.config?.toolScope).toContain('bash');
+    expect(loaded.state.config?.toolScope).toContain('ripgrep_search');
+  });
+
+  it('persona tools are additive over lace builtins (MCP-only persona keeps builtins)', async () => {
+    // Models the kata-#31 scenario: a persona declares only specialized
+    // (e.g. MCP-namespaced) tools. Lace builtins are part of the platform and
+    // MUST remain available so the subagent can read files, search, etc.
+    writeFileSync(
+      join(userPersonasDir, 'mcponly.md'),
+      `---
+tools:
+  - knowledge/grep
+---
+mcp-only persona`
+    );
+
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request(
+      'initialize',
+      defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+    );
+
+    const created = (await client.request('session/new', {
+      workDir: tempDir,
+      persona: 'mcponly',
+    })) as { sessionId: string };
+
+    const loaded = loadSession(created.sessionId);
+    const scope = loaded.state.config?.toolScope ?? [];
+    // Persona-declared tool present.
+    expect(scope).toContain('knowledge/grep');
+    // Lace builtins always present.
+    expect(scope).toContain('file_read');
+    expect(scope).toContain('ripgrep_search');
+    expect(scope).toContain('bash');
+    expect(scope).toContain('file_write');
+    expect(scope).toContain('delegate');
+    // No duplicates from the union.
+    expect(new Set(scope).size).toBe(scope.length);
   });
 });

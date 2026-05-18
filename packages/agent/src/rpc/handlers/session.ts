@@ -34,6 +34,7 @@ import { SkillRegistry, getSkillDirectories } from '../../skills';
 import { killAllRunningJobs } from '../../jobs';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { PersonaNotFoundError, PersonaParseError } from '../../config/persona-registry';
+import { LACE_BUILTIN_TOOL_NAMES } from '../../tools/executor';
 
 /**
  * Register session lifecycle handlers with the peer.
@@ -107,7 +108,16 @@ export function registerSessionHandlers(
       try {
         const { config: personaConfig } = state.personaRegistry.parsePersona(requestedPersona);
         if (personaConfig.model) personaDefaults.modelId = personaConfig.model;
-        if (personaConfig.tools) personaDefaults.toolScope = [...personaConfig.tools];
+        if (personaConfig.tools) {
+          // Persona `tools:` frontmatter is ADDITIVE over lace builtins.
+          // Builtins are platform tools (file_read, bash, ripgrep_search, ...)
+          // that should always be available; the persona layer only declares
+          // its specialized additions (typically MCP-namespaced tools).
+          // Treating persona.tools as a strict allowlist caused kata #31:
+          // subagents lost access to file_read and stopped after one turn.
+          const union = new Set<string>([...LACE_BUILTIN_TOOL_NAMES, ...personaConfig.tools]);
+          personaDefaults.toolScope = Array.from(union);
+        }
         if (personaConfig.mcpServers) {
           personaDefaults.mcpServers = Object.entries(personaConfig.mcpServers).map(
             ([name, spec]) => ({
