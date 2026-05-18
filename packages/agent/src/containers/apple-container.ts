@@ -13,7 +13,7 @@ import {
   ContainerExecError,
 } from './types';
 import { logger } from '@lace/agent/utils/logger';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import { v4 as uuidv4 } from 'uuid';
 import { existsSync, mkdirSync } from 'fs';
@@ -346,8 +346,116 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
     return notReadyPatterns.some((pattern) => combinedMessage.includes(pattern.toLowerCase()));
   }
 
-  execStream(_containerId: string, _options: ExecStreamOptions): Promise<ExecStreamHandle> {
-    throw new Error('AppleContainerRuntime.execStream not yet implemented (kata #49a-i)');
+  async execStream(containerId: string, options: ExecStreamOptions): Promise<ExecStreamHandle> {
+    await this.readyPromise; // Wait for system to be ready
+
+    const info = this.inspect(containerId);
+    if (info.state !== 'running') {
+      throw new ContainerError(`Container ${containerId} is not running`, containerId);
+    }
+
+    // Mirror the arg shape used by exec(); -i keeps stdin open for streaming.
+    const args = ['exec', '-i'];
+
+    for (const [key, value] of Object.entries(options.environment || {})) {
+      args.push('-e', `${key}=${value}`);
+    }
+
+    if (options.workingDirectory) {
+      args.push('-w', options.workingDirectory);
+    }
+
+    args.push(containerId, ...options.command);
+
+    logger.debug('Streaming exec in Apple container', {
+      containerId,
+      argCount: args.length,
+    });
+
+    const child = spawn('container', args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    // Reject the returned promise on spawn failure (CLI not on PATH, etc.).
+    // After 'spawn' fires, post-spawn errors surface via wait().
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const onSpawn = () => {
+          child.off('error', onError);
+          resolve();
+        };
+        const onError = (err: Error) => {
+          child.off('spawn', onSpawn);
+          reject(
+            new ContainerError(
+              `Failed to spawn 'container' for exec stream: ${err.message}`,
+              containerId,
+              err
+            )
+          );
+        };
+        child.once('spawn', onSpawn);
+        child.once('error', onError);
+      });
+    } catch (err) {
+      try {
+        child.kill('SIGKILL');
+      } catch {
+        // Best effort; child may already be unspawned.
+      }
+      throw err;
+    }
+
+    if (!child.stdin || !child.stdout || !child.stderr) {
+      throw new ContainerError(
+        `Spawned 'container' child is missing one or more standard streams`,
+        containerId
+      );
+    }
+
+    const waitPromise = new Promise<{ exitCode: number }>((resolve) => {
+      // Map signal-killed exits to the 128+N convention the rest of this file uses.
+      const signalExitCodes: Record<string, number> = {
+        SIGHUP: 129,
+        SIGINT: 130,
+        SIGQUIT: 131,
+        SIGABRT: 134,
+        SIGKILL: 137,
+        SIGTERM: 143,
+      };
+      let settled = false;
+      const settle = (exitCode: number) => {
+        if (settled) return;
+        settled = true;
+        resolve({ exitCode });
+      };
+      child.once('exit', (code, signal) => {
+        if (typeof code === 'number') {
+          settle(code);
+        } else if (signal) {
+          settle(signalExitCodes[signal] ?? 128);
+        } else {
+          settle(-1);
+        }
+      });
+      child.once('error', (err) => {
+        logger.warn('Exec stream child errored after spawn', {
+          containerId,
+          error: err.message,
+        });
+        settle(-1);
+      });
+    });
+
+    return {
+      stdin: child.stdin,
+      stdout: child.stdout,
+      stderr: child.stderr,
+      wait: () => waitPromise,
+      kill: (signal?: NodeJS.Signals) => {
+        child.kill(signal);
+      },
+    };
   }
 
   async exec(containerId: string, options: ExecOptions): Promise<ExecResult> {
