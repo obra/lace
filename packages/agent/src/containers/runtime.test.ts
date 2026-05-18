@@ -76,6 +76,7 @@ describe('BaseContainerRuntime', () => {
     it('should return container info when container exists', async () => {
       const config: ContainerConfig = {
         id: 'test-container',
+        image: 'test:latest',
         workingDirectory: '/app',
         mounts: [],
       };
@@ -98,8 +99,18 @@ describe('BaseContainerRuntime', () => {
     });
 
     it('should return all containers', async () => {
-      runtime.create({ id: 'container1', workingDirectory: '/app', mounts: [] });
-      runtime.create({ id: 'container2', workingDirectory: '/app', mounts: [] });
+      runtime.create({
+        id: 'container1',
+        image: 'test:latest',
+        workingDirectory: '/app',
+        mounts: [],
+      });
+      runtime.create({
+        id: 'container2',
+        image: 'test:latest',
+        workingDirectory: '/app',
+        mounts: [],
+      });
 
       const containers = await runtime.list();
       expect(containers).toHaveLength(2);
@@ -112,6 +123,7 @@ describe('BaseContainerRuntime', () => {
     it('should translate host path to container path based on mounts', () => {
       const config: ContainerConfig = {
         id: 'test-container',
+        image: 'test:latest',
         workingDirectory: '/app',
         mounts: [
           { source: '/Users/test/project', target: '/workspace', readonly: false },
@@ -130,6 +142,7 @@ describe('BaseContainerRuntime', () => {
     it('should handle exact mount point paths', () => {
       const config: ContainerConfig = {
         id: 'test-container',
+        image: 'test:latest',
         workingDirectory: '/app',
         mounts: [{ source: '/Users/test/project', target: '/workspace', readonly: false }],
       };
@@ -142,6 +155,7 @@ describe('BaseContainerRuntime', () => {
     it('should return original path when no mount matches', () => {
       const config: ContainerConfig = {
         id: 'test-container',
+        image: 'test:latest',
         workingDirectory: '/app',
         mounts: [{ source: '/Users/test/project', target: '/workspace', readonly: false }],
       };
@@ -162,6 +176,7 @@ describe('BaseContainerRuntime', () => {
     it('should translate container path to host path based on mounts', () => {
       const config: ContainerConfig = {
         id: 'test-container',
+        image: 'test:latest',
         workingDirectory: '/app',
         mounts: [{ source: '/Users/test/project', target: '/workspace', readonly: false }],
       };
@@ -174,6 +189,7 @@ describe('BaseContainerRuntime', () => {
     it('should handle multiple mount points correctly', () => {
       const config: ContainerConfig = {
         id: 'test-container',
+        image: 'test:latest',
         workingDirectory: '/app',
         mounts: [
           { source: '/Users/test/project', target: '/workspace', readonly: false },
@@ -193,6 +209,7 @@ describe('BaseContainerRuntime', () => {
     it('should return original path when no mount matches', () => {
       const config: ContainerConfig = {
         id: 'test-container',
+        image: 'test:latest',
         workingDirectory: '/app',
         mounts: [],
       };
@@ -207,6 +224,7 @@ describe('BaseContainerRuntime', () => {
     it('should update container state correctly', async () => {
       const containerId = await runtime.create({
         id: 'test-container',
+        image: 'test:latest',
         workingDirectory: '/app',
         mounts: [],
       });
@@ -229,6 +247,7 @@ describe('BaseContainerRuntime', () => {
     it('should clean up mounts when container is removed', async () => {
       const containerId = runtime.create({
         id: 'test-container',
+        image: 'test:latest',
         workingDirectory: '/app',
         mounts: [{ source: '/Users/test', target: '/workspace', readonly: false }],
       });

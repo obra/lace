@@ -77,6 +77,7 @@ describe.skipIf(process.platform !== 'darwin')('Container Cleanup Validation', (
   it('should stop running container, handle already-stopped state, and fully remove', async () => {
     const config: ContainerConfig = {
       id: 'cleanup-validation-test',
+      image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
       workingDirectory: '/workspace',
       mounts: [
         {
@@ -118,6 +119,7 @@ describe.skipIf(process.platform !== 'darwin')('Container Cleanup Validation', (
     // Create container but don't start it
     const config: ContainerConfig = {
       id: 'cleanup-never-started',
+      image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
       workingDirectory: '/workspace',
       mounts: [
         {
@@ -144,6 +146,7 @@ describe.skipIf(process.platform !== 'darwin')('Container Cleanup Validation', (
   it('should remove container even if stop times out', async () => {
     const config: ContainerConfig = {
       id: 'cleanup-timeout-test',
+      image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
       workingDirectory: '/workspace',
       mounts: [
         {

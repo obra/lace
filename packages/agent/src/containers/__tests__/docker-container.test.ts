@@ -106,13 +106,14 @@ describe('DockerContainerRuntime', () => {
       const last = allArgs[allArgs.length - 1] as Callback;
       last(null, { stdout: '', stderr: '' });
     });
-    runtime = new DockerContainerRuntime('alpine:latest');
+    runtime = new DockerContainerRuntime();
   });
 
   describe('create', () => {
     it('issues docker create with --name lace- prefix, -v mounts, -e env, image, and sleep infinity', async () => {
       const id = await runtime.create({
         name: 'shell-agent',
+        image: 'alpine:latest',
         workingDirectory: '/workspace',
         mounts: [
           { source: '/host/src', target: '/workspace', readonly: false },
@@ -146,6 +147,7 @@ describe('DockerContainerRuntime', () => {
     it('preserves an existing lace- prefix without doubling it', async () => {
       const id = await runtime.create({
         name: 'lace-already-prefixed',
+        image: 'alpine:latest',
         workingDirectory: '/w',
         mounts: [],
       });
@@ -155,6 +157,7 @@ describe('DockerContainerRuntime', () => {
     it('uses config.id with uuid suffix when name is absent', async () => {
       const id = await runtime.create({
         id: 'persona-x',
+        image: 'alpine:latest',
         workingDirectory: '/w',
         mounts: [],
       });
@@ -163,6 +166,7 @@ describe('DockerContainerRuntime', () => {
 
     it('generates an autoname when neither name nor id is provided', async () => {
       const id = await runtime.create({
+        image: 'alpine:latest',
         workingDirectory: '/w',
         mounts: [],
       });
@@ -177,15 +181,38 @@ describe('DockerContainerRuntime', () => {
       ]);
 
       await expect(
-        runtime.create({ name: 'x', workingDirectory: '/w', mounts: [] })
+        runtime.create({ name: 'x', image: 'alpine:latest', workingDirectory: '/w', mounts: [] })
       ).rejects.toThrow(/docker CLI not found/);
     });
 
     it('rejects on name collision before shelling out', async () => {
-      await runtime.create({ name: 'dup', workingDirectory: '/w', mounts: [] });
+      await runtime.create({
+        name: 'dup',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
       await expect(
-        runtime.create({ name: 'dup', workingDirectory: '/w', mounts: [] })
+        runtime.create({ name: 'dup', image: 'alpine:latest', workingDirectory: '/w', mounts: [] })
       ).rejects.toThrow(/name already in use/);
+    });
+
+    it('uses config.image on the docker CLI rather than any runtime default (kata #53)', async () => {
+      // Regression: previously DockerContainerRuntime carried a constructor default
+      // image and ignored ContainerConfig.image, so persona images never ran.
+      await runtime.create({
+        name: 'persona',
+        image: 'node:24-bookworm',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+
+      const args = findCallWithSubcommand('create');
+      expect(args).toBeDefined();
+      expect(args).toContain('node:24-bookworm');
+      // The image must immediately precede the entrypoint command.
+      const imageIdx = args!.indexOf('node:24-bookworm');
+      expect(args![imageIdx + 1]).toBe('sleep');
     });
 
     it('surfaces docker errors (e.g. image missing) as ContainerError', async () => {
@@ -199,14 +226,24 @@ describe('DockerContainerRuntime', () => {
       ]);
 
       await expect(
-        runtime.create({ name: 'bad-image', workingDirectory: '/w', mounts: [] })
+        runtime.create({
+          name: 'bad-image',
+          image: 'alpine:latest',
+          workingDirectory: '/w',
+          mounts: [],
+        })
       ).rejects.toBeInstanceOf(ContainerError);
     });
   });
 
   describe('start / stop / remove', () => {
     it('start runs `docker start <id>` and marks running', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
       mockExecFile.mockClear();
       await runtime.start(id);
 
@@ -215,7 +252,12 @@ describe('DockerContainerRuntime', () => {
     });
 
     it('start is idempotent when already running', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
       await runtime.start(id);
       mockExecFile.mockClear();
       await runtime.start(id);
@@ -223,7 +265,12 @@ describe('DockerContainerRuntime', () => {
     });
 
     it('stop passes -t <seconds> and updates state to stopped', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
       await runtime.start(id);
       mockExecFile.mockClear();
       await runtime.stop(id, 5000);
@@ -233,7 +280,12 @@ describe('DockerContainerRuntime', () => {
     });
 
     it('remove runs `docker rm -f <id>` and forgets the container locally', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
       mockExecFile.mockClear();
       await runtime.remove(id);
 
@@ -242,7 +294,12 @@ describe('DockerContainerRuntime', () => {
     });
 
     it('remove cleans local state even if docker reports no-such-container', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
 
       setExecFileResponses([
         {
@@ -266,12 +323,22 @@ describe('DockerContainerRuntime', () => {
 
   describe('exec', () => {
     it('refuses to exec when container is not running', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
       await expect(runtime.exec(id, { command: ['ls'] })).rejects.toBeInstanceOf(ContainerError);
     });
 
     it('shapes args with -w, -e, container id, and command, and returns stdout/stderr/exitCode', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
       await runtime.start(id);
 
       setExecFileResponses([{ stdout: 'hi\n', stderr: '' }]);
@@ -290,7 +357,12 @@ describe('DockerContainerRuntime', () => {
     });
 
     it('returns non-zero exitCode rather than throwing for failing commands', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
       await runtime.start(id);
 
       setExecFileResponses([
@@ -311,7 +383,12 @@ describe('DockerContainerRuntime', () => {
 
   describe('execStream', () => {
     it('spawns docker exec -i and wires stdin/stdout/stderr through the handle', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
       await runtime.start(id);
 
       const handle = await runtime.execStream(id, {
@@ -347,14 +424,24 @@ describe('DockerContainerRuntime', () => {
     });
 
     it('rejects when container is not running', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
       await expect(runtime.execStream(id, { command: ['ls'] })).rejects.toBeInstanceOf(
         ContainerError
       );
     });
 
     it('wait() returns the same settled promise across repeated calls (no listener leak)', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
       await runtime.start(id);
 
       const handle = await runtime.execStream(id, { command: ['cat'] });
@@ -372,7 +459,12 @@ describe('DockerContainerRuntime', () => {
 
   describe('inspect (sync, cached)', () => {
     it('returns the cached ContainerInfo without shelling out', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
       mockExecFile.mockClear();
       const info = runtime.inspect(id);
       expect(info.id).toBe(id);
@@ -383,7 +475,12 @@ describe('DockerContainerRuntime', () => {
 
   describe('refreshState', () => {
     it('parses docker inspect JSON into ContainerInfo and refreshes cached state', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
 
       const payload = {
         Id: 'sha256:abc',
@@ -414,7 +511,12 @@ describe('DockerContainerRuntime', () => {
     });
 
     it('throws ContainerNotFoundError when docker reports no such container', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
       setExecFileResponses([
         {
           error: Object.assign(new Error('inspect failed'), {
@@ -447,7 +549,12 @@ describe('DockerContainerRuntime', () => {
     });
 
     it('falls back to cached containers when docker ps fails', async () => {
-      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
       setExecFileResponses([
         { error: Object.assign(new Error('docker daemon offline'), { code: 1 }) },
       ]);
@@ -461,6 +568,7 @@ describe('DockerContainerRuntime', () => {
     it('translates host paths to container paths via registered mounts', async () => {
       const id = await runtime.create({
         name: 'paths',
+        image: 'alpine:latest',
         workingDirectory: '/workspace',
         mounts: [{ source: '/host/proj', target: '/workspace' }],
       });

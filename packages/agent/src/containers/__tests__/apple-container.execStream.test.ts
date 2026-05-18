@@ -62,6 +62,7 @@ function makeRuntime(): AppleContainerRuntime {
 function setupRunningContainer(runtime: AppleContainerRuntime): string {
   const containerId = runtime.create({
     id: 'stream-test',
+    image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
     workingDirectory: '/workspace',
     mounts: [],
   });
@@ -81,6 +82,7 @@ describe('AppleContainerRuntime.execStream', () => {
     const runtime = makeRuntime();
     const containerId = runtime.create({
       id: 'not-running',
+      image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
       workingDirectory: '/workspace',
       mounts: [],
     });

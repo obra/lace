@@ -33,6 +33,7 @@ describe.skipIf(process.platform !== 'darwin')('AppleContainerRuntime Integratio
 
     const config: ContainerConfig = {
       id: 'shared-container',
+      image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
       workingDirectory: '/workspace',
       mounts: [{ source: testDir, target: '/workspace', readonly: false }],
       environment: {
@@ -149,12 +150,14 @@ describe.skipIf(process.platform !== 'darwin')('AppleContainerRuntime Integratio
       // Create two containers
       const config1: ContainerConfig = {
         id: 'concurrent-1',
+        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
         workingDirectory: '/workspace',
         mounts: [{ source: concurrentTestDir, target: '/workspace' }],
       };
 
       const config2: ContainerConfig = {
         id: 'concurrent-2',
+        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
         workingDirectory: '/workspace',
         mounts: [{ source: concurrentTestDir, target: '/workspace' }],
       };

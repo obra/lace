@@ -68,7 +68,12 @@ class MockContainerRuntime extends BaseContainerRuntime {
 
   /** test helper: directly create-then-stop to simulate a leftover stopped container */
   async seedStopped(containerId: string): Promise<void> {
-    this.create({ id: containerId, workingDirectory: '/x', mounts: [] });
+    this.create({
+      id: containerId,
+      image: 'test:latest',
+      workingDirectory: '/x',
+      mounts: [],
+    });
     await this.start(containerId);
     await this.stop(containerId);
     // clear log so tests can inspect only manager-driven calls
@@ -110,10 +115,23 @@ describe('ContainerManager', () => {
       expect(createSpy).toHaveBeenCalledWith({
         id: 'lace-sess1-worker',
         name: 'sess1-worker',
+        image: 'node:20',
         workingDirectory: '/lace',
         mounts: baseSpec.mounts,
         environment: { FOO: 'bar' },
       });
+    });
+
+    it('propagates spec.image into ContainerConfig (kata #53)', async () => {
+      // Regression: ContainerManager used to drop spec.image, so every container
+      // booted whatever default image the runtime carried. Lock the wiring down.
+      const createSpy = vi.spyOn(runtime, 'create');
+      const customSpec: ContainerSpec = { ...baseSpec, name: 'persona', image: 'node:24-bookworm' };
+
+      await manager.materialize(customSpec);
+
+      const [config] = createSpy.mock.calls[0] as [ContainerConfig];
+      expect(config.image).toBe('node:24-bookworm');
     });
 
     it('is idempotent: second materialize with same name returns existing without recreating', async () => {
@@ -183,7 +201,12 @@ describe('ContainerManager', () => {
 
     it('returns null if runtime has the container but manager has no cached spec', async () => {
       // simulates resurrected container after restart — manager has not materialized in this process
-      runtime.create({ id: 'lace-orphan', workingDirectory: '/x', mounts: [] });
+      runtime.create({
+        id: 'lace-orphan',
+        image: 'test:latest',
+        workingDirectory: '/x',
+        mounts: [],
+      });
 
       const handle = await manager.inspect('orphan');
 
@@ -242,13 +265,38 @@ describe('ContainerManager', () => {
   describe('reapOrphans', () => {
     it('destroys containers matching prefix that are not in liveSpecNames', async () => {
       // three lace-sess1-* containers, two live + one orphan
-      runtime.create({ id: 'lace-sess1-alpha', workingDirectory: '/x', mounts: [] });
-      runtime.create({ id: 'lace-sess1-beta', workingDirectory: '/x', mounts: [] });
-      runtime.create({ id: 'lace-sess1-zombie', workingDirectory: '/x', mounts: [] });
+      runtime.create({
+        id: 'lace-sess1-alpha',
+        image: 'test:latest',
+        workingDirectory: '/x',
+        mounts: [],
+      });
+      runtime.create({
+        id: 'lace-sess1-beta',
+        image: 'test:latest',
+        workingDirectory: '/x',
+        mounts: [],
+      });
+      runtime.create({
+        id: 'lace-sess1-zombie',
+        image: 'test:latest',
+        workingDirectory: '/x',
+        mounts: [],
+      });
       // unrelated prefix — must be left alone
-      runtime.create({ id: 'lace-other-x', workingDirectory: '/x', mounts: [] });
+      runtime.create({
+        id: 'lace-other-x',
+        image: 'test:latest',
+        workingDirectory: '/x',
+        mounts: [],
+      });
       // non-lace id — must be ignored entirely
-      runtime.create({ id: 'docker-default', workingDirectory: '/x', mounts: [] });
+      runtime.create({
+        id: 'docker-default',
+        image: 'test:latest',
+        workingDirectory: '/x',
+        mounts: [],
+      });
       runtime.callLog.length = 0;
 
       const result = await manager.reapOrphans('sess1-', new Set(['sess1-alpha', 'sess1-beta']));
@@ -262,8 +310,8 @@ describe('ContainerManager', () => {
     });
 
     it('empty prefix reaps any lace- container not in liveSpecNames', async () => {
-      runtime.create({ id: 'lace-keep', workingDirectory: '/x', mounts: [] });
-      runtime.create({ id: 'lace-drop', workingDirectory: '/x', mounts: [] });
+      runtime.create({ id: 'lace-keep', image: 'test:latest', workingDirectory: '/x', mounts: [] });
+      runtime.create({ id: 'lace-drop', image: 'test:latest', workingDirectory: '/x', mounts: [] });
 
       const result = await manager.reapOrphans('', new Set(['keep']));
 
@@ -271,8 +319,8 @@ describe('ContainerManager', () => {
     });
 
     it('continues past individual failures and reports successes', async () => {
-      runtime.create({ id: 'lace-a', workingDirectory: '/x', mounts: [] });
-      runtime.create({ id: 'lace-b', workingDirectory: '/x', mounts: [] });
+      runtime.create({ id: 'lace-a', image: 'test:latest', workingDirectory: '/x', mounts: [] });
+      runtime.create({ id: 'lace-b', image: 'test:latest', workingDirectory: '/x', mounts: [] });
       const originalStop = runtime.stop.bind(runtime);
       vi.spyOn(runtime, 'stop').mockImplementation(async (id: string) => {
         if (id === 'lace-a') throw new Error('boom');
