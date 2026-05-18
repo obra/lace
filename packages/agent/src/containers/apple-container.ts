@@ -26,15 +26,10 @@ interface AppleContainerInfo extends ContainerInfo {
 }
 
 export class AppleContainerRuntime extends BaseContainerRuntime {
-  // Default image to use for containers
-  // Microsoft devcontainer includes common dev tools, git, etc.
-  private readonly DEFAULT_IMAGE = 'mcr.microsoft.com/devcontainers/base:ubuntu';
   private readonly readyPromise: Promise<void>;
-  private readonly image: string;
 
-  constructor(image?: string) {
+  constructor() {
     super();
-    this.image = image || this.DEFAULT_IMAGE;
     // Start system initialization but don't await in constructor
     // Methods will await this.readyPromise before executing
     this.readyPromise = this.ensureSystemStarted();
@@ -163,7 +158,7 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
       args.push('-w', config.workingDirectory);
 
       // Add image and command
-      args.push(this.image, 'tail', '-f', '/dev/null');
+      args.push(config.image, 'tail', '-f', '/dev/null');
 
       logger.debug('Starting container', { containerId, argCount: args.length });
 

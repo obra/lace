@@ -52,6 +52,7 @@ export class ContainerManager {
     const config: ContainerConfig = {
       id: containerId,
       name: spec.name,
+      image: spec.image,
       workingDirectory: spec.workingDirectory,
       mounts: spec.mounts,
       environment: spec.env,

@@ -10,6 +10,7 @@ async function test() {
   logger.info('Creating container without mounts...');
   const containerId = runtime.create({
     id: 'simple-test',
+    image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
     workingDirectory: '/tmp',
     mounts: [], // No mounts
     environment: {

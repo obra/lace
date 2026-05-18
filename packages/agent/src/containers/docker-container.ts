@@ -53,13 +53,10 @@ interface DockerPsRowJson {
 }
 
 export class DockerContainerRuntime extends BaseContainerRuntime {
-  private readonly DEFAULT_IMAGE = 'mcr.microsoft.com/devcontainers/base:ubuntu';
-  private readonly image: string;
   private readonly dockerBin: string;
 
-  constructor(image?: string, dockerBin: string = 'docker') {
+  constructor(dockerBin: string = 'docker') {
     super();
-    this.image = image || this.DEFAULT_IMAGE;
     this.dockerBin = dockerBin;
   }
 
@@ -96,7 +93,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       args.push('-e', `${key}=${value}`);
     }
 
-    args.push(this.image);
+    args.push(config.image);
 
     if (config.command && config.command.length > 0) {
       args.push(...config.command);
