@@ -13,7 +13,11 @@ import {
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
 import { getJobOutputPath } from './job-file-utils';
-import { applyEffectiveJobConfig, rpcErrorMessage } from './subagent-job-helpers';
+import {
+  applyEffectiveJobConfig,
+  buildSubagentInitConfig,
+  rpcErrorMessage,
+} from './subagent-job-helpers';
 import { logger } from '@lace/agent/utils/logger';
 import type { ToolResult } from '@lace/ent-protocol';
 import {
@@ -558,6 +562,16 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
     try {
       const currentState = getState();
 
+      // Inherit the parent's effective approvalMode so the child runs under
+      // the same permission policy. Hardcoding 'ask' here caused kata #37: a
+      // parent in `dangerouslySkipPermissions` would spawn a child that still
+      // asked, and the upstream supervisor's missing handler cancelled the
+      // request in ~15ms — silently dropping the subagent's writes.
+      const parentEffective = getEffectiveConfig(
+        currentState.config,
+        currentState.activeSession?.state.config
+      );
+
       await childPeer.request('initialize', {
         protocolVersion: '1.0',
         clientInfo: { name: 'lace-agent', version: '0.1.0' },
@@ -566,7 +580,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           permissions: true,
           'ent/jobStreaming': currentState.jobManager.getStreamingMode(),
         },
-        config: { approvalMode: 'ask' },
+        config: buildSubagentInitConfig(parentEffective),
       });
 
       // Resume existing session or create a new one
@@ -608,11 +622,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       // The two fields are inherited independently: when a persona supplies a
       // modelId but the delegate call provides no connectionId, the parent's
       // connectionId must still flow through.
-      const effective = getEffectiveConfig(
-        currentState.config,
-        currentState.activeSession?.state.config
-      );
-      applyEffectiveJobConfig(job, effective);
+      applyEffectiveJobConfig(job, parentEffective);
 
       // Apply persona mcpServers on first creation only — resumed sessions
       // already have their MCP config persisted from the original run.

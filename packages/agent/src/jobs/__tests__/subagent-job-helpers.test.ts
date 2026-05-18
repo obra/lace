@@ -1,7 +1,11 @@
 // ABOUTME: Tests for subagent-job helpers (config inheritance + error extraction)
 
 import { describe, it, expect } from 'vitest';
-import { applyEffectiveJobConfig, rpcErrorMessage } from '../subagent-job-helpers';
+import {
+  applyEffectiveJobConfig,
+  buildSubagentInitConfig,
+  rpcErrorMessage,
+} from '../subagent-job-helpers';
 
 describe('applyEffectiveJobConfig', () => {
   it('fills both fields when both are unset on the job', () => {
@@ -36,6 +40,48 @@ describe('applyEffectiveJobConfig', () => {
     applyEffectiveJobConfig(job, { modelId: 'parent-model' });
     expect(job.connectionId).toBeUndefined();
     expect(job.modelId).toBe('persona-model');
+  });
+});
+
+describe('buildSubagentInitConfig (kata #37 Layer A)', () => {
+  // The bug: subagent-job.ts:569 used to hardcode `config: { approvalMode: 'ask' }`
+  // on `initialize`, regardless of the parent's approvalMode. That meant a parent
+  // running with `dangerouslySkipPermissions` (e.g. an automated runner that never
+  // attaches a permission handler) would spawn children that still tried to ask
+  // for permission — and the request would be cancelled within ~15ms by the
+  // sen-core supervisor's missing handler, silently dropping the subagent's
+  // tool calls. The fix propagates the parent's effective approvalMode.
+
+  it('propagates dangerouslySkipPermissions from the parent effective config', () => {
+    expect(buildSubagentInitConfig({ approvalMode: 'dangerouslySkipPermissions' })).toEqual({
+      approvalMode: 'dangerouslySkipPermissions',
+    });
+  });
+
+  it('propagates ask from the parent effective config (negative: not always skip)', () => {
+    // Parent's mode propagates verbatim — children do not get a hardcoded
+    // permission-bypass when the parent is genuinely in ask mode.
+    expect(buildSubagentInitConfig({ approvalMode: 'ask' })).toEqual({
+      approvalMode: 'ask',
+    });
+  });
+
+  it('propagates approve from the parent effective config', () => {
+    expect(buildSubagentInitConfig({ approvalMode: 'approve' })).toEqual({
+      approvalMode: 'approve',
+    });
+  });
+
+  it('propagates deny from the parent effective config', () => {
+    expect(buildSubagentInitConfig({ approvalMode: 'deny' })).toEqual({
+      approvalMode: 'deny',
+    });
+  });
+
+  it("defaults to 'ask' when the parent effective config has no approvalMode set", () => {
+    // Safe fallback: an unconfigured parent must not silently grant child
+    // sessions a permission bypass.
+    expect(buildSubagentInitConfig({})).toEqual({ approvalMode: 'ask' });
   });
 });
 

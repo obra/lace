@@ -1,9 +1,35 @@
 // ABOUTME: Pure helpers used by subagent-job — config inheritance + RPC error extraction.
 // Kept separate from subagent-job.ts so they can be unit-tested without spawning a child process.
 
+export type ApprovalMode =
+  | 'ask'
+  | 'approveReads'
+  | 'approveEdits'
+  | 'approve'
+  | 'deny'
+  | 'dangerouslySkipPermissions';
+
 export interface SubagentEffectiveConfig {
   connectionId?: string;
   modelId?: string;
+  approvalMode?: ApprovalMode;
+}
+
+/**
+ * Build the `config` block passed to a child subagent's `initialize` RPC.
+ *
+ * The child must inherit the parent's effective approvalMode — otherwise a
+ * parent running with `dangerouslySkipPermissions` (e.g. an automated runner
+ * that never attaches a permission handler) would spawn children that still
+ * ask, and those requests would be cancelled by the upstream supervisor with
+ * no handler, silently dropping the subagent's tool calls. When the parent
+ * has no approvalMode set, fall back to `ask` (safe default — never grant a
+ * silent permission bypass).
+ */
+export function buildSubagentInitConfig(effective: SubagentEffectiveConfig): {
+  approvalMode: ApprovalMode;
+} {
+  return { approvalMode: effective.approvalMode ?? 'ask' };
 }
 
 export interface SubagentConfigSlot {
