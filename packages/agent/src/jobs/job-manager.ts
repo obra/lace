@@ -43,6 +43,15 @@ export type CreateJobOptions = {
       tools?: Record<string, unknown>;
     }
   >;
+  // Parsed persona container runtime, forwarded to subagent-job when present.
+  personaContainerRuntime?: {
+    type: 'container';
+    image: string;
+    workingDirectory: string;
+    mounts: Record<string, string>;
+    env?: Record<string, string>;
+    ports?: Array<{ host: number; container: number }>;
+  };
 };
 
 /**
@@ -401,6 +410,9 @@ export class JobManager {
             ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
             ...(options.persona ? { persona: options.persona } : {}),
             ...(options.personaMcpServers ? { personaMcpServers: options.personaMcpServers } : {}),
+            ...(options.personaContainerRuntime
+              ? { personaContainerRuntime: options.personaContainerRuntime }
+              : {}),
           }
         : {}),
     };

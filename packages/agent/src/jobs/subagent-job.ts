@@ -1,7 +1,6 @@
 // ABOUTME: Subagent job execution - handles spawning and managing AI subagent processes
 
 import { randomUUID } from 'node:crypto';
-import { spawn } from 'node:child_process';
 import { mkdirSync, existsSync, appendFileSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
@@ -20,6 +19,7 @@ import {
   rpcErrorMessage,
 } from './subagent-job-helpers';
 import { logger } from '@lace/agent/utils/logger';
+import { spawnSubagent, type SubagentProcessHandle } from './subagent-spawn';
 import type { ToolResult } from '@lace/ent-protocol';
 import { logToolUpdateToJobLog } from './job-log-formatter';
 import {
@@ -139,30 +139,35 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
 
     // Buffer for collecting stderr output
     let stderrBuffer = '';
-    let childProc: ReturnType<typeof spawn> | undefined;
+    let subagentProc: SubagentProcessHandle | undefined;
     let childTransport: ReturnType<typeof createNdjsonStdioTransport> | undefined;
     let childPeer: JsonRpcPeer | undefined;
 
     try {
-      childProc = spawn(process.execPath, [process.argv[1] ?? ''], {
-        cwd: process.cwd(),
-        env: { ...process.env },
-        stdio: ['pipe', 'pipe', 'pipe'],
+      subagentProc = await spawnSubagent({
+        parentSessionId: state.activeSession.meta.sessionId,
+        personaName: job.persona,
+        personaContainerRuntime: job.personaContainerRuntime,
+        containerManager: state.containerManager,
+        containerMounts: state.containerMounts,
       });
-      job.proc = childProc;
 
-      // Handle spawn errors (e.g., executable not found)
-      childProc.on('error', (err) => {
+      if (subagentProc.nativeProcess) {
+        job.proc = subagentProc.nativeProcess;
+      }
+      if (subagentProc.containerExec) {
+        job.containerExec = subagentProc.containerExec;
+      }
+
+      subagentProc.onSpawnError((err) => {
         stderrBuffer += `[SPAWN ERROR] ${err.message}\n`;
       });
 
-      // Capture stderr from child process for debugging
-      childProc.stderr?.on('data', (chunk: Buffer) => {
+      subagentProc.stderr.on('data', (chunk: Buffer) => {
         stderrBuffer += chunk.toString('utf8');
       });
 
-      // Log if child process exits with error
-      childProc.on('exit', (code, signal) => {
+      subagentProc.onExit(({ code, signal }) => {
         if (code !== 0 && code !== null) {
           logger.debug('job.subagent.child_exit', {
             jobId: job.jobId,
@@ -173,14 +178,9 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         }
       });
 
-      // With stdio: ['pipe', 'pipe', 'pipe'], stdout and stdin are guaranteed non-null
-      if (!childProc.stdout || !childProc.stdin) {
-        throw new Error('Failed to create stdio pipes for child process');
-      }
-
       childTransport = createNdjsonStdioTransport({
-        readable: childProc.stdout,
-        writable: childProc.stdin,
+        readable: subagentProc.stdout,
+        writable: subagentProc.stdin,
       });
       job.childTransportClose = childTransport.close;
 
@@ -337,6 +337,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         record.status = outcome;
         record.finished = true;
         record.proc = undefined;
+        record.containerExec = undefined;
         record.childPeer = undefined;
         record.subagentSessionId = undefined;
         record.childTransportClose = undefined;
@@ -776,21 +777,19 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         });
       }
 
-      if (childProc && childProc.exitCode === null) {
-        childProc.kill('SIGTERM');
+      if (subagentProc && subagentProc.exitCode === null) {
+        subagentProc.kill('SIGTERM');
 
         // Wait up to 2 seconds for graceful exit
-        const exitPromise = new Promise<void>((resolve) =>
-          childProc!.once('exit', () => resolve())
-        );
+        const exitPromise = subagentProc.wait().then(() => undefined);
         const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 2_000));
 
         await Promise.race([exitPromise, timeoutPromise]);
 
         // Force kill if still running
-        if (childProc.exitCode === null) {
+        if (subagentProc.exitCode === null) {
           try {
-            childProc.kill('SIGKILL');
+            subagentProc.kill('SIGKILL');
           } catch (error) {
             // Process may have exited between check and kill
             logger.debug('job.subagent.sigkill.failed', {
@@ -801,7 +800,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
 
           // Final wait with shorter timeout
           await Promise.race([
-            new Promise<void>((resolve) => childProc!.once('exit', () => resolve())),
+            subagentProc.wait().then(() => undefined),
             new Promise<void>((resolve) => setTimeout(resolve, 1_000)),
           ]);
         }

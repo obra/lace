@@ -104,12 +104,25 @@ The subagent receives your message with its full conversation history intact.`;
           }
         >
       | undefined;
+    let personaContainerRuntime:
+      | {
+          type: 'container';
+          image: string;
+          workingDirectory: string;
+          mounts: Record<string, string>;
+          env?: Record<string, string>;
+          ports?: Array<{ host: number; container: number }>;
+        }
+      | undefined;
 
     if (persona) {
       try {
         const parsed = this.personaRegistry.parsePersona(persona);
         personaModelDefault = parsed.config.model;
         personaMcpServers = parsed.config.mcpServers;
+        if (parsed.config.runtime.type === 'container') {
+          personaContainerRuntime = parsed.config.runtime;
+        }
       } catch (err) {
         if (err instanceof PersonaNotFoundError || err instanceof PersonaParseError) {
           return {
@@ -165,6 +178,7 @@ The subagent receives your message with its full conversation history intact.`;
           : undefined,
       ...(persona ? { persona } : {}),
       ...(personaMcpServers ? { personaMcpServers } : {}),
+      ...(personaContainerRuntime ? { personaContainerRuntime } : {}),
     });
 
     // Background mode - return immediately
