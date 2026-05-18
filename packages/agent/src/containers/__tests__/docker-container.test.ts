@@ -1,0 +1,475 @@
+// ABOUTME: Unit tests for DockerContainerRuntime with stubbed child_process
+// ABOUTME: Verifies CLI command shaping, error paths, exec streaming wiring, inspect parse, and list filter
+
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { EventEmitter } from 'events';
+
+type Callback = (
+  err: (Error & { code?: number | string; stderr?: string; stdout?: string }) | null,
+  result?: { stdout: string; stderr: string }
+) => void;
+
+// Hoisted mocks so module-level `promisify(execFile)` captures them.
+const { mockExecFile, mockSpawn, fakeChildren } = vi.hoisted(() => {
+  type SpawnedChild = EventEmitter & {
+    stdin: EventEmitter & { end: ReturnType<typeof vi.fn>; write: ReturnType<typeof vi.fn> };
+    stdout: EventEmitter;
+    stderr: EventEmitter;
+    kill: ReturnType<typeof vi.fn>;
+  };
+  const fakeChildren: SpawnedChild[] = [];
+  const mockSpawn = vi.fn(() => {
+    const child = new EventEmitter() as SpawnedChild;
+    const stdin = new EventEmitter() as SpawnedChild['stdin'];
+    stdin.end = vi.fn();
+    stdin.write = vi.fn();
+    child.stdin = stdin;
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = vi.fn();
+    fakeChildren.push(child);
+    return child;
+  });
+
+  // Default implementation: success with empty stdout/stderr.
+  const mockExecFile = vi.fn((...allArgs: unknown[]) => {
+    const last = allArgs[allArgs.length - 1];
+    if (typeof last === 'function') {
+      (last as Callback)(null, { stdout: '', stderr: '' });
+    }
+  });
+
+  return { mockExecFile, mockSpawn, fakeChildren };
+});
+
+vi.mock('child_process', () => ({
+  execFile: mockExecFile,
+  spawn: mockSpawn,
+}));
+
+// Avoid touching real filesystem for mount source directories.
+vi.mock('fs', () => ({
+  existsSync: vi.fn().mockReturnValue(true),
+  mkdirSync: vi.fn(),
+}));
+
+import { DockerContainerRuntime } from '../docker-container';
+import { ContainerError, ContainerNotFoundError } from '../types';
+
+function findCallWithSubcommand(sub: string): string[] | undefined {
+  for (const call of mockExecFile.mock.calls) {
+    const args = call[1] as string[];
+    if (Array.isArray(args) && args[0] === sub) return args;
+  }
+  return undefined;
+}
+
+function setExecFileResponses(
+  responses: Array<{
+    match?: (args: string[]) => boolean;
+    stdout?: string;
+    stderr?: string;
+    error?: Error & { code?: number | string; stderr?: string; stdout?: string };
+  }>
+) {
+  let idx = 0;
+  mockExecFile.mockImplementation((...allArgs: unknown[]) => {
+    const args = allArgs[1] as string[];
+    const last = allArgs[allArgs.length - 1] as Callback;
+
+    let response = responses[idx];
+    // If a matcher is present, prefer the first matching unconsumed response.
+    if (response && response.match && !response.match(args)) {
+      const matched = responses.find((r) => r.match && r.match(args));
+      if (matched) response = matched;
+    } else {
+      idx = Math.min(idx + 1, responses.length - 1);
+    }
+
+    if (response?.error) {
+      last(response.error);
+      return;
+    }
+    last(null, { stdout: response?.stdout ?? '', stderr: response?.stderr ?? '' });
+  });
+}
+
+describe('DockerContainerRuntime', () => {
+  let runtime: DockerContainerRuntime;
+
+  beforeEach(() => {
+    mockExecFile.mockReset();
+    mockSpawn.mockClear();
+    fakeChildren.length = 0;
+    // Restore default success behavior after reset.
+    mockExecFile.mockImplementation((...allArgs: unknown[]) => {
+      const last = allArgs[allArgs.length - 1] as Callback;
+      last(null, { stdout: '', stderr: '' });
+    });
+    runtime = new DockerContainerRuntime('alpine:latest');
+  });
+
+  describe('create', () => {
+    it('issues docker create with --name lace- prefix, -v mounts, -e env, image, and sleep infinity', async () => {
+      const id = await runtime.create({
+        name: 'shell-agent',
+        workingDirectory: '/workspace',
+        mounts: [
+          { source: '/host/src', target: '/workspace', readonly: false },
+          { source: '/host/identity', target: '/etc/identity', readonly: true },
+        ],
+        environment: { FOO: 'bar', BAZ: 'qux' },
+      });
+
+      expect(id).toBe('lace-shell-agent');
+      const args = findCallWithSubcommand('create');
+      expect(args).toBeDefined();
+      expect(args![0]).toBe('create');
+      expect(args).toContain('--name');
+      expect(args).toContain('lace-shell-agent');
+      expect(args).toContain('-w');
+      expect(args).toContain('/workspace');
+      expect(args).toContain('-v');
+      expect(args).toContain('/host/src:/workspace');
+      expect(args).toContain('/host/identity:/etc/identity:ro');
+      expect(args).toContain('-e');
+      expect(args).toContain('FOO=bar');
+      expect(args).toContain('BAZ=qux');
+      expect(args).toContain('alpine:latest');
+      // image must come before the entrypoint command
+      const imageIdx = args!.indexOf('alpine:latest');
+      const sleepIdx = args!.indexOf('sleep');
+      expect(sleepIdx).toBeGreaterThan(imageIdx);
+      expect(args!.slice(sleepIdx)).toEqual(['sleep', 'infinity']);
+    });
+
+    it('preserves an existing lace- prefix without doubling it', async () => {
+      const id = await runtime.create({
+        name: 'lace-already-prefixed',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+      expect(id).toBe('lace-already-prefixed');
+    });
+
+    it('uses config.id with uuid suffix when name is absent', async () => {
+      const id = await runtime.create({
+        id: 'persona-x',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+      expect(id).toMatch(/^lace-persona-x-[a-f0-9]{8}$/);
+    });
+
+    it('generates an autoname when neither name nor id is provided', async () => {
+      const id = await runtime.create({
+        workingDirectory: '/w',
+        mounts: [],
+      });
+      expect(id).toMatch(/^lace-[a-f0-9]{8}$/);
+    });
+
+    it('rejects when docker is not on PATH (ENOENT)', async () => {
+      setExecFileResponses([
+        {
+          error: Object.assign(new Error('spawn docker ENOENT'), { code: 'ENOENT' }),
+        },
+      ]);
+
+      await expect(
+        runtime.create({ name: 'x', workingDirectory: '/w', mounts: [] })
+      ).rejects.toThrow(/docker CLI not found/);
+    });
+
+    it('rejects on name collision before shelling out', async () => {
+      await runtime.create({ name: 'dup', workingDirectory: '/w', mounts: [] });
+      await expect(
+        runtime.create({ name: 'dup', workingDirectory: '/w', mounts: [] })
+      ).rejects.toThrow(/name already in use/);
+    });
+
+    it('surfaces docker errors (e.g. image missing) as ContainerError', async () => {
+      setExecFileResponses([
+        {
+          error: Object.assign(new Error('docker: Error response from daemon: No such image'), {
+            code: 125,
+            stderr: 'Unable to find image alpine:nope locally',
+          }),
+        },
+      ]);
+
+      await expect(
+        runtime.create({ name: 'bad-image', workingDirectory: '/w', mounts: [] })
+      ).rejects.toBeInstanceOf(ContainerError);
+    });
+  });
+
+  describe('start / stop / remove', () => {
+    it('start runs `docker start <id>` and marks running', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      mockExecFile.mockClear();
+      await runtime.start(id);
+
+      const startArgs = findCallWithSubcommand('start');
+      expect(startArgs).toEqual(['start', id]);
+    });
+
+    it('start is idempotent when already running', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      await runtime.start(id);
+      mockExecFile.mockClear();
+      await runtime.start(id);
+      expect(findCallWithSubcommand('start')).toBeUndefined();
+    });
+
+    it('stop passes -t <seconds> and updates state to stopped', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      await runtime.start(id);
+      mockExecFile.mockClear();
+      await runtime.stop(id, 5000);
+
+      const stopArgs = findCallWithSubcommand('stop');
+      expect(stopArgs).toEqual(['stop', '-t', '5', id]);
+    });
+
+    it('remove runs `docker rm -f <id>` and forgets the container locally', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      mockExecFile.mockClear();
+      await runtime.remove(id);
+
+      expect(findCallWithSubcommand('rm')).toEqual(['rm', '-f', id]);
+      expect(() => runtime.translateToContainer('/anything', id)).toThrow(ContainerNotFoundError);
+    });
+
+    it('remove cleans local state even if docker reports no-such-container', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+
+      setExecFileResponses([
+        {
+          error: Object.assign(new Error('docker rm failed'), {
+            code: 1,
+            stderr: 'Error: No such container: ' + id,
+          }),
+        },
+      ]);
+
+      await runtime.remove(id);
+      expect(() => runtime.translateToContainer('/anything', id)).toThrow(ContainerNotFoundError);
+    });
+
+    it('throws ContainerNotFoundError on unknown container id', async () => {
+      await expect(runtime.start('lace-unknown')).rejects.toBeInstanceOf(ContainerNotFoundError);
+      await expect(runtime.stop('lace-unknown')).rejects.toBeInstanceOf(ContainerNotFoundError);
+      await expect(runtime.remove('lace-unknown')).rejects.toBeInstanceOf(ContainerNotFoundError);
+    });
+  });
+
+  describe('exec', () => {
+    it('refuses to exec when container is not running', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      await expect(runtime.exec(id, { command: ['ls'] })).rejects.toBeInstanceOf(ContainerError);
+    });
+
+    it('shapes args with -w, -e, container id, and command, and returns stdout/stderr/exitCode', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      await runtime.start(id);
+
+      setExecFileResponses([{ stdout: 'hi\n', stderr: '' }]);
+      const result = await runtime.exec(id, {
+        command: ['echo', 'hi'],
+        workingDirectory: '/work',
+        environment: { K: 'V' },
+      });
+
+      const execArgs = findCallWithSubcommand('exec');
+      expect(execArgs).toBeDefined();
+      expect(execArgs!.slice(0, 5)).toEqual(['exec', '-w', '/work', '-e', 'K=V']);
+      expect(execArgs).toContain(id);
+      expect(execArgs!.slice(-2)).toEqual(['echo', 'hi']);
+      expect(result).toEqual({ stdout: 'hi\n', stderr: '', exitCode: 0 });
+    });
+
+    it('returns non-zero exitCode rather than throwing for failing commands', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      await runtime.start(id);
+
+      setExecFileResponses([
+        {
+          error: Object.assign(new Error('cmd failed'), {
+            code: 2,
+            stdout: 'partial',
+            stderr: 'boom',
+          }),
+        },
+      ]);
+
+      const result = await runtime.exec(id, { command: ['false'] });
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toBe('boom');
+    });
+  });
+
+  describe('execStream', () => {
+    it('spawns docker exec -i and wires stdin/stdout/stderr through the handle', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      await runtime.start(id);
+
+      const handle = await runtime.execStream(id, {
+        command: ['cat'],
+        workingDirectory: '/work',
+        environment: { K: 'V' },
+      });
+
+      expect(mockSpawn).toHaveBeenCalledTimes(1);
+      const [bin, args] = mockSpawn.mock.calls[0] as [string, string[]];
+      expect(bin).toBe('docker');
+      expect(args[0]).toBe('exec');
+      expect(args[1]).toBe('-i');
+      expect(args).toContain('-w');
+      expect(args).toContain('/work');
+      expect(args).toContain('-e');
+      expect(args).toContain('K=V');
+      expect(args).toContain(id);
+      expect(args[args.length - 1]).toBe('cat');
+
+      const child = fakeChildren[0];
+      expect(handle.stdin).toBe(child.stdin);
+      expect(handle.stdout).toBe(child.stdout);
+      expect(handle.stderr).toBe(child.stderr);
+
+      // wait resolves on close
+      const waitPromise = handle.wait();
+      child.emit('close', 0, null);
+      await expect(waitPromise).resolves.toEqual({ exitCode: 0 });
+
+      handle.kill('SIGINT');
+      expect(child.kill).toHaveBeenCalledWith('SIGINT');
+    });
+
+    it('rejects when container is not running', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      await expect(runtime.execStream(id, { command: ['ls'] })).rejects.toBeInstanceOf(
+        ContainerError
+      );
+    });
+
+    it('wait() returns the same settled promise across repeated calls (no listener leak)', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      await runtime.start(id);
+
+      const handle = await runtime.execStream(id, { command: ['cat'] });
+      const child = fakeChildren[0];
+
+      const first = handle.wait();
+      const second = handle.wait();
+      expect(first).toBe(second);
+
+      child.emit('close', 0, null);
+      await expect(first).resolves.toEqual({ exitCode: 0 });
+      await expect(handle.wait()).resolves.toEqual({ exitCode: 0 });
+    });
+  });
+
+  describe('inspect (sync, cached)', () => {
+    it('returns the cached ContainerInfo without shelling out', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      mockExecFile.mockClear();
+      const info = runtime.inspect(id);
+      expect(info.id).toBe(id);
+      expect(info.state).toBe('created');
+      expect(findCallWithSubcommand('inspect')).toBeUndefined();
+    });
+  });
+
+  describe('refreshState', () => {
+    it('parses docker inspect JSON into ContainerInfo and refreshes cached state', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+
+      const payload = {
+        Id: 'sha256:abc',
+        Name: `/${id}`,
+        State: {
+          Status: 'running',
+          Running: true,
+          Pid: 4321,
+          ExitCode: 0,
+          StartedAt: '2026-05-18T10:00:00Z',
+          FinishedAt: '0001-01-01T00:00:00Z',
+        },
+      };
+      setExecFileResponses([{ stdout: JSON.stringify(payload), stderr: '' }]);
+
+      const info = await runtime.refreshState(id);
+      expect(info.id).toBe(id);
+      expect(info.state).toBe('running');
+      expect(info.pid).toBe(4321);
+      expect(info.startedAt instanceof Date).toBe(true);
+      expect(info.stoppedAt).toBeUndefined();
+
+      const args = findCallWithSubcommand('inspect');
+      expect(args).toEqual(['inspect', id, '--format', '{{json .}}']);
+
+      // Cached state should now reflect the refresh.
+      expect(runtime.inspect(id).state).toBe('running');
+    });
+
+    it('throws ContainerNotFoundError when docker reports no such container', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      setExecFileResponses([
+        {
+          error: Object.assign(new Error('inspect failed'), {
+            code: 1,
+            stderr: 'Error: No such object: ' + id,
+          }),
+        },
+      ]);
+      await expect(runtime.refreshState(id)).rejects.toBeInstanceOf(ContainerNotFoundError);
+    });
+  });
+
+  describe('list', () => {
+    it('passes --filter name=lace- to docker ps and parses NDJSON', async () => {
+      const lines = [
+        JSON.stringify({ ID: 'a', Names: 'lace-a', State: 'running' }),
+        JSON.stringify({ ID: 'b', Names: 'lace-b', State: 'exited' }),
+        '',
+        JSON.stringify({ ID: 'c', Names: 'not-lace', State: 'running' }), // should be skipped
+      ].join('\n');
+      setExecFileResponses([{ stdout: lines, stderr: '' }]);
+
+      const result = await runtime.list();
+      const psArgs = findCallWithSubcommand('ps');
+      expect(psArgs).toEqual(['ps', '-a', '--filter', 'name=lace-', '--format', '{{json .}}']);
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({ id: 'lace-a', state: 'running' });
+      expect(result[1]).toEqual({ id: 'lace-b', state: 'stopped' });
+    });
+
+    it('falls back to cached containers when docker ps fails', async () => {
+      const id = await runtime.create({ name: 'svc', workingDirectory: '/w', mounts: [] });
+      setExecFileResponses([
+        { error: Object.assign(new Error('docker daemon offline'), { code: 1 }) },
+      ]);
+
+      const result = await runtime.list();
+      expect(result.map((c) => c.id)).toEqual([id]);
+    });
+  });
+
+  describe('translateToContainer / translateToHost', () => {
+    it('translates host paths to container paths via registered mounts', async () => {
+      const id = await runtime.create({
+        name: 'paths',
+        workingDirectory: '/workspace',
+        mounts: [{ source: '/host/proj', target: '/workspace' }],
+      });
+      expect(runtime.translateToContainer('/host/proj/src/index.ts', id)).toBe(
+        '/workspace/src/index.ts'
+      );
+      expect(runtime.translateToHost('/workspace/src/index.ts', id)).toBe(
+        '/host/proj/src/index.ts'
+      );
+    });
+  });
+});
