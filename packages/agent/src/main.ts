@@ -61,14 +61,14 @@ const writable = new Writable({
   },
 });
 
-const transport = createNdjsonStdioTransport({ readable, writable });
-const peer = new JsonRpcPeer(transport, { idPrefix: 'a_' });
-
-// Best-effort orphan reap at boot. Blocks RPC handler registration so that no
-// session work begins while leftover containers are still being torn down.
-// Failures inside the reaper are swallowed and logged; they never block boot.
+// Best-effort orphan reap runs before we wire up JSON-RPC so that any inbound
+// requests during the (possibly slow) reap pause on the stdin tee buffer rather
+// than landing on a peer with no methods registered. Failures inside the reaper
+// are swallowed and logged; they never block boot.
 await runStartupReaper(createContainerManagerForPlatform());
 
+const transport = createNdjsonStdioTransport({ readable, writable });
+const peer = new JsonRpcPeer(transport, { idPrefix: 'a_' });
 registerAgentRpcMethods(peer, state);
 
 let shuttingDown = false;
