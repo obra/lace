@@ -21,6 +21,7 @@ import {
 } from './subagent-job-helpers';
 import { logger } from '@lace/agent/utils/logger';
 import type { ToolResult } from '@lace/ent-protocol';
+import { logToolUpdateToJobLog } from './job-log-formatter';
 import {
   MAX_JOB_OUTPUT_BYTES,
   type SessionUpdate,
@@ -220,6 +221,18 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
     };
 
     const childJobIdMap = new Map<string, string>();
+    // Track which toolCallIds we've already emitted a `[tool: ...]` line for
+    // (per job-log path) so that pending→running status transitions don't
+    // produce duplicate announcement lines. Keyed by output path so forwarded
+    // delegate jobs get their own dedupe namespace.
+    const announcedToolCallsByPath = new Map<string, Set<string>>();
+    const getSeenSetFor = (path: string): Set<string> => {
+      const existing = announcedToolCallsByPath.get(path);
+      if (existing) return existing;
+      const fresh = new Set<string>();
+      announcedToolCallsByPath.set(path, fresh);
+      return fresh;
+    };
 
     const mapChildJobId = (childJobId: string): string => {
       const existing = childJobIdMap.get(childJobId);
@@ -396,6 +409,31 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
 
         if (update.type === 'tool_use' && typeof update.toolCallId === 'string') {
           update.toolCallId = `${mappedJobId}:${update.toolCallId}`;
+
+          // Mirror tool_use into the forwarded job's per-job log (kata #39).
+          // Forwarded delegate jobs need the same visibility into failed tool
+          // calls as the direct case above.
+          if (typeof update.name === 'string') {
+            const forwardedInput: Record<string, unknown> =
+              typeof update.input === 'object' && update.input !== null
+                ? (update.input as Record<string, unknown>)
+                : {};
+            const forwardedStatus = typeof update.status === 'string' ? update.status : undefined;
+            const forwardedResult = update.result as ToolResult | undefined;
+            await runExclusive(() => {
+              logToolUpdateToJobLog(
+                {
+                  toolCallId: update.toolCallId as string,
+                  name: update.name as string,
+                  input: forwardedInput,
+                  status: forwardedStatus,
+                  result: forwardedResult,
+                },
+                getSeenSetFor(record.outputPath),
+                record.outputPath
+              );
+            });
+          }
         }
 
         await emitSessionUpdate(
@@ -471,6 +509,24 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
 
         // Extract result - validated by protocol, trusted from child process
         const result = p.result as ToolResult | undefined;
+
+        // Mirror the tool_use into the per-job log so failed/cancelled tool
+        // calls are visible without consulting events.jsonl (kata #39). Done
+        // under the same lock as other appendJobOutput writes to keep ordering
+        // consistent with text deltas.
+        await runExclusive(() => {
+          logToolUpdateToJobLog(
+            {
+              toolCallId: namespacedToolCallId,
+              name: p.name as string,
+              input,
+              status,
+              result,
+            },
+            getSeenSetFor(job.outputPath),
+            job.outputPath
+          );
+        });
 
         await emitSessionUpdate(
           {
