@@ -1327,29 +1327,6 @@ describe('Ent protocol contract (selected coverage)', () => {
     ).rejects.toMatchObject({ message: expect.stringContaining('McpServerNot') });
   });
 
-  it('covers workspace method param validation and notfound', async () => {
-    agent = spawnAgentProcess({ laceDir });
-    await requestOk({
-      agent,
-      method: 'initialize',
-      requestSchema: MethodSchemas.InitializeRequestSchema,
-      responseSchema: MethodSchemas.InitializeResponseSchema,
-      params: defaultInitializeParams(),
-      label: 'init',
-    });
-
-    await expect(agent.peer.request('ent/workspace/info', {})).rejects.toMatchObject({
-      code: -32602,
-    });
-    await expect(agent.peer.request('ent/workspace/create', {})).rejects.toMatchObject({
-      code: -32602,
-    });
-
-    await expect(
-      agent.peer.request('ent/workspace/info', { sessionId: 'missing-workspace' })
-    ).rejects.toMatchObject({ message: 'WorkspaceNotFound', data: { category: 'workspace' } });
-  });
-
   it('covers ent/connections/test shape and ent/job/inject noop', async () => {
     agent = spawnAgentProcess({ laceDir });
     await requestOk({

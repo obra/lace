@@ -2,7 +2,6 @@
 // ABOUTME: Model-agnostic tool definitions compatible with multiple AI SDKs and MCP
 
 import type { CombinedTokenUsage } from '@lace/agent/token-management/types';
-import type { IWorkspaceManager } from '@lace/agent/workspace/workspace-manager';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 
 export interface ToolContext {
@@ -33,9 +32,6 @@ export interface ToolContext {
     containerMountPath?: string;
     branchName?: string;
   };
-
-  // Workspace manager - provided by ToolExecutor to avoid circular dependencies
-  workspaceManager?: IWorkspaceManager;
 
   // Implemented by the agent runtime from its history
   hasFileBeenRead?: (path: string) => boolean;
