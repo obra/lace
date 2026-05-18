@@ -387,6 +387,15 @@ export class ConversationRunner {
 
           if (!result.shouldContinue) {
             shouldContinue = false;
+            // When the permission request itself was cancelled (kata #37 —
+            // upstream supervisor has no handler, request races out in ~15ms)
+            // the tool never ran. Surface that as a distinct stopReason so
+            // subagent-job (and anything else mapping turn results to job
+            // status) can mark the job as failed instead of silently
+            // reporting 'completed' for a turn that lost its writes.
+            if (result.cancelReason === 'permission_cancelled') {
+              stopReason = 'permission_cancelled';
+            }
           }
         }
 
@@ -465,6 +474,13 @@ export class ConversationRunner {
     streamTurnSeq: number;
     coreResult: CoreToolResult;
     shouldContinue: boolean;
+    /**
+     * Set when this tool call ended the turn for a reason the main loop must
+     * surface as a distinct stopReason. Today only 'permission_cancelled' is
+     * used (kata #37) — the permission request threw, the tool never ran, and
+     * the parent must be able to tell this apart from a clean end_turn.
+     */
+    cancelReason?: 'permission_cancelled';
   }> {
     const {
       toolCall,
@@ -747,6 +763,7 @@ export class ConversationRunner {
             content: [{ type: 'text', text: 'Cancelled' }],
           },
           shouldContinue: false,
+          cancelReason: 'permission_cancelled',
         };
       }
 

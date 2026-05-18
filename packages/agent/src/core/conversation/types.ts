@@ -154,7 +154,8 @@ export interface RunResult {
     | 'max_turns'
     | 'cancelled'
     | 'budget_exceeded'
-    | 'incomplete';
+    | 'incomplete'
+    | 'permission_cancelled';
   /** Final assistant content */
   content: Array<{ type: 'text'; text: string }>;
   /** Token usage for this turn */

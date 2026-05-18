@@ -53,6 +53,21 @@ export function applyEffectiveJobConfig(
 }
 
 /**
+ * Map a subagent's session/prompt stopReason to the parent job's terminal
+ * status. 'incomplete' (kata #31 round 2 — model declared intent but did not
+ * call the tool that would do the work) and 'permission_cancelled' (kata #37 —
+ * the tool's permission request was cancelled before the tool could run) both
+ * indicate the subagent did not complete what it claimed. Surface those as
+ * 'failed' so the parent can react instead of silently accepting a turn that
+ * lost its writes. Everything else (including undefined) is 'completed'.
+ */
+const FAILED_STOP_REASONS: ReadonlySet<string> = new Set(['incomplete', 'permission_cancelled']);
+
+export function jobStatusFromStopReason(stopReason: string | undefined): 'completed' | 'failed' {
+  return stopReason && FAILED_STOP_REASONS.has(stopReason) ? 'failed' : 'completed';
+}
+
+/**
  * Extract a human-readable message from an unknown error value.
  *
  * JSON-RPC error responses arrive as plain objects of the shape

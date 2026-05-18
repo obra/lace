@@ -40,7 +40,8 @@ export interface TurnResult {
     | 'max_turns'
     | 'cancelled'
     | 'budget_exceeded'
-    | 'incomplete';
+    | 'incomplete'
+    | 'permission_cancelled';
   content: Array<{ type: 'text'; text: string }>;
   usage: { inputTokens: number; outputTokens: number };
   cost?: number;

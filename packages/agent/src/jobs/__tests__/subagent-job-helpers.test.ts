@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import {
   applyEffectiveJobConfig,
   buildSubagentInitConfig,
+  jobStatusFromStopReason,
   rpcErrorMessage,
 } from '../subagent-job-helpers';
 
@@ -82,6 +83,32 @@ describe('buildSubagentInitConfig (kata #37 Layer A)', () => {
     // Safe fallback: an unconfigured parent must not silently grant child
     // sessions a permission bypass.
     expect(buildSubagentInitConfig({})).toEqual({ approvalMode: 'ask' });
+  });
+});
+
+describe('jobStatusFromStopReason (kata #37 Layer C)', () => {
+  it("marks 'permission_cancelled' as failed", () => {
+    // kata #37 — the tool's permission was cancelled by the supervisor and the
+    // tool never ran. The turn cannot honestly be reported as completed.
+    expect(jobStatusFromStopReason('permission_cancelled')).toBe('failed');
+  });
+
+  it("marks 'incomplete' as failed (kata #31 round 2)", () => {
+    expect(jobStatusFromStopReason('incomplete')).toBe('failed');
+  });
+
+  it("treats 'end_turn' as completed", () => {
+    expect(jobStatusFromStopReason('end_turn')).toBe('completed');
+  });
+
+  it("treats 'max_turns' as completed", () => {
+    // max_turns is a clean exit from the agentic loop — not a lost-writes
+    // signal — so it does not flip the job to failed.
+    expect(jobStatusFromStopReason('max_turns')).toBe('completed');
+  });
+
+  it('treats an undefined stopReason as completed', () => {
+    expect(jobStatusFromStopReason(undefined)).toBe('completed');
   });
 });
 

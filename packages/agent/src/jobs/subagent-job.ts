@@ -16,6 +16,7 @@ import { getJobOutputPath } from './job-file-utils';
 import {
   applyEffectiveJobConfig,
   buildSubagentInitConfig,
+  jobStatusFromStopReason,
   rpcErrorMessage,
 } from './subagent-job-helpers';
 import { logger } from '@lace/agent/utils/logger';
@@ -655,13 +656,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       })) as { stopReason?: string } | undefined;
 
       if (job.status !== 'cancelled') {
-        // 'incomplete' means the model declared future-tense intent on a
-        // text-only turn following a tool round-trip without actually calling
-        // the tool that would do the work (kata #31 round 2). The subagent
-        // therefore did not complete what it claimed; surface that to the
-        // parent as 'failed' so it can react instead of silently accepting an
-        // unfulfilled-intent string as the final output.
-        job.status = promptResult?.stopReason === 'incomplete' ? 'failed' : 'completed';
+        job.status = jobStatusFromStopReason(promptResult?.stopReason);
       }
     } catch (error) {
       if (job.status !== 'cancelled') job.status = 'failed';
