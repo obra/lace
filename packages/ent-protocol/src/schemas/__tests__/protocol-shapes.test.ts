@@ -56,6 +56,58 @@ describe('protocol shapes (representative examples)', () => {
       })
     ).toThrow();
 
+    // initialize with embedder-supplied containerMounts is accepted.
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'init-containermounts',
+        method: 'initialize',
+        params: {
+          protocolVersion: '1.0',
+          clientInfo: { name: 'test-client', version: '0.0.0' },
+          capabilities: { streaming: true },
+          containerMounts: {
+            scratch: { hostPath: '/var/lace/scratch', readonly: false },
+            knowledge: { hostPath: '/var/lace/knowledge', readonly: true },
+          },
+        },
+      })
+    ).not.toThrow();
+
+    // invalid mount name (uppercase) is rejected.
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'init-bad-mount-name',
+        method: 'initialize',
+        params: {
+          protocolVersion: '1.0',
+          clientInfo: { name: 'test-client', version: '0.0.0' },
+          capabilities: { streaming: true },
+          containerMounts: {
+            Scratch: { hostPath: '/var/lace/scratch', readonly: false },
+          },
+        },
+      })
+    ).toThrow();
+
+    // missing readonly on a mount entry is rejected.
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'init-bad-mount-shape',
+        method: 'initialize',
+        params: {
+          protocolVersion: '1.0',
+          clientInfo: { name: 'test-client', version: '0.0.0' },
+          capabilities: { streaming: true },
+          containerMounts: {
+            scratch: { hostPath: '/var/lace/scratch' },
+          },
+        },
+      })
+    ).toThrow();
+
     expect(() =>
       EntProtocolRequestSchema.parse({
         jsonrpc: '2.0',

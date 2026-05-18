@@ -126,6 +126,23 @@ const InitializeParamsSchema = z
     // `.lace/skills` and `.claude/skills`). When provided, these directories
     // are used exclusively — the embedder controls the skill search path.
     skillDirs: z.array(NonEmptyStringSchema).optional(),
+    // Named-mount registry consulted when a persona with
+    // `runtime.type: 'container'` is materialized. Each persona declares
+    // logical mount names + container-side targets; this registry pins the
+    // matching host path and readonly flag. Mount names must match
+    // ^[a-z][a-z0-9-]*$ . Defaults to {} when omitted.
+    containerMounts: z
+      .record(
+        z.string().regex(/^[a-z][a-z0-9-]*$/),
+        z
+          .object({
+            hostPath: NonEmptyStringSchema,
+            readonly: z.boolean(),
+          })
+          .strict()
+      )
+      .optional()
+      .default({}),
   })
   .strict();
 export type InitializeParams = z.infer<typeof InitializeParamsSchema>;
