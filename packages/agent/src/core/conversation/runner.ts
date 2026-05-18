@@ -111,7 +111,8 @@ export class ConversationRunner {
       executionMode,
       this.deps.mcpServerManager,
       this.deps.jobManager,
-      this.deps.skillRegistry
+      this.deps.skillRegistry,
+      this.deps.personaRegistry
     );
 
     const provider = await this.deps.createProvider();
