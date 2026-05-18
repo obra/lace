@@ -10,6 +10,7 @@ import {
   personaRegistry as defaultPersonaRegistry,
   type PersonaRegistry,
 } from './config/persona-registry';
+import { createDefaultContainerManager } from './containers/manager-factory';
 import { ToolExecutor } from './tools/executor';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { SkillRegistry } from '@lace/agent/skills';
@@ -105,6 +106,7 @@ export function createAgentServerState(): AgentServerState {
     toolExecutorCache: new Map(),
     personaRegistry: defaultPersonaRegistry,
     containerMounts: {},
+    containerManager: createDefaultContainerManager(),
   };
 }
 

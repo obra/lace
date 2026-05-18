@@ -16,6 +16,9 @@ import type { ToolExecutor } from './tools/executor';
 import type { Tool } from './tools/tool';
 import type { SkillRegistry } from './skills';
 import type { PersonaRegistry } from './config/persona-registry';
+import type { ContainerManager } from './containers/container-manager';
+import type { ExecStreamHandle } from './containers/types';
+import type { PersonaContainerRuntime } from './jobs/persona-container-spec';
 
 /**
  * Per-build allowlist of tool names. `undefined` means "no scope filter" (all tools available).
@@ -79,6 +82,10 @@ export type JobState = {
   exitCode?: number;
   outputPath: string;
   proc?: ChildProcess;
+  // When the subagent runs inside a persona container, the long-lived stream
+  // for the in-container lace-agent process is stored here instead of `proc`.
+  // job-control consults both fields to terminate the right thing.
+  containerExec?: ExecStreamHandle;
   permissionAbortController?: AbortController;
   childPeer?: JsonRpcPeer;
   subagentSessionId?: string;
@@ -106,6 +113,10 @@ export type JobState = {
       tools?: Record<string, unknown>;
     }
   >;
+  // When the delegate's persona declares `runtime.type: container`, the parsed
+  // runtime block flows through to subagent-job to drive container
+  // materialization at spawn time. Absent ⇒ native spawn (root runtime).
+  personaContainerRuntime?: PersonaContainerRuntime;
 };
 
 export type PendingJobNotification = {
@@ -170,6 +181,10 @@ export type AgentServerState = {
   // path + readonly flag. Always present; defaults to {} when initialize
   // omits the param.
   containerMounts: Record<string, MountRegistryEntry>;
+  // Persona-container materialization (K-49e). null when the host platform
+  // has no supported container runtime — persona-container delegate calls
+  // then fail with a clear error. Tests inject fakes by replacing this field.
+  containerManager: ContainerManager | null;
 };
 
 // Single entry in the embedder-supplied containerMounts registry.

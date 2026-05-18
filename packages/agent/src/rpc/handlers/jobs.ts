@@ -132,12 +132,12 @@ export function registerJobHandlers(peer: JsonRpcPeer, state: AgentServerState):
     const job = state.jobManager.getJob(jobId);
     if (!job || job.status !== 'running') return { success: false };
 
-    if (job.proc) {
+    if (job.proc || job.containerExec) {
       // Kill the process with SIGTERM, then SIGKILL if still running
       await killJob(job, { waitMs: 500, forceKill: true });
 
       // Wait extra time after SIGKILL for stubborn processes
-      if (!job.finished && job.proc.exitCode === null) {
+      if (!job.finished && job.proc?.exitCode === null) {
         await Promise.race([
           job.completion,
           new Promise<void>((resolve) => setTimeout(resolve, 1_500)),

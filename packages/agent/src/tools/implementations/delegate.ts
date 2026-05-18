@@ -10,6 +10,7 @@ import {
   PersonaNotFoundError,
   PersonaParseError,
 } from '@lace/agent/config/persona-registry';
+import type { PersonaContainerRuntime } from '@lace/agent/jobs/persona-container-spec';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
 const delegateSchema = z
@@ -104,12 +105,16 @@ The subagent receives your message with its full conversation history intact.`;
           }
         >
       | undefined;
+    let personaContainerRuntime: PersonaContainerRuntime | undefined;
 
     if (persona) {
       try {
         const parsed = this.personaRegistry.parsePersona(persona);
         personaModelDefault = parsed.config.model;
         personaMcpServers = parsed.config.mcpServers;
+        if (parsed.config.runtime.type === 'container') {
+          personaContainerRuntime = parsed.config.runtime;
+        }
       } catch (err) {
         if (err instanceof PersonaNotFoundError || err instanceof PersonaParseError) {
           return {
@@ -165,6 +170,7 @@ The subagent receives your message with its full conversation history intact.`;
           : undefined,
       ...(persona ? { persona } : {}),
       ...(personaMcpServers ? { personaMcpServers } : {}),
+      ...(personaContainerRuntime ? { personaContainerRuntime } : {}),
     });
 
     // Background mode - return immediately

@@ -76,6 +76,37 @@ export async function killJob(job: JobState, options?: KillJobOptions): Promise<
         });
       }
     }
+  } else if (job.containerExec) {
+    // Persona-container subagent: kill the in-container exec process. The
+    // container itself persists (across delegates, across Ada restart).
+    const exec = job.containerExec;
+    try {
+      exec.kill('SIGTERM');
+    } catch (error) {
+      logger.debug('job.kill.sigterm.failed', {
+        jobId: job.jobId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    await Promise.race([
+      job.completion,
+      new Promise<void>((resolve) => setTimeout(resolve, waitMs)),
+    ]);
+
+    // ExecStreamHandle does not expose an `exitCode` until `wait()` resolves,
+    // so use `job.finished` (set by finalizeJob on exit) as the signal that the
+    // process has terminated and force-kill is unnecessary.
+    if (forceKill && !job.finished) {
+      try {
+        exec.kill('SIGKILL');
+      } catch (error) {
+        logger.debug('job.kill.sigkill.failed', {
+          jobId: job.jobId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
   }
 }
 
