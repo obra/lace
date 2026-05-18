@@ -9,6 +9,7 @@ import { OllamaProvider } from './ollama-provider';
 import { GeminiProvider } from './gemini-provider';
 import { ProviderCatalogManager } from './catalog/manager';
 import { ProviderInstanceManager } from './instance/manager';
+import { resolveModelAlias } from './catalog/alias-resolver';
 import type { CatalogProvider, CatalogModel, ModelConfig } from './catalog/types';
 import { OpenRouterDynamicProvider } from './openrouter/dynamic-provider';
 import { OpenAIDynamicProvider } from './openai/dynamic-provider';
@@ -329,7 +330,8 @@ export class ProviderRegistry {
     // Get dynamic catalog if available (includes discovered models)
     const catalog = await this.getCatalogProvider(providerId);
     if (catalog) {
-      const model = catalog.models.find((m) => m.id === modelId);
+      const resolvedModelId = resolveModelAlias(modelId, catalog.models);
+      const model = catalog.models.find((m) => m.id === resolvedModelId);
       if (model) {
         return model;
       }
@@ -409,7 +411,15 @@ export class ProviderRegistry {
 
     // Verify model exists in instance-specific catalog (or fall back to static)
     const catalog = instanceCatalog ?? this.catalogManager.getProvider(instance.catalogProviderId);
-    const model = catalog?.models.find((m) => m.id === modelId);
+    const resolvedModelId = resolveModelAlias(modelId, catalog?.models ?? []);
+    if (resolvedModelId !== modelId) {
+      logger.debug('Resolved model alias', {
+        input: modelId,
+        resolved: resolvedModelId,
+        instanceId,
+      });
+    }
+    const model = catalog?.models.find((m) => m.id === resolvedModelId);
 
     if (!model) {
       throw new Error(
@@ -423,7 +433,7 @@ export class ProviderRegistry {
     const trimmedCatalog = (expandEnvVar(catalogProvider.api_endpoint) ?? '').trim();
     const baseURL = trimmedInstance || trimmedCatalog;
     const providerConfig: ProviderConfig = {
-      model: modelId,
+      model: resolvedModelId,
       apiKey: credentials.apiKey,
       ...(credentials.additionalAuth || {}),
       ...(baseURL && { baseURL }),
