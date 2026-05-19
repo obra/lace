@@ -218,12 +218,11 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
   }
 
   async stop(containerId: string, timeout?: number): Promise<void> {
+    // The in-process cache (`this.containers`) is empty after a parent restart,
+    // so destructive operations must go to the daemon rather than gating on cache.
+    // `docker stop` is idempotent (no-op on already-stopped, NotFound mapped below).
     const info = this.containers.get(containerId);
-    if (!info) {
-      throw new ContainerNotFoundError(containerId);
-    }
-
-    if (info.state !== 'running') {
+    if (info && info.state !== 'running') {
       logger.debug('Container not running, skipping stop', { containerId });
       return;
     }
@@ -252,10 +251,8 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
   }
 
   async remove(containerId: string): Promise<void> {
-    if (!this.containers.has(containerId)) {
-      throw new ContainerNotFoundError(containerId);
-    }
-
+    // Cache may be empty after a parent restart; `docker rm -f` is idempotent
+    // and the NotFound branch below handles the daemon-side "no such container".
     try {
       await execFileAsync(this.dockerBin, ['rm', '-f', containerId]);
       logger.info('Removed docker container', { containerId });
