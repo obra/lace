@@ -1,6 +1,8 @@
 // ABOUTME: Container system type definitions and interfaces
 // ABOUTME: Defines container lifecycle, configuration, and runtime contracts
 
+import type { Readable, Writable } from 'node:stream';
+
 export interface ContainerConfig {
   // Container identification (optional - will be generated if not provided)
   id?: string;
@@ -60,9 +62,9 @@ export interface ExecStreamOptions {
 }
 
 export interface ExecStreamHandle {
-  stdin: NodeJS.WritableStream;
-  stdout: NodeJS.ReadableStream;
-  stderr: NodeJS.ReadableStream;
+  stdin: Writable;
+  stdout: Readable;
+  stderr: Readable;
   wait(): Promise<{ exitCode: number }>;
   kill(signal?: NodeJS.Signals): void;
 }

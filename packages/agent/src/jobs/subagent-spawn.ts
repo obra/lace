@@ -176,13 +176,9 @@ async function spawnContainerSubagent(input: {
   });
 
   return {
-    // ExecStreamHandle's interface uses the generic NodeJS.{Readable,Writable}Stream
-    // types, but every concrete runtime (apple-container, docker-container) wires
-    // up a real ChildProcess's stdin/stdout/stderr — Readable/Writable. The cast
-    // narrows back to the concrete type the NDJSON transport expects.
-    stdin: handle.stdin as Writable,
-    stdout: handle.stdout as Readable,
-    stderr: handle.stderr as Readable,
+    stdin: handle.stdin,
+    stdout: handle.stdout,
+    stderr: handle.stderr,
     get exitCode() {
       return exitCode;
     },
