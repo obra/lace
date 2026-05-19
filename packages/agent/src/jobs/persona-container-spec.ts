@@ -10,6 +10,8 @@ import type { MountRegistryEntry } from '@lace/agent/server-types';
 // Other call sites (JobState, delegate, job-manager options) import this.
 import type { PersonaRuntime } from '@lace/agent/config/persona-registry';
 export type PersonaContainerRuntime = Extract<PersonaRuntime, { type: 'container' }>;
+// Box runtime is single-tenant and long-lived — see kata #62 design notes.
+export type PersonaBoxRuntime = Extract<PersonaRuntime, { type: 'box' }>;
 
 // Spec-name components compose into a container name on the host; defend with
 // an allowlist before composing. Same shape on both sides keeps the rule
@@ -45,27 +47,25 @@ export class PersonaContainerSpecError extends Error {
   }
 }
 
-export function buildPersonaContainerSpec(input: {
-  parentSessionId: string;
+/**
+ * Shared core: resolves a persona's declared mounts against the embedder
+ * registry, applies the auto-injection rules (persona / lace-data / credentials),
+ * and merges runtime.env with the LACE_DIR auto-inject.
+ *
+ * Used by both `buildPersonaContainerSpec` (per-delegate containers) and
+ * `buildPersonaBoxSpec` (single-tenant boxes) so the mount/env contract stays
+ * identical across runtime arms.
+ */
+function resolvePersonaMountsAndEnv(input: {
   personaName: string;
-  runtime: PersonaContainerRuntime;
+  runtimeMounts: Record<string, string>;
+  runtimeEnv: Record<string, string> | undefined;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
-}): ContainerSpec {
-  const { parentSessionId, personaName, runtime, containerMounts } = input;
-
-  if (!SPEC_NAME_COMPONENT_RE.test(parentSessionId)) {
-    throw new PersonaContainerSpecError(
-      `Invalid parentSessionId for container spec name: '${parentSessionId}'`
-    );
-  }
-  if (!SPEC_NAME_COMPONENT_RE.test(personaName)) {
-    throw new PersonaContainerSpecError(
-      `Invalid personaName for container spec name: '${personaName}'`
-    );
-  }
+}): { mounts: ContainerMount[]; env: Record<string, string> } {
+  const { personaName, runtimeMounts, runtimeEnv, containerMounts } = input;
 
   const mounts: ContainerMount[] = [];
-  for (const [mountName, target] of Object.entries(runtime.mounts)) {
+  for (const [mountName, target] of Object.entries(runtimeMounts)) {
     if (mountName === 'persona') {
       throw new PersonaContainerSpecError(
         `Persona '${personaName}' declares mount 'persona' — reserved for ` +
@@ -147,10 +147,39 @@ export function buildPersonaContainerSpec(input: {
   // wins: the mount IS the source of truth for where LACE_DIR resolves
   // inside the container, so a persona-supplied LACE_DIR pointing elsewhere
   // would be inconsistent with the mounted directory.
-  const env: Record<string, string> = { ...(runtime.env ?? {}) };
+  const env: Record<string, string> = { ...(runtimeEnv ?? {}) };
   if (laceDataRegistryEntry) {
     env.LACE_DIR = SUBAGENT_LACE_DATA_TARGET;
   }
+
+  return { mounts, env };
+}
+
+export function buildPersonaContainerSpec(input: {
+  parentSessionId: string;
+  personaName: string;
+  runtime: PersonaContainerRuntime;
+  containerMounts: Readonly<Record<string, MountRegistryEntry>>;
+}): ContainerSpec {
+  const { parentSessionId, personaName, runtime, containerMounts } = input;
+
+  if (!SPEC_NAME_COMPONENT_RE.test(parentSessionId)) {
+    throw new PersonaContainerSpecError(
+      `Invalid parentSessionId for container spec name: '${parentSessionId}'`
+    );
+  }
+  if (!SPEC_NAME_COMPONENT_RE.test(personaName)) {
+    throw new PersonaContainerSpecError(
+      `Invalid personaName for container spec name: '${personaName}'`
+    );
+  }
+
+  const { mounts, env } = resolvePersonaMountsAndEnv({
+    personaName,
+    runtimeMounts: runtime.mounts,
+    runtimeEnv: runtime.env,
+    containerMounts,
+  });
 
   return {
     name: `${parentSessionId}-${personaName}`,
@@ -159,5 +188,45 @@ export function buildPersonaContainerSpec(input: {
     mounts,
     env,
     ...(runtime.ports ? { ports: runtime.ports } : {}),
+  };
+}
+
+// Fixed daemon-side id for the personal box (kata #62). Single-tenant: no
+// per-session suffix, no `lace-` prefix (so the startup reaper's `lace-*`
+// scan ignores it).
+export const PERSONA_BOX_CONTAINER_ID = 'sen-box';
+
+/**
+ * Build a ContainerSpec for a persona's `runtime.type: box`. Unlike
+ * `buildPersonaContainerSpec`, the box is single-tenant: no parentSessionId
+ * in the spec name, fixed daemon-side container id `sen-box`, and a
+ * `restartPolicy` so docker auto-restarts it after a host reboot.
+ */
+export function buildPersonaBoxSpec(input: {
+  personaName: string;
+  runtime: PersonaBoxRuntime;
+  containerMounts: Readonly<Record<string, MountRegistryEntry>>;
+}): ContainerSpec {
+  const { personaName, runtime, containerMounts } = input;
+
+  if (!SPEC_NAME_COMPONENT_RE.test(personaName)) {
+    throw new PersonaContainerSpecError(`Invalid personaName for box spec name: '${personaName}'`);
+  }
+
+  const { mounts, env } = resolvePersonaMountsAndEnv({
+    personaName,
+    runtimeMounts: runtime.mounts,
+    runtimeEnv: runtime.env,
+    containerMounts,
+  });
+
+  return {
+    name: 'box',
+    containerId: PERSONA_BOX_CONTAINER_ID,
+    image: runtime.image,
+    workingDirectory: runtime.workingDirectory,
+    mounts,
+    env,
+    restartPolicy: 'unless-stopped',
   };
 }

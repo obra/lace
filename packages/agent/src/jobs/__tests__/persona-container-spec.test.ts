@@ -3,6 +3,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildPersonaContainerSpec,
+  buildPersonaBoxSpec,
+  PERSONA_BOX_CONTAINER_ID,
   PersonaContainerSpecError,
   SUBAGENT_USER_PERSONAS_TARGET,
   SUBAGENT_LACE_DATA_TARGET,
@@ -290,5 +292,149 @@ describe('buildPersonaContainerSpec', () => {
 
     expect(spec.env).toEqual({ FOO: 'bar' });
     expect(spec.ports).toEqual([{ host: 9222, container: 9222 }]);
+  });
+});
+
+describe('buildPersonaBoxSpec (kata #62)', () => {
+  const baseBoxRuntime = {
+    type: 'box' as const,
+    image: 'sen-box:dev',
+    workingDirectory: '/home/agent',
+    mounts: {},
+  };
+
+  it('produces a single-tenant spec with fixed name, containerId, and restartPolicy', () => {
+    const spec = buildPersonaBoxSpec({
+      personaName: 'sen',
+      runtime: baseBoxRuntime,
+      containerMounts: {},
+    });
+
+    expect(spec.name).toBe('box');
+    expect(spec.containerId).toBe(PERSONA_BOX_CONTAINER_ID);
+    expect(spec.containerId).toBe('sen-box');
+    expect(spec.restartPolicy).toBe('unless-stopped');
+    expect(spec.image).toBe('sen-box:dev');
+    expect(spec.workingDirectory).toBe('/home/agent');
+    expect(spec.mounts).toEqual([]);
+    expect(spec.env).toEqual({});
+    // Box has no ports in v1.
+    expect(spec.ports).toBeUndefined();
+  });
+
+  it('resolves runtime.mounts against the registry', () => {
+    const spec = buildPersonaBoxSpec({
+      personaName: 'sen',
+      runtime: {
+        ...baseBoxRuntime,
+        mounts: { work: '/work', knowledge: '/knowledge' },
+      },
+      containerMounts: {
+        work: { hostPath: '/host/work', readonly: false },
+        knowledge: { hostPath: '/host/knowledge', readonly: true },
+      },
+    });
+
+    expect(spec.mounts).toEqual(
+      expect.arrayContaining([
+        { source: '/host/work', target: '/work', readonly: false },
+        { source: '/host/knowledge', target: '/knowledge', readonly: true },
+      ])
+    );
+  });
+
+  it('auto-injects persona + lace-data + credentials and sets LACE_DIR', () => {
+    const spec = buildPersonaBoxSpec({
+      personaName: 'sen',
+      runtime: baseBoxRuntime,
+      containerMounts: {
+        persona: { hostPath: '/host/agent-personas', readonly: true },
+        'lace-data': { hostPath: '/host/lace-data', readonly: false },
+        credentials: { hostPath: '/host/credentials', readonly: true },
+      },
+    });
+
+    expect(spec.mounts).toContainEqual({
+      source: '/host/agent-personas',
+      target: SUBAGENT_USER_PERSONAS_TARGET,
+      readonly: true,
+    });
+    expect(spec.mounts).toContainEqual({
+      source: '/host/lace-data',
+      target: SUBAGENT_LACE_DATA_TARGET,
+      readonly: false,
+    });
+    expect(spec.mounts).toContainEqual({
+      source: '/host/credentials',
+      target: SUBAGENT_CREDENTIALS_TARGET,
+      readonly: true,
+    });
+    expect(spec.env.LACE_DIR).toBe(SUBAGENT_LACE_DATA_TARGET);
+  });
+
+  it('rejects unknown mount name', () => {
+    expect(() =>
+      buildPersonaBoxSpec({
+        personaName: 'sen',
+        runtime: { ...baseBoxRuntime, mounts: { phantom: '/phantom' } },
+        containerMounts: {},
+      })
+    ).toThrow(/unknown mount 'phantom'/);
+  });
+
+  it('rejects reserved mount names', () => {
+    expect(() =>
+      buildPersonaBoxSpec({
+        personaName: 'sen',
+        runtime: { ...baseBoxRuntime, mounts: { persona: '/p' } },
+        containerMounts: { persona: { hostPath: '/h', readonly: true } },
+      })
+    ).toThrow(/reserved/);
+
+    expect(() =>
+      buildPersonaBoxSpec({
+        personaName: 'sen',
+        runtime: { ...baseBoxRuntime, mounts: { 'lace-data': '/p' } },
+        containerMounts: { 'lace-data': { hostPath: '/h', readonly: false } },
+      })
+    ).toThrow(/reserved/);
+
+    expect(() =>
+      buildPersonaBoxSpec({
+        personaName: 'sen',
+        runtime: { ...baseBoxRuntime, mounts: { credentials: '/p' } },
+        containerMounts: { credentials: { hostPath: '/h', readonly: true } },
+      })
+    ).toThrow(/reserved/);
+  });
+
+  it('rejects unsafe personaName', () => {
+    expect(() =>
+      buildPersonaBoxSpec({
+        personaName: '../etc/passwd',
+        runtime: baseBoxRuntime,
+        containerMounts: {},
+      })
+    ).toThrow(/Invalid personaName/);
+  });
+
+  it('passes through runtime.env', () => {
+    const spec = buildPersonaBoxSpec({
+      personaName: 'sen',
+      runtime: { ...baseBoxRuntime, env: { FOO: 'bar' } },
+      containerMounts: {},
+    });
+
+    expect(spec.env).toEqual({ FOO: 'bar' });
+  });
+
+  it('throws PersonaContainerSpecError for invalid input', () => {
+    expect(() =>
+      buildPersonaBoxSpec({
+        personaName: 'sen',
+        runtime: { ...baseBoxRuntime, mounts: { phantom: '/p' } },
+        containerMounts: {},
+      })
+    ).toThrow(PersonaContainerSpecError);
   });
 });
