@@ -93,6 +93,10 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       args.push('-e', `${key}=${value}`);
     }
 
+    for (const port of config.ports || []) {
+      args.push('-p', `${port.host}:${port.container}`);
+    }
+
     args.push(config.image);
 
     if (config.command && config.command.length > 0) {
