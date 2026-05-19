@@ -11,6 +11,7 @@ import { ConversationRunner } from '../runner';
 import type { RunnerConfig, RunnerDependencies } from '../types';
 import { PersonaRegistry } from '@lace/agent/config/persona-registry';
 import { TestAgentProvider } from '@lace/agent/runtime/test-provider';
+import type { JobManager } from '@lace/agent/jobs/job-manager';
 
 function makePersonaRegistry(userPersonasDir: string): PersonaRegistry {
   // bundledPersonasPath points at an empty tempdir so we can assert
@@ -22,12 +23,10 @@ function makePersonaRegistry(userPersonasDir: string): PersonaRegistry {
   });
 }
 
-function makeMockDeps(overrides: Partial<RunnerDependencies>): RunnerDependencies {
-  const mockExecutor = {
-    getTool: vi.fn().mockReturnValue(undefined),
-    execute: vi.fn().mockResolvedValue({ status: 'completed', content: [] }),
-  };
-  const mockJobManager = {
+// Single source of truth for the JobManager mock surface used by these tests.
+// Confines the unsafe cast to one place; callers get a properly typed JobManager.
+function makeMockJobManager(overrides: Partial<JobManager> = {}): JobManager {
+  const base: Partial<JobManager> = {
     getJob: vi.fn().mockReturnValue(undefined),
     listJobs: vi.fn().mockReturnValue([]),
     getJobOutput: vi.fn().mockReturnValue(''),
@@ -43,6 +42,14 @@ function makeMockDeps(overrides: Partial<RunnerDependencies>): RunnerDependencie
     getNotificationQueue: vi.fn().mockReturnValue([]),
     getRunningJobs: vi.fn().mockReturnValue([]),
   };
+  return { ...base, ...overrides } as JobManager;
+}
+
+function makeMockDeps(overrides: Partial<RunnerDependencies>): RunnerDependencies {
+  const mockExecutor = {
+    getTool: vi.fn().mockReturnValue(undefined),
+    execute: vi.fn().mockResolvedValue({ status: 'completed', content: [] }),
+  };
 
   return {
     onUpdate: vi.fn().mockResolvedValue(undefined),
@@ -57,7 +64,7 @@ function makeMockDeps(overrides: Partial<RunnerDependencies>): RunnerDependencie
     createProvider: vi.fn().mockImplementation(async () => new TestAgentProvider()),
     getModelPricing: vi.fn().mockResolvedValue(null),
     startShellJob: vi.fn().mockResolvedValue({ jobId: 'job_test' }),
-    jobManager: mockJobManager as unknown as RunnerDependencies['jobManager'],
+    jobManager: makeMockJobManager(),
     mcpServerManager: undefined,
     setActiveTurnStatus: vi.fn(),
     getSessionCostUsd: vi.fn().mockReturnValue(0),
@@ -178,20 +185,17 @@ describe('ConversationRunner threads personaRegistry into deps.createToolExecuto
     // delegate runs in background to avoid waiting on job completion. If
     // wiring is broken, this falls back to defaultPersonaRegistry which
     // does not see our tempdir → status: 'failed' with PersonaNotFoundError.
-    const mockJobManager = {
+    const mockJobManager = makeMockJobManager({
       createJob: vi.fn().mockResolvedValue({
         jobId: 'job_test',
         job: { completion: new Promise(() => {}) },
       }),
-      listJobs: vi.fn().mockReturnValue([]),
-    };
+    });
     const result = await delegate!.execute(
       { prompt: 'go', persona: 'test-shell', background: true },
       {
         signal: new AbortController().signal,
-        jobManager: mockJobManager as unknown as Parameters<
-          typeof delegate.execute
-        >[1]['jobManager'],
+        jobManager: mockJobManager,
       }
     );
 
