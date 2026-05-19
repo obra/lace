@@ -101,7 +101,7 @@ export class ContainerManager {
     }
   }
 
-  async execStream(specName: string, options: ExecStreamOptions): Promise<ExecStreamHandle> {
+  execStream(specName: string, options: ExecStreamOptions): Promise<ExecStreamHandle> {
     const containerId = resolveContainerId(specName);
     return this.runtime.execStream(containerId, options);
   }
