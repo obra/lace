@@ -45,6 +45,22 @@ function makeMockJobManager(overrides: Partial<JobManager> = {}): JobManager {
   return { ...base, ...overrides } as JobManager;
 }
 
+// Names the positional arguments to deps.createToolExecutor so assertions
+// reference them by shape, not index. Update this helper (one place) if
+// the signature ever grows to an options bag.
+type CreateToolExecutorParams = Parameters<RunnerDependencies['createToolExecutor']>;
+function getCreateToolExecutorArgs(call: unknown[] | undefined): Partial<{
+  executionMode: CreateToolExecutorParams[0];
+  mcpServerManager: CreateToolExecutorParams[1];
+  jobManager: CreateToolExecutorParams[2];
+  skillRegistry: CreateToolExecutorParams[3];
+  personaRegistry: CreateToolExecutorParams[4];
+}> {
+  const [executionMode, mcpServerManager, jobManager, skillRegistry, personaRegistry] = (call ??
+    []) as CreateToolExecutorParams;
+  return { executionMode, mcpServerManager, jobManager, skillRegistry, personaRegistry };
+}
+
 function makeMockDeps(overrides: Partial<RunnerDependencies>): RunnerDependencies {
   const mockExecutor = {
     getTool: vi.fn().mockReturnValue(undefined),
@@ -128,8 +144,9 @@ describe('ConversationRunner threads personaRegistry into deps.createToolExecuto
     });
 
     expect(createToolExecutor).toHaveBeenCalledTimes(1);
-    // (executionMode, mcpServerManager, jobManager, skillRegistry, personaRegistry)
-    expect(createToolExecutor.mock.calls[0]?.[4]).toBe(personaRegistry);
+    expect(getCreateToolExecutorArgs(createToolExecutor.mock.calls[0]).personaRegistry).toBe(
+      personaRegistry
+    );
   });
 
   it('passes undefined when deps.personaRegistry is omitted', async () => {
@@ -158,7 +175,9 @@ describe('ConversationRunner threads personaRegistry into deps.createToolExecuto
       startedAt: new Date().toISOString(),
     });
 
-    expect(createToolExecutor.mock.calls[0]?.[4]).toBeUndefined();
+    expect(
+      getCreateToolExecutorArgs(createToolExecutor.mock.calls[0]).personaRegistry
+    ).toBeUndefined();
   });
 
   it('DelegateTool through the full pipeline resolves an embedder-supplied user persona', async () => {
