@@ -38,10 +38,10 @@ vi.mock('openai', () => {
   return { default: MockOpenAI };
 });
 
-// TODO(kata #64): Tests stub openai.chat.completions but production code prefers
-// the Responses API (openai.responses.create) for the default path. Tests need a mock that
-// covers both API surfaces, or fixtures forcing the chat.completions fallback path.
-describe.skip('OpenAIProvider retry functionality', () => {
+// These tests exercise retry behavior on the Chat Completions API path. Production prefers
+// the Responses API by default; we force the chat.completions fallback by configuring a
+// custom baseURL, which makes OpenAIProvider.isCustomEndpoint() return true.
+describe('OpenAIProvider retry functionality', () => {
   let provider: OpenAIProvider;
 
   beforeEach(() => {
@@ -53,6 +53,7 @@ describe.skip('OpenAIProvider retry functionality', () => {
 
     provider = new OpenAIProvider({
       apiKey: 'test-key',
+      baseURL: 'http://localhost:8080/v1',
     });
 
     // Add error handlers to prevent unhandled errors in tests
