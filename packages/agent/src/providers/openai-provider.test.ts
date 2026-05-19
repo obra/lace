@@ -32,10 +32,13 @@ vi.mock('../../utils/logger.js', () => ({
   },
 }));
 
-// TODO(kata #64): Tests stub openai.chat.completions but production code prefers
-// the Responses API (openai.responses.create) for the default path. Tests need a mock that
-// covers both API surfaces, or fixtures forcing the chat.completions fallback path.
-describe.skip('OpenAIProvider', () => {
+// These tests exercise the Chat Completions API path. Production prefers the Responses API
+// (openai.responses.create) by default; we force the chat.completions fallback by configuring
+// a custom baseURL, which causes OpenAIProvider.isCustomEndpoint() to return true. The
+// Responses API path is covered separately in __tests__/openai-provider-thinking.test.ts.
+const CHAT_COMPLETIONS_BASE_URL = 'http://localhost:8080/v1';
+
+describe('OpenAIProvider', () => {
   let provider: OpenAIProvider;
   let mockTool: Tool;
 
@@ -44,6 +47,7 @@ describe.skip('OpenAIProvider', () => {
 
     provider = new OpenAIProvider({
       apiKey: 'test-key',
+      baseURL: CHAT_COMPLETIONS_BASE_URL,
     });
     provider.setSystemPrompt('Test system prompt');
 
@@ -141,6 +145,7 @@ describe.skip('OpenAIProvider', () => {
               tool_calls: [
                 {
                   id: 'call_123',
+                  type: 'function',
                   function: {
                     name: 'test_tool',
                     arguments: JSON.stringify({ action: 'test' }),
@@ -505,6 +510,7 @@ describe.skip('OpenAIProvider', () => {
     it('should use model passed as parameter', async () => {
       const customProvider = new OpenAIProvider({
         apiKey: 'test-key',
+        baseURL: CHAT_COMPLETIONS_BASE_URL,
       });
 
       mockCreate.mockResolvedValue({
@@ -531,6 +537,7 @@ describe.skip('OpenAIProvider', () => {
     it('should use fallback system prompt when none provided', async () => {
       const noSystemProvider = new OpenAIProvider({
         apiKey: 'test-key',
+        baseURL: CHAT_COMPLETIONS_BASE_URL,
       });
 
       mockCreate.mockResolvedValue({
@@ -751,6 +758,7 @@ describe.skip('OpenAIProvider', () => {
               tool_calls: [
                 {
                   id: 'call_123',
+                  type: 'function',
                   function: {
                     name: 'filesystem_read_file', // Sanitized name
                     arguments: JSON.stringify({ path: '/test.txt' }),
@@ -860,6 +868,7 @@ describe.skip('OpenAIProvider', () => {
                 tool_calls: [
                   {
                     id: 'call_a',
+                    type: 'function',
                     function: {
                       name: 'mcp_tool_a',
                       arguments: JSON.stringify({}),
@@ -880,6 +889,7 @@ describe.skip('OpenAIProvider', () => {
                 tool_calls: [
                   {
                     id: 'call_b',
+                    type: 'function',
                     function: {
                       name: 'mcp_tool_b',
                       arguments: JSON.stringify({}),
@@ -1109,7 +1119,7 @@ describe.skip('OpenAIProvider', () => {
       // Should throw error for invalid tool name
       await expect(
         provider.createResponse([{ role: 'user', content: 'Test' }], [emptyTool], 'gpt-4o')
-      ).rejects.toThrow('invalid - sanitizes to empty or underscore-only');
+      ).rejects.toThrow('sanitizes to empty or underscore-only');
     });
 
     it('should handle unicode characters in tool names', async () => {
