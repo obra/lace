@@ -13,10 +13,15 @@ import { PersonaRegistry } from '@lace/agent/config/persona-registry';
 import { TestAgentProvider } from '@lace/agent/runtime/test-provider';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 
+// Tempdirs created by makePersonaRegistry within a single test, so afterEach
+// can clean them up. Reset per-test in beforeEach.
+let bundleTempdirs: string[] = [];
+
 function makePersonaRegistry(userPersonasDir: string): PersonaRegistry {
   // bundledPersonasPath points at an empty tempdir so we can assert
   // user-only resolution without bundled noise.
   const emptyBundle = mkdtempSync(join(tmpdir(), 'lace-bundle-empty-'));
+  bundleTempdirs.push(emptyBundle);
   return new PersonaRegistry({
     bundledPersonasPath: emptyBundle,
     userPersonasPaths: [userPersonasDir],
@@ -99,6 +104,7 @@ describe('ConversationRunner threads personaRegistry into deps.createToolExecuto
     sessionDir = join(tmpdir(), `lace-runner-persona-session-${testId}`);
     cwd = join(tmpdir(), `lace-runner-persona-cwd-${testId}`);
     userPersonasDir = join(tmpdir(), `lace-runner-persona-personas-${testId}`);
+    bundleTempdirs = [];
     mkdirSync(sessionDir, { recursive: true });
     mkdirSync(cwd, { recursive: true });
     mkdirSync(userPersonasDir, { recursive: true });
@@ -111,7 +117,7 @@ describe('ConversationRunner threads personaRegistry into deps.createToolExecuto
   });
 
   afterEach(() => {
-    for (const dir of [sessionDir, cwd, userPersonasDir]) {
+    for (const dir of [sessionDir, cwd, userPersonasDir, ...bundleTempdirs]) {
       if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
     }
   });
