@@ -27,153 +27,159 @@ async function containerExists(containerId: string): Promise<boolean> {
   }
 }
 
-describe.skipIf(process.platform !== 'darwin')('Container Cleanup Validation', () => {
-  let runtime: AppleContainerRuntime;
-  let testDir: string;
-  let createdContainers: string[] = [];
+// Opt-in: requires the `container` CLI, a running daemon, and the ability to pull
+// `mcr.microsoft.com/devcontainers/base:ubuntu`. Set LACE_APPLE_CONTAINER_TESTS=1 to run.
+// TODO(kata #63): auto-detect availability like docker-container.integration.test.ts
+describe.skipIf(process.platform !== 'darwin' || !process.env.LACE_APPLE_CONTAINER_TESTS)(
+  'Container Cleanup Validation',
+  () => {
+    let runtime: AppleContainerRuntime;
+    let testDir: string;
+    let createdContainers: string[] = [];
 
-  // Share runtime instance across tests - it's stateless and ensureSystemStarted() adds overhead
-  beforeAll(() => {
-    runtime = new AppleContainerRuntime();
-    testDir = join(tmpdir(), `container-cleanup-validation-${uuidv4()}`);
-    mkdirSync(testDir, { recursive: true });
-  });
+    // Share runtime instance across tests - it's stateless and ensureSystemStarted() adds overhead
+    beforeAll(() => {
+      runtime = new AppleContainerRuntime();
+      testDir = join(tmpdir(), `container-cleanup-validation-${uuidv4()}`);
+      mkdirSync(testDir, { recursive: true });
+    });
 
-  beforeEach(() => {
-    createdContainers = [];
-  });
+    beforeEach(() => {
+      createdContainers = [];
+    });
 
-  afterEach(async () => {
-    // Clean up all created containers
-    for (const containerId of createdContainers) {
-      try {
-        // Use shorter timeout (1000ms) since we force-remove anyway if this fails
-        await runtime.stop(containerId, 1000);
-        await runtime.remove(containerId);
-      } catch (error) {
-        logger.warn('Cleanup: Failed to remove container', {
-          containerId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // Force remove via container CLI as fallback
+    afterEach(async () => {
+      // Clean up all created containers
+      for (const containerId of createdContainers) {
         try {
-          await execFileAsync('container', ['delete', '--force', containerId], { timeout: 2000 });
-        } catch {
-          // Best effort
+          // Use shorter timeout (1000ms) since we force-remove anyway if this fails
+          await runtime.stop(containerId, 1000);
+          await runtime.remove(containerId);
+        } catch (error) {
+          logger.warn('Cleanup: Failed to remove container', {
+            containerId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // Force remove via container CLI as fallback
+          try {
+            await execFileAsync('container', ['delete', '--force', containerId], { timeout: 2000 });
+          } catch {
+            // Best effort
+          }
         }
       }
-    }
-  }, 20000); // Generous timeout for cleanup
+    }, 20000); // Generous timeout for cleanup
 
-  afterAll(() => {
-    // Clean up test directory after all tests
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
-    }
-  });
+    afterAll(() => {
+      // Clean up test directory after all tests
+      if (existsSync(testDir)) {
+        rmSync(testDir, { recursive: true, force: true });
+      }
+    });
 
-  // Combined test: verifies stop, double-stop handling, and remove in a single container lifecycle
-  // This saves ~6 seconds by avoiding a redundant container start/stop cycle
-  it('should stop running container, handle already-stopped state, and fully remove', async () => {
-    const config: ContainerConfig = {
-      id: 'cleanup-validation-test',
-      image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
-      workingDirectory: '/workspace',
-      mounts: [
-        {
-          source: testDir,
-          target: '/workspace',
+    // Combined test: verifies stop, double-stop handling, and remove in a single container lifecycle
+    // This saves ~6 seconds by avoiding a redundant container start/stop cycle
+    it('should stop running container, handle already-stopped state, and fully remove', async () => {
+      const config: ContainerConfig = {
+        id: 'cleanup-validation-test',
+        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
+        workingDirectory: '/workspace',
+        mounts: [
+          {
+            source: testDir,
+            target: '/workspace',
+          },
+        ],
+        environment: {
+          TEST_VAR: 'test-value',
         },
-      ],
-      environment: {
-        TEST_VAR: 'test-value',
-      },
-    };
+      };
 
-    // Create and start container
-    const containerId = runtime.create(config);
-    createdContainers.push(containerId);
+      // Create and start container
+      const containerId = runtime.create(config);
+      createdContainers.push(containerId);
 
-    await runtime.start(containerId);
+      await runtime.start(containerId);
 
-    // Verify container is running
-    expect(await containerExists(containerId)).toBe(true);
+      // Verify container is running
+      expect(await containerExists(containerId)).toBe(true);
 
-    // Stop the running container
-    await runtime.stop(containerId, 5000);
+      // Stop the running container
+      await runtime.stop(containerId, 5000);
 
-    // Verify stop is idempotent - stopping again should not throw
-    await expect(runtime.stop(containerId, 5000)).resolves.not.toThrow();
+      // Verify stop is idempotent - stopping again should not throw
+      await expect(runtime.stop(containerId, 5000)).resolves.not.toThrow();
 
-    // Remove should work on an already-stopped container
-    await expect(runtime.remove(containerId)).resolves.not.toThrow();
+      // Remove should work on an already-stopped container
+      await expect(runtime.remove(containerId)).resolves.not.toThrow();
 
-    // Verify container is completely gone from system
-    expect(await containerExists(containerId)).toBe(false);
+      // Verify container is completely gone from system
+      expect(await containerExists(containerId)).toBe(false);
 
-    // Remove from tracking since we cleaned it successfully
-    createdContainers = createdContainers.filter((id) => id !== containerId);
-  }, 30000); // Longer timeout for container operations
+      // Remove from tracking since we cleaned it successfully
+      createdContainers = createdContainers.filter((id) => id !== containerId);
+    }, 30000); // Longer timeout for container operations
 
-  it('should handle cleanup when container fails to start', async () => {
-    // Create container but don't start it
-    const config: ContainerConfig = {
-      id: 'cleanup-never-started',
-      image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
-      workingDirectory: '/workspace',
-      mounts: [
-        {
-          source: testDir,
-          target: '/workspace',
-        },
-      ],
-    };
+    it('should handle cleanup when container fails to start', async () => {
+      // Create container but don't start it
+      const config: ContainerConfig = {
+        id: 'cleanup-never-started',
+        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
+        workingDirectory: '/workspace',
+        mounts: [
+          {
+            source: testDir,
+            target: '/workspace',
+          },
+        ],
+      };
 
-    const containerId = runtime.create(config);
-    createdContainers.push(containerId);
+      const containerId = runtime.create(config);
+      createdContainers.push(containerId);
 
-    // Don't start - container is in 'created' state
+      // Don't start - container is in 'created' state
 
-    // Remove should still work
-    await expect(runtime.remove(containerId)).resolves.not.toThrow();
+      // Remove should still work
+      await expect(runtime.remove(containerId)).resolves.not.toThrow();
 
-    // Verify not in system
-    expect(await containerExists(containerId)).toBe(false);
+      // Verify not in system
+      expect(await containerExists(containerId)).toBe(false);
 
-    createdContainers = createdContainers.filter((id) => id !== containerId);
-  }, 30000);
+      createdContainers = createdContainers.filter((id) => id !== containerId);
+    }, 30000);
 
-  it('should remove container even if stop times out', async () => {
-    const config: ContainerConfig = {
-      id: 'cleanup-timeout-test',
-      image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
-      workingDirectory: '/workspace',
-      mounts: [
-        {
-          source: testDir,
-          target: '/workspace',
-        },
-      ],
-    };
+    it('should remove container even if stop times out', async () => {
+      const config: ContainerConfig = {
+        id: 'cleanup-timeout-test',
+        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
+        workingDirectory: '/workspace',
+        mounts: [
+          {
+            source: testDir,
+            target: '/workspace',
+          },
+        ],
+      };
 
-    const containerId = runtime.create(config);
-    createdContainers.push(containerId);
+      const containerId = runtime.create(config);
+      createdContainers.push(containerId);
 
-    await runtime.start(containerId);
+      await runtime.start(containerId);
 
-    // Try stop with very short timeout (might timeout)
-    try {
-      await runtime.stop(containerId, 500); // Half second - may timeout
-    } catch {
-      // Stop may have timed out, but remove should still work
-    }
+      // Try stop with very short timeout (might timeout)
+      try {
+        await runtime.stop(containerId, 500); // Half second - may timeout
+      } catch {
+        // Stop may have timed out, but remove should still work
+      }
 
-    // Remove with force should clean up
-    await runtime.remove(containerId);
+      // Remove with force should clean up
+      await runtime.remove(containerId);
 
-    // Verify fully removed
-    expect(await containerExists(containerId)).toBe(false);
+      // Verify fully removed
+      expect(await containerExists(containerId)).toBe(false);
 
-    createdContainers = createdContainers.filter((id) => id !== containerId);
-  }, 30000);
-});
+      createdContainers = createdContainers.filter((id) => id !== containerId);
+    }, 30000);
+  }
+);
