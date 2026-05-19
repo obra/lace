@@ -41,6 +41,26 @@ export class ContainerManager {
 
   constructor(private readonly runtime: ContainerRuntime) {}
 
+  /**
+   * Materialize a ContainerSpec into a running container.
+   *
+   * Idempotent under SEQUENTIAL calls with the same `spec.name`: a second call
+   * observes the existing container and returns its handle without recreating.
+   *
+   * NOT internally serialized against CONCURRENT calls sharing the same
+   * `spec.name`. There is a benign TOCTOU between `tryInspect` and
+   * `runtime.create`/`start`: two concurrent calls could both observe "no
+   * existing container" and both call `create`, producing duplicate-id errors
+   * from the runtime.
+   *
+   * Callers must ensure at most one concurrent `materialize` per `spec.name`.
+   * The current call shape (single subagent spawn per (session, persona) pair
+   * via `spawnContainerSubagent`) satisfies this.
+   *
+   * If a future caller violates this invariant, the safe fix is an in-flight
+   * `Map<specName, Promise<ContainerHandle>>` that returns the same in-flight
+   * promise; do not introduce that machinery preemptively (YAGNI).
+   */
   async materialize(
     spec: ContainerSpec,
     hooks?: ContainerLifecycleHooks
