@@ -12,6 +12,7 @@ export default defineConfig({
     include: [
       'src/**/__tests__/**/*.{test,spec}.{ts,tsx}',
       'src/__tests__/**/*.{test,spec}.{ts,tsx}',
+      'src/**/*.{test,spec}.{ts,tsx}',
     ],
     environment: 'node',
     setupFiles: [],
