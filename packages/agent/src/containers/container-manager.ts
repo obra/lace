@@ -1,5 +1,7 @@
 // ABOUTME: Generic ContainerManager — materializes ContainerSpec into running containers
-// ABOUTME: Idempotent by spec.name; knows nothing about personas, worktrees, or sessions
+// ABOUTME: Idempotent by spec.name; knows nothing about personas, worktrees, or sessions,
+// ABOUTME: but namespaces all container ids under the `lace-` prefix to support orphan
+// ABOUTME: reaping across processes.
 
 import { logger } from '@lace/agent/utils/logger';
 import type {
@@ -12,6 +14,8 @@ import type {
 import { ContainerNotFoundError } from './types';
 import type { ContainerHandle, ContainerLifecycleHooks, ContainerSpec } from './spec';
 
+// See ABOUTME above: every container id is namespaced under this prefix so
+// cross-process orphan reaping can scope its scan.
 const CONTAINER_ID_PREFIX = 'lace-';
 
 function resolveContainerId(specName: string): string {
