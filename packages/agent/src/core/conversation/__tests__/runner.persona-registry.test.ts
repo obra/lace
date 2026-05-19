@@ -180,7 +180,7 @@ describe('ConversationRunner threads personaRegistry into deps.createToolExecuto
     ).toBeUndefined();
   });
 
-  it('DelegateTool through the full pipeline resolves an embedder-supplied user persona', async () => {
+  it('createToolExecutorForMode wires personaRegistry into DelegateTool', async () => {
     // End-to-end-ish: use the real createToolExecutorForMode so we exercise
     // registerAllAvailableTools + new DelegateTool({personaRegistry}). We
     // don't actually run the runner — we just verify that wiring deps
