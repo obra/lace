@@ -6,7 +6,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { JobState, JobStatus, JobType, PendingJobNotification } from '../server-types';
 import { MAX_CONCURRENT_JOBS } from '../server-types';
-import type { PersonaContainerRuntime } from './persona-container-spec';
+import type { PersonaContainerRuntime, PersonaBoxRuntime } from './persona-container-spec';
 import { toNonEmptyString } from '../rpc/utils';
 import { getJobOutputPath } from './job-file-utils';
 
@@ -46,6 +46,9 @@ export type CreateJobOptions = {
   >;
   // Parsed persona container runtime, forwarded to subagent-job when present.
   personaContainerRuntime?: PersonaContainerRuntime;
+  // Parsed persona box runtime (kata #62). Mutually exclusive with
+  // personaContainerRuntime at the persona level.
+  personaBoxRuntime?: PersonaBoxRuntime;
 };
 
 /**
@@ -407,6 +410,7 @@ export class JobManager {
             ...(options.personaContainerRuntime
               ? { personaContainerRuntime: options.personaContainerRuntime }
               : {}),
+            ...(options.personaBoxRuntime ? { personaBoxRuntime: options.personaBoxRuntime } : {}),
           }
         : {}),
     };

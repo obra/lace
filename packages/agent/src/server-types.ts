@@ -18,7 +18,7 @@ import type { SkillRegistry } from './skills';
 import type { PersonaRegistry } from './config/persona-registry';
 import type { ContainerManager } from './containers/container-manager';
 import type { ExecStreamHandle } from './containers/types';
-import type { PersonaContainerRuntime } from './jobs/persona-container-spec';
+import type { PersonaContainerRuntime, PersonaBoxRuntime } from './jobs/persona-container-spec';
 
 /**
  * Per-build allowlist of tool names. `undefined` means "no scope filter" (all tools available).
@@ -117,6 +117,9 @@ export type JobState = {
   // runtime block flows through to subagent-job to drive container
   // materialization at spawn time. Absent ⇒ native spawn (root runtime).
   personaContainerRuntime?: PersonaContainerRuntime;
+  // Mirror field for `runtime.type: box` personas (kata #62). Mutually
+  // exclusive with personaContainerRuntime at the persona level.
+  personaBoxRuntime?: PersonaBoxRuntime;
 };
 
 export type PendingJobNotification = {

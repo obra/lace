@@ -175,6 +175,74 @@ describe('spawnSubagent', () => {
     expect(fakeManager.materialize).not.toHaveBeenCalled();
   });
 
+  it('box runtime materializes box spec and execStreams the in-container lace-agent (kata #62)', async () => {
+    const boxRuntime = {
+      type: 'box' as const,
+      image: 'sen-box:dev',
+      workingDirectory: '/home/agent',
+      mounts: {},
+    };
+
+    const handle = await spawnSubagent({
+      parentSessionId: 'sess1',
+      personaName: 'sen',
+      personaBoxRuntime: boxRuntime,
+      containerManager: fakeManager as unknown as ContainerManager,
+      containerMounts: {},
+    });
+
+    expect(fakeManager.materialize).toHaveBeenCalledOnce();
+    const spec = fakeManager.materialize.mock.calls[0][0];
+    expect(spec.name).toBe('box');
+    expect(spec.containerId).toBe('sen-box');
+    expect(spec.restartPolicy).toBe('unless-stopped');
+    expect(spec.ports).toBeUndefined();
+
+    expect(fakeManager.execStream).toHaveBeenCalledOnce();
+    const [specName, options] = fakeManager.execStream.mock.calls[0];
+    expect(specName).toBe('box');
+    expect(options.command).toEqual(['node', '/lace/packages/agent/dist/main.js']);
+    expect(options.workingDirectory).toBe('/home/agent');
+
+    expect(handle.containerExec).not.toBeNull();
+    expect(handle.nativeProcess).toBeNull();
+  });
+
+  it('box runtime without a containerManager throws (kata #62)', async () => {
+    await expect(
+      spawnSubagent({
+        parentSessionId: 'sess1',
+        personaName: 'sen',
+        personaBoxRuntime: {
+          type: 'box',
+          image: 'sen-box:dev',
+          workingDirectory: '/home/agent',
+          mounts: {},
+        },
+        containerManager: null,
+        containerMounts: {},
+      })
+    ).rejects.toThrow(SubagentSpawnError);
+  });
+
+  it('box runtime without a personaName throws (kata #62)', async () => {
+    await expect(
+      spawnSubagent({
+        parentSessionId: 'sess1',
+        personaName: undefined,
+        personaBoxRuntime: {
+          type: 'box',
+          image: 'sen-box:dev',
+          workingDirectory: '/home/agent',
+          mounts: {},
+        },
+        containerManager: fakeManager as unknown as ContainerManager,
+        containerMounts: {},
+      })
+    ).rejects.toThrow(SubagentSpawnError);
+    expect(fakeManager.materialize).not.toHaveBeenCalled();
+  });
+
   it('root persona path does not consult the container manager', async () => {
     // We do not actually spawn a real lace-agent here; spawn() will succeed but
     // the child process is killed immediately to avoid leaking subprocesses.
