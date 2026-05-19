@@ -115,8 +115,22 @@ export class ContainerManager {
     return this.runtime.execStream(containerId, options);
   }
 
-  async reapOrphans(idPrefix: string, liveSpecNames: Set<string>): Promise<{ reaped: string[] }> {
-    const scanPrefix = `${CONTAINER_ID_PREFIX}${idPrefix}`;
+  /**
+   * Reap containers under our `lace-` id-prefix that are not in `liveSpecNames`.
+   *
+   * @param specNamePrefix A SPEC-name prefix (NOT a container-id prefix). It is
+   *   prepended internally with `CONTAINER_ID_PREFIX` (`lace-`) to form the
+   *   scan prefix. Pass `''` to scan all `lace-` containers.
+   * @param liveSpecNames Set of spec names (no `lace-` prefix) that must NOT
+   *   be reaped.
+   * @returns `reaped` — spec names (no `lace-` prefix) of containers that were
+   *   destroyed.
+   */
+  async reapOrphans(
+    specNamePrefix: string,
+    liveSpecNames: Set<string>
+  ): Promise<{ reaped: string[] }> {
+    const scanPrefix = `${CONTAINER_ID_PREFIX}${specNamePrefix}`;
     let containers: ContainerInfo[];
     try {
       containers = await this.runtime.list();
