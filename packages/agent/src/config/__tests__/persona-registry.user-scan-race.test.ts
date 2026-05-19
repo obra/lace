@@ -2,7 +2,7 @@
 // doesn't exist at first scan, the 5-second TTL cache locks in an empty
 // userPersonasCache for 5 seconds even after the directory appears.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -65,22 +65,35 @@ describe('PersonaRegistry user-persona scan with missing path at construction', 
     expect(registry.getPersonaPath('anything')).toBeNull();
   });
 
-  it('still caches when the path exists but is empty', () => {
-    // Empty-but-existing dir is a legit empty result — cache should hold.
+  it('caches a successful empty scan within TTL and re-scans after TTL', () => {
+    // Empty-but-existing dir is a legit empty result — cache should hold
+    // for the TTL, then expire and pick up new files on the next call.
     mkdirSync(userPersonasDir, { recursive: true });
-    const registry = new PersonaRegistry({
-      bundledPersonasPath: bundledPath,
-      userPersonasPaths: [userPersonasDir],
-    });
 
-    expect(registry.listAvailablePersonas()).toEqual([]);
+    // Fake timers so we can advance Date.now() past the 5s USER_CACHE_TTL
+    // without actually waiting. The registry reads Date.now() inside
+    // loadUserPersonas.
+    vi.useFakeTimers();
+    try {
+      const registry = new PersonaRegistry({
+        bundledPersonasPath: bundledPath,
+        userPersonasPaths: [userPersonasDir],
+      });
 
-    // Adding files after the cache is populated still gets picked up
-    // eventually (after TTL), but within TTL we treat the cache as
-    // authoritative. The important invariant is: a SUCCESSFUL scan of an
-    // empty dir IS cached (we don't re-scan needlessly).
-    writeFileSync(join(userPersonasDir, 'late.md'), 'late persona');
-    // Within TTL, cache remains empty.
-    expect(registry.listAvailablePersonas()).toEqual([]);
+      expect(registry.listAvailablePersonas()).toEqual([]);
+
+      writeFileSync(join(userPersonasDir, 'late.md'), 'late persona');
+
+      // Within TTL: cached empty result wins.
+      vi.advanceTimersByTime(4000);
+      expect(registry.listAvailablePersonas()).toEqual([]);
+
+      // Past TTL (5000ms): re-scans and picks up the new file.
+      vi.advanceTimersByTime(2000);
+      const personas = registry.listAvailablePersonas();
+      expect(personas.map((p) => p.name)).toContain('late');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
