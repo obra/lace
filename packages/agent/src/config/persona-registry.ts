@@ -46,7 +46,26 @@ const runtimeContainerSchema = z
   })
   .strict();
 
-const runtimeSchema = z.discriminatedUnion('type', [runtimeRootSchema, runtimeContainerSchema]);
+// The 'box' runtime is a single-tenant long-lived container owned by the agent.
+// Differs from 'container': fixed daemon-side id (no per-session suffix), reused
+// across agent restarts via docker --restart=unless-stopped, and adopted on
+// boot rather than created+destroyed per delegate. No host port publishing in
+// v1 — boxes are reached by `docker exec` only.
+const runtimeBoxSchema = z
+  .object({
+    type: z.literal('box'),
+    image: z.string().min(1),
+    workingDirectory: z.string().min(1),
+    mounts: z.record(mountNameSchema, z.string().min(1)),
+    env: z.record(z.string(), z.string()).optional().default({}),
+  })
+  .strict();
+
+const runtimeSchema = z.discriminatedUnion('type', [
+  runtimeRootSchema,
+  runtimeContainerSchema,
+  runtimeBoxSchema,
+]);
 
 export type PersonaRuntime = z.infer<typeof runtimeSchema>;
 

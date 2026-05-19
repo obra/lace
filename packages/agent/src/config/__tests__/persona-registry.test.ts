@@ -190,6 +190,86 @@ Body.`;
     expect(() => registry.parsePersona('bad-mount-digit')).toThrow(/mounts/i);
   });
 
+  it('parses runtime.type=box with required fields (kata #62)', () => {
+    const content = `---
+runtime:
+  type: box
+  image: ghcr.io/example/sen-box:latest
+  workingDirectory: /home/agent
+  mounts:
+    work: /work
+    knowledge: /knowledge
+  env:
+    FOO: bar
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'box-runtime.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    const result = registry.parsePersona('box-runtime');
+    expect(result.config.runtime).toEqual({
+      type: 'box',
+      image: 'ghcr.io/example/sen-box:latest',
+      workingDirectory: '/home/agent',
+      mounts: { work: '/work', knowledge: '/knowledge' },
+      env: { FOO: 'bar' },
+    });
+  });
+
+  it('parses runtime.type=box with empty mounts and defaulted env (kata #62)', () => {
+    const content = `---
+runtime:
+  type: box
+  image: img:latest
+  workingDirectory: /home/agent
+  mounts: {}
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'box-minimal.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    const result = registry.parsePersona('box-minimal');
+    expect(result.config.runtime).toEqual({
+      type: 'box',
+      image: 'img:latest',
+      workingDirectory: '/home/agent',
+      mounts: {},
+      env: {},
+    });
+  });
+
+  it('throws when runtime.type=box is missing image (kata #62)', () => {
+    const content = `---
+runtime:
+  type: box
+  workingDirectory: /home/agent
+  mounts: {}
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'box-no-image.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(() => registry.parsePersona('box-no-image')).toThrow(/image/i);
+  });
+
+  it('rejects runtime.type=box with ports (kata #62 — boxes have no ports in v1)', () => {
+    const content = `---
+runtime:
+  type: box
+  image: img:latest
+  workingDirectory: /home/agent
+  mounts: {}
+  ports:
+    - host: 8080
+      container: 80
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'box-with-ports.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(() => registry.parsePersona('box-with-ports')).toThrow(/ports/i);
+  });
+
   it('rejects unknown runtime discriminator', () => {
     const content = `---
 runtime:
