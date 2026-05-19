@@ -207,6 +207,8 @@ describe('ConversationRunner threads personaRegistry into deps.createToolExecuto
     const mockJobManager = makeMockJobManager({
       createJob: vi.fn().mockResolvedValue({
         jobId: 'job_test',
+        // Never-resolving completion is safe: background:true returns
+        // immediately on createJob and the test never awaits this promise.
         job: { completion: new Promise(() => {}) },
       }),
     });
