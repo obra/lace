@@ -18,8 +18,14 @@ import type { ContainerHandle, ContainerLifecycleHooks, ContainerSpec } from './
 // cross-process orphan reaping can scope its scan.
 const CONTAINER_ID_PREFIX = 'lace-';
 
-function resolveContainerId(specName: string): string {
-  return `${CONTAINER_ID_PREFIX}${specName}`;
+function resolveContainerId(spec: Pick<ContainerSpec, 'name' | 'containerId'>): string {
+  // Box runtime opts out of the `lace-` namespace by supplying a verbatim
+  // containerId (e.g. `sen-box`). Using a non-`lace-` id is intentional: it
+  // makes boxes invisible to the startup reaper, which only lists `lace-*`.
+  if (spec.containerId && spec.containerId.length > 0) {
+    return spec.containerId;
+  }
+  return `${CONTAINER_ID_PREFIX}${spec.name}`;
 }
 
 /**
@@ -65,13 +71,37 @@ export class ContainerManager {
     spec: ContainerSpec,
     hooks?: ContainerLifecycleHooks
   ): Promise<ContainerHandle> {
-    const containerId = resolveContainerId(spec.name);
-    const existing = await this.tryInspect(containerId);
+    const containerId = resolveContainerId(spec);
+    const config: ContainerConfig = {
+      id: containerId,
+      name: spec.name,
+      image: spec.image,
+      workingDirectory: spec.workingDirectory,
+      mounts: spec.mounts,
+      environment: spec.env,
+      ports: spec.ports,
+      restartPolicy: spec.restartPolicy,
+    };
 
-    if (existing) {
+    // Box specs may have a daemon-side container that survived this process —
+    // the docker --restart policy keeps `sen-box` alive across agent restarts.
+    // Consult the daemon directly so we adopt instead of recreating.
+    const adoptable = spec.containerId
+      ? await this.runtime.daemonInspect(containerId)
+      : await this.tryInspect(containerId);
+
+    if (adoptable) {
       this.specs.set(spec.name, spec);
-      if (existing.state === 'running') {
-        return { spec, containerId, state: existing.state };
+      // Adopt the daemon-side container into the runtime's in-process caches
+      // so subsequent start/exec calls succeed. No-op when the runtime has no
+      // caches to populate (apple-container falls back to its own create-path
+      // bookkeeping which is already in place when the local cache has it).
+      if (spec.containerId) {
+        await this.runtime.adopt(config, adoptable.state);
+      }
+
+      if (adoptable.state === 'running') {
+        return { spec, containerId, state: adoptable.state };
       }
       await this.runtime.start(containerId);
       const after = await this.tryInspect(containerId);
@@ -86,16 +116,6 @@ export class ContainerManager {
     if (hooks?.beforeCreate) {
       await hooks.beforeCreate();
     }
-
-    const config: ContainerConfig = {
-      id: containerId,
-      name: spec.name,
-      image: spec.image,
-      workingDirectory: spec.workingDirectory,
-      mounts: spec.mounts,
-      environment: spec.env,
-      ports: spec.ports,
-    };
 
     const createdId = await this.runtime.create(config);
     await this.runtime.start(createdId);
@@ -114,16 +134,16 @@ export class ContainerManager {
   }
 
   async inspect(specName: string): Promise<ContainerHandle | null> {
-    const containerId = resolveContainerId(specName);
+    const spec = this.specs.get(specName);
+    const containerId = this.resolveBySpecName(specName);
     const info = await this.tryInspect(containerId);
     if (!info) return null;
-    const spec = this.specs.get(specName);
     if (!spec) return null;
     return { spec, containerId: info.id, state: info.state };
   }
 
   async destroy(specName: string, hooks?: ContainerLifecycleHooks): Promise<void> {
-    const containerId = resolveContainerId(specName);
+    const containerId = this.resolveBySpecName(specName);
 
     try {
       await this.runtime.stop(containerId);
@@ -145,8 +165,19 @@ export class ContainerManager {
   }
 
   execStream(specName: string, options: ExecStreamOptions): Promise<ExecStreamHandle> {
-    const containerId = resolveContainerId(specName);
+    const containerId = this.resolveBySpecName(specName);
     return this.runtime.execStream(containerId, options);
+  }
+
+  /**
+   * Resolve a container id for a known-by-name spec. If the spec is cached and
+   * carries a verbatim `containerId`, that id is used; otherwise the spec name
+   * is `lace-`-prefixed. Reaping uses this fallback path for daemon-side
+   * containers the manager has never seen.
+   */
+  private resolveBySpecName(specName: string): string {
+    const cached = this.specs.get(specName);
+    return resolveContainerId({ name: specName, containerId: cached?.containerId });
   }
 
   /**
