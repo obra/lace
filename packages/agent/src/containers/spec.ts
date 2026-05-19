@@ -1,12 +1,9 @@
 // ABOUTME: Generic container spec types — name, image, mounts, env, ports
 // ABOUTME: Consumed by ContainerManager; built by domain-specific spec factories
 
-import type { ContainerMount, ContainerState } from './types';
+import type { ContainerMount, ContainerState, PortMapping } from './types';
 
-export interface PortMapping {
-  host: number;
-  container: number;
-}
+export type { PortMapping };
 
 export interface ContainerSpec {
   name: string;

@@ -94,6 +94,7 @@ export class ContainerManager {
       workingDirectory: spec.workingDirectory,
       mounts: spec.mounts,
       environment: spec.env,
+      ports: spec.ports,
     };
 
     const createdId = await this.runtime.create(config);

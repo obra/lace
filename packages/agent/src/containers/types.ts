@@ -3,6 +3,11 @@
 
 import type { Readable, Writable } from 'node:stream';
 
+export interface PortMapping {
+  host: number;
+  container: number;
+}
+
 export interface ContainerConfig {
   // Container identification (optional - will be generated if not provided)
   id?: string;
@@ -18,6 +23,10 @@ export interface ContainerConfig {
   // Process configuration
   command?: string[];
   environment?: Record<string, string>;
+
+  // Host->container port publishing. Optional; runtimes that lack a port concept
+  // may ignore (see AppleContainerRuntime).
+  ports?: PortMapping[];
 
   // Resource limits (optional for now)
   memory?: number; // bytes

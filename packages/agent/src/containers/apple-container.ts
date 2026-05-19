@@ -157,6 +157,18 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
       // Add working directory
       args.push('-w', config.workingDirectory);
 
+      // Port publishing (config.ports) is intentionally NOT forwarded here:
+      // the Apple `container` CLI's port-publishing surface is not yet
+      // characterized for lace. Personas that require host-published ports
+      // (e.g. browser-driver's noVNC at 6080) currently only work under the
+      // Docker runtime. Follow-up tracked separately (kata #60).
+      if (config.ports && config.ports.length > 0) {
+        logger.warn('AppleContainerRuntime: ignoring spec.ports (not yet supported)', {
+          containerId,
+          portCount: config.ports.length,
+        });
+      }
+
       // Add image and command
       args.push(config.image, 'tail', '-f', '/dev/null');
 
