@@ -55,6 +55,11 @@ export class ContainerManager {
       }
       await this.runtime.start(containerId);
       const after = await this.tryInspect(containerId);
+      // Fallback rationale: we just successfully called runtime.start(). If a
+      // subsequent tryInspect cannot see the container, the runtime is in an
+      // inconsistent state we cannot recover from here. We report 'running'
+      // because that's what start() was asked to produce; the caller will
+      // discover staleness on the next operation.
       return { spec, containerId, state: after?.state ?? 'running' };
     }
 
@@ -76,6 +81,10 @@ export class ContainerManager {
 
     this.specs.set(spec.name, spec);
     const info = await this.tryInspect(createdId);
+    // Same fallback rationale as the stopped-resume branch above: we just
+    // successfully called runtime.create()+start(); if tryInspect cannot see
+    // the container the runtime is inconsistent. Report 'running' (the
+    // intended post-start state) and let the next operation surface staleness.
     return {
       spec,
       containerId: createdId,
