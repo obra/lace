@@ -363,7 +363,7 @@ async function main(): Promise<void> {
   if (args.loadSessionId) {
     const sessionId = asSessionId(args.loadSessionId);
     await withTimeout(
-      conn.peer.request('session/load', { sessionId }),
+      conn.peer.request('session/load', { sessionId, cwd: args.workDir, mcpServers: [] }),
       args.timeoutMs,
       'session/load'
     );
@@ -371,7 +371,7 @@ async function main(): Promise<void> {
     printLine(`loaded session ${sessionId}`);
   } else {
     const created = (await withTimeout(
-      conn.peer.request('session/new', { workDir: args.workDir }),
+      conn.peer.request('session/new', { cwd: args.workDir, mcpServers: [] }),
       args.timeoutMs,
       'session/new'
     )) as any;
@@ -621,7 +621,7 @@ async function main(): Promise<void> {
       if (cmd === 'new') {
         const workDir = argText.length > 0 ? argText : args.workDir;
         const created = (await withTimeout(
-          conn.peer.request('session/new', { workDir }),
+          conn.peer.request('session/new', { cwd: workDir, mcpServers: [] }),
           args.timeoutMs,
           'session/new'
         )) as any;
@@ -632,7 +632,7 @@ async function main(): Promise<void> {
       if (cmd === 'load') {
         const sessionId = asSessionId(argText);
         await withTimeout(
-          conn.peer.request('session/load', { sessionId }),
+          conn.peer.request('session/load', { sessionId, cwd: args.workDir, mcpServers: [] }),
           args.timeoutMs,
           'session/load'
         );
@@ -642,7 +642,7 @@ async function main(): Promise<void> {
       }
       if (cmd === 'list') {
         const res = await withTimeout(
-          conn.peer.request('session/list', { workDir: args.workDir }),
+          conn.peer.request('session/list', { cwd: args.workDir }),
           args.timeoutMs,
           'session/list'
         );
@@ -654,11 +654,7 @@ async function main(): Promise<void> {
         return;
       }
       if (cmd === 'cancel') {
-        await withTimeout(
-          conn.peer.request('session/cancel', {}),
-          args.timeoutMs,
-          'session/cancel'
-        );
+        if (activeSessionId) conn.peer.notify('session/cancel', { sessionId: activeSessionId });
         return;
       }
       if (cmd === 'raw') {

@@ -53,13 +53,13 @@ describe('agent rpc server (smoke)', () => {
     const ping = await client.request('ent/agent/ping');
     expect(ping).toMatchObject({ ok: true, timestamp: expect.any(String) });
 
-    const created = await client.request('session/new', { workDir: process.cwd() });
+    const created = await client.request('session/new', { cwd: process.cwd(), mcpServers: [] });
     expect(created).toMatchObject({
       sessionId: expect.stringMatching(/^sess_/),
       created: expect.any(String),
     });
 
-    const list = await client.request('session/list', { workDir: process.cwd() });
+    const list = await client.request('session/list', { cwd: process.cwd() });
     expect(list).toMatchObject({
       sessions: [
         {
@@ -72,7 +72,11 @@ describe('agent rpc server (smoke)', () => {
       ],
     });
 
-    const loaded = await client.request('session/load', { sessionId: created.sessionId });
+    const loaded = await client.request('session/load', {
+      sessionId: created.sessionId,
+      cwd: process.cwd(),
+      mcpServers: [],
+    });
     expect(loaded).toMatchObject({ sessionId: created.sessionId, messageCount: 0 });
 
     const status = await client.request('ent/agent/status');
@@ -92,7 +96,11 @@ describe('agent rpc server (smoke)', () => {
     await client.request('initialize', defaultInitializeParams());
 
     await expect(
-      client.request('session/load', { sessionId: 'sess_00000000-0000-0000-0000-000000000000' })
+      client.request('session/load', {
+        sessionId: 'sess_00000000-0000-0000-0000-000000000000',
+        cwd: process.cwd(),
+        mcpServers: [],
+      })
     ).rejects.toMatchObject({
       code: AcpErrorCodes.SessionNotFound,
       message: 'SessionNotFound',
@@ -107,7 +115,7 @@ describe('agent rpc server (smoke)', () => {
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
     await client.request('initialize', defaultInitializeParams());
-    await client.request('session/new', { workDir: process.cwd() });
+    await client.request('session/new', { cwd: process.cwd(), mcpServers: [] });
 
     await expect(client.request('ent/job/output', { jobId: 'job_missing' })).rejects.toMatchObject({
       code: EntErrorCodes.JobNotFound,

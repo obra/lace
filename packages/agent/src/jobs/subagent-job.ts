@@ -660,10 +660,16 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
 
       // Resume existing session or create a new one
       const resumedSession = !!job.subagentSessionId;
+      const subagentWorkDir = job.personaContainerRuntime
+        ? job.personaContainerRuntime.workingDirectory
+        : job.personaBoxRuntime
+          ? job.personaBoxRuntime.workingDirectory
+          : currentState.activeSession!.meta.workDir;
       if (resumedSession) {
-        // Resume: load the existing session
-        await childPeer.request('session/load', {
+        await childPeer.request('session/resume', {
           sessionId: job.subagentSessionId,
+          cwd: subagentWorkDir,
+          mcpServers: [],
         });
       } else {
         // New session - thread persona through so subagent's system prompt
@@ -672,13 +678,9 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         // inside the child's container, so use the persona's declared
         // runtime.workingDirectory instead. Native subagents share the
         // parent's filesystem and continue using the parent workDir.
-        const subagentWorkDir = job.personaContainerRuntime
-          ? job.personaContainerRuntime.workingDirectory
-          : job.personaBoxRuntime
-            ? job.personaBoxRuntime.workingDirectory
-            : currentState.activeSession!.meta.workDir;
         const created = (await childPeer.request('session/new', {
-          workDir: subagentWorkDir,
+          cwd: subagentWorkDir,
+          mcpServers: [],
           ...(job.persona ? { persona: job.persona } : {}),
         })) as { sessionId: string };
         job.subagentSessionId = created.sessionId;

@@ -4,11 +4,9 @@ import { randomUUID } from 'node:crypto';
 import {
   AcpErrorCodes,
   EntErrorCodes,
-  McpServerConfigSchema,
   type JsonRpcPeer,
   type ContextBreakdown,
   type ThreadTokenUsage,
-  type McpServerConfig,
 } from '@lace/ent-protocol';
 import {
   readSessionState,
@@ -42,6 +40,7 @@ import {
 import { compactDroppedMessagesWithCore } from '../../compaction/compact-dropped-messages';
 import { createProviderForTurn } from '../../providers/turn-factory';
 import { getEffectiveConfig } from '@lace/agent/core/session';
+import { mergeMcpServers } from '../session-config';
 
 /**
  * Compute context breakdown for the active session
@@ -305,44 +304,7 @@ export function registerSessionOperationHandlers(
     }
 
     if (parsed.mcpServers !== undefined) {
-      const mcpParsed = McpServerConfigSchema.array().safeParse(parsed.mcpServers);
-      if (!mcpParsed.success) {
-        throwInvalidParams('mcpServers is invalid');
-      }
-
-      for (const server of mcpParsed.data) {
-        if (server.transport && server.transport !== 'stdio') {
-          throwInvalidParams(`Unsupported MCP transport for ${server.name}: ${server.transport}`);
-        }
-      }
-
-      const configWithServers = currentConfig as { mcpServers?: unknown };
-      const existing = Array.isArray(configWithServers.mcpServers)
-        ? McpServerConfigSchema.array().safeParse(configWithServers.mcpServers)
-        : { success: true as const, data: [] as McpServerConfig[] };
-      const existingServers = existing.success ? existing.data : [];
-
-      const incomingByName = new Map(mcpParsed.data.map((s) => [s.name, s]));
-      const merged: McpServerConfig[] = [];
-      const seen = new Set<string>();
-
-      for (const oldServer of existingServers) {
-        const incoming = incomingByName.get(oldServer.name);
-        if (incoming) {
-          merged.push({ ...oldServer, ...incoming });
-          seen.add(oldServer.name);
-        } else {
-          merged.push(oldServer);
-          seen.add(oldServer.name);
-        }
-      }
-
-      for (const server of mcpParsed.data) {
-        if (seen.has(server.name)) continue;
-        merged.push(server);
-      }
-
-      (nextConfig as { mcpServers?: McpServerConfig[] }).mcpServers = merged;
+      nextConfig.mcpServers = mergeMcpServers(currentConfig.mcpServers, parsed.mcpServers);
       applied.push('mcpServers');
     }
 

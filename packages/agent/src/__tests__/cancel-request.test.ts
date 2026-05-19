@@ -1,5 +1,5 @@
-// ABOUTME: Tests for $/cancel_request notification - verifies ACP-compliant cancellation
-// ABOUTME: Ensures session/cancel is removed and -32800 error code is defined
+// ABOUTME: Tests for ACP session cancellation and close lifecycle handling.
+// ABOUTME: Ensures cancellation remains mapped to the JSON-RPC cancellation error code.
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { PassThrough } from 'node:stream';
@@ -28,7 +28,7 @@ function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   return { client, server };
 }
 
-describe('$/cancel_request notification', () => {
+describe('ACP session cancellation', () => {
   let originalLaceDir: string | undefined;
   let tempDir: string;
 
@@ -45,20 +45,29 @@ describe('$/cancel_request notification', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('accepts $/cancel_request notification', async () => {
+  it('aborts the active turn on session/cancel notification', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
     await client.request('initialize', defaultInitializeParams());
-    await client.request('session/new', { workDir: process.cwd() });
+    const created = (await client.request('session/new', {
+      cwd: process.cwd(),
+      mcpServers: [],
+    })) as { sessionId: string };
 
-    // Send a $/cancel_request notification (notifications don't expect a response)
-    client.notify('$/cancel_request', { requestId: 'test-request-123' });
+    const abortController = new AbortController();
+    state.activeTurn = {
+      turnId: 'turn_test',
+      startedAt: new Date().toISOString(),
+      status: 'running',
+      abortController,
+    };
 
-    // Give it a moment to process
+    client.notify('session/cancel', { sessionId: created.sessionId });
+
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // Verify server is still responsive
+    expect(abortController.signal.aborted).toBe(true);
     const ping = await client.request('ent/agent/ping');
     expect(ping).toMatchObject({ ok: true, timestamp: expect.any(String) });
 
@@ -66,15 +75,30 @@ describe('$/cancel_request notification', () => {
     server.close();
   });
 
-  it('rejects session/cancel as an unknown method', async () => {
+  it('closes the active session and aborts its active turn', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
     await client.request('initialize', defaultInitializeParams());
-    await client.request('session/new', { workDir: process.cwd() });
+    const created = (await client.request('session/new', {
+      cwd: process.cwd(),
+      mcpServers: [],
+    })) as { sessionId: string };
 
-    // session/cancel should no longer be supported - it's been replaced by $/cancel_request
-    await expect(client.request('session/cancel', {})).rejects.toThrow();
+    const abortController = new AbortController();
+    state.activeTurn = {
+      turnId: 'turn_test',
+      startedAt: new Date().toISOString(),
+      status: 'running',
+      abortController,
+    };
+
+    const result = await client.request('session/close', { sessionId: created.sessionId });
+
+    expect(result).toEqual({});
+    expect(abortController.signal.aborted).toBe(true);
+    expect(state.activeTurn).toBeNull();
+    expect(state.activeSession).toBeNull();
 
     client.close();
     server.close();

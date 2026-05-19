@@ -8,6 +8,7 @@ import {
   SessionForkParamsSchema,
   isSessionId,
   type JsonRpcPeer,
+  type McpServerConfig,
 } from '@lace/ent-protocol';
 import {
   ensureSessionFiles,
@@ -17,6 +18,7 @@ import {
   readSessionState,
   writeSessionMeta,
   writeSessionState,
+  type LoadedSession,
   type SessionState,
 } from '../../storage/session-store';
 import { SessionStorageError } from '../../errors/agent-errors';
@@ -35,14 +37,124 @@ import { killAllRunningJobs } from '../../jobs';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { PersonaNotFoundError, PersonaParseError } from '../../config/persona-registry';
 import { LACE_BUILTIN_TOOL_NAMES } from '../../tools/executor';
+import { mergeMcpServers } from '../session-config';
+
+type SessionRestoreParams = {
+  sessionId: string;
+  cwd: string;
+  mcpServers: McpServerConfig[];
+};
+
+function assertSessionIdParam(sessionId: unknown): asserts sessionId is string {
+  if (!sessionId) throwInvalidParams('sessionId is required');
+  if (typeof sessionId !== 'string' || !isSessionId(sessionId)) {
+    throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+  }
+}
+
+function parseSessionRestoreParams(params: unknown): SessionRestoreParams {
+  const parsed = params as Partial<SessionRestoreParams> | undefined;
+  assertSessionIdParam(parsed?.sessionId);
+  if (!parsed?.cwd) throwInvalidParams('cwd is required');
+  if (!Array.isArray(parsed.mcpServers)) throwInvalidParams('mcpServers is required');
+  return {
+    sessionId: parsed.sessionId,
+    cwd: parsed.cwd,
+    mcpServers: parsed.mcpServers,
+  };
+}
+
+function rehydrateServerConfigFromSession(
+  state: AgentServerState,
+  sessionState: SessionState
+): void {
+  const loadedConfig = sessionState.config;
+  if (loadedConfig?.connectionId) {
+    state.config.connectionId = loadedConfig.connectionId;
+  }
+  if (loadedConfig?.modelId) {
+    state.config.modelId = loadedConfig.modelId;
+  }
+}
+
+function applyMcpServersToActiveSession(state: AgentServerState, mcpServers: unknown): void {
+  if (!state.activeSession) return;
+  const currentState = readSessionState(state.activeSession.dir);
+  const currentConfig = currentState.config ?? {};
+  const nextState: SessionState = {
+    ...currentState,
+    config: {
+      ...currentConfig,
+      mcpServers: mergeMcpServers(currentConfig.mcpServers, mcpServers),
+    },
+  };
+  writeSessionState(state.activeSession.dir, nextState);
+  state.activeSession = { ...state.activeSession, state: nextState };
+}
+
+function abortActiveTurn(state: AgentServerState): void {
+  if (state.activeTurn) {
+    state.activeTurn.abortController.abort();
+  }
+}
+
+async function activateStoredSession(
+  state: AgentServerState,
+  params: SessionRestoreParams,
+  reissuePendingPermissionRequests: () => Promise<void>
+): Promise<LoadedSession> {
+  if (state.activeTurn) {
+    throw {
+      code: AcpErrorCodes.SessionBusy,
+      message: 'SessionBusy',
+      data: { category: 'session' },
+    };
+  }
+
+  const switchingSessions =
+    state.activeSession && state.activeSession.meta.sessionId !== params.sessionId;
+  if (switchingSessions) {
+    await killAllRunningJobs(state.jobManager.getRunningJobs());
+    state.pendingPermissionRequests.clear();
+    state.jobManager.clearJobs();
+  }
+
+  let loaded;
+  try {
+    loaded = loadSession(params.sessionId);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Session not found') {
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
+    }
+    throw error;
+  }
+  if (loaded.meta.workDir !== params.cwd) {
+    writeSessionMeta(loaded.dir, { ...loaded.meta, workDir: params.cwd });
+    loaded = loadSession(params.sessionId);
+  }
+  state.activeSession = loaded;
+
+  applyMcpServersToActiveSession(state, params.mcpServers);
+  rehydrateServerConfigFromSession(state, state.activeSession.state);
+
+  await reconcileMcpServersForActiveSession(state);
+  await reissuePendingPermissionRequests();
+  return state.activeSession;
+}
 
 /**
  * Register session lifecycle handlers with the peer.
  * - session/new: Create a new session
  * - session/list: List all available sessions
  * - session/load: Load an existing session
+ * - session/resume: Reconnect to an existing session without replaying history
+ * - session/close: Release an active session
  * - session/fork: Create a fork of an existing session
- * - $/cancel_request: Cancel active operations
+ * - session/cancel: Cancel active operations
  * - session/set_mode: Change execution mode (plan/execute)
  */
 export function registerSessionHandlers(
@@ -67,25 +179,25 @@ export function registerSessionHandlers(
     state.jobManager.clearJobs();
 
     const parsed = params as {
-      workDir: string;
+      cwd: string;
+      mcpServers?: Array<{
+        name: string;
+        command: string;
+        args?: string[];
+        env?: Record<string, string>;
+        transport?: 'stdio' | 'sse' | 'http';
+        enabled?: boolean;
+        tools?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
+      }>;
       persona?: string;
       systemPrompt?: unknown;
       config?: {
         connectionId?: string;
         modelId?: string;
         persona?: string;
-        mcpServers?: Array<{
-          name: string;
-          command: string;
-          args?: string[];
-          env?: Record<string, string>;
-          transport?: 'stdio' | 'sse' | 'http';
-          enabled?: boolean;
-          tools?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
-        }>;
       };
     };
-    if (!parsed?.workDir) throwInvalidParams('workDir is required');
+    if (!parsed?.cwd) throwInvalidParams('cwd is required');
 
     // Persona may arrive top-level (subagent/delegate path) or nested under config.
     const requestedPersona =
@@ -151,7 +263,7 @@ export function registerSessionHandlers(
       toNonEmptyString(parsed.config?.modelId) ?? personaDefaults.modelId ?? state.config.modelId;
     const effectiveConnectionId =
       toNonEmptyString(parsed.config?.connectionId) ?? state.config.connectionId;
-    const effectiveMcpServers = parsed.config?.mcpServers ?? personaDefaults.mcpServers;
+    const effectiveMcpServers = parsed.mcpServers ?? personaDefaults.mcpServers;
     const effectiveToolScope = personaDefaults.toolScope;
 
     const sessionId = `sess_${randomUUID()}`;
@@ -160,7 +272,7 @@ export function registerSessionHandlers(
     let sessionDir: string;
     try {
       sessionDir = getSessionDir(sessionId);
-      writeSessionMeta(sessionDir, { sessionId, workDir: parsed.workDir, created });
+      writeSessionMeta(sessionDir, { sessionId, workDir: parsed.cwd, created });
       writeSessionState(sessionDir, {
         nextEventSeq: 1,
         nextStreamSeq: 1,
@@ -198,7 +310,7 @@ export function registerSessionHandlers(
 
     // Create skill registry for this session. Embedder-supplied skillDirs
     // (set during initialize) override the default workDir-based discovery.
-    const skillDirs = state.skillDirs ?? getSkillDirectories(parsed.workDir);
+    const skillDirs = state.skillDirs ?? getSkillDirectories(parsed.cwd);
     const skillRegistry = new SkillRegistry({ skillDirs });
 
     // Get available tools for system prompt context
@@ -213,7 +325,7 @@ export function registerSessionHandlers(
     const tools = toolsForProvider.map((t) => ({ name: t.name, description: t.description }));
 
     // Create session context for working directory
-    const sessionContext = { getWorkingDirectory: () => parsed.workDir };
+    const sessionContext = { getWorkingDirectory: () => parsed.cwd };
 
     const promptConfig = await loadPromptConfig({
       persona,
@@ -248,7 +360,6 @@ export function registerSessionHandlers(
     return { sessionId, created };
   });
 
-  // ACP-aligned: cwd instead of workDir
   peer.onRequest('session/list', async (params: unknown) => {
     assertInitialized(state);
 
@@ -262,66 +373,22 @@ export function registerSessionHandlers(
   peer.onRequest('session/load', async (params: unknown) => {
     assertInitialized(state);
 
-    const parsed = params as { sessionId: string };
-    if (!parsed?.sessionId) throwInvalidParams('sessionId is required');
-    if (!isSessionId(parsed.sessionId)) {
-      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
-    }
-
-    if (state.activeTurn) {
-      throw {
-        code: AcpErrorCodes.SessionBusy,
-        message: 'SessionBusy',
-        data: { category: 'session' },
-      };
-    }
-
-    const switchingSessions =
-      state.activeSession && state.activeSession.meta.sessionId !== parsed.sessionId;
-    if (switchingSessions) {
-      // Kill all running jobs before switching sessions
-      await killAllRunningJobs(state.jobManager.getRunningJobs());
-      state.pendingPermissionRequests.clear();
-      state.jobManager.clearJobs();
-    }
-
-    let loaded;
-    try {
-      loaded = loadSession(parsed.sessionId);
-    } catch (error) {
-      if (error instanceof Error && error.message === 'Session not found') {
-        throw {
-          code: AcpErrorCodes.SessionNotFound,
-          message: 'SessionNotFound',
-          data: { category: 'session' },
-        };
-      }
-      throw error;
-    }
-    state.activeSession = loaded;
-
-    // Rehydrate state.config from the persisted session's config so the next
-    // session/prompt works without an intervening ent/session/configure call.
-    // Without this, embedders see "connectionId and modelId are required
-    // before prompting" from the turn factory even though the loaded session
-    // was originally created with those values.
-    const loadedConfig = loaded.state.config;
-    if (loadedConfig?.connectionId) {
-      state.config.connectionId = loadedConfig.connectionId;
-    }
-    if (loadedConfig?.modelId) {
-      state.config.modelId = loadedConfig.modelId;
-    }
-
-    await reconcileMcpServersForActiveSession(state);
-    await reissuePendingPermissionRequests();
+    const parsed = parseSessionRestoreParams(params);
+    const loaded = await activateStoredSession(state, parsed, reissuePendingPermissionRequests);
     const summary = summarizeDurableEvents(loaded.dir);
-    // ACP-aligned: lastActive renamed to updatedAt
     return {
       sessionId: parsed.sessionId,
       messageCount: summary.messageCount,
       updatedAt: summary.lastActive ?? loaded.meta.created,
     };
+  });
+
+  peer.onRequest('session/resume', async (params: unknown) => {
+    assertInitialized(state);
+
+    const parsed = parseSessionRestoreParams(params);
+    await activateStoredSession(state, parsed, reissuePendingPermissionRequests);
+    return {};
   });
 
   peer.onRequest('session/fork', async (params: unknown) => {
@@ -396,19 +463,42 @@ export function registerSessionHandlers(
     };
   });
 
-  peer.onRequest('$/cancel_request', async (_params: unknown) => {
+  peer.onRequest('session/close', async (params: unknown) => {
     assertInitialized(state);
 
-    // Auto-cascade: send $/cancel_request for all pending permission requests
-    for (const [, permission] of state.pendingPermissionRequests) {
-      peer.notify('$/cancel_request', { requestId: permission.rpcId });
+    const parsed = params as { sessionId?: unknown } | undefined;
+    assertSessionIdParam(parsed?.sessionId);
+    if (!state.activeSession || state.activeSession.meta.sessionId !== parsed.sessionId) {
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
     }
 
-    // Abort the active turn if one is running
-    if (state.activeTurn) {
-      state.activeTurn.abortController.abort();
+    abortActiveTurn(state);
+    await killAllRunningJobs(state.jobManager.getRunningJobs());
+    state.pendingPermissionRequests.clear();
+    state.jobManager.clearJobs();
+    state.toolExecutorCache.clear();
+    state.activeTurn = null;
+    state.activeSession = null;
+
+    return {};
+  });
+
+  peer.onRequest('session/cancel', async (params: unknown) => {
+    assertInitialized(state);
+
+    const parsed = params as { sessionId?: unknown } | undefined;
+    if (!parsed?.sessionId || typeof parsed.sessionId !== 'string') {
+      return undefined;
+    }
+    if (state.activeSession?.meta.sessionId !== parsed.sessionId) {
+      return undefined;
     }
 
+    abortActiveTurn(state);
     return undefined;
   });
 

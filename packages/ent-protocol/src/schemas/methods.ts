@@ -52,6 +52,7 @@ const AgentCapabilitiesSchema = z
       .object({
         fork: z.object({}).optional(),
         resume: z.object({}).optional(),
+        close: z.object({}).optional(),
       })
       .strict()
       .optional(),
@@ -180,7 +181,8 @@ export const InitializeResponseSchema = z
 
 const SessionNewParamsSchema = z
   .object({
-    workDir: NonEmptyStringSchema,
+    cwd: NonEmptyStringSchema,
+    mcpServers: z.array(McpServerConfigSchema).optional(),
     persona: NonEmptyStringSchema.optional(),
     systemPrompt: z
       .union([
@@ -201,7 +203,6 @@ const SessionNewParamsSchema = z
         connectionId: NonEmptyStringSchema.optional(),
         modelId: NonEmptyStringSchema.optional(),
         persona: NonEmptyStringSchema.optional(),
-        mcpServers: z.array(McpServerConfigSchema).optional(),
       })
       .strict()
       .optional(),
@@ -235,10 +236,11 @@ export const SessionNewResponseSchema = z
 const SessionLoadParamsSchema = z
   .object({
     sessionId: SessionIdSchema,
+    cwd: NonEmptyStringSchema,
+    mcpServers: z.array(McpServerConfigSchema),
   })
   .strict();
 
-// ACP-aligned: lastActive renamed to updatedAt
 const SessionLoadResultSchema = z
   .object({
     sessionId: SessionIdSchema,
@@ -261,6 +263,58 @@ export const SessionLoadResponseSchema = z
     jsonrpc: JsonRpcVersionSchema,
     id: JsonRpcIdSchema,
     result: SessionLoadResultSchema,
+  })
+  .strict();
+
+const SessionResumeParamsSchema = z
+  .object({
+    sessionId: SessionIdSchema,
+    cwd: NonEmptyStringSchema,
+    mcpServers: z.array(McpServerConfigSchema),
+  })
+  .strict();
+
+const SessionResumeResultSchema = z.object({}).strict();
+
+export const SessionResumeRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('session/resume'),
+    params: SessionResumeParamsSchema,
+  })
+  .strict();
+
+export const SessionResumeResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: SessionResumeResultSchema,
+  })
+  .strict();
+
+const SessionCloseParamsSchema = z
+  .object({
+    sessionId: SessionIdSchema,
+  })
+  .strict();
+
+const SessionCloseResultSchema = z.object({}).strict();
+
+export const SessionCloseRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('session/close'),
+    params: SessionCloseParamsSchema,
+  })
+  .strict();
+
+export const SessionCloseResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: SessionCloseResultSchema,
   })
   .strict();
 
@@ -298,7 +352,6 @@ export const SessionForkResponseSchema = z
   })
   .strict();
 
-// ACP-aligned: workDir renamed to cwd, added cursor for pagination
 const SessionListParamsSchema = z
   .object({
     cwd: NonEmptyStringSchema.optional(),
@@ -306,7 +359,6 @@ const SessionListParamsSchema = z
   })
   .strict();
 
-// ACP-aligned: workDir→cwd, lastActive→updatedAt, added title/_meta/nextCursor
 const SessionListResultSchema = z
   .object({
     sessions: z.array(
@@ -430,17 +482,17 @@ export const SessionPromptResponseSchema = z
   })
   .strict();
 
-const CancelRequestParamsSchema = z
+const SessionCancelParamsSchema = z
   .object({
-    requestId: JsonRpcIdSchema,
+    sessionId: SessionIdSchema,
   })
   .strict();
 
-export const CancelRequestNotificationSchema = z
+export const SessionCancelNotificationSchema = z
   .object({
     jsonrpc: JsonRpcVersionSchema,
-    method: z.literal('$/cancel_request'),
-    params: CancelRequestParamsSchema,
+    method: z.literal('session/cancel'),
+    params: SessionCancelParamsSchema,
   })
   .strict();
 
@@ -2014,6 +2066,8 @@ export const EntProtocolRequestSchema = z.union([
   InitializeRequestSchema,
   SessionNewRequestSchema,
   SessionLoadRequestSchema,
+  SessionResumeRequestSchema,
+  SessionCloseRequestSchema,
   SessionForkRequestSchema,
   SessionListRequestSchema,
   SessionSetModeRequestSchema,
@@ -2053,7 +2107,7 @@ export const EntProtocolRequestSchema = z.union([
 ]);
 
 export const EntProtocolNotificationSchema = z.union([
-  CancelRequestNotificationSchema,
+  SessionCancelNotificationSchema,
   EntSessionInjectNotificationSchema,
   EntJobInjectNotificationSchema,
   SessionUpdateNotificationSchema,

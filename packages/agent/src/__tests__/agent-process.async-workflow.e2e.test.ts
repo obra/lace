@@ -45,7 +45,7 @@ describe('async job workflow (E2E)', () => {
       );
 
       await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       );
@@ -137,7 +137,7 @@ describe('async job workflow (E2E)', () => {
       );
 
       await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       );
@@ -249,7 +249,7 @@ describe('async job workflow (E2E)', () => {
       );
 
       await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       );
@@ -320,7 +320,7 @@ describe('async job workflow (E2E)', () => {
     );
 
     const created = (await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     )) as { sessionId: string };
@@ -375,7 +375,7 @@ describe('async job workflow (E2E)', () => {
     );
 
     await withTimeout(
-      ctx.agent.peer.request('session/load', { sessionId }),
+      ctx.agent.peer.request('session/load', { sessionId, cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/load (restart)'
     );
@@ -431,7 +431,7 @@ describe('async job workflow (E2E)', () => {
     );
 
     await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     );
@@ -515,7 +515,7 @@ describe('async job workflow (E2E)', () => {
 
     // Create first session and start a long-running job
     const session1 = (await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new (1)'
     )) as { sessionId: string };
@@ -545,14 +545,18 @@ describe('async job workflow (E2E)', () => {
 
     // Switch to a new session
     await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new (2)'
     );
 
     // Load back the first session and check job status
     await withTimeout(
-      ctx.agent.peer.request('session/load', { sessionId: session1Id }),
+      ctx.agent.peer.request('session/load', {
+        sessionId: session1Id,
+        cwd: ctx.workDir,
+        mcpServers: [],
+      }),
       2_000,
       'session/load'
     );
@@ -599,7 +603,7 @@ describe('async job workflow (E2E)', () => {
       );
 
       await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       );
@@ -697,7 +701,7 @@ describe('async job workflow (E2E)', () => {
     );
 
     await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     );
@@ -801,7 +805,7 @@ describe('async job workflow (E2E)', () => {
       );
 
       await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       );

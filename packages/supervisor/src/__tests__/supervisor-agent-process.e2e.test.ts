@@ -58,7 +58,7 @@ describe('SupervisorAgentProcess (E2E)', () => {
       'initialize'
     );
     await withTimeout(
-      supervisor.peer.request('session/new', { workDir: ctx.workDir }),
+      supervisor.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     );

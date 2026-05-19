@@ -67,7 +67,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
 
       const created = (await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       )) as { sessionId: string };
@@ -127,7 +127,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
 
       const list = (await withTimeout(
-        ctx.agent.peer.request('session/list', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/list', { cwd: ctx.workDir }),
         2_000,
         'session/list'
       )) as { sessions: Array<{ sessionId: string }> };
@@ -145,7 +145,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     );
 
     const created = (await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     )) as { sessionId: string };
@@ -171,7 +171,11 @@ describe('lace-agent process (E2E over stdio)', () => {
     );
 
     await withTimeout(
-      ctx.agent.peer.request('session/load', { sessionId: created.sessionId }),
+      ctx.agent.peer.request('session/load', {
+        sessionId: created.sessionId,
+        cwd: ctx.workDir,
+        mcpServers: [],
+      }),
       2_000,
       'session/load (restart)'
     );
@@ -207,7 +211,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       'initialize'
     );
     await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     );
@@ -257,7 +261,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
 
       await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       );
@@ -356,7 +360,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
 
       await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       );
@@ -426,7 +430,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
 
       const created = (await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       )) as { sessionId: string };
@@ -507,7 +511,11 @@ describe('lace-agent process (E2E over stdio)', () => {
         'initialize (restart)'
       );
       await withTimeout(
-        ctx.agent.peer.request('session/load', { sessionId: created.sessionId }),
+        ctx.agent.peer.request('session/load', {
+          sessionId: created.sessionId,
+          cwd: ctx.workDir,
+          mcpServers: [],
+        }),
         2_000,
         'session/load (restart)'
       );
@@ -586,7 +594,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     );
 
     await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     );
@@ -632,7 +640,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       'initialize'
     );
     await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     );
@@ -690,13 +698,13 @@ describe('lace-agent process (E2E over stdio)', () => {
       'initialize'
     );
 
-    await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+    const created = (await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
-    );
+    )) as { sessionId: string };
 
-    const { requestId, result: promptPromise } = ctx.agent.peer.requestWithId('session/prompt', {
+    const { result: promptPromise } = ctx.agent.peer.requestWithId('session/prompt', {
       content: [{ type: 'text', text: 'run: echo will-not-run' }],
     });
 
@@ -713,7 +721,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       'permission request received'
     );
 
-    ctx.agent.peer.notify('$/cancel_request', { requestId });
+    ctx.agent.peer.notify('session/cancel', { sessionId: created.sessionId });
 
     const cancelled = (await withTimeout(promptPromise, 5_000, 'prompt cancelled')) as {
       stopReason: string;
@@ -761,7 +769,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       'initialize'
     );
     await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     );
@@ -818,7 +826,7 @@ describe('lace-agent process (E2E over stdio)', () => {
         'initialize'
       );
       await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       );
@@ -852,7 +860,7 @@ describe('lace-agent process (E2E over stdio)', () => {
         'initialize'
       );
       await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       );
@@ -905,7 +913,7 @@ describe('lace-agent process (E2E over stdio)', () => {
         'initialize'
       );
       await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       );

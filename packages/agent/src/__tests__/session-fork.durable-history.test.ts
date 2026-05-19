@@ -54,7 +54,10 @@ describe('session/fork durable history', () => {
     try {
       await client.request('initialize', defaultInitializeParams());
 
-      const created = (await client.request('session/new', { workDir: process.cwd() })) as any;
+      const created = (await client.request('session/new', {
+        cwd: process.cwd(),
+        mcpServers: [],
+      })) as any;
       expect(created).toMatchObject({ sessionId: expect.any(String), created: expect.any(String) });
 
       // Create enough durable events to exceed readDurableEvents default limit (100).
@@ -88,7 +91,11 @@ describe('session/fork durable history', () => {
         forkedFrom: created.sessionId,
       });
 
-      await client.request('session/load', { sessionId: forked.sessionId });
+      await client.request('session/load', {
+        sessionId: forked.sessionId,
+        cwd: process.cwd(),
+        mcpServers: [],
+      });
       const forkedEventsResult = (await client.request('ent/session/events', {
         afterEventSeq: 0,
         limit: 2000,

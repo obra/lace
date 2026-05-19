@@ -1,5 +1,5 @@
 // ABOUTME: E2E tests for agent abort handling during various operation phases.
-// ABOUTME: Validates that $/cancel_request works reliably during streaming, tool execution, and permission waits.
+// ABOUTME: Validates session/cancel during streaming, tool execution, and permission waits.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { writeFileSync } from 'node:fs';
@@ -38,20 +38,20 @@ describe('agent abort reliability (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+    const created = (await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
-    );
+    )) as { sessionId: string };
 
     // Start a prompt (will be delayed by streaming delay)
-    const { requestId, result: promptPromise } = ctx.agent.peer.requestWithId('session/prompt', {
+    const { result: promptPromise } = ctx.agent.peer.requestWithId('session/prompt', {
       content: [{ type: 'text', text: 'hello' }],
     });
 
     // Wait a bit for the turn to start, then cancel
     await new Promise((resolve) => setTimeout(resolve, 200));
-    ctx.agent.peer.notify('$/cancel_request', { requestId });
+    ctx.agent.peer.notify('session/cancel', { sessionId: created.sessionId });
 
     // Turn should end with cancelled status
     const result = (await withTimeout(promptPromise, 10_000, 'prompt')) as {
@@ -111,14 +111,14 @@ describe('agent abort reliability (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+    const created = (await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
-    );
+    )) as { sessionId: string };
 
     // Start a prompt that will run a slow bash command
-    const { requestId, result: promptPromise } = ctx.agent.peer.requestWithId('session/prompt', {
+    const { result: promptPromise } = ctx.agent.peer.requestWithId('session/prompt', {
       content: [{ type: 'text', text: 'run: sleep 10' }],
     });
 
@@ -141,7 +141,7 @@ describe('agent abort reliability (E2E)', () => {
     );
 
     // Cancel during tool execution
-    ctx.agent.peer.notify('$/cancel_request', { requestId });
+    ctx.agent.peer.notify('session/cancel', { sessionId: created.sessionId });
 
     // Turn should end with cancelled status
     const result = (await withTimeout(promptPromise, 10_000, 'prompt')) as {
@@ -194,14 +194,14 @@ describe('agent abort reliability (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+    const created = (await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
-    );
+    )) as { sessionId: string };
 
     // Start a prompt that requires permission
-    const { requestId, result: promptPromise } = ctx.agent.peer.requestWithId('session/prompt', {
+    const { result: promptPromise } = ctx.agent.peer.requestWithId('session/prompt', {
       content: [{ type: 'text', text: 'run: echo test' }],
     });
 
@@ -220,7 +220,7 @@ describe('agent abort reliability (E2E)', () => {
     );
 
     // Send cancel instead of approval
-    ctx.agent.peer.notify('$/cancel_request', { requestId });
+    ctx.agent.peer.notify('session/cancel', { sessionId: created.sessionId });
 
     // Turn should end with cancelled status
     const result = (await withTimeout(promptPromise, 5_000, 'prompt')) as {
@@ -257,11 +257,11 @@ describe('agent abort reliability (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+    const created = (await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
-    );
+    )) as { sessionId: string };
 
     // Verify no turn is active
     const beforeStatus = (await withTimeout(
@@ -273,7 +273,7 @@ describe('agent abort reliability (E2E)', () => {
     expect(beforeStatus.currentTurn).toBeUndefined();
 
     // Send cancel when idle - should be a no-op
-    ctx.agent.peer.notify('$/cancel_request', { requestId: 'cancel-turn' });
+    ctx.agent.peer.notify('session/cancel', { sessionId: created.sessionId });
 
     // Give it a moment to process
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -322,22 +322,19 @@ describe('agent abort reliability (E2E)', () => {
       'initialize'
     );
 
-    await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+    const created = (await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
-    );
+    )) as { sessionId: string };
 
     // First turn - abort it
-    const { requestId, result: firstPromptPromise } = ctx.agent.peer.requestWithId(
-      'session/prompt',
-      {
-        content: [{ type: 'text', text: 'first message' }],
-      }
-    );
+    const { result: firstPromptPromise } = ctx.agent.peer.requestWithId('session/prompt', {
+      content: [{ type: 'text', text: 'first message' }],
+    });
 
     await new Promise((resolve) => setTimeout(resolve, 200));
-    ctx.agent.peer.notify('$/cancel_request', { requestId });
+    ctx.agent.peer.notify('session/cancel', { sessionId: created.sessionId });
 
     const firstResult = (await withTimeout(firstPromptPromise, 10_000, 'first prompt')) as {
       stopReason: string;
@@ -368,7 +365,7 @@ describe('agent abort reliability (E2E)', () => {
 
     // Load the same session
     const list = (await withTimeout(
-      ctx.agent.peer.request('session/list', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/list', { cwd: ctx.workDir }),
       2_000,
       'session/list'
     )) as { sessions: Array<{ sessionId: string }> };
@@ -376,7 +373,11 @@ describe('agent abort reliability (E2E)', () => {
     expect(list.sessions.length).toBeGreaterThan(0);
     const sessionId = list.sessions[0]!.sessionId;
 
-    await withTimeout(ctx.agent.peer.request('session/load', { sessionId }), 2_000, 'session/load');
+    await withTimeout(
+      ctx.agent.peer.request('session/load', { sessionId, cwd: ctx.workDir, mcpServers: [] }),
+      2_000,
+      'session/load'
+    );
 
     // Create a file for the second turn to read
     writeFileSync(join(ctx.workDir, 'test.txt'), 'hello world\n', 'utf8');

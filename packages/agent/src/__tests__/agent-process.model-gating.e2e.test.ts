@@ -47,7 +47,7 @@ describe('ent/models enable/disable (provider-global gating)', () => {
     );
 
     await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     );

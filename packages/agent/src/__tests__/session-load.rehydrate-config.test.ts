@@ -51,7 +51,8 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       })
     );
     const created = (await setupClient.request('session/new', {
-      workDir: tempDir,
+      cwd: tempDir,
+      mcpServers: [{ name: 'initial', command: process.execPath, enabled: false }],
     })) as { sessionId: string };
 
     // Step 2: simulate a process restart. New state, new initialize. Embedder
@@ -63,7 +64,11 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     );
 
     await loadClient.request('initialize', defaultInitializeParams());
-    await loadClient.request('session/load', { sessionId: created.sessionId });
+    await loadClient.request('session/load', {
+      sessionId: created.sessionId,
+      cwd: tempDir,
+      mcpServers: [{ name: 'loaded', command: process.execPath, enabled: false }],
+    });
 
     // Step 3: after load, the persisted connectionId+modelId must be
     // rehydrated into state.config. Prompting depends on this — the
@@ -75,5 +80,54 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     expect(loadState.activeSession?.state.config?.modelId).toBe('model_test');
     expect(loadState.config.connectionId).toBe('conn_test');
     expect(loadState.config.modelId).toBe('model_test');
+    expect(loadState.activeSession?.state.config?.mcpServers).toEqual([
+      { name: 'initial', command: process.execPath, enabled: false },
+      { name: 'loaded', command: process.execPath, enabled: false },
+    ]);
+  });
+
+  it('resumes a session without replaying history and reapplies session MCP servers', async () => {
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+
+    await setupClient.request(
+      'initialize',
+      defaultInitializeParams({
+        config: { connectionId: 'conn_test', modelId: 'model_test' },
+      })
+    );
+    const created = (await setupClient.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [{ name: 'shared', command: process.execPath, args: ['old'], enabled: false }],
+    })) as { sessionId: string };
+
+    const resumeState = createAgentServerState();
+    const { client: resumeClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, resumeState)
+    );
+    const updates: unknown[] = [];
+    resumeClient.onRequest('session/update', (params) => {
+      updates.push(params);
+      return undefined;
+    });
+
+    await resumeClient.request('initialize', defaultInitializeParams());
+    const result = await resumeClient.request('session/resume', {
+      sessionId: created.sessionId,
+      cwd: tempDir,
+      mcpServers: [{ name: 'shared', command: process.execPath, args: ['new'], enabled: false }],
+    });
+
+    expect(result).toEqual({});
+    expect(updates).toEqual([]);
+    expect(resumeState.activeSession?.state.config?.connectionId).toBe('conn_test');
+    expect(resumeState.activeSession?.state.config?.modelId).toBe('model_test');
+    expect(resumeState.config.connectionId).toBe('conn_test');
+    expect(resumeState.config.modelId).toBe('model_test');
+    expect(resumeState.activeSession?.state.config?.mcpServers).toEqual([
+      { name: 'shared', command: process.execPath, args: ['new'], enabled: false },
+    ]);
   });
 });

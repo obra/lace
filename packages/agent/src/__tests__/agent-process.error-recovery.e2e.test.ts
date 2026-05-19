@@ -37,7 +37,7 @@ describe('lace-agent error recovery (E2E)', () => {
       );
 
       await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       );
@@ -124,7 +124,7 @@ describe('lace-agent error recovery (E2E)', () => {
     );
 
     await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     );
@@ -209,7 +209,7 @@ describe('lace-agent error recovery (E2E)', () => {
       );
 
       await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       );

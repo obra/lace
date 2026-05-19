@@ -84,7 +84,8 @@ You are a frontmatter persona.`
     );
 
     const created = (await client.request('session/new', {
-      workDir: tempDir,
+      cwd: tempDir,
+      mcpServers: [],
       persona: 'frontmatter',
     })) as { sessionId: string };
 
@@ -112,7 +113,8 @@ You are a frontmatter persona.`
     );
 
     const created = (await client.request('session/new', {
-      workDir: tempDir,
+      cwd: tempDir,
+      mcpServers: [],
       persona: 'bodyonly',
     })) as { sessionId: string };
 
@@ -140,7 +142,8 @@ persona body`
     );
 
     const created = (await client.request('session/new', {
-      workDir: tempDir,
+      cwd: tempDir,
+      mcpServers: [],
       persona: 'modelpersona',
       config: { modelId: 'request-wins-model' },
     })) as { sessionId: string };
@@ -159,7 +162,7 @@ persona body`
     );
 
     await expect(
-      client.request('session/new', { workDir: tempDir, persona: 'does-not-exist' })
+      client.request('session/new', { cwd: tempDir, mcpServers: [], persona: 'does-not-exist' })
     ).rejects.toMatchObject({
       message: expect.stringContaining('does-not-exist'),
     });
@@ -184,7 +187,8 @@ scoped persona`
     );
 
     const created = (await client.request('session/new', {
-      workDir: tempDir,
+      cwd: tempDir,
+      mcpServers: [],
       persona: 'scoped',
     })) as { sessionId: string };
 
@@ -219,7 +223,8 @@ mcp-only persona`
     );
 
     const created = (await client.request('session/new', {
-      workDir: tempDir,
+      cwd: tempDir,
+      mcpServers: [],
       persona: 'mcponly',
     })) as { sessionId: string };
 

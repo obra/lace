@@ -114,10 +114,58 @@ describe('protocol shapes (representative examples)', () => {
         id: 'c_2',
         method: 'session/new',
         params: {
-          workDir: '/tmp',
+          cwd: '/tmp',
           persona: 'lace',
           systemPrompt: { type: 'preset', preset: 'lace' },
+          mcpServers: [],
         },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'c_2_workdir',
+        method: 'session/new',
+        params: {
+          workDir: '/tmp',
+          persona: 'lace',
+        },
+      })
+    ).toThrow();
+
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'c_load',
+        method: 'session/load',
+        params: {
+          sessionId: 'sess_00000000-0000-0000-0000-000000000001',
+          cwd: '/tmp',
+          mcpServers: [{ name: 'disabled', command: '/usr/bin/true', enabled: false }],
+        },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'c_resume',
+        method: 'session/resume',
+        params: {
+          sessionId: 'sess_00000000-0000-0000-0000-000000000001',
+          cwd: '/tmp',
+          mcpServers: [{ name: 'disabled', command: '/usr/bin/true', enabled: false }],
+        },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'c_close',
+        method: 'session/close',
+        params: { sessionId: 'sess_00000000-0000-0000-0000-000000000001' },
       })
     ).not.toThrow();
 
@@ -236,6 +284,14 @@ describe('protocol shapes (representative examples)', () => {
           content: [{ type: 'text', text: 'system prompt' }],
           priority: 'immediate',
         },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProtocolNotificationSchema.parse({
+        jsonrpc: '2.0',
+        method: 'session/cancel',
+        params: { sessionId: 'sess_00000000-0000-0000-0000-000000000001' },
       })
     ).not.toThrow();
 

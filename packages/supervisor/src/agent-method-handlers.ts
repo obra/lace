@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import {
-  CancelRequestNotificationSchema,
   EntAgentStatusRequestSchema,
   EntAgentStatusResponseSchema,
   EntConnectionsCredentialsClearRequestSchema,
@@ -63,6 +62,9 @@ import {
   EntSessionTokenUsageResponseSchema,
   EntToolsListRequestSchema,
   EntToolsListResponseSchema,
+  SessionCancelNotificationSchema,
+  SessionCloseRequestSchema,
+  SessionCloseResponseSchema,
   SessionPromptRequestSchema,
   SessionPromptResponseSchema,
   SessionSetModeRequestSchema,
@@ -83,9 +85,14 @@ export const agentMethodHandlers: Record<string, AgentMethodHandler> = {
     paramsSchema: SessionPromptRequestSchema.shape.params,
     resultSchema: SessionPromptResponseSchema.shape.result,
   },
-  '$/cancel_request': {
+  'session/cancel': {
     kind: 'notify',
-    paramsSchema: CancelRequestNotificationSchema.shape.params,
+    paramsSchema: SessionCancelNotificationSchema.shape.params,
+  },
+  'session/close': {
+    kind: 'request',
+    paramsSchema: SessionCloseRequestSchema.shape.params,
+    resultSchema: SessionCloseResponseSchema.shape.result,
   },
   'session/set_mode': {
     kind: 'request',

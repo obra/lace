@@ -55,7 +55,7 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     );
 
     const created = (await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     )) as { sessionId: string };
@@ -123,7 +123,7 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     );
 
     const created = (await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     )) as { sessionId: string };
@@ -196,7 +196,7 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     );
 
     const created = (await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     )) as { sessionId: string };
@@ -269,7 +269,7 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     );
 
     await withTimeout(
-      ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
     );

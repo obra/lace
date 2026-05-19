@@ -120,7 +120,7 @@ describe('lace-agent subagent intent-text-stop (kata #31 round 2)', () => {
         'initialize'
       );
       await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       );
@@ -275,7 +275,7 @@ describe('lace-agent subagent intent-text-stop (kata #31 round 2)', () => {
         'initialize'
       );
       await withTimeout(
-        ctx.agent.peer.request('session/new', { workDir: ctx.workDir }),
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
       );

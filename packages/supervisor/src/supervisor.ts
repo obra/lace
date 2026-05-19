@@ -176,7 +176,7 @@ export class Supervisor {
       'session/new',
       SessionNewRequestSchema.shape.params,
       SessionNewResponseSchema.shape.result,
-      { workDir, ...(options?.persona ? { persona: options.persona } : {}) }
+      { cwd: workDir, mcpServers: [], ...(options?.persona ? { persona: options.persona } : {}) }
     );
     activeSessionId = created.sessionId;
 
@@ -218,12 +218,18 @@ export class Supervisor {
       supervisorInitializeParams({ approvalMode: 'ask' })
     );
 
+    const stored = this.store.get(workspaceSessionId);
+    if (!stored) {
+      await agent.shutdown();
+      throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
+    }
+
     await requestEnt(
       agent.peer,
       'session/load',
       SessionLoadRequestSchema.shape.params,
       SessionLoadResponseSchema.shape.result,
-      { sessionId }
+      { sessionId, cwd: stored.workDir, mcpServers: [] }
     );
 
     const list = await requestEnt(
@@ -239,7 +245,6 @@ export class Supervisor {
       throw new Error(`Session not found: ${sessionId}`);
     }
 
-    // ACP-aligned: protocol uses cwd instead of workDir
     return { agent, workDir: meta.cwd, pid: agent.proc.pid ?? -1 };
   }
 
@@ -612,8 +617,9 @@ export class Supervisor {
   }
 
   async cancel(workspaceSessionId: string): Promise<void> {
-    const peer = await this.getPeer(workspaceSessionId);
-    peer.notify('$/cancel_request', { requestId: 'supervisor_cancel' });
+    await this.ensureActive(workspaceSessionId);
+    const { agent, sessionId } = this.requireAgent(workspaceSessionId);
+    agent.peer.notify('session/cancel', { sessionId });
   }
 
   async shutdownWorkspaceSession(workspaceSessionId: string): Promise<void> {

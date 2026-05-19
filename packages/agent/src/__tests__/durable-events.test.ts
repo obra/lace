@@ -47,7 +47,7 @@ describe('durable events', () => {
 
     try {
       await client.request('initialize', defaultInitializeParams());
-      const created = await client.request('session/new', { workDir: process.cwd() });
+      const created = await client.request('session/new', { cwd: process.cwd(), mcpServers: [] });
 
       const promptResult = await client.request('session/prompt', {
         content: [{ type: 'text', text: 'hi' }],

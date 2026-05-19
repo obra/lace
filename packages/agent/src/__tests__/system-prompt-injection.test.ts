@@ -45,7 +45,7 @@ describe('system prompt injection on session/new', () => {
     );
 
     const created = (await withTimeout(
-      agent.peer.request('session/new', { workDir }),
+      agent.peer.request('session/new', { cwd: workDir, mcpServers: [] }),
       2_000,
       'session/new'
     )) as { sessionId: string };
@@ -97,7 +97,7 @@ describe('system prompt injection on session/new', () => {
 
     // Create session with explicit persona parameter
     const created = (await withTimeout(
-      agent.peer.request('session/new', { workDir, persona: 'lace' }),
+      agent.peer.request('session/new', { cwd: workDir, mcpServers: [], persona: 'lace' }),
       2_000,
       'session/new with persona'
     )) as { sessionId: string };
@@ -132,7 +132,11 @@ describe('system prompt injection on session/new', () => {
       'initialize'
     );
 
-    await withTimeout(agent.peer.request('session/new', { workDir }), 2_000, 'session/new');
+    await withTimeout(
+      agent.peer.request('session/new', { cwd: workDir, mcpServers: [] }),
+      2_000,
+      'session/new'
+    );
 
     // Query events via the protocol endpoint
     const durable = (await withTimeout(
@@ -169,7 +173,7 @@ describe('system prompt injection on session/new', () => {
     );
 
     const created = (await withTimeout(
-      agent.peer.request('session/new', { workDir }),
+      agent.peer.request('session/new', { cwd: workDir, mcpServers: [] }),
       2_000,
       'session/new'
     )) as { sessionId: string };
@@ -223,7 +227,7 @@ describe('system prompt injection on session/new', () => {
     );
 
     const created = (await withTimeout(
-      agent.peer.request('session/new', { workDir }),
+      agent.peer.request('session/new', { cwd: workDir, mcpServers: [] }),
       2_000,
       'session/new'
     )) as { sessionId: string };
@@ -251,7 +255,7 @@ describe('system prompt injection on session/new', () => {
 
     // Create session with a specific working directory
     const created = (await withTimeout(
-      agent.peer.request('session/new', { workDir }),
+      agent.peer.request('session/new', { cwd: workDir, mcpServers: [] }),
       2_000,
       'session/new'
     )) as { sessionId: string };
@@ -284,7 +288,7 @@ describe('system prompt injection on session/new', () => {
     );
 
     const created = (await withTimeout(
-      agent.peer.request('session/new', { workDir }),
+      agent.peer.request('session/new', { cwd: workDir, mcpServers: [] }),
       2_000,
       'session/new'
     )) as { sessionId: string };

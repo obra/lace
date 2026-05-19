@@ -50,7 +50,7 @@ describe('skills e2e', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'approve' } })
       );
-      await client.request('session/new', { workDir: ctx.workDir });
+      await client.request('session/new', { cwd: ctx.workDir, mcpServers: [] });
 
       // Get events to find the context_injected event with system prompt
       const events = (await client.request('ent/session/events', { limit: 10 })) as {
@@ -87,7 +87,7 @@ describe('skills e2e', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'approve' } })
       );
-      await client.request('session/new', { workDir: ctx.workDir });
+      await client.request('session/new', { cwd: ctx.workDir, mcpServers: [] });
 
       // Get tool list to verify use_skill is available
       const tools = (await client.request('ent/tools/list', {})) as {
@@ -123,7 +123,7 @@ describe('skills e2e', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'approve' } })
       );
-      await client.request('session/new', { workDir: ctx.workDir });
+      await client.request('session/new', { cwd: ctx.workDir, mcpServers: [] });
 
       // Get events to find the context_injected event
       const events = (await client.request('ent/session/events', { limit: 10 })) as {

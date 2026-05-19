@@ -211,7 +211,7 @@ describe('Ent protocol contract (selected coverage)', () => {
         method: 'session/new',
         requestSchema: MethodSchemas.SessionNewRequestSchema,
         responseSchema: MethodSchemas.SessionNewResponseSchema,
-        params: { workDir },
+        params: { cwd: workDir, mcpServers: [] },
         label: 'session/new',
       });
       expect(sessionId).toBeTruthy();
@@ -365,7 +365,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
       responseSchema: MethodSchemas.SessionNewResponseSchema,
-      params: { workDir },
+      params: { cwd: workDir, mcpServers: [] },
       label: 'session/new',
     });
     expect(sessionId).toBeTruthy();
@@ -436,7 +436,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
       responseSchema: MethodSchemas.SessionNewResponseSchema,
-      params: { workDir: laceDir },
+      params: { cwd: laceDir, mcpServers: [] },
       label: 'session/new',
     });
 
@@ -760,7 +760,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
       responseSchema: MethodSchemas.SessionNewResponseSchema,
-      params: { workDir },
+      params: { cwd: workDir, mcpServers: [] },
       label: 'session/new',
     });
     expect(sessionId).toBeTruthy();
@@ -795,7 +795,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
       responseSchema: MethodSchemas.SessionNewResponseSchema,
-      params: { workDir },
+      params: { cwd: workDir, mcpServers: [] },
       label: 'session/new',
     });
 
@@ -870,7 +870,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
       responseSchema: MethodSchemas.SessionNewResponseSchema,
-      params: { workDir },
+      params: { cwd: workDir, mcpServers: [] },
       label: 'session/new',
     });
     expect(sessionId).toBeTruthy();
@@ -932,7 +932,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
       responseSchema: MethodSchemas.SessionNewResponseSchema,
-      params: { workDir },
+      params: { cwd: workDir, mcpServers: [] },
       label: 'session/new',
     });
 
@@ -1104,7 +1104,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
       responseSchema: MethodSchemas.SessionNewResponseSchema,
-      params: { workDir },
+      params: { cwd: workDir, mcpServers: [] },
       label: 'session/new',
     });
     expect(sessionId).toBeTruthy();
@@ -1197,7 +1197,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
       responseSchema: MethodSchemas.SessionNewResponseSchema,
-      params: { workDir },
+      params: { cwd: workDir, mcpServers: [] },
       label: 'session/new',
     });
     await requestOk({
@@ -1233,7 +1233,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
       responseSchema: MethodSchemas.SessionNewResponseSchema,
-      params: { workDir },
+      params: { cwd: workDir, mcpServers: [] },
       label: 'session/new',
     });
 
@@ -1372,7 +1372,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
       responseSchema: MethodSchemas.SessionNewResponseSchema,
-      params: { workDir },
+      params: { cwd: workDir, mcpServers: [] },
       label: 'session/new',
     });
 
@@ -1385,7 +1385,7 @@ describe('Ent protocol contract (selected coverage)', () => {
     });
   });
 
-  it('accepts $/cancel_request notification', async () => {
+  it('accepts session/cancel notification', async () => {
     agent = spawnAgentProcess({ laceDir });
     await requestOk({
       agent,
@@ -1395,20 +1395,20 @@ describe('Ent protocol contract (selected coverage)', () => {
       params: defaultInitializeParams(),
       label: 'init',
     });
-    await requestOk({
+    const created = await requestOk<{ sessionId: string }>({
       agent,
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
       responseSchema: MethodSchemas.SessionNewResponseSchema,
-      params: { workDir },
+      params: { cwd: workDir, mcpServers: [] },
       label: 'session/new',
     });
 
     notifyOk({
       agent,
-      method: '$/cancel_request',
-      notificationSchema: MethodSchemas.CancelRequestNotificationSchema,
-      params: { requestId: 'c_1' },
+      method: 'session/cancel',
+      notificationSchema: MethodSchemas.SessionCancelNotificationSchema,
+      params: { sessionId: created.sessionId },
     });
 
     const ping = await requestOk<{ ok: boolean }>({
@@ -1494,7 +1494,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
       responseSchema: MethodSchemas.SessionNewResponseSchema,
-      params: { workDir: workDirA },
+      params: { cwd: workDirA, mcpServers: [] },
       label: 'session/new A',
     });
 
@@ -1503,7 +1503,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
       responseSchema: MethodSchemas.SessionNewResponseSchema,
-      params: { workDir: workDirB },
+      params: { cwd: workDirB, mcpServers: [] },
       label: 'session/new B',
     });
 
@@ -1535,7 +1535,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/load',
       requestSchema: MethodSchemas.SessionLoadRequestSchema,
       responseSchema: MethodSchemas.SessionLoadResponseSchema,
-      params: { sessionId: sessionA },
+      params: { sessionId: sessionA, cwd: workDirA, mcpServers: [] },
       label: 'session/load A',
     }).catch((error) => {
       const message = (error as any)?.message ?? String(error);
@@ -1555,6 +1555,8 @@ describe('Ent protocol contract (selected coverage)', () => {
     try {
       await agent.peer.request('session/load', {
         sessionId: 'sess_00000000-0000-0000-0000-000000000000',
+        cwd: workDirA,
+        mcpServers: [],
       });
       throw new Error('expected SessionNotFound');
     } catch (error) {
@@ -1577,7 +1579,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/load',
       requestSchema: MethodSchemas.SessionLoadRequestSchema,
       responseSchema: MethodSchemas.SessionLoadResponseSchema,
-      params: { sessionId: fork.sessionId },
+      params: { sessionId: fork.sessionId, cwd: workDirB, mcpServers: [] },
       label: 'load fork',
     }).catch((error) => {
       const message = (error as any)?.message ?? String(error);
@@ -1613,7 +1615,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
       responseSchema: MethodSchemas.SessionNewResponseSchema,
-      params: { workDir },
+      params: { cwd: workDir, mcpServers: [] },
       label: 'session/new',
     });
 
@@ -1692,7 +1694,7 @@ describe('Ent protocol contract (selected coverage)', () => {
           method: 'session/load',
           requestSchema: MethodSchemas.SessionLoadRequestSchema,
           responseSchema: MethodSchemas.SessionLoadResponseSchema,
-          params: { sessionId },
+          params: { sessionId, cwd: workDir, mcpServers: [] },
           label: 'session/load',
         });
       }),

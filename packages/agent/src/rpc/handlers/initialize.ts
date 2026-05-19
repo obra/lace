@@ -166,7 +166,7 @@ export function registerInitializeHandler(
       capabilities: {
         streaming: true,
         multiTurn: true,
-        session: { fork: {}, resume: {} },
+        session: { fork: {}, resume: {}, close: {} },
         tools: toolInfos,
         operations: { checkpoint: true, rewind: true, configure: true, compact: true },
         'ent/contextInjection': true,

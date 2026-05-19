@@ -35,7 +35,7 @@ describe('session/set_mode', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'approve' } })
       );
-      await client.request('session/new', { workDir: ctx.workDir });
+      await client.request('session/new', { cwd: ctx.workDir, mcpServers: [] });
 
       const setPlan = await client.request('session/set_mode', { mode: 'plan' });
       expect(setPlan).toEqual({ mode: 'plan', previousMode: 'execute' });
