@@ -18,8 +18,17 @@ function resolveContainerId(specName: string): string {
   return `${CONTAINER_ID_PREFIX}${specName}`;
 }
 
-function specNameFromContainerId(containerId: string): string | null {
-  if (!containerId.startsWith(CONTAINER_ID_PREFIX)) return null;
+/**
+ * Strip the `lace-` prefix off a container id. Caller MUST have already
+ * verified the prefix (e.g. via `startsWith(CONTAINER_ID_PREFIX)` or a scan
+ * prefix that begins with it); violating this contract throws.
+ */
+function specNameFromContainerId(containerId: string): string {
+  if (!containerId.startsWith(CONTAINER_ID_PREFIX)) {
+    throw new Error(
+      `specNameFromContainerId: id ${containerId} does not start with ${CONTAINER_ID_PREFIX}`
+    );
+  }
   return containerId.slice(CONTAINER_ID_PREFIX.length);
 }
 
@@ -123,7 +132,6 @@ export class ContainerManager {
     for (const info of containers) {
       if (!info.id.startsWith(scanPrefix)) continue;
       const specName = specNameFromContainerId(info.id);
-      if (specName === null) continue;
       if (liveSpecNames.has(specName)) continue;
 
       try {
