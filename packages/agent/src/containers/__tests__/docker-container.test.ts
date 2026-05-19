@@ -215,6 +215,50 @@ describe('DockerContainerRuntime', () => {
       expect(args![imageIdx + 1]).toBe('sleep');
     });
 
+    it('emits -p <host>:<container> for each spec.ports entry (kata #60)', async () => {
+      await runtime.create({
+        name: 'browser',
+        image: 'sen-browser:dev',
+        workingDirectory: '/w',
+        mounts: [],
+        ports: [
+          { host: 7777, container: 7777 },
+          { host: 6080, container: 6080 },
+        ],
+      });
+
+      const args = findCallWithSubcommand('create');
+      expect(args).toBeDefined();
+      expect(args).toContain('-p');
+      expect(args).toContain('7777:7777');
+      expect(args).toContain('6080:6080');
+      // Both -p flags must appear before the image (docker create arg order).
+      const imageIdx = args!.indexOf('sen-browser:dev');
+      for (const mapping of ['7777:7777', '6080:6080']) {
+        expect(args!.indexOf(mapping)).toBeLessThan(imageIdx);
+      }
+    });
+
+    it('emits no -p flags when ports is undefined or empty (kata #60)', async () => {
+      await runtime.create({
+        name: 'no-ports',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+      expect(findCallWithSubcommand('create')).not.toContain('-p');
+
+      mockExecFile.mockClear();
+      await runtime.create({
+        name: 'empty-ports',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+        ports: [],
+      });
+      expect(findCallWithSubcommand('create')).not.toContain('-p');
+    });
+
     it('surfaces docker errors (e.g. image missing) as ContainerError', async () => {
       setExecFileResponses([
         {

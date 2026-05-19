@@ -122,6 +122,31 @@ describe('ContainerManager', () => {
       });
     });
 
+    it('propagates spec.ports into ContainerConfig (kata #60)', async () => {
+      // Regression: ContainerManager.materialize used to drop spec.ports when
+      // building ContainerConfig, so the docker runtime never saw -p flags and
+      // browser-driver's noVNC port 6080 was unreachable from the host.
+      const createSpy = vi.spyOn(runtime, 'create');
+      const portsSpec: ContainerSpec = {
+        ...baseSpec,
+        name: 'browser',
+        ports: [{ host: 6080, container: 6080 }],
+      };
+
+      await manager.materialize(portsSpec);
+
+      const [config] = createSpy.mock.calls[0] as [ContainerConfig];
+      expect(config.ports).toEqual([{ host: 6080, container: 6080 }]);
+    });
+
+    it('omits ports when spec has none (kata #60)', async () => {
+      const createSpy = vi.spyOn(runtime, 'create');
+      await manager.materialize(baseSpec);
+
+      const [config] = createSpy.mock.calls[0] as [ContainerConfig];
+      expect(config.ports).toBeUndefined();
+    });
+
     it('propagates spec.image into ContainerConfig (kata #53)', async () => {
       // Regression: ContainerManager used to drop spec.image, so every container
       // booted whatever default image the runtime carried. Lock the wiring down.
