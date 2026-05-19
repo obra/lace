@@ -1,5 +1,5 @@
 // ABOUTME: Session MCP server control API for runtime server management
-// ABOUTME: Controls MCP servers via ent/session/configure on supervisor-managed agents
+// ABOUTME: Controls MCP servers via ACP session/resume on supervisor-managed agents
 
 import { Project } from '@lace/web/lib/server/projects/project';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
@@ -14,32 +14,31 @@ import {
 } from '@lace/web/lib/server/route-helpers';
 import { z } from 'zod';
 import type { MCPServerConfig } from '@lace/web/types/core';
+import type { McpServerConfig } from '@lace/ent-protocol';
 
 const ControlActionSchema = z.object({
   action: z.enum(['start', 'stop', 'restart']),
 });
 
 /**
- * Build the mcpServers config payload for ent/session/configure.
+ * Build the mcpServers config payload for session/resume.
  * Extracts the repeated object construction from start/stop/restart cases.
  */
 function buildMcpServerPayload(
   serverId: string,
   serverConfig: MCPServerConfig,
   enabled: boolean
-): { mcpServers: Array<Record<string, unknown>> } {
-  return {
-    mcpServers: [
-      {
-        name: serverId,
-        command: serverConfig.command,
-        ...(serverConfig.args ? { args: serverConfig.args } : {}),
-        ...(serverConfig.env ? { env: serverConfig.env } : {}),
-        enabled,
-        tools: serverConfig.tools,
-      },
-    ],
-  };
+): McpServerConfig[] {
+  return [
+    {
+      name: serverId,
+      command: serverConfig.command,
+      ...(serverConfig.args ? { args: serverConfig.args } : {}),
+      ...(serverConfig.env ? { env: serverConfig.env } : {}),
+      enabled,
+      tools: serverConfig.tools,
+    },
+  ];
 }
 
 export async function action({
@@ -74,6 +73,12 @@ export async function action({
     if (!workspaceSession || workspaceSession.projectId !== projectId) {
       throwNotFound('Session');
     }
+    const coordinator = workspaceSession.agents[0];
+    if (!coordinator) {
+      return createErrorResponse('Session has no coordinator agent', 500, {
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+    }
 
     // Get server configuration from project
     const serverConfig = project.getMCPServer(serverId);
@@ -83,14 +88,23 @@ export async function action({
       });
     }
 
+    const resumeWithMcpServer = async (enabled: boolean) => {
+      await supervisor.agentRequest({
+        workspaceSessionId: sessionId,
+        sessionId: coordinator.sessionId,
+        method: 'session/resume',
+        requestParams: {
+          sessionId: coordinator.sessionId,
+          cwd: workspaceSession.workDir,
+          mcpServers: buildMcpServerPayload(serverId, serverConfig, enabled),
+        },
+      });
+    };
+
     // Perform the requested action using the shared payload builder
     switch (controlAction) {
       case 'start':
-        await supervisor.agentRequest({
-          workspaceSessionId: sessionId,
-          method: 'ent/session/configure',
-          requestParams: buildMcpServerPayload(serverId, serverConfig, true),
-        });
+        await resumeWithMcpServer(true);
         return createSuperjsonResponse({
           message: `Server start initiated for '${serverId}'`,
           serverId,
@@ -98,11 +112,7 @@ export async function action({
         });
 
       case 'stop':
-        await supervisor.agentRequest({
-          workspaceSessionId: sessionId,
-          method: 'ent/session/configure',
-          requestParams: buildMcpServerPayload(serverId, serverConfig, false),
-        });
+        await resumeWithMcpServer(false);
         return createSuperjsonResponse({
           message: `Server stop initiated for '${serverId}'`,
           serverId,
@@ -110,17 +120,8 @@ export async function action({
         });
 
       case 'restart':
-        // Stop then start
-        await supervisor.agentRequest({
-          workspaceSessionId: sessionId,
-          method: 'ent/session/configure',
-          requestParams: buildMcpServerPayload(serverId, serverConfig, false),
-        });
-        await supervisor.agentRequest({
-          workspaceSessionId: sessionId,
-          method: 'ent/session/configure',
-          requestParams: buildMcpServerPayload(serverId, serverConfig, true),
-        });
+        await resumeWithMcpServer(false);
+        await resumeWithMcpServer(true);
         return createSuperjsonResponse({
           message: `Server restart initiated for '${serverId}'`,
           serverId,

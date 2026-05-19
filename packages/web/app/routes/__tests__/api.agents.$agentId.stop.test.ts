@@ -1,5 +1,5 @@
 // ABOUTME: Integration tests for the supervisor-backed agent stop endpoint
-// ABOUTME: Verifies $/cancel_request is routed through supervisor
+// ABOUTME: Verifies ACP session/cancel is routed through supervisor
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { action } from '@lace/web/app/routes/api.agents.$agentId.stop';
@@ -23,6 +23,7 @@ describe('/api/agents/[agentId]/stop', () => {
   it('stops an agent session', async () => {
     const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+    const notifySpy = vi.spyOn(supervisor, 'agentNotify');
 
     const request = new Request(`http://localhost/api/agents/${created.sessionId}/stop`, {
       method: 'POST',
@@ -37,6 +38,12 @@ describe('/api/agents/[agentId]/stop', () => {
     expect(data.success).toBe(true);
     expect(data.stopped).toBe(true);
     expect(data.agentId).toBe(created.sessionId);
+    expect(notifySpy).toHaveBeenCalledWith({
+      workspaceSessionId: created.workspaceSessionId,
+      sessionId: created.sessionId,
+      method: 'session/cancel',
+      notifyParams: { sessionId: created.sessionId },
+    });
   });
 
   it('returns 400 for invalid agent ID format', async () => {

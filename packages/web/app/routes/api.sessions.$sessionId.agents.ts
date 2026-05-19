@@ -13,6 +13,8 @@ import {
 } from '@lace/web/lib/server/route-helpers';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import { getProviderManagementAgent } from '@lace/web/lib/server/supervisor-service';
+import { Project } from '@lace/web/lib/server/projects/project';
+import { mcpServersForProject } from '@lace/web/lib/server/projects/project-mcp-servers';
 import type { Route } from './+types/api.sessions.$sessionId.agents';
 import type { PersonaInfo } from '@lace/ent-protocol';
 
@@ -107,7 +109,11 @@ export async function action({ request, params }: Route.ActionArgs) {
     // Spawn agent process (agent protocol session) and configure it
     let created;
     try {
-      created = await supervisor.createAgentSession(workspaceSessionId, { persona });
+      const project = ws.projectId ? Project.getById(ws.projectId) : undefined;
+      created = await supervisor.createAgentSession(workspaceSessionId, {
+        persona,
+        ...(project ? { mcpServers: mcpServersForProject(project) } : {}),
+      });
     } catch (error) {
       // Log full error for server debugging while keeping client response sanitized
       console.error('Failed to spawn agent:', error);

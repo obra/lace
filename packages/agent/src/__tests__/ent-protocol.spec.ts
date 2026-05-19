@@ -745,7 +745,7 @@ describe('Ent protocol contract (selected coverage)', () => {
     expect(personas.personas).toBeDefined();
   });
 
-  it('validates session/configure params for env and mcpServers', async () => {
+  it('validates session/configure params and rejects ACP-owned lifecycle fields', async () => {
     agent = spawnAgentProcess({ laceDir });
     await requestOk({
       agent,
@@ -770,8 +770,12 @@ describe('Ent protocol contract (selected coverage)', () => {
     ).rejects.toMatchObject({ code: -32602 });
 
     await expect(
+      agent.peer.request('ent/session/configure', { cwd: workDir })
+    ).rejects.toMatchObject({ code: -32602 });
+
+    await expect(
       agent.peer.request('ent/session/configure', {
-        mcpServers: [{ name: 'bad', command: 'echo', transport: 'http' }],
+        mcpServers: [{ name: 'project', command: 'echo', enabled: false }],
       })
     ).rejects.toMatchObject({ code: -32602 });
 

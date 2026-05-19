@@ -1,8 +1,8 @@
 use crate::app::reducer::{decide_permission, Outbound};
 use crate::app::{AppState, ChatMessage, Role};
 use serde_json::json;
-use tui_textarea::{CursorMove, TextArea};
 use strsim::normalized_levenshtein;
+use tui_textarea::{CursorMove, TextArea};
 
 fn input_text(state: &AppState) -> String {
     state.input.lines().join("\n")
@@ -32,9 +32,9 @@ pub enum UiAction {
     CursorDown,
     CursorHome,
     CursorEnd,
-    KillToEnd,      // Ctrl+K
-    KillToStart,    // Ctrl+U
-    KillWordBack,   // Ctrl+W
+    KillToEnd,    // Ctrl+K
+    KillToStart,  // Ctrl+U
+    KillWordBack, // Ctrl+W
     HistoryPrev,
     HistoryNext,
     ActivityPrev,
@@ -566,7 +566,9 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             Vec::new()
         }
         UiAction::ConnectionsTest => crate::app::connections::request_test_selected(state),
-        UiAction::ConnectionsCredentialsStatus => crate::app::connections::request_credentials_status(state),
+        UiAction::ConnectionsCredentialsStatus => {
+            crate::app::connections::request_credentials_status(state)
+        }
         UiAction::ConnectionsBeginClearCredentials => {
             crate::app::connections::begin_clear_credentials(state);
             Vec::new()
@@ -585,12 +587,16 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             Vec::new()
         }
         UiAction::ConnectionsModelsToggle => crate::app::connections::toggle_selected_model(state),
-        UiAction::ConnectionsModelsRefresh => crate::app::connections::request_models_refresh(state),
+        UiAction::ConnectionsModelsRefresh => {
+            crate::app::connections::request_models_refresh(state)
+        }
         UiAction::ConnectionsModelsClose => {
             crate::app::connections::close_models(state);
             Vec::new()
         }
-        UiAction::ModelFetchOptions => crate::app::connections::request_models_for_current_connection(state),
+        UiAction::ModelFetchOptions => {
+            crate::app::connections::request_models_for_current_connection(state)
+        }
         UiAction::ConnectionsSubmit => {
             if state.connections.confirm_delete {
                 crate::app::connections::confirm_delete_selected(state)
@@ -664,8 +670,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             if state.active_permission.is_some() {
                 // guidance row is choices.len()
                 let max = permission_choices(state).len();
-                state.active_permission_selected =
-                    (state.active_permission_selected + 1).min(max);
+                state.active_permission_selected = (state.active_permission_selected + 1).min(max);
             }
             Vec::new()
         }
@@ -747,7 +752,9 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
                         out.push(Outbound::JsonRpcRequest {
                             id,
                             method: "session/prompt".to_string(),
-                            params: Some(json!({ "content": [ { "type": "text", "text": guidance_text } ] })),
+                            params: Some(
+                                json!({ "content": [ { "type": "text", "text": guidance_text } ] }),
+                            ),
                         });
                     }
                     state.permission_guidance_input.clear();
@@ -835,18 +842,20 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             // Prefetch model options if needed
             let mut out = Vec::new();
             if head == "model" && !state.connections.models.loading {
-                out.extend(crate::app::connections::request_models_for_current_connection(
-                    state,
-                ));
+                out.extend(crate::app::connections::request_models_for_current_connection(state));
             }
 
             let options: Vec<String> = all_slash_commands(state)
                 .into_iter()
                 .filter_map(|cmd| {
                     let lower = cmd.name.to_lowercase();
-                    lower
-                        .split_once(' ')
-                        .and_then(|(h, t)| if h == head { Some(t.to_string()) } else { None })
+                    lower.split_once(' ').and_then(|(h, t)| {
+                        if h == head {
+                            Some(t.to_string())
+                        } else {
+                            None
+                        }
+                    })
                 })
                 .collect::<std::collections::BTreeSet<_>>()
                 .into_iter()
@@ -857,9 +866,7 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
             }
 
             let suffix_norm = suffix.to_lowercase().trim().to_string();
-            let idx = options
-                .iter()
-                .position(|o| o.to_lowercase() == suffix_norm);
+            let idx = options.iter().position(|o| o.to_lowercase() == suffix_norm);
             let next = options[match idx {
                 Some(i) => (i + 1) % options.len(),
                 None => 0,
@@ -887,15 +894,13 @@ pub fn apply_ui_action(state: &mut AppState, action: UiAction) -> Vec<Outbound> 
         UiAction::SlashPickerSelect => {
             let filtered = filtered_slash_commands(state);
             // Clone needed values before modifying state
-            let selected_cmd = filtered
-                .get(state.slash_picker_selected)
-                .map(|cmd| {
-                    (
-                        cmd.name.clone(),
-                        cmd.input_hint.is_some(),
-                        cmd.source.clone().unwrap_or_else(|| "builtin".to_string()),
-                    )
-                });
+            let selected_cmd = filtered.get(state.slash_picker_selected).map(|cmd| {
+                (
+                    cmd.name.clone(),
+                    cmd.input_hint.is_some(),
+                    cmd.source.clone().unwrap_or_else(|| "builtin".to_string()),
+                )
+            });
             drop(filtered);
 
             if let Some((name, has_hint, source)) = selected_cmd {
@@ -1068,7 +1073,7 @@ pub(crate) fn all_slash_commands(state: &AppState) -> Vec<crate::app::SlashComma
             },
             source: Some("local".to_string()),
         })
-            .collect()
+        .collect()
     }
 
     fn permission_commands(state: &AppState) -> Vec<crate::app::SlashCommand> {
@@ -1312,9 +1317,7 @@ fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound
         }
         "configure" => crate::app::config_wizard::open(state),
         "sessions" => crate::app::sessions::open_sessions(state),
-        "connections" => {
-            apply_ui_action(state, UiAction::OpenConnections)
-        }
+        "connections" => apply_ui_action(state, UiAction::OpenConnections),
         "env" => apply_ui_action(state, UiAction::OpenEnvEditor),
         "context" => apply_ui_action(state, UiAction::OpenContextViewer),
         "mcp servers" => crate::app::config_panels::mcp_open(state),
@@ -1327,9 +1330,7 @@ fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound
             set_input_text(state, "/model ");
             let mut out = Vec::new();
             if !state.connections.models.loading {
-                out.extend(crate::app::connections::request_models_for_current_connection(
-                    state,
-                ));
+                out.extend(crate::app::connections::request_models_for_current_connection(state));
             }
             state.slash_picker_open = true;
             state.slash_picker_selected = 0;
@@ -1352,7 +1353,7 @@ fn execute_local_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound
             out.push(Outbound::JsonRpcRequest {
                 id,
                 method: "session/new".to_string(),
-                params: Some(json!({ "workDir": state.workdir.clone() })),
+                params: Some(json!({ "cwd": state.workdir.clone(), "mcpServers": [] })),
             });
             out
         }
@@ -1398,7 +1399,11 @@ fn execute_permission_slash_command(state: &mut AppState, name: &str) -> Vec<Out
     let Some(req) = state.active_permission.clone() else {
         return Vec::new();
     };
-    let target = name.strip_prefix("permission ").unwrap_or("").trim().to_lowercase();
+    let target = name
+        .strip_prefix("permission ")
+        .unwrap_or("")
+        .trim()
+        .to_lowercase();
     let mut selected_idx: Option<usize> = None;
 
     for (idx, opt) in req.options.iter().enumerate() {
@@ -1422,7 +1427,9 @@ fn execute_permission_slash_command(state: &mut AppState, name: &str) -> Vec<Out
         }
     }
 
-    let Some(idx) = selected_idx else { return Vec::new() };
+    let Some(idx) = selected_idx else {
+        return Vec::new();
+    };
     state.active_permission = Some(req);
     state.permission_details_scroll = 0;
     state.active_permission_selected = idx;
@@ -1456,8 +1463,7 @@ pub(crate) fn permission_choices(state: &AppState) -> Vec<PermissionChoice> {
         let label_lower = opt.label.to_lowercase();
         if allow_opt.is_none() && (id_lower.contains("allow") || label_lower.contains("allow")) {
             allow_opt = Some(opt.option_id.clone());
-        } else if deny_opt.is_none()
-            && (id_lower.contains("deny") || label_lower.contains("deny"))
+        } else if deny_opt.is_none() && (id_lower.contains("deny") || label_lower.contains("deny"))
         {
             deny_opt = Some(opt.option_id.clone());
         } else {

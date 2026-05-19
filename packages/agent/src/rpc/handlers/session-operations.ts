@@ -32,7 +32,6 @@ import {
   recordsShallowEqual,
 } from '../utils';
 import { assertSessionReady } from '../helpers/session-guards';
-import { reconcileMcpServersForActiveSession } from './mcp-servers';
 import {
   buildProviderMessagesFromDurableEvents,
   estimateProviderTokens,
@@ -40,7 +39,6 @@ import {
 import { compactDroppedMessagesWithCore } from '../../compaction/compact-dropped-messages';
 import { createProviderForTurn } from '../../providers/turn-factory';
 import { getEffectiveConfig } from '@lace/agent/core/session';
-import { mergeMcpServers } from '../session-config';
 
 /**
  * Compute context breakdown for the active session
@@ -186,7 +184,7 @@ async function computeContextBreakdownForActiveSession(
 
 /**
  * Register session operation handlers with the peer.
- * - ent/session/configure: Configure session settings (connection, model, MCP servers, etc.)
+ * - ent/session/configure: Configure session settings (connection, model, runtime limits, etc.)
  * - ent/session/compact: Compact conversation history using various strategies
  * - ent/session/checkpoint: Create a checkpoint of the current session state
  * - ent/session/rewind: Rewind to a previous checkpoint
@@ -210,12 +208,24 @@ export function registerSessionOperationHandlers(
         data: { category: 'session' },
       };
 
-    const parsed = params as Partial<{
+    if (params !== undefined && (!params || typeof params !== 'object' || Array.isArray(params))) {
+      throwInvalidParams('params must be an object');
+    }
+    const rawParams = (params ?? {}) as Record<string, unknown>;
+    if (rawParams.cwd !== undefined) {
+      throwInvalidParams('cwd must be provided via session/new, session/load, or session/resume');
+    }
+    if (rawParams.mcpServers !== undefined) {
+      throwInvalidParams(
+        'mcpServers must be provided via session/new, session/load, or session/resume'
+      );
+    }
+
+    const parsed = rawParams as Partial<{
       connectionId: string;
       modelId: string;
       maxThinkingTokens: number;
       maxBudgetUsd: number;
-      mcpServers: unknown;
       environment: Record<string, string>;
       approvalMode:
         | 'ask'
@@ -303,17 +313,11 @@ export function registerSessionOperationHandlers(
       }
     }
 
-    if (parsed.mcpServers !== undefined) {
-      nextConfig.mcpServers = mergeMcpServers(currentConfig.mcpServers, parsed.mcpServers);
-      applied.push('mcpServers');
-    }
-
     const nextState: SessionState = { ...currentState, config: nextConfig };
     writeSessionState(state.activeSession.dir, nextState);
     state.activeSession = { ...state.activeSession!, state: nextState };
 
     const effectiveAfter = getEffectiveConfig(state.config, state.activeSession.state.config);
-    await reconcileMcpServersForActiveSession(state);
 
     return {
       applied,
@@ -325,7 +329,6 @@ export function registerSessionOperationHandlers(
         maxBudgetUsd: effectiveAfter.maxBudgetUsd,
         approvalMode: effectiveAfter.approvalMode,
         environment: state.activeSession.state.config?.environment,
-        mcpServers: state.activeSession.state.config?.mcpServers,
       },
     };
   });

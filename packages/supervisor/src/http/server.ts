@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
-import { SessionPromptRequestSchema } from '@lace/ent-protocol';
+import { McpServerConfigSchema, SessionPromptRequestSchema } from '@lace/ent-protocol';
 import { agentMethodHandlers } from '../agent-method-handlers';
 import { PendingPermissionsTracker } from '../pending-permissions-tracker';
 import { Supervisor } from '../supervisor';
@@ -23,6 +23,7 @@ type SupervisorServerHandle = {
 const WorkspaceSessionCreateSchema = z
   .object({
     workDir: z.string().min(1),
+    mcpServers: z.array(McpServerConfigSchema).optional(),
   })
   .strict();
 
@@ -39,7 +40,12 @@ const WorkspaceSessionUpdateSchema = z
   })
   .strict();
 
-const CreateAgentSessionSchema = z.object({ persona: z.string().optional() }).strict();
+const CreateAgentSessionSchema = z
+  .object({
+    persona: z.string().optional(),
+    mcpServers: z.array(McpServerConfigSchema).optional(),
+  })
+  .strict();
 
 const UpsertAgentMetaSchema = z
   .object({
@@ -247,7 +253,9 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
 
       if (method === 'POST' && pathname === '/workspace-sessions') {
         const body = WorkspaceSessionCreateSchema.parse(await readJson(req));
-        const created = await supervisor.createWorkspaceSession(body.workDir);
+        const created = await supervisor.createWorkspaceSession(body.workDir, {
+          ...(body.mcpServers ? { mcpServers: body.mcpServers } : {}),
+        });
         return asJson(res, 201, created);
       }
 
@@ -286,6 +294,7 @@ export function createSupervisorServer(options: SupervisorServerOptions): Superv
           const body = CreateAgentSessionSchema.parse(await readJson(req));
           const created = await supervisor.createAgentSession(workspaceSessionId, {
             ...(body.persona ? { persona: body.persona } : {}),
+            ...(body.mcpServers ? { mcpServers: body.mcpServers } : {}),
           });
           return asJson(res, 201, created);
         }

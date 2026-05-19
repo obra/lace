@@ -59,25 +59,18 @@ describe('Session MCP Server Status API', () => {
     });
 
     const supervisor = await getSupervisor();
-    const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+    const created = await supervisor.createWorkspaceSession(context.tempProjectDir, {
+      mcpServers: Object.entries(project.getMCPServers()).map(([name, config]) => ({
+        name,
+        command: config.command,
+        ...(config.args ? { args: config.args } : {}),
+        ...(config.env ? { env: config.env } : {}),
+        enabled: config.enabled,
+        tools: config.tools,
+      })),
+    });
     await supervisor.updateWorkspaceSession(created.workspaceSessionId, {
       projectId: project.getId(),
-    });
-
-    await supervisor.agentRequest({
-      workspaceSessionId: created.workspaceSessionId,
-      sessionId: created.sessionId,
-      method: 'ent/session/configure',
-      requestParams: {
-        mcpServers: Object.entries(project.getMCPServers()).map(([name, config]) => ({
-          name,
-          command: config.command,
-          ...(config.args ? { args: config.args } : {}),
-          ...(config.env ? { env: config.env } : {}),
-          enabled: config.enabled,
-          tools: config.tools,
-        })),
-      },
     });
 
     const request = new Request(

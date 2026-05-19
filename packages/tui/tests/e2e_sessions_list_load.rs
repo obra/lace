@@ -38,7 +38,7 @@ fn e2e_sessions_list_and_load_with_fake_agent() {
         .send_line(jsonrpc::encode_request(
             json!("c_2"),
             "session/new",
-            Some(json!({"workDir": workdir.path().to_string_lossy()})),
+            Some(json!({"cwd": workdir.path().to_string_lossy(), "mcpServers": []})),
         ))
         .unwrap();
 
@@ -47,7 +47,22 @@ fn e2e_sessions_list_and_load_with_fake_agent() {
     state.next_client_seq = 3;
 
     let out = sessions::open_sessions(&mut state);
-    send_request(&transport, &mut state, out.into_iter().next().unwrap());
+    let list_request = out.into_iter().next().unwrap();
+    match &list_request {
+        Outbound::JsonRpcRequest { method, params, .. } => {
+            assert_eq!(method, "session/list");
+            assert_eq!(
+                params
+                    .as_ref()
+                    .and_then(|p| p.get("cwd"))
+                    .and_then(|v| v.as_str()),
+                Some(state.workdir.as_str())
+            );
+            assert!(params.as_ref().and_then(|p| p.get("workDir")).is_none());
+        }
+        Outbound::JsonRpcResponse { .. } => panic!("expected session/list request"),
+    }
+    send_request(&transport, &mut state, list_request);
 
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {
@@ -77,7 +92,31 @@ fn e2e_sessions_list_and_load_with_fake_agent() {
     state.sessions.selected = 0;
     let out = sessions::submit_load_selected(&mut state);
     assert_eq!(out.len(), 1);
-    send_request(&transport, &mut state, out.into_iter().next().unwrap());
+    let load_request = out.into_iter().next().unwrap();
+    match &load_request {
+        Outbound::JsonRpcRequest { method, params, .. } => {
+            assert_eq!(method, "session/load");
+            let params = params.as_ref().expect("session/load params");
+            assert_eq!(
+                params.get("sessionId").and_then(|v| v.as_str()),
+                Some("sess_test")
+            );
+            assert_eq!(
+                params.get("cwd").and_then(|v| v.as_str()),
+                Some(state.workdir.as_str())
+            );
+            assert_eq!(
+                params
+                    .get("mcpServers")
+                    .and_then(|v| v.as_array())
+                    .map(Vec::len),
+                Some(0)
+            );
+            assert!(params.get("workDir").is_none());
+        }
+        Outbound::JsonRpcResponse { .. } => panic!("expected session/load request"),
+    }
+    send_request(&transport, &mut state, load_request);
 
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {

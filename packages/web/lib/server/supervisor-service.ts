@@ -5,6 +5,7 @@ import {
   agentMethodHandlers,
   PendingPermissionsTracker,
   type CreateAgentSessionOptions,
+  type CreateWorkspaceSessionOptions,
   Supervisor,
   SupervisorClient,
   type PendingPermission,
@@ -215,8 +216,8 @@ class InProcessSupervisorClient extends SupervisorClient {
     return this.supervisor.getWorkspaceSession(workspaceSessionId);
   }
 
-  override async createWorkspaceSession(workDir: string) {
-    return await this.supervisor.createWorkspaceSession(workDir);
+  override async createWorkspaceSession(workDir: string, options?: CreateWorkspaceSessionOptions) {
+    return await this.supervisor.createWorkspaceSession(workDir, options);
   }
 
   override async attachWorkspaceSession(sessionId: string) {

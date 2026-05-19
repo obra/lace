@@ -1,5 +1,5 @@
 // ABOUTME: Stop endpoint for halting processing in a supervisor-backed agent session
-// ABOUTME: Sends $/cancel_request to the agent process via supervisor
+// ABOUTME: Sends ACP session/cancel to the agent process via supervisor
 
 import { isAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
@@ -31,8 +31,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     await supervisor.agentNotify({
       workspaceSessionId: workspace.workspaceSessionId,
       sessionId: agentId,
-      method: '$/cancel_request',
-      notifyParams: { requestId: 'api_stop' },
+      method: 'session/cancel',
+      notifyParams: { sessionId: agentId },
     });
 
     return createSuperjsonResponse({

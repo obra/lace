@@ -101,18 +101,8 @@ export type JobState = {
   // Subagent provider/model configuration
   connectionId?: string;
   modelId?: string;
-  // Persona-bundle defaults applied to subagent session (delegate jobs only)
+  // Persona bundle applied to subagent session (delegate jobs only)
   persona?: string;
-  personaMcpServers?: Record<
-    string,
-    {
-      command: string;
-      args?: string[];
-      env?: Record<string, string>;
-      enabled?: boolean;
-      tools?: Record<string, unknown>;
-    }
-  >;
   // When the delegate's persona declares `runtime.type: container`, the parsed
   // runtime block flows through to subagent-job to drive container
   // materialization at spawn time. Absent ⇒ native spawn (root runtime).

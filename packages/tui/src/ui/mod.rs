@@ -1,5 +1,5 @@
-mod markdown;
 pub mod diff;
+mod markdown;
 pub mod theme;
 pub mod tool_renderers;
 
@@ -19,10 +19,10 @@ use crate::protocol::{ent, jsonrpc};
 use crossterm::event::{
     self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEventKind, KeyModifiers,
 };
+use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use crossterm::execute;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Color, Modifier, Style};
@@ -221,16 +221,11 @@ fn run_loop(
                             .unwrap_or_default()
                             .as_millis() as u64;
 
-                        // If we have active streaming requests, cancel them
                         if !state.active_prompt_request_ids.is_empty() {
-                            // Clone IDs first to avoid borrow issues
-                            let req_ids: Vec<_> =
-                                state.active_prompt_request_ids.iter().cloned().collect();
-                            // Send cancel for each active request
-                            for req_id in req_ids {
+                            if let Some(session_id) = state.session_id.clone() {
                                 let cancel_msg = jsonrpc::encode_notification(
-                                    "$/cancel_request",
-                                    Some(serde_json::json!({ "requestId": req_id })),
+                                    "session/cancel",
+                                    Some(serde_json::json!({ "sessionId": session_id })),
                                 );
                                 if let Err(e) = transport.send_line(cancel_msg) {
                                     state.push_debug_line(format!("cancel send error: {e}"));
@@ -303,7 +298,8 @@ fn run_loop(
                                 KeyCode::Enter => {
                                     // In env field, Ctrl+Enter submits; Enter adds newline
                                     if state.mcp_panel.form_field == 4
-                                        && !key.modifiers.contains(KeyModifiers::CONTROL) {
+                                        && !key.modifiers.contains(KeyModifiers::CONTROL)
+                                    {
                                         Some(UiAction::McpFormNewline)
                                     } else {
                                         Some(UiAction::McpFormSubmit)
@@ -313,7 +309,9 @@ fn run_loop(
                                     Some(UiAction::McpFormToggleEnabled)
                                 }
                                 KeyCode::Backspace => Some(UiAction::McpFormBackspace),
-                                KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                KeyCode::Char(ch)
+                                    if !key.modifiers.contains(KeyModifiers::CONTROL) =>
+                                {
                                     Some(UiAction::McpFormChar(ch))
                                 }
                                 _ => None,
@@ -330,7 +328,9 @@ fn run_loop(
                         let action = match key.code {
                             KeyCode::Esc => Some(UiAction::ContextViewerClose),
                             KeyCode::Up | KeyCode::PageUp => Some(UiAction::ContextViewerScrollUp),
-                            KeyCode::Down | KeyCode::PageDown => Some(UiAction::ContextViewerScrollDown),
+                            KeyCode::Down | KeyCode::PageDown => {
+                                Some(UiAction::ContextViewerScrollDown)
+                            }
                             _ => None,
                         };
                         if let Some(action) = action {
@@ -656,12 +656,12 @@ fn run_loop(
                                 }
                                 None
                             }
-                        KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                            // Type into input while picker is open
-                            state.input.insert_char(ch);
-                            state.slash_picker_selected = 0;
-                            None
-                        }
+                            KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                // Type into input while picker is open
+                                state.input.insert_char(ch);
+                                state.slash_picker_selected = 0;
+                                None
+                            }
                             _ => None,
                         };
                         if let Some(action) = action {
@@ -733,9 +733,7 @@ fn run_loop(
                                 let head = head_raw.to_lowercase();
                                 let has_option_set = !head.is_empty()
                                     && all_slash_commands(state).into_iter().any(|cmd| {
-                                        cmd.name
-                                            .to_lowercase()
-                                            .starts_with(&format!("{head} "))
+                                        cmd.name.to_lowercase().starts_with(&format!("{head} "))
                                     });
 
                                 let suffix = parts.collect::<Vec<_>>().join(" ");
@@ -756,7 +754,9 @@ fn run_loop(
                         KeyCode::PageUp => Some(UiAction::ScrollUp),
                         KeyCode::PageDown => Some(UiAction::ScrollDown),
                         KeyCode::Left if state.focus == Focus::Input => Some(UiAction::CursorLeft),
-                        KeyCode::Right if state.focus == Focus::Input => Some(UiAction::CursorRight),
+                        KeyCode::Right if state.focus == Focus::Input => {
+                            Some(UiAction::CursorRight)
+                        }
                         KeyCode::Home if state.focus == Focus::Input => Some(UiAction::CursorHome),
                         KeyCode::End if state.focus == Focus::Input => Some(UiAction::CursorEnd),
                         KeyCode::Delete if state.focus == Focus::Input => Some(UiAction::Delete),
@@ -925,7 +925,11 @@ fn send_outbound(
         match m {
             Outbound::JsonRpcRequest { id, method, params } => {
                 let params_clone = params.clone();
-                let line = jsonrpc::encode_request(Value::String(id.clone()), &method, params_clone.clone());
+                let line = jsonrpc::encode_request(
+                    Value::String(id.clone()),
+                    &method,
+                    params_clone.clone(),
+                );
                 transport
                     .send_line(line)
                     .map_err(|e| io::Error::new(io::ErrorKind::BrokenPipe, e))?;
@@ -1110,8 +1114,7 @@ fn handle_agent_line(
                     }
                     if !state.config_wizard.open && !state.connections.open {
                         let auto = crate::app::config_panels::maybe_autoconfigure_from_connections(
-                            state,
-                            &result,
+                            state, &result,
                         );
                         if !auto.is_empty() {
                             send_outbound(transport, state, auto, timeout_ms)?;
@@ -1208,7 +1211,9 @@ fn handle_agent_line(
                     // Extract serverId from pending params to identify which server
                     if let Some(params) = pending_params.as_ref() {
                         if let Some(sid) = params.get("serverId").and_then(|v| v.as_str()) {
-                            crate::app::config_panels::mcp_handle_test_response(state, sid, &result);
+                            crate::app::config_panels::mcp_handle_test_response(
+                                state, sid, &result,
+                            );
                         }
                     }
                 }
@@ -1327,9 +1332,7 @@ fn handle_session_update(state: &mut AppState, params: &Value) {
                 ..
             } => {
                 // Use current turn context as fallback when event doesn't have turn_id
-                let effective_turn_id = turn_id
-                    .clone()
-                    .or_else(|| state.current_turn_id.clone());
+                let effective_turn_id = turn_id.clone().or_else(|| state.current_turn_id.clone());
                 let effective_turn_seq = turn_seq.or(state.current_turn_seq);
 
                 activity::upsert_tool_use(
@@ -1444,10 +1447,7 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
     let right_width = status_right_width(state);
     let status_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Min(1),
-            Constraint::Length(right_width),
-        ])
+        .constraints([Constraint::Min(1), Constraint::Length(right_width)])
         .split(status_area);
 
     f.render_widget(render_status_left(state), status_layout[0]);
@@ -1481,10 +1481,7 @@ fn draw(f: &mut ratatui::Frame, state: &AppState) {
             .map(|c| c.name.len() + c.description.len() + 6) // rough estimate with markers
             .max()
             .unwrap_or(20) as u16;
-        let picker_width = max_line
-            .saturating_add(4)
-            .min(input_area.width)
-            .max(30);
+        let picker_width = max_line.saturating_add(4).min(input_area.width).max(30);
         let picker_area = ratatui::layout::Rect {
             x: input_area.x,
             y: picker_y,
@@ -1739,10 +1736,7 @@ fn render_sessions_modal(state: &AppState) -> Paragraph<'static> {
                 let title = if alias.is_empty() {
                     it.session_id.clone()
                 } else {
-                    format!(
-                        "{alias} ({})",
-                        &it.session_id[..8.min(it.session_id.len())]
-                    )
+                    format!("{alias} ({})", &it.session_id[..8.min(it.session_id.len())])
                 };
 
                 let marker = if selected { "▸ " } else { "  " };
@@ -1771,7 +1765,10 @@ fn render_sessions_modal(state: &AppState) -> Paragraph<'static> {
             lines.push(Line::from(""));
             lines.push(Line::from(vec![
                 Span::styled("Rename: ", Style::default().fg(colors.fg_muted)),
-                Span::styled(s.rename_input.clone(), Style::default().fg(colors.fg_primary)),
+                Span::styled(
+                    s.rename_input.clone(),
+                    Style::default().fg(colors.fg_primary),
+                ),
                 Span::styled("▌", Style::default().fg(colors.accent)),
             ]));
         }
@@ -1952,7 +1949,10 @@ fn render_config_modal(state: &AppState) -> Paragraph<'static> {
             // Show filter input
             lines.push(Line::from(vec![
                 Span::styled("Filter: ", Style::default().fg(colors.fg_muted)),
-                Span::styled(w.model_filter.clone(), Style::default().fg(colors.fg_primary)),
+                Span::styled(
+                    w.model_filter.clone(),
+                    Style::default().fg(colors.fg_primary),
+                ),
                 Span::styled("▌", Style::default().fg(colors.accent)),
             ]));
             lines.push(Line::from(""));
@@ -1983,7 +1983,10 @@ fn render_config_modal(state: &AppState) -> Paragraph<'static> {
                     } else {
                         Style::default().fg(colors.fg_secondary)
                     };
-                    lines.push(Line::from(Span::styled(format!("{marker}{}", filtered[i]), style)));
+                    lines.push(Line::from(Span::styled(
+                        format!("{marker}{}", filtered[i]),
+                        style,
+                    )));
                 }
             }
         }
@@ -2010,9 +2013,9 @@ fn render_config_modal(state: &AppState) -> Paragraph<'static> {
         }
         config_wizard::ConfigWizardStep::NotSupported => {
             lines.push(Line::from(Span::styled(
-                w.error_message.clone().unwrap_or_else(|| {
-                    "configuration not supported by this agent".to_string()
-                }),
+                w.error_message
+                    .clone()
+                    .unwrap_or_else(|| "configuration not supported by this agent".to_string()),
                 Style::default().fg(colors.warning),
             )));
             lines.push(Line::from(""));
@@ -2154,40 +2157,55 @@ fn render_context_modal(state: &AppState) -> Paragraph<'static> {
 
         lines.push(Line::from(vec![
             Span::styled("Model: ", Style::default().fg(colors.fg_muted)),
-            Span::styled(breakdown.model_id.clone(), Style::default().fg(colors.fg_primary)),
+            Span::styled(
+                breakdown.model_id.clone(),
+                Style::default().fg(colors.fg_primary),
+            ),
         ]));
         lines.push(Line::from(""));
 
-        lines.push(Line::from(vec![
-            Span::styled(
-                format!("{bar} {used_pct}%"),
-                if used_pct > 80 {
-                    Style::default().fg(colors.warning)
-                } else {
-                    Style::default().fg(colors.accent)
-                },
+        lines.push(Line::from(vec![Span::styled(
+            format!("{bar} {used_pct}%"),
+            if used_pct > 80 {
+                Style::default().fg(colors.warning)
+            } else {
+                Style::default().fg(colors.accent)
+            },
+        )]));
+        lines.push(Line::from(vec![Span::styled(
+            format!(
+                "{} / {} tokens",
+                format_tokens(breakdown.total_used_tokens),
+                format_tokens(breakdown.context_limit)
             ),
-        ]));
-        lines.push(Line::from(vec![
-            Span::styled(
-                format!(
-                    "{} / {} tokens",
-                    format_tokens(breakdown.total_used_tokens),
-                    format_tokens(breakdown.context_limit)
-                ),
-                Style::default().fg(colors.fg_muted),
-            ),
-        ]));
+            Style::default().fg(colors.fg_muted),
+        )]));
         lines.push(Line::from(""));
 
         // Category breakdown with bars
         let categories = [
-            ("System Prompt", breakdown.system_prompt.tokens, colors.accent),
-            ("Core Tools", breakdown.core_tools.tokens, colors.fg_secondary),
+            (
+                "System Prompt",
+                breakdown.system_prompt.tokens,
+                colors.accent,
+            ),
+            (
+                "Core Tools",
+                breakdown.core_tools.tokens,
+                colors.fg_secondary,
+            ),
             ("MCP Tools", breakdown.mcp_tools.tokens, colors.warning),
             ("Messages", breakdown.messages.tokens, colors.success),
-            ("Reserved", breakdown.reserved_for_response.tokens, colors.fg_muted),
-            ("Free Space", breakdown.free_space.tokens, colors.border_subtle),
+            (
+                "Reserved",
+                breakdown.reserved_for_response.tokens,
+                colors.fg_muted,
+            ),
+            (
+                "Free Space",
+                breakdown.free_space.tokens,
+                colors.border_subtle,
+            ),
         ];
 
         let max_tokens = breakdown.context_limit.max(1);
@@ -2195,7 +2213,8 @@ fn render_context_modal(state: &AppState) -> Paragraph<'static> {
             if tokens > 0 || label == "Free Space" {
                 let pct = (tokens * 100 / max_tokens) as usize;
                 let mini_bar_filled = (pct * 20 / 100).min(20);
-                let mini_bar: String = "▓".repeat(mini_bar_filled) + &"░".repeat(20 - mini_bar_filled);
+                let mini_bar: String =
+                    "▓".repeat(mini_bar_filled) + &"░".repeat(20 - mini_bar_filled);
 
                 lines.push(Line::from(vec![
                     Span::styled(format!("{label:<16}"), Style::default().fg(colors.fg_muted)),
@@ -2376,9 +2395,15 @@ fn render_mcp_modal(state: &AppState) -> Paragraph<'static> {
 
                     lines.push(Line::from(vec![
                         Span::styled(marker.to_string(), style),
-                        Span::styled(format!("[{}] ", status_str), Style::default().fg(colors.fg_muted)),
+                        Span::styled(
+                            format!("[{}] ", status_str),
+                            Style::default().fg(colors.fg_muted),
+                        ),
                         Span::styled(server.name.clone(), style.add_modifier(Modifier::BOLD)),
-                        Span::styled(format!("{enabled_str}{tools_str}"), Style::default().fg(colors.fg_muted)),
+                        Span::styled(
+                            format!("{enabled_str}{tools_str}"),
+                            Style::default().fg(colors.fg_muted),
+                        ),
                     ]));
                     lines.push(Line::from(vec![
                         Span::styled("    ", style),
@@ -2388,7 +2413,10 @@ fn render_mcp_modal(state: &AppState) -> Paragraph<'static> {
                     if let Some(err) = &server.error {
                         lines.push(Line::from(vec![
                             Span::styled("    ", style),
-                            Span::styled(format!("Error: {err}"), Style::default().fg(colors.error)),
+                            Span::styled(
+                                format!("Error: {err}"),
+                                Style::default().fg(colors.error),
+                            ),
                         ]));
                     }
                 }
@@ -2403,7 +2431,11 @@ fn render_mcp_modal(state: &AppState) -> Paragraph<'static> {
 
         McpPanelView::AddEdit => {
             let is_edit = state.mcp_panel.edit_server_id.is_some();
-            let title = if is_edit { "Edit MCP Server" } else { "Add MCP Server" };
+            let title = if is_edit {
+                "Edit MCP Server"
+            } else {
+                "Add MCP Server"
+            };
 
             lines.push(Line::from(Span::styled(
                 title,
@@ -2453,7 +2485,10 @@ fn render_mcp_modal(state: &AppState) -> Paragraph<'static> {
             } else {
                 Style::default().fg(colors.fg_muted)
             };
-            lines.push(Line::from(Span::styled("Env (KEY=VALUE, one per line):", env_label_style)));
+            lines.push(Line::from(Span::styled(
+                "Env (KEY=VALUE, one per line):",
+                env_label_style,
+            )));
             let env_lines: Vec<&str> = state.mcp_panel.form_env.lines().collect();
             if env_lines.is_empty() {
                 let cursor = if is_env_selected { "▌" } else { "" };
@@ -2464,9 +2499,16 @@ fn render_mcp_modal(state: &AppState) -> Paragraph<'static> {
             } else {
                 for (i, line) in env_lines.iter().enumerate() {
                     let is_last = i == env_lines.len() - 1;
-                    let cursor = if is_env_selected && is_last { "▌" } else { "" };
+                    let cursor = if is_env_selected && is_last {
+                        "▌"
+                    } else {
+                        ""
+                    };
                     lines.push(Line::from(vec![
-                        Span::styled(format!("  {line}"), Style::default().fg(colors.fg_secondary)),
+                        Span::styled(
+                            format!("  {line}"),
+                            Style::default().fg(colors.fg_secondary),
+                        ),
                         Span::styled(cursor, Style::default().fg(colors.accent)),
                     ]));
                 }
@@ -2479,7 +2521,11 @@ fn render_mcp_modal(state: &AppState) -> Paragraph<'static> {
             } else {
                 Style::default().fg(colors.fg_muted)
             };
-            let checkbox = if state.mcp_panel.form_enabled { "[x]" } else { "[ ]" };
+            let checkbox = if state.mcp_panel.form_enabled {
+                "[x]"
+            } else {
+                "[ ]"
+            };
             lines.push(Line::from(Span::styled(
                 format!("{checkbox} Enabled"),
                 enabled_style,
@@ -2570,10 +2616,7 @@ fn render_slash_picker(state: &AppState) -> Paragraph<'static> {
     }
 
     if filtered.is_empty() {
-        if input_text(state)
-            .trim_start()
-            .starts_with("/model")
-            && state.connections.models.loading
+        if input_text(state).trim_start().starts_with("/model") && state.connections.models.loading
         {
             lines.push(Line::from(Span::styled(
                 "  Loading models…",
@@ -2660,7 +2703,10 @@ fn render_json_input(lines: &mut Vec<Line<'static>>, input: &Value, colors: &the
     if show_truncation {
         lines.push(Line::from(vec![
             Span::styled("  ", Style::default()),
-            Span::styled("       ... (truncated)", Style::default().fg(colors.fg_muted)),
+            Span::styled(
+                "       ... (truncated)",
+                Style::default().fg(colors.fg_muted),
+            ),
         ]));
     }
 }
@@ -2770,7 +2816,8 @@ fn render_permission_bar(state: &AppState) -> Paragraph<'static> {
             if let Some(input) = state.tool_inputs_by_tool_call_id.get(tool_call_id) {
                 // Tool-specific rendering
                 if tool == "file_edit" {
-                    if let Some(diff_lines) = crate::ui::diff::render_file_edit_diff(input, colors) {
+                    if let Some(diff_lines) = crate::ui::diff::render_file_edit_diff(input, colors)
+                    {
                         lines.push(Line::from(""));
                         let scroll = state.permission_details_scroll as usize;
                         lines.extend(diff_lines.into_iter().skip(scroll));
@@ -3033,7 +3080,10 @@ fn extract_todo_items(result: &Value) -> Option<Vec<Value>> {
 
 /// Formats todo_read result as pretty-printed lines.
 /// Returns None if the result doesn't look like a todo list.
-fn format_todo_read_result(result: &Value, colors: &theme::ThemeColors) -> Option<Vec<Line<'static>>> {
+fn format_todo_read_result(
+    result: &Value,
+    colors: &theme::ThemeColors,
+) -> Option<Vec<Line<'static>>> {
     let items = extract_todo_items(result)?;
     if items.is_empty() {
         return Some(vec![Line::from(Span::styled(
@@ -3044,7 +3094,10 @@ fn format_todo_read_result(result: &Value, colors: &theme::ThemeColors) -> Optio
 
     let mut lines = Vec::new();
     for item in &items {
-        let status = item.get("status").and_then(|v| v.as_str()).unwrap_or("pending");
+        let status = item
+            .get("status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("pending");
         // Support both "title" and "content" field names (Claude Code uses "content")
         let title = item
             .get("content")
@@ -3176,14 +3229,12 @@ fn tool_call_line_count(item: &activity::ActivityItem, selected: bool, expanded:
                     } else {
                         for todo_item in &items {
                             count += 1; // content line
-                            // Add line for activeForm if in_progress
+                                        // Add line for activeForm if in_progress
                             let status = todo_item
                                 .get("status")
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("pending");
-                            if status == "in_progress"
-                                && todo_item.get("activeForm").is_some()
-                            {
+                            if status == "in_progress" && todo_item.get("activeForm").is_some() {
                                 count += 1;
                             }
                         }
@@ -3232,7 +3283,8 @@ fn render_thinking_block(
     // Add streaming cursor if still thinking
     if block.streaming && !block.text.is_empty() {
         if let Some(last) = lines.last_mut() {
-            last.spans.push(Span::styled(" ▌", Style::default().fg(colors.accent)));
+            last.spans
+                .push(Span::styled(" ▌", Style::default().fg(colors.accent)));
         }
     }
 
@@ -3367,10 +3419,7 @@ fn render_tool_call_line(
                         format!("{job_indent}  \u{2514}\u{2500} "),
                         base_style.fg(colors.error),
                     ),
-                    Span::styled(
-                        truncate_preview(&err, 70),
-                        base_style.fg(colors.error),
-                    ),
+                    Span::styled(truncate_preview(&err, 70), base_style.fg(colors.error)),
                 ]));
             }
         } else if is_complete {
@@ -3389,7 +3438,10 @@ fn render_tool_call_line(
                         format!("{job_indent}  \u{2514}\u{2500} "),
                         base_style.fg(colors.border_subtle),
                     ),
-                    Span::styled(truncate_preview(preview, 50), base_style.fg(colors.fg_muted)),
+                    Span::styled(
+                        truncate_preview(preview, 50),
+                        base_style.fg(colors.fg_muted),
+                    ),
                 ]));
             }
         }
@@ -3469,9 +3521,7 @@ fn markdown_span_style(
     match md_style {
         MarkdownStyle::Normal => base.fg(colors.fg_primary),
         MarkdownStyle::Bold => base.fg(colors.fg_primary).add_modifier(Modifier::BOLD),
-        MarkdownStyle::InlineCode => Style::default()
-            .fg(colors.accent)
-            .bg(colors.bg_surface),
+        MarkdownStyle::InlineCode => Style::default().fg(colors.accent).bg(colors.bg_surface),
         MarkdownStyle::Header(level) => {
             // Headers get bold, with h1 being brighter
             let fg = if *level == 1 {
@@ -3498,11 +3548,16 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
     // turn_id is the same for all events in a turn, unlike turn_seq which is
     // a sequence counter within the turn (text_delta gets 0, tool_use gets 1, etc.)
     let completed_tools = state.completed_tool_calls();
-    let mut tools_by_turn_id: std::collections::HashMap<String, Vec<(usize, &activity::ActivityItem)>> =
-        std::collections::HashMap::new();
+    let mut tools_by_turn_id: std::collections::HashMap<
+        String,
+        Vec<(usize, &activity::ActivityItem)>,
+    > = std::collections::HashMap::new();
     for (i, tool) in completed_tools.iter().enumerate() {
         if let Some(id) = &tool.turn_id {
-            tools_by_turn_id.entry(id.clone()).or_default().push((i, tool));
+            tools_by_turn_id
+                .entry(id.clone())
+                .or_default()
+                .push((i, tool));
         }
     }
 
@@ -3511,11 +3566,16 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
         std::collections::HashSet::new();
 
     // Build thinking blocks by turn_id
-    let mut thinking_by_turn_id: std::collections::HashMap<String, Vec<&crate::app::ThinkingBlock>> =
-        std::collections::HashMap::new();
+    let mut thinking_by_turn_id: std::collections::HashMap<
+        String,
+        Vec<&crate::app::ThinkingBlock>,
+    > = std::collections::HashMap::new();
     for block in &state.thinking_blocks {
         if let Some(turn_id) = &block.turn_id {
-            thinking_by_turn_id.entry(turn_id.clone()).or_default().push(block);
+            thinking_by_turn_id
+                .entry(turn_id.clone())
+                .or_default()
+                .push(block);
         }
     }
     // Track which thinking blocks we've rendered
@@ -3616,7 +3676,12 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
                         for (idx, tool) in tools {
                             let is_selected = state.chat_selected_tool_idx == Some(*idx);
                             let is_expanded = is_selected && state.chat_tool_expanded;
-                            lines.extend(render_tool_call_line(tool, colors, is_selected, is_expanded));
+                            lines.extend(render_tool_call_line(
+                                tool,
+                                colors,
+                                is_selected,
+                                is_expanded,
+                            ));
                             rendered_tool_indices.insert(*idx);
                         }
                     }
@@ -3636,7 +3701,12 @@ fn render_chat(state: &AppState) -> Paragraph<'static> {
         for (i, item) in orphaned_tools {
             let is_selected = state.chat_selected_tool_idx == Some(i);
             let is_expanded = is_selected && state.chat_tool_expanded;
-            lines.extend(render_tool_call_line(item, colors, is_selected, is_expanded));
+            lines.extend(render_tool_call_line(
+                item,
+                colors,
+                is_selected,
+                is_expanded,
+            ));
         }
     }
 
@@ -3794,8 +3864,14 @@ fn render_activity_overlay(state: &AppState) -> Paragraph<'static> {
         };
 
         lines.push(Line::from(vec![
-            Span::styled(format!("{} ", status_char), Style::default().fg(status_color)),
-            Span::styled(format!("{:?}", item.kind), Style::default().fg(colors.fg_primary)),
+            Span::styled(
+                format!("{} ", status_char),
+                Style::default().fg(status_color),
+            ),
+            Span::styled(
+                format!("{:?}", item.kind),
+                Style::default().fg(colors.fg_primary),
+            ),
             Span::styled(
                 format!("  {}", item.summary),
                 Style::default().fg(colors.fg_muted),
@@ -3838,7 +3914,10 @@ fn render_tool_details_overlay(state: &AppState) -> Paragraph<'static> {
 
     if let Some(tool) = selected_tool {
         // Tool name and status
-        let tool_name = tool.tool_name.clone().unwrap_or_else(|| "unknown".to_string());
+        let tool_name = tool
+            .tool_name
+            .clone()
+            .unwrap_or_else(|| "unknown".to_string());
         let status = tool.status.clone().unwrap_or_else(|| "unknown".to_string());
         let status_color = match status.as_str() {
             "completed" | "success" => colors.success,
@@ -3848,7 +3927,12 @@ fn render_tool_details_overlay(state: &AppState) -> Paragraph<'static> {
 
         lines.push(Line::from(vec![
             Span::styled("Tool: ", Style::default().fg(colors.fg_muted)),
-            Span::styled(tool_name, Style::default().fg(colors.fg_primary).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                tool_name,
+                Style::default()
+                    .fg(colors.fg_primary)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ]));
         lines.push(Line::from(vec![
             Span::styled("Status: ", Style::default().fg(colors.fg_muted)),
@@ -3868,9 +3952,7 @@ fn render_tool_details_overlay(state: &AppState) -> Paragraph<'static> {
             .tool_call_id
             .as_ref()
             .and_then(|id| state.tool_inputs_by_tool_call_id.get(id))
-            .or_else(|| {
-                tool.details.as_ref().and_then(|d| d.get("input"))
-            });
+            .or_else(|| tool.details.as_ref().and_then(|d| d.get("input")));
 
         if let Some(input) = input_json {
             let pretty = serde_json::to_string_pretty(input).unwrap_or_else(|_| input.to_string());
@@ -3900,7 +3982,8 @@ fn render_tool_details_overlay(state: &AppState) -> Paragraph<'static> {
         let result_json = tool.details.as_ref().and_then(|d| d.get("result"));
 
         if let Some(result) = result_json {
-            let pretty = serde_json::to_string_pretty(result).unwrap_or_else(|_| result.to_string());
+            let pretty =
+                serde_json::to_string_pretty(result).unwrap_or_else(|_| result.to_string());
             for line in pretty.lines() {
                 lines.push(Line::from(Span::styled(
                     line.to_string(),
@@ -3956,14 +4039,19 @@ fn render_input(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout:
         let (prefix, style) = if i == 0 {
             // First line: use accent color, styled differently when images attached
             let style = if image_count > 0 {
-                Style::default().fg(colors.accent).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(colors.accent)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(colors.accent)
             };
             (first_prefix.clone(), style)
         } else {
             // Continuation lines: spaces to match width
-            (" ".repeat(prompt_width as usize), Style::default().fg(colors.accent))
+            (
+                " ".repeat(prompt_width as usize),
+                Style::default().fg(colors.accent),
+            )
         };
         prompt_lines.push(Line::from(Span::styled(prefix, style)));
     }
@@ -4058,7 +4146,8 @@ fn render_help_modal(state: &AppState) -> Paragraph<'static> {
     ];
 
     // Group slash commands by first token for compact help
-    let mut grouped: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
+    let mut grouped: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
     for cmd in all_slash_commands(state) {
         if cmd.source.as_deref() == Some("permission") {
             continue;
@@ -4093,7 +4182,10 @@ fn render_help_modal(state: &AppState) -> Paragraph<'static> {
             lines.push(Line::from(vec![
                 Span::styled("/", Style::default().fg(colors.fg_muted)),
                 Span::styled(head.clone(), Style::default().fg(colors.fg_primary)),
-                Span::styled(format!(" ({opts_str})"), Style::default().fg(colors.fg_secondary)),
+                Span::styled(
+                    format!(" ({opts_str})"),
+                    Style::default().fg(colors.fg_secondary),
+                ),
             ]));
         }
     }
@@ -4217,11 +4309,16 @@ fn chat_total_rendered_lines(state: &AppState, content_width: usize) -> usize {
 
     // Build map of turn_id -> tools for matching (same as render_chat)
     let completed_tools = state.completed_tool_calls();
-    let mut tools_by_turn_id: std::collections::HashMap<String, Vec<(usize, &activity::ActivityItem)>> =
-        std::collections::HashMap::new();
+    let mut tools_by_turn_id: std::collections::HashMap<
+        String,
+        Vec<(usize, &activity::ActivityItem)>,
+    > = std::collections::HashMap::new();
     for (i, tool) in completed_tools.iter().enumerate() {
         if let Some(id) = &tool.turn_id {
-            tools_by_turn_id.entry(id.clone()).or_default().push((i, tool));
+            tools_by_turn_id
+                .entry(id.clone())
+                .or_default()
+                .push((i, tool));
         }
     }
 
@@ -4541,7 +4638,7 @@ mod tests {
 
     #[test]
     fn connections_models_modal_shows_legend_after_toggle() {
-        use crate::app::connections::{ConnectionModelItem, toggle_selected_model};
+        use crate::app::connections::{toggle_selected_model, ConnectionModelItem};
 
         let mut state = AppState::new_with_paths(None, None);
         state.connections.open = true;
@@ -4622,7 +4719,7 @@ mod tests {
 
     #[test]
     fn connections_models_modal_shows_legend_with_many_models() {
-        use crate::app::connections::{ConnectionModelItem, toggle_selected_model};
+        use crate::app::connections::{toggle_selected_model, ConnectionModelItem};
 
         let mut state = AppState::new_with_paths(None, None);
         state.connections.open = true;
@@ -5124,7 +5221,11 @@ mod tests {
         state.permission_details_expanded = true;
 
         let height = permission_bar_height(&state);
-        assert!(height > 5, "Height should include diff lines, got {}", height);
+        assert!(
+            height > 5,
+            "Height should include diff lines, got {}",
+            height
+        );
     }
 
     #[test]
@@ -5388,7 +5489,12 @@ mod tests {
             lines[1].contains("file_read"),
             "Line 1 should be the tool call header, got: {:?}.\nAll lines:\n{}",
             lines[1],
-            lines.iter().enumerate().map(|(i, l)| format!("{}: {:?}", i, l)).collect::<Vec<_>>().join("\n")
+            lines
+                .iter()
+                .enumerate()
+                .map(|(i, l)| format!("{}: {:?}", i, l))
+                .collect::<Vec<_>>()
+                .join("\n")
         );
     }
 

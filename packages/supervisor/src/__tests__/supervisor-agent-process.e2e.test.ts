@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { resolve } from 'node:path';
 import { SupervisorAgentProcess } from '../supervisor-agent-process';
 import { Supervisor } from '../supervisor';
 import { createE2EContext } from './helpers';
@@ -215,6 +216,26 @@ describe('Supervisor (E2E)', () => {
       { workspaceSessionId: ws.workspaceSessionId, sessionId: ws.sessionId },
       { workspaceSessionId: ws.workspaceSessionId, sessionId: second.sessionId },
     ]);
+  });
+
+  it('passes MCP servers through session/new when creating a workspace session', async () => {
+    supervisor = new Supervisor({ storeDir: ctx.laceDir });
+    const fixturePath = resolve('../web/test-utils/fixtures/mcp-stdio-test-server.cjs');
+
+    const ws = await supervisor.createWorkspaceSession(ctx.workDir, {
+      mcpServers: [
+        { name: 'project-test', command: process.execPath, args: [fixturePath], enabled: true },
+      ],
+    });
+
+    const status = (await (
+      await supervisor.getPeer(ws.workspaceSessionId, ws.sessionId)
+    ).request('ent/agent/status', {})) as { mcpServers?: Array<{ name: string; status: string }> };
+
+    expect(status.mcpServers?.find((s) => s.name === 'project-test')).toMatchObject({
+      name: 'project-test',
+      status: 'connected',
+    });
   });
 
   it('applies per-agent tool policies before prompting for permission', async () => {

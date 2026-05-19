@@ -680,7 +680,6 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         // parent's filesystem and continue using the parent workDir.
         const created = (await childPeer.request('session/new', {
           cwd: subagentWorkDir,
-          mcpServers: [],
           ...(job.persona ? { persona: job.persona } : {}),
         })) as { sessionId: string };
         job.subagentSessionId = created.sessionId;
@@ -710,29 +709,13 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       // connectionId must still flow through.
       applyEffectiveJobConfig(job, parentEffective);
 
-      // Apply persona mcpServers on first creation only — resumed sessions
-      // already have their MCP config persisted from the original run.
-      const personaMcpServersList =
-        job.personaMcpServers && !resumedSession
-          ? Object.entries(job.personaMcpServers).map(([name, spec]) => ({
-              name,
-              command: spec.command,
-              ...(spec.args ? { args: spec.args } : {}),
-              ...(spec.env ? { env: spec.env } : {}),
-              ...(spec.enabled !== undefined ? { enabled: spec.enabled } : {}),
-            }))
-          : undefined;
-
-      // Configure subagent session with provider/model and any persona MCP defaults.
-      const hasConfigurable =
-        job.connectionId || job.modelId || (personaMcpServersList && personaMcpServersList.length);
+      // Configure subagent session with provider/model. Persona MCP defaults
+      // flow through session/new so resumed sessions keep their persisted MCP config.
+      const hasConfigurable = job.connectionId || job.modelId;
       if (hasConfigurable) {
         await childPeer.request('ent/session/configure', {
           ...(job.connectionId ? { connectionId: job.connectionId } : {}),
           ...(job.modelId ? { modelId: job.modelId } : {}),
-          ...(personaMcpServersList && personaMcpServersList.length
-            ? { mcpServers: personaMcpServersList }
-            : {}),
         });
       }
 

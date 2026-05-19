@@ -1,6 +1,7 @@
 import type {
   AgentSessionHandle,
   CreateAgentSessionOptions,
+  CreateWorkspaceSessionOptions,
   WorkspaceSessionHandle,
 } from '../supervisor';
 import type { WorkspaceSessionRecord } from '../workspace-session-store';
@@ -121,11 +122,17 @@ export class SupervisorClient {
     }
   }
 
-  async createWorkspaceSession(workDir: string): Promise<WorkspaceSessionHandle> {
+  async createWorkspaceSession(
+    workDir: string,
+    options?: CreateWorkspaceSessionOptions
+  ): Promise<WorkspaceSessionHandle> {
     return await fetchJson(asUrl(this.baseUrl, '/workspace-sessions'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ workDir }),
+      body: JSON.stringify({
+        workDir,
+        ...(options?.mcpServers ? { mcpServers: options.mcpServers } : {}),
+      }),
     });
   }
 
@@ -174,6 +181,7 @@ export class SupervisorClient {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           ...(options?.persona ? { persona: options.persona } : {}),
+          ...(options?.mcpServers ? { mcpServers: options.mcpServers } : {}),
         }),
       }
     );

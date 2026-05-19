@@ -91,7 +91,6 @@ mcpServers:
         prompt: 'look up something',
         persona: 'librarian',
         modelId: 'claude-3-5-sonnet',
-        personaMcpServers: { fs: { command: 'mcp-fs' } },
       })
     );
   });
@@ -156,7 +155,6 @@ mcpServers:
     );
     const args = createJob.mock.calls[0]![1] as Record<string, unknown>;
     expect(args.modelId).toBeUndefined();
-    expect(args.personaMcpServers).toBeUndefined();
   });
 
   it('unknown persona returns failed result listing available personas', async () => {

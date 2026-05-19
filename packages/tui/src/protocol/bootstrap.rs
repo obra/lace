@@ -50,9 +50,16 @@ pub fn bootstrap_session(
     };
 
     let session_params = if let Some(session_id) = load_session_id {
-        json!({ "sessionId": session_id })
+        json!({
+            "sessionId": session_id,
+            "cwd": workdir.to_string_lossy(),
+            "mcpServers": []
+        })
     } else {
-        json!({ "workDir": workdir.to_string_lossy() })
+        json!({
+            "cwd": workdir.to_string_lossy(),
+            "mcpServers": []
+        })
     };
 
     transport
@@ -266,8 +273,7 @@ fn parse_history_events(result: &Option<Value>) -> (Vec<ChatMessage>, Vec<Histor
     };
 
     // First pass: collect turn_ids that have tool_use events
-    let mut turns_with_tools: std::collections::HashSet<String> =
-        std::collections::HashSet::new();
+    let mut turns_with_tools: std::collections::HashSet<String> = std::collections::HashSet::new();
     for event in events {
         let Some(event_obj) = event.as_object() else {
             continue;
@@ -312,32 +318,32 @@ fn parse_history_events(result: &Option<Value>) -> (Vec<ChatMessage>, Vec<Histor
             }
             "message" => {
                 // Assistant message: data.content may be a string or array of content blocks
-                let text = data
-                    .and_then(|d| d.get("content"))
-                    .and_then(|c| {
-                        // Try as string first (legacy or simple format)
-                        if let Some(s) = c.as_str() {
-                            return Some(s.to_string());
+                let text = data.and_then(|d| d.get("content")).and_then(|c| {
+                    // Try as string first (legacy or simple format)
+                    if let Some(s) = c.as_str() {
+                        return Some(s.to_string());
+                    }
+                    // Try as array of content blocks
+                    if let Some(arr) = c.as_array() {
+                        let text_parts: Vec<String> = arr
+                            .iter()
+                            .filter_map(|block| {
+                                let obj = block.as_object()?;
+                                if obj.get("type").and_then(|v| v.as_str()) == Some("text") {
+                                    obj.get("text")
+                                        .and_then(|v| v.as_str())
+                                        .map(|s| s.to_string())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        if !text_parts.is_empty() {
+                            return Some(text_parts.join("\n"));
                         }
-                        // Try as array of content blocks
-                        if let Some(arr) = c.as_array() {
-                            let text_parts: Vec<String> = arr
-                                .iter()
-                                .filter_map(|block| {
-                                    let obj = block.as_object()?;
-                                    if obj.get("type").and_then(|v| v.as_str()) == Some("text") {
-                                        obj.get("text").and_then(|v| v.as_str()).map(|s| s.to_string())
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .collect();
-                            if !text_parts.is_empty() {
-                                return Some(text_parts.join("\n"));
-                            }
-                        }
-                        None
-                    });
+                    }
+                    None
+                });
 
                 // Create message if: has text content OR turn has tool calls (for inline rendering)
                 let has_tools = turn_id
@@ -382,10 +388,7 @@ fn parse_history_events(result: &Option<Value>) -> (Vec<ChatMessage>, Vec<Histor
                                     .map(|s| s.to_string())
                             });
 
-                        let input = data_obj
-                            .get("input")
-                            .cloned()
-                            .unwrap_or(Value::Null);
+                        let input = data_obj.get("input").cloned().unwrap_or(Value::Null);
                         let result = data_obj.get("result").cloned();
                         let job_id = data_obj
                             .get("jobId")
@@ -595,7 +598,10 @@ mod tests {
         assert_eq!(tool.turn_seq, Some(1));
         assert!(tool.result.is_some());
         // Verify input was captured
-        assert_eq!(tool.input.get("path").and_then(|v| v.as_str()), Some("/tmp/test.txt"));
+        assert_eq!(
+            tool.input.get("path").and_then(|v| v.as_str()),
+            Some("/tmp/test.txt")
+        );
     }
 
     #[test]

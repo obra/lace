@@ -39,17 +39,20 @@ function handleRequest(msg) {
   }
 
   if (method === 'session/load') {
-    respond(id, { sessionId: params?.sessionId, messageCount: 0, lastActive: new Date().toISOString() });
+    respond(id, { sessionId: params?.sessionId, messageCount: 0, updatedAt: new Date().toISOString() });
     return;
   }
 
   if (method === 'session/list') {
-    respond(id, { sessions: [{ sessionId: nextSessionId, workDir: params?.workDir ?? '.', created: new Date().toISOString() }] });
-    return;
-  }
-
-  if (method === 'session/cancel') {
-    respond(id, null);
+    respond(id, {
+      sessions: [{
+        sessionId: nextSessionId,
+        cwd: params?.cwd ?? '.',
+        created: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        messageCount: 0,
+      }],
+    });
     return;
   }
 

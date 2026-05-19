@@ -96,7 +96,7 @@ pub fn open_sessions(state: &mut AppState) -> Vec<Outbound> {
     vec![Outbound::JsonRpcRequest {
         id,
         method: "session/list".to_string(),
-        params: Some(serde_json::json!({ "workDir": state.workdir.clone() })),
+        params: Some(serde_json::json!({ "cwd": state.workdir.clone() })),
     }]
 }
 
@@ -198,7 +198,11 @@ pub fn submit_load_selected(state: &mut AppState) -> Vec<Outbound> {
     vec![Outbound::JsonRpcRequest {
         id,
         method: "session/load".to_string(),
-        params: Some(serde_json::json!({ "sessionId": session_id })),
+        params: Some(serde_json::json!({
+            "sessionId": session_id,
+            "cwd": state.workdir.clone(),
+            "mcpServers": []
+        })),
     }]
 }
 
@@ -263,7 +267,7 @@ pub fn handle_session_list_response(
                     continue;
                 };
                 let work_dir = sobj
-                    .get("workDir")
+                    .get("cwd")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
                 let created = sobj
@@ -271,7 +275,7 @@ pub fn handle_session_list_response(
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
                 let last_active = sobj
-                    .get("lastActive")
+                    .get("updatedAt")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
                 items.push(SessionListItem {
@@ -312,11 +316,16 @@ mod tests {
         handle_session_list_response(
             &mut state,
             &Some(
-                json!({"sessions":[{"sessionId":"sess_1","workDir":"/a"},{"sessionId":"sess_2","workDir":"/b"}]}),
+                json!({"sessions":[{"sessionId":"sess_1","cwd":"/a","updatedAt":"2026-01-01T00:00:00.000Z"},{"sessionId":"sess_2","cwd":"/b","updatedAt":"2026-01-02T00:00:00.000Z"}]}),
             ),
             None,
         );
         assert_eq!(state.sessions.items.len(), 2);
+        assert_eq!(state.sessions.items[0].work_dir.as_deref(), Some("/a"));
+        assert_eq!(
+            state.sessions.items[0].last_active.as_deref(),
+            Some("2026-01-01T00:00:00.000Z")
+        );
         assert_eq!(state.sessions.filtered, vec![0, 1]);
 
         state

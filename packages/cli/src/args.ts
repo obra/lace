@@ -75,14 +75,14 @@ export function helpText(): string {
     '',
     'Flags:',
     '  --agent-cmd "<command>"   Command to spawn (default: lace-agent if on PATH, else built agent)',
-    '  --workdir <path>          Sets agent cwd and session workDir (default: current dir)',
+    '  --workdir <path>          Sets agent cwd and session cwd (default: current dir)',
     '  --load <sessionId>        Load an existing session instead of creating a new one',
     '  --approval-mode <mode>    Passed to initialize.config.approvalMode (Lace agents may use it)',
     '  --timeout-ms <n>          Client-side request timeout in ms',
     '  --no-color                (reserved; currently unused)',
     '',
     'REPL:',
-    '  :help, :exit, :status, :new [workDir], :load <sessionId>, :list, :prompt <text>, :cancel, :raw <json>',
+    '  :help, :exit, :status, :new [cwd], :load <sessionId>, :list, :prompt <text>, :cancel, :raw <json>',
   ];
   return `${lines.join('\n')}\n`;
 }

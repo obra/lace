@@ -38,6 +38,7 @@ import {
   SessionNewResponseSchema,
   SessionPromptRequestSchema,
   SessionPromptResponseSchema,
+  type McpServerConfig,
 } from '@lace/ent-protocol';
 import {
   SupervisorAgentProcess,
@@ -74,6 +75,11 @@ export type AgentSessionHandle = {
 
 export type CreateAgentSessionOptions = {
   persona?: string;
+  mcpServers?: McpServerConfig[];
+};
+
+export type CreateWorkspaceSessionOptions = {
+  mcpServers?: McpServerConfig[];
 };
 
 export type SupervisorOptions = {
@@ -176,7 +182,11 @@ export class Supervisor {
       'session/new',
       SessionNewRequestSchema.shape.params,
       SessionNewResponseSchema.shape.result,
-      { cwd: workDir, mcpServers: [], ...(options?.persona ? { persona: options.persona } : {}) }
+      {
+        cwd: workDir,
+        mcpServers: options?.mcpServers ?? [],
+        ...(options?.persona ? { persona: options.persona } : {}),
+      }
     );
     activeSessionId = created.sessionId;
 
@@ -218,20 +228,6 @@ export class Supervisor {
       supervisorInitializeParams({ approvalMode: 'ask' })
     );
 
-    const stored = this.store.get(workspaceSessionId);
-    if (!stored) {
-      await agent.shutdown();
-      throw new Error(`Unknown workspaceSessionId: ${workspaceSessionId}`);
-    }
-
-    await requestEnt(
-      agent.peer,
-      'session/load',
-      SessionLoadRequestSchema.shape.params,
-      SessionLoadResponseSchema.shape.result,
-      { sessionId, cwd: stored.workDir, mcpServers: [] }
-    );
-
     const list = await requestEnt(
       agent.peer,
       'session/list',
@@ -245,10 +241,21 @@ export class Supervisor {
       throw new Error(`Session not found: ${sessionId}`);
     }
 
+    await requestEnt(
+      agent.peer,
+      'session/load',
+      SessionLoadRequestSchema.shape.params,
+      SessionLoadResponseSchema.shape.result,
+      { sessionId, cwd: meta.cwd, mcpServers: [] }
+    );
+
     return { agent, workDir: meta.cwd, pid: agent.proc.pid ?? -1 };
   }
 
-  async createWorkspaceSession(workDir: string): Promise<WorkspaceSessionHandle> {
+  async createWorkspaceSession(
+    workDir: string,
+    options?: CreateWorkspaceSessionOptions
+  ): Promise<WorkspaceSessionHandle> {
     const workspaceSessionId = this.store.createWorkspaceSessionId();
     this.store.create(workspaceSessionId, workDir);
 
@@ -258,7 +265,9 @@ export class Supervisor {
       agentsBySessionId: new Map(),
     });
 
-    const created = await this.createAgentSession(workspaceSessionId);
+    const created = await this.createAgentSession(workspaceSessionId, {
+      ...(options?.mcpServers ? { mcpServers: options.mcpServers } : {}),
+    });
 
     const ws = this.requireWorkspace(workspaceSessionId);
     ws.primarySessionId = created.sessionId;

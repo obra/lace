@@ -34,16 +34,6 @@ export type CreateJobOptions = {
   progressIntervalMs?: number;
   // Persona-bundle support for delegate jobs
   persona?: string;
-  personaMcpServers?: Record<
-    string,
-    {
-      command: string;
-      args?: string[];
-      env?: Record<string, string>;
-      enabled?: boolean;
-      tools?: Record<string, unknown>;
-    }
-  >;
   // Parsed persona container runtime, forwarded to subagent-job when present.
   personaContainerRuntime?: PersonaContainerRuntime;
   // Parsed persona box runtime (kata #62). Mutually exclusive with
@@ -406,7 +396,6 @@ export class JobManager {
             subagentContent: [{ type: 'text', text: options.prompt }],
             ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
             ...(options.persona ? { persona: options.persona } : {}),
-            ...(options.personaMcpServers ? { personaMcpServers: options.personaMcpServers } : {}),
             ...(options.personaContainerRuntime
               ? { personaContainerRuntime: options.personaContainerRuntime }
               : {}),

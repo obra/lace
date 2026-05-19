@@ -391,7 +391,7 @@ async function main(): Promise<void> {
       ':exit - exit',
       ':status - show connection + sessionId',
       ':configure - configure connection + model (Lace agents)',
-      ':new [workDir] - create a new session',
+      ':new [cwd] - create a new session',
       ':load <sessionId> - load an existing session',
       ':list - list sessions',
       ':prompt <text> - send a prompt',
@@ -609,7 +609,7 @@ async function main(): Promise<void> {
       if (cmd === 'status') {
         printBlock([
           `agent: pid=${conn.proc.pid}`,
-          `workDir: ${args.workDir}`,
+          `cwd: ${args.workDir}`,
           `sessionId: ${activeSessionId ?? '<none>'}`,
         ]);
         return;

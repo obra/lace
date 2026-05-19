@@ -2,6 +2,7 @@
 // ABOUTME: Uses Project class methods for session management with proper project-session relationships
 
 import { Project } from '@lace/web/lib/server/projects/project';
+import { mcpServersForProject } from '@lace/web/lib/server/projects/project-mcp-servers';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
@@ -74,7 +75,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     const supervisor = await getSupervisor();
-    const created = await supervisor.createWorkspaceSession(project.getWorkingDirectory());
+    const created = await supervisor.createWorkspaceSession(project.getWorkingDirectory(), {
+      mcpServers: mcpServersForProject(project),
+    });
     await supervisor.updateWorkspaceSession(created.workspaceSessionId, {
       projectId,
       name: sessionName,
@@ -94,14 +97,6 @@ export async function action({ request, params }: Route.ActionArgs) {
         connectionId: validatedData.providerInstanceId,
         modelId: validatedData.modelId,
         approvalMode: 'ask',
-        mcpServers: Object.entries(project.getMCPServers()).map(([name, config]) => ({
-          name,
-          command: config.command,
-          ...(config.args ? { args: config.args } : {}),
-          ...(config.env ? { env: config.env } : {}),
-          enabled: config.enabled,
-          tools: config.tools,
-        })),
       },
     });
 

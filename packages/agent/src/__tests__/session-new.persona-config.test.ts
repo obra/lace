@@ -85,7 +85,6 @@ You are a frontmatter persona.`
 
     const created = (await client.request('session/new', {
       cwd: tempDir,
-      mcpServers: [],
       persona: 'frontmatter',
     })) as { sessionId: string };
 
@@ -114,7 +113,6 @@ You are a frontmatter persona.`
 
     const created = (await client.request('session/new', {
       cwd: tempDir,
-      mcpServers: [],
       persona: 'bodyonly',
     })) as { sessionId: string };
 
@@ -143,7 +141,6 @@ persona body`
 
     const created = (await client.request('session/new', {
       cwd: tempDir,
-      mcpServers: [],
       persona: 'modelpersona',
       config: { modelId: 'request-wins-model' },
     })) as { sessionId: string };
@@ -188,7 +185,6 @@ scoped persona`
 
     const created = (await client.request('session/new', {
       cwd: tempDir,
-      mcpServers: [],
       persona: 'scoped',
     })) as { sessionId: string };
 
@@ -224,7 +220,6 @@ mcp-only persona`
 
     const created = (await client.request('session/new', {
       cwd: tempDir,
-      mcpServers: [],
       persona: 'mcponly',
     })) as { sessionId: string };
 

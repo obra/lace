@@ -90,6 +90,19 @@ function handleRequest(msg) {
     return;
   }
 
+  if (method === 'ent/providers/list') {
+    respond(id, {
+      providers: [
+        {
+          providerId: 'openai',
+          displayName: 'OpenAI',
+          type: 'openai',
+        },
+      ],
+    });
+    return;
+  }
+
   if (method === 'ent/connections/upsert') {
     respond(id, { connectionId, providerId: params?.providerId ?? 'openai', created: true });
     return;

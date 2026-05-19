@@ -22,7 +22,7 @@ fn e2e_session_update_can_arrive_as_request() {
         .send_line(jsonrpc::encode_request(
             json!("c_2"),
             "session/new",
-            Some(json!({"workDir":"."})),
+            Some(json!({"cwd":".","mcpServers": []})),
         ))
         .unwrap();
 

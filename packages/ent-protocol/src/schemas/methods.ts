@@ -111,7 +111,6 @@ const InitializeParamsSchema = z
             'dangerouslySkipPermissions',
           ])
           .optional(),
-        mcpServers: z.array(McpServerConfigSchema).optional(),
         maxBudgetUsd: z.number().optional(),
         maxThinkingTokens: z.number().optional(),
         enableFileCheckpointing: z.boolean().optional(),
@@ -618,12 +617,6 @@ const EntSessionConfigureParamsSchema = z
      * Keys/values must be strings to keep the transport simple and avoid leaking objects.
      */
     environment: z.record(z.string(), z.string()).optional(),
-    /**
-     * Working directory to use for this session. Supervisor remains responsible for sandboxing
-     * and validating the path; the agent should treat it as an opaque string.
-     */
-    cwd: z.string().optional(),
-    mcpServers: z.array(McpServerConfigSchema).optional(),
     approvalMode: z
       .enum([
         'ask',

@@ -18,7 +18,7 @@ import {
   createEntTestConnection,
   deleteEntTestConnection,
 } from '@lace/web/test-utils/ent-test-helpers';
-import { shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
+import { getSupervisor, shutdownSupervisorForTests } from '@lace/web/lib/server/supervisor-service';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -270,6 +270,53 @@ describe('Session API endpoints under projects', () => {
       expect(data.id).toBeDefined();
       expect(data.name).toBe('Provider Instance Session');
       expect(data.createdAt).toBeDefined();
+    });
+
+    it('passes project MCP servers through ACP session creation', async () => {
+      const project = Project.getById(projectId);
+      expect(project).toBeDefined();
+      project!.addMCPServer('project-test', {
+        command: process.execPath,
+        args: ['--version'],
+        enabled: false,
+        tools: {},
+      });
+
+      const supervisor = await getSupervisor();
+      const createSpy = vi.spyOn(supervisor, 'createWorkspaceSession');
+      const requestSpy = vi.spyOn(supervisor, 'agentRequest');
+
+      const request = new Request(`http://localhost/api/projects/${projectId}/sessions`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Project MCP Session',
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      const response = await POST(createActionArgs(request, { projectId }));
+
+      expect(response.status).toBe(201);
+      expect(createSpy).toHaveBeenCalledWith(project!.getWorkingDirectory(), {
+        mcpServers: [
+          {
+            name: 'project-test',
+            command: process.execPath,
+            args: ['--version'],
+            enabled: false,
+            tools: {},
+          },
+        ],
+      });
+      expect(requestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'ent/session/configure',
+          requestParams: expect.not.objectContaining({
+            mcpServers: expect.anything(),
+          }),
+        })
+      );
     });
 
     it('should spawn background session naming with SSE events for initialMessage', async () => {

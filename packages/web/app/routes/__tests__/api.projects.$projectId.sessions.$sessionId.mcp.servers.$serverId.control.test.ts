@@ -1,5 +1,5 @@
 // ABOUTME: Integration tests for project session MCP server control API
-// ABOUTME: Validates start/stop/restart via ent/session/configure on supervisor-managed agents
+// ABOUTME: Validates start/stop/restart via ACP session/resume on supervisor-managed agents
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { action } from '@lace/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control';
@@ -53,6 +53,7 @@ describe('Session MCP Server Control API', () => {
 
   it('starts an MCP server', async () => {
     const { project, supervisor, created } = await createProjectAndSession(context.tempProjectDir);
+    const requestSpy = vi.spyOn(supervisor, 'agentRequest');
 
     const request = new Request(
       `http://localhost/api/projects/${project.getId()}/sessions/${created.workspaceSessionId}/mcp/servers/test/control`,
@@ -75,6 +76,23 @@ describe('Session MCP Server Control API', () => {
 
     expect(response.status).toBe(200);
     expect(data.serverId).toBe('test');
+    expect(requestSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceSessionId: created.workspaceSessionId,
+        sessionId: created.sessionId,
+        method: 'session/resume',
+        requestParams: expect.objectContaining({
+          sessionId: created.sessionId,
+          cwd: context.tempProjectDir,
+          mcpServers: [
+            expect.objectContaining({
+              name: 'test',
+              enabled: true,
+            }),
+          ],
+        }),
+      })
+    );
 
     const status = (await supervisor.agentRequest({
       workspaceSessionId: created.workspaceSessionId,
@@ -94,8 +112,10 @@ describe('Session MCP Server Control API', () => {
     await supervisor.agentRequest({
       workspaceSessionId: created.workspaceSessionId,
       sessionId: created.sessionId,
-      method: 'ent/session/configure',
+      method: 'session/resume',
       requestParams: {
+        sessionId: created.sessionId,
+        cwd: context.tempProjectDir,
         mcpServers: [
           {
             name: 'test',
@@ -148,8 +168,10 @@ describe('Session MCP Server Control API', () => {
     await supervisor.agentRequest({
       workspaceSessionId: created.workspaceSessionId,
       sessionId: created.sessionId,
-      method: 'ent/session/configure',
+      method: 'session/resume',
       requestParams: {
+        sessionId: created.sessionId,
+        cwd: context.tempProjectDir,
         mcpServers: [
           {
             name: 'test',

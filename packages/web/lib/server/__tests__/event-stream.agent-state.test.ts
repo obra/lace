@@ -222,8 +222,8 @@ describe('event stream agent state', () => {
         await supervisor.agentNotify({
           workspaceSessionId: created.workspaceSessionId,
           sessionId: created.sessionId,
-          method: '$/cancel_request',
-          notifyParams: { requestId: 'test_cancel' },
+          method: 'session/cancel',
+          notifyParams: { sessionId: created.sessionId },
         });
 
         const result = (await promptPromise) as { stopReason?: unknown };

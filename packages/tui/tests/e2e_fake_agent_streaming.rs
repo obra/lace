@@ -22,7 +22,7 @@ fn e2e_streaming_text_delta_and_turn_end() {
         .send_line(jsonrpc::encode_request(
             json!("c_2"),
             "session/new",
-            Some(json!({"workDir": workdir.path().to_string_lossy()})),
+            Some(json!({"cwd": workdir.path().to_string_lossy(), "mcpServers": []})),
         ))
         .unwrap();
 
