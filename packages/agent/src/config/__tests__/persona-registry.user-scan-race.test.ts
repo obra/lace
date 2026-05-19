@@ -48,6 +48,23 @@ describe('PersonaRegistry user-persona scan with missing path at construction', 
     expect(personas.map((p) => p.name)).toContain('test-shell');
   });
 
+  it('handles userPersonasPaths: [] without scanning or erroring', () => {
+    // The empty-paths branch in loadUserPersonas: the loop never iterates,
+    // anyPathScanned stays false, but length === 0 means the cache expiry
+    // is still set so subsequent calls are no-ops. Without that branch,
+    // every list call would re-enter the no-op scan loop.
+    const registry = new PersonaRegistry({
+      bundledPersonasPath: bundledPath,
+      userPersonasPaths: [],
+    });
+
+    // Multiple calls return a consistent empty result and do not throw.
+    expect(registry.listAvailablePersonas()).toEqual([]);
+    expect(registry.listAvailablePersonas()).toEqual([]);
+    expect(registry.hasPersona('anything')).toBe(false);
+    expect(registry.getPersonaPath('anything')).toBeNull();
+  });
+
   it('still caches when the path exists but is empty', () => {
     // Empty-but-existing dir is a legit empty result — cache should hold.
     mkdirSync(userPersonasDir, { recursive: true });
