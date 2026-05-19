@@ -157,7 +157,7 @@ export class ContainerManager {
     }
   }
 
-  private logBestEffortFailure(op: string, containerId: string, error: unknown): void {
+  private logBestEffortFailure(op: 'stop' | 'remove', containerId: string, error: unknown): void {
     if (error instanceof ContainerNotFoundError) {
       logger.debug(`ContainerManager.${op}: container already gone`, { containerId });
       return;
