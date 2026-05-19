@@ -91,6 +91,37 @@ describe('runStartupReaper', () => {
     });
   });
 
+  it('does not reap a box container (sen-box) when listed alongside lace- containers (kata #62)', async () => {
+    // Box containers intentionally lack the lace- prefix so the startup
+    // reaper's scan ignores them. ContainerManager.reapOrphans filters by
+    // the `lace-` id prefix; verify by handing it a mixed list and asserting
+    // that sen-box survives.
+    const reaped: string[] = [];
+    const fakeManager = {
+      reapOrphans: vi.fn(async (idPrefix: string, liveSpecNames: Set<string>) => {
+        // Simulate the real ContainerManager prefix-scan against a daemon
+        // that contains both lace-* and sen-box.
+        const ids = ['lace-sess1-shell', 'lace-sess1-worker', 'sen-box', 'lace-orphan'];
+        const scanPrefix = `lace-${idPrefix}`;
+        for (const id of ids) {
+          if (!id.startsWith(scanPrefix)) continue;
+          const name = id.slice('lace-'.length);
+          if (!liveSpecNames.has(name)) reaped.push(name);
+        }
+        return { reaped };
+      }),
+    } as unknown as ContainerManager;
+
+    await runStartupReaper(fakeManager);
+
+    // sen-box was passed to the reaper alongside lace- containers, but the
+    // prefix filter never matches it — so it never enters the reaped set.
+    expect(reaped).not.toContain('sen-box');
+    expect(reaped).toContain('sess1-shell');
+    expect(reaped).toContain('sess1-worker');
+    expect(reaped).toContain('orphan');
+  });
+
   it('skips silently when no container runtime is available for the platform', async () => {
     await expect(runStartupReaper(null)).resolves.toBeUndefined();
 

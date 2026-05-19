@@ -598,6 +598,23 @@ describe('DockerContainerRuntime', () => {
       expect(result[1]).toEqual({ id: 'lace-b', state: 'stopped' });
     });
 
+    it('list() filter excludes non-lace containers such as sen-box (kata #62)', async () => {
+      // The box runtime intentionally lives outside the lace- namespace so the
+      // startup reaper (which uses list()) never considers it for reaping.
+      // The CLI itself returns whatever the daemon gives back; the filter is
+      // both at the CLI (`--filter name=lace-`) and the JSON post-parse loop.
+      const lines = [
+        JSON.stringify({ ID: 'a', Names: 'lace-a', State: 'running' }),
+        JSON.stringify({ ID: 'b', Names: 'sen-box', State: 'running' }),
+      ].join('\n');
+      setExecFileResponses([{ stdout: lines, stderr: '' }]);
+
+      const result = await runtime.list();
+
+      expect(result.map((c) => c.id)).not.toContain('sen-box');
+      expect(result.map((c) => c.id)).toContain('lace-a');
+    });
+
     it('falls back to cached containers when docker ps fails', async () => {
       const id = await runtime.create({
         name: 'svc',
