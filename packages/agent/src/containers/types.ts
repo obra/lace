@@ -31,6 +31,11 @@ export interface ContainerConfig {
   // Resource limits (optional for now)
   memory?: number; // bytes
   cpuShares?: number;
+
+  // Docker --restart policy. Only 'unless-stopped' is supported in v1; used by
+  // box-runtime containers so the daemon resurrects them after host reboot.
+  // Absent ⇒ no restart flag emitted (default no-restart behavior).
+  restartPolicy?: 'unless-stopped';
 }
 
 export interface ContainerMount {
@@ -92,6 +97,24 @@ export interface ContainerRuntime {
   // Information
   inspect(containerId: string): ContainerInfo | Promise<ContainerInfo>;
   list(): ContainerInfo[] | Promise<ContainerInfo[]>;
+
+  /**
+   * Live-inspect against the daemon (not the in-process cache). Returns null
+   * when the container does not exist on the daemon side. Used by
+   * ContainerManager to adopt boxes that survived a parent restart.
+   *
+   * Distinct from sync `inspect()`: the latter reads only the in-memory cache.
+   * Subclasses may fall back to the cached inspect when the daemon-side
+   * concept does not apply (e.g. AppleContainerRuntime).
+   */
+  daemonInspect(containerId: string): Promise<ContainerInfo | null>;
+
+  /**
+   * Register an existing daemon-side container into the runtime's in-process
+   * caches so subsequent start/exec calls work. Idempotent and no-op when the
+   * runtime has no caches to populate.
+   */
+  adopt(config: ContainerConfig, state: ContainerState): Promise<void>;
 
   // Path translation
   translateToContainer(hostPath: string, containerId: string): string;

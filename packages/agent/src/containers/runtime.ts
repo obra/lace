@@ -34,6 +34,37 @@ export abstract class BaseContainerRuntime implements ContainerRuntime {
     return info;
   }
 
+  /**
+   * Default daemon-side inspect: falls back to the cached `inspect()` and
+   * returns null on NotFound. Runtimes with a real daemon (DockerContainerRuntime)
+   * override this to shell out for an authoritative answer.
+   */
+  async daemonInspect(containerId: string): Promise<ContainerInfo | null> {
+    try {
+      return this.inspect(containerId);
+    } catch (error) {
+      if (error instanceof ContainerNotFoundError) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * Default adopt: register the container + mounts into the in-process caches
+   * so subsequent start/exec calls succeed. Idempotent.
+   */
+  async adopt(config: ContainerConfig, state: ContainerState): Promise<void> {
+    const id = config.id;
+    if (!id) {
+      throw new Error('adopt() requires config.id to identify the existing container');
+    }
+    if (!this.containers.has(id)) {
+      this.containers.set(id, { id, state });
+    } else {
+      this.containers.get(id)!.state = state;
+    }
+    this.registerMounts(id, config);
+  }
+
   list(): Promise<ContainerInfo[]> {
     return Promise.resolve(Array.from(this.containers.values()));
   }
