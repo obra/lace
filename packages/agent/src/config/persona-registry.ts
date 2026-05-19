@@ -180,8 +180,13 @@ export class PersonaRegistry {
             this.userPersonasCache.set(name, path.join(userPersonasPath, file));
           }
         }
-      } catch {
-        // Path may not exist or be readable; skip silently and continue with remaining paths.
+      } catch (error) {
+        // Path may not exist or be readable; skip and continue with remaining paths.
+        // Log at debug so a misbehaving mount/symlink can be diagnosed.
+        logger.debug('User persona path scan failed', {
+          userPersonasPath,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
