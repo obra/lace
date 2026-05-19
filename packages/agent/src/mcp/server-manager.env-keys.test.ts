@@ -7,7 +7,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MCPServerManager } from './server-manager';
-import type { MCPServerConfig } from './types';
+import type { MCPServerConfig } from '@lace/agent/config/mcp-types';
 import { reconcileMcpServersForActiveSession } from '../rpc/handlers/mcp-servers';
 import type { AgentServerState } from '../server-types';
 import type { LoadedSession, SessionState } from '../storage/session-store';
