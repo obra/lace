@@ -136,8 +136,10 @@ export function registerJobHandlers(peer: JsonRpcPeer, state: AgentServerState):
       // Kill the process with SIGTERM, then SIGKILL if still running
       await killJob(job, { waitMs: 500, forceKill: true });
 
-      // Wait extra time after SIGKILL for stubborn processes
-      if (!job.finished && job.proc?.exitCode === null) {
+      // Wait extra time after SIGKILL for stubborn processes.
+      // !job.finished works for both native (proc) and container-exec jobs;
+      // proc.exitCode would always be null for container jobs since proc is unset.
+      if (!job.finished) {
         await Promise.race([
           job.completion,
           new Promise<void>((resolve) => setTimeout(resolve, 1_500)),
