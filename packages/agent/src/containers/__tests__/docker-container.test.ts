@@ -614,6 +614,155 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
+  describe('box runtime: restart policy + verbatim id (kata #62)', () => {
+    it('emits --restart=unless-stopped when config.restartPolicy set', async () => {
+      await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+        restartPolicy: 'unless-stopped',
+      });
+
+      const args = findCallWithSubcommand('create');
+      expect(args).toBeDefined();
+      expect(args).toContain('--restart=unless-stopped');
+    });
+
+    it('emits no --restart flag when restartPolicy is absent', async () => {
+      await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+
+      const args = findCallWithSubcommand('create');
+      expect(args).toBeDefined();
+      const hasRestart = args!.some((a) => a.startsWith('--restart'));
+      expect(hasRestart).toBe(false);
+    });
+
+    it('uses config.id verbatim (no lace- prefix) when id+name both set with distinct id', async () => {
+      // This shape is produced by ContainerManager when spec.containerId is
+      // present: id is the daemon-side identifier, name is the spec name.
+      const id = await runtime.create({
+        id: 'sen-box',
+        name: 'box',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+
+      expect(id).toBe('sen-box');
+      const args = findCallWithSubcommand('create');
+      expect(args).toContain('--name');
+      expect(args).toContain('sen-box');
+      // Must NOT have been auto-prefixed.
+      expect(args).not.toContain('lace-sen-box');
+      expect(args).not.toContain('lace-box');
+    });
+
+    it('still prefixes ids that lack the lace- prefix only when set via config.name', async () => {
+      // Regression: making sure config.name path remains intact.
+      const id = await runtime.create({
+        name: 'persona-x',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+      expect(id).toBe('lace-persona-x');
+    });
+
+    it('legacy: config.id alone (no name) still gets prefix + uuid suffix', async () => {
+      // Regression check: the box verbatim path requires BOTH id and name
+      // present; setting only id keeps the legacy auto-suffix behavior.
+      const id = await runtime.create({
+        id: 'persona-x',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+      expect(id).toMatch(/^lace-persona-x-[a-f0-9]{8}$/);
+    });
+  });
+
+  describe('daemonInspect (kata #62)', () => {
+    it('shells out to docker inspect and returns parsed info without requiring cache', async () => {
+      const payload = {
+        Id: 'sha256:abc',
+        Name: '/sen-box',
+        State: {
+          Status: 'running',
+          Running: true,
+          Pid: 99,
+          ExitCode: 0,
+          StartedAt: '2026-05-19T10:00:00Z',
+          FinishedAt: '0001-01-01T00:00:00Z',
+        },
+      };
+      setExecFileResponses([{ stdout: JSON.stringify(payload), stderr: '' }]);
+
+      const info = await runtime.daemonInspect('sen-box');
+      expect(info).not.toBeNull();
+      expect(info!.id).toBe('sen-box');
+      expect(info!.state).toBe('running');
+
+      const args = findCallWithSubcommand('inspect');
+      expect(args).toEqual(['inspect', 'sen-box', '--format', '{{json .}}']);
+    });
+
+    it('returns null when docker reports no such container', async () => {
+      setExecFileResponses([
+        {
+          error: Object.assign(new Error('inspect failed'), {
+            code: 1,
+            stderr: 'Error: No such object: sen-box',
+          }),
+        },
+      ]);
+
+      const info = await runtime.daemonInspect('sen-box');
+      expect(info).toBeNull();
+    });
+
+    it('returns null when docker CLI is missing (ENOENT)', async () => {
+      setExecFileResponses([
+        { error: Object.assign(new Error('spawn docker ENOENT'), { code: 'ENOENT' }) },
+      ]);
+
+      const info = await runtime.daemonInspect('sen-box');
+      expect(info).toBeNull();
+    });
+  });
+
+  describe('adopt (kata #62)', () => {
+    it('registers an existing container in cache so start/execStream see it', async () => {
+      await runtime.adopt(
+        {
+          id: 'sen-box',
+          image: 'alpine:latest',
+          workingDirectory: '/work',
+          mounts: [{ source: '/host/work', target: '/work' }],
+        },
+        'running'
+      );
+
+      // Adopted container is now in the cache.
+      const info = runtime.inspect('sen-box');
+      expect(info.id).toBe('sen-box');
+      expect(info.state).toBe('running');
+      // Mount registration is in place.
+      expect(runtime.translateToContainer('/host/work/index.ts', 'sen-box')).toBe('/work/index.ts');
+    });
+
+    it('throws when config.id is missing', async () => {
+      await expect(
+        runtime.adopt({ image: 'alpine:latest', workingDirectory: '/w', mounts: [] }, 'running')
+      ).rejects.toThrow(/config.id/);
+    });
+  });
+
   describe('translateToContainer / translateToHost', () => {
     it('translates host paths to container paths via registered mounts', async () => {
       const id = await runtime.create({

@@ -65,6 +65,21 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
   }
 
   private resolveContainerName(config: ContainerConfig): string {
+    // Box runtime supplies a verbatim id that intentionally lacks the `lace-`
+    // prefix (so the startup reaper's `name=lace-` scan ignores it). Honor
+    // config.id directly when BOTH id and name are present and id is already a
+    // distinct, fully-qualified daemon-side identifier — that pattern is only
+    // produced by ContainerManager when spec.containerId is set.
+    if (
+      config.id &&
+      config.id.length > 0 &&
+      config.name &&
+      config.name.length > 0 &&
+      config.id !== config.name &&
+      !config.id.startsWith(LACE_PREFIX)
+    ) {
+      return config.id;
+    }
     if (config.name && config.name.length > 0) {
       return this.ensurePrefixed(config.name);
     }
@@ -77,6 +92,10 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
 
   private buildCreateArgs(name: string, config: ContainerConfig): string[] {
     const args: string[] = ['create', '--name', name];
+
+    if (config.restartPolicy) {
+      args.push(`--restart=${config.restartPolicy}`);
+    }
 
     if (config.workingDirectory) {
       args.push('-w', config.workingDirectory);
@@ -517,6 +536,55 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
         error instanceof Error ? error : undefined
       );
     }
+  }
+
+  /**
+   * Live daemon-side inspect that does NOT require the container to be in the
+   * in-process cache. Returns null if the daemon reports no such container.
+   * Used by ContainerManager to adopt boxes resurrected by Docker's restart
+   * policy after a parent process restart.
+   */
+  async daemonInspect(containerId: string): Promise<ContainerInfo | null> {
+    try {
+      const { stdout } = await execFileAsync(this.dockerBin, [
+        'inspect',
+        containerId,
+        '--format',
+        '{{json .}}',
+      ]);
+      const parsed = JSON.parse(stdout) as DockerInspectJson;
+      return this.dockerInspectToInfo(containerId, parsed);
+    } catch (error: unknown) {
+      if (this.isNotFoundError(error)) {
+        return null;
+      }
+      if (this.isDockerMissingError(error)) {
+        return null;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ContainerError(
+        `Failed to daemon-inspect container: ${message}`,
+        containerId,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Register an existing daemon-side container into the in-process cache and
+   * mount map. Mirrors the bookkeeping `create()` performs after a successful
+   * `docker create`, so subsequent `start()` and `execStream()` work against
+   * an adopted container.
+   */
+  async adopt(config: ContainerConfig, state: ContainerState): Promise<void> {
+    const id = config.id;
+    if (!id) {
+      throw new ContainerError('adopt() requires config.id', undefined);
+    }
+    const info: ContainerInfo = this.containers.get(id) ?? { id, state };
+    info.state = state;
+    this.containers.set(id, info);
+    this.registerMounts(id, config);
   }
 
   private dockerInspectToInfo(containerId: string, parsed: DockerInspectJson): ContainerInfo {
