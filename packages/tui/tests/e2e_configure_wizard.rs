@@ -47,15 +47,21 @@ fn e2e_configure_wizard_against_fake_agent() {
     let deadline = Instant::now() + Duration::from_secs(10);
     let mut saw_init = false;
     let mut saw_new = false;
+    let mut session_id: Option<String> = None;
     while Instant::now() < deadline {
         let line = common::wait_for_line(&transport, deadline);
         let inbound = jsonrpc::parse_inbound(&line).unwrap();
-        if let jsonrpc::InboundMessage::Response { id, .. } = inbound {
+        if let jsonrpc::InboundMessage::Response { id, result, .. } = inbound {
             if id == json!("c_1") {
                 saw_init = true;
             }
             if id == json!("c_2") {
                 saw_new = true;
+                session_id = result
+                    .as_ref()
+                    .and_then(|v| v.get("sessionId"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
             }
             if saw_init && saw_new {
                 break;
@@ -64,9 +70,11 @@ fn e2e_configure_wizard_against_fake_agent() {
     }
     assert!(saw_init);
     assert!(saw_new);
+    assert_eq!(session_id.as_deref(), Some("sess_test"));
 
     let mut state = AppState::new_with_paths(None, None);
     state.next_client_seq = 3;
+    state.session_id = session_id;
 
     let out = config_wizard::open(&mut state);
     assert_eq!(out.len(), 1);

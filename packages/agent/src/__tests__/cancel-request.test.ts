@@ -185,6 +185,57 @@ describe('ACP session cancellation', () => {
     server.close();
   });
 
+  it('emits a cancelled tool update for active-turn permission prompts', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    const updates: Array<Record<string, unknown>> = [];
+
+    client.onRequest('session/request_permission', async () => new Promise(() => undefined));
+    client.onRequest('session/update', async (params) => {
+      updates.push(params as Record<string, unknown>);
+      return undefined;
+    });
+
+    await client.request('initialize', defaultInitializeParams());
+    const created = (await client.request('session/new', {
+      cwd: process.cwd(),
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    const abortController = new AbortController();
+    state.activeTurn = {
+      turnId: 'turn_active_permission',
+      startedAt: new Date().toISOString(),
+      status: 'awaiting_permission',
+      abortController,
+    };
+
+    const { permissionResult } = await startBackgroundPermissionRequest({
+      server,
+      state,
+      tempDir,
+      sessionId: created.sessionId,
+      turnId: 'turn_active_permission',
+      toolCallId: 'tool_active_permission',
+    });
+
+    client.notify('session/cancel', { sessionId: created.sessionId });
+
+    await expect(permissionResult).rejects.toThrow('cancelled');
+    expect(updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'tool_use',
+          toolCallId: 'tool_active_permission',
+          status: 'cancelled',
+        }),
+      ])
+    );
+
+    client.close();
+    server.close();
+  });
+
   it('aborts running job permission controllers on session/cancel notification', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));

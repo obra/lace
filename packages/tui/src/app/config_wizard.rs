@@ -18,6 +18,8 @@ pub struct ConfigWizardState {
     pub credential_values: std::collections::BTreeMap<String, String>,
     pub error_message: Option<String>,
     pub forced_connection_id: Option<String>,
+    pub pending_connection_config: bool,
+    pub pending_model_config: bool,
     /// Filter query for model selection
     pub model_filter: String,
 }
@@ -85,6 +87,8 @@ impl ConfigWizardState {
             credential_values: std::collections::BTreeMap::new(),
             error_message: None,
             forced_connection_id: None,
+            pending_connection_config: false,
+            pending_model_config: false,
             model_filter: String::new(),
         }
     }
@@ -106,6 +110,8 @@ pub fn open(state: &mut AppState) -> Vec<Outbound> {
     state.config_wizard.credential_values.clear();
     state.config_wizard.error_message = None;
     state.config_wizard.forced_connection_id = None;
+    state.config_wizard.pending_connection_config = false;
+    state.config_wizard.pending_model_config = false;
     state.config_wizard.model_filter.clear();
 
     let id = state.next_client_id();
@@ -147,6 +153,8 @@ pub fn open_for_connection(state: &mut AppState) -> Vec<Outbound> {
     state.config_wizard.credential_values.clear();
     state.config_wizard.error_message = None;
     state.config_wizard.forced_connection_id = Some(it.connection_id.clone());
+    state.config_wizard.pending_connection_config = false;
+    state.config_wizard.pending_model_config = false;
     state.config_wizard.model_filter.clear();
 
     let id = state.next_client_id();
@@ -163,6 +171,8 @@ pub fn close(state: &mut AppState) {
     state.config_wizard.error_message = None;
     state.config_wizard.credential_input.clear();
     state.config_wizard.forced_connection_id = None;
+    state.config_wizard.pending_connection_config = false;
+    state.config_wizard.pending_model_config = false;
 }
 
 pub fn prev(state: &mut AppState) {
@@ -267,10 +277,14 @@ pub fn handle_response(
             state.config_wizard.step = ConfigWizardStep::NotSupported;
             state.config_wizard.error_message =
                 Some("configuration not supported by this agent".to_string());
+            state.config_wizard.pending_connection_config = false;
+            state.config_wizard.pending_model_config = false;
             return Vec::new();
         }
         state.config_wizard.step = ConfigWizardStep::Error;
         state.config_wizard.error_message = Some(err.to_string());
+        state.config_wizard.pending_connection_config = false;
+        state.config_wizard.pending_model_config = false;
         return Vec::new();
     }
 
@@ -281,8 +295,8 @@ pub fn handle_response(
         "ent/connections/credentials/start" => on_credentials_start(state, result),
         "ent/connections/credentials/submit" => on_credentials_submit(state, result),
         "ent/models/list" => on_models_list(state, result),
-        "ent/session/configure" => on_session_configure(state, result),
-        "session/set_config_option" => on_session_configure(state, result),
+        "ent/session/configure" => on_connection_configure(state, result),
+        "session/set_config_option" => on_model_config_option(state, result),
         _ => Vec::new(),
     }
 }
@@ -697,21 +711,28 @@ fn submit_model(state: &mut AppState) -> Vec<Outbound> {
     state.config_wizard.model_id = Some(model_id.clone());
     state.config_wizard.step = ConfigWizardStep::Applying;
 
+    let Some(session_id) = state.session_id.clone() else {
+        state.config_wizard.step = ConfigWizardStep::Error;
+        state.config_wizard.error_message = Some("missing session id".to_string());
+        return Vec::new();
+    };
     let Some(connection_id) = state.config_wizard.connection_id.clone().filter(|c| !c.is_empty())
     else {
         state.config_wizard.step = ConfigWizardStep::Error;
         state.config_wizard.error_message = Some("missing connection id".to_string());
         return Vec::new();
     };
+    state.config_wizard.pending_connection_config = true;
+    state.config_wizard.pending_model_config = true;
     let configure_id = state.next_client_id();
     let model_config_id = state.next_client_id();
-    let mut out = vec![Outbound::JsonRpcRequest {
-        id: configure_id,
-        method: "ent/session/configure".to_string(),
-        params: Some(json!({ "connectionId": connection_id })),
-    }];
-    if let Some(session_id) = state.session_id.clone() {
-        out.push(Outbound::JsonRpcRequest {
+    vec![
+        Outbound::JsonRpcRequest {
+            id: configure_id,
+            method: "ent/session/configure".to_string(),
+            params: Some(json!({ "connectionId": connection_id })),
+        },
+        Outbound::JsonRpcRequest {
             id: model_config_id,
             method: "session/set_config_option".to_string(),
             params: Some(json!({
@@ -719,9 +740,8 @@ fn submit_model(state: &mut AppState) -> Vec<Outbound> {
                 "configId": "model",
                 "value": model_id,
             })),
-        });
-    }
-    out
+        },
+    ]
 }
 
 fn model_disabled(o: &serde_json::Map<String, Value>) -> bool {
@@ -734,20 +754,36 @@ fn model_disabled(o: &serde_json::Map<String, Value>) -> bool {
         .is_some_and(|s| s == "disabled")
 }
 
-fn on_session_configure(state: &mut AppState, result: &Option<Value>) -> Vec<Outbound> {
-    let mut connection_id = state.config_wizard.connection_id.clone();
-    let model_id = state.config_wizard.model_id.clone();
-    if let Some(Value::Object(obj)) = result {
-        if let Some(Value::Object(cfg)) = obj.get("config") {
-            if let Some(cid) = cfg.get("connectionId").and_then(|v| v.as_str()) {
-                connection_id = Some(cid.to_string());
-            }
-        }
-    }
+fn on_connection_configure(state: &mut AppState, result: &Option<Value>) -> Vec<Outbound> {
+    let connection_id = crate::protocol::ent::extract_session_configure_connection(result)
+        .or_else(|| state.config_wizard.connection_id.clone());
     state.connection_id = connection_id.clone();
-    state.model_id = model_id.clone();
     state.config_wizard.connection_id = connection_id;
+    state.config_wizard.pending_connection_config = false;
+
+    finish_session_configure_if_ready(state)
+}
+
+fn on_model_config_option(state: &mut AppState, result: &Option<Value>) -> Vec<Outbound> {
+    if !state.config_wizard.pending_model_config {
+        return Vec::new();
+    }
+
+    let model_id = crate::protocol::ent::extract_session_config_option_model(result)
+        .or_else(|| state.config_wizard.model_id.clone());
     state.config_wizard.model_id = model_id;
+    state.config_wizard.pending_model_config = false;
+
+    finish_session_configure_if_ready(state)
+}
+
+fn finish_session_configure_if_ready(state: &mut AppState) -> Vec<Outbound> {
+    if state.config_wizard.pending_connection_config || state.config_wizard.pending_model_config {
+        return Vec::new();
+    }
+
+    state.connection_id = state.config_wizard.connection_id.clone();
+    state.model_id = state.config_wizard.model_id.clone();
     state.config_wizard.step = ConfigWizardStep::Done;
     state.prefs.last_connection_id = state.connection_id.clone();
     state.prefs.last_model_id = state.model_id.clone();
@@ -896,6 +932,107 @@ mod tests {
         }
         assert_eq!(state.prefs.last_connection_id, Some("c1".to_string()));
         assert_eq!(state.prefs.last_model_id, Some("m1".to_string()));
+    }
+
+    #[test]
+    fn waits_for_model_config_option_before_completing() {
+        let mut state = AppState::new_with_paths(None, None);
+        state.session_id = Some("sess_1".to_string());
+        state.config_wizard.open = true;
+        state.config_wizard.step = ConfigWizardStep::LoadingModels;
+        state.config_wizard.connection_id = Some("c1".to_string());
+
+        let requests = handle_response(
+            &mut state,
+            "ent/models/list",
+            &Some(json!({"models":[{"modelId":"m1","disabledState":"enabled"}]})),
+            None,
+        );
+        assert_eq!(requests.len(), 2);
+        assert_eq!(state.config_wizard.step, ConfigWizardStep::Applying);
+        assert_eq!(state.config_wizard.model_id, Some("m1".to_string()));
+
+        let out = handle_response(
+            &mut state,
+            "ent/session/configure",
+            &Some(json!({"ok":true,"config":{"connectionId":"c1"}})),
+            None,
+        );
+
+        assert!(out.is_empty());
+        assert_eq!(state.config_wizard.step, ConfigWizardStep::Applying);
+        assert_eq!(state.prefs.last_model_id, None);
+
+        let out = handle_response(
+            &mut state,
+            "session/set_config_option",
+            &Some(json!({"configOptions":[
+                {
+                    "id":"model",
+                    "name":"Model",
+                    "category":"model",
+                    "type":"select",
+                    "currentValue":"m1",
+                    "options":[{"value":"m1","name":"m1"}]
+                }
+            ]})),
+            None,
+        );
+
+        assert_eq!(state.config_wizard.step, ConfigWizardStep::Done);
+        assert_eq!(state.prefs.last_connection_id, Some("c1".to_string()));
+        assert_eq!(state.prefs.last_model_id, Some("m1".to_string()));
+        assert_eq!(out.len(), 1);
+    }
+
+    #[test]
+    fn waits_for_connection_configure_before_completing() {
+        let mut state = AppState::new_with_paths(None, None);
+        state.session_id = Some("sess_1".to_string());
+        state.config_wizard.open = true;
+        state.config_wizard.step = ConfigWizardStep::LoadingModels;
+        state.config_wizard.connection_id = Some("c1".to_string());
+
+        let requests = handle_response(
+            &mut state,
+            "ent/models/list",
+            &Some(json!({"models":[{"modelId":"m1","disabledState":"enabled"}]})),
+            None,
+        );
+        assert_eq!(requests.len(), 2);
+        assert_eq!(state.config_wizard.step, ConfigWizardStep::Applying);
+
+        let out = handle_response(
+            &mut state,
+            "session/set_config_option",
+            &Some(json!({"configOptions":[
+                {
+                    "id":"model",
+                    "name":"Model",
+                    "category":"model",
+                    "type":"select",
+                    "currentValue":"m1",
+                    "options":[{"value":"m1","name":"m1"}]
+                }
+            ]})),
+            None,
+        );
+
+        assert!(out.is_empty());
+        assert_eq!(state.config_wizard.step, ConfigWizardStep::Applying);
+        assert_eq!(state.prefs.last_model_id, None);
+
+        let out = handle_response(
+            &mut state,
+            "ent/session/configure",
+            &Some(json!({"ok":true,"config":{"connectionId":"c1"}})),
+            None,
+        );
+
+        assert_eq!(state.config_wizard.step, ConfigWizardStep::Done);
+        assert_eq!(state.prefs.last_connection_id, Some("c1".to_string()));
+        assert_eq!(state.prefs.last_model_id, Some("m1".to_string()));
+        assert_eq!(out.len(), 1);
     }
 
     #[test]

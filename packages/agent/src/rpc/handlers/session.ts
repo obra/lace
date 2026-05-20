@@ -534,12 +534,9 @@ export function registerSessionHandlers(
       return undefined;
     }
 
-    const activeTurnId = state.activeTurn?.turnId;
     abortActiveTurn(state);
+    await cancelPendingPermissionRequests(peer, state, runExclusive);
     abortRunningJobPermissionControllers(state);
-    await cancelPendingPermissionRequests(peer, state, runExclusive, {
-      ...(activeTurnId ? { exceptTurnId: activeTurnId } : {}),
-    });
     return undefined;
   });
 
