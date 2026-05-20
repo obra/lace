@@ -82,13 +82,16 @@ class HostFileSystem implements RuntimeFileSystem {
 }
 
 class HostProcessRunner implements RuntimeProcessRunner {
-  constructor(
-    private readonly cwd: string,
-    private readonly defaultEnv?: NodeJS.ProcessEnv
-  ) {}
+  #cwd: string;
+  #defaultEnv?: NodeJS.ProcessEnv;
+
+  constructor(cwd: string, defaultEnv?: NodeJS.ProcessEnv) {
+    this.#cwd = cwd;
+    this.#defaultEnv = defaultEnv;
+  }
 
   private envFor(opts: RuntimeProcessOptions): NodeJS.ProcessEnv | undefined {
-    return opts.env ?? this.defaultEnv;
+    return opts.env ?? this.#defaultEnv;
   }
 
   async exec(command: string[], opts: RuntimeProcessOptions = {}) {
@@ -96,7 +99,7 @@ class HostProcessRunner implements RuntimeProcessRunner {
     if (!file) throw new Error('runtime process command is empty');
     try {
       const result = await execFileAsync(file, args, {
-        cwd: opts.cwd ?? this.cwd,
+        cwd: opts.cwd ?? this.#cwd,
         env: this.envFor(opts),
         signal: opts.signal,
         maxBuffer: 10 * 1024 * 1024,
@@ -117,7 +120,7 @@ class HostProcessRunner implements RuntimeProcessRunner {
     const [file, ...args] = command;
     if (!file) throw new Error('runtime process command is empty');
     const child = spawn(file, args, {
-      cwd: opts.cwd ?? this.cwd,
+      cwd: opts.cwd ?? this.#cwd,
       env: this.envFor(opts),
       stdio: ['pipe', 'pipe', 'pipe'],
       signal: opts.signal,
@@ -169,7 +172,7 @@ export class HostToolRuntime implements ToolRuntime {
   readonly process: RuntimeProcessRunner;
   readonly network = new HostNetworkClient();
 
-  constructor(readonly input: { id: string; cwd: string; env?: NodeJS.ProcessEnv }) {
+  constructor(input: { id: string; cwd: string; env?: NodeJS.ProcessEnv }) {
     this.id = input.id;
     this.cwd = input.cwd;
     this.paths = new HostPathService(input.cwd);

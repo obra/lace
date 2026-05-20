@@ -64,6 +64,17 @@ describe('HostToolRuntime', () => {
     expect(result.stdout).toBe('present:path');
   });
 
+  it('does not expose default environment through JSON serialization', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const runtime = new HostToolRuntime({
+      id: 'rt_host',
+      cwd: dir,
+      env: { LACE_HOST_RUNTIME_SECRET_TEST: 'sentinel-secret-value' },
+    });
+
+    expect(JSON.stringify(runtime)).not.toContain('sentinel-secret-value');
+  });
+
   it('rejects start completion when spawn fails', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
     const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
