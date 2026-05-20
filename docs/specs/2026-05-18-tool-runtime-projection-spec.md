@@ -462,16 +462,16 @@ process restart.
 The binding is host-side session/job state. It is not part of the prompt, model
 trace, or projected container filesystem.
 
-- Session-level binding lives in the session `state.json`, under session config,
-  alongside existing persisted session configuration such as connection/model,
-  environment, and MCP server config.
+- Session-level binding lives at `state.config.runtimeBinding` in session
+  `state.json`, alongside existing persisted session configuration such as
+  connection/model, environment, and MCP server config.
 - `meta.json` should keep only list/resume metadata such as `sessionId`,
   `workDir`, and creation time. Do not put full runtime descriptors there; it is
   more likely to be surfaced in lightweight session listings.
-- Async job creation must copy the active binding into the durable `job_started`
-  event data for jobs that need runtime rehydration. The in-memory `JobState`
-  can cache the parsed binding, but `events.jsonl` is the source of truth after
-  restart.
+- Async job creation must copy the active binding into
+  `job_started.data.runtimeBinding` for jobs that need runtime rehydration. The
+  in-memory `JobState.runtimeBinding` can cache the parsed binding, but
+  `events.jsonl` is the source of truth after restart.
 - Delegate jobs inherit the parent binding unless the delegate persona
   explicitly chooses lace-in-container placement. Resumed delegates use the
   binding recorded with their original job/session, not the current caller's
@@ -511,8 +511,15 @@ Individual tools must not read the host secret store directly.
 Secret reference namespaces are not LLM provider credential namespaces. A
 runtime secret reference cannot point at provider credentials selected by
 `connectionId`, provider config files, or cached model-client tokens. Runtime
-secret namespaces are limited to explicit session/project/runtime secret stores
-and host-service secrets that were deliberately allowed for that MCP server.
+secret namespaces are limited to explicit session/project stores and
+host-service secrets that were deliberately allowed for that MCP server.
+
+The host runtime-binding layer owns secret authorization. Concretely, a
+`RuntimeSecretResolver` or equivalent host component validates that a
+`RuntimeSecretReference` is allowed for the active session, project, runtime
+binding, and MCP server before returning a value. Runtime implementations and
+tool implementations receive resolved env maps; they do not make authorization
+decisions.
 
 `RuntimeSecretReference` values are redacted as metadata. Model-visible output,
 ordinary UI summaries, and non-debug traces should show at most that a secret
@@ -553,7 +560,7 @@ runtime projection should not guess silently.
 Concrete examples:
 
 - An old local session with only `meta.workDir: "/repo"` resumes as
-  `{ schemaVersion: 1, identity: { runtimeId: "session:<id>:local" }, agentPlacement: "host", toolRuntime: { type: "local", cwd: "/repo" } }`.
+  `{ schemaVersion: 1, identity: { runtimeId: "session:<id>:local:<hash('/repo')>" }, agentPlacement: "host", toolRuntime: { type: "local", cwd: "/repo" } }`.
 - An old workspace session that has `projectRoot`, `workspaceRoot`, and `cwd`
   resumes as `WorkspaceToolRuntime`.
 - An old workspace session with `workspaceRoot` but no original project root
@@ -803,6 +810,16 @@ execution.
 - If descriptor rehydration fails for a background job, delegate job, or
   runtime-placed MCP server, that unit fails clearly instead of reconstructing a
   different runtime.
+- Runtime binding parse/default/migration errors should be visible at the user
+  action that triggered them: `session/resume` returns a resume error, job tools
+  report the job rehydration failure, and MCP status/config surfaces mark the
+  affected server failed. These errors may also be logged, but logs are not the
+  only signal.
+- `state.config.runtimeBinding` must be written with the same atomic JSON write
+  discipline as other session state. Malformed or unsupported bindings in
+  `state.json` fail session resume. Malformed `job_started.data.runtimeBinding`
+  fails only the affected job unless the active session itself depends on that
+  job during resume.
 - Unsupported placement combinations, such as HTTP/SSE MCP with
   `placement: 'toolRuntime'` in v1, fail at config/startup time instead of
   silently using host networking.
@@ -846,6 +863,22 @@ This spec intentionally does not define the rollout sequence or PR boundaries.
 After the spec is approved, the implementation plan should decompose the work
 into small, reviewable changes. No implementation should begin until that plan
 exists and has been approved. That plan must preserve these constraints:
+
+Required implementation-plan sections:
+
+- persisted schema paths and type changes, including
+  `state.config.runtimeBinding`, `job_started.data.runtimeBinding`, and
+  `JobState.runtimeBinding`;
+- migration/defaulting for no-binding sessions, workspace sessions,
+  lace-in-container personas, projected-container bindings, and unsupported
+  schema versions;
+- runtime binding validation order, including secret authorization and MCP
+  placement validation;
+- MCP reconciliation and connection-key changes;
+- fake-runtime test boundaries for each migrated built-in tool group;
+- Docker/helper smoke coverage for projected container correctness;
+- rollback/error behavior for malformed state, stale containers, missing helper,
+  missing secrets, and unsupported transports.
 
 - Start from behavior-preserving runtime plumbing before changing tool
   semantics.
