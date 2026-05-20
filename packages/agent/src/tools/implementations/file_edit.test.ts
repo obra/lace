@@ -6,6 +6,7 @@ import { writeFile, rm } from 'fs/promises';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { FileEditTool } from './file_edit';
+import { HostToolRuntime } from '../runtime/host';
 import { setupCoreTest } from '@lace/agent/test-utils/core-test-setup';
 import type { ToolContext } from '@lace/agent/tools/types';
 
@@ -16,6 +17,7 @@ describe('FileEditTool Integration Tests', () => {
   let testDir: string;
   let testFile: string;
   let hasFileBeenReadImpl: (path: string) => boolean;
+  let runtimeId = 0;
 
   beforeEach(async () => {
     tool = new FileEditTool();
@@ -31,6 +33,11 @@ describe('FileEditTool Integration Tests', () => {
     context = {
       signal: new AbortController().signal,
       hasFileBeenRead: (path: string) => hasFileBeenReadImpl(path),
+      runtime: new HostToolRuntime({
+        id: `rt_file_edit_test_${runtimeId++}`,
+        cwd: process.cwd(),
+      }),
+      hasRuntimeFileBeenRead: (path) => hasFileBeenReadImpl(path.hostPath ?? path.runtimePath),
     };
   });
 
@@ -839,9 +846,12 @@ describe('FileEditTool Integration Tests', () => {
           ],
         },
         {
-          signal: new AbortController().signal,
+          ...context,
           workingDirectory: testDir,
-          hasFileBeenRead: () => true,
+          runtime: new HostToolRuntime({
+            id: `rt_file_edit_test_${runtimeId++}`,
+            cwd: testDir,
+          }),
         }
       );
 
@@ -863,9 +873,8 @@ describe('FileEditTool Integration Tests', () => {
           ],
         },
         {
-          signal: new AbortController().signal,
+          ...context,
           workingDirectory: '/some/other/dir',
-          hasFileBeenRead: () => true,
         }
       );
 
@@ -911,7 +920,14 @@ describe('FileEditTool Integration Tests', () => {
             },
           ],
         },
-        { signal: new AbortController().signal, workingDirectory: testDir }
+        {
+          ...context,
+          workingDirectory: testDir,
+          runtime: new HostToolRuntime({
+            id: `rt_file_edit_test_${runtimeId++}`,
+            cwd: testDir,
+          }),
+        }
       );
 
       expect(result.status).toBe('failed');

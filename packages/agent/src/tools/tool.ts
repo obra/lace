@@ -11,6 +11,7 @@ import type {
   ToolAnnotations,
   ToolResultStatus,
 } from './types';
+import type { RuntimePath } from './runtime/types';
 import { logger } from '@lace/agent/utils/logger';
 
 export abstract class Tool {
@@ -239,6 +240,42 @@ export abstract class Tool {
     }
 
     return null; // Check passed
+  }
+
+  /**
+   * Check read-before-write protection through the active tool runtime.
+   * Returns an error result if the runtime file exists but hasn't been read.
+   * Returns null if the file doesn't exist or was read.
+   */
+  protected async checkRuntimeFileReadProtection(
+    filePath: string,
+    runtimePath: RuntimePath,
+    context: ToolContext
+  ): Promise<ToolResult | null> {
+    if (!context.runtime) {
+      return this.createError('Tool context missing runtime. This is a system error.');
+    }
+
+    try {
+      await context.runtime.fs.stat(runtimePath);
+    } catch {
+      return null;
+    }
+
+    if (!context.hasRuntimeFileBeenRead) {
+      return this.createError(
+        'Tool context missing hasRuntimeFileBeenRead(). This is a system error.'
+      );
+    }
+
+    if (!context.hasRuntimeFileBeenRead(runtimePath)) {
+      return this.createError(
+        `File ${filePath} exists but hasn't been read in this conversation. ` +
+          `Use file_read to examine the current contents before modifying.`
+      );
+    }
+
+    return null;
   }
 
   // Private implementation

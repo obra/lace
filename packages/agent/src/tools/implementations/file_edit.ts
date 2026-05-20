@@ -2,9 +2,9 @@
 // ABOUTME: Supports atomic multi-edit operations with precise occurrence counting
 
 import { z } from 'zod';
-import { readFile, writeFile } from 'fs/promises';
 import { Tool } from '../tool';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
+import type { RuntimePath } from '../runtime/types';
 import { FilePath } from '../schemas/common';
 
 // Define schemas for input validation
@@ -71,29 +71,46 @@ Example:
       return this.createCancellationResult();
     }
 
-    const resolvedPath = this.resolveWorkspacePath(args.path, context);
-    const edits = args.edits;
-
-    // Check read-before-write protection
-    const protectionError = await this.checkFileReadProtection(args.path, resolvedPath, context);
-    if (protectionError) {
-      return protectionError;
+    if (!context.runtime) {
+      return this.createError('Tool context missing runtime. This is a system error.');
     }
+
+    const edits = args.edits;
+    let runtimePath: RuntimePath;
+
+    try {
+      runtimePath = await context.runtime.paths.resolve(args.path);
+    } catch (error: unknown) {
+      return this.createError(
+        `Unexpected error reading file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+    const displayPath = runtimePath.displayPath;
 
     // Read file
     let content: string;
     try {
-      content = await readFile(resolvedPath, 'utf-8');
+      // Check read-before-write protection
+      const protectionError = await this.checkRuntimeFileReadProtection(
+        displayPath,
+        runtimePath,
+        context
+      );
+      if (protectionError) {
+        return protectionError;
+      }
+
+      content = await context.runtime.fs.readTextFile(runtimePath);
     } catch (error: unknown) {
       if (error instanceof Error && 'code' in error) {
         const nodeError = error as NodeJS.ErrnoException;
         switch (nodeError.code) {
           case 'ENOENT':
-            return this.createError(`File not found: ${args.path}`);
+            return this.createError(`File not found: ${displayPath}`);
           case 'EACCES':
-            return this.createError(`Permission denied: Cannot read file ${args.path}`);
+            return this.createError(`Permission denied: Cannot read file ${displayPath}`);
           case 'EPERM':
-            return this.createError(`Operation not permitted: Cannot access file ${args.path}`);
+            return this.createError(`Operation not permitted: Cannot access file ${displayPath}`);
         }
       }
       // Return error for unexpected read errors instead of throwing
@@ -120,7 +137,7 @@ Example:
       if (occurrences === 0) {
         const filePreview = this.getFilePreview(workingContent, edit.old_text);
 
-        const errorMessage = `Edit ${i + 1} of ${edits.length}: Could not find exact text in ${args.path}.
+        const errorMessage = `Edit ${i + 1} of ${edits.length}: Could not find exact text in ${displayPath}.
 
 Searched for (between >>>markers<<<):
 >>>${edit.old_text}<<<
@@ -196,10 +213,11 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
     // Dry run mode
     if (args.dry_run) {
       return this.createResult(
-        `Dry run completed. Would apply ${edits.length} edit${edits.length === 1 ? '' : 's'} to ${args.path}`,
+        `Dry run completed. Would apply ${edits.length} edit${edits.length === 1 ? '' : 's'} to ${displayPath}`,
         {
           dry_run: true,
           would_modify: true,
+          path: displayPath,
           edits_to_apply: edits,
           diff: diffContext,
         }
@@ -213,17 +231,17 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
 
     // Write file
     try {
-      await writeFile(resolvedPath, newContent, 'utf-8');
+      await context.runtime.fs.writeTextFile(runtimePath, newContent);
     } catch (error: unknown) {
       if (error instanceof Error && 'code' in error) {
         const nodeError = error as NodeJS.ErrnoException;
         switch (nodeError.code) {
           case 'EACCES':
-            return this.createError(`Permission denied: Cannot write to file ${args.path}`);
+            return this.createError(`Permission denied: Cannot write to file ${displayPath}`);
           case 'EPERM':
-            return this.createError(`Operation not permitted: Cannot write to file ${args.path}`);
+            return this.createError(`Operation not permitted: Cannot write to file ${displayPath}`);
           case 'ENOSPC':
-            return this.createError(`No space left on device: Cannot write to file ${args.path}`);
+            return this.createError(`No space left on device: Cannot write to file ${displayPath}`);
         }
       }
       return this.createError(
@@ -235,7 +253,7 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
       `Successfully applied ${edits.length} edit${edits.length === 1 ? '' : 's'}`,
       {
         diff: diffContext,
-        path: args.path,
+        path: displayPath,
         edits_applied: edits.map((edit, index) => ({
           old_text: edit.old_text,
           new_text: edit.new_text,

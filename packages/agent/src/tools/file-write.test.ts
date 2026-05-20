@@ -5,10 +5,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFile, rm, stat } from 'fs/promises';
 import { join, dirname } from 'path';
 import { FileWriteTool } from '@lace/agent/tools/implementations/file_write';
+import { createFakeRuntime } from './runtime/__tests__/fake-runtime';
+import { HostToolRuntime } from './runtime/host';
 import type { ToolContext } from '@lace/agent/tools/types';
 
 describe('FileWriteTool with schema validation', () => {
   let tool: FileWriteTool;
+  let runtimeId = 0;
 
   beforeEach(() => {
     tool = new FileWriteTool();
@@ -17,15 +20,25 @@ describe('FileWriteTool with schema validation', () => {
   const testDir = join(process.cwd(), 'test-temp-file-write-schema');
 
   function createToolContext(overrides: Partial<ToolContext> = {}): ToolContext {
+    const runtime =
+      overrides.runtime ??
+      new HostToolRuntime({
+        id: `rt_file_write_test_${runtimeId++}`,
+        cwd: overrides.workingDirectory ?? process.cwd(),
+      });
+
     return {
       signal: new AbortController().signal,
       hasFileBeenRead: () => true,
+      runtime,
+      hasRuntimeFileBeenRead: () => true,
       ...overrides,
     };
   }
 
   afterEach(async () => {
     await rm(testDir, { recursive: true, force: true });
+    await rm(join(process.cwd(), 'a.txt'), { force: true });
   });
 
   describe('Tool metadata', () => {
@@ -144,6 +157,31 @@ Creates parent directories automatically if needed. Returns file size written.`)
   });
 
   describe('File writing operations', () => {
+    it('checks read-before-write against runtime canonical path', async () => {
+      const resolved = {
+        original: 'a.txt',
+        runtimePath: '/runtime/a.txt',
+        displayPath: 'a.txt',
+      };
+      const runtime = createFakeRuntime({
+        resolve: resolved,
+        canonicalKey: 'container:rt_1:/runtime/a.txt',
+        statType: 'file',
+      });
+
+      const result = await tool.execute(
+        { path: 'a.txt', content: 'new' },
+        {
+          signal: new AbortController().signal,
+          runtime,
+          hasRuntimeFileBeenRead: () => false,
+        }
+      );
+
+      expect(result.status).toBe('failed');
+      expect(result.content[0].text).toContain("hasn't been read");
+    });
+
     it('should write content to new file', async () => {
       const testFile = join(testDir, 'test.txt');
       const content = 'Hello, world!';

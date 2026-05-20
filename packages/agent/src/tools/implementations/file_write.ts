@@ -2,11 +2,11 @@
 // ABOUTME: Safe file creation and modification with Zod validation and enhanced error handling
 
 import { z } from 'zod';
-import { writeFile, mkdir } from 'fs/promises';
 import { dirname } from 'path';
 import { Tool } from '../tool';
 import { FilePath } from '../schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
+import type { RuntimePath } from '../runtime/types';
 import { formatFileSize } from '@lace/agent/tools/utils/format-file-size';
 
 const fileWriteSchema = z.object({
@@ -14,6 +14,15 @@ const fileWriteSchema = z.object({
   content: z.string(), // Allow empty content
   createDirs: z.boolean().default(true),
 });
+
+function parentRuntimePath(runtimePath: RuntimePath): RuntimePath {
+  return {
+    original: dirname(runtimePath.original),
+    runtimePath: dirname(runtimePath.runtimePath),
+    ...(runtimePath.hostPath ? { hostPath: dirname(runtimePath.hostPath) } : {}),
+    displayPath: dirname(runtimePath.displayPath),
+  };
+}
 
 export class FileWriteTool extends Tool {
   name = 'file_write';
@@ -32,12 +41,23 @@ Creates parent directories automatically if needed. Returns file size written.`;
     if (context.signal.aborted) {
       return this.createCancellationResult();
     }
+
+    if (!context.runtime) {
+      return this.createError('Tool context missing runtime. This is a system error.');
+    }
+
+    let displayPath = args.path;
     try {
       const { content, createDirs } = args;
-      const resolvedPath = this.resolveWorkspacePath(args.path, context);
+      const runtimePath = await context.runtime.paths.resolve(args.path);
+      displayPath = runtimePath.displayPath;
 
       // Check read-before-write protection
-      const protectionError = await this.checkFileReadProtection(args.path, resolvedPath, context);
+      const protectionError = await this.checkRuntimeFileReadProtection(
+        displayPath,
+        runtimePath,
+        context
+      );
       if (protectionError) {
         return protectionError;
       }
@@ -49,8 +69,7 @@ Creates parent directories automatically if needed. Returns file size written.`;
           return this.createCancellationResult();
         }
 
-        const dir = dirname(resolvedPath);
-        await mkdir(dir, { recursive: true });
+        await context.runtime.fs.mkdir(parentRuntimePath(runtimePath), { recursive: true });
 
         // Check abort after mkdir
         if (context.signal.aborted) {
@@ -59,7 +78,7 @@ Creates parent directories automatically if needed. Returns file size written.`;
       }
 
       // Write the file
-      await writeFile(resolvedPath, content, 'utf8');
+      await context.runtime.fs.writeTextFile(runtimePath, content);
 
       // Check abort before returning success
       if (context.signal.aborted) {
@@ -68,12 +87,12 @@ Creates parent directories automatically if needed. Returns file size written.`;
 
       const byteLength = Buffer.byteLength(content, 'utf8');
       const result = this.createResult(
-        `Successfully wrote ${formatFileSize(byteLength)} to ${resolvedPath}`
+        `Successfully wrote ${formatFileSize(byteLength)} to ${displayPath}`
       );
-      result.metadata = { path: resolvedPath, bytesWritten: byteLength };
+      result.metadata = { path: displayPath, bytesWritten: byteLength };
       return result;
     } catch (error: unknown) {
-      return this.handleFileSystemError(error, args.path);
+      return this.handleFileSystemError(error, displayPath);
     }
   }
 
