@@ -539,10 +539,32 @@ the job started but is revoked before rehydration, the resumed unit fails with a
 redacted "secret unavailable or unauthorized" runtime error instead of retaining
 the old access.
 
+Per-unit behavior:
+
+- Session resume fails if the session runtime binding requires a secret that is
+  currently missing or unauthorized. No projected process should be left running
+  after the failure.
+- Background bash job rehydration marks only that job failed, records a redacted
+  job error, and does not retry automatically in v1.
+- Delegate job rehydration follows the original delegate binding. If a required
+  secret is unavailable, the delegate job fails before spawning or reconnecting
+  a child agent.
+- Runtime-placed MCP startup marks that server failed and closes any partial SDK
+  client, transport, or runtime process handle. It retries only after explicit
+  config/session reconciliation, not in a tight loop.
+
+Model-visible output should only see these failures when the user asks a tool to
+inspect the affected job/server/session. Host operational logs may include the
+runtime id and affected unit id with redacted secret references.
+
 Denied secret resolution should be written to host-side operational logs with
 the runtime id, server/job id when present, and a redacted secret reference. Raw
 secret values are never logged; ordinary model-visible tool output only receives
-the redacted runtime error.
+the redacted runtime error. Those operational logs are host-owned agent logs;
+projected containers do not receive them, and they should follow the same access
+controls and retention policy as existing host trace/job diagnostics. If that
+policy is weaker than provider credential logs, the implementation plan must
+tighten it before adding denied-secret logging.
 
 Configuration should set `agentPlacement` explicitly when constructing the
 binding. Current persona-container behavior maps to
@@ -560,6 +582,12 @@ access to the active binding.
 Existing state should keep working when it has enough information to do so, but
 runtime projection should not guess silently.
 
+This spec defines supported compatibility behavior for v0 state with no runtime
+binding and v1 `RuntimeExecutionBinding` state. Approval of this spec is
+approval for those compatibility/defaulting rules. Any additional backward
+compatibility path discovered during implementation must be called out in the
+implementation plan before code is written.
+
 | Existing durable state                         | Resume/default behavior                                                                                                                                           |
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Session/job has no runtime binding             | Default to v1 local host binding using the existing session `meta.workDir` as `cwd`.                                                                              |
@@ -571,8 +599,9 @@ runtime projection should not guess silently.
 
 Concrete examples:
 
-- An old local session with only `meta.workDir: "/repo"` resumes as
-  `{ schemaVersion: 1, identity: { runtimeId: "legacy-local:<sessionId>" }, agentPlacement: "host", toolRuntime: { type: "local", cwd: "/repo" } }`.
+- An old local session with only `meta.workDir: "/repo"` resumes as a v1 local
+  binding whose id follows the legacy uniqueness rule in
+  [Runtime Identity And Concurrency](#runtime-identity-and-concurrency).
 - An old workspace session that has `projectRoot`, `workspaceRoot`, and `cwd`
   resumes as `WorkspaceToolRuntime`.
 - An old workspace session with `workspaceRoot` but no original project root
@@ -768,12 +797,26 @@ must not accidentally share mutable runtime state.
 - New local, workspace, and container bindings should use an opaque generated id
   such as a UUID/ULID with a `rt_` prefix. Do not derive ids from filesystem
   paths. Legacy no-binding defaults may use deterministic ids such as
-  `legacy-local:<sessionId>` because there is no persisted id to recover.
+  `legacy:<scope>:<sessionId>[:<jobId>]:<fingerprint>` because there is no
+  persisted id to recover.
+- Legacy deterministic ids must be unique per binding scope. `scope` is
+  `session`, `job`, or `mcp`; `jobId` is present for job-scoped bindings; and
+  `fingerprint` is the first 16 hex characters of SHA-256 over canonical JSON
+  containing the defaulted descriptor fields that affect semantics. Canonical
+  JSON sorts object keys, uses normalized absolute paths with `/` separators,
+  preserves case, strips trailing slashes except filesystem roots, and does not
+  resolve symlinks.
 - The descriptor, not the runtime id alone, defines runtime semantics. On
   resume, Lace validates both the persisted id and descriptor before reusing the
   binding. Container runtimes store the logical runtime id separately from
   `containerId` so a stale container can be rematerialized only when the
   persisted descriptor proves it is the same logical runtime.
+- Container descriptor semantic identity includes image, working directory,
+  runtime cwd, container mount paths and readonly flags, literal env values,
+  secret reference identities, helper mode/container path/command, and container
+  port declarations. Operational details such as `containerId`, copied helper
+  host path, and host-assigned port numbers may change during rematerialization
+  only when the semantic identity is unchanged.
 - If rematerialization would change the runtime semantics, Lace must fail resume
   instead of reusing the old runtime id for a different target.
 - Runtime-placed MCP connection keys include server id, transport, placement,
@@ -839,9 +882,11 @@ execution.
   job during resume.
 - Session listing should continue to work when a runtime binding is malformed,
   because `meta.json` and durable event summaries are enough for listing. The
-  resume error should include the session id and affected state file path so a
-  human can inspect or repair the state. Automatic repair/export of malformed
-  runtime bindings is not a v1 goal.
+  resume error should include the session id, affected job id when relevant,
+  malformed field path, affected file path, and suggested manual action
+  ("inspect or remove the malformed runtimeBinding after saving a copy of the
+  file"). Automatic repair/export of malformed runtime bindings is not a v1
+  goal.
 - Unsupported placement combinations, such as HTTP/SSE MCP with
   `placement: 'toolRuntime'` in v1, fail at config/startup time instead of
   silently using host networking.
@@ -913,15 +958,21 @@ Required implementation-plan sections:
 Required stage order:
 
 1. Schema/types and durable-path additions with no runtime behavior change.
-2. Migration/defaulting and resume validation for v0/no-binding and v1 bindings.
-3. Runtime binding construction, runtime id generation, and secret resolver
-   authorization.
-4. Built-in tool migration in one small group at a time.
+2. Migration/defaulting plus structural resume validation for v0/no-binding and
+   v1 bindings. Structural validation must not start any runtime process.
+3. Runtime binding construction, runtime id generation, secret resolver
+   authorization, and the checkpoint that no projected runtime process can start
+   before current-policy authorization succeeds.
+4. Built-in tool migration in this order: read-only filesystem/introspection,
+   simple write/edit operations, process/search tools, then network fetch.
 5. Background job and delegate rehydration through persisted bindings.
-6. MCP schema/defaulting, reconciliation keys, and runtime stdio transport.
-7. Projected-container helper delivery and Docker/helper smoke coverage.
-8. Removal of legacy `workspaceInfo` and `resolveWorkspacePath()` after all
-   consumers have moved.
+6. MCP schema/defaulting while preserving existing host-placed behavior.
+7. MCP reconciliation-key changes while preserving existing host-placed
+   behavior.
+8. Runtime-placed stdio MCP transport plus lifecycle cleanup.
+9. Projected-container helper delivery and Docker/helper smoke coverage.
+10. Removal of legacy `workspaceInfo` and `resolveWorkspacePath()` after all
+    consumers have moved.
 
 - Start from behavior-preserving runtime plumbing before changing tool
   semantics.
