@@ -105,9 +105,22 @@ function abortRunningJobPermissionControllers(state: AgentServerState): void {
   }
 }
 
+async function releaseRunningSessionWork(
+  peer: JsonRpcPeer,
+  state: AgentServerState,
+  runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>
+): Promise<void> {
+  await cancelPendingPermissionRequests(peer, state, runExclusive);
+  await killAllRunningJobs(state.jobManager.getRunningJobs());
+  state.pendingPermissionRequests.clear();
+  state.jobManager.clearJobs();
+}
+
 async function activateStoredSession(
+  peer: JsonRpcPeer,
   state: AgentServerState,
   params: SessionRestoreParams,
+  runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
   reissuePendingPermissionRequests: () => Promise<void>
 ): Promise<LoadedSession> {
   if (state.activeTurn) {
@@ -121,9 +134,7 @@ async function activateStoredSession(
   const switchingSessions =
     state.activeSession && state.activeSession.meta.sessionId !== params.sessionId;
   if (switchingSessions) {
-    await killAllRunningJobs(state.jobManager.getRunningJobs());
-    state.pendingPermissionRequests.clear();
-    state.jobManager.clearJobs();
+    await releaseRunningSessionWork(peer, state, runExclusive);
   }
 
   let loaded;
@@ -176,10 +187,7 @@ export function registerSessionHandlers(
         data: { category: 'session' },
       };
 
-    // Kill all running jobs before switching sessions
-    await killAllRunningJobs(state.jobManager.getRunningJobs());
-    state.pendingPermissionRequests.clear();
-    state.jobManager.clearJobs();
+    await releaseRunningSessionWork(peer, state, runExclusive);
 
     const parsed = params as {
       cwd: string;
@@ -380,7 +388,13 @@ export function registerSessionHandlers(
     assertInitialized(state);
 
     const parsed = parseSessionRestoreParams(params);
-    const loaded = await activateStoredSession(state, parsed, reissuePendingPermissionRequests);
+    const loaded = await activateStoredSession(
+      peer,
+      state,
+      parsed,
+      runExclusive,
+      reissuePendingPermissionRequests
+    );
     const summary = summarizeDurableEvents(loaded.dir);
     return {
       sessionId: parsed.sessionId,
@@ -393,7 +407,13 @@ export function registerSessionHandlers(
     assertInitialized(state);
 
     const parsed = parseSessionRestoreParams(params);
-    await activateStoredSession(state, parsed, reissuePendingPermissionRequests);
+    await activateStoredSession(
+      peer,
+      state,
+      parsed,
+      runExclusive,
+      reissuePendingPermissionRequests
+    );
     return {};
   });
 
@@ -489,9 +509,7 @@ export function registerSessionHandlers(
       };
 
     abortActiveTurn(state);
-    await killAllRunningJobs(state.jobManager.getRunningJobs());
-    state.pendingPermissionRequests.clear();
-    state.jobManager.clearJobs();
+    await releaseRunningSessionWork(peer, state, runExclusive);
     await state.mcpServerManager.shutdown();
     state.toolExecutorCache.clear();
     state.activeTurn = null;

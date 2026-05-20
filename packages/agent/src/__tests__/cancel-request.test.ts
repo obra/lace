@@ -31,6 +31,58 @@ function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   return { client, server };
 }
 
+async function startBackgroundPermissionRequest(params: {
+  server: JsonRpcPeer;
+  state: ReturnType<typeof createAgentServerState>;
+  tempDir: string;
+  sessionId: string;
+  toolCallId: string;
+  turnId: string;
+}): Promise<{
+  permissionResult: Promise<{ decision?: string; updatedInput?: Record<string, unknown> }>;
+}> {
+  const abortController = new AbortController();
+  const jobId = `job_${params.toolCallId}`;
+  params.state.jobManager.getRunningJobs().set(jobId, {
+    jobId,
+    type: 'bash',
+    status: 'running',
+    startedAt: new Date().toISOString(),
+    outputPath: join(params.tempDir, `${jobId}.log`),
+    permissionAbortController: abortController,
+    finished: false,
+    completion: new Promise(() => undefined),
+    resolveCompletion: () => undefined,
+  });
+
+  const permissionResult = requestPermissionFromClient(
+    params.server,
+    params.state,
+    async (work) => work(),
+    {
+      sessionId: params.sessionId,
+      turnId: params.turnId,
+      turnSeq: 0,
+      jobId,
+      toolCallId: params.toolCallId,
+      tool: 'bash',
+      kind: 'execute',
+      resource: 'echo hi',
+      options: [
+        { optionId: 'allow', label: 'Allow' },
+        { optionId: 'deny', label: 'Deny' },
+      ],
+      input: { command: 'echo hi' },
+      signal: abortController.signal,
+    }
+  );
+
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(params.state.pendingPermissionRequests.has(params.toolCallId)).toBe(true);
+
+  return { permissionResult };
+}
+
 describe('ACP session cancellation', () => {
   let originalLaceDir: string | undefined;
   let tempDir: string;
@@ -178,38 +230,14 @@ describe('ACP session cancellation', () => {
       mcpServers: [],
     })) as { sessionId: string };
 
-    const abortController = new AbortController();
-    state.jobManager.getRunningJobs().set('job_permission', {
-      jobId: 'job_permission',
-      type: 'bash',
-      status: 'running',
-      startedAt: new Date().toISOString(),
-      outputPath: join(tempDir, 'job_permission.log'),
-      permissionAbortController: abortController,
-      finished: false,
-      completion: new Promise(() => undefined),
-      resolveCompletion: () => undefined,
-    });
-
-    const permissionResult = requestPermissionFromClient(server, state, async (work) => work(), {
+    const { permissionResult } = await startBackgroundPermissionRequest({
+      server,
+      state,
+      tempDir,
       sessionId: created.sessionId,
       turnId: 'turn_job',
-      turnSeq: 0,
-      jobId: 'job_permission',
       toolCallId: 'tool_live_background',
-      tool: 'bash',
-      kind: 'execute',
-      resource: 'echo hi',
-      options: [
-        { optionId: 'allow', label: 'Allow' },
-        { optionId: 'deny', label: 'Deny' },
-      ],
-      input: { command: 'echo hi' },
-      signal: abortController.signal,
     });
-
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(state.pendingPermissionRequests.has('tool_live_background')).toBe(true);
 
     client.notify('session/cancel', { sessionId: created.sessionId });
 
@@ -220,6 +248,105 @@ describe('ACP session cancellation', () => {
 
     expect(cancelledEvents).toHaveLength(1);
     expect(state.pendingPermissionRequests.has('tool_live_background')).toBe(false);
+
+    client.close();
+    server.close();
+  });
+
+  it('cancels background permission prompts before closing a session', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    const updates: Array<Record<string, unknown>> = [];
+
+    client.onRequest('session/request_permission', async () => new Promise(() => undefined));
+    client.onRequest('session/update', async (params) => {
+      updates.push(params as Record<string, unknown>);
+      return undefined;
+    });
+
+    await client.request('initialize', defaultInitializeParams());
+    const created = (await client.request('session/new', {
+      cwd: process.cwd(),
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    const { permissionResult } = await startBackgroundPermissionRequest({
+      server,
+      state,
+      tempDir,
+      sessionId: created.sessionId,
+      turnId: 'turn_close_job',
+      toolCallId: 'tool_close_background',
+    });
+
+    await expect(
+      client.request('session/close', { sessionId: created.sessionId })
+    ).resolves.toEqual({});
+    await expect(permissionResult).rejects.toThrow('cancelled');
+
+    expect(updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'tool_use',
+          toolCallId: 'tool_close_background',
+          status: 'cancelled',
+        }),
+      ])
+    );
+    expect(state.pendingPermissionRequests.has('tool_close_background')).toBe(false);
+    expect(state.activeSession).toBeNull();
+
+    client.close();
+    server.close();
+  });
+
+  it('cancels background permission prompts before loading another session', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    const updates: Array<Record<string, unknown>> = [];
+
+    client.onRequest('session/request_permission', async () => new Promise(() => undefined));
+    client.onRequest('session/update', async (params) => {
+      updates.push(params as Record<string, unknown>);
+      return undefined;
+    });
+
+    await client.request('initialize', defaultInitializeParams());
+    const first = (await client.request('session/new', {
+      cwd: process.cwd(),
+      mcpServers: [],
+    })) as { sessionId: string };
+    const second = (await client.request('session/fork', {
+      sessionId: first.sessionId,
+    })) as { sessionId: string };
+
+    const { permissionResult } = await startBackgroundPermissionRequest({
+      server,
+      state,
+      tempDir,
+      sessionId: first.sessionId,
+      turnId: 'turn_load_job',
+      toolCallId: 'tool_load_background',
+    });
+
+    await client.request('session/load', {
+      sessionId: second.sessionId,
+      cwd: process.cwd(),
+      mcpServers: [],
+    });
+    await expect(permissionResult).rejects.toThrow('cancelled');
+
+    expect(updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'tool_use',
+          toolCallId: 'tool_load_background',
+          status: 'cancelled',
+        }),
+      ])
+    );
+    expect(state.pendingPermissionRequests.has('tool_load_background')).toBe(false);
+    expect(state.activeSession?.meta.sessionId).toBe(second.sessionId);
 
     client.close();
     server.close();
