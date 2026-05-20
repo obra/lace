@@ -3,12 +3,13 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
 import { defaultInitializeParams } from './helpers/initialize';
+import { loadSession } from '../storage/session-store';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -84,6 +85,39 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       { name: 'initial', command: process.execPath, enabled: false },
       { name: 'loaded', command: process.execPath, enabled: false },
     ]);
+  });
+
+  it('preserves the stored session cwd when loading from another directory', async () => {
+    const projectDir = join(tempDir, 'project-a');
+    const callerDir = join(tempDir, 'project-b');
+    mkdirSync(projectDir, { recursive: true });
+    mkdirSync(callerDir, { recursive: true });
+
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+
+    await setupClient.request('initialize', defaultInitializeParams());
+    const created = (await setupClient.request('session/new', {
+      cwd: projectDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    const loadState = createAgentServerState();
+    const { client: loadClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, loadState)
+    );
+
+    await loadClient.request('initialize', defaultInitializeParams());
+    await loadClient.request('session/load', {
+      sessionId: created.sessionId,
+      cwd: callerDir,
+      mcpServers: [],
+    });
+
+    expect(loadState.activeSession?.meta.workDir).toBe(projectDir);
+    expect(loadSession(created.sessionId).meta.workDir).toBe(projectDir);
   });
 
   it('resumes a session without replaying history and reapplies session MCP servers', async () => {

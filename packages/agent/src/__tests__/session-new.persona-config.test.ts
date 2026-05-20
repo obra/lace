@@ -100,6 +100,47 @@ You are a frontmatter persona.`
     ]);
   });
 
+  it('merges request MCP servers with persona defaults by server name', async () => {
+    writeFileSync(
+      join(userPersonasDir, 'merged-mcp.md'),
+      `---
+mcpServers:
+  shared:
+    command: persona-shared
+    args: ['persona-arg']
+    enabled: false
+  persona-only:
+    command: persona-only
+    enabled: false
+---
+You are a persona with MCP defaults.`
+    );
+
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request(
+      'initialize',
+      defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+    );
+
+    const created = (await client.request('session/new', {
+      cwd: tempDir,
+      persona: 'merged-mcp',
+      mcpServers: [
+        { name: 'shared', command: 'request-shared', enabled: false },
+        { name: 'request-only', command: 'request-only', enabled: false },
+      ],
+    })) as { sessionId: string };
+
+    const loaded = loadSession(created.sessionId);
+    expect(loaded.state.config?.mcpServers).toEqual([
+      { name: 'shared', command: 'request-shared', enabled: false },
+      { name: 'persona-only', command: 'persona-only', enabled: false },
+      { name: 'request-only', command: 'request-only', enabled: false },
+    ]);
+  });
+
   it('body-only persona applies no config defaults', async () => {
     writeFileSync(join(userPersonasDir, 'bodyonly.md'), 'You are a body-only persona.');
 

@@ -5,7 +5,7 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { PassThrough } from 'node:stream';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   AcpErrorCodes,
   createNdjsonStdioTransport,
@@ -106,6 +106,39 @@ describe('ACP session cancellation', () => {
 
     client.close();
     server.close();
+  });
+
+  it('stops session MCP servers on session/close', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    const fixturePath = resolve('../web/test-utils/fixtures/mcp-stdio-test-server.cjs');
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      const created = (await client.request('session/new', {
+        cwd: process.cwd(),
+        mcpServers: [{ name: 'close-test', command: process.execPath, args: [fixturePath] }],
+      })) as { sessionId: string };
+
+      const status = (await client.request('ent/agent/status')) as {
+        mcpServers?: Array<{ name: string; status: string }>;
+      };
+      expect(status.mcpServers?.find((s) => s.name === 'close-test')).toMatchObject({
+        name: 'close-test',
+        status: 'connected',
+      });
+
+      await expect(
+        client.request('session/close', { sessionId: created.sessionId })
+      ).resolves.toEqual({});
+
+      expect(state.activeSession).toBeNull();
+      expect(state.mcpServerManager.getAllServers()).toEqual([]);
+    } finally {
+      await state.mcpServerManager.shutdown();
+      client.close();
+      server.close();
+    }
   });
 
   it('sends -32800 error code when handling cancellation request', async () => {

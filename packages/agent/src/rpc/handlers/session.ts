@@ -132,10 +132,6 @@ async function activateStoredSession(
     }
     throw error;
   }
-  if (loaded.meta.workDir !== params.cwd) {
-    writeSessionMeta(loaded.dir, { ...loaded.meta, workDir: params.cwd });
-    loaded = loadSession(params.sessionId);
-  }
   state.activeSession = loaded;
 
   applyMcpServersToActiveSession(state, params.mcpServers);
@@ -263,7 +259,10 @@ export function registerSessionHandlers(
       toNonEmptyString(parsed.config?.modelId) ?? personaDefaults.modelId ?? state.config.modelId;
     const effectiveConnectionId =
       toNonEmptyString(parsed.config?.connectionId) ?? state.config.connectionId;
-    const effectiveMcpServers = parsed.mcpServers ?? personaDefaults.mcpServers;
+    const effectiveMcpServers =
+      parsed.mcpServers !== undefined
+        ? mergeMcpServers(personaDefaults.mcpServers, parsed.mcpServers)
+        : personaDefaults.mcpServers;
     const effectiveToolScope = personaDefaults.toolScope;
 
     const sessionId = `sess_${randomUUID()}`;
@@ -486,6 +485,7 @@ export function registerSessionHandlers(
     await killAllRunningJobs(state.jobManager.getRunningJobs());
     state.pendingPermissionRequests.clear();
     state.jobManager.clearJobs();
+    await state.mcpServerManager.shutdown();
     state.toolExecutorCache.clear();
     state.activeTurn = null;
     state.activeSession = null;

@@ -27,7 +27,7 @@ export function mergeMcpServers(existing: unknown, incoming: unknown): McpServer
   for (const oldServer of existingServers) {
     const incomingServer = incomingByName.get(oldServer.name);
     if (incomingServer) {
-      merged.push({ ...oldServer, ...incomingServer });
+      merged.push(incomingServer);
     } else {
       merged.push(oldServer);
     }
