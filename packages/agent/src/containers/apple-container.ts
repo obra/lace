@@ -89,6 +89,29 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
     return containers;
   }
 
+  private async waitForContainerNotRunning(
+    containerId: string,
+    timeoutMs: number = 5000
+  ): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      try {
+        const containers = await this.listSystemContainers({ all: true, timeout: 2000 });
+        const container = containers.find((c) => c.id === containerId);
+        if (!container || container.status.toLowerCase() !== 'running') {
+          return true;
+        }
+      } catch {
+        // Keep polling until the timeout; transient XPC/list errors are common during state changes.
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    return false;
+  }
+
   create(config: ContainerConfig): string {
     // Generate unique container ID if not provided
     const uniqueSuffix = uuidv4().slice(0, 8);
@@ -213,62 +236,69 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
 
     logger.info('Stopping Apple container', { containerId });
 
+    let gracefulError: unknown;
+    let gracefulErrorCode: number | undefined;
     try {
-      // First try graceful stop with shorter timeout
-      // Note: container stop returns 143 when it successfully stops the container with SIGTERM
+      // First try graceful stop. The CLI can return 143 during SIGTERM handling,
+      // so daemon-visible state is verified below.
       await execFileAsync('container', ['stop', containerId], {
-        timeout: Math.min(timeout, 3000),
+        timeout,
       });
-      this.updateContainerState(containerId, 'stopped');
     } catch (error: unknown) {
-      // Exit code 143 means the container was successfully stopped with SIGTERM
-      const errorCode = (error as { code?: number }).code;
-      if (errorCode === 143) {
+      gracefulError = error;
+      gracefulErrorCode = (error as { code?: number }).code;
+    }
+
+    if (await this.waitForContainerNotRunning(containerId, timeout)) {
+      if (gracefulErrorCode === 143) {
         logger.debug('Container stopped with SIGTERM', { containerId });
+      }
+      this.updateContainerState(containerId, 'stopped');
+      return;
+    }
+
+    logger.warn('Graceful stop failed, forcing kill', {
+      containerId,
+      errorCode: gracefulErrorCode,
+    });
+
+    try {
+      await execFileAsync('container', ['kill', containerId], { timeout: 2000 });
+    } catch (killError: unknown) {
+      const killErrorCode = (killError as { code?: number }).code;
+      if (killErrorCode !== 143) {
+        logger.warn('Container kill command failed', { containerId, errorCode: killErrorCode });
+      }
+    }
+
+    if (await this.waitForContainerNotRunning(containerId, timeout)) {
+      this.updateContainerState(containerId, 'stopped');
+      return;
+    }
+
+    // Container might already be stopped but list polling could not prove it.
+    try {
+      const containers = await this.listSystemContainers({ all: true, timeout: 1000 });
+      const container = containers.find((c) => c.id === containerId);
+
+      if (!container) {
         this.updateContainerState(containerId, 'stopped');
         return;
       }
 
-      logger.warn('Graceful stop failed, forcing kill', { containerId, errorCode });
-      // Force kill if stop failed for other reasons
-      try {
-        await execFileAsync('container', ['kill', containerId], { timeout: 2000 });
+      if (container.status.toLowerCase() !== 'running') {
         this.updateContainerState(containerId, 'stopped');
-      } catch (killError: unknown) {
-        // Exit code 143 is also OK for kill
-        const killErrorCode = (killError as { code?: number }).code;
-        if (killErrorCode === 143) {
-          this.updateContainerState(containerId, 'stopped');
-          return;
-        }
-
-        // Container might already be stopped, check by listing
-        try {
-          const containers = await this.listSystemContainers({ timeout: 1000 });
-          const container = containers.find((c) => c.id === containerId);
-
-          if (!container) {
-            this.updateContainerState(containerId, 'stopped');
-            return;
-          }
-
-          const normalized = container.status.toLowerCase();
-          if (normalized !== 'running') {
-            this.updateContainerState(containerId, 'stopped');
-            return;
-          }
-        } catch {
-          // Assume stopped if we can't check
-          this.updateContainerState(containerId, 'stopped');
-          return;
-        }
-        throw new ContainerError(
-          `Failed to stop container`,
-          containerId,
-          error instanceof Error ? error : undefined
-        );
+        return;
       }
+    } catch {
+      // The caller may still force-delete; do not mark stopped without proof.
     }
+
+    throw new ContainerError(
+      `Failed to stop container`,
+      containerId,
+      gracefulError instanceof Error ? gracefulError : undefined
+    );
   }
 
   async remove(containerId: string): Promise<void> {
@@ -276,9 +306,16 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
 
     this.inspect(containerId); // Verify container exists in our records
 
-    // Always attempt to stop before removal, regardless of cached state.
-    // This avoids race conditions where state cache says "stopped" but container is still running.
-    await this.stop(containerId, 5000);
+    try {
+      // Always attempt to stop before removal, regardless of cached state.
+      // This avoids race conditions where state cache says "stopped" but container is still running.
+      await this.stop(containerId, 5000);
+    } catch (error: unknown) {
+      logger.warn('Stop before removal failed; proceeding to delete', {
+        containerId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     logger.info('Removing Apple container', { containerId });
 

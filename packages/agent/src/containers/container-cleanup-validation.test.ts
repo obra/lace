@@ -119,10 +119,10 @@ describe.skipIf(!APPLE_CONTAINER_AVAILABLE)('Container Cleanup Validation', () =
     expect(await containerExists(containerId)).toBe(true);
 
     // Stop the running container
-    await runtime.stop(containerId, 5000);
+    await runtime.stop(containerId, 20000);
 
     // Verify stop is idempotent - stopping again should not throw
-    await expect(runtime.stop(containerId, 5000)).resolves.not.toThrow();
+    await expect(runtime.stop(containerId, 20000)).resolves.not.toThrow();
 
     // Remove should work on an already-stopped container
     await expect(runtime.remove(containerId)).resolves.not.toThrow();

@@ -112,7 +112,9 @@ async function releaseRunningSessionWork(
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>
 ): Promise<void> {
   await cancelPendingPermissionRequests(peer, state, runExclusive);
-  await killAllRunningJobs(state.jobManager.getRunningJobs());
+  const runningJobs = [...state.jobManager.getRunningJobs().values()];
+  await killAllRunningJobs(state.jobManager.getRunningJobs(), { waitMs: 500, forceKill: true });
+  await Promise.all(runningJobs.map((job) => state.jobManager.finalizeJob(job)));
   state.pendingPermissionRequests.clear();
   state.jobManager.clearJobs();
 }

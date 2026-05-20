@@ -174,7 +174,7 @@ describe.skipIf(!APPLE_CONTAINER_AVAILABLE)('AppleContainerRuntime Integration',
     // Uses shared runtime and concurrentTestDir from parent scope
     // Cleanup is handled by the parent afterAll
 
-    it('should handle concurrent container execution', async () => {
+    it('should handle concurrent container execution', { timeout: 20_000 }, async () => {
       // Create two containers
       const config1: ContainerConfig = {
         id: 'concurrent-1',
