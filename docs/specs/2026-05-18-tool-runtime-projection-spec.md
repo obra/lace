@@ -10,6 +10,10 @@ projected tool runtimes. It is not the implementation plan. Once this spec is
 approved, we will write a separate implementation plan that decomposes the work
 into small, reviewable changes.
 
+Implementation must not start from this document alone. The implementation plan
+is the gate that defines task order, review boundaries, and verification for
+each change.
+
 ## Summary
 
 Lace currently has three related ideas that are not cleanly separated:
@@ -375,13 +379,24 @@ binding when the session or job starts.
 Recommended descriptors:
 
 ```typescript
+export type RuntimeBindingSchemaVersion = 1;
+
+export type RuntimeSecretNamespace = 'session' | 'project' | 'host-service';
+
 export interface RuntimeSecretReference {
-  provider: string;
+  namespace: RuntimeSecretNamespace;
   name: string;
 }
 
+export interface RuntimeBindingIdentity {
+  runtimeId: string;
+}
+
 export type ToolRuntimeDescriptor =
-  | { type: 'local'; cwd: string }
+  | {
+      type: 'local';
+      cwd: string;
+    }
   | {
       type: 'workspace';
       projectRoot: string;
@@ -416,6 +431,8 @@ export type ToolRuntimeDescriptor =
     };
 
 export interface RuntimeExecutionBinding {
+  schemaVersion: RuntimeBindingSchemaVersion;
+  identity: RuntimeBindingIdentity;
   toolRuntime: ToolRuntimeDescriptor;
   agentPlacement: 'host' | 'container';
 }
@@ -440,6 +457,32 @@ stable source reference that deterministically rebuilds the same
 `ContainerSpec`. Do not rely on `ContainerManager`'s in-memory spec cache after
 process restart.
 
+### Durable Storage Contract
+
+The binding is host-side session/job state. It is not part of the prompt, model
+trace, or projected container filesystem.
+
+- Session-level binding lives in the session `state.json`, under session config,
+  alongside existing persisted session configuration such as connection/model,
+  environment, and MCP server config.
+- `meta.json` should keep only list/resume metadata such as `sessionId`,
+  `workDir`, and creation time. Do not put full runtime descriptors there; it is
+  more likely to be surfaced in lightweight session listings.
+- Async job creation must copy the active binding into the durable `job_started`
+  event data for jobs that need runtime rehydration. The in-memory `JobState`
+  can cache the parsed binding, but `events.jsonl` is the source of truth after
+  restart.
+- Delegate jobs inherit the parent binding unless the delegate persona
+  explicitly chooses lace-in-container placement. Resumed delegates use the
+  binding recorded with their original job/session, not the current caller's
+  binding.
+- Runtime-placed MCP reconciliation reads the active session binding plus the
+  persisted MCP config. Connection state remains in memory and must be rebuilt
+  from those durable inputs after restart.
+
+Bindings are schema-versioned. Unknown future `schemaVersion` values fail
+resume/startup clearly instead of being treated as v1.
+
 ### Descriptor Security
 
 Persisted runtime descriptors must not contain provider credentials or raw
@@ -460,6 +503,28 @@ sensitive operational metadata:
 - it must never include host provider credentials, Lace session storage, trace
   directories, or provider config files by default.
 
+Secret references are host-resolved. Tools, MCP adapters, and helper processes
+receive resolved environment values only after the host runtime-binding layer
+has authorized and resolved the reference for that specific runtime/server.
+Individual tools must not read the host secret store directly.
+
+Secret reference namespaces are not LLM provider credential namespaces. A
+runtime secret reference cannot point at provider credentials selected by
+`connectionId`, provider config files, or cached model-client tokens. Runtime
+secret namespaces are limited to explicit session/project/runtime secret stores
+and host-service secrets that were deliberately allowed for that MCP server.
+
+`RuntimeSecretReference` values are redacted as metadata. Model-visible output,
+ordinary UI summaries, and non-debug traces should show at most that a secret
+reference existed, not its namespace/name pair. Structured debug logs may
+include redacted reference identifiers only when the log sink is host-side and
+access is restricted like other agent operational logs; raw secret values are
+never logged.
+
+If a referenced secret is missing, unauthorized for the target runtime/server,
+or fails resolution, runtime materialization or MCP server startup fails before
+the tool process is launched.
+
 Configuration should set `agentPlacement` explicitly when constructing the
 binding. Current persona-container behavior maps to
 `agentPlacement: 'container'`. New projected-container behavior must request
@@ -476,19 +541,37 @@ access to the active binding.
 Existing state should keep working when it has enough information to do so, but
 runtime projection should not guess silently.
 
-- If an existing session or job has no runtime descriptor, default to a local
-  host runtime using the existing session working directory.
-- If existing workspace state has enough `projectRoot`, `workspaceRoot`, and
-  `cwd` information, map it to `WorkspaceToolRuntime`. If it does not, resume as
-  local only when that matches the old behavior; otherwise fail with a clear
-  resume error.
-- Existing lace-in-container personas map to `agentPlacement: 'container'`.
-  Their child agent process runs inside the container and should construct a
-  local runtime from its own process environment.
-- New projected-container sessions must request `agentPlacement: 'host'` plus
-  `toolRuntime.type: 'container'`.
-- Missing MCP `placement` fields should be defaulted by config source, not by
-  inspecting whether the active runtime is a container.
+| Existing durable state                         | Resume/default behavior                                                                                                                                           |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Session/job has no runtime binding             | Default to v1 local host binding using the existing session `meta.workDir` as `cwd`.                                                                              |
+| Session has complete workspace mapping         | Build a v1 workspace binding when `projectRoot`, `workspaceRoot`, and `cwd` are all present and valid.                                                            |
+| Session has partial workspace mapping          | Resume as local only if that matches the old behavior for that session. Otherwise fail with a clear error naming the missing workspace fields.                    |
+| Persona/job has existing container-agent state | Map to `agentPlacement: 'container'`. The child lace-agent runs inside the container and constructs its own local runtime from that process environment.          |
+| Projected-container session/job has v1 binding | Validate schema version, descriptor shape, helper config, mounts, secret references, and MCP placement before materializing or reconnecting to runtime processes. |
+| Binding has unknown `schemaVersion`            | Fail resume/startup with an unsupported runtime binding version error.                                                                                            |
+
+Concrete examples:
+
+- An old local session with only `meta.workDir: "/repo"` resumes as
+  `{ schemaVersion: 1, identity: { runtimeId: "session:<id>:local" }, agentPlacement: "host", toolRuntime: { type: "local", cwd: "/repo" } }`.
+- An old workspace session that has `projectRoot`, `workspaceRoot`, and `cwd`
+  resumes as `WorkspaceToolRuntime`.
+- An old workspace session with `workspaceRoot` but no original project root
+  fails if any persisted tool/job state depends on project-coordinate display or
+  containment checks.
+- An old delegate persona with `personaContainerRuntime` remains
+  lace-in-container; the host does not infer projected tool runtime just because
+  a container exists.
+- A new projected-container session must explicitly persist
+  `agentPlacement: "host"` and `toolRuntime.type: "container"`.
+
+Missing MCP `placement` fields should be defaulted by config source, not by
+inspecting whether the active runtime is a container:
+
+- session/persona/project MCP defaults to `toolRuntime`;
+- user/global MCP defaults to `host`; and
+- HTTP/SSE MCP with omitted placement defaults to `host` in v1 because
+  runtime-placed HTTP/SSE is unsupported.
 
 ## MCP Servers
 
@@ -599,6 +682,15 @@ runtime-placed server with the same user-facing name cannot alias.
 servers into sessions. Strict schemas must reject neither the new field nor the
 intended defaulting behavior.
 
+MCP validation happens at two boundaries:
+
+- config load/session creation validates schema shape, defaults missing
+  placement by config source, rejects unknown placement values, and rejects raw
+  secret values where `secretEnv` is required; and
+- server start/reconciliation validates the active runtime binding, resolves
+  `secretEnv`, rejects unsupported transport/placement combinations, and fails
+  before launch if a secret is missing or unauthorized.
+
 ### HTTP/SSE MCP
 
 The protocol schema currently accepts `transport: 'stdio' | 'sse' | 'http'`, but
@@ -651,6 +743,15 @@ must not accidentally share mutable runtime state.
 - Each materialized runtime gets a stable `runtime.id` for the lifetime of the
   session/job binding. For containers, that id is included in canonical file
   access keys.
+- `runtime.id` is a logical binding id, not necessarily the Docker/container
+  process id. It is generated when the session or job binding is created and is
+  persisted with that binding.
+- Local and workspace runtimes can derive deterministic ids from the session/job
+  id plus cwd/workspace roots. Container runtimes store the logical runtime id
+  separately from `containerId` so a stale container can be rematerialized only
+  when the persisted descriptor proves it is the same logical runtime.
+- If rematerialization would change the runtime semantics, Lace must fail resume
+  instead of reusing the old runtime id for a different target.
 - Runtime-placed MCP connection keys include server id, transport, placement,
   effective cwd, and runtime id. A host server and runtime-placed server with
   the same user-facing name must not alias.
@@ -693,6 +794,9 @@ execution.
 - If the helper or its interpreter/runtime is missing, host-mount fast-path
   operations may continue, but helper-backed operations fail with an error that
   identifies the missing helper capability.
+- If a referenced runtime or MCP secret is missing or unauthorized, startup for
+  that runtime/server fails before launching any projected process. The error
+  names the config field and redacted reference, not the secret value.
 - If a runtime process exits, crashes, or is killed, the tool/job result records
   the exit status or signal and flushes available stdout/stderr into host-side
   logs.
@@ -716,6 +820,12 @@ Use fake runtimes before real containers:
 - Test local runtime against current behavior.
 - Test workspace runtime path containment and display path behavior.
 - Test projected container runtime with a fake `ContainerManager`.
+- Test v0/no-binding, workspace, lace-in-container, v1 projected-container, and
+  unknown-version resume/defaulting cases.
+- Test secret reference validation: raw secret rejection, missing secret
+  failure, unauthorized secret failure, and redacted debug/error output.
+- Test runtime id stability across session/job reload and runtime-placed MCP
+  reconciliation.
 - Add one gated Docker integration smoke:
   1. materialize a container,
   2. `bash` writes a file under container `/tmp`,
@@ -734,7 +844,8 @@ Use fake runtimes before real containers:
 
 This spec intentionally does not define the rollout sequence or PR boundaries.
 After the spec is approved, the implementation plan should decompose the work
-into small, reviewable changes. That plan must preserve these constraints:
+into small, reviewable changes. No implementation should begin until that plan
+exists and has been approved. That plan must preserve these constraints:
 
 - Start from behavior-preserving runtime plumbing before changing tool
   semantics.
