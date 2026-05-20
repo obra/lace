@@ -8,6 +8,8 @@ import { parseProviderModel } from '@lace/agent/providers/provider-utils';
 import { ToolExecutor } from '@lace/agent/tools/executor';
 import { Tool } from '@lace/agent/tools/tool';
 import { ToolCall, ToolResult, ToolContext, createErrorResult } from '@lace/agent/tools/types';
+import { createRuntimeId } from '@lace/agent/tools/runtime/identity';
+import { HostToolRuntime } from '@lace/agent/tools/runtime/host';
 import type { AIProvider } from '@lace/agent/providers/base-provider';
 import { logger } from '@lace/agent/utils/logger';
 
@@ -196,10 +198,16 @@ export class InfrastructureHelper extends BaseHelper {
 
       // Build context without agent (infrastructure mode)
       const composedSignal = this.options.abortSignal ?? signal ?? new AbortController().signal;
+      const runtimeCwd = this.options.workingDirectory ?? process.cwd();
       const context: ToolContext = {
         signal: composedSignal,
         workingDirectory: this.options.workingDirectory,
         processEnv: this.options.processEnv,
+        runtime: new HostToolRuntime({
+          id: createRuntimeId(),
+          cwd: runtimeCwd,
+          env: this.options.processEnv,
+        }),
         // NO agent property - this is infrastructure mode
       };
 

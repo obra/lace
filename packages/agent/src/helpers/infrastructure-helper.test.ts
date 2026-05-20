@@ -1,6 +1,9 @@
 // ABOUTME: Tests InfrastructureHelper provider resolution, whitelist enforcement, error/abort handling, and model tier mapping
 // ABOUTME: Validates tool blocking, bypass approval, custom working directory, and graceful error handling
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { InfrastructureHelper } from './infrastructure-helper';
 import { UserSettingsManager } from '@lace/agent/config/user-settings';
 import { ProviderInstanceManager } from '@lace/agent/providers/instance/manager';
@@ -186,10 +189,12 @@ describe('InfrastructureHelper', () => {
     });
 
     it('should use custom working directory in tool context', async () => {
+      const workingDirectory = await mkdtemp(join(tmpdir(), 'infrastructure-helper-'));
       const helper = new InfrastructureHelper({
         model: 'fast',
         tools: ['test_tool'],
-        workingDirectory: '/custom/work/dir',
+        workingDirectory,
+        processEnv: { TEST: 'value' },
       });
       helper['toolExecutor'] = toolExecutor;
 
@@ -211,15 +216,35 @@ describe('InfrastructureHelper', () => {
         toolCalls: [],
       });
 
-      await helper.execute('Test custom working directory');
+      try {
+        await helper.execute('Test custom working directory');
 
-      // Should pass working directory in context
-      expect(executeSpy).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.objectContaining({
-          workingDirectory: '/custom/work/dir',
-        })
-      );
+        // Should pass working directory in context
+        expect(executeSpy).toHaveBeenCalledWith(
+          expect.any(Object),
+          expect.objectContaining({
+            workingDirectory,
+            processEnv: { TEST: 'value' },
+          })
+        );
+
+        const context = executeSpy.mock.calls[0]?.[1];
+        expect(context.runtime).toEqual(
+          expect.objectContaining({
+            kind: 'local',
+            cwd: workingDirectory,
+          })
+        );
+
+        const envResult = await context.runtime!.process.exec([
+          process.execPath,
+          '-e',
+          'process.stdout.write(process.env.TEST ?? "")',
+        ]);
+        expect(envResult.stdout).toBe('value');
+      } finally {
+        await rm(workingDirectory, { recursive: true, force: true });
+      }
     });
 
     it('should handle empty tool list', async () => {

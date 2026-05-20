@@ -187,6 +187,32 @@ describe('FileReadTool', () => {
       expect(result.content[0].text).toContain('Use a line number between 1 and 5');
     });
 
+    it('should not mark a runtime file read when line validation fails', async () => {
+      const resolved = {
+        original: 'short.txt',
+        runtimePath: '/runtime/short.txt',
+        displayPath: 'short.txt',
+      };
+      const runtime = createFakeRuntime({
+        resolve: resolved,
+        readText: 'Line 1\nLine 2',
+        statType: 'file',
+      });
+      const markFileRead = vi.fn();
+
+      const result = await tool.execute(
+        {
+          path: 'short.txt',
+          startLine: 10,
+        },
+        { signal: new AbortController().signal, runtime, markFileRead }
+      );
+
+      expect(result.status).toBe('failed');
+      expect(result.content[0].text).toContain('Line 10 exceeds file length');
+      expect(markFileRead).not.toHaveBeenCalled();
+    });
+
     it('should handle end line beyond file length gracefully', async () => {
       const result = await tool.execute(
         {

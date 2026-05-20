@@ -68,7 +68,6 @@ export class FileReadTool extends Tool {
 
       // Read file content
       const content = await context.runtime.fs.readTextFile(runtimePath);
-      context.markFileRead?.(runtimePath);
       const lines = content.split('\n');
 
       // Validate line numbers against actual file content
@@ -140,6 +139,7 @@ export class FileReadTool extends Tool {
         metadata.requestedRange = requestedRange;
       }
 
+      context.markFileRead?.(runtimePath);
       return this.createResult(resultContent, metadata);
     } catch (error: unknown) {
       // Type guard for Node.js filesystem errors
