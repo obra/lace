@@ -25,6 +25,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^0.29.2",
     "@anthropic-ai/sdk": "^0.54.0",
     "@google/genai": "^1.19.0",
     "@lace/ent-protocol": "file:../ent-protocol",
