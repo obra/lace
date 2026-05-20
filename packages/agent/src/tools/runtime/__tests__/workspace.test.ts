@@ -1,10 +1,26 @@
-import { mkdir, mkdtemp, realpath } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, realpath, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { WorkspaceToolRuntime } from '../workspace';
 
 describe('WorkspaceToolRuntime', () => {
+  async function makeTempRuntime() {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'lace-workspace-project-'));
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'lace-workspace-runtime-'));
+
+    return {
+      projectRoot,
+      workspaceRoot,
+      runtime: new WorkspaceToolRuntime({
+        id: 'rt_ws',
+        projectRoot,
+        workspaceRoot,
+        cwd: workspaceRoot,
+      }),
+    };
+  }
+
   it('maps project absolute paths into workspace root', async () => {
     const runtime = new WorkspaceToolRuntime({
       id: 'rt_ws',
@@ -101,5 +117,102 @@ describe('WorkspaceToolRuntime', () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(`${resolvedCwd}:present:path`);
+  });
+
+  it('rejects reads through symlinks that escape the workspace root', async () => {
+    const { runtime, workspaceRoot } = await makeTempRuntime();
+    const outsideDir = await mkdtemp(join(tmpdir(), 'lace-workspace-outside-'));
+    const outsideFile = join(outsideDir, 'secret.txt');
+    await writeFile(outsideFile, 'outside secret', 'utf8');
+    await symlink(outsideFile, join(workspaceRoot, 'secret-link.txt'));
+
+    const path = await runtime.paths.resolve('secret-link.txt');
+
+    await expect(runtime.fs.readTextFile(path)).rejects.toThrow(/outside workspace/i);
+  });
+
+  it('rejects stat through symlinks that escape the workspace root', async () => {
+    const { runtime, workspaceRoot } = await makeTempRuntime();
+    const outsideDir = await mkdtemp(join(tmpdir(), 'lace-workspace-outside-'));
+    const outsideFile = join(outsideDir, 'secret.txt');
+    await writeFile(outsideFile, 'outside secret', 'utf8');
+    await symlink(outsideFile, join(workspaceRoot, 'secret-link.txt'));
+
+    const path = await runtime.paths.resolve('secret-link.txt');
+
+    await expect(runtime.fs.stat(path)).rejects.toThrow(/outside workspace/i);
+  });
+
+  it('rejects readdir through symlinks that escape the workspace root', async () => {
+    const { runtime, workspaceRoot } = await makeTempRuntime();
+    const outsideDir = await mkdtemp(join(tmpdir(), 'lace-workspace-outside-'));
+    await writeFile(join(outsideDir, 'secret.txt'), 'outside secret', 'utf8');
+    await symlink(outsideDir, join(workspaceRoot, 'outside-link'));
+
+    const path = await runtime.paths.resolve('outside-link');
+
+    await expect(runtime.fs.readdir(path)).rejects.toThrow(/outside workspace/i);
+  });
+
+  it('rejects writes through symlinked parents that escape the workspace root', async () => {
+    const { runtime, workspaceRoot } = await makeTempRuntime();
+    const outsideDir = await mkdtemp(join(tmpdir(), 'lace-workspace-outside-'));
+    const outsideFile = join(outsideDir, 'new.txt');
+    await symlink(outsideDir, join(workspaceRoot, 'outside-link'));
+
+    const path = await runtime.paths.resolve('outside-link/new.txt');
+
+    await expect(runtime.fs.writeTextFile(path, 'leaked')).rejects.toThrow(/outside workspace/i);
+    await expect(access(outsideFile)).rejects.toThrow();
+  });
+
+  it('rejects process cwd overrides that escape the workspace root', async () => {
+    const { runtime } = await makeTempRuntime();
+    const outsideDir = await mkdtemp(join(tmpdir(), 'lace-workspace-outside-'));
+
+    await expect(
+      runtime.process.exec(['node', '-e', "process.stdout.write('spawned')"], {
+        cwd: outsideDir,
+      })
+    ).rejects.toThrow(/outside workspace/i);
+  });
+
+  it('maps project-coordinate process cwd overrides into the workspace root', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'lace-workspace-project-'));
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'lace-workspace-runtime-'));
+    const projectCwd = join(projectRoot, 'src');
+    const workspaceCwd = join(workspaceRoot, 'src');
+    await mkdir(projectCwd);
+    await mkdir(workspaceCwd);
+    const resolvedWorkspaceCwd = await realpath(workspaceCwd);
+    const runtime = new WorkspaceToolRuntime({
+      id: 'rt_ws',
+      projectRoot,
+      workspaceRoot,
+      cwd: workspaceRoot,
+    });
+
+    const result = await runtime.process.exec(
+      ['node', '-e', 'process.stdout.write(process.cwd())'],
+      { cwd: projectCwd }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe(resolvedWorkspaceCwd);
+  });
+
+  it('resolves relative process cwd overrides from the runtime cwd', async () => {
+    const { runtime, workspaceRoot } = await makeTempRuntime();
+    const nestedCwd = join(workspaceRoot, 'nested');
+    await mkdir(nestedCwd);
+    const resolvedNestedCwd = await realpath(nestedCwd);
+
+    const result = await runtime.process.exec(
+      ['node', '-e', 'process.stdout.write(process.cwd())'],
+      { cwd: 'nested' }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe(resolvedNestedCwd);
   });
 });
