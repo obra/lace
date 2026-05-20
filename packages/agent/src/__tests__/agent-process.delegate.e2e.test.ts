@@ -248,7 +248,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
     expect(firstJobId).toBeDefined();
 
     // Now resume that job and ask a follow-up
-    const resumePrompt = await withTimeout(
+    await withTimeout(
       ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: `delegate resume=${firstJobId} now say goodbye` }],
       }),
@@ -421,7 +421,6 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       let delegateJobId: string | undefined;
-      let sessionId: string | undefined;
 
       ctx.agent.peer.onRequest('session/update', async (params) => {
         const p = params as Record<string, unknown>;
@@ -446,7 +445,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
         2_000,
         'session/new'
       )) as { sessionId: string };
-      sessionId = sessionResult.sessionId;
+      const sessionId = sessionResult.sessionId;
 
       // Run a delegate
       await withTimeout(
@@ -478,7 +477,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
 
       // Check events.jsonl for job_session_assigned
       const sessionsDir = join(ctx.laceDir, 'agent-sessions');
-      const sessionDir = join(sessionsDir, sessionId!);
+      const sessionDir = join(sessionsDir, sessionId);
       const eventsPath = join(sessionDir, 'events.jsonl');
       const eventsContent = readFileSync(eventsPath, 'utf8');
       const events = eventsContent
