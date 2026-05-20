@@ -408,7 +408,8 @@ export type ToolRuntimeDescriptor =
       spec: {
         name: string;
         containerId?: string;
-        image: string;
+        requestedImage: string;
+        resolvedImageDigest: string;
         workingDirectory: string;
         mounts: Array<{
           hostPath: string;
@@ -456,6 +457,13 @@ For container runtimes, "enough" means a full materialization descriptor or a
 stable source reference that deterministically rebuilds the same
 `ContainerSpec`. Do not rely on `ContainerManager`'s in-memory spec cache after
 process restart.
+
+Persisted projected-container descriptors must not rely on mutable image tags
+for semantic identity. Store both the requested image string and the resolved
+immutable image digest. If the requested image already uses digest form, the
+resolved digest is the same digest. Resume/rematerialization validates against
+the resolved digest; a tag that now resolves to different content is a semantic
+change and must fail or require a new runtime binding.
 
 ### Durable Storage Contract
 
@@ -806,17 +814,40 @@ must not accidentally share mutable runtime state.
   JSON sorts object keys, uses normalized absolute paths with `/` separators,
   preserves case, strips trailing slashes except filesystem roots, and does not
   resolve symlinks.
+- Legacy fingerprint inputs are fixed by runtime type:
+  - common fields: `schemaVersion`, `agentPlacement`, `scope`, `sessionId`,
+    optional `jobId`, optional MCP `serverId`, and `toolRuntime.type`;
+  - local: common fields plus `toolRuntime.cwd`;
+  - workspace: common fields plus `toolRuntime.projectRoot`,
+    `toolRuntime.workspaceRoot`, and `toolRuntime.cwd`;
+  - container: common fields plus `requestedImage`, `resolvedImageDigest`,
+    `workingDirectory`, runtime `cwd`, mounts sorted by `containerPath`, literal
+    env sorted by key, secret references sorted by key, helper
+    mode/containerPath/command, and container port declarations sorted by
+    container port; and
+  - MCP-scoped legacy ids also include `placement`, `transport`, and effective
+    cwd so host and runtime-placed connections cannot alias.
+- Legacy fingerprint fixtures:
+  - local session input
+    `{"agentPlacement":"host","schemaVersion":1,"scope":"session","sessionId":"sess_123","toolRuntime":{"cwd":"/repo","type":"local"}}`
+    -> `d33ee12dd7d5f31b`;
+  - workspace session input
+    `{"agentPlacement":"host","schemaVersion":1,"scope":"session","sessionId":"sess_123","toolRuntime":{"cwd":"/work","projectRoot":"/repo","type":"workspace","workspaceRoot":"/tmp/ws"}}`
+    -> `540af98facc5cf4c`; and
+  - job-local input
+    `{"agentPlacement":"host","jobId":"job_456","schemaVersion":1,"scope":"job","sessionId":"sess_123","toolRuntime":{"cwd":"/repo","type":"local"}}`
+    -> `4412929fcf49cd3e`.
 - The descriptor, not the runtime id alone, defines runtime semantics. On
   resume, Lace validates both the persisted id and descriptor before reusing the
   binding. Container runtimes store the logical runtime id separately from
   `containerId` so a stale container can be rematerialized only when the
   persisted descriptor proves it is the same logical runtime.
-- Container descriptor semantic identity includes image, working directory,
-  runtime cwd, container mount paths and readonly flags, literal env values,
-  secret reference identities, helper mode/container path/command, and container
-  port declarations. Operational details such as `containerId`, copied helper
-  host path, and host-assigned port numbers may change during rematerialization
-  only when the semantic identity is unchanged.
+- Container descriptor semantic identity includes `resolvedImageDigest`, working
+  directory, runtime cwd, container mount paths and readonly flags, literal env
+  values, secret reference identities, helper mode/container path/command, and
+  container port declarations. Operational details such as `requestedImage`,
+  `containerId`, copied helper host path, and host-assigned port numbers may
+  change during rematerialization only when the semantic identity is unchanged.
 - If rematerialization would change the runtime semantics, Lace must fail resume
   instead of reusing the old runtime id for a different target.
 - Runtime-placed MCP connection keys include server id, transport, placement,
@@ -894,6 +925,22 @@ execution.
   surfaced as runtime errors with display paths; they should not expose redacted
   host paths or secret references.
 
+Failure surfaces:
+
+- `session/resume`: returns the redacted runtime binding error directly to the
+  caller and does not start projected processes.
+- `session/list`: continues to list the session from `meta.json` and durable
+  event summaries, with an optional warning marker if binding validation is
+  attempted and fails.
+- `job_output` / job inspection: reports the affected job's rehydration or
+  runtime failure and points to the host-side output log when one exists.
+- MCP/server inspection: reports per-server failed status and redacted startup
+  error without exposing secret references or raw host paths.
+- Ordinary tool invocation: receives runtime errors only for the tool call that
+  touched the failing runtime capability.
+- Host logs: may include correlation ids, runtime id, session id, job id, server
+  id, and redacted reference ids under host operational log access controls.
+
 ## Testing Requirements
 
 Use fake runtimes before real containers:
@@ -915,7 +962,18 @@ Use fake runtimes before real containers:
   `state.config.runtimeBinding`, job rehydration from
   `job_started.data.runtimeBinding`, and malformed binding failures that do not
   break session listing.
+- Each migrated tool group needs an explicit acceptance case:
+  - read-only filesystem/introspection proves runtime cwd/path resolution and
+    canonical read tracking without host `fs` shortcuts;
+  - write/edit proves read-before-write against canonical runtime paths;
+  - process/search proves runtime cwd, runtime env, missing executable behavior,
+    and no host fallback;
+  - network fetch proves runtime network view and host-side temp artifact
+    storage.
 - Test unsupported MCP transport/placement failure before process launch.
+- Before runtime-placed MCP is added, host-placed MCP startup, reconnect,
+  listing/discovery, and tool-call tests must pass with placement/defaulting
+  changes enabled.
 - Test stale container handling for both successful rematerialization and clear
   resume failure.
 - Add one gated Docker integration smoke:
@@ -960,18 +1018,19 @@ Required stage order:
 1. Schema/types and durable-path additions with no runtime behavior change.
 2. Migration/defaulting plus structural resume validation for v0/no-binding and
    v1 bindings. Structural validation must not start any runtime process.
-3. Runtime binding construction, runtime id generation, secret resolver
-   authorization, and the checkpoint that no projected runtime process can start
-   before current-policy authorization succeeds.
-4. Built-in tool migration in this order: read-only filesystem/introspection,
+3. Runtime binding construction plus runtime id generation/validation, with
+   tests for legacy fingerprint fixtures and no projected process launch.
+4. Secret resolver authorization and the checkpoint that no projected runtime
+   process can start before current-policy authorization succeeds.
+5. Built-in tool migration in this order: read-only filesystem/introspection,
    simple write/edit operations, process/search tools, then network fetch.
-5. Background job and delegate rehydration through persisted bindings.
-6. MCP schema/defaulting while preserving existing host-placed behavior.
-7. MCP reconciliation-key changes while preserving existing host-placed
+6. Background job and delegate rehydration through persisted bindings.
+7. MCP schema/defaulting while preserving existing host-placed behavior.
+8. MCP reconciliation-key changes while preserving existing host-placed
    behavior.
-8. Runtime-placed stdio MCP transport plus lifecycle cleanup.
-9. Projected-container helper delivery and Docker/helper smoke coverage.
-10. Removal of legacy `workspaceInfo` and `resolveWorkspacePath()` after all
+9. Runtime-placed stdio MCP transport plus lifecycle cleanup.
+10. Projected-container helper delivery and Docker/helper smoke coverage.
+11. Removal of legacy `workspaceInfo` and `resolveWorkspacePath()` after all
     consumers have moved.
 
 - Start from behavior-preserving runtime plumbing before changing tool
@@ -1038,6 +1097,8 @@ Required stage order:
 - Existing lace-in-container subagents continue to work.
 - Projected-container mode does not require the full Lace codebase, Lace session
   storage, traces, or provider credentials to be present in the container.
+- Persisted projected-container bindings validate immutable image digests, not
+  mutable tags alone.
 - Host-side traces, durable events, job logs, and provider credentials remain
   available without extracting artifacts from the container.
 - Persisted runtime descriptors and MCP configs do not store raw secret values.
