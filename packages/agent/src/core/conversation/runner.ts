@@ -1030,6 +1030,7 @@ export class ConversationRunner {
     const runtime = new HostToolRuntime({
       id: runtimeBinding.identity.runtimeId,
       cwd,
+      env: envOverlay,
     });
 
     return await toolExecutor.execute(

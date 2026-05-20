@@ -46,6 +46,46 @@ describe('HostToolRuntime', () => {
     expect(result.stderr).toBe('err');
   });
 
+  it('applies default environment to exec commands', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const runtime = new HostToolRuntime({
+      id: 'rt_host',
+      cwd: dir,
+      env: { LACE_HOST_RUNTIME_ENV_TEST: 'present' },
+    });
+
+    const result = await runtime.process.exec([
+      'node',
+      '-e',
+      "process.stdout.write(`${process.env.LACE_HOST_RUNTIME_ENV_TEST}:${process.env.PATH ? 'path' : 'missing'}`)",
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('present:path');
+  });
+
+  it('rejects start completion when spawn fails', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
+
+    const handle = await runtime.process.start(['lace-host-runtime-missing-command']);
+
+    await expect(handle.completion).rejects.toThrow(/lace-host-runtime-missing-command/);
+  });
+
+  it('rejects start completion when the process is aborted', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
+    const abortController = new AbortController();
+
+    const handle = await runtime.process.start(['node', '-e', 'setInterval(() => {}, 1000);'], {
+      signal: abortController.signal,
+    });
+    abortController.abort();
+
+    await expect(handle.completion).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
   it('writes text files through runtime fs', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
     const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });

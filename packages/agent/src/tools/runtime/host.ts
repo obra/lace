@@ -82,7 +82,14 @@ class HostFileSystem implements RuntimeFileSystem {
 }
 
 class HostProcessRunner implements RuntimeProcessRunner {
-  constructor(private readonly cwd: string) {}
+  constructor(
+    private readonly cwd: string,
+    private readonly defaultEnv?: NodeJS.ProcessEnv
+  ) {}
+
+  private envFor(opts: RuntimeProcessOptions): NodeJS.ProcessEnv | undefined {
+    return opts.env ?? this.defaultEnv;
+  }
 
   async exec(command: string[], opts: RuntimeProcessOptions = {}) {
     const [file, ...args] = command;
@@ -90,7 +97,7 @@ class HostProcessRunner implements RuntimeProcessRunner {
     try {
       const result = await execFileAsync(file, args, {
         cwd: opts.cwd ?? this.cwd,
-        env: opts.env,
+        env: this.envFor(opts),
         signal: opts.signal,
         maxBuffer: 10 * 1024 * 1024,
       });
@@ -111,7 +118,7 @@ class HostProcessRunner implements RuntimeProcessRunner {
     if (!file) throw new Error('runtime process command is empty');
     const child = spawn(file, args, {
       cwd: opts.cwd ?? this.cwd,
-      env: opts.env,
+      env: this.envFor(opts),
       stdio: ['pipe', 'pipe', 'pipe'],
       signal: opts.signal,
     });
@@ -121,11 +128,21 @@ class HostProcessRunner implements RuntimeProcessRunner {
       stdout: child.stdout,
       stderr: child.stderr,
       kill: (signal?: NodeJS.Signals) => child.kill(signal),
-      completion: new Promise<{ exitCode: number | null; signal?: NodeJS.Signals }>((resolve) => {
-        child.on('close', (exitCode, signal) => resolve({ exitCode, signal: signal ?? undefined }));
-      }),
+      completion: new Promise<{ exitCode: number | null; signal?: NodeJS.Signals }>(
+        (resolve, reject) => {
+          child.on('error', reject);
+          child.on('close', (exitCode, signal) =>
+            resolve({ exitCode, signal: signal ?? undefined })
+          );
+        }
+      ),
     };
   }
+}
+
+function defaultProcessEnv(env: NodeJS.ProcessEnv | undefined): NodeJS.ProcessEnv | undefined {
+  if (!env) return undefined;
+  return { ...process.env, ...env };
 }
 
 class HostNetworkClient implements RuntimeNetworkClient {
@@ -152,11 +169,11 @@ export class HostToolRuntime implements ToolRuntime {
   readonly process: RuntimeProcessRunner;
   readonly network = new HostNetworkClient();
 
-  constructor(readonly input: { id: string; cwd: string }) {
+  constructor(readonly input: { id: string; cwd: string; env?: NodeJS.ProcessEnv }) {
     this.id = input.id;
     this.cwd = input.cwd;
     this.paths = new HostPathService(input.cwd);
-    this.process = new HostProcessRunner(input.cwd);
+    this.process = new HostProcessRunner(input.cwd, defaultProcessEnv(input.env));
   }
 
   readonly id: string;
