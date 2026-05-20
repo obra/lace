@@ -1,6 +1,6 @@
 // ABOUTME: Permission request handling for tool execution approvals
 
-import type { JsonRpcPeer } from '@lace/ent-protocol';
+import { JSONRPC_ERROR_CANCELLED, type JsonRpcPeer } from '@lace/ent-protocol';
 import { appendDurableEvent } from '../storage/event-log';
 import { readSessionState, writeSessionState, loadSession } from '../storage/session-store';
 import {
@@ -8,7 +8,106 @@ import {
   type PendingPermissionRecord,
 } from '../storage/permissions-from-events';
 import { toNonEmptyString } from './utils';
-import type { AgentServerState } from '../server-types';
+import type { AgentServerState, SessionUpdate } from '../server-types';
+
+type ToolUseUpdate = Extract<SessionUpdate, { type: 'tool_use' }>;
+type ToolUseKind = NonNullable<ToolUseUpdate['kind']>;
+
+const TOOL_USE_KINDS = new Set<ToolUseKind>([
+  'read',
+  'edit',
+  'delete',
+  'search',
+  'execute',
+  'think',
+  'fetch',
+  'other',
+]);
+
+function toToolUseKind(kind: string | undefined): ToolUseKind | undefined {
+  return kind && TOOL_USE_KINDS.has(kind as ToolUseKind) ? (kind as ToolUseKind) : undefined;
+}
+
+async function recordPermissionCancelled(
+  state: AgentServerState,
+  runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
+  record: PendingPermissionRecord
+): Promise<void> {
+  if (!state.activeSession) return;
+
+  await runExclusive(() => {
+    if (!state.activeSession) return;
+
+    let sessionState = readSessionState(state.activeSession.dir);
+    const { nextState } = appendDurableEvent(state.activeSession.dir, sessionState, {
+      type: 'permission_cancelled',
+      turnId: record.turnId,
+      data: { toolCallId: record.toolCallId, turnSeq: record.turnSeq, reason: 'cancelled' },
+    });
+    sessionState = nextState;
+    writeSessionState(state.activeSession.dir, sessionState);
+    state.activeSession = loadSession(state.activeSession.meta.sessionId);
+  });
+}
+
+async function emitPermissionCancelledUpdate(
+  peer: JsonRpcPeer,
+  state: AgentServerState,
+  runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
+  record: PendingPermissionRecord
+): Promise<void> {
+  if (!state.activeSession) return;
+  const kind = toToolUseKind(record.kind);
+  const update: ToolUseUpdate = {
+    type: 'tool_use',
+    toolCallId: record.toolCallId,
+    name: record.tool,
+    ...(kind ? { kind } : {}),
+    input: record.input,
+    status: 'cancelled',
+    result: {
+      outcome: 'cancelled',
+      content: [{ type: 'error', message: 'Cancelled' }],
+    },
+  };
+
+  await runExclusive(() => {
+    if (!state.activeSession) return;
+
+    const sessionState = readSessionState(state.activeSession.dir);
+    peer.notify('session/update', {
+      sessionId: state.activeSession.meta.sessionId,
+      streamSeq: sessionState.nextStreamSeq,
+      turnId: record.turnId,
+      turnSeq: record.turnSeq,
+      ...(record.jobId ? { jobId: record.jobId } : {}),
+      ...update,
+    });
+    writeSessionState(state.activeSession.dir, {
+      ...sessionState,
+      nextStreamSeq: sessionState.nextStreamSeq + 1,
+    });
+    state.activeSession = loadSession(state.activeSession.meta.sessionId);
+  });
+}
+
+export async function cancelPendingPermissionRequests(
+  peer: JsonRpcPeer,
+  state: AgentServerState,
+  runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
+  options?: { exceptTurnId?: string }
+): Promise<void> {
+  const pending = Array.from(state.pendingPermissionRequests.values()).filter(
+    (permission) => permission.record.turnId !== options?.exceptTurnId
+  );
+
+  for (const permission of pending) {
+    state.pendingPermissionRequests.delete(permission.record.toolCallId);
+    peer.rejectRequest(permission.rpcId, JSONRPC_ERROR_CANCELLED, 'cancelled');
+    await recordPermissionCancelled(state, runExclusive, permission.record);
+    await emitPermissionCancelledUpdate(peer, state, runExclusive, permission.record);
+  }
+}
 
 /**
  * Request permission from client for a tool execution.
@@ -103,20 +202,12 @@ export async function requestPermissionFromClient(
       | { decision?: string; updatedInput?: Record<string, unknown> }
       | undefined;
   } catch {
+    const pending = state.pendingPermissionRequests.get(request.toolCallId);
+    if (pending?.rpcId !== rpcId) throw new Error('cancelled');
+
     peer.abandonRequest(rpcId);
     state.pendingPermissionRequests.delete(request.toolCallId);
-
-    await runExclusive(() => {
-      let sessionState = readSessionState(state.activeSession!.dir);
-      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
-        type: 'permission_cancelled',
-        turnId: request.turnId,
-        data: { toolCallId: request.toolCallId, turnSeq: request.turnSeq, reason: 'cancelled' },
-      });
-      sessionState = nextState;
-      writeSessionState(state.activeSession!.dir, sessionState);
-      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-    });
+    await recordPermissionCancelled(state, runExclusive, record);
 
     throw new Error('cancelled');
   }

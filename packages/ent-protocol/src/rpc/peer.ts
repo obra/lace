@@ -3,6 +3,7 @@ import {
   JSONRPCClient,
   JSONRPCServer,
   createJSONRPCNotification,
+  createJSONRPCErrorResponse,
   createJSONRPCRequest,
   createJSONRPCSuccessResponse,
   isJSONRPCRequest,
@@ -120,6 +121,11 @@ export class JsonRpcPeer {
   abandonRequest(requestId: JsonRpcId): void {
     const id = requestId as JSONRPCID;
     this.client.receive(createJSONRPCSuccessResponse(id, null));
+  }
+
+  rejectRequest(requestId: JsonRpcId, code: number, message: string, data?: unknown): void {
+    const id = requestId as JSONRPCID;
+    this.client.receive(createJSONRPCErrorResponse(id, code, message, data));
   }
 
   private createRequestId(): JsonRpcId {

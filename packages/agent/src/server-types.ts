@@ -5,7 +5,7 @@
 import type { ChildProcess } from 'node:child_process';
 import type { z } from 'zod';
 import { SessionUpdateNotificationSchema } from '@lace/ent-protocol';
-import type { JsonRpcPeer } from '@lace/ent-protocol';
+import type { JsonRpcId, JsonRpcPeer } from '@lace/ent-protocol';
 import type { LoadedSession } from './storage/session-store';
 import type { PendingPermissionRecord } from './storage/permissions-from-events';
 import { ProviderCatalogManager } from './providers/catalog/manager';
@@ -153,7 +153,7 @@ export type AgentServerState = {
     string,
     {
       requestId: string;
-      rpcId: unknown;
+      rpcId: JsonRpcId;
       record: PendingPermissionRecord;
       result: Promise<unknown>;
     }

@@ -38,6 +38,7 @@ import { getEffectiveConfig } from '@lace/agent/core/session';
 import { PersonaNotFoundError, PersonaParseError } from '../../config/persona-registry';
 import { LACE_BUILTIN_TOOL_NAMES } from '../../tools/executor';
 import { mergeMcpServers } from '../session-config';
+import { cancelPendingPermissionRequests } from '../permissions';
 
 type SessionRestoreParams = {
   sessionId: string;
@@ -95,6 +96,12 @@ function applyMcpServersToActiveSession(state: AgentServerState, mcpServers: unk
 function abortActiveTurn(state: AgentServerState): void {
   if (state.activeTurn) {
     state.activeTurn.abortController.abort();
+  }
+}
+
+function abortRunningJobPermissionControllers(state: AgentServerState): void {
+  for (const job of state.jobManager.getRunningJobs().values()) {
+    job.permissionAbortController?.abort();
   }
 }
 
@@ -504,7 +511,12 @@ export function registerSessionHandlers(
       return undefined;
     }
 
+    const activeTurnId = state.activeTurn?.turnId;
     abortActiveTurn(state);
+    abortRunningJobPermissionControllers(state);
+    await cancelPendingPermissionRequests(peer, state, runExclusive, {
+      ...(activeTurnId ? { exceptTurnId: activeTurnId } : {}),
+    });
     return undefined;
   });
 
