@@ -3,6 +3,13 @@
 **Status:** Draft for review. **Date:** 2026-05-18. **Related:**
 `docs/specs/2026-05-18-container-runtime-spec.md`, kata #49.
 
+## Spec Boundary
+
+This document defines the target architecture and behavioral contract for
+projected tool runtimes. It is not the implementation plan. Once this spec is
+approved, we will write a separate implementation plan that decomposes the work
+into small, reviewable changes.
+
 ## Summary
 
 Lace currently has three related ideas that are not cleanly separated:
@@ -132,9 +139,12 @@ the child agent needs.
 The two modes should not be inferred from the same flag. Runtime target and
 agent placement are separate choices:
 
-- `agentPlacement: 'host'` means the host agent uses a projected tool runtime.
+- `toolRuntime.type` describes where built-in tools and runtime-placed MCP
+  servers execute.
+- `agentPlacement: 'host'` means the host agent uses that tool runtime through
+  projection.
 - `agentPlacement: 'container'` means the child lace-agent process itself runs
-  inside the container.
+  inside the container and constructs its own local tool runtime there.
 
 ## Design Decision
 
@@ -336,20 +346,20 @@ tools move to `context.runtime.paths.resolve()`.
 
 ## Built-In Tool Migration
 
-| Tool                                  | Runtime behavior                                                                                                                                                                                                                                          |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bash`                                | Use `runtime.process.start(['/bin/bash', '-c', command], { cwd: runtime.cwd, env })`. Continue storing stdout/stderr/combined files in host `toolTempDir`.                                                                                                |
-| background `bash`                     | Extend shell jobs with a serialized runtime descriptor and run through `runtime.process.start()` instead of host `spawn(..., { shell: true })`.                                                                                                           |
-| `file_read`                           | Use `runtime.paths.resolve(path)`, then `runtime.fs.readTextFile()`. Return `displayPath` in metadata. Mark the canonical runtime path as read.                                                                                                           |
-| `file_write`                          | Resolve through runtime paths. Enforce read-before-write against canonical runtime paths. Write through `runtime.fs.writeTextFile()`.                                                                                                                     |
-| `file_edit`                           | Read and write through `runtime.fs`. Diff display stays unchanged except paths use `displayPath`.                                                                                                                                                         |
-| `file_find`                           | Use `runtime.fs.readdir/stat` recursively. For container runtime this works through host mount fast path or the helper.                                                                                                                                   |
-| `ripgrep_search`                      | Run `rg` through `runtime.process.exec()` in the runtime cwd. If `rg` is absent, report that it is missing in the projected runtime.                                                                                                                      |
-| `url_fetch`                           | Use `runtime.network.fetch()`. For projected containers this runs through the helper so `localhost`, DNS, and network policy match the container.                                                                                                         |
-| `delegate`                            | Inherit the parent's runtime descriptor by default. Existing personas that declare "run the child agent inside the container" keep using `spawnSubagent()`; projected personas can instead spawn a host child agent with the inherited projected runtime. |
-| `job_output`, `jobs_list`, `job_kill` | Stay agent/session-local. They manage Lace job records, not the projected runtime filesystem. `job_kill` must terminate either a host process or runtime process handle.                                                                                  |
-| `todo_read`, `todo_write`             | Stay session-local. They are handled by `ConversationRunner`, not `ToolExecutor`.                                                                                                                                                                         |
-| `use_skill`                           | Load project skill directories through the runtime path service when the configured skill directory is inside the projected workspace. Global/user skill directories stay host-side.                                                                      |
+| Tool                                  | Runtime behavior                                                                                                                                                                                                                                       |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bash`                                | Use `runtime.process.start(['/bin/bash', '-c', command], { cwd: runtime.cwd, env })`. Continue storing stdout/stderr/combined files in host `toolTempDir`.                                                                                             |
+| background `bash`                     | Extend shell jobs with a serialized runtime binding and run through `runtime.process.start()` instead of host `spawn(..., { shell: true })`.                                                                                                           |
+| `file_read`                           | Use `runtime.paths.resolve(path)`, then `runtime.fs.readTextFile()`. Return `displayPath` in metadata. Mark the canonical runtime path as read.                                                                                                        |
+| `file_write`                          | Resolve through runtime paths. Enforce read-before-write against canonical runtime paths. Write through `runtime.fs.writeTextFile()`.                                                                                                                  |
+| `file_edit`                           | Read and write through `runtime.fs`. Diff display stays unchanged except paths use `displayPath`.                                                                                                                                                      |
+| `file_find`                           | Use `runtime.fs.readdir/stat` recursively. For container runtime this works through host mount fast path or the helper.                                                                                                                                |
+| `ripgrep_search`                      | Run `rg` through `runtime.process.exec()` in the runtime cwd. If `rg` is absent, report that it is missing in the projected runtime.                                                                                                                   |
+| `url_fetch`                           | Use `runtime.network.fetch()`. For projected containers this runs through the helper so `localhost`, DNS, and network policy match the container.                                                                                                      |
+| `delegate`                            | Inherit the parent's runtime binding by default. Existing personas that declare "run the child agent inside the container" keep using `spawnSubagent()`; projected personas can instead spawn a host child agent with the inherited projected runtime. |
+| `job_output`, `jobs_list`, `job_kill` | Stay agent/session-local. They manage Lace job records, not the projected runtime filesystem. `job_kill` must terminate either a host process or runtime process handle.                                                                               |
+| `todo_read`, `todo_write`             | Stay session-local. They are handled by `ConversationRunner`, not `ToolExecutor`.                                                                                                                                                                      |
+| `use_skill`                           | Load project skill directories through the runtime path service when the configured skill directory is inside the projected workspace. Global/user skill directories stay host-side.                                                                   |
 
 Project skill loading is part of runtime projection because the host agent
 builds the system prompt and serves `use_skill`. If a projected container owns
@@ -362,9 +372,14 @@ remain host-side because they are part of the host agent environment.
 Do not let individual tools infer runtime from persona config. Build one runtime
 binding when the session or job starts.
 
-Recommended descriptor:
+Recommended descriptors:
 
 ```typescript
+export interface RuntimeSecretReference {
+  provider: string;
+  name: string;
+}
+
 export type ToolRuntimeDescriptor =
   | { type: 'local'; cwd: string }
   | {
@@ -385,12 +400,13 @@ export type ToolRuntimeDescriptor =
           containerPath: string;
           readonly: boolean;
         }>;
+        // Non-secret literals only. Secret values must use secretEnv.
         env?: Record<string, string>;
+        secretEnv?: Record<string, RuntimeSecretReference>;
         ports?: Array<{ host: number; container: number }>;
         restartPolicy?: 'unless-stopped';
       };
       cwd: string;
-      agentPlacement: 'host' | 'container';
       helper?: {
         mode: 'copy' | 'mount' | 'image';
         hostPath?: string;
@@ -398,38 +414,81 @@ export type ToolRuntimeDescriptor =
         command: string[];
       };
     };
+
+export interface RuntimeExecutionBinding {
+  toolRuntime: ToolRuntimeDescriptor;
+  agentPlacement: 'host' | 'container';
+}
 ```
 
-`agentPlacement` is deliberately separate from the tool runtime target:
+`agentPlacement` is orchestration metadata carried alongside the tool runtime
+descriptor. It is deliberately not a field on `ToolRuntimeDescriptor`:
 
 - `agentPlacement: 'container'` is today's container persona behavior. The child
-  lace-agent runs inside the container, so most of this projection machinery is
-  not needed inside that child.
+  lace-agent runs inside the container and constructs its own local
+  `ToolRuntime` there. The host does not project tools into the container for
+  that child.
 - `agentPlacement: 'host'` is the new projected behavior. The agent runs on the
   host, but its tools target the container.
 
-The session state should persist enough of this descriptor for background jobs,
-delegate resumes, and MCP server reconciliation to rebuild the same runtime
-after a reload.
+The session state should persist enough of this binding for background jobs,
+delegate resumes, and MCP server reconciliation to rebuild the same runtime and
+agent-placement decision after a reload.
 
 For container runtimes, "enough" means a full materialization descriptor or a
 stable source reference that deterministically rebuilds the same
 `ContainerSpec`. Do not rely on `ContainerManager`'s in-memory spec cache after
-process restart. The persisted descriptor should not include provider
-credentials. Credentials used by the host agent stay host-side; credentials
+process restart.
+
+### Descriptor Security
+
+Persisted runtime descriptors must not contain provider credentials or raw
+secret values. Credentials used by the host agent stay host-side. Credentials
 intentionally exposed to runtime-placed tools or MCP servers must be explicit
-tool-runtime configuration.
+tool-runtime configuration and should be represented as secret references in
+durable state, not plaintext values.
+
+The only literal environment variables allowed in a persisted descriptor are
+non-secret values. Any field that can contain host paths, mount declarations,
+container names, helper commands, or secret references should be treated as
+sensitive operational metadata:
+
+- it may be stored in session/job state when required for runtime rehydration;
+- it should be redacted from model-visible output, UI summaries, traces, and
+  error messages unless the field is already part of an intentional display
+  path; and
+- it must never include host provider credentials, Lace session storage, trace
+  directories, or provider config files by default.
 
 Configuration should set `agentPlacement` explicitly when constructing the
-descriptor. Current persona-container behavior maps to
+binding. Current persona-container behavior maps to
 `agentPlacement: 'container'`. New projected-container behavior must request
 `agentPlacement: 'host'`; do not infer projection from
-`runtime.type: 'container'` alone.
+`toolRuntime.type: 'container'` alone.
 
-`ToolRuntimeDescriptor` should be part of the session/job contract, not a field
-that each tool independently reconstructs. `session/new`, `session/resume`,
-background job creation, and delegate job creation all need access to the active
-descriptor.
+`RuntimeExecutionBinding` should be part of the session/job contract, not a
+field that each tool independently reconstructs. `session/new`,
+`session/resume`, background job creation, and delegate job creation all need
+access to the active binding.
+
+## Compatibility And Defaulting
+
+Existing state should keep working when it has enough information to do so, but
+runtime projection should not guess silently.
+
+- If an existing session or job has no runtime descriptor, default to a local
+  host runtime using the existing session working directory.
+- If existing workspace state has enough `projectRoot`, `workspaceRoot`, and
+  `cwd` information, map it to `WorkspaceToolRuntime`. If it does not, resume as
+  local only when that matches the old behavior; otherwise fail with a clear
+  resume error.
+- Existing lace-in-container personas map to `agentPlacement: 'container'`.
+  Their child agent process runs inside the container and should construct a
+  local runtime from its own process environment.
+- New projected-container sessions must request `agentPlacement: 'host'` plus
+  `toolRuntime.type: 'container'`.
+- Missing MCP `placement` fields should be defaulted by config source, not by
+  inspecting whether the active runtime is a container.
 
 ## MCP Servers
 
@@ -454,6 +513,10 @@ They would see host paths while built-in tools see container paths.
 Add MCP placement and make stdio MCP use the same runtime process capability as
 built-in tools.
 
+The core rule is that built-in tools and runtime-placed stdio MCP servers share
+the same `ToolRuntime`. Host-service MCP servers stay host-side by explicit
+placement.
+
 Recommended config shape:
 
 ```typescript
@@ -462,7 +525,9 @@ export type McpPlacement = 'toolRuntime' | 'host';
 export interface MCPServerConfig {
   command: string;
   args?: string[];
+  // Non-secret literals only. Secret values must use secretEnv.
   env?: Record<string, string>;
+  secretEnv?: Record<string, RuntimeSecretReference>;
   transport?: 'stdio' | 'sse' | 'http';
   enabled: boolean;
   tools: Record<string, ToolPolicy>;
@@ -484,6 +549,12 @@ Semantics:
   as a first-class path. In local and workspace runtimes, `toolRuntime` and
   `host` both execute on the host; the distinction only matters once the tool
   runtime is projected into a container or future remote target.
+
+MCP environment follows the same security rule as runtime descriptors: persisted
+config can contain non-secret literals and secret references, but not raw secret
+values. A runtime-placed MCP server only receives credentials that were
+explicitly configured for that runtime/server. Host agent provider credentials
+are not inherited automatically.
 
 Implementation detail: write a `RuntimeStdioClientTransport` implementing the
 MCP SDK `Transport` interface over `runtime.process.start()` streams. The SDK
@@ -571,6 +642,27 @@ tool returns. File tools should mark the canonical runtime path as read after a
 successful runtime-backed read, and write/edit tools should check the same
 canonical key.
 
+## Runtime Identity And Concurrency
+
+Runtime identity is part of the behavioral contract, not an implementation
+detail. Two sessions may share the same container image or materialized spec but
+must not accidentally share mutable runtime state.
+
+- Each materialized runtime gets a stable `runtime.id` for the lifetime of the
+  session/job binding. For containers, that id is included in canonical file
+  access keys.
+- Runtime-placed MCP connection keys include server id, transport, placement,
+  effective cwd, and runtime id. A host server and runtime-placed server with
+  the same user-facing name must not alias.
+- Background process handles are scoped to the session/job runtime that created
+  them. Resuming a job must rehydrate the runtime before reconnecting to or
+  managing the process handle.
+- Host temp files, streamed output logs, and tool artifacts remain per session
+  or per job even when multiple sessions target the same container image.
+- Runtime helpers are addressed through the active runtime binding. A helper
+  copied or mounted for one materialized runtime should not be assumed valid for
+  another runtime unless the descriptor says so explicitly.
+
 ## Temp Files And Output Logs
 
 Tool temp output files stay host-side under the session directory:
@@ -585,6 +677,34 @@ Tool temp output files stay host-side under the session directory:
   write the temp file there.
 
 This avoids requiring every container to mount Lace's session storage.
+
+## Failure Semantics
+
+Projection failures should be explicit and should not silently fall back to host
+execution.
+
+- If a persisted container id is stale, Lace should inspect or rematerialize the
+  runtime from the persisted descriptor when possible. If it cannot, session or
+  job resume fails with a clear runtime-rehydration error.
+- If a declared mount is missing or cannot be established during
+  materialization, runtime creation fails before tools run. If a path simply has
+  no host mount fast path, helper-backed filesystem operations may still use the
+  container path.
+- If the helper or its interpreter/runtime is missing, host-mount fast-path
+  operations may continue, but helper-backed operations fail with an error that
+  identifies the missing helper capability.
+- If a runtime process exits, crashes, or is killed, the tool/job result records
+  the exit status or signal and flushes available stdout/stderr into host-side
+  logs.
+- If descriptor rehydration fails for a background job, delegate job, or
+  runtime-placed MCP server, that unit fails clearly instead of reconstructing a
+  different runtime.
+- Unsupported placement combinations, such as HTTP/SSE MCP with
+  `placement: 'toolRuntime'` in v1, fail at config/startup time instead of
+  silently using host networking.
+- Permission errors from the runtime filesystem, process runner, or helper are
+  surfaced as runtime errors with display paths; they should not expose redacted
+  host paths or secret references.
 
 ## Testing Requirements
 
@@ -605,37 +725,48 @@ Use fake runtimes before real containers:
 - Add one stdio MCP smoke with a tiny MCP server that reports `pwd` and reads a
   file. Run it with `placement: 'toolRuntime'` and assert it sees the projected
   runtime cwd.
-- Add background bash coverage using the same runtime descriptor as sync bash.
+- Add background bash coverage using the same runtime binding as sync bash.
 - Add a helper-delivery smoke that proves a projected container can perform a
   helper-backed read of a container-local file without the full Lace dist or
   provider credentials mounted into the container.
 
-## Rollout Plan
+## Implementation Plan Constraints
 
-1. Add `ToolRuntime` interfaces plus `HostToolRuntime`. Wire
-   `ConversationRunner` to pass `context.runtime` while keeping current
-   `workingDirectory` for migrated code.
-2. Move file read/write/edit/find from `resolveWorkspacePath()` to runtime
-   `paths` and `fs`.
-3. Move sync Bash, background Bash, and `ripgrep_search` to runtime `process`.
-4. Persist and pass `ToolRuntimeDescriptor` through session state, background
-   job state, and delegate job creation.
-5. Add `ProjectedContainerToolRuntime` with mount fast path and runtime helper
-   fallback.
-6. Move `url_fetch` to runtime `network`.
-7. Add MCP placement and `RuntimeStdioClientTransport`.
-8. Make delegate jobs inherit runtime descriptors. Preserve existing
-   lace-in-container persona behavior and add projected-host behavior as an
-   explicit runtime descriptor.
-9. Delete `workspaceInfo` and `resolveWorkspacePath()` once all consumers are
-   migrated.
+This spec intentionally does not define the rollout sequence or PR boundaries.
+After the spec is approved, the implementation plan should decompose the work
+into small, reviewable changes. That plan must preserve these constraints:
+
+- Start from behavior-preserving runtime plumbing before changing tool
+  semantics.
+- Define descriptor versioning, compatibility defaults, and secret-redaction
+  rules before persisted sessions, jobs, delegates, or MCP reconciliation depend
+  on runtime descriptors.
+- Do not migrate background processes, delegate jobs, or runtime-placed MCP
+  servers before the runtime binding is durable enough to rehydrate after a
+  process restart.
+- Prove helper delivery and a helper-backed container-local file operation
+  before claiming projected container filesystem correctness.
+- Migrate built-in tools in small groups with fake-runtime coverage that catches
+  direct `fs`, `child_process`, and `process.cwd()` use for runtime-sensitive
+  work.
+- Add MCP schema/defaulting and connection-key behavior before enabling
+  runtime-placed stdio MCP servers.
+- Preserve existing lace-in-container persona behavior throughout the migration;
+  projected-host behavior should be added as an explicit new binding, not
+  inferred from container presence.
+- Delete `workspaceInfo` and `resolveWorkspacePath()` only after all consumers
+  have moved to `ToolRuntime` capabilities.
 
 ## Risks
 
+- Persisted descriptors can leak secrets or host operational details if env,
+  mount, helper, and path fields are not redacted consistently.
 - The in-container helper becomes a contract. Keep it intentionally small and
   covered by tests.
 - Runtime path identity can regress read-before-write protections. Use canonical
   runtime paths consistently from the first file-tool migration.
+- Runtime binding migration can break old sessions/jobs if missing descriptors
+  and missing MCP placement fields do not have explicit compatibility behavior.
 - MCP servers are long-lived. `MCPServerManager` must stop runtime-placed
   servers on session switch and kill their runtime process handles during
   shutdown.
@@ -667,3 +798,9 @@ Use fake runtimes before real containers:
   storage, traces, or provider credentials to be present in the container.
 - Host-side traces, durable events, job logs, and provider credentials remain
   available without extracting artifacts from the container.
+- Persisted runtime descriptors and MCP configs do not store raw secret values.
+- Existing sessions/jobs without runtime descriptors have explicit defaulting or
+  fail with clear resume errors.
+- Runtime-placed MCP servers are keyed by runtime identity and cannot alias host
+  servers or other sessions with the same user-facing server id.
+- Projection failures do not silently fall back to host execution.
