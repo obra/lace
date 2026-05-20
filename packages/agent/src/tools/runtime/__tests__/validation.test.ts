@@ -24,6 +24,28 @@ describe('runtime binding validation', () => {
     ).toThrow(/unsupported runtime binding version/i);
   });
 
+  it('rejects unknown schema versions before nested descriptor validation', () => {
+    expect(() =>
+      parseRuntimeExecutionBinding({
+        schemaVersion: 99,
+        identity: { runtimeId: 'rt_bad_container' },
+        agentPlacement: 'host',
+        toolRuntime: {
+          type: 'container',
+          cwd: '/workspace',
+          spec: {
+            name: 'proj',
+            requestedImage: 'example/app:dev',
+            resolvedImageDigest: 'latest',
+            imagePlatform: 'linux/arm64',
+            workingDirectory: '/workspace',
+            mounts: [],
+          },
+        },
+      })
+    ).toThrow(/unsupported runtime binding version/i);
+  });
+
   it('rejects projected container binding without image platform', () => {
     expect(() =>
       parseRuntimeExecutionBinding({

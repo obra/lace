@@ -78,8 +78,6 @@ const RuntimeExecutionBindingSchema = z
   .strict();
 
 export function parseRuntimeExecutionBinding(value: unknown): RuntimeExecutionBinding {
-  const parsed = RuntimeExecutionBindingSchema.safeParse(value);
-  if (parsed.success) return parsed.data;
   const version =
     value && typeof value === 'object'
       ? (value as { schemaVersion?: unknown }).schemaVersion
@@ -87,6 +85,8 @@ export function parseRuntimeExecutionBinding(value: unknown): RuntimeExecutionBi
   if (version !== 1) {
     throw new Error(`Unsupported runtime binding version: ${String(version)}`);
   }
+  const parsed = RuntimeExecutionBindingSchema.safeParse(value);
+  if (parsed.success) return parsed.data;
   throw new Error(`Invalid runtime binding: ${parsed.error.message}`);
 }
 
