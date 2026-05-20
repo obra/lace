@@ -31,7 +31,7 @@ import {
   toNonEmptyString,
   recordsShallowEqual,
 } from '../utils';
-import { assertSessionReady } from '../helpers/session-guards';
+import { assertActiveSession, assertSessionReady } from '../helpers/session-guards';
 import {
   buildProviderMessagesFromDurableEvents,
   estimateProviderTokens,
@@ -201,13 +201,7 @@ export function registerSessionOperationHandlers(
   createToolExecutorForMode: CreateToolExecutorFn
 ): void {
   peer.onRequest('ent/session/configure', async (params: unknown) => {
-    assertInitialized(state);
-    if (!state.activeSession)
-      throw {
-        code: AcpErrorCodes.SessionNotFound,
-        message: 'SessionNotFound',
-        data: { category: 'session' },
-      };
+    assertActiveSession(state);
 
     if (params !== undefined && (!params || typeof params !== 'object' || Array.isArray(params))) {
       throwInvalidParams('params must be an object');
@@ -235,76 +229,80 @@ export function registerSessionOperationHandlers(
       environment: Record<string, string>;
     }>;
 
-    const currentState = readSessionState(state.activeSession.dir);
-    const currentConfig = currentState.config || {};
-    const effectiveBefore = getEffectiveConfig(state.config, currentConfig);
-    const nextConfig = { ...currentConfig };
-    const applied: string[] = [];
+    return await runExclusive(() => {
+      assertActiveSession(state);
 
-    if (
-      typeof parsed.connectionId === 'string' &&
-      parsed.connectionId !== effectiveBefore.connectionId
-    ) {
-      nextConfig.connectionId = parsed.connectionId;
-      applied.push('connectionId');
-    }
+      const currentState = readSessionState(state.activeSession!.dir);
+      const currentConfig = currentState.config || {};
+      const effectiveBefore = getEffectiveConfig(state.config, currentConfig);
+      const nextConfig = { ...currentConfig };
+      const applied: string[] = [];
 
-    if (
-      typeof parsed.maxThinkingTokens === 'number' &&
-      parsed.maxThinkingTokens !== effectiveBefore.maxThinkingTokens
-    ) {
-      nextConfig.maxThinkingTokens = parsed.maxThinkingTokens;
-      applied.push('maxThinkingTokens');
-    }
-
-    if (
-      typeof parsed.maxBudgetUsd === 'number' &&
-      parsed.maxBudgetUsd !== effectiveBefore.maxBudgetUsd
-    ) {
-      nextConfig.maxBudgetUsd = parsed.maxBudgetUsd;
-      applied.push('maxBudgetUsd');
-    }
-
-    if (parsed.environment !== undefined) {
       if (
-        !parsed.environment ||
-        typeof parsed.environment !== 'object' ||
-        Array.isArray(parsed.environment)
+        typeof parsed.connectionId === 'string' &&
+        parsed.connectionId !== effectiveBefore.connectionId
       ) {
-        throwInvalidParams('environment must be an object of string:string');
-      }
-      const envObj: Record<string, string> = {};
-      for (const [k, v] of Object.entries(parsed.environment as Record<string, unknown>)) {
-        if (typeof v !== 'string') throwInvalidParams('environment values must be strings');
-        envObj[k] = v;
+        nextConfig.connectionId = parsed.connectionId;
+        applied.push('connectionId');
       }
 
-      const currentEnv =
-        (currentConfig as { environment?: Record<string, string> })?.environment || undefined;
-      if (!recordsShallowEqual(envObj, currentEnv)) {
-        nextConfig.environment = envObj;
-        applied.push('environment');
+      if (
+        typeof parsed.maxThinkingTokens === 'number' &&
+        parsed.maxThinkingTokens !== effectiveBefore.maxThinkingTokens
+      ) {
+        nextConfig.maxThinkingTokens = parsed.maxThinkingTokens;
+        applied.push('maxThinkingTokens');
       }
-    }
 
-    const nextState: SessionState = { ...currentState, config: nextConfig };
-    writeSessionState(state.activeSession.dir, nextState);
-    state.activeSession = { ...state.activeSession!, state: nextState };
+      if (
+        typeof parsed.maxBudgetUsd === 'number' &&
+        parsed.maxBudgetUsd !== effectiveBefore.maxBudgetUsd
+      ) {
+        nextConfig.maxBudgetUsd = parsed.maxBudgetUsd;
+        applied.push('maxBudgetUsd');
+      }
 
-    const effectiveAfter = getEffectiveConfig(state.config, state.activeSession.state.config);
+      if (parsed.environment !== undefined) {
+        if (
+          !parsed.environment ||
+          typeof parsed.environment !== 'object' ||
+          Array.isArray(parsed.environment)
+        ) {
+          throwInvalidParams('environment must be an object of string:string');
+        }
+        const envObj: Record<string, string> = {};
+        for (const [k, v] of Object.entries(parsed.environment as Record<string, unknown>)) {
+          if (typeof v !== 'string') throwInvalidParams('environment values must be strings');
+          envObj[k] = v;
+        }
 
-    return {
-      applied,
-      config: {
-        executionMode: effectiveAfter.executionMode,
-        connectionId: effectiveAfter.connectionId,
-        modelId: effectiveAfter.modelId,
-        maxThinkingTokens: effectiveAfter.maxThinkingTokens,
-        maxBudgetUsd: effectiveAfter.maxBudgetUsd,
-        approvalMode: effectiveAfter.approvalMode,
-        environment: state.activeSession.state.config?.environment,
-      },
-    };
+        const currentEnv =
+          (currentConfig as { environment?: Record<string, string> })?.environment || undefined;
+        if (!recordsShallowEqual(envObj, currentEnv)) {
+          nextConfig.environment = envObj;
+          applied.push('environment');
+        }
+      }
+
+      const nextState: SessionState = { ...currentState, config: nextConfig };
+      writeSessionState(state.activeSession!.dir, nextState);
+      state.activeSession = { ...state.activeSession!, state: nextState };
+
+      const effectiveAfter = getEffectiveConfig(state.config, state.activeSession.state.config);
+
+      return {
+        applied,
+        config: {
+          executionMode: effectiveAfter.executionMode,
+          connectionId: effectiveAfter.connectionId,
+          modelId: effectiveAfter.modelId,
+          maxThinkingTokens: effectiveAfter.maxThinkingTokens,
+          maxBudgetUsd: effectiveAfter.maxBudgetUsd,
+          approvalMode: effectiveAfter.approvalMode,
+          environment: state.activeSession.state.config?.environment,
+        },
+      };
+    });
   });
 
   peer.onRequest('session/set_config_option', async (params: unknown) => {
@@ -315,42 +313,46 @@ export function registerSessionOperationHandlers(
     }
     const parsed = params as Partial<{ sessionId: string; configId: string; value: string }>;
     if (!parsed.sessionId) throwInvalidParams('sessionId is required');
-    if (parsed.sessionId !== state.activeSession!.meta.sessionId) {
-      throw {
-        code: AcpErrorCodes.SessionNotFound,
-        message: 'SessionNotFound',
-        data: { category: 'session' },
-      };
-    }
     if (!parsed.configId) throwInvalidParams('configId is required');
     if (typeof parsed.value !== 'string' || parsed.value.length === 0) {
       throwInvalidParams('value is required');
     }
 
-    const currentState = readSessionState(state.activeSession!.dir);
-    const currentConfig = currentState.config || {};
-    const nextConfig = { ...currentConfig };
-
-    if (parsed.configId === 'model') {
-      nextConfig.modelId = parsed.value;
-    } else if (parsed.configId === 'approvalMode') {
-      if (!isApprovalMode(parsed.value)) {
-        throwInvalidParams(
-          'approvalMode must be one of ask|approveReads|approveEdits|approve|deny|dangerouslySkipPermissions'
-        );
+    return await runExclusive(() => {
+      assertSessionReady(state);
+      if (parsed.sessionId !== state.activeSession!.meta.sessionId) {
+        throw {
+          code: AcpErrorCodes.SessionNotFound,
+          message: 'SessionNotFound',
+          data: { category: 'session' },
+        };
       }
-      nextConfig.approvalMode = parsed.value;
-    } else {
-      throwInvalidParams(`Unknown configId: ${parsed.configId}`);
-    }
 
-    const nextState: SessionState = { ...currentState, config: nextConfig };
-    writeSessionState(state.activeSession!.dir, nextState);
-    state.activeSession = { ...state.activeSession!, state: nextState };
+      const currentState = readSessionState(state.activeSession!.dir);
+      const currentConfig = currentState.config || {};
+      const nextConfig = { ...currentConfig };
 
-    return {
-      configOptions: buildSessionConfigOptions(state.config, nextState.config),
-    };
+      if (parsed.configId === 'model') {
+        nextConfig.modelId = parsed.value;
+      } else if (parsed.configId === 'approvalMode') {
+        if (!isApprovalMode(parsed.value)) {
+          throwInvalidParams(
+            'approvalMode must be one of ask|approveReads|approveEdits|approve|deny|dangerouslySkipPermissions'
+          );
+        }
+        nextConfig.approvalMode = parsed.value;
+      } else {
+        throwInvalidParams(`Unknown configId: ${parsed.configId}`);
+      }
+
+      const nextState: SessionState = { ...currentState, config: nextConfig };
+      writeSessionState(state.activeSession!.dir, nextState);
+      state.activeSession = { ...state.activeSession!, state: nextState };
+
+      return {
+        configOptions: buildSessionConfigOptions(state.config, nextState.config),
+      };
+    });
   });
 
   peer.onRequest('ent/session/compact', async (params: unknown) => {
