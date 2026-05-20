@@ -410,6 +410,7 @@ export type ToolRuntimeDescriptor =
         containerId?: string;
         requestedImage: string;
         resolvedImageDigest: string;
+        imagePlatform: string;
         workingDirectory: string;
         mounts: Array<{
           hostPath: string;
@@ -464,6 +465,51 @@ immutable image digest. If the requested image already uses digest form, the
 resolved digest is the same digest. Resume/rematerialization validates against
 the resolved digest; a tag that now resolves to different content is a semantic
 change and must fail or require a new runtime binding.
+
+### Container Image Identity
+
+`resolvedImageDigest` means the OCI image manifest digest for the exact platform
+Lace will run, not a mutable tag, Docker local image id, or unqualified manifest
+list reference. Persist `imagePlatform` with normalized `os/arch[/variant]`
+syntax, for example `linux/arm64` or `linux/amd64`.
+
+Resolution rules:
+
+- If `requestedImage` is already `name@sha256:...`, persist that digest as
+  `resolvedImageDigest` after confirming it resolves for `imagePlatform`.
+- If `requestedImage` is a tag, resolve it to the platform-specific manifest
+  digest before creating a projected-container binding.
+- If the registry returns a multi-arch index, select the manifest matching
+  `imagePlatform` and persist that platform manifest digest.
+- If the image exists only as a local mutable tag and no immutable digest can be
+  resolved, projected-container binding creation fails in v1. Local-only mutable
+  tags are not resumable projected runtime identity.
+- Registry credentials used for image resolution are host-side operational
+  credentials. Errors from registry auth, image lookup, or digest validation are
+  redacted like runtime secret failures.
+- Host operational logs may include normalized image names, registry hosts,
+  immutable digests, and platform strings for diagnosis, but never registry
+  credentials or bearer tokens. Model-visible output should receive only the
+  redacted image resolution/materialization error class.
+
+Resume/rematerialization algorithm:
+
+1. Validate `requestedImage`, `resolvedImageDigest`, and `imagePlatform`.
+2. Prefer running/pulling by immutable digest plus platform, not by mutable tag.
+3. If the stored digest is available locally, resume can succeed even when the
+   original tag has drifted or the registry is temporarily unavailable.
+4. If the stored digest is not available locally and cannot be pulled because
+   the registry is unavailable or auth fails, report a transient image
+   resolution/materialization error.
+5. If the requested tag now resolves to a different digest, do not update the
+   binding in place. Continue using the stored digest when available; otherwise
+   require explicit rebinding to use the new image content.
+6. If the digest exists only for a different platform than `imagePlatform`, fail
+   with a platform mismatch error.
+
+`requestedImage` is display/provenance metadata for the binding. It should not
+change during ordinary resume. Changing it to track a moved tag or new image
+content creates a new runtime binding.
 
 ### Durable Storage Contract
 
@@ -604,6 +650,7 @@ implementation plan before code is written.
 | Persona/job has existing container-agent state | Map to `agentPlacement: 'container'`. The child lace-agent runs inside the container and constructs its own local runtime from that process environment.          |
 | Projected-container session/job has v1 binding | Validate schema version, descriptor shape, helper config, mounts, secret references, and MCP placement before materializing or reconnecting to runtime processes. |
 | Binding has unknown `schemaVersion`            | Fail resume/startup with an unsupported runtime binding version error.                                                                                            |
+| Projected-container binding has only `image`   | Treat as unsupported pre-v1 projected state. Do not infer a digest during resume; require explicit rebinding so image identity is intentionally pinned.           |
 
 Concrete examples:
 
@@ -821,9 +868,9 @@ must not accidentally share mutable runtime state.
   - workspace: common fields plus `toolRuntime.projectRoot`,
     `toolRuntime.workspaceRoot`, and `toolRuntime.cwd`;
   - container: common fields plus `requestedImage`, `resolvedImageDigest`,
-    `workingDirectory`, runtime `cwd`, mounts sorted by `containerPath`, literal
-    env sorted by key, secret references sorted by key, helper
-    mode/containerPath/command, and container port declarations sorted by
+    `imagePlatform`, `workingDirectory`, runtime `cwd`, mounts sorted by
+    `containerPath`, literal env sorted by key, secret references sorted by key,
+    helper mode/containerPath/command, and container port declarations sorted by
     container port; and
   - MCP-scoped legacy ids also include `placement`, `transport`, and effective
     cwd so host and runtime-placed connections cannot alias.
@@ -837,17 +884,21 @@ must not accidentally share mutable runtime state.
   - job-local input
     `{"agentPlacement":"host","jobId":"job_456","schemaVersion":1,"scope":"job","sessionId":"sess_123","toolRuntime":{"cwd":"/repo","type":"local"}}`
     -> `4412929fcf49cd3e`.
+  - projected-container input
+    `{"agentPlacement":"host","schemaVersion":1,"scope":"session","sessionId":"sess_123","toolRuntime":{"cwd":"/workspace","helper":{"command":["node","/usr/local/bin/lace-runtime-helper"],"containerPath":"/usr/local/bin/lace-runtime-helper","mode":"image"},"spec":{"env":{"NODE_ENV":"test"},"imagePlatform":"linux/arm64","mounts":[{"containerPath":"/workspace","hostPath":"/repo","readonly":false}],"ports":[{"container":3000,"host":13000}],"requestedImage":"example/app:dev","resolvedImageDigest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","secretEnv":{"API_KEY":{"name":"api-key","namespace":"project"}},"workingDirectory":"/workspace"},"type":"container"}}`
+    -> `572e0f4cb1e340fb`.
 - The descriptor, not the runtime id alone, defines runtime semantics. On
   resume, Lace validates both the persisted id and descriptor before reusing the
   binding. Container runtimes store the logical runtime id separately from
   `containerId` so a stale container can be rematerialized only when the
   persisted descriptor proves it is the same logical runtime.
-- Container descriptor semantic identity includes `resolvedImageDigest`, working
-  directory, runtime cwd, container mount paths and readonly flags, literal env
-  values, secret reference identities, helper mode/container path/command, and
-  container port declarations. Operational details such as `requestedImage`,
-  `containerId`, copied helper host path, and host-assigned port numbers may
-  change during rematerialization only when the semantic identity is unchanged.
+- Container descriptor semantic identity includes `resolvedImageDigest`,
+  `imagePlatform`, working directory, runtime cwd, container mount paths and
+  readonly flags, literal env values, secret reference identities, helper
+  mode/container path/command, and container port declarations. Operational
+  details such as `containerId`, copied helper host path, and host-assigned port
+  numbers may change during rematerialization only when the semantic identity is
+  unchanged.
 - If rematerialization would change the runtime semantics, Lace must fail resume
   instead of reusing the old runtime id for a different target.
 - Runtime-placed MCP connection keys include server id, transport, placement,
@@ -976,6 +1027,16 @@ Use fake runtimes before real containers:
   changes enabled.
 - Test stale container handling for both successful rematerialization and clear
   resume failure.
+- Test image identity cases:
+  - digest-form `requestedImage` persists the same `resolvedImageDigest`;
+  - tag drift continues to use the stored digest when available and requires
+    explicit rebinding to adopt new content;
+  - missing local digest plus unavailable registry produces a transient
+    materialization error;
+  - registry auth failure is redacted like a secret failure;
+  - multi-arch images persist and validate the selected `imagePlatform`; and
+  - v1 projected-container descriptors missing `resolvedImageDigest` fail
+    validation.
 - Add one gated Docker integration smoke:
   1. materialize a container,
   2. `bash` writes a file under container `/tmp`,
@@ -1029,8 +1090,11 @@ Required stage order:
 8. MCP reconciliation-key changes while preserving existing host-placed
    behavior.
 9. Runtime-placed stdio MCP transport plus lifecycle cleanup.
-10. Projected-container helper delivery and Docker/helper smoke coverage.
-11. Removal of legacy `workspaceInfo` and `resolveWorkspacePath()` after all
+10. Container image reference resolution, platform selection, digest
+    persistence, digest validation, and fake-adapter tests for tag drift,
+    registry failure, auth failure, and platform mismatch.
+11. Projected-container helper delivery and Docker/helper smoke coverage.
+12. Removal of legacy `workspaceInfo` and `resolveWorkspacePath()` after all
     consumers have moved.
 
 - Start from behavior-preserving runtime plumbing before changing tool
