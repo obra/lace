@@ -1,5 +1,5 @@
-// ABOUTME: Tests for mustache template engine with include functionality
-// ABOUTME: Tests variable substitution, includes, error handling, and recursion protection
+// ABOUTME: Tests for mustache template engine with @path include functionality
+// ABOUTME: Tests variable substitution, @path expansion, error handling, and recursion protection
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
@@ -88,7 +88,7 @@ describe('TemplateEngine', () => {
 
       // Create main template
       const templatePath = path.join(tempDir, 'main.md');
-      fs.writeFileSync(templatePath, '{{include:header.md}}\n\nMain content here.');
+      fs.writeFileSync(templatePath, '@header.md\n\nMain content here.');
 
       const result = templateEngine.render('main.md', {});
 
@@ -102,7 +102,7 @@ describe('TemplateEngine', () => {
 
       // Create main template
       const templatePath = path.join(tempDir, 'main.md');
-      fs.writeFileSync(templatePath, '{{include:greeting.md}}');
+      fs.writeFileSync(templatePath, '@greeting.md');
 
       const result = templateEngine.render('main.md', { name: 'Alice' });
 
@@ -115,10 +115,10 @@ describe('TemplateEngine', () => {
       fs.writeFileSync(level2Path, 'Level 2 content');
 
       const level1Path = path.join(tempDir, 'level1.md');
-      fs.writeFileSync(level1Path, 'Level 1: {{include:level2.md}}');
+      fs.writeFileSync(level1Path, 'Level 1: @level2.md');
 
       const mainPath = path.join(tempDir, 'main.md');
-      fs.writeFileSync(mainPath, 'Main: {{include:level1.md}}');
+      fs.writeFileSync(mainPath, 'Main: @level1.md');
 
       const result = templateEngine.render('main.md', {});
 
@@ -134,7 +134,7 @@ describe('TemplateEngine', () => {
       fs.writeFileSync(includePath, 'Footer content');
 
       const templatePath = path.join(tempDir, 'main.md');
-      fs.writeFileSync(templatePath, 'Main content\n{{include:sections/footer.md}}');
+      fs.writeFileSync(templatePath, 'Main content\n@sections/footer.md');
 
       const result = templateEngine.render('main.md', {});
 
@@ -144,10 +144,10 @@ describe('TemplateEngine', () => {
     it('should prevent circular includes', () => {
       // Create circular include
       const file1Path = path.join(tempDir, 'file1.md');
-      fs.writeFileSync(file1Path, 'File 1: {{include:file2.md}}');
+      fs.writeFileSync(file1Path, 'File 1: @file2.md');
 
       const file2Path = path.join(tempDir, 'file2.md');
-      fs.writeFileSync(file2Path, 'File 2: {{include:file1.md}}');
+      fs.writeFileSync(file2Path, 'File 2: @file1.md');
 
       const result = templateEngine.render('file1.md', {});
 
@@ -155,13 +155,63 @@ describe('TemplateEngine', () => {
       expect(result).toContain('file2.md -->');
     });
 
-    it('should handle missing include files gracefully', () => {
+    it('should leave the original @path text in place when the include file is missing', () => {
       const templatePath = path.join(tempDir, 'main.md');
-      fs.writeFileSync(templatePath, 'Before {{include:missing.md}} After');
+      fs.writeFileSync(templatePath, 'Before @missing.md After');
 
       const result = templateEngine.render('main.md', {});
 
-      expect(result).toBe('Before <!-- Include not found: missing.md --> After');
+      expect(result).toBe('Before @missing.md After');
+    });
+
+    it('should leave bare @username mentions in prose untouched', () => {
+      const templatePath = path.join(tempDir, 'main.md');
+      fs.writeFileSync(templatePath, 'Hi @alice and @bob, see @sections/footer.md');
+      const subDir = path.join(tempDir, 'sections');
+      fs.mkdirSync(subDir);
+      fs.writeFileSync(path.join(subDir, 'footer.md'), 'shared footer');
+
+      const result = templateEngine.render('main.md', {});
+
+      expect(result).toBe('Hi @alice and @bob, see shared footer');
+    });
+
+    it('should leave email addresses untouched', () => {
+      // The `@` in `name@example.com` is preceded by a non-whitespace char,
+      // so it must not be treated as a path reference.
+      const templatePath = path.join(tempDir, 'main.md');
+      fs.writeFileSync(templatePath, "email: 'test@example.com'");
+
+      const result = templateEngine.render('main.md', {});
+
+      expect(result).toBe("email: 'test@example.com'");
+    });
+
+    it('should expand mustache variables that appear inside an included file', () => {
+      const includePath = path.join(tempDir, 'greeting.md');
+      fs.writeFileSync(includePath, 'Hello {{name}}!');
+
+      const templatePath = path.join(tempDir, 'main.md');
+      fs.writeFileSync(templatePath, '@greeting.md');
+
+      const result = templateEngine.render('main.md', { name: 'Alice' });
+
+      expect(result).toBe('Hello Alice!');
+    });
+
+    it('should no longer process {{include:...}} as a directive', () => {
+      // Sanity: the legacy mustache-style include syntax must be inert. Mustache
+      // will treat `include:foo.md` as a missing variable and render empty, so
+      // the produced bytes must not contain the included file contents.
+      const includePath = path.join(tempDir, 'header.md');
+      fs.writeFileSync(includePath, 'INCLUDED HEADER CONTENT');
+
+      const templatePath = path.join(tempDir, 'main.md');
+      fs.writeFileSync(templatePath, '{{include:header.md}}\nrest');
+
+      const result = templateEngine.render('main.md', {});
+
+      expect(result).not.toContain('INCLUDED HEADER CONTENT');
     });
   });
 
@@ -192,7 +242,7 @@ describe('TemplateEngine', () => {
       fs.chmodSync(includePath, 0o000); // Remove all permissions
 
       const templatePath = path.join(tempDir, 'main.md');
-      fs.writeFileSync(templatePath, '{{include:protected.md}}');
+      fs.writeFileSync(templatePath, '@protected.md');
 
       try {
         const result = templateEngine.render('main.md', {});
@@ -216,10 +266,7 @@ describe('TemplateEngine', () => {
 
       // Create main template
       const mainPath = path.join(tempDir, 'main.md');
-      fs.writeFileSync(
-        mainPath,
-        '{{include:header.md}}\n\nMain content here.\n\n{{include:footer.md}}'
-      );
+      fs.writeFileSync(mainPath, '@header.md\n\nMain content here.\n\n@footer.md');
 
       const result = templateEngine.render('main.md', {
         title: 'My App',
@@ -288,7 +335,7 @@ describe('TemplateEngine', () => {
 
     it('should handle includes across multiple directories', () => {
       // Create main template in first directory
-      fs.writeFileSync(path.join(tempDir, 'main.md'), 'Main: {{include:shared.md}}');
+      fs.writeFileSync(path.join(tempDir, 'main.md'), 'Main: @shared.md');
 
       // Create include file only in second directory
       fs.writeFileSync(path.join(secondTempDir, 'shared.md'), 'Shared content: {{name}}');
@@ -300,7 +347,7 @@ describe('TemplateEngine', () => {
 
     it('should prioritize includes from first directory', () => {
       // Create main template
-      fs.writeFileSync(path.join(tempDir, 'main.md'), 'Main: {{include:shared.md}}');
+      fs.writeFileSync(path.join(tempDir, 'main.md'), 'Main: @shared.md');
 
       // Create include file in both directories
       fs.writeFileSync(path.join(tempDir, 'shared.md'), 'First: {{name}}');

@@ -159,9 +159,9 @@ maxTurns: 50
 
 # You are the librarian.
 
-[body = the persona's system prompt template — `@file.md` transclusions
-work via TemplateEngine, including `{{include:...}}` and `@dir/*.md`-style
-glob expansion]
+[body = the persona's system prompt template — Claude Code-style
+`@path/to/file.md` references are expanded recursively by TemplateEngine
+before mustache variable substitution]
 ```
 
 Frontmatter is optional. If omitted, the persona is a template-only persona (just a system prompt; model/tools/MCPs come from session-level config or your delegate call).

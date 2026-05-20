@@ -120,7 +120,7 @@ describe('PromptManager', () => {
       // Create main system template
       fs.writeFileSync(
         path.join(tempDir, 'lace.md'),
-        '{{include:sections/agent-personality.md}}\n\n{{include:sections/environment.md}}\n\n{{include:sections/tools.md}}\n\n{{include:sections/guidelines.md}}\n\n{{context.disclaimer}}'
+        '@sections/agent-personality.md\n\n@sections/environment.md\n\n@sections/tools.md\n\n@sections/guidelines.md\n\n{{context.disclaimer}}'
       );
 
       const tools = [
@@ -143,7 +143,7 @@ describe('PromptManager', () => {
     it('should generate prompt without tools when none provided', async () => {
       fs.writeFileSync(
         path.join(tempDir, 'lace.md'),
-        '{{include:sections/agent-personality.md}}\n\n{{#tools}}Tools available{{/tools}}{{^tools}}No tools available{{/tools}}'
+        '@sections/agent-personality.md\n\n{{#tools}}Tools available{{/tools}}{{^tools}}No tools available{{/tools}}'
       );
 
       const manager = new PromptManager({ templateDirs: [tempDir] });
@@ -156,14 +156,14 @@ describe('PromptManager', () => {
     it('should handle missing include files gracefully', async () => {
       fs.writeFileSync(
         path.join(tempDir, 'lace.md'),
-        '{{include:sections/agent-personality.md}}\n\n{{include:sections/missing.md}}\n\nEnd of prompt'
+        '@sections/agent-personality.md\n\n@sections/missing.md\n\nEnd of prompt'
       );
 
       const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toContain('You are Lace, an AI coding assistant.');
-      expect(prompt).toContain('<!-- Include not found: sections/missing.md -->');
+      expect(prompt).toContain('@sections/missing.md');
       expect(prompt).toContain('End of prompt');
     });
 
@@ -272,7 +272,7 @@ describe('PromptManager', () => {
 
       fs.writeFileSync(
         path.join(tempDir, 'lace.md'),
-        '{{include:sections/header.md}}\n\n{{include:sections/environment.md}}\n\n{{include:sections/tools.md}}\n\n{{context.disclaimer}}'
+        '@sections/header.md\n\n@sections/environment.md\n\n@sections/tools.md\n\n{{context.disclaimer}}'
       );
 
       const tools = [
@@ -376,7 +376,7 @@ describe('PromptManager', () => {
       // System template uses both includes
       fs.writeFileSync(
         path.join(userTemplateDir, 'lace.md'),
-        '{{include:sections/agent-personality.md}}\n\n{{include:sections/environment.md}}'
+        '@sections/agent-personality.md\n\n@sections/environment.md'
       );
 
       const manager = new PromptManager({ templateDirs: [userTemplateDir, defaultTemplateDir] });

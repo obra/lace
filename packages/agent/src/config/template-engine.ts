@@ -1,5 +1,5 @@
-// ABOUTME: Template engine for system prompts using mustache with include functionality
-// ABOUTME: Handles variable substitution and template includes with error handling and fallbacks
+// ABOUTME: Template engine for system prompts using mustache with @path include functionality
+// ABOUTME: Handles variable substitution and Claude Code-style @path includes with recursion guards
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -129,17 +129,36 @@ export class TemplateEngine {
   }
 
   /**
-   * Process {{include:file.md}} directives with recursion protection
+   * Process Claude Code-style `@path/to/file.md` includes with recursion protection.
+   *
+   * A token is treated as a path reference only when:
+   * - the `@` is at the start of the content or immediately preceded by whitespace
+   *   (so `email@example.com` in prose is left alone), and
+   * - the captured token contains at least one `/` or `.` (so bare `@username`
+   *   mentions are left alone), and
+   * - the token ends in an alphanumeric / underscore character (so trailing
+   *   sentence punctuation is not captured into the path).
+   *
+   * Missing files: warn and emit the original `@path` text literally. Circular
+   * references: detected via a per-render Set and replaced with an HTML comment
+   * marker to break the cycle without crashing.
    */
   private processIncludes(content: string, currentDir: string): string {
-    const includeRegex = /\{\{include:([^}]+)\}\}/g;
+    const includeRegex = /(?<=^|\s)@([A-Za-z0-9_/.-]*[A-Za-z0-9_])/g;
     let out = '';
     let lastIndex = 0;
 
     for (let m: RegExpExecArray | null; (m = includeRegex.exec(content)); ) {
-      const includePath = m[1].trim();
+      const includePath = m[1];
       out += content.slice(lastIndex, m.index);
       lastIndex = includeRegex.lastIndex;
+
+      // Disambiguation: only treat as a path reference if it looks like a path.
+      // Bare `@username` (no slash, no dot) is left untouched in prose.
+      if (!includePath.includes('/') && !includePath.includes('.')) {
+        out += `@${includePath}`;
+        continue;
+      }
 
       // Try embedded files first (Bun executable)
       let foundContent: string | null = null;
@@ -197,7 +216,7 @@ export class TemplateEngine {
 
       if (!foundContent && !foundPath) {
         logger.warn('Include file not found', { includePath, searchedDirs: this.templateDirs });
-        out += `<!-- Include not found: ${includePath} -->`;
+        out += `@${includePath}`;
         continue;
       }
 
