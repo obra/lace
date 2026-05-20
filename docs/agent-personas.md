@@ -40,7 +40,7 @@ Examples:
 Create your own personas in `~/.lace/agent-personas/`:
 
 1. Create a new `.md` file (e.g., `my-persona.md`)
-2. Use the template system with `{{include:sections/...}}`
+2. Pull in shared sections with Claude Code-style `@sections/...` references
 3. Add persona-specific content and guidelines
 4. Use in tasks: `new:my-persona:provider/model`
 
@@ -49,7 +49,7 @@ User personas override built-in ones with the same name.
 ### Example Custom Persona
 
 ```markdown
-{{include:sections/agent-personality.md}}
+@sections/agent-personality.md
 
 You are a data analysis specialist focused on:
 
@@ -57,7 +57,7 @@ You are a data analysis specialist focused on:
 - Data cleaning and preprocessing
 - Insight generation and reporting
 
-{{include:sections/core-principles.md}}
+@sections/core-principles.md
 
 ## Data Analysis Guidelines
 
@@ -66,7 +66,7 @@ You are a data analysis specialist focused on:
 - Provide clear visualizations
 - Explain methodology and assumptions
 
-{{include:sections/tools.md}} {{context.disclaimer}}
+@sections/tools.md {{context.disclaimer}}
 ```
 
 ## Breaking Changes

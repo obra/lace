@@ -11,7 +11,7 @@ prompts (personas).
 
 - **Persona**: A system prompt template that defines an agent's
   behavior/capabilities
-- **Template System**: Personas use `{{include:sections/...}}` to reuse shared
+- **Template System**: Personas use `@sections/...` to reuse shared
   prompt sections
 - **Override System**: User-defined personas (in `~/.lace/`) override built-in
   ones by name
@@ -688,12 +688,12 @@ describe('PromptManager', () => {
     // Create test persona files
     fs.writeFileSync(
       path.join(tempPersonasDir, 'lace.md'),
-      '# Lace Default\n{{include:sections/core.md}}'
+      '# Lace Default\n@sections/core.md'
     );
 
     fs.writeFileSync(
       path.join(tempPersonasDir, 'coding-agent.md'),
-      '# Coding Agent\n{{include:sections/core.md}}\n{{include:sections/coding.md}}'
+      '# Coding Agent\n@sections/core.md\n@sections/coding.md'
     );
 
     // Create sections directory
@@ -729,7 +729,7 @@ describe('PromptManager', () => {
 
     expect(prompt).toContain('# Lace Default');
     expect(prompt).toContain('Core functionality');
-    expect(prompt).not.toContain('{{include:');
+    expect(prompt).not.toContain('@sections/');
   });
 
   it('generates system prompt for specified persona', async () => {
@@ -1151,7 +1151,7 @@ persona:provider/model format"
 **File:** `packages/core/config/agent-personas/coding-agent.md`
 
 ```markdown
-{{include:sections/agent-personality.md}}
+@sections/agent-personality.md
 
 You are a specialized coding assistant with deep expertise in software
 development. Your primary focus is on:
@@ -1162,7 +1162,7 @@ development. Your primary focus is on:
 - Debugging complex issues systematically
 - Suggesting refactoring opportunities
 
-{{include:sections/core-principles.md}}
+@sections/core-principles.md
 
 ## Coding-Specific Guidelines
 
@@ -1173,17 +1173,17 @@ development. Your primary focus is on:
 - Consider performance implications of your suggestions
 - Follow the existing codebase patterns and style
 
-{{include:sections/tools.md}}
+@sections/tools.md
 
-{{include:sections/workflows.md}}
+@sections/workflows.md
 
-{{include:sections/code-quality.md}}
+@sections/code-quality.md
 
-{{include:sections/collaboration.md}}
+@sections/collaboration.md
 
-{{include:sections/error-recovery.md}}
+@sections/error-recovery.md
 
-{{include:sections/examples.md}}
+@sections/examples.md
 
 {{context.disclaimer}}
 ```
@@ -1191,7 +1191,7 @@ development. Your primary focus is on:
 **File:** `packages/core/config/agent-personas/helper-agent.md`
 
 ```markdown
-{{include:sections/agent-personality.md}}
+@sections/agent-personality.md
 
 You are a helpful assistant focused on productivity and task completion. Your
 role is to:
@@ -1202,7 +1202,7 @@ role is to:
 - Maintain a supportive, encouraging tone
 - Focus on getting things done efficiently
 
-{{include:sections/core-principles.md}}
+@sections/core-principles.md
 
 ## Helper-Specific Guidelines
 
@@ -1213,17 +1213,17 @@ role is to:
 - Offer to handle routine tasks automatically
 - Keep responses concise but complete
 
-{{include:sections/interaction-patterns.md}}
+@sections/interaction-patterns.md
 
-{{include:sections/environment.md}}
+@sections/environment.md
 
-{{include:sections/tools.md}}
+@sections/tools.md
 
-{{include:sections/workflows.md}}
+@sections/workflows.md
 
-{{include:sections/collaboration.md}}
+@sections/collaboration.md
 
-{{include:sections/error-recovery.md}}
+@sections/error-recovery.md
 
 {{context.disclaimer}}
 ```
@@ -1260,7 +1260,7 @@ describe('Example Personas', () => {
 
       expect(prompt).toBeTruthy();
       expect(prompt.length).toBeGreaterThan(100); // Should be substantial
-      expect(prompt).not.toContain('{{include:'); // All includes should be resolved
+      expect(prompt).not.toContain('@sections/'); // All includes should be resolved
       expect(prompt).not.toContain('{{context.'); // All context should be resolved
     }
   });
@@ -1457,7 +1457,7 @@ new:helper-agent:openai/gpt-4
 Create your own personas in `~/.lace/agent-personas/`:
 
 1. Create a new `.md` file (e.g., `my-persona.md`)
-2. Use the template system with `{{include:sections/...}}`
+2. Use the template system with `@sections/...`
 3. Add persona-specific content and guidelines
 4. Use in tasks: `new:my-persona:provider/model`
 
@@ -1653,7 +1653,7 @@ npm run lint
 ```typescript
 // Use factory functions for consistent test data
 export function createTestPersona(name: string, content?: string): string {
-  return content || `# ${name} Persona\n{{include:sections/core.md}}`;
+  return content || `# ${name} Persona\n@sections/core.md`;
 }
 
 export function createTestAgentSpec(

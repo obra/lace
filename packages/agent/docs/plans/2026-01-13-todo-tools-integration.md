@@ -108,11 +108,11 @@ All tests pass (template changes shouldn't break tests)
 In `packages/agent/config/agent-personas/lace.md`, add after the tools include:
 
 ```markdown
-{{include:sections/tools.md}}
+@sections/tools.md
 
-{{include:sections/task-tracking.md}}
+@sections/task-tracking.md
 
-{{include:sections/workflows.md}}
+@sections/workflows.md
 ```
 
 **Step 4: Run tests again**

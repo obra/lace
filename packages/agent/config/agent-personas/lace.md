@@ -1,10 +1,10 @@
-{{include:sections/agent-personality.md}}
+@sections/agent-personality.md
 
-{{include:sections/interaction-patterns.md}}
+@sections/interaction-patterns.md
 
-{{include:sections/environment.md}}
+@sections/environment.md
 
-{{include:sections/tools.md}}
+@sections/tools.md
 
 {{#availableSkills}}
 ## Available Skills
@@ -16,14 +16,14 @@ workflows.
 {{{availableSkills}}}
 {{/availableSkills}}
 
-{{include:sections/delegation.md}}
+@sections/delegation.md
 
-{{include:sections/task-tracking.md}}
+@sections/task-tracking.md
 
-{{include:sections/workflows.md}}
+@sections/workflows.md
 
-{{include:sections/code-quality.md}}
+@sections/code-quality.md
 
-{{include:sections/error-recovery.md}}
+@sections/error-recovery.md
 
 {{context.disclaimer}}
