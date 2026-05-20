@@ -475,12 +475,20 @@ syntax, for example `linux/arm64` or `linux/amd64`.
 
 Resolution rules:
 
-- If `requestedImage` is already `name@sha256:...`, persist that digest as
-  `resolvedImageDigest` after confirming it resolves for `imagePlatform`.
+- If `requestedImage` is already `name@sha256:...`, treat that value as
+  provenance. If it resolves to a platform-specific manifest for
+  `imagePlatform`, persist that digest as `resolvedImageDigest`. If it resolves
+  to an OCI index/manifest list, select the child manifest matching
+  `imagePlatform` and persist the child manifest digest as
+  `resolvedImageDigest`.
 - If `requestedImage` is a tag, resolve it to the platform-specific manifest
   digest before creating a projected-container binding.
 - If the registry returns a multi-arch index, select the manifest matching
   `imagePlatform` and persist that platform manifest digest.
+- `imagePlatform` is required and must be normalized before persistence.
+  Supported v1 syntax is `os/arch` or `os/arch/variant` using lowercase OCI
+  platform components. Missing, malformed, unsupported, or non-normalizable
+  platform values fail binding creation or resume validation.
 - If the image exists only as a local mutable tag and no immutable digest can be
   resolved, projected-container binding creation fails in v1. Local-only mutable
   tags are not resumable projected runtime identity.
@@ -651,6 +659,7 @@ implementation plan before code is written.
 | Projected-container session/job has v1 binding | Validate schema version, descriptor shape, helper config, mounts, secret references, and MCP placement before materializing or reconnecting to runtime processes. |
 | Binding has unknown `schemaVersion`            | Fail resume/startup with an unsupported runtime binding version error.                                                                                            |
 | Projected-container binding has only `image`   | Treat as unsupported pre-v1 projected state. Do not infer a digest during resume; require explicit rebinding so image identity is intentionally pinned.           |
+| V1 projected-container binding lacks platform  | Treat as unsupported/incomplete v1 state. Do not infer `imagePlatform` during resume; require explicit rebinding.                                                 |
 
 Concrete examples:
 
@@ -991,6 +1000,11 @@ Failure surfaces:
   touched the failing runtime capability.
 - Host logs: may include correlation ids, runtime id, session id, job id, server
   id, and redacted reference ids under host operational log access controls.
+- Image resolution failures use distinct classes: registry auth failure,
+  registry unavailable, image not found, digest unavailable locally, digest
+  mismatch, and platform mismatch. Model-visible errors receive only the class
+  and redacted image reference; host logs may include registry host, normalized
+  image name, digest, and platform under host operational log access controls.
 
 ## Testing Requirements
 
@@ -1035,8 +1049,12 @@ Use fake runtimes before real containers:
     materialization error;
   - registry auth failure is redacted like a secret failure;
   - multi-arch images persist and validate the selected `imagePlatform`; and
-  - v1 projected-container descriptors missing `resolvedImageDigest` fail
-    validation.
+  - v1 projected-container descriptors missing `resolvedImageDigest` or
+    `imagePlatform` fail validation.
+- Test `imagePlatform` validation for missing values, malformed syntax,
+  unsupported platforms, and normalized variant handling.
+- Update descriptor fixtures, golden runtime-id cases, and resume validation
+  fixtures whenever image identity fields change.
 - Add one gated Docker integration smoke:
   1. materialize a container,
   2. `bash` writes a file under container `/tmp`,
@@ -1076,7 +1094,10 @@ Required implementation-plan sections:
 
 Required stage order:
 
-1. Schema/types and durable-path additions with no runtime behavior change.
+1. Schema/types and durable-path additions with no runtime behavior change,
+   including the projected-container image identity schema (`requestedImage`,
+   `resolvedImageDigest`, `imagePlatform`) and structural validation for
+   digest/platform presence and syntax.
 2. Migration/defaulting plus structural resume validation for v0/no-binding and
    v1 bindings. Structural validation must not start any runtime process.
 3. Runtime binding construction plus runtime id generation/validation, with
@@ -1090,9 +1111,10 @@ Required stage order:
 8. MCP reconciliation-key changes while preserving existing host-placed
    behavior.
 9. Runtime-placed stdio MCP transport plus lifecycle cleanup.
-10. Container image reference resolution, platform selection, digest
-    persistence, digest validation, and fake-adapter tests for tag drift,
-    registry failure, auth failure, and platform mismatch.
+10. Container image reference resolution adapter behavior: registry lookup,
+    platform-specific child manifest selection, digest persistence, pull/run by
+    digest, and fake-adapter tests for tag drift, registry failure, auth
+    failure, and platform mismatch.
 11. Projected-container helper delivery and Docker/helper smoke coverage.
 12. Removal of legacy `workspaceInfo` and `resolveWorkspacePath()` after all
     consumers have moved.
