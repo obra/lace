@@ -532,6 +532,18 @@ If a referenced secret is missing, unauthorized for the target runtime/server,
 or fails resolution, runtime materialization or MCP server startup fails before
 the tool process is launched.
 
+Secret references are reauthorized against current host policy whenever a
+runtime, background job, delegate job, or MCP server is rehydrated after a
+restart. V1 does not persist captured secret grants. If a secret was valid when
+the job started but is revoked before rehydration, the resumed unit fails with a
+redacted "secret unavailable or unauthorized" runtime error instead of retaining
+the old access.
+
+Denied secret resolution should be written to host-side operational logs with
+the runtime id, server/job id when present, and a redacted secret reference. Raw
+secret values are never logged; ordinary model-visible tool output only receives
+the redacted runtime error.
+
 Configuration should set `agentPlacement` explicitly when constructing the
 binding. Current persona-container behavior maps to
 `agentPlacement: 'container'`. New projected-container behavior must request
@@ -560,7 +572,7 @@ runtime projection should not guess silently.
 Concrete examples:
 
 - An old local session with only `meta.workDir: "/repo"` resumes as
-  `{ schemaVersion: 1, identity: { runtimeId: "session:<id>:local:<hash('/repo')>" }, agentPlacement: "host", toolRuntime: { type: "local", cwd: "/repo" } }`.
+  `{ schemaVersion: 1, identity: { runtimeId: "legacy-local:<sessionId>" }, agentPlacement: "host", toolRuntime: { type: "local", cwd: "/repo" } }`.
 - An old workspace session that has `projectRoot`, `workspaceRoot`, and `cwd`
   resumes as `WorkspaceToolRuntime`.
 - An old workspace session with `workspaceRoot` but no original project root
@@ -753,10 +765,15 @@ must not accidentally share mutable runtime state.
 - `runtime.id` is a logical binding id, not necessarily the Docker/container
   process id. It is generated when the session or job binding is created and is
   persisted with that binding.
-- Local and workspace runtimes can derive deterministic ids from the session/job
-  id plus cwd/workspace roots. Container runtimes store the logical runtime id
-  separately from `containerId` so a stale container can be rematerialized only
-  when the persisted descriptor proves it is the same logical runtime.
+- New local, workspace, and container bindings should use an opaque generated id
+  such as a UUID/ULID with a `rt_` prefix. Do not derive ids from filesystem
+  paths. Legacy no-binding defaults may use deterministic ids such as
+  `legacy-local:<sessionId>` because there is no persisted id to recover.
+- The descriptor, not the runtime id alone, defines runtime semantics. On
+  resume, Lace validates both the persisted id and descriptor before reusing the
+  binding. Container runtimes store the logical runtime id separately from
+  `containerId` so a stale container can be rematerialized only when the
+  persisted descriptor proves it is the same logical runtime.
 - If rematerialization would change the runtime semantics, Lace must fail resume
   instead of reusing the old runtime id for a different target.
 - Runtime-placed MCP connection keys include server id, transport, placement,
@@ -820,6 +837,11 @@ execution.
   `state.json` fail session resume. Malformed `job_started.data.runtimeBinding`
   fails only the affected job unless the active session itself depends on that
   job during resume.
+- Session listing should continue to work when a runtime binding is malformed,
+  because `meta.json` and durable event summaries are enough for listing. The
+  resume error should include the session id and affected state file path so a
+  human can inspect or repair the state. Automatic repair/export of malformed
+  runtime bindings is not a v1 goal.
 - Unsupported placement combinations, such as HTTP/SSE MCP with
   `placement: 'toolRuntime'` in v1, fail at config/startup time instead of
   silently using host networking.
@@ -840,9 +862,17 @@ Use fake runtimes before real containers:
 - Test v0/no-binding, workspace, lace-in-container, v1 projected-container, and
   unknown-version resume/defaulting cases.
 - Test secret reference validation: raw secret rejection, missing secret
-  failure, unauthorized secret failure, and redacted debug/error output.
+  failure, unauthorized secret failure, current-policy revalidation on resume,
+  and redacted debug/error output.
 - Test runtime id stability across session/job reload and runtime-placed MCP
   reconciliation.
+- Test exact persistence paths: session resume from
+  `state.config.runtimeBinding`, job rehydration from
+  `job_started.data.runtimeBinding`, and malformed binding failures that do not
+  break session listing.
+- Test unsupported MCP transport/placement failure before process launch.
+- Test stale container handling for both successful rematerialization and clear
+  resume failure.
 - Add one gated Docker integration smoke:
   1. materialize a container,
   2. `bash` writes a file under container `/tmp`,
@@ -880,6 +910,19 @@ Required implementation-plan sections:
 - rollback/error behavior for malformed state, stale containers, missing helper,
   missing secrets, and unsupported transports.
 
+Required stage order:
+
+1. Schema/types and durable-path additions with no runtime behavior change.
+2. Migration/defaulting and resume validation for v0/no-binding and v1 bindings.
+3. Runtime binding construction, runtime id generation, and secret resolver
+   authorization.
+4. Built-in tool migration in one small group at a time.
+5. Background job and delegate rehydration through persisted bindings.
+6. MCP schema/defaulting, reconciliation keys, and runtime stdio transport.
+7. Projected-container helper delivery and Docker/helper smoke coverage.
+8. Removal of legacy `workspaceInfo` and `resolveWorkspacePath()` after all
+   consumers have moved.
+
 - Start from behavior-preserving runtime plumbing before changing tool
   semantics.
 - Define descriptor versioning, compatibility defaults, and secret-redaction
@@ -914,6 +957,10 @@ Required implementation-plan sections:
 - MCP servers are long-lived. `MCPServerManager` must stop runtime-placed
   servers on session switch and kill their runtime process handles during
   shutdown.
+- MCP reconciliation keys will be more specific after runtime placement. Keep
+  `runtime.id` stable across resume and restart only when config/runtime
+  semantics are unchanged so reconciliation does not churn healthy server
+  processes.
 - Container runtime rehydration after agent restart is still only partly solved
   by the current container manager. Projected runtime descriptors should include
   enough container/spec identity to inspect or rematerialize cleanly.
