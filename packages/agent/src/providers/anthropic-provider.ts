@@ -10,6 +10,7 @@ import type {
 } from '@anthropic-ai/sdk/resources/messages';
 import { AIProvider, type WireTool } from './base-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderInfo } from './base-provider';
+import type { CatalogProvider } from './catalog/types';
 import { ToolCall } from '@lace/agent/tools/types';
 import { logger } from '@lace/agent/utils/logger';
 import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
@@ -246,8 +247,10 @@ export class AnthropicProvider extends AIProvider {
         // Log request with pretty formatting
         logProviderRequest('anthropic', requestPayload as unknown as Record<string, unknown>);
 
+        const extraHeaders = this.getExtraHeadersForModel(model);
         const response = (await this.getAnthropicClient().messages.create(requestPayload, {
           signal,
+          ...(extraHeaders ? { headers: extraHeaders } : {}),
         })) as Anthropic.Messages.Message;
 
         // Log response with pretty formatting
@@ -318,8 +321,10 @@ export class AnthropicProvider extends AIProvider {
         });
 
         // Use the streaming API
+        const extraHeaders = this.getExtraHeadersForModel(model);
         const stream = this.getAnthropicClient().messages.stream(requestPayload, {
           signal,
+          ...(extraHeaders ? { headers: extraHeaders } : {}),
         });
 
         // Mark that stream is created to prevent retries after this point
@@ -503,5 +508,17 @@ export class AnthropicProvider extends AIProvider {
   override isRecoverableError(error: unknown): boolean {
     // Use base class implementation - Anthropic SDK uses same patterns as OpenAI
     return super.isRecoverableError(error);
+  }
+
+  // Per-model headers from the catalog (e.g. anthropic-beta to opt into the 1M
+  // context window for opus-4-7-1m). Returned undefined when the model has no
+  // declared extra headers so callers can spread without sending {} on the wire.
+  private getExtraHeadersForModel(model: string): Record<string, string> | undefined {
+    const catalogProvider = (this._config as { catalogProvider?: CatalogProvider }).catalogProvider;
+    if (!catalogProvider) return undefined;
+    const entry = catalogProvider.models.find((m) => m.id === model);
+    const headers = entry?.extra_headers;
+    if (!headers || Object.keys(headers).length === 0) return undefined;
+    return headers;
   }
 }

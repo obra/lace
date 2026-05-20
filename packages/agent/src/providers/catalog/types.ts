@@ -34,6 +34,10 @@ export const CatalogModelSchema = z.object({
   reasoning_effort: z.string().optional(),
   supports_attachments: z.boolean().optional(),
   supported_parameters: z.array(z.string()).optional(),
+  // Per-model HTTP headers attached to every provider request for this model.
+  // Used to opt into provider-side beta features (Anthropic's 1M context
+  // window, for example, needs `anthropic-beta: context-1m-2025-08-07`).
+  extra_headers: z.record(z.string(), z.string()).optional(),
 });
 
 // Catwalk catalog provider schema

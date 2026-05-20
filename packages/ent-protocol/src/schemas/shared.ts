@@ -239,6 +239,10 @@ export const CatalogModelInfoSchema = z
     reasoning_effort: z.string().optional(),
     supports_attachments: z.boolean().optional(),
     supported_parameters: z.array(z.string()).optional(),
+    // Per-model HTTP headers attached to every provider request for this
+    // model. Matches @lace/agent's CatalogModelSchema; lets opt-in beta
+    // features (Anthropic's 1M context window) ride with the model entry.
+    extra_headers: z.record(z.string(), z.string()).optional(),
   })
   .strict();
 export type CatalogModelInfo = z.infer<typeof CatalogModelInfoSchema>;
