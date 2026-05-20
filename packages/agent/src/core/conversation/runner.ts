@@ -7,6 +7,8 @@ import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node
 import type { ToolResult } from '@lace/ent-protocol';
 import type { ToolResult as CoreToolResult, ToolCall, ToolContext } from '@lace/agent/tools/types';
 import type { Tool } from '@lace/agent/tools/tool';
+import { HostToolRuntime } from '@lace/agent/tools/runtime/host';
+import { buildDefaultLocalRuntimeBinding } from '@lace/agent/tools/runtime/validation';
 import {
   readSessionState,
   writeSessionState,
@@ -999,7 +1001,6 @@ export class ConversationRunner {
     } = params;
 
     // Note: bash with background=true is handled before permission check and never reaches here.
-
     // Handle todo tools (still use runtime handling - todo tools need sessionDir)
     if (toolName === 'todo_read' || toolName === 'todo_write') {
       const todoContext = { sessionDir: this.config.sessionDir };
@@ -1022,11 +1023,21 @@ export class ConversationRunner {
     }
 
     // Default: execute through tool executor
+    const runtimeBinding = buildDefaultLocalRuntimeBinding({
+      sessionId: this.config.sessionId,
+      cwd,
+    });
+    const runtime = new HostToolRuntime({
+      id: runtimeBinding.identity.runtimeId,
+      cwd,
+    });
+
     return await toolExecutor.execute(
       { id: toolCallId, name: toolName, arguments: finalInput },
       {
         signal: abortController.signal,
         workingDirectory: cwd,
+        runtime,
         toolTempRoot: join(this.config.sessionDir, 'tool-temp'),
         processEnv: envOverlay,
         hasFileBeenRead: (p: string) => filesRead.has(isAbsolutePath(p) ? p : resolvePath(cwd, p)),
