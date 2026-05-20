@@ -8,7 +8,9 @@ import type { ToolResult } from '@lace/ent-protocol';
 import type { ToolResult as CoreToolResult, ToolCall, ToolContext } from '@lace/agent/tools/types';
 import type { Tool } from '@lace/agent/tools/tool';
 import { HostToolRuntime } from '@lace/agent/tools/runtime/host';
+import { FileAccessTracker } from '@lace/agent/tools/runtime/file-access-tracker';
 import { buildDefaultLocalRuntimeBinding } from '@lace/agent/tools/runtime/validation';
+import type { RuntimePath } from '@lace/agent/tools/runtime/types';
 import {
   readSessionState,
   writeSessionState,
@@ -157,6 +159,7 @@ export class ConversationRunner {
     } = this.config;
 
     const filesRead = deriveFilesReadFromDurableEvents(sessionDir, cwd);
+    const runtimeFileAccessTracker = await this.createDefaultLocalFileAccessTracker(filesRead, cwd);
 
     const envOverlay = environment && typeof environment === 'object' ? environment : undefined;
 
@@ -450,6 +453,7 @@ export class ConversationRunner {
             approvalMode,
             cwd,
             filesRead,
+            runtimeFileAccessTracker,
             envOverlay,
             abortController,
             turnId,
@@ -543,6 +547,7 @@ export class ConversationRunner {
     approvalMode: ApprovalMode;
     cwd: string;
     filesRead: Set<string>;
+    runtimeFileAccessTracker: FileAccessTracker;
     envOverlay?: Record<string, string>;
     abortController: AbortController;
     turnId: string;
@@ -567,6 +572,7 @@ export class ConversationRunner {
       approvalMode,
       cwd,
       filesRead,
+      runtimeFileAccessTracker,
       envOverlay,
       abortController,
       turnId,
@@ -909,6 +915,7 @@ export class ConversationRunner {
       toolExecutor,
       cwd,
       filesRead,
+      runtimeFileAccessTracker,
       envOverlay,
       abortController,
       turnId,
@@ -983,6 +990,7 @@ export class ConversationRunner {
     };
     cwd: string;
     filesRead: Set<string>;
+    runtimeFileAccessTracker: FileAccessTracker;
     envOverlay?: Record<string, string>;
     abortController: AbortController;
     turnId: string;
@@ -995,6 +1003,7 @@ export class ConversationRunner {
       toolExecutor,
       cwd,
       filesRead,
+      runtimeFileAccessTracker,
       envOverlay,
       abortController,
       turnId,
@@ -1023,15 +1032,12 @@ export class ConversationRunner {
     }
 
     // Default: execute through tool executor
-    const runtimeBinding = buildDefaultLocalRuntimeBinding({
-      sessionId: this.config.sessionId,
-      cwd,
-    });
-    const runtime = new HostToolRuntime({
-      id: runtimeBinding.identity.runtimeId,
-      cwd,
-      env: envOverlay,
-    });
+    const runtime = this.createDefaultLocalRuntime(cwd, envOverlay);
+    const markRuntimeFileRead = (path: RuntimePath): void => {
+      runtimeFileAccessTracker.markRead(path, runtime.paths.canonicalKey(path));
+      const hostPath = path.hostPath ?? (runtime.kind === 'local' ? path.runtimePath : undefined);
+      if (hostPath) filesRead.add(isAbsolutePath(hostPath) ? hostPath : resolvePath(cwd, hostPath));
+    };
 
     return await toolExecutor.execute(
       { id: toolCallId, name: toolName, arguments: finalInput },
@@ -1042,6 +1048,9 @@ export class ConversationRunner {
         toolTempRoot: join(this.config.sessionDir, 'tool-temp'),
         processEnv: envOverlay,
         hasFileBeenRead: (p: string) => filesRead.has(isAbsolutePath(p) ? p : resolvePath(cwd, p)),
+        hasRuntimeFileBeenRead: (path) =>
+          runtimeFileAccessTracker.hasRead(path, runtime.paths.canonicalKey(path)),
+        markFileRead: markRuntimeFileRead,
         turnId,
         turnSeq: toolTurnSeq,
         ...(this.deps.alarmScheduler ? { alarmScheduler: this.deps.alarmScheduler } : {}),
@@ -1049,6 +1058,36 @@ export class ConversationRunner {
         activeSessionDir: this.config.sessionDir,
       }
     );
+  }
+
+  private createDefaultLocalRuntime(
+    cwd: string,
+    envOverlay?: Record<string, string>
+  ): HostToolRuntime {
+    const runtimeBinding = buildDefaultLocalRuntimeBinding({
+      sessionId: this.config.sessionId,
+      cwd,
+    });
+    return new HostToolRuntime({
+      id: runtimeBinding.identity.runtimeId,
+      cwd,
+      env: envOverlay,
+    });
+  }
+
+  private async createDefaultLocalFileAccessTracker(
+    filesRead: Set<string>,
+    cwd: string
+  ): Promise<FileAccessTracker> {
+    const tracker = new FileAccessTracker();
+    const runtime = this.createDefaultLocalRuntime(cwd);
+
+    for (const filePath of filesRead) {
+      const runtimePath = await runtime.paths.resolve(filePath);
+      tracker.markRead(runtimePath, runtime.paths.canonicalKey(runtimePath));
+    }
+
+    return tracker;
   }
 
   /**

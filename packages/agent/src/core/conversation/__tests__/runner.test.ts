@@ -8,6 +8,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ConversationRunner } from '../runner';
 import type { RunnerConfig, RunnerDependencies } from '../types';
 import { TestAgentProvider } from '@lace/agent/runtime/test-provider';
+import { ToolExecutor } from '@lace/agent/tools/executor';
+import { FileReadTool } from '@lace/agent/tools/implementations/file_read';
+import { FileWriteTool } from '@lace/agent/tools/implementations/file_write';
 import {
   AIProvider,
   type ProviderMessage,
@@ -255,6 +258,105 @@ describe('ConversationRunner', () => {
 
       // updateSessionUsage should have been called
       expect(updateSessionUsage).toHaveBeenCalled();
+    });
+
+    it('tracks runtime file reads across real file_read and file_write execution', async () => {
+      const targetFile = join(cwd, 'tracked.txt');
+      writeFileSync(targetFile, 'old content');
+
+      class RuntimeFileTrackingProvider extends AIProvider {
+        callCount = 0;
+
+        get providerName(): string {
+          return 'runtime-file-tracking-test';
+        }
+
+        getProviderInfo() {
+          return {
+            name: 'runtime-file-tracking-test',
+            displayName: 'Runtime File Tracking Test',
+            requiresApiKey: false,
+          };
+        }
+
+        isConfigured(): boolean {
+          return true;
+        }
+
+        get supportsStreaming(): boolean {
+          return true;
+        }
+
+        async createResponse(
+          messages: ProviderMessage[],
+          tools: Tool[],
+          model: string,
+          signal?: AbortSignal,
+          conversationState?: ConversationState,
+          options?: RequestOptions
+        ): Promise<ProviderResponse> {
+          return this.createStreamingResponse(
+            messages,
+            tools,
+            model,
+            signal,
+            conversationState,
+            options
+          );
+        }
+
+        async createStreamingResponse(): Promise<ProviderResponse> {
+          this.callCount++;
+          if (this.callCount === 1) {
+            return {
+              content: '',
+              toolCalls: [{ id: 'tc_read', name: 'file_read', arguments: { path: 'tracked.txt' } }],
+              stopReason: 'tool_use',
+            };
+          }
+
+          return {
+            content: '',
+            toolCalls: [
+              {
+                id: 'tc_write',
+                name: 'file_write',
+                arguments: { path: 'tracked.txt', content: 'new content' },
+              },
+            ],
+            stopReason: 'tool_use',
+          };
+        }
+      }
+
+      const provider = new RuntimeFileTrackingProvider();
+      const executor = new ToolExecutor();
+      executor.registerTools([new FileReadTool(), new FileWriteTool()]);
+      const config: RunnerConfig = {
+        sessionDir,
+        sessionId: 'sess_test',
+        cwd,
+        executionMode: 'execute',
+        approvalMode: 'approve',
+      };
+      const deps = createMockDeps({
+        createProvider: vi.fn().mockImplementation(async () => provider),
+        createToolExecutor: vi.fn().mockReturnValue({
+          executor,
+          toolsForProvider: executor.getAllTools(),
+        }),
+      });
+      const runner = new ConversationRunner(config, deps);
+
+      await runner.run({
+        content: [{ type: 'text', text: 'Read then update the tracked file.' }],
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
+        maxTurns: 2,
+      });
+
+      expect(readFileSync(targetFile, 'utf8')).toBe('new content');
     });
 
     describe('thinking events', () => {
