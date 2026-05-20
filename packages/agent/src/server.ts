@@ -50,6 +50,7 @@ import {
 } from './notifications';
 import type { AlarmRow } from './alarms/types';
 import { logger } from './utils/logger';
+import type { RuntimeExecutionBinding } from './tools/runtime/types';
 
 // Re-export public API from message-builder for backwards compatibility
 export {
@@ -544,6 +545,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     description?: string;
     command?: string;
     turnContext?: { turnId: string; turnSeq: number };
+    runtimeBinding?: RuntimeExecutionBinding;
   }): Promise<void> => {
     await runExclusive(() => {
       let sessionState = readSessionState(state.activeSession!.dir);
@@ -557,6 +559,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           jobType: event.jobType,
           description: event.description,
           command: event.command,
+          ...(event.runtimeBinding ? { runtimeBinding: event.runtimeBinding } : {}),
         },
       });
       sessionState = nextState;
