@@ -3,6 +3,7 @@
 
 import { AIProvider, ProviderConfig, ProviderInfo, ModelInfo } from './base-provider';
 import { AnthropicProvider } from './anthropic-provider';
+import { BedrockProvider } from './bedrock-provider';
 import { OpenAIProvider } from './openai-provider';
 import { LMStudioProvider } from './lmstudio-provider';
 import { OllamaProvider } from './ollama-provider';
@@ -483,7 +484,7 @@ export class ProviderRegistry {
     models: ModelInfo[];
     configured: boolean;
   }> {
-    const providers = ['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama'];
+    const providers = ['anthropic', 'bedrock', 'openai', 'gemini', 'lmstudio', 'ollama'];
     const results = [];
 
     for (const providerName of providers) {
@@ -524,6 +525,12 @@ export class ProviderRegistry {
           // Metadata-only instance (no API calls); include catalog for models
           return new AnthropicProvider({
             apiKey: null,
+            ...(catalogProvider ? { catalogProvider } : {}),
+          });
+        }
+        case 'bedrock': {
+          // Metadata-only instance (no API calls); include catalog for models
+          return new BedrockProvider({
             ...(catalogProvider ? { catalogProvider } : {}),
           });
         }
@@ -576,6 +583,24 @@ export class ProviderRegistry {
         return new AnthropicProvider({
           ...config,
           apiKey: typeof config.apiKey === 'string' ? config.apiKey : null,
+        });
+      }
+      case 'bedrock': {
+        logger.debug('Creating BedrockProvider', {
+          hasExplicitCreds:
+            typeof config.awsAccessKeyId === 'string' &&
+            typeof config.awsSecretAccessKey === 'string',
+          awsRegion: typeof config.awsRegion === 'string' ? config.awsRegion : undefined,
+        });
+        return new BedrockProvider({
+          ...config,
+          awsRegion: typeof config.awsRegion === 'string' ? config.awsRegion : undefined,
+          awsAccessKeyId:
+            typeof config.awsAccessKeyId === 'string' ? config.awsAccessKeyId : undefined,
+          awsSecretAccessKey:
+            typeof config.awsSecretAccessKey === 'string' ? config.awsSecretAccessKey : undefined,
+          awsSessionToken:
+            typeof config.awsSessionToken === 'string' ? config.awsSessionToken : undefined,
         });
       }
       case 'openai': {
