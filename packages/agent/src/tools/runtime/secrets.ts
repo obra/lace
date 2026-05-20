@@ -13,12 +13,20 @@ export interface RuntimeSecretResolver {
 }
 
 export class RuntimeSecretResolutionError extends Error {
-  constructor(
-    message: string,
-    public readonly reference: RuntimeSecretReference
-  ) {
+  public readonly redactedReference: string;
+  public readonly runtimeId: string;
+  public readonly sessionId: string;
+  public readonly jobId?: string;
+  public readonly serverId?: string;
+
+  constructor(message: string, request: RuntimeSecretResolutionRequest) {
     super(message);
     this.name = 'RuntimeSecretResolutionError';
+    this.redactedReference = redactSecretReference(request.reference);
+    this.runtimeId = request.runtimeId;
+    this.sessionId = request.sessionId;
+    this.jobId = request.jobId;
+    this.serverId = request.serverId;
   }
 }
 
@@ -35,7 +43,7 @@ export class InMemoryRuntimeSecretResolver implements RuntimeSecretResolver {
     if (value === undefined) {
       throw new RuntimeSecretResolutionError(
         `Secret unavailable or unauthorized: ${redactSecretReference(request.reference)}`,
-        request.reference
+        request
       );
     }
     return value;
