@@ -2,10 +2,10 @@
 // ABOUTME: Safe file access with AI-optimized error messages and misspelling suggestions
 
 import { z } from 'zod';
-import { readFile, stat } from 'fs/promises';
 import { Tool } from '../tool';
 import { FilePath, LineNumber } from '../schemas/common';
 import type { ToolResult, ToolContext } from '../types';
+import type { RuntimePath, ToolRuntime } from '../runtime/types';
 import { findSimilarPaths } from '../utils/file-suggestions';
 import { formatFileSize } from '@lace/agent/tools/utils/format-file-size';
 
@@ -48,20 +48,27 @@ export class FileReadTool extends Tool {
     if (context.signal.aborted) {
       return this.createCancellationResult();
     }
-    // Resolve path with workspace support
-    const resolvedPath = this.resolveWorkspacePath(args.path, context);
+
+    if (!context.runtime) {
+      return this.createError('Tool context missing runtime. This is a system error.');
+    }
+
+    let runtimePath: RuntimePath | undefined;
 
     try {
+      runtimePath = await context.runtime.paths.resolve(args.path);
+
       // Check file size before reading (unless using line range)
       if (!args.startLine && !args.endLine) {
-        const sizeError = await this.validateFileSizeForWholeRead(resolvedPath);
+        const sizeError = await this.validateFileSizeForWholeRead(context.runtime, runtimePath);
         if (sizeError) {
           return this.createError(sizeError);
         }
       }
 
       // Read file content
-      const content = await readFile(resolvedPath, 'utf-8');
+      const content = await context.runtime.fs.readTextFile(runtimePath);
+      context.markFileRead?.(runtimePath);
       const lines = content.split('\n');
 
       // Validate line numbers against actual file content
@@ -145,7 +152,9 @@ export class FileReadTool extends Tool {
 
       // Handle file not found with helpful suggestions
       if (isNodeError(error) && error.code === 'ENOENT') {
-        const suggestions = await findSimilarPaths(resolvedPath);
+        const suggestionPath = runtimePath?.hostPath ?? runtimePath?.runtimePath;
+        const suggestions =
+          runtimePath?.hostPath && suggestionPath ? await findSimilarPaths(suggestionPath) : [];
         const suggestionText =
           suggestions.length > 0 ? `\n\nSimilar files: ${suggestions.join(', ')}` : '';
 
@@ -173,9 +182,12 @@ export class FileReadTool extends Tool {
     }
   }
 
-  private async validateFileSizeForWholeRead(filePath: string): Promise<string | null> {
+  private async validateFileSizeForWholeRead(
+    runtime: ToolRuntime,
+    runtimePath: RuntimePath
+  ): Promise<string | null> {
     try {
-      const fileStats = await stat(filePath);
+      const fileStats = await runtime.fs.stat(runtimePath);
       if (fileStats.size > MAX_FILE_SIZE) {
         const fileSizeFormatted = formatFileSize(fileStats.size);
         return `File is too large (${fileSizeFormatted}) for whole-file read. Use startLine and endLine parameters for ranged reads (e.g., startLine: 1, endLine: 100). File size limit is ${formatFileSize(

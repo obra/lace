@@ -2,11 +2,11 @@
 // ABOUTME: Recursively searches for files using glob patterns with Zod validation
 
 import { z } from 'zod';
-import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { Tool } from '../tool';
 import { NonEmptyString, FilePath } from '../schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
+import type { RuntimePath, ToolRuntime } from '../runtime/types';
 import { formatFileSize } from '@lace/agent/tools/utils/format-file-size';
 
 const MIN_DEPTH = 1;
@@ -16,6 +16,13 @@ const DEFAULT_DEPTH = 10;
 const MIN_RESULTS = 1;
 const MAX_RESULTS = 1000;
 const DEFAULT_RESULTS = 50;
+
+type FileMatch = {
+  path: RuntimePath;
+  size: number;
+  mtime: Date;
+  isDirectory: boolean;
+};
 
 const fileFindSchema = z.object({
   pattern: NonEmptyString,
@@ -52,16 +59,18 @@ export class FileFindTool extends Tool {
     if (context.signal.aborted) {
       return this.createCancellationResult();
     }
+    if (!context.runtime) {
+      return this.createError('Tool context missing runtime. This is a system error.');
+    }
+
     try {
       const { pattern, maxDepth, includeHidden, maxResults } = args;
-
-      // Resolve path using working directory from context
-      const resolvedPath = this.resolveWorkspacePath(args.path, context);
+      const rootPath = await context.runtime.paths.resolve(args.path);
 
       // Validate directory exists
       try {
-        const pathStat = await stat(resolvedPath);
-        if (!pathStat.isDirectory()) {
+        const pathStat = await context.runtime.fs.stat(rootPath);
+        if (pathStat.type !== 'directory') {
           return this.createError(
             `Path ${args.path} is not a directory. Specify a directory path to search in.`
           );
@@ -76,7 +85,8 @@ export class FileFindTool extends Tool {
       }
 
       const matches = await this.findFiles(
-        resolvedPath,
+        context.runtime,
+        rootPath,
         {
           pattern,
           maxDepth,
@@ -117,7 +127,8 @@ export class FileFindTool extends Tool {
   }
 
   private async findFiles(
-    dirPath: string,
+    runtime: ToolRuntime,
+    dirPath: RuntimePath,
     options: {
       pattern: string;
       maxDepth: number;
@@ -126,40 +137,40 @@ export class FileFindTool extends Tool {
       currentDepth: number;
     },
     signal?: AbortSignal
-  ): Promise<Array<{ path: string; size: number; mtime: Date; isDirectory: boolean }>> {
+  ): Promise<FileMatch[]> {
     // Check for abort signal
     if (signal?.aborted) {
       throw new Error('Aborted');
     }
 
-    const matches: Array<{ path: string; size: number; mtime: Date; isDirectory: boolean }> = [];
+    const matches: FileMatch[] = [];
 
     if (options.currentDepth > options.maxDepth) {
       return matches;
     }
 
     try {
-      const items = await readdir(dirPath);
+      const items = await runtime.fs.readdir(dirPath);
 
       for (const item of items) {
         // Check abort signal periodically during loop
         if (signal?.aborted) {
           throw new Error('Aborted');
         }
-        if (!options.includeHidden && item.startsWith('.')) {
+        if (!options.includeHidden && item.name.startsWith('.')) {
           continue;
         }
 
-        const fullPath = join(dirPath, item);
+        const childPath = this.childPath(dirPath, item.name);
 
         try {
-          const stats = await stat(fullPath);
-          const isDirectory = stats.isDirectory();
+          const stats = await runtime.fs.stat(childPath);
+          const isDirectory = stats.type === 'directory';
 
           // Case-insensitive pattern matching
-          if (this.matchesPattern(item, options.pattern)) {
+          if (this.matchesPattern(item.name, options.pattern)) {
             matches.push({
-              path: fullPath,
+              path: childPath,
               size: stats.size,
               mtime: stats.mtime,
               isDirectory,
@@ -174,7 +185,8 @@ export class FileFindTool extends Tool {
           // Recurse into directories
           if (isDirectory && options.currentDepth < options.maxDepth) {
             const subMatches = await this.findFiles(
-              fullPath,
+              runtime,
+              childPath,
               {
                 ...options,
                 currentDepth: options.currentDepth + 1,
@@ -200,16 +212,20 @@ export class FileFindTool extends Tool {
     return matches;
   }
 
-  private formatFileEntry(entry: {
-    path: string;
-    size: number;
-    mtime: Date;
-    isDirectory: boolean;
-  }): string {
+  private childPath(parent: RuntimePath, name: string): RuntimePath {
+    return {
+      original: join(parent.original, name),
+      runtimePath: join(parent.runtimePath, name),
+      hostPath: parent.hostPath ? join(parent.hostPath, name) : undefined,
+      displayPath: join(parent.displayPath, name),
+    };
+  }
+
+  private formatFileEntry(entry: FileMatch): string {
     const sizeStr = formatFileSize(entry.size);
     const timeStr = this.formatRelativeTime(entry.mtime);
     const typeIndicator = entry.isDirectory ? '/' : '';
-    return `${entry.path}${typeIndicator} (${sizeStr}) - ${timeStr}`;
+    return `${entry.path.displayPath}${typeIndicator} (${sizeStr}) - ${timeStr}`;
   }
 
   private formatRelativeTime(date: Date): string {

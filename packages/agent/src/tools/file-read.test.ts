@@ -1,16 +1,27 @@
 // ABOUTME: Tests for file reading tool with range support
 // ABOUTME: Validates file reading, line ranges, and error handling
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { writeFile, mkdir, rm } from 'fs/promises';
 import { join } from 'path';
 import { FileReadTool } from '@lace/agent/tools/implementations/file_read';
+import { createFakeRuntime } from './runtime/__tests__/fake-runtime';
+import { HostToolRuntime } from './runtime/host';
+import type { ToolContext } from './types';
 
 describe('FileReadTool', () => {
   const tool = new FileReadTool();
   const testDir = join(process.cwd(), 'test-temp-file-read');
   const testFile = join(testDir, 'test.txt');
   const testContent = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5';
+  let runtimeId = 0;
+
+  function createHostContext(cwd = process.cwd()): ToolContext {
+    return {
+      signal: new AbortController().signal,
+      runtime: new HostToolRuntime({ id: `rt_file_read_test_${runtimeId++}`, cwd }),
+    };
+  }
 
   beforeAll(async () => {
     await mkdir(testDir, { recursive: true });
@@ -42,11 +53,33 @@ describe('FileReadTool', () => {
   });
 
   describe('file reading', () => {
-    it('should read entire file when no range specified with line numbers', async () => {
+    it('uses context.runtime for file reads', async () => {
+      const resolved = {
+        original: 'a.txt',
+        runtimePath: '/runtime/a.txt',
+        displayPath: 'a.txt',
+      };
+      const runtime = createFakeRuntime({
+        resolve: resolved,
+        canonicalKey: '/runtime/a.txt',
+        readText: 'hello',
+        statType: 'file',
+      });
+      const markFileRead = vi.fn();
+
       const result = await tool.execute(
-        { path: testFile },
-        { signal: new AbortController().signal }
+        { path: 'a.txt' },
+        { signal: new AbortController().signal, runtime, markFileRead }
       );
+
+      expect(result.status).toBe('completed');
+      expect(runtime.paths.resolve).toHaveBeenCalledWith('a.txt');
+      expect(runtime.fs.readTextFile).toHaveBeenCalledWith(resolved);
+      expect(markFileRead).toHaveBeenCalledWith(resolved);
+    });
+
+    it('should read entire file when no range specified with line numbers', async () => {
+      const result = await tool.execute({ path: testFile }, createHostContext());
 
       expect(result.status).toBe('completed');
       expect(result.content).toHaveLength(1);
@@ -61,7 +94,7 @@ describe('FileReadTool', () => {
           startLine: 2,
           endLine: 4,
         },
-        { signal: new AbortController().signal }
+        createHostContext()
       );
 
       expect(result.status).toBe('completed');
@@ -74,7 +107,7 @@ describe('FileReadTool', () => {
           path: testFile,
           startLine: 3,
         },
-        { signal: new AbortController().signal }
+        createHostContext()
       );
 
       expect(result.status).toBe('completed');
@@ -87,7 +120,7 @@ describe('FileReadTool', () => {
           path: testFile,
           endLine: 2,
         },
-        { signal: new AbortController().signal }
+        createHostContext()
       );
 
       expect(result.status).toBe('completed');
@@ -113,10 +146,7 @@ describe('FileReadTool', () => {
     });
 
     it('should handle non-existent file', async () => {
-      const result = await tool.execute(
-        { path: '/non/existent/file.txt' },
-        { signal: new AbortController().signal }
-      );
+      const result = await tool.execute({ path: '/non/existent/file.txt' }, createHostContext());
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('File not found');
@@ -128,7 +158,7 @@ describe('FileReadTool', () => {
           path: testFile,
           startLine: 10,
         },
-        { signal: new AbortController().signal }
+        createHostContext()
       );
 
       expect(result.status).toBe('failed');
@@ -143,7 +173,7 @@ describe('FileReadTool', () => {
           startLine: 3,
           endLine: 10,
         },
-        { signal: new AbortController().signal }
+        createHostContext()
       );
 
       expect(result.status).toBe('completed');
@@ -160,7 +190,7 @@ describe('FileReadTool', () => {
         {
           path: largeFile,
         },
-        { signal: new AbortController().signal }
+        createHostContext()
       );
 
       expect(result.status).toBe('failed');
@@ -184,7 +214,7 @@ describe('FileReadTool', () => {
           startLine: 500,
           endLine: 505,
         },
-        { signal: new AbortController().signal }
+        createHostContext()
       );
 
       expect(result.status).toBe('completed');
@@ -204,7 +234,7 @@ describe('FileReadTool', () => {
           startLine: 1,
           endLine: 2500, // Request 2500 lines, should get 2000
         },
-        { signal: new AbortController().signal }
+        createHostContext()
       );
 
       expect(result.status).toBe('completed');
@@ -225,10 +255,7 @@ describe('FileReadTool', () => {
       const emptyFile = join(testDir, 'empty.txt');
       await writeFile(emptyFile, '');
 
-      const result = await tool.execute(
-        { path: emptyFile },
-        { signal: new AbortController().signal }
-      );
+      const result = await tool.execute({ path: emptyFile }, createHostContext());
 
       expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe('1\t');
@@ -238,53 +265,41 @@ describe('FileReadTool', () => {
       const singleLineFile = join(testDir, 'single.txt');
       await writeFile(singleLineFile, 'Only line');
 
-      const result = await tool.execute(
-        { path: singleLineFile },
-        { signal: new AbortController().signal }
-      );
+      const result = await tool.execute({ path: singleLineFile }, createHostContext());
 
       expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe('1\tOnly line');
     });
   });
 
-  describe('working directory support', () => {
-    it('should resolve relative paths using working directory from context', async () => {
+  describe('Host runtime cwd support', () => {
+    it('should resolve relative paths using host runtime cwd', async () => {
       // Create a relative test file
       const relativeTestFile = 'relative-test.txt';
       const absoluteTestFile = join(testDir, relativeTestFile);
       await writeFile(absoluteTestFile, 'Content from relative path');
 
-      const result = await tool.execute(
-        { path: relativeTestFile },
-        { signal: new AbortController().signal, workingDirectory: testDir }
-      );
+      const result = await tool.execute({ path: relativeTestFile }, createHostContext(testDir));
 
       expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe('1\tContent from relative path');
     });
 
-    it('should use absolute paths directly even when working directory is provided', async () => {
-      const result = await tool.execute(
-        { path: testFile }, // absolute path
-        { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
-      );
+    it('should use absolute paths directly even when host runtime cwd differs', async () => {
+      const result = await tool.execute({ path: testFile }, createHostContext('/some/other/dir'));
 
       expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe('1\tLine 1\n2\tLine 2\n3\tLine 3\n4\tLine 4\n5\tLine 5');
     });
 
-    it('should fall back to process.cwd() when no working directory in context', async () => {
+    it('should resolve relative paths using process cwd host runtime', async () => {
       // Create a file relative to current working directory
       const relativeFile = 'temp-cwd-test.txt';
       const absoluteFile = join(process.cwd(), relativeFile);
       await writeFile(absoluteFile, 'CWD test content');
 
       try {
-        const result = await tool.execute(
-          { path: relativeFile },
-          { signal: new AbortController().signal }
-        );
+        const result = await tool.execute({ path: relativeFile }, createHostContext());
 
         expect(result.status).toBe('completed');
         expect(result.content[0].text).toBe('1\tCWD test content');
@@ -293,10 +308,10 @@ describe('FileReadTool', () => {
       }
     });
 
-    it('should handle non-existent relative paths with working directory context', async () => {
+    it('should handle non-existent relative paths with host runtime cwd', async () => {
       const result = await tool.execute(
         { path: 'non-existent-relative.txt' },
-        { signal: new AbortController().signal, workingDirectory: testDir }
+        createHostContext(testDir)
       );
 
       expect(result.status).toBe('failed');

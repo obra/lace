@@ -1,16 +1,21 @@
 // ABOUTME: Tests for schema-based file finding tool with structured output
 // ABOUTME: Validates file pattern matching, glob support, and directory traversal
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { FileFindTool } from '@lace/agent/tools/implementations/file_find';
 import { createTestTempDir } from '@lace/agent/test-utils/temp-directory';
+import { createFakeRuntime } from './runtime/__tests__/fake-runtime';
+import { HostToolRuntime } from './runtime/host';
+import type { ToolContext } from './types';
+import type { RuntimePath } from './runtime/types';
 
 describe('FileFindTool with schema validation', () => {
   let tool: FileFindTool;
   const tempDir = createTestTempDir('file_find-test-');
   let testDir: string;
+  let runtimeId = 0;
 
   beforeEach(async () => {
     tool = new FileFindTool();
@@ -38,9 +43,14 @@ describe('FileFindTool with schema validation', () => {
     await tempDir.cleanup();
   });
 
-  // Helper function for context generation
-  function createTestContext(signal: AbortSignal): { signal: AbortSignal } {
-    return { signal };
+  function createTestContext(
+    cwd = process.cwd(),
+    signal = new AbortController().signal
+  ): ToolContext {
+    return {
+      signal,
+      runtime: new HostToolRuntime({ id: `rt_file_find_test_${runtimeId++}`, cwd }),
+    };
   }
 
   describe('Tool metadata', () => {
@@ -70,7 +80,7 @@ describe('FileFindTool with schema validation', () => {
 
   describe('Input validation', () => {
     it('should reject missing pattern', async () => {
-      const result = await tool.execute({}, { signal: new AbortController().signal });
+      const result = await tool.execute({}, createTestContext());
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
@@ -79,7 +89,7 @@ describe('FileFindTool with schema validation', () => {
     });
 
     it('should reject empty pattern', async () => {
-      const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
+      const result = await tool.execute({ pattern: '' }, createTestContext());
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
@@ -92,7 +102,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: '*.ts',
           maxDepth: -1,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('failed');
@@ -105,7 +115,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: '*.ts',
           maxDepth: 1.5,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('failed');
@@ -119,7 +129,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: '*.ts',
           maxResults: 10000,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('failed');
@@ -132,7 +142,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: '*.nonexistent',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -141,13 +151,71 @@ describe('FileFindTool with schema validation', () => {
   });
 
   describe('File search operations', () => {
+    it('uses runtime display paths while recursing', async () => {
+      const rootPath: RuntimePath = {
+        original: '.',
+        runtimePath: '/runtime',
+        displayPath: 'project',
+      };
+      const srcPath: RuntimePath = {
+        original: 'src',
+        runtimePath: '/runtime/src',
+        displayPath: 'project/src',
+      };
+      const appPath: RuntimePath = {
+        original: 'src/app.ts',
+        runtimePath: '/runtime/src/app.ts',
+        displayPath: 'project/src/app.ts',
+      };
+      const runtime = createFakeRuntime({
+        resolve: rootPath,
+        statType: 'directory',
+      });
+      const mtime = new Date('2026-05-20T00:00:00.000Z');
+      vi.mocked(runtime.fs.stat).mockImplementation(async (path) => {
+        if (path.runtimePath === rootPath.runtimePath || path.runtimePath === srcPath.runtimePath) {
+          return { type: 'directory', size: 0, mtime };
+        }
+        if (path.runtimePath === appPath.runtimePath) {
+          return { type: 'file', size: 12, mtime };
+        }
+        throw Object.assign(new Error(`Not found: ${path.runtimePath}`), { code: 'ENOENT' });
+      });
+      vi.mocked(runtime.fs.readdir).mockImplementation(async (path) => {
+        if (path.runtimePath === rootPath.runtimePath) {
+          return [{ name: 'src', type: 'directory' }];
+        }
+        if (path.runtimePath === srcPath.runtimePath) {
+          return [{ name: 'app.ts', type: 'file' }];
+        }
+        return [];
+      });
+
+      const result = await tool.execute(
+        {
+          pattern: '*.ts',
+          path: '.',
+          maxDepth: 2,
+        },
+        { signal: new AbortController().signal, runtime }
+      );
+
+      expect(result.status).toBe('completed');
+      expect(result.content[0].text).toContain('project/src/app.ts');
+      expect(result.content[0].text).not.toContain('/runtime/src/app.ts');
+      expect(runtime.paths.resolve).toHaveBeenCalledTimes(1);
+      expect(runtime.paths.resolve).toHaveBeenCalledWith('.');
+      expect(runtime.fs.stat).toHaveBeenCalledWith(expect.objectContaining(srcPath));
+      expect(runtime.fs.stat).toHaveBeenCalledWith(expect.objectContaining(appPath));
+    });
+
     it('should find files by exact name', async () => {
       const result = await tool.execute(
         {
           pattern: 'README.md',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -160,7 +228,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: '*.ts',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -175,7 +243,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: 'app.*',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -191,7 +259,7 @@ describe('FileFindTool with schema validation', () => {
           path: testDir,
           maxDepth: 1,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -210,7 +278,7 @@ describe('FileFindTool with schema validation', () => {
           path: testDir,
           maxDepth: 1,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -224,7 +292,7 @@ describe('FileFindTool with schema validation', () => {
           path: testDir,
           maxDepth: 5,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -237,7 +305,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: 'readme.md',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -251,7 +319,7 @@ describe('FileFindTool with schema validation', () => {
           path: testDir,
           maxDepth: 1,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -267,7 +335,7 @@ describe('FileFindTool with schema validation', () => {
           includeHidden: true,
           maxDepth: 1,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -281,7 +349,7 @@ describe('FileFindTool with schema validation', () => {
           path: testDir,
           maxResults: 2,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -302,7 +370,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: 'README.md',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -315,7 +383,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: 'src',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -332,7 +400,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: '*.ts',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -340,7 +408,7 @@ describe('FileFindTool with schema validation', () => {
     });
 
     it('should use createError for validation failures', async () => {
-      const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
+      const result = await tool.execute({ pattern: '' }, createTestContext());
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
@@ -352,7 +420,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: '*.nonexistent',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -366,7 +434,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: '*.ts',
           path: '/nonexistent/directory',
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('failed');
@@ -381,7 +449,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: 'app.?s',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -397,7 +465,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: 'package.json',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -413,7 +481,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: '*',
           path: emptyDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -421,8 +489,8 @@ describe('FileFindTool with schema validation', () => {
     });
   });
 
-  describe('Working directory support', () => {
-    it('should resolve relative paths using working directory from context', async () => {
+  describe('Host runtime cwd support', () => {
+    it('should resolve relative paths using host runtime cwd', async () => {
       // Create a relative test file structure
       const subDir = 'relative-test-dir';
       const subDirPath = join(testDir, subDir);
@@ -431,45 +499,42 @@ describe('FileFindTool with schema validation', () => {
 
       const result = await tool.execute(
         { pattern: 'relative-file.txt', path: subDir },
-        { signal: new AbortController().signal, workingDirectory: testDir }
+        createTestContext(testDir)
       );
 
       expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('relative-file.txt');
     });
 
-    it('should use absolute paths directly even when working directory is provided', async () => {
+    it('should use absolute paths directly even when host runtime cwd differs', async () => {
       const result = await tool.execute(
         { pattern: 'README.md', path: testDir }, // absolute path
-        { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
+        createTestContext('/some/other/dir')
       );
 
       expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
     });
 
-    it('should fall back to process.cwd() when no working directory in context', async () => {
-      // This test would create a file in the current working directory
-      // but it's complex to do safely in tests, so we'll just verify
-      // the tool works with relative paths when no context is provided
-      // Use maxDepth: 1 to limit the search to the current directory only (minimum allowed depth)
+    it('should resolve relative paths using process cwd host runtime', async () => {
+      // Use maxDepth: 1 to keep the process.cwd() search bounded.
       const result = await tool.execute(
         {
           pattern: 'non-existent-file.txt',
           path: '.',
           maxDepth: 1,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('No files found');
     }, 10000);
 
-    it('should handle non-existent relative paths with working directory context', async () => {
+    it('should handle non-existent relative paths with host runtime cwd', async () => {
       const result = await tool.execute(
         { pattern: '*', path: 'non-existent-dir' },
-        { signal: new AbortController().signal, workingDirectory: testDir }
+        createTestContext(testDir)
       );
 
       expect(result.status).toBe('failed');
@@ -500,7 +565,7 @@ describe('FileFindTool with schema validation', () => {
           pattern: '*.ts',
           path: testDir,
         },
-        createTestContext(abortController.signal)
+        createTestContext(process.cwd(), abortController.signal)
       );
 
       expect(result.status).toBe('aborted');
