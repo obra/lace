@@ -13,6 +13,7 @@ import { registerSessionOperationHandlers } from './handlers/session-operations'
 import { registerMcpHandlers } from './handlers/mcp-servers';
 import { registerPromptHandler } from './handlers/prompt';
 import type { AgentServerState, SessionUpdate, CreateToolExecutorFn } from '../server-types';
+import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 
 /**
  * Dependencies passed to handler registration functions
@@ -44,6 +45,7 @@ interface HandlerDependencies {
     parentJobId?: string;
     turnContext?: { turnId: string; turnSeq: number };
     progressIntervalMs?: number;
+    runtimeBinding?: RuntimeExecutionBinding;
   }) => Promise<{ jobId: string }>;
   runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null };
   /**

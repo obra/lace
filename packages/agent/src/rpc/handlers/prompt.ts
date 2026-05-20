@@ -27,6 +27,7 @@ import type { RunnerConfig, RunnerDependencies } from '@lace/agent/core/conversa
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { SkillRegistry, getSkillDirectories } from '@lace/agent/skills';
 import { getOrCreateSessionToolExecutor } from '@lace/agent/server';
+import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 
 /**
  * Register the session/prompt RPC handler.
@@ -56,6 +57,7 @@ export function registerPromptHandler(
     command: string;
     description?: string;
     turnContext: { turnId: string; turnSeq: number };
+    runtimeBinding?: RuntimeExecutionBinding;
   }) => Promise<{ jobId: string }>,
   runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null }
 ) {

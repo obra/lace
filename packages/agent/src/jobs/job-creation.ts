@@ -136,6 +136,7 @@ async function finalizeJobCreation(
     description?: string;
     command?: string;
     turnContext?: { turnId: string; turnSeq: number };
+    runtimeBinding?: RuntimeExecutionBinding;
   },
   runJobProcess: (job: JobState) => void
 ): Promise<{ jobId: string }> {
