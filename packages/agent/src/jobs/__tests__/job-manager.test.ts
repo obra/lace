@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { JobManager, JobCreationError } from '../job-manager';
 import type { JobState } from '../../server-types';
 import type { JobManagerDeps } from '../job-manager';
+import type { RuntimeExecutionBinding } from '../../tools/runtime/types';
 
 describe('JobManager', () => {
   describe('construction', () => {
@@ -735,6 +736,31 @@ describe('JobManager', () => {
       expect(eventArg.data.command).toBe('echo hello');
       expect(eventArg.data.description).toBe('Test');
       expect(eventArg.data.jobId).toMatch(/^job_/);
+    });
+
+    it('persists runtimeBinding in job_started event and job state', async () => {
+      const persistEvent = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ persistEvent });
+      const manager = new JobManager(deps);
+      const runtimeBinding: RuntimeExecutionBinding = {
+        schemaVersion: 1,
+        identity: { runtimeId: 'rt_job_manager' },
+        agentPlacement: 'host',
+        toolRuntime: { type: 'local', cwd: '/repo' },
+      };
+
+      const result = await manager.createJob('delegate', {
+        prompt: 'Do something',
+        runtimeBinding,
+      });
+
+      expect(result.job.runtimeBinding).toEqual(runtimeBinding);
+      expect(manager.getJob(result.jobId)?.runtimeBinding).toEqual(runtimeBinding);
+
+      const eventArg = persistEvent.mock.calls[0][0] as {
+        data: Record<string, unknown>;
+      };
+      expect(eventArg.data.runtimeBinding).toEqual(runtimeBinding);
     });
 
     it('emits job_started update', async () => {

@@ -9,6 +9,7 @@ import { MAX_CONCURRENT_JOBS } from '../server-types';
 import type { PersonaContainerRuntime, PersonaBoxRuntime } from './persona-container-spec';
 import { toNonEmptyString } from '../rpc/utils';
 import { getJobOutputPath } from './job-file-utils';
+import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 
 export type JobManagerDeps = {
   getActiveSession: () => { sessionId: string; dir: string } | null;
@@ -32,6 +33,7 @@ export type CreateJobOptions = {
   connectionId?: string;
   modelId?: string;
   progressIntervalMs?: number;
+  runtimeBinding?: RuntimeExecutionBinding;
   // Persona-bundle support for delegate jobs
   persona?: string;
   // Parsed persona container runtime, forwarded to subagent-job when present.
@@ -726,6 +728,7 @@ export class JobManager {
       progressIntervalMs: options.progressIntervalMs,
       connectionId: options.connectionId,
       modelId: options.modelId,
+      ...(options.runtimeBinding ? { runtimeBinding: options.runtimeBinding } : {}),
       ...(type === 'delegate'
         ? {
             subagentContent: [{ type: 'text', text: options.prompt }],
@@ -752,6 +755,7 @@ export class JobManager {
         description,
         command,
         turnContext: options.turnContext,
+        ...(options.runtimeBinding ? { runtimeBinding: options.runtimeBinding } : {}),
       },
     });
 
