@@ -16,7 +16,7 @@ describe('sanitizeToolName', () => {
 
   it("replaces '/' with '_'", () => {
     expect(sanitizeToolName('private-journal/process_thoughts')).toBe(
-      'private-journal_process_thoughts',
+      'private-journal_process_thoughts'
     );
   });
 
@@ -40,7 +40,7 @@ describe('buildSanitizedToolNames', () => {
     expect(names).toEqual(['send_slack_message', 'private-journal_process_thoughts']);
     expect(mapping.get('send_slack_message')).toBe('send_slack_message');
     expect(mapping.get('private-journal_process_thoughts')).toBe(
-      'private-journal/process_thoughts',
+      'private-journal/process_thoughts'
     );
   });
 

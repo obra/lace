@@ -82,8 +82,7 @@ describe('AnthropicProvider caching format', () => {
 
     await provider.createResponse(messages, [mockTool], 'claude-sonnet-4-20250514');
 
-    const callArgs = mockCreateResponse.mock
-      .calls[0][0] as Anthropic.Messages.MessageCreateParams;
+    const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
 
     // System prompt should be an array with cache_control
     expect(Array.isArray(callArgs.system)).toBe(true);
@@ -123,23 +122,18 @@ describe('AnthropicProvider caching format', () => {
 
     const messages = [{ role: 'user' as const, content: 'Hello' }];
 
-    await provider.createResponse(
-      messages,
-      [mockTool, secondTool],
-      'claude-sonnet-4-20250514'
-    );
+    await provider.createResponse(messages, [mockTool, secondTool], 'claude-sonnet-4-20250514');
 
-    const callArgs = mockCreateResponse.mock
-      .calls[0][0] as Anthropic.Messages.MessageCreateParams;
+    const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
 
     // First tool should NOT have cache_control
     expect(callArgs.tools![0]).not.toHaveProperty('cache_control');
 
     // Last tool SHOULD have cache_control
     expect(callArgs.tools![1]).toHaveProperty('cache_control');
-    expect(
-      (callArgs.tools![1] as { cache_control?: { type: string } }).cache_control
-    ).toEqual({ type: 'ephemeral' });
+    expect((callArgs.tools![1] as { cache_control?: { type: string } }).cache_control).toEqual({
+      type: 'ephemeral',
+    });
   });
 
   it('should add cache_control to single tool when only one tool provided', async () => {
@@ -152,14 +146,13 @@ describe('AnthropicProvider caching format', () => {
 
     await provider.createResponse(messages, [mockTool], 'claude-sonnet-4-20250514');
 
-    const callArgs = mockCreateResponse.mock
-      .calls[0][0] as Anthropic.Messages.MessageCreateParams;
+    const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
 
     // Single tool should have cache_control
     expect(callArgs.tools![0]).toHaveProperty('cache_control');
-    expect(
-      (callArgs.tools![0] as { cache_control?: { type: string } }).cache_control
-    ).toEqual({ type: 'ephemeral' });
+    expect((callArgs.tools![0] as { cache_control?: { type: string } }).cache_control).toEqual({
+      type: 'ephemeral',
+    });
   });
 
   it('should handle empty tools array without error', async () => {
@@ -172,8 +165,7 @@ describe('AnthropicProvider caching format', () => {
 
     await provider.createResponse(messages, [], 'claude-sonnet-4-20250514');
 
-    const callArgs = mockCreateResponse.mock
-      .calls[0][0] as Anthropic.Messages.MessageCreateParams;
+    const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
 
     // Empty tools should work fine
     expect(callArgs.tools).toEqual([]);

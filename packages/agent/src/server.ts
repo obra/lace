@@ -28,7 +28,6 @@ import {
   type CreateShellJobOptions,
   type CreateSubagentJobOptions,
 } from './jobs/job-creation';
-import { createJobDerivation } from './jobs/job-derivation';
 import { JobManager } from './jobs/job-manager';
 import {
   type SessionUpdate,
@@ -339,15 +338,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   const _startSubagentJob = (options: CreateSubagentJobOptions): Promise<{ jobId: string }> =>
     wrapJobCreation(() => createSubagentJob(options, jobCreationDeps));
-
-  // Job derivation - uses extracted library function with caching
-  const deriveJobsForActiveSession = createJobDerivation({
-    getActiveSession: () =>
-      state.activeSession
-        ? { sessionId: state.activeSession.meta.sessionId, dir: state.activeSession.dir }
-        : null,
-    getRunningJobs: () => state.jobManager.getRunningJobs(),
-  });
 
   // Register all RPC handlers with dependencies
   registerAllHandlers(peer, state, {

@@ -5,7 +5,6 @@ import {
   type WireTool,
   type RequestOptions,
 } from '../providers/base-provider';
-import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { LaceEvent } from '@lace/agent/threads/types';
 import type { CompactionContext, CompactionStrategy } from './types';
 import { registerDefaultStrategies } from './registry';

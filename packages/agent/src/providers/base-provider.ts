@@ -198,7 +198,7 @@ export abstract class AIProvider extends EventEmitter {
       model,
       signal,
       conversationState,
-      options,
+      options
     );
     return this._unsanitizeResponse(response, mapping);
   }
@@ -223,7 +223,7 @@ export abstract class AIProvider extends EventEmitter {
       model,
       signal,
       conversationState,
-      options,
+      options
     );
     return this._unsanitizeResponse(response, mapping);
   }
@@ -272,7 +272,7 @@ export abstract class AIProvider extends EventEmitter {
       model,
       signal,
       conversationState,
-      options,
+      options
     );
   }
 
@@ -299,7 +299,7 @@ export abstract class AIProvider extends EventEmitter {
    */
   private _sanitizeForWire(
     messages: ProviderMessage[],
-    tools: Tool[],
+    tools: Tool[]
   ): {
     wireMessages: ProviderMessage[];
     wireTools: WireTool[];
@@ -331,7 +331,7 @@ export abstract class AIProvider extends EventEmitter {
 
   private _unsanitizeResponse(
     response: ProviderResponse,
-    mapping: Map<string, string>,
+    mapping: Map<string, string>
   ): ProviderResponse {
     if (response.toolCalls.length === 0) return response;
     return {

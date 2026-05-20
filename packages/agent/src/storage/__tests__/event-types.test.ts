@@ -1,7 +1,7 @@
 // ABOUTME: Tests for DurableEventData discriminated union type narrowing
 
 import { describe, it, expect } from 'vitest';
-import type { DurableEventData, TypedDurableEvent } from '../event-types';
+import type { TypedDurableEvent } from '../event-types';
 
 describe('DurableEventData', () => {
   it('narrows prompt event data correctly', () => {

@@ -540,9 +540,7 @@ export class OpenAIProvider extends AIProvider {
             messageCount: messages.length,
           }
         );
-        inputItems = this._convertMessagesToInputItems(
-          messages.filter((m) => m.role !== 'system')
-        );
+        inputItems = this._convertMessagesToInputItems(messages.filter((m) => m.role !== 'system'));
       }
     } else {
       // First turn: Include all non-system messages

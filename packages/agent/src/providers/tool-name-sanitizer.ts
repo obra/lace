@@ -22,7 +22,7 @@ export function sanitizeToolName(name: string): string {
   const sanitized = name.replace(ALLOWED, '_').replace(COLLAPSE_UNDERSCORES, '_');
   if (!sanitized || /^_+$/.test(sanitized)) {
     throw new Error(
-      `Tool name "${name}" is invalid — sanitizes to empty or underscore-only string`,
+      `Tool name "${name}" is invalid — sanitizes to empty or underscore-only string`
     );
   }
   return sanitized;
@@ -83,9 +83,6 @@ export function buildSanitizedToolNames(toolNames: string[]): {
  * the sanitized name unchanged if not found in the mapping — that's the legitimate case
  * where the tool name didn't actually need sanitization (no special chars to begin with).
  */
-export function unsanitizeToolName(
-  sanitizedName: string,
-  mapping: Map<string, string>,
-): string {
+export function unsanitizeToolName(sanitizedName: string, mapping: Map<string, string>): string {
   return mapping.get(sanitizedName) ?? sanitizedName;
 }

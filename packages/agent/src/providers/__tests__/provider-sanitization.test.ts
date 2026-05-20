@@ -41,11 +41,11 @@ class CapturingProvider extends AIProvider {
 
   protected _createResponseImpl(
     messages: ProviderMessage[],
-    tools: WireTool[],
+    tools: WireTool[]
   ): Promise<ProviderResponse> {
     this.lastSeenToolNames = tools.map((t) => t.name);
     this.lastSeenMessageToolNames = messages.flatMap((m) =>
-      (m.toolCalls ?? []).map((tc) => tc.name),
+      (m.toolCalls ?? []).map((tc) => tc.name)
     );
     return Promise.resolve({
       content: '',
@@ -60,7 +60,7 @@ describe('AIProvider sanitization contract', () => {
     await provider.createResponse(
       [{ role: 'user', content: 'hi' }],
       [new FakeTool('private-journal/process_thoughts'), new FakeTool('send_slack_message')],
-      'test-model',
+      'test-model'
     );
     expect(provider.lastSeenToolNames).toEqual([
       'private-journal_process_thoughts',
@@ -77,7 +77,7 @@ describe('AIProvider sanitization contract', () => {
     const response = await provider.createResponse(
       [{ role: 'user', content: 'hi' }],
       [new FakeTool('private-journal/process_thoughts')],
-      'test-model',
+      'test-model'
     );
     expect(response.toolCalls).toEqual([
       { id: 'call_1', name: 'private-journal/process_thoughts', arguments: { reflections: 'x' } },
@@ -92,13 +92,11 @@ describe('AIProvider sanitization contract', () => {
         {
           role: 'assistant',
           content: '',
-          toolCalls: [
-            { id: 'call_0', name: 'private-journal/process_thoughts', arguments: {} },
-          ],
+          toolCalls: [{ id: 'call_0', name: 'private-journal/process_thoughts', arguments: {} }],
         },
       ],
       [new FakeTool('private-journal/process_thoughts')],
-      'test-model',
+      'test-model'
     );
     expect(provider.lastSeenMessageToolNames).toEqual(['private-journal_process_thoughts']);
   });
@@ -109,7 +107,7 @@ describe('AIProvider sanitization contract', () => {
     const response = await provider.createResponse(
       [{ role: 'user', content: 'hi' }],
       [new FakeTool('send_slack_message')],
-      'test-model',
+      'test-model'
     );
     expect(provider.lastSeenToolNames).toEqual(['send_slack_message']);
     expect(response.toolCalls[0]?.name).toBe('send_slack_message');
