@@ -78,6 +78,27 @@ describe('FileReadTool', () => {
       expect(markFileRead).toHaveBeenCalledWith(resolved);
     });
 
+    it('returns runtime display path in metadata', async () => {
+      const resolved = {
+        original: 'src/a.txt',
+        runtimePath: '/runtime/src/a.txt',
+        displayPath: '/project/src/a.txt',
+      };
+      const runtime = createFakeRuntime({
+        resolve: resolved,
+        readText: 'hello',
+        statType: 'file',
+      });
+
+      const result = await tool.execute(
+        { path: 'src/a.txt' },
+        { signal: new AbortController().signal, runtime }
+      );
+
+      expect(result.status).toBe('completed');
+      expect(result.metadata?.displayPath).toBe('/project/src/a.txt');
+    });
+
     it('should read entire file when no range specified with line numbers', async () => {
       const result = await tool.execute({ path: testFile }, createHostContext());
 

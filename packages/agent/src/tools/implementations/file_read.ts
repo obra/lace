@@ -127,6 +127,7 @@ export class FileReadTool extends Tool {
       }
 
       const metadata: Record<string, unknown> = {
+        displayPath: runtimePath.displayPath,
         totalLines: lines.length,
         linesReturned,
         range: { start: startLineNum, end: endLineNum },
