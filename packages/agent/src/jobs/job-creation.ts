@@ -7,6 +7,7 @@ import type { JobState, JobType, SessionUpdate } from '../server-types';
 import { MAX_CONCURRENT_JOBS } from '../server-types';
 import { getJobOutputPath } from './job-file-utils';
 import type { LoadedSession } from '../storage/session-store';
+import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 
 /**
  * Options for creating a shell job.
@@ -17,6 +18,7 @@ export type CreateShellJobOptions = {
   parentJobId?: string;
   turnContext?: { turnId: string; turnSeq: number };
   progressIntervalMs?: number;
+  runtimeBinding?: RuntimeExecutionBinding;
 };
 
 /**
@@ -31,6 +33,7 @@ export type CreateSubagentJobOptions = {
   progressIntervalMs?: number;
   connectionId?: string;
   modelId?: string;
+  runtimeBinding?: RuntimeExecutionBinding;
 };
 
 /**
@@ -49,6 +52,7 @@ export type JobCreationDeps = {
     description?: string;
     command?: string;
     turnContext?: { turnId: string; turnSeq: number };
+    runtimeBinding?: RuntimeExecutionBinding;
   }) => Promise<void>;
   /** Emit a session update notification. */
   emitSessionUpdate: (
@@ -188,6 +192,7 @@ export async function createShellJob(
     completion: scaffold.completion,
     resolveCompletion: scaffold.resolveCompletion,
     progressIntervalMs: options.progressIntervalMs,
+    ...(options.runtimeBinding ? { runtimeBinding: options.runtimeBinding } : {}),
   };
 
   return finalizeJobCreation(
@@ -200,6 +205,7 @@ export async function createShellJob(
       description: options.description,
       command: options.command,
       turnContext: options.turnContext,
+      ...(options.runtimeBinding ? { runtimeBinding: options.runtimeBinding } : {}),
     },
     deps.runShellJobProcess
   );
@@ -235,6 +241,7 @@ export async function createSubagentJob(
     connectionId: options.connectionId,
     modelId: options.modelId,
     ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
+    ...(options.runtimeBinding ? { runtimeBinding: options.runtimeBinding } : {}),
   };
 
   return finalizeJobCreation(
@@ -247,6 +254,7 @@ export async function createSubagentJob(
       description,
       command: options.prompt,
       turnContext: options.turnContext,
+      ...(options.runtimeBinding ? { runtimeBinding: options.runtimeBinding } : {}),
     },
     deps.runSubagentJobProcess
   );

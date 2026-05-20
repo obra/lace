@@ -87,6 +87,35 @@ describe('storage/session-store', () => {
     expect(roundTrip.config).toMatchObject({ approvalMode: 'ask' });
   });
 
+  it('persists runtimeBinding under state.config.runtimeBinding', () => {
+    const sessionDir = join(tempDir, 'sess_runtime_binding');
+    writeSessionMeta(sessionDir, {
+      sessionId: 'sess_runtime_binding',
+      workDir: '/repo',
+      created: '2026-05-20T00:00:00.000Z',
+    });
+
+    writeSessionState(sessionDir, {
+      nextEventSeq: 1,
+      nextStreamSeq: 1,
+      config: {
+        runtimeBinding: {
+          schemaVersion: 1,
+          identity: { runtimeId: 'rt_test' },
+          agentPlacement: 'host',
+          toolRuntime: { type: 'local', cwd: '/repo' },
+        },
+      },
+    });
+
+    expect(readSessionState(sessionDir).config?.runtimeBinding).toEqual({
+      schemaVersion: 1,
+      identity: { runtimeId: 'rt_test' },
+      agentPlacement: 'host',
+      toolRuntime: { type: 'local', cwd: '/repo' },
+    });
+  });
+
   it('writes state.json atomically (temp file + rename; no partial writes to target)', () => {
     const sessionDir = getSessionDir(TEST_SESSION_ID);
 

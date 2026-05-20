@@ -20,6 +20,7 @@ import type { ContainerManager } from './containers/container-manager';
 import type { ExecStreamHandle } from './containers/types';
 import type { PersonaContainerRuntime, PersonaBoxRuntime } from './jobs/persona-container-spec';
 import type { AlarmScheduler } from './alarms/alarm-scheduler';
+import type { RuntimeExecutionBinding } from './tools/runtime/types';
 
 /**
  * Per-build allowlist of tool names. `undefined` means "no scope filter" (all tools available).
@@ -102,6 +103,7 @@ export type JobState = {
   // Subagent provider/model configuration
   connectionId?: string;
   modelId?: string;
+  runtimeBinding?: RuntimeExecutionBinding;
   // Persona bundle applied to subagent session (delegate jobs only)
   persona?: string;
   // When the delegate's persona declares `runtime.type: container`, the parsed

@@ -2,6 +2,7 @@
 // All event types are defined here with their specific data shapes
 
 import type { ToolResult } from '@lace/ent-protocol';
+import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 
 // Content block types used in prompts and messages
 export type ContentBlock =
@@ -62,6 +63,7 @@ export type JobStartedEventData = {
   command?: string;
   description?: string;
   prompt?: string;
+  runtimeBinding?: RuntimeExecutionBinding;
 };
 
 export type JobFinishedEventData = {

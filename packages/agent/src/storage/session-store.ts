@@ -6,6 +6,7 @@ import { asSessionId } from '@lace/ent-protocol';
 import { deriveNextEventSeqFromEventLog, summarizeDurableEvents } from './event-log';
 import { atomicWriteJson } from './atomic-write';
 import { SessionStorageError } from '../errors/agent-errors';
+import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 
 export type SessionMeta = {
   sessionId: string;
@@ -42,6 +43,7 @@ export type SessionState = {
     maxBudgetUsd?: number;
     maxThinkingTokens?: number;
     environment?: Record<string, string>;
+    runtimeBinding?: RuntimeExecutionBinding;
     mcpServers?: Array<{
       name: string;
       command: string;
@@ -125,7 +127,10 @@ export function readSessionState(sessionDir: string): SessionState {
               totalOutputTokens: parsed.tokenUsage.totalOutputTokens ?? 0,
             }
           : undefined,
-      config: typeof parsed.config === 'object' && parsed.config ? parsed.config : undefined,
+      config:
+        typeof parsed.config === 'object' && parsed.config
+          ? (parsed.config as SessionState['config'])
+          : undefined,
     };
   } catch {
     return { nextEventSeq: 1, nextStreamSeq: 1 };
