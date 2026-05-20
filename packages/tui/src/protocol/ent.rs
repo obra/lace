@@ -251,24 +251,41 @@ pub fn extract_agent_status_config(result: &Option<Value>) -> (Option<String>, O
     (connection_id, model_id)
 }
 
-pub fn extract_session_configure_config(result: &Option<Value>) -> (Option<String>, Option<String>) {
+pub fn extract_session_configure_connection(result: &Option<Value>) -> Option<String> {
     let Some(Value::Object(obj)) = result else {
-        return (None, None);
+        return None;
     };
     let Some(Value::Object(cfg)) = obj.get("config") else {
-        return (None, None);
+        return None;
     };
 
-    let connection_id = cfg
+    cfg
         .get("connectionId")
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    let model_id = cfg
-        .get("modelId")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+        .map(|s| s.to_string())
+}
 
-    (connection_id, model_id)
+pub fn extract_session_config_option_model(result: &Option<Value>) -> Option<String> {
+    let Some(Value::Object(obj)) = result else {
+        return None;
+    };
+    let Some(Value::Array(options)) = obj.get("configOptions") else {
+        return None;
+    };
+
+    for option in options {
+        let Some(option_obj) = option.as_object() else {
+            continue;
+        };
+        if option_obj.get("id").and_then(|v| v.as_str()) == Some("model") {
+            return option_obj
+                .get("currentValue")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+        }
+    }
+
+    None
 }
 
 /// Extract token usage from a session/prompt response.
@@ -388,17 +405,34 @@ mod tests {
     }
 
     #[test]
-    fn extracts_session_configure_config() {
-        let (conn, model) = extract_session_configure_config(&Some(json!({
+    fn extracts_session_configure_connection() {
+        let conn = extract_session_configure_connection(&Some(json!({
           "ok": true,
-          "config": { "connectionId":"c1", "modelId":"m1" }
+          "config": { "connectionId":"c1" }
         })));
         assert_eq!(conn.as_deref(), Some("c1"));
+
+        let conn = extract_session_configure_connection(&Some(json!({"ok":true})));
+        assert!(conn.is_none());
+    }
+
+    #[test]
+    fn extracts_session_config_option_model() {
+        let model = extract_session_config_option_model(&Some(json!({
+            "configOptions": [
+                {
+                    "id": "model",
+                    "name": "Model",
+                    "category": "model",
+                    "type": "select",
+                    "currentValue": "m1",
+                    "options": [{"value":"m1","name":"m1"}]
+                }
+            ]
+        })));
         assert_eq!(model.as_deref(), Some("m1"));
 
-        let (conn, model) = extract_session_configure_config(&Some(json!({"ok":true})));
-        assert!(conn.is_none());
-        assert!(model.is_none());
+        assert!(extract_session_config_option_model(&Some(json!({"configOptions":[]}))).is_none());
     }
 
     #[test]

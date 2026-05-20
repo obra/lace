@@ -15,6 +15,7 @@ import {
   ProviderInfoSchema,
   CatalogProviderInfoSchema,
   SandboxConfigSchema,
+  SessionConfigOptionSchema,
   ToolInfoSchema,
   ToolResultSchema,
   UsageInfoSchema,
@@ -212,6 +213,7 @@ const SessionNewResultSchema = z
   .object({
     sessionId: SessionIdSchema,
     created: IsoTimestampSchema,
+    configOptions: z.array(SessionConfigOptionSchema).optional(),
   })
   .strict();
 
@@ -245,6 +247,7 @@ const SessionLoadResultSchema = z
     sessionId: SessionIdSchema,
     messageCount: z.number(),
     updatedAt: IsoTimestampSchema,
+    configOptions: z.array(SessionConfigOptionSchema).optional(),
   })
   .strict();
 
@@ -421,6 +424,37 @@ export const SessionSetModeResponseSchema = z
     jsonrpc: JsonRpcVersionSchema,
     id: JsonRpcIdSchema,
     result: SessionSetModeResultSchema,
+  })
+  .strict();
+
+const SessionSetConfigOptionParamsSchema = z
+  .object({
+    sessionId: SessionIdSchema,
+    configId: NonEmptyStringSchema,
+    value: NonEmptyStringSchema,
+  })
+  .strict();
+
+const SessionSetConfigOptionResultSchema = z
+  .object({
+    configOptions: z.array(SessionConfigOptionSchema),
+  })
+  .strict();
+
+export const SessionSetConfigOptionRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('session/set_config_option'),
+    params: SessionSetConfigOptionParamsSchema,
+  })
+  .strict();
+
+export const SessionSetConfigOptionResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: SessionSetConfigOptionResultSchema,
   })
   .strict();
 
@@ -609,7 +643,6 @@ export const EntSessionCompactResponseSchema = z
 const EntSessionConfigureParamsSchema = z
   .object({
     connectionId: z.string().optional(),
-    modelId: z.string().optional(),
     maxThinkingTokens: z.number().optional(),
     maxBudgetUsd: z.number().optional(),
     /**
@@ -617,16 +650,6 @@ const EntSessionConfigureParamsSchema = z
      * Keys/values must be strings to keep the transport simple and avoid leaking objects.
      */
     environment: z.record(z.string(), z.string()).optional(),
-    approvalMode: z
-      .enum([
-        'ask',
-        'approveReads',
-        'approveEdits',
-        'approve',
-        'deny',
-        'dangerouslySkipPermissions',
-      ])
-      .optional(),
   })
   .strict();
 
@@ -2064,6 +2087,7 @@ export const EntProtocolRequestSchema = z.union([
   SessionForkRequestSchema,
   SessionListRequestSchema,
   SessionSetModeRequestSchema,
+  SessionSetConfigOptionRequestSchema,
   SessionPromptRequestSchema,
   EntAgentPingRequestSchema,
   EntAgentStatusRequestSchema,

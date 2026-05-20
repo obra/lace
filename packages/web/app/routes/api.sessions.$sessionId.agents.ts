@@ -15,6 +15,7 @@ import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import { getProviderManagementAgent } from '@lace/web/lib/server/supervisor-service';
 import { Project } from '@lace/web/lib/server/projects/project';
 import { mcpServersForProject } from '@lace/web/lib/server/projects/project-mcp-servers';
+import { configureAgentSession } from '@lace/web/lib/server/agent-session-config';
 import type { Route } from './+types/api.sessions.$sessionId.agents';
 import type { PersonaInfo } from '@lace/ent-protocol';
 
@@ -132,15 +133,12 @@ export async function action({ request, params }: Route.ActionArgs) {
       modelId: body.modelId,
     });
 
-    await supervisor.agentRequest({
+    await configureAgentSession(supervisor.agentRequest.bind(supervisor), {
       workspaceSessionId,
       sessionId: created.sessionId,
-      method: 'ent/session/configure',
-      requestParams: {
-        connectionId: body.providerInstanceId,
-        modelId: body.modelId,
-        approvalMode: 'ask',
-      },
+      connectionId: body.providerInstanceId,
+      modelId: body.modelId,
+      approvalMode: 'ask',
     });
 
     const initialMessage =

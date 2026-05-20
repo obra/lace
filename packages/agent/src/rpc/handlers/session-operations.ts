@@ -39,6 +39,7 @@ import {
 import { compactDroppedMessagesWithCore } from '../../compaction/compact-dropped-messages';
 import { createProviderForTurn } from '../../providers/turn-factory';
 import { getEffectiveConfig } from '@lace/agent/core/session';
+import { buildSessionConfigOptions, isApprovalMode } from '../session-config';
 
 /**
  * Compute context breakdown for the active session
@@ -184,7 +185,7 @@ async function computeContextBreakdownForActiveSession(
 
 /**
  * Register session operation handlers with the peer.
- * - ent/session/configure: Configure session settings (connection, model, runtime limits, etc.)
+ * - ent/session/configure: Configure Ent-owned session settings (connection, runtime limits, etc.)
  * - ent/session/compact: Compact conversation history using various strategies
  * - ent/session/checkpoint: Create a checkpoint of the current session state
  * - ent/session/rewind: Rewind to a previous checkpoint
@@ -220,20 +221,18 @@ export function registerSessionOperationHandlers(
         'mcpServers must be provided via session/new, session/load, or session/resume'
       );
     }
+    if (rawParams.modelId !== undefined) {
+      throwInvalidParams('modelId must be provided via session/set_config_option');
+    }
+    if (rawParams.approvalMode !== undefined) {
+      throwInvalidParams('approvalMode must be provided via session/set_config_option');
+    }
 
     const parsed = rawParams as Partial<{
       connectionId: string;
-      modelId: string;
       maxThinkingTokens: number;
       maxBudgetUsd: number;
       environment: Record<string, string>;
-      approvalMode:
-        | 'ask'
-        | 'approveReads'
-        | 'approveEdits'
-        | 'approve'
-        | 'deny'
-        | 'dangerouslySkipPermissions';
     }>;
 
     const currentState = readSessionState(state.activeSession.dir);
@@ -250,11 +249,6 @@ export function registerSessionOperationHandlers(
       applied.push('connectionId');
     }
 
-    if (typeof parsed.modelId === 'string' && parsed.modelId !== effectiveBefore.modelId) {
-      nextConfig.modelId = parsed.modelId;
-      applied.push('modelId');
-    }
-
     if (
       typeof parsed.maxThinkingTokens === 'number' &&
       parsed.maxThinkingTokens !== effectiveBefore.maxThinkingTokens
@@ -269,26 +263,6 @@ export function registerSessionOperationHandlers(
     ) {
       nextConfig.maxBudgetUsd = parsed.maxBudgetUsd;
       applied.push('maxBudgetUsd');
-    }
-
-    if (parsed.approvalMode !== undefined) {
-      const allowed = new Set([
-        'ask',
-        'approveReads',
-        'approveEdits',
-        'approve',
-        'deny',
-        'dangerouslySkipPermissions',
-      ]);
-      if (!allowed.has(parsed.approvalMode)) {
-        throwInvalidParams(
-          'approvalMode must be one of ask|approveReads|approveEdits|approve|deny|dangerouslySkipPermissions'
-        );
-      }
-      if (parsed.approvalMode !== effectiveBefore.approvalMode) {
-        nextConfig.approvalMode = parsed.approvalMode;
-        applied.push('approvalMode');
-      }
     }
 
     if (parsed.environment !== undefined) {
@@ -330,6 +304,52 @@ export function registerSessionOperationHandlers(
         approvalMode: effectiveAfter.approvalMode,
         environment: state.activeSession.state.config?.environment,
       },
+    };
+  });
+
+  peer.onRequest('session/set_config_option', async (params: unknown) => {
+    assertSessionReady(state);
+
+    if (!params || typeof params !== 'object' || Array.isArray(params)) {
+      throwInvalidParams('params must be an object');
+    }
+    const parsed = params as Partial<{ sessionId: string; configId: string; value: string }>;
+    if (!parsed.sessionId) throwInvalidParams('sessionId is required');
+    if (parsed.sessionId !== state.activeSession!.meta.sessionId) {
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
+    }
+    if (!parsed.configId) throwInvalidParams('configId is required');
+    if (typeof parsed.value !== 'string' || parsed.value.length === 0) {
+      throwInvalidParams('value is required');
+    }
+
+    const currentState = readSessionState(state.activeSession!.dir);
+    const currentConfig = currentState.config || {};
+    const nextConfig = { ...currentConfig };
+
+    if (parsed.configId === 'model') {
+      nextConfig.modelId = parsed.value;
+    } else if (parsed.configId === 'approvalMode') {
+      if (!isApprovalMode(parsed.value)) {
+        throwInvalidParams(
+          'approvalMode must be one of ask|approveReads|approveEdits|approve|deny|dangerouslySkipPermissions'
+        );
+      }
+      nextConfig.approvalMode = parsed.value;
+    } else {
+      throwInvalidParams(`Unknown configId: ${parsed.configId}`);
+    }
+
+    const nextState: SessionState = { ...currentState, config: nextConfig };
+    writeSessionState(state.activeSession!.dir, nextState);
+    state.activeSession = { ...state.activeSession!, state: nextState };
+
+    return {
+      configOptions: buildSessionConfigOptions(state.config, nextState.config),
     };
   });
 

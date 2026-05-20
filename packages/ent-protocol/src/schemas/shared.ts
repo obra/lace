@@ -195,6 +195,40 @@ export const PermissionRequestSchema = z
   .strict();
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
 
+export const SessionConfigSelectOptionSchema = z
+  .object({
+    value: NonEmptyStringSchema,
+    name: z.string(),
+    description: z.string().optional(),
+  })
+  .strict();
+export type SessionConfigSelectOption = z.infer<typeof SessionConfigSelectOptionSchema>;
+
+export const SessionConfigSelectGroupSchema = z
+  .object({
+    group: NonEmptyStringSchema,
+    name: z.string(),
+    options: z.array(SessionConfigSelectOptionSchema),
+  })
+  .strict();
+export type SessionConfigSelectGroup = z.infer<typeof SessionConfigSelectGroupSchema>;
+
+export const SessionConfigOptionSchema = z
+  .object({
+    id: NonEmptyStringSchema,
+    name: z.string(),
+    description: z.string().optional(),
+    category: z.string().optional(),
+    type: z.literal('select'),
+    currentValue: NonEmptyStringSchema,
+    options: z.union([
+      z.array(SessionConfigSelectOptionSchema),
+      z.array(SessionConfigSelectGroupSchema),
+    ]),
+  })
+  .strict();
+export type SessionConfigOption = z.infer<typeof SessionConfigOptionSchema>;
+
 export const ProviderInfoSchema = z
   .object({
     providerId: NonEmptyStringSchema,

@@ -2,7 +2,8 @@ import readline from 'node:readline';
 
 const rl = readline.createInterface({ input: process.stdin });
 
-let configured = false;
+let connectionConfigured = false;
+let modelConfigured = false;
 
 function send(msg) {
   process.stdout.write(`${JSON.stringify(msg)}\n`);
@@ -32,7 +33,12 @@ function handleRequest(msg) {
   if (method === 'ent/connections/list') {
     respond(id, {
       connections: [
-        { connectionId: 'openai-openai', providerId: 'openai', name: 'OpenAI', credentialState: 'ready' },
+        {
+          connectionId: 'openai-openai',
+          providerId: 'openai',
+          name: 'OpenAI',
+          credentialState: 'ready',
+        },
         { connectionId: 'groq-groq', providerId: 'groq', name: 'Groq', credentialState: 'ready' },
       ],
     });
@@ -54,17 +60,61 @@ function handleRequest(msg) {
   }
 
   if (method === 'ent/session/configure') {
-    configured = true;
-    respond(id, { applied: ['connectionId', 'modelId'], config: { connectionId: params?.connectionId, modelId: params?.modelId } });
+    if (params?.modelId) {
+      send({
+        jsonrpc: '2.0',
+        id,
+        error: {
+          code: -32602,
+          message: 'modelId must be configured via session/set_config_option',
+        },
+      });
+      return;
+    }
+    connectionConfigured = true;
+    respond(id, { applied: ['connectionId'], config: { connectionId: params?.connectionId } });
+    return;
+  }
+
+  if (method === 'session/set_config_option') {
+    if (params?.configId === 'model') {
+      modelConfigured = true;
+      respond(id, {
+        configOptions: [
+          {
+            id: 'model',
+            name: 'Model',
+            category: 'model',
+            type: 'select',
+            currentValue: params.value,
+            options: [{ value: params.value, name: params.value }],
+          },
+        ],
+      });
+      return;
+    }
+    send({ jsonrpc: '2.0', id, error: { code: -32602, message: 'unknown config option' } });
     return;
   }
 
   if (method === 'session/prompt') {
-    if (!configured) {
-      send({ jsonrpc: '2.0', id, error: { code: 0, message: 'Missing provider configuration: connectionId and modelId are required' } });
+    if (!connectionConfigured || !modelConfigured) {
+      send({
+        jsonrpc: '2.0',
+        id,
+        error: {
+          code: 0,
+          message: 'Missing provider configuration: connectionId and modelId are required',
+        },
+      });
       return;
     }
-    respond(id, { turnId: 'turn_test', stopReason: 'end_turn', content: [{ type: 'text', text: 'ok' }], usage: { inputTokens: 0, outputTokens: 0 } });
+    respond(id, {
+      turnId: 'turn_test',
+      stopReason: 'end_turn',
+      content: [{ type: 'text', text: 'ok' }],
+      usage: { inputTokens: 0, outputTokens: 0 },
+    });
     return;
   }
 
@@ -80,4 +130,3 @@ rl.on('line', (line) => {
   }
   if (msg && msg.method && msg.id !== undefined) handleRequest(msg);
 });
-

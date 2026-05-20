@@ -118,6 +118,7 @@ describe('cli e2e (lace-agent)', () => {
     const { proc, lines } = spawnCli({ workDir, laceDir });
 
     await waitFor(() => lines.some((l) => l.startsWith('new session ')), 20_000);
+    const sessionId = lines.find((l) => l.startsWith('new session '))!.slice('new session '.length);
 
     proc.stdin.write(':raw {"method":"ent/providers/list","params":{}}\n');
     await waitFor(() => lines.some((l) => l.includes('"providers"')), 20_000);
@@ -190,16 +191,43 @@ describe('cli e2e (lace-agent)', () => {
     proc.stdin.write(
       `:raw ${JSON.stringify({
         method: 'ent/session/configure',
-        params: { connectionId, modelId, approvalMode: 'ask' },
+        params: { connectionId },
+      })}\n`
+    );
+    proc.stdin.write(
+      `:raw ${JSON.stringify({
+        method: 'session/set_config_option',
+        params: { sessionId, configId: 'model', value: modelId },
+      })}\n`
+    );
+    proc.stdin.write(
+      `:raw ${JSON.stringify({
+        method: 'session/set_config_option',
+        params: { sessionId, configId: 'approvalMode', value: 'ask' },
       })}\n`
     );
 
     await waitFor(
+      () => !!findJsonLine(lines, (obj) => obj?.result?.config?.connectionId === connectionId),
+      20_000
+    );
+    await waitFor(
       () =>
-        !!findJsonLine(
-          lines,
-          (obj) =>
-            obj?.result?.config?.connectionId === connectionId && obj?.result?.config?.modelId
+        !!findJsonLine(lines, (obj) =>
+          obj?.result?.configOptions?.some?.(
+            (o: { id?: string; currentValue?: string }) =>
+              o.id === 'model' && o.currentValue === modelId
+          )
+        ),
+      20_000
+    );
+    await waitFor(
+      () =>
+        !!findJsonLine(lines, (obj) =>
+          obj?.result?.configOptions?.some?.(
+            (o: { id?: string; currentValue?: string }) =>
+              o.id === 'approvalMode' && o.currentValue === 'ask'
+          )
         ),
       20_000
     );

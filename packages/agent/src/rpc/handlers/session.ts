@@ -37,7 +37,7 @@ import { killAllRunningJobs } from '../../jobs';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { PersonaNotFoundError, PersonaParseError } from '../../config/persona-registry';
 import { LACE_BUILTIN_TOOL_NAMES } from '../../tools/executor';
-import { mergeMcpServers } from '../session-config';
+import { buildSessionConfigOptions, mergeMcpServers } from '../session-config';
 import { cancelPendingPermissionRequests } from '../permissions';
 
 type SessionRestoreParams = {
@@ -371,7 +371,11 @@ export function registerSessionHandlers(
 
     state.activeSession = { ...state.activeSession, state: sessionState };
 
-    return { sessionId, created };
+    return {
+      sessionId,
+      created,
+      configOptions: buildSessionConfigOptions(state.config, state.activeSession.state.config),
+    };
   });
 
   peer.onRequest('session/list', async (params: unknown) => {
@@ -400,6 +404,7 @@ export function registerSessionHandlers(
       sessionId: parsed.sessionId,
       messageCount: summary.messageCount,
       updatedAt: summary.lastActive ?? loaded.meta.created,
+      configOptions: buildSessionConfigOptions(state.config, loaded.state.config),
     };
   });
 

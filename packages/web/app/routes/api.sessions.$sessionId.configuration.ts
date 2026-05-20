@@ -12,6 +12,10 @@ import {
 } from '@lace/web/lib/server/route-helpers';
 import { z } from 'zod';
 import type { Route } from './+types/api.sessions.$sessionId.configuration';
+import {
+  configureAgentSession,
+  type ApprovalMode,
+} from '@lace/web/lib/server/agent-session-config';
 
 const ConfigurationSchema = z
   .object({
@@ -86,7 +90,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     const permissionMode = validatedData.runtimeOverrides?.permissionMode;
-    const approvalMode =
+    const approvalMode: ApprovalMode =
       permissionMode === 'yolo'
         ? 'dangerouslySkipPermissions'
         : permissionMode === 'read-only'
@@ -102,17 +106,15 @@ export async function action({ request, params }: Route.ActionArgs) {
       ...(validatedData.toolPolicies ? { toolPolicies: validatedData.toolPolicies } : {}),
     });
 
-    await supervisor.agentRequest({
+    await configureAgentSession(supervisor.agentRequest.bind(supervisor), {
       workspaceSessionId,
       sessionId: coordinator.sessionId,
-      method: 'ent/session/configure',
-      requestParams: {
-        ...(typeof validatedData.providerInstanceId === 'string'
-          ? { connectionId: validatedData.providerInstanceId }
-          : {}),
-        ...(typeof validatedData.modelId === 'string' ? { modelId: validatedData.modelId } : {}),
-        approvalMode,
-      },
+      connectionId:
+        typeof validatedData.providerInstanceId === 'string'
+          ? validatedData.providerInstanceId
+          : undefined,
+      modelId: typeof validatedData.modelId === 'string' ? validatedData.modelId : undefined,
+      approvalMode,
     });
 
     const { tools } = (await supervisor.agentRequest({

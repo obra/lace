@@ -199,16 +199,28 @@ pub fn maybe_autoconfigure_from_connections(
         return Vec::new();
     }
 
-    let id = state.next_client_id();
-    vec![Outbound::JsonRpcRequest {
-        id,
+    let configure_id = state.next_client_id();
+    let model_config_id = state.next_client_id();
+    let mut out = vec![Outbound::JsonRpcRequest {
+        id: configure_id,
         method: "ent/session/configure".to_string(),
         params: Some(json!({
             "connectionId": conn,
-            "modelId": model,
             "environment": state.environment,
         })),
-    }]
+    }];
+    if let Some(session_id) = state.session_id.clone() {
+        out.push(Outbound::JsonRpcRequest {
+            id: model_config_id,
+            method: "session/set_config_option".to_string(),
+            params: Some(json!({
+                "sessionId": session_id,
+                "configId": "model",
+                "value": model,
+            })),
+        });
+    }
+    out
 }
 
 pub fn connection_exists_in_list(result: &Option<serde_json::Value>, conn: &str) -> bool {

@@ -1156,18 +1156,26 @@ fn handle_agent_line(
                         send_outbound(transport, state, out, timeout_ms)?;
                     }
                 }
-                if state.config_wizard.open && method.starts_with("ent/") {
+                if state.config_wizard.open
+                    && (method.starts_with("ent/") || method == "session/set_config_option")
+                {
                     let out = config_wizard::handle_response(state, method, &result, error_message);
                     send_outbound(transport, state, out, timeout_ms)?;
                 }
                 if method == "ent/session/configure" && !state.config_wizard.open {
                     if error_message.is_none() {
-                        let (conn, model) = ent::extract_session_configure_config(&result);
-                        if conn.is_some() {
-                            state.connection_id = conn;
+                        if let Some(conn) = ent::extract_session_configure_connection(&result) {
+                            state.connection_id = Some(conn);
                         }
-                        if model.is_some() {
-                            state.model_id = model;
+                        state.prefs.last_connection_id = state.connection_id.clone();
+                        state.prefs.last_model_id = state.model_id.clone();
+                        let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
+                    }
+                }
+                if method == "session/set_config_option" && !state.config_wizard.open {
+                    if error_message.is_none() {
+                        if let Some(model) = ent::extract_session_config_option_model(&result) {
+                            state.model_id = Some(model);
                         }
                         state.prefs.last_connection_id = state.connection_id.clone();
                         state.prefs.last_model_id = state.model_id.clone();

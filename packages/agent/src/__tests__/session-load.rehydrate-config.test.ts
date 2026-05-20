@@ -75,8 +75,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     // rehydrated into state.config. Prompting depends on this — the
     // turn factory rejects when state.config.connectionId/modelId
     // (read via the effective-config merge) is missing, and embedders
-    // shouldn't have to call ent/session/configure to re-bind values
-    // the session already knows.
+    // shouldn't have to re-bind values the session already knows.
     expect(loadState.activeSession?.state.config?.connectionId).toBe('conn_test');
     expect(loadState.activeSession?.state.config?.modelId).toBe('model_test');
     expect(loadState.config.connectionId).toBe('conn_test');

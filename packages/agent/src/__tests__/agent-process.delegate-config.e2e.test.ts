@@ -246,19 +246,27 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
         'ent/connections/upsert'
       );
 
-      await withTimeout(
+      const created = (await withTimeout(
         ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
         2_000,
         'session/new'
-      );
+      )) as { sessionId: string };
 
       await withTimeout(
         ctx.agent.peer.request('ent/session/configure', {
           connectionId: 'test-conn',
-          modelId: 'session-model',
         }),
         2_000,
         'ent/session/configure'
+      );
+      await withTimeout(
+        ctx.agent.peer.request('session/set_config_option', {
+          sessionId: created.sessionId,
+          configId: 'model',
+          value: 'session-model',
+        }),
+        2_000,
+        'session/set_config_option'
       );
 
       await withTimeout(

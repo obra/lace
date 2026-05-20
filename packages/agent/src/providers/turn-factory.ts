@@ -24,9 +24,7 @@ export async function createProviderForTurn(options: {
   const connectionId = toNonEmptyString(options.connectionId);
   const modelId = toNonEmptyString(options.modelId);
   if (!connectionId || !modelId) {
-    throwInvalidParams(
-      'connectionId and modelId are required before prompting; call ent/session/configure'
-    );
+    throwInvalidParams('connectionId and modelId are required before prompting');
   }
 
   const registry = ProviderRegistry.getInstance();

@@ -1384,15 +1384,25 @@ fn switch_model(state: &mut AppState, model_id: &str) -> Vec<Outbound> {
     state.prefs.last_model_id = state.model_id.clone();
     let _ = crate::app::prefs::save(state.prefs_path.as_deref(), &state.prefs);
 
-    let id = state.next_client_id();
-    vec![Outbound::JsonRpcRequest {
-        id,
+    let configure_id = state.next_client_id();
+    let model_config_id = state.next_client_id();
+    let mut out = vec![Outbound::JsonRpcRequest {
+        id: configure_id,
         method: "ent/session/configure".to_string(),
-        params: Some(json!({
-            "connectionId": connection_id,
-            "modelId": model_id,
-        })),
-    }]
+        params: Some(json!({ "connectionId": connection_id })),
+    }];
+    if let Some(session_id) = state.session_id.clone() {
+        out.push(Outbound::JsonRpcRequest {
+            id: model_config_id,
+            method: "session/set_config_option".to_string(),
+            params: Some(json!({
+                "sessionId": session_id,
+                "configId": "model",
+                "value": model_id,
+            })),
+        });
+    }
+    out
 }
 
 fn execute_permission_slash_command(state: &mut AppState, name: &str) -> Vec<Outbound> {

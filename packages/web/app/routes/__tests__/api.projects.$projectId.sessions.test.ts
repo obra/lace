@@ -312,8 +312,24 @@ describe('Session API endpoints under projects', () => {
       expect(requestSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           method: 'ent/session/configure',
-          requestParams: expect.not.objectContaining({
-            mcpServers: expect.anything(),
+          requestParams: { connectionId: providerInstanceId },
+        })
+      );
+      expect(requestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'session/set_config_option',
+          requestParams: expect.objectContaining({
+            configId: 'model',
+            value: 'claude-3-5-haiku-20241022',
+          }),
+        })
+      );
+      expect(requestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'session/set_config_option',
+          requestParams: expect.objectContaining({
+            configId: 'approvalMode',
+            value: 'ask',
           }),
         })
       );

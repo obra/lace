@@ -282,6 +282,7 @@ pub fn handle_response(
         "ent/connections/credentials/submit" => on_credentials_submit(state, result),
         "ent/models/list" => on_models_list(state, result),
         "ent/session/configure" => on_session_configure(state, result),
+        "session/set_config_option" => on_session_configure(state, result),
         _ => Vec::new(),
     }
 }
@@ -702,12 +703,25 @@ fn submit_model(state: &mut AppState) -> Vec<Outbound> {
         state.config_wizard.error_message = Some("missing connection id".to_string());
         return Vec::new();
     };
-    let id = state.next_client_id();
-    vec![Outbound::JsonRpcRequest {
-        id,
+    let configure_id = state.next_client_id();
+    let model_config_id = state.next_client_id();
+    let mut out = vec![Outbound::JsonRpcRequest {
+        id: configure_id,
         method: "ent/session/configure".to_string(),
-        params: Some(json!({ "connectionId": connection_id, "modelId": model_id })),
-    }]
+        params: Some(json!({ "connectionId": connection_id })),
+    }];
+    if let Some(session_id) = state.session_id.clone() {
+        out.push(Outbound::JsonRpcRequest {
+            id: model_config_id,
+            method: "session/set_config_option".to_string(),
+            params: Some(json!({
+                "sessionId": session_id,
+                "configId": "model",
+                "value": model_id,
+            })),
+        });
+    }
+    out
 }
 
 fn model_disabled(o: &serde_json::Map<String, Value>) -> bool {
@@ -722,14 +736,11 @@ fn model_disabled(o: &serde_json::Map<String, Value>) -> bool {
 
 fn on_session_configure(state: &mut AppState, result: &Option<Value>) -> Vec<Outbound> {
     let mut connection_id = state.config_wizard.connection_id.clone();
-    let mut model_id = state.config_wizard.model_id.clone();
+    let model_id = state.config_wizard.model_id.clone();
     if let Some(Value::Object(obj)) = result {
         if let Some(Value::Object(cfg)) = obj.get("config") {
             if let Some(cid) = cfg.get("connectionId").and_then(|v| v.as_str()) {
                 connection_id = Some(cid.to_string());
-            }
-            if let Some(mid) = cfg.get("modelId").and_then(|v| v.as_str()) {
-                model_id = Some(mid.to_string());
             }
         }
     }
@@ -869,7 +880,7 @@ mod tests {
         let out = handle_response(
             &mut state,
             "ent/session/configure",
-            &Some(json!({"ok":true,"config":{"connectionId":"c1","modelId":"m1"}})),
+            &Some(json!({"ok":true,"config":{"connectionId":"c1"}})),
             None,
         );
 
@@ -890,6 +901,7 @@ mod tests {
     #[test]
     fn models_list_filters_disabled_state_models() {
         let mut state = AppState::new_with_paths(None, None);
+        state.session_id = Some("sess_1".to_string());
         state.config_wizard.open = true;
         state.config_wizard.step = ConfigWizardStep::LoadingModels;
         state.config_wizard.connection_id = Some("c1".to_string());
@@ -908,7 +920,7 @@ mod tests {
         assert_eq!(state.config_wizard.models[0].model_id, "m2");
         assert_eq!(state.config_wizard.step, ConfigWizardStep::Applying);
 
-        assert_eq!(out.len(), 1);
+        assert_eq!(out.len(), 2);
         match &out[0] {
             Outbound::JsonRpcRequest { method, params, .. } => {
                 assert_eq!(method, "ent/session/configure");
@@ -916,7 +928,18 @@ mod tests {
                     panic!("expected object params");
                 };
                 assert_eq!(p.get("connectionId").and_then(|v| v.as_str()), Some("c1"));
-                assert_eq!(p.get("modelId").and_then(|v| v.as_str()), Some("m2"));
+                assert!(p.get("modelId").is_none());
+            }
+            _ => panic!("expected request"),
+        }
+        match &out[1] {
+            Outbound::JsonRpcRequest { method, params, .. } => {
+                assert_eq!(method, "session/set_config_option");
+                let Some(p) = params.as_ref().and_then(|v| v.as_object()) else {
+                    panic!("expected object params");
+                };
+                assert_eq!(p.get("configId").and_then(|v| v.as_str()), Some("model"));
+                assert_eq!(p.get("value").and_then(|v| v.as_str()), Some("m2"));
             }
             _ => panic!("expected request"),
         }

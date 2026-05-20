@@ -92,6 +92,9 @@ describe('generateSessionName', () => {
       if (params.method === 'ent/session/configure') {
         return {};
       }
+      if (params.method === 'session/set_config_option') {
+        return { configOptions: [] };
+      }
       if (params.method === 'session/prompt') {
         return { content: [{ type: 'text', text: 'Fix Auth Bug' }] };
       }
@@ -108,7 +111,15 @@ describe('generateSessionName', () => {
         method: 'ent/session/configure',
         requestParams: expect.objectContaining({
           connectionId: 'conn_test',
-          modelId: 'model_test',
+        }),
+      })
+    );
+    expect(mockSupervisor.agentRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'session/set_config_option',
+        requestParams: expect.objectContaining({
+          configId: 'model',
+          value: 'model_test',
         }),
       })
     );

@@ -593,15 +593,14 @@ describe('lace-agent process (E2E over stdio)', () => {
       'initialize'
     );
 
-    await withTimeout(
+    const created = (await withTimeout(
       ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
       2_000,
       'session/new'
-    );
+    )) as { sessionId: string };
 
     const configured = (await withTimeout(
       ctx.agent.peer.request('ent/session/configure', {
-        approvalMode: 'approve',
         maxBudgetUsd: 1.25,
         environment: { TEST_KEY: 'test-value' },
       }),
@@ -609,12 +608,24 @@ describe('lace-agent process (E2E over stdio)', () => {
       'ent/session/configure'
     )) as { applied: string[]; config: Record<string, unknown> };
 
-    expect(configured.applied).toEqual(
-      expect.arrayContaining(['approvalMode', 'maxBudgetUsd', 'environment'])
-    );
-    expect(configured.config.approvalMode).toBe('approve');
+    expect(configured.applied).toEqual(expect.arrayContaining(['maxBudgetUsd', 'environment']));
     expect(configured.config.maxBudgetUsd).toBe(1.25);
     expect((configured.config as any).environment).toMatchObject({ TEST_KEY: 'test-value' });
+
+    const configOptions = (await withTimeout(
+      ctx.agent.peer.request('session/set_config_option', {
+        sessionId: created.sessionId,
+        configId: 'approvalMode',
+        value: 'approve',
+      }),
+      2_000,
+      'session/set_config_option'
+    )) as { configOptions: Array<{ id: string; currentValue: string }> };
+    expect(configOptions.configOptions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'approvalMode', currentValue: 'approve' }),
+      ])
+    );
 
     const status = (await withTimeout(
       ctx.agent.peer.request('ent/agent/status'),

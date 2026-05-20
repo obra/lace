@@ -80,7 +80,7 @@ describe('Agent API', () => {
     expect(data.error).toBe('Agent not found');
   });
 
-  it('PUT /api/agents/:agentId updates agent metadata and ent config', async () => {
+  it('PUT /api/agents/:agentId updates agent metadata and ACP model config', async () => {
     const providerInstanceId = (await createEntTestConnection({ providerId: 'openai' }))
       .connectionId;
 
@@ -88,6 +88,7 @@ describe('Agent API', () => {
       const supervisor = await getSupervisor();
       const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
       const spawned = await supervisor.createAgentSession(created.workspaceSessionId);
+      const requestSpy = vi.spyOn(supervisor, 'agentRequest');
 
       const request = new Request(`http://localhost/api/agents/${spawned.sessionId}`, {
         method: 'PUT',
@@ -124,6 +125,22 @@ describe('Agent API', () => {
 
       expect(status.currentSession?.connectionId).toBe(providerInstanceId);
       expect(status.currentSession?.modelId).toBe('claude-3-5-haiku-20241022');
+      expect(requestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'ent/session/configure',
+          requestParams: { connectionId: providerInstanceId },
+        })
+      );
+      expect(requestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'session/set_config_option',
+          requestParams: expect.objectContaining({
+            sessionId: spawned.sessionId,
+            configId: 'model',
+            value: 'claude-3-5-haiku-20241022',
+          }),
+        })
+      );
     } finally {
       await deleteEntTestConnection(providerInstanceId);
     }

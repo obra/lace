@@ -2,6 +2,7 @@
 // ABOUTME: Takes project name + user input and returns a short session title
 
 import { getProviderManagementAgent, getSupervisor } from './supervisor-service';
+import { configureAgentSession } from './agent-session-config';
 
 export async function generateSessionName(
   projectName: string,
@@ -12,15 +13,12 @@ export async function generateSessionName(
   const mgmt = await getProviderManagementAgent();
 
   if (fallbackModel) {
-    await supervisor.agentRequest({
+    await configureAgentSession(supervisor.agentRequest.bind(supervisor), {
       workspaceSessionId: mgmt.workspaceSessionId,
       sessionId: mgmt.agentSessionId,
-      method: 'ent/session/configure',
-      requestParams: {
-        connectionId: fallbackModel.connectionId,
-        modelId: fallbackModel.modelId,
-        approvalMode: 'ask',
-      },
+      connectionId: fallbackModel.connectionId,
+      modelId: fallbackModel.modelId,
+      approvalMode: 'ask',
     });
   }
 

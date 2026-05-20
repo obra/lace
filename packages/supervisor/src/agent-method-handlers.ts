@@ -69,6 +69,8 @@ import {
   SessionPromptResponseSchema,
   SessionResumeRequestSchema,
   SessionResumeResponseSchema,
+  SessionSetConfigOptionRequestSchema,
+  SessionSetConfigOptionResponseSchema,
   SessionSetModeRequestSchema,
   SessionSetModeResponseSchema,
 } from '@lace/ent-protocol';
@@ -105,6 +107,11 @@ export const agentMethodHandlers: Record<string, AgentMethodHandler> = {
     kind: 'request',
     paramsSchema: SessionSetModeRequestSchema.shape.params,
     resultSchema: SessionSetModeResponseSchema.shape.result,
+  },
+  'session/set_config_option': {
+    kind: 'request',
+    paramsSchema: SessionSetConfigOptionRequestSchema.shape.params,
+    resultSchema: SessionSetConfigOptionResponseSchema.shape.result,
   },
   'ent/session/configure': {
     kind: 'request',

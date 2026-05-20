@@ -2,7 +2,8 @@ import readline from 'node:readline';
 
 const rl = readline.createInterface({ input: process.stdin });
 
-let configured = false;
+let connectionConfigured = false;
+let modelConfigured = false;
 let connectionId = 'conn_1';
 let modelId = 'gpt-test';
 
@@ -40,7 +41,7 @@ function handleRequest(msg) {
   }
 
   if (method === 'session/prompt') {
-    if (!configured) {
+    if (!connectionConfigured || !modelConfigured) {
       error(id, 'Missing provider configuration: connectionId and modelId are required');
       return;
     }
@@ -131,12 +132,40 @@ function handleRequest(msg) {
   }
 
   if (method === 'ent/session/configure') {
-    configured = true;
+    if (params?.modelId || params?.approvalMode) {
+      error(
+        id,
+        'modelId and approvalMode must be configured via session/set_config_option',
+        -32602
+      );
+      return;
+    }
+    connectionConfigured = true;
     respond(id, {
-      applied: ['connectionId', 'modelId'],
-      config: { connectionId, modelId, approvalMode: 'ask' },
+      applied: ['connectionId'],
+      config: { connectionId },
     });
     return;
+  }
+
+  if (method === 'session/set_config_option') {
+    if (params?.configId === 'model') {
+      modelConfigured = true;
+      modelId = params.value;
+      respond(id, {
+        configOptions: [
+          {
+            id: 'model',
+            name: 'Model',
+            category: 'model',
+            type: 'select',
+            currentValue: modelId,
+            options: [{ value: modelId, name: modelId }],
+          },
+        ],
+      });
+      return;
+    }
   }
 
   respond(id, null);

@@ -12,6 +12,7 @@ import {
 import { findWorkspaceForAgentSession } from '@lace/web/lib/server/agent-utils';
 import { z } from 'zod';
 import { getProviderManagementAgent } from '@lace/web/lib/server/supervisor-service';
+import { configureAgentSession } from '@lace/web/lib/server/agent-session-config';
 import type { ThreadTokenUsage } from '@lace/ent-protocol';
 import type { Route } from './+types/api.agents.$agentId';
 
@@ -117,14 +118,11 @@ export async function action({ request, params }: Route.ActionArgs) {
     });
 
     if (validatedData.providerInstanceId && validatedData.modelId) {
-      await supervisor.agentRequest({
+      await configureAgentSession(supervisor.agentRequest.bind(supervisor), {
         workspaceSessionId: record.workspaceSessionId,
         sessionId: agentId,
-        method: 'ent/session/configure',
-        requestParams: {
-          connectionId: validatedData.providerInstanceId,
-          modelId: validatedData.modelId,
-        },
+        connectionId: validatedData.providerInstanceId,
+        modelId: validatedData.modelId,
       });
     }
 

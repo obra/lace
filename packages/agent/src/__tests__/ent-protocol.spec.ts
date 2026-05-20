@@ -205,7 +205,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       expect(disabledEntry?.disabled).toBe(true);
       expect(disabledEntry?.disabledState).toBe('disabled');
 
-      // configure session with env + approvalMode
+      // configure provider connection/env via Ent and model/permission mode via ACP config options
       const { sessionId } = await requestOk<{ sessionId: string }>({
         agent,
         method: 'session/new',
@@ -226,22 +226,54 @@ describe('Ent protocol contract (selected coverage)', () => {
         responseSchema: MethodSchemas.EntSessionConfigureResponseSchema,
         params: {
           connectionId,
-          modelId: targetModel,
           environment: { HELLO: 'WORLD' },
-          approvalMode: 'approveReads',
         },
         label: 'session/configure',
       });
 
       expect(configureResult.applied).toEqual(
-        expect.arrayContaining(['connectionId', 'modelId', 'environment', 'approvalMode'])
+        expect.arrayContaining(['connectionId', 'environment'])
       );
       expect(configureResult.config).toMatchObject({
         connectionId,
-        modelId: targetModel,
         environment: { HELLO: 'WORLD' },
-        approvalMode: 'approveReads',
       });
+
+      const modelResult = await requestOk<{ configOptions: Array<Record<string, unknown>> }>({
+        agent,
+        method: 'session/set_config_option',
+        requestSchema: (MethodSchemas as any).SessionSetConfigOptionRequestSchema,
+        responseSchema: (MethodSchemas as any).SessionSetConfigOptionResponseSchema,
+        params: { sessionId, configId: 'model', value: targetModel },
+        label: 'session/set_config_option model',
+      });
+      expect(modelResult.configOptions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'model',
+            category: 'model',
+            currentValue: targetModel,
+          }),
+        ])
+      );
+
+      const approvalResult = await requestOk<{ configOptions: Array<Record<string, unknown>> }>({
+        agent,
+        method: 'session/set_config_option',
+        requestSchema: (MethodSchemas as any).SessionSetConfigOptionRequestSchema,
+        responseSchema: (MethodSchemas as any).SessionSetConfigOptionResponseSchema,
+        params: { sessionId, configId: 'approvalMode', value: 'approveReads' },
+        label: 'session/set_config_option approvalMode',
+      });
+      expect(approvalResult.configOptions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'approvalMode',
+            category: '_permission_mode',
+            currentValue: 'approveReads',
+          }),
+        ])
+      );
     }
   );
 
@@ -349,7 +381,7 @@ describe('Ent protocol contract (selected coverage)', () => {
     });
   });
 
-  it('ent/session/configure accepts arbitrary connectionId/modelId values', async () => {
+  it('session/set_config_option applies model while ent/session/configure owns connection only', async () => {
     agent = spawnAgentProcess({ laceDir });
     await requestOk({
       agent,
@@ -375,10 +407,32 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'ent/session/configure',
       requestSchema: MethodSchemas.EntSessionConfigureRequestSchema,
       responseSchema: MethodSchemas.EntSessionConfigureResponseSchema,
-      params: { connectionId: 'missing', modelId: 'foo' },
+      params: { connectionId: 'missing' },
       label: 'session/configure missing',
     });
-    expect(configuredMissing.applied).toEqual(expect.arrayContaining(['connectionId', 'modelId']));
+    expect(configuredMissing.applied).toEqual(expect.arrayContaining(['connectionId']));
+
+    await expect(
+      agent.peer.request('ent/session/configure', { modelId: 'foo' })
+    ).rejects.toMatchObject({ code: -32602 });
+
+    const missingModel = await requestOk<{ configOptions: Array<Record<string, unknown>> }>({
+      agent,
+      method: 'session/set_config_option',
+      requestSchema: (MethodSchemas as any).SessionSetConfigOptionRequestSchema,
+      responseSchema: (MethodSchemas as any).SessionSetConfigOptionResponseSchema,
+      params: { sessionId, configId: 'model', value: 'foo' },
+      label: 'session/set_config_option arbitrary model',
+    });
+    expect(missingModel.configOptions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'model',
+          category: 'model',
+          currentValue: 'foo',
+        }),
+      ])
+    );
 
     const { providers } = await requestOk<{ providers: ProviderInfo[] }>({
       agent,
@@ -415,10 +469,27 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'ent/session/configure',
       requestSchema: MethodSchemas.EntSessionConfigureRequestSchema,
       responseSchema: MethodSchemas.EntSessionConfigureResponseSchema,
-      params: { connectionId, modelId: validModel },
+      params: { connectionId },
       label: 'session/configure valid',
     });
-    expect(ok.applied).toEqual(expect.arrayContaining(['connectionId', 'modelId']));
+    expect(ok.applied).toEqual(expect.arrayContaining(['connectionId']));
+
+    const modelOk = await requestOk<{ configOptions: Array<Record<string, unknown>> }>({
+      agent,
+      method: 'session/set_config_option',
+      requestSchema: (MethodSchemas as any).SessionSetConfigOptionRequestSchema,
+      responseSchema: (MethodSchemas as any).SessionSetConfigOptionResponseSchema,
+      params: { sessionId, configId: 'model', value: validModel },
+      label: 'session/set_config_option valid model',
+    });
+    expect(modelOk.configOptions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'model',
+          currentValue: validModel,
+        }),
+      ])
+    );
   });
 
   it('ent/session/token_usage and ent/session/context_breakdown return context metrics', async () => {
@@ -431,7 +502,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       params: defaultInitializeParams({ approvalMode: 'approve' }),
       label: 'initialize',
     });
-    await requestOk({
+    const { sessionId } = await requestOk<{ sessionId: string }>({
       agent,
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
@@ -484,8 +555,24 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'ent/session/configure',
       requestSchema: MethodSchemas.EntSessionConfigureRequestSchema,
       responseSchema: MethodSchemas.EntSessionConfigureResponseSchema,
-      params: { connectionId, modelId, approvalMode: 'approve' },
+      params: { connectionId },
       label: 'session/configure',
+    });
+    await requestOk({
+      agent,
+      method: 'session/set_config_option',
+      requestSchema: (MethodSchemas as any).SessionSetConfigOptionRequestSchema,
+      responseSchema: (MethodSchemas as any).SessionSetConfigOptionResponseSchema,
+      params: { sessionId, configId: 'model', value: modelId },
+      label: 'session/set_config_option model',
+    });
+    await requestOk({
+      agent,
+      method: 'session/set_config_option',
+      requestSchema: (MethodSchemas as any).SessionSetConfigOptionRequestSchema,
+      responseSchema: (MethodSchemas as any).SessionSetConfigOptionResponseSchema,
+      params: { sessionId, configId: 'approvalMode', value: 'approve' },
+      label: 'session/set_config_option approvalMode',
     });
 
     const initialUsage = await requestOk<Record<string, unknown>>({
@@ -884,8 +971,16 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'ent/session/configure',
       requestSchema: MethodSchemas.EntSessionConfigureRequestSchema,
       responseSchema: MethodSchemas.EntSessionConfigureResponseSchema,
-      params: { connectionId, modelId, environment: { FOO: 'BAR' } },
+      params: { connectionId, environment: { FOO: 'BAR' } },
       label: 'session/configure',
+    });
+    await requestOk({
+      agent,
+      method: 'session/set_config_option',
+      requestSchema: (MethodSchemas as any).SessionSetConfigOptionRequestSchema,
+      responseSchema: (MethodSchemas as any).SessionSetConfigOptionResponseSchema,
+      params: { sessionId, configId: 'model', value: modelId },
+      label: 'session/set_config_option model',
     });
 
     const status = await requestOk<{
@@ -931,7 +1026,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       label: 'init',
     });
 
-    await requestOk({
+    const { sessionId } = await requestOk<{ sessionId: string }>({
       agent,
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
@@ -942,11 +1037,11 @@ describe('Ent protocol contract (selected coverage)', () => {
 
     await requestOk({
       agent,
-      method: 'ent/session/configure',
-      requestSchema: MethodSchemas.EntSessionConfigureRequestSchema,
-      responseSchema: MethodSchemas.EntSessionConfigureResponseSchema,
-      params: { approvalMode: 'approve' },
-      label: 'session/configure approve',
+      method: 'session/set_config_option',
+      requestSchema: (MethodSchemas as any).SessionSetConfigOptionRequestSchema,
+      responseSchema: (MethodSchemas as any).SessionSetConfigOptionResponseSchema,
+      params: { sessionId, configId: 'approvalMode', value: 'approve' },
+      label: 'session/set_config_option approvalMode',
     });
 
     // Create a short job with a predictable, multi-line output.
@@ -1196,7 +1291,7 @@ describe('Ent protocol contract (selected coverage)', () => {
     });
     const modelId = models[0].modelId;
 
-    await requestOk({
+    const { sessionId } = await requestOk<{ sessionId: string }>({
       agent,
       method: 'session/new',
       requestSchema: MethodSchemas.SessionNewRequestSchema,
@@ -1209,8 +1304,16 @@ describe('Ent protocol contract (selected coverage)', () => {
       method: 'ent/session/configure',
       requestSchema: MethodSchemas.EntSessionConfigureRequestSchema,
       responseSchema: MethodSchemas.EntSessionConfigureResponseSchema,
-      params: { connectionId, modelId },
+      params: { connectionId },
       label: 'session/configure',
+    });
+    await requestOk({
+      agent,
+      method: 'session/set_config_option',
+      requestSchema: (MethodSchemas as any).SessionSetConfigOptionRequestSchema,
+      responseSchema: (MethodSchemas as any).SessionSetConfigOptionResponseSchema,
+      params: { sessionId, configId: 'model', value: modelId },
+      label: 'session/set_config_option model',
     });
 
     await expect(

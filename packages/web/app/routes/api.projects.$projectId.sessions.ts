@@ -9,6 +9,7 @@ import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.sessions';
 import { getProviderManagementAgent, getSupervisor } from '@lace/web/lib/server/supervisor-service';
+import { configureAgentSession } from '@lace/web/lib/server/agent-session-config';
 
 const CreateSessionSchema = z.object({
   name: z.string().min(1).optional(), // Optional for both flows
@@ -89,15 +90,12 @@ export async function action({ request, params }: Route.ActionArgs) {
       modelId: validatedData.modelId,
     });
 
-    await supervisor.agentRequest({
+    await configureAgentSession(supervisor.agentRequest.bind(supervisor), {
       workspaceSessionId: created.workspaceSessionId,
       sessionId: created.sessionId,
-      method: 'ent/session/configure',
-      requestParams: {
-        connectionId: validatedData.providerInstanceId,
-        modelId: validatedData.modelId,
-        approvalMode: 'ask',
-      },
+      connectionId: validatedData.providerInstanceId,
+      modelId: validatedData.modelId,
+      approvalMode: 'ask',
     });
 
     const sessionData = {
@@ -176,15 +174,12 @@ async function spawnSessionNamingHelper(
     const supervisor = await getSupervisor();
     const mgmt = await getProviderManagementAgent();
 
-    await supervisor.agentRequest({
+    await configureAgentSession(supervisor.agentRequest.bind(supervisor), {
       workspaceSessionId: mgmt.workspaceSessionId,
       sessionId: mgmt.agentSessionId,
-      method: 'ent/session/configure',
-      requestParams: {
-        connectionId: fallbackModel.providerInstanceId,
-        modelId: fallbackModel.modelId,
-        approvalMode: 'ask',
-      },
+      connectionId: fallbackModel.providerInstanceId,
+      modelId: fallbackModel.modelId,
+      approvalMode: 'ask',
     });
 
     const prompt = [

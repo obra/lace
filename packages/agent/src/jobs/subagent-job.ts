@@ -709,13 +709,18 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       // connectionId must still flow through.
       applyEffectiveJobConfig(job, parentEffective);
 
-      // Configure subagent session with provider/model. Persona MCP defaults
-      // flow through session/new so resumed sessions keep their persisted MCP config.
-      const hasConfigurable = job.connectionId || job.modelId;
-      if (hasConfigurable) {
+      // Configure subagent provider connection separately from ACP model config.
+      // Persona MCP defaults flow through session/new so resumed sessions keep their persisted MCP config.
+      if (job.connectionId) {
         await childPeer.request('ent/session/configure', {
-          ...(job.connectionId ? { connectionId: job.connectionId } : {}),
-          ...(job.modelId ? { modelId: job.modelId } : {}),
+          connectionId: job.connectionId,
+        });
+      }
+      if (job.modelId) {
+        await childPeer.request('session/set_config_option', {
+          sessionId: job.subagentSessionId,
+          configId: 'model',
+          value: job.modelId,
         });
       }
 

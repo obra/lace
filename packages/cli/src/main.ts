@@ -556,13 +556,21 @@ async function main(): Promise<void> {
     }
 
     printLine('configure: applying session config');
-    const configured = (await req('ent/session/configure', { connectionId, modelId })) as any;
+    if (!activeSessionId) {
+      printLine('error: no active session');
+      return;
+    }
+    const configured = (await req('ent/session/configure', { connectionId })) as any;
+    await req('session/set_config_option', {
+      sessionId: activeSessionId,
+      configId: 'model',
+      value: modelId,
+    });
     const effectiveConnectionId =
       typeof configured?.config?.connectionId === 'string'
         ? configured.config.connectionId
         : connectionId;
-    const effectiveModelId =
-      typeof configured?.config?.modelId === 'string' ? configured.config.modelId : modelId;
+    const effectiveModelId = modelId;
 
     printLine(
       `configured session: connectionId=${effectiveConnectionId} modelId=${effectiveModelId}`

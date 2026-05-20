@@ -1,5 +1,5 @@
 // ABOUTME: Integration tests for supervisor-backed session configuration API endpoints - GET, PUT
-// ABOUTME: Session configuration is stored on the coordinator agent session via ent/session/configure
+// ABOUTME: Provider connection uses Ent; model and permission mode use ACP config options
 
 import { describe, it, expect, afterEach } from 'vitest';
 import {
@@ -81,6 +81,7 @@ describe('Session Configuration API', () => {
   it('PUT /api/sessions/:sessionId/configuration updates coordinator config', async () => {
     const supervisor = await getSupervisor();
     const created = await supervisor.createWorkspaceSession(context.tempProjectDir);
+    const requestSpy = vi.spyOn(supervisor, 'agentRequest');
 
     const request = new Request(
       `http://localhost/api/sessions/${created.workspaceSessionId}/configuration`,
@@ -103,6 +104,32 @@ describe('Session Configuration API', () => {
     expect(response.status).toBe(200);
     expect(data.configuration.providerInstanceId).toBe('conn_updated');
     expect(data.configuration.modelId).toBe('model_updated');
+    expect(requestSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'ent/session/configure',
+        requestParams: { connectionId: 'conn_updated' },
+      })
+    );
+    expect(requestSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'session/set_config_option',
+        requestParams: expect.objectContaining({
+          sessionId: created.sessionId,
+          configId: 'model',
+          value: 'model_updated',
+        }),
+      })
+    );
+    expect(requestSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'session/set_config_option',
+        requestParams: expect.objectContaining({
+          sessionId: created.sessionId,
+          configId: 'approvalMode',
+          value: 'dangerouslySkipPermissions',
+        }),
+      })
+    );
   });
 
   it('PUT /api/sessions/:sessionId/configuration returns 400 for invalid session ID format', async () => {
