@@ -31,6 +31,21 @@ describe('HostToolRuntime', () => {
     expect(result.stdout).toBe(dir);
   });
 
+  it('returns structured results for commands that exit non-zero', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
+
+    const result = await runtime.process.exec([
+      'node',
+      '-e',
+      "process.stdout.write('out'); process.stderr.write('err'); process.exit(3);",
+    ]);
+
+    expect(result.exitCode).toBe(3);
+    expect(result.stdout).toBe('out');
+    expect(result.stderr).toBe('err');
+  });
+
   it('writes text files through runtime fs', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
     const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });

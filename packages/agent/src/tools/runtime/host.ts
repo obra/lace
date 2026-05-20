@@ -15,6 +15,17 @@ import type {
 
 const execFileAsync = promisify(execFile);
 
+interface ExecFileError extends Error {
+  code?: string | number;
+  stdout?: string | Buffer;
+  stderr?: string | Buffer;
+}
+
+function outputToString(output: string | Buffer | undefined): string {
+  if (output === undefined) return '';
+  return typeof output === 'string' ? output : output.toString('utf8');
+}
+
 class HostPathService implements RuntimePathService {
   constructor(private readonly cwd: string) {}
 
@@ -76,13 +87,23 @@ class HostProcessRunner implements RuntimeProcessRunner {
   async exec(command: string[], opts: RuntimeProcessOptions = {}) {
     const [file, ...args] = command;
     if (!file) throw new Error('runtime process command is empty');
-    const result = await execFileAsync(file, args, {
-      cwd: opts.cwd ?? this.cwd,
-      env: opts.env,
-      signal: opts.signal,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-    return { exitCode: 0, stdout: result.stdout, stderr: result.stderr };
+    try {
+      const result = await execFileAsync(file, args, {
+        cwd: opts.cwd ?? this.cwd,
+        env: opts.env,
+        signal: opts.signal,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      return { exitCode: 0, stdout: result.stdout, stderr: result.stderr };
+    } catch (error) {
+      const execError = error as ExecFileError;
+      if (typeof execError.code !== 'number') throw error;
+      return {
+        exitCode: execError.code,
+        stdout: outputToString(execError.stdout),
+        stderr: outputToString(execError.stderr),
+      };
+    }
   }
 
   async start(command: string[], opts: RuntimeProcessOptions = {}) {
