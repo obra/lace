@@ -12,6 +12,10 @@ function permissionKey(agentSessionId: string, toolCallId: string): string {
   return `${agentSessionId}:${toolCallId}`;
 }
 
+function isPromptingToolStatus(status: string): boolean {
+  return status === 'pending' || status === 'awaiting_permission';
+}
+
 export type PendingPermissionDecision = {
   decision: 'allow' | 'deny';
   updatedInput?: Record<string, unknown>;
@@ -54,9 +58,13 @@ export class PendingPermissionsTracker {
     const agentSessionId = typeof update.sessionId === 'string' ? update.sessionId : '';
 
     if (!toolCallId || !name || !agentSessionId) return;
-    if (status !== 'pending' && status !== 'awaiting_permission') return;
 
     const key = permissionKey(agentSessionId, toolCallId);
+    if (!isPromptingToolStatus(status)) {
+      this.clearToolPermission(key, workspaceSessionId, agentSessionId);
+      return;
+    }
+
     this.pendingToolCalls.set(key, {
       workspaceSessionId,
       agentSessionId,
@@ -159,6 +167,29 @@ export class PendingPermissionsTracker {
     });
 
     return { ok: true };
+  }
+
+  private clearToolPermission(
+    key: string,
+    workspaceSessionId: string,
+    agentSessionId: string
+  ): void {
+    const pendingToolCall = this.pendingToolCalls.get(key);
+    if (
+      pendingToolCall?.workspaceSessionId === workspaceSessionId &&
+      pendingToolCall.agentSessionId === agentSessionId
+    ) {
+      this.pendingToolCalls.delete(key);
+    }
+
+    const pendingPermission = this.pendingPermissions.get(key);
+    if (
+      pendingPermission?.workspaceSessionId === workspaceSessionId &&
+      pendingPermission.agentSessionId === agentSessionId
+    ) {
+      this.pendingPermissions.delete(key);
+      pendingPermission.resolve({ decision: 'deny' });
+    }
   }
 
   clearWorkspace(workspaceSessionId: string): void {
