@@ -78,9 +78,11 @@ function rehydrateServerConfigFromSession(
   }
 }
 
-function applyMcpServersToActiveSession(state: AgentServerState, mcpServers: unknown): void {
-  if (!state.activeSession) return;
-  const currentState = readSessionState(state.activeSession.dir);
+function mergeMcpServersIntoLoadedSession(
+  loaded: LoadedSession,
+  mcpServers: McpServerConfig[]
+): LoadedSession {
+  const currentState = loaded.state;
   const currentConfig = currentState.config ?? {};
   const nextState: SessionState = {
     ...currentState,
@@ -89,8 +91,7 @@ function applyMcpServersToActiveSession(state: AgentServerState, mcpServers: unk
       mcpServers: mergeMcpServers(currentConfig.mcpServers, mcpServers),
     },
   };
-  writeSessionState(state.activeSession.dir, nextState);
-  state.activeSession = { ...state.activeSession, state: nextState };
+  return { ...loaded, state: nextState };
 }
 
 function abortActiveTurn(state: AgentServerState): void {
@@ -131,12 +132,6 @@ async function activateStoredSession(
     };
   }
 
-  const switchingSessions =
-    state.activeSession && state.activeSession.meta.sessionId !== params.sessionId;
-  if (switchingSessions) {
-    await releaseRunningSessionWork(peer, state, runExclusive);
-  }
-
   let loaded;
   try {
     loaded = loadSession(params.sessionId);
@@ -150,9 +145,17 @@ async function activateStoredSession(
     }
     throw error;
   }
-  state.activeSession = loaded;
 
-  applyMcpServersToActiveSession(state, params.mcpServers);
+  const loadedWithMcpServers = mergeMcpServersIntoLoadedSession(loaded, params.mcpServers);
+  const switchingSessions =
+    state.activeSession && state.activeSession.meta.sessionId !== params.sessionId;
+
+  writeSessionState(loadedWithMcpServers.dir, loadedWithMcpServers.state);
+  if (switchingSessions) {
+    await releaseRunningSessionWork(peer, state, runExclusive);
+  }
+
+  state.activeSession = loadedWithMcpServers;
   rehydrateServerConfigFromSession(state, state.activeSession.state);
 
   await reconcileMcpServersForActiveSession(state);

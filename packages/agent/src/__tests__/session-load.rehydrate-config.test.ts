@@ -10,6 +10,7 @@ import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
 import { defaultInitializeParams } from './helpers/initialize';
 import { loadSession } from '../storage/session-store';
+import type { JobState } from '../server-types';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -162,5 +163,44 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     expect(resumeState.activeSession?.state.config?.mcpServers).toEqual([
       { name: 'shared', command: process.execPath, args: ['new'], enabled: false },
     ]);
+  });
+
+  it('keeps the current session and jobs when load rejects invalid MCP servers', async () => {
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', defaultInitializeParams());
+    const first = (await client.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+    const second = (await client.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    const runningJob: JobState = {
+      jobId: 'job_current',
+      type: 'bash',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+      outputPath: join(tempDir, 'job_current.log'),
+      finished: false,
+      completion: new Promise(() => undefined),
+      resolveCompletion: () => undefined,
+    };
+    state.jobManager.getRunningJobs().set(runningJob.jobId, runningJob);
+
+    await expect(
+      client.request('session/load', {
+        sessionId: first.sessionId,
+        cwd: tempDir,
+        mcpServers: [{ name: 'bad-transport', command: process.execPath, transport: 'http' }],
+      })
+    ).rejects.toMatchObject({ code: -32602 });
+
+    expect(state.activeSession?.meta.sessionId).toBe(second.sessionId);
+    expect(state.jobManager.getRunningJobs().get(runningJob.jobId)).toBe(runningJob);
+    expect(runningJob.status).toBe('running');
   });
 });
