@@ -7,6 +7,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  AcpErrorCodes,
   createNdjsonStdioTransport,
   JsonRpcPeer,
   JSONRPC_ERROR_CANCELLED,
@@ -75,7 +76,7 @@ describe('ACP session cancellation', () => {
     server.close();
   });
 
-  it('closes the active session and aborts its active turn', async () => {
+  it('rejects session/close while a turn is active', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
@@ -93,12 +94,15 @@ describe('ACP session cancellation', () => {
       abortController,
     };
 
-    const result = await client.request('session/close', { sessionId: created.sessionId });
+    await expect(
+      client.request('session/close', { sessionId: created.sessionId })
+    ).rejects.toMatchObject({
+      code: AcpErrorCodes.SessionBusy,
+    });
 
-    expect(result).toEqual({});
-    expect(abortController.signal.aborted).toBe(true);
-    expect(state.activeTurn).toBeNull();
-    expect(state.activeSession).toBeNull();
+    expect(abortController.signal.aborted).toBe(false);
+    expect(state.activeTurn).toBeTruthy();
+    expect(state.activeSession?.meta.sessionId).toBe(created.sessionId);
 
     client.close();
     server.close();

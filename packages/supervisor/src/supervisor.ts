@@ -184,7 +184,7 @@ export class Supervisor {
       SessionNewResponseSchema.shape.result,
       {
         cwd: workDir,
-        mcpServers: options?.mcpServers ?? [],
+        ...(options?.mcpServers !== undefined ? { mcpServers: options.mcpServers } : {}),
         ...(options?.persona ? { persona: options.persona } : {}),
       }
     );

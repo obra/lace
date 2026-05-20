@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { resolve } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { SupervisorAgentProcess } from '../supervisor-agent-process';
 import { Supervisor } from '../supervisor';
 import { createE2EContext } from './helpers';
@@ -234,6 +235,37 @@ describe('Supervisor (E2E)', () => {
 
     expect(status.mcpServers?.find((s) => s.name === 'project-test')).toMatchObject({
       name: 'project-test',
+      status: 'connected',
+    });
+  });
+
+  it('preserves persona MCP defaults when spawning an agent without explicit MCP servers', async () => {
+    supervisor = new Supervisor({ storeDir: ctx.laceDir });
+    const fixturePath = resolve('../web/test-utils/fixtures/mcp-stdio-test-server.cjs');
+    const personasDir = join(ctx.laceDir, 'agent-personas');
+    mkdirSync(personasDir, { recursive: true });
+    writeFileSync(
+      join(personasDir, 'persona-mcp.md'),
+      `---
+mcpServers:
+  persona-test:
+    command: ${JSON.stringify(process.execPath)}
+    args: [${JSON.stringify(fixturePath)}]
+---
+Persona with MCP defaults.`
+    );
+
+    const ws = await supervisor.createWorkspaceSession(ctx.workDir);
+    const agent = await supervisor.createAgentSession(ws.workspaceSessionId, {
+      persona: 'persona-mcp',
+    });
+
+    const status = (await (
+      await supervisor.getPeer(ws.workspaceSessionId, agent.sessionId)
+    ).request('ent/agent/status', {})) as { mcpServers?: Array<{ name: string; status: string }> };
+
+    expect(status.mcpServers?.find((s) => s.name === 'persona-test')).toMatchObject({
+      name: 'persona-test',
       status: 'connected',
     });
   });

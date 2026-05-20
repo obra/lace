@@ -475,6 +475,12 @@ export function registerSessionHandlers(
         data: { category: 'session' },
       };
     }
+    if (state.activeTurn)
+      throw {
+        code: AcpErrorCodes.SessionBusy,
+        message: 'SessionBusy',
+        data: { category: 'session' },
+      };
 
     abortActiveTurn(state);
     await killAllRunningJobs(state.jobManager.getRunningJobs());

@@ -110,9 +110,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     let created;
     try {
       const project = ws.projectId ? Project.getById(ws.projectId) : undefined;
+      const mcpServers = project ? mcpServersForProject(project) : undefined;
       created = await supervisor.createAgentSession(workspaceSessionId, {
         persona,
-        ...(project ? { mcpServers: mcpServersForProject(project) } : {}),
+        ...(mcpServers && mcpServers.length > 0 ? { mcpServers } : {}),
       });
     } catch (error) {
       // Log full error for server debugging while keeping client response sanitized
