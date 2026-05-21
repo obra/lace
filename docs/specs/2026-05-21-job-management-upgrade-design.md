@@ -265,16 +265,16 @@ is missing. Borrowed wholesale:
 |--------------------------------------------------|:----:|:-------------------:|:----------:|:--------:|
 | Async spawn that returns a handle                |  ✓   |          —          |     ✓      |   ok     |
 | Sync `blocking=true` spawn-and-wait              |  ✓   |          —          |     ✓ (sync mode)     |   ok     |
+| Resumable subagent sessions                      | partial | — | ✓ (`session/resume`, `subagentSessionId`) | ok |
 | Tool-level `wait(handle, timeout)`               |  ✓   |          —          | partial (`job_output block=true`) | **high** |
 | Minimum-wait-timeout guard against polling       |  ✓   |          —          |     ✗      | **high** |
 | Auto-injected completion notification            |  —   |    ✓ (on exit)      |     ✓ (queued; idle-only wake) | medium |
 | Mid-turn wake on notification                    |  —   |          ✓          | ✗ (PRI-1691 fixes) | **high** |
 | Opt-in subscription per-job (`job_notify`)       |  —   |          ✓          |     ✗      | **high** |
-| Subscriber-side filter (per-line or per-event)   |  —   |          ✓          |     ✗      |  medium  |
-| 200ms batching of bursty lines                   |  —   |          ✓          |     ✗      |  medium  |
+| Subscriber-side filter (regex/predicate)         |  —   |          ✓          |     ✗      |  medium  |
+| 200ms batching of bursty events                  |  —   |          ✓          |     ✗      |  medium  |
 | Overflow auto-stop                               |  —   |          ✓          |     ✗      |  medium  |
 | Persistent vs bounded subscription               |  —   |          ✓          |  partial (progress timer is on-or-off) | medium |
-| Idle-but-not-exited notification                 |  —   |          —          |     ✗ (job ends on first stopReason today) | medium |
 | Structured subagent→parent message (`communicate`) | ✓ |          —          |     ✗ — *deferred, see below*    | — |
 | `resume_agent` semantics (steer-if-running, restart-if-idle) | ✓ |   —     | partial (`delegate(resume=...)` only after job ends) | medium |
 | Depth limit on delegation                        |  ✓   |          —          |   unknown — needs audit |  low |
@@ -293,8 +293,8 @@ lift:
 
 - The subagent's final assistant turn already *is* the structured
   result; lace captures it on exit and the parent reads it.
-- "For-parent vs log noise" is solved by subscriber-side filter (Phase 2
-  below), e.g. `job_notify(jobId, on=['output'], filter='^RESULT:')`
+- "For-parent vs log noise" is solved by subscriber-side filter (Phase
+  2 below), e.g. `job_notify(jobId, on=['progress'], filter='^RESULT:')`
   paired with a persona convention.
 - "Asks-a-question-then-stops" is already a serialized handoff: the
   subagent ends its turn with the question, parent reads it, parent
@@ -307,18 +307,59 @@ Do not ship a `communicate` tool in this work.
 
 ## Proposed design
 
-The thesis: lace's existing notification queue is the right *substrate*.
-The fix is to expose it as a first-class subscription tool, harden it
-against polling, add a typed subagent→parent channel, and tighten the
-operational defaults so the cheap path is the obvious path.
+The thesis: lace's existing notification queue is the right *substrate*,
+and lace's existing job-lifecycle vocabulary is the right *contract*.
+The fix is to expose both as a first-class subscription tool, harden the
+surface against polling, and tighten the operational defaults so the
+cheap path is the obvious path.
+
+### Subagent sessions are already persistent — lean on that
+
+Critical correction from earlier revisions of this doc: **lace's
+subagent SESSIONS persist across jobs.** Each `delegate(prompt=...)`
+call creates a new ephemeral *job*. If the call has `resume=jobId`, the
+new job binds to the prior job's `subagentSessionId` via
+`session/resume` (`packages/agent/src/jobs/subagent-job.ts:662-669`);
+otherwise it creates a fresh session via `session/new`. The session id
+is persisted in a durable `job_session_assigned` event
+(`subagent-job.ts:688-704`) and survives parent restart, session
+close, and even displacement by `session/new`
+(`packages/agent/src/rpc/handlers/session.ts:109-120` —
+`releaseRunningSessionWork` kills running jobs but does not delete
+on-disk session state; `loadSession` reads it back later). The
+formatted notification block lace already emits today literally tells
+the parent how to resume
+(`packages/agent/src/jobs/format-notification.ts:135`):
+
+    To continue the conversation: delegate(resume="${jobId}", prompt="...")
+
+There is no runtime code path that destroys a session. The only
+`session_ended` reference in the codebase is in a test fixture.
+
+This is the **load-bearing mental model** for the upgrade:
+
+> A delegate **job** is one round. A delegate **session** is the whole
+> conversation. Every `delegate(prompt=...)` creates a new job under a
+> (new or resumed) session. `job_notify` wakes you when *this job*
+> finishes. You decide whether *the session* keeps going via
+> `delegate(resume=jobId, prompt=...)`.
+
+If the agent understands that split, polling stops looking attractive
+("wait for the job to finish, then decide" is the obvious move) and the
+resume mechanic stops looking like an exotic feature ("this is just how
+you continue a conversation"). The rewritten `delegate` and
+`job_notify` tool descriptions must teach this distinction explicitly.
 
 ### New tool: `job_notify`
 
-Subscribe to lifecycle and (optionally) output events from a job. Returns
-immediately. When the job transitions through a subscribed state, a
-`<background-job-notification>` block is synthesized into the parent's
-inbox via the existing
+Subscribe to job-lifecycle notifications. Returns immediately. When the
+job transitions to a subscribed state, a `<background-job-notification>`
+block is synthesized into the parent's inbox via the existing
 `packages/agent/src/rpc/handlers/prompt.ts:104` injection path.
+
+The vocabulary matches lace's existing `JobNotificationType`
+(`packages/agent/src/server-types.ts:69`): `completed | failed |
+cancelled | progress`. No new lifecycle types are invented.
 
 ```typescript
 // packages/agent/src/tools/implementations/job_notify.ts
@@ -330,19 +371,19 @@ import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 const jobNotifySchema = z
   .object({
     jobId: NonEmptyString,
-    /** Which lifecycle states to wake the parent on.
-        - 'idle'   — subagent's main loop returned with no further tool
-                     calls (model is "done for now"); the job may still
-                     be alive and resumable. See "Idle vs exited" below
-                     for the as-of-today caveat.
-        - 'exited' — job has finalized: completed | failed | cancelled.
-        Default subscribes to both. */
+    /** Which job notifications to wake the parent on. Matches
+        JobNotificationType in server-types.ts.
+        - 'completed' | 'failed' | 'cancelled' — sparse terminal states.
+        - 'progress' — chatty: timer-based byte-delta + tail preview.
+        Default subscribes to the three terminal states only. */
     on: z
-      .array(z.enum(['idle', 'exited']))
+      .array(z.enum(['completed', 'failed', 'cancelled', 'progress']))
       .min(1)
-      .default(['idle', 'exited']),
-    /** Per-line regex applied to subagent stdout. Only matching lines
-        trigger output-stream notifications. Phase 2 only. */
+      .default(['completed', 'failed', 'cancelled']),
+    /** Optional regex applied subscriber-side. No-op for sparse
+        terminal-state subscriptions (`completed`/`failed`/`cancelled`).
+        When subscribing to `progress`, matches against the tail
+        preview text — non-matching ticks are dropped. Phase 2. */
     filter: z.string().optional(),
     /** Cancel the subscription after this many notifications have been
         delivered. Default: unlimited. */
@@ -356,58 +397,52 @@ const jobNotifySchema = z
 
 Return shape: `{ subscribed: true, jobId, subscriptionId, on, filter?, expiresAt }`.
 
-The synthesized notification block carries a `state` field
-(`idle | exited`) plus, for `exited`, the existing `outcome`
-(`completed | failed | cancelled`) and `exitCode`. The parent inspects
-the payload — including a preview of the output — and decides whether to
-follow up (`delegate(resume=...)`), close the job, or move on. Lace does
-*not* second-guess whether the output is "useful"; that's the parent's
-call.
+The synthesized notification block keeps the wire shape that
+`packages/agent/src/jobs/format-notification.ts` already produces today
+— `type`, `outcome`/`exitCode`, `duration`, output size, last-N-lines
+preview, plus the existing in-line resume hint for delegate jobs. The
+parent inspects the payload and decides what to do: act on the output,
+`delegate(resume=jobId, prompt=...)` to keep the session going, or
+move on. Lace does not second-guess whether the output is "useful";
+that's the parent's call.
 
 **Default behavior** (matches PRI-1692 acceptance criteria):
-`job_notify(jobId)` = `{ on: ['idle', 'exited'] }`. Parent wakes on
-either signal, reads the payload, decides what to do.
+`job_notify(jobId)` with no other args = `{ on: ['completed',
+'failed', 'cancelled'] }`. Parent wakes on any terminal outcome,
+reads the payload, decides.
 
-**Idle vs exited — current implementation caveat:** today, lace's
-subagent job finalizes on the first `stopReason` it receives from the
-child (`packages/agent/src/jobs/subagent-job.ts:732`), so the job
-transitions from `running` straight to `completed`/`failed` — there is
-*no* in-between idle state. Under the current implementation,
-`'idle'` and `'exited'` fire simultaneously. This is a known
-divergence from serf's model where the subagent's `ProcessInput`
-return is distinct from session close. The `on=['idle','exited']`
-design is forward-compatible: when lace gains a long-lived subagent
-session (which the resumable-session story already implies), `idle`
-fires on each turn-end and `exited` fires only on session close. Until
-then, subscribing to both is correct and the dual-firing is harmless
-(de-duped by the JobManager fanout).
+**`progress` is opt-in.** Today's timer-based progress notifications
+fire every 5 minutes for every delegate job that has a progress
+interval configured (`packages/agent/src/jobs/job-notifications.ts:87`,
+`packages/agent/src/server-types.ts:56`). With `job_notify` available,
+the default `progressIntervalMs` should drop to `null` (Phase 3) and
+the agent that wants periodic updates explicitly subscribes:
+`job_notify(jobId, on=['progress'], filter='^ERROR:|^FATAL:')`. The
+filter is strongly encouraged for `progress` subscriptions; the tool
+description names it as the standard pattern.
 
-**Mapping to lace's existing notification types**
-(`packages/agent/src/server-types.ts:69`): the current
-`JobNotificationType = 'completed' | 'failed' | 'cancelled' | 'progress'`
-collapses into `state='exited'` with `outcome` carrying the
-specific terminal. The `progress` type is orthogonal — kept for the
-opt-in timer path, but not part of `on=[]`. Phase 2 adds `output` as a
-separate stream-shaped channel below.
+**Subscription scope.** Per-jobId. A `delegate(resume=jobId, ...)`
+call creates a *new* jobId. If the agent wants notifications on the
+resumed cycle, it re-subscribes via `job_notify(newJobId)`. No
+ambient state across resumes; smaller surface; no "did my old sub
+follow the resume?" guessing.
 
 **Operational discipline borrowed from `Monitor`:**
 
-- The `filter` regex applies *at the producer side* for output streams
-  (Phase 2) — lines that don't match never become notifications. Cuts
-  conversation noise.
-- 200ms batching window: stdout lines emitted within 200ms group into a
-  single notification block (Phase 2).
-- Coverage discipline baked into the tool description: "If you
-  subscribe only to `output`, you will not be notified when the job
-  crashes silently. Always include `exited` (or use the default `on`)
-  unless you've also armed a separate subscription for terminal
-  state." (Mirrors Monitor's "silence is not success.")
-- Auto-stop on overflow: if a single subscription would emit more than
-  N notifications in M seconds (proposed: 20 in 60s), the subscription
-  is cancelled and a synthetic `<subscription-overflow>` notification
-  is delivered explaining what happened (Phase 2).
-- Idempotent: subscribing twice to the same `jobId` with the same `on`
-  set returns the existing subscription's id.
+- Coverage discipline in the tool description: "Subscribe to terminal
+  states unless you've separately armed something to catch failures.
+  A `progress`-only subscription stays silent through a crash."
+  (Mirrors Monitor's "silence is not success.")
+- 200ms batching window: notifications emitted within 200ms group into
+  a single block (matters mainly for `progress` and Phase 2 output).
+- Auto-stop on overflow: if a single subscription would emit more
+  than N notifications in M seconds (proposed: 20 in 60s), the
+  subscription auto-cancels and a synthetic `<subscription-overflow>`
+  notification arrives explaining what happened. The subscriber can
+  re-subscribe with a tighter `filter`. Mostly relevant to `progress`
+  and Phase 2 output subscriptions; sparse terminals can't trip it.
+- Idempotent: subscribing twice to the same `jobId` with the same
+  `on` set returns the existing subscription's id.
 
 ### Removed: `job_output(block=true)` as the wait primitive
 
@@ -425,9 +460,10 @@ pre-v1 surface.
 
 Considered borrowing serf's `communicate` tool (see "Why
 `communicate` is deferred, not shipped" above). Deferred. The parent
-reads the subagent's final output on `exited` (or its in-flight output
-via Phase 2's `output` subscription with a `^RESULT:` filter), inspects
-it, and decides what to do. No new tool ships in this work.
+reads the subagent's final output on `completed`/`failed`/`cancelled`
+(or its in-flight progress via Phase 2's `progress` subscription with
+a `^RESULT:` filter), inspects it, and decides whether to act, resume,
+or move on. No new tool ships in this work.
 
 If typed multi-message streaming becomes a concrete need, resurrect
 the `communicate` design from the prior revision of this doc; the
@@ -466,9 +502,11 @@ Concrete changes:
 1. **Rewrite tool descriptions** for `delegate`, `job_notify`,
    `job_output`, `jobs_list`, `job_kill` to embed the
    notify-and-return-to-user pattern as the canonical usage. Cover the
-   coverage discipline (subscribe to `exited` unless you've separately
-   armed something), the polling anti-pattern, and the
-   `delegate(resume=...)` continuation flow.
+   **job vs session** distinction (every `delegate` is a new job; the
+   session behind it persists; `delegate(resume=jobId)` continues the
+   conversation), the coverage discipline (subscribe to terminal
+   states unless you've separately armed something), the polling
+   anti-pattern, and the `delegate(resume=...)` continuation flow.
 2. **Shrink `delegation.md`** to ≤3 sentences: a routing-preference
    pointer plus "see the `delegate` tool description for usage." Same
    for any equivalent sections in other personas.
@@ -550,10 +588,13 @@ JobManager additions:
 
 ```typescript
 // packages/agent/src/jobs/job-manager.ts
+type SubscribableKind = 'completed' | 'failed' | 'cancelled' | 'progress';
+// Phase 2 may add an event-based 'output' kind; see Open Questions.
+
 interface JobSubscription {
   subscriptionId: string;
   jobId: string;
-  on: Array<'idle' | 'exited' | 'output'>;  // 'output' is Phase 2
+  on: SubscribableKind[];
   filter?: RegExp;
   maxNotifications?: number;
   expiresAt: number;
@@ -569,75 +610,79 @@ class JobManager {
   subscribe(opts: SubscribeOptions): JobSubscription { /* ... */ }
   unsubscribe(subscriptionId: string): void { /* ... */ }
 
-  /** Called by subagent-job.ts whenever the subagent's main loop
-      returns ('idle'), whenever a line of stdout is appended
-      ('output', Phase 2), and at finalize ('exited'). */
-  fanout(
-    jobId: string,
-    kind: 'idle' | 'exited' | 'output',
-    payload: unknown
-  ): void { /* ... */ }
+  /** Called by createFinalizeJob and the progress timer. The kind
+      matches JobNotificationType. */
+  fanout(jobId: string, kind: SubscribableKind, payload: unknown): void { /* ... */ }
 }
 ```
 
-The `fanout` call lands two existing hot paths:
+`fanout` lands in two existing hot paths — no new event types,
+no new emission sites:
 
-- `createFinalizeJob` (`job-notifications.ts:128`) already queues a
-  completion notification; convert it to a `fanout(..., 'exited', ...)`
-  carrying `{outcome, exitCode}`, and let the queueing happen inside
-  `fanout` for every matching subscription (plus, for back-compat, one
-  default-shape notification if no subscription exists — so parents
-  that haven't subscribed still get the existing automatic completion
-  ping).
-- `subagent-job.ts:732` (where `stopReason` resolves to a terminal
-  status) is also where the subagent's main loop has just returned —
-  emit `fanout(jobId, 'idle', {stopReason})` immediately *before*
-  finalizing. As noted in the idle-vs-exited caveat above, under
-  today's tear-down-on-first-stopReason behavior these fire back-to-back
-  and de-dupe inside `fanout`. The split is wired in so the design is
-  ready for a future long-lived subagent session.
-- Phase 2: `subagent-job.ts` already buffers stdout via the job-log
-  writer; adding `fanout(jobId, 'output', line)` per buffered line is
-  mechanical.
+- `createFinalizeJob` (`packages/agent/src/jobs/job-notifications.ts:128`)
+  already queues a completion notification with the correct
+  `JobNotificationType`. Convert that queue-push into a
+  `fanout(jobId, type, payload)` call. Subscribers matching that
+  jobId + kind get their notification queued. **Back-compat**: if no
+  subscription exists for the job, fall back to the current
+  always-on queueing so parents that haven't subscribed still get the
+  existing automatic completion ping. This preserves today's
+  behavior for any caller that hasn't been updated yet, and removes a
+  failure mode where a forgotten `job_notify` call silently swallows
+  exit visibility.
+- `createSetupProgressTimer` (`job-notifications.ts:87`) similarly
+  becomes `fanout(jobId, 'progress', payload)`. Subscribers to
+  `progress` receive ticks; non-subscribers don't (once Phase 3 drops
+  the default `progressIntervalMs` to `null`, the timer doesn't run
+  at all unless someone asked).
+
+Phase 2 may add an event-based `output` kind for per-line stdout
+fanout — see Open Questions for whether it shares the `progress`
+slot or becomes a distinct kind.
 
 ### Test plan
 
-- **`job_notify` happy path (default `on`)**: dispatch a delegate job,
-  call `job_notify(jobId)`, wait synthetically for the child to exit,
-  assert exactly one notification appears in the parent's prompt
-  content on the next turn carrying `state='exited'` with the right
+- **`job_notify` happy path (default `on`)**: dispatch a delegate
+  job, call `job_notify(jobId)`, wait synthetically for the child to
+  finish, assert exactly one notification appears in the parent's
+  prompt content on the next turn with `type='completed'` plus
   `outcome` and `exitCode`.
-- **`on=['idle']` only**: dispatch a job, subscribe with `on=['idle']`,
-  assert the parent wakes on subagent stopReason. Under the
-  today-collapsed implementation, this fires at the same instant as the
-  exit; explicitly test that `on=['idle']` *without* `'exited'` still
-  delivers one notification (idle is sufficient — no silent drop).
-- **`on=['exited']` only**: subscribe with `on=['exited']`, assert the
-  parent gets exactly one exit notification and no duplicate from the
-  collapsed idle.
-- **De-dupe under collapsed firing**: subscribe with the default
-  `on=['idle','exited']`. Under today's behavior, idle and exited
-  collapse — assert exactly one notification, not two.
-- **`job_notify` with `on=['output']` + `filter`** (Phase 2): dispatch
-  a job that prints 5 lines, only 2 of which match `^ERROR`. Assert
-  exactly two notifications, batched if within 200ms.
-- **Overflow auto-stop** (Phase 2): dispatch a job that prints 100
-  lines/sec for 10sec; subscribe with `on=['output']`, no filter.
-  Assert the subscription is auto-cancelled after the threshold and a
-  synthetic overflow notification arrives.
+- **`on=['failed']` only**: subscribe with `on=['failed']`, dispatch
+  a job that succeeds, assert no notification. Run again with a job
+  that fails, assert exactly one notification.
+- **`on=['cancelled']`**: subscribe, then `job_kill(jobId)`, assert
+  exactly one notification with `type='cancelled'`.
+- **Back-compat: no subscription**: dispatch a delegate job *without*
+  calling `job_notify`. Assert the existing always-on completion
+  notification still arrives (matches today's behavior; no caller
+  regresses).
+- **Resume creates a new jobId, requires re-subscribe**: dispatch
+  job A, subscribe, wait for completion, then
+  `delegate(resume=A.jobId, prompt=...)` → job B. Assert subscription
+  on A does *not* fire for B's completion; assert
+  `job_notify(B.jobId)` then does.
+- **`on=['progress']` with `filter`** (Phase 2): configure a job with
+  a short `progressIntervalMs`; subscribe with
+  `filter='^ERROR:'`. Assert only ticks whose tail-preview matches
+  produce notifications.
+- **Overflow auto-stop** (Phase 2): force a high progress emission
+  rate; subscribe with `on=['progress']`, no filter. Assert
+  subscription auto-cancels after the threshold and a synthetic
+  `<subscription-overflow>` notification arrives.
 - **Mid-turn delivery (paired with PRI-1691)**: while parent is
-  mid-turn in some other tool, subscribed jobId exits. Assert the
-  notification preempts via mid-turn injection rather than waiting for
-  turn end.
+  mid-turn in some other tool, subscribed jobId completes. Assert
+  the notification preempts via mid-turn injection rather than
+  waiting for turn end.
 - **Minimum-timeout guard on `job_output`**: assert that `job_output`
-  with `block=true, timeoutMs=1000` is either rejected or clamped to
+  with `block=true, timeoutMs=1000` is rejected or clamped to
   120_000 (mirror serf's `minWaitTimeoutMS`).
 - **Subscription idempotency**: call `job_notify(jobId)` twice with
   identical args; assert the second call returns the same
-  `subscriptionId` and no second notification fires on a single exit.
-- **Restart recovery**: kill lace mid-job, restart, assert the
-  orphaned subagent's OS process is reaped and the job is marked
-  failed in `events.jsonl`.
+  `subscriptionId` and no duplicate notification fires on a single
+  completion.
+- **Restart recovery** (Phase 3): kill lace mid-job, restart, assert
+  the orphaned subagent's OS process is reaped and the job is
+  marked failed in `events.jsonl`.
 
 ### Migration / backwards-compat
 
@@ -663,31 +708,43 @@ Phased so each lands with its own tests and is independently mergeable:
 **Phase 1 — wake-the-parent core (closes PRI-1692 acceptance):**
    - Add `JobManager.subscribe / unsubscribe / fanout`.
    - Add `JobNotifyTool`; register on top-level agent.
-   - Wire `fanout('idle', ...)` immediately before finalize in
-     `subagent-job.ts:732`; wire `fanout('exited', ...)` from
-     `createFinalizeJob` (`job-notifications.ts:128`).
-   - Implement de-dup so collapsed idle+exited fire one notification
-     when a subscriber wants both.
+   - Convert `createFinalizeJob`'s queue-push into a `fanout(jobId,
+     type, payload)` call (`packages/agent/src/jobs/job-notifications.ts:128`).
+     Preserve back-compat: if no subscription exists, still queue the
+     existing always-on completion ping.
    - Rewrite tool descriptions for `delegate`, `job_notify`,
      `job_output`, `jobs_list`, `job_kill` per the guidance section
-     above. Shrink `delegation.md`.
-   - Tests: happy path, `on=['idle']` only, `on=['exited']` only,
-     default `on`, idempotency.
+     above. The `delegate` description must teach the *job vs
+     session* distinction explicitly. Shrink `delegation.md` to ≤3
+     sentences of routing-preference prose.
+   - Clamp `job_output(block=true)` blocking timeout to a 120_000ms
+     minimum (the cheap polling guard, doesn't need to wait for
+     Phase 3's full deprecation).
+   - Tests: happy path, per-terminal-state subscriptions,
+     back-compat (no subscription), resume creates new jobId,
+     idempotency, mid-turn delivery (paired with PRI-1691).
 
-**Phase 2 — `output` subscriptions with discipline:**
-   - Wire `fanout('output', line)` from `subagent-job.ts`.
+**Phase 2 — `progress` subscriptions with discipline:**
+   - Convert `createSetupProgressTimer`'s queue-push into
+     `fanout(jobId, 'progress', payload)`.
    - Implement subscriber-side filter regex, 200ms batching, overflow
      auto-stop.
-   - Add output-discipline notes to the `job_notify` tool description
-     (Monitor's "silence is not success" + coverage rules).
+   - Add coverage-discipline notes to the `job_notify` tool
+     description (Monitor's "silence is not success" + the
+     `filter='^ERROR:'` pattern for progress subscriptions).
+   - Optional: introduce an event-based `output` kind distinct from
+     timer-based `progress` (see Open Questions).
 
 **Phase 3 — tighten the rest:**
-   - Deprecate `job_output(block=true)`; clamp any remaining blocking
-     wait to a 120_000ms minimum.
-   - Default `progressIntervalMs` to `null`.
-   - `job_output(byteOffset)` wired for incremental reads, or removed.
-   - Restart-recovery: reap orphaned subagent processes on
-     `JobManager` boot.
+   - Deprecate `job_output(block=true)` entirely; the polling path is
+     gone.
+   - Default `progressIntervalMs` to `null` (no timer unless a
+     `job_notify(on=['progress'])` subscription exists, or it's
+     explicitly configured on the job).
+   - `job_output(byteOffset)` wired for incremental reads, or
+     removed.
+   - Restart-recovery: reap orphaned subagent OS processes on
+     `JobManager` boot; mark their jobs failed.
 
 Depends on / pairs with:
 
@@ -701,102 +758,99 @@ Depends on / pairs with:
 
 The upgrade is done when:
 
-1. `job_notify(jobId, on=['idle','exited'], filter?)` is registered on
-   the top-level persona and the four high-severity gaps in the table
-   above are closed.
-2. A subagent transitioning to idle *or* exited (or both at once,
-   under today's collapsed behavior) causes exactly one
-   `<background-job-notification>` block — carrying `state`,
-   `outcome`, `exitCode`, and a preview — to appear in the parent's
-   next turn's prompt content, via the existing
-   `packages/agent/src/rpc/handlers/prompt.ts:104` injection path.
-3. `job_output(block=true)` is deprecated; default behavior is
-   non-blocking read. Any blocking timeout below 120_000ms is
-   rejected or clamped (mirroring serf's `minWaitTimeoutMS`).
+1. `job_notify(jobId, on=['completed','failed','cancelled'], filter?)`
+   is registered on the top-level persona; default `on` is the three
+   terminal states. The four high-severity gaps in the table above
+   are closed.
+2. A subagent job transitioning to a subscribed `JobNotificationType`
+   (`completed | failed | cancelled | progress`) causes exactly one
+   `<background-job-notification>` block — keeping the wire shape
+   `packages/agent/src/jobs/format-notification.ts` already produces
+   — to appear in the parent's next turn's prompt content via the
+   existing `packages/agent/src/rpc/handlers/prompt.ts:104` injection
+   path.
+3. `job_output(block=true)` blocking wait is clamped to a 120_000ms
+   minimum in Phase 1 and fully deprecated by end of Phase 3
+   (mirroring serf's `minWaitTimeoutMS`).
 4. Tool descriptions for `delegate`, `job_notify`, `job_output`,
-   `jobs_list`, `job_kill` embed the
-   notify-and-return-to-user pattern as canonical usage.
-   `delegation.md` is shrunk to ≤3 sentences of
-   routing-preference prose.
-5. Test coverage as enumerated above; integration tests with a real
+   `jobs_list`, `job_kill` embed the notify-and-return-to-user
+   pattern as canonical usage. The `delegate` description explicitly
+   teaches the **job vs session** distinction. `delegation.md`
+   shrinks to ≤3 sentences of routing-preference prose.
+5. Existing always-on completion notifications continue to fire for
+   jobs with no subscription (back-compat for any caller not yet
+   updated).
+6. Test coverage as enumerated above; integration tests with a real
    subagent process (no mocks at the IPC boundary).
-6. A repeat of the Ada smoke test (delegate a slow shell subagent,
+7. A repeat of the Ada smoke test (delegate a slow shell subagent,
    wait 8 minutes) consumes < 2k tokens of parent context across the
    wait, not 30k.
 
 ## Open questions
 
-1. **Should `output` subscriptions ride the parent's prompt-content
-   queue at all, or a separate "log" channel the UI shows but the LLM
-   doesn't always see?** A long-running build that emits 500 matching
-   lines could blow context. Monitor solves this with auto-stop and
-   batching. Recommended default: require explicit `on=['output']`
-   opt-in plus the overflow guard. But this needs Jesse's call.
-2. **When does idle diverge from exited?** Today, lace tears down the
-   subagent job on first `stopReason`, so the two collapse. The design
-   forward-compat'd for a long-lived subagent session, which the
-   resumable-session story (`delegate(resume=...)`) already implies.
-   Worth a separate spike on "should subagent sessions stay warm across
-   parent prompts" — outcome decides whether `idle`/`exited` ever
-   actually diverge in lace.
-3. **Resurrect `communicate`?** Flagged for revisit if/when typed
+1. **`progress` and event-based `output`: same notification kind, or
+   separate?** Today's `progress` is timer-based: every N minutes,
+   emit a byte-delta + last-N-lines preview. A natural Phase 2 add
+   is *event-based* fanout: every matching stdout line is a
+   notification. These are different shapes. Options:
+   (a) keep one kind `progress` and overload it with both timer ticks
+       and per-line events, distinguished by payload fields;
+   (b) add a distinct `output` kind for event-based per-line
+       notifications, with `progress` reserved for the byte-delta
+       timer.
+   Recommendation: (b) — separate kinds keep the filter semantics
+   crisp (filter on a single line vs filter on a tail-preview). Phase
+   2 design decision.
+2. **Resurrect `communicate`?** Flagged for revisit if/when typed
    multi-message streaming progress becomes a concrete need (e.g.,
    per-step results from a long pipeline). The JSON-RPC plumbing in
    `subagent-job.ts` is the right interception point. Not now.
-4. **`PushNotification`-style escalation.** Claude Code's Monitor pairs
-   with a `PushNotification` tool to wake the human. Lace has a Slack
-   relay and a TUI, but no unified "wake the user *now*" surface. Out
-   of scope for PRI-1692; flagged as a future ticket.
-5. **Should `wait` be its own tool too?** Lace could expose
+3. **Should `wait` be its own tool too?** Lace could expose
    `job_wait(jobId, minTimeoutMs=120_000)` as a strict synchronous
    wait, distinct from the async `job_notify`. *Recommendation: no —
    one tool with clearer guidance beats two. `job_notify(jobId)` is
    the async path; `delegate(...)` with no background is the sync
    path. A tool-level wait adds a third path that's confusing.*
-6. **Restart recovery — reattach or reap?** When lace restarts and
+4. **Restart recovery — reattach or reap?** When lace restarts and
    finds a `running` subagent in events, the OS process may still be
    alive. Reattaching is harder (need to find the JSON-RPC socket);
    reaping is simpler (kill the process, mark failed).
    *Recommendation: reap for v1, with a TODO for reattach in a
    follow-up. The persistent-checkout coworker arch (PRI-1673) makes
    reattach more attractive long-term.*
-7. **Cross-session subscriptions.** Should an agent be able to
-   subscribe to a job from a *prior* session? E.g., Ada starts a long
-   delegation, ends her session, restarts later — can she
-   `job_notify(jobId)` the still-running child? Currently the
-   `JobManager` is session-scoped. *Recommendation: defer; the v1
-   scope is single-session.*
+5. **Cross-session subscriptions.** Should an agent be able to
+   subscribe to a job from a *prior* parent session? E.g., Ada
+   starts a long delegation, closes her session, restarts later —
+   can she `job_notify(jobId)` the still-running child? Currently
+   the `JobManager` is session-scoped. *Recommendation: defer; the
+   v1 scope is single-session. Note: subagent SESSIONS already
+   persist (see "Subagent sessions are already persistent" above);
+   it's the parent's subscription registry that's session-scoped.*
 
 ## Surprises worth flagging
 
 - **Lace already has 80% of this.** The notification queue, the
   `runPromptInternal` wake-up trigger, the formatted
   `<background-job-notification>` blocks — they all exist. The Ada
-  lockup happened because the surface didn't expose them and the tool
-  descriptions didn't teach them. The fix is more API and docs work
-  than plumbing work, which is good news.
+  lockup happened because the surface didn't expose them and the
+  tool descriptions didn't teach them. The fix is more API and docs
+  work than plumbing work, which is good news.
+- **Subagent SESSIONS are already persistent.** Earlier revisions
+  of this doc missed this. Each `delegate()` creates a fresh job;
+  the session behind it survives across resumes, restarts, and
+  session displacements. `format-notification.ts:135` already tells
+  the parent how to resume. The upgrade leans on this rather than
+  inventing new lifecycle states.
 - **`job_output.block=true` is the foot-gun, not the missing tool.**
   Half the work here is making the polling path harder to take.
-  Adding `job_notify` without deprecating `block=true` would let Ada
-  keep polling.
+  Adding `job_notify` without clamping/deprecating `block=true`
+  would let Ada keep polling.
 - **`byteOffset` is in the schema and unused.** Either it was
   deferred or the author forgot. Worth wiring up for the
   incremental-read case the original schema clearly intended.
 - **Serf's `wait` has a 2-minute minimum timeout.** This is the
-  single most operationally important guard against polling in serf,
-  and lace has nothing equivalent. Cheap to add.
-- **Today, `idle` and `exited` are the same instant in lace.** The
-  subagent job tears down on first `stopReason`
-  (`subagent-job.ts:732`). The `on=['idle','exited']` split is
-  forward-compatible; it doesn't gain anything until lace gains a
-  long-lived subagent session model. Wiring both events anyway costs
-  almost nothing and avoids a future schema change.
-- **`JobNotificationType` in `server-types.ts:69` is
-  outcome-shaped, not lifecycle-shaped** (`completed | failed |
-  cancelled | progress`). The new design rotates the vocabulary to
-  lifecycle (`idle | exited | output`) with `outcome` as a payload
-  field on `exited`. Touch carefully — the wire-shape change ripples
-  through `format-notification.ts` and the prompt-injection path.
+  single most operationally important guard against polling in
+  serf, and lace has nothing equivalent. Cheap to add.
 
 ## References
 
