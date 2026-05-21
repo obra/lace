@@ -114,6 +114,27 @@ async function startServerForActiveSession(
   });
 }
 
+async function syncEnabledMcpServerForActiveSession(
+  state: AgentServerState,
+  serverId: string,
+  config: MCPServerConfig
+): Promise<void> {
+  const connectionKey = activeSessionConnectionKey(state, serverId, config);
+
+  for (const existing of state.mcpServerManager.getAllServers()) {
+    if (existing.id === serverId && existing.connectionKey !== connectionKey) {
+      await state.mcpServerManager.removeServer(existing.connectionKey);
+    }
+  }
+
+  const existing = state.mcpServerManager.getServer(connectionKey);
+  if (existing && !mcpServerConfigEquivalent(existing.config, config)) {
+    await state.mcpServerManager.stopServer(connectionKey);
+  }
+
+  await startServerForActiveSession(state, serverId, config);
+}
+
 /**
  * Reconcile MCP servers for the active session.
  * Compares configured servers to running servers and starts/stops as needed.
@@ -376,7 +397,7 @@ export function registerMcpHandlers(
         transport: config.transport,
       });
     } else if (enabled) {
-      await reconcileMcpServersForActiveSession(state);
+      await syncEnabledMcpServerForActiveSession(state, serverId, config);
     }
 
     invalidateSessionToolExecutor(state.toolExecutorCache, state.activeSession.meta.sessionId);

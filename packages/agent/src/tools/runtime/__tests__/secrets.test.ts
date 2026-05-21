@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  EnvironmentRuntimeSecretResolver,
   InMemoryRuntimeSecretResolver,
   RuntimeSecretResolutionError,
   redactSecretReference,
@@ -51,6 +52,53 @@ describe('runtime secret resolver', () => {
       expect(resolutionError.jobId).toBe('job_1');
       expect(resolutionError.serverId).toBe('server_1');
     }
+  });
+
+  it('resolves environment-backed references from explicit Lace secret variables', async () => {
+    const resolver = new EnvironmentRuntimeSecretResolver({
+      LACE_SECRET_PROJECT_API_KEY: 'secret-value',
+      API_KEY: 'not-authorized',
+    });
+
+    await expect(
+      resolver.resolve({
+        reference: { namespace: 'project', name: 'api-key' },
+        runtimeId: 'rt_1',
+        sessionId: 'sess_1',
+      })
+    ).resolves.toBe('secret-value');
+  });
+
+  it('does not resolve bare parent environment variables as runtime secrets', async () => {
+    const resolver = new EnvironmentRuntimeSecretResolver({
+      API_KEY: 'not-authorized',
+    });
+
+    await expect(
+      resolver.resolve({
+        reference: { namespace: 'project', name: 'api-key' },
+        runtimeId: 'rt_1',
+        sessionId: 'sess_1',
+      })
+    ).rejects.toBeInstanceOf(RuntimeSecretResolutionError);
+  });
+
+  it('does not expose missing environment secret names in errors', async () => {
+    const resolver = new EnvironmentRuntimeSecretResolver({});
+
+    await expect(
+      resolver.resolve({
+        reference: { namespace: 'host-service', name: 'service-token' },
+        runtimeId: 'rt_1',
+        sessionId: 'sess_1',
+        serverId: 'server_1',
+      })
+    ).rejects.toMatchObject({
+      redactedReference: '[secret:host-service:REDACTED]',
+      runtimeId: 'rt_1',
+      sessionId: 'sess_1',
+      serverId: 'server_1',
+    });
   });
 
   it('redacts reference identity for model-visible output', () => {

@@ -50,6 +50,34 @@ export class InMemoryRuntimeSecretResolver implements RuntimeSecretResolver {
   }
 }
 
+function normalizeSecretEnvSegment(value: string): string {
+  return value
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toUpperCase();
+}
+
+function environmentKeyForSecretReference(reference: RuntimeSecretReference): string {
+  return `LACE_SECRET_${normalizeSecretEnvSegment(reference.namespace)}_${normalizeSecretEnvSegment(
+    reference.name
+  )}`;
+}
+
+export class EnvironmentRuntimeSecretResolver implements RuntimeSecretResolver {
+  constructor(private readonly env: Record<string, string | undefined> = process.env) {}
+
+  async resolve(request: RuntimeSecretResolutionRequest): Promise<string> {
+    const value = this.env[environmentKeyForSecretReference(request.reference)];
+    if (value === undefined) {
+      throw new RuntimeSecretResolutionError(
+        `Secret unavailable or unauthorized: ${redactSecretReference(request.reference)}`,
+        request
+      );
+    }
+    return value;
+  }
+}
+
 export async function resolveSecretEnv(input: {
   secretEnv?: Record<string, RuntimeSecretReference>;
   resolver: RuntimeSecretResolver;

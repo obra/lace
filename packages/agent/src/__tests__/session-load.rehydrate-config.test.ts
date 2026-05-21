@@ -695,6 +695,78 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     );
   });
 
+  it('does not start unrelated configured MCP servers during single-server upsert', async () => {
+    const state = createAgentServerState();
+    const startServer = vi
+      .spyOn(state.mcpServerManager, 'startServer')
+      .mockImplementation(async (input) => {
+        if (input.serverId === 'broken-server') {
+          throw new Error('unrelated server should not start');
+        }
+      });
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', defaultInitializeParams());
+    await client.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    });
+
+    writeSessionState(state.activeSession!.dir, {
+      ...state.activeSession!.state,
+      config: {
+        ...state.activeSession!.state.config,
+        mcpServers: [
+          {
+            name: 'broken-server',
+            command: process.execPath,
+            transport: 'stdio',
+            placement: 'host',
+            enabled: true,
+            secretEnv: {
+              TOKEN: { namespace: 'project', name: 'missing-token' },
+            },
+          },
+        ],
+      },
+    });
+    state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+
+    await client.request('ent/mcp/servers/upsert', {
+      name: 'target-server',
+      command: process.execPath,
+      transport: 'stdio',
+      placement: 'host',
+      enabled: true,
+    });
+
+    expect(startServer).toHaveBeenCalledTimes(1);
+    expect(startServer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        serverId: 'target-server',
+      })
+    );
+    expect(loadSession(state.activeSession!.meta.sessionId).state.config?.mcpServers).toEqual([
+      {
+        name: 'broken-server',
+        command: process.execPath,
+        transport: 'stdio',
+        placement: 'host',
+        enabled: true,
+        secretEnv: {
+          TOKEN: { namespace: 'project', name: 'missing-token' },
+        },
+      },
+      {
+        name: 'target-server',
+        command: process.execPath,
+        transport: 'stdio',
+        placement: 'host',
+        enabled: true,
+      },
+    ]);
+  });
+
   it.each(['http', 'sse'] as const)(
     'stops an existing running stdio server when upserted to unsupported %s transport',
     async (transport) => {

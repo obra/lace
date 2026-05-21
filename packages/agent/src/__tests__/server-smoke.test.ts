@@ -11,6 +11,7 @@ import {
 } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
 import { defaultInitializeParams } from './helpers/initialize';
+import { EnvironmentRuntimeSecretResolver } from '../tools/runtime/secrets';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -41,6 +42,12 @@ describe('agent rpc server (smoke)', () => {
     else process.env.LACE_DIR = originalLaceDir;
 
     rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('installs the default runtime secret resolver', () => {
+    const state = createAgentServerState();
+
+    expect(state.runtimeSecretResolver).toBeInstanceOf(EnvironmentRuntimeSecretResolver);
   });
 
   it('handles initialize and session/new', async () => {

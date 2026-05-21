@@ -51,6 +51,7 @@ import {
 import type { AlarmRow } from './alarms/types';
 import { logger } from './utils/logger';
 import type { RuntimeExecutionBinding } from './tools/runtime/types';
+import { EnvironmentRuntimeSecretResolver } from './tools/runtime/secrets';
 
 // Re-export public API from message-builder for backwards compatibility
 export {
@@ -120,6 +121,7 @@ export function createAgentServerState(): AgentServerState {
     containerMounts: {},
     containerManager: createDefaultContainerManager(),
     peer: null,
+    runtimeSecretResolver: new EnvironmentRuntimeSecretResolver(),
   };
 }
 
