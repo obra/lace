@@ -99,16 +99,7 @@ export function registerPromptHandler(
         });
       };
 
-      // Inject any pending job notifications before the user's prompt
-      let promptContent = parsed.content as unknown[];
-      if (state.jobManager.getNotificationQueue().length > 0) {
-        const notifications = state.jobManager.flushNotifications();
-        const notificationBlocks = notifications.map((n) => ({
-          type: 'text' as const,
-          text: n.content,
-        }));
-        promptContent = [...notificationBlocks, ...promptContent];
-      }
+      const promptContent = parsed.content as unknown[];
 
       await writeAndAdvance({ type: 'prompt', data: { content: promptContent } });
       await writeAndAdvance({ type: 'turn_start', data: {} });

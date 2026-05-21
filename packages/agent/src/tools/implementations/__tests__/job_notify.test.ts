@@ -184,21 +184,10 @@ describe('JobNotifyTool', () => {
     // registration exists.
     expect(subscribeSpy).toHaveBeenCalledTimes(2);
 
-    // No duplicate subscription side-effect: fanout for this job's
-    // terminal kind should produce exactly one queued notification.
-    const fallback = vi.fn();
-    jobManager.fanout(
-      'job_dup',
-      'completed',
-      {
-        jobId: 'job_dup',
-        type: 'completed',
-        content: '<background-job-notification job-id="job_dup" type="completed" />',
-        createdAt: Date.now(),
-      },
-      fallback
-    );
-    expect(fallback).not.toHaveBeenCalled();
-    expect(jobManager.getNotificationQueue()).toHaveLength(1);
+    // No duplicate subscription side-effect: fanoutToInject for this job's
+    // terminal kind should fire the inject callback exactly once.
+    const inject = vi.fn();
+    jobManager.fanoutToInject('job_dup', 'completed', {}, inject);
+    expect(inject).toHaveBeenCalledTimes(1);
   });
 });

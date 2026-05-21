@@ -45,7 +45,7 @@ Every \`delegate(prompt=...)\` creates a NEW job. With \`resume=<prior jobId>\`,
 **The async pattern (canonical usage).**
 1. \`delegate(prompt=..., background=true)\` → returns \`{ jobId, status: "started" }\` immediately.
 2. \`job_notify(jobId)\` → subscribe so lace wakes you when this job finishes.
-3. **Return to the user.** Don't poll. Don't sit in \`job_output(block=true)\`. Do something else, answer the user, take another tool call. When this job transitions to \`completed\`/\`failed\`/\`cancelled\`, a \`<background-job-notification>\` block is injected into your next-turn prompt.
+3. **Return to the user.** Don't poll. Don't sit in \`job_output(block=true)\`. Do something else, answer the user, take another tool call. When this job transitions to \`completed\`/\`failed\`/\`cancelled\`, a \`<notification kind="job-completed"|"job-failed"|"job-cancelled" job-id="...">\` block is injected into your next-turn prompt.
 4. Inspect the result (\`job_output(jobId)\` for full text, or read the notification's preview). **You** decide what's next: act on the output, \`delegate(resume=jobId, prompt=...)\` to continue the conversation in another round, or move on.
 
 **Sync mode** (\`background=false\`, the default): the tool call blocks until the subagent finishes and returns its output prefixed with \`delegate jobId=<id>\`. Convenient for cheap, fast subagents. Brings the parent to a halt for the duration — DON'T use sync mode for anything that might take more than a few seconds; use background + \`job_notify\` instead.

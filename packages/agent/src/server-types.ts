@@ -113,19 +113,6 @@ export type JobState = {
   personaBoxRuntime?: PersonaBoxRuntime;
 };
 
-export type PendingJobNotification = {
-  jobId: string;
-  type: JobNotificationType;
-  content: string;
-  createdAt: number;
-  // PRI-1692 Phase 2: raw preview text (joined lastLines) carried alongside
-  // the formatted `content`. Used by subscriber-side filter regexes for
-  // `progress` notifications so the regex matches against the actual tail
-  // output, not the surrounding XML wrapper. Absent for terminal-state
-  // notifications (filter is no-op there).
-  preview?: string;
-};
-
 // Server State Type
 export type AgentServerState = {
   initialized: boolean;

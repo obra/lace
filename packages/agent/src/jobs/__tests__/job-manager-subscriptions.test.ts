@@ -1,9 +1,11 @@
 // ABOUTME: Tests for JobManager subscription registry (PRI-1692 Phase 1)
-// Covers subscribe/unsubscribe/fanout for per-jobId terminal-state subscriptions.
+// Covers subscribe/unsubscribe/fanoutToInject for per-jobId terminal-state
+// subscriptions. After PRI-1744, fanout delivers via an `inject` callback that
+// the caller wires to injectNotification; this test exercises the gating
+// semantics by spying on that callback.
 
 import { describe, it, expect, vi } from 'vitest';
 import { JobManager } from '../job-manager';
-import type { PendingJobNotification } from '../../server-types';
 
 function makeManager() {
   const deps = {
@@ -14,18 +16,6 @@ function makeManager() {
     runSubagentProcess: vi.fn(),
   };
   return new JobManager(deps);
-}
-
-function makeNotification(
-  jobId: string,
-  type: PendingJobNotification['type']
-): PendingJobNotification {
-  return {
-    jobId,
-    type,
-    content: `<background-job-notification job-id="${jobId}" type="${type}"></background-job-notification>`,
-    createdAt: Date.now(),
-  };
 }
 
 describe('JobManager subscriptions', () => {
@@ -52,93 +42,74 @@ describe('JobManager subscriptions', () => {
       const manager = makeManager();
       const sub = manager.subscribe({ jobId: 'job_1', on: ['completed', 'failed', 'cancelled'] });
       manager.unsubscribe(sub.subscriptionId);
-      // Fanout to a job with no subscribers should fall back to the always-on
-      // queue-push (provided by the fallback fn) — see fanout tests below.
-      const fallback = vi.fn();
-      manager.fanout('job_1', 'completed', makeNotification('job_1', 'completed'), fallback);
-      // Queue should contain the fallback notification (back-compat), not a
-      // subscriber notification. Easiest assertion: fallback got called.
-      expect(fallback).toHaveBeenCalledTimes(1);
+      // With no subscribers, fanoutToInject invokes the inject callback once
+      // as the always-on fallback.
+      const inject = vi.fn();
+      manager.fanoutToInject('job_1', 'completed', {}, inject);
+      expect(inject).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('fanout', () => {
-    it('delivers exactly one notification to the agent queue when a subscriber matches', () => {
+  describe('fanoutToInject', () => {
+    it('invokes inject exactly once when a single subscriber matches', () => {
       const manager = makeManager();
       manager.subscribe({ jobId: 'job_1', on: ['completed', 'failed', 'cancelled'] });
 
-      const fallback = vi.fn();
-      manager.fanout('job_1', 'completed', makeNotification('job_1', 'completed'), fallback);
+      const inject = vi.fn();
+      manager.fanoutToInject('job_1', 'completed', {}, inject);
 
-      // Subscriber-driven notification went on the queue; fallback NOT called.
-      expect(fallback).not.toHaveBeenCalled();
-      const queue = manager.getNotificationQueue();
-      expect(queue).toHaveLength(1);
-      expect(queue[0].type).toBe('completed');
-      expect(queue[0].jobId).toBe('job_1');
+      expect(inject).toHaveBeenCalledTimes(1);
     });
 
     it('once subscribed, an unmatched kind delivers nothing (no fallback)', () => {
       // Coverage-discipline contract from the design: subscribing with
       // on=['failed'] and watching a job complete successfully produces NO
-      // notification. "Silence is not success." The back-compat fallback is
+      // notification. "Silence is not success." The always-on fallback is
       // suppressed as soon as ANY subscription exists for this jobId.
       const manager = makeManager();
       manager.subscribe({ jobId: 'job_1', on: ['failed'] });
 
-      const fallback = vi.fn();
-      manager.fanout('job_1', 'completed', makeNotification('job_1', 'completed'), fallback);
+      const inject = vi.fn();
+      manager.fanoutToInject('job_1', 'completed', {}, inject);
 
-      expect(fallback).not.toHaveBeenCalled();
-      expect(manager.getNotificationQueue()).toHaveLength(0);
+      expect(inject).not.toHaveBeenCalled();
     });
 
     it('fires subscriber when kind matches `on=["failed"]`', () => {
       const manager = makeManager();
       manager.subscribe({ jobId: 'job_1', on: ['failed'] });
 
-      const fallback = vi.fn();
-      manager.fanout('job_1', 'failed', makeNotification('job_1', 'failed'), fallback);
+      const inject = vi.fn();
+      manager.fanoutToInject('job_1', 'failed', {}, inject);
 
-      expect(fallback).not.toHaveBeenCalled();
-      expect(manager.getNotificationQueue()).toHaveLength(1);
-      expect(manager.getNotificationQueue()[0].type).toBe('failed');
+      expect(inject).toHaveBeenCalledTimes(1);
     });
 
-    it('back-compat: with no subscribers, invokes the fallback (always-on queue-push)', () => {
+    it('back-compat: with no subscribers, inject fires once as the fallback', () => {
       const manager = makeManager();
-      const fallback = vi.fn();
-      manager.fanout(
-        'job_unsubscribed',
-        'completed',
-        makeNotification('job_unsubscribed', 'completed'),
-        fallback
-      );
-      expect(fallback).toHaveBeenCalledTimes(1);
-      // Subscriber path didn't queue anything.
-      expect(manager.getNotificationQueue()).toHaveLength(0);
+      const inject = vi.fn();
+      manager.fanoutToInject('job_unsubscribed', 'completed', {}, inject);
+      expect(inject).toHaveBeenCalledTimes(1);
     });
 
-    it('fanout to a different jobId does not affect other subscriptions', () => {
+    it('fanout to a different jobId does not match other subscriptions', () => {
       const manager = makeManager();
       manager.subscribe({ jobId: 'job_A', on: ['completed'] });
 
-      const fallback = vi.fn();
-      manager.fanout('job_B', 'completed', makeNotification('job_B', 'completed'), fallback);
+      const inject = vi.fn();
+      manager.fanoutToInject('job_B', 'completed', {}, inject);
 
       // No subscriber for job_B → fallback fires.
-      expect(fallback).toHaveBeenCalledTimes(1);
-      expect(manager.getNotificationQueue()).toHaveLength(0);
+      expect(inject).toHaveBeenCalledTimes(1);
     });
 
     it('default subscription on=[completed,failed,cancelled] receives all three terminal states', () => {
       for (const kind of ['completed', 'failed', 'cancelled'] as const) {
         const manager = makeManager();
         manager.subscribe({ jobId: 'job_x', on: ['completed', 'failed', 'cancelled'] });
-        const fallback = vi.fn();
-        manager.fanout('job_x', kind, makeNotification('job_x', kind), fallback);
-        expect(fallback).not.toHaveBeenCalled();
-        expect(manager.getNotificationQueue()[0].type).toBe(kind);
+        const inject = vi.fn();
+        manager.fanoutToInject('job_x', kind, {}, inject);
+        expect(inject).toHaveBeenCalledTimes(1);
       }
     });
 
@@ -152,11 +123,10 @@ describe('JobManager subscriptions', () => {
         filter: '__never_matches__',
       });
 
-      const fallback = vi.fn();
-      manager.fanout('job_1', 'completed', makeNotification('job_1', 'completed'), fallback);
+      const inject = vi.fn();
+      manager.fanoutToInject('job_1', 'completed', {}, inject);
 
-      expect(fallback).not.toHaveBeenCalled();
-      expect(manager.getNotificationQueue()).toHaveLength(1);
+      expect(inject).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -169,9 +139,9 @@ describe('JobManager subscriptions', () => {
       manager.removeJob('job_1');
 
       // No subscription remains for job_1 → fallback fires.
-      const fallback = vi.fn();
-      manager.fanout('job_1', 'completed', makeNotification('job_1', 'completed'), fallback);
-      expect(fallback).toHaveBeenCalledTimes(1);
+      const inject = vi.fn();
+      manager.fanoutToInject('job_1', 'completed', {}, inject);
+      expect(inject).toHaveBeenCalledTimes(1);
       // Re-subscribing returns a fresh subscriptionId (the old one is gone).
       const fresh = manager.subscribe({
         jobId: 'job_1',
@@ -179,15 +149,11 @@ describe('JobManager subscriptions', () => {
       });
       expect(fresh.subscriptionId).not.toBe(sub.subscriptionId);
 
-      // Other jobs' subscriptions are unaffected.
-      const fallback2 = vi.fn();
-      manager.fanout(
-        'job_other',
-        'completed',
-        makeNotification('job_other', 'completed'),
-        fallback2
-      );
-      expect(fallback2).not.toHaveBeenCalled();
+      // Other jobs' subscriptions are unaffected — exactly one inject for the
+      // matching subscriber.
+      const inject2 = vi.fn();
+      manager.fanoutToInject('job_other', 'completed', {}, inject2);
+      expect(inject2).toHaveBeenCalledTimes(1);
     });
 
     it('clearJobs() prunes every subscription across all jobs', () => {
@@ -197,11 +163,13 @@ describe('JobManager subscriptions', () => {
 
       manager.clearJobs();
 
-      const fallback = vi.fn();
-      manager.fanout('job_a', 'completed', makeNotification('job_a', 'completed'), fallback);
-      manager.fanout('job_b', 'failed', makeNotification('job_b', 'failed'), fallback);
+      const injectA = vi.fn();
+      const injectB = vi.fn();
+      manager.fanoutToInject('job_a', 'completed', {}, injectA);
+      manager.fanoutToInject('job_b', 'failed', {}, injectB);
       // Both jobs' subscriptions are gone → fallback for each.
-      expect(fallback).toHaveBeenCalledTimes(2);
+      expect(injectA).toHaveBeenCalledTimes(1);
+      expect(injectB).toHaveBeenCalledTimes(1);
     });
 
     it('finalizeJob() prunes subscriptions for the finalized job', async () => {
@@ -224,14 +192,10 @@ describe('JobManager subscriptions', () => {
 
       await manager.finalizeJob(job);
 
-      const fallback = vi.fn();
-      manager.fanout(
-        'job_finalize',
-        'cancelled',
-        makeNotification('job_finalize', 'cancelled'),
-        fallback
-      );
-      expect(fallback).toHaveBeenCalledTimes(1);
+      const inject = vi.fn();
+      manager.fanoutToInject('job_finalize', 'cancelled', {}, inject);
+      // Subscription is gone → fallback inject fires.
+      expect(inject).toHaveBeenCalledTimes(1);
     });
   });
 });

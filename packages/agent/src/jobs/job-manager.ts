@@ -4,13 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type {
-  JobState,
-  JobStatus,
-  JobType,
-  JobNotificationType,
-  PendingJobNotification,
-} from '../server-types';
+import type { JobState, JobStatus, JobType, JobNotificationType } from '../server-types';
 import { MAX_CONCURRENT_JOBS } from '../server-types';
 import type { PersonaContainerRuntime, PersonaBoxRuntime } from './persona-container-spec';
 import { toNonEmptyString } from '../rpc/utils';
@@ -114,12 +108,13 @@ export type SubscribeOptions = {
 /**
  * Pending per-subscription progress batch (PRI-1692 Phase 2). When a
  * subscription receives its first `progress` fanout, a 200ms timer is
- * armed; further progress within the window replaces `notification`
- * (latest preview wins). The timer fires the buffered notification to
- * the queue, or a terminal-state fanout flushes it early.
+ * armed; further progress within the window replaces `inject` (latest
+ * call wins, carrying the latest preview). The timer fires the buffered
+ * inject() to write the durable event, or a terminal-state fanout
+ * flushes it early.
  */
 type ProgressBatch = {
-  notification: PendingJobNotification;
+  inject: () => void;
   timer: ReturnType<typeof setTimeout>;
 };
 
@@ -128,7 +123,6 @@ const PROGRESS_BATCH_WINDOW_MS = 200;
 export class JobManager {
   private jobs = new Map<string, JobState>();
   private streamingMode: 'full' | 'coalesced' | 'none' = 'full';
-  private notificationQueue: PendingJobNotification[] = [];
   private deps: JobManagerDeps;
   private listJobsCache: JobsCache | null = null;
   private subscriptions = new Map<string, JobSubscription>();
@@ -401,22 +395,15 @@ export class JobManager {
   }
 
   /**
-   * Queue a notification for delivery to the agent.
-   */
-  queueNotification(notification: PendingJobNotification): void {
-    this.notificationQueue.push(notification);
-  }
-
-  /**
    * Register a subscription so the parent agent is woken when this job
    * transitions to one of the listed lifecycle kinds. Idempotent: a second
    * call with the same args returns the existing subscription.
    *
    * Once a job has at least one subscription, terminal-state notifications
-   * are routed through `fanout()` instead of the always-on queue-push.
-   * Subscribing to `on=['failed']` and watching a job complete successfully
-   * therefore produces NO notification — "silence is not success" is the
-   * coverage-discipline contract documented in the design.
+   * are routed through `fanoutToInject()` instead of the always-on inject
+   * fallback. Subscribing to `on=['failed']` and watching a job complete
+   * successfully therefore produces NO notification — "silence is not
+   * success" is the coverage-discipline contract documented in the design.
    */
   subscribe(opts: SubscribeOptions): JobSubscription {
     const existing = this.findSubscription(opts);
@@ -462,7 +449,7 @@ export class JobManager {
 
   /**
    * Remove a subscription. After unsubscribe, a job with no remaining
-   * subscriptions reverts to the back-compat always-on queue-push path.
+   * subscriptions reverts to the always-on inject-fallback path.
    */
   unsubscribe(subscriptionId: string): void {
     const sub = this.subscriptions.get(subscriptionId);
@@ -483,33 +470,38 @@ export class JobManager {
   }
 
   /**
-   * Deliver a job-lifecycle notification.
+   * Deliver a job-lifecycle notification via the inject callback.
    *
    * If at least one subscription exists for `jobId`, every subscription
-   * whose `on` set contains `kind` gets the notification pushed onto the
-   * agent's notification queue. Subscriptions that don't match `kind` do
-   * NOT deliver — the parent opted into selective coverage.
+   * whose `on` set contains `kind` triggers exactly one `inject()` call
+   * (subject to filter + 200ms progress batching). Subscriptions that
+   * don't match `kind` do NOT deliver — the parent opted into selective
+   * coverage.
    *
-   * If no subscription exists for `jobId`, the `fallback` is invoked. The
-   * fallback is the original always-on queue-push behavior, preserved so
-   * unsubscribed jobs still wake the parent on terminal states.
+   * If no subscription exists for `jobId`, `inject()` is invoked once as
+   * the always-on fallback so unsubscribed jobs still wake the parent on
+   * terminal states.
+   *
+   * The progress batch buffers the most recent `inject` closure — when
+   * multiple progress fanouts land inside a 200ms window for the same
+   * subscription, only the latest closure runs (latest tail-preview wins).
    */
-  fanout(
+  fanoutToInject(
     jobId: string,
     kind: JobNotificationType,
-    notification: PendingJobNotification,
-    fallback: (notification: PendingJobNotification) => void
+    options: { preview?: string },
+    inject: () => void
   ): void {
     const subIds = this.subscriptionsByJob.get(jobId);
     if (!subIds || subIds.size === 0) {
-      fallback(notification);
+      inject();
       return;
     }
 
     // Terminal-state fanout: flush every pending progress batch for THIS
     // job's subscriptions before iterating, even subs whose `on` does not
     // include the terminal kind. Otherwise a progress-only sub's buffered
-    // batch keeps ticking past the terminal and queues a stale "phantom"
+    // batch keeps ticking past the terminal and fires a stale "phantom"
     // delivery 200ms after the job has already died.
     if (kind !== 'progress') {
       for (const subId of subIds) {
@@ -526,50 +518,47 @@ export class JobManager {
       // requires they're never filterable.
       if (kind === 'progress') {
         if (sub.filterRegex) {
-          const preview = notification.preview ?? '';
+          const preview = options.preview ?? '';
           if (!sub.filterRegex.test(preview)) continue;
         }
-        this.bufferProgressForSubscription(sub.subscriptionId, { ...notification });
+        this.bufferProgressForSubscription(sub.subscriptionId, inject);
       } else {
-        // Terminal: batches were already flushed above. Just enqueue.
-        this.notificationQueue.push({ ...notification });
+        // Terminal: batches were already flushed above. Just inject.
+        inject();
       }
     }
   }
 
   /**
-   * Buffer a matching progress notification for a subscription, arming the
-   * 200ms flush timer on the first event of a new window. Subsequent events
-   * within the window replace the buffered notification — latest preview
-   * wins, matching the LLM's actual need (most recent tail, not stale
-   * history).
+   * Buffer a matching progress inject closure for a subscription, arming
+   * the 200ms flush timer on the first event of a new window. Subsequent
+   * events within the window replace the buffered closure — latest
+   * preview wins, matching the LLM's actual need (most recent tail, not
+   * stale history).
    */
-  private bufferProgressForSubscription(
-    subscriptionId: string,
-    notification: PendingJobNotification
-  ): void {
+  private bufferProgressForSubscription(subscriptionId: string, inject: () => void): void {
     const existing = this.progressBatches.get(subscriptionId);
     if (existing) {
-      existing.notification = notification;
+      existing.inject = inject;
       return;
     }
     const timer = setTimeout(() => {
       this.flushProgressBatch(subscriptionId);
     }, PROGRESS_BATCH_WINDOW_MS);
-    this.progressBatches.set(subscriptionId, { notification, timer });
+    this.progressBatches.set(subscriptionId, { inject, timer });
   }
 
   /**
-   * Push the buffered progress notification (if any) to the queue and clear
-   * the per-subscription batch state. Called by the 200ms timer, on terminal
-   * fanout for the same subscription, and on subscription teardown.
+   * Fire the buffered inject closure (if any) and clear the per-subscription
+   * batch state. Called by the 200ms timer, on terminal fanout for the same
+   * subscription, and on subscription teardown.
    */
   private flushProgressBatch(subscriptionId: string): void {
     const batch = this.progressBatches.get(subscriptionId);
     if (!batch) return;
     clearTimeout(batch.timer);
     this.progressBatches.delete(subscriptionId);
-    this.notificationQueue.push(batch.notification);
+    batch.inject();
   }
 
   /**
@@ -680,22 +669,6 @@ export class JobManager {
       return existing;
     }
     return undefined;
-  }
-
-  /**
-   * Flush all queued notifications, returning them and clearing the queue.
-   * Used when injecting notifications before a prompt.
-   */
-  flushNotifications(): PendingJobNotification[] {
-    return this.notificationQueue.splice(0);
-  }
-
-  /**
-   * Get the current notification queue.
-   * Returns a reference to the actual queue for checking length.
-   */
-  getNotificationQueue(): PendingJobNotification[] {
-    return this.notificationQueue;
   }
 
   /**

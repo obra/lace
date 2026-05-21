@@ -11,7 +11,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { JobManager } from '../job-manager';
-import type { JobState, PendingJobNotification } from '../../server-types';
+import type { JobState } from '../../server-types';
 
 function makeManager(): JobManager {
   return new JobManager({
@@ -23,25 +23,9 @@ function makeManager(): JobManager {
   });
 }
 
-function progressNotification(jobId: string, preview: string): PendingJobNotification {
-  return {
-    jobId,
-    type: 'progress',
-    content: `<background-job-notification job-id="${jobId}" type="progress">\n${preview}\n</background-job-notification>`,
-    createdAt: Date.now(),
-    preview,
-  };
-}
-
-function terminalNotification(
-  jobId: string,
-  type: 'completed' | 'failed' | 'cancelled'
-): PendingJobNotification {
-  return {
-    jobId,
-    type,
-    content: `<background-job-notification job-id="${jobId}" type="${type}"></background-job-notification>`,
-    createdAt: Date.now(),
+function recordedInject(calls: string[], tag: string): () => void {
+  return () => {
+    calls.push(tag);
   };
 }
 
@@ -74,26 +58,22 @@ describe('JobManager review-driven fixes (PRI-1692 Phase 2)', () => {
       manager.subscribe({ jobId: 'job_1', on: ['progress'] });
       manager.subscribe({ jobId: 'job_1', on: ['completed', 'failed', 'cancelled'] });
 
-      const fallback = vi.fn();
+      const calls: string[] = [];
       // Progress fires — sub A buffers a batch (200ms timer armed).
-      manager.fanout('job_1', 'progress', progressNotification('job_1', 'p1'), fallback);
+      manager.fanoutToInject('job_1', 'progress', { preview: 'p1' }, recordedInject(calls, 'p1'));
       vi.advanceTimersByTime(50);
       // Terminal fires for the job.
-      manager.fanout('job_1', 'completed', terminalNotification('job_1', 'completed'), fallback);
+      manager.fanoutToInject('job_1', 'completed', {}, recordedInject(calls, 'terminal'));
 
       // Before any further timer advance: sub A's batch must have been
       // flushed by the terminal fanout (so progress lands before terminal),
-      // and sub B has the terminal queued.
-      const queue = manager.getNotificationQueue();
-      expect(queue).toHaveLength(2);
-      expect(queue[0].type).toBe('progress');
-      expect(queue[0].preview).toBe('p1');
-      expect(queue[1].type).toBe('completed');
+      // and sub B injected the terminal.
+      expect(calls).toEqual(['p1', 'terminal']);
 
-      // No phantom delivery 200ms later — the pending batch must have been
+      // No phantom inject 200ms later — the pending batch must have been
       // cancelled by the flush, not just delivered-and-then-rearmed.
       vi.advanceTimersByTime(500);
-      expect(manager.getNotificationQueue()).toHaveLength(2);
+      expect(calls).toEqual(['p1', 'terminal']);
     });
 
     it('progress-only sub still receives buffered progress even when only OTHER sub gets the terminal', () => {
@@ -101,43 +81,42 @@ describe('JobManager review-driven fixes (PRI-1692 Phase 2)', () => {
       manager.subscribe({ jobId: 'job_1', on: ['progress'], filter: '^MATCH' });
       manager.subscribe({ jobId: 'job_1', on: ['completed'] });
 
-      manager.fanout(
+      const calls: string[] = [];
+      manager.fanoutToInject(
         'job_1',
         'progress',
-        progressNotification('job_1', 'MATCH: only thing that matters'),
-        vi.fn()
+        { preview: 'MATCH: only thing that matters' },
+        recordedInject(calls, 'MATCH')
       );
-      manager.fanout('job_1', 'completed', terminalNotification('job_1', 'completed'), vi.fn());
+      manager.fanoutToInject('job_1', 'completed', {}, recordedInject(calls, 'completed'));
 
-      const queue = manager.getNotificationQueue();
       // Progress sub's MATCH event was real, filtered-through, and buffered.
       // Terminal flushes it. Both subs see their respective notifications.
-      expect(queue.map((n) => n.type)).toEqual(['progress', 'completed']);
-      expect(queue[0].preview).toContain('MATCH');
+      expect(calls).toEqual(['MATCH', 'completed']);
     });
 
     it('terminal fanout against a job with no batched progress does nothing extra', () => {
       const manager = makeManager();
       manager.subscribe({ jobId: 'job_1', on: ['completed', 'failed', 'cancelled'] });
 
-      manager.fanout('job_1', 'completed', terminalNotification('job_1', 'completed'), vi.fn());
+      const calls: string[] = [];
+      manager.fanoutToInject('job_1', 'completed', {}, recordedInject(calls, 'completed'));
 
-      const queue = manager.getNotificationQueue();
-      expect(queue).toHaveLength(1);
-      expect(queue[0].type).toBe('completed');
+      expect(calls).toEqual(['completed']);
     });
   });
 
   describe('clearSubscriptionsForJob flushes pending batches on job-end (B1)', () => {
-    it('finalizeJob flushes pending progress batches to the queue before reaping subs', async () => {
+    it('finalizeJob flushes pending progress batches before reaping subs', async () => {
       const manager = makeManager();
       manager.subscribe({ jobId: 'job_1', on: ['progress'] });
 
-      manager.fanout(
+      const calls: string[] = [];
+      manager.fanoutToInject(
         'job_1',
         'progress',
-        progressNotification('job_1', 'last meaningful tail'),
-        vi.fn()
+        { preview: 'last meaningful tail' },
+        recordedInject(calls, 'last meaningful tail')
       );
 
       // Simulate cancel/kill path: finalizeJob → clearSubscriptionsForJob.
@@ -146,31 +125,27 @@ describe('JobManager review-driven fixes (PRI-1692 Phase 2)', () => {
       job.status = 'cancelled';
       await manager.finalizeJob(job);
 
-      // The buffered progress was meaningful tail data — it must land in
-      // the queue so the agent doesn't lose 0–200ms of work, not be
-      // silently discarded.
-      const queue = manager.getNotificationQueue();
-      const progressEntries = queue.filter((n) => n.type === 'progress');
-      expect(progressEntries).toHaveLength(1);
-      expect(progressEntries[0].preview).toBe('last meaningful tail');
+      // The buffered progress was meaningful tail data — it must inject so
+      // the agent doesn't lose 0–200ms of work, not be silently discarded.
+      expect(calls).toEqual(['last meaningful tail']);
 
-      // No late delivery after subs are gone.
+      // No late inject after subs are gone.
       vi.advanceTimersByTime(500);
-      const afterAdvance = manager.getNotificationQueue();
-      expect(afterAdvance.filter((n) => n.type === 'progress')).toHaveLength(1);
+      expect(calls).toEqual(['last meaningful tail']);
     });
 
     it('explicit unsubscribe still CANCELS the batch (not flush) — explicit teardown drops in-flight data', () => {
       const manager = makeManager();
       const sub = manager.subscribe({ jobId: 'job_1', on: ['progress'] });
 
-      manager.fanout('job_1', 'progress', progressNotification('job_1', 'p1'), vi.fn());
+      const calls: string[] = [];
+      manager.fanoutToInject('job_1', 'progress', { preview: 'p1' }, recordedInject(calls, 'p1'));
       manager.unsubscribe(sub.subscriptionId);
 
       vi.advanceTimersByTime(500);
       // Explicit unsubscribe is intent to stop receiving — don't deliver
       // the half-batched event. (Contrast with job-end above.)
-      expect(manager.getNotificationQueue()).toHaveLength(0);
+      expect(calls).toEqual([]);
     });
   });
 

@@ -1,13 +1,11 @@
 // ABOUTME: Tests for JobManager subscriber-side filter regex (PRI-1692 Phase 2)
 // Covers regex application to progress notifications, no-op on terminal-state
 // kinds, multi-subscriber filter isolation, and invalid-regex rejection.
-// These tests are batching-agnostic — they only assert the eventual outcome
-// (after a long-enough timer advance) so they remain green whether or not
-// the 200ms batching window has been implemented yet.
+// After PRI-1744 the notification is delivered via an `inject` callback; the
+// test spies on that callback to assert filter pass/drop behavior.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { JobManager } from '../job-manager';
-import type { PendingJobNotification } from '../../server-types';
 
 function makeManager(): JobManager {
   return new JobManager({
@@ -19,25 +17,9 @@ function makeManager(): JobManager {
   });
 }
 
-function progressNotification(jobId: string, preview: string): PendingJobNotification {
-  return {
-    jobId,
-    type: 'progress',
-    content: `<background-job-notification job-id="${jobId}" type="progress">\n${preview}\n</background-job-notification>`,
-    createdAt: Date.now(),
-    preview,
-  };
-}
-
-function terminalNotification(
-  jobId: string,
-  type: 'completed' | 'failed' | 'cancelled'
-): PendingJobNotification {
-  return {
-    jobId,
-    type,
-    content: `<background-job-notification job-id="${jobId}" type="${type}"></background-job-notification>`,
-    createdAt: Date.now(),
+function recordedInject(calls: string[], tag: string): () => void {
+  return () => {
+    calls.push(tag);
   };
 }
 
@@ -59,17 +41,18 @@ describe('JobManager filter regex (PRI-1692 Phase 2)', () => {
         filter: '^ERROR:',
       });
 
-      const fallback = vi.fn();
-      manager.fanout('job_1', 'progress', progressNotification('job_1', 'info: ok'), fallback);
+      const calls: string[] = [];
+      manager.fanoutToInject(
+        'job_1',
+        'progress',
+        { preview: 'info: ok' },
+        recordedInject(calls, 'info')
+      );
 
-      // Flush any pending batch window — non-matching events must NOT deliver.
+      // Flush any pending batch window — non-matching events must NOT inject.
       vi.advanceTimersByTime(500);
 
-      // Regex did not match → subscriber sees nothing.
-      // Fallback also does NOT fire (subscription exists; we don't fall back
-      // to queue-push just because the filter dropped the event).
-      expect(fallback).not.toHaveBeenCalled();
-      expect(manager.getNotificationQueue()).toHaveLength(0);
+      expect(calls).toEqual([]);
     });
 
     it('delivers a progress notification whose preview matches the regex', () => {
@@ -80,15 +63,16 @@ describe('JobManager filter regex (PRI-1692 Phase 2)', () => {
         filter: '^ERROR:',
       });
 
-      const fallback = vi.fn();
-      manager.fanout('job_1', 'progress', progressNotification('job_1', 'ERROR: oops'), fallback);
+      const calls: string[] = [];
+      manager.fanoutToInject(
+        'job_1',
+        'progress',
+        { preview: 'ERROR: oops' },
+        recordedInject(calls, 'ERROR: oops')
+      );
       vi.advanceTimersByTime(500);
 
-      expect(fallback).not.toHaveBeenCalled();
-      const queue = manager.getNotificationQueue();
-      expect(queue).toHaveLength(1);
-      expect(queue[0].type).toBe('progress');
-      expect(queue[0].preview).toBe('ERROR: oops');
+      expect(calls).toEqual(['ERROR: oops']);
     });
 
     it('regex uses multi-line matching so `^X` matches a line inside a multi-line preview', () => {
@@ -99,29 +83,32 @@ describe('JobManager filter regex (PRI-1692 Phase 2)', () => {
         filter: '^ERROR:',
       });
 
-      const fallback = vi.fn();
-      manager.fanout(
+      const calls: string[] = [];
+      manager.fanoutToInject(
         'job_1',
         'progress',
-        progressNotification('job_1', 'info: starting\nERROR: boom\ninfo: done'),
-        fallback
+        { preview: 'info: starting\nERROR: boom\ninfo: done' },
+        recordedInject(calls, 'multi')
       );
 
       vi.advanceTimersByTime(500);
-      expect(manager.getNotificationQueue()).toHaveLength(1);
-      expect(fallback).not.toHaveBeenCalled();
+      expect(calls).toEqual(['multi']);
     });
 
     it('subscription without a filter delivers every progress notification', () => {
       const manager = makeManager();
       manager.subscribe({ jobId: 'job_1', on: ['progress'] });
 
-      const fallback = vi.fn();
-      manager.fanout('job_1', 'progress', progressNotification('job_1', 'info: ok'), fallback);
+      const calls: string[] = [];
+      manager.fanoutToInject(
+        'job_1',
+        'progress',
+        { preview: 'info: ok' },
+        recordedInject(calls, 'info')
+      );
 
       vi.advanceTimersByTime(500);
-      expect(manager.getNotificationQueue()).toHaveLength(1);
-      expect(fallback).not.toHaveBeenCalled();
+      expect(calls).toEqual(['info']);
     });
   });
 
@@ -134,13 +121,10 @@ describe('JobManager filter regex (PRI-1692 Phase 2)', () => {
         filter: '^X',
       });
 
-      const fallback = vi.fn();
-      manager.fanout('job_1', 'failed', terminalNotification('job_1', 'failed'), fallback);
+      const calls: string[] = [];
+      manager.fanoutToInject('job_1', 'failed', {}, recordedInject(calls, 'failed'));
 
-      expect(fallback).not.toHaveBeenCalled();
-      const queue = manager.getNotificationQueue();
-      expect(queue).toHaveLength(1);
-      expect(queue[0].type).toBe('failed');
+      expect(calls).toEqual(['failed']);
     });
 
     it('filter is also no-op for `completed` and `cancelled`', () => {
@@ -151,10 +135,9 @@ describe('JobManager filter regex (PRI-1692 Phase 2)', () => {
           on: [kind],
           filter: '__never_matches__',
         });
-        const fallback = vi.fn();
-        manager.fanout('job_x', kind, terminalNotification('job_x', kind), fallback);
-        expect(fallback).not.toHaveBeenCalled();
-        expect(manager.getNotificationQueue()).toHaveLength(1);
+        const calls: string[] = [];
+        manager.fanoutToInject('job_x', kind, {}, recordedInject(calls, kind));
+        expect(calls).toEqual([kind]);
       }
     });
   });
@@ -167,20 +150,32 @@ describe('JobManager filter regex (PRI-1692 Phase 2)', () => {
       // Subscriber B: only WARN:
       manager.subscribe({ jobId: 'job_1', on: ['progress'], filter: '^WARN:' });
 
-      const fallback = vi.fn();
-      manager.fanout('job_1', 'progress', progressNotification('job_1', 'ERROR: a'), fallback);
+      const calls: string[] = [];
+      manager.fanoutToInject(
+        'job_1',
+        'progress',
+        { preview: 'ERROR: a' },
+        recordedInject(calls, 'ERROR: a')
+      );
       vi.advanceTimersByTime(500);
-      manager.fanout('job_1', 'progress', progressNotification('job_1', 'WARN: b'), fallback);
+      manager.fanoutToInject(
+        'job_1',
+        'progress',
+        { preview: 'WARN: b' },
+        recordedInject(calls, 'WARN: b')
+      );
       vi.advanceTimersByTime(500);
-      manager.fanout('job_1', 'progress', progressNotification('job_1', 'info: c'), fallback);
+      manager.fanoutToInject(
+        'job_1',
+        'progress',
+        { preview: 'info: c' },
+        recordedInject(calls, 'info: c')
+      );
       vi.advanceTimersByTime(500);
 
       // After all batching settles: subscriber A got 'ERROR: a',
       // subscriber B got 'WARN: b', and nobody got 'info: c'.
-      const queue = manager.getNotificationQueue();
-      const previews = queue.map((n) => n.preview).sort();
-      expect(previews).toEqual(['ERROR: a', 'WARN: b']);
-      expect(fallback).not.toHaveBeenCalled();
+      expect(calls.slice().sort()).toEqual(['ERROR: a', 'WARN: b']);
     });
   });
 
@@ -203,10 +198,16 @@ describe('JobManager filter regex (PRI-1692 Phase 2)', () => {
       } catch {
         // expected
       }
-      // No subscription was registered → progress fanout falls back.
-      const fallback = vi.fn();
-      manager.fanout('job_bad', 'progress', progressNotification('job_bad', 'ERROR: x'), fallback);
-      expect(fallback).toHaveBeenCalledTimes(1);
+      // No subscription was registered → progress fanout falls back to a
+      // single inject call.
+      const calls: string[] = [];
+      manager.fanoutToInject(
+        'job_bad',
+        'progress',
+        { preview: 'ERROR: x' },
+        recordedInject(calls, 'fallback')
+      );
+      expect(calls).toEqual(['fallback']);
     });
   });
 });

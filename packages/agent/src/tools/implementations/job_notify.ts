@@ -2,8 +2,8 @@
 // Lets the parent agent register interest in a job's lifecycle transitions
 // (terminal states + optional progress with a filter regex) and return to
 // other work; when the job transitions, lace synthesizes a
-// <background-job-notification> block into the parent's next-turn inbox via
-// the existing notification-injection path.
+// <notification kind="job-..."> block into the parent's events.jsonl via
+// the unified injectNotification path.
 
 import { z } from 'zod';
 import { Tool } from '../tool';
@@ -31,7 +31,7 @@ export class JobNotifyTool extends Tool {
 **Mental model — read this before using.**
 A delegate **job** is one round. A delegate **session** is the whole conversation. Every \`delegate(prompt=...)\` creates a NEW job under a (new or resumed) session. \`job_notify\` wakes you when *this job* transitions. *You* decide whether the session keeps going via \`delegate(resume=jobId, prompt=...)\` — that creates the next job in the same session.
 
-**Use this tool whenever you start a background job (\`delegate(..., background=true)\` or any \`bash(background=true)\`).** It is the cheap, async path. Don't sit in \`job_output(block=true)\` waiting; that brings the conversation to a halt and burns tokens. Subscribe, return to the user, do something else — lace will deliver a \`<background-job-notification>\` block on your next turn when the job transitions.
+**Use this tool whenever you start a background job (\`delegate(..., background=true)\` or any \`bash(background=true)\`).** It is the cheap, async path. Don't sit in \`job_output(block=true)\` waiting; that brings the conversation to a halt and burns tokens. Subscribe, return to the user, do something else — lace will deliver a \`<notification kind="job-completed"|"job-failed"|"job-cancelled"|"job-progress" job-id="...">\` block on your next turn when the job transitions.
 
 **Silence is not success.** Always subscribe to the terminal states (\`completed\`, \`failed\`, \`cancelled\`) — they're cheap and fire exactly once. A \`progress\`-only or \`failed\`-only subscription will stay silent through a crash or a successful completion, and you will not learn the job ended.
 

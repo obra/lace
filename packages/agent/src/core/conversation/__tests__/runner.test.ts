@@ -39,9 +39,6 @@ function createMockDeps(overrides: Partial<RunnerDependencies> = {}): RunnerDepe
     finalizeJob: vi.fn().mockResolvedValue(undefined),
     getStreamingMode: vi.fn().mockReturnValue('full'),
     setStreamingMode: vi.fn(),
-    queueNotification: vi.fn(),
-    flushNotifications: vi.fn().mockReturnValue([]),
-    getNotificationQueue: vi.fn().mockReturnValue([]),
     getRunningJobs: vi.fn().mockReturnValue([]),
   };
 

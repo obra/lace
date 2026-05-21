@@ -1,11 +1,15 @@
-// ABOUTME: Integration test for the createFinalizeJob → fanout → notification-queue
-// path (PRI-1692 Acceptance #5). Spins up a real JobManager and the real
-// createQueueJobNotification factory used in production by server.ts, then
-// verifies that subscribers receive the <background-job-notification> block
-// via the fanout path while unsubscribed jobs still get it via the back-compat
-// queue-push fallback. Wire shape stays identical between the two paths.
+// ABOUTME: Integration test for the createFinalizeJob → fanoutToInject →
+// injectNotification path (PRI-1692 Acceptance #5, PRI-1744). Spins up a real
+// JobManager and the real createQueueJobNotification factory used in
+// production by server.ts, then verifies that subscribers cause the
+// <notification kind="job-..."> block to be written to events.jsonl via the
+// fanout path while unsubscribed jobs still get it via the always-on inject
+// fallback. Wire shape stays identical between the two paths.
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { JobManager } from '../job-manager';
 import { createQueueJobNotification } from '../job-notifications';
 import type { AgentServerState, JobState } from '../../server-types';
@@ -34,22 +38,54 @@ function makeJobState(jobId: string): JobState {
 }
 
 /**
- * Minimal AgentServerState stub. createQueueJobNotification only touches
- * activeTurn, activeSession, and jobManager; the rest can stay undefined
- * for the duration of the test.
+ * Read context_injected events from the session's events.jsonl. Returns the
+ * text payloads in order — one entry per injectNotification call.
  */
-function makeStateStub(jobManager: JobManager): AgentServerState {
+function readInjectedNotificationTexts(sessionDir: string): string[] {
+  const path = join(sessionDir, 'events.jsonl');
+  if (!existsSync(path)) return [];
+  const lines = readFileSync(path, 'utf8').split('\n').filter(Boolean);
+  const texts: string[] = [];
+  for (const line of lines) {
+    const evt = JSON.parse(line) as {
+      type?: string;
+      data?: {
+        priority?: string;
+        content?: Array<{ type?: string; text?: string }>;
+      };
+    };
+    if (evt.type !== 'context_injected') continue;
+    if (evt.data?.priority !== 'immediate') continue;
+    for (const block of evt.data.content ?? []) {
+      if (block.type === 'text' && typeof block.text === 'string') {
+        texts.push(block.text);
+      }
+    }
+  }
+  return texts;
+}
+
+function makeStateStub(jobManager: JobManager, sessionDir: string): AgentServerState {
   return {
     activeTurn: null,
-    activeSession: { meta: { sessionId: 'sess_1' }, dir: '/tmp/sess' },
+    activeSession: { meta: { sessionId: 'sess_1' }, dir: sessionDir },
     jobManager,
   } as unknown as AgentServerState;
 }
 
-describe('createFinalizeJob → fanout integration (PRI-1692 Acceptance #5)', () => {
-  it('subscribed jobId: completion routes through fanout (subscriber path), NOT through queue-push fallback', () => {
+describe('createFinalizeJob → fanoutToInject integration (PRI-1744)', () => {
+  let sessionDir: string;
+
+  beforeEach(() => {
+    sessionDir = mkdtempSync(join(tmpdir(), 'lace-fanout-inject-'));
+  });
+
+  afterEach(() => {
+    rmSync(sessionDir, { recursive: true, force: true });
+  });
+
+  it('subscribed jobId: completion routes through fanout and writes one context_injected event', () => {
     const jobManager = makeJobManager();
-    const queueNotificationSpy = vi.spyOn(jobManager, 'queueNotification');
 
     // Subscribe to terminal states for this job.
     jobManager.subscribe({
@@ -57,64 +93,48 @@ describe('createFinalizeJob → fanout integration (PRI-1692 Acceptance #5)', ()
       on: ['completed', 'failed', 'cancelled'],
     });
 
-    const state = makeStateStub(jobManager);
+    const state = makeStateStub(jobManager, sessionDir);
     const queueJobNotification = createQueueJobNotification(state, { current: null });
 
     queueJobNotification(makeJobState('job_subscribed'), 'completed');
 
-    // Subscriber path queued the notification directly (no queueNotification
-    // call, because the fanout fallback was suppressed).
-    expect(queueNotificationSpy).not.toHaveBeenCalled();
-
-    const queue = jobManager.getNotificationQueue();
-    expect(queue).toHaveLength(1);
-    expect(queue[0].jobId).toBe('job_subscribed');
-    expect(queue[0].type).toBe('completed');
-    // Wire shape: <background-job-notification> block (the same format the
-    // unsubscribed path produces — see next test).
-    expect(queue[0].content).toContain('<background-job-notification');
-    expect(queue[0].content).toContain('job-id="job_subscribed"');
-    expect(queue[0].content).toContain('type="completed"');
+    const texts = readInjectedNotificationTexts(sessionDir);
+    expect(texts).toHaveLength(1);
+    // Wire shape: <notification kind="job-completed" job-id="..."> block.
+    expect(texts[0]).toContain('<notification kind="job-completed"');
+    expect(texts[0]).toContain('job-id="job_subscribed"');
+    expect(texts[0]).toContain('</notification>');
   });
 
-  it('unsubscribed jobId: completion routes through the back-compat queue-push fallback', () => {
+  it('unsubscribed jobId: completion routes through the always-on fallback inject', () => {
     const jobManager = makeJobManager();
-    const queueNotificationSpy = vi.spyOn(jobManager, 'queueNotification');
-
     // No subscription for this jobId.
 
-    const state = makeStateStub(jobManager);
+    const state = makeStateStub(jobManager, sessionDir);
     const queueJobNotification = createQueueJobNotification(state, { current: null });
 
     queueJobNotification(makeJobState('job_unsubscribed'), 'completed');
 
-    // Fallback path → exactly one queueNotification call.
-    expect(queueNotificationSpy).toHaveBeenCalledTimes(1);
-
-    const queue = jobManager.getNotificationQueue();
-    expect(queue).toHaveLength(1);
-    expect(queue[0].jobId).toBe('job_unsubscribed');
-    expect(queue[0].type).toBe('completed');
-    // Same wire shape as the subscriber path → back-compat preserved.
-    expect(queue[0].content).toContain('<background-job-notification');
-    expect(queue[0].content).toContain('job-id="job_unsubscribed"');
-    expect(queue[0].content).toContain('type="completed"');
+    const texts = readInjectedNotificationTexts(sessionDir);
+    expect(texts).toHaveLength(1);
+    // Same wire shape as the subscriber path → fallback preserved.
+    expect(texts[0]).toContain('<notification kind="job-completed"');
+    expect(texts[0]).toContain('job-id="job_unsubscribed"');
   });
 
   it('subscribed with on=[failed] only, a successful completion is SILENT (no fallback)', () => {
     // Coverage-discipline contract from the design, exercised end-to-end
-    // through createQueueJobNotification: once subscribed, the back-compat
+    // through createQueueJobNotification: once subscribed, the always-on
     // fallback is suppressed for unmatched kinds.
     const jobManager = makeJobManager();
-    const queueNotificationSpy = vi.spyOn(jobManager, 'queueNotification');
     jobManager.subscribe({ jobId: 'job_silent', on: ['failed'] });
 
-    const state = makeStateStub(jobManager);
+    const state = makeStateStub(jobManager, sessionDir);
     const queueJobNotification = createQueueJobNotification(state, { current: null });
 
     queueJobNotification(makeJobState('job_silent'), 'completed');
 
-    expect(queueNotificationSpy).not.toHaveBeenCalled();
-    expect(jobManager.getNotificationQueue()).toHaveLength(0);
+    const texts = readInjectedNotificationTexts(sessionDir);
+    expect(texts).toEqual([]);
   });
 });

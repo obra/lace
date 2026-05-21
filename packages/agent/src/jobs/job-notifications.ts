@@ -1,9 +1,8 @@
-// ABOUTME: Job notification system for progress updates and completion events
-// This module handles job notifications including progress updates, completion notifications,
-// and progress timer management for background jobs.
+// ABOUTME: createQueueJobNotification composes <notification kind="job-*"> bodies
+// ABOUTME: and writes them via injectNotification. Also exports the progress
+// ABOUTME: timer + finalize-job helpers that drive the lifecycle.
 
 import { existsSync, statSync } from 'node:fs';
-import { formatJobNotification } from './format-notification';
 import { getLastLines } from './job-file-utils';
 import { DEFAULT_PROGRESS_INTERVAL_MS } from '../server-types';
 import { appendDurableEvent } from '../storage/event-log';
@@ -14,15 +13,39 @@ import {
   type AgentServerState,
   type SessionUpdate,
 } from '../server-types';
+import { injectNotification } from '../notifications/inject-notification';
+import {
+  composeJobCompletedBody,
+  composeJobFailedBody,
+  composeJobCancelledBody,
+  composeJobProgressBody,
+} from '../notifications/composers';
+import type { NotificationKind } from '../notifications/notification-wrapper';
+
+function jobTypeToKind(type: JobNotificationType): NotificationKind {
+  switch (type) {
+    case 'completed':
+      return 'job-completed';
+    case 'failed':
+      return 'job-failed';
+    case 'cancelled':
+      return 'job-cancelled';
+    case 'progress':
+      return 'job-progress';
+  }
+}
 
 /**
  * Create a queue job notification function for a given server state.
- * Queue a job notification for delivery to the agent.
- * If the agent is idle (no active turn) and runPromptInternal is available,
- * triggers an internal turn to process the notification immediately.
  *
- * The runPromptInternal reference is accessed from the provided context object,
- * which allows it to be updated after creation.
+ * Builds a `<notification kind="job-*" job-id="...">` block via the unified
+ * composers + injectNotification path. Subscription gating runs through
+ * JobManager.fanoutToInject; the inject callback is invoked once per matching
+ * subscription, or once via the fallback path when no subscription exists.
+ *
+ * If the agent is idle (no active turn) injectNotification's idleWake hook
+ * triggers an internal turn so the just-written event is picked up
+ * immediately.
  */
 export function createQueueJobNotification(
   state: AgentServerState,
@@ -33,60 +56,87 @@ export function createQueueJobNotification(
     type: JobNotificationType,
     options?: { reason?: string; deltaBytes?: number }
   ) => {
+    if (!state.activeSession) return;
+
     const outputBytes = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
     const durationMs = Date.now() - new Date(job.startedAt).getTime();
-    // For delegate jobs show more context (last 8 lines) so parent can see questions
-    // For bash jobs: completed shows 1 line, others show 3
+    // For delegate jobs show more context (last 8 lines) so parent can see questions.
+    // For bash jobs: completed shows 1 line, others show 3.
     const lastLineCount = job.type === 'delegate' ? 8 : type === 'completed' ? 1 : 3;
     const lastLines = getLastLines(job.outputPath, lastLineCount);
 
-    const content = formatJobNotification({
-      jobId: job.jobId,
-      type,
-      jobType: job.type,
-      exitCode: job.exitCode,
-      durationMs,
-      outputBytes,
-      deltaBytes: options?.deltaBytes,
-      lastLines,
-      reason: options?.reason,
-    });
-
-    const notification = {
-      jobId: job.jobId,
-      type,
-      content,
-      createdAt: Date.now(),
-      // Filter regexes (PRI-1692 Phase 2) match against the raw tail
-      // preview, not the surrounding XML wrapper. Only populated for
-      // 'progress' — terminal-state notifications ignore filter anyway
-      // and don't need to carry the field.
-      ...(type === 'progress' ? { preview: lastLines.join('\n') } : {}),
-    };
-
-    // Route through the subscription registry. Subscribers to (jobId, type)
-    // receive a queued notification each; jobs with NO subscriptions fall
-    // back to the always-on queue-push (PRI-1692 Phase 1 back-compat).
-    state.jobManager.fanout(job.jobId, type, notification, (n) => {
-      state.jobManager.queueNotification(n);
-    });
-
-    // If agent is idle (no active turn), trigger an internal turn to process notifications
-    if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
-      // Use setImmediate to avoid blocking the current execution and allow any
-      // in-flight state updates to complete before starting the turn
-      setImmediate(() => {
-        // Re-check conditions since state may have changed
-        if (
-          !state.activeTurn &&
-          state.activeSession &&
-          state.jobManager.getNotificationQueue().length > 0 &&
-          runPromptInternalRef.current
-        ) {
-          void runPromptInternalRef.current([]);
-        }
-      });
+    let body: string;
+    switch (type) {
+      case 'completed':
+        body = composeJobCompletedBody({
+          jobId: job.jobId,
+          jobType: job.type,
+          exitCode: job.exitCode ?? 0,
+          durationMs,
+          outputBytes,
+          lastLines,
+        });
+        break;
+      case 'failed':
+        body = composeJobFailedBody({
+          jobId: job.jobId,
+          jobType: job.type,
+          exitCode: job.exitCode ?? -1,
+          durationMs,
+          outputBytes,
+          lastLines,
+        });
+        break;
+      case 'cancelled':
+        body = composeJobCancelledBody({
+          jobId: job.jobId,
+          jobType: job.type,
+          durationMs,
+          outputBytes,
+          lastLines,
+          ...(options?.reason ? { reason: options.reason } : {}),
+        });
+        break;
+      case 'progress':
+        body = composeJobProgressBody({
+          jobId: job.jobId,
+          durationMs,
+          outputBytes,
+          deltaBytes: options?.deltaBytes ?? 0,
+          lastLines,
+        });
+        break;
     }
+
+    const sessionDir = state.activeSession.dir;
+    const kind = jobTypeToKind(type);
+    // Filter regexes (PRI-1692 Phase 2) match against the raw tail preview,
+    // not the surrounding wrapper. Only populated for 'progress' — terminal
+    // kinds ignore filter by design.
+    const preview = type === 'progress' ? lastLines.join('\n') : undefined;
+
+    const doInject = () =>
+      injectNotification({
+        sessionDir,
+        kind,
+        identifiers: { 'job-id': job.jobId },
+        body,
+        idleWake: {
+          isActive: (d) => d === state.activeSession?.dir,
+          hasActiveTurn: () => !!state.activeTurn,
+          triggerInternalTurn: () => {
+            if (runPromptInternalRef.current) {
+              setImmediate(() => {
+                if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
+                  void runPromptInternalRef.current([]);
+                }
+              });
+            }
+          },
+        },
+      });
+
+    state.jobManager.fanoutToInject(job.jobId, type, { preview }, doInject);
   };
 }
 
