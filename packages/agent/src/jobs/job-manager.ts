@@ -99,6 +99,10 @@ export type JobSubscription = {
   jobId: string;
   on: readonly JobNotificationType[];
   filter?: string;
+  // Compiled form of `filter` (multi-line, so `^X` matches a line inside a
+  // multi-line preview). Built once at subscribe time; null when no filter
+  // is set. Phase 2 of PRI-1692.
+  filterRegex?: RegExp;
 };
 
 export type SubscribeOptions = {
@@ -372,11 +376,26 @@ export class JobManager {
     const existing = this.findSubscription(opts);
     if (existing) return existing;
 
+    // Compile the filter regex up-front. Invalid patterns are rejected at
+    // subscribe time so the agent gets a clear error rather than silently
+    // dropping every progress event. Multi-line flag lets `^X` match line
+    // boundaries inside the preview.
+    let filterRegex: RegExp | undefined;
+    if (opts.filter !== undefined) {
+      try {
+        filterRegex = new RegExp(opts.filter, 'm');
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        throw new Error(`Invalid filter regex "${opts.filter}": ${reason}`);
+      }
+    }
+
     const sub: JobSubscription = {
       subscriptionId: `sub_${randomUUID()}`,
       jobId: opts.jobId,
       on: [...opts.on],
       ...(opts.filter !== undefined ? { filter: opts.filter } : {}),
+      ...(filterRegex ? { filterRegex } : {}),
     };
     this.subscriptions.set(sub.subscriptionId, sub);
     let byJob = this.subscriptionsByJob.get(opts.jobId);
@@ -431,8 +450,13 @@ export class JobManager {
       const sub = this.subscriptions.get(subId);
       if (!sub) continue;
       if (!sub.on.includes(kind)) continue;
-      // Phase 1: filter is accepted but no-op on terminal-state kinds.
-      // Phase 2 will apply filter to 'progress' / per-line subscriptions.
+      // Filter applies ONLY to 'progress'. Terminal-state kinds always
+      // fire regardless of filter — the "silence is not success" contract
+      // requires they're never filterable.
+      if (kind === 'progress' && sub.filterRegex) {
+        const preview = notification.preview ?? '';
+        if (!sub.filterRegex.test(preview)) continue;
+      }
       this.notificationQueue.push({ ...notification });
     }
   }

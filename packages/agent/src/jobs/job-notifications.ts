@@ -57,6 +57,11 @@ export function createQueueJobNotification(
       type,
       content,
       createdAt: Date.now(),
+      // Filter regexes (PRI-1692 Phase 2) match against the raw tail
+      // preview, not the surrounding XML wrapper. Only populated for
+      // 'progress' — terminal-state notifications ignore filter anyway
+      // and don't need to carry the field.
+      ...(type === 'progress' ? { preview: lastLines.join('\n') } : {}),
     };
 
     // Route through the subscription registry. Subscribers to (jobId, type)
