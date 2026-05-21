@@ -9,6 +9,9 @@ import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
+// Phase 1 intentionally omits maxNotifications / expiresMs from the spec's
+// TypeScript block; deferred to Phase 2 along with overflow auto-stop. See
+// docs/specs/2026-05-21-job-management-upgrade-design.md Acceptance #1.
 const jobNotifySchema = z
   .object({
     jobId: NonEmptyString,
