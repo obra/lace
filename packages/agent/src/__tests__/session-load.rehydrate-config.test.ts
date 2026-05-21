@@ -10,6 +10,7 @@ import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
 import { defaultInitializeParams } from './helpers/initialize';
 import { loadSession, writeSessionState } from '../storage/session-store';
+import { reconcileMcpServersForActiveSession } from '../rpc/handlers/mcp-servers';
 import type { JobState } from '../server-types';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 
@@ -655,6 +656,65 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         transport,
         enabled: true,
       });
+      startServer.mockClear();
+      expect(state.mcpServerManager.getServer('remote-server')?.config.transport).toBe(transport);
+
+      const result = (await client.request('ent/mcp/servers/test', {
+        serverId: 'remote-server',
+      })) as { ok: boolean; error?: string };
+
+      expect(result).toMatchObject({
+        ok: false,
+        error: `Unsupported MCP transport for test: ${transport}`,
+      });
+      expect(startServer).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['http', 'sse'] as const)(
+    'does not restart stale stdio config after reconciling a running server to unsupported %s transport',
+    async (transport) => {
+      const state = createAgentServerState();
+      const startServer = vi
+        .spyOn(state.mcpServerManager, 'startServer')
+        .mockResolvedValue(undefined);
+      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+      await client.request('initialize', defaultInitializeParams());
+      await client.request('session/new', {
+        cwd: tempDir,
+        mcpServers: [],
+      });
+
+      state.mcpServerManager.registerConnection('remote-server', {
+        id: 'remote-server',
+        config: {
+          command: process.execPath,
+          transport: 'stdio',
+          enabled: true,
+          tools: {},
+        },
+        status: 'running',
+      });
+
+      writeSessionState(state.activeSession!.dir, {
+        ...state.activeSession!.state,
+        config: {
+          ...state.activeSession!.state.config,
+          mcpServers: [
+            {
+              name: 'remote-server',
+              command: process.execPath,
+              transport,
+              placement: 'host',
+              enabled: true,
+            },
+          ],
+        },
+      });
+      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+
+      await reconcileMcpServersForActiveSession(state);
       startServer.mockClear();
       expect(state.mcpServerManager.getServer('remote-server')?.config.transport).toBe(transport);
 

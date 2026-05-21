@@ -85,6 +85,7 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
 
     if (isUnsupportedMcpTransport(config)) {
       await state.mcpServerManager.stopServer(serverId);
+      state.mcpServerManager.replaceStoppedServerConfig(serverId, config);
       logger.warn('Skipping MCP server with unsupported transport', {
         serverId,
         transport: config.transport,
