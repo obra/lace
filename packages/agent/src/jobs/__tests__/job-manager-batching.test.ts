@@ -48,19 +48,21 @@ describe('JobManager 200ms progress batching (PRI-1692 Phase 2)', () => {
     vi.useRealTimers();
   });
 
-  it('coalesces 5 progress notifications fired in 50ms intervals into ONE delivery with the latest preview', () => {
+  it('coalesces 5 progress notifications fired inside one window into ONE delivery with the latest preview', () => {
     const manager = makeManager();
     manager.subscribe({ jobId: 'job_1', on: ['progress'] });
 
     const fallback = vi.fn();
+    // Fixed-window batching: the first fanout arms the 200ms timer; later
+    // fires within that window replace the buffer (latest preview wins).
+    // 5 fires at 30ms intervals → all 5 land inside [t=0, t=200).
     for (let i = 0; i < 5; i++) {
       manager.fanout('job_1', 'progress', progressNotification('job_1', `tick-${i}`), fallback);
-      vi.advanceTimersByTime(50);
+      vi.advanceTimersByTime(30);
     }
+    // Advance past the window boundary so the timer flushes.
+    vi.advanceTimersByTime(200);
 
-    // We've advanced 250ms total but the timer fires 200ms after the FIRST
-    // fanout. Last fanout was at t=200, timer fired at t=200 carrying the
-    // latest preview at that time.
     const queue = manager.getNotificationQueue();
     expect(queue).toHaveLength(1);
     expect(queue[0].type).toBe('progress');

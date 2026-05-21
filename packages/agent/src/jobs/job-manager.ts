@@ -111,6 +111,20 @@ export type SubscribeOptions = {
   filter?: string;
 };
 
+/**
+ * Pending per-subscription progress batch (PRI-1692 Phase 2). When a
+ * subscription receives its first `progress` fanout, a 200ms timer is
+ * armed; further progress within the window replaces `notification`
+ * (latest preview wins). The timer fires the buffered notification to
+ * the queue, or a terminal-state fanout flushes it early.
+ */
+type ProgressBatch = {
+  notification: PendingJobNotification;
+  timer: ReturnType<typeof setTimeout>;
+};
+
+const PROGRESS_BATCH_WINDOW_MS = 200;
+
 export class JobManager {
   private jobs = new Map<string, JobState>();
   private streamingMode: 'full' | 'coalesced' | 'none' = 'full';
@@ -119,6 +133,8 @@ export class JobManager {
   private listJobsCache: JobsCache | null = null;
   private subscriptions = new Map<string, JobSubscription>();
   private subscriptionsByJob = new Map<string, Set<string>>();
+  // Per-subscription batched progress (see ProgressBatch above).
+  private progressBatches = new Map<string, ProgressBatch>();
 
   constructor(deps: JobManagerDeps) {
     this.deps = deps;
@@ -288,6 +304,13 @@ export class JobManager {
    */
   clearJobs(): void {
     this.jobs.clear();
+    // Cancel every armed progress batch before dropping the subscriptions
+    // they belong to — leaving a setTimeout pending would deliver after the
+    // subscription is gone.
+    for (const batch of this.progressBatches.values()) {
+      clearTimeout(batch.timer);
+    }
+    this.progressBatches.clear();
     this.subscriptions.clear();
     this.subscriptionsByJob.clear();
   }
@@ -414,6 +437,7 @@ export class JobManager {
   unsubscribe(subscriptionId: string): void {
     const sub = this.subscriptions.get(subscriptionId);
     if (!sub) return;
+    this.cancelProgressBatch(subscriptionId);
     this.subscriptions.delete(subscriptionId);
     const byJob = this.subscriptionsByJob.get(sub.jobId);
     if (byJob) {
@@ -453,12 +477,67 @@ export class JobManager {
       // Filter applies ONLY to 'progress'. Terminal-state kinds always
       // fire regardless of filter — the "silence is not success" contract
       // requires they're never filterable.
-      if (kind === 'progress' && sub.filterRegex) {
-        const preview = notification.preview ?? '';
-        if (!sub.filterRegex.test(preview)) continue;
+      if (kind === 'progress') {
+        if (sub.filterRegex) {
+          const preview = notification.preview ?? '';
+          if (!sub.filterRegex.test(preview)) continue;
+        }
+        this.bufferProgressForSubscription(sub.subscriptionId, { ...notification });
+      } else {
+        // Terminal-state fanout: flush any pending progress batch FIRST so
+        // it lands before the terminal in the agent's inbox, then enqueue
+        // the terminal immediately (no 200ms delay for terminals).
+        this.flushProgressBatch(sub.subscriptionId);
+        this.notificationQueue.push({ ...notification });
       }
-      this.notificationQueue.push({ ...notification });
     }
+  }
+
+  /**
+   * Buffer a matching progress notification for a subscription, arming the
+   * 200ms flush timer on the first event of a new window. Subsequent events
+   * within the window replace the buffered notification — latest preview
+   * wins, matching the LLM's actual need (most recent tail, not stale
+   * history).
+   */
+  private bufferProgressForSubscription(
+    subscriptionId: string,
+    notification: PendingJobNotification
+  ): void {
+    const existing = this.progressBatches.get(subscriptionId);
+    if (existing) {
+      existing.notification = notification;
+      return;
+    }
+    const timer = setTimeout(() => {
+      this.flushProgressBatch(subscriptionId);
+    }, PROGRESS_BATCH_WINDOW_MS);
+    this.progressBatches.set(subscriptionId, { notification, timer });
+  }
+
+  /**
+   * Push the buffered progress notification (if any) to the queue and clear
+   * the per-subscription batch state. Called by the 200ms timer, on terminal
+   * fanout for the same subscription, and on subscription teardown.
+   */
+  private flushProgressBatch(subscriptionId: string): void {
+    const batch = this.progressBatches.get(subscriptionId);
+    if (!batch) return;
+    clearTimeout(batch.timer);
+    this.progressBatches.delete(subscriptionId);
+    this.notificationQueue.push(batch.notification);
+  }
+
+  /**
+   * Cancel any pending batch for `subscriptionId` without delivering it.
+   * Used when a subscription is torn down: late delivery after unsubscribe
+   * would violate the lifecycle contract.
+   */
+  private cancelProgressBatch(subscriptionId: string): void {
+    const batch = this.progressBatches.get(subscriptionId);
+    if (!batch) return;
+    clearTimeout(batch.timer);
+    this.progressBatches.delete(subscriptionId);
   }
 
   /**
@@ -469,7 +548,10 @@ export class JobManager {
   private clearSubscriptionsForJob(jobId: string): void {
     const subIds = this.subscriptionsByJob.get(jobId);
     if (!subIds) return;
-    for (const subId of subIds) this.subscriptions.delete(subId);
+    for (const subId of subIds) {
+      this.cancelProgressBatch(subId);
+      this.subscriptions.delete(subId);
+    }
     this.subscriptionsByJob.delete(jobId);
   }
 
