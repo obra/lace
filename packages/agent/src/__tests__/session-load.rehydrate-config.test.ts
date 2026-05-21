@@ -670,6 +670,9 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       });
       startServer.mockClear();
       expect(state.mcpServerManager.getServer('remote-server')?.config.transport).toBe(transport);
+      expect(state.mcpServerManager.getServer('remote-server')?.connectionKey).toBe(
+        `remote-server:host:${transport}:${tempDir}`
+      );
 
       const result = (await client.request('ent/mcp/servers/test', {
         serverId: 'remote-server',
@@ -729,6 +732,9 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       await reconcileMcpServersForActiveSession(state);
       startServer.mockClear();
       expect(state.mcpServerManager.getServer('remote-server')?.config.transport).toBe(transport);
+      expect(state.mcpServerManager.getServer('remote-server')?.connectionKey).toBe(
+        `remote-server:host:${transport}:${tempDir}`
+      );
 
       const result = (await client.request('ent/mcp/servers/test', {
         serverId: 'remote-server',

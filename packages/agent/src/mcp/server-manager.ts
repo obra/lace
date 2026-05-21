@@ -20,11 +20,15 @@ export function mcpConnectionKey(input: {
   serverId: string;
   config: Pick<MCPServerConfig, 'placement' | 'transport'>;
   runtimeId: string;
+  runtimeCwd?: string;
   hostCwd?: string;
 }): string {
   const placement = input.config.placement ?? 'host';
   const transport = input.config.transport ?? 'stdio';
-  const placementScope = placement === 'toolRuntime' ? input.runtimeId : (input.hostCwd ?? '');
+  const placementScope =
+    placement === 'toolRuntime'
+      ? `${input.runtimeId}:${input.runtimeCwd ?? ''}`
+      : (input.hostCwd ?? '');
   return `${input.serverId}:${placement}:${transport}:${placementScope}`;
 }
 
@@ -42,6 +46,7 @@ export class MCPServerManager extends EventEmitter {
       serverId,
       config,
       runtimeId: runtime.id,
+      runtimeCwd: runtime.cwd,
       hostCwd,
     });
     const existing = this.servers.get(connectionKey);
@@ -145,6 +150,7 @@ export class MCPServerManager extends EventEmitter {
         serverId,
         config: connection.config,
         runtimeId: 'registered',
+        runtimeCwd: 'registered',
         hostCwd: 'registered',
       });
     if (this.servers.has(connectionKey)) {
@@ -189,13 +195,22 @@ export class MCPServerManager extends EventEmitter {
   /**
    * Replace config for an already-stopped server without spawning a subprocess.
    */
-  replaceStoppedServerConfig(serverId: string, config: MCPServerConfig): void {
+  replaceStoppedServerConfig(
+    serverId: string,
+    config: MCPServerConfig,
+    desiredConnectionKey?: string
+  ): void {
     for (const connection of this.resolveConnections(serverId)) {
       if (connection.status !== 'stopped') {
         continue;
       }
 
       connection.config = config;
+      if (desiredConnectionKey && desiredConnectionKey !== connection.connectionKey) {
+        this.servers.delete(connection.connectionKey);
+        connection.connectionKey = desiredConnectionKey;
+        this.servers.set(desiredConnectionKey, connection);
+      }
     }
   }
 

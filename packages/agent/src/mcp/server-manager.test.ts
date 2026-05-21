@@ -214,10 +214,47 @@ describe('MCPServerManager', () => {
     const servers = manager.getAllServers();
     expect(servers.map((server) => server.connectionKey).sort()).toEqual([
       'shared:host:stdio:/host/project',
-      'shared:toolRuntime:stdio:rt_projected',
+      'shared:toolRuntime:stdio:rt_projected:/runtime/project',
     ]);
     expect(servers).toHaveLength(2);
     expect(manager.getServer('shared')).toBeUndefined();
+  });
+
+  it('keeps runtime placed connections with the same runtime id and different cwd distinct', async () => {
+    const firstRuntime = createFakeRuntime();
+    Object.assign(firstRuntime, { id: 'rt_shared', cwd: '/runtime/one' });
+    const secondRuntime = createFakeRuntime();
+    Object.assign(secondRuntime, { id: 'rt_shared', cwd: '/runtime/two' });
+    const config: MCPServerConfig = {
+      command: 'node',
+      transport: 'stdio',
+      placement: 'toolRuntime',
+      enabled: true,
+      tools: {},
+    };
+
+    await manager.startServer({
+      serverId: 'shared-runtime',
+      config,
+      runtime: firstRuntime,
+      hostCwd: '/host/project',
+    });
+    await manager.startServer({
+      serverId: 'shared-runtime',
+      config,
+      runtime: secondRuntime,
+      hostCwd: '/host/project',
+    });
+
+    expect(
+      manager
+        .getAllServers()
+        .map((server) => server.connectionKey)
+        .sort()
+    ).toEqual([
+      'shared-runtime:toolRuntime:stdio:rt_shared:/runtime/one',
+      'shared-runtime:toolRuntime:stdio:rt_shared:/runtime/two',
+    ]);
   });
 
   it('uses runtime stdio transport for runtime placement and SDK stdio for host placement', async () => {

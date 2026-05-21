@@ -52,8 +52,8 @@ export class RuntimeStdioClientTransport implements Transport {
       handle.stdin?.on('error', (error) => {
         this.onerror?.(error);
       });
-      handle.stdout?.on('data', (chunk: Buffer) => {
-        this.readBuffer.append(chunk);
+      handle.stdout?.on('data', (chunk: Buffer | string | Uint8Array) => {
+        this.readBuffer.append(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
         this.processReadBuffer();
       });
       handle.stdout?.on('error', (error) => {

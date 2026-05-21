@@ -55,6 +55,21 @@ function activeSessionHostCwd(state: AgentServerState): string {
   return state.activeSession?.meta.workDir ?? process.cwd();
 }
 
+function activeSessionConnectionKey(
+  state: AgentServerState,
+  serverId: string,
+  config: MCPServerConfig
+): string {
+  const runtime = activeSessionRuntime(state);
+  return mcpConnectionKey({
+    serverId,
+    config,
+    runtimeId: runtime.id,
+    runtimeCwd: runtime.cwd,
+    hostCwd: activeSessionHostCwd(state),
+  });
+}
+
 async function startServerForActiveSession(
   state: AgentServerState,
   serverId: string,
@@ -114,6 +129,7 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
       serverId: server.name,
       config,
       runtimeId: runtime.id,
+      runtimeCwd: runtime.cwd,
       hostCwd,
     });
     desired.set(connectionKey, { serverId: server.name, config });
@@ -140,7 +156,7 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
 
     if (isUnsupportedMcpTransport(config)) {
       await state.mcpServerManager.stopServer(serverId);
-      state.mcpServerManager.replaceStoppedServerConfig(serverId, config);
+      state.mcpServerManager.replaceStoppedServerConfig(serverId, config, connectionKey);
       logger.warn('Skipping MCP server with unsupported transport', {
         serverId,
         transport: config.transport,
@@ -297,8 +313,9 @@ export function registerMcpHandlers(
 
     // Start the server if enabled
     if (enabled && isUnsupportedMcpTransport(config)) {
+      const connectionKey = activeSessionConnectionKey(state, serverId, config);
       await state.mcpServerManager.stopServer(serverId);
-      state.mcpServerManager.replaceStoppedServerConfig(serverId, config);
+      state.mcpServerManager.replaceStoppedServerConfig(serverId, config, connectionKey);
       logger.warn('Skipping MCP server with unsupported transport', {
         serverId,
         transport: config.transport,
