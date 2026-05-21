@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { FileEditTool } from '@lace/agent/tools/implementations/file_edit';
 import type { FileEditDiffContext } from '@lace/agent/tools/implementations/file_edit';
 import type { ToolContext } from '@lace/agent/tools/types';
+import { HostToolRuntime } from '@lace/agent/tools/runtime/host';
 import { promises as fs } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -13,6 +14,7 @@ describe('FileEditTool context extraction', () => {
   let tool: FileEditTool;
   let testDir: string;
   let testFile: string;
+  let runtimeId = 0;
 
   beforeEach(async () => {
     tool = new FileEditTool();
@@ -24,6 +26,11 @@ describe('FileEditTool context extraction', () => {
     return {
       signal: new AbortController().signal,
       hasFileBeenRead: () => true,
+      runtime: new HostToolRuntime({
+        id: `rt_file_edit_context_test_${runtimeId++}`,
+        cwd: testDir,
+      }),
+      hasRuntimeFileBeenRead: () => true,
     };
   }
 

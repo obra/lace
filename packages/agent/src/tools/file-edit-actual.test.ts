@@ -6,12 +6,14 @@ import { writeFile, readFile, rm, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { FileEditTool } from '@lace/agent/tools/implementations/file_edit';
+import { HostToolRuntime } from '@lace/agent/tools/runtime/host';
 import type { ToolContext } from '@lace/agent/tools/types';
 
 describe('FileEditTool actual file modification', () => {
   let tool: FileEditTool;
   let testDir: string;
   let testFile: string;
+  let runtimeId = 0;
 
   beforeEach(async () => {
     tool = new FileEditTool();
@@ -24,6 +26,11 @@ describe('FileEditTool actual file modification', () => {
     return {
       signal: new AbortController().signal,
       hasFileBeenRead: () => true,
+      runtime: new HostToolRuntime({
+        id: `rt_file_edit_actual_test_${runtimeId++}`,
+        cwd: testDir,
+      }),
+      hasRuntimeFileBeenRead: () => true,
     };
   }
 
