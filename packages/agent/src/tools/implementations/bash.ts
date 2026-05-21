@@ -46,10 +46,10 @@ Parameters:
 - command: The shell command to run
 - background: Set to true for background execution (returns jobId immediately)
 - description: Label shown in job listings when background=true (optional)
-- progressIntervalMs: For background jobs, interval in ms for progress notifications (5000-600000, default 300000)
+- progressIntervalMs: For background jobs, interval in ms for periodic progress notifications (5000-600000). **Off by default** — set this only if you want a fixed cadence regardless of subscribers. Subscribing to a job via job_notify(on=['progress'], ...) arms the timer on its own at the default cadence.
 
 When background=true, returns { jobId, status: "started" }. Use job_output(jobId) to check status/output.
-Background jobs send completion notifications automatically. Progress notifications sent every 5 minutes by default.
+Background jobs send completion notifications automatically. Progress notifications are opt-in (see progressIntervalMs / job_notify).
 
 Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain with && or ;.`;
   schema = bashSchema;

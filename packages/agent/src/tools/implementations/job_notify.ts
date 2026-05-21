@@ -37,7 +37,7 @@ A delegate **job** is one round. A delegate **session** is the whole conversatio
 
 Parameters:
 - \`jobId\` (required): the job to watch.
-- \`on\`: which lifecycle kinds to wake on. Defaults to the three terminal states \`['completed','failed','cancelled']\`. Subscribe to all three unless you have a specific reason. \`progress\` is opt-in and chatty — pair it with a \`filter\` and keep the terminal-state subscription armed alongside it.
+- \`on\`: which lifecycle kinds to wake on. Defaults to the three terminal states \`['completed','failed','cancelled']\`. Subscribe to all three unless you have a specific reason. \`progress\` is opt-in and chatty — pair it with a \`filter\` and keep the terminal-state subscription armed alongside it. Subscribing with \`progress\` arms the job's progress timer on demand (default cadence ~5min); when you and any other progress subscribers unsubscribe, the timer stops and the job stops emitting. Operator-configured cadences (jobs created with an explicit \`progressIntervalMs\`) run independently and outlive subscriber churn.
 - \`filter\` (optional): regex applied subscriber-side.
    - For \`progress\`: functional. The regex is evaluated (multi-line) against the latest tail-preview text; non-matching ticks are dropped for this subscriber. Typical pattern: \`filter='^ERROR:|^FATAL:'\` to wake only on interesting output.
    - For terminal states (\`completed\`/\`failed\`/\`cancelled\`): no-op. Terminal notifications always fire — they're never filterable, by design.
