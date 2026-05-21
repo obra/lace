@@ -34,6 +34,18 @@ export const McpServerConfigSchema = z
     args: z.array(z.string()).optional(),
     env: z.record(z.string(), z.string()).optional(),
     transport: z.enum(['stdio', 'sse', 'http']).optional(),
+    secretEnv: z
+      .record(
+        z.string(),
+        z
+          .object({
+            namespace: z.enum(['session', 'project', 'host-service']),
+            name: NonEmptyStringSchema,
+          })
+          .strict()
+      )
+      .optional(),
+    placement: z.enum(['toolRuntime', 'host']).optional(),
     enabled: z.boolean().optional(),
     tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
   })

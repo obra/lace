@@ -16,10 +16,20 @@ const DiscoveredToolSchema = z.object({
   description: z.string().optional(),
 });
 
+const MCPSecretReferenceSchema = z
+  .object({
+    namespace: z.enum(['session', 'project', 'host-service']),
+    name: z.string().min(1),
+  })
+  .strict();
+
 const MCPServerConfigSchema = z.object({
   command: z.string().min(1, 'Command is required'),
   args: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
+  transport: z.enum(['stdio', 'sse', 'http']).optional(),
+  secretEnv: z.record(z.string(), MCPSecretReferenceSchema).optional(),
+  placement: z.enum(['toolRuntime', 'host']).optional(),
   enabled: z.boolean(),
   tools: z.record(z.string(), ToolPolicySchema),
   // Tool discovery cache fields

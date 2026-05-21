@@ -11,11 +11,23 @@ export interface DiscoveredTool {
   description?: string;
 }
 
+export type MCPTransport = 'stdio' | 'sse' | 'http';
+export type MCPPlacement = 'toolRuntime' | 'host';
+export type MCPSecretNamespace = 'session' | 'project' | 'host-service';
+
+export interface MCPSecretReference {
+  namespace: MCPSecretNamespace;
+  name: string;
+}
+
 // MCP Server Configuration (matches mcp-config.json structure)
 export interface MCPServerConfig {
   command: string; // Executable name
   args?: string[]; // Command arguments
   env?: Record<string, string>; // Environment variables
+  transport?: MCPTransport;
+  secretEnv?: Record<string, MCPSecretReference>;
+  placement?: MCPPlacement;
   enabled: boolean;
   tools: Record<string, ToolPolicy>; // Tool name -> approval policy
 

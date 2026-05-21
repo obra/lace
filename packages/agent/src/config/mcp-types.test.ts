@@ -2,6 +2,9 @@
 // ABOUTME: Ensures type safety and backward compatibility for MCP server configurations
 
 import { describe, it, expect } from 'vitest';
+import { McpServerConfigSchema } from '@lace/ent-protocol';
+import { mergeMcpServers } from '../rpc/session-config';
+import { MCPConfigLoader } from './mcp-config-loader';
 import type { MCPServerConfig, DiscoveredTool } from './mcp-types';
 
 describe('MCPServerConfig Discovery Fields', () => {
@@ -60,6 +63,90 @@ describe('MCPServerConfig Discovery Fields', () => {
     };
 
     expect(config.discoveryError).toBe('Connection timeout');
+  });
+
+  it('should accept MCP placement and secret environment references', () => {
+    const config: MCPServerConfig = {
+      command: 'test',
+      enabled: true,
+      tools: {},
+      placement: 'toolRuntime',
+      secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+    };
+
+    const hostConfig: MCPServerConfig = {
+      command: 'test',
+      enabled: true,
+      tools: {},
+      placement: 'host',
+    };
+
+    expect(config.placement).toBe('toolRuntime');
+    expect(config.secretEnv?.API_KEY).toEqual({ namespace: 'project', name: 'api-key' });
+    expect(hostConfig.placement).toBe('host');
+  });
+
+  it('should validate local MCP placement and secret environment references', () => {
+    const parsed = MCPConfigLoader.validateConfigStructure({
+      servers: {
+        runtime: {
+          command: 'test',
+          enabled: true,
+          tools: {},
+          placement: 'toolRuntime',
+          secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+        },
+        host: {
+          command: 'test',
+          enabled: true,
+          tools: {},
+          placement: 'host',
+        },
+      },
+    });
+
+    expect(parsed.servers.runtime.placement).toBe('toolRuntime');
+    expect(parsed.servers.runtime.secretEnv?.API_KEY).toEqual({
+      namespace: 'project',
+      name: 'api-key',
+    });
+    expect(parsed.servers.host.placement).toBe('host');
+  });
+
+  it('should validate protocol MCP placement and secret environment references', () => {
+    const parsed = McpServerConfigSchema.parse({
+      name: 'runtime',
+      command: 'test',
+      placement: 'toolRuntime',
+      secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+    });
+
+    expect(parsed.placement).toBe('toolRuntime');
+    expect(parsed.secretEnv?.API_KEY).toEqual({ namespace: 'project', name: 'api-key' });
+    expect(
+      McpServerConfigSchema.parse({ name: 'host', command: 'test', placement: 'host' }).placement
+    ).toBe('host');
+  });
+
+  it('should default merged MCP placement by transport', () => {
+    const merged = mergeMcpServers(undefined, [
+      { name: 'stdio-default', command: 'test' },
+      { name: 'stdio-explicit', command: 'test', transport: 'stdio' },
+      { name: 'http-default', command: 'test', transport: 'http' },
+      { name: 'sse-default', command: 'test', transport: 'sse' },
+    ]);
+
+    expect(merged).toEqual([
+      { name: 'stdio-default', command: 'test', placement: 'toolRuntime' },
+      {
+        name: 'stdio-explicit',
+        command: 'test',
+        transport: 'stdio',
+        placement: 'toolRuntime',
+      },
+      { name: 'http-default', command: 'test', transport: 'http', placement: 'host' },
+      { name: 'sse-default', command: 'test', transport: 'sse', placement: 'host' },
+    ]);
   });
 });
 

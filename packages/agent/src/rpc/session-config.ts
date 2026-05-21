@@ -28,24 +28,30 @@ const APPROVAL_MODE_OPTIONS: Array<{ value: ApprovalMode; name: string; descript
   },
 ];
 
+function withDefaultMcpPlacement(server: McpServerConfig): McpServerConfig {
+  if (server.placement) return server;
+
+  return {
+    ...server,
+    placement: server.transport === 'http' || server.transport === 'sse' ? 'host' : 'toolRuntime',
+  };
+}
+
 export function mergeMcpServers(existing: unknown, incoming: unknown): McpServerConfig[] {
   const parsedIncoming = McpServerConfigSchema.array().safeParse(incoming);
   if (!parsedIncoming.success) {
     throwInvalidParams('mcpServers is invalid');
   }
 
-  for (const server of parsedIncoming.data) {
-    if (server.transport && server.transport !== 'stdio') {
-      throwInvalidParams(`Unsupported MCP transport for ${server.name}: ${server.transport}`);
-    }
-  }
-
   const parsedExisting = Array.isArray(existing)
     ? McpServerConfigSchema.array().safeParse(existing)
     : { success: true as const, data: [] as McpServerConfig[] };
-  const existingServers = parsedExisting.success ? parsedExisting.data : [];
+  const existingServers = parsedExisting.success
+    ? parsedExisting.data.map(withDefaultMcpPlacement)
+    : [];
+  const incomingServers = parsedIncoming.data.map(withDefaultMcpPlacement);
 
-  const incomingByName = new Map(parsedIncoming.data.map((server) => [server.name, server]));
+  const incomingByName = new Map(incomingServers.map((server) => [server.name, server]));
   const merged: McpServerConfig[] = [];
   const seen = new Set<string>();
 
@@ -59,7 +65,7 @@ export function mergeMcpServers(existing: unknown, incoming: unknown): McpServer
     seen.add(oldServer.name);
   }
 
-  for (const server of parsedIncoming.data) {
+  for (const server of incomingServers) {
     if (seen.has(server.name)) continue;
     merged.push(server);
   }
