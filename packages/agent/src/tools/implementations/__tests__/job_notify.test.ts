@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { JobNotifyTool } from '../job_notify';
-import type { JobManager } from '@lace/agent/jobs/job-manager';
+import { JobManager } from '@lace/agent/jobs/job-manager';
 
 describe('JobNotifyTool', () => {
   it('returns error when jobManager not in context', async () => {
@@ -116,5 +116,61 @@ describe('JobNotifyTool', () => {
     // Should point the agent at delegate(resume=...) for continuing a
     // conversation rather than waiting again.
     expect(tool.description).toMatch(/resume/i);
+  });
+
+  it('is idempotent at the tool layer: calling twice with identical args returns the same subscriptionId', async () => {
+    // Mirrors the JobManager-level idempotency contract, but exercised
+    // through the tool wrapper agents actually call (PRI-1692).
+    const jobManager = new JobManager({
+      getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: '/tmp/sess' }),
+      persistEvent: vi.fn(),
+      emitUpdate: vi.fn(),
+      runShellProcess: vi.fn(),
+      runSubagentProcess: vi.fn(),
+    });
+    const subscribeSpy = vi.spyOn(jobManager, 'subscribe');
+
+    const tool = new JobNotifyTool();
+    const args = { jobId: 'job_dup', on: ['completed', 'failed', 'cancelled'] as const };
+
+    const first = await tool.execute(args, {
+      signal: new AbortController().signal,
+      jobManager,
+    });
+    const second = await tool.execute(args, {
+      signal: new AbortController().signal,
+      jobManager,
+    });
+
+    expect(first.status).toBe('completed');
+    expect(second.status).toBe('completed');
+
+    const firstPayload = JSON.parse(first.content[0].text ?? '{}') as { subscriptionId: string };
+    const secondPayload = JSON.parse(second.content[0].text ?? '{}') as { subscriptionId: string };
+
+    // Same subscriptionId comes back both times.
+    expect(secondPayload.subscriptionId).toBe(firstPayload.subscriptionId);
+
+    // Both tool calls forwarded to JobManager.subscribe (idempotency lives
+    // INSIDE JobManager, not in the tool wrapper) — but only one underlying
+    // registration exists.
+    expect(subscribeSpy).toHaveBeenCalledTimes(2);
+
+    // No duplicate subscription side-effect: fanout for this job's
+    // terminal kind should produce exactly one queued notification.
+    const fallback = vi.fn();
+    jobManager.fanout(
+      'job_dup',
+      'completed',
+      {
+        jobId: 'job_dup',
+        type: 'completed',
+        content: '<background-job-notification job-id="job_dup" type="completed" />',
+        createdAt: Date.now(),
+      },
+      fallback
+    );
+    expect(fallback).not.toHaveBeenCalled();
+    expect(jobManager.getNotificationQueue()).toHaveLength(1);
   });
 });
