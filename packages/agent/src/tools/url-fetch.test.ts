@@ -1,8 +1,12 @@
 // ABOUTME: Tests for schema-based URL fetch tool with structured output
 // ABOUTME: Validates URL fetching, content handling, and enhanced error reporting
 
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
 import { UrlFetchTool } from '@lace/agent/tools/implementations/url_fetch';
+import { createFakeRuntime } from './runtime/__tests__/fake-runtime';
 
 describe('UrlFetchTool with schema validation', () => {
   let tool: UrlFetchTool;
@@ -146,14 +150,13 @@ Follows redirects by default. Returns detailed error context for failures.`
     });
 
     it('should accept valid parameters', async () => {
-      // Mock successful response
-      mockFetch.mockResolvedValueOnce(
-        new Response('{"test": "success"}', {
+      const runtime = createFakeRuntime({
+        fetchResult: {
           status: 200,
-          statusText: 'OK',
           headers: { 'content-type': 'application/json' },
-        })
-      );
+          body: new TextEncoder().encode('{"test": "success"}'),
+        },
+      });
 
       const result = await tool.execute(
         {
@@ -164,7 +167,7 @@ Follows redirects by default. Returns detailed error context for failures.`
           followRedirects: true,
           returnContent: true,
         },
-        { signal: new AbortController().signal }
+        { signal: new AbortController().signal, runtime }
       );
 
       // May fail with network error, but should not fail validation
@@ -292,21 +295,86 @@ Follows redirects by default. Returns detailed error context for failures.`
   });
 
   describe('Network error scenarios', () => {
-    it('should handle timeout errors gracefully', async () => {
-      // Mock timeout by rejecting after delay
-      mockFetch.mockImplementationOnce(
-        () =>
-          new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('The operation was aborted due to timeout')), 100);
-          })
+    it('should return a system error when runtime is missing', async () => {
+      const result = await tool.execute(
+        { url: 'https://example.com/hello' },
+        { signal: new AbortController().signal }
       );
+
+      expect(result.status).toBe('failed');
+      expect(result.content[0].text).toBe('Tool context missing runtime. This is a system error.');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should route requests through runtime network fetch', async () => {
+      const runtime = createFakeRuntime({
+        fetchResult: {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+          body: new TextEncoder().encode('hello'),
+        },
+      });
+
+      const result = await tool.execute(
+        { url: 'https://example.com/hello' },
+        { signal: new AbortController().signal, runtime }
+      );
+
+      expect(result.status).toBe('completed');
+      expect(result.content[0].text).toContain('hello');
+      expect(runtime.network.fetch).toHaveBeenCalledWith(
+        'https://example.com/hello',
+        expect.objectContaining({
+          signal: expect.any(AbortSignal),
+        })
+      );
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should save large responses under the host tool temp directory', async () => {
+      const tempRoot = await mkdtemp(join(tmpdir(), 'url-fetch-test-'));
+
+      try {
+        const toolTempDir = join(tempRoot, 'tool-call-url-fetch');
+        const runtime = createFakeRuntime({
+          fetchResult: {
+            status: 200,
+            headers: { 'content-type': 'text/plain' },
+            body: new TextEncoder().encode('x'.repeat(33 * 1024)),
+          },
+        });
+
+        const result = await tool.execute(
+          {
+            url: 'https://example.com/large',
+            maxSize: 64 * 1024,
+            returnContent: false,
+          },
+          { signal: new AbortController().signal, runtime, toolTempDir }
+        );
+
+        expect(result.status).toBe('completed');
+        const output = result.content[0].text ?? '';
+        const savedPath = output.match(/Saved to: (.+)$/m)?.[1];
+        expect(savedPath?.startsWith(join(toolTempDir, 'url-fetch-'))).toBe(true);
+        expect(runtime.fs.writeTextFile).not.toHaveBeenCalled();
+      } finally {
+        await rm(tempRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('should handle timeout errors gracefully', async () => {
+      const runtime = createFakeRuntime();
+      const timeoutError = new Error('The operation was aborted due to timeout');
+      timeoutError.name = 'AbortError';
+      vi.mocked(runtime.network.fetch).mockRejectedValueOnce(timeoutError);
 
       const result = await tool.execute(
         {
           url: 'https://httpbin.org/delay/5',
           timeout: 1000, // 1 second timeout for 5 second delay
         },
-        { signal: new AbortController().signal }
+        { signal: new AbortController().signal, runtime }
       );
 
       expect(result.status).toBe('failed');
@@ -315,11 +383,16 @@ Follows redirects by default. Returns detailed error context for failures.`
     }, 10000);
 
     it('should handle invalid domains', async () => {
+      const runtime = createFakeRuntime();
+      vi.mocked(runtime.network.fetch).mockRejectedValueOnce(
+        new Error('getaddrinfo ENOTFOUND this-domain-definitely-does-not-exist-12345.invalid')
+      );
+
       const result = await tool.execute(
         {
           url: 'https://this-domain-definitely-does-not-exist-12345.invalid',
         },
-        { signal: new AbortController().signal }
+        { signal: new AbortController().signal, runtime }
       );
 
       expect(result.status).toBe('failed');

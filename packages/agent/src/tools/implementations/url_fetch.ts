@@ -6,6 +6,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { unlinkSync } from 'fs';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { STATUS_CODES } from 'http';
 import TurndownService from 'turndown';
 import { Tool } from '../tool';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
@@ -145,7 +146,12 @@ Follows redirects by default. Returns detailed error context for failures.`;
     if (context.signal.aborted) {
       return this.createCancellationResult();
     }
-    return await this.performFetch(args, context.signal);
+
+    if (!context.runtime) {
+      return this.createError('Tool context missing runtime. This is a system error.');
+    }
+
+    return await this.performFetch(args, context, context.runtime);
   }
 
   validateUrl(url: string): void {
@@ -195,18 +201,11 @@ Follows redirects by default. Returns detailed error context for failures.`;
 
   private async performFetch(
     params: z.infer<typeof urlFetchSchema>,
-    abortSignal?: AbortSignal
+    context: ToolContext,
+    runtime: NonNullable<ToolContext['runtime']>
   ): Promise<ToolResult> {
-    const {
-      url,
-      method,
-      headers = {},
-      body,
-      timeout,
-      maxSize,
-      followRedirects,
-      returnContent,
-    } = params;
+    const { url, method, headers = {}, body, timeout, maxSize, returnContent } = params;
+    const abortSignal = context.signal;
 
     const timing: RequestTiming = {
       start: Date.now(),
@@ -228,7 +227,6 @@ Follows redirects by default. Returns detailed error context for failures.`;
     const fetchOptions: {
       method: string;
       headers: Record<string, string>;
-      redirect: 'follow' | 'manual';
       signal: AbortSignal;
       body?: string;
     } = {
@@ -237,7 +235,6 @@ Follows redirects by default. Returns detailed error context for failures.`;
         'User-Agent': 'Lace/1.0 (AI Assistant)',
         ...headers,
       },
-      redirect: followRedirects ? 'follow' : 'manual',
       signal: controller.signal,
     };
 
@@ -246,32 +243,22 @@ Follows redirects by default. Returns detailed error context for failures.`;
     }
 
     try {
-      const response = await fetch(url, fetchOptions);
+      const response = await runtime.network.fetch(url, fetchOptions);
       clearTimeout(timeoutId);
       abortSignal?.removeEventListener('abort', abortHandler);
 
       timing.total = Date.now() - timing.start;
 
-      // Collect response headers
-      const responseHeaders: Record<string, string> = {};
-      response.headers.forEach((value, key) => {
-        responseHeaders[key.toLowerCase()] = value;
-      });
-
-      // Track redirects if any occurred
+      const responseHeaders = this.normalizeResponseHeaders(response.headers);
+      const statusText = STATUS_CODES[response.status] ?? '';
+      const finalUrl = url;
       const redirectChain: string[] = [];
-      const finalUrl = response.url;
-      if (finalUrl !== url) {
-        // Note: We can't get the full redirect chain from fetch API
-        // This is a limitation, but we can at least show the final URL
-        redirectChain.push(url, finalUrl);
-      }
 
-      if (!response.ok) {
+      if (response.status < 200 || response.status >= 300) {
         // Try to get response body for error context
         let bodyPreview: string | undefined;
         try {
-          const text = await response.text();
+          const text = new TextDecoder('utf-8', { fatal: false }).decode(response.body);
           bodyPreview = text.length > 1000 ? text.substring(0, 1000) + '...' : text;
         } catch {
           // Ignore errors reading body
@@ -280,7 +267,7 @@ Follows redirects by default. Returns detailed error context for failures.`;
         return this.createRichError({
           error: {
             type: 'http',
-            message: `HTTP ${response.status} ${response.statusText}`,
+            message: `HTTP ${response.status} ${statusText}`,
             code: response.status.toString(),
           },
           request: {
@@ -293,15 +280,15 @@ Follows redirects by default. Returns detailed error context for failures.`;
           },
           response: {
             status: response.status,
-            statusText: response.statusText,
+            statusText,
             headers: responseHeaders,
             bodyPreview,
           },
         });
       }
 
-      const contentType = response.headers.get('content-type') || 'application/octet-stream';
-      const contentLength = response.headers.get('content-length');
+      const contentType = responseHeaders['content-type'] || 'application/octet-stream';
+      const contentLength = responseHeaders['content-length'];
       const size = contentLength ? parseInt(contentLength, 10) : 0;
 
       // Check size limits
@@ -321,7 +308,7 @@ Follows redirects by default. Returns detailed error context for failures.`;
           },
           response: {
             status: response.status,
-            statusText: response.statusText,
+            statusText,
             headers: responseHeaders,
             size,
           },
@@ -329,7 +316,7 @@ Follows redirects by default. Returns detailed error context for failures.`;
       }
 
       // Read response
-      const buffer = await response.arrayBuffer();
+      const buffer = new Uint8Array(response.body).buffer;
       const actualSize = buffer.byteLength;
 
       if (actualSize > maxSize) {
@@ -348,7 +335,7 @@ Follows redirects by default. Returns detailed error context for failures.`;
           },
           response: {
             status: response.status,
-            statusText: response.statusText,
+            statusText,
             headers: responseHeaders,
             size: actualSize,
           },
@@ -361,7 +348,14 @@ Follows redirects by default. Returns detailed error context for failures.`;
       }
 
       // Handle large responses with temp files
-      return await this.handleLargeContent(buffer, contentType, url, actualSize, returnContent);
+      return await this.handleLargeContent(
+        buffer,
+        contentType,
+        url,
+        actualSize,
+        returnContent,
+        context.toolTempDir
+      );
     } catch (error) {
       clearTimeout(timeoutId);
       abortSignal?.removeEventListener('abort', abortHandler);
@@ -424,6 +418,12 @@ Follows redirects by default. Returns detailed error context for failures.`;
         },
       });
     }
+  }
+
+  private normalizeResponseHeaders(headers: Record<string, string>): Record<string, string> {
+    return Object.fromEntries(
+      Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value])
+    );
   }
 
   private handleInlineContent(
@@ -607,11 +607,12 @@ Follows redirects by default. Returns detailed error context for failures.`;
     contentType: string,
     url: string,
     size: number,
-    returnContent: boolean
+    returnContent: boolean,
+    toolTempDir?: string
   ): Promise<ToolResult> {
     try {
       // Create temp directory if it doesn't exist
-      const tempDir = join(process.cwd(), 'temp');
+      const tempDir = toolTempDir ?? join(process.cwd(), 'temp');
       if (!existsSync(tempDir)) {
         await mkdir(tempDir, { recursive: true });
       }
