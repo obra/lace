@@ -203,6 +203,17 @@ export class MCPServerManager extends EventEmitter {
   }
 
   /**
+   * Stop and forget connections that are no longer part of desired session config.
+   */
+  async removeServer(serverId: string): Promise<void> {
+    const connections = this.resolveConnections(serverId);
+    for (const connection of connections) {
+      await this.stopServer(connection.connectionKey);
+      this.servers.delete(connection.connectionKey);
+    }
+  }
+
+  /**
    * Replace config for an already-stopped server without spawning a subprocess.
    */
   replaceStoppedServerConfig(

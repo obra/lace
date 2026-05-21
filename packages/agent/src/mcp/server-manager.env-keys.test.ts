@@ -332,6 +332,70 @@ describe.skipIf(skipOnWindows)(
       );
     });
 
+    it('removes stale same-id connections when placement changes', async () => {
+      const runtimeCwd = path.join(tmpRoot, 'runtime-project');
+      fs.mkdirSync(runtimeCwd, { recursive: true });
+      const runtimeStdioKey = mcpConnectionKey({
+        serverId: 'shared',
+        config: { placement: 'toolRuntime', transport: 'stdio' },
+        runtimeId: 'rt_stale_reconcile',
+        runtimeCwd,
+        hostCwd: tmpRoot,
+      });
+      mcpServerManager.registerConnection('shared', {
+        id: 'shared',
+        connectionKey: runtimeStdioKey,
+        config: {
+          command: process.execPath,
+          transport: 'stdio',
+          placement: 'toolRuntime',
+          enabled: true,
+          tools: {},
+        },
+        status: 'running',
+      });
+
+      const state = buildState({
+        nextEventSeq: 1,
+        nextStreamSeq: 1,
+        config: {
+          runtimeBinding: {
+            schemaVersion: 1,
+            identity: { runtimeId: 'rt_stale_reconcile' },
+            agentPlacement: 'host',
+            toolRuntime: {
+              type: 'local',
+              cwd: runtimeCwd,
+            },
+          },
+          mcpServers: [
+            {
+              name: 'shared',
+              command: process.execPath,
+              transport: 'stdio',
+              placement: 'host',
+              enabled: false,
+              tools: {},
+            },
+          ],
+        },
+      });
+
+      await reconcileMcpServersForActiveSession(state);
+
+      expect(mcpServerManager.getServer(runtimeStdioKey)).toBeUndefined();
+      expect(mcpServerManager.getAllServers()).toEqual([
+        expect.objectContaining({
+          id: 'shared',
+          status: 'stopped',
+          config: expect.objectContaining({
+            placement: 'host',
+            enabled: false,
+          }),
+        }),
+      ]);
+    });
+
     it('does not rewrite same-id runtime connection when host placement reconciles to unsupported transport', async () => {
       const runtimeCwd = path.join(tmpRoot, 'runtime-project');
       fs.mkdirSync(runtimeCwd, { recursive: true });

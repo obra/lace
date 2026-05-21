@@ -166,7 +166,7 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
 
   for (const existing of state.mcpServerManager.getAllServers()) {
     if (!desired.has(existing.connectionKey)) {
-      await state.mcpServerManager.stopServer(existing.connectionKey);
+      await state.mcpServerManager.removeServer(existing.connectionKey);
     }
   }
 
@@ -181,6 +181,10 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
 
     if (!config.enabled) {
       await state.mcpServerManager.stopServer(connectionKey);
+      state.mcpServerManager.replaceStoppedServerConfig(serverId, config, {
+        desiredConnectionKey: connectionKey,
+        replaceConnectionKey: connectionKey,
+      });
       continue;
     }
 
