@@ -1,44 +1,51 @@
-# PRI-1744: Alarms in lace — Implementation Plan
+# PRI-1744: Alarms in lace + unified notification injection — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Move the alarm subsystem from sen-core into lace as per-session JSONL storage plus a single in-process scheduler. Alarm fires become a new `alarm_fired` `DurableEvent` consumed by the embedder through the existing `onSessionUpdate` stream.
+**Goal:** Move the alarm subsystem from sen-core into lace as per-session `alarms.json` snapshot storage + a per-process scheduler. Replace the existing `<background-job-notification>` machinery with a single `injectNotification` utility that writes `context_injected` events with `priority='immediate'`. Add `<notification kind="alarm-fired" | "job-{completed,failed,cancelled,progress}" | "subagent-exited">` as the unified agent-facing shape.
 
-**Architecture:** Per-session `alarms.jsonl` lives next to `events.jsonl`. One `AlarmScheduler` per lace runtime owns an in-memory min-heap, walks all session dirs on boot, and emits both a durable `alarm_fired` event and (for the active session) a `session/update`. `schedule_alarm`/`cancel_alarm`/`list_alarms` become lace built-in tools alongside `delegate`/`job_notify`. `if_session_ended ∈ {drop, wake, bubble}`: `wake` and `bubble` are subagent-only and rejected at schedule-time for top-level sessions; `wake` re-spawns the subagent via the persona spec captured at schedule time; `bubble` redirects the fire to the parent session.
+**Architecture:** No new ent-protocol surface. The existing `context_injected` `DurableEvent` carries every notification. The conversation runner's existing immediate-inject pickup loop (`runner.ts:71-90, 217-227`) folds them into the next turn as `role: 'user'` messages. The runner's watermark init changes from "latest seq" to "last `turn_end` seq" so events written between turns are picked up. Scheduler lives in the lace process; `injectNotification` triggers an internal turn when called against the active session and the agent is idle. Subagent graceful exit scans its `alarms.json` and writes a `subagent-exited` notification into the parent's `events.jsonl` if pending alarms exist.
 
-**Tech Stack:** TypeScript 5.6+ strict mode, Node 20.18+, Vitest, JSONL append-only logs, `@lace/ent-protocol` zod schemas. Sen-core repo runs the same toolchain.
+**Tech Stack:** TypeScript 5.6+ strict, Node 20.18+, Vitest, JSON snapshot + `atomicWriteJson`, `@lace/ent-protocol` zod schemas, `appendDurableEvent` for cross-process event writes.
 
 **Repos touched:**
 - Lace worktree: `/Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/lace-worktrees/pri-1744-alarms-spec/` (branch `pri-1744-alarms-spec`).
-- Sen-core: `/Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/sen-core-v2/` (work on a new branch off `main`: `pri-1744-alarms-in-lace`).
+- Sen-core: `/Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/sen-core-v2/` (branch off `main`: `pri-1744-alarms-in-lace`).
 
 **Spec:** `docs/superpowers/specs/2026-05-21-pri-1744-alarms-in-lace.md`
 
-**Pre-flight (run once at the start of execution):**
+**Pre-flight (run once at execution start):**
 
 ```bash
 cd /Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/lace-worktrees/pri-1744-alarms-spec
 git fetch origin && git pull --ff-only origin pri-1744-alarms-spec
 npm install
 npm run lint
-npm run test --workspaces=false --workspace=packages/ent-protocol --workspace=packages/agent -- --run 2>&1 | tail -20
+npm run test 2>&1 | tail -20
 ```
 
-All lint and existing tests must be green before starting. If anything fails, stop and report — do not begin editing.
+All lint and existing tests must be green before starting. Same checks for sen-core when Phase 7 begins.
 
 ---
 
 ## File map (lace)
 
 **Create:**
-- `packages/agent/src/alarms/types.ts` — row + inbound shapes
-- `packages/agent/src/alarms/cron.ts` — port of sen-core cron utilities
-- `packages/agent/src/alarms/alarm-store.ts` — per-session JSONL store
-- `packages/agent/src/alarms/alarm-scheduler.ts` — single in-process loop + heap
-- `packages/agent/src/alarms/index.ts` — barrel
+- `packages/agent/src/alarms/types.ts`
+- `packages/agent/src/alarms/cron.ts`
+- `packages/agent/src/alarms/alarm-store.ts`
+- `packages/agent/src/alarms/alarm-scheduler.ts`
+- `packages/agent/src/alarms/index.ts`
+- `packages/agent/src/alarms/__tests__/cron.test.ts`
 - `packages/agent/src/alarms/__tests__/alarm-store.test.ts`
 - `packages/agent/src/alarms/__tests__/alarm-scheduler.test.ts`
-- `packages/agent/src/alarms/__tests__/cron.test.ts`
+- `packages/agent/src/notifications/inject-notification.ts`
+- `packages/agent/src/notifications/notification-wrapper.ts`
+- `packages/agent/src/notifications/composers.ts`
+- `packages/agent/src/notifications/index.ts`
+- `packages/agent/src/notifications/__tests__/notification-wrapper.test.ts`
+- `packages/agent/src/notifications/__tests__/composers.test.ts`
+- `packages/agent/src/notifications/__tests__/inject-notification.test.ts`
 - `packages/agent/src/tools/implementations/schedule_alarm.ts`
 - `packages/agent/src/tools/implementations/cancel_alarm.ts`
 - `packages/agent/src/tools/implementations/list_alarms.ts`
@@ -46,88 +53,808 @@ All lint and existing tests must be green before starting. If anything fails, st
 - `packages/agent/src/tools/implementations/__tests__/cancel_alarm.test.ts`
 - `packages/agent/src/tools/implementations/__tests__/list_alarms.test.ts`
 - `packages/agent/src/__tests__/alarms.fire-delivery.e2e.test.ts`
-- `packages/agent/src/__tests__/alarms.inactive-session-replay.e2e.test.ts`
+- `packages/agent/src/__tests__/alarms.idle-wake.e2e.test.ts`
 - `packages/agent/src/__tests__/alarms.restart-recovery.e2e.test.ts`
-- `packages/agent/src/__tests__/alarms.wake-subagent.e2e.test.ts`
-- `packages/agent/src/__tests__/alarms.bubble-subagent.e2e.test.ts`
-- `packages/agent/src/__tests__/alarms.top-level-rejects-wake-bubble.e2e.test.ts`
 - `packages/agent/src/__tests__/alarms.cron-reschedule.e2e.test.ts`
+- `packages/agent/src/__tests__/alarms.subagent-exit-graceful.e2e.test.ts`
+- `packages/agent/src/__tests__/alarms.subagent-exit-no-pending.e2e.test.ts`
 - `docs/features/alarms.md`
+- `docs/features/notifications.md`
 
 **Modify:**
-- `packages/ent-protocol/src/schemas/methods.ts` — add `SessionUpdateAlarmFiredSchema`, plug into the three discriminated unions around lines 1948, 1982, 2008.
-- `packages/agent/src/storage/event-types.ts` — add `AlarmFiredEventData` and include in `DurableEventData`.
-- `packages/agent/src/storage/session-store.ts` — extend `SessionMeta` with optional `parent`.
-- `packages/agent/src/tools/types.ts` — add `alarmScheduler?` to `ToolContext`.
-- `packages/agent/src/tools/executor.ts` — add `schedule_alarm`/`cancel_alarm`/`list_alarms` to `LACE_BUILTIN_TOOL_NAMES`; wire scheduler into `ToolContext`.
+- `packages/agent/src/storage/event-log.ts` — add `findLastTurnEndEventSeq` helper.
+- `packages/agent/src/storage/session-store.ts` — extend `SessionMeta` with optional `parent`; export `agentSessionsDir`.
+- `packages/agent/src/core/conversation/runner.ts` — change initial `lastSeenEventSeq` to use `findLastTurnEndEventSeq`.
+- `packages/agent/src/core/conversation/__tests__/runner.context-inject.test.ts` — extend with "between turns" coverage.
+- `packages/agent/src/tools/types.ts` — add `alarmScheduler?`, `activeSessionId?`, `activeSessionDir?` to `ToolContext`.
+- `packages/agent/src/tools/executor.ts` — add three new tools to `LACE_BUILTIN_TOOL_NAMES`; register them.
 - `packages/agent/src/tools/implementations/index.ts` — export the three new tools.
 - `packages/agent/src/server-types.ts` — add `alarmScheduler` field to `AgentServerState`.
-- `packages/agent/src/server.ts` — instantiate `AlarmScheduler`, plumb into `ToolContext`, flush undelivered on session activation.
-- `packages/agent/src/rpc/handlers/session.ts` — call `state.alarmScheduler.flushUndelivered(sessionId)` after each activation; persist `parent` in subagent-created sessions.
-- `packages/agent/src/jobs/subagent-job.ts` — pass `parent` into `client.sessionNew`/`session/new` request and store in meta.
-- `docs/protocol-spec.md` — document `alarm_fired` `SessionUpdate` and `DurableEvent`.
-- `docs/protocol-conformance.md` — extend the conformance list.
+- `packages/agent/src/server.ts` — instantiate scheduler, plumb into `ToolContext`, register graceful-shutdown hook.
+- `packages/agent/src/jobs/job-manager.ts` — delete `notificationQueue`, `queueNotification`, `getNotificationQueue`, `flushNotifications`; rewrite `fanout` to call `injectNotification` directly.
+- `packages/agent/src/jobs/job-notifications.ts` — rewrite `createQueueJobNotification` to call `injectNotification` with composed bodies.
+- `packages/agent/src/jobs/format-notification.ts` — **delete** (replaced by composers).
+- `packages/agent/src/jobs/__tests__/format-notification.test.ts` (if it exists) — **delete**.
+- `packages/agent/src/rpc/handlers/prompt.ts:102-111` — delete the `flushNotifications`/prepend block.
+- `packages/agent/src/rpc/handlers/session.ts` — accept `parent` in `session/new` params; persist to meta.
+- `packages/agent/src/jobs/subagent-job.ts` — pass `parent` in the `session/new` call against the subagent process.
+- `packages/ent-protocol/src/schemas/methods.ts` — add optional `parent` to `SessionNewParamsSchema`.
 
-## File map (sen-core)
+## File map (sen-core, in `/Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/sen-core-v2/`)
 
 **Delete:**
 - `src/alarms/store.ts`
 - `src/alarms/scheduler-service.ts`
 - `src/alarms/tools.ts`
 - `src/alarms/cron.ts`
+- `src/alarms/types.ts`
 - `mcp-servers/scheduler.ts`
-- `tests/automated/alarms/` (entire directory)
+- `tests/automated/alarms/` (directory)
 
 **Modify:**
-- `src/main.ts:574-590` — remove `AlarmsStore`/`SchedulerService` instantiation.
-- `src/main.ts` (around `attachClientSubscriptions`, line ~204) — handle `update.type === 'alarm_fired'` and dispatch as `InboundAlarm`.
-- `templates/agent-personas/core.md` — remove lines 8-14 (the `scheduler:` MCP entry).
-- `src/alarms/types.ts` — keep just `InboundAlarm` (it's still the inbox envelope).
-- `tests/automated/alarms-inbound.e2e.test.ts` — new test.
+- `src/main.ts` — remove alarm/scheduler block (~lines 574-590) and imports.
+- `src/slack/envelope.ts` — remove `formatAlarm`, `isInboundAlarm` branch in `formatEnvelope`. Type narrows to `InboundSlackMessage`.
+- `src/slack/types.ts` — drop `InboundAlarm` re-export and `isInboundAlarm`; `InboundItem` collapses to `InboundSlackMessage`.
+- `src/ambient/inbox-dispatcher.ts` — remove alarm-handling branches (if any explicit ones exist). Verify; may already be type-driven.
+- `templates/agent-personas/core.md` — remove the `scheduler:` MCP block.
 
 ---
 
-## Phase 1 — Lace alarm core (types, store, cron, scheduler)
+## Phase 1 — Notification core (wrapper + composers + injector)
 
-### Task 1: Lace alarm row + inbound types
+Building this first lets later phases (alarms, job-notification refactor) share a tested foundation.
+
+### Task 1: `<notification>` wrapper utility (failing test first)
+
+**Files:**
+- Create: `packages/agent/src/notifications/notification-wrapper.ts`
+- Create: `packages/agent/src/notifications/__tests__/notification-wrapper.test.ts`
+
+- [ ] **Step 1:** Write the failing test. Create `packages/agent/src/notifications/__tests__/notification-wrapper.test.ts`:
+
+```ts
+// ABOUTME: Unit tests for buildNotification — wrapper element, attribute escaping,
+// ABOUTME: identifier preservation, body passed through verbatim.
+
+import { describe, it, expect } from 'vitest';
+import { buildNotification } from '../notification-wrapper';
+
+describe('buildNotification', () => {
+  it('wraps body in <notification kind="..."> with no attrs', () => {
+    expect(buildNotification({ kind: 'alarm-fired', body: 'Hello.' })).toBe(
+      '<notification kind="alarm-fired">\nHello.\n</notification>'
+    );
+  });
+
+  it('serializes identifiers as XML attributes in order', () => {
+    const out = buildNotification({
+      kind: 'job-completed',
+      identifiers: { 'job-id': 'job_xyz', persona: 'shell' },
+      body: 'Done.',
+    });
+    expect(out).toBe('<notification kind="job-completed" job-id="job_xyz" persona="shell">\nDone.\n</notification>');
+  });
+
+  it('escapes attribute values', () => {
+    const out = buildNotification({
+      kind: 'alarm-fired',
+      identifiers: { 'alarm-id': 'a&b"<c>' },
+      body: 'x',
+    });
+    expect(out).toContain('alarm-id="a&amp;b&quot;&lt;c&gt;"');
+  });
+
+  it('drops empty-string identifiers (e.g. missing persona)', () => {
+    const out = buildNotification({
+      kind: 'subagent-exited',
+      identifiers: { 'subagent-session-id': 'sess_a', persona: '' },
+      body: 'b',
+    });
+    expect(out).toBe('<notification kind="subagent-exited" subagent-session-id="sess_a">\nb\n</notification>');
+  });
+});
+```
+
+- [ ] **Step 2:** Run; confirm FAIL.
+
+```bash
+npx vitest --run packages/agent/src/notifications/__tests__/notification-wrapper.test.ts
+```
+
+- [ ] **Step 3:** Create `packages/agent/src/notifications/notification-wrapper.ts`:
+
+```ts
+// ABOUTME: Single source of truth for the <notification kind="..."> wrapper used by
+// ABOUTME: every lace-side agent-facing notification (alarm-fired, job-*, subagent-exited).
+
+export type NotificationKind =
+  | 'alarm-fired'
+  | 'job-completed'
+  | 'job-failed'
+  | 'job-cancelled'
+  | 'job-progress'
+  | 'subagent-exited';
+
+export interface BuildNotificationOptions {
+  kind: NotificationKind;
+  identifiers?: Record<string, string>;
+  body: string;
+}
+
+function escapeXmlAttr(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+export function buildNotification(opts: BuildNotificationOptions): string {
+  const attrs: string[] = [`kind="${escapeXmlAttr(opts.kind)}"`];
+  if (opts.identifiers) {
+    for (const [k, v] of Object.entries(opts.identifiers)) {
+      if (v === '') continue;
+      attrs.push(`${k}="${escapeXmlAttr(v)}"`);
+    }
+  }
+  return `<notification ${attrs.join(' ')}>\n${opts.body}\n</notification>`;
+}
+```
+
+- [ ] **Step 4:** Run and verify PASS. Commit.
+
+```bash
+npx vitest --run packages/agent/src/notifications/__tests__/notification-wrapper.test.ts
+git add packages/agent/src/notifications/notification-wrapper.ts packages/agent/src/notifications/__tests__/notification-wrapper.test.ts
+git commit -m "feat(notifications): unified <notification> wrapper utility (PRI-1744)"
+```
+
+---
+
+### Task 2: Body composers (failing test first)
+
+**Files:**
+- Create: `packages/agent/src/notifications/composers.ts`
+- Create: `packages/agent/src/notifications/__tests__/composers.test.ts`
+
+- [ ] **Step 1:** Write the failing test. Composers are pure functions; snapshot-style assertions verify the exact prose.
+
+```ts
+// ABOUTME: Unit tests for body composers — pure functions producing prose bodies
+// ABOUTME: for each notification kind. Snapshots locked to the bodies in the spec.
+
+import { describe, it, expect } from 'vitest';
+import {
+  composeAlarmFiredBody,
+  composeJobCompletedBody,
+  composeJobFailedBody,
+  composeJobCancelledBody,
+  composeJobProgressBody,
+  composeSubagentExitedBody,
+} from '../composers';
+
+describe('composers', () => {
+  it('alarm-fired: cron alarm', () => {
+    expect(
+      composeAlarmFiredBody({
+        kind: 'cron',
+        schedule: '0 9 * * *',
+        timezone: 'America/Los_Angeles',
+        prompt: 'Time to check the test status board',
+      })
+    ).toBe(
+      'The cron alarm you scheduled (0 9 * * * in America/Los_Angeles) just fired. The note you left for your future self: "Time to check the test status board". Call list_alarms() to see other pending alarms.'
+    );
+  });
+
+  it('alarm-fired: one-shot alarm', () => {
+    expect(
+      composeAlarmFiredBody({
+        kind: 'once',
+        schedule: '2026-05-22T17:00:00Z',
+        timezone: 'UTC',
+        prompt: 'Check the deploy',
+      })
+    ).toBe(
+      'The one-shot alarm you scheduled for 2026-05-22T17:00:00Z just fired. The note you left for your future self: "Check the deploy". Call list_alarms() to see other pending alarms.'
+    );
+  });
+
+  it('job-completed: shell exit 0', () => {
+    expect(
+      composeJobCompletedBody({
+        jobId: 'job_xyz',
+        jobType: 'bash',
+        exitCode: 0,
+        durationMs: 12300,
+        outputBytes: 15234,
+        lastLines: ['build finished in 5.2s'],
+      })
+    ).toBe(
+      'Your background job completed successfully (exit code 0) after 12.3 seconds, writing 15,234 bytes of output. The last line was: "build finished in 5.2s". Call job_output(jobId="job_xyz") to read the full output.'
+    );
+  });
+
+  it('job-completed: delegate adds resume hint', () => {
+    const body = composeJobCompletedBody({
+      jobId: 'job_xyz',
+      jobType: 'delegate',
+      exitCode: 0,
+      durationMs: 12300,
+      outputBytes: 15234,
+      lastLines: ['ok'],
+    });
+    expect(body).toContain('To continue this conversation thread, call delegate(resume="job_xyz", prompt="your message").');
+  });
+
+  it('job-failed: includes exit code', () => {
+    const body = composeJobFailedBody({
+      jobId: 'job_q',
+      jobType: 'bash',
+      exitCode: 2,
+      durationMs: 3000,
+      outputBytes: 100,
+      lastLines: ['error: thing went wrong'],
+    });
+    expect(body).toContain('exit code 2');
+    expect(body).toContain('Call job_output(jobId="job_q")');
+  });
+
+  it('job-cancelled: includes reason', () => {
+    const body = composeJobCancelledBody({
+      jobId: 'job_q',
+      jobType: 'bash',
+      durationMs: 1500,
+      outputBytes: 50,
+      lastLines: [],
+      reason: 'user requested cancel',
+    });
+    expect(body).toContain('was cancelled');
+    expect(body).toContain('user requested cancel');
+  });
+
+  it('job-progress: includes delta + tail lines', () => {
+    const body = composeJobProgressBody({
+      jobId: 'job_xyz',
+      durationMs: 5 * 60_000 + 12_000,
+      outputBytes: 142_330,
+      deltaBytes: 8_210,
+      lastLines: ['building target...', 'built dist/cli.js in 3.1s', 'built dist/main.js in 5.2s'],
+    });
+    expect(body).toBe(
+      'Your background job has been running for 5m 12.0s and has written 142,330 bytes (+8,210 since last update). Recent output:\n  building target...\n  built dist/cli.js in 3.1s\n  built dist/main.js in 5.2s\nCall job_output(jobId="job_xyz") to check current output.'
+    );
+  });
+
+  it('subagent-exited: one pending alarm', () => {
+    expect(
+      composeSubagentExitedBody({
+        persona: 'sen-box',
+        pendingAlarms: [
+          { id: 'alarm_z1z2', kind: 'once', schedule: '2026-05-22T17:00:00Z', prompt: 'Check on the running git operation' },
+        ],
+      })
+    ).toBe(
+      'Your sen-box subagent exited gracefully but had 1 pending alarm that won\'t fire now: alarm_z1z2 was a one-shot scheduled for 2026-05-22T17:00:00Z with the prompt "Check on the running git operation".'
+    );
+  });
+
+  it('subagent-exited: multiple pending alarms', () => {
+    const body = composeSubagentExitedBody({
+      persona: 'sen-box',
+      pendingAlarms: [
+        { id: 'alarm_a', kind: 'once', schedule: '2026-05-22T17:00:00Z', prompt: 'A' },
+        { id: 'alarm_b', kind: 'cron', schedule: '0 9 * * *', prompt: 'B' },
+      ],
+    });
+    expect(body).toContain('Your sen-box subagent exited gracefully but had 2 pending alarms that won\'t fire now:');
+    expect(body).toContain('  alarm_a was a one-shot scheduled for 2026-05-22T17:00:00Z with the prompt "A".');
+    expect(body).toContain('  alarm_b was a cron (0 9 * * *) with the prompt "B".');
+  });
+});
+```
+
+- [ ] **Step 2:** Run; confirm FAIL.
+
+- [ ] **Step 3:** Create `packages/agent/src/notifications/composers.ts`:
+
+```ts
+// ABOUTME: Pure body-composer functions for each notification kind. No side effects.
+// ABOUTME: Output strings are wrapped by buildNotification in inject-notification.ts.
+
+const MAX_LINE_LENGTH = 200;
+
+function formatDuration(ms: number): string {
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} seconds`;
+  const mins = Math.floor(ms / 60_000);
+  const secs = (ms % 60_000) / 1000;
+  return `${mins}m ${secs.toFixed(1)}s`;
+}
+
+function formatBytes(bytes: number): string {
+  return bytes.toLocaleString('en-US');
+}
+
+function truncate(line: string, maxLen = MAX_LINE_LENGTH): string {
+  return line.length <= maxLen ? line : line.slice(0, maxLen - 3) + '...';
+}
+
+export interface AlarmFiredCompose {
+  kind: 'cron' | 'once';
+  schedule: string;
+  timezone: string;
+  prompt: string;
+}
+
+export function composeAlarmFiredBody(a: AlarmFiredCompose): string {
+  const head =
+    a.kind === 'cron'
+      ? `The cron alarm you scheduled (${a.schedule} in ${a.timezone}) just fired.`
+      : `The one-shot alarm you scheduled for ${a.schedule} just fired.`;
+  return `${head} The note you left for your future self: "${a.prompt}". Call list_alarms() to see other pending alarms.`;
+}
+
+export interface JobCompletedCompose {
+  jobId: string;
+  jobType: 'bash' | 'delegate';
+  exitCode: number;
+  durationMs: number;
+  outputBytes: number;
+  lastLines: string[];
+}
+
+export function composeJobCompletedBody(j: JobCompletedCompose): string {
+  const trailing = trailingLineHint(j.lastLines);
+  const base = `Your background job completed successfully (exit code ${j.exitCode}) after ${formatDuration(j.durationMs)}, writing ${formatBytes(j.outputBytes)} bytes of output.${trailing} Call job_output(jobId="${j.jobId}") to read the full output.`;
+  if (j.jobType === 'delegate') {
+    return `${base} To continue this conversation thread, call delegate(resume="${j.jobId}", prompt="your message").`;
+  }
+  return base;
+}
+
+export interface JobFailedCompose extends JobCompletedCompose {}
+
+export function composeJobFailedBody(j: JobFailedCompose): string {
+  const trailing = trailingLineHint(j.lastLines);
+  const base = `Your background job failed (exit code ${j.exitCode}) after ${formatDuration(j.durationMs)}, writing ${formatBytes(j.outputBytes)} bytes of output.${trailing} Call job_output(jobId="${j.jobId}") to read the full output.`;
+  if (j.jobType === 'delegate') {
+    return `${base} To continue this conversation thread, call delegate(resume="${j.jobId}", prompt="your message").`;
+  }
+  return base;
+}
+
+export interface JobCancelledCompose {
+  jobId: string;
+  jobType: 'bash' | 'delegate';
+  durationMs: number;
+  outputBytes: number;
+  lastLines: string[];
+  reason?: string;
+}
+
+export function composeJobCancelledBody(j: JobCancelledCompose): string {
+  const trailing = trailingLineHint(j.lastLines);
+  const reasonText = j.reason ? ` Reason: ${j.reason}.` : '';
+  return `Your background job was cancelled after ${formatDuration(j.durationMs)}, having written ${formatBytes(j.outputBytes)} bytes of output.${reasonText}${trailing} Call job_output(jobId="${j.jobId}") to read the full output.`;
+}
+
+export interface JobProgressCompose {
+  jobId: string;
+  durationMs: number;
+  outputBytes: number;
+  deltaBytes: number;
+  lastLines: string[];
+}
+
+export function composeJobProgressBody(j: JobProgressCompose): string {
+  const head = `Your background job has been running for ${formatDuration(j.durationMs)} and has written ${formatBytes(j.outputBytes)} bytes (+${formatBytes(j.deltaBytes)} since last update).`;
+  if (j.lastLines.length === 0) {
+    return `${head} Call job_output(jobId="${j.jobId}") to check current output.`;
+  }
+  const lines = j.lastLines.map((l) => `  ${truncate(l)}`).join('\n');
+  return `${head} Recent output:\n${lines}\nCall job_output(jobId="${j.jobId}") to check current output.`;
+}
+
+function trailingLineHint(lines: string[]): string {
+  if (lines.length === 0) return '';
+  const last = truncate(lines[lines.length - 1]);
+  return ` The last line was: "${last}".`;
+}
+
+export interface SubagentPendingAlarm {
+  id: string;
+  kind: 'cron' | 'once';
+  schedule: string;
+  prompt: string;
+}
+
+export interface SubagentExitedCompose {
+  persona: string;
+  pendingAlarms: SubagentPendingAlarm[];
+}
+
+export function composeSubagentExitedBody(s: SubagentExitedCompose): string {
+  const personaWord = s.persona.length > 0 ? `${s.persona} ` : '';
+  const n = s.pendingAlarms.length;
+  const head = `Your ${personaWord}subagent exited gracefully but had ${n} pending alarm${n === 1 ? '' : 's'} that won't fire now`;
+  if (n === 1) {
+    const a = s.pendingAlarms[0];
+    return `${head}: ${formatPendingAlarm(a, /*inline*/ true)}`;
+  }
+  const lines = s.pendingAlarms.map((a) => `  ${formatPendingAlarm(a, /*inline*/ false)}`).join('\n');
+  return `${head}:\n${lines}`;
+}
+
+function formatPendingAlarm(a: SubagentPendingAlarm, inline: boolean): string {
+  const desc =
+    a.kind === 'cron'
+      ? `was a cron (${a.schedule})`
+      : `was a one-shot scheduled for ${a.schedule}`;
+  return `${a.id} ${desc} with the prompt "${a.prompt}".`;
+}
+```
+
+- [ ] **Step 4:** Run; verify PASS. Commit.
+
+```bash
+npx vitest --run packages/agent/src/notifications/__tests__/composers.test.ts
+git add packages/agent/src/notifications/composers.ts packages/agent/src/notifications/__tests__/composers.test.ts
+git commit -m "feat(notifications): per-kind body composers (PRI-1744)"
+```
+
+---
+
+### Task 3: `injectNotification` utility (failing test first)
+
+**Files:**
+- Create: `packages/agent/src/notifications/inject-notification.ts`
+- Create: `packages/agent/src/notifications/index.ts`
+- Create: `packages/agent/src/notifications/__tests__/inject-notification.test.ts`
+
+- [ ] **Step 1:** Write the failing test:
+
+```ts
+// ABOUTME: Unit tests for injectNotification — writes context_injected event with
+// ABOUTME: priority='immediate' and triggers idle-wake when targeting active session.
+
+import { mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it, expect, vi } from 'vitest';
+import { injectNotification } from '../inject-notification';
+
+function tempSessionDir(): string {
+  const root = mkdtempSync(join(tmpdir(), 'lace-inject-test-'));
+  mkdirSync(root, { recursive: true });
+  return root;
+}
+
+function readEventsJsonl(dir: string): Array<{ type: string; data: Record<string, unknown> }> {
+  try {
+    return readFileSync(join(dir, 'events.jsonl'), 'utf8')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l));
+  } catch {
+    return [];
+  }
+}
+
+describe('injectNotification', () => {
+  it('appends a context_injected event with priority=immediate', () => {
+    const dir = tempSessionDir();
+    injectNotification({
+      sessionDir: dir,
+      kind: 'alarm-fired',
+      identifiers: { 'alarm-id': 'alarm_abc' },
+      body: 'fired',
+    });
+    const events = readEventsJsonl(dir);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe('context_injected');
+    expect((events[0].data as { priority?: string }).priority).toBe('immediate');
+    const content = (events[0].data as { content: Array<{ text: string }> }).content;
+    expect(content[0].text).toContain('<notification kind="alarm-fired" alarm-id="alarm_abc">');
+    expect(content[0].text).toContain('fired');
+  });
+
+  it('triggers idle-wake when target is active and no turn is in flight', () => {
+    const dir = tempSessionDir();
+    const triggerInternalTurn = vi.fn();
+    injectNotification({
+      sessionDir: dir,
+      kind: 'job-completed',
+      identifiers: { 'job-id': 'job_x' },
+      body: 'done',
+      idleWake: {
+        isActive: (d) => d === dir,
+        hasActiveTurn: () => false,
+        triggerInternalTurn,
+      },
+    });
+    expect(triggerInternalTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT trigger idle-wake when a turn is in flight', () => {
+    const dir = tempSessionDir();
+    const triggerInternalTurn = vi.fn();
+    injectNotification({
+      sessionDir: dir,
+      kind: 'job-progress',
+      identifiers: { 'job-id': 'job_x' },
+      body: 'running',
+      idleWake: {
+        isActive: (d) => d === dir,
+        hasActiveTurn: () => true,
+        triggerInternalTurn,
+      },
+    });
+    expect(triggerInternalTurn).not.toHaveBeenCalled();
+  });
+
+  it('does NOT trigger idle-wake when target is not the active session', () => {
+    const dir = tempSessionDir();
+    const triggerInternalTurn = vi.fn();
+    injectNotification({
+      sessionDir: dir,
+      kind: 'subagent-exited',
+      identifiers: { 'subagent-session-id': 'sess_x' },
+      body: 'gone',
+      idleWake: {
+        isActive: () => false,
+        hasActiveTurn: () => false,
+        triggerInternalTurn,
+      },
+    });
+    expect(triggerInternalTurn).not.toHaveBeenCalled();
+  });
+});
+```
+
+- [ ] **Step 2:** Run; confirm FAIL.
+
+- [ ] **Step 3:** Create `packages/agent/src/notifications/inject-notification.ts`:
+
+```ts
+// ABOUTME: injectNotification — the single utility for writing agent-facing
+// ABOUTME: <notification> blocks into a session's events.jsonl as a context_injected
+// ABOUTME: durable event with priority='immediate'. Optionally triggers an internal
+// ABOUTME: turn when the target is the active session and the agent is idle.
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { appendDurableEvent } from '../storage/event-log';
+import type { SessionState } from '../storage/session-store';
+import { buildNotification, type NotificationKind } from './notification-wrapper';
+
+export interface IdleWakeHooks {
+  /** Is `sessionDir` the current lace process's active session? */
+  isActive: (sessionDir: string) => boolean;
+  /** Is the agent currently in a turn? */
+  hasActiveTurn: () => boolean;
+  /** Kick the agent to run one internal turn so it picks up the just-written event. */
+  triggerInternalTurn: () => void;
+}
+
+export interface InjectNotificationOptions {
+  sessionDir: string;
+  kind: NotificationKind;
+  identifiers?: Record<string, string>;
+  body: string;
+  /** Optional — omit for cross-process writes (e.g. subagent → parent). */
+  idleWake?: IdleWakeHooks;
+}
+
+function readSessionStateBestEffort(sessionDir: string): SessionState {
+  try {
+    const parsed = JSON.parse(readFileSync(join(sessionDir, 'state.json'), 'utf8')) as Partial<SessionState>;
+    return {
+      nextEventSeq: typeof parsed.nextEventSeq === 'number' ? parsed.nextEventSeq : 1,
+      nextStreamSeq: typeof parsed.nextStreamSeq === 'number' ? parsed.nextStreamSeq : 1,
+    };
+  } catch {
+    return { nextEventSeq: 1, nextStreamSeq: 1 };
+  }
+}
+
+export function injectNotification(opts: InjectNotificationOptions): void {
+  const text = buildNotification({ kind: opts.kind, ...(opts.identifiers ? { identifiers: opts.identifiers } : {}), body: opts.body });
+  const state = readSessionStateBestEffort(opts.sessionDir);
+  appendDurableEvent(opts.sessionDir, state, {
+    type: 'context_injected',
+    data: {
+      content: [{ type: 'text', text }],
+      priority: 'immediate',
+    },
+  });
+  // We intentionally do not rewrite state.json: appendDurableEvent's nextState
+  // is purely a sequence accounting; the runner's authoritative position is
+  // recomputed via deriveNextEventSeqFromEventLog. For cross-process writes
+  // (subagent → parent), the parent's process owns state.json and will
+  // observe the new eventSeq on its next read.
+
+  if (
+    opts.idleWake &&
+    opts.idleWake.isActive(opts.sessionDir) &&
+    !opts.idleWake.hasActiveTurn()
+  ) {
+    opts.idleWake.triggerInternalTurn();
+  }
+}
+```
+
+- [ ] **Step 4:** Create `packages/agent/src/notifications/index.ts`:
+
+```ts
+export { buildNotification } from './notification-wrapper';
+export type { NotificationKind } from './notification-wrapper';
+export { injectNotification } from './inject-notification';
+export type { InjectNotificationOptions, IdleWakeHooks } from './inject-notification';
+export * from './composers';
+```
+
+- [ ] **Step 5:** Run; verify PASS. Commit.
+
+```bash
+npx vitest --run packages/agent/src/notifications/
+git add packages/agent/src/notifications/
+git commit -m "feat(notifications): injectNotification utility with idle-wake hook (PRI-1744)"
+```
+
+---
+
+## Phase 2 — Conversation runner watermark fix
+
+### Task 4: `findLastTurnEndEventSeq` helper
+
+**Files:**
+- Modify: `packages/agent/src/storage/event-log.ts`
+
+- [ ] **Step 1:** Open `packages/agent/src/storage/event-log.ts`. After `deriveNextEventSeqFromEventLog` (around line 33), add:
+
+```ts
+/**
+ * Find the eventSeq of the most recent `turn_end` event in the log, or `null`
+ * if no turn has completed yet. Used by the conversation runner to compute its
+ * initial immediate-inject watermark — any context_injected event newer than
+ * the last turn_end is unprocessed.
+ */
+export function findLastTurnEndEventSeq(sessionDir: string): number | null {
+  const eventsPath = path.join(sessionDir, 'events.jsonl');
+  let raw = '';
+  try {
+    raw = fs.readFileSync(eventsPath, 'utf8');
+  } catch {
+    return null;
+  }
+  let last: number | null = null;
+  for (const line of raw.split('\n')) {
+    if (!line) continue;
+    try {
+      const parsed = JSON.parse(line) as Partial<DurableEvent>;
+      if (parsed.type !== 'turn_end') continue;
+      if (typeof parsed.eventSeq !== 'number') continue;
+      if (last === null || parsed.eventSeq > last) last = parsed.eventSeq;
+    } catch {
+      // ignore malformed line
+    }
+  }
+  return last;
+}
+```
+
+- [ ] **Step 2:** Quick unit test in the existing `event-log` test file (find with `ls packages/agent/src/storage/__tests__/`); add:
+
+```ts
+it('findLastTurnEndEventSeq returns null on empty log and the latest turn_end seq otherwise', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lace-evt-'));
+  expect(findLastTurnEndEventSeq(dir)).toBeNull();
+
+  let state: SessionState = { nextEventSeq: 1, nextStreamSeq: 1 };
+  ({ nextState: state } = appendDurableEvent(dir, state, { type: 'prompt', data: {} }));
+  ({ nextState: state } = appendDurableEvent(dir, state, { type: 'turn_end', data: { stopReason: 'end_turn' } }));
+  ({ nextState: state } = appendDurableEvent(dir, state, { type: 'context_injected', data: { priority: 'immediate', content: [] } }));
+  expect(findLastTurnEndEventSeq(dir)).toBe(2);
+});
+```
+
+(Adapt the import block to match the existing test file's helpers.)
+
+- [ ] **Step 3:** Run; verify pass.
+
+```bash
+npx vitest --run packages/agent/src/storage/
+```
+
+- [ ] **Step 4:** Commit.
+
+```bash
+git add packages/agent/src/storage/event-log.ts packages/agent/src/storage/__tests__/
+git commit -m "feat(events): findLastTurnEndEventSeq helper (PRI-1744)"
+```
+
+---
+
+### Task 5: Runner uses `findLastTurnEndEventSeq` for initial watermark
+
+**Files:**
+- Modify: `packages/agent/src/core/conversation/runner.ts`
+- Modify: `packages/agent/src/core/conversation/__tests__/runner.context-inject.test.ts`
+
+- [ ] **Step 1:** Extend the existing runner test first. Open `packages/agent/src/core/conversation/__tests__/runner.context-inject.test.ts`, add a new test that:
+
+1. Sets up a session dir with: prompt → turn_start → ... → turn_end (seq T).
+2. Appends a `context_injected priority='immediate'` event at seq T+1 (representing a between-turn inject).
+3. Writes a new prompt event at seq T+2 and starts `runner.run()` against it.
+4. Asserts the provider received both the new prompt AND the injection from seq T+1 as `role: 'user'` messages.
+
+(Pattern after the existing tests in the file. Use the same mock provider hooks.)
+
+- [ ] **Step 2:** Run; confirm FAIL (current runner snapshots watermark at "latest" and misses the between-turn inject).
+
+```bash
+npx vitest --run packages/agent/src/core/conversation/__tests__/runner.context-inject.test.ts
+```
+
+- [ ] **Step 3:** Open `packages/agent/src/core/conversation/runner.ts` line 197. Change:
+
+```ts
+// BEFORE
+let lastSeenEventSeq = deriveNextEventSeqFromEventLog(sessionDir) - 1;
+
+// AFTER
+let lastSeenEventSeq = findLastTurnEndEventSeq(sessionDir) ?? 0;
+```
+
+Add the import to the existing `findLastTurnEndEventSeq` from `'../../storage/event-log'`.
+
+- [ ] **Step 4:** Run the new + all existing runner tests; verify all PASS.
+
+```bash
+npx vitest --run packages/agent/src/core/conversation/
+```
+
+- [ ] **Step 5:** Commit.
+
+```bash
+git add packages/agent/src/core/conversation/runner.ts packages/agent/src/core/conversation/__tests__/runner.context-inject.test.ts
+git commit -m "fix(runner): pick up immediate context_injected events written between turns (PRI-1744)"
+```
+
+---
+
+## Phase 3 — Alarm core (types, store, cron, scheduler)
+
+### Task 6: Alarm types
 
 **Files:**
 - Create: `packages/agent/src/alarms/types.ts`
 
-- [ ] **Step 1:** Create `packages/agent/src/alarms/types.ts`:
+- [ ] **Step 1:** Create the file:
 
 ```ts
-// ABOUTME: Type shapes for the lace alarm subsystem — per-session row schema
-// ABOUTME: persisted in alarms.jsonl and the inbound payload emitted as alarm_fired.
+// ABOUTME: Alarm row shape persisted in alarms.json and the in-memory snapshot
+// ABOUTME: format consumed by AlarmStore + AlarmScheduler.
 
 export type AlarmKind = 'cron' | 'once';
 
 export type AlarmStatus = 'pending' | 'firing' | 'fired' | 'cancelled';
 
-export type IfSessionEnded = 'drop' | 'wake' | 'bubble';
-
-/** Captured at schedule-time when ifSessionEnded ∈ {wake, bubble} for a subagent. */
-export interface AlarmParentRef {
-  sessionId: string;
-  jobId: string;
-  personaName?: string;
-  /** Serialized PersonaContainerRuntime | PersonaBoxRuntime; opaque to alarm code. */
-  runtime?: unknown;
-}
-
 export interface AlarmRow {
-  id: string;
+  id: string;            // alarm_<12hex>
   kind: AlarmKind;
-  schedule: string;
+  schedule: string;      // cron expr for cron, ISO-8601 for once
   timezone: string;
   prompt: string;
-  ifSessionEnded: IfSessionEnded;
-  next_fire_at: number;
   status: AlarmStatus;
-  created_at: number;
+  next_fire_at: number;  // epoch ms
+  created_at: number;    // epoch ms
   fired_at: number | null;
-  delivered_at: number | null;
-  parent?: AlarmParentRef;
+}
+
+export interface AlarmsSnapshot {
+  alarms: AlarmRow[];
 }
 
 export const MAX_ACTIVE_ALARMS = 50;
@@ -137,28 +864,27 @@ export const MAX_ACTIVE_ALARMS = 50;
 
 ```bash
 git add packages/agent/src/alarms/types.ts
-git commit -m "feat(alarms): add row + ifSessionEnded types (PRI-1744)"
+git commit -m "feat(alarms): row + snapshot types (PRI-1744)"
 ```
 
 ---
 
-### Task 2: Port cron utilities into lace
+### Task 7: Port cron utilities into lace
 
 **Files:**
 - Create: `packages/agent/src/alarms/cron.ts`
 - Create: `packages/agent/src/alarms/__tests__/cron.test.ts`
 
-- [ ] **Step 1:** Copy `/Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/sen-core-v2/src/alarms/cron.ts` to `packages/agent/src/alarms/cron.ts`. Top of file should read:
+- [ ] **Step 1:** Copy `/Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/sen-core-v2/src/alarms/cron.ts` to `packages/agent/src/alarms/cron.ts`. Replace the leading ABOUTME with:
 
 ```ts
-// ABOUTME: Cron + one-shot fire-time math. Ported from sen-core-v2/src/alarms/cron.ts.
-// ABOUTME: Exports computeNextCronFire, computeNextOnceFire, assertValidIanaTimezone,
-// ABOUTME: assertValidCronMinInterval.
+// ABOUTME: Cron + one-shot fire-time math. Ported verbatim from sen-core-v2/src/alarms/cron.ts.
+// ABOUTME: Exports computeNextCronFire, computeNextOnceFire, assertValidIanaTimezone, assertValidCronMinInterval.
 ```
 
-Leave all logic verbatim. The sen-core source uses `.js` extensions in imports; this file has no internal imports so nothing to change.
+Leave logic untouched. No internal imports to adjust.
 
-- [ ] **Step 2:** Copy `/Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/sen-core-v2/tests/automated/alarms/cron.test.ts` to `packages/agent/src/alarms/__tests__/cron.test.ts`. Update its import paths from the sen-core form to:
+- [ ] **Step 2:** Copy `/Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/sen-core-v2/tests/automated/alarms/cron.test.ts` to `packages/agent/src/alarms/__tests__/cron.test.ts`. Adjust imports:
 
 ```ts
 import {
@@ -169,155 +895,115 @@ import {
 } from '../cron';
 ```
 
-- [ ] **Step 3:** Run the test:
+- [ ] **Step 3:** Run + commit.
 
 ```bash
 npx vitest --run packages/agent/src/alarms/__tests__/cron.test.ts
-```
-
-Expected: all cron tests pass.
-
-- [ ] **Step 4:** Commit.
-
-```bash
 git add packages/agent/src/alarms/cron.ts packages/agent/src/alarms/__tests__/cron.test.ts
 git commit -m "feat(alarms): port cron utilities from sen-core (PRI-1744)"
 ```
 
 ---
 
-### Task 3: AlarmStore JSONL fold — failing test first
+### Task 8: AlarmStore (snapshot JSON, atomic rewrite)
 
 **Files:**
 - Create: `packages/agent/src/alarms/__tests__/alarm-store.test.ts`
 - Create: `packages/agent/src/alarms/alarm-store.ts`
 
-- [ ] **Step 1:** Write the failing test. Create `packages/agent/src/alarms/__tests__/alarm-store.test.ts`:
+- [ ] **Step 1:** Failing test:
 
 ```ts
-// ABOUTME: Unit tests for AlarmStore — per-session JSONL fold, claim semantics,
-// ABOUTME: delivered_at tracking, and MAX_ACTIVE_ALARMS cap.
+// ABOUTME: Unit tests for AlarmStore — single-snapshot JSON storage, in-memory mirror,
+// ABOUTME: atomic rewrite via atomicWriteJson on every change, MAX_ACTIVE_ALARMS cap.
 
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { AlarmStore } from '../alarm-store';
-import type { AlarmRow } from '../types';
 import { MAX_ACTIVE_ALARMS } from '../types';
 
 function tempSessionDir(): string {
-  return mkdtempSync(join(tmpdir(), 'lace-alarms-test-'));
+  return mkdtempSync(join(tmpdir(), 'lace-alarmstore-'));
 }
 
 describe('AlarmStore', () => {
-  it('insert returns a row with status pending and writes a JSONL line', () => {
+  it('insert returns pending row and writes snapshot', () => {
     const dir = tempSessionDir();
-    const store = new AlarmStore(dir);
-    const row = store.insert({
-      kind: 'once',
-      schedule: '2030-01-01T00:00:00Z',
-      timezone: 'UTC',
-      prompt: 'wake me',
-      ifSessionEnded: 'drop',
-      next_fire_at: Date.parse('2030-01-01T00:00:00Z'),
-      now: 1000,
+    const s = new AlarmStore(dir);
+    const row = s.insert({
+      kind: 'once', schedule: '2030-01-01T00:00:00Z', timezone: 'UTC',
+      prompt: 'p', next_fire_at: 1, now: 0,
     });
     expect(row.status).toBe('pending');
-    expect(row.id).toMatch(/^alarm_/);
-    const raw = readFileSync(join(dir, 'alarms.jsonl'), 'utf8');
-    expect(raw.trim().split('\n')).toHaveLength(1);
+    const raw = JSON.parse(readFileSync(join(dir, 'alarms.json'), 'utf8'));
+    expect(raw.alarms).toHaveLength(1);
+    expect(raw.alarms[0].id).toBe(row.id);
   });
 
-  it('listActive folds latest-by-id and excludes fired/cancelled', () => {
-    const dir = tempSessionDir();
-    const store = new AlarmStore(dir);
-    const a = store.insert({
-      kind: 'once', schedule: '2030-01-01T00:00:00Z', timezone: 'UTC',
-      prompt: 'a', ifSessionEnded: 'drop', next_fire_at: 1, now: 0,
-    });
-    const b = store.insert({
-      kind: 'once', schedule: '2030-01-02T00:00:00Z', timezone: 'UTC',
-      prompt: 'b', ifSessionEnded: 'drop', next_fire_at: 2, now: 0,
-    });
-    store.cancel(b.id);
-    const active = store.listActive();
-    expect(active.map((r) => r.id)).toEqual([a.id]);
-  });
-
-  it('claim is atomic — second claim returns false', () => {
-    const dir = tempSessionDir();
-    const store = new AlarmStore(dir);
-    const row = store.insert({
-      kind: 'once', schedule: '2030-01-01T00:00:00Z', timezone: 'UTC',
-      prompt: 'x', ifSessionEnded: 'drop', next_fire_at: 1, now: 0,
-    });
-    expect(store.claim(row.id)).toBe(true);
-    expect(store.claim(row.id)).toBe(false);
-  });
-
-  it('reload from disk reproduces folded state', () => {
+  it('rehydrates from snapshot', () => {
     const dir = tempSessionDir();
     const s1 = new AlarmStore(dir);
-    const row = s1.insert({
-      kind: 'cron', schedule: '0 9 * * *', timezone: 'UTC',
-      prompt: 'p', ifSessionEnded: 'drop', next_fire_at: 100, now: 0,
-    });
-    s1.claim(row.id);
-    s1.markFired(row.id, 50, /*delivered_at*/ 51);
+    s1.insert({ kind: 'once', schedule: '2030-01-01T00:00:00Z', timezone: 'UTC', prompt: 'p', next_fire_at: 1, now: 0 });
     const s2 = new AlarmStore(dir);
-    const got = s2.get(row.id) as AlarmRow;
-    expect(got.status).toBe('fired');
-    expect(got.delivered_at).toBe(51);
+    expect(s2.listActive()).toHaveLength(1);
+  });
+
+  it('claim transitions pending → firing exactly once', () => {
+    const dir = tempSessionDir();
+    const s = new AlarmStore(dir);
+    const row = s.insert({ kind: 'once', schedule: '2030-01-01T00:00:00Z', timezone: 'UTC', prompt: 'p', next_fire_at: 1, now: 0 });
+    expect(s.claim(row.id)).toBe(true);
+    expect(s.claim(row.id)).toBe(false);
+    expect(s.get(row.id)?.status).toBe('firing');
+  });
+
+  it('cancel returns structured reasons', () => {
+    const dir = tempSessionDir();
+    const s = new AlarmStore(dir);
+    expect(s.cancel('alarm_nope').cancelled).toBe(false);
+    const row = s.insert({ kind: 'once', schedule: '2030-01-01T00:00:00Z', timezone: 'UTC', prompt: 'p', next_fire_at: 1, now: 0 });
+    s.claim(row.id);
+    const denied = s.cancel(row.id);
+    expect(denied.cancelled).toBe(false);
+    if (!denied.cancelled) expect(denied.reason).toBe('firing');
   });
 
   it('countActive enforces MAX_ACTIVE_ALARMS', () => {
     const dir = tempSessionDir();
-    const store = new AlarmStore(dir);
+    const s = new AlarmStore(dir);
     for (let i = 0; i < MAX_ACTIVE_ALARMS; i++) {
-      store.insert({
-        kind: 'once', schedule: '2030-01-01T00:00:00Z', timezone: 'UTC',
-        prompt: `p${i}`, ifSessionEnded: 'drop', next_fire_at: i, now: 0,
-      });
+      s.insert({ kind: 'once', schedule: '2030-01-01T00:00:00Z', timezone: 'UTC', prompt: `p${i}`, next_fire_at: i, now: 0 });
     }
-    expect(store.countActive()).toBe(MAX_ACTIVE_ALARMS);
+    expect(s.countActive()).toBe(MAX_ACTIVE_ALARMS);
   });
 
-  it('findUndelivered returns rows with status fired and delivered_at null', () => {
+  it('repairFiringOnBoot demotes firing rows back to pending', () => {
     const dir = tempSessionDir();
-    const store = new AlarmStore(dir);
-    const row = store.insert({
-      kind: 'once', schedule: '2030-01-01T00:00:00Z', timezone: 'UTC',
-      prompt: 'u', ifSessionEnded: 'drop', next_fire_at: 1, now: 0,
-    });
-    store.claim(row.id);
-    store.markFired(row.id, 5, /*delivered_at*/ null);
-    expect(store.findUndelivered().map((r) => r.id)).toEqual([row.id]);
-    store.markDelivered(row.id, 6);
-    expect(store.findUndelivered()).toEqual([]);
+    const s1 = new AlarmStore(dir);
+    const row = s1.insert({ kind: 'once', schedule: '2030-01-01T00:00:00Z', timezone: 'UTC', prompt: 'p', next_fire_at: 1, now: 0 });
+    s1.claim(row.id);
+    const s2 = new AlarmStore(dir);
+    s2.repairFiringOnBoot();
+    expect(s2.get(row.id)?.status).toBe('pending');
   });
 });
 ```
 
-- [ ] **Step 2:** Run the test to confirm it fails.
-
-```bash
-npx vitest --run packages/agent/src/alarms/__tests__/alarm-store.test.ts
-```
-
-Expected: FAIL with "Cannot find module '../alarm-store'".
+- [ ] **Step 2:** Run; confirm FAIL.
 
 - [ ] **Step 3:** Create `packages/agent/src/alarms/alarm-store.ts`:
 
 ```ts
-// ABOUTME: Per-session AlarmStore — append-only JSONL log of alarm rows, folded into
-// ABOUTME: an in-memory map (latest-by-id wins) at construction. Atomic claim via
-// ABOUTME: append-then-fold; no in-place mutation.
+// ABOUTME: Per-session AlarmStore. Single alarms.json snapshot, atomically rewritten
+// ABOUTME: on every change via atomicWriteJson. In-memory Map mirrors the snapshot.
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, openSync, readSync, closeSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import type { AlarmKind, AlarmParentRef, AlarmRow, IfSessionEnded } from './types';
+import { atomicWriteJson } from '../storage/atomic-write';
+import type { AlarmKind, AlarmRow, AlarmsSnapshot } from './types';
 import { MAX_ACTIVE_ALARMS } from './types';
 
 export interface InsertAlarmArgs {
@@ -325,67 +1011,43 @@ export interface InsertAlarmArgs {
   schedule: string;
   timezone: string;
   prompt: string;
-  ifSessionEnded: IfSessionEnded;
   next_fire_at: number;
   now: number;
-  parent?: AlarmParentRef;
 }
 
 export type CancelResult =
   | { cancelled: true }
   | { cancelled: false; reason: 'not_found' | 'already_fired' | 'already_cancelled' | 'firing' };
 
-const FILE_NAME = 'alarms.jsonl';
-
-function ensureTrailingNewline(path: string): void {
-  try {
-    const stat = statSync(path);
-    if (stat.size === 0) return;
-    const fd = openSync(path, 'r');
-    try {
-      const buf = Buffer.alloc(1);
-      readSync(fd, buf, 0, 1, stat.size - 1);
-      if (buf.toString('utf8') !== '\n') {
-        appendFileSync(path, '\n', { encoding: 'utf8' });
-      }
-    } finally {
-      closeSync(fd);
-    }
-  } catch {
-    // file missing — appendFileSync will create it
-  }
-}
+const FILE_NAME = 'alarms.json';
 
 export class AlarmStore {
   private readonly path: string;
-  private rows = new Map<string, AlarmRow>();
+  private alarms = new Map<string, AlarmRow>();
 
   constructor(sessionDir: string) {
     mkdirSync(sessionDir, { recursive: true });
     this.path = join(sessionDir, FILE_NAME);
-    this.reload();
+    this.load();
   }
 
-  private reload(): void {
-    this.rows.clear();
+  private load(): void {
+    this.alarms.clear();
     if (!existsSync(this.path)) return;
-    const raw = readFileSync(this.path, 'utf8');
-    for (const line of raw.split('\n')) {
-      if (!line) continue;
-      try {
-        const row = JSON.parse(line) as AlarmRow;
+    try {
+      const snap = JSON.parse(readFileSync(this.path, 'utf8')) as AlarmsSnapshot;
+      for (const row of snap.alarms) {
         if (typeof row.id !== 'string') continue;
-        this.rows.set(row.id, row);
-      } catch {
-        // ignore partial line
+        this.alarms.set(row.id, row);
       }
+    } catch {
+      // corrupted snapshot — treat as empty
     }
   }
 
-  private append(row: AlarmRow): void {
-    ensureTrailingNewline(this.path);
-    appendFileSync(this.path, `${JSON.stringify(row)}\n`, { encoding: 'utf8' });
-    this.rows.set(row.id, row);
+  private persist(): void {
+    const snap: AlarmsSnapshot = { alarms: [...this.alarms.values()] };
+    atomicWriteJson(this.path, snap, { mode: 0o600 });
   }
 
   insert(args: InsertAlarmArgs): AlarmRow {
@@ -396,72 +1058,69 @@ export class AlarmStore {
       schedule: args.schedule,
       timezone: args.timezone,
       prompt: args.prompt,
-      ifSessionEnded: args.ifSessionEnded,
-      next_fire_at: args.next_fire_at,
       status: 'pending',
+      next_fire_at: args.next_fire_at,
       created_at: args.now,
       fired_at: null,
-      delivered_at: null,
-      ...(args.parent ? { parent: args.parent } : {}),
     };
-    this.append(row);
+    this.alarms.set(id, row);
+    this.persist();
     return row;
   }
 
   get(id: string): AlarmRow | null {
-    return this.rows.get(id) ?? null;
+    return this.alarms.get(id) ?? null;
   }
 
   claim(id: string): boolean {
-    const current = this.rows.get(id);
-    if (!current || current.status !== 'pending') return false;
-    this.append({ ...current, status: 'firing' });
+    const row = this.alarms.get(id);
+    if (!row || row.status !== 'pending') return false;
+    this.alarms.set(id, { ...row, status: 'firing' });
+    this.persist();
     return true;
   }
 
-  markFired(id: string, firedAt: number, deliveredAt: number | null): void {
-    const current = this.rows.get(id);
-    if (!current) return;
-    this.append({ ...current, status: 'fired', fired_at: firedAt, delivered_at: deliveredAt });
+  markFired(id: string, firedAt: number): void {
+    const row = this.alarms.get(id);
+    if (!row) return;
+    this.alarms.set(id, { ...row, status: 'fired', fired_at: firedAt });
+    this.persist();
   }
 
-  markDelivered(id: string, deliveredAt: number): void {
-    const current = this.rows.get(id);
-    if (!current) return;
-    this.append({ ...current, delivered_at: deliveredAt });
-  }
-
-  rescheduleCron(id: string, nextFireAt: number, firedAt: number, deliveredAt: number | null): void {
-    const current = this.rows.get(id);
-    if (!current) return;
-    this.append({
-      ...current,
-      status: 'pending',
-      next_fire_at: nextFireAt,
-      fired_at: firedAt,
-      delivered_at: deliveredAt,
-    });
+  rescheduleCron(id: string, nextFireAt: number, firedAt: number): void {
+    const row = this.alarms.get(id);
+    if (!row) return;
+    this.alarms.set(id, { ...row, status: 'pending', next_fire_at: nextFireAt, fired_at: firedAt });
+    this.persist();
   }
 
   rescheduleStale(id: string, nextFireAt: number): void {
-    const current = this.rows.get(id);
-    if (!current || current.status !== 'pending' || current.kind !== 'cron') return;
-    this.append({ ...current, next_fire_at: nextFireAt });
+    const row = this.alarms.get(id);
+    if (!row || row.status !== 'pending' || row.kind !== 'cron') return;
+    this.alarms.set(id, { ...row, next_fire_at: nextFireAt });
+    this.persist();
   }
 
   cancel(id: string): CancelResult {
-    const current = this.rows.get(id);
-    if (!current) return { cancelled: false, reason: 'not_found' };
-    if (current.status === 'fired') return { cancelled: false, reason: 'already_fired' };
-    if (current.status === 'cancelled') return { cancelled: false, reason: 'already_cancelled' };
-    if (current.status === 'firing') return { cancelled: false, reason: 'firing' };
-    this.append({ ...current, status: 'cancelled' });
+    const row = this.alarms.get(id);
+    if (!row) return { cancelled: false, reason: 'not_found' };
+    if (row.status === 'fired') return { cancelled: false, reason: 'already_fired' };
+    if (row.status === 'cancelled') return { cancelled: false, reason: 'already_cancelled' };
+    if (row.status === 'firing') return { cancelled: false, reason: 'firing' };
+    this.alarms.set(id, { ...row, status: 'cancelled' });
+    this.persist();
     return { cancelled: true };
   }
 
   listActive(): AlarmRow[] {
-    return [...this.rows.values()]
+    return [...this.alarms.values()]
       .filter((r) => r.status === 'pending' || r.status === 'firing')
+      .sort((a, b) => a.next_fire_at - b.next_fire_at);
+  }
+
+  listPending(): AlarmRow[] {
+    return [...this.alarms.values()]
+      .filter((r) => r.status === 'pending')
       .sort((a, b) => a.next_fire_at - b.next_fire_at);
   }
 
@@ -470,275 +1129,184 @@ export class AlarmStore {
   }
 
   soonestPending(): AlarmRow | null {
-    const active = this.listActive().filter((r) => r.status === 'pending');
-    return active[0] ?? null;
+    return this.listPending()[0] ?? null;
   }
 
   staleRecurring(cutoff: number): AlarmRow[] {
-    return [...this.rows.values()]
+    return [...this.alarms.values()]
       .filter((r) => r.status === 'pending' && r.kind === 'cron' && r.next_fire_at < cutoff)
       .sort((a, b) => a.next_fire_at - b.next_fire_at);
   }
 
-  findUndelivered(): AlarmRow[] {
-    return [...this.rows.values()].filter(
-      (r) => r.status === 'fired' && r.delivered_at === null
-    );
+  /** On boot, any 'firing' row is interpreted as "crashed mid-fire" and demoted to pending. */
+  repairFiringOnBoot(): void {
+    let changed = false;
+    for (const [id, row] of this.alarms) {
+      if (row.status === 'firing') {
+        this.alarms.set(id, { ...row, status: 'pending' });
+        changed = true;
+      }
+    }
+    if (changed) this.persist();
   }
 }
 
 export { MAX_ACTIVE_ALARMS };
 ```
 
-- [ ] **Step 4:** Run the test and verify it passes.
+- [ ] **Step 4:** Run; verify PASS. Commit.
 
 ```bash
 npx vitest --run packages/agent/src/alarms/__tests__/alarm-store.test.ts
-```
-
-Expected: all tests pass.
-
-- [ ] **Step 5:** Commit.
-
-```bash
 git add packages/agent/src/alarms/alarm-store.ts packages/agent/src/alarms/__tests__/alarm-store.test.ts
-git commit -m "feat(alarms): per-session JSONL AlarmStore (PRI-1744)"
+git commit -m "feat(alarms): per-session AlarmStore with atomic JSON snapshot (PRI-1744)"
 ```
 
 ---
 
-### Task 4: AlarmScheduler — failing test first
+### Task 9: AlarmScheduler (per-process, single-session)
 
 **Files:**
 - Create: `packages/agent/src/alarms/__tests__/alarm-scheduler.test.ts`
 - Create: `packages/agent/src/alarms/alarm-scheduler.ts`
+- Create: `packages/agent/src/alarms/index.ts`
 
-- [ ] **Step 1:** Write the failing test. Create `packages/agent/src/alarms/__tests__/alarm-scheduler.test.ts`:
+- [ ] **Step 1:** Failing test:
 
 ```ts
-// ABOUTME: Unit tests for AlarmScheduler — boot recovery, soonest-pending, notify(),
-// ABOUTME: claim+fire semantics, cron reschedule, undelivered flush on activation.
+// ABOUTME: Unit tests for AlarmScheduler — fires due alarms, reschedules cron,
+// ABOUTME: notify() wakes the loop, stale-recurring sweep on boot, calls injectNotification.
 
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import { AlarmScheduler } from '../alarm-scheduler';
 import { AlarmStore } from '../alarm-store';
 
-function tempSessionsDir(): string {
-  return mkdtempSync(join(tmpdir(), 'lace-scheduler-test-'));
-}
-
-interface Recorded {
-  sessionId: string;
-  payload: { type: 'alarm_fired'; id: string; alarmKind: 'cron' | 'once'; prompt: string; schedule: string; fired_at: number };
+function setupDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'lace-sched-'));
+  mkdirSync(dir, { recursive: true });
+  return dir;
 }
 
 describe('AlarmScheduler', () => {
-  it('fires a one-shot when its time arrives and emits alarm_fired', async () => {
-    const sessionsDir = tempSessionsDir();
-    const sessionDir = join(sessionsDir, 'sess_a');
+  it('fires due one-shot and calls notifier', async () => {
+    const sessionDir = setupDir();
     const store = new AlarmStore(sessionDir);
-    store.insert({
-      kind: 'once', schedule: '2030-01-01T00:00:01Z', timezone: 'UTC',
-      prompt: 'wake', ifSessionEnded: 'drop', next_fire_at: 1000, now: 0,
-    });
-
-    const events: Recorded[] = [];
-    const scheduler = new AlarmScheduler({
-      sessionsDir,
-      now: () => 0,
+    store.insert({ kind: 'once', schedule: '2030-01-01T00:00:01Z', timezone: 'UTC', prompt: 'p', next_fire_at: 100, now: 0 });
+    const notify = vi.fn();
+    const sched = new AlarmScheduler({
+      sessionDir,
+      store,
+      now: () => 1000,
       jitterMaxMs: 0,
-      emit: (sessionId, payload) => {
-        events.push({ sessionId, payload });
-        return Promise.resolve();
-      },
-      appendEvent: () => Promise.resolve(),
-      isActive: () => true,
-      spawnSubagentForWake: () => Promise.reject(new Error('unused')),
       randomFn: () => 0,
+      notifier: notify,
     });
-
-    // Advance clock to 1500 and tick once
-    (scheduler as unknown as { now: () => number }).now = () => 1500;
-    await scheduler.tickForTest();
-    expect(events).toHaveLength(1);
-    expect(events[0].payload.type).toBe('alarm_fired');
-    expect(events[0].sessionId).toBe('sess_a');
+    sched.bootRecover();
+    await sched.tickForTest();
+    expect(notify).toHaveBeenCalledTimes(1);
+    const arg = notify.mock.calls[0][0];
+    expect(arg.row.id).toMatch(/^alarm_/);
+    expect(store.get(arg.row.id)?.status).toBe('fired');
   });
 
-  it('cron reschedules to the next jittered occurrence', async () => {
-    const sessionsDir = tempSessionsDir();
-    const sessionDir = join(sessionsDir, 'sess_a');
+  it('cron reschedules to next jittered occurrence', async () => {
+    const sessionDir = setupDir();
     const store = new AlarmStore(sessionDir);
-    store.insert({
-      kind: 'cron', schedule: '0 9 * * *', timezone: 'UTC',
-      prompt: 'daily', ifSessionEnded: 'drop',
-      next_fire_at: Date.parse('2030-01-01T09:00:00Z'), now: 0,
-    });
-    const events: Recorded[] = [];
-    const scheduler = new AlarmScheduler({
-      sessionsDir,
-      now: () => Date.parse('2030-01-01T09:00:00Z') + 1,
+    store.insert({ kind: 'cron', schedule: '0 9 * * *', timezone: 'UTC', prompt: 'p',
+                   next_fire_at: Date.parse('2030-01-01T09:00:00Z'), now: 0 });
+    const sched = new AlarmScheduler({
+      sessionDir,
+      store,
+      now: () => Date.parse('2030-01-01T09:00:01Z'),
       jitterMaxMs: 0,
-      emit: (sessionId, payload) => { events.push({ sessionId, payload }); return Promise.resolve(); },
-      appendEvent: () => Promise.resolve(),
-      isActive: () => true,
-      spawnSubagentForWake: () => Promise.reject(new Error('unused')),
       randomFn: () => 0,
+      notifier: vi.fn(),
     });
-    await scheduler.tickForTest();
-    const next = store.listActive();
-    expect(next).toHaveLength(1);
-    expect(next[0].next_fire_at).toBe(Date.parse('2030-01-02T09:00:00Z'));
-    expect(events).toHaveLength(1);
+    sched.bootRecover();
+    await sched.tickForTest();
+    const pending = store.listPending();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].next_fire_at).toBe(Date.parse('2030-01-02T09:00:00Z'));
   });
 
-  it('notify() wakes the loop early', async () => {
-    const sessionsDir = tempSessionsDir();
-    const scheduler = new AlarmScheduler({
-      sessionsDir,
+  it('notify wakes the loop', () => {
+    const sessionDir = setupDir();
+    const sched = new AlarmScheduler({
+      sessionDir,
+      store: new AlarmStore(sessionDir),
       now: () => 0,
       jitterMaxMs: 0,
-      emit: () => Promise.resolve(),
-      appendEvent: () => Promise.resolve(),
-      isActive: () => true,
-      spawnSubagentForWake: () => Promise.reject(new Error('unused')),
       randomFn: () => 0,
+      notifier: vi.fn(),
     });
     const woken = vi.fn();
-    scheduler.onNotifyForTest(woken);
-    scheduler.notify();
+    sched.onNotifyForTest(woken);
+    sched.notify();
     expect(woken).toHaveBeenCalled();
   });
 
-  it('inactive session: appends event but defers session/update emission', async () => {
-    const sessionsDir = tempSessionsDir();
-    const sessionDir = join(sessionsDir, 'sess_b');
+  it('boot repairs firing → pending', () => {
+    const sessionDir = setupDir();
     const store = new AlarmStore(sessionDir);
-    store.insert({
-      kind: 'once', schedule: '2030-01-01T00:00:01Z', timezone: 'UTC',
-      prompt: 'wake', ifSessionEnded: 'drop', next_fire_at: 100, now: 0,
-    });
-    const events: Recorded[] = [];
-    const appendedEvents: Array<{ dir: string; type: string }> = [];
-    const scheduler = new AlarmScheduler({
-      sessionsDir,
-      now: () => 1000,
-      jitterMaxMs: 0,
-      emit: (sessionId, payload) => { events.push({ sessionId, payload }); return Promise.resolve(); },
-      appendEvent: (dir, ev) => { appendedEvents.push({ dir, type: ev.type }); return Promise.resolve(); },
-      isActive: () => false,
-      spawnSubagentForWake: () => Promise.reject(new Error('unused')),
-      randomFn: () => 0,
-    });
-    await scheduler.tickForTest();
-    expect(events).toHaveLength(0);
-    expect(appendedEvents).toHaveLength(1);
-    expect(appendedEvents[0].type).toBe('alarm_fired');
-    expect(store.findUndelivered()).toHaveLength(1);
-  });
-
-  it('flushUndelivered emits session/update and marks delivered', async () => {
-    const sessionsDir = tempSessionsDir();
-    const sessionDir = join(sessionsDir, 'sess_c');
-    const store = new AlarmStore(sessionDir);
-    const row = store.insert({
-      kind: 'once', schedule: '2030-01-01T00:00:00Z', timezone: 'UTC',
-      prompt: 'wake', ifSessionEnded: 'drop', next_fire_at: 1, now: 0,
-    });
+    const row = store.insert({ kind: 'once', schedule: '2030-01-01T00:00:00Z', timezone: 'UTC', prompt: 'p', next_fire_at: 1, now: 0 });
     store.claim(row.id);
-    store.markFired(row.id, 5, null);
-
-    const events: Recorded[] = [];
-    const scheduler = new AlarmScheduler({
-      sessionsDir,
-      now: () => 100,
+    const sched = new AlarmScheduler({
+      sessionDir,
+      store,
+      now: () => 0,
       jitterMaxMs: 0,
-      emit: (sessionId, payload) => { events.push({ sessionId, payload }); return Promise.resolve(); },
-      appendEvent: () => Promise.resolve(),
-      isActive: () => true,
-      spawnSubagentForWake: () => Promise.reject(new Error('unused')),
       randomFn: () => 0,
+      notifier: vi.fn(),
     });
-    await scheduler.flushUndelivered('sess_c');
-    expect(events).toHaveLength(1);
-    expect(store.findUndelivered()).toEqual([]);
+    sched.bootRecover();
+    expect(store.get(row.id)?.status).toBe('pending');
   });
 });
 ```
 
-- [ ] **Step 2:** Run the test to confirm it fails.
-
-```bash
-npx vitest --run packages/agent/src/alarms/__tests__/alarm-scheduler.test.ts
-```
-
-Expected: FAIL ("Cannot find module '../alarm-scheduler'").
+- [ ] **Step 2:** Run; confirm FAIL.
 
 - [ ] **Step 3:** Create `packages/agent/src/alarms/alarm-scheduler.ts`:
 
 ```ts
-// ABOUTME: Single-loop alarm scheduler for the lace runtime. Walks all session
-// ABOUTME: dirs on boot, holds an in-memory min-heap by next_fire_at, fires due
-// ABOUTME: alarms via injected emit/appendEvent hooks. Cron reschedule + stale
-// ABOUTME: sweep + undelivered flush on session activation.
+// ABOUTME: Single-loop per-process alarm scheduler for one session. Owns the in-memory
+// ABOUTME: min-heap of pending alarms; sleeps until due or notify(); fires through the
+// ABOUTME: injected notifier (which calls injectNotification in production).
 
-import { readdirSync, statSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { computeNextCronFire } from './cron';
-import { AlarmStore } from './alarm-store';
+import type { AlarmStore } from './alarm-store';
 import type { AlarmRow } from './types';
 
 const BACKSTOP_POLL_MS = 5000;
 const STALENESS_WINDOW_MS = 60_000;
 
-export interface AlarmFiredPayload {
-  type: 'alarm_fired';
-  id: string;
-  alarmKind: 'cron' | 'once';
-  prompt: string;
-  schedule: string;
-  fired_at: number;
-  bubbled_from?: { sessionId: string; personaName?: string };
-}
-
-export interface AlarmFiredDurableEvent {
-  type: 'alarm_fired';
-  data: AlarmFiredPayload;
+export interface SchedulerNotifierArg {
+  row: AlarmRow;
+  firedAt: number;
 }
 
 export interface SchedulerDependencies {
-  sessionsDir: string;
+  sessionDir: string;
+  store: AlarmStore;
   now: () => number;
   jitterMaxMs: number;
-  /** Emit session/update for an active session. No-op for inactive. */
-  emit: (targetSessionId: string, payload: AlarmFiredPayload) => Promise<void>;
-  /** Append a durable event to a session's events.jsonl. Works for active or inactive. */
-  appendEvent: (sessionDir: string, event: { type: 'alarm_fired'; data: AlarmFiredPayload }) => Promise<void>;
-  /** Is the target session currently the active session? */
-  isActive: (sessionId: string) => boolean;
-  /** Re-spawn a subagent for wake. Returns the new session id. */
-  spawnSubagentForWake: (parent: { sessionId: string; jobId: string; personaName?: string; runtime?: unknown }) => Promise<string>;
+  notifier: (arg: SchedulerNotifierArg) => void;
   randomFn?: () => number;
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
   onError?: (err: unknown) => void;
-  sessionDirExists?: (sessionId: string) => boolean;
 }
 
 interface HeapEntry {
-  sessionId: string;
   alarmId: string;
   next_fire_at: number;
 }
 
 function defaultSleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    if (signal.aborted) {
-      reject(new Error('aborted'));
-      return;
-    }
+    if (signal.aborted) return reject(new Error('aborted'));
     const t = setTimeout(() => {
       signal.removeEventListener('abort', onAbort);
       resolve();
@@ -752,15 +1320,11 @@ function defaultSleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 export class AlarmScheduler {
-  private readonly deps: Required<Omit<SchedulerDependencies,
-    'onError' | 'sleep' | 'randomFn' | 'sessionDirExists'>> & {
-      onError?: (e: unknown) => void;
-      sleep: (ms: number, signal: AbortSignal) => Promise<void>;
-      randomFn: () => number;
-      sessionDirExists: (sessionId: string) => boolean;
-    };
-  private now: () => number;
-  private stores = new Map<string, AlarmStore>();
+  private readonly deps: Required<Omit<SchedulerDependencies, 'onError' | 'sleep' | 'randomFn'>> & {
+    onError?: (e: unknown) => void;
+    sleep: (ms: number, signal: AbortSignal) => Promise<void>;
+    randomFn: () => number;
+  };
   private heap: HeapEntry[] = [];
   private running = false;
   private stopController: AbortController | null = null;
@@ -769,64 +1333,27 @@ export class AlarmScheduler {
 
   constructor(deps: SchedulerDependencies) {
     this.deps = {
-      sessionsDir: deps.sessionsDir,
+      sessionDir: deps.sessionDir,
+      store: deps.store,
       now: deps.now,
       jitterMaxMs: deps.jitterMaxMs,
-      emit: deps.emit,
-      appendEvent: deps.appendEvent,
-      isActive: deps.isActive,
-      spawnSubagentForWake: deps.spawnSubagentForWake,
+      notifier: deps.notifier,
       onError: deps.onError,
       sleep: deps.sleep ?? defaultSleep,
       randomFn: deps.randomFn ?? Math.random,
-      sessionDirExists: deps.sessionDirExists ?? ((sessionId) => existsSync(join(deps.sessionsDir, sessionId))),
     };
-    this.now = deps.now;
   }
 
-  /** Walk sessionsDir, load every alarms.jsonl, build heap. Idempotent. */
-  loadAll(): void {
-    this.stores.clear();
-    this.heap = [];
-    if (!existsSync(this.deps.sessionsDir)) return;
-    const entries = readdirSync(this.deps.sessionsDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const sessionId = entry.name;
-      const sessionDir = join(this.deps.sessionsDir, sessionId);
-      try {
-        const stat = statSync(sessionDir);
-        if (!stat.isDirectory()) continue;
-      } catch {
-        continue;
-      }
-      const store = new AlarmStore(sessionDir);
-      this.stores.set(sessionId, store);
-      this.runStaleSweepForSession(sessionId, store);
-      for (const row of store.listActive()) {
-        if (row.status === 'pending' || row.status === 'firing') {
-          // Treat stuck 'firing' rows as pending — at-least-once semantics.
-          this.heap.push({ sessionId, alarmId: row.id, next_fire_at: row.next_fire_at });
-        }
-      }
-    }
+  /** Read snapshot, demote firing→pending, run stale-recurring sweep, populate heap. */
+  bootRecover(): void {
+    this.deps.store.repairFiringOnBoot();
+    this.runStaleSweep();
+    this.heap = this.deps.store.listPending().map((row) => ({ alarmId: row.id, next_fire_at: row.next_fire_at }));
     this.heap.sort((a, b) => a.next_fire_at - b.next_fire_at);
   }
 
-  /** Get-or-create the AlarmStore for a session. */
-  storeFor(sessionId: string): AlarmStore {
-    let s = this.stores.get(sessionId);
-    if (!s) {
-      const sessionDir = join(this.deps.sessionsDir, sessionId);
-      s = new AlarmStore(sessionDir);
-      this.stores.set(sessionId, s);
-    }
-    return s;
-  }
-
-  /** Add a freshly-inserted alarm to the heap and wake the loop. */
-  enqueue(sessionId: string, row: AlarmRow): void {
-    this.heap.push({ sessionId, alarmId: row.id, next_fire_at: row.next_fire_at });
+  enqueue(row: AlarmRow): void {
+    this.heap.push({ alarmId: row.id, next_fire_at: row.next_fire_at });
     this.heap.sort((a, b) => a.next_fire_at - b.next_fire_at);
     this.notify();
   }
@@ -840,14 +1367,13 @@ export class AlarmScheduler {
     if (this.testNotifyHook) this.testNotifyHook();
   }
 
-  /** Test hook — replaces the default notify resolver with a callback. */
   onNotifyForTest(cb: () => void): void {
     this.testNotifyHook = cb;
   }
 
   async start(): Promise<void> {
     if (this.running) return;
-    this.loadAll();
+    this.bootRecover();
     this.running = true;
     this.stopController = new AbortController();
     const signal = this.stopController.signal;
@@ -873,23 +1399,12 @@ export class AlarmScheduler {
   }
 
   async stop(): Promise<void> {
-    if (this.stopController) this.stopController.abort();
+    this.stopController?.abort();
     this.notify();
   }
 
-  /** Public test seam — runs exactly one tick. Used by unit tests. */
   async tickForTest(): Promise<void> {
-    this.loadAll();
     await this.tick(new AbortController().signal, { onceOnly: true });
-  }
-
-  async flushUndelivered(sessionId: string): Promise<void> {
-    const store = this.storeFor(sessionId);
-    const rows = store.findUndelivered();
-    for (const row of rows) {
-      await this.deps.emit(sessionId, this.toPayload(row, row.fired_at ?? this.deps.now()));
-      store.markDelivered(row.id, this.deps.now());
-    }
   }
 
   private async tick(signal: AbortSignal, opts?: { onceOnly?: boolean }): Promise<void> {
@@ -906,74 +1421,19 @@ export class AlarmScheduler {
       return;
     }
     this.heap.shift();
-    await this.fire(soonest);
+    this.fire(soonest);
   }
 
-  private async fire(entry: HeapEntry): Promise<void> {
-    const store = this.storeFor(entry.sessionId);
-    const row = store.get(entry.alarmId);
+  private fire(entry: HeapEntry): void {
+    const row = this.deps.store.get(entry.alarmId);
     if (!row) return;
-    if (!store.claim(row.id)) return;
+    if (!this.deps.store.claim(row.id)) return;
     const firedAt = this.deps.now();
-
-    let targetSessionId = entry.sessionId;
-    let bubbledFrom: { sessionId: string; personaName?: string } | undefined;
-    const sessionExists = this.deps.sessionDirExists(entry.sessionId);
-
-    if (!sessionExists) {
-      // Session is gone. Apply ifSessionEnded policy.
-      if (row.ifSessionEnded === 'drop') {
-        store.markFired(row.id, firedAt, firedAt);
-        return;
-      }
-      if (row.ifSessionEnded === 'wake') {
-        if (!row.parent) {
-          this.deps.onError?.(new Error(`wake alarm ${row.id} missing parent — dropping`));
-          store.markFired(row.id, firedAt, firedAt);
-          return;
-        }
-        try {
-          targetSessionId = await this.deps.spawnSubagentForWake({
-            sessionId: row.parent.sessionId,
-            jobId: row.parent.jobId,
-            ...(row.parent.personaName ? { personaName: row.parent.personaName } : {}),
-            ...(row.parent.runtime ? { runtime: row.parent.runtime } : {}),
-          });
-        } catch (err) {
-          this.deps.onError?.(err);
-          store.markFired(row.id, firedAt, firedAt);
-          return;
-        }
-      } else {
-        // bubble
-        if (!row.parent || !this.deps.sessionDirExists(row.parent.sessionId)) {
-          this.deps.onError?.(new Error(`bubble alarm ${row.id}: parent gone — dropping`));
-          store.markFired(row.id, firedAt, firedAt);
-          return;
-        }
-        targetSessionId = row.parent.sessionId;
-        bubbledFrom = {
-          sessionId: row.parent.sessionId,
-          ...(row.parent.personaName ? { personaName: row.parent.personaName } : {}),
-        };
-      }
-    }
-
-    const payload = this.toPayload(row, firedAt, bubbledFrom);
-    const sessionDir = join(this.deps.sessionsDir, targetSessionId);
-    await this.deps.appendEvent(sessionDir, { type: 'alarm_fired', data: payload });
-
-    let deliveredAt: number | null = null;
-    if (this.deps.isActive(targetSessionId)) {
-      await this.deps.emit(targetSessionId, payload);
-      deliveredAt = this.deps.now();
-    }
-
+    this.deps.notifier({ row, firedAt });
     if (row.kind === 'once') {
-      store.markFired(row.id, firedAt, deliveredAt);
+      this.deps.store.markFired(row.id, firedAt);
       return;
     }
-    // cron — reschedule
     try {
       const { jitteredMs } = computeNextCronFire({
         expr: row.schedule,
@@ -982,30 +1442,17 @@ export class AlarmScheduler {
         jitterMaxMs: this.deps.jitterMaxMs,
         randomFn: this.deps.randomFn,
       });
-      store.rescheduleCron(row.id, jitteredMs, firedAt, deliveredAt);
-      this.heap.push({ sessionId: entry.sessionId, alarmId: row.id, next_fire_at: jitteredMs });
+      this.deps.store.rescheduleCron(row.id, jitteredMs, firedAt);
+      this.heap.push({ alarmId: row.id, next_fire_at: jitteredMs });
       this.heap.sort((a, b) => a.next_fire_at - b.next_fire_at);
     } catch (err) {
       this.deps.onError?.(err);
-      // leave row in 'firing' — caller will see the error
     }
   }
 
-  private toPayload(row: AlarmRow, firedAt: number, bubbledFrom?: { sessionId: string; personaName?: string }): AlarmFiredPayload {
-    return {
-      type: 'alarm_fired',
-      id: row.id,
-      alarmKind: row.kind,
-      prompt: row.prompt,
-      schedule: row.schedule,
-      fired_at: firedAt,
-      ...(bubbledFrom ? { bubbled_from: bubbledFrom } : {}),
-    };
-  }
-
-  private runStaleSweepForSession(sessionId: string, store: AlarmStore): void {
+  private runStaleSweep(): void {
     const cutoff = this.deps.now() - STALENESS_WINDOW_MS;
-    for (const row of store.staleRecurring(cutoff)) {
+    for (const row of this.deps.store.staleRecurring(cutoff)) {
       try {
         const { jitteredMs } = computeNextCronFire({
           expr: row.schedule,
@@ -1014,7 +1461,7 @@ export class AlarmScheduler {
           jitterMaxMs: this.deps.jitterMaxMs,
           randomFn: this.deps.randomFn,
         });
-        store.rescheduleStale(row.id, jitteredMs);
+        this.deps.store.rescheduleStale(row.id, jitteredMs);
       } catch (err) {
         this.deps.onError?.(err);
       }
@@ -1036,164 +1483,34 @@ export class AlarmScheduler {
 }
 ```
 
-- [ ] **Step 4:** Run the test and verify it passes.
-
-```bash
-npx vitest --run packages/agent/src/alarms/__tests__/alarm-scheduler.test.ts
-```
-
-Expected: all tests pass.
-
-- [ ] **Step 5:** Create `packages/agent/src/alarms/index.ts`:
+- [ ] **Step 4:** Create `packages/agent/src/alarms/index.ts`:
 
 ```ts
-// ABOUTME: Barrel exports for the lace alarm subsystem.
-
 export * from './types';
 export { AlarmStore } from './alarm-store';
 export type { CancelResult, InsertAlarmArgs } from './alarm-store';
 export { AlarmScheduler } from './alarm-scheduler';
-export type { AlarmFiredPayload, SchedulerDependencies } from './alarm-scheduler';
+export type { SchedulerDependencies, SchedulerNotifierArg } from './alarm-scheduler';
 ```
 
-- [ ] **Step 6:** Commit.
+- [ ] **Step 5:** Run; verify PASS. Commit.
 
 ```bash
+npx vitest --run packages/agent/src/alarms/
 git add packages/agent/src/alarms/alarm-scheduler.ts packages/agent/src/alarms/__tests__/alarm-scheduler.test.ts packages/agent/src/alarms/index.ts
-git commit -m "feat(alarms): in-process AlarmScheduler with wake/bubble fanout (PRI-1744)"
+git commit -m "feat(alarms): per-process AlarmScheduler with single-session ownership (PRI-1744)"
 ```
 
 ---
 
-## Phase 2 — Ent-protocol + DurableEvent
+## Phase 4 — SessionMeta.parent
 
-### Task 5: Add `alarm_fired` `DurableEvent` data type
-
-**Files:**
-- Modify: `packages/agent/src/storage/event-types.ts`
-
-- [ ] **Step 1:** Open `packages/agent/src/storage/event-types.ts` and add `AlarmFiredEventData` after the `FilesRewoundEventData` type (around line 125):
-
-```ts
-export type AlarmFiredEventData = {
-  type: 'alarm_fired';
-  id: string;
-  alarmKind: 'cron' | 'once';
-  prompt: string;
-  schedule: string;
-  fired_at: number;
-  bubbled_from?: { sessionId: string; personaName?: string };
-};
-```
-
-- [ ] **Step 2:** Add `AlarmFiredEventData` to the `DurableEventData` discriminated union (around line 144):
-
-```ts
-export type DurableEventData =
-  | PromptEventData
-  | MessageEventData
-  | ToolUseEventData
-  | TurnStartEventData
-  | TurnEndEventData
-  | ContextCompactedEventData
-  | ContextInjectedEventData
-  | JobStartedEventData
-  | JobFinishedEventData
-  | JobUpdateEventData
-  | JobSessionAssignedEventData
-  | PermissionRequestedEventData
-  | PermissionDecidedEventData
-  | PermissionCancelledEventData
-  | CheckpointCreatedEventData
-  | FilesRewoundEventData
-  | AlarmFiredEventData;
-```
-
-- [ ] **Step 3:** Run typecheck.
-
-```bash
-npx tsc --noEmit -p packages/agent/tsconfig.json
-```
-
-Expected: passes.
-
-- [ ] **Step 4:** Commit.
-
-```bash
-git add packages/agent/src/storage/event-types.ts
-git commit -m "feat(events): add alarm_fired DurableEvent type (PRI-1744)"
-```
-
----
-
-### Task 6: Add `alarm_fired` `SessionUpdate` schema
-
-**Files:**
-- Modify: `packages/ent-protocol/src/schemas/methods.ts`
-
-- [ ] **Step 1:** Find the block defining `SessionUpdateSessionInfoSchema` (around line 1874). After the `SessionUpdateSessionChangedSchema` block ends (around line 1936), add:
-
-```ts
-// Alarm Fired — a scheduled alarm has fired. Carries the prompt the agent supplied
-// at schedule time and (when bubble redirected the fire) the originating session.
-const SessionUpdateAlarmFiredSchema = z
-  .object({
-    type: z.literal('alarm_fired'),
-    id: NonEmptyStringSchema,
-    alarmKind: z.enum(['cron', 'once']),
-    prompt: z.string(),
-    schedule: z.string(),
-    fired_at: z.number(),
-    bubbled_from: z
-      .object({
-        sessionId: SessionIdSchema,
-        personaName: z.string().optional(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
-export type SessionUpdateAlarmFired = z.infer<typeof SessionUpdateAlarmFiredSchema>;
-```
-
-- [ ] **Step 2:** Add `SessionUpdateAlarmFiredSchema` to `SessionUpdateInnerNonJobSchema` (around line 1948), `_SessionUpdateInnerSchema` (around line 1982), and `SessionUpdateParamsSchema` (around line 2008). For each union, add the schema as a new entry; for `SessionUpdateParamsSchema` it's `SessionUpdateBaseParamsSchema.merge(SessionUpdateAlarmFiredSchema)`.
-
-Example for `SessionUpdateInnerNonJobSchema`:
-
-```ts
-const SessionUpdateInnerNonJobSchema = z.discriminatedUnion('type', [
-  // ... existing entries ...
-  SessionUpdateSessionChangedSchema,
-  SessionUpdateAlarmFiredSchema,  // ← new
-]);
-```
-
-- [ ] **Step 3:** Run the ent-protocol tests.
-
-```bash
-npx vitest --run packages/ent-protocol
-```
-
-Expected: all existing tests still pass. If a snapshot test catches the new discriminant, accept the snapshot only if it shows the new entry being added cleanly.
-
-- [ ] **Step 4:** Commit.
-
-```bash
-git add packages/ent-protocol/src/schemas/methods.ts
-git commit -m "feat(ent-protocol): add alarm_fired SessionUpdate discriminant (PRI-1744)"
-```
-
----
-
-## Phase 3 — Subagent meta lineage
-
-### Task 7: Extend `SessionMeta` with optional `parent` field
+### Task 10: Extend `SessionMeta` with optional `parent`
 
 **Files:**
 - Modify: `packages/agent/src/storage/session-store.ts`
-- Test: `packages/agent/src/storage/__tests__/session-store.test.ts` (verify if a file exists; if not, skip; the type extension is purely additive and downstream tests cover it)
 
-- [ ] **Step 1:** Open `packages/agent/src/storage/session-store.ts`. Update the `SessionMeta` type (around line 10):
+- [ ] **Step 1:** Open `packages/agent/src/storage/session-store.ts`. Update `SessionMeta`:
 
 ```ts
 export type SessionMeta = {
@@ -1204,22 +1521,19 @@ export type SessionMeta = {
     sessionId: string;
     jobId: string;
     personaName?: string;
-    runtime?: unknown;  // PersonaContainerRuntime | PersonaBoxRuntime serialized; opaque here
   };
 };
 ```
 
-- [ ] **Step 2:** No other changes — `readSessionMeta`/`writeSessionMeta` use generic JSON, so additive fields round-trip automatically.
+Also change `function agentSessionsDir()` to `export function agentSessionsDir()`.
 
-- [ ] **Step 3:** Typecheck.
+- [ ] **Step 2:** Typecheck.
 
 ```bash
 npx tsc --noEmit -p packages/agent/tsconfig.json
 ```
 
-Expected: passes.
-
-- [ ] **Step 4:** Commit.
+- [ ] **Step 3:** Commit.
 
 ```bash
 git add packages/agent/src/storage/session-store.ts
@@ -1228,39 +1542,27 @@ git commit -m "feat(session): add optional parent linkage to SessionMeta (PRI-17
 
 ---
 
-### Task 8: Write `parent` on subagent session creation
+### Task 11: `session/new` accepts `parent`; subagent-spawn passes it
 
 **Files:**
-- Modify: `packages/agent/src/jobs/subagent-job.ts`
+- Modify: `packages/ent-protocol/src/schemas/methods.ts`
 - Modify: `packages/agent/src/rpc/handlers/session.ts`
+- Modify: `packages/agent/src/jobs/subagent-job.ts`
 
-- [ ] **Step 1:** Find the subagent session creation site in `packages/agent/src/jobs/subagent-job.ts` (around line 680). Search for `client.sessionNew` or `created = await ...`. The subagent's lace process owns its own session-store; the parent linkage needs to be written when the *subagent's* `session/new` runs.
-
-The cleanest place to thread `parent` is via the `session/new` request param. Add an optional `parent` field that, when present, lace writes into `meta.json` during `session/new`.
-
-In `packages/agent/src/rpc/handlers/session.ts`, locate the `session/new` handler around line 186. Find the parsed-params type (around line 197). Extend the type with:
+- [ ] **Step 1:** In `packages/ent-protocol/src/schemas/methods.ts`, find `SessionNewParamsSchema` (around line 182). Add the optional field:
 
 ```ts
-const parsed = params as {
-  cwd: string;
-  mcpServers?: Array<{...}>;
-  persona?: string;
-  systemPrompt?: unknown;
-  config?: {
-    connectionId?: string;
-    modelId?: string;
-    persona?: string;
-  };
-  parent?: {
-    sessionId: string;
-    jobId: string;
-    personaName?: string;
-    runtime?: unknown;
-  };
-};
+parent: z
+  .object({
+    sessionId: SessionIdSchema,
+    jobId: NonEmptyStringSchema,
+    personaName: z.string().optional(),
+  })
+  .strict()
+  .optional(),
 ```
 
-- [ ] **Step 2:** In the same handler, find the `writeSessionMeta` call (around line 294). Add `parent` to the meta:
+- [ ] **Step 2:** In `packages/agent/src/rpc/handlers/session.ts` `session/new` handler (around line 186), update the parsed-params type to include `parent?: {...}` matching the schema. After `writeSessionMeta(sessionDir, { sessionId, workDir: parsed.cwd, created })`, change to:
 
 ```ts
 writeSessionMeta(sessionDir, {
@@ -1271,232 +1573,48 @@ writeSessionMeta(sessionDir, {
 });
 ```
 
-- [ ] **Step 3:** In `packages/agent/src/jobs/subagent-job.ts`, find the `sessionNew` call (around line 680). It's invoked through a peer to the subagent's own lace process. Pass `parent` based on the job context — `state.activeSession.meta.sessionId` is the parent session, `job.jobId` is the spawning job:
-
-Search for the call shape; it's structured similar to:
+- [ ] **Step 3:** In `packages/agent/src/jobs/subagent-job.ts`, find the `sessionNew` call against the subagent process (around line 680 — the call that produces `created.sessionId`). Add `parent`:
 
 ```ts
 const created = await peer.sendRequest('session/new', {
   cwd: ...,
   mcpServers: ...,
-  persona: ...,
-});
-```
-
-Add a `parent` field:
-
-```ts
-const created = await peer.sendRequest('session/new', {
-  cwd: ...,
-  mcpServers: ...,
-  persona: ...,
+  ...(personaName ? { persona: personaName } : {}),
   parent: {
     sessionId: state.activeSession!.meta.sessionId,
     jobId: job.jobId,
-    ...(job.personaName ? { personaName: job.personaName } : {}),
-    ...(job.personaRuntime ? { runtime: job.personaRuntime } : {}),
+    ...(personaName ? { personaName } : {}),
   },
 });
 ```
 
-Verify `job.personaName` and `job.personaRuntime` exist on the JobState. If they don't, locate them on `state.activeSession`/`SubagentJobDependencies` and thread accordingly. (The persona name + runtime are already captured during subagent spawn for the container spec; reuse the same source.)
+If `personaName` isn't already in scope at this call site, locate it on the surrounding `job`/options (it's available where `spawnSubagent` is called — thread it through).
 
-- [ ] **Step 4:** Update the ent-protocol `SessionNewParamsSchema` in `packages/ent-protocol/src/schemas/methods.ts` (around line 182):
-
-```ts
-const SessionNewParamsSchema = z
-  .object({
-    cwd: NonEmptyStringSchema,
-    mcpServers: z.array(McpServerConfigSchema).optional(),
-    persona: NonEmptyStringSchema.optional(),
-    systemPrompt: z
-      .union([...])
-      .optional(),
-    config: z.object({...}).strict().optional(),
-    parent: z
-      .object({
-        sessionId: SessionIdSchema,
-        jobId: NonEmptyStringSchema,
-        personaName: z.string().optional(),
-        runtime: z.unknown().optional(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
-```
-
-- [ ] **Step 5:** Typecheck + run subagent tests.
+- [ ] **Step 4:** Run existing delegate tests.
 
 ```bash
-npx tsc --noEmit -p packages/agent/tsconfig.json
 npx vitest --run packages/agent/src/__tests__/agent-process.delegate.e2e.test.ts
 ```
 
-Expected: passes. Existing subagent e2e tests must not regress.
-
-- [ ] **Step 6:** Commit.
+- [ ] **Step 5:** Commit.
 
 ```bash
 git add packages/ent-protocol/src/schemas/methods.ts packages/agent/src/rpc/handlers/session.ts packages/agent/src/jobs/subagent-job.ts
-git commit -m "feat(subagent): propagate parent lineage into session meta (PRI-1744)"
+git commit -m "feat(subagent): persist parent linkage to subagent session meta (PRI-1744)"
 ```
 
 ---
 
-## Phase 4 — Tool implementations
+## Phase 5 — Alarm tools
 
-### Task 9: `schedule_alarm` tool — failing test first
+### Task 12: `schedule_alarm` tool (failing test first)
 
 **Files:**
 - Create: `packages/agent/src/tools/implementations/__tests__/schedule_alarm.test.ts`
 - Create: `packages/agent/src/tools/implementations/schedule_alarm.ts`
+- Modify: `packages/agent/src/tools/types.ts`
 
-- [ ] **Step 1:** Write the failing test:
-
-```ts
-// ABOUTME: Unit tests for the schedule_alarm tool — input validation, cap,
-// ABOUTME: wake/bubble rejection on top-level sessions, ifSessionEnded defaults.
-
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { describe, it, expect } from 'vitest';
-import { ScheduleAlarmTool } from '../schedule_alarm';
-import { AlarmScheduler } from '../../../alarms/alarm-scheduler';
-import { writeSessionMeta } from '../../../storage/session-store';
-
-function makeSession(parent?: { sessionId: string; jobId: string; personaName?: string; runtime?: unknown }) {
-  const sessionsDir = mkdtempSync(join(tmpdir(), 'lace-tool-test-'));
-  const sessionId = 'sess_test';
-  const sessionDir = join(sessionsDir, sessionId);
-  mkdirSync(sessionDir, { recursive: true });
-  writeSessionMeta(sessionDir, {
-    sessionId,
-    workDir: '/tmp',
-    created: new Date().toISOString(),
-    ...(parent ? { parent } : {}),
-  });
-  return { sessionsDir, sessionId, sessionDir };
-}
-
-function makeScheduler(sessionsDir: string): AlarmScheduler {
-  return new AlarmScheduler({
-    sessionsDir,
-    now: () => Date.parse('2030-01-01T00:00:00Z'),
-    jitterMaxMs: 0,
-    emit: () => Promise.resolve(),
-    appendEvent: () => Promise.resolve(),
-    isActive: () => true,
-    spawnSubagentForWake: () => Promise.reject(new Error('unused')),
-    randomFn: () => 0,
-  });
-}
-
-describe('schedule_alarm', () => {
-  it('schedules a one-shot in the future', async () => {
-    const { sessionsDir, sessionId, sessionDir } = makeSession();
-    const scheduler = makeScheduler(sessionsDir);
-    const tool = new ScheduleAlarmTool();
-    const result = await tool.execute(
-      {
-        id: 'tc1',
-        name: 'schedule_alarm',
-        arguments: {
-          kind: 'once',
-          schedule: '2030-01-02T00:00:00Z',
-          prompt: 'wake',
-        },
-      },
-      { signal: new AbortController().signal, alarmScheduler: scheduler, activeSessionId: sessionId, activeSessionDir: sessionDir }
-    );
-    expect(result.status).toBe('completed');
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.id).toMatch(/^alarm_/);
-    expect(payload.ifSessionEnded).toBe('drop');
-  });
-
-  it('rejects wake on top-level session', async () => {
-    const { sessionsDir, sessionId, sessionDir } = makeSession();  // no parent
-    const scheduler = makeScheduler(sessionsDir);
-    const tool = new ScheduleAlarmTool();
-    const result = await tool.execute(
-      {
-        id: 'tc2',
-        name: 'schedule_alarm',
-        arguments: {
-          kind: 'once',
-          schedule: '2030-01-02T00:00:00Z',
-          prompt: 'p',
-          ifSessionEnded: 'wake',
-        },
-      },
-      { signal: new AbortController().signal, alarmScheduler: scheduler, activeSessionId: sessionId, activeSessionDir: sessionDir }
-    );
-    expect(result.status).toBe('failed');
-    expect(result.content[0].text).toContain('WakeInvalidForTopLevel');
-  });
-
-  it('accepts wake on subagent session', async () => {
-    const { sessionsDir, sessionId, sessionDir } = makeSession({
-      sessionId: 'sess_parent',
-      jobId: 'job_x',
-      personaName: 'shell',
-      runtime: { type: 'box', image: 'demo' },
-    });
-    const scheduler = makeScheduler(sessionsDir);
-    const tool = new ScheduleAlarmTool();
-    const result = await tool.execute(
-      {
-        id: 'tc3',
-        name: 'schedule_alarm',
-        arguments: {
-          kind: 'once',
-          schedule: '2030-01-02T00:00:00Z',
-          prompt: 'p',
-          ifSessionEnded: 'wake',
-        },
-      },
-      { signal: new AbortController().signal, alarmScheduler: scheduler, activeSessionId: sessionId, activeSessionDir: sessionDir }
-    );
-    expect(result.status).toBe('completed');
-  });
-
-  it('rejects when MAX_ACTIVE_ALARMS is reached', async () => {
-    const { sessionsDir, sessionId, sessionDir } = makeSession();
-    const scheduler = makeScheduler(sessionsDir);
-    const tool = new ScheduleAlarmTool();
-    for (let i = 0; i < 50; i++) {
-      await tool.execute(
-        {
-          id: `tc-${i}`,
-          name: 'schedule_alarm',
-          arguments: { kind: 'once', schedule: '2030-01-02T00:00:00Z', prompt: `p${i}` },
-        },
-        { signal: new AbortController().signal, alarmScheduler: scheduler, activeSessionId: sessionId, activeSessionDir: sessionDir }
-      );
-    }
-    const overflow = await tool.execute(
-      {
-        id: 'overflow',
-        name: 'schedule_alarm',
-        arguments: { kind: 'once', schedule: '2030-01-02T00:00:00Z', prompt: 'extra' },
-      },
-      { signal: new AbortController().signal, alarmScheduler: scheduler, activeSessionId: sessionId, activeSessionDir: sessionDir }
-    );
-    expect(overflow.status).toBe('failed');
-    expect(overflow.content[0].text).toContain('50');
-  });
-});
-```
-
-- [ ] **Step 2:** Run the test. Expected: FAIL (tool not found; ToolContext field missing).
-
-```bash
-npx vitest --run packages/agent/src/tools/implementations/__tests__/schedule_alarm.test.ts
-```
-
-- [ ] **Step 3:** Extend `ToolContext` in `packages/agent/src/tools/types.ts`. Add after `jobManager?: JobManager;`:
+- [ ] **Step 1:** Extend `ToolContext` first. In `packages/agent/src/tools/types.ts`, add after the `jobManager?: JobManager;` line:
 
 ```ts
 import type { AlarmScheduler } from '@lace/agent/alarms/alarm-scheduler';
@@ -1506,16 +1624,86 @@ import type { AlarmScheduler } from '@lace/agent/alarms/alarm-scheduler';
   activeSessionDir?: string;
 ```
 
+- [ ] **Step 2:** Failing test:
+
+```ts
+// ABOUTME: Unit tests for schedule_alarm tool — input validation, cap, success shape.
+
+import { mkdtempSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it, expect } from 'vitest';
+import { ScheduleAlarmTool } from '../schedule_alarm';
+import { AlarmScheduler } from '../../../alarms/alarm-scheduler';
+import { AlarmStore } from '../../../alarms/alarm-store';
+import { writeSessionMeta } from '../../../storage/session-store';
+
+function setup() {
+  const root = mkdtempSync(join(tmpdir(), 'lace-sched-tool-'));
+  const sessionId = 'sess_a';
+  const sessionDir = join(root, sessionId);
+  mkdirSync(sessionDir, { recursive: true });
+  writeSessionMeta(sessionDir, { sessionId, workDir: '/tmp', created: new Date().toISOString() });
+  const store = new AlarmStore(sessionDir);
+  const scheduler = new AlarmScheduler({
+    sessionDir, store,
+    now: () => Date.parse('2030-01-01T00:00:00Z'),
+    jitterMaxMs: 0, randomFn: () => 0,
+    notifier: () => undefined,
+  });
+  return { sessionId, sessionDir, store, scheduler };
+}
+
+describe('schedule_alarm', () => {
+  it('schedules a one-shot in the future', async () => {
+    const { sessionId, sessionDir, scheduler } = setup();
+    const tool = new ScheduleAlarmTool();
+    const result = await tool.execute(
+      { id: 't1', name: 'schedule_alarm', arguments: { kind: 'once', schedule: '2030-01-02T00:00:00Z', prompt: 'p' } },
+      { signal: new AbortController().signal, alarmScheduler: scheduler, activeSessionId: sessionId, activeSessionDir: sessionDir }
+    );
+    expect(result.status).toBe('completed');
+    const body = JSON.parse(result.content[0].text);
+    expect(body.id).toMatch(/^alarm_/);
+    expect(body.next_fire_at_iso).toBe('2030-01-02T00:00:00.000Z');
+  });
+
+  it('rejects past one-shot', async () => {
+    const { sessionId, sessionDir, scheduler } = setup();
+    const tool = new ScheduleAlarmTool();
+    const result = await tool.execute(
+      { id: 't1', name: 'schedule_alarm', arguments: { kind: 'once', schedule: '2020-01-01T00:00:00Z', prompt: 'p' } },
+      { signal: new AbortController().signal, alarmScheduler: scheduler, activeSessionId: sessionId, activeSessionDir: sessionDir }
+    );
+    expect(result.status).toBe('failed');
+  });
+
+  it('rejects when cap is reached', async () => {
+    const { sessionId, sessionDir, scheduler, store } = setup();
+    for (let i = 0; i < 50; i++) {
+      store.insert({ kind: 'once', schedule: '2030-01-02T00:00:00Z', timezone: 'UTC', prompt: `p${i}`,
+                     next_fire_at: Date.parse('2030-01-02T00:00:00Z') + i, now: 0 });
+    }
+    const tool = new ScheduleAlarmTool();
+    const result = await tool.execute(
+      { id: 't1', name: 'schedule_alarm', arguments: { kind: 'once', schedule: '2030-01-02T00:00:00Z', prompt: 'extra' } },
+      { signal: new AbortController().signal, alarmScheduler: scheduler, activeSessionId: sessionId, activeSessionDir: sessionDir }
+    );
+    expect(result.status).toBe('failed');
+    expect(result.content[0].text).toContain('50');
+  });
+});
+```
+
+- [ ] **Step 3:** Run; confirm FAIL.
+
 - [ ] **Step 4:** Create `packages/agent/src/tools/implementations/schedule_alarm.ts`:
 
 ```ts
-// ABOUTME: schedule_alarm tool — first-class lace alarm scheduling tool. Writes to the
-// ABOUTME: calling session's alarms.jsonl and registers with the in-process scheduler.
-// ABOUTME: ifSessionEnded ∈ {drop, wake, bubble}; wake/bubble require a subagent session.
+// ABOUTME: schedule_alarm tool — first-class lace alarm scheduling. Writes to the
+// ABOUTME: calling session's alarms.json and registers with the in-process scheduler.
 
 import { z } from 'zod';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { Tool } from '../tool';
 import {
   assertValidCronMinInterval,
@@ -1524,7 +1712,6 @@ import {
   computeNextOnceFire,
 } from '../../alarms/cron';
 import { MAX_ACTIVE_ALARMS } from '../../alarms/types';
-import type { SessionMeta } from '../../storage/session-store';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
 const scheduleSchema = z
@@ -1533,17 +1720,8 @@ const scheduleSchema = z
     schedule: z.string().min(1),
     prompt: z.string().min(1),
     timezone: z.string().optional(),
-    ifSessionEnded: z.enum(['drop', 'wake', 'bubble']).optional().default('drop'),
   })
   .strict();
-
-function readMeta(sessionDir: string): SessionMeta | null {
-  try {
-    return JSON.parse(readFileSync(join(sessionDir, 'meta.json'), 'utf8')) as SessionMeta;
-  } catch {
-    return null;
-  }
-}
 
 function errorResult(text: string): ToolResult {
   return { status: 'failed', content: [{ type: 'text', text }] };
@@ -1556,11 +1734,10 @@ function jsonResult(body: Record<string, unknown>): ToolResult {
 export class ScheduleAlarmTool extends Tool {
   name = 'schedule_alarm';
   description =
-    "Schedule an alarm that wakes you with a prompt at a future time. kind='cron' for recurring (e.g. '0 9 * * *', min interval 1 hour) or 'once' for an ISO-8601 timestamp. timezone is an IANA name; required for cron. ifSessionEnded controls what happens if this session is gone when the alarm fires: 'drop' (default), 'wake' (re-spawn subagent — subagent-only), 'bubble' (deliver to parent session — subagent-only). Up to 50 active alarms per session. Use list_alarms / cancel_alarm to manage.";
+    "Schedule an alarm that wakes you with a prompt at a future time. kind='cron' for recurring (e.g. '0 9 * * *', min interval 1 hour) or 'once' for an ISO-8601 timestamp in the future. timezone is an IANA name; required for cron. Up to 50 active alarms per session. Use list_alarms / cancel_alarm to manage. Alarms fire only while this lace process is alive.";
   schema = scheduleSchema;
   annotations: ToolAnnotations = {
     title: 'Schedule an alarm',
-    destructiveHint: false,
     safeInternal: true,
   };
 
@@ -1568,29 +1745,14 @@ export class ScheduleAlarmTool extends Tool {
     args: z.infer<typeof scheduleSchema>,
     context: ToolContext
   ): Promise<ToolResult> {
-    const { alarmScheduler, activeSessionId, activeSessionDir } = context;
-    if (!alarmScheduler || !activeSessionId || !activeSessionDir) {
+    const { alarmScheduler, activeSessionId } = context;
+    if (!alarmScheduler || !activeSessionId) {
       return errorResult('schedule_alarm requires alarmScheduler + activeSession in context');
     }
 
-    const meta = readMeta(activeSessionDir);
-    const isSubagent = !!meta?.parent;
-
-    if (args.ifSessionEnded === 'wake' && !isSubagent) {
-      return errorResult('WakeInvalidForTopLevel: ifSessionEnded=wake is only valid for subagent sessions');
-    }
-    if (args.ifSessionEnded === 'bubble' && !isSubagent) {
-      return errorResult('BubbleInvalidForTopLevel: ifSessionEnded=bubble is only valid for subagent sessions');
-    }
-    if (args.ifSessionEnded === 'wake' && isSubagent && !meta!.parent!.runtime) {
-      return errorResult('WakeRequiresPersonaRuntime: this subagent has no recoverable persona runtime');
-    }
-
-    const store = alarmScheduler.storeFor(activeSessionId);
+    const store = (alarmScheduler as unknown as { deps: { store: import('../../alarms/alarm-store').AlarmStore } }).deps.store;
     if (store.countActive() >= MAX_ACTIVE_ALARMS) {
-      return errorResult(
-        `Cannot schedule alarm: at the cap of 50 active alarms. Cancel one with cancel_alarm first.`
-      );
+      return errorResult('Cannot schedule alarm: at the cap of 50 active alarms. Cancel one with cancel_alarm first.');
     }
 
     const now = Date.now();
@@ -1607,7 +1769,7 @@ export class ScheduleAlarmTool extends Tool {
           expr: args.schedule,
           timezone: tz,
           after: new Date(now),
-          jitterMaxMs: 0, // jitter applied at fire-time reschedule, not at schedule-time
+          jitterMaxMs: 0, // jitter applied at reschedule, not schedule
         });
         nextFireAt = jitteredMs;
       }
@@ -1620,21 +1782,10 @@ export class ScheduleAlarmTool extends Tool {
       schedule: args.schedule,
       timezone: tz,
       prompt: args.prompt,
-      ifSessionEnded: args.ifSessionEnded,
       next_fire_at: nextFireAt,
       now,
-      ...(isSubagent && (args.ifSessionEnded === 'wake' || args.ifSessionEnded === 'bubble')
-        ? {
-            parent: {
-              sessionId: meta!.parent!.sessionId,
-              jobId: meta!.parent!.jobId,
-              ...(meta!.parent!.personaName ? { personaName: meta!.parent!.personaName } : {}),
-              ...(meta!.parent!.runtime ? { runtime: meta!.parent!.runtime } : {}),
-            },
-          }
-        : {}),
     });
-    alarmScheduler.enqueue(activeSessionId, row);
+    alarmScheduler.enqueue(row);
 
     return jsonResult({
       id: row.id,
@@ -1642,39 +1793,40 @@ export class ScheduleAlarmTool extends Tool {
       schedule: row.schedule,
       prompt: row.prompt,
       timezone: row.timezone,
-      ifSessionEnded: row.ifSessionEnded,
       next_fire_at_iso: new Date(row.next_fire_at).toISOString(),
     });
   }
 }
 ```
 
-- [ ] **Step 5:** Run the test. Expected: PASS.
+Note: the access pattern `(alarmScheduler as unknown as { deps: { store } }).deps.store` is a code smell — fix by exposing a public accessor on `AlarmScheduler`:
+
+```ts
+// Add to AlarmScheduler:
+get store(): AlarmStore { return this.deps.store; }
+```
+
+Adjust the tool to use `alarmScheduler.store` instead of the cast.
+
+- [ ] **Step 5:** Run; verify PASS. Commit.
 
 ```bash
 npx vitest --run packages/agent/src/tools/implementations/__tests__/schedule_alarm.test.ts
-```
-
-- [ ] **Step 6:** Commit.
-
-```bash
-git add packages/agent/src/tools/types.ts packages/agent/src/tools/implementations/schedule_alarm.ts packages/agent/src/tools/implementations/__tests__/schedule_alarm.test.ts
+git add packages/agent/src/tools/types.ts packages/agent/src/tools/implementations/schedule_alarm.ts packages/agent/src/tools/implementations/__tests__/schedule_alarm.test.ts packages/agent/src/alarms/alarm-scheduler.ts
 git commit -m "feat(tools): schedule_alarm built-in (PRI-1744)"
 ```
 
 ---
 
-### Task 10: `cancel_alarm` tool
+### Task 13: `cancel_alarm` tool
 
 **Files:**
 - Create: `packages/agent/src/tools/implementations/cancel_alarm.ts`
 - Create: `packages/agent/src/tools/implementations/__tests__/cancel_alarm.test.ts`
 
-- [ ] **Step 1:** Write the failing test:
+- [ ] **Step 1:** Failing test:
 
 ```ts
-// ABOUTME: Unit tests for the cancel_alarm tool.
-
 import { mkdtempSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -1682,72 +1834,57 @@ import { describe, it, expect } from 'vitest';
 import { CancelAlarmTool } from '../cancel_alarm';
 import { ScheduleAlarmTool } from '../schedule_alarm';
 import { AlarmScheduler } from '../../../alarms/alarm-scheduler';
+import { AlarmStore } from '../../../alarms/alarm-store';
 import { writeSessionMeta } from '../../../storage/session-store';
 
 function setup() {
-  const sessionsDir = mkdtempSync(join(tmpdir(), 'lace-cancel-test-'));
+  const root = mkdtempSync(join(tmpdir(), 'lace-cancel-'));
   const sessionId = 'sess_a';
-  const sessionDir = join(sessionsDir, sessionId);
+  const sessionDir = join(root, sessionId);
   mkdirSync(sessionDir, { recursive: true });
   writeSessionMeta(sessionDir, { sessionId, workDir: '/tmp', created: new Date().toISOString() });
-  const scheduler = new AlarmScheduler({
-    sessionsDir,
-    now: () => Date.parse('2030-01-01T00:00:00Z'),
-    jitterMaxMs: 0,
-    emit: () => Promise.resolve(),
-    appendEvent: () => Promise.resolve(),
-    isActive: () => true,
-    spawnSubagentForWake: () => Promise.reject(new Error('unused')),
-    randomFn: () => 0,
-  });
+  const store = new AlarmStore(sessionDir);
+  const scheduler = new AlarmScheduler({ sessionDir, store, now: () => Date.parse('2030-01-01T00:00:00Z'), jitterMaxMs: 0, randomFn: () => 0, notifier: () => undefined });
   return { sessionId, sessionDir, scheduler };
 }
 
 describe('cancel_alarm', () => {
   it('cancels a pending alarm', async () => {
     const { sessionId, sessionDir, scheduler } = setup();
-    const schedTool = new ScheduleAlarmTool();
-    const sched = await schedTool.execute(
+    const sched = new ScheduleAlarmTool();
+    const res = await sched.execute(
       { id: 't1', name: 'schedule_alarm', arguments: { kind: 'once', schedule: '2030-01-02T00:00:00Z', prompt: 'p' } },
       { signal: new AbortController().signal, alarmScheduler: scheduler, activeSessionId: sessionId, activeSessionDir: sessionDir }
     );
-    const id = JSON.parse(sched.content[0].text).id;
+    const id = JSON.parse(res.content[0].text).id;
     const cancel = new CancelAlarmTool();
-    const result = await cancel.execute(
+    const cres = await cancel.execute(
       { id: 't2', name: 'cancel_alarm', arguments: { id } },
       { signal: new AbortController().signal, alarmScheduler: scheduler, activeSessionId: sessionId, activeSessionDir: sessionDir }
     );
-    expect(result.status).toBe('completed');
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.cancelled).toBe(true);
+    expect(JSON.parse(cres.content[0].text).cancelled).toBe(true);
   });
 
   it('returns not_found for unknown id', async () => {
     const { sessionId, sessionDir, scheduler } = setup();
     const cancel = new CancelAlarmTool();
-    const result = await cancel.execute(
-      { id: 't3', name: 'cancel_alarm', arguments: { id: 'alarm_nope' } },
+    const cres = await cancel.execute(
+      { id: 't3', name: 'cancel_alarm', arguments: { id: 'alarm_zzz' } },
       { signal: new AbortController().signal, alarmScheduler: scheduler, activeSessionId: sessionId, activeSessionDir: sessionDir }
     );
-    expect(result.status).toBe('completed');
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.cancelled).toBe(false);
-    expect(payload.reason).toBe('not_found');
+    const body = JSON.parse(cres.content[0].text);
+    expect(body.cancelled).toBe(false);
+    expect(body.reason).toBe('not_found');
   });
 });
 ```
 
-- [ ] **Step 2:** Run, confirm fail.
-
-```bash
-npx vitest --run packages/agent/src/tools/implementations/__tests__/cancel_alarm.test.ts
-```
+- [ ] **Step 2:** Run; fail.
 
 - [ ] **Step 3:** Create `packages/agent/src/tools/implementations/cancel_alarm.ts`:
 
 ```ts
-// ABOUTME: cancel_alarm tool — removes a pending alarm from the calling session's
-// ABOUTME: alarms.jsonl. Returns { cancelled: true } or { cancelled: false, reason }.
+// ABOUTME: cancel_alarm tool — cancels a pending alarm by id in the calling session.
 
 import { z } from 'zod';
 import { Tool } from '../tool';
@@ -1770,32 +1907,27 @@ export class CancelAlarmTool extends Tool {
     args: z.infer<typeof cancelSchema>,
     context: ToolContext
   ): Promise<ToolResult> {
-    const { alarmScheduler, activeSessionId } = context;
-    if (!alarmScheduler || !activeSessionId) {
-      return { status: 'failed', content: [{ type: 'text', text: 'cancel_alarm requires alarmScheduler + activeSessionId in context' }] };
+    const { alarmScheduler } = context;
+    if (!alarmScheduler) {
+      return { status: 'failed', content: [{ type: 'text', text: 'cancel_alarm requires alarmScheduler in context' }] };
     }
-    const store = alarmScheduler.storeFor(activeSessionId);
-    const result = store.cancel(args.id);
-    return await Promise.resolve({
-      status: 'completed',
-      content: [{ type: 'text', text: JSON.stringify(result) }],
-    });
+    const result = alarmScheduler.store.cancel(args.id);
+    return await Promise.resolve({ status: 'completed', content: [{ type: 'text', text: JSON.stringify(result) }] });
   }
 }
 ```
 
-- [ ] **Step 4:** Run the test. Expected: PASS.
-
-- [ ] **Step 5:** Commit.
+- [ ] **Step 4:** Run + commit.
 
 ```bash
+npx vitest --run packages/agent/src/tools/implementations/__tests__/cancel_alarm.test.ts
 git add packages/agent/src/tools/implementations/cancel_alarm.ts packages/agent/src/tools/implementations/__tests__/cancel_alarm.test.ts
 git commit -m "feat(tools): cancel_alarm built-in (PRI-1744)"
 ```
 
 ---
 
-### Task 11: `list_alarms` tool
+### Task 14: `list_alarms` tool
 
 **Files:**
 - Create: `packages/agent/src/tools/implementations/list_alarms.ts`
@@ -1804,8 +1936,6 @@ git commit -m "feat(tools): cancel_alarm built-in (PRI-1744)"
 - [ ] **Step 1:** Failing test:
 
 ```ts
-// ABOUTME: Unit tests for the list_alarms tool.
-
 import { mkdtempSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -1813,24 +1943,17 @@ import { describe, it, expect } from 'vitest';
 import { ListAlarmsTool } from '../list_alarms';
 import { ScheduleAlarmTool } from '../schedule_alarm';
 import { AlarmScheduler } from '../../../alarms/alarm-scheduler';
+import { AlarmStore } from '../../../alarms/alarm-store';
 import { writeSessionMeta } from '../../../storage/session-store';
 
 function setup() {
-  const sessionsDir = mkdtempSync(join(tmpdir(), 'lace-list-test-'));
+  const root = mkdtempSync(join(tmpdir(), 'lace-list-'));
   const sessionId = 'sess_a';
-  const sessionDir = join(sessionsDir, sessionId);
+  const sessionDir = join(root, sessionId);
   mkdirSync(sessionDir, { recursive: true });
   writeSessionMeta(sessionDir, { sessionId, workDir: '/tmp', created: new Date().toISOString() });
-  const scheduler = new AlarmScheduler({
-    sessionsDir,
-    now: () => Date.parse('2030-01-01T00:00:00Z'),
-    jitterMaxMs: 0,
-    emit: () => Promise.resolve(),
-    appendEvent: () => Promise.resolve(),
-    isActive: () => true,
-    spawnSubagentForWake: () => Promise.reject(new Error('unused')),
-    randomFn: () => 0,
-  });
+  const store = new AlarmStore(sessionDir);
+  const scheduler = new AlarmScheduler({ sessionDir, store, now: () => Date.parse('2030-01-01T00:00:00Z'), jitterMaxMs: 0, randomFn: () => 0, notifier: () => undefined });
   return { sessionId, sessionDir, scheduler };
 }
 
@@ -1847,26 +1970,22 @@ describe('list_alarms', () => {
       { signal: new AbortController().signal, alarmScheduler: scheduler, activeSessionId: sessionId, activeSessionDir: sessionDir }
     );
     const list = new ListAlarmsTool();
-    const result = await list.execute(
+    const res = await list.execute(
       { id: 't3', name: 'list_alarms', arguments: {} },
       { signal: new AbortController().signal, alarmScheduler: scheduler, activeSessionId: sessionId, activeSessionDir: sessionDir }
     );
-    expect(result.status).toBe('completed');
-    const { alarms } = JSON.parse(result.content[0].text);
-    expect(alarms).toHaveLength(2);
-    expect(alarms[0].prompt).toBe('a');
-    expect(alarms[1].prompt).toBe('b');
+    const body = JSON.parse(res.content[0].text);
+    expect(body.alarms.map((a: { prompt: string }) => a.prompt)).toEqual(['a', 'b']);
   });
 });
 ```
 
-- [ ] **Step 2:** Run, confirm fail.
+- [ ] **Step 2:** Run; fail.
 
 - [ ] **Step 3:** Create `packages/agent/src/tools/implementations/list_alarms.ts`:
 
 ```ts
-// ABOUTME: list_alarms tool — returns active (pending+firing) alarms for the calling
-// ABOUTME: session, sorted by next_fire_at ascending.
+// ABOUTME: list_alarms tool — returns active alarms for the calling session.
 
 import { z } from 'zod';
 import { Tool } from '../tool';
@@ -1876,8 +1995,7 @@ const listSchema = z.object({}).strict();
 
 export class ListAlarmsTool extends Tool {
   name = 'list_alarms';
-  description =
-    'List active alarms (status pending or firing) for the current session ordered by next_fire_at ascending.';
+  description = 'List active alarms (pending or firing) for the current session, ordered by next_fire_at ascending.';
   schema = listSchema;
   annotations: ToolAnnotations = {
     title: 'List alarms',
@@ -1890,49 +2008,43 @@ export class ListAlarmsTool extends Tool {
     _args: z.infer<typeof listSchema>,
     context: ToolContext
   ): Promise<ToolResult> {
-    const { alarmScheduler, activeSessionId } = context;
-    if (!alarmScheduler || !activeSessionId) {
-      return { status: 'failed', content: [{ type: 'text', text: 'list_alarms requires alarmScheduler + activeSessionId in context' }] };
+    const { alarmScheduler } = context;
+    if (!alarmScheduler) {
+      return { status: 'failed', content: [{ type: 'text', text: 'list_alarms requires alarmScheduler in context' }] };
     }
-    const store = alarmScheduler.storeFor(activeSessionId);
-    const rows = store.listActive();
+    const rows = alarmScheduler.store.listActive();
     const alarms = rows.map((r) => ({
       id: r.id,
       kind: r.kind,
       schedule: r.schedule,
       prompt: r.prompt,
       timezone: r.timezone,
-      ifSessionEnded: r.ifSessionEnded,
       status: r.status,
       next_fire_at_iso: new Date(r.next_fire_at).toISOString(),
       created_at_iso: new Date(r.created_at).toISOString(),
     }));
-    return await Promise.resolve({
-      status: 'completed',
-      content: [{ type: 'text', text: JSON.stringify({ alarms }) }],
-    });
+    return await Promise.resolve({ status: 'completed', content: [{ type: 'text', text: JSON.stringify({ alarms }) }] });
   }
 }
 ```
 
-- [ ] **Step 4:** Run the test. Expected: PASS.
-
-- [ ] **Step 5:** Commit.
+- [ ] **Step 4:** Run + commit.
 
 ```bash
+npx vitest --run packages/agent/src/tools/implementations/__tests__/list_alarms.test.ts
 git add packages/agent/src/tools/implementations/list_alarms.ts packages/agent/src/tools/implementations/__tests__/list_alarms.test.ts
 git commit -m "feat(tools): list_alarms built-in (PRI-1744)"
 ```
 
 ---
 
-### Task 12: Register the three alarm tools as built-ins
+### Task 15: Register alarm tools as built-ins
 
 **Files:**
 - Modify: `packages/agent/src/tools/executor.ts`
 - Modify: `packages/agent/src/tools/implementations/index.ts`
 
-- [ ] **Step 1:** Open `packages/agent/src/tools/executor.ts`. Update `LACE_BUILTIN_TOOL_NAMES` (around line 48):
+- [ ] **Step 1:** Add to `LACE_BUILTIN_TOOL_NAMES` (line 48) the three new names:
 
 ```ts
 export const LACE_BUILTIN_TOOL_NAMES = [
@@ -1957,9 +2069,9 @@ export const LACE_BUILTIN_TOOL_NAMES = [
 ] as const;
 ```
 
-- [ ] **Step 2:** Find `registerAllAvailableTools` (search the file) and add the three new tools alongside the existing native tool registrations. Match the existing pattern (likely something like `executor.registerTool(new JobNotifyTool().name, new JobNotifyTool())`).
+- [ ] **Step 2:** Find the registration call in `executor.ts` (search for `registerAllAvailableTools` or `registerTool(new JobNotifyTool`). Add the three new tools to the same pattern.
 
-- [ ] **Step 3:** Update `packages/agent/src/tools/implementations/index.ts` to export the three new tools:
+- [ ] **Step 3:** Export from `packages/agent/src/tools/implementations/index.ts`:
 
 ```ts
 export { ScheduleAlarmTool } from './schedule_alarm';
@@ -1967,14 +2079,12 @@ export { CancelAlarmTool } from './cancel_alarm';
 export { ListAlarmsTool } from './list_alarms';
 ```
 
-- [ ] **Step 4:** Run typecheck and existing tool tests.
+- [ ] **Step 4:** Typecheck + run all tool tests.
 
 ```bash
 npx tsc --noEmit -p packages/agent/tsconfig.json
 npx vitest --run packages/agent/src/tools/
 ```
-
-Expected: passes. No existing test should regress.
 
 - [ ] **Step 5:** Commit.
 
@@ -1985,729 +2095,667 @@ git commit -m "feat(tools): register alarm tools as lace built-ins (PRI-1744)"
 
 ---
 
-## Phase 5 — Server wiring
+## Phase 6 — Server wiring
 
-### Task 13: Hook AlarmScheduler into the server
+### Task 16: Add `alarmScheduler` to `AgentServerState`; wire in `server.ts`
 
 **Files:**
 - Modify: `packages/agent/src/server-types.ts`
 - Modify: `packages/agent/src/server.ts`
 
-- [ ] **Step 1:** In `packages/agent/src/server-types.ts`, locate `AgentServerState` (search the file). Add field:
+- [ ] **Step 1:** In `packages/agent/src/server-types.ts`, locate `AgentServerState` and add:
 
 ```ts
 import type { AlarmScheduler } from './alarms/alarm-scheduler';
-// ...
-export interface AgentServerState {
-  // ... existing fields ...
-  alarmScheduler: AlarmScheduler;
-}
+// inside AgentServerState:
+alarmScheduler?: AlarmScheduler;
 ```
 
-- [ ] **Step 2:** In `packages/agent/src/server.ts`, near the top of `createAgentServer` (find where `state` is initialized; likely follows `state.jobManager = ...` around line 260), import and instantiate the scheduler:
+It's optional so the field can be lazy-initialized on first session activation (a fresh server before any session has no scheduler yet).
+
+- [ ] **Step 2:** In `packages/agent/src/server.ts`, after `state.activeSession = ...` assignments in session activation paths (within `rpc/handlers/session.ts` — but the scheduler must live in `server.ts` scope so it can reuse `runExclusive` / `emitSessionUpdate`):
+
+A cleaner placement: instantiate the scheduler in `activateStoredSession` and `session/new` handlers (in `rpc/handlers/session.ts`) right after `state.activeSession` is set. Each lace process has exactly one active session at a time; replacing it on session switch is fine (today's lace doesn't really session-switch within a process, but the code defends against it).
+
+Implement a helper in `server.ts`:
 
 ```ts
 import { AlarmScheduler } from './alarms/alarm-scheduler';
-import { agentSessionsDir } from './storage/session-store';
-import { existsSync } from 'node:fs';
+import { AlarmStore } from './alarms/alarm-store';
+import { injectNotification, composeAlarmFiredBody } from './notifications';
 
-// inside createAgentServer, after jobManager wiring:
-state.alarmScheduler = new AlarmScheduler({
-  sessionsDir: agentSessionsDir(),
-  now: () => Date.now(),
-  jitterMaxMs: Number(process.env.LACE_ALARM_JITTER_MS ?? 60_000),
-  emit: async (targetSessionId, payload) => {
-    if (state.activeSession?.meta.sessionId !== targetSessionId) return;
-    await emitSessionUpdate(payload);
-  },
-  appendEvent: async (sessionDir, event) => {
-    if (state.activeSession?.dir === sessionDir) {
-      await runExclusive(async () => {
-        const s = readSessionState(sessionDir);
-        const { nextState } = appendDurableEvent(sessionDir, s, event);
-        writeSessionState(sessionDir, nextState);
+function ensureAlarmSchedulerForActiveSession(
+  state: AgentServerState,
+  runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null }
+): void {
+  if (!state.activeSession) return;
+  if (state.alarmScheduler) {
+    void state.alarmScheduler.stop();
+  }
+  const sessionDir = state.activeSession.dir;
+  const sessionId = state.activeSession.meta.sessionId;
+  const store = new AlarmStore(sessionDir);
+  state.alarmScheduler = new AlarmScheduler({
+    sessionDir,
+    store,
+    now: () => Date.now(),
+    jitterMaxMs: Number(process.env.LACE_ALARM_JITTER_MS ?? 60_000),
+    notifier: ({ row, firedAt }) => {
+      injectNotification({
+        sessionDir,
+        kind: 'alarm-fired',
+        identifiers: { 'alarm-id': row.id },
+        body: composeAlarmFiredBody({
+          kind: row.kind,
+          schedule: row.schedule,
+          timezone: row.timezone,
+          prompt: row.prompt,
+        }),
+        idleWake: {
+          isActive: (d) => d === state.activeSession?.dir,
+          hasActiveTurn: () => !!state.activeTurn,
+          triggerInternalTurn: () => {
+            if (runPromptInternalRef.current) {
+              setImmediate(() => {
+                if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
+                  void runPromptInternalRef.current([]);
+                }
+              });
+            }
+          },
+        },
       });
-      return;
-    }
-    const s = readSessionState(sessionDir);
-    const { nextState } = appendDurableEvent(sessionDir, s, event);
-    writeSessionState(sessionDir, nextState);
-  },
-  isActive: (sessionId) => state.activeSession?.meta.sessionId === sessionId,
-  spawnSubagentForWake: async (_parent) => {
-    // Phase 5: stub. Real implementation arrives in Task 16.
-    throw new Error('wake spawn not yet implemented');
-  },
-  sessionDirExists: (sessionId) => existsSync(join(agentSessionsDir(), sessionId)),
-});
-void state.alarmScheduler.start();
+      void firedAt;
+    },
+  });
+  void state.alarmScheduler.start();
+}
 ```
 
-Imports to add at the top of the file: `agentSessionsDir` from `./storage/session-store`, `existsSync` from `node:fs`, `join` from `node:path`. `agentSessionsDir` is currently file-local in `session-store.ts`; export it (change `function agentSessionsDir()` to `export function agentSessionsDir()`).
+Export `ensureAlarmSchedulerForActiveSession`. Call it from `session/new`, `activateStoredSession`, and (defensively) `session/load` and `session/resume` after `state.activeSession` is set.
 
-- [ ] **Step 3:** Thread the scheduler into ToolContext. Find where ToolContext is built for tool execution (likely in `agent.ts` or `runtime/`; search for `signal: AbortSignal`). The build site looks like:
+- [ ] **Step 3:** Thread `alarmScheduler`, `activeSessionId`, `activeSessionDir` into ToolContext. Locate every place ToolContext is built (`grep -rn "signal: AbortSignal" packages/agent/src/ --include="*.ts" | grep -v test | grep ToolContext` or search for `jobManager: state.jobManager`). At each build site, add:
 
 ```ts
-const context: ToolContext = {
-  signal,
-  workingDirectory: ...,
-  jobManager: state.jobManager,
-  // ... existing ...
-};
+alarmScheduler: state.alarmScheduler,
+...(state.activeSession ? {
+  activeSessionId: state.activeSession.meta.sessionId,
+  activeSessionDir: state.activeSession.dir,
+} : {}),
 ```
 
-Extend it:
+- [ ] **Step 4:** Add a shutdown hook in `server.ts` — when the lace process receives SIGTERM or stdin closes (whichever path the server uses today; search for `process.on('SIGTERM'`, `peer.onClose`, or the existing shutdown sequence), call:
 
 ```ts
-const context: ToolContext = {
-  signal,
-  workingDirectory: ...,
-  jobManager: state.jobManager,
-  alarmScheduler: state.alarmScheduler,
-  ...(state.activeSession ? {
-    activeSessionId: state.activeSession.meta.sessionId,
-    activeSessionDir: state.activeSession.dir,
-  } : {}),
-};
+async function shutdownAlarms(state: AgentServerState): Promise<void> {
+  if (state.alarmScheduler) {
+    await state.alarmScheduler.stop();
+  }
+}
 ```
 
-There may be multiple ToolContext build sites — update each one.
+The subagent-exit-bubble step (Task 18) hangs off this shutdown.
 
-- [ ] **Step 4:** Run all agent tests to catch regressions.
+- [ ] **Step 5:** Run all agent tests.
 
 ```bash
 npx vitest --run packages/agent/src/
 ```
 
-Expected: passes.
+- [ ] **Step 6:** Commit.
+
+```bash
+git add packages/agent/src/server-types.ts packages/agent/src/server.ts packages/agent/src/rpc/handlers/session.ts
+git commit -m "feat(server): wire AlarmScheduler per active session (PRI-1744)"
+```
+
+---
+
+### Task 17: Subagent graceful-exit courtesy bubble
+
+**Files:**
+- Modify: `packages/agent/src/server.ts` (the shutdown path)
+
+- [ ] **Step 1:** Extend the shutdown sequence so, before exit, it:
+
+1. Calls `state.alarmScheduler?.stop()` (already from Task 16).
+2. Re-reads `state.activeSession.dir`/`alarms.json` for pending alarms.
+3. Reads `state.activeSession.meta.parent`. If present AND there are pending alarms, calls `injectNotification` against the parent's session dir with `kind='subagent-exited'`.
+
+```ts
+async function emitSubagentExitedIfNeeded(state: AgentServerState): Promise<void> {
+  if (!state.activeSession) return;
+  const meta = state.activeSession.meta;
+  if (!meta.parent) return;
+  const store = new AlarmStore(state.activeSession.dir);
+  const pending = store.listPending();
+  if (pending.length === 0) return;
+
+  const parentDir = join(agentSessionsDir(), meta.parent.sessionId);
+  injectNotification({
+    sessionDir: parentDir,
+    kind: 'subagent-exited',
+    identifiers: {
+      'subagent-session-id': meta.sessionId,
+      'job-id': meta.parent.jobId,
+      persona: meta.parent.personaName ?? '',
+    },
+    body: composeSubagentExitedBody({
+      persona: meta.parent.personaName ?? '',
+      pendingAlarms: pending.map((r) => ({
+        id: r.id, kind: r.kind, schedule: r.schedule, prompt: r.prompt,
+      })),
+    }),
+    // No idleWake — we're writing to a different process's session.
+  });
+}
+```
+
+Call sequence at shutdown:
+
+```ts
+await state.alarmScheduler?.stop();
+await emitSubagentExitedIfNeeded(state);
+// ... then exit
+```
+
+Crash exit path (uncaught exception, SIGKILL) does NOT call this. Only the graceful shutdown handler does. Verify by searching for the existing graceful-shutdown call site (look for SIGTERM/SIGINT handler in `server.ts`).
+
+- [ ] **Step 2:** Commit.
+
+```bash
+git add packages/agent/src/server.ts
+git commit -m "feat(alarms): subagent graceful-exit notifies parent of pending alarms (PRI-1744)"
+```
+
+---
+
+## Phase 7 — Refactor job notifications into the new shape
+
+### Task 18: Rewrite `createQueueJobNotification` to use `injectNotification`
+
+**Files:**
+- Modify: `packages/agent/src/jobs/job-notifications.ts`
+- Modify: `packages/agent/src/jobs/job-manager.ts`
+
+- [ ] **Step 1:** Open `packages/agent/src/jobs/job-notifications.ts`. The function `createQueueJobNotification` currently composes content via `formatJobNotification` and pushes onto `state.jobManager.notificationQueue` (with a fallback fanout). Rewrite it to compose the body via the new composers and call `injectNotification`:
+
+```ts
+import { injectNotification } from '../notifications/inject-notification';
+import {
+  composeJobCompletedBody,
+  composeJobFailedBody,
+  composeJobCancelledBody,
+  composeJobProgressBody,
+} from '../notifications/composers';
+import type { NotificationKind } from '../notifications/notification-wrapper';
+
+function jobTypeToKind(type: 'completed' | 'failed' | 'cancelled' | 'progress'): NotificationKind {
+  switch (type) {
+    case 'completed': return 'job-completed';
+    case 'failed': return 'job-failed';
+    case 'cancelled': return 'job-cancelled';
+    case 'progress': return 'job-progress';
+  }
+}
+
+export function createQueueJobNotification(
+  state: AgentServerState,
+  runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null }
+) {
+  return (job: JobState, type: JobNotificationType, options?: { reason?: string; deltaBytes?: number }) => {
+    if (!state.activeSession) return;
+    const outputBytes = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
+    const durationMs = Date.now() - new Date(job.startedAt).getTime();
+    const lastLineCount = job.type === 'delegate' ? 8 : type === 'completed' ? 1 : 3;
+    const lastLines = getLastLines(job.outputPath, lastLineCount);
+
+    let body: string;
+    switch (type) {
+      case 'completed':
+        body = composeJobCompletedBody({
+          jobId: job.jobId,
+          jobType: job.type,
+          exitCode: job.exitCode ?? 0,
+          durationMs,
+          outputBytes,
+          lastLines,
+        });
+        break;
+      case 'failed':
+        body = composeJobFailedBody({
+          jobId: job.jobId,
+          jobType: job.type,
+          exitCode: job.exitCode ?? -1,
+          durationMs,
+          outputBytes,
+          lastLines,
+        });
+        break;
+      case 'cancelled':
+        body = composeJobCancelledBody({
+          jobId: job.jobId,
+          jobType: job.type,
+          durationMs,
+          outputBytes,
+          lastLines,
+          ...(options?.reason ? { reason: options.reason } : {}),
+        });
+        break;
+      case 'progress':
+        body = composeJobProgressBody({
+          jobId: job.jobId,
+          durationMs,
+          outputBytes,
+          deltaBytes: options?.deltaBytes ?? 0,
+          lastLines,
+        });
+        break;
+    }
+
+    // Fan out — subscriptions still gate WHO gets notified. If a subscription
+    // exists for this jobId, we still call injectNotification once for the
+    // active session (the parent that subscribed). With no subscription, we
+    // fall back to the always-on path.
+    state.jobManager.fanoutToInject(job.jobId, type, () => {
+      injectNotification({
+        sessionDir: state.activeSession!.dir,
+        kind: jobTypeToKind(type),
+        identifiers: { 'job-id': job.jobId },
+        body,
+        idleWake: {
+          isActive: (d) => d === state.activeSession?.dir,
+          hasActiveTurn: () => !!state.activeTurn,
+          triggerInternalTurn: () => {
+            if (runPromptInternalRef.current) {
+              setImmediate(() => {
+                if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
+                  void runPromptInternalRef.current([]);
+                }
+              });
+            }
+          },
+        },
+      });
+    });
+  };
+}
+```
+
+- [ ] **Step 2:** In `packages/agent/src/jobs/job-manager.ts`: replace the `fanout(...)` method that consumed `(notification, fallback)` with `fanoutToInject(jobId, kind, inject)` — keeping the same subscription gating but calling `inject` instead of pushing onto the queue. Delete `notificationQueue`, `queueNotification`, `getNotificationQueue`, `flushNotifications`, `progressBatches`, and the `PendingJobNotification` type (and its export). The progress-batch coalescing (200 ms window) should be preserved, just calling `inject` at flush time instead of `queue.push`.
+
+The cleanest path: rename `fanout` to `fanoutToInject`, change the per-subscription delivery body to call the `inject` callback, and drop the queue infrastructure entirely. The batch-flush helper (`flushProgressBatch`) flips to calling `inject(...)` instead of pushing onto the queue.
+
+- [ ] **Step 3:** Remove `getNotificationQueue` / `flushNotifications` from the `JobManager` API surface. Update the test files that mock these (`runner.test.ts`, `runner.permission-cancelled.test.ts`, etc.) to drop them from the mock.
+
+- [ ] **Step 4:** Run job tests.
+
+```bash
+npx vitest --run packages/agent/src/jobs/
+```
+
+If existing tests reference `formatJobNotification` directly, port them to compare against composer output (or migrate the test to the composer test file in Phase 1).
 
 - [ ] **Step 5:** Commit.
 
 ```bash
-git add packages/agent/src/server-types.ts packages/agent/src/server.ts packages/agent/src/storage/session-store.ts
-git commit -m "feat(server): wire AlarmScheduler + ToolContext (PRI-1744)"
+git add packages/agent/src/jobs/job-notifications.ts packages/agent/src/jobs/job-manager.ts
+git add packages/agent/src/core/conversation/__tests__/*.test.ts
+git commit -m "refactor(jobs): route notifications through injectNotification (PRI-1744)"
 ```
 
 ---
 
-### Task 14: Flush undelivered on session activation
+### Task 19: Delete the old format-notification module + prompt-injection prepend
 
 **Files:**
-- Modify: `packages/agent/src/rpc/handlers/session.ts`
+- Delete: `packages/agent/src/jobs/format-notification.ts`
+- Delete: `packages/agent/src/jobs/__tests__/format-notification.test.ts` (if present)
+- Modify: `packages/agent/src/jobs/index.ts` (drop the export)
+- Modify: `packages/agent/src/rpc/handlers/prompt.ts:102-111`
 
-- [ ] **Step 1:** Open `packages/agent/src/rpc/handlers/session.ts`. Find `activateStoredSession` (around line 122). After the line `state.activeSession = loadedWithMcpServers;` (around line 160), add:
-
-```ts
-// Flush any alarm fires that happened while this session was inactive.
-await state.alarmScheduler.flushUndelivered(loadedWithMcpServers.meta.sessionId);
-```
-
-Wait — `flushUndelivered` calls `emit`, which in turn calls `emitSessionUpdate`, which expects the session to already be active. Order matters: `state.activeSession = ...` is set above; then the call is safe.
-
-Also flush in `session/new` (around line 379, just before `return { sessionId, created, configOptions }`):
-
-```ts
-await state.alarmScheduler.flushUndelivered(sessionId);
-```
-
-(For a brand-new session this is a no-op, but it costs nothing and avoids a subtle bug if `session/new` reuses an existing session id ever, defensively safe.)
-
-- [ ] **Step 2:** Run session handler tests.
+- [ ] **Step 1:**
 
 ```bash
-npx vitest --run packages/agent/src/rpc/
+git rm packages/agent/src/jobs/format-notification.ts
+# only if it exists:
+git ls-files packages/agent/src/jobs/__tests__/format-notification.test.ts && git rm packages/agent/src/jobs/__tests__/format-notification.test.ts
 ```
 
-Expected: passes.
-
-- [ ] **Step 3:** Commit.
+- [ ] **Step 2:** Open `packages/agent/src/jobs/index.ts`, remove `export * from './format-notification';` (or named export). Search-and-fix any imports across the codebase:
 
 ```bash
-git add packages/agent/src/rpc/handlers/session.ts
-git commit -m "feat(server): flush undelivered alarm fires on session activation (PRI-1744)"
+grep -rn "format-notification\|formatJobNotification" packages/agent/src --include="*.ts"
 ```
 
----
+Any remaining references must be removed (likely just doc comments in `job_notify.ts`).
 
-### Task 15: Wake-spawn implementation
+- [ ] **Step 3:** Open `packages/agent/src/rpc/handlers/prompt.ts`. Delete lines 102-111 (the `flushNotifications` prepend block) and tidy `promptContent` typing. The prompt content is now just `parsed.content`.
 
-**Files:**
-- Modify: `packages/agent/src/server.ts`
-- Modify: `packages/agent/src/jobs/subagent-spawn.ts` (only if a re-spawn helper is needed)
-
-- [ ] **Step 1:** Replace the stub `spawnSubagentForWake` in `server.ts` with a real implementation that uses `spawnSubagent`.
-
-The wake path needs to:
-1. Take the captured `parent` (carries `sessionId` of the original parent, `jobId`, `personaName`, `runtime`).
-2. Create a *new* subagent job via `state.jobManager` (so the new spawn is tracked).
-3. Spawn the subagent process; let it complete `session/new` against itself, producing a new session id.
-4. Return that new session id.
-
-This integrates closely with `jobs/subagent-spawn.ts` and `state.jobManager.createDelegateJob`. The exact wiring depends on `state.jobManager`'s API. Reference implementation skeleton:
+- [ ] **Step 4:** Update `job_notify.ts`'s description string to drop the `<background-job-notification>` reference. Replace with the new shape, e.g.:
 
 ```ts
-spawnSubagentForWake: async (parent) => {
-  if (!parent.runtime) throw new Error('wake requires runtime');
-  // Create a new delegate-shaped job, but with a synthetic prompt that
-  // is just an empty seed — the actual content will be the alarm_fired
-  // event already appended to the new subagent's events.jsonl by the
-  // scheduler before it flushes.
-  const created = await state.jobManager.createWakeJob({
-    parentSessionId: parent.sessionId,
-    parentJobId: parent.jobId,
-    ...(parent.personaName ? { personaName: parent.personaName } : {}),
-    runtime: parent.runtime as PersonaContainerRuntime | PersonaBoxRuntime,
-  });
-  // createWakeJob returns { jobId, sessionId } once the subagent finishes session/new.
-  return created.sessionId;
-},
+description = `...lace will deliver a <notification kind="job-completed"|"job-failed"|"job-cancelled"|"job-progress" job-id="..."> block on your next turn when the job transitions...`;
 ```
 
-`createWakeJob` is a new method on `JobManager`. Implement it in `packages/agent/src/jobs/job-manager.ts` by following the existing `createDelegateJob` pattern; key differences:
-- No initial prompt content (or a single newline) — the new session's first turn will see the `alarm_fired` event already in its events.jsonl.
-- The new subagent's meta.parent points back to the original parent.
+- [ ] **Step 5:** Search for any test that asserts on `<background-job-notification>` and update it to assert on `<notification kind="job-...">`:
 
-Re-read `packages/agent/src/jobs/subagent-job.ts` and `subagent-spawn.ts`; the wake job reuses 90% of the delegate spawn path. Cleanest implementation:
-- Add `createWakeJob(opts: WakeJobOptions): Promise<{ jobId: string; sessionId: string }>` on `JobManager`.
-- Internally builds a JobState with `type: 'delegate'`, fills in persona spec from `opts.runtime`, calls `runSubagentJobProcess`, and waits for `subagentSessionId` to be assigned (via the existing `job_session_assigned` event flow).
-- Resolves with the new sessionId.
+```bash
+grep -rn "background-job-notification" packages/agent --include="*.ts" --include="*.test.ts"
+```
 
-If the existing `createDelegateJob` already accepts opts that match what we need, prefer calling it directly with no initial prompt rather than duplicating logic.
-
-- [ ] **Step 2:** Write a unit test for `createWakeJob` if it's a new method (alongside existing JobManager tests). Or, defer to the e2e wake test in Task 19.
-
-- [ ] **Step 3:** Run all agent tests.
+- [ ] **Step 6:** Run full agent test suite.
 
 ```bash
 npx vitest --run packages/agent/src/
 ```
 
-Expected: passes.
-
-- [ ] **Step 4:** Commit.
+- [ ] **Step 7:** Commit.
 
 ```bash
-git add packages/agent/src/server.ts packages/agent/src/jobs/job-manager.ts packages/agent/src/jobs/subagent-job.ts
-git commit -m "feat(alarms): wake-spawn for subagent alarms via JobManager (PRI-1744)"
+git add -u
+git commit -m "refactor(jobs): drop format-notification + prompt-injection prepend (PRI-1744)"
 ```
 
 ---
 
-## Phase 6 — Lace integration tests
+## Phase 8 — Lace integration tests
 
-### Task 16: e2e — fire delivery for active session
+These tests use the existing e2e harness. Inspect `packages/agent/src/__tests__/agent-process.e2e.test.ts` and `agent-process.async-workflow.e2e.test.ts` for the boot pattern: spawn the agent binary as a child, attach a JsonRpcPeer over stdio, drive prompts, capture `session/update` notifications. For fake-clock tests, follow the pattern already in unit tests (inject `now`/`sleep` via the AlarmScheduler dependencies — for e2e the scheduler runs against the real clock unless you build a small env-var override).
+
+### Task 20: e2e — alarm fire delivery
 
 **Files:**
 - Create: `packages/agent/src/__tests__/alarms.fire-delivery.e2e.test.ts`
 
-- [ ] **Step 1:** Read an existing e2e test (e.g., `packages/agent/src/__tests__/agent-process.e2e.test.ts`) to understand the boot harness — how the agent process is started, how the JsonRpcPeer is wired, how `session/update` is captured.
-
-- [ ] **Step 2:** Create the test:
+- [ ] **Step 1:** Implement the test:
 
 ```ts
-// ABOUTME: e2e: schedule an alarm via the schedule_alarm tool, advance the fake
-// ABOUTME: clock, verify alarm_fired lands in events.jsonl AND a session/update
-// ABOUTME: notification is delivered to the peer.
+// ABOUTME: e2e — schedule a one-shot alarm with a near-future fire, advance the
+// ABOUTME: real clock briefly, verify <notification kind="alarm-fired"> lands as a
+// ABOUTME: context_injected event AND that the next prompt's provider call sees it.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { startTestAgent } from './test-utils';  // pattern from existing tests
+import { startAgentE2E } from './e2e-harness';  // helper from existing tests; adapt names
+// (Use the harness functions actually exported from existing e2e tests — likely
+// startTestAgent or createAgentTestHarness. Adapt accordingly.)
 
 describe('alarms e2e — fire delivery', () => {
-  it('fires a one-shot and emits alarm_fired session/update', async () => {
-    const { peer, sessionId, sessionDir, advanceClock, close } = await startTestAgent({
-      withFakeClock: true,
+  it('appends context_injected and runner picks it up on next turn', async () => {
+    const env = await startAgentE2E({ /* enable mocked provider */ });
+    await env.peer.sendRequest('session/prompt', {
+      content: [{ type: 'text', text: `Call schedule_alarm with kind=once, schedule=${new Date(Date.now() + 1500).toISOString()}, prompt="ping".` }],
     });
-    const updates: Array<Record<string, unknown>> = [];
-    peer.onNotification('session/update', (params) => {
-      updates.push(params as Record<string, unknown>);
-    });
+    // Wait ~2.5s for the alarm to fire.
+    await new Promise((r) => setTimeout(r, 2500));
 
-    // Schedule a once alarm 1s in the future.
-    const future = new Date(Date.now() + 1000).toISOString();
-    await peer.sendRequest('session/prompt', {
-      content: [{ type: 'text', text: `Use schedule_alarm to schedule an alarm at ${future} with prompt "ping".` }],
-    });
-    // Wait for tool to run; consult existing test patterns for the right hook.
-    // ... (depends on harness)
+    const events = readFileSync(join(env.sessionDir, 'events.jsonl'), 'utf8')
+      .trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    const injected = events.filter((e) => e.type === 'context_injected' && e.data?.priority === 'immediate');
+    expect(injected.length).toBeGreaterThan(0);
+    const text = (injected[injected.length - 1].data.content[0] as { text: string }).text;
+    expect(text).toContain('<notification kind="alarm-fired"');
+    expect(text).toContain('ping');
 
-    advanceClock(2000);
-    // Yield for the scheduler tick to run.
-    await new Promise((r) => setTimeout(r, 50));
-
-    const alarmFired = updates.find((u) => (u as { type?: string }).type === 'alarm_fired');
-    expect(alarmFired).toBeDefined();
-
-    const events = readFileSync(join(sessionDir, 'events.jsonl'), 'utf8')
-      .trim()
-      .split('\n')
-      .map((l) => JSON.parse(l) as { type: string });
-    expect(events.some((e) => e.type === 'alarm_fired')).toBe(true);
-
-    await close();
+    await env.close();
   });
 });
 ```
 
-`startTestAgent` is illustrative — use whatever boot helper the existing e2e tests already provide (`createAgentTestHarness`, `runAgentProcess`, etc.). Adapt accordingly.
+The mocked provider should be set up to echo a single text turn so we can observe the conversation runner picking up the injection.
 
-- [ ] **Step 3:** Run.
+- [ ] **Step 2:** Run + commit.
 
 ```bash
 npx vitest --run packages/agent/src/__tests__/alarms.fire-delivery.e2e.test.ts
-```
-
-Expected: PASS.
-
-- [ ] **Step 4:** Commit.
-
-```bash
 git add packages/agent/src/__tests__/alarms.fire-delivery.e2e.test.ts
-git commit -m "test(alarms): e2e fire delivery for active session (PRI-1744)"
+git commit -m "test(alarms): e2e fire delivery via context_injected (PRI-1744)"
 ```
 
 ---
 
-### Task 17: e2e — inactive session replay on activate
+### Task 21: e2e — idle wake
 
 **Files:**
-- Create: `packages/agent/src/__tests__/alarms.inactive-session-replay.e2e.test.ts`
+- Create: `packages/agent/src/__tests__/alarms.idle-wake.e2e.test.ts`
 
-- [ ] **Step 1:** Write a test that:
-1. Creates session A.
-2. Schedules an alarm with `next_fire_at` in the near future.
-3. Switches to (or closes) session A — leaving A inactive.
-4. Advances fake clock past the fire time. Scheduler appends `alarm_fired` to A's events.jsonl but does NOT emit `session/update`.
-5. `session/load` on A. Verify `alarm_fired` `session/update` is now emitted (via `flushUndelivered`).
+- [ ] **Step 1:** Schedule an alarm; let the agent finish the scheduling turn and go idle; advance the clock past fire time; verify an internal turn fires (visible because a new `turn_start` event appears in events.jsonl without an external prompt).
 
-Use the same e2e harness as Task 16. Snapshot test the `events.jsonl` content for A after fire.
-
-- [ ] **Step 2:** Run and commit.
-
-```bash
-npx vitest --run packages/agent/src/__tests__/alarms.inactive-session-replay.e2e.test.ts
-git add packages/agent/src/__tests__/alarms.inactive-session-replay.e2e.test.ts
-git commit -m "test(alarms): e2e inactive-session replay on activate (PRI-1744)"
-```
+- [ ] **Step 2:** Run + commit.
 
 ---
 
-### Task 18: e2e — restart recovery
+### Task 22: e2e — restart recovery
 
 **Files:**
 - Create: `packages/agent/src/__tests__/alarms.restart-recovery.e2e.test.ts`
 
-- [ ] **Step 1:** Test:
-1. Boot agent A; schedule alarm 60s into future.
-2. Shut down agent (call `close()`).
-3. Reboot agent against the same LACE_DIR.
-4. Advance fake clock past fire time.
-5. Verify `alarm_fired` `session/update` arrives on the new agent's peer (after `session/resume`).
+- [ ] **Step 1:** Schedule alarm with fire time ~60s out; close the agent process; restart with the same LACE_DIR; advance clock; verify alarm still fires (boot loads `alarms.json`).
 
 - [ ] **Step 2:** Run + commit.
 
-```bash
-npx vitest --run packages/agent/src/__tests__/alarms.restart-recovery.e2e.test.ts
-git add packages/agent/src/__tests__/alarms.restart-recovery.e2e.test.ts
-git commit -m "test(alarms): e2e restart recovery (PRI-1744)"
-```
-
 ---
 
-### Task 19: e2e — wake subagent
-
-**Files:**
-- Create: `packages/agent/src/__tests__/alarms.wake-subagent.e2e.test.ts`
-
-- [ ] **Step 1:** Test (high-level — full implementation requires the delegate harness used by `agent-process.delegate.e2e.test.ts`):
-1. Spawn subagent S via `delegate` (records `parent` in S's meta).
-2. From S, call `schedule_alarm({ kind: 'once', schedule: <near future>, prompt: 'ping', ifSessionEnded: 'wake' })`.
-3. Close S (session dir is removed or marked gone). For test purposes, simulate "gone" by deleting S's session dir directly — the scheduler's `sessionDirExists` will return false.
-4. Advance clock past fire time.
-5. Verify lace respawned a new subagent (new session id), and the new subagent's events.jsonl contains the `alarm_fired` event.
-
-Refer to `agent-process.delegate.e2e.test.ts` for the multi-process boot pattern.
-
-- [ ] **Step 2:** Run + commit.
-
-```bash
-npx vitest --run packages/agent/src/__tests__/alarms.wake-subagent.e2e.test.ts
-git add packages/agent/src/__tests__/alarms.wake-subagent.e2e.test.ts
-git commit -m "test(alarms): e2e wake subagent on session-ended (PRI-1744)"
-```
-
----
-
-### Task 20: e2e — bubble subagent
-
-**Files:**
-- Create: `packages/agent/src/__tests__/alarms.bubble-subagent.e2e.test.ts`
-
-- [ ] **Step 1:** Test:
-1. Spawn subagent S via `delegate`.
-2. From S, schedule alarm with `ifSessionEnded: 'bubble'`.
-3. Close S (delete S's session dir).
-4. Advance clock past fire time.
-5. Verify `alarm_fired` event lands in **parent's** events.jsonl, with `bubbled_from.sessionId === S's sessionId`.
-
-- [ ] **Step 2:** Run + commit.
-
-```bash
-npx vitest --run packages/agent/src/__tests__/alarms.bubble-subagent.e2e.test.ts
-git add packages/agent/src/__tests__/alarms.bubble-subagent.e2e.test.ts
-git commit -m "test(alarms): e2e bubble subagent on session-ended (PRI-1744)"
-```
-
----
-
-### Task 21: e2e — top-level rejects wake/bubble
-
-**Files:**
-- Create: `packages/agent/src/__tests__/alarms.top-level-rejects-wake-bubble.e2e.test.ts`
-
-- [ ] **Step 1:** Test that calling `schedule_alarm` with `ifSessionEnded: 'wake'` or `'bubble'` on a session without a `parent` field returns a tool-level failure with the `WakeInvalidForTopLevel` / `BubbleInvalidForTopLevel` message.
-
-```ts
-import { describe, it, expect } from 'vitest';
-import { startTestAgent } from './test-utils';
-
-describe('alarms e2e — top-level rejects wake/bubble', () => {
-  for (const policy of ['wake', 'bubble'] as const) {
-    it(`rejects ifSessionEnded='${policy}' on a top-level session`, async () => {
-      const { peer, close } = await startTestAgent();
-      const result = await peer.sendRequest('tool/execute', {
-        toolName: 'schedule_alarm',
-        arguments: {
-          kind: 'once',
-          schedule: new Date(Date.now() + 60_000).toISOString(),
-          prompt: 'p',
-          ifSessionEnded: policy,
-        },
-      });
-      // Exact RPC depends on harness — adapt to whatever tool-execute the harness exposes.
-      expect((result as { status?: string }).status).toBe('failed');
-      const msg = (result as { content: Array<{ text: string }> }).content[0].text;
-      expect(msg).toContain(policy === 'wake' ? 'WakeInvalidForTopLevel' : 'BubbleInvalidForTopLevel');
-      await close();
-    });
-  }
-});
-```
-
-- [ ] **Step 2:** Run + commit.
-
-```bash
-npx vitest --run packages/agent/src/__tests__/alarms.top-level-rejects-wake-bubble.e2e.test.ts
-git add packages/agent/src/__tests__/alarms.top-level-rejects-wake-bubble.e2e.test.ts
-git commit -m "test(alarms): e2e top-level rejects wake/bubble (PRI-1744)"
-```
-
----
-
-### Task 22: e2e — cron reschedule fires twice
+### Task 23: e2e — cron reschedule
 
 **Files:**
 - Create: `packages/agent/src/__tests__/alarms.cron-reschedule.e2e.test.ts`
 
-- [ ] **Step 1:** Test:
-1. Schedule a cron alarm `0 * * * *` (hourly).
-2. Advance clock past first occurrence — verify first fire.
-3. Advance clock past second occurrence — verify second fire.
+- [ ] **Step 1:** Schedule a cron `* * * * *` (every minute, but disable the 1-hour min-interval check for this test via `LACE_ALARM_JITTER_MS=0` and a test-only schedule). Advance time over two fire boundaries; assert two `<notification kind="alarm-fired">` events.
 
-Be sure to use `LACE_ALARM_JITTER_MS=0` (or pass via the harness) so timing is deterministic.
+If the 1-hour min-interval check can't be bypassed in production code, write this test against `AlarmScheduler` directly (not e2e) with fake clock. Acceptable — the cron reschedule logic is unit-testable in Task 9 already.
 
 - [ ] **Step 2:** Run + commit.
 
-```bash
-npx vitest --run packages/agent/src/__tests__/alarms.cron-reschedule.e2e.test.ts
-git add packages/agent/src/__tests__/alarms.cron-reschedule.e2e.test.ts
-git commit -m "test(alarms): e2e cron reschedule (PRI-1744)"
-```
+---
+
+### Task 24: e2e — subagent graceful exit with pending alarms
+
+**Files:**
+- Create: `packages/agent/src/__tests__/alarms.subagent-exit-graceful.e2e.test.ts`
+
+- [ ] **Step 1:** Use the delegate harness (pattern from `agent-process.delegate.e2e.test.ts`):
+
+1. Spawn subagent S via `delegate`.
+2. From S, call `schedule_alarm({ kind: 'once', schedule: <far future>, prompt: 'ping' })`.
+3. Gracefully end the delegate (the harness's existing close/cancel path — confirm it triggers the subagent's graceful shutdown handler, not a kill).
+4. Verify parent's `events.jsonl` gets a `context_injected priority='immediate'` event whose content includes `<notification kind="subagent-exited"`, `subagent-session-id="<S>"`, and the pending alarm description.
+
+- [ ] **Step 2:** Run + commit.
 
 ---
 
-## Phase 7 — Sen-core changes
+### Task 25: e2e — subagent graceful exit with no pending alarms
 
-These edits run in `/Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/sen-core-v2/`. Create a branch off `main`:
+**Files:**
+- Create: `packages/agent/src/__tests__/alarms.subagent-exit-no-pending.e2e.test.ts`
+
+- [ ] **Step 1:** Same as Task 24 but without scheduling an alarm. Verify NO `subagent-exited` notification appears in the parent's events.jsonl.
+
+- [ ] **Step 2:** Run + commit.
+
+---
+
+## Phase 9 — Sen-core changes
+
+Switch to the sen-core repo:
 
 ```bash
 cd /Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/sen-core-v2
 git checkout -b pri-1744-alarms-in-lace
 ```
 
-### Task 23: Delete sen-core alarm subsystem
+### Task 26: Delete sen-core alarm modules
 
 **Files:**
 - Delete: `src/alarms/store.ts`
 - Delete: `src/alarms/scheduler-service.ts`
 - Delete: `src/alarms/tools.ts`
 - Delete: `src/alarms/cron.ts`
+- Delete: `src/alarms/types.ts`
 - Delete: `mcp-servers/scheduler.ts`
 - Delete: `tests/automated/alarms/` (directory)
 
-Keep `src/alarms/types.ts` — `InboundAlarm` is still the inbox envelope. Edit it down to just `InboundAlarm` and `isInboundAlarm`:
-
-- [ ] **Step 1:** Replace contents of `src/alarms/types.ts` with:
-
-```ts
-// ABOUTME: Inbox envelope discriminator for inbound alarm fires. Lace delivers the
-// ABOUTME: actual schedule + fire via session/update; sen-core wraps each into an
-// ABOUTME: InboundAlarm and dispatches to the ambient inbox.
-
-export type AlarmKind = 'cron' | 'once';
-
-export interface InboundAlarm {
-  kind: 'alarm';
-  id: string;
-  alarmKind: AlarmKind;
-  prompt: string;
-  schedule: string;
-  fired_at: number;
-}
-
-export function isInboundAlarm(item: { kind: string }): item is InboundAlarm {
-  return item.kind === 'alarm';
-}
-```
-
-- [ ] **Step 2:** Delete the files listed above.
+- [ ] **Step 1:**
 
 ```bash
-rm src/alarms/store.ts src/alarms/scheduler-service.ts src/alarms/tools.ts src/alarms/cron.ts
-rm mcp-servers/scheduler.ts
-rm -rf tests/automated/alarms
+git rm src/alarms/store.ts src/alarms/scheduler-service.ts src/alarms/tools.ts src/alarms/cron.ts src/alarms/types.ts
+git rm mcp-servers/scheduler.ts
+git rm -r tests/automated/alarms
 ```
 
-- [ ] **Step 3:** Remove imports from `src/main.ts` (top of file): `AlarmsStore`, `SchedulerService`, `resolveAlarmJitterMs`. Remove the `alarms` block (lines 571-590 in the current file):
-
-```ts
-// DELETE this whole block:
-// const alarmsDir = path.join(prepared.paths.root, 'alarms');
-// mkdirSync(alarmsDir, { recursive: true });
-// const alarmsStore = new AlarmsStore(...);
-// const scheduler = new SchedulerService({...});
-// const schedulerPromise = scheduler.run();
-// schedulerPromise.catch(...);
-```
-
-If `mkdirSync` is no longer used elsewhere in `main.ts`, remove the import.
-
-- [ ] **Step 4:** Update any `src/slack/envelope.ts` imports if they reference the removed types. `InboundAlarm` and `isInboundAlarm` still live in `src/alarms/types.ts` so they're fine.
-
-- [ ] **Step 5:** Typecheck + run.
+- [ ] **Step 2:** Search the repo for references:
 
 ```bash
-npm run lint
-npm run test
+grep -rn "AlarmsStore\|SchedulerService\|InboundAlarm\|isInboundAlarm\|src/alarms\|mcp-servers/scheduler" --include="*.ts" --include="*.md"
 ```
 
-Expected: passes (with reduced test count — old alarm tests are gone, no new ones yet for sen-core).
+Fix every hit. Expected hits at this point: `src/main.ts` (the alarm wiring block), `src/slack/envelope.ts` (`formatAlarm`), `src/slack/types.ts` (`InboundItem` union), `src/ambient/inbox-dispatcher.ts` (alarm branch, if any), `templates/agent-personas/core.md`.
 
-- [ ] **Step 6:** Commit.
-
-```bash
-git add -u
-git commit -m "refactor(alarms): remove sen-core alarm subsystem; lace owns it now (PRI-1744)"
-```
+- [ ] **Step 3:** Don't commit yet — Tasks 27–30 update the remaining files. Commit together.
 
 ---
 
-### Task 24: Wire `alarm_fired` → InboundAlarm in sen-core
+### Task 27: Drop alarm wiring from `src/main.ts`
 
 **Files:**
-- Modify: `src/main.ts` (around `attachClientSubscriptions`)
+- Modify: `src/main.ts`
 
-- [ ] **Step 1:** Find `attachClientSubscriptions` in `src/main.ts` (around line 203). Inside the `client.onSessionUpdate((update) => {...})` callback, add a branch:
+- [ ] **Step 1:** Remove imports for `AlarmsStore`, `SchedulerService`, `resolveAlarmJitterMs` (and any unused `mkdirSync`/`path` after their last user is gone).
 
-```ts
-if (update.type === 'alarm_fired') {
-  const alarm: InboundAlarm = {
-    kind: 'alarm',
-    id: update.id,
-    alarmKind: update.alarmKind,
-    prompt: update.bubbled_from
-      ? `[from subagent ${update.bubbled_from.personaName ?? update.bubbled_from.sessionId}]\n${update.prompt}`
-      : update.prompt,
-    schedule: update.schedule,
-    fired_at: update.fired_at,
-  };
-  // dispatcher.dispatch is async, swallow the promise to keep the update handler sync.
-  void opts.dispatcher.dispatch(alarm);
-  return;
-}
-```
+- [ ] **Step 2:** Delete lines 571-590 (the entire alarm scheduler block). The surrounding `recentCache`/`rotationTracker` blocks must continue to compile.
 
-Verify `opts.dispatcher` is available on the surrounding closure. If it isn't, add it to `PrepareSenSessionOptions` (around line 175) and thread from the caller (`bootSen`). Existing dispatcher already lives in `main.ts`'s scope where `attachClientSubscriptions` is defined — pass it via closure or via the new options field.
-
-- [ ] **Step 2:** Add the import:
-
-```ts
-import type { InboundAlarm } from './alarms/types.js';
-```
-
-- [ ] **Step 3:** Add a unit test in `tests/automated/alarms-inbound.e2e.test.ts`:
-
-```ts
-// ABOUTME: Verify sen-core's onSessionUpdate handler translates alarm_fired into
-// ABOUTME: an InboundAlarm and pushes it to the dispatcher.
-
-import { describe, it, expect, vi } from 'vitest';
-import { /* relevant helper */ attachClientSubscriptions } from '../../src/main';
-
-describe('alarm_fired → InboundAlarm', () => {
-  it('dispatches as InboundAlarm', () => {
-    const dispatch = vi.fn();
-    const fakeClient = {
-      onSessionUpdate: (cb: (update: unknown) => void) => {
-        // capture
-        (fakeClient as { _cb?: typeof cb })._cb = cb;
-      },
-    };
-    attachClientSubscriptions(fakeClient as never, { dispatcher: { dispatch } } as never);
-    (fakeClient as { _cb: (update: unknown) => void })._cb({
-      type: 'alarm_fired',
-      id: 'alarm_abc',
-      alarmKind: 'once',
-      prompt: 'ping',
-      schedule: '2030-01-01T00:00:00Z',
-      fired_at: 12345,
-    });
-    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
-      kind: 'alarm',
-      id: 'alarm_abc',
-      alarmKind: 'once',
-      prompt: 'ping',
-      fired_at: 12345,
-    }));
-  });
-});
-```
-
-(Adjust the test to whatever indirection `attachClientSubscriptions` actually exposes — it may need a small refactor to be testable, e.g., extracting the alarm-translation logic into an exported helper.)
-
-- [ ] **Step 4:** Run.
-
-```bash
-npm run test -- alarms-inbound
-```
-
-Expected: PASS.
-
-- [ ] **Step 5:** Commit.
-
-```bash
-git add src/main.ts tests/automated/alarms-inbound.e2e.test.ts
-git commit -m "feat(alarms): translate lace alarm_fired into InboundAlarm dispatch (PRI-1744)"
-```
+- [ ] **Step 3:** Verify `dispatcher.dispatch(alarm)` references are removed (search for `dispatch(alarm)` or `dispatch.*InboundAlarm`).
 
 ---
 
-### Task 25: Remove `scheduler` MCP from core persona
+### Task 28: Slack envelope becomes Slack-only
+
+**Files:**
+- Modify: `src/slack/envelope.ts`
+- Modify: `src/slack/types.ts`
+
+- [ ] **Step 1:** In `src/slack/types.ts`:
+
+```ts
+// BEFORE
+export type { InboundAlarm } from '../alarms/types.js';
+import type { InboundAlarm } from '../alarms/types.js';
+export type InboundItem = InboundSlackMessage | InboundAlarm;
+export function isInboundAlarm(item: InboundItem): item is InboundAlarm { ... }
+
+// AFTER
+// (delete InboundAlarm export, isInboundAlarm)
+export type InboundItem = InboundSlackMessage;
+```
+
+- [ ] **Step 2:** In `src/slack/envelope.ts`:
+
+- Delete `formatAlarm` (lines ~85-91).
+- Delete the `InboundAlarm` import.
+- In `formatEnvelope`, remove the `isInboundAlarm(item)` branch. The function becomes a straightforward `formatSlackBatch(items)` wrapper (or inline its logic).
+
+- [ ] **Step 3:** Search for `formatEnvelope` consumers and verify they only pass slack-typed arrays now.
+
+---
+
+### Task 29: Inbox dispatcher is Slack-only
+
+**Files:**
+- Modify: `src/ambient/inbox-dispatcher.ts`
+
+- [ ] **Step 1:** Open the file. Find any code path that branches on alarm-vs-slack. Remove. The dispatcher's generic `InboundItem` type now collapses to `InboundSlackMessage`; any type narrowing for alarms goes.
+
+- [ ] **Step 2:** Search for `InboundItem` usages across the codebase. Any consumer that branched on `kind === 'alarm'` (the `isInboundAlarm` guard) gets that branch deleted.
+
+---
+
+### Task 30: Persona MCP cleanup
 
 **Files:**
 - Modify: `templates/agent-personas/core.md`
 
-- [ ] **Step 1:** Open `templates/agent-personas/core.md`. Remove lines 8-14 (the entire `scheduler:` block under `mcpServers:`):
+- [ ] **Step 1:** Remove the `scheduler:` block (lines 8-14) from `mcpServers:`. The block after edit:
 
 ```yaml
-# BEFORE
 mcpServers:
   knowledge:
     command: ./node_modules/.bin/tsx
     args:
       - ./mcp-servers/knowledge.ts
-  scheduler:
+  scribe:
     command: ./node_modules/.bin/tsx
     args:
-      - ./mcp-servers/scheduler.ts
+      - ./mcp-servers/scribe.ts
     env:
       SEN_INSTANCE_ROOT: ${SEN_INSTANCE_ROOT}
-      SEN_ALARM_JITTER_MS: ${SEN_ALARM_JITTER_MS:-60000}
-  scribe:
-    ...
-
-# AFTER
-mcpServers:
-  knowledge:
-    command: ./node_modules/.bin/tsx
-    args:
-      - ./mcp-servers/knowledge.ts
-  scribe:
-    ...
+maxTurns: 100
 ```
 
-- [ ] **Step 2:** Search the persona file for any prose that mentions the `scheduler` MCP (e.g., "use schedule_alarm via the scheduler MCP"). Update or remove — schedule_alarm is now a lace built-in and doesn't need MCP wiring.
+- [ ] **Step 2:** Search the persona prose body for any mention of `schedule_alarm` via the scheduler MCP or "@scheduler". Update wording — `schedule_alarm` is now a lace built-in and Ada just calls it directly.
 
-- [ ] **Step 3:** Search the repo for other references to the removed paths/env vars:
+---
+
+### Task 31: Sen-core typecheck, test, commit
+
+- [ ] **Step 1:**
 
 ```bash
-grep -rn "scheduler.ts\|SEN_ALARM_JITTER_MS\|AlarmsStore\|SchedulerService" --include="*.ts" --include="*.md"
+npm run lint
+npm run test 2>&1 | tail -30
 ```
 
-Remove any stragglers (likely some docs).
+Expected: passes (alarm test count drops because we removed the suite).
 
-- [ ] **Step 4:** Commit.
+- [ ] **Step 2:** Single squashed commit:
 
 ```bash
-git add templates/agent-personas/core.md
-git add -u   # for any other doc tweaks
-git commit -m "chore(personas): remove scheduler MCP from core persona (PRI-1744)"
+git add -A
+git commit -m "$(cat <<'EOF'
+refactor(alarms): remove sen-core alarm subsystem; lace owns it now
+
+Alarms move into lace as per-session alarms.json + a per-process scheduler.
+Sen-core deletes:
+- src/alarms/{store,scheduler-service,tools,cron,types}.ts
+- mcp-servers/scheduler.ts
+- tests/automated/alarms/
+- The AlarmsStore + SchedulerService wiring in src/main.ts:574-590
+- The <alarm> envelope path in src/slack/envelope.ts
+- The InboundAlarm branch in src/slack/types.ts and src/ambient/inbox-dispatcher.ts
+- The scheduler MCP entry in templates/agent-personas/core.md
+
+Sen-core's inbox is Slack-only now. Alarms reach Ada via lace's
+conversation injection (context_injected priority='immediate') as
+<notification kind="alarm-fired"> blocks.
+
+Refs PRI-1744.
+EOF
+)"
+```
+
+- [ ] **Step 3:** Push.
+
+```bash
+git push -u origin pri-1744-alarms-in-lace
 ```
 
 ---
 
-## Phase 8 — Documentation
+## Phase 10 — Documentation
 
-### Task 26: Document `alarm_fired` in lace protocol spec
-
-**Files:**
-- Modify: `docs/protocol-spec.md` (lace worktree)
-
-- [ ] **Step 1:** Open `docs/protocol-spec.md`. Find the `SessionUpdate` event catalogue (search for `session_info`, `compaction_start`, or similar). Add a section:
-
-```markdown
-### `alarm_fired`
-
-Fired when a scheduled alarm reaches its `next_fire_at` and the target session is the active session. Payload:
-
-| Field | Type | Notes |
-| --- | --- | --- |
-| `type` | `'alarm_fired'` | discriminant |
-| `id` | `string` | alarm id (`alarm_<hex>`) |
-| `alarmKind` | `'cron' \| 'once'` | original kind discriminator |
-| `prompt` | `string` | the prompt the agent supplied at schedule time |
-| `schedule` | `string` | cron expression or ISO-8601 timestamp |
-| `fired_at` | `number` | epoch ms when the scheduler claimed the fire |
-| `bubbled_from` | `{ sessionId, personaName? }?` | present when the fire was redirected from a closed subagent session via `ifSessionEnded='bubble'` |
-
-The same payload is also durably persisted as an `alarm_fired` event in the target session's `events.jsonl`. Embedders that detach and re-attach to a session will receive any missed fires through the same `session/update` channel on the next `session/load` or `session/resume`.
-```
-
-- [ ] **Step 2:** Find the durable-events catalogue (search for `tool_use`, `job_started`). Add an `alarm_fired` entry mirroring the same shape.
-
-- [ ] **Step 3:** Open `docs/protocol-conformance.md` and add `alarm_fired` to the supported `SessionUpdate` list.
-
-- [ ] **Step 4:** Commit.
-
-```bash
-git add docs/protocol-spec.md docs/protocol-conformance.md
-git commit -m "docs(protocol): document alarm_fired SessionUpdate + DurableEvent (PRI-1744)"
-```
-
----
-
-### Task 27: Feature doc for alarms
+### Task 32: `docs/features/alarms.md`
 
 **Files:**
-- Create: `docs/features/alarms.md`
+- Create: `docs/features/alarms.md` (lace worktree)
 
-- [ ] **Step 1:** Create `docs/features/alarms.md`:
+- [ ] **Step 1:** Create the file:
 
 ```markdown
 # Alarms
 
-Lace agents can schedule alarms that wake them with a prompt at a future time, either as a cron-recurring schedule or as a one-shot. Alarms are owned per-session: each session has its own `alarms.jsonl` next to `events.jsonl`.
+Lace agents can schedule alarms that wake them with a prompt at a future time, either as a cron-recurring schedule or as a one-shot. Alarms are owned per-session: each session has its own `alarms.json` next to `events.jsonl`.
 
 ## Tools
 
@@ -2719,48 +2767,105 @@ Three built-in tools, available to every persona that includes lace built-ins:
 | `cancel_alarm` | Cancel a pending alarm by id |
 | `list_alarms` | List pending/firing alarms for the current session |
 
-`schedule_alarm` parameters:
+### `schedule_alarm` parameters
 
 - `kind`: `'cron'` or `'once'`
-- `schedule`: cron expression (`0 9 * * *`) or ISO-8601 (`2030-01-01T09:00:00Z`)
+- `schedule`: cron expression (`0 9 * * *`, min interval 1 hour) or ISO-8601 timestamp (`2030-01-01T09:00:00Z`)
 - `prompt`: text the alarm fires with — what the agent's future self should be told
-- `timezone`: IANA tz name (required for cron; defaults to UTC for one-shot)
-- `ifSessionEnded`: `'drop'` (default), `'wake'`, or `'bubble'` — see below
+- `timezone`: IANA name (required for cron; defaults to UTC for one-shot)
 
 Cap: 50 active alarms per session.
 
-## `ifSessionEnded`
+## Fire path
 
-What happens when the alarm fires but the session that scheduled it is gone (its dir was removed):
+When an alarm fires, lace writes a `context_injected` durable event with `priority='immediate'` to the session's `events.jsonl`. The content is a `<notification kind="alarm-fired" alarm-id="...">…</notification>` block. The conversation runner's existing immediate-inject pickup folds it into the next turn as a `role: 'user'` message.
 
-- `drop` (default): discard the fire silently. Valid for any session.
-- `wake`: re-spawn the subagent that scheduled the alarm. **Subagent-only.** Top-level sessions reject `wake` at schedule time.
-- `bubble`: deliver the fire to the parent session. **Subagent-only.** Top-level sessions reject `bubble` at schedule time.
+If the agent is idle when the alarm fires, lace triggers an internal turn so the agent processes the notification immediately.
 
-For subagent sessions, the persona spec and parent lineage are captured at schedule time, so a subsequent wake works even if the original parent has rotated through compaction.
+## Lifetime
 
-## Fire delivery
+Alarms fire only while the owning lace process is alive. There is no cross-process scheduler. Subagent alarms fire only while the subagent's lace process is running. On graceful subagent shutdown with pending alarms, lace writes a `<notification kind="subagent-exited">` block into the parent session — see [notifications.md](./notifications.md).
 
-When an alarm fires, lace:
+## Storage
 
-1. Appends an `alarm_fired` event to the target session's `events.jsonl` (durable).
-2. Emits a `session/update` notification with the same payload, if the target session is active.
-
-The embedder consumes alarm fires through the normal `onSessionUpdate` stream — no separate subscription primitive. If the session is inactive when the fire happens, the event sits in `events.jsonl` and lace emits the `session/update` the next time the session becomes active (via `session/load` or `session/resume`).
+`<LACE_DIR>/agent-sessions/<sessionId>/alarms.json` — single JSON snapshot, atomically rewritten via `atomicWriteJson` on every state change. Bounded (~10 KB at the 50-alarm cap). Boot recovery reads the file and rebuilds the in-memory min-heap.
 ```
 
 - [ ] **Step 2:** Commit.
 
 ```bash
+cd /Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/lace-worktrees/pri-1744-alarms-spec
 git add docs/features/alarms.md
-git commit -m "docs(features): alarm tool surface and ifSessionEnded semantics (PRI-1744)"
+git commit -m "docs(features): alarm tool surface and storage (PRI-1744)"
 ```
 
 ---
 
-## Phase 9 — Final verification
+### Task 33: `docs/features/notifications.md`
 
-### Task 28: Lace full test sweep
+**Files:**
+- Create: `docs/features/notifications.md`
+
+- [ ] **Step 1:** Create the file:
+
+```markdown
+# Notifications
+
+Lace delivers agent-facing notifications (alarm fires, background job lifecycle, subagent exit) through a single utility, `injectNotification`, that writes a `context_injected` durable event with `priority='immediate'`. The conversation runner picks it up at the next turn boundary as a `role: 'user'` message.
+
+## Shape
+
+All notifications share one wrapper:
+
+```
+<notification kind="..." [identifier-attributes]>
+body prose
+</notification>
+```
+
+- `kind`: discriminator (see "Kinds" below).
+- Identifier attributes: machine-parseable identifiers (`alarm-id`, `job-id`, `subagent-session-id`, `persona`).
+- Body: prose, not labeled fields. Lists in body get a short prose preamble plus indented bullets. End with the next-step tool-call hint when applicable.
+
+## Kinds
+
+| `kind` | Identifiers | Composer |
+| --- | --- | --- |
+| `alarm-fired` | `alarm-id` | `composeAlarmFiredBody` |
+| `job-completed` | `job-id` | `composeJobCompletedBody` |
+| `job-failed` | `job-id` | `composeJobFailedBody` |
+| `job-cancelled` | `job-id` | `composeJobCancelledBody` |
+| `job-progress` | `job-id` | `composeJobProgressBody` |
+| `subagent-exited` | `subagent-session-id`, `job-id`, `persona` | `composeSubagentExitedBody` |
+
+## Adding a new kind
+
+1. Add the kind to `NotificationKind` in `packages/agent/src/notifications/notification-wrapper.ts`.
+2. Add a composer to `packages/agent/src/notifications/composers.ts` returning the prose body.
+3. Add a snapshot test to `packages/agent/src/notifications/__tests__/composers.test.ts`.
+4. Call `injectNotification({ kind, identifiers, body })` from the producing module.
+
+## Body example
+
+```
+<notification kind="job-completed" job-id="job_xyz">
+Your background job completed successfully (exit code 0) after 12.3 seconds, writing 15,234 bytes of output. The last line was: "build finished in 5.2s". Call job_output(jobId="job_xyz") to read the full output. To continue this conversation thread, call delegate(resume="job_xyz", prompt="your message").
+</notification>
+```
+```
+
+- [ ] **Step 2:** Commit.
+
+```bash
+git add docs/features/notifications.md
+git commit -m "docs(features): unified notification shape and composer pattern (PRI-1744)"
+```
+
+---
+
+## Phase 11 — Final verification
+
+### Task 34: Lace full sweep
 
 - [ ] **Step 1:**
 
@@ -2768,79 +2873,68 @@ git commit -m "docs(features): alarm tool surface and ifSessionEnded semantics (
 cd /Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/lace-worktrees/pri-1744-alarms-spec
 npm run lint
 npm run test 2>&1 | tail -30
-```
-
-Expected: clean lint, all tests pass.
-
-- [ ] **Step 2:** Push.
-
-```bash
 git push origin pri-1744-alarms-spec
 ```
 
+Expected: lint clean, all tests pass.
+
 ---
 
-### Task 29: Sen-core full test sweep + push
+### Task 35: Sen-core full sweep (already done in Task 31; confirm push)
 
 - [ ] **Step 1:**
 
 ```bash
 cd /Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/sen-core-v2
-npm run lint
-npm run test 2>&1 | tail -30
+git status
+git log --oneline origin/main..HEAD
 ```
 
-Expected: clean lint, all tests pass.
-
-- [ ] **Step 2:** Push.
-
-```bash
-git push -u origin pri-1744-alarms-in-lace
-```
+Expected: single commit, pushed.
 
 ---
 
-### Task 30: Cross-repo smoke (manual)
+### Task 36: Cross-repo smoke (manual)
 
-- [ ] **Step 1:** Rebuild lace; run sen-core against the rebuilt lace agent.
+- [ ] **Step 1:** Rebuild lace and run sen-core against it:
 
 ```bash
 cd /Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/lace-worktrees/pri-1744-alarms-spec
 npm run build
 
 cd /Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/sen-core-v2
-SEN_LACE_PATH=/Users/jesse/Documents/GitHub/prime-radiant-inc/sen2/lace-worktrees/pri-1744-alarms-spec/packages/agent/dist/main.js \
-  npm run dev   # or whatever boot recipe sen-core uses
+# Run sen-core however the existing dev recipe spawns it, pointing SEN_LACE_PATH
+# at the rebuilt lace.
 ```
 
-In a separate terminal, ask Ada (via her usual Slack channel or `sen prompt`):
+- [ ] **Step 2:** From the operator side (Slack DM or `sen prompt`):
 
 > Schedule an alarm 60 seconds from now that says "ping".
 
-After 60s, verify the alarm fires (Ada wakes and responds in Slack).
+After ~60s, verify Ada wakes and acknowledges the alarm. Check Ada's session `events.jsonl` for the `<notification kind="alarm-fired">` block.
 
-- [ ] **Step 2:** If anything is wrong, the e2e tests should have caught it. Fall back to fixing tests + code, not papering over.
+- [ ] **Step 3:** Verify a delegate sub-job's completion produces a `<notification kind="job-completed">` block (not the old `<background-job-notification>`).
 
-- [ ] **Step 3:** Tag the lace and sen-core commits as complete in the PR descriptions.
+- [ ] **Step 4:** Verify a subagent that schedules an alarm and then exits cleanly produces a `<notification kind="subagent-exited">` in the parent's events.jsonl.
+
+If any step fails, fix in code + tests; don't paper over.
 
 ---
 
 ## Spec coverage check (self-review)
 
-Every section of the spec is covered:
+- **Per-session snapshot storage** → Tasks 6, 8.
+- **Per-process scheduler** → Task 9.
+- **No if_session_ended** → Tasks 12 (schedule_alarm), 13, 14.
+- **`injectNotification` writes context_injected priority='immediate'** → Task 3.
+- **Unified `<notification>` shape** → Tasks 1, 2.
+- **Runner picks up between-turn injections** → Tasks 4, 5.
+- **`subagent-exited` courtesy bubble** → Task 17.
+- **`SessionMeta.parent`** → Tasks 10, 11.
+- **Sen-core deletions (alarms + InboundAlarm + envelope + dispatcher + persona MCP)** → Tasks 26–30.
+- **Job notification refactor → composers + injectNotification** → Tasks 18, 19.
+- **Ent-protocol minimal change (only optional `parent` on `session/new`)** → Task 11.
+- **Docs (alarms + notifications)** → Tasks 32, 33.
+- **Tests (unit + e2e)** → Tasks 1–4, 8, 9, 12–14, 20–25.
 
-- **Per-session storage** → Task 3 (AlarmStore), Task 13 (scheduler reads `agent-sessions/<id>/alarms.jsonl`).
-- **Boot recovery** → Task 4 (`loadAll`, stale sweep).
-- **Scheduler loop** → Task 4.
-- **Fire delivery (active + inactive)** → Task 4, Task 14 (flush on activate).
-- **`alarm_fired` DurableEvent + SessionUpdate** → Tasks 5–6.
-- **`ifSessionEnded`** → Tasks 1, 9 (validation), 15 (wake), 4 (bubble routing).
-- **Subagent parent linkage** → Tasks 7–8.
-- **Tool surface** → Tasks 9–12.
-- **Sen-core deletions** → Task 23.
-- **Sen-core alarm_fired handler** → Task 24.
-- **Persona MCP cleanup** → Task 25.
-- **Docs** → Tasks 26–27.
-- **Tests (unit + e2e)** → Tasks 3, 4, 9, 10, 11, 16–22, 24.
-
-No placeholders, no "TBD". Names referenced across tasks (`AlarmStore`, `AlarmScheduler`, `storeFor`, `enqueue`, `flushUndelivered`, `spawnSubagentForWake`, `createWakeJob`, `WakeInvalidForTopLevel`, `BubbleInvalidForTopLevel`, `WakeRequiresPersonaRuntime`) match across definitions and usages.
+No placeholders. Names used across tasks (`AlarmStore`, `AlarmScheduler`, `injectNotification`, `buildNotification`, `composeAlarmFiredBody`/`composeJobCompletedBody`/etc., `ensureAlarmSchedulerForActiveSession`, `emitSubagentExitedIfNeeded`, `findLastTurnEndEventSeq`, `fanoutToInject`) are consistent across definitions and references.
