@@ -24,19 +24,6 @@ export interface ToolContext {
   // Environment variables for subprocess execution
   processEnv?: NodeJS.ProcessEnv;
 
-  // Workspace information - provided by ToolExecutor to avoid circular dependencies
-  workspaceInfo?: {
-    sessionId: string;
-    projectDir: string;
-    clonePath: string;
-    containerId: string;
-    state: string;
-    containerMountPath?: string;
-    branchName?: string;
-  };
-
-  // Implemented by the agent runtime from its history
-  hasFileBeenRead?: (path: string) => boolean;
   runtime?: ToolRuntime;
   runtimeBinding?: RuntimeExecutionBinding;
   hasRuntimeFileBeenRead?: (path: RuntimePath) => boolean;

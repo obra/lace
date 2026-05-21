@@ -25,7 +25,6 @@ describe('FileEditTool actual file modification', () => {
   function createToolContext(): ToolContext {
     return {
       signal: new AbortController().signal,
-      hasFileBeenRead: () => true,
       runtime: new HostToolRuntime({
         id: `rt_file_edit_actual_test_${runtimeId++}`,
         cwd: testDir,

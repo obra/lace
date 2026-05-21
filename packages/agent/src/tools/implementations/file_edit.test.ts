@@ -17,7 +17,7 @@ describe('FileEditTool Integration Tests', () => {
   let context: ToolContext;
   let testDir: string;
   let testFile: string;
-  let hasFileBeenReadImpl: (path: string) => boolean;
+  let hasRuntimePathBeenRead: (path: string) => boolean;
   let runtimeId = 0;
 
   beforeEach(async () => {
@@ -28,17 +28,16 @@ describe('FileEditTool Integration Tests', () => {
     mkdirSync(testDir, { recursive: true });
 
     // Default: allow edits unless a test overrides this
-    hasFileBeenReadImpl = () => true;
+    hasRuntimePathBeenRead = () => true;
 
     // Default context: no workingDirectory (exercises fallback-to-cwd path behavior)
     context = {
       signal: new AbortController().signal,
-      hasFileBeenRead: (path: string) => hasFileBeenReadImpl(path),
       runtime: new HostToolRuntime({
         id: `rt_file_edit_test_${runtimeId++}`,
         cwd: process.cwd(),
       }),
-      hasRuntimeFileBeenRead: (path) => hasFileBeenReadImpl(path.hostPath ?? path.runtimePath),
+      hasRuntimeFileBeenRead: (path) => hasRuntimePathBeenRead(path.hostPath ?? path.runtimePath),
     };
   });
 
@@ -61,7 +60,7 @@ describe('FileEditTool Integration Tests', () => {
     it('should require file to be read before editing', async () => {
       await writeFile(testFile, 'original content');
 
-      hasFileBeenReadImpl = () => false;
+      hasRuntimePathBeenRead = () => false;
 
       // Try to edit without reading first
       const result = await tool.execute(
@@ -85,7 +84,7 @@ describe('FileEditTool Integration Tests', () => {
     it('should allow edit after file has been read', async () => {
       await writeFile(testFile, 'original content');
 
-      // hasFileBeenRead is mocked to return true in beforeEach
+      // Runtime read tracking is mocked to return true in beforeEach
       // so edit should work
       const result = await tool.execute(
         {
@@ -131,7 +130,7 @@ describe('FileEditTool Integration Tests', () => {
       await writeFile(testFile2, 'content2');
 
       // Mock to say only testFile has been read, not testFile2
-      hasFileBeenReadImpl = (path: string) => path === testFile;
+      hasRuntimePathBeenRead = (path: string) => path === testFile;
 
       // Should work for testFile (marked as read)
       await writeFile(testFile, 'content1');

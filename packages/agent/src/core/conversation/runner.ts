@@ -1059,7 +1059,6 @@ export class ConversationRunner {
         runtimeBinding,
         toolTempRoot: join(this.config.sessionDir, 'tool-temp'),
         processEnv: envOverlay,
-        hasFileBeenRead: (p: string) => filesRead.has(isAbsolutePath(p) ? p : resolvePath(cwd, p)),
         hasRuntimeFileBeenRead: (path) =>
           runtimeFileAccessTracker.hasRead(path, runtime.paths.canonicalKey(path)),
         markFileRead: markRuntimeFileRead,

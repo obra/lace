@@ -25,7 +25,6 @@ describe('FileEditTool context extraction', () => {
   function createToolContext(): ToolContext {
     return {
       signal: new AbortController().signal,
-      hasFileBeenRead: () => true,
       runtime: new HostToolRuntime({
         id: `rt_file_edit_context_test_${runtimeId++}`,
         cwd: testDir,

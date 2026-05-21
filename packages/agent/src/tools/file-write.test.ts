@@ -29,7 +29,6 @@ describe('FileWriteTool with schema validation', () => {
 
     return {
       signal: new AbortController().signal,
-      hasFileBeenRead: () => true,
       runtime,
       hasRuntimeFileBeenRead: () => true,
       ...overrides,
