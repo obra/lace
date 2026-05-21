@@ -52,11 +52,18 @@ export function createQueueJobNotification(
       reason: options?.reason,
     });
 
-    state.jobManager.queueNotification({
+    const notification = {
       jobId: job.jobId,
       type,
       content,
       createdAt: Date.now(),
+    };
+
+    // Route through the subscription registry. Subscribers to (jobId, type)
+    // receive a queued notification each; jobs with NO subscriptions fall
+    // back to the always-on queue-push (PRI-1692 Phase 1 back-compat).
+    state.jobManager.fanout(job.jobId, type, notification, (n) => {
+      state.jobManager.queueNotification(n);
     });
 
     // If agent is idle (no active turn), trigger an internal turn to process notifications

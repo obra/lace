@@ -4,7 +4,13 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type { JobState, JobStatus, JobType, PendingJobNotification } from '../server-types';
+import type {
+  JobState,
+  JobStatus,
+  JobType,
+  JobNotificationType,
+  PendingJobNotification,
+} from '../server-types';
 import { MAX_CONCURRENT_JOBS } from '../server-types';
 import type { PersonaContainerRuntime, PersonaBoxRuntime } from './persona-container-spec';
 import { toNonEmptyString } from '../rpc/utils';
@@ -80,12 +86,35 @@ type JobsCache = {
   result: JobRecord[];
 };
 
+/**
+ * A subscription registered via `job_notify`. Tracks which lifecycle kinds
+ * the parent wants to be woken on for a given jobId.
+ *
+ * Phase 1 of PRI-1692: subscriptions exist for the four
+ * `JobNotificationType` kinds. `filter` is accepted but no-op on terminal
+ * states (Phase 2 will use it for progress / per-line subscriptions).
+ */
+export type JobSubscription = {
+  subscriptionId: string;
+  jobId: string;
+  on: readonly JobNotificationType[];
+  filter?: string;
+};
+
+export type SubscribeOptions = {
+  jobId: string;
+  on: readonly JobNotificationType[];
+  filter?: string;
+};
+
 export class JobManager {
   private jobs = new Map<string, JobState>();
   private streamingMode: 'full' | 'coalesced' | 'none' = 'full';
   private notificationQueue: PendingJobNotification[] = [];
   private deps: JobManagerDeps;
   private listJobsCache: JobsCache | null = null;
+  private subscriptions = new Map<string, JobSubscription>();
+  private subscriptionsByJob = new Map<string, Set<string>>();
 
   constructor(deps: JobManagerDeps) {
     this.deps = deps;
@@ -318,6 +347,104 @@ export class JobManager {
    */
   queueNotification(notification: PendingJobNotification): void {
     this.notificationQueue.push(notification);
+  }
+
+  /**
+   * Register a subscription so the parent agent is woken when this job
+   * transitions to one of the listed lifecycle kinds. Idempotent: a second
+   * call with the same args returns the existing subscription.
+   *
+   * Once a job has at least one subscription, terminal-state notifications
+   * are routed through `fanout()` instead of the always-on queue-push.
+   * Subscribing to `on=['failed']` and watching a job complete successfully
+   * therefore produces NO notification — "silence is not success" is the
+   * coverage-discipline contract documented in the design.
+   */
+  subscribe(opts: SubscribeOptions): JobSubscription {
+    const existing = this.findSubscription(opts);
+    if (existing) return existing;
+
+    const sub: JobSubscription = {
+      subscriptionId: `sub_${randomUUID()}`,
+      jobId: opts.jobId,
+      on: [...opts.on],
+      ...(opts.filter !== undefined ? { filter: opts.filter } : {}),
+    };
+    this.subscriptions.set(sub.subscriptionId, sub);
+    let byJob = this.subscriptionsByJob.get(opts.jobId);
+    if (!byJob) {
+      byJob = new Set();
+      this.subscriptionsByJob.set(opts.jobId, byJob);
+    }
+    byJob.add(sub.subscriptionId);
+    return sub;
+  }
+
+  /**
+   * Remove a subscription. After unsubscribe, a job with no remaining
+   * subscriptions reverts to the back-compat always-on queue-push path.
+   */
+  unsubscribe(subscriptionId: string): void {
+    const sub = this.subscriptions.get(subscriptionId);
+    if (!sub) return;
+    this.subscriptions.delete(subscriptionId);
+    const byJob = this.subscriptionsByJob.get(sub.jobId);
+    if (byJob) {
+      byJob.delete(subscriptionId);
+      if (byJob.size === 0) this.subscriptionsByJob.delete(sub.jobId);
+    }
+  }
+
+  /**
+   * Deliver a job-lifecycle notification.
+   *
+   * If at least one subscription exists for `jobId`, every subscription
+   * whose `on` set contains `kind` gets the notification pushed onto the
+   * agent's notification queue. Subscriptions that don't match `kind` do
+   * NOT deliver — the parent opted into selective coverage.
+   *
+   * If no subscription exists for `jobId`, the `fallback` is invoked. The
+   * fallback is the original always-on queue-push behavior, preserved so
+   * unsubscribed jobs still wake the parent on terminal states.
+   */
+  fanout(
+    jobId: string,
+    kind: JobNotificationType,
+    notification: PendingJobNotification,
+    fallback: (notification: PendingJobNotification) => void
+  ): void {
+    const subIds = this.subscriptionsByJob.get(jobId);
+    if (!subIds || subIds.size === 0) {
+      fallback(notification);
+      return;
+    }
+
+    for (const subId of subIds) {
+      const sub = this.subscriptions.get(subId);
+      if (!sub) continue;
+      if (!sub.on.includes(kind)) continue;
+      // Phase 1: filter is accepted but no-op on terminal-state kinds.
+      // Phase 2 will apply filter to 'progress' / per-line subscriptions.
+      this.notificationQueue.push({ ...notification });
+    }
+  }
+
+  /**
+   * Find a subscription whose args match exactly (jobId, on as a set, filter).
+   */
+  private findSubscription(opts: SubscribeOptions): JobSubscription | undefined {
+    const subIds = this.subscriptionsByJob.get(opts.jobId);
+    if (!subIds) return undefined;
+    const wantOn = [...opts.on].sort().join(',');
+    for (const subId of subIds) {
+      const existing = this.subscriptions.get(subId);
+      if (!existing) continue;
+      const haveOn = [...existing.on].sort().join(',');
+      if (haveOn !== wantOn) continue;
+      if ((existing.filter ?? null) !== (opts.filter ?? null)) continue;
+      return existing;
+    }
+    return undefined;
   }
 
   /**
