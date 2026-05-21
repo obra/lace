@@ -359,10 +359,11 @@ export class TestAgentProvider extends AIProvider {
     args: Record<string, unknown>;
   } {
     // Handle "alarm: schedule=<ISO> prompt=<text>" pattern for one-shot alarms.
-    // Must run before the generic "subagent: …" / "delegate …" patterns so a
-    // subagent prompt body of `alarm: schedule=… prompt=…` resolves correctly
-    // inside the subagent process.
-    const alarmMatch = text.match(/alarm:\s*schedule=(\S+)\s+prompt=(.+)\s*$/i);
+    // Anchored at the start of the (trimmed) text so a parent prompt of
+    // `subagent: alarm: schedule=…` correctly delegates first — the subagent
+    // process then sees `alarm: schedule=…` as its turn-1 input and matches
+    // the alarm pattern itself.
+    const alarmMatch = text.trim().match(/^alarm:\s*schedule=(\S+)\s+prompt=(.+)\s*$/i);
     if (alarmMatch) {
       return {
         name: 'schedule_alarm',
