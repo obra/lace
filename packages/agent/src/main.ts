@@ -1,5 +1,10 @@
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
-import { createAgentServerState, registerAgentRpcMethods } from './server';
+import {
+  createAgentServerState,
+  registerAgentRpcMethods,
+  shutdownAlarms,
+  emitSubagentExitedIfNeeded,
+} from './server';
 import { getLaceDir } from '@lace/agent/config/lace-dir';
 import { PassThrough, Writable } from 'stream';
 import * as fs from 'fs';
@@ -76,6 +81,12 @@ let shuttingDown = false;
 const shutdown = async () => {
   if (shuttingDown) return;
   shuttingDown = true;
+  try {
+    await shutdownAlarms(state);
+    emitSubagentExitedIfNeeded(state);
+  } catch {
+    // Best-effort; never block process exit on alarm bookkeeping.
+  }
   peer.close();
   await state.mcpServerManager.shutdown();
   process.exit(0);

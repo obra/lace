@@ -38,9 +38,15 @@ import {
 import { toolKindFromName } from './rpc/utils';
 import { requestPermissionFromClient, reissuePendingPermissionRequests } from './rpc/permissions';
 import { registerAllHandlers } from './rpc/register-handlers';
+import { join } from 'node:path';
 import { AlarmScheduler } from './alarms/alarm-scheduler';
 import { AlarmStore } from './alarms/alarm-store';
-import { injectNotification, composeAlarmFiredBody } from './notifications';
+import {
+  injectNotification,
+  composeAlarmFiredBody,
+  composeSubagentExitedBody,
+} from './notifications';
+import { agentSessionsDir } from './storage/session-store';
 import { logger } from './utils/logger';
 
 // Re-export public API from message-builder for backwards compatibility
@@ -208,6 +214,55 @@ export function ensureAlarmSchedulerForActiveSession(
     },
   });
   void state.alarmScheduler.start();
+}
+
+/**
+ * Stop the per-process AlarmScheduler if one is bound.
+ * Called from the process shutdown handler so the loop's setTimeout
+ * and AbortController are torn down before exit.
+ */
+export async function shutdownAlarms(state: AgentServerState): Promise<void> {
+  if (state.alarmScheduler) {
+    await state.alarmScheduler.stop();
+    state.alarmScheduler = undefined;
+  }
+}
+
+/**
+ * On graceful subagent shutdown, write a `subagent-exited` notification
+ * into the PARENT session's events.jsonl if the subagent still had
+ * pending alarms that won't fire now.
+ *
+ * Reads pending rows from the alarms.json snapshot directly (the
+ * scheduler is already stopped at this point). No idle-wake — the
+ * parent agent runs in a separate process.
+ */
+export function emitSubagentExitedIfNeeded(state: AgentServerState): void {
+  if (!state.activeSession) return;
+  const meta = state.activeSession.meta;
+  if (!meta.parent) return;
+  const store = new AlarmStore(state.activeSession.dir);
+  const pending = store.listPending();
+  if (pending.length === 0) return;
+  const parentDir = join(agentSessionsDir(), meta.parent.sessionId);
+  injectNotification({
+    sessionDir: parentDir,
+    kind: 'subagent-exited',
+    identifiers: {
+      'subagent-session-id': meta.sessionId,
+      'job-id': meta.parent.jobId,
+      persona: meta.parent.personaName ?? '',
+    },
+    body: composeSubagentExitedBody({
+      persona: meta.parent.personaName ?? '',
+      pendingAlarms: pending.map((r) => ({
+        id: r.id,
+        kind: r.kind,
+        schedule: r.schedule,
+        prompt: r.prompt,
+      })),
+    }),
+  });
 }
 
 export function invalidateSessionToolExecutor(cache: ToolExecutorCache, sessionId: string): void {
