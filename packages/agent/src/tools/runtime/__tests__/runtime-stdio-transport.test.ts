@@ -5,6 +5,10 @@ import { createFakeRuntime } from './fake-runtime';
 import type { ToolRuntime } from '../types';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 
+vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
+  getDefaultEnvironment: vi.fn(() => ({ HOME: '/host-home', PATH: '/host-bin' })),
+}));
+
 function runtimeWithStdout(chunk: string | Buffer): ToolRuntime {
   const runtime = createFakeRuntime();
   runtime.process.start = vi.fn(async () => ({
@@ -48,6 +52,41 @@ describe('RuntimeStdioClientTransport', () => {
     ).resolves.toEqual({
       jsonrpc: '2.0',
       method: 'notifications/initialized',
+    });
+  });
+
+  it('uses SDK default environment for host-like runtimes', async () => {
+    const runtime = runtimeWithStdout('');
+    const transport = new RuntimeStdioClientTransport({
+      runtime,
+      command: 'node',
+      env: { DECLARED: 'visible' },
+    });
+
+    await transport.start();
+
+    expect(runtime.process.start).toHaveBeenCalledWith(['node'], {
+      cwd: '/runtime',
+      env: { HOME: '/host-home', PATH: '/host-bin', DECLARED: 'visible' },
+      envMode: 'replace',
+    });
+  });
+
+  it('does not inject host SDK defaults into container runtimes', async () => {
+    const runtime = runtimeWithStdout('');
+    Object.assign(runtime, { kind: 'container' });
+    const transport = new RuntimeStdioClientTransport({
+      runtime,
+      command: 'node',
+      env: { DECLARED: 'visible' },
+    });
+
+    await transport.start();
+
+    expect(runtime.process.start).toHaveBeenCalledWith(['node'], {
+      cwd: '/runtime',
+      env: { DECLARED: 'visible' },
+      envMode: 'replace',
     });
   });
 });

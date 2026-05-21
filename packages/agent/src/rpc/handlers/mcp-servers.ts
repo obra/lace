@@ -25,6 +25,10 @@ function isUnsupportedMcpTransport(config: { transport?: string }): boolean {
   return Boolean(config.transport && config.transport !== 'stdio');
 }
 
+function unsupportedMcpTransportError(config: { transport?: string }): string {
+  return `Unsupported MCP transport: ${config.transport}`;
+}
+
 function defaultMcpPlacement(config: MCPServerConfig): MCPServerConfig {
   if (config.placement) return config;
   return {
@@ -191,12 +195,12 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
         state.mcpServerManager.getServer(displacedStdioConnectionKey)?.connectionKey ??
         displacedStdioConnectionKey;
       await state.mcpServerManager.stopServer(stoppedConnectionKey);
-      state.mcpServerManager.replaceStoppedServerConfig(
-        serverId,
-        config,
-        connectionKey,
-        stoppedConnectionKey
-      );
+      state.mcpServerManager.replaceStoppedServerConfig(serverId, config, {
+        desiredConnectionKey: connectionKey,
+        replaceConnectionKey: stoppedConnectionKey,
+        status: 'failed',
+        lastError: unsupportedMcpTransportError(config),
+      });
       logger.warn('Skipping MCP server with unsupported transport', {
         serverId,
         transport: config.transport,
@@ -354,7 +358,11 @@ export function registerMcpHandlers(
     if (enabled && isUnsupportedMcpTransport(config)) {
       const connectionKey = activeSessionConnectionKey(state, serverId, config);
       await state.mcpServerManager.stopServer(serverId);
-      state.mcpServerManager.replaceStoppedServerConfig(serverId, config, connectionKey);
+      state.mcpServerManager.replaceStoppedServerConfig(serverId, config, {
+        desiredConnectionKey: connectionKey,
+        status: 'failed',
+        lastError: unsupportedMcpTransportError(config),
+      });
       logger.warn('Skipping MCP server with unsupported transport', {
         serverId,
         transport: config.transport,

@@ -102,6 +102,30 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
+  it('honors replace-mode process env without descriptor env', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    projectedDescriptor.spec.env = { DESCRIPTOR_ONLY: 'hidden' };
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], {
+      cwd: runtime.cwd,
+      env: { MCP_ONLY: 'visible' },
+      envMode: 'replace',
+    });
+
+    expect(manager.execStream).toHaveBeenCalledWith(
+      'projected-runtime',
+      expect.objectContaining({
+        environment: { MCP_ONLY: 'visible' },
+      })
+    );
+  });
+
   it('kills the container process when aborted while execStream is starting', async () => {
     const containerHandle = createFakeExecStreamHandle();
     let resolveExecStream!: (handle: typeof containerHandle) => void;

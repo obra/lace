@@ -16,6 +16,13 @@ export interface StartMCPServerInput {
   hostCwd?: string;
 }
 
+interface ReplaceStoppedServerConfigOptions {
+  desiredConnectionKey?: string;
+  replaceConnectionKey?: string;
+  status?: 'stopped' | 'failed';
+  lastError?: string;
+}
+
 export function mcpConnectionKey(input: {
   serverId: string;
   config: Pick<MCPServerConfig, 'placement' | 'transport'>;
@@ -25,11 +32,14 @@ export function mcpConnectionKey(input: {
 }): string {
   const placement = input.config.placement ?? 'host';
   const transport = input.config.transport ?? 'stdio';
-  const placementScope =
-    placement === 'toolRuntime'
-      ? `${input.runtimeId}:${input.runtimeCwd ?? ''}`
-      : `${input.runtimeId}:${input.hostCwd ?? ''}`;
-  return `${input.serverId}:${placement}:${transport}:${placementScope}`;
+  const effectiveCwd = placement === 'toolRuntime' ? input.runtimeCwd : input.hostCwd;
+  return JSON.stringify([
+    input.serverId,
+    placement,
+    transport,
+    input.runtimeId,
+    effectiveCwd ?? '',
+  ]);
 }
 
 export class MCPServerManager extends EventEmitter {
@@ -198,10 +208,11 @@ export class MCPServerManager extends EventEmitter {
   replaceStoppedServerConfig(
     serverId: string,
     config: MCPServerConfig,
-    desiredConnectionKey?: string,
-    replaceConnectionKey?: string
+    options: ReplaceStoppedServerConfigOptions = {}
   ): void {
-    const replacement = replaceConnectionKey ? this.servers.get(replaceConnectionKey) : undefined;
+    const replacement = options.replaceConnectionKey
+      ? this.servers.get(options.replaceConnectionKey)
+      : undefined;
     const connections = replacement ? [replacement] : this.resolveConnections(serverId);
     let primary: MCPServerConnection | undefined;
 
@@ -217,21 +228,28 @@ export class MCPServerManager extends EventEmitter {
 
       primary = connection;
       connection.config = config;
-      if (desiredConnectionKey && desiredConnectionKey !== connection.connectionKey) {
+      connection.status = options.status ?? 'stopped';
+      connection.lastError = options.lastError;
+      if (
+        options.desiredConnectionKey &&
+        options.desiredConnectionKey !== connection.connectionKey
+      ) {
         this.servers.delete(connection.connectionKey);
-        connection.connectionKey = desiredConnectionKey;
-        this.servers.set(desiredConnectionKey, connection);
+        connection.connectionKey = options.desiredConnectionKey;
+        this.servers.set(options.desiredConnectionKey, connection);
       }
     }
 
-    if (!primary && desiredConnectionKey) {
-      this.servers.set(desiredConnectionKey, {
+    if (!primary && options.desiredConnectionKey) {
+      const status = options.status ?? 'stopped';
+      this.servers.set(options.desiredConnectionKey, {
         id: serverId,
-        connectionKey: desiredConnectionKey,
+        connectionKey: options.desiredConnectionKey,
         config,
-        status: 'stopped',
+        status,
+        ...(options.lastError ? { lastError: options.lastError } : {}),
       });
-      this.emit('server-status-changed', serverId, 'stopped', desiredConnectionKey);
+      this.emit('server-status-changed', serverId, status, options.desiredConnectionKey);
     }
   }
 

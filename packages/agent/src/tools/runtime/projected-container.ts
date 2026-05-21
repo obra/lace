@@ -457,7 +457,10 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
         opts.cwd ?? this.descriptor.cwd,
         this.descriptor.cwd
       ),
-      environment: definedEnvironment(this.descriptor.spec.env, opts.env),
+      environment: definedEnvironment(
+        opts.envMode === 'replace' ? undefined : this.descriptor.spec.env,
+        opts.env
+      ),
     };
   }
 

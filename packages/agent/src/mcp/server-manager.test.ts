@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { MCPServerManager } from './server-manager';
+import { MCPServerManager, mcpConnectionKey } from './server-manager';
 import type { MCPServerConfig } from './types';
 import { RuntimeStdioClientTransport } from '../tools/runtime/runtime-stdio-transport';
 import { createFakeRuntime } from '../tools/runtime/__tests__/fake-runtime';
@@ -95,7 +95,14 @@ describe('MCPServerManager', () => {
     expect(server?.status).toBe('running');
     expect(server?.client).toBeDefined();
     expect(server?.transport).toBeDefined();
-    expect(server?.connectionKey).toBe('test:host:stdio:rt_fake:/test/dir');
+    expect(server?.connectionKey).toBe(
+      mcpConnectionKey({
+        serverId: 'test',
+        config,
+        runtimeId: 'rt_fake',
+        hostCwd: '/test/dir',
+      })
+    );
   });
 
   it('should handle connection errors', async () => {
@@ -214,8 +221,20 @@ describe('MCPServerManager', () => {
 
     const servers = manager.getAllServers();
     expect(servers.map((server) => server.connectionKey).sort()).toEqual([
-      'shared:host:stdio:rt_fake:/host/project',
-      'shared:toolRuntime:stdio:rt_projected:/runtime/project',
+      mcpConnectionKey({
+        serverId: 'shared',
+        config: { ...config, placement: 'host' },
+        runtimeId: 'rt_fake',
+        runtimeCwd: '/runtime',
+        hostCwd: '/host/project',
+      }),
+      mcpConnectionKey({
+        serverId: 'shared',
+        config: { ...config, placement: 'toolRuntime' },
+        runtimeId: 'rt_projected',
+        runtimeCwd: '/runtime/project',
+        hostCwd: '/host/project',
+      }),
     ]);
     expect(servers).toHaveLength(2);
     expect(manager.getServer('shared')).toBeUndefined();
@@ -253,9 +272,39 @@ describe('MCPServerManager', () => {
         .map((server) => server.connectionKey)
         .sort()
     ).toEqual([
-      'shared-runtime:toolRuntime:stdio:rt_shared:/runtime/one',
-      'shared-runtime:toolRuntime:stdio:rt_shared:/runtime/two',
+      mcpConnectionKey({
+        serverId: 'shared-runtime',
+        config,
+        runtimeId: 'rt_shared',
+        runtimeCwd: '/runtime/one',
+        hostCwd: '/host/project',
+      }),
+      mcpConnectionKey({
+        serverId: 'shared-runtime',
+        config,
+        runtimeId: 'rt_shared',
+        runtimeCwd: '/runtime/two',
+        hostCwd: '/host/project',
+      }),
     ]);
+  });
+
+  it('keeps structured connection keys collision-free when fields contain colons', () => {
+    expect(
+      mcpConnectionKey({
+        serverId: 'shared',
+        config: { placement: 'toolRuntime', transport: 'stdio' },
+        runtimeId: 'rt:a',
+        runtimeCwd: 'b:/work',
+      })
+    ).not.toBe(
+      mcpConnectionKey({
+        serverId: 'shared',
+        config: { placement: 'toolRuntime', transport: 'stdio' },
+        runtimeId: 'rt:a:b',
+        runtimeCwd: '/work',
+      })
+    );
   });
 
   it('uses runtime stdio transport for runtime placement and SDK stdio for host placement', async () => {

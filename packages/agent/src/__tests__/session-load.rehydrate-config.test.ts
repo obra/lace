@@ -13,6 +13,7 @@ import { loadSession, writeSessionState } from '../storage/session-store';
 import { reconcileMcpServersForActiveSession } from '../rpc/handlers/mcp-servers';
 import type { JobState } from '../server-types';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
+import { mcpConnectionKey } from '../mcp/server-manager';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -63,6 +64,33 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         ...loaded.state.config,
         runtimeBinding,
       },
+    });
+  }
+
+  function activeHostMcpConnectionKey(
+    serverId: string,
+    transport: 'stdio' | 'http' | 'sse',
+    sessionId: string
+  ): string {
+    return mcpConnectionKey({
+      serverId,
+      config: { placement: 'host', transport },
+      runtimeId: `session:${sessionId}:host`,
+      hostCwd: tempDir,
+    });
+  }
+
+  function activeToolRuntimeMcpConnectionKey(
+    serverId: string,
+    transport: 'stdio' | 'http' | 'sse',
+    sessionId: string
+  ): string {
+    return mcpConnectionKey({
+      serverId,
+      config: { placement: 'toolRuntime', transport },
+      runtimeId: `session:${sessionId}:host`,
+      runtimeCwd: tempDir,
+      hostCwd: tempDir,
     });
   }
 
@@ -443,12 +471,14 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     ]);
     expect(loadState.mcpServerManager.getServer('http-server')).toMatchObject({
       id: 'http-server',
-      status: 'stopped',
+      status: 'failed',
+      lastError: 'Unsupported MCP transport: http',
       config: expect.objectContaining({ transport: 'http', placement: 'host' }),
     });
     expect(loadState.mcpServerManager.getServer('sse-server')).toMatchObject({
       id: 'sse-server',
-      status: 'stopped',
+      status: 'failed',
+      lastError: 'Unsupported MCP transport: sse',
       config: expect.objectContaining({ transport: 'sse', placement: 'host' }),
     });
   });
@@ -578,7 +608,11 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         mcpServers: [],
       })) as { sessionId: string };
 
-      const hostStdioKey = `remote-server:host:stdio:session:${state.activeSession!.meta.sessionId}:host:${tempDir}`;
+      const hostStdioKey = activeHostMcpConnectionKey(
+        'remote-server',
+        'stdio',
+        state.activeSession!.meta.sessionId
+      );
       state.mcpServerManager.registerConnection('remote-server', {
         id: 'remote-server',
         connectionKey: hostStdioKey,
@@ -608,7 +642,10 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         },
       ]);
       expect(stopServer).toHaveBeenCalledWith('remote-server');
-      expect(state.mcpServerManager.getServer('remote-server')?.status).toBe('stopped');
+      expect(state.mcpServerManager.getServer('remote-server')?.status).toBe('failed');
+      expect(state.mcpServerManager.getServer('remote-server')?.lastError).toBe(
+        `Unsupported MCP transport: ${transport}`
+      );
       expect(startServer).not.toHaveBeenCalled();
     }
   );
@@ -647,7 +684,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
   );
 
   it.each(['http', 'sse'] as const)(
-    'represents a fresh unsupported %s MCP transport as stopped for list and test',
+    'represents a fresh unsupported %s MCP transport as failed for list and test',
     async (transport) => {
       const state = createAgentServerState();
       const startServer = vi
@@ -669,19 +706,21 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       });
 
       const server = state.mcpServerManager.getServer('remote-server');
-      expect(server?.status).toBe('stopped');
+      expect(server?.status).toBe('failed');
+      expect(server?.lastError).toBe(`Unsupported MCP transport: ${transport}`);
       expect(server?.config.transport).toBe(transport);
       expect(server?.connectionKey).toBe(
-        `remote-server:host:${transport}:session:${state.activeSession!.meta.sessionId}:host:${tempDir}`
+        activeHostMcpConnectionKey('remote-server', transport, state.activeSession!.meta.sessionId)
       );
 
       const list = (await client.request('ent/mcp/servers/list', {})) as {
-        servers: Array<{ serverId: string; status: string }>;
+        servers: Array<{ serverId: string; status: string; lastError?: string }>;
       };
       expect(list.servers).toEqual([
         expect.objectContaining({
           serverId: 'remote-server',
-          status: 'stopped',
+          status: 'failed',
+          lastError: `Unsupported MCP transport: ${transport}`,
         }),
       ]);
 
@@ -743,7 +782,11 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         mcpServers: [],
       });
 
-      const hostStdioKey = `remote-server:host:stdio:session:${state.activeSession!.meta.sessionId}:host:${tempDir}`;
+      const hostStdioKey = activeHostMcpConnectionKey(
+        'remote-server',
+        'stdio',
+        state.activeSession!.meta.sessionId
+      );
       state.mcpServerManager.registerConnection('remote-server', {
         id: 'remote-server',
         connectionKey: hostStdioKey,
@@ -765,7 +808,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       startServer.mockClear();
       expect(state.mcpServerManager.getServer('remote-server')?.config.transport).toBe(transport);
       expect(state.mcpServerManager.getServer('remote-server')?.connectionKey).toBe(
-        `remote-server:host:${transport}:session:${state.activeSession!.meta.sessionId}:host:${tempDir}`
+        activeHostMcpConnectionKey('remote-server', transport, state.activeSession!.meta.sessionId)
       );
 
       const result = (await client.request('ent/mcp/servers/test', {
@@ -795,7 +838,11 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         mcpServers: [],
       });
 
-      const runtimeStdioKey = `remote-server:toolRuntime:stdio:session:${state.activeSession!.meta.sessionId}:host:${tempDir}`;
+      const runtimeStdioKey = activeToolRuntimeMcpConnectionKey(
+        'remote-server',
+        'stdio',
+        state.activeSession!.meta.sessionId
+      );
       state.mcpServerManager.registerConnection('remote-server', {
         id: 'remote-server',
         connectionKey: runtimeStdioKey,
@@ -816,9 +863,16 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         enabled: true,
       });
 
-      const hostUnsupportedKey = `remote-server:host:${transport}:session:${state.activeSession!.meta.sessionId}:host:${tempDir}`;
+      const hostUnsupportedKey = activeHostMcpConnectionKey(
+        'remote-server',
+        transport,
+        state.activeSession!.meta.sessionId
+      );
       expect(state.mcpServerManager.getServer(runtimeStdioKey)).toBeUndefined();
-      expect(state.mcpServerManager.getServer(hostUnsupportedKey)?.status).toBe('stopped');
+      expect(state.mcpServerManager.getServer(hostUnsupportedKey)?.status).toBe('failed');
+      expect(state.mcpServerManager.getServer(hostUnsupportedKey)?.lastError).toBe(
+        `Unsupported MCP transport: ${transport}`
+      );
       expect(state.mcpServerManager.getServer(hostUnsupportedKey)?.config.transport).toBe(
         transport
       );
@@ -842,7 +896,11 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         mcpServers: [],
       });
 
-      const hostStdioKey = `remote-server:host:stdio:session:${state.activeSession!.meta.sessionId}:host:${tempDir}`;
+      const hostStdioKey = activeHostMcpConnectionKey(
+        'remote-server',
+        'stdio',
+        state.activeSession!.meta.sessionId
+      );
       state.mcpServerManager.registerConnection('remote-server', {
         id: 'remote-server',
         connectionKey: hostStdioKey,
@@ -876,7 +934,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       startServer.mockClear();
       expect(state.mcpServerManager.getServer('remote-server')?.config.transport).toBe(transport);
       expect(state.mcpServerManager.getServer('remote-server')?.connectionKey).toBe(
-        `remote-server:host:${transport}:session:${state.activeSession!.meta.sessionId}:host:${tempDir}`
+        activeHostMcpConnectionKey('remote-server', transport, state.activeSession!.meta.sessionId)
       );
 
       const result = (await client.request('ent/mcp/servers/test', {

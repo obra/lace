@@ -19,6 +19,13 @@ function delay(ms: number): Promise<void> {
   });
 }
 
+function defaultEnvironmentForRuntime(runtime: ToolRuntime): NodeJS.ProcessEnv {
+  if (runtime.kind === 'container') {
+    return {};
+  }
+  return getDefaultEnvironment();
+}
+
 export class RuntimeStdioClientTransport implements Transport {
   onclose?: () => void;
   onerror?: (error: Error) => void;
@@ -43,7 +50,10 @@ export class RuntimeStdioClientTransport implements Transport {
         [this.options.command, ...(this.options.args ?? [])],
         {
           cwd: this.options.cwd ?? this.options.runtime.cwd,
-          env: { ...getDefaultEnvironment(), ...(this.options.env ?? {}) },
+          env: {
+            ...defaultEnvironmentForRuntime(this.options.runtime),
+            ...(this.options.env ?? {}),
+          },
           envMode: 'replace',
         }
       );

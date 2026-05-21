@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MCPServerManager } from './server-manager';
+import { MCPServerManager, mcpConnectionKey } from './server-manager';
 import type { MCPServerConfig } from '@lace/agent/config/mcp-types';
 import { reconcileMcpServersForActiveSession } from '../rpc/handlers/mcp-servers';
 import type { AgentServerState } from '../server-types';
@@ -322,7 +322,14 @@ describe.skipIf(skipOnWindows)(
 
       const server = mcpServerManager.getServer('env-dump');
       expect(server?.status).toBe('running');
-      expect(server?.connectionKey).toBe(`env-dump:host:stdio:rt_workspace_reconcile:${tmpRoot}`);
+      expect(server?.connectionKey).toBe(
+        mcpConnectionKey({
+          serverId: 'env-dump',
+          config: { placement: 'host', transport: 'stdio' },
+          runtimeId: 'rt_workspace_reconcile',
+          hostCwd: tmpRoot,
+        })
+      );
     });
 
     it('does not rewrite same-id runtime connection when host placement reconciles to unsupported transport', async () => {
@@ -362,9 +369,25 @@ describe.skipIf(skipOnWindows)(
         },
       });
 
-      const hostStdioKey = `shared:host:stdio:rt_alias_reconcile:${tmpRoot}`;
-      const hostHttpKey = `shared:host:http:rt_alias_reconcile:${tmpRoot}`;
-      const runtimeStdioKey = `shared:toolRuntime:stdio:rt_alias_reconcile:${runtimeCwd}`;
+      const hostStdioKey = mcpConnectionKey({
+        serverId: 'shared',
+        config: { placement: 'host', transport: 'stdio' },
+        runtimeId: 'rt_alias_reconcile',
+        hostCwd: tmpRoot,
+      });
+      const hostHttpKey = mcpConnectionKey({
+        serverId: 'shared',
+        config: { placement: 'host', transport: 'http' },
+        runtimeId: 'rt_alias_reconcile',
+        hostCwd: tmpRoot,
+      });
+      const runtimeStdioKey = mcpConnectionKey({
+        serverId: 'shared',
+        config: { placement: 'toolRuntime', transport: 'stdio' },
+        runtimeId: 'rt_alias_reconcile',
+        runtimeCwd,
+        hostCwd: tmpRoot,
+      });
       mcpServerManager.registerConnection('shared', {
         id: 'shared',
         connectionKey: hostStdioKey,
@@ -400,7 +423,8 @@ describe.skipIf(skipOnWindows)(
       await reconcileMcpServersForActiveSession(state);
 
       const host = mcpServerManager.getServer(hostHttpKey);
-      expect(host?.status).toBe('stopped');
+      expect(host?.status).toBe('failed');
+      expect(host?.lastError).toBe('Unsupported MCP transport: http');
       expect(host?.config.transport).toBe('http');
       expect(host?.connectionKey).toBe(hostHttpKey);
 
