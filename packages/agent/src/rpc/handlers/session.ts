@@ -177,6 +177,9 @@ async function activateStoredSession(
     }
     throw error;
   }
+  if (loaded.state.config?.runtimeBinding !== undefined) {
+    parseSessionRuntimeBinding(loaded.state.config.runtimeBinding);
+  }
 
   const loadedWithMcpServers = mergeMcpServersIntoLoadedSession(
     loaded,

@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
 import { defaultInitializeParams } from './helpers/initialize';
-import { loadSession } from '../storage/session-store';
+import { loadSession, writeSessionState } from '../storage/session-store';
 import type { JobState } from '../server-types';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 
@@ -52,6 +52,17 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         cwd,
       },
     };
+  }
+
+  function persistRuntimeBinding(sessionId: string, runtimeBinding: RuntimeExecutionBinding): void {
+    const loaded = loadSession(sessionId);
+    writeSessionState(loaded.dir, {
+      ...loaded.state,
+      config: {
+        ...loaded.state.config,
+        runtimeBinding,
+      },
+    });
   }
 
   it('rehydrates state.config.connectionId and modelId after session/load', async () => {
@@ -296,6 +307,76 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
 
     expect(loadSession(created.sessionId).state.config?.runtimeBinding).toBeUndefined();
     expect(loadState.activeSession).toBeNull();
+  });
+
+  it('rejects stored non-local runtimeBinding during session/load before activation', async () => {
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+
+    await setupClient.request('initialize', defaultInitializeParams());
+    const created = (await setupClient.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+    const storedRuntimeBinding = workspaceRuntimeBinding(tempDir);
+    persistRuntimeBinding(created.sessionId, storedRuntimeBinding);
+
+    const loadState = createAgentServerState();
+    const { client: loadClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, loadState)
+    );
+
+    await loadClient.request('initialize', defaultInitializeParams());
+    await expect(
+      loadClient.request('session/load', {
+        sessionId: created.sessionId,
+        cwd: tempDir,
+        mcpServers: [{ name: 'loaded', command: process.execPath, enabled: false }],
+      })
+    ).rejects.toMatchObject({ code: -32602 });
+
+    expect(loadState.activeSession).toBeNull();
+    expect(loadSession(created.sessionId).state.config).toMatchObject({
+      runtimeBinding: storedRuntimeBinding,
+    });
+    expect(loadSession(created.sessionId).state.config?.mcpServers).toEqual([]);
+  });
+
+  it('rejects stored non-local runtimeBinding during session/resume before activation', async () => {
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+
+    await setupClient.request('initialize', defaultInitializeParams());
+    const created = (await setupClient.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+    const storedRuntimeBinding = workspaceRuntimeBinding(tempDir);
+    persistRuntimeBinding(created.sessionId, storedRuntimeBinding);
+
+    const resumeState = createAgentServerState();
+    const { client: resumeClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, resumeState)
+    );
+
+    await resumeClient.request('initialize', defaultInitializeParams());
+    await expect(
+      resumeClient.request('session/resume', {
+        sessionId: created.sessionId,
+        cwd: tempDir,
+        mcpServers: [{ name: 'resumed', command: process.execPath, enabled: false }],
+      })
+    ).rejects.toMatchObject({ code: -32602 });
+
+    expect(resumeState.activeSession).toBeNull();
+    expect(loadSession(created.sessionId).state.config).toMatchObject({
+      runtimeBinding: storedRuntimeBinding,
+    });
+    expect(loadSession(created.sessionId).state.config?.mcpServers).toEqual([]);
   });
 
   it('keeps the current session and jobs when load rejects invalid MCP servers', async () => {
