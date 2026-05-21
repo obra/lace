@@ -470,6 +470,17 @@ export class JobManager {
       return;
     }
 
+    // Terminal-state fanout: flush every pending progress batch for THIS
+    // job's subscriptions before iterating, even subs whose `on` does not
+    // include the terminal kind. Otherwise a progress-only sub's buffered
+    // batch keeps ticking past the terminal and queues a stale "phantom"
+    // delivery 200ms after the job has already died.
+    if (kind !== 'progress') {
+      for (const subId of subIds) {
+        this.flushProgressBatch(subId);
+      }
+    }
+
     for (const subId of subIds) {
       const sub = this.subscriptions.get(subId);
       if (!sub) continue;
@@ -484,10 +495,7 @@ export class JobManager {
         }
         this.bufferProgressForSubscription(sub.subscriptionId, { ...notification });
       } else {
-        // Terminal-state fanout: flush any pending progress batch FIRST so
-        // it lands before the terminal in the agent's inbox, then enqueue
-        // the terminal immediately (no 200ms delay for terminals).
-        this.flushProgressBatch(sub.subscriptionId);
+        // Terminal: batches were already flushed above. Just enqueue.
         this.notificationQueue.push({ ...notification });
       }
     }
@@ -549,7 +557,12 @@ export class JobManager {
     const subIds = this.subscriptionsByJob.get(jobId);
     if (!subIds) return;
     for (const subId of subIds) {
-      this.cancelProgressBatch(subId);
+      // Job-end reap (cancel/kill/session-close): the buffered progress
+      // represents the most recent meaningful tail — flush it so the agent
+      // doesn't lose 0–200ms of work to teardown. Contrast with
+      // unsubscribe(), which is explicit user intent to STOP receiving and
+      // therefore cancels (drops) the pending batch.
+      this.flushProgressBatch(subId);
       this.subscriptions.delete(subId);
     }
     this.subscriptionsByJob.delete(jobId);
