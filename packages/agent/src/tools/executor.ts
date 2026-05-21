@@ -17,6 +17,7 @@ import { DelegateTool } from './implementations/delegate';
 import { JobOutputTool } from './implementations/job_output';
 import { JobsListTool } from './implementations/jobs_list';
 import { JobKillTool } from './implementations/job_kill';
+import { JobNotifyTool } from './implementations/job_notify';
 import { TodoReadTool } from './implementations/todo_read';
 import { TodoWriteTool } from './implementations/todo_write';
 import { UseSkillTool } from './implementations/use-skill-tool';
@@ -56,6 +57,7 @@ export const LACE_BUILTIN_TOOL_NAMES = [
   'job_output',
   'jobs_list',
   'job_kill',
+  'job_notify',
   'todo_read',
   'todo_write',
   'use_skill',
@@ -287,6 +289,7 @@ export class ToolExecutor {
       new JobOutputTool(),
       new JobsListTool(),
       new JobKillTool(),
+      new JobNotifyTool(),
       new TodoReadTool(),
       new TodoWriteTool(),
     ];
