@@ -1,13 +1,15 @@
 // ABOUTME: Shell job execution - handles spawning and managing shell command processes
 
 import { randomUUID } from 'node:crypto';
-import { spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { appendFileSync, existsSync, statSync } from 'node:fs';
 import type { JobState, SessionUpdate } from '../server-types';
 import { MAX_JOB_OUTPUT_BYTES } from '../server-types';
 import { toolKindFromName, shouldAskPermission } from '../rpc/utils';
 import { readSessionState, type LoadedSession } from '../storage/session-store';
 import type { ToolResult } from '@lace/ent-protocol';
+import { HostToolRuntime } from '../tools/runtime/host';
+import type { RuntimeProcessHandle } from '../tools/runtime/types';
 
 export type ShellJobContext = {
   getState: () => {
@@ -43,6 +45,33 @@ export type ShellJobContext = {
   }) => Promise<{ decision?: string; updatedInput?: Record<string, unknown> }>;
   finalizeJob: (job: JobState, options?: { exitCode?: number }) => Promise<void>;
 };
+
+function createJobProcessAdapter(handle: RuntimeProcessHandle): ChildProcess {
+  let exitCode: number | null = null;
+  void handle.completion.then(
+    ({ exitCode: code }) => {
+      exitCode = code;
+    },
+    () => {
+      exitCode = 1;
+    }
+  );
+
+  // job-control only needs kill() and exitCode. Leave pid hidden because the
+  // runtime handle is not started as a detached process group.
+  return {
+    get pid() {
+      return undefined;
+    },
+    get exitCode() {
+      return exitCode;
+    },
+    kill(signal?: NodeJS.Signals) {
+      handle.kill(signal);
+      return true;
+    },
+  } as unknown as ChildProcess;
+}
 
 export const createRunShellJobProcess = (context: ShellJobContext) => {
   return (job: JobState) => {
@@ -154,17 +183,6 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
         }
       }
 
-      const proc = spawn(job.command ?? '', {
-        cwd: state.activeSession.meta.workDir,
-        shell: true,
-        detached: process.platform !== 'win32',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      job.proc = proc;
-
-      proc.stdout!.setEncoding('utf8');
-      proc.stderr!.setEncoding('utf8');
-
       const appendOutput = async (chunk: string) => {
         if (!state.activeSession) return;
         await context.runExclusive(() => {
@@ -176,6 +194,34 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
           appendFileSync(job.outputPath, toWrite, { encoding: 'utf8' });
         });
       };
+
+      let proc: RuntimeProcessHandle;
+      try {
+        const runtimeBinding = job.runtimeBinding;
+        if (runtimeBinding?.toolRuntime.type !== 'local') {
+          throw new Error(
+            'Only local runtime shell jobs are supported before projected container runtime lands'
+          );
+        }
+
+        const runtime = new HostToolRuntime({
+          id: runtimeBinding.identity.runtimeId,
+          cwd: runtimeBinding.toolRuntime.cwd,
+        });
+        proc = await runtime.process.start(['/bin/bash', '-c', job.command ?? '']);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        await appendOutput(`[BASH ERROR]\nMessage: ${message}\n`);
+        job.status = 'failed';
+        await context.finalizeJob(job, { exitCode: 1 });
+        return;
+      }
+
+      proc.stdin?.end();
+      job.proc = createJobProcessAdapter(proc);
+
+      proc.stdout?.setEncoding('utf8');
+      proc.stderr?.setEncoding('utf8');
 
       const onStdout = async (chunk: string) => {
         await appendOutput(chunk);
@@ -209,24 +255,33 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
         );
       };
 
-      proc.stdout!.on('data', (chunk) => void onStdout(chunk as string));
-      proc.stderr!.on('data', (chunk) => void onStderr(chunk as string));
+      proc.stdout?.on('data', (chunk) => void onStdout(String(chunk)));
+      proc.stderr?.on('data', (chunk) => void onStderr(String(chunk)));
 
-      proc.on('close', (code) => {
-        void (async () => {
-          if (job.finished) {
-            job.resolveCompletion();
-            return;
-          }
+      void proc.completion.then(
+        ({ exitCode }) => {
+          void (async () => {
+            if (job.finished) {
+              job.resolveCompletion();
+              return;
+            }
 
-          const exitCode = code ?? 0;
-          if (job.status !== 'cancelled') {
-            job.status = exitCode === 0 ? 'completed' : 'failed';
-          }
+            if (job.status !== 'cancelled') {
+              job.status = exitCode === 0 ? 'completed' : 'failed';
+            }
 
-          await context.finalizeJob(job, { exitCode });
-        })();
-      });
+            await context.finalizeJob(job, { exitCode: exitCode ?? 0 });
+          })();
+        },
+        (error) => {
+          void (async () => {
+            const message = error instanceof Error ? error.message : String(error);
+            await appendOutput(`[BASH ERROR]\nMessage: ${message}\n`);
+            job.status = 'failed';
+            await context.finalizeJob(job, { exitCode: 1 });
+          })();
+        }
+      );
     })();
   };
 };

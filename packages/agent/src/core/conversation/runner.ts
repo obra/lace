@@ -10,7 +10,7 @@ import type { Tool } from '@lace/agent/tools/tool';
 import { HostToolRuntime } from '@lace/agent/tools/runtime/host';
 import { FileAccessTracker } from '@lace/agent/tools/runtime/file-access-tracker';
 import { buildDefaultLocalRuntimeBinding } from '@lace/agent/tools/runtime/validation';
-import type { RuntimePath } from '@lace/agent/tools/runtime/types';
+import type { RuntimeExecutionBinding, RuntimePath } from '@lace/agent/tools/runtime/types';
 import {
   readSessionState,
   writeSessionState,
@@ -159,6 +159,10 @@ export class ConversationRunner {
     } = this.config;
 
     const filesRead = deriveFilesReadFromDurableEvents(sessionDir, cwd);
+    const runtimeBinding = buildDefaultLocalRuntimeBinding({
+      sessionId,
+      cwd,
+    });
     const runtimeFileAccessTracker = await this.createDefaultLocalFileAccessTracker(filesRead, cwd);
 
     const envOverlay = environment && typeof environment === 'object' ? environment : undefined;
@@ -459,6 +463,7 @@ export class ConversationRunner {
             turnId,
             startedAt,
             sessionId,
+            runtimeBinding,
             writeAndAdvance,
           });
 
@@ -553,6 +558,7 @@ export class ConversationRunner {
     turnId: string;
     startedAt: string;
     sessionId: string;
+    runtimeBinding: RuntimeExecutionBinding;
     writeAndAdvance: (event: { type: string; data: Record<string, unknown> }) => Promise<void>;
   }): Promise<{
     streamTurnSeq: number;
@@ -578,6 +584,7 @@ export class ConversationRunner {
       turnId,
       startedAt: _startedAt,
       sessionId,
+      runtimeBinding,
       writeAndAdvance,
     } = params;
     const { toolExecutor } = params;
@@ -744,6 +751,7 @@ export class ConversationRunner {
         command,
         description: description || command.substring(0, 50),
         turnContext: { turnId, turnSeq: toolTurnSeq },
+        runtimeBinding,
         ...(progressIntervalMs !== null ? { progressIntervalMs } : {}),
       });
 

@@ -6,6 +6,8 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { JobType, JobStatus, JobState } from '../server-types';
 import { toNonEmptyString } from '../rpc/utils';
+import { parseRuntimeExecutionBinding } from '../tools/runtime/validation';
+import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 
 /**
  * A derived job record from events.
@@ -20,6 +22,7 @@ export type DerivedJob = {
   startTime: string;
   exitCode?: number;
   subagentSessionId?: string;
+  runtimeBinding?: RuntimeExecutionBinding;
 };
 
 /**
@@ -120,6 +123,14 @@ export function createJobDerivation(deps: {
         if (parsed.type === 'job_started') {
           const jobType = data.jobType === 'delegate' ? 'delegate' : 'bash';
           const startTime = timestamp ?? new Date().toISOString();
+          let runtimeBinding: RuntimeExecutionBinding | undefined;
+          if (data.runtimeBinding !== undefined) {
+            try {
+              runtimeBinding = parseRuntimeExecutionBinding(data.runtimeBinding);
+            } catch {
+              runtimeBinding = undefined;
+            }
+          }
           byId.set(jobId, {
             jobId,
             parentJobId: toNonEmptyString(data.parentJobId) ?? undefined,
@@ -128,6 +139,7 @@ export function createJobDerivation(deps: {
             description: toNonEmptyString(data.description) ?? undefined,
             command: toNonEmptyString(data.command) ?? undefined,
             startTime,
+            ...(runtimeBinding ? { runtimeBinding } : {}),
           });
         } else if (parsed.type === 'job_session_assigned') {
           const existing = byId.get(jobId);

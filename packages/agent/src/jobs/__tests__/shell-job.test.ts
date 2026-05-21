@@ -45,6 +45,7 @@ vi.mock('../../storage/session-store', () => ({
 
 // Mock child_process to avoid actual spawning
 vi.mock('node:child_process', () => ({
+  execFile: vi.fn(),
   spawn: mockSpawn,
 }));
 
@@ -117,6 +118,12 @@ describe('createRunShellJobProcess', () => {
       finished: false,
       completion: Promise.resolve(),
       resolveCompletion: vi.fn(),
+      runtimeBinding: {
+        schemaVersion: 1,
+        identity: { runtimeId: 'rt_test' },
+        agentPlacement: 'host',
+        toolRuntime: { type: 'local', cwd: '/tmp/work' },
+      },
     };
 
     // Run the job - if the bug exists, this will silently return
@@ -135,11 +142,11 @@ describe('createRunShellJobProcess', () => {
     // If the bug exists (state captured at creation), the job was silently
     // skipped and spawn was never called. The fix is to use getState()
     // to get current state each time the job runs.
-    expect(mockSpawn).toHaveBeenCalledWith('echo hello', {
+    expect(mockSpawn).toHaveBeenCalledWith('/bin/bash', ['-c', 'echo hello'], {
       cwd: '/tmp/work',
-      shell: true,
-      detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      env: expect.any(Object),
+      stdio: ['pipe', 'pipe', 'pipe'],
+      signal: undefined,
     });
 
     // And finalizeJob should have been called when process completed

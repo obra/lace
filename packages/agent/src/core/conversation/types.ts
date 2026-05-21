@@ -9,6 +9,7 @@ import type { MCPServerManager } from '@lace/agent/mcp/server-manager';
 import type { SkillRegistry } from '@lace/agent/skills';
 import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
 import type { AlarmScheduler } from '@lace/agent/alarms/alarm-scheduler';
+import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 
 /**
  * Approval mode for tool permissions.
@@ -96,6 +97,7 @@ export interface RunnerDependencies {
     command: string;
     description?: string;
     turnContext: { turnId: string; turnSeq: number };
+    runtimeBinding?: RuntimeExecutionBinding;
   }) => Promise<{ jobId: string }>;
 
   /** MCP server manager (optional) */

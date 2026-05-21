@@ -1,5 +1,7 @@
 // ABOUTME: E2E tests for the complete async job workflow
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { join } from 'node:path';
+import { readDurableEvents } from '../storage/event-log';
 import {
   createE2EContext,
   spawnAgentProcess,
@@ -12,6 +14,77 @@ describe('async job workflow (E2E)', () => {
 
   beforeEach(() => ctx.setup());
   afterEach(() => ctx.teardown());
+
+  it('persists runtimeBinding on shell job_started events', { timeout: 20_000 }, async () => {
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+
+    let jobId: string | undefined;
+    ctx.agent.peer.onRequest('session/update', async (params) => {
+      const p = params as Record<string, unknown>;
+      if (p.type === 'job_started' && typeof p.jobId === 'string') {
+        jobId = p.jobId;
+      }
+      return undefined;
+    });
+    ctx.agent.peer.onRequest('session/request_permission', async () => {
+      return { decision: 'allow' };
+    });
+
+    await withTimeout(
+      ctx.agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'allow' } })
+      ),
+      2_000,
+      'initialize'
+    );
+
+    const created = (await withTimeout(
+      ctx.agent.peer.request('session/new', {
+        cwd: ctx.workDir,
+        mcpServers: [],
+      }),
+      2_000,
+      'session/new'
+    )) as { sessionId: string };
+
+    await withTimeout(
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'job: echo runtime-binding' }],
+      }),
+      5_000,
+      'session/prompt'
+    );
+
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          if (jobId) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      5_000,
+      'job_started'
+    );
+
+    const sessionDir = join(ctx.laceDir, 'agent-sessions', created.sessionId);
+    const { events } = readDurableEvents(sessionDir, {
+      afterEventSeq: 0,
+      limit: 100,
+      types: ['job_started'],
+    });
+    const jobStarted = events.find((event) => event.data.jobId === jobId);
+
+    expect(jobStarted?.data).toMatchObject({
+      runtimeBinding: {
+        schemaVersion: 1,
+        agentPlacement: 'host',
+        toolRuntime: { type: 'local' },
+      },
+    });
+  });
 
   it(
     'complete async bash workflow: spawn, list, check output, kill',

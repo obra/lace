@@ -783,11 +783,16 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         : job.personaBoxRuntime
           ? job.personaBoxRuntime.workingDirectory
           : currentState.activeSession!.meta.workDir;
+      const inheritedRuntimeConfig =
+        !isContainerizedSubagent && job.runtimeBinding
+          ? { config: { runtimeBinding: job.runtimeBinding } }
+          : {};
       if (resumedSession) {
         await childPeer.request('session/resume', {
           sessionId: job.subagentSessionId,
           cwd: subagentWorkDir,
           mcpServers: [],
+          ...inheritedRuntimeConfig,
         });
       } else {
         // New session - thread persona through so subagent's system prompt
@@ -804,6 +809,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
             jobId: job.jobId,
             ...(job.persona ? { personaName: job.persona } : {}),
           },
+          ...inheritedRuntimeConfig,
         })) as { sessionId: string };
         job.subagentSessionId = created.sessionId;
       }
