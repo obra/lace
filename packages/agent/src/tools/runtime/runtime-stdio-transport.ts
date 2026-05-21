@@ -1,6 +1,7 @@
 import type { RuntimeProcessHandle, ToolRuntime } from './types';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { ReadBuffer, serializeMessage } from '@modelcontextprotocol/sdk/shared/stdio.js';
+import { getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 
 export interface RuntimeStdioClientTransportOptions {
@@ -42,7 +43,8 @@ export class RuntimeStdioClientTransport implements Transport {
         [this.options.command, ...(this.options.args ?? [])],
         {
           cwd: this.options.cwd ?? this.options.runtime.cwd,
-          env: this.options.env ?? {},
+          env: { ...getDefaultEnvironment(), ...(this.options.env ?? {}) },
+          envMode: 'replace',
         }
       );
       this.process = handle;

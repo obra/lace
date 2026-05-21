@@ -15,6 +15,7 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
 }));
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
+  getDefaultEnvironment: vi.fn(() => ({ PATH: '/usr/bin' })),
   StdioClientTransport: vi.fn().mockImplementation(() => ({
     close: vi.fn().mockResolvedValue(undefined),
     onerror: null,
@@ -94,7 +95,7 @@ describe('MCPServerManager', () => {
     expect(server?.status).toBe('running');
     expect(server?.client).toBeDefined();
     expect(server?.transport).toBeDefined();
-    expect(server?.connectionKey).toBe('test:host:stdio:/test/dir');
+    expect(server?.connectionKey).toBe('test:host:stdio:rt_fake:/test/dir');
   });
 
   it('should handle connection errors', async () => {
@@ -213,7 +214,7 @@ describe('MCPServerManager', () => {
 
     const servers = manager.getAllServers();
     expect(servers.map((server) => server.connectionKey).sort()).toEqual([
-      'shared:host:stdio:/host/project',
+      'shared:host:stdio:rt_fake:/host/project',
       'shared:toolRuntime:stdio:rt_projected:/runtime/project',
     ]);
     expect(servers).toHaveLength(2);
@@ -282,10 +283,14 @@ describe('MCPServerManager', () => {
       hostCwd: '/host/project',
     });
 
-    expect(runtime.process.start).toHaveBeenCalledWith(['node', 'server.js'], {
-      cwd: '/runtime',
-      env: { NODE_ENV: 'test' },
-    });
+    expect(runtime.process.start).toHaveBeenCalledWith(
+      ['node', 'server.js'],
+      expect.objectContaining({
+        cwd: '/runtime',
+        env: expect.objectContaining({ NODE_ENV: 'test' }),
+        envMode: 'replace',
+      })
+    );
     expect(StdioClientTransport).toHaveBeenCalledTimes(1);
     expect(manager.getServer('runtime-server')?.transport).toBeInstanceOf(
       RuntimeStdioClientTransport

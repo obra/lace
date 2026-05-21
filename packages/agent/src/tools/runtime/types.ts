@@ -89,6 +89,7 @@ export interface RuntimeFileSystem {
 export interface RuntimeProcessOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
+  envMode?: 'inherit' | 'replace';
   signal?: AbortSignal;
 }
 

@@ -56,6 +56,20 @@ async function startHostServer(
   });
 }
 
+async function startRuntimeServer(
+  manager: MCPServerManager,
+  serverId: string,
+  config: MCPServerConfig,
+  cwd: string
+): Promise<void> {
+  await manager.startServer({
+    serverId,
+    config: { ...config, placement: 'toolRuntime' },
+    runtime: new HostToolRuntime({ id: `test:${serverId}`, cwd }),
+    hostCwd: cwd,
+  });
+}
+
 describe.skipIf(skipOnWindows)('MCPServerManager env propagation (kata #47)', () => {
   let manager: MCPServerManager;
 
@@ -144,6 +158,29 @@ describe.skipIf(skipOnWindows)('MCPServerManager env propagation (kata #47)', ()
 
     expect(env.KATA47_SOLO).toBe('lone');
   });
+
+  it('runtime placement does not leak parent env through host-backed runtimes', async () => {
+    const sentinelName = 'KATA47_RUNTIME_PARENT_ONLY_SENTINEL';
+    process.env[sentinelName] = 'should-not-leak';
+
+    try {
+      const config: MCPServerConfig = {
+        command: process.execPath,
+        args: [HELPER],
+        env: { KATA47_RUNTIME_DECLARED: 'visible' },
+        enabled: true,
+        tools: {},
+      };
+
+      await startRuntimeServer(manager, 'env-dump', config, process.cwd());
+      const env = await readSubprocessEnv(manager, 'env-dump');
+
+      expect(env.KATA47_RUNTIME_DECLARED).toBe('visible');
+      expect(env[sentinelName]).toBeUndefined();
+    } finally {
+      delete process.env[sentinelName];
+    }
+  });
 });
 
 describe.skipIf(skipOnWindows)(
@@ -216,6 +253,40 @@ describe.skipIf(skipOnWindows)(
       expect(env.KATA47_RECONCILE_A).toBe('alpha');
       expect(env.KATA47_RECONCILE_B).toBe('bravo');
       expect(env.KATA47_RECONCILE_C).toBe('charlie');
+    });
+
+    it('rejects non-local runtime bindings during MCP reconciliation', async () => {
+      const state = buildState({
+        nextEventSeq: 1,
+        nextStreamSeq: 1,
+        config: {
+          runtimeBinding: {
+            schemaVersion: 1,
+            identity: { runtimeId: 'rt_workspace_reconcile' },
+            agentPlacement: 'host',
+            toolRuntime: {
+              type: 'workspace',
+              projectRoot: tmpRoot,
+              workspaceRoot: tmpRoot,
+              cwd: tmpRoot,
+            },
+          },
+          mcpServers: [
+            {
+              name: 'env-dump',
+              command: process.execPath,
+              args: [HELPER],
+              enabled: true,
+              tools: {},
+            },
+          ],
+        },
+      });
+
+      await expect(reconcileMcpServersForActiveSession(state)).rejects.toThrow(
+        'MCP runtime placement only supports local runtime bindings'
+      );
+      expect(mcpServerManager.getAllServers()).toEqual([]);
     });
   }
 );

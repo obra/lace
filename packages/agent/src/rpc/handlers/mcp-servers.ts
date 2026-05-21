@@ -45,6 +45,12 @@ function activeSessionRuntime(state: AgentServerState): ToolRuntime {
     });
   }
 
+  if (runtimeBinding) {
+    throw new Error(
+      `MCP runtime placement only supports local runtime bindings for now; received ${runtimeBinding.toolRuntime.type}`
+    );
+  }
+
   return new HostToolRuntime({
     id: activeSession ? `session:${activeSession.meta.sessionId}:host` : 'mcp:host',
     cwd: hostCwd,

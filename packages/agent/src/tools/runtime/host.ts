@@ -91,6 +91,9 @@ class HostProcessRunner implements RuntimeProcessRunner {
   }
 
   private envFor(opts: RuntimeProcessOptions): NodeJS.ProcessEnv {
+    if (opts.envMode === 'replace') {
+      return { ...(opts.env ?? {}) };
+    }
     return { ...this.#defaultEnv, ...(opts.env ?? {}) };
   }
 

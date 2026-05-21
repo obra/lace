@@ -28,7 +28,7 @@ export function mcpConnectionKey(input: {
   const placementScope =
     placement === 'toolRuntime'
       ? `${input.runtimeId}:${input.runtimeCwd ?? ''}`
-      : (input.hostCwd ?? '');
+      : `${input.runtimeId}:${input.hostCwd ?? ''}`;
   return `${input.serverId}:${placement}:${transport}:${placementScope}`;
 }
 
