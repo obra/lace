@@ -922,13 +922,20 @@ describe('JobManager', () => {
       expect(setupProgressTimer).not.toHaveBeenCalled();
     });
 
-    it('works without setupProgressTimer', async () => {
-      // Deps without setupProgressTimer - should not throw
+    it('works without setupProgressTimer even when progressIntervalMs is set', async () => {
+      // Deps without setupProgressTimer - should not throw. We deliberately
+      // pass progressIntervalMs so the opt-in branch actually exercises the
+      // `?.()` optional-chain on the missing dep (PRI-1707). Without the
+      // explicit interval the branch would short-circuit before reaching
+      // setupProgressTimer at all, and this test would silently lie.
       const deps = createDeps();
       delete (deps as Partial<JobManagerDeps>).setupProgressTimer;
       const manager = new JobManager(deps);
 
-      const result = await manager.createJob('shell', { command: 'echo hello' });
+      const result = await manager.createJob('shell', {
+        command: 'echo hello',
+        progressIntervalMs: 60000,
+      });
 
       expect(result.jobId).toMatch(/^job_/);
     });

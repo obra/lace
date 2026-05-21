@@ -204,4 +204,74 @@ describe('progress timer opt-in (PRI-1707)', () => {
 
     expect(job.progressTimer).toBeUndefined();
   });
+
+  // PRI-1707 post-review hardening: the operator-configured branch needs its
+  // own teardown coverage, because the subscriber-driven branch happens to
+  // pass the same assertions for a different reason. Catches future
+  // refactors that conflate "operator-configured" with "unconfigured."
+  it('clears an operator-configured timer on removeJob and clearJobs', async () => {
+    const setupProgressTimer = makeSetupProgressTimer();
+    const manager = new JobManager(createDeps({ setupProgressTimer }));
+
+    const a = await manager.createJob('delegate', { prompt: 'a', progressIntervalMs: 60000 });
+    const b = await manager.createJob('delegate', { prompt: 'b', progressIntervalMs: 60000 });
+    const jobA = manager.getJob(a.jobId)!;
+    const jobB = manager.getJob(b.jobId)!;
+    expect(jobA.progressTimer).toBeDefined();
+    expect(jobB.progressTimer).toBeDefined();
+
+    manager.removeJob(a.jobId);
+    expect(jobA.progressTimer).toBeUndefined();
+    // Sibling job's timer stays armed.
+    expect(jobB.progressTimer).toBeDefined();
+
+    manager.clearJobs();
+    expect(jobB.progressTimer).toBeUndefined();
+  });
+
+  // Reviewer B finding: subscribe-to-finished-job zombies a fresh interval
+  // that only self-clears on its first tick (up to 5 minutes later).
+  it('does not arm a fresh timer when subscribe lands on a non-running job', async () => {
+    const setupProgressTimer = makeSetupProgressTimer();
+    const manager = new JobManager(createDeps({ setupProgressTimer }));
+
+    const result = await manager.createJob('delegate', { prompt: 'do work' });
+    const job = manager.getJob(result.jobId)!;
+    job.status = 'completed';
+
+    manager.subscribe({ jobId: result.jobId, on: ['progress'] });
+
+    expect(setupProgressTimer).not.toHaveBeenCalled();
+    expect(job.progressTimer).toBeUndefined();
+  });
+
+  // Reviewer A finding: a subscription with `on` including 'progress' may
+  // exist for a jobId that has not yet been registered in the running-jobs
+  // map (e.g. the caller subscribed to a known id before adding the job).
+  // When the job arrives via addJob, the pre-existing demand should be
+  // honored — otherwise the subscriber silently receives nothing.
+  it('arms the timer on addJob when a pre-existing progress subscription is waiting', () => {
+    const setupProgressTimer = makeSetupProgressTimer();
+    const manager = new JobManager(createDeps({ setupProgressTimer }));
+
+    const sub = manager.subscribe({ jobId: 'job_predicted', on: ['progress'] });
+    // No job yet — there's nothing to arm.
+    expect(setupProgressTimer).not.toHaveBeenCalled();
+
+    const job: JobState = {
+      jobId: 'job_predicted',
+      type: 'delegate',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+      outputPath: '/tmp/job.log',
+      finished: false,
+      completion: Promise.resolve(),
+      resolveCompletion: () => {},
+    };
+    manager.addJob(job);
+
+    expect(setupProgressTimer).toHaveBeenCalledOnce();
+    expect(job.progressTimer).toBeDefined();
+    manager.unsubscribe(sub.subscriptionId);
+  });
 });

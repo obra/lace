@@ -283,6 +283,14 @@ export class JobManager {
 
   addJob(job: JobState): void {
     this.jobs.set(job.jobId, job);
+    // Honor any pre-existing progress subscriptions registered against this
+    // jobId before the job was added (PRI-1707). subscribe() accepts
+    // unknown jobIds, so a caller can legitimately register progress
+    // interest before the job lands in the map; without this hook the
+    // timer would never arm.
+    if (this.hasProgressSubscriber(job.jobId)) {
+      this.startProgressTimerIfNeeded(job.jobId);
+    }
   }
 
   getJob(jobId: string): JobState | undefined {
@@ -592,13 +600,20 @@ export class JobManager {
   }
 
   /**
-   * Arm the progress timer for `jobId` if it isn't already running. No-op
-   * when the job has no setupProgressTimer dep wired (test deps may omit
-   * it) or when the timer is already armed. Idempotent.
+   * Arm the progress timer for `jobId` if it isn't already running.
+   *
+   * - No-op when the job isn't in the running-jobs map.
+   * - No-op when the job's status is no longer 'running' — arming a fresh
+   *   interval on a finished job would zombie until the first tick
+   *   self-clears it inside createSetupProgressTimer (5min default), wasting
+   *   the full window for nothing.
+   * - No-op when the dep is missing (some test rigs omit it).
+   * - Idempotent: a second call while the timer is armed does nothing.
    */
   private startProgressTimerIfNeeded(jobId: string): void {
     const job = this.jobs.get(jobId);
     if (!job) return;
+    if (job.status !== 'running') return;
     if (job.progressTimer) return;
     this.deps.setupProgressTimer?.(job);
   }
