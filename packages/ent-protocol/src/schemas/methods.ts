@@ -206,6 +206,15 @@ const SessionNewParamsSchema = z
       })
       .strict()
       .optional(),
+    // Links this session to the parent session that spawned it (subagent path).
+    parent: z
+      .object({
+        sessionId: SessionIdSchema,
+        jobId: NonEmptyStringSchema,
+        personaName: z.string().optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

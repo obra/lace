@@ -681,6 +681,11 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         const created = (await childPeer.request('session/new', {
           cwd: subagentWorkDir,
           ...(job.persona ? { persona: job.persona } : {}),
+          parent: {
+            sessionId: currentState.activeSession!.meta.sessionId,
+            jobId: job.jobId,
+            ...(job.persona ? { personaName: job.persona } : {}),
+          },
         })) as { sessionId: string };
         job.subagentSessionId = created.sessionId;
       }

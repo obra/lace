@@ -212,6 +212,11 @@ export function registerSessionHandlers(
         modelId?: string;
         persona?: string;
       };
+      parent?: {
+        sessionId: string;
+        jobId: string;
+        personaName?: string;
+      };
     };
     if (!parsed?.cwd) throwInvalidParams('cwd is required');
 
@@ -291,7 +296,12 @@ export function registerSessionHandlers(
     let sessionDir: string;
     try {
       sessionDir = getSessionDir(sessionId);
-      writeSessionMeta(sessionDir, { sessionId, workDir: parsed.cwd, created });
+      writeSessionMeta(sessionDir, {
+        sessionId,
+        workDir: parsed.cwd,
+        created,
+        ...(parsed.parent ? { parent: parsed.parent } : {}),
+      });
       writeSessionState(sessionDir, {
         nextEventSeq: 1,
         nextStreamSeq: 1,
