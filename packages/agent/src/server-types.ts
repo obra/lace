@@ -19,6 +19,7 @@ import type { PersonaRegistry } from './config/persona-registry';
 import type { ContainerManager } from './containers/container-manager';
 import type { ExecStreamHandle } from './containers/types';
 import type { PersonaContainerRuntime, PersonaBoxRuntime } from './jobs/persona-container-spec';
+import type { AlarmScheduler } from './alarms/alarm-scheduler';
 
 /**
  * Per-build allowlist of tool names. `undefined` means "no scope filter" (all tools available).
@@ -184,6 +185,10 @@ export type AgentServerState = {
   // has no supported container runtime — persona-container delegate calls
   // then fail with a clear error. Tests inject fakes by replacing this field.
   containerManager: ContainerManager | null;
+  // Per-process AlarmScheduler bound to the currently active session.
+  // Created/replaced on session switch via ensureAlarmSchedulerForActiveSession;
+  // stopped on shutdown. Absent when no session is active.
+  alarmScheduler?: AlarmScheduler;
 };
 
 // Single entry in the embedder-supplied containerMounts registry.

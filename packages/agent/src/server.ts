@@ -38,6 +38,10 @@ import {
 import { toolKindFromName } from './rpc/utils';
 import { requestPermissionFromClient, reissuePendingPermissionRequests } from './rpc/permissions';
 import { registerAllHandlers } from './rpc/register-handlers';
+import { AlarmScheduler } from './alarms/alarm-scheduler';
+import { AlarmStore } from './alarms/alarm-store';
+import { injectNotification, composeAlarmFiredBody } from './notifications';
+import { logger } from './utils/logger';
 
 // Re-export public API from message-builder for backwards compatibility
 export {
@@ -143,6 +147,67 @@ export function getOrCreateSessionToolExecutor(
     if (cache.get(key) === pending) cache.delete(key);
   });
   return pending;
+}
+
+/**
+ * Bind a fresh AlarmScheduler to the currently active session.
+ * Idempotent: if a scheduler already exists, it is stopped first.
+ * No-op when there is no active session (e.g., after session/close).
+ *
+ * The scheduler's notifier writes an immediate-priority context_injected
+ * event into the active session's events.jsonl and triggers an internal
+ * turn if the agent is idle, so the next turn picks up the alarm body.
+ */
+export function ensureAlarmSchedulerForActiveSession(
+  state: AgentServerState,
+  runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null }
+): void {
+  if (!state.activeSession) return;
+  if (state.alarmScheduler) {
+    void state.alarmScheduler.stop();
+    state.alarmScheduler = undefined;
+  }
+  const sessionDir = state.activeSession.dir;
+  const store = new AlarmStore(sessionDir);
+  const jitterEnv = Number(process.env.LACE_ALARM_JITTER_MS ?? 60_000);
+  const jitterMaxMs = Number.isFinite(jitterEnv) && jitterEnv >= 0 ? jitterEnv : 60_000;
+  state.alarmScheduler = new AlarmScheduler({
+    sessionDir,
+    store,
+    now: () => Date.now(),
+    jitterMaxMs,
+    notifier: ({ row }) => {
+      injectNotification({
+        sessionDir,
+        kind: 'alarm-fired',
+        identifiers: { 'alarm-id': row.id },
+        body: composeAlarmFiredBody({
+          kind: row.kind,
+          schedule: row.schedule,
+          timezone: row.timezone,
+          prompt: row.prompt,
+        }),
+        idleWake: {
+          isActive: (d) => d === state.activeSession?.dir,
+          hasActiveTurn: () => !!state.activeTurn,
+          triggerInternalTurn: () => {
+            if (!runPromptInternalRef.current) return;
+            setImmediate(() => {
+              if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
+                void runPromptInternalRef.current([]);
+              }
+            });
+          },
+        },
+      });
+    },
+    onError: (err) => {
+      logger.warn('alarm.scheduler.error', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    },
+  });
+  void state.alarmScheduler.start();
 }
 
 export function invalidateSessionToolExecutor(cache: ToolExecutorCache, sessionId: string): void {
@@ -339,6 +404,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   const _startSubagentJob = (options: CreateSubagentJobOptions): Promise<{ jobId: string }> =>
     wrapJobCreation(() => createSubagentJob(options, jobCreationDeps));
 
+  const ensureAlarmScheduler = (): void =>
+    ensureAlarmSchedulerForActiveSession(state, runPromptInternalRef);
+
   // Register all RPC handlers with dependencies
   registerAllHandlers(peer, state, {
     createToolExecutorForMode,
@@ -348,5 +416,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     requestPermissionFromClient: _requestPermissionFromClient,
     startShellJob: _startShellJob,
     runPromptInternalRef,
+    ensureAlarmScheduler,
   });
 }

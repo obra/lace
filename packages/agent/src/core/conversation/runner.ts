@@ -1032,6 +1032,9 @@ export class ConversationRunner {
         hasFileBeenRead: (p: string) => filesRead.has(isAbsolutePath(p) ? p : resolvePath(cwd, p)),
         turnId,
         turnSeq: toolTurnSeq,
+        ...(this.deps.alarmScheduler ? { alarmScheduler: this.deps.alarmScheduler } : {}),
+        ...(this.deps.activeSessionId ? { activeSessionId: this.deps.activeSessionId } : {}),
+        activeSessionDir: this.config.sessionDir,
       }
     );
   }

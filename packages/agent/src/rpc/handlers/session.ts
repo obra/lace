@@ -124,7 +124,8 @@ async function activateStoredSession(
   state: AgentServerState,
   params: SessionRestoreParams,
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
-  reissuePendingPermissionRequests: () => Promise<void>
+  reissuePendingPermissionRequests: () => Promise<void>,
+  ensureAlarmScheduler: () => void
 ): Promise<LoadedSession> {
   if (state.activeTurn) {
     throw {
@@ -159,6 +160,7 @@ async function activateStoredSession(
 
   state.activeSession = loadedWithMcpServers;
   rehydrateServerConfigFromSession(state, state.activeSession.state);
+  ensureAlarmScheduler();
 
   await reconcileMcpServersForActiveSession(state);
   await reissuePendingPermissionRequests();
@@ -181,7 +183,8 @@ export function registerSessionHandlers(
   state: AgentServerState,
   createToolExecutorForMode: CreateToolExecutorFn,
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
-  reissuePendingPermissionRequests: () => Promise<void>
+  reissuePendingPermissionRequests: () => Promise<void>,
+  ensureAlarmScheduler: () => void
 ): void {
   peer.onRequest('session/new', async (params: unknown) => {
     assertInitialized(state);
@@ -332,6 +335,7 @@ export function registerSessionHandlers(
     }
 
     state.activeSession = loadSession(sessionId);
+    ensureAlarmScheduler();
     await reconcileMcpServersForActiveSession(state);
 
     // Inject system prompt as context_injected event
@@ -412,7 +416,8 @@ export function registerSessionHandlers(
       state,
       parsed,
       runExclusive,
-      reissuePendingPermissionRequests
+      reissuePendingPermissionRequests,
+      ensureAlarmScheduler
     );
     const summary = summarizeDurableEvents(loaded.dir);
     return {
@@ -432,7 +437,8 @@ export function registerSessionHandlers(
       state,
       parsed,
       runExclusive,
-      reissuePendingPermissionRequests
+      reissuePendingPermissionRequests,
+      ensureAlarmScheduler
     );
     return {};
   });
@@ -532,6 +538,10 @@ export function registerSessionHandlers(
     await releaseRunningSessionWork(peer, state, runExclusive);
     await state.mcpServerManager.shutdown();
     state.toolExecutorCache.clear();
+    if (state.alarmScheduler) {
+      await state.alarmScheduler.stop();
+      state.alarmScheduler = undefined;
+    }
     state.activeTurn = null;
     state.activeSession = null;
 

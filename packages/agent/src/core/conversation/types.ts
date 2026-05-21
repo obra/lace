@@ -8,6 +8,7 @@ import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { MCPServerManager } from '@lace/agent/mcp/server-manager';
 import type { SkillRegistry } from '@lace/agent/skills';
 import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
+import type { AlarmScheduler } from '@lace/agent/alarms/alarm-scheduler';
 
 /**
  * Approval mode for tool permissions.
@@ -129,6 +130,12 @@ export interface RunnerDependencies {
     inputTokens: number;
     outputTokens: number;
   }) => void;
+
+  /** Optional alarm scheduler for the current session's alarm tools */
+  alarmScheduler?: AlarmScheduler;
+
+  /** Current session's id (used by alarm tools that need session-scoped context) */
+  activeSessionId?: string;
 }
 
 /**

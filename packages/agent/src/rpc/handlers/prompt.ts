@@ -271,6 +271,8 @@ export function registerPromptHandler(
         mcpServerManager: state.mcpServerManager,
         skillRegistry,
         personaRegistry: state.personaRegistry,
+        ...(state.alarmScheduler ? { alarmScheduler: state.alarmScheduler } : {}),
+        ...(state.activeSession ? { activeSessionId: state.activeSession.meta.sessionId } : {}),
         setActiveTurnStatus: (status, ac) => {
           if (status === null) {
             state.activeTurn = null;
