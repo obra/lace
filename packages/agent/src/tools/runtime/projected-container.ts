@@ -524,6 +524,7 @@ class ProjectedContainerNetworkClient implements RuntimeNetworkClient {
           method: opts.method,
           headers: opts.headers,
           body: opts.body,
+          redirect: opts.redirect,
         },
         opts.signal
       )

@@ -116,6 +116,7 @@ export interface RuntimeFetchOptions {
   method?: string;
   headers?: Record<string, string>;
   body?: string;
+  redirect?: 'follow' | 'manual';
   signal?: AbortSignal;
 }
 

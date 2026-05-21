@@ -204,7 +204,16 @@ Follows redirects by default. Returns detailed error context for failures.`;
     context: ToolContext,
     runtime: NonNullable<ToolContext['runtime']>
   ): Promise<ToolResult> {
-    const { url, method, headers = {}, body, timeout, maxSize, returnContent } = params;
+    const {
+      url,
+      method,
+      headers = {},
+      body,
+      timeout,
+      maxSize,
+      followRedirects,
+      returnContent,
+    } = params;
     const abortSignal = context.signal;
 
     const timing: RequestTiming = {
@@ -227,6 +236,7 @@ Follows redirects by default. Returns detailed error context for failures.`;
     const fetchOptions: {
       method: string;
       headers: Record<string, string>;
+      redirect: 'follow' | 'manual';
       signal: AbortSignal;
       body?: string;
     } = {
@@ -235,6 +245,7 @@ Follows redirects by default. Returns detailed error context for failures.`;
         'User-Agent': 'Lace/1.0 (AI Assistant)',
         ...headers,
       },
+      redirect: followRedirects ? 'follow' : 'manual',
       signal: controller.signal,
     };
 

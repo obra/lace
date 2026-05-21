@@ -1,10 +1,14 @@
 import { mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HostToolRuntime } from '../host';
 
 describe('HostToolRuntime', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('resolves relative paths against cwd and reads files', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
     await writeFile(join(dir, 'file.txt'), 'hello', 'utf8');
@@ -105,5 +109,26 @@ describe('HostToolRuntime', () => {
     await runtime.fs.writeTextFile(path, 'content');
 
     await expect(readFile(join(dir, 'out.txt'), 'utf8')).resolves.toBe('content');
+  });
+
+  it('passes redirect mode to global fetch', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
+    const mockFetch = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>().mockResolvedValue(
+      new Response('ok', {
+        status: 200,
+        headers: { 'content-type': 'text/plain' },
+      })
+    );
+    vi.stubGlobal('fetch', mockFetch);
+
+    await runtime.network.fetch('https://example.test/redirect', { redirect: 'manual' });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://example.test/redirect',
+      expect.objectContaining({
+        redirect: 'manual',
+      })
+    );
   });
 });

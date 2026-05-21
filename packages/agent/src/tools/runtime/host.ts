@@ -153,6 +153,7 @@ class HostNetworkClient implements RuntimeNetworkClient {
       method: opts.method,
       headers: opts.headers,
       body: opts.body,
+      redirect: opts.redirect,
       signal: opts.signal,
     });
     return {

@@ -331,6 +331,29 @@ Follows redirects by default. Returns detailed error context for failures.`
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
+    it('should request manual redirects when followRedirects is false', async () => {
+      const runtime = createFakeRuntime({
+        fetchResult: {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+          body: new TextEncoder().encode('hello'),
+        },
+      });
+
+      const result = await tool.execute(
+        { url: 'https://example.com/redirect', followRedirects: false },
+        { signal: new AbortController().signal, runtime }
+      );
+
+      expect(result.status).toBe('completed');
+      expect(runtime.network.fetch).toHaveBeenCalledWith(
+        'https://example.com/redirect',
+        expect.objectContaining({
+          redirect: 'manual',
+        })
+      );
+    });
+
     it('should save large responses under the host tool temp directory', async () => {
       const tempRoot = await mkdtemp(join(tmpdir(), 'url-fetch-test-'));
 

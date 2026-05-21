@@ -10,6 +10,7 @@ export type HelperRequest =
       method?: string;
       headers?: Record<string, string>;
       body?: string;
+      redirect?: 'follow' | 'manual';
     };
 
 export type HelperResponse =

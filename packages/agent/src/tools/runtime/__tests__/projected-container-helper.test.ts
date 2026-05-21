@@ -122,4 +122,39 @@ describe('ProjectedContainerToolRuntime helper', () => {
       await fetchResult;
     }
   });
+
+  it('passes redirect mode to helper-backed fetch', async () => {
+    const stdin = new PassThrough();
+    let request = '';
+    stdin.on('data', (chunk: Buffer | string) => {
+      request += chunk.toString();
+    });
+    const manager = {
+      execStream: vi.fn().mockResolvedValue({
+        stdin,
+        stdout: Readable.from([
+          `${JSON.stringify({
+            ok: true,
+            value: { status: 200, headers: {}, body: Buffer.from('ok').toString('base64') },
+          })}\n`,
+        ]),
+        stderr: Readable.from([]),
+        wait: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        kill: vi.fn(),
+      }),
+    };
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: containerDescriptorWithHelper(),
+    });
+
+    await runtime.network.fetch('https://example.test/redirect', { redirect: 'manual' });
+
+    expect(JSON.parse(request)).toMatchObject({
+      op: 'fetch',
+      url: 'https://example.test/redirect',
+      redirect: 'manual',
+    });
+  });
 });
