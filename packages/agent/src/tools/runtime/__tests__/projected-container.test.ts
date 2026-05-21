@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { ProjectedContainerToolRuntime } from '../projected-container';
+import { InMemoryRuntimeSecretResolver } from '../secrets';
 
 function createFakeExecStreamHandle() {
   return {
@@ -134,6 +135,55 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(manager.materialize.mock.invocationCallOrder[0]).toBeLessThan(
       manager.execStream.mock.invocationCallOrder[0]
     );
+  });
+
+  it('merges resolved secret env into the materialized container spec', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    projectedDescriptor.spec.env = { BASE: 'yes' };
+    projectedDescriptor.spec.secretEnv = {
+      API_KEY: { namespace: 'project', name: 'api-key' },
+    };
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+      sessionId: 'sess_secret',
+      secretResolver: new InMemoryRuntimeSecretResolver({
+        'project:api-key': 'resolved-secret',
+      }),
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
+
+    expect(manager.materialize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: { BASE: 'yes', API_KEY: 'resolved-secret' },
+      })
+    );
+  });
+
+  it('fails materialization with redacted secret context when no resolver is available', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    projectedDescriptor.spec.secretEnv = {
+      API_KEY: { namespace: 'project', name: 'api-key' },
+    };
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+      sessionId: 'sess_secret',
+    });
+
+    await expect(
+      runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd })
+    ).rejects.toMatchObject({
+      redactedReference: '[secret:project:REDACTED]',
+      runtimeId: 'rt_container',
+      sessionId: 'sess_secret',
+    });
+    expect(manager.materialize).not.toHaveBeenCalled();
   });
 
   it('materializes tag-requested descriptors with a digest-pinned image reference', async () => {

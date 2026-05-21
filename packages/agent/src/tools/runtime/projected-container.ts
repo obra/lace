@@ -13,6 +13,12 @@ import type { ContainerHandle, ContainerSpec } from '../../containers/spec';
 import type { ExecStreamHandle, ExecStreamOptions } from '../../containers/types';
 import { decodeHelperResponse, encodeHelperRequest, type HelperRequest } from './helper-protocol';
 import { imageReferenceForResolvedDigest } from './image-identity';
+import {
+  RuntimeSecretResolutionError,
+  type RuntimeSecretResolver,
+  redactSecretReference,
+  resolveSecretEnv,
+} from './secrets';
 import type {
   RuntimeFileSystem,
   RuntimeFetchOptions,
@@ -24,6 +30,7 @@ import type {
   RuntimeProcessOptions,
   RuntimeProcessResult,
   RuntimeProcessRunner,
+  RuntimeSecretReference,
   ToolRuntime,
   ToolRuntimeDescriptor,
 } from './types';
@@ -31,6 +38,12 @@ import type {
 type ContainerToolRuntimeDescriptor = Extract<ToolRuntimeDescriptor, { type: 'container' }>;
 
 export type ProjectedContainerToolRuntimeDescriptor = Omit<ContainerToolRuntimeDescriptor, 'type'>;
+
+interface ProjectedContainerSecretContext {
+  runtimeId: string;
+  sessionId?: string;
+  secretResolver?: RuntimeSecretResolver;
+}
 
 interface NodeError extends Error {
   code?: string;
@@ -127,9 +140,15 @@ function definedEnvironment(
   return Object.keys(environment).length > 0 ? environment : undefined;
 }
 
-function containerSpecFromDescriptor(
-  descriptor: ProjectedContainerToolRuntimeDescriptor
-): ContainerSpec {
+async function containerSpecFromDescriptor(
+  descriptor: ProjectedContainerToolRuntimeDescriptor,
+  secretContext: ProjectedContainerSecretContext
+): Promise<ContainerSpec> {
+  const secretEntries = Object.entries(descriptor.spec.secretEnv ?? {});
+  const resolvedSecrets =
+    secretEntries.length === 0
+      ? {}
+      : await resolveProjectedContainerSecrets(descriptor, secretContext, secretEntries);
   const spec: ContainerSpec = {
     name: descriptor.spec.name,
     image: imageReferenceForResolvedDigest(
@@ -142,7 +161,7 @@ function containerSpecFromDescriptor(
       target: mount.containerPath,
       readonly: mount.readonly,
     })),
-    env: descriptor.spec.env ?? {},
+    env: { ...(descriptor.spec.env ?? {}), ...resolvedSecrets },
   };
 
   if (descriptor.spec.containerId) {
@@ -156,6 +175,32 @@ function containerSpecFromDescriptor(
   }
 
   return spec;
+}
+
+async function resolveProjectedContainerSecrets(
+  descriptor: ProjectedContainerToolRuntimeDescriptor,
+  context: ProjectedContainerSecretContext,
+  secretEntries: Array<[string, RuntimeSecretReference]>
+): Promise<Record<string, string>> {
+  const sessionId = context.sessionId ?? 'unknown';
+  if (!context.secretResolver) {
+    const [, reference] = secretEntries[0]!;
+    throw new RuntimeSecretResolutionError(
+      `Secret unavailable or unauthorized: ${redactSecretReference(reference)}`,
+      {
+        reference,
+        runtimeId: context.runtimeId,
+        sessionId,
+      }
+    );
+  }
+
+  return await resolveSecretEnv({
+    secretEnv: descriptor.spec.secretEnv,
+    resolver: context.secretResolver,
+    runtimeId: context.runtimeId,
+    sessionId,
+  });
 }
 
 function helperUnavailable(): never {
@@ -479,7 +524,8 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
 
   constructor(
     private readonly descriptor: ProjectedContainerToolRuntimeDescriptor,
-    private readonly containerManager: ProjectedContainerManager
+    private readonly containerManager: ProjectedContainerManager,
+    private readonly secretContext: ProjectedContainerSecretContext
   ) {}
 
   private optionsFor(command: string[], opts: RuntimeProcessOptions = {}): ExecStreamOptions {
@@ -507,9 +553,10 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
       return;
     }
 
-    const materialized = this.containerManager
-      .materialize(containerSpecFromDescriptor(this.descriptor))
-      .then(() => undefined);
+    const materialized = (async () => {
+      const spec = await containerSpecFromDescriptor(this.descriptor, this.secretContext);
+      await this.containerManager.materialize(spec);
+    })();
     this.materialized = materialized;
 
     try {
@@ -655,6 +702,8 @@ export class ProjectedContainerToolRuntime implements ToolRuntime {
     id: string;
     containerManager: ProjectedContainerManager;
     descriptor: ProjectedContainerToolRuntimeDescriptor;
+    sessionId?: string;
+    secretResolver?: RuntimeSecretResolver;
   }) {
     this.id = input.id;
     this.cwd = normalizeContainerPath(input.descriptor.cwd, input.descriptor.spec.workingDirectory);
@@ -665,7 +714,12 @@ export class ProjectedContainerToolRuntime implements ToolRuntime {
     );
     this.process = new ProjectedContainerProcessRunner(
       { ...input.descriptor, cwd: this.cwd },
-      input.containerManager
+      input.containerManager,
+      {
+        runtimeId: input.id,
+        sessionId: input.sessionId,
+        secretResolver: input.secretResolver,
+      }
     );
     const helper = new ProjectedContainerRuntimeHelper(
       { ...input.descriptor, cwd: this.cwd },
