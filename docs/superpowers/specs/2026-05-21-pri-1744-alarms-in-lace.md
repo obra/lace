@@ -1,171 +1,252 @@
-# PRI-1744: Move alarms into lace, per-session storage
+# PRI-1744: Alarms in lace, per-session, with a unified notification shape
 
-**Status:** Design spec
+**Status:** Design spec (revised 2026-05-21 — supersedes the earlier `if_session_ended`/agent-names framing)
 **Linear:** https://linear.app/prime-radiant/issue/PRI-1744
 **Author:** Bot (with Jesse)
-**Date:** 2026-05-21
 
 ## Problem
 
-Sen-core today owns the alarm subsystem:
+Sen-core owns the alarm subsystem today:
 
 - `sen-core-v2/src/alarms/{store,scheduler-service,tools,types,cron}.ts` implement the SQLite store, scheduler loop, MCP tool surface, and cron math.
-- `sen-core-v2/mcp-servers/scheduler.ts` exposes `schedule_alarm`/`cancel_alarm`/`list_alarms` as a stdio MCP subprocess that lace spawns inside the persona container.
-- `sen-core-v2/src/main.ts:574-590` instantiates a second `AlarmsStore` handle on the same SQLite file and runs the in-process `SchedulerService.run()` loop that turns due alarms into `InboundAlarm` items via the dispatcher.
+- `sen-core-v2/mcp-servers/scheduler.ts` runs as a stdio MCP subprocess that lace spawns inside the persona container, opening its own `AlarmsStore` handle on `/var/sen/instance/alarms/alarms.db`.
+- `sen-core-v2/src/main.ts:574-590` holds a second handle on the same SQLite file and runs the in-process `SchedulerService.run()` loop.
 
-Both handles target `/var/sen/instance/alarms/alarms.db` (a bind-mounted host file). Cross-process WAL across a bind-mount is the root cause of the sporadic disk-I/O errors (sen-core-v2#46) and one-shot-vanishing behaviour (sen-core-v2#45). It also forces a 5-second backstop poll because the MCP subprocess can't `notify()` the in-process scheduler in another container.
+Cross-process WAL across a bind-mounted SQLite file is the root cause of the sporadic disk-I/O errors (sen-core-v2#46) and silent one-shot loss (sen-core-v2#45). It also forces a 5-second backstop poll — the MCP subprocess can't `notify()` the in-process scheduler in another container.
 
-A second, longer-horizon constraint: sen-box and other personas will soon need their own alarms. Today they would share Ada's `alarms.db` via the wide `LACE_DIR` mount — wrong scope.
+Forcing function: sen-box and future personas will need their own alarms. Today they'd share Ada's `alarms.db` via the wide LACE_DIR mount. Per-agent isolation is required before a second persona that schedules alarms ships.
 
 ## Goal
 
-Move alarm storage, scheduling, and tool surface into lace. Each lace session gets its own `alarms.jsonl` next to `events.jsonl`. Alarm fires become a new `DurableEvent` type appended to the target session's events log; the embedder picks them up through the existing `onSessionUpdate` fanout. No cross-process SQLite, no bind-mounted DB, no new subscription primitive.
+Move alarm storage, scheduling, and tool surface into lace, scoped per-session. Each lace process owns its session's alarms; storage is a single per-session `alarms.json` snapshot, atomically rewritten. Alarm fires (and all other agent-facing lace notifications) flow through a single `injectNotification` utility that writes a `context_injected` durable event with `priority='immediate'`. The conversation runner's existing pickup folds that event into the next turn as a `role: 'user'` message. No new ent-protocol surface, no new `DurableEvent` types.
 
 ## Verified constraints (from the code, 2026-05-21)
 
-These shape the design and must hold for it to work:
-
-1. **Session IDs are stable for the life of the session.** Rotation in `sen-core-v2/src/rotation/runner.ts:166` is implemented as `ent/session/compact` — same session, new `context_compacted` event appended. There is no "rotation creates a new session" code path.
-2. **Sen-core persists its core session id and resumes it across restarts.** `sen-core-v2/src/main.ts:309-325` reads `<instance-root>/history/core-session-id` and calls `client.sessionResume({ sessionId })`. First-boot writes the file. The session-id binding alarms need is already enforced.
-3. **One lace runtime hosts many sessions, sharing one `LACE_DIR`.** The parent's session and every subagent session live under `<LACE_DIR>/agent-sessions/<sessionId>/`. Only one session is *active* at a time (`state.activeSession`), but inactive sessions still own a session directory.
-4. **`appendDurableEvent(sessionDir, ...)` is path-keyed**, not active-session-keyed. It opens `events.jsonl`, derives the next `eventSeq` from the log itself, and appends. It works for any session directory, active or not. (`packages/agent/src/storage/event-log.ts:84`.)
-5. **Subagent sessions are spawned by lace.** `packages/agent/src/jobs/subagent-spawn.ts` owns the persona-container / native-child spawn machinery. Each delegate job records a `job_started` then a `job_session_assigned` event in the parent's `events.jsonl` linking the spawning `jobId` to the subagent's `sessionId`.
+1. **Session IDs are stable for life.** `sen-core-v2/src/rotation/runner.ts:166` rotation = `ent/session/compact`, same session, new `context_compacted` event. No session-id change happens.
+2. **Sen-core persists + resumes the same session-id across restarts** (`main.ts:309-325`). Session-id binding alarms need is already enforced.
+3. **Process isolation per session.** Each lace session runs in its own lace process. Sen-core spawns a lace child for Ada. Subagents spawn their own lace processes via `packages/agent/src/jobs/subagent-spawn.ts` (native child or in-container `docker exec` / `container exec`). The host's LACE_DIR is shared across these processes via bind-mount.
+4. **Conversation runner already reads `context_injected priority='immediate'` between iterations.** `packages/agent/src/core/conversation/runner.ts:71-90` (`readImmediateInjectsSince`) and the call site at `runner.ts:217-227`. It folds the injected text into the next `role: 'user'` message inside the agentic loop. This is the existing primitive we ride.
+5. **`atomicWriteJson` exists** at `packages/agent/src/storage/atomic-write.ts:14` — write-tmp-then-rename, used for `meta.json` and `state.json`. We reuse it for `alarms.json`.
+6. **`appendDurableEvent(sessionDir, ...)` is path-keyed**, not active-session-keyed (`packages/agent/src/storage/event-log.ts:84`). It works for any session directory, including one owned by a different lace process. That's how a subagent process writes a `subagent-exited` notification into the parent's `events.jsonl`.
 
 ## Architecture
 
-### Per-session storage
+### Tool surface
 
-```
-<LACE_DIR>/agent-sessions/<sessionId>/
-  meta.json
-  state.json
-  events.jsonl       # existing
-  alarms.jsonl       # NEW
-```
+Three lace native tools in `packages/agent/src/tools/implementations/`, alongside `delegate`/`job_notify`/etc. Ported behavior from `sen-core-v2/src/alarms/tools.ts` minus the (now-dropped) `ifSessionEnded` parameter.
 
-`alarms.jsonl` is an append-only log of alarm records. Each row is a complete record; status transitions append a new row with the same `id` and the new status. The latest-by-`id` wins on replay. (Same shape as `events.jsonl` — append-only, JSON-per-line, no in-place mutation.)
-
-Row schema:
+#### `schedule_alarm`
 
 ```ts
-type AlarmRow = {
-  id: string;                         // alarm_<12 hex>
-  kind: 'cron' | 'once';
-  schedule: string;                   // cron expr OR ISO-8601 timestamp
-  timezone: string;                   // IANA tz name; UTC for unspecified once
-  prompt: string;
-  ifSessionEnded: 'drop' | 'wake' | 'bubble';  // NEW, default 'drop'
-  next_fire_at: number;               // epoch ms
-  status: 'pending' | 'firing' | 'fired' | 'cancelled';
-  created_at: number;                 // epoch ms
-  fired_at: number | null;            // epoch ms; null until first fire
-  delivered_at: number | null;        // NEW; epoch ms when alarm_fired event was emitted as session/update
+// input
+{
+  kind: 'cron' | 'once',
+  schedule: string,        // cron expr for cron, ISO-8601 for once
+  prompt: string,
+  timezone?: string,       // IANA; required for cron, defaults UTC for once
+}
+
+// success output
+{
+  id: 'alarm_<12hex>',
+  kind, schedule, prompt, timezone,
+  next_fire_at_iso: '2026-05-22T16:00:00.000Z',
+}
+
+// failure output (uses Tool's existing error envelope)
+{ isError: true, content: [{ type: 'text', text: '<reason>' }] }
+```
+
+Validation: same as today's sen-core tool — IANA timezone, cron min-interval 1 hour, MAX_ACTIVE_ALARMS=50.
+
+#### `cancel_alarm`
+
+```ts
+// input: { id }
+// output: { cancelled: true }
+//      OR { cancelled: false, reason: 'not_found'|'already_fired'|'already_cancelled'|'firing' }
+```
+
+#### `list_alarms`
+
+```ts
+// input: {}
+// output: { alarms: Array<{
+//   id, kind, schedule, prompt, timezone, status,
+//   next_fire_at_iso, created_at_iso
+// }> }
+```
+
+### Storage
+
+**Per-session snapshot** at `<LACE_DIR>/agent-sessions/<sessionId>/alarms.json`. Single JSON file, atomically rewritten on every state change via `atomicWriteJson`.
+
+```ts
+type AlarmsSnapshot = {
+  alarms: Array<{
+    id: string;                  // alarm_<12hex>
+    kind: 'cron' | 'once';
+    schedule: string;
+    timezone: string;
+    prompt: string;
+    status: 'pending' | 'firing' | 'fired' | 'cancelled';
+    next_fire_at: number;        // epoch ms
+    created_at: number;          // epoch ms
+    fired_at: number | null;     // epoch ms; null until first fire
+  }>;
 };
 ```
 
-`delivered_at` exists so the scheduler can replay alarm fires that occurred while the target session was inactive: when the session next becomes active (`session/load` or `session/resume`), lace emits `session/update` for every alarm row with `status='fired'` and `delivered_at=null`, then appends a follow-up alarm-row with `delivered_at` set.
+Bounded: MAX_ACTIVE_ALARMS=50 × ~200 bytes per record ⇒ ~10 KB. Atomic rewrite on every change is cheap. No append-only log, no compaction, no fold-on-replay — boot reads the JSON, snapshot is the state.
 
-### Boot recovery
+Boot recovery:
 
-On lace startup, `AlarmScheduler.start()`:
+1. Read `alarms.json` (initialize empty if missing).
+2. For each `pending` alarm, insert into in-memory min-heap by `next_fire_at`.
+3. Re-queue any `firing` rows as `pending` — interpreted as "claimed but crashed before completing the fire." At-most-once duplicate fire, never lost.
+4. Stale-recurring sweep: cron rows whose `next_fire_at` is more than 60 s in the past are silently advanced (via `computeNextCronFire`) to the next occurrence. One-shots are left alone and fire on next tick.
 
-1. Lists `agent-sessions/*/` directories.
-2. For each, reads `alarms.jsonl` and folds it to the latest-by-id state.
-3. For each `pending` (or stuck `firing`) row, inserts `{ sessionId, alarmId, next_fire_at }` into an in-memory min-heap keyed by `next_fire_at`.
-4. Runs the stale-recurring sweep (port of `SchedulerService.runStaleSweep`): cron rows whose `next_fire_at` is more than 60 s in the past are silently rescheduled to the next occurrence after `now`. One-shots are left alone — past one-shots fire on the next tick.
-5. Begins the main loop (see "Scheduler loop" below).
+### Scheduler
 
-`firing` rows on startup are interpreted as "we claimed but crashed before completing the fire" — treated as `pending` and re-queued, so a crash mid-fire results in at most a duplicate fire, never a lost fire.
+**Per-lace-process scheduler** in `packages/agent/src/alarms/alarm-scheduler.ts`. Each lace process runs ONE scheduler that owns its session's alarms only — no cross-process coordination, no shared scheduler walking other session dirs.
 
-### Scheduler loop
-
-Single loop per lace runtime. Same shape as the current `SchedulerService.tick`:
+Loop shape (matches `sen-core-v2/src/alarms/scheduler-service.ts` skeleton):
 
 ```
 loop:
-  if heap empty:
-    sleep(BACKSTOP_POLL_MS=5000) OR until notify()
-    continue
+  if heap empty:                  sleep(BACKSTOP_POLL_MS=5000) OR notify()
   peek soonest:
-    if next_fire_at > now: sleep(min(diff, BACKSTOP_POLL_MS)) OR notify(); continue
-    fire(soonest)
+    if next_fire_at > now:        sleep(min(diff, 5000)) OR notify()
+    else:                         fire(soonest)
 
 fire(row):
-  - atomic claim: append `{ ...row, status: 'firing' }` to alarms.jsonl if latest row is still 'pending'
-  - if claim lost (someone else moved it): skip
-  - appendDurableEvent on target session: { type: 'alarm_fired', data: { id, alarmKind, prompt, schedule, fired_at } }
-  - if target session is the active session: emitSessionUpdate({ type: 'alarm_fired', ... }) and append { ...row, status: 'fired', fired_at, delivered_at: now } to alarms.jsonl
-  - if target session is inactive: append { ...row, status: 'fired', fired_at, delivered_at: null }
-  - if kind === 'cron': append { ...row, status: 'pending', next_fire_at: <next jittered occurrence>, fired_at, delivered_at }
-  - re-insert into heap if cron
+  - snapshot status: pending → firing; rewrite alarms.json
+  - call injectNotification({ sessionDir, kind: 'alarm-fired',
+                              identifiers: { 'alarm-id': row.id }, body })
+  - if once: status → fired; rewrite
+  - if cron: compute next jittered occurrence; status → pending,
+             next_fire_at updated; rewrite; re-insert into heap
 ```
 
-`notify()` wakes the loop early when a new alarm is scheduled in-process — same shape as today's notify, just no cross-process boundary anymore.
+`notify()` wakes the loop in-process when `schedule_alarm` inserts a new alarm — same shape as today's `SchedulerService.notify()`, just no cross-process boundary.
 
-`MAX_ACTIVE_ALARMS = 50` is enforced per-session (counted from `alarms.jsonl` folded state).
+### Fire mechanism — `injectNotification`
 
-### Fire delivery
-
-Two paths, picked at fire time by checking whether the target session is the active session.
-
-**Target session is active (the common case):**
-
-1. Append `alarm_fired` event to `<sessionId>/events.jsonl` via `appendDurableEvent`. This is durable.
-2. Emit `session/update` with the same payload. Sen-core's `onSessionUpdate` handler receives it on the live JsonRpcPeer.
-3. Append the `fired` alarm row to `alarms.jsonl` with `delivered_at=now`.
-4. Sen-core's existing dispatcher translates `alarm_fired` → `InboundAlarm` → inbox enqueue → ambient loop wake → next turn includes the `<alarm>` block in the prompt.
-
-**Target session is inactive (rare but real — e.g., subagent that finished and its session is dormant, or sen-core crashed and hasn't resumed yet):**
-
-1. Append `alarm_fired` event to `<sessionId>/events.jsonl` — durable, unchanged shape.
-2. Append the `fired` alarm row to `alarms.jsonl` with `delivered_at=null`.
-3. No `session/update` emitted (no live transport to deliver to for this session).
-
-When the session becomes active again (`session/load`, `session/resume`, or in the `wake` flow described below): lace scans `alarms.jsonl` for rows with `status='fired'` and `delivered_at=null`. For each, it emits `session/update { type: 'alarm_fired', ... }` and appends an updated row with `delivered_at=now`. This is the "normal replay" — embedder receives undelivered fires through the same `onSessionUpdate` callback it always uses.
-
-### `alarm_fired` durable event
-
-New entry in `DurableEventData` (`packages/agent/src/storage/event-types.ts`):
+When the scheduler fires an alarm, it calls a new utility:
 
 ```ts
-export type AlarmFiredEventData = {
-  type: 'alarm_fired';
-  id: string;
-  alarmKind: 'cron' | 'once';
-  prompt: string;
-  schedule: string;
-  fired_at: number;   // epoch ms
-};
+function injectNotification(opts: {
+  sessionDir: string;
+  kind: NotificationKind;
+  identifiers?: Record<string, string>;  // emitted as XML attrs on the wrapper
+  body: string;                          // prose body
+}): void
 ```
 
-Surfaced through the existing `session/update` discriminated union. New `SessionUpdate*Schema` in `packages/ent-protocol/src/schemas/methods.ts`:
+Effect:
 
-```ts
-const SessionUpdateAlarmFiredSchema = z.object({
-  type: z.literal('alarm_fired'),
-  id: NonEmptyStringSchema,
-  alarmKind: z.enum(['cron', 'once']),
-  prompt: z.string(),
-  schedule: z.string(),
-  fired_at: z.number(),
-}).strict();
+1. Wraps `body` in `<notification kind="..." [attrs]>...body...</notification>`.
+2. Appends a `context_injected` durable event with `priority='immediate'` to `<sessionDir>/events.jsonl` (via existing `appendDurableEvent`).
+3. If `sessionDir` is the current lace process's active session AND the agent is idle (no active turn), trigger an internal turn so the agent picks up the notification immediately rather than waiting for the next user prompt. (Same pattern as today's `job-notifications.ts:75-89`.)
+
+For a fire targeting THIS process's session: written directly into the session we're already in.
+
+For a `subagent-exited` notification written by a subagent process targeting its parent: the subagent's lace process has access to the host LACE_DIR (mounted), so `<parent.sessionId>/events.jsonl` is reachable. The parent lace process picks the event up via its runner's existing immediate-inject loop on the next turn. The subagent does not (and cannot) trigger the parent's internal-turn wake; it relies on the next external prompt or job-lifecycle wake reaching the parent.
+
+#### Conversation runner watermark fix
+
+There is one small, necessary tweak to make the existing pickup work end-to-end for the new "write event while idle then wake" pattern.
+
+Current behavior (`runner.ts:197`): `lastSeenEventSeq = deriveNextEventSeqFromEventLog(sessionDir) - 1`. This snapshots the latest seq at run-start, so any event already written (including a just-written context_injected from injectNotification) is skipped.
+
+Required behavior: the runner needs to see context_injected events written *between turns*. Two equally valid implementations:
+
+- **A.** Make the runner accept an optional `startEventSeq` param; `injectNotification` captures the pre-write watermark and threads it through when it triggers the internal turn. Same for `session/prompt`'s entry point: capture watermark before writing the prompt event, pass to `runner.run()`.
+- **B.** Have the runner derive `lastSeenEventSeq` by walking back to the last `turn_end` event (or `0` if none). Any context_injected event newer than the last turn_end is by definition unprocessed.
+
+We pick **B** in this spec because it requires no plumbing changes outside the runner and naturally handles `ent/session/inject` calls that arrived while idle (today silently dropped — pre-existing latent bug closed as a side effect). The first iteration's `readImmediateInjectsSince` reads only events of type `context_injected` with `priority='immediate'`, so the cost is bounded.
+
+### Unified notification shape
+
+All lace-side agent-facing notifications share one wrapper, produced by a single utility.
+
+**Rules:**
+
+- Single wrapper: `<notification kind="..." [identifier-attributes]>...body...</notification>`.
+- Identifiers as attributes (`alarm-id`, `job-id`, `subagent-session-id`, `persona`, ...) for machine parsing. XML-escape attribute values.
+- Body is prose, not labeled fields. Lists in body get a one-sentence prose preamble plus indented bullets. End with the next-step tool-call hint when applicable.
+
+**Kinds the implementer will write composers for:**
+
+| `kind` | Identifiers | Composer | Replaces today |
+| --- | --- | --- | --- |
+| `alarm-fired` | `alarm-id` | `composeAlarmFiredBody(row)` | (new) |
+| `job-completed` | `job-id` | `composeJobCompletedBody(job)` | `formatJobNotification(type='completed')` |
+| `job-failed` | `job-id` | `composeJobFailedBody(job)` | `formatJobNotification(type='failed')` |
+| `job-cancelled` | `job-id` | `composeJobCancelledBody(job)` | `formatJobNotification(type='cancelled')` |
+| `job-progress` | `job-id` | `composeJobProgressBody(job, recentLines)` | `formatJobNotification(type='progress')` |
+| `subagent-exited` | `subagent-session-id`, `job-id`, `persona` | `composeSubagentExitedBody({ subagent, pendingAlarms })` | (new) |
+
+**Example bodies (verbatim from the ticket):**
+
+```
+<notification kind="alarm-fired" alarm-id="alarm_a1b2c3">
+The cron alarm you scheduled (0 9 * * * in America/Los_Angeles) just fired. The note you left for your future self: "Time to check the test status board". Call list_alarms() to see other pending alarms.
+</notification>
 ```
 
-Add `SessionUpdateAlarmFiredSchema` to `SessionUpdateInnerNonJobSchema`, `_SessionUpdateInnerSchema`, and `SessionUpdateParamsSchema`.
+```
+<notification kind="job-completed" job-id="job_xyz">
+Your background job completed successfully (exit code 0) after 12.3 seconds, writing 15,234 bytes of output. The last line was: "build finished in 5.2s". Call job_output(jobId="job_xyz") to read the full output. To continue this conversation thread, call delegate(resume="job_xyz", prompt="your message").
+</notification>
+```
 
-### `if_session_ended` semantics
+```
+<notification kind="job-progress" job-id="job_xyz">
+Your background job has been running for 5m 12s and has written 142,330 bytes (+8,210 since last update). Recent output:
+  building target...
+  built dist/cli.js in 3.1s
+  built dist/main.js in 5.2s
+Call job_output(jobId="job_xyz") to check current output.
+</notification>
+```
 
-Per-alarm policy for what happens at fire time when the **session-id this alarm was scheduled against is no longer recoverable**. "No longer recoverable" means the session directory was removed (e.g., a subagent that completed and was cleaned up). It does NOT mean "session is currently inactive" — inactive sessions are handled by the deliver-on-activate path above.
+```
+<notification kind="subagent-exited" subagent-session-id="sess_abc" job-id="job_xyz" persona="sen-box">
+Your sen-box subagent exited gracefully but had 1 pending alarm that won't fire now: alarm_z1z2 was a one-shot scheduled for 2026-05-22T17:00:00Z with the prompt "Check on the running git operation".
+</notification>
+```
 
-Three values:
+The composer functions are pure and easily unit-tested. They have no side effects — formatting only.
 
-| value | top-level session | subagent session |
-| --- | --- | --- |
-| `drop` (default) | ✅ allowed; alarm is discarded silently | ✅ allowed; alarm is discarded silently |
-| `wake` | ❌ rejected at schedule-time (`WakeInvalidForTopLevel`) | ✅ allowed; lace respawns the subagent |
-| `bubble` | ❌ rejected at schedule-time (`BubbleInvalidForTopLevel`) | ✅ allowed; alarm is delivered to the parent session |
+### What this refactors away
 
-**Determining if a session is a subagent:** `meta.json` gains an optional `parent` field, written when lace creates a subagent session via the delegate path:
+The unified shape lets us collapse the existing job-notification queue + flush plumbing:
+
+- `packages/agent/src/jobs/format-notification.ts` (the whole `formatJobNotification` and its `<background-job-notification>` wrapper) is **deleted**, replaced by the composers + `injectNotification`.
+- `packages/agent/src/jobs/job-manager.ts`'s `notificationQueue` field, `queueNotification`, `getNotificationQueue`, and `flushNotifications` are **deleted**. Fanout still exists for subscription filtering; it now calls `injectNotification(...)` directly instead of pushing onto a queue.
+- `packages/agent/src/jobs/job-notifications.ts`'s `createQueueJobNotification` is rewritten: instead of pushing onto the queue, it composes the body for the kind and calls `injectNotification`. The "trigger internal turn when idle" path is preserved (moved into `injectNotification`).
+- `packages/agent/src/rpc/handlers/prompt.ts:102-111` — the `state.jobManager.flushNotifications()` prepend path — is **deleted**. Notifications now arrive as `context_injected` events that the runner picks up on its first iteration (via the watermark fix).
+
+### Subagent exit handling (the courtesy bubble)
+
+When a subagent's lace process shuts down gracefully (SIGTERM during the shutdown sequence, normal stdin EOF, etc., **not** crash):
+
+1. Stop the scheduler loop (so no fires are in flight).
+2. Read `<own-sessionId>/alarms.json` from disk.
+3. If any rows have `status === 'pending'`:
+   - Look up `parent.sessionId` from this session's `meta.json`. If `meta.parent` is missing, skip (we're a top-level session — no one to notify).
+   - Build the parent's session dir path: `<LACE_DIR>/agent-sessions/<parent.sessionId>/`.
+   - Call `injectNotification({ sessionDir: parentDir, kind: 'subagent-exited', identifiers: { 'subagent-session-id': sessionId, 'job-id': parent.jobId, persona: parent.personaName ?? '' }, body: composeSubagentExitedBody(...) })`.
+4. Exit.
+
+Pending alarms remain in the subagent's `alarms.json` but never fire — no scheduler is running for that session. This is documented as a known limitation (today's behavior is already to lose them).
+
+Crash exit (uncaught exception, SIGKILL, OOM, host kill) does not notify. The parent learns via the existing job-lifecycle path (`job-failed` notification fires when the parent's job-manager detects the subagent process died).
+
+### `SessionMeta.parent`
+
+Add optional `parent` field, written when a subagent session is created:
 
 ```ts
 type SessionMeta = {
@@ -173,228 +254,101 @@ type SessionMeta = {
   workDir: string;
   created: string;
   parent?: {
-    sessionId: string;     // parent session id
-    jobId: string;         // delegate job id that spawned us
-    personaName?: string;  // persona that ran (for wake)
-    runtime?: PersonaContainerRuntime | PersonaBoxRuntime;  // serialized spec for re-spawn
+    sessionId: string;       // parent session id
+    jobId: string;           // delegate job id that spawned us
+    personaName?: string;
   };
 };
 ```
 
-`parent` is set in `subagent-job.ts` at the moment the subagent session is created (around the existing `client.sessionNew` call path), captured from the spawn options. Missing `parent` field means top-level session.
+Wired in `packages/agent/src/jobs/subagent-spawn.ts` (and `subagent-job.ts`, where `client.sessionNew` is called against the subagent process): the spawning context already knows `parentSessionId`, `jobId`, and `personaName`; thread these as a new optional `parent` param on `session/new` and persist into the subagent's `meta.json`.
 
-**`wake` flow (subagent only):**
-
-1. Scheduler fires the alarm, but target session dir is gone.
-2. Scheduler reads the *most recent* `alarms.jsonl` row to recover the alarm's original session's meta — but meta is gone too. Solution: when an alarm is scheduled with `wake` or `bubble`, the alarm row carries a copy of the meta's `parent` snapshot. The alarm record gains:
-   ```ts
-   parent?: {
-     sessionId: string;
-     jobId: string;
-     personaName?: string;
-     runtime?: ...;
-   };
-   ```
-   Captured at schedule-time. Frozen — does not track later edits to meta.
-3. Lace re-spawns the persona using `runtime` via existing `spawnSubagent()` plumbing. The new subagent comes up with a **new** session id.
-4. The `alarm_fired` event is appended to the *new* session's `events.jsonl`. The `session/update` fires once the new session becomes active.
-5. The original session dir stays gone. The alarm row is marked `fired`; if cron, the next occurrence is also bound to the new session id (subsequent fires go to the new session).
-
-Edge case: if `runtime` is unavailable (e.g., persona spec evicted), wake degrades to `drop` with a warning log. Documented behavior.
-
-**`bubble` flow (subagent only):**
-
-1. Scheduler fires the alarm, but target session dir is gone.
-2. Scheduler reads the alarm row's `parent.sessionId`.
-3. Appends `alarm_fired` to the **parent** session's `events.jsonl` (and emits `session/update` if parent is active, or queues delivery via the inactive-session replay).
-4. The `alarm_fired` event carries an additional `bubbled_from` field so the parent can tell it's a bubble:
-   ```ts
-   { type: 'alarm_fired', id, alarmKind, prompt, schedule, fired_at,
-     bubbled_from?: { sessionId: string; personaName?: string } }
-   ```
-5. If the parent session is also gone, bubble degrades to `drop` with a warning log.
-
-For cron alarms in `bubble` mode: subsequent fires also bubble to the parent. The cron alarm row stays bound to its (defunct) origin session-id; the scheduler keeps reading its `parent` pointer.
-
-### Tool surface
-
-Three first-class lace tools in `packages/agent/src/tools/implementations/`:
-
-- `schedule_alarm.ts`
-- `cancel_alarm.ts`
-- `list_alarms.ts`
-
-Input / output shape preserved exactly from `sen-core-v2/src/alarms/tools.ts`, plus the new `ifSessionEnded` parameter on `schedule_alarm`:
-
-```ts
-const scheduleInputShape = {
-  kind: z.enum(['cron', 'once']),
-  schedule: z.string().min(1),
-  prompt: z.string().min(1),
-  timezone: z.string().optional(),
-  ifSessionEnded: z.enum(['drop', 'wake', 'bubble']).optional().default('drop'),  // NEW
-};
-
-const scheduleOutputShape = {
-  id: z.string(),
-  kind: z.enum(['cron', 'once']),
-  schedule: z.string(),
-  prompt: z.string(),
-  timezone: z.string(),
-  ifSessionEnded: z.enum(['drop', 'wake', 'bubble']),
-  next_fire_at_iso: z.string(),
-};
-```
-
-**Validation at schedule time:**
-
-- Cron expression: existing `assertValidCronMinInterval` (min 1 hour) and `assertValidIanaTimezone`.
-- One-shot: existing `computeNextOnceFire` (ISO-8601 in the future).
-- `MAX_ACTIVE_ALARMS=50` per session.
-- If `ifSessionEnded` is `wake` or `bubble` and the calling session has no `parent` field in `meta.json`, reject with `WakeInvalidForTopLevel` / `BubbleInvalidForTopLevel` (structured tool error).
-- If `ifSessionEnded` is `wake` and `parent.runtime` is undefined (e.g., a subagent spawned without a persona spec, which is unusual but possible), reject with `WakeRequiresPersonaRuntime`.
-
-**Tool execution context:** all three tools resolve the calling session as the current `state.activeSession` (the tool always runs in the context of an active session). The `AlarmStore` accessor for that session is `<state.activeSession.dir>/alarms.jsonl`.
-
-**Tool annotations:** `schedule_alarm` is destructive (`destructive: true`, `safeInternal: false`); approval gate matches the existing alarm tool semantics. `cancel_alarm` is destructive. `list_alarms` is read-only (`readOnlySafe: true`).
-
-### AlarmStore + AlarmScheduler in lace
-
-Two new files in `packages/agent/src/alarms/`:
-
-- `alarm-store.ts` — `class AlarmStore` wraps a per-session `alarms.jsonl`. Methods: `insert`, `cancel`, `listActive`, `countActive`, `claim`, `markFired`, `rescheduleCron`, `markDelivered`, `findUndelivered`. Implementation is JSONL append + in-memory fold (rebuilt on construction).
-- `alarm-scheduler.ts` — `class AlarmScheduler` runs the single loop. Holds the in-memory min-heap, the per-session `AlarmStore` map, and the emit hook. Started during server initialization (after session storage is available, before tool execution can begin).
-
-Cron math (`computeNextCronFire`, `computeNextOnceFire`, `assertValid*`) ports verbatim from `sen-core-v2/src/alarms/cron.ts` to `packages/agent/src/alarms/cron.ts`.
-
-Wiring in `server.ts`:
-
-```ts
-state.alarmScheduler = new AlarmScheduler({
-  sessionsDir: agentSessionsDir(),
-  jitterMaxMs: resolveAlarmJitterMs(state.config.env),
-  now: () => Date.now(),
-  emitToActive: (targetSessionId, update) => {
-    if (state.activeSession?.meta.sessionId === targetSessionId) {
-      return emitSessionUpdate(update);
-    }
-    return Promise.resolve();
-  },
-  appendEvent: (sessionDir, event) => {
-    // Reuses runExclusive for active session; direct append for inactive.
-    if (state.activeSession?.dir === sessionDir) {
-      return runExclusive(() => {
-        const s = readSessionState(sessionDir);
-        const { nextState } = appendDurableEvent(sessionDir, s, event);
-        writeSessionState(sessionDir, nextState);
-      });
-    }
-    const s = readSessionState(sessionDir);
-    const { nextState } = appendDurableEvent(sessionDir, s, event);
-    writeSessionState(sessionDir, nextState);
-    return Promise.resolve();
-  },
-  spawnSubagentForWake: spawnSubagent,  // from jobs/subagent-spawn
-});
-state.alarmScheduler.start();
-```
-
-Session activation (`activateStoredSession` in `rpc/handlers/session.ts`): after `state.activeSession = ...`, call `state.alarmScheduler.flushUndelivered(state.activeSession.meta.sessionId)`. This replays any undelivered alarm fires as `session/update` notifications and marks them delivered.
-
-`ToolContext` gains an `alarmScheduler` field so the three tools can call `state.alarmScheduler.schedule({ sessionId, ...args })` etc.
+Missing `parent` ⇒ top-level session.
 
 ## Ent-protocol changes
 
-Single surface change: one new `SessionUpdate` discriminant.
+**None.** No new methods. No new `DurableEvent` types. No new `SessionUpdate` discriminants. We reuse the existing `context_injected` event type with `priority='immediate'`.
 
-**`packages/ent-protocol/src/schemas/methods.ts`:**
-
-- Add `SessionUpdateAlarmFiredSchema` (see schema above).
-- Add it to `SessionUpdateInnerNonJobSchema`, `_SessionUpdateInnerSchema`, and `SessionUpdateParamsSchema`.
-- Export `SessionUpdateAlarmFired` type.
-
-**`packages/ent-protocol/src/errors.ts`:** no new error codes required. Wake/bubble rejections are tool-execution errors (returned as `{ isError: true, content: [...] }`), not RPC errors. If we later decide they should be RPC-level, we'd add `WakeInvalidForTopLevel` and `BubbleInvalidForTopLevel` to `EntErrorCodes`; out of scope for this ticket.
-
-No changes to `session/new`, `session/load`, `session/resume`, `session/list`, `session/close`, `session/fork`, or any other method. No new methods. No name primitive. No name field on any schema.
+Optionally: add `parent` to `SessionNewParamsSchema` so the subagent's `session/new` call can pass parent linkage through the wire format. (The handler validation already accepts an open shape via `as` casts; adding the field to the schema keeps validation strict.)
 
 ## Sen-core changes
+
+These edits expand beyond the previous draft's scope.
 
 **Delete:**
 
 - `sen-core-v2/src/alarms/store.ts`
 - `sen-core-v2/src/alarms/scheduler-service.ts`
 - `sen-core-v2/src/alarms/tools.ts`
-- `sen-core-v2/src/alarms/cron.ts` (ported into lace; the sen-core copy goes)
+- `sen-core-v2/src/alarms/cron.ts`
+- `sen-core-v2/src/alarms/types.ts` (`InboundAlarm` is no longer needed — alarms don't pass through sen-core's inbox; they arrive at Ada's conversation via lace's injection path)
 - `sen-core-v2/mcp-servers/scheduler.ts`
-- `sen-core-v2/tests/automated/alarms/` (replaced by lace's tests)
-
-**Keep:**
-
-- `sen-core-v2/src/alarms/types.ts` — `InboundAlarm` shape stays as the inbox envelope discriminator. Optionally trimmed to just the inbox envelope (no store-side types).
+- `sen-core-v2/tests/automated/alarms/` (directory)
 
 **Update:**
 
-- `sen-core-v2/src/main.ts:574-590` — remove `alarmsDir`/`mkdirSync`/`AlarmsStore`/`SchedulerService`/`schedulerPromise`. The dispatcher's existing inbox-enqueue path for `InboundAlarm` stays.
-- Extend `attachClientSubscriptions` (around `sen-core-v2/src/main.ts:204`) to recognize `update.type === 'alarm_fired'` and translate to an `InboundAlarm` for `dispatcher.dispatch(...)`. The mapping is direct: `id`, `alarmKind`, `prompt`, `schedule`, `fired_at` → same fields on `InboundAlarm`. `bubbled_from`, if present, is folded into the alarm prompt (e.g., a leading `[from subagent <name>]` line) — let sen-core decide how it surfaces.
-- `sen-core-v2/templates/agent-personas/core.md` — remove the `scheduler:` MCP server entry (lines 8-14).
-- `sen-core-v2/src/slack/envelope.ts` — no change. `InboundAlarm` shape is unchanged.
+- `sen-core-v2/src/main.ts:574-590` — remove `alarmsDir`/`mkdirSync`/`AlarmsStore`/`SchedulerService` + the `schedulerPromise` block. Remove related imports.
+- `sen-core-v2/src/main.ts` (around `attachClientSubscriptions`, line ~203) — remove any `update.type` branches that referenced alarm handling, if present. (None today — alarms went through the inbox dispatcher, not session/update — but verify.)
+- `sen-core-v2/src/slack/envelope.ts` — remove `formatAlarm`, remove the `isInboundAlarm` branch in `formatEnvelope`, narrow the type to `InboundSlackMessage[]`. The envelope formatter is now Slack-only.
+- `sen-core-v2/src/slack/types.ts` — remove `InboundAlarm` re-export and `isInboundAlarm`. `InboundItem` becomes a type alias for `InboundSlackMessage` (or the union collapses to a single member).
+- `sen-core-v2/src/ambient/inbox-dispatcher.ts` — drop any alarm-branch handling. The dispatcher is Slack-only now.
+- `sen-core-v2/src/main.ts` — drop the dispatcher-side alarm wiring. The `dispatcher.dispatch(alarm)` callback that was supplied to `SchedulerService` goes away with the scheduler.
+- `sen-core-v2/templates/agent-personas/core.md` — remove the `scheduler` MCP server entry (lines 8-14).
 
-## Test surface
-
-### Lace tests
-
-**Unit (`packages/agent/src/alarms/__tests__/`):**
-
-- `alarm-store.test.ts` — JSONL fold semantics: insert, cancel, claim, markFired, rescheduleCron, markDelivered. Replay-on-construction parity (state matches a fresh fold). MAX_ACTIVE_ALARMS=50 cap.
-- `alarm-scheduler.test.ts` — fake clock + fake sleep: soonest-pending math, notify wakes the loop, stale-recurring sweep, claim contention (only one claim per fire). Boot recovery from a mixed alarms.jsonl.
-- `cron.test.ts` — port the existing `sen-core-v2/tests/automated/alarms/cron.test.ts` and `assertValid*` tests.
-
-**Unit (`packages/agent/src/tools/implementations/__tests__/`):**
-
-- `schedule_alarm.test.ts` — valid cron, valid one-shot, invalid tz, invalid cron interval, cap exceeded, `ifSessionEnded='wake'` rejected on top-level session, `ifSessionEnded='bubble'` rejected on top-level session, both accepted on a subagent session.
-- `cancel_alarm.test.ts` — port from sen-core's `cancel_alarm` tests.
-- `list_alarms.test.ts` — port; verifies pending+firing rows are returned in `next_fire_at` order; fired/cancelled excluded.
-
-**Integration (`packages/agent/src/__tests__/`):**
-
-- `alarms.fire-delivery.e2e.test.ts` — schedule one-shot via lace tool, advance fake clock, verify `alarm_fired` lands in `events.jsonl` AND `session/update` is emitted to the connected peer.
-- `alarms.inactive-session-replay.e2e.test.ts` — create session A, schedule alarm, close A, advance clock so alarm fires (lace's scheduler appends to A's events.jsonl while inactive), reopen A via `session/resume`, verify `session/update` is replayed with `alarm_fired`.
-- `alarms.restart-recovery.e2e.test.ts` — schedule alarm, kill lace process, restart, advance clock, verify alarm still fires (boot recovery scanned `alarms.jsonl`).
-- `alarms.wake-subagent.e2e.test.ts` — spawn a subagent that schedules an alarm with `ifSessionEnded='wake'`, complete the subagent (session dir gone), advance clock, verify lace respawns the subagent and the new subagent's events.jsonl receives the `alarm_fired` event.
-- `alarms.bubble-subagent.e2e.test.ts` — spawn a subagent, schedule alarm with `ifSessionEnded='bubble'`, end subagent (session dir gone), advance clock, verify parent session receives `alarm_fired` with `bubbled_from`.
-- `alarms.top-level-rejects-wake-bubble.e2e.test.ts` — top-level session calls `schedule_alarm` with `ifSessionEnded='wake'` and `'bubble'`; both are tool-level errors.
-- `alarms.cron-reschedule.e2e.test.ts` — cron alarm fires, scheduler reschedules with jitter, verifies a second fire happens at the rescheduled time.
-
-### Sen-core tests
-
-- `tests/automated/alarms-inbound.e2e.test.ts` — given a fake `alarm_fired` `session/update`, sen-core's `attachClientSubscriptions` dispatches an `InboundAlarm` to the inbox dispatcher.
-- Delete `tests/automated/alarms/` (the old store/scheduler tests). Their behavior is now covered by lace's tests.
+End state: sen-core's inbox is Slack-only. Alarms reach Ada via lace's conversation injection on Ada's session, not via sen-core's inbox dispatcher.
 
 ## Documentation updates
 
-**`docs/protocol-spec.md`** (lace top-level docs): add `alarm_fired` to the `SessionUpdate` event catalogue. Cover `bubbled_from` field semantics.
+- **New section in lace docs** for the alarm tools (`schedule_alarm`, `cancel_alarm`, `list_alarms`) under native tools. Likely path: `docs/features/alarms.md` (new file).
+- **New section** describing the unified notification shape (`<notification kind="...">`), the composer pattern, and how to add a new `kind`. Likely path: `docs/features/notifications.md` (new file) or a section in an existing tools doc.
+- Sen-core docs note that the in-process scheduler has been replaced by lace's tool-driven model; alarms fire via the conversation injection path. The inbox is Slack-only.
 
-**`docs/protocol-conformance.md`**: confirm/extend the conformance list to include `alarm_fired`.
+The implementer verifies the exact locations against the lace docs tree (`docs/features/`, `docs/architecture/`, `docs/protocol-spec.md`).
 
-**New** `docs/features/alarms.md`: short overview of the alarm tool surface and `if_session_ended` semantics. Cross-link to `schedule_alarm` tool documentation.
+## Test surface
 
-**Tool docs:** confirm location with the implementer (likely the long `description` field on each Tool class is the source of truth, mirroring `delegate.ts` and `job_notify.ts`).
+### Lace
 
-**`docs/about-the-protocol.md`**: brief mention if the document calls out the durable-event types catalog.
+**Unit:**
 
-The implementer must verify each location; this spec lists the likely targets, not a contract.
+- `packages/agent/src/notifications/__tests__/inject-notification.test.ts`: wrapper escaping, attribute serialization, `context_injected priority='immediate'` write, idle-wake trigger when called with the active session's dir.
+- `packages/agent/src/notifications/__tests__/composers.test.ts`: a snapshot for each composer (`alarm-fired`, `job-completed`, `job-failed`, `job-cancelled`, `job-progress`, `subagent-exited`).
+- `packages/agent/src/alarms/__tests__/alarm-store.test.ts`: snapshot read/write, `insert`/`cancel`/`claim`/`markFired`/`rescheduleCron`/`listActive`/`countActive`, MAX_ACTIVE_ALARMS=50, boot-from-disk reproduces last-written state.
+- `packages/agent/src/alarms/__tests__/alarm-scheduler.test.ts`: fake clock + fake sleep; soonest-pending sequencing; `notify()` wakes early; stale-recurring sweep; claim is at-most-once; cron reschedule; `firing`-on-boot re-queued.
+- `packages/agent/src/alarms/__tests__/cron.test.ts`: port of `sen-core-v2/tests/automated/alarms/cron.test.ts`.
+- `packages/agent/src/tools/implementations/__tests__/schedule_alarm.test.ts`, `cancel_alarm.test.ts`, `list_alarms.test.ts`: port input-validation suites from sen-core.
+
+**Integration (e2e):**
+
+- `alarms.fire-delivery.e2e.test.ts` — schedule a once alarm, advance fake clock, verify `<notification kind="alarm-fired">` lands in `events.jsonl` and the conversation runner folds it into the next turn (assert by inspecting the provider request).
+- `alarms.idle-wake.e2e.test.ts` — schedule alarm while agent is idle, advance clock, verify an internal turn fires automatically.
+- `alarms.restart-recovery.e2e.test.ts` — schedule alarm, kill lace process, restart, advance clock, verify alarm still fires (boot reads `alarms.json`).
+- `alarms.cron-reschedule.e2e.test.ts` — cron alarm fires, reschedules, fires again at the new time.
+- `alarms.subagent-exit-graceful.e2e.test.ts` — spawn subagent S, schedule alarm in S, gracefully shut down S, verify parent's `events.jsonl` gets `<notification kind="subagent-exited">` listing the pending alarm.
+- `alarms.subagent-exit-no-pending.e2e.test.ts` — graceful subagent exit with zero pending alarms emits no notification.
+
+**Runner watermark regression:**
+
+- `runner.context-inject.test.ts` (existing): extend to cover the case where a `context_injected priority='immediate'` event is written between turns and must be picked up at the next turn start.
+
+### Sen-core
+
+- Existing alarm test suite is deleted (its responsibility moves to lace).
+- Boot smoke test: lace child starts cleanly with no `AlarmsStore`/`SchedulerService` wiring.
+- End-to-end: schedule an alarm via lace's tool (driven by a prompt), advance clock, verify Ada's next conversation turn sees the `<notification kind="alarm-fired">` block. (This is best exercised in lace's e2e harness; sen-core's tests can be a thin smoke.)
 
 ## Out of scope
 
-- Session naming as a first-class concept (the original PRI-1744 design). Sen-core's session-id persistence is sufficient.
-- Session-id rotation / "new session on rotation."
-- Catastrophic session-loss recovery (corrupted `core-session-id`, deleted session dir).
-- Migrating Ada's existing `alarms.db` rows — accepted loss per the ticket.
-- `ent/alarms/list` or other RPC for inspecting alarms from outside the agent context — operator tooling can read `alarms.jsonl` directly for now.
-- Cancellation across subagent boundaries (top-level cancelling a subagent's alarm). Out of scope; `cancel_alarm` only sees alarms in the calling session's `alarms.jsonl`.
+- `if_session_ended: wake | bubble` — dropped (D-for-now). Alarms fire only while their owning lace process is alive.
+- Session naming / `session/rename` — dropped. Session-id binding is sufficient.
+- Crash-on-exit notification for subagents — only graceful exits notify.
+- Catastrophic session-loss recovery — separate hardening kata.
+- Migrating Ada's existing `alarms.db` rows — accept the loss.
+- Operator-side tooling to inspect alarms across sessions — readers can `cat alarms.json` directly for now.
 
-## Open implementation questions (deferrable to plan)
+## Open implementation questions (deferrable to the plan)
 
-- Exact placement of `state.alarmScheduler.start()` in the server bootstrap (must be after session storage is reachable, before `peer.onRequest('session/...')` handlers can route schedule calls). The plan will pick this precisely.
-- Whether `alarms.jsonl` needs the same partial-write defense as `events.jsonl` (newline-terminator check). Lace inherits the pattern; the plan should reuse `appendDurableEvent`'s newline guard.
-- Folding strategy efficiency: read-whole-file on every store construction is cheap for 50 rows; if it becomes hot, switch to a snapshot file. Out of scope to optimize up front.
+- Exact placement of `injectNotification`'s idle-wake call site in the server bootstrap. The plan picks this precisely.
+- Whether the runner's watermark change (init to last `turn_end`) needs a feature flag for safety. Default: no — it's the obviously-correct semantics, and `runner.context-inject.test.ts` covers regression.
+- Whether `findLastTurnEndEventSeq` lives next to `deriveNextEventSeqFromEventLog` in `event-log.ts` (probably yes; small helper).
+- Composer line-length / truncation policy — port `formatJobNotification`'s 200-char `MAX_LINE_LENGTH` behavior into the progress composer; leave others natural-length.
