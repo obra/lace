@@ -6,6 +6,12 @@ import { dirname } from 'path';
 import { z } from 'zod';
 import type { MCPServerConfig } from '@lace/web/types/core';
 import { getLaceWebFilePath } from './web-data-dir';
+import {
+  McpPlacementSchema,
+  McpSecretReferenceSchema,
+  McpTransportSchema,
+  normalizeMcpServers,
+} from './mcp-config-normalization';
 
 const ToolPolicySchema = z.enum(['allow', 'ask', 'deny', 'disable']);
 
@@ -14,6 +20,9 @@ const McpServerConfigSchema = z
     command: z.string().min(1),
     args: z.array(z.string()).optional(),
     env: z.record(z.string(), z.string()).optional(),
+    transport: McpTransportSchema.optional(),
+    secretEnv: z.record(z.string(), McpSecretReferenceSchema).optional(),
+    placement: McpPlacementSchema.optional(),
     enabled: z.boolean().optional(),
     tools: z.record(z.string(), ToolPolicySchema).optional(),
   })
@@ -26,6 +35,13 @@ const McpConfigSchema = z
   .strict();
 
 export type GlobalMcpConfig = z.infer<typeof McpConfigSchema>;
+
+function normalizeGlobalMcpConfig(config: GlobalMcpConfig): GlobalMcpConfig {
+  return {
+    ...config,
+    servers: normalizeMcpServers(config.servers, 'global'),
+  };
+}
 
 export class McpConfigStore {
   private static readonly filename = 'mcp.json';
@@ -40,16 +56,17 @@ export class McpConfigStore {
     if (!result.success) {
       throw new Error(`Invalid global MCP config format: ${filePath}`);
     }
-    return result.data;
+    return normalizeGlobalMcpConfig(result.data);
   }
 
   static saveGlobalConfig(config: GlobalMcpConfig): void {
+    const normalizedConfig = normalizeGlobalMcpConfig(config);
     const filePath = getLaceWebFilePath(this.filename);
     const dir = dirname(filePath);
     mkdirSync(dir, { recursive: true });
 
     const tempPath = `${filePath}.tmp`;
-    writeFileSync(tempPath, JSON.stringify(config, null, 2), { mode: 0o600 });
+    writeFileSync(tempPath, JSON.stringify(normalizedConfig, null, 2), { mode: 0o600 });
     renameSync(tempPath, filePath);
   }
 

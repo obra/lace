@@ -227,9 +227,9 @@ describe('MCP Route Handlers', () => {
 
         const result = await createMcpServer(globalContext, 'new-server', newServerConfig);
 
-        expect(result).toEqual({ id: 'new-server', ...newServerConfig });
+        expect(result).toEqual({ id: 'new-server', ...newServerConfig, placement: 'host' });
         expect(mockMcpConfigStore.saveGlobalConfig).toHaveBeenCalledWith({
-          servers: { 'new-server': newServerConfig },
+          servers: { 'new-server': { ...newServerConfig, placement: 'host' } },
         });
       });
 
@@ -238,9 +238,28 @@ describe('MCP Route Handlers', () => {
 
         const result = await createMcpServer(globalContext, 'new-server', newServerConfig);
 
-        expect(result).toEqual({ id: 'new-server', ...newServerConfig });
+        expect(result).toEqual({ id: 'new-server', ...newServerConfig, placement: 'host' });
         expect(mockMcpConfigStore.saveGlobalConfig).toHaveBeenCalledWith({
-          servers: { 'new-server': newServerConfig },
+          servers: { 'new-server': { ...newServerConfig, placement: 'host' } },
+        });
+      });
+
+      it('preserves MCP config fields when creating a global HTTP server', async () => {
+        mockMcpConfigStore.loadGlobalConfig.mockReturnValue({ servers: {} });
+        const config: McpServerConfigInput = {
+          command: 'server',
+          transport: 'http',
+          placement: 'toolRuntime',
+          secretEnv: { API_KEY: { namespace: 'host-service', name: 'api-key' } },
+          enabled: true,
+          tools: {},
+        };
+
+        const result = await createMcpServer(globalContext, 'http-server', config);
+
+        expect(result).toEqual({ id: 'http-server', ...config });
+        expect(mockMcpConfigStore.saveGlobalConfig).toHaveBeenCalledWith({
+          servers: { 'http-server': config },
         });
       });
     });
@@ -279,11 +298,34 @@ describe('MCP Route Handlers', () => {
 
         const result = await createMcpServer(projectContext, 'new-server', newServerConfig);
 
-        expect(result).toEqual({ id: 'new-server', ...newServerConfig });
-        expect(mockProjectInstance.addMCPServer).toHaveBeenCalledWith(
-          'new-server',
-          newServerConfig
-        );
+        expect(result).toEqual({ id: 'new-server', ...newServerConfig, placement: 'toolRuntime' });
+        expect(mockProjectInstance.addMCPServer).toHaveBeenCalledWith('new-server', {
+          ...newServerConfig,
+          placement: 'toolRuntime',
+        });
+      });
+
+      it('defaults project HTTP servers to host while preserving secret refs', async () => {
+        const config: McpServerConfigInput = {
+          command: 'server',
+          transport: 'http',
+          secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+          enabled: true,
+          tools: {},
+        };
+        const mockProjectInstance = {
+          getMCPServer: vi.fn().mockReturnValue(null),
+          addMCPServer: vi.fn(),
+        };
+        mockProject.getById.mockReturnValue(mockProjectInstance as unknown as Project);
+
+        const result = await createMcpServer(projectContext, 'http-server', config);
+
+        expect(result).toEqual({ id: 'http-server', ...config, placement: 'host' });
+        expect(mockProjectInstance.addMCPServer).toHaveBeenCalledWith('http-server', {
+          ...config,
+          placement: 'host',
+        });
       });
     });
   });
@@ -325,12 +367,45 @@ describe('MCP Route Handlers', () => {
           command: 'npx',
           args: ['updated-args'],
           enabled: false,
+          placement: 'host',
         });
         expect(mockMcpConfigStore.saveGlobalConfig).toHaveBeenCalledWith({
           servers: {
             'test-server': {
               command: 'npx',
               args: ['updated-args'],
+              enabled: false,
+              placement: 'host',
+            },
+          },
+        });
+      });
+
+      it('preserves explicit placement and secret refs when updating global servers', async () => {
+        const existingConfig: McpServerConfigInput = {
+          command: 'npx',
+          transport: 'sse',
+          placement: 'toolRuntime',
+          secretEnv: { TOKEN: { namespace: 'session', name: 'token' } },
+          enabled: true,
+        };
+        mockMcpConfigStore.loadGlobalConfig.mockReturnValue({
+          servers: { 'test-server': existingConfig },
+        });
+
+        const result = await updateMcpServer(globalContext, 'test-server', {
+          enabled: false,
+        });
+
+        expect(result).toEqual({
+          id: 'test-server',
+          ...existingConfig,
+          enabled: false,
+        });
+        expect(mockMcpConfigStore.saveGlobalConfig).toHaveBeenCalledWith({
+          servers: {
+            'test-server': {
+              ...existingConfig,
               enabled: false,
             },
           },
@@ -379,11 +454,13 @@ describe('MCP Route Handlers', () => {
           command: 'npx',
           args: ['updated-args'],
           enabled: false,
+          placement: 'toolRuntime',
         });
         expect(mockProjectInstance.updateMCPServer).toHaveBeenCalledWith('test-server', {
           command: 'npx',
           args: ['updated-args'],
           enabled: false,
+          placement: 'toolRuntime',
         });
       });
     });

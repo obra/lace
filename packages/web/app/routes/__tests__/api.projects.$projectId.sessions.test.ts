@@ -278,6 +278,9 @@ describe('Session API endpoints under projects', () => {
       project!.addMCPServer('project-test', {
         command: process.execPath,
         args: ['--version'],
+        transport: 'http',
+        placement: 'host',
+        secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
         enabled: false,
         tools: {},
       });
@@ -304,6 +307,9 @@ describe('Session API endpoints under projects', () => {
             name: 'project-test',
             command: process.execPath,
             args: ['--version'],
+            transport: 'http',
+            placement: 'host',
+            secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
             enabled: false,
             tools: {},
           },

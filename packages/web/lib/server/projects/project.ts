@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { basename } from 'path';
 import { accessSync, constants, existsSync, statSync } from 'fs';
 import type { MCPServerConfig } from '@lace/web/types/core';
+import { normalizeMcpServerConfig } from '@lace/web/lib/server/mcp-config-normalization';
 import { ProjectStore, type ProjectRecord } from './project-store';
 
 type ProjectData = {
@@ -315,9 +316,10 @@ export class Project {
     if (servers[serverId]) {
       throw new Error(`MCP server '${serverId}' already exists in project`);
     }
+    const normalizedServerConfig = normalizeMcpServerConfig(serverConfig, 'project');
     this.data = {
       ...this.data,
-      mcpServers: { ...servers, [serverId]: serverConfig },
+      mcpServers: { ...servers, [serverId]: normalizedServerConfig },
       lastUsedAt: new Date(),
     };
     const store = new ProjectStore();
@@ -329,9 +331,10 @@ export class Project {
     if (!servers[serverId]) {
       throw new Error(`MCP server '${serverId}' not found in project`);
     }
+    const normalizedServerConfig = normalizeMcpServerConfig(serverConfig, 'project');
     this.data = {
       ...this.data,
-      mcpServers: { ...servers, [serverId]: serverConfig },
+      mcpServers: { ...servers, [serverId]: normalizedServerConfig },
       lastUsedAt: new Date(),
     };
     const store = new ProjectStore();

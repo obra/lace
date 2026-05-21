@@ -149,6 +149,49 @@ describe('Agent Spawning API E2E Tests', () => {
       expect(data.name).toBe('openai-agent');
     });
 
+    it('passes project MCP metadata through agent session creation', async () => {
+      testProject.addMCPServer('project-http', {
+        command: 'server',
+        transport: 'http',
+        placement: 'host',
+        secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+        enabled: true,
+        tools: {},
+      });
+      const supervisor = await getSupervisor();
+      const createAgentSpy = vi.spyOn(supervisor, 'createAgentSession');
+
+      const request = new Request(`http://localhost/api/sessions/${workspaceSessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'mcp-agent',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      const response = await POST(createActionArgs(request, { sessionId: workspaceSessionId }));
+
+      expect(response.status).toBe(201);
+      expect(createAgentSpy).toHaveBeenCalledWith(
+        workspaceSessionId,
+        expect.objectContaining({
+          mcpServers: [
+            {
+              name: 'project-http',
+              command: 'server',
+              transport: 'http',
+              placement: 'host',
+              secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+              enabled: true,
+              tools: {},
+            },
+          ],
+        })
+      );
+    });
+
     it('should auto-generate agent name when missing', async () => {
       const request = new Request(`http://localhost/api/sessions/${workspaceSessionId}/agents`, {
         method: 'POST',

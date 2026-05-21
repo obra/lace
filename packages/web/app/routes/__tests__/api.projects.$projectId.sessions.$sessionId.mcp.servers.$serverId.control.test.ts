@@ -32,6 +32,9 @@ async function createProjectAndSession(workDir: string) {
   project.addMCPServer('test', {
     command: process.execPath,
     args: [fixturePath],
+    transport: 'stdio',
+    placement: 'host',
+    secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
     enabled: false,
     tools: { echo: 'allow' },
   });
@@ -87,6 +90,9 @@ describe('Session MCP Server Control API', () => {
           mcpServers: [
             expect.objectContaining({
               name: 'test',
+              transport: 'stdio',
+              placement: 'host',
+              secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
               enabled: true,
             }),
           ],

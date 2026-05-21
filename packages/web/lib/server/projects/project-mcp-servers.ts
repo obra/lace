@@ -7,6 +7,9 @@ export function mcpServersForProject(project: Project): McpServerConfig[] {
     command: config.command,
     ...(config.args ? { args: config.args } : {}),
     ...(config.env ? { env: config.env } : {}),
+    ...(config.transport ? { transport: config.transport } : {}),
+    ...(config.placement ? { placement: config.placement } : {}),
+    ...(config.secretEnv ? { secretEnv: config.secretEnv } : {}),
     enabled: config.enabled,
     tools: config.tools,
   }));

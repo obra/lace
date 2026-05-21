@@ -180,6 +180,15 @@ export interface MCPServerConfig {
   command: string;
   args?: string[];
   env?: Record<string, string>;
+  transport?: 'stdio' | 'sse' | 'http';
+  secretEnv?: Record<
+    string,
+    {
+      namespace: 'session' | 'project' | 'host-service';
+      name: string;
+    }
+  >;
+  placement?: 'toolRuntime' | 'host';
   enabled: boolean;
   tools: Record<string, ToolPolicy>;
   discoveredTools?: DiscoveredTool[];

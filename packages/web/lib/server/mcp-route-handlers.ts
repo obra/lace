@@ -5,6 +5,15 @@ import { z } from 'zod';
 import type { MCPServerConfig } from '@lace/web/types/core';
 import { McpConfigStore } from '@lace/web/lib/server/mcp-config-store';
 import { RouteValidationError, requireProject } from './route-helpers';
+import {
+  McpPlacementSchema,
+  McpSecretReferenceSchema,
+  McpTransportSchema,
+  normalizeMcpServerConfig,
+  type MCPPlacement,
+  type MCPSecretReference,
+  type MCPTransport,
+} from './mcp-config-normalization';
 
 /**
  * Context for MCP route operations.
@@ -26,6 +35,9 @@ export interface McpServerInfo {
   command: string;
   args?: string[];
   env?: Record<string, string>;
+  transport?: MCPTransport;
+  secretEnv?: Record<string, MCPSecretReference>;
+  placement?: MCPPlacement;
   enabled?: boolean;
   tools?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
 }
@@ -49,6 +61,9 @@ export const CreateServerSchema = z.object({
   command: z.string().min(1, 'Command is required'),
   args: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
+  transport: McpTransportSchema.optional(),
+  secretEnv: z.record(z.string(), McpSecretReferenceSchema).optional(),
+  placement: McpPlacementSchema.optional(),
   enabled: z.boolean().default(true),
   tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).default({}),
 });
@@ -61,6 +76,9 @@ export const CreateServerConfigSchema = z.object({
   command: z.string().min(1, 'Command is required'),
   args: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
+  transport: McpTransportSchema.optional(),
+  secretEnv: z.record(z.string(), McpSecretReferenceSchema).optional(),
+  placement: McpPlacementSchema.optional(),
   enabled: z.boolean().default(true),
   tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).default({}),
 });
@@ -73,6 +91,9 @@ export const UpdateServerSchema = z.object({
   command: z.string().min(1).optional(),
   args: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
+  transport: McpTransportSchema.optional(),
+  secretEnv: z.record(z.string(), McpSecretReferenceSchema).optional(),
+  placement: McpPlacementSchema.optional(),
   enabled: z.boolean().optional(),
   tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
 });
@@ -150,9 +171,10 @@ export async function createMcpServer(
         'DUPLICATE_SERVER'
       );
     }
+    const normalizedConfig = normalizeMcpServerConfig(config, 'project');
     // Cast to MCPServerConfig as the Zod schema has already validated the config
-    project.addMCPServer(serverId, config as MCPServerConfig);
-    return { id: serverId, ...config };
+    project.addMCPServer(serverId, normalizedConfig as MCPServerConfig);
+    return { id: serverId, ...normalizedConfig };
   }
 
   const globalConfig = McpConfigStore.loadGlobalConfig() || { servers: {} };
@@ -163,15 +185,16 @@ export async function createMcpServer(
       'DUPLICATE_SERVER'
     );
   }
+  const normalizedConfig = normalizeMcpServerConfig(config, 'global');
   const updatedConfig = {
     ...globalConfig,
     servers: {
       ...globalConfig.servers,
-      [serverId]: config,
+      [serverId]: normalizedConfig,
     },
   };
   McpConfigStore.saveGlobalConfig(updatedConfig);
-  return { id: serverId, ...config };
+  return { id: serverId, ...normalizedConfig };
 }
 
 /**
@@ -193,7 +216,7 @@ export async function updateMcpServer(
         'RESOURCE_NOT_FOUND'
       );
     }
-    const mergedConfig = { ...existingConfig, ...updates };
+    const mergedConfig = normalizeMcpServerConfig({ ...existingConfig, ...updates }, 'project');
     // Cast to MCPServerConfig as the merged config is validated
     project.updateMCPServer(serverId, mergedConfig as MCPServerConfig);
     return { id: serverId, ...mergedConfig };
@@ -204,7 +227,7 @@ export async function updateMcpServer(
   if (!existingConfig) {
     throw new RouteValidationError(`MCP server '${serverId}' not found`, 404, 'RESOURCE_NOT_FOUND');
   }
-  const mergedConfig = { ...existingConfig, ...updates };
+  const mergedConfig = normalizeMcpServerConfig({ ...existingConfig, ...updates }, 'global');
   const updatedGlobalConfig = {
     ...globalConfig,
     servers: {

@@ -5,12 +5,21 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { dirname, join } from 'path';
 import { z } from 'zod';
 import { getLaceWebDir } from '@lace/web/lib/server/web-data-dir';
+import {
+  McpPlacementSchema,
+  McpSecretReferenceSchema,
+  McpTransportSchema,
+  normalizeMcpServers,
+} from '@lace/web/lib/server/mcp-config-normalization';
 
 const McpServerConfigSchema = z
   .object({
     command: z.string().min(1),
     args: z.array(z.string()).optional(),
     env: z.record(z.string(), z.string()).optional(),
+    transport: McpTransportSchema.optional(),
+    secretEnv: z.record(z.string(), McpSecretReferenceSchema).optional(),
+    placement: McpPlacementSchema.optional(),
     enabled: z.boolean().optional(),
     tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
   })
@@ -36,6 +45,13 @@ const ProjectStoreSchema = z.array(ProjectRecordSchema);
 
 export type ProjectRecord = z.infer<typeof ProjectRecordSchema>;
 
+function normalizeProjectRecord(record: ProjectRecord): ProjectRecord {
+  return {
+    ...record,
+    mcpServers: record.mcpServers ? normalizeMcpServers(record.mcpServers, 'project') : undefined,
+  };
+}
+
 export class ProjectStore {
   private readonly filePath: string;
 
@@ -51,7 +67,7 @@ export class ProjectStore {
     if (!result.success) {
       throw new Error(`Invalid projects store format: ${this.filePath}`);
     }
-    return result.data;
+    return result.data.map(normalizeProjectRecord);
   }
 
   load(id: string): ProjectRecord | null {
@@ -61,8 +77,9 @@ export class ProjectStore {
   upsert(record: ProjectRecord): void {
     const next = this.loadAll();
     const idx = next.findIndex((p) => p.id === record.id);
-    if (idx >= 0) next[idx] = record;
-    else next.push(record);
+    const normalizedRecord = normalizeProjectRecord(record);
+    if (idx >= 0) next[idx] = normalizedRecord;
+    else next.push(normalizedRecord);
     this.saveAll(next);
   }
 
@@ -72,11 +89,12 @@ export class ProjectStore {
   }
 
   private saveAll(records: ProjectRecord[]): void {
+    const normalizedRecords = records.map(normalizeProjectRecord);
     const dir = dirname(this.filePath);
     mkdirSync(dir, { recursive: true });
 
     const tempPath = `${this.filePath}.tmp`;
-    writeFileSync(tempPath, JSON.stringify(records, null, 2), { mode: 0o600 });
+    writeFileSync(tempPath, JSON.stringify(normalizedRecords, null, 2), { mode: 0o600 });
     renameSync(tempPath, this.filePath);
   }
 }
