@@ -6,6 +6,7 @@ import { MCPConfigLoader } from '@lace/agent/config/mcp-config-loader';
 import { logger } from '@lace/agent/utils/logger';
 import type { Project } from '@lace/agent/projects/project';
 import type { MCPServerConfig, DiscoveredTool } from '@lace/agent/config/mcp-types';
+import { HostToolRuntime } from './runtime/host';
 
 /**
  * Tool Discovery & Enumeration
@@ -131,7 +132,13 @@ export class ToolCatalog {
       }
 
       // Start temporary server for discovery
-      await tempManager.startServer(serverId, config);
+      const hostCwd = projectDir ?? process.cwd();
+      await tempManager.startServer({
+        serverId,
+        config: { ...config, placement: config.placement ?? 'host' },
+        runtime: new HostToolRuntime({ id: `mcp-discovery:${serverId}`, cwd: hostCwd }),
+        hostCwd,
+      });
 
       // Discover available tools
       const client = tempManager.getClient(serverId);

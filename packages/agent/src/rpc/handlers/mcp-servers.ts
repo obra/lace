@@ -17,9 +17,55 @@ import { readSessionState, writeSessionState } from '../../storage/session-store
 import { loadSession } from '../../storage/session-store';
 import { invalidateSessionToolExecutor } from '../../server';
 import { defaultMcpServerPlacements } from '../session-config';
+import { HostToolRuntime } from '../../tools/runtime/host';
+import type { ToolRuntime } from '../../tools/runtime/types';
+import { mcpConnectionKey } from '../../mcp/server-manager';
 
 function isUnsupportedMcpTransport(config: { transport?: string }): boolean {
   return Boolean(config.transport && config.transport !== 'stdio');
+}
+
+function defaultMcpPlacement(config: MCPServerConfig): MCPServerConfig {
+  if (config.placement) return config;
+  return {
+    ...config,
+    placement: config.transport === 'http' || config.transport === 'sse' ? 'host' : 'toolRuntime',
+  };
+}
+
+function activeSessionRuntime(state: AgentServerState): ToolRuntime {
+  const activeSession = state.activeSession;
+  const runtimeBinding = activeSession?.state.config?.runtimeBinding;
+  const hostCwd = activeSession?.meta.workDir ?? process.cwd();
+
+  if (runtimeBinding?.toolRuntime.type === 'local') {
+    return new HostToolRuntime({
+      id: runtimeBinding.identity.runtimeId,
+      cwd: runtimeBinding.toolRuntime.cwd,
+    });
+  }
+
+  return new HostToolRuntime({
+    id: activeSession ? `session:${activeSession.meta.sessionId}:host` : 'mcp:host',
+    cwd: hostCwd,
+  });
+}
+
+function activeSessionHostCwd(state: AgentServerState): string {
+  return state.activeSession?.meta.workDir ?? process.cwd();
+}
+
+async function startServerForActiveSession(
+  state: AgentServerState,
+  serverId: string,
+  config: MCPServerConfig
+): Promise<void> {
+  await state.mcpServerManager.startServer({
+    serverId,
+    config,
+    runtime: activeSessionRuntime(state),
+    hostCwd: activeSessionHostCwd(state),
+  });
 }
 
 /**
@@ -45,14 +91,16 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
   }
 
   const mcpServers = parsed.data;
-  const desired = new Map<string, MCPServerConfig>();
+  const runtime = activeSessionRuntime(state);
+  const hostCwd = activeSessionHostCwd(state);
+  const desired = new Map<string, { serverId: string; config: MCPServerConfig }>();
 
   for (const server of mcpServers) {
     const enabled = typeof server.enabled === 'boolean' ? server.enabled : true;
     const tools: Record<string, ToolPolicy> =
       server.tools && typeof server.tools === 'object' ? server.tools : {};
 
-    desired.set(server.name, {
+    const config = defaultMcpPlacement({
       command: server.command,
       ...(Array.isArray(server.args) ? { args: server.args } : {}),
       ...(server.env && typeof server.env === 'object' ? { env: server.env } : {}),
@@ -62,24 +110,31 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
       enabled,
       tools,
     });
+    const connectionKey = mcpConnectionKey({
+      serverId: server.name,
+      config,
+      runtimeId: runtime.id,
+      hostCwd,
+    });
+    desired.set(connectionKey, { serverId: server.name, config });
   }
 
   for (const existing of state.mcpServerManager.getAllServers()) {
-    if (!desired.has(existing.id)) {
-      await state.mcpServerManager.stopServer(existing.id);
+    if (!desired.has(existing.connectionKey)) {
+      await state.mcpServerManager.stopServer(existing.connectionKey);
     }
   }
 
-  for (const [serverId, config] of desired) {
-    const existing = state.mcpServerManager.getServer(serverId);
+  for (const [connectionKey, { serverId, config }] of desired) {
+    const existing = state.mcpServerManager.getServer(connectionKey);
     const needsRestart = existing ? !mcpServerConfigEquivalent(existing.config, config) : false;
 
     if (needsRestart) {
-      await state.mcpServerManager.stopServer(serverId);
+      await state.mcpServerManager.stopServer(connectionKey);
     }
 
     if (!config.enabled) {
-      await state.mcpServerManager.stopServer(serverId);
+      await state.mcpServerManager.stopServer(connectionKey);
       continue;
     }
 
@@ -93,9 +148,11 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
       continue;
     }
 
-    await state.mcpServerManager.startServer(serverId, {
-      ...config,
-      cwd: state.activeSession.meta.workDir,
+    await state.mcpServerManager.startServer({
+      serverId,
+      config,
+      runtime,
+      hostCwd,
     });
   }
 }
@@ -124,6 +181,7 @@ export function registerMcpHandlers(
       }
 
       return {
+        connectionKey: connection.connectionKey,
         serverId: connection.id,
         name: connection.id,
         command: connection.config.command,
@@ -193,7 +251,7 @@ export function registerMcpHandlers(
       },
     ]);
 
-    const config: MCPServerConfig = {
+    const config: MCPServerConfig = defaultMcpPlacement({
       command: serverConfig.command,
       ...(Array.isArray(parsed.args) ? { args: parsed.args } : {}),
       ...(parsed.env && typeof parsed.env === 'object' ? { env: parsed.env } : {}),
@@ -202,7 +260,7 @@ export function registerMcpHandlers(
       ...(serverConfig.placement ? { placement: serverConfig.placement } : {}),
       enabled: serverConfig.enabled ?? true,
       tools: (serverConfig.tools ?? {}) as Record<string, ToolPolicy>,
-    };
+    });
 
     // Update session config to include this MCP server
     await runExclusive(() => {
@@ -246,10 +304,7 @@ export function registerMcpHandlers(
         transport: config.transport,
       });
     } else if (enabled) {
-      await state.mcpServerManager.startServer(serverId, {
-        ...config,
-        cwd: state.activeSession.meta.workDir,
-      });
+      await startServerForActiveSession(state, serverId, config);
     }
 
     invalidateSessionToolExecutor(state.toolExecutorCache, state.activeSession.meta.sessionId);
@@ -325,10 +380,7 @@ export function registerMcpHandlers(
     if (server.status !== 'running') {
       const startTime = Date.now();
       try {
-        await state.mcpServerManager.startServer(serverId, {
-          ...server.config,
-          cwd: state.activeSession?.meta.workDir,
-        });
+        await startServerForActiveSession(state, serverId, server.config);
 
         // Get tool count from the client
         const client = state.mcpServerManager.getClient(serverId);

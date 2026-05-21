@@ -8,9 +8,10 @@ import { MCPServerManager } from './server-manager';
 import { logger } from '@lace/agent/utils/logger';
 import type { MCPConfig } from '@lace/agent/config/mcp-types';
 import type { ToolPolicy } from '@lace/agent/tools/types';
+import { HostToolRuntime } from '@lace/agent/tools/runtime/host';
 
 export class MCPToolRegistry extends EventEmitter {
-  private toolsByServer = new Map<string, Tool[]>();
+  private toolsByConnection = new Map<string, Tool[]>();
   private serverManager: MCPServerManager;
 
   constructor(serverManager: MCPServerManager) {
@@ -18,19 +19,23 @@ export class MCPToolRegistry extends EventEmitter {
     this.serverManager = serverManager;
 
     // Listen for server status changes to discover tools
-    this.serverManager.on('server-status-changed', (serverId: string, status: string) => {
-      if (status === 'running') {
-        this.discoverServerTools(serverId).catch((error: unknown) => {
-          this.emit(
-            'tool-discovery-error',
-            serverId,
-            error instanceof Error ? error.message : String(error)
-          );
-        });
-      } else if (status === 'stopped' || status === 'failed') {
-        this.clearServerTools(serverId);
+    this.serverManager.on(
+      'server-status-changed',
+      (serverId: string, status: string, connectionKey?: string) => {
+        const key = connectionKey ?? serverId;
+        if (status === 'running') {
+          this.discoverServerTools(key).catch((error: unknown) => {
+            this.emit(
+              'tool-discovery-error',
+              serverId,
+              error instanceof Error ? error.message : String(error)
+            );
+          });
+        } else if (status === 'stopped' || status === 'failed') {
+          this.clearServerTools(key, serverId);
+        }
       }
-    });
+    );
   }
 
   /**
@@ -41,13 +46,20 @@ export class MCPToolRegistry extends EventEmitter {
     const startPromises = Object.entries(config.servers)
       .filter(([_, serverConfig]) => serverConfig.enabled)
       .map(([serverId, serverConfig]) =>
-        this.serverManager.startServer(serverId, serverConfig).catch((error: unknown) => {
-          logger.error(`Failed to start MCP server ${serverId}:`, {
+        this.serverManager
+          .startServer({
             serverId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          // Don't fail entire initialization if one server fails
-        })
+            config: { ...serverConfig, placement: serverConfig.placement ?? 'host' },
+            runtime: new HostToolRuntime({ id: `mcp-registry:${serverId}`, cwd: process.cwd() }),
+            hostCwd: process.cwd(),
+          })
+          .catch((error: unknown) => {
+            logger.error(`Failed to start MCP server ${serverId}:`, {
+              serverId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+            // Don't fail entire initialization if one server fails
+          })
       );
 
     await Promise.all(startPromises);
@@ -56,10 +68,15 @@ export class MCPToolRegistry extends EventEmitter {
   /**
    * Discover tools from a specific server using MCP SDK
    */
-  private async discoverServerTools(serverId: string): Promise<void> {
-    const client = this.serverManager.getClient(serverId);
+  private async discoverServerTools(connectionKey: string): Promise<void> {
+    const server = this.serverManager.getServer(connectionKey);
+    const client = server?.client;
     if (!client) {
-      this.emit('tool-discovery-error', serverId, 'No client available for server');
+      this.emit(
+        'tool-discovery-error',
+        server?.id ?? connectionKey,
+        'No client available for server'
+      );
       return;
     }
 
@@ -68,15 +85,15 @@ export class MCPToolRegistry extends EventEmitter {
       const result = await client.listTools();
 
       const adaptedTools = result.tools.map(
-        (mcpTool) => new MCPToolAdapter(mcpTool, serverId, client)
+        (mcpTool) => new MCPToolAdapter(mcpTool, server.id, client)
       );
 
-      this.toolsByServer.set(serverId, adaptedTools);
-      this.emit('tools-updated', serverId, adaptedTools);
+      this.toolsByConnection.set(connectionKey, adaptedTools);
+      this.emit('tools-updated', server.id, adaptedTools);
     } catch (error) {
       this.emit(
         'tool-discovery-error',
-        serverId,
+        server.id,
         error instanceof Error ? error.message : 'Unknown error'
       );
     }
@@ -85,8 +102,8 @@ export class MCPToolRegistry extends EventEmitter {
   /**
    * Clear tools for a server that has stopped
    */
-  private clearServerTools(serverId: string): void {
-    this.toolsByServer.delete(serverId);
+  private clearServerTools(connectionKey: string, serverId: string): void {
+    this.toolsByConnection.delete(connectionKey);
     this.emit('tools-updated', serverId, []);
   }
 
@@ -96,7 +113,11 @@ export class MCPToolRegistry extends EventEmitter {
   getAvailableTools(config: MCPConfig): Tool[] {
     const allTools: Tool[] = [];
 
-    for (const [serverId, tools] of this.toolsByServer.entries()) {
+    for (const [connectionKey, tools] of this.toolsByConnection.entries()) {
+      const server = this.serverManager.getServer(connectionKey);
+      const serverId = server?.id;
+      if (!serverId) continue;
+
       const serverConfig = config.servers[serverId];
       if (!serverConfig?.enabled) {
         continue;
@@ -121,7 +142,12 @@ export class MCPToolRegistry extends EventEmitter {
    * Get tools from a specific server
    */
   getServerTools(serverId: string): Tool[] {
-    return this.toolsByServer.get(serverId) || [];
+    const matches = Array.from(this.toolsByConnection.entries()).filter(([connectionKey]) => {
+      const server = this.serverManager.getServer(connectionKey);
+      return server?.id === serverId;
+    });
+    if (matches.length !== 1) return [];
+    return matches[0]?.[1] ?? [];
   }
 
   /**
@@ -146,7 +172,7 @@ export class MCPToolRegistry extends EventEmitter {
     const refreshPromises = this.serverManager
       .getAllServers()
       .filter((server) => server.status === 'running')
-      .map((server) => this.discoverServerTools(server.id));
+      .map((server) => this.discoverServerTools(server.connectionKey));
 
     await Promise.all(refreshPromises);
   }
@@ -155,7 +181,7 @@ export class MCPToolRegistry extends EventEmitter {
    * Cleanup registry
    */
   async shutdown(): Promise<void> {
-    this.toolsByServer.clear();
+    this.toolsByConnection.clear();
     await this.serverManager.shutdown();
   }
 }

@@ -12,6 +12,7 @@ import { reconcileMcpServersForActiveSession } from '../rpc/handlers/mcp-servers
 import type { AgentServerState } from '../server-types';
 import type { LoadedSession, SessionState } from '../storage/session-store';
 import { writeSessionMeta, writeSessionState, ensureSessionFiles } from '../storage/session-store';
+import { HostToolRuntime } from '../tools/runtime/host';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,6 +42,20 @@ async function readSubprocessEnv(
   return JSON.parse(text) as Record<string, string>;
 }
 
+async function startHostServer(
+  manager: MCPServerManager,
+  serverId: string,
+  config: MCPServerConfig,
+  cwd: string
+): Promise<void> {
+  await manager.startServer({
+    serverId,
+    config: { ...config, placement: config.placement ?? 'host' },
+    runtime: new HostToolRuntime({ id: `test:${serverId}`, cwd }),
+    hostCwd: cwd,
+  });
+}
+
 describe.skipIf(skipOnWindows)('MCPServerManager env propagation (kata #47)', () => {
   let manager: MCPServerManager;
 
@@ -65,7 +80,7 @@ describe.skipIf(skipOnWindows)('MCPServerManager env propagation (kata #47)', ()
       tools: {},
     };
 
-    await manager.startServer('env-dump', config);
+    await startHostServer(manager, 'env-dump', config, process.cwd());
     const env = await readSubprocessEnv(manager, 'env-dump');
 
     expect(env.KATA47_KEY_A).toBe('alpha');
@@ -88,7 +103,7 @@ describe.skipIf(skipOnWindows)('MCPServerManager env propagation (kata #47)', ()
         tools: {},
       };
 
-      await manager.startServer('env-dump', config);
+      await startHostServer(manager, 'env-dump', config, process.cwd());
       const env = await readSubprocessEnv(manager, 'env-dump');
 
       expect(env.KATA47_DECLARED).toBe('visible');
@@ -106,7 +121,7 @@ describe.skipIf(skipOnWindows)('MCPServerManager env propagation (kata #47)', ()
       tools: {},
     };
 
-    await manager.startServer('env-dump', config);
+    await startHostServer(manager, 'env-dump', config, process.cwd());
     const env = await readSubprocessEnv(manager, 'env-dump');
 
     // At minimum HOME and PATH should be passed through (always present in CI).
@@ -124,7 +139,7 @@ describe.skipIf(skipOnWindows)('MCPServerManager env propagation (kata #47)', ()
       tools: {},
     };
 
-    await manager.startServer('env-dump', config);
+    await startHostServer(manager, 'env-dump', config, process.cwd());
     const env = await readSubprocessEnv(manager, 'env-dump');
 
     expect(env.KATA47_SOLO).toBe('lone');

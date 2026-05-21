@@ -3,6 +3,7 @@
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { ToolPolicy } from '@lace/agent/tools/types';
 
 // Discovered tool information from MCP server
@@ -45,10 +46,11 @@ export interface MCPConfig {
 // Runtime server connection state
 export interface MCPServerConnection {
   id: string;
+  connectionKey: string;
   config: MCPServerConfig;
   status: 'stopped' | 'starting' | 'running' | 'failed';
   client?: Client; // MCP SDK client instance
-  transport?: StdioClientTransport; // MCP SDK transport instance
+  transport?: Transport; // MCP SDK transport instance
   lastError?: string;
   connectedAt?: Date;
 }
@@ -56,4 +58,4 @@ export interface MCPServerConnection {
 // Re-export key SDK types for convenience
 export type { Tool as MCPTool } from '@modelcontextprotocol/sdk/types.js';
 export type { CallToolRequest, ListToolsRequest } from '@modelcontextprotocol/sdk/types.js';
-export type { Client, StdioClientTransport };
+export type { Client, StdioClientTransport, Transport };

@@ -480,15 +480,21 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       ],
     });
 
-    expect(startServer).toHaveBeenCalledWith('stdio-host', {
-      command: process.execPath,
-      transport: 'stdio',
-      placement: 'host',
-      secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
-      enabled: true,
-      tools: {},
-      cwd: tempDir,
-    });
+    expect(startServer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        serverId: 'stdio-host',
+        config: {
+          command: process.execPath,
+          transport: 'stdio',
+          placement: 'host',
+          secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+          enabled: true,
+          tools: {},
+        },
+        hostCwd: tempDir,
+        runtime: expect.objectContaining({ cwd: tempDir }),
+      })
+    );
   });
 
   it('upserts MCP configs with placement defaults and preserves transport metadata', async () => {
@@ -532,14 +538,20 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       enabled: true,
     });
 
-    expect(startServer).toHaveBeenCalledWith('local-stdio', {
-      command: process.execPath,
-      transport: 'stdio',
-      placement: 'host',
-      enabled: true,
-      tools: {},
-      cwd: tempDir,
-    });
+    expect(startServer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        serverId: 'local-stdio',
+        config: {
+          command: process.execPath,
+          transport: 'stdio',
+          placement: 'host',
+          enabled: true,
+          tools: {},
+        },
+        hostCwd: tempDir,
+        runtime: expect.objectContaining({ cwd: tempDir }),
+      })
+    );
   });
 
   it.each(['http', 'sse'] as const)(

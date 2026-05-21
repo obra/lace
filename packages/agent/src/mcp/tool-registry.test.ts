@@ -16,6 +16,7 @@ interface MinimalTool {
 class FakeMCPServerManager extends EventEmitter implements MCPServerManager {
   startServer = vi.fn();
   stopServer = vi.fn();
+  getServer = vi.fn();
   getClient = vi.fn();
   getAllServers = vi.fn();
   shutdown = vi.fn();
@@ -47,6 +48,13 @@ describe('MCPToolRegistry', () => {
         ],
       }),
     });
+    mockServerManager.getServer.mockImplementation((serverId: string) => ({
+      id: serverId,
+      connectionKey: serverId,
+      config: { command: 'node', enabled: true, tools: {} },
+      status: 'running',
+      client: mockServerManager.getClient(serverId),
+    }));
     mockServerManager.getAllServers.mockReturnValue([]);
     mockServerManager.shutdown.mockResolvedValue();
 
@@ -78,10 +86,15 @@ describe('MCPToolRegistry', () => {
     await registry.initialize(config);
 
     expect(mockServerManager.startServer).toHaveBeenCalledWith(
-      'filesystem',
-      config.servers.filesystem
+      expect.objectContaining({
+        serverId: 'filesystem',
+        config: { ...config.servers.filesystem, placement: 'host' },
+        runtime: expect.objectContaining({ id: 'mcp-registry:filesystem' }),
+      })
     );
-    expect(mockServerManager.startServer).not.toHaveBeenCalledWith('browser', expect.anything());
+    expect(mockServerManager.startServer).not.toHaveBeenCalledWith(
+      expect.objectContaining({ serverId: 'browser' })
+    );
   });
 
   it('should discover tools when server comes online', async () => {
@@ -117,7 +130,7 @@ describe('MCPToolRegistry', () => {
       execute: vi.fn(),
     };
 
-    registry['toolsByServer'].set('filesystem', [
+    registry['toolsByConnection'].set('filesystem', [
       { name: 'filesystem/read_file', ...mockTool },
       { name: 'filesystem/write_file', ...mockTool },
     ]);
@@ -181,7 +194,7 @@ describe('MCPToolRegistry', () => {
   it('should clear tools when server stops', () => {
     // Set up tools first
     const mockTool = { name: 'filesystem/read_file' } as any;
-    registry['toolsByServer'].set('filesystem', [mockTool]);
+    registry['toolsByConnection'].set('filesystem', [mockTool]);
 
     const toolsUpdated = vi.fn();
     registry.on('tools-updated', toolsUpdated);
