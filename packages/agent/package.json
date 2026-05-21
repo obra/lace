@@ -14,7 +14,7 @@
   },
   "scripts": {
     "prebuild": "cd ../.. && npm run build --workspace=packages/ent-protocol",
-    "build": "rm -f tsconfig.tsbuildinfo && tsc && tsc-alias -p tsconfig.json -f -fe .js && mkdir -p dist/providers/catalog && cp -r src/providers/catalog/data dist/providers/catalog/",
+    "build": "rm -f tsconfig.tsbuildinfo && tsc && tsc-alias -p tsconfig.json -f -fe .js && mkdir -p dist/providers/catalog && cp -r src/providers/catalog/data dist/providers/catalog/ && mkdir -p dist/config && cp -r config/agent-personas dist/config/agent-personas",
     "build:clean": "rm -rf dist tsconfig.tsbuildinfo && npm run build",
     "pretest": "cd ../.. && npm run build --workspace=packages/ent-protocol && npm run build --workspace=packages/agent",
     "typecheck": "tsc --noEmit",
