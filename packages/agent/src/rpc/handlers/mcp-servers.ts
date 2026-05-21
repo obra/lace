@@ -173,8 +173,25 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
     }
 
     if (isUnsupportedMcpTransport(config)) {
-      await state.mcpServerManager.stopServer(serverId);
-      state.mcpServerManager.replaceStoppedServerConfig(serverId, config, connectionKey);
+      const displacedStdioConnectionKey = mcpConnectionKey({
+        serverId,
+        config: { ...config, transport: 'stdio' },
+        runtimeId: runtime.id,
+        runtimeCwd: runtime.cwd,
+        hostCwd,
+      });
+      const stoppedConnectionKey =
+        existing?.connectionKey ??
+        state.mcpServerManager.getServer(displacedStdioConnectionKey)?.connectionKey ??
+        // Bare id fallback is safe here because getServer only resolves unique user-facing ids.
+        state.mcpServerManager.getServer(serverId)?.connectionKey ??
+        displacedStdioConnectionKey;
+      await state.mcpServerManager.stopServer(stoppedConnectionKey);
+      state.mcpServerManager.replaceStoppedServerConfig(
+        stoppedConnectionKey,
+        config,
+        connectionKey
+      );
       logger.warn('Skipping MCP server with unsupported transport', {
         serverId,
         transport: config.transport,

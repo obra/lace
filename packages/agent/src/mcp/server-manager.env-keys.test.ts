@@ -1,7 +1,7 @@
 // ABOUTME: End-to-end test ensuring all env keys from MCP server config reach the spawned subprocess.
 // ABOUTME: Regression coverage for kata #47 — persona-declared multi-key env blocks were truncated.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -323,6 +323,92 @@ describe.skipIf(skipOnWindows)(
       const server = mcpServerManager.getServer('env-dump');
       expect(server?.status).toBe('running');
       expect(server?.connectionKey).toBe(`env-dump:host:stdio:rt_workspace_reconcile:${tmpRoot}`);
+    });
+
+    it('does not rewrite same-id runtime connection when host placement reconciles to unsupported transport', async () => {
+      const runtimeCwd = path.join(tmpRoot, 'runtime-project');
+      fs.mkdirSync(runtimeCwd, { recursive: true });
+      const state = buildState({
+        nextEventSeq: 1,
+        nextStreamSeq: 1,
+        config: {
+          runtimeBinding: {
+            schemaVersion: 1,
+            identity: { runtimeId: 'rt_alias_reconcile' },
+            agentPlacement: 'host',
+            toolRuntime: {
+              type: 'local',
+              cwd: runtimeCwd,
+            },
+          },
+          mcpServers: [
+            {
+              name: 'shared',
+              command: process.execPath,
+              transport: 'http',
+              placement: 'host',
+              enabled: true,
+              tools: {},
+            },
+            {
+              name: 'shared',
+              command: process.execPath,
+              transport: 'stdio',
+              placement: 'toolRuntime',
+              enabled: true,
+              tools: {},
+            },
+          ],
+        },
+      });
+
+      const hostStdioKey = `shared:host:stdio:rt_alias_reconcile:${tmpRoot}`;
+      const hostHttpKey = `shared:host:http:rt_alias_reconcile:${tmpRoot}`;
+      const runtimeStdioKey = `shared:toolRuntime:stdio:rt_alias_reconcile:${runtimeCwd}`;
+      mcpServerManager.registerConnection('shared', {
+        id: 'shared',
+        connectionKey: hostStdioKey,
+        config: {
+          command: process.execPath,
+          transport: 'stdio',
+          placement: 'host',
+          enabled: true,
+          tools: {},
+        },
+        status: 'running',
+      });
+      mcpServerManager.registerConnection('shared', {
+        id: 'shared',
+        connectionKey: runtimeStdioKey,
+        config: {
+          command: process.execPath,
+          transport: 'stdio',
+          placement: 'toolRuntime',
+          enabled: true,
+          tools: {},
+        },
+        status: 'running',
+      });
+      const originalStartServer = mcpServerManager.startServer.bind(mcpServerManager);
+      vi.spyOn(mcpServerManager, 'startServer').mockImplementation(async (input) => {
+        if (input.serverId === 'shared' && input.config.placement === 'toolRuntime') {
+          expect(mcpServerManager.getServer(runtimeStdioKey)).toBeDefined();
+        }
+        return originalStartServer(input);
+      });
+
+      await reconcileMcpServersForActiveSession(state);
+
+      const host = mcpServerManager.getServer(hostHttpKey);
+      expect(host?.status).toBe('stopped');
+      expect(host?.config.transport).toBe('http');
+      expect(host?.connectionKey).toBe(hostHttpKey);
+
+      const runtime = mcpServerManager.getServer(runtimeStdioKey);
+      expect(runtime?.status).toBe('running');
+      expect(runtime?.config.transport).toBe('stdio');
+      expect(runtime?.connectionKey).toBe(runtimeStdioKey);
+      expect(mcpServerManager.getAllServers()).toHaveLength(2);
     });
   }
 );
