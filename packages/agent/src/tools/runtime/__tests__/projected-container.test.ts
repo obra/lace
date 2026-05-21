@@ -17,6 +17,11 @@ function createFakeExecStreamHandle() {
 
 function createFakeContainerManager() {
   return {
+    materialize: vi.fn().mockResolvedValue({
+      spec: descriptor().spec,
+      containerId: 'container_123',
+      state: 'running' as const,
+    }),
     execStream: vi.fn().mockResolvedValue(createFakeExecStreamHandle()),
   };
 }
@@ -102,6 +107,35 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
+  it('materializes the descriptor spec before process start so explicit containerId is honored', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    projectedDescriptor.spec.env = { BASE: 'yes' };
+    projectedDescriptor.spec.ports = [{ host: 7777, container: 7777 }];
+    projectedDescriptor.spec.restartPolicy = 'unless-stopped';
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
+
+    expect(manager.materialize).toHaveBeenCalledWith({
+      name: 'projected-runtime',
+      containerId: 'container_123',
+      image: projectedDescriptor.spec.resolvedImageDigest,
+      workingDirectory: '/workspace',
+      mounts: [{ source: '/host/repo', target: '/workspace', readonly: false }],
+      env: { BASE: 'yes' },
+      ports: [{ host: 7777, container: 7777 }],
+      restartPolicy: 'unless-stopped',
+    });
+    expect(manager.materialize.mock.invocationCallOrder[0]).toBeLessThan(
+      manager.execStream.mock.invocationCallOrder[0]
+    );
+  });
+
   it('honors replace-mode process env without descriptor env', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
@@ -122,6 +156,7 @@ describe('ProjectedContainerToolRuntime', () => {
       'projected-runtime',
       expect.objectContaining({
         environment: { MCP_ONLY: 'visible' },
+        environmentMode: 'replace',
       })
     );
   });
@@ -133,6 +168,11 @@ describe('ProjectedContainerToolRuntime', () => {
       resolveExecStream = resolve;
     });
     const manager = {
+      materialize: vi.fn().mockResolvedValue({
+        spec: descriptor().spec,
+        containerId: 'container_123',
+        state: 'running' as const,
+      }),
       execStream: vi.fn().mockReturnValue(execStreamPromise),
     };
     const runtime = new ProjectedContainerToolRuntime({
@@ -147,12 +187,14 @@ describe('ProjectedContainerToolRuntime', () => {
       signal: abortController.signal,
     });
 
-    expect(manager.execStream).toHaveBeenCalledWith(
-      'projected-runtime',
-      expect.objectContaining({
-        command: ['/bin/sh', '-lc', 'echo ok'],
-        workingDirectory: '/workspace',
-      })
+    await vi.waitFor(() =>
+      expect(manager.execStream).toHaveBeenCalledWith(
+        'projected-runtime',
+        expect.objectContaining({
+          command: ['/bin/sh', '-lc', 'echo ok'],
+          workingDirectory: '/workspace',
+        })
+      )
     );
 
     abortController.abort();

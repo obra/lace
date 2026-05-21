@@ -17,6 +17,7 @@ import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import { v4 as uuidv4 } from 'uuid';
 import { existsSync, mkdirSync } from 'fs';
+import { appendEnvironmentOverlayArgs, commandWithExecEnvironment } from './exec-environment';
 
 const execFileAsync = promisify(execFile);
 
@@ -396,15 +397,13 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
     // Mirror the arg shape used by exec(); -i keeps stdin open for streaming.
     const args = ['exec', '-i'];
 
-    for (const [key, value] of Object.entries(options.environment || {})) {
-      args.push('-e', `${key}=${value}`);
-    }
+    appendEnvironmentOverlayArgs(args, options);
 
     if (options.workingDirectory) {
       args.push('-w', options.workingDirectory);
     }
 
-    args.push(containerId, ...options.command);
+    args.push(containerId, ...commandWithExecEnvironment(options));
 
     logger.debug('Streaming exec in Apple container', {
       containerId,
@@ -513,10 +512,7 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
     // Build args array for container exec
     const args = ['exec'];
 
-    // Add environment variables
-    for (const [key, value] of Object.entries(options.environment || {})) {
-      args.push('-e', `${key}=${value}`);
-    }
+    appendEnvironmentOverlayArgs(args, options);
 
     // Add working directory if specified
     if (options.workingDirectory) {
@@ -527,7 +523,7 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
     args.push(containerId);
 
     // Add the command to execute
-    args.push(...options.command);
+    args.push(...commandWithExecEnvironment(options));
 
     logger.debug('Executing command', { containerId, argCount: args.length });
 

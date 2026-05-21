@@ -6,6 +6,11 @@ function createFakeContainerManagerWithHelper(input: {
   response: { ok: true; value: unknown } | { ok: false; error: unknown };
 }) {
   return {
+    materialize: vi.fn().mockResolvedValue({
+      spec: containerDescriptorWithHelper().spec,
+      containerId: 'container_123',
+      state: 'running' as const,
+    }),
     execStream: vi.fn().mockResolvedValue({
       stdin: new PassThrough(),
       stdout: Readable.from([`${JSON.stringify(input.response)}\n`]),
@@ -42,6 +47,11 @@ function createAbortableContainerManagerWithHelper() {
   };
 
   return {
+    materialize: vi.fn().mockResolvedValue({
+      spec: containerDescriptorWithHelper().spec,
+      containerId: 'container_123',
+      state: 'running' as const,
+    }),
     execStream: vi.fn().mockResolvedValue(handle),
     finish() {
       if (finished) return;
@@ -130,6 +140,11 @@ describe('ProjectedContainerToolRuntime helper', () => {
       request += chunk.toString();
     });
     const manager = {
+      materialize: vi.fn().mockResolvedValue({
+        spec: containerDescriptorWithHelper().spec,
+        containerId: 'container_123',
+        state: 'running' as const,
+      }),
       execStream: vi.fn().mockResolvedValue({
         stdin,
         stdout: Readable.from([

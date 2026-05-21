@@ -241,6 +241,29 @@ describe('MCPServerManager', () => {
     expect(manager.getServer('shared')).toBeUndefined();
   });
 
+  it('resolves same-id lookup to the only running connection when stale siblings remain', () => {
+    const config: MCPServerConfig = {
+      command: 'node',
+      transport: 'stdio',
+      enabled: true,
+      tools: {},
+    };
+    manager.registerConnection('shared', {
+      id: 'shared',
+      connectionKey: 'stopped-shared',
+      config: { ...config, placement: 'host' },
+      status: 'stopped',
+    });
+    manager.registerConnection('shared', {
+      id: 'shared',
+      connectionKey: 'running-shared',
+      config: { ...config, placement: 'toolRuntime' },
+      status: 'running',
+    });
+
+    expect(manager.getServer('shared')?.connectionKey).toBe('running-shared');
+  });
+
   it('keeps runtime placed connections with the same runtime id and different cwd distinct', async () => {
     const firstRuntime = createFakeRuntime();
     Object.assign(firstRuntime, { id: 'rt_shared', cwd: '/runtime/one' });

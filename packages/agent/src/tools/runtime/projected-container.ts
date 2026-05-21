@@ -9,6 +9,7 @@ import {
 } from 'node:fs/promises';
 import { dirname, isAbsolute, posix, relative, resolve as resolveHostPath, sep } from 'node:path';
 import type { Readable, Writable } from 'node:stream';
+import type { ContainerHandle, ContainerSpec } from '../../containers/spec';
 import type { ExecStreamHandle, ExecStreamOptions } from '../../containers/types';
 import { decodeHelperResponse, encodeHelperRequest, type HelperRequest } from './helper-protocol';
 import type {
@@ -42,6 +43,7 @@ interface ProjectedHostMount {
 }
 
 export interface ProjectedContainerManager {
+  materialize(spec: ContainerSpec): Promise<ContainerHandle>;
   execStream(specName: string, options: ExecStreamOptions): Promise<ExecStreamHandle>;
 }
 
@@ -122,6 +124,34 @@ function definedEnvironment(
   }
 
   return Object.keys(environment).length > 0 ? environment : undefined;
+}
+
+function containerSpecFromDescriptor(
+  descriptor: ProjectedContainerToolRuntimeDescriptor
+): ContainerSpec {
+  const spec: ContainerSpec = {
+    name: descriptor.spec.name,
+    image: descriptor.spec.resolvedImageDigest,
+    workingDirectory: descriptor.spec.workingDirectory,
+    mounts: descriptor.spec.mounts.map((mount) => ({
+      source: mount.hostPath,
+      target: mount.containerPath,
+      readonly: mount.readonly,
+    })),
+    env: descriptor.spec.env ?? {},
+  };
+
+  if (descriptor.spec.containerId) {
+    spec.containerId = descriptor.spec.containerId;
+  }
+  if (descriptor.spec.ports) {
+    spec.ports = descriptor.spec.ports;
+  }
+  if (descriptor.spec.restartPolicy) {
+    spec.restartPolicy = descriptor.spec.restartPolicy;
+  }
+
+  return spec;
 }
 
 function helperUnavailable(): never {
@@ -441,6 +471,8 @@ class ProjectedContainerHostAccess {
 }
 
 class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
+  private materialized?: Promise<void>;
+
   constructor(
     private readonly descriptor: ProjectedContainerToolRuntimeDescriptor,
     private readonly containerManager: ProjectedContainerManager
@@ -461,7 +493,29 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
         opts.envMode === 'replace' ? undefined : this.descriptor.spec.env,
         opts.env
       ),
+      environmentMode: opts.envMode ?? 'inherit',
     };
+  }
+
+  private async ensureMaterialized(): Promise<void> {
+    if (this.materialized) {
+      await this.materialized;
+      return;
+    }
+
+    const materialized = this.containerManager
+      .materialize(containerSpecFromDescriptor(this.descriptor))
+      .then(() => undefined);
+    this.materialized = materialized;
+
+    try {
+      await materialized;
+    } catch (error) {
+      if (this.materialized === materialized) {
+        this.materialized = undefined;
+      }
+      throw error;
+    }
   }
 
   async exec(command: string[], opts: RuntimeProcessOptions = {}): Promise<RuntimeProcessResult> {
@@ -479,6 +533,12 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
   }
 
   async start(command: string[], opts: RuntimeProcessOptions = {}): Promise<RuntimeProcessHandle> {
+    if (opts.signal?.aborted) {
+      opts.signal.throwIfAborted();
+    }
+
+    await this.ensureMaterialized();
+
     if (opts.signal?.aborted) {
       opts.signal.throwIfAborted();
     }

@@ -406,6 +406,34 @@ describe('DockerContainerRuntime', () => {
       expect(result).toEqual({ stdout: 'hi\n', stderr: '', exitCode: 0 });
     });
 
+    it('wraps replace-mode commands with env -i instead of docker env flags', async () => {
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+      await runtime.start(id);
+
+      setExecFileResponses([{ stdout: '', stderr: '' }]);
+      await runtime.exec(id, {
+        command: ['printenv', 'HOST_SECRET'],
+        environment: { MCP_ONLY: 'visible' },
+        environmentMode: 'replace',
+      });
+
+      const execArgs = findCallWithSubcommand('exec');
+      expect(execArgs).toBeDefined();
+      expect(execArgs).not.toContain('-e');
+      expect(execArgs!.slice(execArgs!.indexOf(id) + 1)).toEqual([
+        'env',
+        '-i',
+        'MCP_ONLY=visible',
+        'printenv',
+        'HOST_SECRET',
+      ]);
+    });
+
     it('returns non-zero exitCode rather than throwing for failing commands', async () => {
       const id = await runtime.create({
         name: 'svc',
@@ -471,6 +499,27 @@ describe('DockerContainerRuntime', () => {
 
       handle.kill('SIGINT');
       expect(child.kill).toHaveBeenCalledWith('SIGINT');
+    });
+
+    it('wraps replace-mode stream commands with env -i instead of docker env flags', async () => {
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+      await runtime.start(id);
+
+      await runtime.execStream(id, {
+        command: ['cat'],
+        environment: { K: 'V' },
+        environmentMode: 'replace',
+      });
+
+      expect(mockSpawn).toHaveBeenCalledTimes(1);
+      const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
+      expect(args).not.toContain('-e');
+      expect(args.slice(args.indexOf(id) + 1)).toEqual(['env', '-i', 'K=V', 'cat']);
     });
 
     it('rejects when container is not running', async () => {

@@ -18,6 +18,7 @@ import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import { v4 as uuidv4 } from 'uuid';
 import { existsSync, mkdirSync } from 'fs';
+import { appendEnvironmentOverlayArgs, commandWithExecEnvironment } from './exec-environment';
 
 const execFileAsync = promisify(execFile);
 
@@ -314,11 +315,9 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       args.push('-w', options.workingDirectory);
     }
 
-    for (const [key, value] of Object.entries(options.environment || {})) {
-      args.push('-e', `${key}=${value}`);
-    }
+    appendEnvironmentOverlayArgs(args, options);
 
-    args.push(containerId, ...options.command);
+    args.push(containerId, ...commandWithExecEnvironment(options));
 
     logger.debug('Executing in docker container', {
       containerId,
@@ -437,11 +436,9 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       args.push('-w', options.workingDirectory);
     }
 
-    for (const [key, value] of Object.entries(options.environment || {})) {
-      args.push('-e', `${key}=${value}`);
-    }
+    appendEnvironmentOverlayArgs(args, options);
 
-    args.push(containerId, ...options.command);
+    args.push(containerId, ...commandWithExecEnvironment(options));
 
     logger.debug('Streaming exec in docker container', {
       containerId,

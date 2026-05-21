@@ -54,11 +54,13 @@ export interface ContainerInfo {
 }
 
 export type ContainerState = 'created' | 'running' | 'stopped' | 'failed';
+export type ExecEnvironmentMode = 'inherit' | 'replace';
 
 export interface ExecOptions {
   command: string[];
   workingDirectory?: string;
   environment?: Record<string, string>;
+  environmentMode?: ExecEnvironmentMode;
   stdin?: string;
   timeout?: number;
 }
@@ -73,6 +75,7 @@ export interface ExecStreamOptions {
   command: string[];
   workingDirectory?: string;
   environment?: Record<string, string>;
+  environmentMode?: ExecEnvironmentMode;
 }
 
 export interface ExecStreamHandle {

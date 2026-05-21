@@ -114,6 +114,28 @@ describe('AppleContainerRuntime.execStream', () => {
     );
   });
 
+  it('wraps replace-mode commands with env -i instead of container env flags', async () => {
+    const runtime = makeRuntime();
+    const containerId = setupRunningContainer(runtime);
+
+    const fake = makeFakeChild();
+    spawnMock.mockReturnValue(fake.child);
+    setImmediate(() => fake.emit('spawn'));
+
+    await runtime.execStream(containerId, {
+      command: ['printenv', 'HOST_SECRET'],
+      environment: { MCP_ONLY: 'visible' },
+      environmentMode: 'replace',
+    });
+
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    expect(spawnMock).toHaveBeenCalledWith(
+      'container',
+      ['exec', '-i', containerId, 'env', '-i', 'MCP_ONLY=visible', 'printenv', 'HOST_SECRET'],
+      expect.objectContaining({ stdio: ['pipe', 'pipe', 'pipe'] })
+    );
+  });
+
   it("rejects when the child emits 'error' before 'spawn' (CLI not on PATH)", async () => {
     const runtime = makeRuntime();
     const containerId = setupRunningContainer(runtime);

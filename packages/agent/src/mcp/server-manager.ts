@@ -362,6 +362,11 @@ export class MCPServerManager extends EventEmitter {
 
   private resolveUniqueServerId(serverId: string): MCPServerConnection | undefined {
     const matches = Array.from(this.servers.values()).filter((server) => server.id === serverId);
-    return matches.length === 1 ? matches[0] : undefined;
+    if (matches.length === 1) {
+      return matches[0];
+    }
+
+    const runningMatches = matches.filter((server) => server.status === 'running');
+    return runningMatches.length === 1 ? runningMatches[0] : undefined;
   }
 }
