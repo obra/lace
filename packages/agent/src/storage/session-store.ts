@@ -11,6 +11,11 @@ export type SessionMeta = {
   sessionId: string;
   workDir: string;
   created: string;
+  parent?: {
+    sessionId: string;
+    jobId: string;
+    personaName?: string;
+  };
 };
 
 export type SessionState = {
@@ -57,7 +62,7 @@ export type LoadedSession = {
   state: SessionState;
 };
 
-function agentSessionsDir(): string {
+export function agentSessionsDir(): string {
   const override = process.env.LACE_SESSION_DIR?.trim();
   const candidates: string[] = [];
 
