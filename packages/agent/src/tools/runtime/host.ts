@@ -126,6 +126,7 @@ class HostProcessRunner implements RuntimeProcessRunner {
       cwd: opts.cwd ?? this.#cwd,
       env: this.envFor(opts),
       stdio: ['pipe', 'pipe', 'pipe'],
+      detached: opts.detached === true,
       signal: opts.signal,
     });
     return {

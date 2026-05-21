@@ -90,6 +90,7 @@ export interface RuntimeProcessOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   envMode?: 'inherit' | 'replace';
+  detached?: boolean;
   signal?: AbortSignal;
 }
 

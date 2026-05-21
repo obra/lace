@@ -146,6 +146,7 @@ describe('createRunShellJobProcess', () => {
       cwd: '/tmp/work',
       env: expect.any(Object),
       stdio: ['pipe', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
       signal: undefined,
     });
 
@@ -204,6 +205,7 @@ describe('createRunShellJobProcess', () => {
       cwd: '/tmp/legacy-work',
       env: expect.any(Object),
       stdio: ['pipe', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
       signal: undefined,
     });
   });

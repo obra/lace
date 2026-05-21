@@ -47,7 +47,10 @@ export type ShellJobContext = {
   finalizeJob: (job: JobState, options?: { exitCode?: number }) => Promise<void>;
 };
 
-function createJobProcessAdapter(handle: RuntimeProcessHandle): ChildProcess {
+function createJobProcessAdapter(
+  handle: RuntimeProcessHandle,
+  options: { processGroup: boolean }
+): ChildProcess {
   let exitCode: number | null = null;
   void handle.completion.then(
     ({ exitCode: code }) => {
@@ -58,11 +61,11 @@ function createJobProcessAdapter(handle: RuntimeProcessHandle): ChildProcess {
     }
   );
 
-  // job-control only needs kill() and exitCode. Leave pid hidden because the
-  // runtime handle is not started as a detached process group.
+  // job-control only needs kill(), exitCode, and, for detached POSIX shell
+  // jobs, pid so it can terminate the entire command process group.
   return {
     get pid() {
-      return undefined;
+      return options.processGroup ? handle.pid : undefined;
     },
     get exitCode() {
       return exitCode;
@@ -214,7 +217,11 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
           id: runtimeBinding.identity.runtimeId,
           cwd: runtimeBinding.toolRuntime.cwd,
         });
-        proc = await runtime.process.start(['/bin/bash', '-c', job.command ?? '']);
+        const detached = process.platform !== 'win32';
+        proc = await runtime.process.start(['/bin/bash', '-c', job.command ?? ''], {
+          detached,
+        });
+        job.proc = createJobProcessAdapter(proc, { processGroup: detached });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         await appendOutput(`[BASH ERROR]\nMessage: ${message}\n`);
@@ -224,7 +231,6 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
       }
 
       proc.stdin?.end();
-      job.proc = createJobProcessAdapter(proc);
 
       proc.stdout?.setEncoding('utf8');
       proc.stderr?.setEncoding('utf8');
