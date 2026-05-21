@@ -900,16 +900,26 @@ describe('JobManager', () => {
       expect(job!.progressIntervalMs).toBe(60000);
     });
 
-    it('calls setupProgressTimer if provided', async () => {
+    it('calls setupProgressTimer when an explicit progressIntervalMs is provided', async () => {
+      const setupProgressTimer = vi.fn();
+      const deps = createDeps({ setupProgressTimer });
+      const manager = new JobManager(deps);
+
+      await manager.createJob('shell', { command: 'echo hello', progressIntervalMs: 60000 });
+
+      expect(setupProgressTimer).toHaveBeenCalledOnce();
+      const jobArg = setupProgressTimer.mock.calls[0][0] as JobState;
+      expect(jobArg.type).toBe('bash');
+    });
+
+    it('does not call setupProgressTimer when no explicit progressIntervalMs is provided (PRI-1707)', async () => {
       const setupProgressTimer = vi.fn();
       const deps = createDeps({ setupProgressTimer });
       const manager = new JobManager(deps);
 
       await manager.createJob('shell', { command: 'echo hello' });
 
-      expect(setupProgressTimer).toHaveBeenCalledOnce();
-      const jobArg = setupProgressTimer.mock.calls[0][0] as JobState;
-      expect(jobArg.type).toBe('bash');
+      expect(setupProgressTimer).not.toHaveBeenCalled();
     });
 
     it('works without setupProgressTimer', async () => {

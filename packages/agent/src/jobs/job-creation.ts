@@ -152,7 +152,12 @@ async function finalizeJobCreation(
       : undefined
   );
 
-  deps.setupProgressTimer(job);
+  // Progress timer is opt-in (PRI-1707): arm only when the caller passed
+  // an explicit progressIntervalMs. Subscriber-driven arming is handled
+  // inside JobManager.subscribe().
+  if (job.progressIntervalMs !== undefined) {
+    deps.setupProgressTimer(job);
+  }
   runJobProcess(job);
 
   return { jobId: job.jobId };

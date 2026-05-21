@@ -290,8 +290,13 @@ export class JobManager {
   }
 
   removeJob(jobId: string): void {
+    const job = this.jobs.get(jobId);
     this.jobs.delete(jobId);
     this.clearSubscriptionsForJob(jobId);
+    // Subscriptions were the only thing keeping this timer armed; with the
+    // job gone, the operator's explicit-interval branch can't reach it
+    // either. Stop unconditionally.
+    if (job) this.stopProgressTimer(job);
   }
 
   getRunningJobs(): Map<string, JobState> {
@@ -303,6 +308,12 @@ export class JobManager {
    * Used when closing a session.
    */
   clearJobs(): void {
+    // Stop every armed progress timer before dropping the jobs. The
+    // setInterval handles live in createSetupProgressTimer's closure and
+    // won't get GC'd just because we drop the JobState reference.
+    for (const job of this.jobs.values()) {
+      this.stopProgressTimer(job);
+    }
     this.jobs.clear();
     // Cancel every armed progress batch before dropping the subscriptions
     // they belong to — leaving a setTimeout pending would deliver after the
@@ -342,6 +353,10 @@ export class JobManager {
     });
 
     job.resolveCompletion?.();
+    // Stop the progress timer before dropping the job. createFinalizeJob in
+    // the notifications path also clears it on the happy path; doing it
+    // here too keeps the internal finalize entry point self-contained.
+    this.stopProgressTimer(job);
     this.jobs.delete(job.jobId);
     // Prune any subscriptions for this jobId. Fanout (if any) has already
     // fired upstream via createFinalizeJob in the notifications path — by
@@ -427,6 +442,13 @@ export class JobManager {
       this.subscriptionsByJob.set(opts.jobId, byJob);
     }
     byJob.add(sub.subscriptionId);
+    // PRI-1707: the progress timer is opt-in. A new subscription that
+    // includes 'progress' is the demand signal that arms it; jobs without
+    // an operator-configured cadence and without progress subscribers
+    // stay silent.
+    if (sub.on.includes('progress')) {
+      this.startProgressTimerIfNeeded(opts.jobId);
+    }
     return sub;
   }
 
@@ -443,6 +465,12 @@ export class JobManager {
     if (byJob) {
       byJob.delete(subscriptionId);
       if (byJob.size === 0) this.subscriptionsByJob.delete(sub.jobId);
+    }
+    // PRI-1707: if this was the last progress subscriber for the job, the
+    // timer is no longer needed. Operator-configured cadences (explicit
+    // progressIntervalMs) outlive subscriber churn and are left alone here.
+    if (sub.on.includes('progress')) {
+      this.stopProgressTimerIfUnused(sub.jobId);
     }
   }
 
@@ -546,6 +574,59 @@ export class JobManager {
     if (!batch) return;
     clearTimeout(batch.timer);
     this.progressBatches.delete(subscriptionId);
+  }
+
+  /**
+   * Returns true iff at least one subscription for `jobId` has 'progress'
+   * in its `on` set. The presence of a progress subscriber is the demand
+   * signal that keeps the per-job progress timer armed (PRI-1707).
+   */
+  private hasProgressSubscriber(jobId: string): boolean {
+    const subIds = this.subscriptionsByJob.get(jobId);
+    if (!subIds) return false;
+    for (const subId of subIds) {
+      const sub = this.subscriptions.get(subId);
+      if (sub?.on.includes('progress')) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Arm the progress timer for `jobId` if it isn't already running. No-op
+   * when the job has no setupProgressTimer dep wired (test deps may omit
+   * it) or when the timer is already armed. Idempotent.
+   */
+  private startProgressTimerIfNeeded(jobId: string): void {
+    const job = this.jobs.get(jobId);
+    if (!job) return;
+    if (job.progressTimer) return;
+    this.deps.setupProgressTimer?.(job);
+  }
+
+  /**
+   * Stop the progress timer for `jobId` IF (a) the operator did not
+   * explicitly configure an interval at create time, AND (b) no
+   * progress-watching subscriber remains. Operator-configured cadences
+   * survive subscriber churn — the operator's intent is independent of
+   * who's listening.
+   */
+  private stopProgressTimerIfUnused(jobId: string): void {
+    const job = this.jobs.get(jobId);
+    if (!job) return;
+    if (job.progressIntervalMs !== undefined) return;
+    if (this.hasProgressSubscriber(jobId)) return;
+    this.stopProgressTimer(job);
+  }
+
+  /**
+   * Clear the in-flight progress interval handle on `job`, if any.
+   * Unconditional — callers decide when stopping is appropriate.
+   */
+  private stopProgressTimer(job: JobState): void {
+    if (job.progressTimer) {
+      clearInterval(job.progressTimer);
+      job.progressTimer = undefined;
+    }
   }
 
   /**
@@ -695,8 +776,12 @@ export class JobManager {
       description,
     });
 
-    // 7. Set up progress timer if configured
-    this.deps.setupProgressTimer?.(job);
+    // 7. Set up progress timer ONLY when the operator explicitly opted in
+    // via `progressIntervalMs` (PRI-1707). Otherwise the timer stays
+    // dormant until a subscriber registers with `on` containing 'progress'.
+    if (options.progressIntervalMs !== undefined) {
+      this.deps.setupProgressTimer?.(job);
+    }
 
     // 8. Call runShellProcess or runSubagentProcess
     if (type === 'shell') {
