@@ -6,6 +6,9 @@ import { join } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
 import { defaultInitializeParams } from './helpers/initialize';
+import { loadSession } from '../storage/session-store';
+import { buildDefaultLocalRuntimeBinding } from '../tools/runtime/validation';
+import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -109,6 +112,43 @@ describe('session/fork durable history', () => {
         type: sourceLast.type,
         data: sourceLast.data,
       });
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('rebuilds runtime binding identity and cwd when forking to a new cwd', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    const sourceCwd = join(tempDir, 'source');
+    const forkedCwd = join(tempDir, 'forked');
+    const sourceRuntimeBinding: RuntimeExecutionBinding = {
+      schemaVersion: 1,
+      identity: { runtimeId: 'rt_source_session' },
+      agentPlacement: 'host',
+      toolRuntime: { type: 'local', cwd: sourceCwd },
+    };
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      const created = (await client.request('session/new', {
+        cwd: sourceCwd,
+        mcpServers: [],
+        config: { runtimeBinding: sourceRuntimeBinding },
+      })) as { sessionId: string };
+
+      const forked = (await client.request('session/fork', {
+        sessionId: created.sessionId,
+        cwd: forkedCwd,
+      })) as { sessionId: string };
+
+      expect(loadSession(created.sessionId).state.config?.runtimeBinding).toEqual(
+        sourceRuntimeBinding
+      );
+      expect(loadSession(forked.sessionId).state.config?.runtimeBinding).toEqual(
+        buildDefaultLocalRuntimeBinding({ sessionId: forked.sessionId, cwd: forkedCwd })
+      );
     } finally {
       client.close();
       server.close();

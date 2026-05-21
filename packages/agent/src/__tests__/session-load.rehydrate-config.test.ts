@@ -40,6 +40,20 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     rmSync(tempDir, { recursive: true, force: true });
   });
 
+  function workspaceRuntimeBinding(cwd: string): RuntimeExecutionBinding {
+    return {
+      schemaVersion: 1,
+      identity: { runtimeId: 'rt_workspace_session' },
+      agentPlacement: 'host',
+      toolRuntime: {
+        type: 'workspace',
+        projectRoot: tempDir,
+        workspaceRoot: tempDir,
+        cwd,
+      },
+    };
+  }
+
   it('rehydrates state.config.connectionId and modelId after session/load', async () => {
     // Step 1: bring up a server, configure connectionId+modelId, create a session
     const setupState = createAgentServerState();
@@ -199,6 +213,89 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
 
     expect(resumeState.activeSession?.state.config?.runtimeBinding).toEqual(runtimeBinding);
     expect(loadSession(created.sessionId).state.config?.runtimeBinding).toEqual(runtimeBinding);
+  });
+
+  it('rejects non-local runtimeBinding during session/new before persistence', async () => {
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', defaultInitializeParams());
+
+    await expect(
+      client.request('session/new', {
+        cwd: tempDir,
+        mcpServers: [],
+        config: { runtimeBinding: workspaceRuntimeBinding(tempDir) },
+      })
+    ).rejects.toMatchObject({ code: -32602 });
+
+    const listed = (await client.request('session/list', { cwd: tempDir })) as {
+      sessions: unknown[];
+    };
+    expect(listed.sessions).toEqual([]);
+    expect(state.activeSession).toBeNull();
+  });
+
+  it('rejects non-local runtimeBinding during session/resume before persistence', async () => {
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+
+    await setupClient.request('initialize', defaultInitializeParams());
+    const created = (await setupClient.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    const resumeState = createAgentServerState();
+    const { client: resumeClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, resumeState)
+    );
+
+    await resumeClient.request('initialize', defaultInitializeParams());
+    await expect(
+      resumeClient.request('session/resume', {
+        sessionId: created.sessionId,
+        cwd: tempDir,
+        mcpServers: [],
+        config: { runtimeBinding: workspaceRuntimeBinding(tempDir) },
+      })
+    ).rejects.toMatchObject({ code: -32602 });
+
+    expect(loadSession(created.sessionId).state.config?.runtimeBinding).toBeUndefined();
+    expect(resumeState.activeSession).toBeNull();
+  });
+
+  it('rejects non-local runtimeBinding during session/load before persistence', async () => {
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+
+    await setupClient.request('initialize', defaultInitializeParams());
+    const created = (await setupClient.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    const loadState = createAgentServerState();
+    const { client: loadClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, loadState)
+    );
+
+    await loadClient.request('initialize', defaultInitializeParams());
+    await expect(
+      loadClient.request('session/load', {
+        sessionId: created.sessionId,
+        cwd: tempDir,
+        mcpServers: [],
+        config: { runtimeBinding: workspaceRuntimeBinding(tempDir) },
+      })
+    ).rejects.toMatchObject({ code: -32602 });
+
+    expect(loadSession(created.sessionId).state.config?.runtimeBinding).toBeUndefined();
+    expect(loadState.activeSession).toBeNull();
   });
 
   it('keeps the current session and jobs when load rejects invalid MCP servers', async () => {

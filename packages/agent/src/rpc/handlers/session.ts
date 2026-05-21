@@ -39,7 +39,10 @@ import { PersonaNotFoundError, PersonaParseError } from '../../config/persona-re
 import { LACE_BUILTIN_TOOL_NAMES } from '../../tools/executor';
 import { buildSessionConfigOptions, mergeMcpServers } from '../session-config';
 import { cancelPendingPermissionRequests } from '../permissions';
-import { parseRuntimeExecutionBinding } from '../../tools/runtime/validation';
+import {
+  buildDefaultLocalRuntimeBinding,
+  parseRuntimeExecutionBinding,
+} from '../../tools/runtime/validation';
 import type { RuntimeExecutionBinding } from '../../tools/runtime/types';
 
 type SessionRestoreParams = {
@@ -74,12 +77,19 @@ function parseSessionRestoreParams(params: unknown): SessionRestoreParams {
 }
 
 function parseSessionRuntimeBinding(value: unknown): RuntimeExecutionBinding {
+  let runtimeBinding: RuntimeExecutionBinding;
   try {
-    return parseRuntimeExecutionBinding(value);
+    runtimeBinding = parseRuntimeExecutionBinding(value);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throwInvalidParams(`config.runtimeBinding is invalid: ${message}`);
   }
+  if (runtimeBinding.toolRuntime.type !== 'local') {
+    throwInvalidParams(
+      'config.runtimeBinding is invalid: only local runtime bindings are supported for sessions'
+    );
+  }
+  return runtimeBinding;
 }
 
 function rehydrateServerConfigFromSession(
@@ -496,6 +506,10 @@ export function registerSessionHandlers(
     const forkedSessionId = `sess_${randomUUID()}`;
     const created = new Date().toISOString();
     const forkedCwd = parsed.cwd ?? sourceSession.meta.workDir;
+    const runtimeBinding = buildDefaultLocalRuntimeBinding({
+      sessionId: forkedSessionId,
+      cwd: forkedCwd,
+    });
 
     const forkedSessionDir = getSessionDir(forkedSessionId);
     writeSessionMeta(forkedSessionDir, { sessionId: forkedSessionId, workDir: forkedCwd, created });
@@ -506,6 +520,7 @@ export function registerSessionHandlers(
       nextStreamSeq: sourceSession.state.nextStreamSeq,
       config: {
         ...sourceSession.state.config,
+        runtimeBinding,
       },
     };
 
