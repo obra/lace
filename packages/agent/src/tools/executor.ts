@@ -21,6 +21,9 @@ import { JobNotifyTool } from './implementations/job_notify';
 import { TodoReadTool } from './implementations/todo_read';
 import { TodoWriteTool } from './implementations/todo_write';
 import { UseSkillTool } from './implementations/use-skill-tool';
+import { ScheduleAlarmTool } from './implementations/schedule_alarm';
+import { CancelAlarmTool } from './implementations/cancel_alarm';
+import { ListAlarmsTool } from './implementations/list_alarms';
 import { MCPServerManager } from '../mcp/server-manager';
 import type { SkillRegistry } from '@lace/agent/skills';
 import type { MCPServerConnection } from '@lace/agent/config/mcp-types';
@@ -60,6 +63,9 @@ export const LACE_BUILTIN_TOOL_NAMES = [
   'job_notify',
   'todo_read',
   'todo_write',
+  'schedule_alarm',
+  'cancel_alarm',
+  'list_alarms',
   'use_skill',
 ] as const;
 
@@ -292,6 +298,9 @@ export class ToolExecutor {
       new JobNotifyTool(),
       new TodoReadTool(),
       new TodoWriteTool(),
+      new ScheduleAlarmTool(),
+      new CancelAlarmTool(),
+      new ListAlarmsTool(),
     ];
 
     // Add skill tool if registry is provided
