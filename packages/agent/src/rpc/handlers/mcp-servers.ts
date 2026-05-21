@@ -18,6 +18,10 @@ import { loadSession } from '../../storage/session-store';
 import { invalidateSessionToolExecutor } from '../../server';
 import { defaultMcpServerPlacements } from '../session-config';
 
+function isUnsupportedMcpTransport(config: { transport?: string }): boolean {
+  return Boolean(config.transport && config.transport !== 'stdio');
+}
+
 /**
  * Reconcile MCP servers for the active session.
  * Compares configured servers to running servers and starts/stops as needed.
@@ -79,7 +83,7 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
       continue;
     }
 
-    if (config.transport && config.transport !== 'stdio') {
+    if (isUnsupportedMcpTransport(config)) {
       await state.mcpServerManager.stopServer(serverId);
       logger.warn('Skipping MCP server with unsupported transport', {
         serverId,
@@ -233,7 +237,8 @@ export function registerMcpHandlers(
     });
 
     // Start the server if enabled
-    if (enabled && config.transport && config.transport !== 'stdio') {
+    if (enabled && isUnsupportedMcpTransport(config)) {
+      await state.mcpServerManager.stopServer(serverId);
       logger.warn('Skipping MCP server with unsupported transport', {
         serverId,
         transport: config.transport,
@@ -306,6 +311,13 @@ export function registerMcpHandlers(
         message: 'McpServerNotFound',
         data: { category: 'mcp', serverId },
       };
+
+    if (isUnsupportedMcpTransport(server.config)) {
+      return {
+        ok: false,
+        error: `Unsupported MCP transport for test: ${server.config.transport}`,
+      };
+    }
 
     // If not running, try to start it
     if (server.status !== 'running') {
