@@ -218,6 +218,7 @@ export function registerPromptHandler(
         connectionId: effectiveConfig.connectionId,
         modelId: effectiveConfig.modelId,
         environment: effectiveConfig.environment as Record<string, string> | undefined,
+        runtimeBinding: state.activeSession.state.config?.runtimeBinding,
         maxBudgetUsd: effectiveConfig.maxBudgetUsd,
       };
 

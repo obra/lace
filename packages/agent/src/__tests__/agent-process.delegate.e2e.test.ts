@@ -7,6 +7,7 @@ import {
   withTimeout,
   defaultInitializeParams,
 } from './helpers';
+import { readSessionState } from '../storage/session-store';
 
 describe('lace-agent delegate tool (E2E over stdio)', () => {
   const ctx = createE2EContext({ prefix: 'lace-agent-delegate' });
@@ -491,6 +492,13 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       expect(sessionAssignedEvent).toBeDefined();
       expect(sessionAssignedEvent.data.subagentSessionId).toBeDefined();
       expect(typeof sessionAssignedEvent.data.subagentSessionId).toBe('string');
+
+      const subagentSessionDir = join(sessionsDir, sessionAssignedEvent.data.subagentSessionId);
+      expect(readSessionState(subagentSessionDir).config?.runtimeBinding).toMatchObject({
+        schemaVersion: 1,
+        agentPlacement: 'host',
+        toolRuntime: { type: 'local', cwd: ctx.workDir },
+      });
 
       // Verify ent/job/list returns the subagentSessionId
       const jobList = (await ctx.agent.peer.request('ent/job/list', {})) as {

@@ -39,11 +39,14 @@ import { PersonaNotFoundError, PersonaParseError } from '../../config/persona-re
 import { LACE_BUILTIN_TOOL_NAMES } from '../../tools/executor';
 import { buildSessionConfigOptions, mergeMcpServers } from '../session-config';
 import { cancelPendingPermissionRequests } from '../permissions';
+import { parseRuntimeExecutionBinding } from '../../tools/runtime/validation';
+import type { RuntimeExecutionBinding } from '../../tools/runtime/types';
 
 type SessionRestoreParams = {
   sessionId: string;
   cwd: string;
   mcpServers: McpServerConfig[];
+  runtimeBinding?: RuntimeExecutionBinding;
 };
 
 function assertSessionIdParam(sessionId: unknown): asserts sessionId is string {
@@ -54,7 +57,9 @@ function assertSessionIdParam(sessionId: unknown): asserts sessionId is string {
 }
 
 function parseSessionRestoreParams(params: unknown): SessionRestoreParams {
-  const parsed = params as Partial<SessionRestoreParams> | undefined;
+  const parsed = params as
+    | (Partial<SessionRestoreParams> & { config?: { runtimeBinding?: unknown } })
+    | undefined;
   assertSessionIdParam(parsed?.sessionId);
   if (!parsed?.cwd) throwInvalidParams('cwd is required');
   if (!Array.isArray(parsed.mcpServers)) throwInvalidParams('mcpServers is required');
@@ -62,7 +67,19 @@ function parseSessionRestoreParams(params: unknown): SessionRestoreParams {
     sessionId: parsed.sessionId,
     cwd: parsed.cwd,
     mcpServers: parsed.mcpServers,
+    ...(parsed.config?.runtimeBinding !== undefined
+      ? { runtimeBinding: parseSessionRuntimeBinding(parsed.config.runtimeBinding) }
+      : {}),
   };
+}
+
+function parseSessionRuntimeBinding(value: unknown): RuntimeExecutionBinding {
+  try {
+    return parseRuntimeExecutionBinding(value);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throwInvalidParams(`config.runtimeBinding is invalid: ${message}`);
+  }
 }
 
 function rehydrateServerConfigFromSession(
@@ -80,7 +97,8 @@ function rehydrateServerConfigFromSession(
 
 function mergeMcpServersIntoLoadedSession(
   loaded: LoadedSession,
-  mcpServers: McpServerConfig[]
+  mcpServers: McpServerConfig[],
+  runtimeBinding?: RuntimeExecutionBinding
 ): LoadedSession {
   const currentState = loaded.state;
   const currentConfig = currentState.config ?? {};
@@ -89,6 +107,7 @@ function mergeMcpServersIntoLoadedSession(
     config: {
       ...currentConfig,
       mcpServers: mergeMcpServers(currentConfig.mcpServers, mcpServers),
+      ...(runtimeBinding ? { runtimeBinding } : {}),
     },
   };
   return { ...loaded, state: nextState };
@@ -149,7 +168,11 @@ async function activateStoredSession(
     throw error;
   }
 
-  const loadedWithMcpServers = mergeMcpServersIntoLoadedSession(loaded, params.mcpServers);
+  const loadedWithMcpServers = mergeMcpServersIntoLoadedSession(
+    loaded,
+    params.mcpServers,
+    params.runtimeBinding
+  );
   const switchingSessions =
     state.activeSession && state.activeSession.meta.sessionId !== params.sessionId;
 
@@ -214,6 +237,7 @@ export function registerSessionHandlers(
         connectionId?: string;
         modelId?: string;
         persona?: string;
+        runtimeBinding?: unknown;
       };
       parent?: {
         sessionId: string;
@@ -222,6 +246,10 @@ export function registerSessionHandlers(
       };
     };
     if (!parsed?.cwd) throwInvalidParams('cwd is required');
+    const runtimeBinding =
+      parsed.config?.runtimeBinding !== undefined
+        ? parseSessionRuntimeBinding(parsed.config.runtimeBinding)
+        : undefined;
 
     // Persona may arrive top-level (subagent/delegate path) or nested under config.
     const requestedPersona =
@@ -317,6 +345,7 @@ export function registerSessionHandlers(
           maxThinkingTokens: state.config.maxThinkingTokens,
           ...(effectiveMcpServers ? { mcpServers: effectiveMcpServers } : {}),
           ...(effectiveToolScope ? { toolScope: effectiveToolScope } : {}),
+          ...(runtimeBinding ? { runtimeBinding } : {}),
         },
       });
       ensureSessionFiles(sessionDir);

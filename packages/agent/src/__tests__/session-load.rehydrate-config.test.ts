@@ -11,6 +11,7 @@ import { createAgentServerState, registerAgentRpcMethods } from '../server';
 import { defaultInitializeParams } from './helpers/initialize';
 import { loadSession } from '../storage/session-store';
 import type { JobState } from '../server-types';
+import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -163,6 +164,41 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     expect(resumeState.activeSession?.state.config?.mcpServers).toEqual([
       { name: 'shared', command: process.execPath, args: ['new'], enabled: false },
     ]);
+  });
+
+  it('persists runtimeBinding passed during session/resume', async () => {
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+
+    await setupClient.request('initialize', defaultInitializeParams());
+    const created = (await setupClient.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    const runtimeBinding: RuntimeExecutionBinding = {
+      schemaVersion: 1,
+      identity: { runtimeId: 'rt_resume_inherited' },
+      agentPlacement: 'host',
+      toolRuntime: { type: 'local', cwd: tempDir },
+    };
+    const resumeState = createAgentServerState();
+    const { client: resumeClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, resumeState)
+    );
+
+    await resumeClient.request('initialize', defaultInitializeParams());
+    await resumeClient.request('session/resume', {
+      sessionId: created.sessionId,
+      cwd: tempDir,
+      mcpServers: [],
+      config: { runtimeBinding },
+    });
+
+    expect(resumeState.activeSession?.state.config?.runtimeBinding).toEqual(runtimeBinding);
+    expect(loadSession(created.sessionId).state.config?.runtimeBinding).toEqual(runtimeBinding);
   });
 
   it('keeps the current session and jobs when load rejects invalid MCP servers', async () => {

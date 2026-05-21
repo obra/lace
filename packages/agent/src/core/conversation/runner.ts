@@ -159,11 +159,11 @@ export class ConversationRunner {
     } = this.config;
 
     const filesRead = deriveFilesReadFromDurableEvents(sessionDir, cwd);
-    const runtimeBinding = buildDefaultLocalRuntimeBinding({
-      sessionId,
-      cwd,
-    });
-    const runtimeFileAccessTracker = await this.createDefaultLocalFileAccessTracker(filesRead, cwd);
+    const runtimeBinding = this.resolveActiveLocalRuntimeBinding(cwd);
+    const runtimeFileAccessTracker = await this.createLocalFileAccessTracker(
+      filesRead,
+      runtimeBinding
+    );
 
     const envOverlay = environment && typeof environment === 'object' ? environment : undefined;
 
@@ -1043,7 +1043,7 @@ export class ConversationRunner {
     }
 
     // Default: execute through tool executor
-    const runtime = this.createDefaultLocalRuntime(cwd, envOverlay);
+    const runtime = this.createLocalRuntime(runtimeBinding, envOverlay);
     const markRuntimeFileRead = (path: RuntimePath): void => {
       runtimeFileAccessTracker.markRead(path, runtime.paths.canonicalKey(path));
       const hostPath = path.hostPath ?? (runtime.kind === 'local' ? path.runtimePath : undefined);
@@ -1072,27 +1072,46 @@ export class ConversationRunner {
     );
   }
 
-  private createDefaultLocalRuntime(
-    cwd: string,
+  private resolveActiveLocalRuntimeBinding(cwd: string): RuntimeExecutionBinding {
+    const runtimeBinding =
+      this.config.runtimeBinding ??
+      buildDefaultLocalRuntimeBinding({
+        sessionId: this.config.sessionId,
+        cwd,
+      });
+
+    if (runtimeBinding.toolRuntime.type !== 'local') {
+      throw new Error(
+        'Only local runtime tool execution is supported before projected container runtime lands'
+      );
+    }
+
+    return runtimeBinding;
+  }
+
+  private createLocalRuntime(
+    runtimeBinding: RuntimeExecutionBinding,
     envOverlay?: Record<string, string>
   ): HostToolRuntime {
-    const runtimeBinding = buildDefaultLocalRuntimeBinding({
-      sessionId: this.config.sessionId,
-      cwd,
-    });
+    if (runtimeBinding.toolRuntime.type !== 'local') {
+      throw new Error(
+        'Only local runtime tool execution is supported before projected container runtime lands'
+      );
+    }
+
     return new HostToolRuntime({
       id: runtimeBinding.identity.runtimeId,
-      cwd,
+      cwd: runtimeBinding.toolRuntime.cwd,
       env: envOverlay,
     });
   }
 
-  private async createDefaultLocalFileAccessTracker(
+  private async createLocalFileAccessTracker(
     filesRead: Set<string>,
-    cwd: string
+    runtimeBinding: RuntimeExecutionBinding
   ): Promise<FileAccessTracker> {
     const tracker = new FileAccessTracker();
-    const runtime = this.createDefaultLocalRuntime(cwd);
+    const runtime = this.createLocalRuntime(runtimeBinding);
 
     for (const filePath of filesRead) {
       const runtimePath = await runtime.paths.resolve(filePath);

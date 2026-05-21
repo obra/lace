@@ -42,6 +42,8 @@ export interface RunnerConfig {
   modelId?: string;
   /** Environment variables for tool execution */
   environment?: Record<string, string>;
+  /** Runtime binding for tool execution */
+  runtimeBinding?: RuntimeExecutionBinding;
   /** Maximum budget in USD for this session */
   maxBudgetUsd?: number;
 }
