@@ -7,6 +7,7 @@ import type { ContentBlock, ProviderMessage } from '../providers/base-provider';
 import { toNonEmptyString, coreToolResultFromProtocol } from '../rpc/utils';
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
+import { logger } from '@lace/agent/utils/logger';
 
 // Typed shapes for parsing event data
 type TextBlock = { type: 'text'; text: string };
@@ -89,6 +90,53 @@ function extractContentBlocks(content: unknown): string | ContentBlock[] {
 }
 
 /**
+ * Defensive post-pass for messages rebuilt from a `context_compacted` event's
+ * `preserved` array. Drops `toolResult` entries from `user` messages when the
+ * immediately-prior message is not an `assistant` carrying a matching `tool_use`
+ * id. Anthropic rejects orphaned tool_results with a 400; this pass keeps a
+ * broken preserved array from bricking a session at read time.
+ *
+ * If a user message ends up with no toolResults and empty content, it is dropped.
+ * Every dropped toolResult is logged at WARN with its toolCallId for visibility.
+ */
+function dropOrphanedToolResults(messages: ProviderMessage[]): void {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!;
+    if (m.role !== 'user' || !Array.isArray(m.toolResults) || m.toolResults.length === 0) continue;
+
+    const prev = messages[i - 1];
+    const priorCallIds =
+      prev && prev.role === 'assistant' && Array.isArray(prev.toolCalls)
+        ? new Set(prev.toolCalls.map((c) => c.id))
+        : new Set<string>();
+
+    const kept: CoreToolResult[] = [];
+    for (const tr of m.toolResults) {
+      if (tr.id && priorCallIds.has(tr.id)) {
+        kept.push(tr);
+      } else {
+        logger.warn('Dropping orphaned tool_result from compacted preserved messages', {
+          toolCallId: tr.id ?? '<missing>',
+        });
+      }
+    }
+
+    if (kept.length === 0) {
+      delete m.toolResults;
+    } else {
+      m.toolResults = kept;
+    }
+
+    const contentIsEmpty =
+      typeof m.content === 'string' ? m.content.trim() === '' : m.content.length === 0;
+    const hasToolResults = Array.isArray(m.toolResults) && m.toolResults.length > 0;
+    if (!hasToolResults && contentIsEmpty) {
+      messages.splice(i, 1);
+    }
+  }
+}
+
+/**
  * Builds provider messages from durable events stored in a session directory.
  * Reconstructs the conversation history by reading and parsing events.jsonl.
  * Exported for testing - converts durable events to provider message format.
@@ -154,6 +202,8 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Prov
             ...(toolResults ? { toolResults } : {}),
           });
         }
+
+        dropOrphanedToolResults(messages);
 
         continue;
       }

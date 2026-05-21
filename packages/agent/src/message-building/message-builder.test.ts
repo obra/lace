@@ -9,10 +9,7 @@ import { buildProviderMessagesFromDurableEvents } from './message-builder';
 import { logger } from '@lace/agent/utils/logger';
 
 function writeEvents(dir: string, events: unknown[]): void {
-  writeFileSync(
-    join(dir, 'events.jsonl'),
-    events.map((e) => JSON.stringify(e)).join('\n') + '\n'
-  );
+  writeFileSync(join(dir, 'events.jsonl'), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
 }
 
 describe('buildProviderMessagesFromDurableEvents — orphan tool_result recovery', () => {
@@ -42,7 +39,9 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_result recovery
           {
             role: 'user',
             content: '',
-            toolResults: [{ id: 'orphan-1', status: 'completed', content: [{ type: 'text', text: 'orphan' }] }],
+            toolResults: [
+              { id: 'orphan-1', status: 'completed', content: [{ type: 'text', text: 'orphan' }] },
+            ],
           },
           {
             role: 'user',
@@ -56,7 +55,9 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_result recovery
           {
             role: 'user',
             content: '',
-            toolResults: [{ id: 'paired-1', status: 'completed', content: [{ type: 'text', text: 'hi' }] }],
+            toolResults: [
+              { id: 'paired-1', status: 'completed', content: [{ type: 'text', text: 'hi' }] },
+            ],
           },
         ],
       },
