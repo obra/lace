@@ -16,6 +16,46 @@ function createFakeContainerManagerWithHelper(input: {
   };
 }
 
+function createAbortableContainerManagerWithHelper() {
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  let finished = false;
+  let resolveWait!: (result: { exitCode: number }) => void;
+  const waitPromise = new Promise<{ exitCode: number }>((resolve) => {
+    resolveWait = resolve;
+  });
+  const abortError = Object.assign(new Error('The operation was aborted'), {
+    name: 'AbortError',
+  });
+  const handle = {
+    stdin: new PassThrough(),
+    stdout,
+    stderr,
+    wait: vi.fn().mockReturnValue(waitPromise),
+    kill: vi.fn(() => {
+      if (finished) return;
+      finished = true;
+      stdout.destroy(abortError);
+      stderr.end();
+      resolveWait({ exitCode: 130 });
+    }),
+  };
+
+  return {
+    execStream: vi.fn().mockResolvedValue(handle),
+    finish() {
+      if (finished) return;
+      finished = true;
+      stdout.end(
+        `${JSON.stringify({ ok: true, value: { status: 200, headers: {}, body: '' } })}\n`
+      );
+      stderr.end();
+      resolveWait({ exitCode: 0 });
+    },
+    handle,
+  };
+}
+
 function containerDescriptorWithHelper() {
   return {
     spec: {
@@ -49,5 +89,37 @@ describe('ProjectedContainerToolRuntime helper', () => {
 
     const path = await runtime.paths.resolve('/tmp/container-only.txt');
     await expect(runtime.fs.readTextFile(path)).resolves.toBe('container-only');
+  });
+
+  it('kills helper-backed fetch when the request is aborted', async () => {
+    const manager = createAbortableContainerManagerWithHelper();
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: containerDescriptorWithHelper(),
+    });
+    const abortController = new AbortController();
+    const fetchResult = runtime.network
+      .fetch('https://example.test/data', { signal: abortController.signal })
+      .then(
+        (value) => ({ status: 'resolved' as const, value }),
+        (error: unknown) => ({ status: 'rejected' as const, error })
+      );
+
+    await vi.waitFor(() => expect(manager.execStream).toHaveBeenCalledTimes(1));
+    abortController.abort();
+
+    try {
+      await vi.waitFor(() => expect(manager.handle.kill).toHaveBeenCalledTimes(1), {
+        timeout: 100,
+      });
+      await expect(fetchResult).resolves.toMatchObject({
+        status: 'rejected',
+        error: { name: 'AbortError' },
+      });
+    } finally {
+      manager.finish();
+      await fetchResult;
+    }
   });
 });

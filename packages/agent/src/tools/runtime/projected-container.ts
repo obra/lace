@@ -1,12 +1,13 @@
 import {
+  lstat,
   mkdir as mkdirHost,
   readdir as readdirHost,
   readFile,
+  realpath,
   stat as statHost,
   writeFile,
 } from 'node:fs/promises';
-import { posix } from 'node:path';
-import { resolve as resolveHostPath } from 'node:path';
+import { dirname, isAbsolute, posix, relative, resolve as resolveHostPath, sep } from 'node:path';
 import type { Readable, Writable } from 'node:stream';
 import type { ExecStreamHandle, ExecStreamOptions } from '../../containers/types';
 import { decodeHelperResponse, encodeHelperRequest, type HelperRequest } from './helper-protocol';
@@ -29,12 +30,41 @@ type ContainerToolRuntimeDescriptor = Extract<ToolRuntimeDescriptor, { type: 'co
 
 export type ProjectedContainerToolRuntimeDescriptor = Omit<ContainerToolRuntimeDescriptor, 'type'>;
 
+interface NodeError extends Error {
+  code?: string;
+}
+
+interface ProjectedHostMount {
+  hostPath: string;
+  containerPath: string;
+  readonly: boolean;
+  realHostPath?: Promise<string>;
+}
+
 export interface ProjectedContainerManager {
   execStream(specName: string, options: ExecStreamOptions): Promise<ExecStreamHandle>;
 }
 
+function isNotFoundError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as NodeError).code === 'ENOENT';
+}
+
 function containerPathIsInside(root: string, path: string): boolean {
   return root === '/' || path === root || path.startsWith(`${root}/`);
+}
+
+function hostPathIsInside(root: string, path: string): boolean {
+  const relativePath = relative(root, path);
+  return (
+    relativePath === '' ||
+    (!relativePath.startsWith(`..${sep}`) && relativePath !== '..' && !isAbsolute(relativePath))
+  );
+}
+
+function requireHostPathInside(root: string, path: string, message: string): void {
+  if (!hostPathIsInside(root, path)) {
+    throw new Error(message);
+  }
 }
 
 function normalizeContainerPath(inputPath: string, cwd: string): string {
@@ -176,22 +206,14 @@ function parseFetchValue(value: unknown): RuntimeFetchResult {
 }
 
 class ProjectedContainerPathService implements RuntimePathService {
-  private readonly mounts: Array<{
-    hostPath: string;
-    containerPath: string;
-  }>;
+  private readonly mounts: ProjectedHostMount[];
 
   constructor(
     private readonly runtimeId: string,
     private readonly cwd: string,
     mounts: ProjectedContainerToolRuntimeDescriptor['spec']['mounts']
   ) {
-    this.mounts = mounts
-      .map((mount) => ({
-        hostPath: resolveHostPath(mount.hostPath),
-        containerPath: normalizeContainerPath(mount.containerPath, '/'),
-      }))
-      .sort((left, right) => right.containerPath.length - left.containerPath.length);
+    this.mounts = normalizeHostMounts(mounts);
   }
 
   async resolve(inputPath: string): Promise<RuntimePath> {
@@ -221,13 +243,17 @@ class ProjectedContainerPathService implements RuntimePathService {
 }
 
 class ProjectedContainerFileSystem implements RuntimeFileSystem {
-  constructor(private readonly helper: ProjectedContainerRuntimeHelper) {}
+  constructor(
+    private readonly helper: ProjectedContainerRuntimeHelper,
+    private readonly hostAccess: ProjectedContainerHostAccess
+  ) {}
 
   async stat(
     path: RuntimePath
   ): Promise<{ type: 'file' | 'directory'; size: number; mtime: Date }> {
     if (path.hostPath) {
-      const result = await statHost(path.hostPath);
+      const hostPath = await this.hostAccess.requireExistingPath(path);
+      const result = await statHost(hostPath);
       return {
         type: result.isDirectory() ? 'directory' : 'file',
         size: result.size,
@@ -240,7 +266,7 @@ class ProjectedContainerFileSystem implements RuntimeFileSystem {
 
   async readTextFile(path: RuntimePath): Promise<string> {
     if (path.hostPath) {
-      return await readFile(path.hostPath, 'utf8');
+      return await readFile(await this.hostAccess.requireExistingPath(path), 'utf8');
     }
 
     const value = await this.helper.request({ op: 'readTextFile', path: path.runtimePath });
@@ -252,7 +278,7 @@ class ProjectedContainerFileSystem implements RuntimeFileSystem {
 
   async writeTextFile(path: RuntimePath, content: string): Promise<void> {
     if (path.hostPath) {
-      await writeFile(path.hostPath, content, 'utf8');
+      await writeFile(await this.hostAccess.requireWritablePath(path), content, 'utf8');
       return;
     }
 
@@ -261,7 +287,7 @@ class ProjectedContainerFileSystem implements RuntimeFileSystem {
 
   async mkdir(path: RuntimePath, opts?: { recursive?: boolean }): Promise<void> {
     if (path.hostPath) {
-      await mkdirHost(path.hostPath, {
+      await mkdirHost(await this.hostAccess.requireCreatableDirectory(path), {
         recursive: opts?.recursive,
       });
       return;
@@ -272,7 +298,7 @@ class ProjectedContainerFileSystem implements RuntimeFileSystem {
 
   async readdir(path: RuntimePath): Promise<Array<{ name: string; type: 'file' | 'directory' }>> {
     if (path.hostPath) {
-      const entries = await readdirHost(path.hostPath, {
+      const entries = await readdirHost(await this.hostAccess.requireExistingPath(path), {
         withFileTypes: true,
       });
       return entries.map((entry) => ({
@@ -282,6 +308,135 @@ class ProjectedContainerFileSystem implements RuntimeFileSystem {
     }
 
     return parseReaddirValue(await this.helper.request({ op: 'readdir', path: path.runtimePath }));
+  }
+}
+
+function normalizeHostMounts(
+  mounts: ProjectedContainerToolRuntimeDescriptor['spec']['mounts']
+): ProjectedHostMount[] {
+  return mounts
+    .map((mount) => ({
+      hostPath: resolveHostPath(mount.hostPath),
+      containerPath: normalizeContainerPath(mount.containerPath, '/'),
+      readonly: mount.readonly,
+    }))
+    .sort((left, right) => right.containerPath.length - left.containerPath.length);
+}
+
+class ProjectedContainerHostAccess {
+  private readonly mounts: ProjectedHostMount[];
+
+  constructor(mounts: ProjectedContainerToolRuntimeDescriptor['spec']['mounts']) {
+    this.mounts = normalizeHostMounts(mounts);
+  }
+
+  private mountedHostPath(path: RuntimePath): { mount: ProjectedHostMount; hostPath: string } {
+    if (!path.hostPath) {
+      throw new Error(
+        `Access denied: path is not backed by a projected host mount: ${path.displayPath}`
+      );
+    }
+
+    const mount = this.mounts.find((candidate) =>
+      containerPathIsInside(candidate.containerPath, path.runtimePath)
+    );
+    if (!mount) {
+      throw new Error(`Access denied: path is outside projected host mounts: ${path.displayPath}`);
+    }
+
+    const hostPath = resolveHostPath(path.hostPath);
+    requireHostPathInside(
+      mount.hostPath,
+      hostPath,
+      `Access denied: path resolves outside projected host mount: ${path.displayPath}`
+    );
+    return { mount, hostPath };
+  }
+
+  private async assertRealInside(
+    mount: ProjectedHostMount,
+    realHostPath: string,
+    originalPath: string
+  ): Promise<void> {
+    mount.realHostPath ??= realpath(mount.hostPath);
+    const realRoot = await mount.realHostPath;
+    if (!hostPathIsInside(realRoot, realHostPath)) {
+      throw new Error(`Access denied: path resolves outside projected host mount: ${originalPath}`);
+    }
+  }
+
+  private async nearestExistingRealPath(hostPath: string): Promise<string> {
+    let candidate = hostPath;
+
+    for (;;) {
+      try {
+        return await realpath(candidate);
+      } catch (error) {
+        if (!isNotFoundError(error)) throw error;
+      }
+
+      const parent = dirname(candidate);
+      if (parent === candidate) {
+        throw new Error(`Path does not exist: ${hostPath}`);
+      }
+      candidate = parent;
+    }
+  }
+
+  async requireExistingPath(path: RuntimePath): Promise<string> {
+    const { mount, hostPath } = this.mountedHostPath(path);
+    const realHostPath = await realpath(hostPath);
+    await this.assertRealInside(mount, realHostPath, path.displayPath);
+    return hostPath;
+  }
+
+  async requireWritablePath(path: RuntimePath): Promise<string> {
+    const { mount, hostPath } = this.mountedHostPath(path);
+    if (mount.readonly) {
+      throw new Error(`Access denied: projected host mount is read-only: ${path.displayPath}`);
+    }
+
+    try {
+      const realTarget = await realpath(hostPath);
+      await this.assertRealInside(mount, realTarget, path.displayPath);
+      return hostPath;
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+    }
+
+    try {
+      const targetStat = await lstat(hostPath);
+      if (targetStat.isSymbolicLink()) {
+        throw new Error(
+          `Access denied: path resolves outside projected host mount: ${path.displayPath}`
+        );
+      }
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+    }
+
+    const realParent = await this.nearestExistingRealPath(dirname(hostPath));
+    await this.assertRealInside(mount, realParent, path.displayPath);
+    return hostPath;
+  }
+
+  async requireCreatableDirectory(path: RuntimePath): Promise<string> {
+    const { mount, hostPath } = this.mountedHostPath(path);
+    if (mount.readonly) {
+      throw new Error(`Access denied: projected host mount is read-only: ${path.displayPath}`);
+    }
+
+    try {
+      const realTarget = await realpath(hostPath);
+      await this.assertRealInside(mount, realTarget, path.displayPath);
+      return hostPath;
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+    }
+
+    const realAncestor = await this.nearestExistingRealPath(dirname(hostPath));
+    await this.assertRealInside(mount, realAncestor, path.displayPath);
+    return hostPath;
   }
 }
 
@@ -362,13 +517,16 @@ class ProjectedContainerNetworkClient implements RuntimeNetworkClient {
 
   async fetch(url: string, opts: RuntimeFetchOptions = {}): Promise<RuntimeFetchResult> {
     return parseFetchValue(
-      await this.helper.request({
-        op: 'fetch',
-        url,
-        method: opts.method,
-        headers: opts.headers,
-        body: opts.body,
-      })
+      await this.helper.request(
+        {
+          op: 'fetch',
+          url,
+          method: opts.method,
+          headers: opts.headers,
+          body: opts.body,
+        },
+        opts.signal
+      )
     );
   }
 }
@@ -379,7 +537,7 @@ class ProjectedContainerRuntimeHelper {
     private readonly processRunner: RuntimeProcessRunner
   ) {}
 
-  async request(request: HelperRequest): Promise<unknown> {
+  async request(request: HelperRequest, signal?: AbortSignal): Promise<unknown> {
     const helper = this.descriptor.helper;
     if (!helper) {
       helperUnavailable();
@@ -387,6 +545,7 @@ class ProjectedContainerRuntimeHelper {
 
     const handle = await this.processRunner.start(helper.command, {
       cwd: this.descriptor.cwd,
+      signal,
     });
     if (!handle.stdin || !handle.stdout) {
       handle.kill();
@@ -444,7 +603,10 @@ export class ProjectedContainerToolRuntime implements ToolRuntime {
       { ...input.descriptor, cwd: this.cwd },
       this.process
     );
-    this.fs = new ProjectedContainerFileSystem(helper);
+    this.fs = new ProjectedContainerFileSystem(
+      helper,
+      new ProjectedContainerHostAccess(input.descriptor.spec.mounts)
+    );
     this.network = new ProjectedContainerNetworkClient(helper);
   }
 
