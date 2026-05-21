@@ -83,15 +83,15 @@ class HostFileSystem implements RuntimeFileSystem {
 
 class HostProcessRunner implements RuntimeProcessRunner {
   #cwd: string;
-  #defaultEnv?: NodeJS.ProcessEnv;
+  #defaultEnv: NodeJS.ProcessEnv;
 
   constructor(cwd: string, defaultEnv?: NodeJS.ProcessEnv) {
     this.#cwd = cwd;
-    this.#defaultEnv = defaultEnv;
+    this.#defaultEnv = defaultProcessEnv(defaultEnv);
   }
 
-  private envFor(opts: RuntimeProcessOptions): NodeJS.ProcessEnv | undefined {
-    return opts.env ?? this.#defaultEnv;
+  private envFor(opts: RuntimeProcessOptions): NodeJS.ProcessEnv {
+    return { ...this.#defaultEnv, ...(opts.env ?? {}) };
   }
 
   async exec(command: string[], opts: RuntimeProcessOptions = {}) {
@@ -143,8 +143,7 @@ class HostProcessRunner implements RuntimeProcessRunner {
   }
 }
 
-function defaultProcessEnv(env: NodeJS.ProcessEnv | undefined): NodeJS.ProcessEnv | undefined {
-  if (!env) return undefined;
+function defaultProcessEnv(env: NodeJS.ProcessEnv | undefined): NodeJS.ProcessEnv {
   return { ...process.env, ...env };
 }
 
@@ -176,7 +175,7 @@ export class HostToolRuntime implements ToolRuntime {
     this.id = input.id;
     this.cwd = input.cwd;
     this.paths = new HostPathService(input.cwd);
-    this.process = new HostProcessRunner(input.cwd, defaultProcessEnv(input.env));
+    this.process = new HostProcessRunner(input.cwd, input.env);
   }
 
   readonly id: string;

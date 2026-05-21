@@ -9,7 +9,7 @@ import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
 
 export interface BashOutput {
   command: string;
-  exitCode: number;
+  exitCode: number | null;
   runtime: number;
 
   // Truncated output for model consumption
@@ -105,8 +105,7 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
 
       const childProcess = await context.runtime.process.start(['/bin/bash', '-c', command], {
         cwd: context.runtime.cwd,
-        env: context.processEnv ?? process.env,
-        signal: context.signal,
+        env: context.processEnv,
       });
 
       // Set up output streams after the runtime process is started so a start failure
@@ -185,7 +184,7 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
               } else {
                 this.completeExecution(
                   command,
-                  exitCode || 0,
+                  exitCode,
                   runtime,
                   stdoutHeadLines,
                   stderrHeadLines,
@@ -307,9 +306,6 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
         childProcess.completion
           .then((result) => {
             exitCode = result.exitCode;
-            if (exitCode === null) {
-              cancelled = true;
-            }
             completionDone = true;
             closeStreamsAndComplete();
           })
@@ -478,7 +474,7 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
    */
   private completeExecution(
     command: string,
-    exitCode: number,
+    exitCode: number | null,
     runtime: number,
     stdoutHeadLines: string[],
     stderrHeadLines: string[],
@@ -544,9 +540,6 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
     // This handles single nonexistent commands like "nonexistentcommand12345"
     if (exitCode === 127 && stdoutLineCount === 0) {
       resolve(this.createError(result as unknown as Record<string, unknown>));
-    } else if (exitCode === null) {
-      // Process was terminated by signal (e.g., SIGKILL, SIGTERM)
-      resolve(this.createCancellationResult());
     } else {
       resolve(this.createResult(result as unknown as Record<string, unknown>));
     }

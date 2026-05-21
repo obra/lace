@@ -100,7 +100,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           ['rg', ...ripgrepArgs],
           {
             cwd: context.runtime.cwd,
-            env: context.processEnv ?? process.env,
+            env: context.processEnv,
             signal: context.signal,
           }
         );

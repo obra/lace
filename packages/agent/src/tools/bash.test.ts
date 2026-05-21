@@ -1,7 +1,8 @@
 // ABOUTME: Comprehensive tests for BashTool implementation
 // ABOUTME: Tests command execution, error handling, and success/failure distinction
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { PassThrough } from 'node:stream';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -22,6 +23,10 @@ describe('BashTool', () => {
       toolTempDir: testTempDir,
       runtime: new HostToolRuntime({ id: `rt_bash_test_${runtimeId++}`, cwd }),
     };
+  }
+
+  function waitForToolListeners(): Promise<void> {
+    return new Promise((resolve) => setImmediate(resolve));
   }
 
   beforeEach(() => {
@@ -153,6 +158,107 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
       expect(output.stderrPreview).toBe('');
       expect(output.command).toBe('true');
       expect(typeof output.runtime).toBe('number');
+    });
+  });
+
+  describe('Runtime process behavior', () => {
+    it('preserves partial output when cancellation kills the runtime process', async () => {
+      const tool = new BashTool();
+      const runtime = createStreamingFakeRuntime();
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      let resolveCompletion!: (result: {
+        exitCode: number | null;
+        signal?: NodeJS.Signals;
+      }) => void;
+      let rejectCompletion!: (error: Error) => void;
+      const completion = new Promise<{ exitCode: number | null; signal?: NodeJS.Signals }>(
+        (resolve, reject) => {
+          resolveCompletion = resolve;
+          rejectCompletion = reject;
+        }
+      );
+      const kill = vi.fn((signal?: NodeJS.Signals) => {
+        resolveCompletion({ exitCode: null, signal });
+      });
+
+      runtime.process.start = vi.fn(async (_command, opts) => {
+        opts?.signal?.addEventListener('abort', () => {
+          const error = new Error('The operation was aborted');
+          error.name = 'AbortError';
+          rejectCompletion(error);
+        });
+
+        return {
+          pid: 123,
+          stdout,
+          stderr,
+          kill,
+          completion,
+        };
+      });
+
+      const abortController = new AbortController();
+      const resultPromise = tool.execute(
+        { command: 'sleep 10' },
+        {
+          signal: abortController.signal,
+          runtime,
+          toolTempDir: testTempDir,
+        }
+      );
+
+      await waitForToolListeners();
+      stdout.write('before cancel\n');
+      abortController.abort();
+      stdout.end();
+      stderr.end();
+
+      const result = await resultPromise;
+      const startOptions = vi.mocked(runtime.process.start).mock.calls[0][1];
+
+      expect(startOptions).not.toHaveProperty('signal');
+      expect(result.status).toBe('aborted');
+      expect(result.content[0].text).toContain('Partial output');
+      expect(result.content[0].text).toContain('before cancel');
+    });
+
+    it('reports non-user signal termination as process completion', async () => {
+      const tool = new BashTool();
+      const runtime = createStreamingFakeRuntime();
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+
+      runtime.process.start = vi.fn(async () => ({
+        pid: 123,
+        stdout,
+        stderr,
+        kill: vi.fn(),
+        completion: Promise.resolve({
+          exitCode: null,
+          signal: 'SIGTERM' as NodeJS.Signals,
+        }),
+      }));
+
+      const resultPromise = tool.execute(
+        { command: 'self-terminating-command' },
+        {
+          signal: new AbortController().signal,
+          runtime,
+          toolTempDir: testTempDir,
+        }
+      );
+
+      await waitForToolListeners();
+      stdout.end('terminated\n');
+      stderr.end();
+
+      const result = await resultPromise;
+
+      expect(result.status).toBe('completed');
+      const output = JSON.parse(result.content[0].text!) as BashOutput;
+      expect(output.exitCode).toBeNull();
+      expect(output.stdoutPreview).toBe('terminated\n');
     });
   });
 

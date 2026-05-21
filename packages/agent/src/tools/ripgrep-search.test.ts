@@ -2,8 +2,8 @@
 // ABOUTME: Validates text search, filtering, and output formatting with Zod validation
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { chmod, writeFile, mkdir } from 'fs/promises';
+import { delimiter, join } from 'path';
 import { RipgrepSearchTool } from '@lace/agent/tools/implementations/ripgrep_search';
 import { createTestTempDir } from '@lace/agent/test-utils/temp-directory';
 import { createFakeRuntimeForProcess } from './runtime/__tests__/fake-runtime';
@@ -181,6 +181,33 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
         expect.arrayContaining(['rg']),
         expect.objectContaining({ cwd: runtime.cwd })
       );
+    });
+
+    it('preserves runtime default env when processEnv overlay is provided', async () => {
+      const binDir = join(testDir, 'bin');
+      await mkdir(binDir);
+      const fakeRipgrep = join(binDir, 'rg');
+      await writeFile(fakeRipgrep, '#!/bin/sh\nprintf "fake.ts:1:needle\\n"\n', 'utf8');
+      await chmod(fakeRipgrep, 0o755);
+
+      const runtime = new HostToolRuntime({
+        id: `rt_ripgrep_search_test_${runtimeId++}`,
+        cwd: testDir,
+        env: { PATH: `${binDir}${delimiter}${process.env.PATH ?? ''}` },
+      });
+
+      const result = await tool.execute(
+        { pattern: 'needle', path: '.' },
+        {
+          signal: new AbortController().signal,
+          runtime,
+          processEnv: { LACE_RIPGREP_OVERLAY_TEST: 'present' },
+        }
+      );
+
+      expect(result.status).toBe('completed');
+      expect(result.content[0].text).toContain('fake.ts');
+      expect(result.content[0].text).toContain('needle');
     });
 
     it('should find matches in multiple files', async () => {
