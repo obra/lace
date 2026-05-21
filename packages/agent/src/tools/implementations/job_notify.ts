@@ -1,6 +1,7 @@
-// ABOUTME: job_notify tool - subscribe to job lifecycle events (PRI-1692 Phase 1)
-// Lets the parent agent register interest in a job's terminal-state transitions
-// and return to other work; when the job finishes, lace synthesizes a
+// ABOUTME: job_notify tool - subscribe to job lifecycle events (PRI-1692 Phases 1-2)
+// Lets the parent agent register interest in a job's lifecycle transitions
+// (terminal states + optional progress with a filter regex) and return to
+// other work; when the job transitions, lace synthesizes a
 // <background-job-notification> block into the parent's next-turn inbox via
 // the existing notification-injection path.
 
@@ -9,8 +10,8 @@ import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
-// Phase 1 intentionally omits maxNotifications / expiresMs from the spec's
-// TypeScript block; deferred to Phase 2 along with overflow auto-stop. See
+// Phase 1+2 intentionally omits maxNotifications / expiresMs from the spec's
+// TypeScript block; deferred to Phase 3 along with overflow auto-stop. See
 // docs/specs/2026-05-21-job-management-upgrade-design.md Acceptance #1.
 const jobNotifySchema = z
   .object({
@@ -28,14 +29,21 @@ export class JobNotifyTool extends Tool {
   description = `Subscribe to background-job lifecycle events so you can return to the user (or work on something else) instead of polling.
 
 **Mental model — read this before using.**
-A delegate **job** is one round. A delegate **session** is the whole conversation. Every \`delegate(prompt=...)\` creates a NEW job under a (new or resumed) session. \`job_notify\` wakes you when *this job* finishes. *You* decide whether the session keeps going via \`delegate(resume=jobId, prompt=...)\` — that creates the next job in the same session.
+A delegate **job** is one round. A delegate **session** is the whole conversation. Every \`delegate(prompt=...)\` creates a NEW job under a (new or resumed) session. \`job_notify\` wakes you when *this job* transitions. *You* decide whether the session keeps going via \`delegate(resume=jobId, prompt=...)\` — that creates the next job in the same session.
 
 **Use this tool whenever you start a background job (\`delegate(..., background=true)\` or any \`bash(background=true)\`).** It is the cheap, async path. Don't sit in \`job_output(block=true)\` waiting; that brings the conversation to a halt and burns tokens. Subscribe, return to the user, do something else — lace will deliver a \`<background-job-notification>\` block on your next turn when the job transitions.
 
+**Silence is not success.** Always subscribe to the terminal states (\`completed\`, \`failed\`, \`cancelled\`) — they're cheap and fire exactly once. A \`progress\`-only or \`failed\`-only subscription will stay silent through a crash or a successful completion, and you will not learn the job ended.
+
 Parameters:
 - \`jobId\` (required): the job to watch.
-- \`on\`: which lifecycle kinds to wake on. Defaults to the three terminal states \`['completed','failed','cancelled']\`. Subscribe to all three unless you have a specific reason — a \`failed\`-only subscription stays SILENT through a successful completion ("silence is not success"). \`progress\` is opt-in and chatty; Phase 1 ships terminal-state delivery only.
-- \`filter\` (optional): regex applied subscriber-side. **Phase 1: no-op for terminal-state subscriptions.** Reserved for Phase 2 progress / per-line subscriptions.
+- \`on\`: which lifecycle kinds to wake on. Defaults to the three terminal states \`['completed','failed','cancelled']\`. Subscribe to all three unless you have a specific reason. \`progress\` is opt-in and chatty — pair it with a \`filter\` and keep the terminal-state subscription armed alongside it.
+- \`filter\` (optional): regex applied subscriber-side.
+   - For \`progress\`: functional. The regex is evaluated (multi-line) against the latest tail-preview text; non-matching ticks are dropped for this subscriber. Typical pattern: \`filter='^ERROR:|^FATAL:'\` to wake only on interesting output.
+   - For terminal states (\`completed\`/\`failed\`/\`cancelled\`): no-op. Terminal notifications always fire — they're never filterable, by design.
+   - Invalid regex (e.g. \`'[invalid'\`) is rejected at subscribe time with a clear error.
+
+**Batching window.** Multiple \`progress\` notifications that fire within 200ms for the same subscription are coalesced into a single delivery carrying the most recent tail preview. Terminal-state notifications flush any pending batch immediately and never wait.
 
 Subscription scope is per-jobId. \`delegate(resume=<old jobId>)\` creates a NEW jobId — re-subscribe with \`job_notify(<new jobId>)\` if you want notifications on the resumed round.
 
@@ -61,11 +69,22 @@ Returns: \`{ subscribed: true, subscriptionId, jobId, on, filter? }\`.`;
       };
     }
 
-    const sub = jobManager.subscribe({
-      jobId: args.jobId,
-      on: args.on,
-      ...(args.filter !== undefined ? { filter: args.filter } : {}),
-    });
+    // jobManager.subscribe throws on invalid filter regex; surface that to
+    // the agent as a structured failure rather than letting it bubble.
+    let sub;
+    try {
+      sub = jobManager.subscribe({
+        jobId: args.jobId,
+        on: args.on,
+        ...(args.filter !== undefined ? { filter: args.filter } : {}),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        status: 'failed',
+        content: [{ type: 'text', text: message }],
+      };
+    }
 
     const payload = {
       subscribed: true as const,

@@ -118,6 +118,34 @@ describe('JobNotifyTool', () => {
     expect(tool.description).toMatch(/resume/i);
   });
 
+  it('teaches the Phase 2 filter + batching + silence-is-not-success contract', () => {
+    const tool = new JobNotifyTool();
+    // Filter is functional for progress, no-op for terminal states.
+    expect(tool.description.toLowerCase()).toContain('filter');
+    expect(tool.description.toLowerCase()).toMatch(/progress/);
+    expect(tool.description.toLowerCase()).toMatch(/no-?op|never filterable/);
+    // 200ms batching window is mentioned for progress.
+    expect(tool.description).toMatch(/200\s*ms/i);
+    // Silence-is-not-success guidance for terminal states.
+    expect(tool.description.toLowerCase()).toMatch(/silence is not success/);
+  });
+
+  it('returns a structured failure when the filter regex is invalid', async () => {
+    const tool = new JobNotifyTool();
+    const subscribe = vi.fn(() => {
+      throw new Error('Invalid filter regex "[invalid": SyntaxError: ...');
+    });
+    const jobManager = { subscribe } as unknown as JobManager;
+
+    const result = await tool.execute(
+      { jobId: 'job_x', filter: '[invalid' },
+      { signal: new AbortController().signal, jobManager }
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.content[0].text).toMatch(/invalid filter regex/i);
+  });
+
   it('is idempotent at the tool layer: calling twice with identical args returns the same subscriptionId', async () => {
     // Mirrors the JobManager-level idempotency contract, but exercised
     // through the tool wrapper agents actually call (PRI-1692).
