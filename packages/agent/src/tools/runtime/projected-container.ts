@@ -1,7 +1,15 @@
+import {
+  mkdir as mkdirHost,
+  readdir as readdirHost,
+  readFile,
+  stat as statHost,
+  writeFile,
+} from 'node:fs/promises';
 import { posix } from 'node:path';
 import { resolve as resolveHostPath } from 'node:path';
-import type { Readable } from 'node:stream';
+import type { Readable, Writable } from 'node:stream';
 import type { ExecStreamHandle, ExecStreamOptions } from '../../containers/types';
+import { decodeHelperResponse, encodeHelperRequest, type HelperRequest } from './helper-protocol';
 import type {
   RuntimeFileSystem,
   RuntimeFetchOptions,
@@ -56,6 +64,21 @@ function streamToString(stream: Readable | undefined): Promise<string> {
   });
 }
 
+function writeStreamAndClose(stream: Writable, content: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    stream.once('error', reject);
+    stream.end(content, 'utf8', resolve);
+  });
+}
+
+function firstResponseLine(output: string): string {
+  const line = output.split(/\r?\n/, 1)[0];
+  if (!line) {
+    throw new Error('Projected runtime helper returned no response');
+  }
+  return line;
+}
+
 function definedEnvironment(
   base: Record<string, string> | undefined,
   override: NodeJS.ProcessEnv | undefined
@@ -71,8 +94,85 @@ function definedEnvironment(
   return Object.keys(environment).length > 0 ? environment : undefined;
 }
 
-function helperNotInstalled(): never {
-  throw new Error('Projected container filesystem helper is not installed');
+function helperUnavailable(): never {
+  throw new Error('Projected runtime helper unavailable');
+}
+
+function ensureRecord(value: unknown, context: string): Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Invalid helper ${context} response`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function parseFileType(value: unknown, context: string): 'file' | 'directory' {
+  if (value === 'file' || value === 'directory') return value;
+  throw new Error(`Invalid helper ${context} response`);
+}
+
+function parseStringRecord(value: unknown, context: string): Record<string, string> {
+  const record = ensureRecord(value, context);
+  return Object.fromEntries(
+    Object.entries(record).map(([key, entry]) => {
+      if (typeof entry !== 'string') {
+        throw new Error(`Invalid helper ${context} response`);
+      }
+      return [key, entry];
+    })
+  );
+}
+
+function parseStatValue(value: unknown): { type: 'file' | 'directory'; size: number; mtime: Date } {
+  const record = ensureRecord(value, 'stat');
+  if (typeof record.size !== 'number') {
+    throw new Error('Invalid helper stat response');
+  }
+  const mtime = new Date(record.mtime as string | number | Date);
+  if (Number.isNaN(mtime.getTime())) {
+    throw new Error('Invalid helper stat response');
+  }
+  return {
+    type: parseFileType(record.type, 'stat'),
+    size: record.size,
+    mtime,
+  };
+}
+
+function parseReaddirValue(value: unknown): Array<{ name: string; type: 'file' | 'directory' }> {
+  if (!Array.isArray(value)) {
+    throw new Error('Invalid helper readdir response');
+  }
+  return value.map((entry) => {
+    const record = ensureRecord(entry, 'readdir');
+    if (typeof record.name !== 'string') {
+      throw new Error('Invalid helper readdir response');
+    }
+    return {
+      name: record.name,
+      type: parseFileType(record.type, 'readdir'),
+    };
+  });
+}
+
+function parseFetchBody(value: unknown): Uint8Array {
+  if (value instanceof Uint8Array) return value;
+  if (typeof value === 'string') return new TextEncoder().encode(value);
+  if (Array.isArray(value) && value.every((entry) => typeof entry === 'number')) {
+    return new Uint8Array(value);
+  }
+  throw new Error('Invalid helper fetch response');
+}
+
+function parseFetchValue(value: unknown): RuntimeFetchResult {
+  const record = ensureRecord(value, 'fetch');
+  if (typeof record.status !== 'number') {
+    throw new Error('Invalid helper fetch response');
+  }
+  return {
+    status: record.status,
+    headers: parseStringRecord(record.headers ?? {}, 'fetch'),
+    body: parseFetchBody(record.body ?? ''),
+  };
 }
 
 class ProjectedContainerPathService implements RuntimePathService {
@@ -121,26 +221,67 @@ class ProjectedContainerPathService implements RuntimePathService {
 }
 
 class ProjectedContainerFileSystem implements RuntimeFileSystem {
+  constructor(private readonly helper: ProjectedContainerRuntimeHelper) {}
+
   async stat(
-    _path: RuntimePath
+    path: RuntimePath
   ): Promise<{ type: 'file' | 'directory'; size: number; mtime: Date }> {
-    helperNotInstalled();
+    if (path.hostPath) {
+      const result = await statHost(path.hostPath);
+      return {
+        type: result.isDirectory() ? 'directory' : 'file',
+        size: result.size,
+        mtime: result.mtime,
+      };
+    }
+
+    return parseStatValue(await this.helper.request({ op: 'stat', path: path.runtimePath }));
   }
 
-  async readTextFile(_path: RuntimePath): Promise<string> {
-    helperNotInstalled();
+  async readTextFile(path: RuntimePath): Promise<string> {
+    if (path.hostPath) {
+      return await readFile(path.hostPath, 'utf8');
+    }
+
+    const value = await this.helper.request({ op: 'readTextFile', path: path.runtimePath });
+    if (typeof value !== 'string') {
+      throw new Error('Invalid helper readTextFile response');
+    }
+    return value;
   }
 
-  async writeTextFile(_path: RuntimePath, _content: string): Promise<void> {
-    helperNotInstalled();
+  async writeTextFile(path: RuntimePath, content: string): Promise<void> {
+    if (path.hostPath) {
+      await writeFile(path.hostPath, content, 'utf8');
+      return;
+    }
+
+    await this.helper.request({ op: 'writeTextFile', path: path.runtimePath, content });
   }
 
-  async mkdir(_path: RuntimePath, _opts?: { recursive?: boolean }): Promise<void> {
-    helperNotInstalled();
+  async mkdir(path: RuntimePath, opts?: { recursive?: boolean }): Promise<void> {
+    if (path.hostPath) {
+      await mkdirHost(path.hostPath, {
+        recursive: opts?.recursive,
+      });
+      return;
+    }
+
+    await this.helper.request({ op: 'mkdir', path: path.runtimePath, recursive: opts?.recursive });
   }
 
-  async readdir(_path: RuntimePath): Promise<Array<{ name: string; type: 'file' | 'directory' }>> {
-    helperNotInstalled();
+  async readdir(path: RuntimePath): Promise<Array<{ name: string; type: 'file' | 'directory' }>> {
+    if (path.hostPath) {
+      const entries = await readdirHost(path.hostPath, {
+        withFileTypes: true,
+      });
+      return entries.map((entry) => ({
+        name: entry.name,
+        type: entry.isDirectory() ? 'directory' : 'file',
+      }));
+    }
+
+    return parseReaddirValue(await this.helper.request({ op: 'readdir', path: path.runtimePath }));
   }
 }
 
@@ -217,8 +358,61 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
 }
 
 class ProjectedContainerNetworkClient implements RuntimeNetworkClient {
-  async fetch(_url: string, _opts?: RuntimeFetchOptions): Promise<RuntimeFetchResult> {
-    throw new Error('Projected container network fetch is not implemented');
+  constructor(private readonly helper: ProjectedContainerRuntimeHelper) {}
+
+  async fetch(url: string, opts: RuntimeFetchOptions = {}): Promise<RuntimeFetchResult> {
+    return parseFetchValue(
+      await this.helper.request({
+        op: 'fetch',
+        url,
+        method: opts.method,
+        headers: opts.headers,
+        body: opts.body,
+      })
+    );
+  }
+}
+
+class ProjectedContainerRuntimeHelper {
+  constructor(
+    private readonly descriptor: ProjectedContainerToolRuntimeDescriptor,
+    private readonly processRunner: RuntimeProcessRunner
+  ) {}
+
+  async request(request: HelperRequest): Promise<unknown> {
+    const helper = this.descriptor.helper;
+    if (!helper) {
+      helperUnavailable();
+    }
+
+    const handle = await this.processRunner.start(helper.command, {
+      cwd: this.descriptor.cwd,
+    });
+    if (!handle.stdin || !handle.stdout) {
+      handle.kill();
+      throw new Error('Projected runtime helper stream unavailable');
+    }
+
+    const stdout = streamToString(handle.stdout);
+    const stderr = streamToString(handle.stderr);
+    await writeStreamAndClose(handle.stdin, encodeHelperRequest(request));
+
+    const [stdoutOutput, stderrOutput, completion] = await Promise.all([
+      stdout,
+      stderr,
+      handle.completion,
+    ]);
+    if (completion.exitCode !== 0) {
+      const message =
+        stderrOutput.trim() || `Projected runtime helper exited ${completion.exitCode}`;
+      throw new Error(message);
+    }
+
+    const response = decodeHelperResponse(firstResponseLine(stdoutOutput));
+    if (!response.ok) {
+      throw new Error(response.error.message);
+    }
+    return response.value;
   }
 }
 
@@ -228,7 +422,7 @@ export class ProjectedContainerToolRuntime implements ToolRuntime {
   readonly paths: RuntimePathService;
   readonly fs: RuntimeFileSystem;
   readonly process: RuntimeProcessRunner;
-  readonly network = new ProjectedContainerNetworkClient();
+  readonly network: RuntimeNetworkClient;
 
   constructor(input: {
     id: string;
@@ -242,11 +436,16 @@ export class ProjectedContainerToolRuntime implements ToolRuntime {
       this.cwd,
       input.descriptor.spec.mounts
     );
-    this.fs = new ProjectedContainerFileSystem();
     this.process = new ProjectedContainerProcessRunner(
       { ...input.descriptor, cwd: this.cwd },
       input.containerManager
     );
+    const helper = new ProjectedContainerRuntimeHelper(
+      { ...input.descriptor, cwd: this.cwd },
+      this.process
+    );
+    this.fs = new ProjectedContainerFileSystem(helper);
+    this.network = new ProjectedContainerNetworkClient(helper);
   }
 
   readonly id: string;
