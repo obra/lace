@@ -6,6 +6,14 @@ import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
+/**
+ * Minimum blocking-wait timeout when `block=true`. Mirrors serf's
+ * `minWaitTimeoutMS = 120_000` — any shorter wait encourages a rapid-retry
+ * polling loop, which is exactly the failure mode `job_notify` exists to
+ * prevent. Any `timeoutMs` below this is clamped up.
+ */
+export const JOB_OUTPUT_MIN_BLOCKING_TIMEOUT_MS = 120_000;
+
 const jobOutputSchema = z.object({
   jobId: NonEmptyString,
   block: z.boolean().default(true),
@@ -15,13 +23,19 @@ const jobOutputSchema = z.object({
 
 export class JobOutputTool extends Tool {
   name = 'job_output';
-  description = `Get status and output from a background job (started with background=true).
+  description = `Read status + stdout from a background job. **Read-only tool** — does NOT continue the conversation.
 
-**Blocking (default):** Waits up to timeoutMs for job completion, then returns.
-**Non-blocking:** Set block=false to check current status without waiting.
-**Incremental:** Use byteOffset to read new output since last check.
+**Mental model.** A job is one round; a session is the whole conversation. \`job_output\` shows what came out of *this round*. To continue the conversation (add a follow-up message to the same subagent), call \`delegate(resume=jobId, prompt=...)\` — that creates a new job in the same session.
 
-Returns: { status: "running"|"completed"|"failed"|"cancelled", output: string, exitCode?: number }`;
+**Use \`job_notify\`, not blocking waits, to know when a job is done.** Blocking here brings the parent's conversation to a halt. If you set \`block=true\`, the timeout is clamped to a minimum of 120s — anything shorter would be polling.
+
+Parameters:
+- \`jobId\` (required): the job to inspect.
+- \`block\` (default true): wait for the job to finish before returning. If you only want a snapshot of current state, pass \`block=false\`.
+- \`timeoutMs\` (default 30_000): blocking wait cap. **Clamped to a minimum of 120_000** (120s) when \`block=true\`. To wait longer than two minutes, subscribe with \`job_notify(jobId)\` instead and return to the user; the next-turn injection will wake you.
+- \`byteOffset\` (default 0): reserved for future incremental reads.
+
+Returns: \`{ status: "running"|"completed"|"failed"|"cancelled", output: string, exitCode?: number }\`.`;
   schema = jobOutputSchema;
   annotations: ToolAnnotations = {
     title: 'Get Job Output',
@@ -53,9 +67,14 @@ Returns: { status: "running"|"completed"|"failed"|"cancelled", output: string, e
       };
     }
 
-    // If blocking mode and job is still running, wait for completion
+    // If blocking mode and job is still running, wait for completion.
+    // Clamp the wait up to the 120s minimum — anything shorter encourages a
+    // polling loop, which is exactly what job_notify exists to replace.
     if (block && job.status === 'running') {
-      const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, timeoutMs));
+      const effectiveTimeoutMs = Math.max(timeoutMs, JOB_OUTPUT_MIN_BLOCKING_TIMEOUT_MS);
+      const timeoutPromise = new Promise<void>((resolve) =>
+        setTimeout(resolve, effectiveTimeoutMs)
+      );
       await Promise.race([job.completion, timeoutPromise]);
     }
 
