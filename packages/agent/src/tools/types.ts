@@ -4,7 +4,7 @@
 import type { CombinedTokenUsage } from '@lace/agent/token-management/types';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { AlarmScheduler } from '@lace/agent/alarms/alarm-scheduler';
-import type { RuntimePath, ToolRuntime } from './runtime/types';
+import type { RuntimeExecutionBinding, RuntimePath, ToolRuntime } from './runtime/types';
 
 export interface ToolContext {
   // Execution control - required for cancellation
@@ -38,6 +38,7 @@ export interface ToolContext {
   // Implemented by the agent runtime from its history
   hasFileBeenRead?: (path: string) => boolean;
   runtime?: ToolRuntime;
+  runtimeBinding?: RuntimeExecutionBinding;
   hasRuntimeFileBeenRead?: (path: RuntimePath) => boolean;
   markFileRead?: (path: RuntimePath) => void;
 

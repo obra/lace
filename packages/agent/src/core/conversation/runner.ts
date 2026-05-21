@@ -927,6 +927,7 @@ export class ConversationRunner {
       envOverlay,
       abortController,
       turnId,
+      runtimeBinding,
     });
 
     const protocolResult = protocolToolResultFromCore(coreResult);
@@ -1002,6 +1003,7 @@ export class ConversationRunner {
     envOverlay?: Record<string, string>;
     abortController: AbortController;
     turnId: string;
+    runtimeBinding: RuntimeExecutionBinding;
   }): Promise<CoreToolResult> {
     const {
       toolName,
@@ -1015,6 +1017,7 @@ export class ConversationRunner {
       envOverlay,
       abortController,
       turnId,
+      runtimeBinding,
     } = params;
 
     // Note: bash with background=true is handled before permission check and never reaches here.
@@ -1053,6 +1056,7 @@ export class ConversationRunner {
         signal: abortController.signal,
         workingDirectory: cwd,
         runtime,
+        runtimeBinding,
         toolTempRoot: join(this.config.sessionDir, 'tool-temp'),
         processEnv: envOverlay,
         hasFileBeenRead: (p: string) => filesRead.has(isAbsolutePath(p) ? p : resolvePath(cwd, p)),

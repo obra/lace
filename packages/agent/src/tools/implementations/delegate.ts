@@ -79,7 +79,7 @@ Parameters:
     args: z.infer<typeof delegateSchema>,
     context: ToolContext
   ): Promise<ToolResult> {
-    const { jobManager } = context;
+    const { jobManager, runtimeBinding } = context;
 
     if (!jobManager) {
       return {
@@ -126,6 +126,8 @@ Parameters:
 
     // Per-call modelId wins; otherwise fall back to persona default (if any).
     const effectiveModelId = modelId ?? personaModelDefault;
+    const shouldInheritRuntimeBinding =
+      !!runtimeBinding && !personaContainerRuntime && !personaBoxRuntime;
 
     // Handle resume - look up previous job's session
     let resumeSessionId: string | undefined;
@@ -169,6 +171,7 @@ Parameters:
       ...(persona ? { persona } : {}),
       ...(personaContainerRuntime ? { personaContainerRuntime } : {}),
       ...(personaBoxRuntime ? { personaBoxRuntime } : {}),
+      ...(shouldInheritRuntimeBinding ? { runtimeBinding } : {}),
     });
 
     // Background mode - return immediately

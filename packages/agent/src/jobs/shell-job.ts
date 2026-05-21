@@ -9,6 +9,7 @@ import { toolKindFromName, shouldAskPermission } from '../rpc/utils';
 import { readSessionState, type LoadedSession } from '../storage/session-store';
 import type { ToolResult } from '@lace/ent-protocol';
 import { HostToolRuntime } from '../tools/runtime/host';
+import { buildDefaultLocalRuntimeBinding } from '../tools/runtime/validation';
 import type { RuntimeProcessHandle } from '../tools/runtime/types';
 
 export type ShellJobContext = {
@@ -197,8 +198,13 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
 
       let proc: RuntimeProcessHandle;
       try {
-        const runtimeBinding = job.runtimeBinding;
-        if (runtimeBinding?.toolRuntime.type !== 'local') {
+        const runtimeBinding =
+          job.runtimeBinding ??
+          buildDefaultLocalRuntimeBinding({
+            sessionId: state.activeSession.meta.sessionId,
+            cwd: state.activeSession.meta.workDir,
+          });
+        if (runtimeBinding.toolRuntime.type !== 'local') {
           throw new Error(
             'Only local runtime shell jobs are supported before projected container runtime lands'
           );

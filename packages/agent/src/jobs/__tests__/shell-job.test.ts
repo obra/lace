@@ -152,4 +152,59 @@ describe('createRunShellJobProcess', () => {
     // And finalizeJob should have been called when process completed
     expect(mockFinalizeJob).toHaveBeenCalled();
   });
+
+  it('starts legacy jobs without runtimeBinding in the active session workDir', async () => {
+    const mutableState = {
+      activeSession: {
+        dir: '/tmp/test-session',
+        meta: {
+          sessionId: 'sess_legacy',
+          workDir: '/tmp/legacy-work',
+          projectId: 'test-project',
+          rootDir: '/tmp',
+          personaId: 'default',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      } as LoadedSession,
+      config: { approvalMode: 'dangerouslySkipPermissions' as const },
+      jobStreaming: 'none' as const,
+    };
+
+    const mockEmitSessionUpdate = vi.fn().mockResolvedValue(undefined);
+    const mockFinalizeJob = vi.fn().mockResolvedValue(undefined);
+    const mockRequestPermission = vi.fn().mockResolvedValue({ decision: 'allow' });
+    const mockRunExclusive = vi.fn().mockImplementation(<T>(fn: () => T) => fn());
+
+    const runShellJobProcess = createRunShellJobProcess({
+      getState: () => mutableState,
+      runExclusive: mockRunExclusive,
+      emitSessionUpdate: mockEmitSessionUpdate,
+      requestPermissionFromClient: mockRequestPermission,
+      finalizeJob: mockFinalizeJob,
+    });
+
+    const job: JobState = {
+      jobId: 'job_legacy',
+      type: 'bash',
+      status: 'running',
+      command: 'pwd',
+      startedAt: new Date().toISOString(),
+      outputPath: '/tmp/test-output',
+      finished: false,
+      completion: Promise.resolve(),
+      resolveCompletion: vi.fn(),
+    };
+
+    runShellJobProcess(job);
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(mockSpawn).toHaveBeenCalledWith('/bin/bash', ['-c', 'pwd'], {
+      cwd: '/tmp/legacy-work',
+      env: expect.any(Object),
+      stdio: ['pipe', 'pipe', 'pipe'],
+      signal: undefined,
+    });
+  });
 });
