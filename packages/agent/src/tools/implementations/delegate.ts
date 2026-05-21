@@ -35,26 +35,31 @@ export interface DelegateToolOptions {
 
 export class DelegateTool extends Tool {
   name = 'delegate';
-  description = `Spawn a subagent to handle a task autonomously. ALL delegate jobs are resumable - the subagent session persists after completion.
+  description = `Spawn or continue a subagent conversation. **Read the mental model below before using.**
+
+**Job vs. session — the load-bearing distinction.**
+A delegate **job** is one round (one \`delegate(prompt=...)\` call → one assistant turn from the subagent → terminal state).
+A delegate **session** is the whole conversation, persisted on disk, surviving across rounds and restarts.
+Every \`delegate(prompt=...)\` creates a NEW job. With \`resume=<prior jobId>\`, that new job runs under the prior job's session (the subagent sees its full history); without \`resume\`, a fresh session is created. There is no "the delegate job" — each round has its own jobId.
+
+**The async pattern (canonical usage).**
+1. \`delegate(prompt=..., background=true)\` → returns \`{ jobId, status: "started" }\` immediately.
+2. \`job_notify(jobId)\` → subscribe so lace wakes you when this job finishes.
+3. **Return to the user.** Don't poll. Don't sit in \`job_output(block=true)\`. Do something else, answer the user, take another tool call. When this job transitions to \`completed\`/\`failed\`/\`cancelled\`, a \`<background-job-notification>\` block is injected into your next-turn prompt.
+4. Inspect the result (\`job_output(jobId)\` for full text, or read the notification's preview). **You** decide what's next: act on the output, \`delegate(resume=jobId, prompt=...)\` to continue the conversation in another round, or move on.
+
+**Sync mode** (\`background=false\`, the default): the tool call blocks until the subagent finishes and returns its output prefixed with \`delegate jobId=<id>\`. Convenient for cheap, fast subagents. Brings the parent to a halt for the duration — DON'T use sync mode for anything that might take more than a few seconds; use background + \`job_notify\` instead.
 
 Parameters:
-- prompt: The task or message for the subagent (required)
-- description: Label shown in job listings (optional)
-- background: Set to true to return immediately with jobId (default: false)
-- resume: JobId of a previous delegate job to continue its session
-- progressIntervalMs: For background jobs, interval in ms for progress notifications (5000-600000, default 300000)
-- connectionId: Provider connection to use for the subagent (optional, defaults to parent session's connection)
-- modelId: Model to use for the subagent (optional, defaults to parent session's model or persona's model)
-- persona: Name of a persona bundle (e.g. "librarian"). Its frontmatter becomes subagent defaults; its body is the subagent's system prompt template. Per-call modelId/connectionId override the persona's defaults.
+- \`prompt\` (required): the task or follow-up message for the subagent.
+- \`description\`: label shown in job listings.
+- \`background\` (default false): return immediately with \`{ jobId, status: "started" }\` and run async. Strongly preferred for anything non-trivial; pair with \`job_notify(jobId)\`.
+- \`resume\`: jobId of a previous delegate job. The new job binds to that job's session and the subagent sees its full conversation history. \`resume\` works whether the prior job was sync or background, completed or cancelled — sessions persist.
+- \`progressIntervalMs\`: 5000–600000 ms. Reserved for Phase 2 progress subscriptions; leave unset unless you've also subscribed with \`job_notify(on=['progress'], ...)\`.
+- \`connectionId\`, \`modelId\`: provider/model overrides for the subagent. Default to the parent session's values (or the persona's defaults if a \`persona\` is set).
+- \`persona\`: a persona bundle name (e.g. \`"librarian"\`). Frontmatter sets defaults; body is the subagent's system prompt template.
 
-**Sync mode (default):** Blocks until subagent completes. Output is prefixed with "delegate jobId=<id>". This jobId can be used with resume.
-
-**Background mode:** Returns { jobId, status: "started" } immediately. This jobId can be used with resume.
-
-**Resuming (works for BOTH sync and background jobs):**
-To continue a conversation with a previous subagent:
-  delegate(resume="<jobId>", prompt="your follow-up message")
-The subagent receives your message with its full conversation history intact.`;
+**Common anti-pattern: do not** call \`delegate(background=true)\` and then immediately \`job_output(block=true)\` — that's polling. Use \`job_notify\` and return to the user.`;
   schema = delegateSchema;
   annotations: ToolAnnotations = {
     title: 'Delegate',

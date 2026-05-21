@@ -13,12 +13,14 @@ const jobsListSchema = z.object({
 
 export class JobsListTool extends Tool {
   name = 'jobs_list';
-  description = `List all background jobs in the current session. Use to find jobIds for job_output or job_kill.
+  description = `List background **jobs** in the current parent session. Useful for finding jobIds to feed to \`job_output\`, \`job_kill\`, \`job_notify\`, or \`delegate(resume=...)\`.
 
-Filter by status: ["pending", "running", "completed", "failed", "cancelled"]
-Filter by type: ["bash", "delegate"]
+**Remember:** each \`delegate(prompt=...)\` is one job — one round. A delegate **session** (the subagent's conversation history) can be associated with multiple jobs over time: every \`delegate(resume=<prior jobId>)\` creates a new job under the same session. This list shows jobs, not sessions; the \`subagentSessionId\` field (when present) reveals which session a delegate job belongs to.
 
-Returns: [{ jobId, type, status, description, startTime }]`;
+Filter by status: \`["pending","running","completed","failed","cancelled"]\`.
+Filter by type: \`["bash","delegate"]\`.
+
+Returns: \`[{ jobId, type, status, description, startTime }]\`.`;
   schema = jobsListSchema;
   annotations: ToolAnnotations = {
     title: 'List Jobs',

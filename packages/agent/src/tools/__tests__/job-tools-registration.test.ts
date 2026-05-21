@@ -12,6 +12,7 @@ describe('ToolExecutor job tools registration', () => {
     expect(toolNames).toContain('job_output');
     expect(toolNames).toContain('jobs_list');
     expect(toolNames).toContain('job_kill');
+    expect(toolNames).toContain('job_notify');
   });
 
   it('retrieves job_output tool by name', () => {
@@ -21,7 +22,11 @@ describe('ToolExecutor job tools registration', () => {
 
     expect(tool).toBeDefined();
     expect(tool?.name).toBe('job_output');
-    expect(tool?.description).toContain('Get status and output from a background job');
+    // Description must teach the job-vs-session distinction and steer the
+    // model toward job_notify rather than blocking waits (PRI-1692).
+    expect(tool?.description).toMatch(/job/i);
+    expect(tool?.description).toMatch(/session/i);
+    expect(tool?.description).toMatch(/job_notify/);
   });
 
   it('retrieves jobs_list tool by name', () => {
@@ -31,7 +36,8 @@ describe('ToolExecutor job tools registration', () => {
 
     expect(tool).toBeDefined();
     expect(tool?.name).toBe('jobs_list');
-    expect(tool?.description).toContain('List all background jobs in the current session');
+    expect(tool?.description).toMatch(/job/i);
+    expect(tool?.description).toMatch(/session/i);
   });
 
   it('retrieves job_kill tool by name', () => {
@@ -41,7 +47,21 @@ describe('ToolExecutor job tools registration', () => {
 
     expect(tool).toBeDefined();
     expect(tool?.name).toBe('job_kill');
-    expect(tool?.description).toContain('Cancel a running background job');
+    // job_kill description must explain that the SESSION survives kill so
+    // the parent can resume the subagent — PRI-1692 mental model.
+    expect(tool?.description).toMatch(/session/i);
+    expect(tool?.description).toMatch(/resume/i);
+  });
+
+  it('retrieves job_notify tool by name', () => {
+    const executor = new ToolExecutor();
+    executor.registerAllAvailableTools();
+    const tool = executor.getTool('job_notify');
+
+    expect(tool).toBeDefined();
+    expect(tool?.name).toBe('job_notify');
+    expect(tool?.description).toMatch(/job/i);
+    expect(tool?.description).toMatch(/session/i);
   });
 
   it('job tools have correct annotations', () => {
@@ -60,5 +80,9 @@ describe('ToolExecutor job tools registration', () => {
 
     const jobKillTool = executor.getTool('job_kill');
     expect(jobKillTool?.annotations?.safeInternal).toBe(true);
+
+    const jobNotifyTool = executor.getTool('job_notify');
+    expect(jobNotifyTool?.annotations?.safeInternal).toBe(true);
+    expect(jobNotifyTool?.annotations?.readOnlySafe).toBe(true);
   });
 });

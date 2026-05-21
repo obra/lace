@@ -12,9 +12,11 @@ const jobKillSchema = z.object({
 
 export class JobKillTool extends Tool {
   name = 'job_kill';
-  description = `Cancel a running background job. Only jobs with status="running" can be killed.
+  description = `Cancel a running background **job**. Only jobs with \`status="running"\` can be killed.
 
-After killing, status becomes "cancelled". For subagent jobs, the session is preserved - use delegate(resume=jobId) to continue later.`;
+**Killing a job does NOT destroy its session.** A delegate job's session — the subagent's conversation history — survives. You can pick the conversation back up later with \`delegate(resume=<killed jobId>, prompt=...)\`; that creates a new job under the same session, with the subagent's prior history intact. Use this when a delegate has gone off-track or stalled and you want to redirect it in a follow-up round.
+
+After killing, the job transitions to \`cancelled\`. If you have an active \`job_notify\` subscription on this jobId with \`'cancelled'\` in its \`on\` set, you'll receive a notification on your next turn.`;
   schema = jobKillSchema;
   annotations: ToolAnnotations = {
     title: 'Kill Job',
