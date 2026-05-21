@@ -263,6 +263,11 @@ export class TestAgentProvider extends AIProvider {
               }
               break;
             }
+            case 'schedule_alarm': {
+              const args = requested.args as Record<string, unknown>;
+              content = `Scheduling alarm at ${args.schedule as string}...`;
+              break;
+            }
             default:
               content = `Writing ${(requested.args as Record<string, unknown>).path as string}...`;
           }
@@ -343,9 +348,28 @@ export class TestAgentProvider extends AIProvider {
   }
 
   private extractRequestedTool(text: string): null | {
-    name: 'delegate' | 'file_read' | 'file_write' | 'bash' | 'todo_read' | 'todo_write';
+    name:
+      | 'delegate'
+      | 'file_read'
+      | 'file_write'
+      | 'bash'
+      | 'todo_read'
+      | 'todo_write'
+      | 'schedule_alarm';
     args: Record<string, unknown>;
   } {
+    // Handle "alarm: schedule=<ISO> prompt=<text>" pattern for one-shot alarms.
+    // Must run before the generic "subagent: …" / "delegate …" patterns so a
+    // subagent prompt body of `alarm: schedule=… prompt=…` resolves correctly
+    // inside the subagent process.
+    const alarmMatch = text.match(/alarm:\s*schedule=(\S+)\s+prompt=(.+)\s*$/i);
+    if (alarmMatch) {
+      return {
+        name: 'schedule_alarm',
+        args: { kind: 'once', schedule: alarmMatch[1], prompt: alarmMatch[2].trim() },
+      };
+    }
+
     // Handle "add todo: <title>" or "todo add: <title>" pattern
     const todoAddMatch = text.match(/(?:add\s+todo|todo\s+add)[:\s]\s*(.+)\s*$/i);
     const todoTitle = todoAddMatch?.[1]?.trim();
