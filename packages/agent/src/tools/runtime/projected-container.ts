@@ -22,7 +22,7 @@ type ContainerToolRuntimeDescriptor = Extract<ToolRuntimeDescriptor, { type: 'co
 export type ProjectedContainerToolRuntimeDescriptor = Omit<ContainerToolRuntimeDescriptor, 'type'>;
 
 export interface ProjectedContainerManager {
-  execStream(containerId: string, options: ExecStreamOptions): Promise<ExecStreamHandle>;
+  execStream(specName: string, options: ExecStreamOptions): Promise<ExecStreamHandle>;
 }
 
 function containerPathIsInside(root: string, path: string): boolean {
@@ -150,10 +150,6 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
     private readonly containerManager: ProjectedContainerManager
   ) {}
 
-  private containerId(): string {
-    return this.descriptor.spec.containerId ?? this.descriptor.spec.name;
-  }
-
   private optionsFor(command: string[], opts: RuntimeProcessOptions = {}): ExecStreamOptions {
     if (command.length === 0) {
       throw new Error('runtime process command is empty');
@@ -189,9 +185,14 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
     }
 
     const containerHandle = await this.containerManager.execStream(
-      this.containerId(),
+      this.descriptor.spec.name,
       this.optionsFor(command, opts)
     );
+
+    if (opts.signal?.aborted) {
+      containerHandle.kill();
+      opts.signal.throwIfAborted();
+    }
 
     const abortHandler = () => containerHandle.kill();
     opts.signal?.addEventListener('abort', abortHandler, { once: true });

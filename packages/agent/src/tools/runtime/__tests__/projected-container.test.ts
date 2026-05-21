@@ -2,15 +2,19 @@ import { PassThrough, Readable } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
 import { ProjectedContainerToolRuntime } from '../projected-container';
 
+function createFakeExecStreamHandle() {
+  return {
+    stdin: new PassThrough(),
+    stdout: Readable.from(['ok']),
+    stderr: Readable.from([]),
+    wait: vi.fn().mockResolvedValue({ exitCode: 0 }),
+    kill: vi.fn(),
+  };
+}
+
 function createFakeContainerManager() {
   return {
-    execStream: vi.fn().mockResolvedValue({
-      stdin: new PassThrough(),
-      stdout: Readable.from(['ok']),
-      stderr: Readable.from([]),
-      wait: vi.fn().mockResolvedValue({ exitCode: 0 }),
-      kill: vi.fn(),
-    }),
+    execStream: vi.fn().mockResolvedValue(createFakeExecStreamHandle()),
   };
 }
 
@@ -65,12 +69,48 @@ describe('ProjectedContainerToolRuntime', () => {
     });
 
     expect(manager.execStream).toHaveBeenCalledWith(
-      'container_123',
+      'projected-runtime',
       expect.objectContaining({
         command: ['/bin/sh', '-lc', 'echo ok'],
         workingDirectory: '/workspace',
         environment: { FOO: 'bar' },
       })
     );
+  });
+
+  it('kills the container process when aborted while execStream is starting', async () => {
+    const containerHandle = createFakeExecStreamHandle();
+    let resolveExecStream!: (handle: typeof containerHandle) => void;
+    const execStreamPromise = new Promise<typeof containerHandle>((resolve) => {
+      resolveExecStream = resolve;
+    });
+    const manager = {
+      execStream: vi.fn().mockReturnValue(execStreamPromise),
+    };
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: descriptor(),
+    });
+    const abortController = new AbortController();
+
+    const startPromise = runtime.process.start(['/bin/sh', '-lc', 'echo ok'], {
+      cwd: runtime.cwd,
+      signal: abortController.signal,
+    });
+
+    expect(manager.execStream).toHaveBeenCalledWith(
+      'projected-runtime',
+      expect.objectContaining({
+        command: ['/bin/sh', '-lc', 'echo ok'],
+        workingDirectory: '/workspace',
+      })
+    );
+
+    abortController.abort();
+    resolveExecStream(containerHandle);
+
+    await expect(startPromise).rejects.toMatchObject({ name: 'AbortError' });
+    expect(containerHandle.kill).toHaveBeenCalledTimes(1);
   });
 });
