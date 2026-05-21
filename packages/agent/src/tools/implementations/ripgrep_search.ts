@@ -2,8 +2,6 @@
 // ABOUTME: Wraps ripgrep command with Zod validation and structured output
 
 import { z } from 'zod';
-import * as childProcess from 'child_process';
-import { promisify } from 'util';
 import { Tool } from '../tool';
 import { NonEmptyString, FilePath } from '../schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
@@ -15,9 +13,6 @@ const DEFAULT_SEARCH_RESULTS = 50;
 const MIN_CONTEXT_LINES = 0;
 const MAX_CONTEXT_LINES = 10;
 const DEFAULT_CONTEXT_LINES = 0;
-
-// Create promisified version of execFile for async/await usage
-const execFileAsync = promisify(childProcess.execFile);
 
 interface SearchMatch {
   path: string;
@@ -69,6 +64,10 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
     if (context.signal.aborted) {
       return this.createCancellationResult();
     }
+    if (!context.runtime) {
+      return this.createError('Tool context missing runtime. This is a system error.');
+    }
+
     try {
       const {
         pattern,
@@ -82,12 +81,11 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
         contextLines,
       } = args;
 
-      // Resolve path using working directory from context
-      const resolvedPath = this.resolveWorkspacePath(path, context);
+      const resolvedPath = await context.runtime.paths.resolve(path);
 
       const ripgrepArgs = this.buildRipgrepArgs({
         pattern,
-        path: resolvedPath,
+        path: resolvedPath.runtimePath,
         caseSensitive,
         wholeWord,
         literal,
@@ -98,12 +96,26 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
       });
 
       try {
-        // Use execFile to prevent shell injection - pass arguments directly
-        const { stdout } = await execFileAsync('rg', ripgrepArgs, {
-          cwd: process.cwd(),
-          maxBuffer: 10485760, // 10MB buffer
-          signal: context.signal,
-        });
+        const { exitCode, stdout, stderr } = await context.runtime.process.exec(
+          ['rg', ...ripgrepArgs],
+          {
+            cwd: context.runtime.cwd,
+            env: context.processEnv ?? process.env,
+            signal: context.signal,
+          }
+        );
+
+        if (exitCode === 1) {
+          return this.createResult(`No matches found for pattern: ${pattern}`);
+        }
+
+        if (exitCode !== 0) {
+          const error = new Error(
+            stderr || `ripgrep exited with code ${exitCode}. Check the search pattern and path.`
+          );
+          (error as Error & { code?: number }).code = exitCode;
+          throw error;
+        }
 
         const matches = this.parseRipgrepOutput(stdout, maxResults);
         const resultText = this.formatResults(matches, pattern, maxResults);
@@ -122,12 +134,16 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
     } catch (error: unknown) {
       if (error instanceof Error) {
         // Check if ripgrep is not installed
+        const errorCode = (error as Error & { code?: string | number }).code;
         if (
+          errorCode === 'ENOENT' ||
+          errorCode === 127 ||
+          error.message.includes('ENOENT') ||
           error.message.includes('command not found') ||
           error.message.includes('not recognized')
         ) {
           return this.createError(
-            'ripgrep (rg) command not found. Install ripgrep to use this tool: brew install ripgrep (macOS) or apt-get install ripgrep (Linux). Search tool dependency missing.'
+            `ripgrep (rg) command not found in ${context.runtime.label}. Install ripgrep in the active runtime to use this tool.`
           );
         }
       }

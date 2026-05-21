@@ -6,11 +6,22 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { RipgrepSearchTool } from '@lace/agent/tools/implementations/ripgrep_search';
 import { createTestTempDir } from '@lace/agent/test-utils/temp-directory';
+import { createFakeRuntimeForProcess } from './runtime/__tests__/fake-runtime';
+import { HostToolRuntime } from './runtime/host';
+import type { ToolContext } from './types';
 
 describe('RipgrepSearchTool with schema validation', () => {
   let tool: RipgrepSearchTool;
   const tempDir = createTestTempDir('ripgrep-test-');
   let testDir: string;
+  let runtimeId = 0;
+
+  function createTestContext(cwd = process.cwd()): ToolContext {
+    return {
+      signal: new AbortController().signal,
+      runtime: new HostToolRuntime({ id: `rt_ripgrep_search_test_${runtimeId++}`, cwd }),
+    };
+  }
 
   beforeEach(async () => {
     tool = new RipgrepSearchTool();
@@ -73,7 +84,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
 
   describe('Input validation', () => {
     it('should reject missing pattern', async () => {
-      const result = await tool.execute({}, { signal: new AbortController().signal });
+      const result = await tool.execute({}, createTestContext());
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
@@ -81,7 +92,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
     });
 
     it('should reject empty pattern', async () => {
-      const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
+      const result = await tool.execute({ pattern: '' }, createTestContext());
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
@@ -94,7 +105,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'hello',
           maxResults: -1,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('failed');
@@ -107,7 +118,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'hello',
           maxResults: 10000,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('failed');
@@ -120,7 +131,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'hello',
           contextLines: -1,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('failed');
@@ -133,7 +144,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'hello',
           contextLines: 20,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('failed');
@@ -146,7 +157,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'hello',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -154,13 +165,31 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
   });
 
   describe('Basic search functionality', () => {
+    it('runs rg through runtime process in runtime cwd', async () => {
+      const tool = new RipgrepSearchTool();
+      const runtime = createFakeRuntimeForProcess({
+        stdout: '/runtime/a.ts:1:needle\n',
+      });
+
+      const result = await tool.execute(
+        { pattern: 'needle', path: '.' },
+        { signal: new AbortController().signal, runtime }
+      );
+
+      expect(result.status).toBe('completed');
+      expect(runtime.process.exec).toHaveBeenCalledWith(
+        expect.arrayContaining(['rg']),
+        expect.objectContaining({ cwd: runtime.cwd })
+      );
+    });
+
     it('should find matches in multiple files', async () => {
       const result = await tool.execute(
         {
           pattern: 'hello',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -179,7 +208,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'nonexistentpattern',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -192,7 +221,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'function hello',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -205,7 +234,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
         {
           pattern: 'hello',
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -221,7 +250,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           path: testDir,
           caseSensitive: false,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       const caseSensitive = await tool.execute(
@@ -230,7 +259,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           path: testDir,
           caseSensitive: true,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(caseInsensitive.status).toBe('completed');
@@ -247,7 +276,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           path: testDir,
           includePattern: '*.ts',
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -265,7 +294,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           path: testDir,
           excludePattern: '*.test.txt',
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -286,7 +315,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           path: testDir,
           wholeWord: true,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       const partialWord = await tool.execute(
@@ -295,7 +324,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           path: testDir,
           wholeWord: false,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(wholeWord.status).toBe('completed');
@@ -314,7 +343,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           path: testDir,
           contextLines: 1,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -341,7 +370,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           path: testDir,
           maxResults: 10,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -365,7 +394,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           path: testDir,
           maxResults: 100,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -379,7 +408,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'hello',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -394,7 +423,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'hello',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -411,7 +440,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'hello',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -425,7 +454,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'nested hello',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -442,7 +471,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'hello',
           path: '/non/existent/directory',
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('failed');
@@ -458,7 +487,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           path: testDir,
           // literal: true is now the default
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -475,7 +504,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           path: testDir,
           literal: false,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -492,7 +521,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'anything',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -507,7 +536,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'hello',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -521,7 +550,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'hello',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -534,7 +563,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: 'nonexistent',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -542,7 +571,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
     });
 
     it('should use createError for validation failures', async () => {
-      const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
+      const result = await tool.execute({ pattern: '' }, createTestContext());
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
@@ -555,23 +584,20 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
     });
   });
 
-  describe('Working directory functionality', () => {
-    it('should resolve relative paths based on context working directory', async () => {
+  describe('Runtime cwd functionality', () => {
+    it('should resolve relative paths based on runtime cwd', async () => {
       // Create a subdirectory within testDir
       const subDir = join(testDir, 'workdir');
       await mkdir(subDir);
       await writeFile(join(subDir, 'workfile.txt'), 'working directory test content');
 
-      // Test with relative path and working directory context
+      // Test with relative path and runtime cwd context
       const result = await tool.execute(
         {
           pattern: 'working directory',
           path: '.',
         },
-        {
-          signal: new AbortController().signal,
-          workingDirectory: subDir,
-        }
+        createTestContext(subDir)
       );
 
       expect(result.status).toBe('completed');
@@ -580,21 +606,18 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
       expect(output).toContain('working directory test content');
     });
 
-    it('should handle absolute paths regardless of working directory', async () => {
+    it('should handle absolute paths regardless of runtime cwd', async () => {
       const subDir = join(testDir, 'workdir');
       await mkdir(subDir);
       await writeFile(join(subDir, 'workfile.txt'), 'absolute path test');
 
-      // Test with absolute path - should work regardless of working directory
+      // Test with absolute path - should work regardless of runtime cwd
       const result = await tool.execute(
         {
           pattern: 'absolute path',
           path: testDir,
         },
-        {
-          signal: new AbortController().signal,
-          workingDirectory: subDir,
-        }
+        createTestContext(subDir)
       );
 
       expect(result.status).toBe('completed');
@@ -612,7 +635,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           pattern: '"hello world"',
           path: testDir,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -628,7 +651,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           includePattern: '*.{ts,js}',
           excludePattern: '*.test.*',
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');
@@ -645,7 +668,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
           path: testDir,
           contextLines: 0,
         },
-        { signal: new AbortController().signal }
+        createTestContext()
       );
 
       expect(result.status).toBe('completed');

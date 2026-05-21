@@ -7,11 +7,22 @@ import os from 'os';
 import path from 'path';
 import { BashTool, type BashOutput } from '@lace/agent/tools/implementations/bash';
 import type { ToolContext } from './types';
+import { createStreamingFakeRuntime } from './runtime/__tests__/fake-runtime';
+import { HostToolRuntime } from './runtime/host';
 
 describe('BashTool', () => {
   let bashTool: BashTool;
   let testTempDir: string;
   let toolContext: ToolContext;
+  let runtimeId = 0;
+
+  function createToolContext(cwd = process.cwd()): ToolContext {
+    return {
+      signal: new AbortController().signal,
+      toolTempDir: testTempDir,
+      runtime: new HostToolRuntime({ id: `rt_bash_test_${runtimeId++}`, cwd }),
+    };
+  }
 
   beforeEach(() => {
     bashTool = new BashTool();
@@ -20,10 +31,7 @@ describe('BashTool', () => {
     testTempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bash-tool-test-'));
 
     // Create ToolContext with temp directory
-    toolContext = {
-      signal: new AbortController().signal,
-      toolTempDir: testTempDir,
-    };
+    toolContext = createToolContext();
   });
 
   afterEach(() => {
@@ -98,6 +106,26 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
   });
 
   describe('Successful command execution (exit code 0)', () => {
+    it('runs sync bash through runtime process', async () => {
+      const tool = new BashTool();
+      const runtime = createStreamingFakeRuntime({ stdout: 'ok\n', exitCode: 0 });
+
+      const result = await tool.execute(
+        { command: 'echo ok' },
+        {
+          signal: new AbortController().signal,
+          runtime,
+          toolTempDir: testTempDir,
+        }
+      );
+
+      expect(result.status).toBe('completed');
+      expect(runtime.process.start).toHaveBeenCalledWith(
+        ['/bin/bash', '-c', 'echo ok'],
+        expect.objectContaining({ cwd: runtime.cwd })
+      );
+    });
+
     it('should execute simple commands successfully', async () => {
       const result = await bashTool.execute({ command: 'echo "hello world"' }, toolContext);
 
@@ -417,8 +445,8 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
     });
   });
 
-  describe('Working directory context', () => {
-    it('should use working directory from context when provided', async () => {
+  describe('Runtime cwd context', () => {
+    it('should use runtime cwd when provided', async () => {
       // Create a temporary directory and test file
       const result = await bashTool.execute(
         {
@@ -429,8 +457,8 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
       );
       expect(result.status).toBe('completed');
 
-      // Now execute a command with context pointing to that directory
-      const contextWithWorkingDir = { ...toolContext, workingDirectory: '/tmp/test-bash-tool' };
+      // Now execute a command with runtime cwd pointing to that directory
+      const contextWithWorkingDir = createToolContext('/tmp/test-bash-tool');
       const pwdResult = await bashTool.execute(
         { command: 'pwd && cat test.txt' },
         contextWithWorkingDir
@@ -446,7 +474,7 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
       expect(output.command).toBe('pwd && cat test.txt');
     });
 
-    it('should use process.cwd() when no context provided', async () => {
+    it('should use process.cwd() when runtime cwd is process.cwd()', async () => {
       const result = await bashTool.execute({ command: 'pwd' }, toolContext);
 
       expect(result.status).toBe('completed');
@@ -458,7 +486,7 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
       expect(output.command).toBe('pwd');
     });
 
-    it('should use process.cwd() when context has no workingDirectory', async () => {
+    it('should use runtime cwd when context has no workingDirectory', async () => {
       const contextWithoutWorkingDir = { ...toolContext }; // No workingDirectory property
       const result = await bashTool.execute({ command: 'pwd' }, contextWithoutWorkingDir);
 
@@ -471,7 +499,7 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
       expect(output.command).toBe('pwd');
     });
 
-    it('should handle relative paths correctly with working directory', async () => {
+    it('should handle relative paths correctly with runtime cwd', async () => {
       // Create a test structure
       const setupResult = await bashTool.execute(
         {
@@ -482,8 +510,8 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
       );
       expect(setupResult.status).toBe('completed');
 
-      // Use context to set working directory and test relative path
-      const contextWithWorkingDir = { ...toolContext, workingDirectory: '/tmp/test-bash-relative' };
+      // Use runtime cwd to set working directory and test relative path
+      const contextWithWorkingDir = createToolContext('/tmp/test-bash-relative');
       const result = await bashTool.execute(
         { command: 'cat subdir/file.txt' },
         contextWithWorkingDir

@@ -1,7 +1,6 @@
 // ABOUTME: Schema-based bash command execution tool
 // ABOUTME: Executes shell commands with Zod validation and structured output
 
-import { spawn } from 'child_process';
 import { createWriteStream } from 'fs';
 import { z } from 'zod';
 import { Tool } from '../tool';
@@ -81,13 +80,12 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
         return this.createCancellationResult();
       }
 
+      if (!context.runtime) {
+        return this.createError('Tool context missing runtime. This is a system error.');
+      }
+
       // Get temp file paths from ToolExecutor
       const outputPaths = this.getOutputFilePaths(context);
-
-      // Set up output streams
-      const stdoutStream = createWriteStream(outputPaths.stdout);
-      const stderrStream = createWriteStream(outputPaths.stderr);
-      const combinedStream = createWriteStream(outputPaths.combined);
 
       // Buffers for head+tail preview
       const stdoutHeadLines: string[] = [];
@@ -105,73 +103,33 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
       let stdoutTailIndex = 0;
       let stderrTailIndex = 0;
 
-      // Execute command with spawn for streaming
-      const childProcess = spawn('/bin/bash', ['-c', command], {
-        cwd: context?.workingDirectory || process.cwd(),
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: context?.processEnv || process.env,
+      const childProcess = await context.runtime.process.start(['/bin/bash', '-c', command], {
+        cwd: context.runtime.cwd,
+        env: context.processEnv ?? process.env,
+        signal: context.signal,
       });
+
+      // Set up output streams after the runtime process is started so a start failure
+      // cannot leave output file handles open.
+      const stdoutStream = createWriteStream(outputPaths.stdout);
+      const stderrStream = createWriteStream(outputPaths.stderr);
+      const combinedStream = createWriteStream(outputPaths.combined);
 
       return new Promise<ToolResult>((resolve) => {
         let cancelled = false;
         let processKilled = false;
+        let settled = false;
+        let completionDone = false;
+        let stdoutEnded = !childProcess.stdout;
+        let stderrEnded = !childProcess.stderr;
+        let exitCode: number | null = null;
 
-        // Handle abort signal
-        const abortHandler = () => {
-          cancelled = true;
-          if (!processKilled) {
-            processKilled = true;
-            // First try SIGTERM
-            childProcess.kill('SIGTERM');
-
-            // Give it 2 seconds to exit gracefully
-            setTimeout(() => {
-              if (!childProcess.killed) {
-                // Force kill if still running
-                childProcess.kill('SIGKILL');
-              }
-            }, 2000);
+        const closeStreamsAndComplete = () => {
+          if (settled || !completionDone || !stdoutEnded || !stderrEnded) {
+            return;
           }
-        };
 
-        context.signal.addEventListener('abort', abortHandler);
-
-        // Handle stdout
-        childProcess.stdout?.on('data', (data: Buffer) => {
-          const result = this.processStreamData(
-            data,
-            stdoutStream,
-            combinedStream,
-            stdoutLineBuffer,
-            stdoutHeadLines,
-            stdoutTailLines,
-            stdoutLineCount,
-            stdoutTailIndex
-          );
-          stdoutLineBuffer = result.lineBuffer;
-          stdoutLineCount = result.lineCount;
-          stdoutTailIndex = result.tailIndex;
-        });
-
-        // Handle stderr
-        childProcess.stderr?.on('data', (data: Buffer) => {
-          const result = this.processStreamData(
-            data,
-            stderrStream,
-            combinedStream,
-            stderrLineBuffer,
-            stderrHeadLines,
-            stderrTailLines,
-            stderrLineCount,
-            stderrTailIndex
-          );
-          stderrLineBuffer = result.lineBuffer;
-          stderrLineCount = result.lineCount;
-          stderrTailIndex = result.tailIndex;
-        });
-
-        // Handle completion
-        childProcess.on('close', (exitCode) => {
+          settled = true;
           const runtime = Date.now() - startTime;
 
           // Clean up abort handler
@@ -246,10 +204,13 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
           stdoutStream.end(onStreamComplete);
           stderrStream.end(onStreamComplete);
           combinedStream.end(onStreamComplete);
-        });
+        };
 
-        // Handle process errors (e.g., spawn failures)
-        childProcess.on('error', (error) => {
+        const handleProcessError = (error: Error) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
           const runtime = Date.now() - startTime;
 
           // Clean up abort handler
@@ -259,6 +220,11 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
           stdoutStream.end();
           stderrStream.end();
           combinedStream.end();
+
+          if (cancelled || context.signal.aborted) {
+            resolve(this.createCancellationResult());
+            return;
+          }
 
           const result: BashOutput = {
             command,
@@ -274,7 +240,80 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
           };
 
           resolve(this.createError(result as unknown as Record<string, unknown>));
+        };
+
+        // Handle abort signal
+        const abortHandler = () => {
+          cancelled = true;
+          if (!processKilled) {
+            processKilled = true;
+            // First try SIGTERM
+            childProcess.kill('SIGTERM');
+
+            // Give it 2 seconds to exit gracefully
+            setTimeout(() => {
+              childProcess.kill('SIGKILL');
+            }, 2000);
+          }
+        };
+
+        context.signal.addEventListener('abort', abortHandler);
+
+        // Handle stdout
+        childProcess.stdout?.on('data', (data: Buffer) => {
+          const result = this.processStreamData(
+            data,
+            stdoutStream,
+            combinedStream,
+            stdoutLineBuffer,
+            stdoutHeadLines,
+            stdoutTailLines,
+            stdoutLineCount,
+            stdoutTailIndex
+          );
+          stdoutLineBuffer = result.lineBuffer;
+          stdoutLineCount = result.lineCount;
+          stdoutTailIndex = result.tailIndex;
         });
+        childProcess.stdout?.on('end', () => {
+          stdoutEnded = true;
+          closeStreamsAndComplete();
+        });
+        childProcess.stdout?.on('error', handleProcessError);
+
+        // Handle stderr
+        childProcess.stderr?.on('data', (data: Buffer) => {
+          const result = this.processStreamData(
+            data,
+            stderrStream,
+            combinedStream,
+            stderrLineBuffer,
+            stderrHeadLines,
+            stderrTailLines,
+            stderrLineCount,
+            stderrTailIndex
+          );
+          stderrLineBuffer = result.lineBuffer;
+          stderrLineCount = result.lineCount;
+          stderrTailIndex = result.tailIndex;
+        });
+        childProcess.stderr?.on('end', () => {
+          stderrEnded = true;
+          closeStreamsAndComplete();
+        });
+        childProcess.stderr?.on('error', handleProcessError);
+
+        // Handle completion
+        childProcess.completion
+          .then((result) => {
+            exitCode = result.exitCode;
+            if (exitCode === null) {
+              cancelled = true;
+            }
+            completionDone = true;
+            closeStreamsAndComplete();
+          })
+          .catch(handleProcessError);
       });
     } catch (error: unknown) {
       const runtime = Date.now() - startTime;
