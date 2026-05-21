@@ -130,6 +130,18 @@ export class MCPServerManager extends EventEmitter {
   }
 
   /**
+   * Replace config for an already-stopped server without spawning a subprocess.
+   */
+  replaceStoppedServerConfig(serverId: string, config: MCPServerConfig): void {
+    const connection = this.servers.get(serverId);
+    if (!connection || connection.status !== 'stopped') {
+      return;
+    }
+
+    connection.config = config;
+  }
+
+  /**
    * Get server connection by ID
    */
   getServer(serverId: string): MCPServerConnection | undefined {

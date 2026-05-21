@@ -239,6 +239,7 @@ export function registerMcpHandlers(
     // Start the server if enabled
     if (enabled && isUnsupportedMcpTransport(config)) {
       await state.mcpServerManager.stopServer(serverId);
+      state.mcpServerManager.replaceStoppedServerConfig(serverId, config);
       logger.warn('Skipping MCP server with unsupported transport', {
         serverId,
         transport: config.transport,

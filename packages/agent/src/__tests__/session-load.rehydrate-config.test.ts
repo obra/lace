@@ -623,6 +623,53 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     }
   );
 
+  it.each(['http', 'sse'] as const)(
+    'does not restart stale stdio config after upserting a running server to unsupported %s transport',
+    async (transport) => {
+      const state = createAgentServerState();
+      const startServer = vi
+        .spyOn(state.mcpServerManager, 'startServer')
+        .mockResolvedValue(undefined);
+      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+      await client.request('initialize', defaultInitializeParams());
+      await client.request('session/new', {
+        cwd: tempDir,
+        mcpServers: [],
+      });
+
+      state.mcpServerManager.registerConnection('remote-server', {
+        id: 'remote-server',
+        config: {
+          command: process.execPath,
+          transport: 'stdio',
+          enabled: true,
+          tools: {},
+        },
+        status: 'running',
+      });
+
+      await client.request('ent/mcp/servers/upsert', {
+        name: 'remote-server',
+        command: process.execPath,
+        transport,
+        enabled: true,
+      });
+      startServer.mockClear();
+      expect(state.mcpServerManager.getServer('remote-server')?.config.transport).toBe(transport);
+
+      const result = (await client.request('ent/mcp/servers/test', {
+        serverId: 'remote-server',
+      })) as { ok: boolean; error?: string };
+
+      expect(result).toMatchObject({
+        ok: false,
+        error: `Unsupported MCP transport for test: ${transport}`,
+      });
+      expect(startServer).not.toHaveBeenCalled();
+    }
+  );
+
   it('keeps the current session and jobs when load rejects invalid MCP servers', async () => {
     const state = createAgentServerState();
     const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
