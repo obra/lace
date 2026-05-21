@@ -73,15 +73,18 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
    * while any TOOL_RESULT in the recent slice has its matching TOOL_CALL in the
    * old slice — that would produce an orphan tool_result that Anthropic rejects.
    *
-   * If there are too few events to make summarization worthwhile (<= RECENT+1),
-   * summarize everything and emit no recent tail.
+   * If the entire conversation fits inside the verbatim window, skip
+   * summarization altogether: keep every event in the recent tail and emit no
+   * summary wrapper. The alternative ("summarize everything") replaces the
+   * conversation with a model-generated blob and loses the user's actual
+   * messages — exactly the failure mode PRI-1719 was filed to prevent.
    */
   private splitAtSnappedBoundary(events: LaceEvent[]): {
     oldEvents: LaceEvent[];
     recentEvents: LaceEvent[];
   } {
-    if (events.length <= this.RECENT_EVENT_COUNT + 1) {
-      return { oldEvents: events, recentEvents: [] };
+    if (events.length <= this.RECENT_EVENT_COUNT) {
+      return { oldEvents: [], recentEvents: events };
     }
 
     let boundary = events.length - this.RECENT_EVENT_COUNT;
