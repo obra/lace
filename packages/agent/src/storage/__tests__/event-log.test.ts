@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { appendDurableEvent, readDurableEvents } from '../event-log';
+import { appendDurableEvent, findLastTurnEndEventSeq, readDurableEvents } from '../event-log';
 
 describe('storage/event-log', () => {
   it('appends and replays events in order', () => {
@@ -67,6 +67,27 @@ describe('storage/event-log', () => {
       expect(page.events.map((e) => e.type)).toEqual(['a']);
       expect(page.events.map((e) => e.eventSeq)).toEqual([1]);
       expect(page.hasMore).toBe(true);
+    } finally {
+      rmSync(sessionDir, { recursive: true, force: true });
+    }
+  });
+
+  it('findLastTurnEndEventSeq returns null on empty log and the latest turn_end seq otherwise', () => {
+    const sessionDir = mkdtempSync(join(tmpdir(), 'lace-event-log-'));
+    try {
+      expect(findLastTurnEndEventSeq(sessionDir)).toBeNull();
+
+      let state = { nextEventSeq: 1, nextStreamSeq: 1 };
+      ({ nextState: state } = appendDurableEvent(sessionDir, state, { type: 'prompt', data: {} }));
+      ({ nextState: state } = appendDurableEvent(sessionDir, state, {
+        type: 'turn_end',
+        data: { stopReason: 'end_turn' },
+      }));
+      ({ nextState: state } = appendDurableEvent(sessionDir, state, {
+        type: 'context_injected',
+        data: { priority: 'immediate', content: [] },
+      }));
+      expect(findLastTurnEndEventSeq(sessionDir)).toBe(2);
     } finally {
       rmSync(sessionDir, { recursive: true, force: true });
     }

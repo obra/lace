@@ -32,6 +32,35 @@ export function deriveNextEventSeqFromEventLog(sessionDir: string): number {
   return (maxSeq ?? 0) + 1;
 }
 
+/**
+ * Find the eventSeq of the most recent `turn_end` event in the log, or `null`
+ * if no turn has completed yet. Used by the conversation runner to compute its
+ * initial immediate-inject watermark — any context_injected event newer than
+ * the last turn_end is unprocessed.
+ */
+export function findLastTurnEndEventSeq(sessionDir: string): number | null {
+  const eventsPath = path.join(sessionDir, 'events.jsonl');
+  let raw = '';
+  try {
+    raw = fs.readFileSync(eventsPath, 'utf8');
+  } catch {
+    return null;
+  }
+  let last: number | null = null;
+  for (const line of raw.split('\n')) {
+    if (!line) continue;
+    try {
+      const parsed = JSON.parse(line) as Partial<DurableEvent>;
+      if (parsed.type !== 'turn_end') continue;
+      if (typeof parsed.eventSeq !== 'number') continue;
+      if (last === null || parsed.eventSeq > last) last = parsed.eventSeq;
+    } catch {
+      // ignore malformed line
+    }
+  }
+  return last;
+}
+
 export type DurableEvent = {
   eventSeq: number;
   timestamp: string;
