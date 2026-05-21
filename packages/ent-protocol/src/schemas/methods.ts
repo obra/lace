@@ -16,6 +16,7 @@ import {
   CatalogProviderInfoSchema,
   SandboxConfigSchema,
   SessionConfigOptionSchema,
+  RuntimeExecutionBindingSchema,
   ToolInfoSchema,
   ToolResultSchema,
   UsageInfoSchema,
@@ -203,6 +204,7 @@ const SessionNewParamsSchema = z
         connectionId: NonEmptyStringSchema.optional(),
         modelId: NonEmptyStringSchema.optional(),
         persona: NonEmptyStringSchema.optional(),
+        runtimeBinding: RuntimeExecutionBindingSchema.optional(),
       })
       .strict()
       .optional(),
@@ -248,6 +250,12 @@ const SessionLoadParamsSchema = z
     sessionId: SessionIdSchema,
     cwd: NonEmptyStringSchema,
     mcpServers: z.array(McpServerConfigSchema),
+    config: z
+      .object({
+        runtimeBinding: RuntimeExecutionBindingSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -282,6 +290,12 @@ const SessionResumeParamsSchema = z
     sessionId: SessionIdSchema,
     cwd: NonEmptyStringSchema,
     mcpServers: z.array(McpServerConfigSchema),
+    config: z
+      .object({
+        runtimeBinding: RuntimeExecutionBindingSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

@@ -592,6 +592,109 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     );
   });
 
+  it('restarts enabled MCP upserts when same-key config changes', async () => {
+    const state = createAgentServerState();
+    const startServer = vi
+      .spyOn(state.mcpServerManager, 'startServer')
+      .mockResolvedValue(undefined);
+    const stopServer = vi.spyOn(state.mcpServerManager, 'stopServer');
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', defaultInitializeParams());
+    await client.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    });
+
+    const connectionKey = activeHostMcpConnectionKey(
+      'local-stdio',
+      'stdio',
+      state.activeSession!.meta.sessionId
+    );
+    state.mcpServerManager.registerConnection('local-stdio', {
+      id: 'local-stdio',
+      connectionKey,
+      config: {
+        command: process.execPath,
+        transport: 'stdio',
+        placement: 'host',
+        env: { MODE: 'old' },
+        enabled: true,
+        tools: {},
+      },
+      status: 'running',
+    });
+
+    await client.request('ent/mcp/servers/upsert', {
+      name: 'local-stdio',
+      command: process.execPath,
+      transport: 'stdio',
+      placement: 'host',
+      env: { MODE: 'new' },
+      enabled: true,
+    });
+
+    expect(stopServer).toHaveBeenCalledWith(connectionKey);
+    expect(startServer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        serverId: 'local-stdio',
+        config: expect.objectContaining({
+          env: { MODE: 'new' },
+        }),
+      })
+    );
+  });
+
+  it('removes stale same-id connections when an enabled upsert changes placement', async () => {
+    const state = createAgentServerState();
+    const startServer = vi
+      .spyOn(state.mcpServerManager, 'startServer')
+      .mockResolvedValue(undefined);
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', defaultInitializeParams());
+    await client.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    });
+
+    const hostKey = activeHostMcpConnectionKey(
+      'local-stdio',
+      'stdio',
+      state.activeSession!.meta.sessionId
+    );
+    state.mcpServerManager.registerConnection('local-stdio', {
+      id: 'local-stdio',
+      connectionKey: hostKey,
+      config: {
+        command: process.execPath,
+        transport: 'stdio',
+        placement: 'host',
+        enabled: true,
+        tools: {},
+      },
+      status: 'running',
+    });
+
+    await client.request('ent/mcp/servers/upsert', {
+      name: 'local-stdio',
+      command: process.execPath,
+      transport: 'stdio',
+      placement: 'toolRuntime',
+      enabled: true,
+    });
+
+    expect(state.mcpServerManager.getServer(hostKey)).toBeUndefined();
+    expect(startServer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        serverId: 'local-stdio',
+        config: expect.objectContaining({
+          placement: 'toolRuntime',
+        }),
+      })
+    );
+  });
+
   it.each(['http', 'sse'] as const)(
     'stops an existing running stdio server when upserted to unsupported %s transport',
     async (transport) => {

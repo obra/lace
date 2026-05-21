@@ -27,6 +27,35 @@ export const SandboxConfigSchema = z
   .strict();
 export type SandboxConfig = z.infer<typeof SandboxConfigSchema>;
 
+export const RuntimeSecretReferenceSchema = z
+  .object({
+    namespace: z.enum(['session', 'project', 'host-service']),
+    name: NonEmptyStringSchema,
+  })
+  .strict();
+export type RuntimeSecretReference = z.infer<typeof RuntimeSecretReferenceSchema>;
+
+const LocalRuntimeDescriptorSchema = z
+  .object({
+    type: z.literal('local'),
+    cwd: NonEmptyStringSchema,
+  })
+  .strict();
+
+export const RuntimeExecutionBindingSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    identity: z
+      .object({
+        runtimeId: NonEmptyStringSchema,
+      })
+      .strict(),
+    agentPlacement: z.enum(['host', 'container']),
+    toolRuntime: LocalRuntimeDescriptorSchema,
+  })
+  .strict();
+export type RuntimeExecutionBinding = z.infer<typeof RuntimeExecutionBindingSchema>;
+
 export const McpServerConfigSchema = z
   .object({
     name: NonEmptyStringSchema,
@@ -34,17 +63,7 @@ export const McpServerConfigSchema = z
     args: z.array(z.string()).optional(),
     env: z.record(z.string(), z.string()).optional(),
     transport: z.enum(['stdio', 'sse', 'http']).optional(),
-    secretEnv: z
-      .record(
-        z.string(),
-        z
-          .object({
-            namespace: z.enum(['session', 'project', 'host-service']),
-            name: NonEmptyStringSchema,
-          })
-          .strict()
-      )
-      .optional(),
+    secretEnv: z.record(z.string(), RuntimeSecretReferenceSchema).optional(),
     placement: z.enum(['toolRuntime', 'host']).optional(),
     enabled: z.boolean().optional(),
     tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),

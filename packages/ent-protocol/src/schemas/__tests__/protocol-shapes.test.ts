@@ -10,6 +10,15 @@ import {
   SessionRequestPermissionResponseSchema,
 } from '../methods';
 
+function localRuntimeBinding(cwd = '/tmp') {
+  return {
+    schemaVersion: 1,
+    identity: { runtimeId: 'rt_local_protocol' },
+    agentPlacement: 'host',
+    toolRuntime: { type: 'local', cwd },
+  };
+}
+
 describe('protocol shapes (representative examples)', () => {
   it('parses representative client->agent requests', () => {
     expect(() =>
@@ -121,6 +130,44 @@ describe('protocol shapes (representative examples)', () => {
         },
       })
     ).not.toThrow();
+
+    for (const request of [
+      {
+        method: 'session/new',
+        params: {
+          cwd: '/tmp',
+          mcpServers: [],
+          config: { runtimeBinding: localRuntimeBinding() },
+        },
+      },
+      {
+        method: 'session/load',
+        params: {
+          sessionId: 'sess_00000000-0000-0000-0000-000000000001',
+          cwd: '/tmp',
+          mcpServers: [],
+          config: { runtimeBinding: localRuntimeBinding() },
+        },
+      },
+      {
+        method: 'session/resume',
+        params: {
+          sessionId: 'sess_00000000-0000-0000-0000-000000000001',
+          cwd: '/tmp',
+          mcpServers: [],
+          config: { runtimeBinding: localRuntimeBinding() },
+        },
+      },
+    ]) {
+      expect(() =>
+        EntProtocolRequestSchema.parse({
+          jsonrpc: '2.0',
+          id: `${request.method}-runtime-binding`,
+          method: request.method,
+          params: request.params,
+        })
+      ).not.toThrow();
+    }
 
     expect(() =>
       EntProtocolRequestSchema.parse({

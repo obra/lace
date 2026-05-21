@@ -3,6 +3,7 @@ import { MCPServerManager, mcpConnectionKey } from './server-manager';
 import type { MCPServerConfig } from './types';
 import { RuntimeStdioClientTransport } from '../tools/runtime/runtime-stdio-transport';
 import { createFakeRuntime } from '../tools/runtime/__tests__/fake-runtime';
+import { InMemoryRuntimeSecretResolver } from '../tools/runtime/secrets';
 
 // Mock the MCP SDK modules
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
@@ -344,5 +345,95 @@ describe('MCPServerManager', () => {
     expect(manager.getServer('runtime-server')?.transport).toBeInstanceOf(
       RuntimeStdioClientTransport
     );
+  });
+
+  it('merges resolved secret env into host stdio transport env', async () => {
+    const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
+    const config: MCPServerConfig = {
+      command: 'node',
+      args: ['server.js'],
+      env: { NODE_ENV: 'test' },
+      secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+      enabled: true,
+      tools: {},
+    };
+
+    await manager.startServer({
+      serverId: 'secret-host',
+      config,
+      runtime: createFakeRuntime(),
+      hostCwd: '/host/project',
+      sessionId: 'sess_secret',
+      secretResolver: new InMemoryRuntimeSecretResolver({
+        'project:api-key': 'resolved-secret',
+      }),
+    });
+
+    expect(StdioClientTransport).toHaveBeenCalledWith({
+      command: 'node',
+      args: ['server.js'],
+      env: { NODE_ENV: 'test', API_KEY: 'resolved-secret' },
+      cwd: '/host/project',
+    });
+  });
+
+  it('merges resolved secret env into runtime stdio transport env', async () => {
+    const runtime = createFakeRuntime();
+    const config: MCPServerConfig = {
+      command: 'node',
+      args: ['server.js'],
+      env: { NODE_ENV: 'test' },
+      secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+      transport: 'stdio',
+      placement: 'toolRuntime',
+      enabled: true,
+      tools: {},
+    };
+
+    await manager.startServer({
+      serverId: 'secret-runtime',
+      config,
+      runtime,
+      hostCwd: '/host/project',
+      sessionId: 'sess_secret',
+      secretResolver: new InMemoryRuntimeSecretResolver({
+        'project:api-key': 'resolved-secret',
+      }),
+    });
+
+    expect(runtime.process.start).toHaveBeenCalledWith(
+      ['node', 'server.js'],
+      expect.objectContaining({
+        env: expect.objectContaining({
+          NODE_ENV: 'test',
+          API_KEY: 'resolved-secret',
+        }),
+      })
+    );
+  });
+
+  it('fails startup with redacted secret references when secret env cannot resolve', async () => {
+    const config: MCPServerConfig = {
+      command: 'node',
+      secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+      enabled: true,
+      tools: {},
+    };
+
+    await expect(
+      manager.startServer({
+        serverId: 'secret-missing',
+        config,
+        runtime: createFakeRuntime(),
+        hostCwd: '/host/project',
+        sessionId: 'sess_secret',
+        secretResolver: new InMemoryRuntimeSecretResolver({}),
+      })
+    ).rejects.toThrow('[secret:project:REDACTED]');
+
+    const server = manager.getServer('secret-missing');
+    expect(server?.status).toBe('failed');
+    expect(server?.lastError).toContain('[secret:project:REDACTED]');
+    expect(server?.lastError).not.toContain('api-key');
   });
 });

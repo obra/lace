@@ -8,12 +8,20 @@ import { logger } from '@lace/agent/utils/logger';
 import type { MCPServerConfig, MCPServerConnection } from '@lace/agent/config/mcp-types';
 import type { ToolRuntime } from '@lace/agent/tools/runtime/types';
 import { RuntimeStdioClientTransport } from '@lace/agent/tools/runtime/runtime-stdio-transport';
+import {
+  RuntimeSecretResolutionError,
+  type RuntimeSecretResolver,
+  redactSecretReference,
+  resolveSecretEnv,
+} from '@lace/agent/tools/runtime/secrets';
 
 export interface StartMCPServerInput {
   serverId: string;
   config: MCPServerConfig;
   runtime: ToolRuntime;
   hostCwd?: string;
+  sessionId?: string;
+  secretResolver?: RuntimeSecretResolver;
 }
 
 interface ReplaceStoppedServerConfigOptions {
@@ -42,6 +50,44 @@ export function mcpConnectionKey(input: {
   ]);
 }
 
+async function resolveMcpEnvironment(input: {
+  serverId: string;
+  config: MCPServerConfig;
+  runtime: ToolRuntime;
+  sessionId?: string;
+  secretResolver?: RuntimeSecretResolver;
+}): Promise<Record<string, string> | undefined> {
+  const secretEntries = Object.entries(input.config.secretEnv ?? {});
+  if (secretEntries.length === 0) return input.config.env;
+
+  const sessionId = input.sessionId ?? 'unknown';
+  if (!input.secretResolver) {
+    const [, reference] = secretEntries[0]!;
+    throw new RuntimeSecretResolutionError(
+      `Secret unavailable or unauthorized: ${redactSecretReference(reference)}`,
+      {
+        reference,
+        runtimeId: input.runtime.id,
+        sessionId,
+        serverId: input.serverId,
+      }
+    );
+  }
+
+  const resolved = await resolveSecretEnv({
+    secretEnv: input.config.secretEnv,
+    resolver: input.secretResolver,
+    runtimeId: input.runtime.id,
+    sessionId,
+    serverId: input.serverId,
+  });
+
+  return {
+    ...(input.config.env ?? {}),
+    ...resolved,
+  };
+}
+
 export class MCPServerManager extends EventEmitter {
   private servers = new Map<string, MCPServerConnection>();
 
@@ -49,7 +95,7 @@ export class MCPServerManager extends EventEmitter {
    * Start a server if it's not already running
    */
   async startServer(input: StartMCPServerInput): Promise<void> {
-    const { serverId, config, runtime, hostCwd } = input;
+    const { serverId, config, runtime, hostCwd, sessionId, secretResolver } = input;
     const placement = config.placement ?? 'host';
     const transportKind = config.transport ?? 'stdio';
     const connectionKey = mcpConnectionKey({
@@ -79,6 +125,14 @@ export class MCPServerManager extends EventEmitter {
     this.emit('server-status-changed', serverId, 'starting', connectionKey);
 
     try {
+      const env = await resolveMcpEnvironment({
+        serverId,
+        config,
+        runtime,
+        sessionId,
+        secretResolver,
+      });
+
       // Create transport for spawning the server process
       const transport =
         placement === 'toolRuntime'
@@ -86,13 +140,13 @@ export class MCPServerManager extends EventEmitter {
               runtime,
               command: config.command,
               args: config.args,
-              env: config.env,
+              env,
               cwd: runtime.cwd,
             })
           : new StdioClientTransport({
               command: config.command,
               args: config.args,
-              env: config.env,
+              env,
               cwd: hostCwd,
             });
 

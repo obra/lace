@@ -25,7 +25,10 @@ interface ErrorResponse {
   details?: unknown;
 }
 
-async function createProjectAndSession(workDir: string) {
+async function createProjectAndSession(
+  workDir: string,
+  options: { includeSecretEnv?: boolean } = {}
+) {
   const fixturePath = path.resolve('test-utils/fixtures/mcp-stdio-test-server.cjs');
 
   const project = Project.create('Test Project', workDir);
@@ -34,7 +37,9 @@ async function createProjectAndSession(workDir: string) {
     args: [fixturePath],
     transport: 'stdio',
     placement: 'host',
-    secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+    ...(options.includeSecretEnv
+      ? { secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } } }
+      : {}),
     enabled: false,
     tools: { echo: 'allow' },
   });
@@ -92,7 +97,6 @@ describe('Session MCP Server Control API', () => {
               name: 'test',
               transport: 'stdio',
               placement: 'host',
-              secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
               enabled: true,
             }),
           ],
@@ -108,6 +112,35 @@ describe('Session MCP Server Control API', () => {
       mcpServers?: Array<{ name: string; status: string }>;
     };
     expect(status.mcpServers?.find((s) => s.name === 'test')?.status).toBe('connected');
+  });
+
+  it('does not leak unresolved secret references when starting an MCP server', async () => {
+    const { project, created } = await createProjectAndSession(context.tempProjectDir, {
+      includeSecretEnv: true,
+    });
+
+    const request = new Request(
+      `http://localhost/api/projects/${project.getId()}/sessions/${created.workspaceSessionId}/mcp/servers/test/control`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      }
+    );
+
+    const response = await action(
+      createActionArgs(request, {
+        projectId: project.getId(),
+        sessionId: created.workspaceSessionId,
+        serverId: 'test',
+      })
+    );
+
+    const data = await parseResponse<ErrorResponse>(response);
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe('Server control operation failed');
+    expect(JSON.stringify(data)).not.toContain('api-key');
   });
 
   it('stops an MCP server', async () => {

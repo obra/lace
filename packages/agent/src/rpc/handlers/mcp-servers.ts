@@ -109,6 +109,8 @@ async function startServerForActiveSession(
     config,
     runtime,
     hostCwd: activeSessionHostCwd(state),
+    sessionId: state.activeSession?.meta.sessionId,
+    secretResolver: state.runtimeSecretResolver,
   });
 }
 
@@ -217,6 +219,8 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
       config,
       runtime,
       hostCwd,
+      sessionId: state.activeSession.meta.sessionId,
+      secretResolver: state.runtimeSecretResolver,
     });
   }
 }
@@ -372,7 +376,7 @@ export function registerMcpHandlers(
         transport: config.transport,
       });
     } else if (enabled) {
-      await startServerForActiveSession(state, serverId, config);
+      await reconcileMcpServersForActiveSession(state);
     }
 
     invalidateSessionToolExecutor(state.toolExecutorCache, state.activeSession.meta.sessionId);

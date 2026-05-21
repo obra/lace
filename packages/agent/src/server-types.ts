@@ -21,6 +21,7 @@ import type { ExecStreamHandle } from './containers/types';
 import type { PersonaContainerRuntime, PersonaBoxRuntime } from './jobs/persona-container-spec';
 import type { AlarmScheduler } from './alarms/alarm-scheduler';
 import type { RuntimeExecutionBinding } from './tools/runtime/types';
+import type { RuntimeSecretResolver } from './tools/runtime/secrets';
 
 /**
  * Per-build allowlist of tool names. `undefined` means "no scope filter" (all tools available).
@@ -184,6 +185,7 @@ export type AgentServerState = {
   // ask the parent to record a `subagent-exited` notification under its
   // runExclusive mutex (avoids cross-process events.jsonl write races).
   peer: JsonRpcPeer | null;
+  runtimeSecretResolver?: RuntimeSecretResolver;
 };
 
 // Single entry in the embedder-supplied containerMounts registry.
