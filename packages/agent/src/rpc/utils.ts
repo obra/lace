@@ -7,7 +7,7 @@ import type { CatalogModel, ProviderInstance } from '../providers/catalog/types'
 import { ProviderInstanceSchema } from '../providers/catalog/types';
 import type { ToolResult as CoreToolResult } from '../tools/types';
 import type { Tool as CoreTool } from '../tools/tool';
-import type { MCPServerConfig } from '../config/mcp-types';
+import type { MCPSecretReference, MCPServerConfig } from '../config/mcp-types';
 import type { AgentServerState } from '../server-types';
 
 export function throwInvalidParams(reason?: string): never {
@@ -252,11 +252,32 @@ export function recordsShallowEqual(
   return true;
 }
 
+function secretEnvRecordsEqual(
+  a?: Record<string, MCPSecretReference>,
+  b?: Record<string, MCPSecretReference>
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    const left = a[key];
+    const right = b[key];
+    if (!left || !right) return false;
+    if (left.namespace !== right.namespace || left.name !== right.name) return false;
+  }
+  return true;
+}
+
 export function mcpServerConfigEquivalent(a: MCPServerConfig, b: MCPServerConfig): boolean {
   return (
     a.command === b.command &&
     arraysShallowEqual(a.args, b.args) &&
     recordsShallowEqual(a.env, b.env) &&
+    a.transport === b.transport &&
+    a.placement === b.placement &&
+    secretEnvRecordsEqual(a.secretEnv, b.secretEnv) &&
     a.enabled === b.enabled &&
     recordsShallowEqual(a.tools as Record<string, string>, b.tools as Record<string, string>)
   );

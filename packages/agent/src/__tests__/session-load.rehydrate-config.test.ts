@@ -1,7 +1,7 @@
 // ABOUTME: Tests that session/load rehydrates connectionId+modelId so the next
 // session/prompt doesn't reject with "connectionId and modelId are required".
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PassThrough } from 'node:stream';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -108,8 +108,8 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     expect(loadState.config.connectionId).toBe('conn_test');
     expect(loadState.config.modelId).toBe('model_test');
     expect(loadState.activeSession?.state.config?.mcpServers).toEqual([
-      { name: 'initial', command: process.execPath, enabled: false },
-      { name: 'loaded', command: process.execPath, enabled: false },
+      { name: 'initial', command: process.execPath, enabled: false, placement: 'toolRuntime' },
+      { name: 'loaded', command: process.execPath, enabled: false, placement: 'toolRuntime' },
     ]);
   });
 
@@ -187,7 +187,13 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     expect(resumeState.config.connectionId).toBe('conn_test');
     expect(resumeState.config.modelId).toBe('model_test');
     expect(resumeState.activeSession?.state.config?.mcpServers).toEqual([
-      { name: 'shared', command: process.execPath, args: ['new'], enabled: false },
+      {
+        name: 'shared',
+        command: process.execPath,
+        args: ['new'],
+        enabled: false,
+        placement: 'toolRuntime',
+      },
     ]);
   });
 
@@ -379,6 +385,111 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     expect(loadSession(created.sessionId).state.config?.mcpServers).toEqual([]);
   });
 
+  it('persists HTTP/SSE MCP configs without spawning them as stdio during load', async () => {
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+
+    await setupClient.request('initialize', defaultInitializeParams());
+    const created = (await setupClient.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    const loadState = createAgentServerState();
+    const { client: loadClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, loadState)
+    );
+
+    await loadClient.request('initialize', defaultInitializeParams());
+    await loadClient.request('session/load', {
+      sessionId: created.sessionId,
+      cwd: tempDir,
+      mcpServers: [
+        {
+          name: 'http-server',
+          command: process.execPath,
+          args: ['-e', 'process.exit(0)'],
+          transport: 'http',
+          secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+        },
+        {
+          name: 'sse-server',
+          command: process.execPath,
+          args: ['-e', 'process.exit(0)'],
+          transport: 'sse',
+        },
+      ],
+    });
+
+    expect(loadState.activeSession?.state.config?.mcpServers).toEqual([
+      {
+        name: 'http-server',
+        command: process.execPath,
+        args: ['-e', 'process.exit(0)'],
+        transport: 'http',
+        secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+        placement: 'host',
+      },
+      {
+        name: 'sse-server',
+        command: process.execPath,
+        args: ['-e', 'process.exit(0)'],
+        transport: 'sse',
+        placement: 'host',
+      },
+    ]);
+    expect(loadState.mcpServerManager.getServer('http-server')).toBeUndefined();
+    expect(loadState.mcpServerManager.getServer('sse-server')).toBeUndefined();
+  });
+
+  it('preserves MCP transport, placement, and secretEnv when reconciling stdio servers', async () => {
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+
+    await setupClient.request('initialize', defaultInitializeParams());
+    const created = (await setupClient.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    const loadState = createAgentServerState();
+    const startServer = vi
+      .spyOn(loadState.mcpServerManager, 'startServer')
+      .mockResolvedValue(undefined);
+    const { client: loadClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, loadState)
+    );
+
+    await loadClient.request('initialize', defaultInitializeParams());
+    await loadClient.request('session/load', {
+      sessionId: created.sessionId,
+      cwd: tempDir,
+      mcpServers: [
+        {
+          name: 'stdio-host',
+          command: process.execPath,
+          transport: 'stdio',
+          placement: 'host',
+          secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+        },
+      ],
+    });
+
+    expect(startServer).toHaveBeenCalledWith('stdio-host', {
+      command: process.execPath,
+      transport: 'stdio',
+      placement: 'host',
+      secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+      enabled: true,
+      tools: {},
+      cwd: tempDir,
+    });
+  });
+
   it('keeps the current session and jobs when load rejects invalid MCP servers', async () => {
     const state = createAgentServerState();
     const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
@@ -409,7 +520,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       client.request('session/load', {
         sessionId: first.sessionId,
         cwd: tempDir,
-        mcpServers: [{ name: 'bad-transport', command: process.execPath, transport: 'http' }],
+        mcpServers: [{ name: 'missing-command' }],
       })
     ).rejects.toMatchObject({ code: -32602 });
 

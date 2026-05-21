@@ -51,6 +51,9 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
       command: server.command,
       ...(Array.isArray(server.args) ? { args: server.args } : {}),
       ...(server.env && typeof server.env === 'object' ? { env: server.env } : {}),
+      ...(server.transport ? { transport: server.transport } : {}),
+      ...(server.placement ? { placement: server.placement } : {}),
+      ...(server.secretEnv ? { secretEnv: server.secretEnv } : {}),
       enabled,
       tools,
     });
@@ -72,6 +75,15 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
 
     if (!config.enabled) {
       await state.mcpServerManager.stopServer(serverId);
+      continue;
+    }
+
+    if (config.transport && config.transport !== 'stdio') {
+      await state.mcpServerManager.stopServer(serverId);
+      logger.warn('Skipping MCP server with unsupported transport', {
+        serverId,
+        transport: config.transport,
+      });
       continue;
     }
 
