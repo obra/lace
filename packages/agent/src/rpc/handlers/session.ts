@@ -37,7 +37,11 @@ import { killAllRunningJobs } from '../../jobs';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { PersonaNotFoundError, PersonaParseError } from '../../config/persona-registry';
 import { LACE_BUILTIN_TOOL_NAMES } from '../../tools/executor';
-import { buildSessionConfigOptions, mergeMcpServers } from '../session-config';
+import {
+  buildSessionConfigOptions,
+  defaultMcpServerPlacements,
+  mergeMcpServers,
+} from '../session-config';
 import { cancelPendingPermissionRequests } from '../permissions';
 import {
   buildDefaultLocalRuntimeBinding,
@@ -331,7 +335,9 @@ export function registerSessionHandlers(
     const effectiveMcpServers =
       parsed.mcpServers !== undefined
         ? mergeMcpServers(personaDefaults.mcpServers, parsed.mcpServers)
-        : personaDefaults.mcpServers;
+        : personaDefaults.mcpServers
+          ? defaultMcpServerPlacements(personaDefaults.mcpServers)
+          : undefined;
     const effectiveToolScope = personaDefaults.toolScope;
 
     const sessionId = `sess_${randomUUID()}`;
@@ -530,7 +536,7 @@ export function registerSessionHandlers(
     // Apply MCP server overrides if provided
     if (parsed.mcpServers) {
       forkedState.config = forkedState.config ?? {};
-      forkedState.config.mcpServers = parsed.mcpServers;
+      forkedState.config.mcpServers = defaultMcpServerPlacements(parsed.mcpServers);
     }
 
     writeSessionState(forkedSessionDir, forkedState);

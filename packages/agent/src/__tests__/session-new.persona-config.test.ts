@@ -96,7 +96,13 @@ You are a frontmatter persona.`
     expect(loaded.state.config?.toolScope).toContain('bash');
     expect(loaded.state.config?.toolScope).toContain('ripgrep_search'); // builtin
     expect(loaded.state.config?.mcpServers).toEqual([
-      { name: 'fs', command: 'mcp-fs', args: ['--root', '/tmp'], enabled: false },
+      {
+        name: 'fs',
+        command: 'mcp-fs',
+        args: ['--root', '/tmp'],
+        enabled: false,
+        placement: 'toolRuntime',
+      },
     ]);
   });
 
@@ -135,9 +141,9 @@ You are a persona with MCP defaults.`
 
     const loaded = loadSession(created.sessionId);
     expect(loaded.state.config?.mcpServers).toEqual([
-      { name: 'shared', command: 'request-shared', enabled: false },
-      { name: 'persona-only', command: 'persona-only', enabled: false },
-      { name: 'request-only', command: 'request-only', enabled: false },
+      { name: 'shared', command: 'request-shared', enabled: false, placement: 'toolRuntime' },
+      { name: 'persona-only', command: 'persona-only', enabled: false, placement: 'toolRuntime' },
+      { name: 'request-only', command: 'request-only', enabled: false, placement: 'toolRuntime' },
     ]);
   });
 

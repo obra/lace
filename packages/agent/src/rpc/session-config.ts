@@ -37,6 +37,10 @@ function withDefaultMcpPlacement(server: McpServerConfig): McpServerConfig {
   };
 }
 
+export function defaultMcpServerPlacements(servers: McpServerConfig[]): McpServerConfig[] {
+  return servers.map(withDefaultMcpPlacement);
+}
+
 export function mergeMcpServers(existing: unknown, incoming: unknown): McpServerConfig[] {
   const parsedIncoming = McpServerConfigSchema.array().safeParse(incoming);
   if (!parsedIncoming.success) {
@@ -47,9 +51,9 @@ export function mergeMcpServers(existing: unknown, incoming: unknown): McpServer
     ? McpServerConfigSchema.array().safeParse(existing)
     : { success: true as const, data: [] as McpServerConfig[] };
   const existingServers = parsedExisting.success
-    ? parsedExisting.data.map(withDefaultMcpPlacement)
+    ? defaultMcpServerPlacements(parsedExisting.data)
     : [];
-  const incomingServers = parsedIncoming.data.map(withDefaultMcpPlacement);
+  const incomingServers = defaultMcpServerPlacements(parsedIncoming.data);
 
   const incomingByName = new Map(incomingServers.map((server) => [server.name, server]));
   const merged: McpServerConfig[] = [];

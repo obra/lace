@@ -154,4 +154,59 @@ describe('session/fork durable history', () => {
       server.close();
     }
   });
+
+  it('defaults direct MCP override placement when forking a session', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      const created = (await client.request('session/new', {
+        cwd: tempDir,
+        mcpServers: [],
+      })) as { sessionId: string };
+
+      const forked = (await client.request('session/fork', {
+        sessionId: created.sessionId,
+        mcpServers: [
+          { name: 'missing-transport', command: 'mcp-default' },
+          { name: 'stdio-transport', command: 'mcp-stdio', transport: 'stdio' },
+          { name: 'http-transport', command: 'mcp-http', transport: 'http' },
+          { name: 'sse-transport', command: 'mcp-sse', transport: 'sse' },
+          {
+            name: 'explicit-host',
+            command: 'mcp-explicit',
+            transport: 'stdio',
+            placement: 'host',
+          },
+        ],
+      })) as { sessionId: string };
+
+      expect(loadSession(forked.sessionId).state.config?.mcpServers).toEqual([
+        { name: 'missing-transport', command: 'mcp-default', placement: 'toolRuntime' },
+        {
+          name: 'stdio-transport',
+          command: 'mcp-stdio',
+          transport: 'stdio',
+          placement: 'toolRuntime',
+        },
+        {
+          name: 'http-transport',
+          command: 'mcp-http',
+          transport: 'http',
+          placement: 'host',
+        },
+        { name: 'sse-transport', command: 'mcp-sse', transport: 'sse', placement: 'host' },
+        {
+          name: 'explicit-host',
+          command: 'mcp-explicit',
+          transport: 'stdio',
+          placement: 'host',
+        },
+      ]);
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
 });
