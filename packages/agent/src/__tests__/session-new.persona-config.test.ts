@@ -147,6 +147,61 @@ You are a persona with MCP defaults.`
     ]);
   });
 
+  it('preserves persona MCP transport, placement, and secret environment references', async () => {
+    writeFileSync(
+      join(userPersonasDir, 'persona-mcp-placement.md'),
+      `---
+mcpServers:
+  remote-http:
+    command: remote-http
+    transport: http
+    secretEnv:
+      API_KEY:
+        namespace: project
+        name: api-key
+    enabled: true
+  explicit-stdio-host:
+    command: stdio-host
+    transport: stdio
+    placement: host
+    enabled: false
+---
+Persona with MCP placement.`
+    );
+
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request(
+      'initialize',
+      defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+    );
+
+    const created = (await client.request('session/new', {
+      cwd: tempDir,
+      persona: 'persona-mcp-placement',
+    })) as { sessionId: string };
+
+    const loaded = loadSession(created.sessionId);
+    expect(loaded.state.config?.mcpServers).toEqual([
+      {
+        name: 'remote-http',
+        command: 'remote-http',
+        transport: 'http',
+        secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+        enabled: true,
+        placement: 'host',
+      },
+      {
+        name: 'explicit-stdio-host',
+        command: 'stdio-host',
+        transport: 'stdio',
+        placement: 'host',
+        enabled: false,
+      },
+    ]);
+  });
+
   it('body-only persona applies no config defaults', async () => {
     writeFileSync(join(userPersonasDir, 'bodyonly.md'), 'You are a body-only persona.');
 

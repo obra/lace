@@ -490,6 +490,57 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     });
   });
 
+  it('upserts MCP configs with placement defaults and preserves transport metadata', async () => {
+    const state = createAgentServerState();
+    const startServer = vi
+      .spyOn(state.mcpServerManager, 'startServer')
+      .mockResolvedValue(undefined);
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', defaultInitializeParams());
+    const created = (await client.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    await client.request('ent/mcp/servers/upsert', {
+      name: 'remote-http',
+      command: process.execPath,
+      transport: 'http',
+      secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+      enabled: true,
+    });
+
+    expect(loadSession(created.sessionId).state.config?.mcpServers).toEqual([
+      {
+        name: 'remote-http',
+        command: process.execPath,
+        transport: 'http',
+        secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
+        enabled: true,
+        placement: 'host',
+      },
+    ]);
+    expect(startServer).not.toHaveBeenCalled();
+
+    await client.request('ent/mcp/servers/upsert', {
+      name: 'local-stdio',
+      command: process.execPath,
+      transport: 'stdio',
+      placement: 'host',
+      enabled: true,
+    });
+
+    expect(startServer).toHaveBeenCalledWith('local-stdio', {
+      command: process.execPath,
+      transport: 'stdio',
+      placement: 'host',
+      enabled: true,
+      tools: {},
+      cwd: tempDir,
+    });
+  });
+
   it('keeps the current session and jobs when load rejects invalid MCP servers', async () => {
     const state = createAgentServerState();
     const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));

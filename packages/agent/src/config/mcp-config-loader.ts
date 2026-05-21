@@ -8,6 +8,8 @@ import { getLaceDir } from './lace-dir';
 import { logger } from '@lace/agent/utils/logger';
 import type { MCPConfig, MCPServerConfig } from './mcp-types';
 
+type MCPConfigSource = 'global' | 'project';
+
 // Zod schemas for validation
 const ToolPolicySchema = z.enum(['allow', 'ask', 'deny', 'disable']);
 
@@ -43,6 +45,25 @@ const MCPConfigSchema = z.object({
   servers: z.record(z.string(), MCPServerConfigSchema),
 });
 
+function defaultPlacementForSource(
+  serverConfig: MCPServerConfig,
+  source: MCPConfigSource
+): MCPServerConfig {
+  if (serverConfig.placement) return serverConfig;
+
+  if (source === 'global') {
+    return { ...serverConfig, placement: 'host' };
+  }
+
+  return {
+    ...serverConfig,
+    placement:
+      serverConfig.transport === 'http' || serverConfig.transport === 'sse'
+        ? 'host'
+        : 'toolRuntime',
+  };
+}
+
 export class MCPConfigLoader {
   private static readonly CONFIG_FILENAME = 'mcp-config.json';
 
@@ -69,11 +90,16 @@ export class MCPConfigLoader {
    * Validate config and disable invalid servers (graceful degradation)
    */
   static validateConfig(config: MCPConfig): MCPConfig {
+    return this.validateConfigForSource(config, 'project');
+  }
+
+  private static validateConfigForSource(config: MCPConfig, source: MCPConfigSource): MCPConfig {
     const validatedConfig = { ...config };
 
     for (const [serverId, serverConfig] of Object.entries(validatedConfig.servers)) {
       try {
-        MCPServerConfigSchema.parse(serverConfig);
+        const parsed = MCPServerConfigSchema.parse(serverConfig);
+        validatedConfig.servers[serverId] = defaultPlacementForSource(parsed, source);
       } catch (error) {
         // Disable invalid servers, keep valid ones running
         validatedConfig.servers[serverId] = {
@@ -91,15 +117,15 @@ export class MCPConfigLoader {
   private static loadGlobalConfigInternal(): MCPConfig | null {
     const laceDir = getLaceDir();
     const globalConfigPath = join(laceDir, this.CONFIG_FILENAME);
-    return this.loadConfigFile(globalConfigPath);
+    return this.loadConfigFile(globalConfigPath, 'global');
   }
 
   private static loadProjectConfig(projectRoot: string): MCPConfig | null {
     const projectConfigPath = join(projectRoot, '.lace', this.CONFIG_FILENAME);
-    return this.loadConfigFile(projectConfigPath);
+    return this.loadConfigFile(projectConfigPath, 'project');
   }
 
-  private static loadConfigFile(filepath: string): MCPConfig | null {
+  private static loadConfigFile(filepath: string, source: MCPConfigSource): MCPConfig | null {
     if (!existsSync(filepath)) {
       return null;
     }
@@ -124,7 +150,7 @@ export class MCPConfigLoader {
       for (const [serverId, serverConfig] of serverEntries) {
         try {
           const validServer = MCPServerConfigSchema.parse(serverConfig);
-          validatedServers[serverId] = validServer;
+          validatedServers[serverId] = defaultPlacementForSource(validServer, source);
         } catch (serverError) {
           // Log but continue with other servers
           logger.warn(`Skipping invalid MCP server '${serverId}':`, {
@@ -181,7 +207,10 @@ export class MCPConfigLoader {
    */
   static saveConfig(config: MCPConfig, projectRoot?: string): void {
     // Validate before saving
-    const validatedConfig = this.validateConfig(config);
+    const validatedConfig = this.validateConfigForSource(
+      config,
+      projectRoot ? 'project' : 'global'
+    );
 
     if (projectRoot) {
       const projectConfigPath = join(projectRoot, '.lace', this.CONFIG_FILENAME);

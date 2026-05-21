@@ -126,6 +126,10 @@ export class ToolCatalog {
     try {
       logger.debug(`Starting tool discovery for ${serverId}`);
 
+      if (config.transport && config.transport !== 'stdio') {
+        throw new Error(`Unsupported MCP transport for discovery: ${config.transport}`);
+      }
+
       // Start temporary server for discovery
       await tempManager.startServer(serverId, config);
 

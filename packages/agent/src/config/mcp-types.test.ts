@@ -2,6 +2,9 @@
 // ABOUTME: Ensures type safety and backward compatibility for MCP server configurations
 
 import { describe, it, expect } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { McpServerConfigSchema } from '@lace/ent-protocol';
 import { mergeMcpServers } from '../rpc/session-config';
 import { MCPConfigLoader } from './mcp-config-loader';
@@ -168,5 +171,85 @@ describe('DiscoveredTool interface', () => {
 
     expect(tool.name).toBe('test_tool');
     expect(tool.description).toBe('A test tool');
+  });
+});
+
+describe('MCPConfigLoader placement defaults', () => {
+  it('defaults global user config MCP placement to host', () => {
+    const originalLaceDir = process.env.LACE_DIR;
+    const laceDir = mkdtempSync(join(tmpdir(), 'lace-global-mcp-'));
+    process.env.LACE_DIR = laceDir;
+
+    try {
+      writeFileSync(
+        join(laceDir, 'mcp-config.json'),
+        JSON.stringify({
+          servers: {
+            missingTransport: { command: 'missing', enabled: true, tools: {} },
+            stdio: { command: 'stdio', transport: 'stdio', enabled: true, tools: {} },
+            http: { command: 'http', transport: 'http', enabled: true, tools: {} },
+            explicit: {
+              command: 'explicit',
+              transport: 'stdio',
+              placement: 'toolRuntime',
+              enabled: true,
+              tools: {},
+            },
+          },
+        })
+      );
+
+      expect(MCPConfigLoader.loadConfig().servers).toMatchObject({
+        missingTransport: { placement: 'host' },
+        stdio: { placement: 'host' },
+        http: { placement: 'host' },
+        explicit: { placement: 'toolRuntime' },
+      });
+    } finally {
+      if (originalLaceDir === undefined) delete process.env.LACE_DIR;
+      else process.env.LACE_DIR = originalLaceDir;
+      rmSync(laceDir, { recursive: true, force: true });
+    }
+  });
+
+  it('defaults project config stdio placement to toolRuntime and HTTP/SSE to host', () => {
+    const originalLaceDir = process.env.LACE_DIR;
+    const laceDir = mkdtempSync(join(tmpdir(), 'lace-global-mcp-'));
+    const projectDir = mkdtempSync(join(tmpdir(), 'lace-project-mcp-'));
+    process.env.LACE_DIR = laceDir;
+
+    try {
+      mkdirSync(join(projectDir, '.lace'), { recursive: true });
+      writeFileSync(
+        join(projectDir, '.lace', 'mcp-config.json'),
+        JSON.stringify({
+          servers: {
+            missingTransport: { command: 'missing', enabled: true, tools: {} },
+            stdio: { command: 'stdio', transport: 'stdio', enabled: true, tools: {} },
+            http: { command: 'http', transport: 'http', enabled: true, tools: {} },
+            sse: { command: 'sse', transport: 'sse', enabled: true, tools: {} },
+            explicit: {
+              command: 'explicit',
+              placement: 'host',
+              enabled: true,
+              tools: {},
+            },
+          },
+        })
+      );
+
+      expect(MCPConfigLoader.loadConfig(projectDir).servers).toMatchObject({
+        missingTransport: { placement: 'toolRuntime' },
+        stdio: { placement: 'toolRuntime' },
+        http: { placement: 'host' },
+        sse: { placement: 'host' },
+        explicit: { placement: 'host' },
+      });
+    } finally {
+      if (originalLaceDir === undefined) delete process.env.LACE_DIR;
+      else process.env.LACE_DIR = originalLaceDir;
+      rmSync(laceDir, { recursive: true, force: true });
+      rmSync(projectDir, { recursive: true, force: true });
+    }
   });
 });

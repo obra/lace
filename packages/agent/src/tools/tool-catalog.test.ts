@@ -211,5 +211,32 @@ describe('ToolCatalog', () => {
         discoveryError: 'Startup failed',
       });
     });
+
+    it('should not start non-stdio servers during discovery', async () => {
+      const { MCPConfigLoader } = vi.mocked(await import('@lace/agent/config/mcp-config-loader'));
+      const httpConfig: MCPServerConfig = {
+        command: 'remote',
+        transport: 'http',
+        placement: 'host',
+        enabled: true,
+        tools: {},
+      };
+
+      await ToolCatalog.discoverAndCacheTools('remote-server', httpConfig, '/test/project');
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(mockServerManager.startServer).not.toHaveBeenCalled();
+      expect(MCPConfigLoader.updateServerConfig).toHaveBeenCalledWith(
+        'remote-server',
+        expect.objectContaining({
+          transport: 'http',
+          placement: 'host',
+          discoveryStatus: 'failed',
+          discoveryError: expect.stringContaining('Unsupported MCP transport'),
+        }),
+        '/test/project'
+      );
+    });
   });
 });

@@ -16,6 +16,7 @@ import { logger } from '../../utils/logger';
 import { readSessionState, writeSessionState } from '../../storage/session-store';
 import { loadSession } from '../../storage/session-store';
 import { invalidateSessionToolExecutor } from '../../server';
+import { defaultMcpServerPlacements } from '../session-config';
 
 /**
  * Reconcile MCP servers for the active session.
@@ -148,6 +149,12 @@ export function registerMcpHandlers(
       command: string;
       args?: string[];
       env?: Record<string, string>;
+      transport?: 'stdio' | 'sse' | 'http';
+      secretEnv?: Record<
+        string,
+        { namespace: 'session' | 'project' | 'host-service'; name: string }
+      >;
+      placement?: 'toolRuntime' | 'host';
       enabled?: boolean;
       tools?: Record<string, string>;
     };
@@ -167,12 +174,29 @@ export function registerMcpHandlers(
         ? (parsed.tools as Record<string, ToolPolicy>)
         : {};
 
+    const [serverConfig] = defaultMcpServerPlacements([
+      {
+        name: serverId,
+        command,
+        ...(Array.isArray(parsed.args) ? { args: parsed.args } : {}),
+        ...(parsed.env && typeof parsed.env === 'object' ? { env: parsed.env } : {}),
+        ...(parsed.transport ? { transport: parsed.transport } : {}),
+        ...(parsed.secretEnv ? { secretEnv: parsed.secretEnv } : {}),
+        ...(parsed.placement ? { placement: parsed.placement } : {}),
+        enabled,
+        tools,
+      },
+    ]);
+
     const config: MCPServerConfig = {
-      command,
+      command: serverConfig.command,
       ...(Array.isArray(parsed.args) ? { args: parsed.args } : {}),
       ...(parsed.env && typeof parsed.env === 'object' ? { env: parsed.env } : {}),
-      enabled,
-      tools,
+      ...(serverConfig.transport ? { transport: serverConfig.transport } : {}),
+      ...(serverConfig.secretEnv ? { secretEnv: serverConfig.secretEnv } : {}),
+      ...(serverConfig.placement ? { placement: serverConfig.placement } : {}),
+      enabled: serverConfig.enabled ?? true,
+      tools: (serverConfig.tools ?? {}) as Record<string, ToolPolicy>,
     };
 
     // Update session config to include this MCP server
@@ -191,6 +215,9 @@ export function registerMcpHandlers(
         command: config.command,
         ...(config.args ? { args: config.args } : {}),
         ...(config.env ? { env: config.env } : {}),
+        ...(config.transport ? { transport: config.transport } : {}),
+        ...(config.secretEnv ? { secretEnv: config.secretEnv } : {}),
+        ...(config.placement ? { placement: config.placement } : {}),
         enabled: config.enabled,
         ...(Object.keys(config.tools).length > 0 ? { tools: config.tools } : {}),
       });
@@ -206,7 +233,12 @@ export function registerMcpHandlers(
     });
 
     // Start the server if enabled
-    if (enabled) {
+    if (enabled && config.transport && config.transport !== 'stdio') {
+      logger.warn('Skipping MCP server with unsupported transport', {
+        serverId,
+        transport: config.transport,
+      });
+    } else if (enabled) {
       await state.mcpServerManager.startServer(serverId, {
         ...config,
         cwd: state.activeSession.meta.workDir,

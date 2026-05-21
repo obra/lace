@@ -70,6 +70,13 @@ const runtimeSchema = z.discriminatedUnion('type', [
 export type PersonaRuntime = z.infer<typeof runtimeSchema>;
 
 // Per-server MCP tool config is opaque to lace and forwarded to the MCP layer.
+const mcpSecretReferenceSchema = z
+  .object({
+    namespace: z.enum(['session', 'project', 'host-service']),
+    name: z.string().min(1),
+  })
+  .strict();
+
 const personaConfigSchema = z
   .object({
     model: z.string().optional(),
@@ -81,6 +88,9 @@ const personaConfigSchema = z
           command: z.string(),
           args: z.array(z.string()).optional(),
           env: z.record(z.string(), z.string()).optional(),
+          transport: z.enum(['stdio', 'sse', 'http']).optional(),
+          secretEnv: z.record(z.string(), mcpSecretReferenceSchema).optional(),
+          placement: z.enum(['toolRuntime', 'host']).optional(),
           enabled: z.boolean().optional(),
           tools: z.record(z.string(), z.unknown()).optional(),
         })

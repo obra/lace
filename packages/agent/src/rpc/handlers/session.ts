@@ -306,6 +306,9 @@ export function registerSessionHandlers(
               command: spec.command,
               ...(spec.args ? { args: spec.args } : {}),
               ...(spec.env ? { env: spec.env } : {}),
+              ...(spec.transport ? { transport: spec.transport } : {}),
+              ...(spec.secretEnv ? { secretEnv: spec.secretEnv } : {}),
+              ...(spec.placement ? { placement: spec.placement } : {}),
               ...(spec.enabled !== undefined ? { enabled: spec.enabled } : {}),
               ...(spec.tools
                 ? {
@@ -530,6 +533,9 @@ export function registerSessionHandlers(
       config: {
         ...sourceSession.state.config,
         runtimeBinding,
+        ...(Array.isArray(sourceSession.state.config?.mcpServers)
+          ? { mcpServers: defaultMcpServerPlacements(sourceSession.state.config.mcpServers) }
+          : {}),
       },
     };
 

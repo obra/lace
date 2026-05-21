@@ -242,6 +242,9 @@ describe('protocol shapes (representative examples)', () => {
           name: 'test-server',
           command: 'node',
           args: ['server.js'],
+          transport: 'http',
+          placement: 'host',
+          secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
           enabled: true,
         },
       })

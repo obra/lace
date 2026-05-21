@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
 import { defaultInitializeParams } from './helpers/initialize';
-import { loadSession } from '../storage/session-store';
+import { loadSession, writeSessionState } from '../storage/session-store';
 import { buildDefaultLocalRuntimeBinding } from '../tools/runtime/validation';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 
@@ -203,6 +203,42 @@ describe('session/fork durable history', () => {
           transport: 'stdio',
           placement: 'host',
         },
+      ]);
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('defaults legacy source MCP placement when forking without overrides', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      const created = (await client.request('session/new', {
+        cwd: tempDir,
+        mcpServers: [],
+      })) as { sessionId: string };
+      const source = loadSession(created.sessionId);
+      writeSessionState(source.dir, {
+        ...source.state,
+        config: {
+          ...source.state.config,
+          mcpServers: [
+            { name: 'legacy-stdio', command: 'mcp-stdio' },
+            { name: 'legacy-http', command: 'mcp-http', transport: 'http' },
+          ],
+        },
+      });
+
+      const forked = (await client.request('session/fork', {
+        sessionId: created.sessionId,
+      })) as { sessionId: string };
+
+      expect(loadSession(forked.sessionId).state.config?.mcpServers).toEqual([
+        { name: 'legacy-stdio', command: 'mcp-stdio', placement: 'toolRuntime' },
+        { name: 'legacy-http', command: 'mcp-http', transport: 'http', placement: 'host' },
       ]);
     } finally {
       client.close();
