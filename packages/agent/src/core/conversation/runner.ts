@@ -14,7 +14,7 @@ import {
 } from '@lace/agent/storage/session-store';
 import {
   appendDurableEvent,
-  deriveNextEventSeqFromEventLog,
+  findLastTurnEndEventSeq,
   readDurableEvents,
   type DurableEvent,
 } from '@lace/agent/storage/event-log';
@@ -195,7 +195,12 @@ export class ConversationRunner {
     // Watermark for mid-turn re-reads of durable events. Events with
     // eventSeq <= this value are already reflected in providerMessages (either
     // from the initial build above or appended on a previous iteration).
-    let lastSeenEventSeq = deriveNextEventSeqFromEventLog(sessionDir) - 1;
+    //
+    // We start from the last turn_end rather than the very latest event so that
+    // any context_injected events written between turns (after turn_end but
+    // before run() was called) are picked up on the first iteration, not
+    // silently skipped (PRI-1744).
+    let lastSeenEventSeq = findLastTurnEndEventSeq(sessionDir) ?? 0;
     let finalAssistantContent = '';
     let stopReason: RunResult['stopReason'] = 'end_turn';
 

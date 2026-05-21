@@ -1,6 +1,8 @@
 // ABOUTME: Tests for ConversationRunner per-iteration re-read of context_injected events
 // Verifies PRI-1691: injections with priority='immediate' arriving mid-turn appear
 // in the next provider call's messages, not after the turn ends.
+// Also verifies PRI-1744: context_injected events written between turns (after
+// turn_end but before run()) are picked up via findLastTurnEndEventSeq watermark.
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -487,5 +489,116 @@ describe('ConversationRunner - mid-turn context_injected re-read (PRI-1691)', ()
       (e) => e.type === 'context_injected' && e.data.priority === 'immediate'
     );
     expect(lateInject).toBeDefined();
+  });
+});
+
+describe('ConversationRunner - between-turn context_injected watermark (PRI-1744)', () => {
+  let sessionDir: string;
+  let cwd: string;
+
+  beforeEach(() => {
+    const testId = randomUUID().substring(0, 8);
+    sessionDir = join(tmpdir(), `lace-runner-between-turn-test-session-${testId}`);
+    cwd = join(tmpdir(), `lace-runner-between-turn-test-cwd-${testId}`);
+    mkdirSync(sessionDir, { recursive: true });
+    mkdirSync(cwd, { recursive: true });
+    writeFileSync(
+      join(sessionDir, 'state.json'),
+      JSON.stringify({ nextEventSeq: 1, nextStreamSeq: 1 })
+    );
+    writeFileSync(join(sessionDir, 'events.jsonl'), '');
+  });
+
+  afterEach(() => {
+    if (existsSync(sessionDir)) rmSync(sessionDir, { recursive: true, force: true });
+    if (existsSync(cwd)) rmSync(cwd, { recursive: true, force: true });
+  });
+
+  /**
+   * Helper: append a durable event to the session log directly (simulates
+   * events written by the RPC layer or a peer process before run() starts).
+   */
+  function appendEvent(
+    type: string,
+    data: Record<string, unknown>,
+    extraFields?: { turnId?: string; turnSeq?: number }
+  ): void {
+    const state = readSessionState(sessionDir);
+    const { nextState } = appendDurableEvent(sessionDir, state, {
+      type,
+      data,
+      ...extraFields,
+    });
+    writeSessionState(sessionDir, nextState);
+  }
+
+  it('picks up a context_injected event written between turns as role:user on the first provider call', async () => {
+    // Build a completed prior turn: prompt → turn_start → message → turn_end
+    const priorTurnId = `turn_${randomUUID()}`;
+    appendEvent('prompt', { content: [{ type: 'text', text: 'first prompt' }] });
+    appendEvent('turn_start', {}, { turnId: priorTurnId, turnSeq: 0 });
+    appendEvent(
+      'message',
+      { content: [{ type: 'text', text: 'first response' }] },
+      { turnId: priorTurnId, turnSeq: 1 }
+    );
+    appendEvent(
+      'turn_end',
+      { stopReason: 'end_turn', usage: { inputTokens: 10, outputTokens: 5, costUsd: 0 } },
+      { turnId: priorTurnId, turnSeq: 2 }
+    );
+
+    // Between-turn injection written AFTER turn_end but BEFORE run()
+    appendEvent('context_injected', {
+      content: [{ type: 'text', text: 'BETWEEN-TURN-INJECT' }],
+      priority: 'immediate',
+    });
+
+    // New prompt for the second turn (written by RPC layer before calling run())
+    appendEvent('prompt', { content: [{ type: 'text', text: 'second prompt' }] });
+
+    // Provider responds with a simple end_turn (no tool calls) on first call
+    const provider = new ScriptedProvider([
+      {
+        response: {
+          content: 'understood',
+          toolCalls: [],
+          stopReason: 'stop',
+          usage: { promptTokens: 50, completionTokens: 5, totalTokens: 55 },
+        },
+      },
+    ]);
+
+    const config: RunnerConfig = {
+      sessionDir,
+      sessionId: 'sess_test',
+      cwd,
+      executionMode: 'execute',
+      approvalMode: 'approve',
+    };
+    const deps = createMockDeps({
+      createProvider: vi.fn().mockImplementation(async () => provider),
+    });
+    const runner = new ConversationRunner(config, deps);
+
+    await runner.run({
+      content: [{ type: 'text', text: 'second prompt' }],
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+
+    // The first (and only) provider call should include the between-turn injection
+    // as a role:'user' message (added by readImmediateInjectsSince at watermark=turn_end seq).
+    expect(provider.callCount).toBe(1);
+    const firstCallMessages = provider.receivedMessages[0]!;
+    const injectedUserMsg = firstCallMessages.find(
+      (m) =>
+        m.role === 'user' &&
+        typeof m.content === 'string' &&
+        (m.content as string).includes('BETWEEN-TURN-INJECT')
+    );
+    expect(injectedUserMsg).toBeDefined();
+    expect(injectedUserMsg!.role).toBe('user');
   });
 });
