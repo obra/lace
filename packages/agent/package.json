@@ -31,6 +31,7 @@
     "@lace/ent-protocol": "file:../ent-protocol",
     "@lmstudio/sdk": "^1.2.1",
     "@modelcontextprotocol/sdk": "^1.17.5",
+    "cron-parser": "^5.5.0",
     "gray-matter": "^4.0.3",
     "mustache": "^4.2.0",
     "node-fetch": "^3.3.2",
