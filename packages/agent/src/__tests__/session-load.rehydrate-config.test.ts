@@ -636,6 +636,37 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     }
   );
 
+  it('does not expose internal MCP connection keys in server list results', async () => {
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', defaultInitializeParams());
+    state.mcpServerManager.registerConnection('visible-server', {
+      id: 'visible-server',
+      config: {
+        command: process.execPath,
+        transport: 'stdio',
+        enabled: true,
+        tools: {},
+      },
+      status: 'running',
+    });
+
+    const result = (await client.request('ent/mcp/servers/list', {})) as {
+      servers: Array<Record<string, unknown>>;
+    };
+
+    expect(result.servers).toHaveLength(1);
+    expect(result.servers[0]).toMatchObject({
+      serverId: 'visible-server',
+      name: 'visible-server',
+      command: process.execPath,
+      enabled: true,
+      status: 'running',
+    });
+    expect(result.servers[0]).not.toHaveProperty('connectionKey');
+  });
+
   it.each(['http', 'sse'] as const)(
     'does not restart stale stdio config after upserting a running server to unsupported %s transport',
     async (transport) => {

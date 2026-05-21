@@ -1416,6 +1416,7 @@ describe('Ent protocol contract (selected coverage)', () => {
       label: 'mcp/servers/list',
     });
     expect(Array.isArray(list.servers)).toBe(true);
+    expect(list.servers.every((server) => !('connectionKey' in (server as object)))).toBe(true);
 
     await expect(
       agent.peer.request('ent/mcp/servers/upsert', { name: 'x', command: 'y' })

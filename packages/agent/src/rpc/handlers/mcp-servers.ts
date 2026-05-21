@@ -33,10 +33,20 @@ function defaultMcpPlacement(config: MCPServerConfig): MCPServerConfig {
   };
 }
 
-function activeSessionRuntime(state: AgentServerState): ToolRuntime {
+function activeSessionRuntime(state: AgentServerState, config: MCPServerConfig): ToolRuntime {
   const activeSession = state.activeSession;
   const runtimeBinding = activeSession?.state.config?.runtimeBinding;
   const hostCwd = activeSession?.meta.workDir ?? process.cwd();
+  const placement = config.placement ?? 'host';
+
+  if (placement === 'host') {
+    return new HostToolRuntime({
+      id:
+        runtimeBinding?.identity.runtimeId ??
+        (activeSession ? `session:${activeSession.meta.sessionId}:host` : 'mcp:host'),
+      cwd: hostCwd,
+    });
+  }
 
   if (runtimeBinding?.toolRuntime.type === 'local') {
     return new HostToolRuntime({
@@ -66,7 +76,7 @@ function activeSessionConnectionKey(
   serverId: string,
   config: MCPServerConfig
 ): string {
-  const runtime = activeSessionRuntime(state);
+  const runtime = activeSessionRuntime(state, config);
   return mcpConnectionKey({
     serverId,
     config,
@@ -81,10 +91,11 @@ async function startServerForActiveSession(
   serverId: string,
   config: MCPServerConfig
 ): Promise<void> {
+  const runtime = activeSessionRuntime(state, config);
   await state.mcpServerManager.startServer({
     serverId,
     config,
-    runtime: activeSessionRuntime(state),
+    runtime,
     hostCwd: activeSessionHostCwd(state),
   });
 }
@@ -112,7 +123,6 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
   }
 
   const mcpServers = parsed.data;
-  const runtime = activeSessionRuntime(state);
   const hostCwd = activeSessionHostCwd(state);
   const desired = new Map<string, { serverId: string; config: MCPServerConfig }>();
 
@@ -131,6 +141,7 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
       enabled,
       tools,
     });
+    const runtime = activeSessionRuntime(state, config);
     const connectionKey = mcpConnectionKey({
       serverId: server.name,
       config,
@@ -148,6 +159,7 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
   }
 
   for (const [connectionKey, { serverId, config }] of desired) {
+    const runtime = activeSessionRuntime(state, config);
     const existing = state.mcpServerManager.getServer(connectionKey);
     const needsRestart = existing ? !mcpServerConfigEquivalent(existing.config, config) : false;
 
@@ -203,7 +215,6 @@ export function registerMcpHandlers(
       }
 
       return {
-        connectionKey: connection.connectionKey,
         serverId: connection.id,
         name: connection.id,
         command: connection.config.command,

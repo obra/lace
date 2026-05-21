@@ -288,5 +288,41 @@ describe.skipIf(skipOnWindows)(
       );
       expect(mcpServerManager.getAllServers()).toEqual([]);
     });
+
+    it('starts explicit host-placed MCP servers with non-local runtime bindings', async () => {
+      const state = buildState({
+        nextEventSeq: 1,
+        nextStreamSeq: 1,
+        config: {
+          runtimeBinding: {
+            schemaVersion: 1,
+            identity: { runtimeId: 'rt_workspace_reconcile' },
+            agentPlacement: 'host',
+            toolRuntime: {
+              type: 'workspace',
+              projectRoot: tmpRoot,
+              workspaceRoot: tmpRoot,
+              cwd: tmpRoot,
+            },
+          },
+          mcpServers: [
+            {
+              name: 'env-dump',
+              command: process.execPath,
+              args: [HELPER],
+              placement: 'host',
+              enabled: true,
+              tools: {},
+            },
+          ],
+        },
+      });
+
+      await reconcileMcpServersForActiveSession(state);
+
+      const server = mcpServerManager.getServer('env-dump');
+      expect(server?.status).toBe('running');
+      expect(server?.connectionKey).toBe(`env-dump:host:stdio:rt_workspace_reconcile:${tmpRoot}`);
+    });
   }
 );
