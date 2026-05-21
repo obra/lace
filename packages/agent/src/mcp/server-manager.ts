@@ -198,19 +198,40 @@ export class MCPServerManager extends EventEmitter {
   replaceStoppedServerConfig(
     serverId: string,
     config: MCPServerConfig,
-    desiredConnectionKey?: string
+    desiredConnectionKey?: string,
+    replaceConnectionKey?: string
   ): void {
-    for (const connection of this.resolveConnections(serverId)) {
+    const replacement = replaceConnectionKey ? this.servers.get(replaceConnectionKey) : undefined;
+    const connections = replacement ? [replacement] : this.resolveConnections(serverId);
+    let primary: MCPServerConnection | undefined;
+
+    for (const connection of connections) {
       if (connection.status !== 'stopped') {
         continue;
       }
 
+      if (primary) {
+        this.servers.delete(connection.connectionKey);
+        continue;
+      }
+
+      primary = connection;
       connection.config = config;
       if (desiredConnectionKey && desiredConnectionKey !== connection.connectionKey) {
         this.servers.delete(connection.connectionKey);
         connection.connectionKey = desiredConnectionKey;
         this.servers.set(desiredConnectionKey, connection);
       }
+    }
+
+    if (!primary && desiredConnectionKey) {
+      this.servers.set(desiredConnectionKey, {
+        id: serverId,
+        connectionKey: desiredConnectionKey,
+        config,
+        status: 'stopped',
+      });
+      this.emit('server-status-changed', serverId, 'stopped', desiredConnectionKey);
     }
   }
 

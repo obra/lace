@@ -441,8 +441,16 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         placement: 'host',
       },
     ]);
-    expect(loadState.mcpServerManager.getServer('http-server')).toBeUndefined();
-    expect(loadState.mcpServerManager.getServer('sse-server')).toBeUndefined();
+    expect(loadState.mcpServerManager.getServer('http-server')).toMatchObject({
+      id: 'http-server',
+      status: 'stopped',
+      config: expect.objectContaining({ transport: 'http', placement: 'host' }),
+    });
+    expect(loadState.mcpServerManager.getServer('sse-server')).toMatchObject({
+      id: 'sse-server',
+      status: 'stopped',
+      config: expect.objectContaining({ transport: 'sse', placement: 'host' }),
+    });
   });
 
   it('preserves MCP transport, placement, and secretEnv when reconciling stdio servers', async () => {
@@ -599,7 +607,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
           placement: 'host',
         },
       ]);
-      expect(stopServer).toHaveBeenCalledWith(hostStdioKey);
+      expect(stopServer).toHaveBeenCalledWith('remote-server');
       expect(state.mcpServerManager.getServer('remote-server')?.status).toBe('stopped');
       expect(startServer).not.toHaveBeenCalled();
     }
@@ -625,6 +633,57 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         },
         status: 'stopped',
       });
+
+      const result = (await client.request('ent/mcp/servers/test', {
+        serverId: 'remote-server',
+      })) as { ok: boolean; error?: string };
+
+      expect(result).toMatchObject({
+        ok: false,
+        error: `Unsupported MCP transport for test: ${transport}`,
+      });
+      expect(startServer).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['http', 'sse'] as const)(
+    'represents a fresh unsupported %s MCP transport as stopped for list and test',
+    async (transport) => {
+      const state = createAgentServerState();
+      const startServer = vi
+        .spyOn(state.mcpServerManager, 'startServer')
+        .mockResolvedValue(undefined);
+      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+      await client.request('initialize', defaultInitializeParams());
+      await client.request('session/new', {
+        cwd: tempDir,
+        mcpServers: [],
+      });
+
+      await client.request('ent/mcp/servers/upsert', {
+        name: 'remote-server',
+        command: process.execPath,
+        transport,
+        enabled: true,
+      });
+
+      const server = state.mcpServerManager.getServer('remote-server');
+      expect(server?.status).toBe('stopped');
+      expect(server?.config.transport).toBe(transport);
+      expect(server?.connectionKey).toBe(
+        `remote-server:host:${transport}:session:${state.activeSession!.meta.sessionId}:host:${tempDir}`
+      );
+
+      const list = (await client.request('ent/mcp/servers/list', {})) as {
+        servers: Array<{ serverId: string; status: string }>;
+      };
+      expect(list.servers).toEqual([
+        expect.objectContaining({
+          serverId: 'remote-server',
+          status: 'stopped',
+        }),
+      ]);
 
       const result = (await client.request('ent/mcp/servers/test', {
         serverId: 'remote-server',
@@ -717,6 +776,53 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         ok: false,
         error: `Unsupported MCP transport for test: ${transport}`,
       });
+      expect(startServer).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['http', 'sse'] as const)(
+    'stops stale runtime-placed stdio config after upserting to unsupported %s transport',
+    async (transport) => {
+      const state = createAgentServerState();
+      const startServer = vi
+        .spyOn(state.mcpServerManager, 'startServer')
+        .mockResolvedValue(undefined);
+      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+      await client.request('initialize', defaultInitializeParams());
+      await client.request('session/new', {
+        cwd: tempDir,
+        mcpServers: [],
+      });
+
+      const runtimeStdioKey = `remote-server:toolRuntime:stdio:session:${state.activeSession!.meta.sessionId}:host:${tempDir}`;
+      state.mcpServerManager.registerConnection('remote-server', {
+        id: 'remote-server',
+        connectionKey: runtimeStdioKey,
+        config: {
+          command: process.execPath,
+          transport: 'stdio',
+          placement: 'toolRuntime',
+          enabled: true,
+          tools: {},
+        },
+        status: 'running',
+      });
+
+      await client.request('ent/mcp/servers/upsert', {
+        name: 'remote-server',
+        command: process.execPath,
+        transport,
+        enabled: true,
+      });
+
+      const hostUnsupportedKey = `remote-server:host:${transport}:session:${state.activeSession!.meta.sessionId}:host:${tempDir}`;
+      expect(state.mcpServerManager.getServer(runtimeStdioKey)).toBeUndefined();
+      expect(state.mcpServerManager.getServer(hostUnsupportedKey)?.status).toBe('stopped');
+      expect(state.mcpServerManager.getServer(hostUnsupportedKey)?.config.transport).toBe(
+        transport
+      );
+      expect(state.mcpServerManager.getAllServers()).toHaveLength(1);
       expect(startServer).not.toHaveBeenCalled();
     }
   );

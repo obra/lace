@@ -192,9 +192,10 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
         displacedStdioConnectionKey;
       await state.mcpServerManager.stopServer(stoppedConnectionKey);
       state.mcpServerManager.replaceStoppedServerConfig(
-        stoppedConnectionKey,
+        serverId,
         config,
-        connectionKey
+        connectionKey,
+        stoppedConnectionKey
       );
       logger.warn('Skipping MCP server with unsupported transport', {
         serverId,
@@ -352,17 +353,8 @@ export function registerMcpHandlers(
     // Start the server if enabled
     if (enabled && isUnsupportedMcpTransport(config)) {
       const connectionKey = activeSessionConnectionKey(state, serverId, config);
-      const displacedStdioConnectionKey = activeSessionDisplacedStdioConnectionKey(
-        state,
-        serverId,
-        config
-      );
-      await state.mcpServerManager.stopServer(displacedStdioConnectionKey);
-      state.mcpServerManager.replaceStoppedServerConfig(
-        displacedStdioConnectionKey,
-        config,
-        connectionKey
-      );
+      await state.mcpServerManager.stopServer(serverId);
+      state.mcpServerManager.replaceStoppedServerConfig(serverId, config, connectionKey);
       logger.warn('Skipping MCP server with unsupported transport', {
         serverId,
         transport: config.transport,
