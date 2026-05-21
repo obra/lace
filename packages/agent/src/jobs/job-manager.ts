@@ -271,6 +271,7 @@ export class JobManager {
 
   removeJob(jobId: string): void {
     this.jobs.delete(jobId);
+    this.clearSubscriptionsForJob(jobId);
   }
 
   getRunningJobs(): Map<string, JobState> {
@@ -283,6 +284,8 @@ export class JobManager {
    */
   clearJobs(): void {
     this.jobs.clear();
+    this.subscriptions.clear();
+    this.subscriptionsByJob.clear();
   }
 
   /**
@@ -313,6 +316,11 @@ export class JobManager {
 
     job.resolveCompletion?.();
     this.jobs.delete(job.jobId);
+    // Prune any subscriptions for this jobId. Fanout (if any) has already
+    // fired upstream via createFinalizeJob in the notifications path — by
+    // the time we reach this internal finalize, the job is dead and no
+    // future fanout for this jobId is possible.
+    this.clearSubscriptionsForJob(job.jobId);
   }
 
   /**
@@ -427,6 +435,18 @@ export class JobManager {
       // Phase 2 will apply filter to 'progress' / per-line subscriptions.
       this.notificationQueue.push({ ...notification });
     }
+  }
+
+  /**
+   * Remove every subscription registered for `jobId`. Called when the job
+   * itself is removed from the JobManager so the subscription registry
+   * can't grow without bound across a long-lived session.
+   */
+  private clearSubscriptionsForJob(jobId: string): void {
+    const subIds = this.subscriptionsByJob.get(jobId);
+    if (!subIds) return;
+    for (const subId of subIds) this.subscriptions.delete(subId);
+    this.subscriptionsByJob.delete(jobId);
   }
 
   /**

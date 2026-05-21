@@ -159,4 +159,79 @@ describe('JobManager subscriptions', () => {
       expect(manager.getNotificationQueue()).toHaveLength(1);
     });
   });
+
+  describe('cleanup on job removal', () => {
+    it('removeJob(jobId) prunes all subscriptions for that jobId', () => {
+      const manager = makeManager();
+      const sub = manager.subscribe({ jobId: 'job_1', on: ['completed', 'failed', 'cancelled'] });
+      manager.subscribe({ jobId: 'job_other', on: ['completed'] });
+
+      manager.removeJob('job_1');
+
+      // No subscription remains for job_1 → fallback fires.
+      const fallback = vi.fn();
+      manager.fanout('job_1', 'completed', makeNotification('job_1', 'completed'), fallback);
+      expect(fallback).toHaveBeenCalledTimes(1);
+      // Re-subscribing returns a fresh subscriptionId (the old one is gone).
+      const fresh = manager.subscribe({
+        jobId: 'job_1',
+        on: ['completed', 'failed', 'cancelled'],
+      });
+      expect(fresh.subscriptionId).not.toBe(sub.subscriptionId);
+
+      // Other jobs' subscriptions are unaffected.
+      const fallback2 = vi.fn();
+      manager.fanout(
+        'job_other',
+        'completed',
+        makeNotification('job_other', 'completed'),
+        fallback2
+      );
+      expect(fallback2).not.toHaveBeenCalled();
+    });
+
+    it('clearJobs() prunes every subscription across all jobs', () => {
+      const manager = makeManager();
+      manager.subscribe({ jobId: 'job_a', on: ['completed'] });
+      manager.subscribe({ jobId: 'job_b', on: ['failed'] });
+
+      manager.clearJobs();
+
+      const fallback = vi.fn();
+      manager.fanout('job_a', 'completed', makeNotification('job_a', 'completed'), fallback);
+      manager.fanout('job_b', 'failed', makeNotification('job_b', 'failed'), fallback);
+      // Both jobs' subscriptions are gone → fallback for each.
+      expect(fallback).toHaveBeenCalledTimes(2);
+    });
+
+    it('finalizeJob() prunes subscriptions for the finalized job', async () => {
+      // The internal JobManager.finalizeJob path (used by cancelJob) removes
+      // a job from the in-memory map; subscriptions should not outlive it.
+      const manager = makeManager();
+      manager.subscribe({ jobId: 'job_finalize', on: ['cancelled'] });
+
+      const job = {
+        jobId: 'job_finalize',
+        type: 'bash',
+        status: 'cancelled',
+        startedAt: new Date().toISOString(),
+        outputPath: '/tmp/job.log',
+        finished: false,
+        completion: Promise.resolve(),
+        resolveCompletion: () => {},
+      } as Parameters<typeof manager.finalizeJob>[0];
+      manager.addJob(job);
+
+      await manager.finalizeJob(job);
+
+      const fallback = vi.fn();
+      manager.fanout(
+        'job_finalize',
+        'cancelled',
+        makeNotification('job_finalize', 'cancelled'),
+        fallback
+      );
+      expect(fallback).toHaveBeenCalledTimes(1);
+    });
+  });
 });
