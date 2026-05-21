@@ -645,6 +645,65 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     );
   });
 
+  it('stops an existing running MCP server when upserted as disabled', async () => {
+    const state = createAgentServerState();
+    const startServer = vi
+      .spyOn(state.mcpServerManager, 'startServer')
+      .mockResolvedValue(undefined);
+    const stopServer = vi.spyOn(state.mcpServerManager, 'stopServer');
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', defaultInitializeParams());
+    const created = (await client.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    const connectionKey = activeHostMcpConnectionKey(
+      'local-stdio',
+      'stdio',
+      state.activeSession!.meta.sessionId
+    );
+    state.mcpServerManager.registerConnection('local-stdio', {
+      id: 'local-stdio',
+      connectionKey,
+      config: {
+        command: process.execPath,
+        transport: 'stdio',
+        placement: 'host',
+        enabled: true,
+        tools: {},
+      },
+      status: 'running',
+    });
+
+    await client.request('ent/mcp/servers/upsert', {
+      name: 'local-stdio',
+      command: process.execPath,
+      transport: 'stdio',
+      placement: 'host',
+      enabled: false,
+    });
+
+    expect(loadSession(created.sessionId).state.config?.mcpServers).toEqual([
+      {
+        name: 'local-stdio',
+        command: process.execPath,
+        transport: 'stdio',
+        placement: 'host',
+        enabled: false,
+      },
+    ]);
+    expect(stopServer).toHaveBeenCalledWith(connectionKey);
+    expect(startServer).not.toHaveBeenCalled();
+    expect(state.mcpServerManager.getServer(connectionKey)).toMatchObject({
+      status: 'stopped',
+      config: expect.objectContaining({
+        enabled: false,
+      }),
+    });
+  });
+
   it('removes stale same-id connections when an enabled upsert changes placement', async () => {
     const state = createAgentServerState();
     const startServer = vi

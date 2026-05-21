@@ -119,6 +119,7 @@ export interface RuntimeFetchOptions {
   headers?: Record<string, string>;
   body?: string;
   redirect?: 'follow' | 'manual';
+  maxBytes?: number;
   signal?: AbortSignal;
 }
 
@@ -130,6 +131,17 @@ export interface RuntimeFetchResult {
 
 export interface RuntimeNetworkClient {
   fetch(url: string, opts?: RuntimeFetchOptions): Promise<RuntimeFetchResult>;
+}
+
+export class RuntimeFetchSizeLimitError extends Error {
+  readonly name = 'RuntimeFetchSizeLimitError';
+
+  constructor(
+    public readonly limit: number,
+    public readonly bytesRead: number
+  ) {
+    super(`Response size (${bytesRead} bytes) exceeds maximum allowed size (${limit} bytes)`);
+  }
 }
 
 export interface ToolRuntime {

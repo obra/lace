@@ -131,4 +131,36 @@ describe('HostToolRuntime', () => {
       })
     );
   });
+
+  it('enforces fetch maxBytes while streaming the response body', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
+    const arrayBuffer = vi.fn(() => {
+      throw new Error('arrayBuffer should not be called');
+    });
+    const response = {
+      status: 200,
+      headers: new Headers({ 'content-type': 'text/plain' }),
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('hello'));
+          controller.enqueue(new TextEncoder().encode(' world'));
+          controller.close();
+        },
+      }),
+      arrayBuffer,
+    } as unknown as Response;
+    const mockFetch = vi
+      .fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>()
+      .mockResolvedValue(response);
+    vi.stubGlobal('fetch', mockFetch);
+
+    await expect(
+      runtime.network.fetch('https://example.test/large', { maxBytes: 5 })
+    ).rejects.toMatchObject({
+      name: 'RuntimeFetchSizeLimitError',
+      limit: 5,
+    });
+    expect(arrayBuffer).not.toHaveBeenCalled();
+  });
 });

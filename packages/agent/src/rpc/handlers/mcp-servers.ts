@@ -135,6 +135,30 @@ async function syncEnabledMcpServerForActiveSession(
   await startServerForActiveSession(state, serverId, config);
 }
 
+async function syncDisabledMcpServerForActiveSession(
+  state: AgentServerState,
+  serverId: string,
+  config: MCPServerConfig
+): Promise<void> {
+  const connectionKey = activeSessionConnectionKey(state, serverId, config);
+  const existingConnections = state.mcpServerManager
+    .getAllServers()
+    .filter((connection) => connection.id === serverId);
+  const replacementConnectionKey = existingConnections[0]?.connectionKey ?? connectionKey;
+
+  for (const existing of existingConnections) {
+    await state.mcpServerManager.stopServer(existing.connectionKey);
+  }
+  for (const stale of existingConnections.slice(1)) {
+    await state.mcpServerManager.removeServer(stale.connectionKey);
+  }
+
+  state.mcpServerManager.replaceStoppedServerConfig(serverId, config, {
+    desiredConnectionKey: connectionKey,
+    replaceConnectionKey: replacementConnectionKey,
+  });
+}
+
 /**
  * Reconcile MCP servers for the active session.
  * Compares configured servers to running servers and starts/stops as needed.
@@ -384,7 +408,9 @@ export function registerMcpHandlers(
     });
 
     // Start the server if enabled
-    if (enabled && isUnsupportedMcpTransport(config)) {
+    if (!enabled) {
+      await syncDisabledMcpServerForActiveSession(state, serverId, config);
+    } else if (isUnsupportedMcpTransport(config)) {
       const connectionKey = activeSessionConnectionKey(state, serverId, config);
       await state.mcpServerManager.stopServer(serverId);
       state.mcpServerManager.replaceStoppedServerConfig(serverId, config, {
@@ -396,7 +422,7 @@ export function registerMcpHandlers(
         serverId,
         transport: config.transport,
       });
-    } else if (enabled) {
+    } else {
       await syncEnabledMcpServerForActiveSession(state, serverId, config);
     }
 

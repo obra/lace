@@ -639,6 +639,7 @@ class ProjectedContainerNetworkClient implements RuntimeNetworkClient {
           headers: opts.headers,
           body: opts.body,
           redirect: opts.redirect,
+          maxBytes: opts.maxBytes,
         },
         opts.signal
       )

@@ -331,6 +331,32 @@ Follows redirects by default. Returns detailed error context for failures.`
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
+    it('should pass maxSize to runtime network fetch as a byte limit', async () => {
+      const runtime = createFakeRuntime({
+        fetchResult: {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+          body: new TextEncoder().encode('hello'),
+        },
+      });
+
+      const result = await tool.execute(
+        {
+          url: 'https://example.com/limited',
+          maxSize: 4096,
+        },
+        { signal: new AbortController().signal, runtime }
+      );
+
+      expect(result.status).toBe('completed');
+      expect(runtime.network.fetch).toHaveBeenCalledWith(
+        'https://example.com/limited',
+        expect.objectContaining({
+          maxBytes: 4096,
+        })
+      );
+    });
+
     it('should request manual redirects when followRedirects is false', async () => {
       const runtime = createFakeRuntime({
         fetchResult: {

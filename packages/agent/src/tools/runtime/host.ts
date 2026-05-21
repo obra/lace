@@ -2,15 +2,16 @@ import { execFile, spawn } from 'node:child_process';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import type {
-  RuntimeFileSystem,
-  RuntimeFetchOptions,
-  RuntimeNetworkClient,
-  RuntimePath,
-  RuntimePathService,
-  RuntimeProcessOptions,
-  RuntimeProcessRunner,
-  ToolRuntime,
+import {
+  RuntimeFetchSizeLimitError,
+  type RuntimeFileSystem,
+  type RuntimeFetchOptions,
+  type RuntimeNetworkClient,
+  type RuntimePath,
+  type RuntimePathService,
+  type RuntimeProcessOptions,
+  type RuntimeProcessRunner,
+  type ToolRuntime,
 } from './types';
 
 const execFileAsync = promisify(execFile);
@@ -24,6 +25,44 @@ interface ExecFileError extends Error {
 function outputToString(output: string | Buffer | undefined): string {
   if (output === undefined) return '';
   return typeof output === 'string' ? output : output.toString('utf8');
+}
+
+async function readBoundedResponseBody(
+  response: Response,
+  maxBytes: number | undefined
+): Promise<Uint8Array> {
+  if (!response.body) {
+    return new Uint8Array();
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let bytesRead = 0;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+
+      bytesRead += value.byteLength;
+      if (maxBytes !== undefined && bytesRead > maxBytes) {
+        await reader.cancel();
+        throw new RuntimeFetchSizeLimitError(maxBytes, bytesRead);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(bytesRead);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
 }
 
 class HostPathService implements RuntimePathService {
@@ -163,7 +202,7 @@ class HostNetworkClient implements RuntimeNetworkClient {
     return {
       status: response.status,
       headers: Object.fromEntries(response.headers.entries()),
-      body: new Uint8Array(await response.arrayBuffer()),
+      body: await readBoundedResponseBody(response, opts.maxBytes),
     };
   }
 }

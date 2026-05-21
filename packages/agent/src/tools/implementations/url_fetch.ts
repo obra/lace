@@ -11,6 +11,7 @@ import TurndownService from 'turndown';
 import { Tool } from '../tool';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
 import { logger } from '@lace/agent/utils/logger';
+import { RuntimeFetchSizeLimitError } from '../runtime/types';
 
 // Constants for configuration and validation
 const INLINE_CONTENT_LIMIT = 32 * 1024; // 32KB
@@ -238,6 +239,7 @@ Follows redirects by default. Returns detailed error context for failures.`;
       headers: Record<string, string>;
       redirect: 'follow' | 'manual';
       signal: AbortSignal;
+      maxBytes: number;
       body?: string;
     } = {
       method,
@@ -247,6 +249,7 @@ Follows redirects by default. Returns detailed error context for failures.`;
       },
       redirect: followRedirects ? 'follow' : 'manual',
       signal: controller.signal,
+      maxBytes: maxSize,
     };
 
     if (body && method === 'POST') {
@@ -373,6 +376,21 @@ Follows redirects by default. Returns detailed error context for failures.`;
       timing.total = Date.now() - timing.start;
 
       if (error instanceof Error) {
+        if (error instanceof RuntimeFetchSizeLimitError) {
+          return this.createRichError({
+            error: {
+              type: 'size',
+              message: error.message,
+            },
+            request: {
+              url,
+              method,
+              headers,
+              timing,
+            },
+          });
+        }
+
         if (error.name === 'AbortError') {
           // Check if it was external cancellation vs timeout
           if (abortSignal?.aborted) {

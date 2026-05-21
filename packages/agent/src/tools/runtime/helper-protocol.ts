@@ -11,6 +11,7 @@ export type HelperRequest =
       headers?: Record<string, string>;
       body?: string;
       redirect?: 'follow' | 'manual';
+      maxBytes?: number;
     };
 
 export type HelperResponse =

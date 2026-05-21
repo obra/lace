@@ -133,7 +133,7 @@ describe('ProjectedContainerToolRuntime helper', () => {
     }
   });
 
-  it('passes redirect mode to helper-backed fetch', async () => {
+  it('passes fetch options to helper-backed fetch', async () => {
     const stdin = new PassThrough();
     let request = '';
     stdin.on('data', (chunk: Buffer | string) => {
@@ -164,12 +164,16 @@ describe('ProjectedContainerToolRuntime helper', () => {
       descriptor: containerDescriptorWithHelper(),
     });
 
-    await runtime.network.fetch('https://example.test/redirect', { redirect: 'manual' });
+    await runtime.network.fetch('https://example.test/redirect', {
+      redirect: 'manual',
+      maxBytes: 4096,
+    });
 
     expect(JSON.parse(request)).toMatchObject({
       op: 'fetch',
       url: 'https://example.test/redirect',
       redirect: 'manual',
+      maxBytes: 4096,
     });
   });
 });
