@@ -3,6 +3,7 @@
 
 import type { CombinedTokenUsage } from '@lace/agent/token-management/types';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
+import type { AlarmScheduler } from '@lace/agent/alarms/alarm-scheduler';
 
 export interface ToolContext {
   // Execution control - required for cancellation
@@ -42,6 +43,11 @@ export interface ToolContext {
   // Turn context for job creation
   turnId?: string;
   turnSeq?: number;
+
+  // Alarm scheduling (provided by the session runner for alarm tools)
+  alarmScheduler?: AlarmScheduler;
+  activeSessionId?: string;
+  activeSessionDir?: string;
 }
 
 export interface ToolAnnotations {

@@ -50,7 +50,7 @@ function defaultSleep(ms: number, signal: AbortSignal): Promise<void> {
 
 export class AlarmScheduler {
   private readonly sessionDir: string;
-  private readonly store: AlarmStore;
+  readonly store: AlarmStore;
   private readonly now: () => number;
   private readonly jitterMaxMs: number;
   private readonly notifier: (arg: SchedulerNotifierArg) => void;
