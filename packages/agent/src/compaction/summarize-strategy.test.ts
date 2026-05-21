@@ -294,19 +294,33 @@ describe('SummarizeCompactionStrategy', () => {
       expect(prev!.type).toBe('TOOL_CALL');
       expect((prev!.data as { id: string }).id).toBe(id);
     }
+
+    // The last verbatim user request must NOT have been folded into the
+    // "Older Conversation to Summarize" section of the summary prompt —
+    // that is the exact failure mode PRI-1719 was filed to prevent.
+    expect(agent.generateSummary).toHaveBeenCalledTimes(1);
+    const summaryRequest = agent.generateSummary.mock.calls[0]![0] as string;
+    const olderSection = summaryRequest
+      .split('## Older Conversation to Summarize')[1]!
+      .split('## Recent Context')[0]!;
+    expect(olderSection).not.toContain('LAST USER REQUEST');
   });
 
-  it('keeps a typical 8-event tail under a reasonable char budget (sanity check)', async () => {
+  it('keeps a worst-case 8-event tail under a reasonable char budget (sanity check)', async () => {
     // Order-of-magnitude check: a worst-case-ish 8-event tail, where every
-    // event carries ~2KB of text (a realistic upper bound for a verbatim
-    // tool_result or agent reply), still fits comfortably in a session
-    // context. We use serialized character length as a proxy for tokens.
+    // event carries ~8KB of text (realistic upper bound for a hefty
+    // tool_result with a long file read or grep dump), still fits inside the
+    // documented budget. We use serialized character length as a proxy for
+    // tokens.
     //
     // Budget: 80KB ≈ ~20K tokens (rough 4-chars-per-token approximation),
-    // which leaves plenty of headroom in a 200K-token context window after
-    // the summary wrapper and system prompt.
+    // which still leaves the rest of a 200K-token context window for the
+    // summary wrapper and system prompt. The synthetic tail below produces
+    // ~56KB — ~70% of the budget — so this assertion would actually fail if
+    // the strategy accidentally duplicated events or kept materially more
+    // than 8 in the tail.
     const TAIL_CHAR_BUDGET = 80 * 1024;
-    const BULK = 'x'.repeat(2048);
+    const BULK = 'x'.repeat(8 * 1024);
 
     const strategy = new SummarizeCompactionStrategy();
     const agent = { generateSummary: vi.fn().mockResolvedValue('summary') };
@@ -346,6 +360,95 @@ describe('SummarizeCompactionStrategy', () => {
     expect(tailChars).toBeLessThan(TAIL_CHAR_BUDGET);
   });
 
+  it('keeps short conversations entirely verbatim — never replaces a small conversation with just a summary blob', async () => {
+    // Regression guard for adversarial finding F1: the previous early-return
+    // guard short-circuited any conversation with <= RECENT_EVENT_COUNT+1
+    // events into "summarize everything, emit no recent tail". When the
+    // constant moved from 2 to 8 that swallowed conversations up to 9 events
+    // long, leaving the user with a synthetic summary wrapper and zero
+    // verbatim history — the exact failure mode PRI-1719 was filed to fix,
+    // just at a different size. A short conversation should keep all of its
+    // events verbatim and produce no summary call.
+    const strategy = new SummarizeCompactionStrategy();
+    const agent = { generateSummary: vi.fn().mockResolvedValue('summary') };
+    const threadId = 'test-thread';
+    const context: CompactionContext = { threadId, agent };
+
+    const events: LaceEvent[] = [
+      userMsg('one', threadId),
+      agentMsg('a1', threadId),
+      userMsg('two', threadId),
+      agentMsg('a2', threadId),
+      userMsg('three', threadId),
+      agentMsg('a3', threadId),
+      userMsg('four', threadId),
+      userMsg('LAST USER REQUEST', threadId),
+    ];
+
+    const result = await strategy.compact(events, context);
+
+    // No summary call was made: the conversation is short enough to keep
+    // entirely verbatim.
+    expect(agent.generateSummary).not.toHaveBeenCalled();
+
+    // No synthetic "[Earlier in our conversation: …]" wrapper was inserted.
+    expect(result.compactedEvents.map((e) => e.data)).not.toContain(
+      expect.stringMatching(/^\[Earlier in our conversation:/)
+    );
+
+    // Every original event survives verbatim, in order.
+    expect(result.compactedEvents).toHaveLength(events.length);
+    expect(result.compactedEvents.map((e) => e.type)).toEqual(events.map((e) => e.type));
+    const last = result.compactedEvents[result.compactedEvents.length - 1]!;
+    expect(last.type).toBe('USER_MESSAGE');
+    expect(last.data).toBe('LAST USER REQUEST');
+  });
+
+  it('snaps the boundary across multiple tool_use/tool_result pairs straddling the naive cut', async () => {
+    // Regression coverage for adversarial finding F5: under the larger
+    // RECENT_EVENT_COUNT window, the snap-left logic from PRI-1712 must still
+    // walk past arbitrarily many bad boundaries. Here three tool_use events
+    // and three tool_results straddle the naive boundary, so the snap has to
+    // decrement the boundary three times to clear every orphan.
+    const strategy = new SummarizeCompactionStrategy();
+    const agent = { generateSummary: vi.fn().mockResolvedValue('summary') };
+    const threadId = 'test-thread';
+    const context: CompactionContext = { threadId, agent };
+
+    const events: LaceEvent[] = [
+      userMsg('one', threadId),
+      agentMsg('a0', threadId),
+      toolCall('a', threadId),
+      toolCall('b', threadId),
+      toolCall('c', threadId),
+      // -- naive boundary lands here (events.length-8 = 5) --
+      toolResult('a', threadId),
+      toolResult('b', threadId),
+      toolResult('c', threadId),
+      agentMsg('a1', threadId),
+      userMsg('two', threadId),
+      agentMsg('a2', threadId),
+      userMsg('three', threadId),
+      agentMsg('a3', threadId),
+    ];
+
+    const result = await strategy.compact(events, context);
+
+    const tail = result.compactedEvents.slice(1);
+    // All three tool_calls and their tool_results must end up in the tail —
+    // the snap-left loop has to step from boundary=5 down to boundary=2.
+    const tailToolCallIds = new Set(
+      tail.filter((e) => e.type === 'TOOL_CALL').map((e) => (e.data as { id: string }).id)
+    );
+    expect(tailToolCallIds).toEqual(new Set(['a', 'b', 'c']));
+    for (const e of tail) {
+      if (e.type === 'TOOL_RESULT') {
+        const id = (e.data as { id: string }).id;
+        expect(tailToolCallIds.has(id)).toBe(true);
+      }
+    }
+  });
+
   it('can summarize using a provider when agent is not available', async () => {
     const strategy = new SummarizeCompactionStrategy();
 
@@ -355,14 +458,21 @@ describe('SummarizeCompactionStrategy', () => {
 
     const context: CompactionContext = { threadId: 'test-thread', provider };
 
+    // Enough events to actually exercise the split path — short conversations
+    // are kept verbatim and would never invoke the provider.
+    const threadId = 'test-thread';
     const events: LaceEvent[] = [
-      agentMsg('Old agent message', 'test-thread'),
-      {
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        data: 'Old system note',
-        context: { threadId: 'test-thread' },
-      },
-      agentMsg('Recent agent message', 'test-thread'),
+      agentMsg('Old agent message 1', threadId),
+      userMsg('Old user message 1', threadId),
+      agentMsg('Old agent message 2', threadId),
+      userMsg('Old user message 2', threadId),
+      // -- naive boundary lands at events.length-8 = 2 --
+      agentMsg('Recent agent message 1', threadId),
+      userMsg('Recent user message 1', threadId),
+      agentMsg('Recent agent message 2', threadId),
+      userMsg('Recent user message 2', threadId),
+      agentMsg('Recent agent message 3', threadId),
+      { type: 'LOCAL_SYSTEM_MESSAGE', data: 'Recent system note', context: { threadId } },
     ];
 
     const result = await strategy.compact(events, context);
