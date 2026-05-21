@@ -12,7 +12,12 @@ import {
   writeSessionState,
   type SessionState,
 } from '@lace/agent/storage/session-store';
-import { appendDurableEvent } from '@lace/agent/storage/event-log';
+import {
+  appendDurableEvent,
+  deriveNextEventSeqFromEventLog,
+  readDurableEvents,
+  type DurableEvent,
+} from '@lace/agent/storage/event-log';
 import { deriveFilesReadFromDurableEvents } from '@lace/agent/storage/files-from-events';
 import { executeTodoRead, executeTodoWrite } from '@lace/agent/todo/todo-tools';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
@@ -37,6 +42,51 @@ const FUTURE_TENSE_INTENT_PATTERN =
 function hasFutureTenseIntent(text: string): boolean {
   if (!text) return false;
   return FUTURE_TENSE_INTENT_PATTERN.test(text);
+}
+
+/**
+ * Extract concatenated text from a context_injected event's content blocks.
+ * Mirrors message-builder.ts's handling: only text blocks contribute.
+ */
+function extractInjectedText(content: unknown): string {
+  if (!Array.isArray(content)) return '';
+  const parts: string[] = [];
+  for (const block of content) {
+    if (!block || typeof block !== 'object') continue;
+    const b = block as { type?: unknown; text?: unknown };
+    if (b.type === 'text' && typeof b.text === 'string') parts.push(b.text);
+  }
+  return parts.join('\n');
+}
+
+/**
+ * Read durable events newer than `afterEventSeq` and return any
+ * priority='immediate' context_injected events plus the highest eventSeq seen.
+ *
+ * Existed because of PRI-1691: a sessionPrompt can be in flight while a peer
+ * calls ent/session/inject, which writes a context_injected event with
+ * priority='immediate'. Without this re-read, the runner would only pick that
+ * event up on the NEXT turn — functionally identical to queueing.
+ */
+function readImmediateInjectsSince(
+  sessionDir: string,
+  afterEventSeq: number
+): { injections: string[]; newWatermark: number } {
+  const { events } = readDurableEvents(sessionDir, {
+    afterEventSeq,
+    limit: Number.MAX_SAFE_INTEGER,
+  });
+  const injections: string[] = [];
+  let watermark = afterEventSeq;
+  for (const e of events) {
+    if (e.eventSeq > watermark) watermark = e.eventSeq;
+    if (e.type !== 'context_injected') continue;
+    const data = (e as DurableEvent).data as { content?: unknown; priority?: unknown };
+    if (data.priority !== 'immediate') continue;
+    const text = extractInjectedText(data.content);
+    if (text.trim()) injections.push(text);
+  }
+  return { injections, newWatermark: watermark };
 }
 
 /**
@@ -141,6 +191,10 @@ export class ConversationRunner {
     };
 
     let providerMessages = buildProviderMessagesFromDurableEvents(sessionDir);
+    // Watermark for mid-turn re-reads of durable events. Events with
+    // eventSeq <= this value are already reflected in providerMessages (either
+    // from the initial build above or appended on a previous iteration).
+    let lastSeenEventSeq = deriveNextEventSeqFromEventLog(sessionDir) - 1;
     let finalAssistantContent = '';
     let stopReason: RunResult['stopReason'] = 'end_turn';
 
@@ -156,6 +210,22 @@ export class ConversationRunner {
 
     try {
       for (; completedTurns < maxTurns; completedTurns++) {
+        // PRI-1691: pick up any priority='immediate' context_injected events
+        // that landed since we last looked. These come from ent/session/inject
+        // RPCs fired by peers while this turn is in flight; without this
+        // re-read they would not be visible until the next sessionPrompt.
+        const { injections, newWatermark } = readImmediateInjectsSince(
+          sessionDir,
+          lastSeenEventSeq
+        );
+        if (injections.length > 0) {
+          providerMessages = [
+            ...providerMessages,
+            ...injections.map((content) => ({ role: 'user' as const, content })),
+          ];
+        }
+        lastSeenEventSeq = newWatermark;
+
         // Inject a reminder every LOOP_CHECK_INTERVAL turns to help detect stuck loops
         if (completedTurns > 0 && completedTurns % ConversationRunner.LOOP_CHECK_INTERVAL === 0) {
           const reminder = `<system-reminder>You have completed ${completedTurns} agentic turns. If you believe you are stuck in a loop or not making progress, stop and ask the user for guidance. Otherwise, continue.</system-reminder>`;
