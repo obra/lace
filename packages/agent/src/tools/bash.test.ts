@@ -223,7 +223,7 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
       expect(result.content[0].text).toContain('before cancel');
     });
 
-    it('reports non-user signal termination as process completion', async () => {
+    it('reports non-user signal termination as tool failure', async () => {
       const tool = new BashTool();
       const runtime = createStreamingFakeRuntime();
       const stdout = new PassThrough();
@@ -255,7 +255,7 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
 
       const result = await resultPromise;
 
-      expect(result.status).toBe('completed');
+      expect(result.status).toBe('failed');
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBeNull();
       expect(output.stdoutPreview).toBe('terminated\n');

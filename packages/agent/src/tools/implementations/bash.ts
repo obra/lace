@@ -535,6 +535,12 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
     // - Git status with changes: Tool success=true, exit code=1, stdout=file list
     // - Single invalid command: Tool success=false, exit code=127, stderr=command not found
     // - Command sequence with invalid command: Tool success=true, exit code=0, stderr=command not found
+    // - Process terminated by signal: Tool success=false, exit code=null
+
+    if (exitCode === null) {
+      resolve(this.createError(result as unknown as Record<string, unknown>));
+      return;
+    }
 
     // Special case: Command not found with exit code 127 and no stdout = tool failure
     // This handles single nonexistent commands like "nonexistentcommand12345"
