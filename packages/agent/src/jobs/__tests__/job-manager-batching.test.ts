@@ -161,15 +161,24 @@ describe('JobManager 200ms progress batching (PRI-1692 Phase 2)', () => {
     expect(manager.getNotificationQueue()).toHaveLength(0);
   });
 
-  it('removeJob cancels pending batch timers for that job', () => {
+  it('removeJob flushes pending batches (job-end reap delivers the last meaningful tail)', () => {
+    // removeJob is called by JobManager.finalizeJob (cancel/kill path).
+    // The buffered progress represents real work the agent asked for — flush
+    // it to the queue rather than silently drop. Contrast with unsubscribe
+    // above, which is explicit user intent to STOP receiving.
     const manager = makeManager();
     manager.subscribe({ jobId: 'job_1', on: ['progress'] });
 
     manager.fanout('job_1', 'progress', progressNotification('job_1', 'p1'), vi.fn());
     manager.removeJob('job_1');
 
+    const queue = manager.getNotificationQueue();
+    expect(queue).toHaveLength(1);
+    expect(queue[0].preview).toBe('p1');
+
+    // Timer is gone — no late delivery on top.
     vi.advanceTimersByTime(500);
-    expect(manager.getNotificationQueue()).toHaveLength(0);
+    expect(manager.getNotificationQueue()).toHaveLength(1);
   });
 
   it('multiple subscribers on the same job each get their own coalesced delivery', () => {
