@@ -26,6 +26,10 @@ function defaultEnvironmentForRuntime(runtime: ToolRuntime): NodeJS.ProcessEnv {
   return getDefaultEnvironment();
 }
 
+function environmentModeForRuntime(runtime: ToolRuntime): 'inherit' | 'replace' {
+  return runtime.kind === 'container' ? 'inherit' : 'replace';
+}
+
 export class RuntimeStdioClientTransport implements Transport {
   onclose?: () => void;
   onerror?: (error: Error) => void;
@@ -54,7 +58,7 @@ export class RuntimeStdioClientTransport implements Transport {
             ...defaultEnvironmentForRuntime(this.options.runtime),
             ...(this.options.env ?? {}),
           },
-          envMode: 'replace',
+          envMode: environmentModeForRuntime(this.options.runtime),
         }
       );
       this.process = handle;

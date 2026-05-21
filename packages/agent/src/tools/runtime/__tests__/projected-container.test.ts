@@ -124,7 +124,7 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(manager.materialize).toHaveBeenCalledWith({
       name: 'projected-runtime',
       containerId: 'container_123',
-      image: projectedDescriptor.spec.resolvedImageDigest,
+      image: `example/app@${projectedDescriptor.spec.resolvedImageDigest}`,
       workingDirectory: '/workspace',
       mounts: [{ source: '/host/repo', target: '/workspace', readonly: false }],
       env: { BASE: 'yes' },
@@ -133,6 +133,25 @@ describe('ProjectedContainerToolRuntime', () => {
     });
     expect(manager.materialize.mock.invocationCallOrder[0]).toBeLessThan(
       manager.execStream.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('materializes tag-requested descriptors with a digest-pinned image reference', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    projectedDescriptor.spec.requestedImage = 'registry.example.test:5000/team/app:dev';
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
+
+    expect(manager.materialize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        image: `registry.example.test:5000/team/app@${projectedDescriptor.spec.resolvedImageDigest}`,
+      })
     );
   });
 

@@ -15,10 +15,36 @@ export function validateResolvedImageDigest(value: string): string {
   return value;
 }
 
+export function imageReferenceForResolvedDigest(
+  requestedImage: string,
+  resolvedImageDigest: string
+): string {
+  const digest = validateResolvedImageDigest(resolvedImageDigest);
+  const imageName = repositoryNameFromRequestedImage(requestedImage);
+  if (imageName.length === 0) {
+    throw new RuntimeImageIdentityError('requestedImage must include an image name');
+  }
+  return `${imageName}@${digest}`;
+}
+
 export function normalizeImagePlatform(value: string): string {
   const normalized = value.trim().toLowerCase();
   if (!PLATFORM_RE.test(normalized)) {
     throw new RuntimeImageIdentityError('imagePlatform must use os/arch or os/arch/variant syntax');
   }
   return normalized;
+}
+
+function repositoryNameFromRequestedImage(value: string): string {
+  const requestedImage = value.trim();
+  const atIndex = requestedImage.indexOf('@');
+  const withoutDigest = atIndex === -1 ? requestedImage : requestedImage.slice(0, atIndex);
+  const lastSlashIndex = withoutDigest.lastIndexOf('/');
+  const lastColonIndex = withoutDigest.lastIndexOf(':');
+
+  if (lastColonIndex > lastSlashIndex) {
+    return withoutDigest.slice(0, lastColonIndex);
+  }
+
+  return withoutDigest;
 }

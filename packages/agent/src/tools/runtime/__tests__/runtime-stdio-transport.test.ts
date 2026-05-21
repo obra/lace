@@ -72,7 +72,7 @@ describe('RuntimeStdioClientTransport', () => {
     });
   });
 
-  it('does not inject host SDK defaults into container runtimes', async () => {
+  it('uses inherited environment for container runtimes so image PATH is preserved', async () => {
     const runtime = runtimeWithStdout('');
     Object.assign(runtime, { kind: 'container' });
     const transport = new RuntimeStdioClientTransport({
@@ -86,7 +86,7 @@ describe('RuntimeStdioClientTransport', () => {
     expect(runtime.process.start).toHaveBeenCalledWith(['node'], {
       cwd: '/runtime',
       env: { DECLARED: 'visible' },
-      envMode: 'replace',
+      envMode: 'inherit',
     });
   });
 });

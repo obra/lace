@@ -12,6 +12,7 @@ import type { Readable, Writable } from 'node:stream';
 import type { ContainerHandle, ContainerSpec } from '../../containers/spec';
 import type { ExecStreamHandle, ExecStreamOptions } from '../../containers/types';
 import { decodeHelperResponse, encodeHelperRequest, type HelperRequest } from './helper-protocol';
+import { imageReferenceForResolvedDigest } from './image-identity';
 import type {
   RuntimeFileSystem,
   RuntimeFetchOptions,
@@ -131,7 +132,10 @@ function containerSpecFromDescriptor(
 ): ContainerSpec {
   const spec: ContainerSpec = {
     name: descriptor.spec.name,
-    image: descriptor.spec.resolvedImageDigest,
+    image: imageReferenceForResolvedDigest(
+      descriptor.spec.requestedImage,
+      descriptor.spec.resolvedImageDigest
+    ),
     workingDirectory: descriptor.spec.workingDirectory,
     mounts: descriptor.spec.mounts.map((mount) => ({
       source: mount.hostPath,
