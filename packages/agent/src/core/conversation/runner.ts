@@ -23,6 +23,7 @@ import { executeTodoRead, executeTodoWrite } from '@lace/agent/todo/todo-tools';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import {
   toNonEmptyString,
+  toPositiveInt,
   toolKindFromName,
   protocolToolResultFromCore,
   shouldAskPermission,
@@ -722,10 +723,15 @@ export class ConversationRunner {
         };
       }
 
+      // Forward operator-configured progressIntervalMs (PRI-1707) — without
+      // this, the bash tool's schema-documented progressIntervalMs is
+      // silently dropped here and the job's progress timer never arms.
+      const progressIntervalMs = toPositiveInt(toolInput.progressIntervalMs);
       const { jobId } = await this.deps.startShellJob({
         command,
         description: description || command.substring(0, 50),
         turnContext: { turnId, turnSeq: toolTurnSeq },
+        ...(progressIntervalMs !== null ? { progressIntervalMs } : {}),
       });
 
       const completed: ToolResult = {

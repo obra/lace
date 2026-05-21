@@ -1191,5 +1191,123 @@ describe('ConversationRunner', () => {
         expect(provider.receivedStates[2]).toEqual({ openaiResponseId: 'resp_bare' });
       });
     });
+
+    describe('bash(background=true) — operator opt-in progress (PRI-1707)', () => {
+      class BashBackgroundProvider extends AIProvider {
+        callCount = 0;
+        constructor(private readonly toolArgs: Record<string, unknown>) {
+          super();
+        }
+        get providerName(): string {
+          return 'bash-bg';
+        }
+        getProviderInfo() {
+          return { name: 'bash-bg', displayName: 'BashBg', requiresApiKey: false };
+        }
+        isConfigured(): boolean {
+          return true;
+        }
+        get supportsStreaming(): boolean {
+          return true;
+        }
+        async createResponse(
+          messages: ProviderMessage[],
+          tools: Tool[],
+          model: string,
+          signal?: AbortSignal,
+          conversationState?: ConversationState,
+          options?: RequestOptions
+        ): Promise<ProviderResponse> {
+          return this.createStreamingResponse(
+            messages,
+            tools,
+            model,
+            signal,
+            conversationState,
+            options
+          );
+        }
+        async createStreamingResponse(): Promise<ProviderResponse> {
+          this.callCount++;
+          // First call: emit the bash background tool call. Subsequent
+          // calls: stop, so the runner doesn't loop. We don't need the
+          // tool_result round-trip; this is purely about verifying the
+          // runner's startShellJob args.
+          if (this.callCount === 1) {
+            return await Promise.resolve({
+              content: '',
+              toolCalls: [{ id: 'tc_bg_1', name: 'bash', arguments: this.toolArgs }],
+              stopReason: 'tool_use',
+              usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+            });
+          }
+          return await Promise.resolve({
+            content: 'done',
+            toolCalls: [],
+            stopReason: 'stop',
+            usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+          });
+        }
+      }
+
+      it('forwards operator-supplied progressIntervalMs to startShellJob', async () => {
+        const startShellJob = vi.fn().mockResolvedValue({ jobId: 'job_test' });
+        const provider = new BashBackgroundProvider({
+          command: 'sleep 60',
+          background: true,
+          progressIntervalMs: 30000,
+        });
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+        const deps = createToolAwareMockDeps(() => provider, { startShellJob });
+        const runner = new ConversationRunner(config, deps);
+
+        await runner.run({
+          content: [{ type: 'text', text: 'Run a background job' }],
+          abortController: new AbortController(),
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+        });
+
+        expect(startShellJob).toHaveBeenCalledOnce();
+        expect(startShellJob.mock.calls[0][0]).toMatchObject({
+          command: 'sleep 60',
+          progressIntervalMs: 30000,
+        });
+      });
+
+      it('omits progressIntervalMs from startShellJob when the model did not set it', async () => {
+        const startShellJob = vi.fn().mockResolvedValue({ jobId: 'job_test' });
+        const provider = new BashBackgroundProvider({
+          command: 'sleep 60',
+          background: true,
+        });
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+        const deps = createToolAwareMockDeps(() => provider, { startShellJob });
+        const runner = new ConversationRunner(config, deps);
+
+        await runner.run({
+          content: [{ type: 'text', text: 'Run a background job' }],
+          abortController: new AbortController(),
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+        });
+
+        expect(startShellJob).toHaveBeenCalledOnce();
+        const arg = startShellJob.mock.calls[0][0] as Record<string, unknown>;
+        expect(arg.progressIntervalMs).toBeUndefined();
+      });
+    });
   });
 });
