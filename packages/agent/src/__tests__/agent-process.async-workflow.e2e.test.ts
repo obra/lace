@@ -655,20 +655,20 @@ describe('async job workflow (E2E)', () => {
         'ent/session/events'
       )) as { events: Array<{ type: string; data?: Record<string, unknown> }> };
 
-      // Find a prompt that contains the notification
-      const promptWithNotification = events.events.find(
+      // Find a context_injected event carrying the notification block.
+      const injectedNotification = events.events.find(
         (e) =>
-          e.type === 'prompt' &&
+          e.type === 'context_injected' &&
           Array.isArray(e.data?.content) &&
           (e.data?.content as Array<{ type: string; text?: string }>).some(
             (c) =>
               c.type === 'text' &&
               typeof c.text === 'string' &&
-              c.text.includes('<background-job-notification')
+              c.text.includes('<notification kind="job-')
           )
       );
 
-      expect(promptWithNotification).toBeDefined();
+      expect(injectedNotification).toBeDefined();
     }
   );
 
@@ -753,20 +753,19 @@ describe('async job workflow (E2E)', () => {
       'ent/session/events'
     )) as { events: Array<{ type: string; data?: Record<string, unknown> }> };
 
-    const promptWithFailureNotification = events.events.find(
+    const injectedFailureNotification = events.events.find(
       (e) =>
-        e.type === 'prompt' &&
+        e.type === 'context_injected' &&
         Array.isArray(e.data?.content) &&
         (e.data?.content as Array<{ type: string; text?: string }>).some(
           (c) =>
             c.type === 'text' &&
             typeof c.text === 'string' &&
-            c.text.includes('<background-job-notification') &&
-            c.text.includes('type="failed"')
+            c.text.includes('<notification kind="job-failed"')
         )
     );
 
-    expect(promptWithFailureNotification).toBeDefined();
+    expect(injectedFailureNotification).toBeDefined();
   });
 
   it(
