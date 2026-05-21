@@ -7,6 +7,7 @@ import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { FileEditTool } from './file_edit';
 import { HostToolRuntime } from '../runtime/host';
+import { createFakeRuntime } from '../runtime/__tests__/fake-runtime';
 import { setupCoreTest } from '@lace/agent/test-utils/core-test-setup';
 import type { ToolContext } from '@lace/agent/tools/types';
 
@@ -163,6 +164,78 @@ describe('FileEditTool Integration Tests', () => {
       );
       expect(result2.status).toBe('failed');
       expect(result2.content[0].text).toContain("exists but hasn't been read");
+    });
+
+    it('allows edits when the resolved runtime canonical key has been read', async () => {
+      const resolved = {
+        original: 'a.txt',
+        runtimePath: '/runtime/a.txt',
+        displayPath: 'a.txt',
+      };
+      const canonicalKey = 'container:rt_1:/runtime/a.txt';
+      const runtime = createFakeRuntime({
+        resolve: resolved,
+        canonicalKey,
+        readText: 'old content',
+        statType: 'file',
+      });
+      const readKeys = new Set([canonicalKey]);
+      let checkedPath: typeof resolved | undefined;
+
+      const result = await tool.execute(
+        {
+          path: 'a.txt',
+          edits: [{ old_text: 'old content', new_text: 'new content' }],
+        },
+        {
+          signal: new AbortController().signal,
+          runtime,
+          hasRuntimeFileBeenRead: (path) => {
+            checkedPath = path;
+            return readKeys.has(runtime.paths.canonicalKey(path));
+          },
+        }
+      );
+
+      expect(result.status).toBe('completed');
+      expect(checkedPath).toBe(resolved);
+      expect(runtime.fs.writeTextFile).toHaveBeenCalledWith(resolved, 'new content');
+    });
+
+    it('rejects edits when the resolved runtime canonical key differs from the read key', async () => {
+      const resolved = {
+        original: './a.txt',
+        runtimePath: '/runtime/a.txt',
+        displayPath: './a.txt',
+      };
+      const runtime = createFakeRuntime({
+        resolve: resolved,
+        canonicalKey: 'container:rt_1:/runtime/a.txt',
+        readText: 'old content',
+        statType: 'file',
+      });
+      const readKeys = new Set(['container:rt_1:/runtime/other.txt']);
+      let checkedPath: typeof resolved | undefined;
+
+      const result = await tool.execute(
+        {
+          path: './a.txt',
+          edits: [{ old_text: 'old content', new_text: 'new content' }],
+        },
+        {
+          signal: new AbortController().signal,
+          runtime,
+          hasRuntimeFileBeenRead: (path) => {
+            checkedPath = path;
+            return readKeys.has(runtime.paths.canonicalKey(path));
+          },
+        }
+      );
+
+      expect(result.status).toBe('failed');
+      expect(result.content[0].text).toContain("exists but hasn't been read");
+      expect(checkedPath).toBe(resolved);
+      expect(runtime.fs.writeTextFile).not.toHaveBeenCalled();
     });
   });
 

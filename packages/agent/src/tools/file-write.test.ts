@@ -157,29 +157,68 @@ Creates parent directories automatically if needed. Returns file size written.`)
   });
 
   describe('File writing operations', () => {
-    it('checks read-before-write against runtime canonical path', async () => {
+    it('allows overwrites when the resolved runtime canonical key has been read', async () => {
       const resolved = {
         original: 'a.txt',
         runtimePath: '/runtime/a.txt',
         displayPath: 'a.txt',
       };
+      const canonicalKey = 'container:rt_1:/runtime/a.txt';
       const runtime = createFakeRuntime({
         resolve: resolved,
-        canonicalKey: 'container:rt_1:/runtime/a.txt',
+        canonicalKey,
         statType: 'file',
       });
+      const readKeys = new Set([canonicalKey]);
+      let checkedPath: typeof resolved | undefined;
 
       const result = await tool.execute(
         { path: 'a.txt', content: 'new' },
         {
           signal: new AbortController().signal,
           runtime,
-          hasRuntimeFileBeenRead: () => false,
+          hasRuntimeFileBeenRead: (path) => {
+            checkedPath = path;
+            return readKeys.has(runtime.paths.canonicalKey(path));
+          },
+        }
+      );
+
+      expect(result.status).toBe('completed');
+      expect(checkedPath).toBe(resolved);
+      expect(runtime.fs.writeTextFile).toHaveBeenCalledWith(resolved, 'new');
+    });
+
+    it('rejects overwrites when the resolved runtime canonical key differs from the read key', async () => {
+      const resolved = {
+        original: './a.txt',
+        runtimePath: '/runtime/a.txt',
+        displayPath: './a.txt',
+      };
+      const runtime = createFakeRuntime({
+        resolve: resolved,
+        canonicalKey: 'container:rt_1:/runtime/a.txt',
+        statType: 'file',
+      });
+      const readKeys = new Set(['container:rt_1:/runtime/other.txt']);
+      let checkedPath: typeof resolved | undefined;
+
+      const result = await tool.execute(
+        { path: './a.txt', content: 'new' },
+        {
+          signal: new AbortController().signal,
+          runtime,
+          hasRuntimeFileBeenRead: (path) => {
+            checkedPath = path;
+            return readKeys.has(runtime.paths.canonicalKey(path));
+          },
         }
       );
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain("hasn't been read");
+      expect(checkedPath).toBe(resolved);
+      expect(runtime.fs.writeTextFile).not.toHaveBeenCalled();
     });
 
     it('should write content to new file', async () => {

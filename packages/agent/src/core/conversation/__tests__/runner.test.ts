@@ -260,7 +260,7 @@ describe('ConversationRunner', () => {
       expect(updateSessionUsage).toHaveBeenCalled();
     });
 
-    it('tracks runtime file reads across real file_read and file_write execution', async () => {
+    it('tracks runtime file reads across equivalent path aliases', async () => {
       const targetFile = join(cwd, 'tracked.txt');
       writeFileSync(targetFile, 'old content');
 
@@ -321,7 +321,7 @@ describe('ConversationRunner', () => {
               {
                 id: 'tc_write',
                 name: 'file_write',
-                arguments: { path: 'tracked.txt', content: 'new content' },
+                arguments: { path: './tracked.txt', content: 'new content' },
               },
             ],
             stopReason: 'tool_use',
