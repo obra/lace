@@ -4,6 +4,7 @@
 import type { LaceEvent } from '@lace/agent/threads/types';
 import type { CompactionStrategy, CompactionContext, CompactionResult } from './types';
 import { generateEventId } from '@lace/agent/utils/generate-event-id';
+import type { ToolCall, ToolResult } from '@lace/agent/tools/types';
 
 export class SummarizeCompactionStrategy implements CompactionStrategy {
   id = 'summarize';
@@ -27,16 +28,13 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
       return this.createCompactionResult([], context, undefined, 0);
     }
 
-    // Separate events into categories
-    const allUserMessages = conversationEvents.filter((e) => e.type === 'USER_MESSAGE');
-    const nonUserEvents = conversationEvents.filter((e) => e.type !== 'USER_MESSAGE');
-
-    // Determine which non-user events to summarize vs preserve
-    const { oldEvents, recentEvents } = this.categorizeEventsByCount(nonUserEvents);
+    // Pick the boundary in original temporal order, then snap leftward so the
+    // boundary never cuts an assistant(tool_use) → user(tool_result) pair.
+    const { oldEvents, recentEvents } = this.splitAtSnappedBoundary(conversationEvents);
 
     const compactedEvents: LaceEvent[] = [];
 
-    // Generate summary for old non-user events if any exist
+    // Generate summary for old events if any exist
     let summary: string | undefined;
     if (oldEvents.length > 0) {
       summary = await this.generateSummaryInConversation(oldEvents, recentEvents, context);
@@ -49,28 +47,62 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
       });
     }
 
-    // Preserve ALL user messages (they provide essential context)
-    compactedEvents.push(...allUserMessages);
-
-    // Add recent non-user events unchanged
+    // Add recent events in their ORIGINAL temporal order. Do NOT segregate by
+    // role — re-ordering destroys tool_use/tool_result adjacency.
     compactedEvents.push(...recentEvents);
 
     return this.createCompactionResult(compactedEvents, context, summary, events.length);
   }
 
-  private categorizeEventsByCount(events: LaceEvent[]) {
-    // Only preserve recent events if we have enough events to make summarization worthwhile
-    // If we have few events, summarize them all
+  /**
+   * Choose the boundary between old (summarized) and recent (preserved as-is)
+   * events. Starts from `events.length - RECENT_EVENT_COUNT` and walks leftward
+   * while any TOOL_RESULT in the recent slice has its matching TOOL_CALL in the
+   * old slice — that would produce an orphan tool_result that Anthropic rejects.
+   *
+   * If there are too few events to make summarization worthwhile (<= RECENT+1),
+   * summarize everything and emit no recent tail.
+   */
+  private splitAtSnappedBoundary(events: LaceEvent[]): {
+    oldEvents: LaceEvent[];
+    recentEvents: LaceEvent[];
+  } {
     if (events.length <= this.RECENT_EVENT_COUNT + 1) {
-      // Too few events - summarize everything
       return { oldEvents: events, recentEvents: [] };
     }
 
-    // Keep the most recent events, summarize the rest
-    const recentEvents = events.slice(-this.RECENT_EVENT_COUNT);
-    const oldEvents = events.slice(0, -this.RECENT_EVENT_COUNT);
+    let boundary = events.length - this.RECENT_EVENT_COUNT;
 
-    return { oldEvents, recentEvents };
+    while (boundary > 0) {
+      const oldCallIds = new Set<string>();
+      for (let i = 0; i < boundary; i++) {
+        const e = events[i]!;
+        if (e.type === 'TOOL_CALL') {
+          const id = (e.data as ToolCall).id;
+          if (id) oldCallIds.add(id);
+        }
+      }
+
+      let hasOrphan = false;
+      for (let i = boundary; i < events.length; i++) {
+        const e = events[i]!;
+        if (e.type === 'TOOL_RESULT') {
+          const id = (e.data as ToolResult).id;
+          if (id && oldCallIds.has(id)) {
+            hasOrphan = true;
+            break;
+          }
+        }
+      }
+
+      if (!hasOrphan) break;
+      boundary -= 1;
+    }
+
+    return {
+      oldEvents: events.slice(0, boundary),
+      recentEvents: events.slice(boundary),
+    };
   }
 
   private async generateSummaryInConversation(

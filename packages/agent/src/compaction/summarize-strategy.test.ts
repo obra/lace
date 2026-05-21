@@ -131,9 +131,7 @@ describe('SummarizeCompactionStrategy', () => {
 
     // For every TOOL_RESULT in the tail, the matching TOOL_CALL must also be in the tail.
     const tailToolCallIds = new Set(
-      tail
-        .filter((e) => e.type === 'TOOL_CALL')
-        .map((e) => (e.data as { id: string }).id)
+      tail.filter((e) => e.type === 'TOOL_CALL').map((e) => (e.data as { id: string }).id)
     );
     for (const e of tail) {
       if (e.type === 'TOOL_RESULT') {
@@ -165,7 +163,7 @@ describe('SummarizeCompactionStrategy', () => {
     expect(summaryRequest).toContain('User: one');
     expect(summaryRequest).toContain('User: two');
 
-    expect((result.compactedEvents[0].data as string)).toContain('SUMMARY-TEXT');
+    expect(result.compactedEvents[0].data as string).toContain('SUMMARY-TEXT');
   });
 
   it('does not introduce orphans when recent tail starts with a chain of tool_uses without results', async () => {
@@ -208,7 +206,11 @@ describe('SummarizeCompactionStrategy', () => {
 
     const events: LaceEvent[] = [
       agentMsg('Old agent message', 'test-thread'),
-      { type: 'LOCAL_SYSTEM_MESSAGE', data: 'Old system note', context: { threadId: 'test-thread' } },
+      {
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        data: 'Old system note',
+        context: { threadId: 'test-thread' },
+      },
       agentMsg('Recent agent message', 'test-thread'),
     ];
 
