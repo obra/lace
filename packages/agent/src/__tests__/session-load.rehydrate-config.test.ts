@@ -570,8 +570,10 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         mcpServers: [],
       })) as { sessionId: string };
 
+      const hostStdioKey = `remote-server:host:stdio:session:${state.activeSession!.meta.sessionId}:host:${tempDir}`;
       state.mcpServerManager.registerConnection('remote-server', {
         id: 'remote-server',
+        connectionKey: hostStdioKey,
         config: {
           command: process.execPath,
           transport: 'stdio',
@@ -597,7 +599,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
           placement: 'host',
         },
       ]);
-      expect(stopServer).toHaveBeenCalledWith('remote-server');
+      expect(stopServer).toHaveBeenCalledWith(hostStdioKey);
       expect(state.mcpServerManager.getServer('remote-server')?.status).toBe('stopped');
       expect(startServer).not.toHaveBeenCalled();
     }
@@ -682,8 +684,10 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         mcpServers: [],
       });
 
+      const hostStdioKey = `remote-server:host:stdio:session:${state.activeSession!.meta.sessionId}:host:${tempDir}`;
       state.mcpServerManager.registerConnection('remote-server', {
         id: 'remote-server',
+        connectionKey: hostStdioKey,
         config: {
           command: process.execPath,
           transport: 'stdio',
@@ -732,8 +736,10 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         mcpServers: [],
       });
 
+      const hostStdioKey = `remote-server:host:stdio:session:${state.activeSession!.meta.sessionId}:host:${tempDir}`;
       state.mcpServerManager.registerConnection('remote-server', {
         id: 'remote-server',
+        connectionKey: hostStdioKey,
         config: {
           command: process.execPath,
           transport: 'stdio',

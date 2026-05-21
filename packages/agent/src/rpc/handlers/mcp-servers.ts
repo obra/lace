@@ -86,6 +86,14 @@ function activeSessionConnectionKey(
   });
 }
 
+function activeSessionDisplacedStdioConnectionKey(
+  state: AgentServerState,
+  serverId: string,
+  config: MCPServerConfig
+): string {
+  return activeSessionConnectionKey(state, serverId, { ...config, transport: 'stdio' });
+}
+
 async function startServerForActiveSession(
   state: AgentServerState,
   serverId: string,
@@ -173,18 +181,14 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
     }
 
     if (isUnsupportedMcpTransport(config)) {
-      const displacedStdioConnectionKey = mcpConnectionKey({
+      const displacedStdioConnectionKey = activeSessionDisplacedStdioConnectionKey(
+        state,
         serverId,
-        config: { ...config, transport: 'stdio' },
-        runtimeId: runtime.id,
-        runtimeCwd: runtime.cwd,
-        hostCwd,
-      });
+        config
+      );
       const stoppedConnectionKey =
         existing?.connectionKey ??
         state.mcpServerManager.getServer(displacedStdioConnectionKey)?.connectionKey ??
-        // Bare id fallback is safe here because getServer only resolves unique user-facing ids.
-        state.mcpServerManager.getServer(serverId)?.connectionKey ??
         displacedStdioConnectionKey;
       await state.mcpServerManager.stopServer(stoppedConnectionKey);
       state.mcpServerManager.replaceStoppedServerConfig(
@@ -348,8 +352,17 @@ export function registerMcpHandlers(
     // Start the server if enabled
     if (enabled && isUnsupportedMcpTransport(config)) {
       const connectionKey = activeSessionConnectionKey(state, serverId, config);
-      await state.mcpServerManager.stopServer(serverId);
-      state.mcpServerManager.replaceStoppedServerConfig(serverId, config, connectionKey);
+      const displacedStdioConnectionKey = activeSessionDisplacedStdioConnectionKey(
+        state,
+        serverId,
+        config
+      );
+      await state.mcpServerManager.stopServer(displacedStdioConnectionKey);
+      state.mcpServerManager.replaceStoppedServerConfig(
+        displacedStdioConnectionKey,
+        config,
+        connectionKey
+      );
       logger.warn('Skipping MCP server with unsupported transport', {
         serverId,
         transport: config.transport,
