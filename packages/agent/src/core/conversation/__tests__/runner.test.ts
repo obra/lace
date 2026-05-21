@@ -19,6 +19,7 @@ import {
   type RequestOptions,
 } from '@lace/agent/providers/base-provider';
 import type { Tool } from '@lace/agent/tools/tool';
+import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 
 /**
  * Create mock dependencies for testing ConversationRunner
@@ -357,6 +358,125 @@ describe('ConversationRunner', () => {
       });
 
       expect(readFileSync(targetFile, 'utf8')).toBe('new content');
+    });
+
+    it('rehydrates file-read history against active local runtime cwd', async () => {
+      const runtimeCwd = join(tmpdir(), `lace-runner-runtime-cwd-${randomUUID().slice(0, 8)}`);
+      mkdirSync(runtimeCwd, { recursive: true });
+      const targetFile = join(runtimeCwd, 'tracked.txt');
+      writeFileSync(targetFile, 'old content');
+      writeFileSync(
+        join(sessionDir, 'events.jsonl'),
+        `${JSON.stringify({
+          eventSeq: 1,
+          timestamp: new Date().toISOString(),
+          type: 'tool_use',
+          data: {
+            toolCallId: 'previous_read',
+            name: 'file_read',
+            input: { path: 'tracked.txt' },
+            result: {
+              outcome: 'completed',
+              content: [{ type: 'text', text: 'old content' }],
+            },
+          },
+        })}\n`
+      );
+
+      class RuntimeCwdWriteProvider extends AIProvider {
+        get providerName(): string {
+          return 'runtime-cwd-write-test';
+        }
+
+        getProviderInfo() {
+          return {
+            name: 'runtime-cwd-write-test',
+            displayName: 'Runtime CWD Write Test',
+            requiresApiKey: false,
+          };
+        }
+
+        isConfigured(): boolean {
+          return true;
+        }
+
+        get supportsStreaming(): boolean {
+          return true;
+        }
+
+        async createResponse(
+          messages: ProviderMessage[],
+          tools: Tool[],
+          model: string,
+          signal?: AbortSignal,
+          conversationState?: ConversationState,
+          options?: RequestOptions
+        ): Promise<ProviderResponse> {
+          return this.createStreamingResponse(
+            messages,
+            tools,
+            model,
+            signal,
+            conversationState,
+            options
+          );
+        }
+
+        async createStreamingResponse(): Promise<ProviderResponse> {
+          return {
+            content: '',
+            toolCalls: [
+              {
+                id: 'tc_write',
+                name: 'file_write',
+                arguments: { path: 'tracked.txt', content: 'new content' },
+              },
+            ],
+            stopReason: 'tool_use',
+          };
+        }
+      }
+
+      try {
+        const runtimeBinding: RuntimeExecutionBinding = {
+          schemaVersion: 1,
+          identity: { runtimeId: 'rt_custom_local' },
+          agentPlacement: 'host',
+          toolRuntime: { type: 'local', cwd: runtimeCwd },
+        };
+        const executor = new ToolExecutor();
+        executor.registerTools([new FileWriteTool()]);
+        const deps = createMockDeps({
+          createProvider: vi.fn().mockImplementation(async () => new RuntimeCwdWriteProvider()),
+          createToolExecutor: vi.fn().mockReturnValue({
+            executor,
+            toolsForProvider: executor.getAllTools(),
+          }),
+        });
+        const runner = new ConversationRunner(
+          {
+            sessionDir,
+            sessionId: 'sess_test',
+            cwd,
+            runtimeBinding,
+            executionMode: 'execute',
+            approvalMode: 'approve',
+          },
+          deps
+        );
+
+        await runner.run({
+          content: [{ type: 'text', text: 'Update the tracked file.' }],
+          abortController: new AbortController(),
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+          maxTurns: 1,
+        });
+
+        expect(readFileSync(targetFile, 'utf8')).toBe('new content');
+      } finally {
+        rmSync(runtimeCwd, { recursive: true, force: true });
+      }
     });
 
     describe('thinking events', () => {

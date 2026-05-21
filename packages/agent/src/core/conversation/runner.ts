@@ -158,8 +158,8 @@ export class ConversationRunner {
       sessionId,
     } = this.config;
 
-    const filesRead = deriveFilesReadFromDurableEvents(sessionDir, cwd);
     const runtimeBinding = this.resolveActiveLocalRuntimeBinding(cwd);
+    const filesRead = deriveFilesReadFromDurableEvents(sessionDir, runtimeBinding.toolRuntime.cwd);
     const runtimeFileAccessTracker = await this.createLocalFileAccessTracker(
       filesRead,
       runtimeBinding
