@@ -9,8 +9,21 @@ import type { ToolCall, ToolResult } from '@lace/agent/tools/types';
 export class SummarizeCompactionStrategy implements CompactionStrategy {
   id = 'summarize';
 
-  // Keep the most recent N events to preserve immediate context
-  private readonly RECENT_EVENT_COUNT = 2; // Last 2 events (usually 1 exchange)
+  // Keep the most recent N events verbatim to preserve immediate context.
+  //
+  // Why 8: a typical mid-conversation tail ends in something like
+  // (USER_MESSAGE, TOOL_CALL, TOOL_RESULT, TOOL_CALL, TOOL_RESULT, USER_MESSAGE).
+  // With N=2 the user's most recent verbatim request was lost into the summary
+  // text. 8 covers the focus exchange plus one or two surrounding turns while
+  // still leaving plenty of token-budget headroom (see the budget sanity test
+  // in summarize-strategy.test.ts).
+  //
+  // Why an event count rather than a token budget: the strategy is
+  // provider-agnostic and runs without a tokenizer in scope. A char/token
+  // budget would require either threading a tokenizer through CompactionContext
+  // or picking a per-provider heuristic — neither is small. The fixed count is
+  // bounded above by the per-event size budget verified in the sanity test.
+  private readonly RECENT_EVENT_COUNT = 8;
 
   async compact(events: LaceEvent[], context: CompactionContext): Promise<CompactionResult> {
     if (!context.agent && !context.provider) {
