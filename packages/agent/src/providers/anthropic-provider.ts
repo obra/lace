@@ -309,7 +309,6 @@ export class AnthropicProvider extends AIProvider {
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
-    let streamCreated = false;
 
     return this.withRetry(
       async () => {
@@ -326,9 +325,6 @@ export class AnthropicProvider extends AIProvider {
           signal,
           ...(extraHeaders ? { headers: extraHeaders } : {}),
         });
-
-        // Mark that stream is created to prevent retries after this point
-        streamCreated = true;
 
         let toolCalls: ToolCall[] = [];
 
@@ -469,7 +465,7 @@ export class AnthropicProvider extends AIProvider {
       {
         signal,
         isStreaming: true,
-        canRetry: () => !streamCreated && !streamingStarted,
+        canRetry: () => !streamingStarted,
       }
     );
   }
@@ -508,6 +504,42 @@ export class AnthropicProvider extends AIProvider {
   override isRecoverableError(error: unknown): boolean {
     // Use base class implementation - Anthropic SDK uses same patterns as OpenAI
     return super.isRecoverableError(error);
+  }
+
+  override isRetryableError(error: unknown): boolean {
+    if (super.isRetryableError(error)) {
+      return true;
+    }
+    // The Anthropic SDK sometimes throws a plain Error whose message is the raw
+    // SSE event JSON when it encounters an error event mid-stream (e.g. after HTTP
+    // 200 has already been received). In that case there is no .status field, so
+    // the base-class HTTP-status check misses it. Parse the message and check the
+    // Anthropic error type explicitly.
+    if (error instanceof Error) {
+      return this.isRetryableAnthropicErrorType(error.message);
+    }
+    return false;
+  }
+
+  private isRetryableAnthropicErrorType(message: string): boolean {
+    try {
+      const parsed: unknown = JSON.parse(message);
+      if (
+        parsed !== null &&
+        typeof parsed === 'object' &&
+        'error' in parsed &&
+        (parsed as { error?: unknown }).error !== null &&
+        typeof (parsed as { error?: unknown }).error === 'object'
+      ) {
+        const type = (parsed as { error: { type?: unknown } }).error.type;
+        // overloaded_error: explicit Anthropic guidance — back off and retry (HTTP 529)
+        // api_error: Anthropic's generic transient server-side error — retryable
+        return type === 'overloaded_error' || type === 'api_error';
+      }
+    } catch {
+      // Not JSON — not an Anthropic SSE error envelope
+    }
+    return false;
   }
 
   // Per-model headers from the catalog (e.g. anthropic-beta to opt into the 1M

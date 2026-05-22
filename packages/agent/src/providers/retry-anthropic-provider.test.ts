@@ -5,6 +5,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AnthropicProvider } from './anthropic-provider';
 import { ProviderMessage } from './base-provider';
 
+// Subclass that exposes isRetryableError for direct unit testing
+class TestableAnthropicProvider extends AnthropicProvider {
+  public isRetryableError(error: unknown): boolean {
+    return super.isRetryableError(error);
+  }
+}
+
 // Create mock functions that we'll reference
 const mockCreate = vi.fn();
 const mockStream = vi.fn();
@@ -165,6 +172,75 @@ describe('AnthropicProvider retry functionality', () => {
     });
   });
 
+  describe('isRetryableError for Anthropic-specific error types', () => {
+    let testableProvider: TestableAnthropicProvider;
+
+    beforeEach(() => {
+      testableProvider = new TestableAnthropicProvider({ apiKey: 'test-key' });
+    });
+
+    it('classifies overloaded_error JSON envelope as retryable', () => {
+      // This is the exact error format seen in the production log (2026-05-22)
+      // where the Anthropic SDK throws an Error with the raw SSE event JSON as message
+      const error = new Error(
+        JSON.stringify({
+          type: 'error',
+          error: { details: null, type: 'overloaded_error', message: 'Overloaded' },
+          request_id: 'req_011CbH7zekhn2XMicWg8wcNo',
+        })
+      );
+      expect(testableProvider.isRetryableError(error)).toBe(true);
+    });
+
+    it('classifies api_error JSON envelope as retryable', () => {
+      // api_error is Anthropic's generic transient server-side error
+      const error = new Error(
+        JSON.stringify({
+          type: 'error',
+          error: { type: 'api_error', message: 'Internal server error' },
+          request_id: 'req_test',
+        })
+      );
+      expect(testableProvider.isRetryableError(error)).toBe(true);
+    });
+
+    it('does not classify authentication_error as retryable', () => {
+      const error = new Error(
+        JSON.stringify({
+          type: 'error',
+          error: { type: 'authentication_error', message: 'Invalid API key' },
+        })
+      );
+      expect(testableProvider.isRetryableError(error)).toBe(false);
+    });
+
+    it('does not classify permission_error as retryable', () => {
+      const error = new Error(
+        JSON.stringify({
+          type: 'error',
+          error: { type: 'permission_error', message: 'Not allowed' },
+        })
+      );
+      expect(testableProvider.isRetryableError(error)).toBe(false);
+    });
+
+    it('does not classify invalid_request_error as retryable', () => {
+      const error = new Error(
+        JSON.stringify({
+          type: 'error',
+          error: { type: 'invalid_request_error', message: 'Bad request' },
+        })
+      );
+      expect(testableProvider.isRetryableError(error)).toBe(false);
+    });
+
+    it('still classifies HTTP 529 APIStatusError as retryable', () => {
+      // When the Anthropic SDK throws an APIStatusError with status: 529
+      const error = Object.assign(new Error('529 Overloaded'), { status: 529 });
+      expect(testableProvider.isRetryableError(error)).toBe(true);
+    });
+  });
+
   describe('createStreamingResponse retry behavior', () => {
     it('should retry streaming requests before first token', async () => {
       const messages: ProviderMessage[] = [{ role: 'user', content: 'Hello' }];
@@ -214,6 +290,53 @@ describe('AnthropicProvider retry functionality', () => {
 
       expect(mockStream).toHaveBeenCalledTimes(2);
       expect(response.content).toBe('Hello world!');
+    });
+
+    it('retries overloaded_error that occurs during stream.finalMessage() before any tokens received', async () => {
+      // Reproduces the production failure: stream object is created, but overloaded_error
+      // fires during finalMessage() before any text tokens arrive (canRetryCheck was wrongly
+      // false because streamCreated=true was set before network I/O began).
+      const messages: ProviderMessage[] = [{ role: 'user', content: 'Hello' }];
+
+      const overloadedError = new Error(
+        JSON.stringify({
+          type: 'error',
+          error: { details: null, type: 'overloaded_error', message: 'Overloaded' },
+          request_id: 'req_test',
+        })
+      );
+
+      const failingStream = {
+        on: vi.fn().mockReturnThis(),
+        finalMessage: vi.fn().mockRejectedValue(overloadedError),
+      };
+
+      const successfulStream = {
+        on: vi.fn().mockReturnThis(),
+        finalMessage: vi.fn().mockResolvedValue({
+          content: [{ type: 'text', text: 'Hello there!' }],
+          usage: { input_tokens: 10, output_tokens: 5 },
+          stop_reason: 'end_turn',
+        }),
+      };
+
+      mockStream.mockReturnValueOnce(failingStream).mockReturnValueOnce(successfulStream);
+
+      const promise = provider.createStreamingResponse(messages, [], 'claude-3-5-haiku-20241022');
+      promise.catch(() => {
+        // Prevent unhandled rejection during retry delay
+      });
+
+      // First attempt fails
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mockStream).toHaveBeenCalledTimes(1);
+
+      // Advance past retry delay to trigger second attempt
+      await vi.advanceTimersByTimeAsync(1100);
+
+      const response = await promise;
+      expect(mockStream).toHaveBeenCalledTimes(2);
+      expect(response.content).toBe('Hello there!');
     });
 
     it('should not retry after streaming has started', async () => {
