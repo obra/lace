@@ -265,7 +265,13 @@ export class TestAgentProvider extends AIProvider {
             }
             case 'schedule_alarm': {
               const args = requested.args as Record<string, unknown>;
-              content = `Scheduling alarm at ${args.schedule as string}...`;
+              if (args.kind === 'interval') {
+                content = `Scheduling interval alarm every ${args.minutes as number} minutes...`;
+              } else if (args.minutes !== undefined) {
+                content = `Scheduling alarm in ${args.minutes as number} minutes...`;
+              } else {
+                content = `Scheduling alarm at ${args.schedule as string}...`;
+              }
               break;
             }
             default:
@@ -377,6 +383,19 @@ export class TestAgentProvider extends AIProvider {
       return {
         name: 'schedule_alarm',
         args: { kind: 'once', minutes: Number(alarmRelMatch[1]), prompt: alarmRelMatch[2].trim() },
+      };
+    }
+
+    // Handle "alarm: interval=<N> prompt=<text>" pattern for recurring interval alarms.
+    const alarmIntMatch = text.trim().match(/^alarm:\s*interval=(\d+)\s+prompt=(.+)\s*$/i);
+    if (alarmIntMatch) {
+      return {
+        name: 'schedule_alarm',
+        args: {
+          kind: 'interval',
+          minutes: Number(alarmIntMatch[1]),
+          prompt: alarmIntMatch[2].trim(),
+        },
       };
     }
 
