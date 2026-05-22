@@ -1,5 +1,7 @@
 import {
+  cp,
   lstat,
+  mkdtemp,
   mkdir as mkdirHost,
   readdir as readdirHost,
   readFile,
@@ -7,9 +9,23 @@ import {
   stat as statHost,
   writeFile,
 } from 'node:fs/promises';
-import { dirname, isAbsolute, posix, relative, resolve as resolveHostPath, sep } from 'node:path';
+import { tmpdir } from 'node:os';
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  posix,
+  relative,
+  resolve as resolveHostPath,
+  sep,
+} from 'node:path';
 import type { Readable, Writable } from 'node:stream';
-import type { ContainerHandle, ContainerSpec } from '../../containers/spec';
+import type {
+  ContainerHandle,
+  ContainerLifecycleHooks,
+  ContainerSpec,
+} from '../../containers/spec';
 import type { ExecStreamHandle, ExecStreamOptions } from '../../containers/types';
 import { decodeHelperResponse, encodeHelperRequest, type HelperRequest } from './helper-protocol';
 import { imageReferenceForResolvedDigest } from './image-identity';
@@ -57,7 +73,7 @@ interface ProjectedHostMount {
 }
 
 export interface ProjectedContainerManager {
-  materialize(spec: ContainerSpec): Promise<ContainerHandle>;
+  materialize(spec: ContainerSpec, hooks?: ContainerLifecycleHooks): Promise<ContainerHandle>;
   execStream(specName: string, options: ExecStreamOptions): Promise<ExecStreamHandle>;
 }
 
@@ -143,12 +159,21 @@ function definedEnvironment(
 async function containerSpecFromDescriptor(
   descriptor: ProjectedContainerToolRuntimeDescriptor,
   secretContext: ProjectedContainerSecretContext
-): Promise<ContainerSpec> {
+): Promise<{ spec: ContainerSpec; hooks?: ContainerLifecycleHooks }> {
   const secretEntries = Object.entries(descriptor.spec.secretEnv ?? {});
   const resolvedSecrets =
     secretEntries.length === 0
       ? {}
       : await resolveProjectedContainerSecrets(descriptor, secretContext, secretEntries);
+  const helper = await helperMaterialization(descriptor.helper);
+  const mounts: ContainerSpec['mounts'] = descriptor.spec.mounts.map((mount) => ({
+    source: mount.hostPath,
+    target: mount.containerPath,
+    readonly: mount.readonly,
+  }));
+  if (helper.mount) {
+    mounts.push(helper.mount);
+  }
   const spec: ContainerSpec = {
     name: descriptor.spec.name,
     image: imageReferenceForResolvedDigest(
@@ -156,11 +181,7 @@ async function containerSpecFromDescriptor(
       descriptor.spec.resolvedImageDigest
     ),
     workingDirectory: descriptor.spec.workingDirectory,
-    mounts: descriptor.spec.mounts.map((mount) => ({
-      source: mount.hostPath,
-      target: mount.containerPath,
-      readonly: mount.readonly,
-    })),
+    mounts,
     env: { ...(descriptor.spec.env ?? {}), ...resolvedSecrets },
   };
 
@@ -174,7 +195,52 @@ async function containerSpecFromDescriptor(
     spec.restartPolicy = descriptor.spec.restartPolicy;
   }
 
-  return spec;
+  return helper.hooks ? { spec, hooks: helper.hooks } : { spec };
+}
+
+async function helperMaterialization(
+  helper: ProjectedContainerToolRuntimeDescriptor['helper']
+): Promise<{ mount?: ContainerSpec['mounts'][number]; hooks?: ContainerLifecycleHooks }> {
+  if (!helper || helper.mode === 'image') {
+    return {};
+  }
+
+  const target = normalizeContainerPath(helper.containerPath, '/');
+  const hostPath = requireHelperHostPath(helper);
+
+  if (helper.mode === 'mount') {
+    return {
+      mount: {
+        source: hostPath,
+        target,
+        readonly: true,
+      },
+    };
+  }
+
+  const copyRoot = await mkdtemp(join(tmpdir(), 'lace-runtime-helper-'));
+  const copyPath = join(copyRoot, basename(hostPath) || 'helper');
+  return {
+    mount: {
+      source: copyPath,
+      target,
+      readonly: true,
+    },
+    hooks: {
+      beforeCreate: async () => {
+        await cp(hostPath, copyPath, { recursive: true, force: true });
+      },
+    },
+  };
+}
+
+function requireHelperHostPath(
+  helper: NonNullable<ProjectedContainerToolRuntimeDescriptor['helper']>
+): string {
+  if (!helper.hostPath) {
+    throw new Error(`Projected runtime helper ${helper.mode} mode requires hostPath`);
+  }
+  return resolveHostPath(helper.hostPath);
 }
 
 async function resolveProjectedContainerSecrets(
@@ -554,8 +620,15 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
     }
 
     const materialized = (async () => {
-      const spec = await containerSpecFromDescriptor(this.descriptor, this.secretContext);
-      await this.containerManager.materialize(spec);
+      const materialization = await containerSpecFromDescriptor(
+        this.descriptor,
+        this.secretContext
+      );
+      if (materialization.hooks) {
+        await this.containerManager.materialize(materialization.spec, materialization.hooks);
+      } else {
+        await this.containerManager.materialize(materialization.spec);
+      }
     })();
     this.materialized = materialized;
 

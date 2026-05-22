@@ -241,6 +241,34 @@ describe('MCPServerManager', () => {
     expect(manager.getServer('shared')).toBeUndefined();
   });
 
+  it('keeps host connection keys stable across tool runtime changes', () => {
+    const config: MCPServerConfig = {
+      command: 'node',
+      transport: 'stdio',
+      placement: 'host',
+      enabled: true,
+      tools: {},
+    };
+
+    expect(
+      mcpConnectionKey({
+        serverId: 'host-server',
+        config,
+        runtimeId: 'rt_first_projected',
+        runtimeCwd: '/runtime/one',
+        hostCwd: '/host/project',
+      })
+    ).toBe(
+      mcpConnectionKey({
+        serverId: 'host-server',
+        config,
+        runtimeId: 'rt_second_projected',
+        runtimeCwd: '/runtime/two',
+        hostCwd: '/host/project',
+      })
+    );
+  });
+
   it('resolves same-id lookup to the only running connection when stale siblings remain', () => {
     const config: MCPServerConfig = {
       command: 'node',

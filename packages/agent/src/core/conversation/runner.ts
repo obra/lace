@@ -7,10 +7,14 @@ import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node
 import type { ToolResult } from '@lace/ent-protocol';
 import type { ToolResult as CoreToolResult, ToolCall, ToolContext } from '@lace/agent/tools/types';
 import type { Tool } from '@lace/agent/tools/tool';
-import { HostToolRuntime } from '@lace/agent/tools/runtime/host';
+import { createToolRuntimeFromBinding } from '@lace/agent/tools/runtime/factory';
 import { FileAccessTracker } from '@lace/agent/tools/runtime/file-access-tracker';
 import { buildDefaultLocalRuntimeBinding } from '@lace/agent/tools/runtime/validation';
-import type { RuntimeExecutionBinding, RuntimePath } from '@lace/agent/tools/runtime/types';
+import type {
+  RuntimeExecutionBinding,
+  RuntimePath,
+  ToolRuntime,
+} from '@lace/agent/tools/runtime/types';
 import {
   readSessionState,
   writeSessionState,
@@ -158,12 +162,9 @@ export class ConversationRunner {
       sessionId,
     } = this.config;
 
-    const runtimeBinding = this.resolveActiveLocalRuntimeBinding(cwd);
+    const runtimeBinding = this.resolveActiveRuntimeBinding(cwd);
     const filesRead = deriveFilesReadFromDurableEvents(sessionDir, runtimeBinding.toolRuntime.cwd);
-    const runtimeFileAccessTracker = await this.createLocalFileAccessTracker(
-      filesRead,
-      runtimeBinding
-    );
+    const runtimeFileAccessTracker = await this.createFileAccessTracker(filesRead, runtimeBinding);
 
     const envOverlay = environment && typeof environment === 'object' ? environment : undefined;
 
@@ -1043,7 +1044,7 @@ export class ConversationRunner {
     }
 
     // Default: execute through tool executor
-    const runtime = this.createLocalRuntime(runtimeBinding, envOverlay);
+    const runtime = this.createRuntime(runtimeBinding, envOverlay);
     const markRuntimeFileRead = (path: RuntimePath): void => {
       runtimeFileAccessTracker.markRead(path, runtime.paths.canonicalKey(path));
       const hostPath = path.hostPath ?? (runtime.kind === 'local' ? path.runtimePath : undefined);
@@ -1071,7 +1072,7 @@ export class ConversationRunner {
     );
   }
 
-  private resolveActiveLocalRuntimeBinding(cwd: string): RuntimeExecutionBinding {
+  private resolveActiveRuntimeBinding(cwd: string): RuntimeExecutionBinding {
     const runtimeBinding =
       this.config.runtimeBinding ??
       buildDefaultLocalRuntimeBinding({
@@ -1079,38 +1080,28 @@ export class ConversationRunner {
         cwd,
       });
 
-    if (runtimeBinding.toolRuntime.type !== 'local') {
-      throw new Error(
-        'Only local runtime tool execution is supported before projected container runtime lands'
-      );
-    }
-
     return runtimeBinding;
   }
 
-  private createLocalRuntime(
+  private createRuntime(
     runtimeBinding: RuntimeExecutionBinding,
     envOverlay?: Record<string, string>
-  ): HostToolRuntime {
-    if (runtimeBinding.toolRuntime.type !== 'local') {
-      throw new Error(
-        'Only local runtime tool execution is supported before projected container runtime lands'
-      );
-    }
-
-    return new HostToolRuntime({
-      id: runtimeBinding.identity.runtimeId,
-      cwd: runtimeBinding.toolRuntime.cwd,
+  ): ToolRuntime {
+    return createToolRuntimeFromBinding({
+      binding: runtimeBinding,
       env: envOverlay,
+      containerManager: this.deps.containerManager,
+      sessionId: this.config.sessionId,
+      secretResolver: this.deps.runtimeSecretResolver,
     });
   }
 
-  private async createLocalFileAccessTracker(
+  private async createFileAccessTracker(
     filesRead: Set<string>,
     runtimeBinding: RuntimeExecutionBinding
   ): Promise<FileAccessTracker> {
     const tracker = new FileAccessTracker();
-    const runtime = this.createLocalRuntime(runtimeBinding);
+    const runtime = this.createRuntime(runtimeBinding);
 
     for (const filePath of filesRead) {
       const runtimePath = await runtime.paths.resolve(filePath);

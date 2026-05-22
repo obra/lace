@@ -496,6 +496,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       activeSession: state.activeSession,
       config: state.config,
       jobStreaming: state.jobManager.getStreamingMode(),
+      containerManager: state.containerManager,
+      runtimeSecretResolver: state.runtimeSecretResolver,
     }),
     runExclusive,
     emitSessionUpdate,

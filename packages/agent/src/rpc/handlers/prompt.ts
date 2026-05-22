@@ -266,6 +266,8 @@ export function registerPromptHandler(
           getModelPricing(state, effectiveConfig.connectionId, effectiveConfig.modelId),
         startShellJob,
         jobManager: state.jobManager,
+        containerManager: state.containerManager,
+        runtimeSecretResolver: state.runtimeSecretResolver,
         mcpServerManager: state.mcpServerManager,
         skillRegistry,
         personaRegistry: state.personaRegistry,

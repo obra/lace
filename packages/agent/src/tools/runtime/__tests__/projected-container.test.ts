@@ -3,6 +3,7 @@ import { access, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import type { ContainerLifecycleHooks, ContainerSpec } from '../../../containers/spec';
 import { ProjectedContainerToolRuntime } from '../projected-container';
 import { InMemoryRuntimeSecretResolver } from '../secrets';
 
@@ -135,6 +136,83 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(manager.materialize.mock.invocationCallOrder[0]).toBeLessThan(
       manager.execStream.mock.invocationCallOrder[0]
     );
+  });
+
+  it('mounts host-provided runtime helpers read-only when helper mode is mount', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = {
+      ...descriptor(),
+      helper: {
+        mode: 'mount' as const,
+        hostPath: '/host/lace-runtime-helper',
+        containerPath: '/usr/local/bin/lace-runtime-helper',
+        command: ['/usr/local/bin/lace-runtime-helper'],
+      },
+    };
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
+
+    expect(manager.materialize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mounts: expect.arrayContaining([
+          {
+            source: '/host/lace-runtime-helper',
+            target: '/usr/local/bin/lace-runtime-helper',
+            readonly: true,
+          },
+        ]),
+      })
+    );
+  });
+
+  it('copies host-provided runtime helpers before creating copy-mode containers', async () => {
+    const helperRoot = await mkdtemp(join(tmpdir(), 'lace-helper-source-'));
+    const helperPath = join(helperRoot, 'runtime-helper.js');
+    await writeFile(helperPath, 'helper source', 'utf8');
+    const projectedDescriptor = {
+      ...descriptor(),
+      helper: {
+        mode: 'copy' as const,
+        hostPath: helperPath,
+        containerPath: '/usr/local/bin/lace-runtime-helper',
+        command: ['/usr/local/bin/lace-runtime-helper'],
+      },
+    };
+    const manager = {
+      materialize: vi.fn(async (spec: ContainerSpec, hooks?: ContainerLifecycleHooks) => {
+        await hooks?.beforeCreate?.();
+        return {
+          spec,
+          containerId: 'container_123',
+          state: 'running' as const,
+        };
+      }),
+      execStream: vi.fn().mockResolvedValue(createFakeExecStreamHandle()),
+    };
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
+
+    const spec = manager.materialize.mock.calls[0][0];
+    const helperMount = spec.mounts.find(
+      (mount) => mount.target === '/usr/local/bin/lace-runtime-helper'
+    );
+    expect(helperMount).toBeDefined();
+    expect(helperMount).toMatchObject({
+      readonly: true,
+      target: '/usr/local/bin/lace-runtime-helper',
+    });
+    expect(helperMount!.source).not.toBe(helperPath);
+    await expect(readFile(helperMount!.source, 'utf8')).resolves.toBe('helper source');
   });
 
   it('merges resolved secret env into the materialized container spec', async () => {

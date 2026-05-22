@@ -88,11 +88,6 @@ function parseSessionRuntimeBinding(value: unknown): RuntimeExecutionBinding {
     const message = error instanceof Error ? error.message : String(error);
     throwInvalidParams(`config.runtimeBinding is invalid: ${message}`);
   }
-  if (runtimeBinding.toolRuntime.type !== 'local') {
-    throwInvalidParams(
-      'config.runtimeBinding is invalid: only local runtime bindings are supported for sessions'
-    );
-  }
   return runtimeBinding;
 }
 

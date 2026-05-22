@@ -18,6 +18,7 @@ import { loadSession } from '../../storage/session-store';
 import { invalidateSessionToolExecutor } from '../../server';
 import { defaultMcpServerPlacements } from '../session-config';
 import { HostToolRuntime } from '../../tools/runtime/host';
+import { createToolRuntimeFromBinding } from '../../tools/runtime/factory';
 import type { ToolRuntime } from '../../tools/runtime/types';
 import { mcpConnectionKey } from '../../mcp/server-manager';
 
@@ -45,24 +46,18 @@ function activeSessionRuntime(state: AgentServerState, config: MCPServerConfig):
 
   if (placement === 'host') {
     return new HostToolRuntime({
-      id:
-        runtimeBinding?.identity.runtimeId ??
-        (activeSession ? `session:${activeSession.meta.sessionId}:host` : 'mcp:host'),
+      id: activeSession ? `session:${activeSession.meta.sessionId}:host` : 'mcp:host',
       cwd: hostCwd,
     });
   }
 
-  if (runtimeBinding?.toolRuntime.type === 'local') {
-    return new HostToolRuntime({
-      id: runtimeBinding.identity.runtimeId,
-      cwd: runtimeBinding.toolRuntime.cwd,
-    });
-  }
-
   if (runtimeBinding) {
-    throw new Error(
-      `MCP runtime placement only supports local runtime bindings for now; received ${runtimeBinding.toolRuntime.type}`
-    );
+    return createToolRuntimeFromBinding({
+      binding: runtimeBinding,
+      containerManager: state.containerManager,
+      sessionId: activeSession?.meta.sessionId,
+      secretResolver: state.runtimeSecretResolver,
+    });
   }
 
   return new HostToolRuntime({

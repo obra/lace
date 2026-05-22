@@ -8,7 +8,9 @@ import { MAX_JOB_OUTPUT_BYTES } from '../server-types';
 import { toolKindFromName, shouldAskPermission } from '../rpc/utils';
 import { readSessionState, type LoadedSession } from '../storage/session-store';
 import type { ToolResult } from '@lace/ent-protocol';
-import { HostToolRuntime } from '../tools/runtime/host';
+import { createToolRuntimeFromBinding } from '../tools/runtime/factory';
+import type { ProjectedContainerManager } from '../tools/runtime/projected-container';
+import type { RuntimeSecretResolver } from '../tools/runtime/secrets';
 import { buildDefaultLocalRuntimeBinding } from '../tools/runtime/validation';
 import type { RuntimeProcessHandle } from '../tools/runtime/types';
 
@@ -25,6 +27,8 @@ export type ShellJobContext = {
         | 'dangerouslySkipPermissions';
     };
     jobStreaming: 'full' | 'coalesced' | 'none';
+    containerManager?: ProjectedContainerManager | null;
+    runtimeSecretResolver?: RuntimeSecretResolver;
   };
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>;
   emitSessionUpdate: (
@@ -207,15 +211,11 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
             sessionId: state.activeSession.meta.sessionId,
             cwd: state.activeSession.meta.workDir,
           });
-        if (runtimeBinding.toolRuntime.type !== 'local') {
-          throw new Error(
-            'Only local runtime shell jobs are supported before projected container runtime lands'
-          );
-        }
-
-        const runtime = new HostToolRuntime({
-          id: runtimeBinding.identity.runtimeId,
-          cwd: runtimeBinding.toolRuntime.cwd,
+        const runtime = createToolRuntimeFromBinding({
+          binding: runtimeBinding,
+          containerManager: state.containerManager,
+          sessionId: state.activeSession.meta.sessionId,
+          secretResolver: state.runtimeSecretResolver,
         });
         const detached = process.platform !== 'win32';
         proc = await runtime.process.start(['/bin/bash', '-c', job.command ?? ''], {

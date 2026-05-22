@@ -255,7 +255,7 @@ describe.skipIf(skipOnWindows)(
       expect(env.KATA47_RECONCILE_C).toBe('charlie');
     });
 
-    it('rejects non-local runtime bindings during MCP reconciliation', async () => {
+    it('starts default runtime-placed MCP servers with workspace runtime bindings', async () => {
       const state = buildState({
         nextEventSeq: 1,
         nextStreamSeq: 1,
@@ -276,6 +276,7 @@ describe.skipIf(skipOnWindows)(
               name: 'env-dump',
               command: process.execPath,
               args: [HELPER],
+              env: { KATA47_WORKSPACE_RUNTIME: 'visible' },
               enabled: true,
               tools: {},
             },
@@ -283,10 +284,21 @@ describe.skipIf(skipOnWindows)(
         },
       });
 
-      await expect(reconcileMcpServersForActiveSession(state)).rejects.toThrow(
-        'MCP runtime placement only supports local runtime bindings'
+      await reconcileMcpServersForActiveSession(state);
+
+      const env = await readSubprocessEnv(mcpServerManager, 'env-dump');
+      const server = mcpServerManager.getServer('env-dump');
+      expect(env.KATA47_WORKSPACE_RUNTIME).toBe('visible');
+      expect(server?.status).toBe('running');
+      expect(server?.connectionKey).toBe(
+        mcpConnectionKey({
+          serverId: 'env-dump',
+          config: { placement: 'toolRuntime', transport: 'stdio' },
+          runtimeId: 'rt_workspace_reconcile',
+          runtimeCwd: tmpRoot,
+          hostCwd: tmpRoot,
+        })
       );
-      expect(mcpServerManager.getAllServers()).toEqual([]);
     });
 
     it('starts explicit host-placed MCP servers with non-local runtime bindings', async () => {

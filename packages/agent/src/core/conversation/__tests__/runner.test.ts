@@ -479,6 +479,116 @@ describe('ConversationRunner', () => {
       }
     });
 
+    it('executes tools through a workspace runtime binding', async () => {
+      const projectRoot = join(tmpdir(), `lace-runner-project-${randomUUID().slice(0, 8)}`);
+      const workspaceRoot = join(tmpdir(), `lace-runner-workspace-${randomUUID().slice(0, 8)}`);
+      const projectCwd = join(projectRoot, 'pkg');
+      const workspaceCwd = join(workspaceRoot, 'pkg');
+      mkdirSync(projectCwd, { recursive: true });
+      mkdirSync(workspaceCwd, { recursive: true });
+
+      class WorkspaceToolProvider extends AIProvider {
+        get providerName(): string {
+          return 'workspace-runtime-test';
+        }
+
+        isConfigured(): boolean {
+          return true;
+        }
+
+        get supportsStreaming(): boolean {
+          return true;
+        }
+
+        async createResponse(
+          messages: ProviderMessage[],
+          tools: Tool[],
+          model: string,
+          signal?: AbortSignal,
+          conversationState?: ConversationState,
+          options?: RequestOptions
+        ): Promise<ProviderResponse> {
+          return this.createStreamingResponse(
+            messages,
+            tools,
+            model,
+            signal,
+            conversationState,
+            options
+          );
+        }
+
+        async createStreamingResponse(): Promise<ProviderResponse> {
+          return {
+            content: '',
+            toolCalls: [{ id: 'tc_workspace', name: 'bash', arguments: { command: 'pwd' } }],
+            stopReason: 'tool_use',
+          };
+        }
+      }
+
+      try {
+        const runtimeBinding: RuntimeExecutionBinding = {
+          schemaVersion: 1,
+          identity: { runtimeId: 'rt_workspace_runner' },
+          agentPlacement: 'host',
+          toolRuntime: {
+            type: 'workspace',
+            projectRoot,
+            workspaceRoot,
+            cwd: projectCwd,
+          },
+        };
+        const mockTool = { name: 'bash', description: 'mock bash', schema: {} } as unknown as Tool;
+        const execute = vi.fn().mockResolvedValue({
+          status: 'completed',
+          content: [{ type: 'text', text: 'mock result' }],
+        });
+        const deps = createMockDeps({
+          createProvider: vi.fn().mockImplementation(async () => new WorkspaceToolProvider()),
+          createToolExecutor: vi.fn().mockReturnValue({
+            executor: {
+              getTool: vi.fn().mockReturnValue(mockTool),
+              execute,
+            },
+            toolsForProvider: [mockTool],
+          }),
+        });
+        const runner = new ConversationRunner(
+          {
+            sessionDir,
+            sessionId: 'sess_test',
+            cwd: projectCwd,
+            runtimeBinding,
+            executionMode: 'execute',
+            approvalMode: 'approve',
+          },
+          deps
+        );
+
+        await runner.run({
+          content: [{ type: 'text', text: 'Run pwd.' }],
+          abortController: new AbortController(),
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+          maxTurns: 1,
+        });
+
+        expect(execute).toHaveBeenCalledOnce();
+        expect(execute.mock.calls[0][1]).toMatchObject({
+          runtime: {
+            kind: 'workspace',
+            id: 'rt_workspace_runner',
+            cwd: workspaceCwd,
+          },
+          runtimeBinding,
+        });
+      } finally {
+        rmSync(projectRoot, { recursive: true, force: true });
+        rmSync(workspaceRoot, { recursive: true, force: true });
+      }
+    });
+
     describe('thinking events', () => {
       /**
        * A test provider that emits thinking events before the response.

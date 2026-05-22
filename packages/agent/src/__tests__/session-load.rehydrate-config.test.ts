@@ -261,28 +261,24 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     expect(loadSession(created.sessionId).state.config?.runtimeBinding).toEqual(runtimeBinding);
   });
 
-  it('rejects non-local runtimeBinding during session/new before persistence', async () => {
+  it('persists non-local runtimeBinding during session/new', async () => {
     const state = createAgentServerState();
     const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    const runtimeBinding = workspaceRuntimeBinding(tempDir);
 
     await client.request('initialize', defaultInitializeParams());
 
-    await expect(
-      client.request('session/new', {
-        cwd: tempDir,
-        mcpServers: [],
-        config: { runtimeBinding: workspaceRuntimeBinding(tempDir) },
-      })
-    ).rejects.toMatchObject({ code: -32602 });
+    const created = (await client.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+      config: { runtimeBinding },
+    })) as { sessionId: string };
 
-    const listed = (await client.request('session/list', { cwd: tempDir })) as {
-      sessions: unknown[];
-    };
-    expect(listed.sessions).toEqual([]);
-    expect(state.activeSession).toBeNull();
+    expect(state.activeSession?.state.config?.runtimeBinding).toEqual(runtimeBinding);
+    expect(loadSession(created.sessionId).state.config?.runtimeBinding).toEqual(runtimeBinding);
   });
 
-  it('rejects non-local runtimeBinding during session/resume before persistence', async () => {
+  it('persists non-local runtimeBinding during session/resume', async () => {
     const setupState = createAgentServerState();
     const { client: setupClient } = createPairedPeers((peer) =>
       registerAgentRpcMethods(peer, setupState)
@@ -300,20 +296,19 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     );
 
     await resumeClient.request('initialize', defaultInitializeParams());
-    await expect(
-      resumeClient.request('session/resume', {
-        sessionId: created.sessionId,
-        cwd: tempDir,
-        mcpServers: [],
-        config: { runtimeBinding: workspaceRuntimeBinding(tempDir) },
-      })
-    ).rejects.toMatchObject({ code: -32602 });
+    const runtimeBinding = workspaceRuntimeBinding(tempDir);
+    await resumeClient.request('session/resume', {
+      sessionId: created.sessionId,
+      cwd: tempDir,
+      mcpServers: [],
+      config: { runtimeBinding },
+    });
 
-    expect(loadSession(created.sessionId).state.config?.runtimeBinding).toBeUndefined();
-    expect(resumeState.activeSession).toBeNull();
+    expect(loadSession(created.sessionId).state.config?.runtimeBinding).toEqual(runtimeBinding);
+    expect(resumeState.activeSession?.state.config?.runtimeBinding).toEqual(runtimeBinding);
   });
 
-  it('rejects non-local runtimeBinding during session/load before persistence', async () => {
+  it('persists non-local runtimeBinding during session/load', async () => {
     const setupState = createAgentServerState();
     const { client: setupClient } = createPairedPeers((peer) =>
       registerAgentRpcMethods(peer, setupState)
@@ -331,20 +326,19 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     );
 
     await loadClient.request('initialize', defaultInitializeParams());
-    await expect(
-      loadClient.request('session/load', {
-        sessionId: created.sessionId,
-        cwd: tempDir,
-        mcpServers: [],
-        config: { runtimeBinding: workspaceRuntimeBinding(tempDir) },
-      })
-    ).rejects.toMatchObject({ code: -32602 });
+    const runtimeBinding = workspaceRuntimeBinding(tempDir);
+    await loadClient.request('session/load', {
+      sessionId: created.sessionId,
+      cwd: tempDir,
+      mcpServers: [],
+      config: { runtimeBinding },
+    });
 
-    expect(loadSession(created.sessionId).state.config?.runtimeBinding).toBeUndefined();
-    expect(loadState.activeSession).toBeNull();
+    expect(loadSession(created.sessionId).state.config?.runtimeBinding).toEqual(runtimeBinding);
+    expect(loadState.activeSession?.state.config?.runtimeBinding).toEqual(runtimeBinding);
   });
 
-  it('rejects stored non-local runtimeBinding during session/load before activation', async () => {
+  it('activates stored non-local runtimeBinding during session/load', async () => {
     const setupState = createAgentServerState();
     const { client: setupClient } = createPairedPeers((peer) =>
       registerAgentRpcMethods(peer, setupState)
@@ -364,22 +358,24 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     );
 
     await loadClient.request('initialize', defaultInitializeParams());
-    await expect(
-      loadClient.request('session/load', {
-        sessionId: created.sessionId,
-        cwd: tempDir,
-        mcpServers: [{ name: 'loaded', command: process.execPath, enabled: false }],
-      })
-    ).rejects.toMatchObject({ code: -32602 });
+    await loadClient.request('session/load', {
+      sessionId: created.sessionId,
+      cwd: tempDir,
+      mcpServers: [{ name: 'loaded', command: process.execPath, enabled: false }],
+    });
 
-    expect(loadState.activeSession).toBeNull();
+    expect(loadState.activeSession?.state.config).toMatchObject({
+      runtimeBinding: storedRuntimeBinding,
+    });
     expect(loadSession(created.sessionId).state.config).toMatchObject({
       runtimeBinding: storedRuntimeBinding,
     });
-    expect(loadSession(created.sessionId).state.config?.mcpServers).toEqual([]);
+    expect(loadSession(created.sessionId).state.config?.mcpServers).toEqual([
+      { name: 'loaded', command: process.execPath, enabled: false, placement: 'toolRuntime' },
+    ]);
   });
 
-  it('rejects stored non-local runtimeBinding during session/resume before activation', async () => {
+  it('activates stored non-local runtimeBinding during session/resume', async () => {
     const setupState = createAgentServerState();
     const { client: setupClient } = createPairedPeers((peer) =>
       registerAgentRpcMethods(peer, setupState)
@@ -399,19 +395,21 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     );
 
     await resumeClient.request('initialize', defaultInitializeParams());
-    await expect(
-      resumeClient.request('session/resume', {
-        sessionId: created.sessionId,
-        cwd: tempDir,
-        mcpServers: [{ name: 'resumed', command: process.execPath, enabled: false }],
-      })
-    ).rejects.toMatchObject({ code: -32602 });
+    await resumeClient.request('session/resume', {
+      sessionId: created.sessionId,
+      cwd: tempDir,
+      mcpServers: [{ name: 'resumed', command: process.execPath, enabled: false }],
+    });
 
-    expect(resumeState.activeSession).toBeNull();
+    expect(resumeState.activeSession?.state.config).toMatchObject({
+      runtimeBinding: storedRuntimeBinding,
+    });
     expect(loadSession(created.sessionId).state.config).toMatchObject({
       runtimeBinding: storedRuntimeBinding,
     });
-    expect(loadSession(created.sessionId).state.config?.mcpServers).toEqual([]);
+    expect(loadSession(created.sessionId).state.config?.mcpServers).toEqual([
+      { name: 'resumed', command: process.execPath, enabled: false, placement: 'toolRuntime' },
+    ]);
   });
 
   it('persists HTTP/SSE MCP configs without spawning them as stdio during load', async () => {

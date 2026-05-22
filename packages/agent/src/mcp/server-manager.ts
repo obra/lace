@@ -41,13 +41,8 @@ export function mcpConnectionKey(input: {
   const placement = input.config.placement ?? 'host';
   const transport = input.config.transport ?? 'stdio';
   const effectiveCwd = placement === 'toolRuntime' ? input.runtimeCwd : input.hostCwd;
-  return JSON.stringify([
-    input.serverId,
-    placement,
-    transport,
-    input.runtimeId,
-    effectiveCwd ?? '',
-  ]);
+  const runtimeKey = placement === 'toolRuntime' ? input.runtimeId : 'host';
+  return JSON.stringify([input.serverId, placement, transport, runtimeKey, effectiveCwd ?? '']);
 }
 
 async function resolveMcpEnvironment(input: {

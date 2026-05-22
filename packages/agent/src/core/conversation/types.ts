@@ -10,6 +10,8 @@ import type { SkillRegistry } from '@lace/agent/skills';
 import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
 import type { AlarmScheduler } from '@lace/agent/alarms/alarm-scheduler';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
+import type { ProjectedContainerManager } from '@lace/agent/tools/runtime/projected-container';
+import type { RuntimeSecretResolver } from '@lace/agent/tools/runtime/secrets';
 
 /**
  * Approval mode for tool permissions.
@@ -107,6 +109,12 @@ export interface RunnerDependencies {
 
   /** Job manager for job-related tools */
   jobManager: JobManager;
+
+  /** Projected container manager for container-backed tool runtimes */
+  containerManager?: ProjectedContainerManager | null;
+
+  /** Resolver for runtime-scoped secret references */
+  runtimeSecretResolver?: RuntimeSecretResolver;
 
   /** Skill registry for skill-related tools (optional) */
   skillRegistry?: SkillRegistry;

@@ -209,4 +209,71 @@ describe('createRunShellJobProcess', () => {
       signal: undefined,
     });
   });
+
+  it('starts workspace runtime jobs in the mapped workspace cwd', async () => {
+    const mutableState = {
+      activeSession: {
+        dir: '/tmp/test-session',
+        meta: {
+          sessionId: 'sess_workspace',
+          workDir: '/project/pkg',
+          projectId: 'test-project',
+          rootDir: '/tmp',
+          personaId: 'default',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      } as LoadedSession,
+      config: { approvalMode: 'dangerouslySkipPermissions' as const },
+      jobStreaming: 'none' as const,
+    };
+
+    const mockEmitSessionUpdate = vi.fn().mockResolvedValue(undefined);
+    const mockFinalizeJob = vi.fn().mockResolvedValue(undefined);
+    const mockRequestPermission = vi.fn().mockResolvedValue({ decision: 'allow' });
+    const mockRunExclusive = vi.fn().mockImplementation(<T>(fn: () => T) => fn());
+
+    const runShellJobProcess = createRunShellJobProcess({
+      getState: () => mutableState,
+      runExclusive: mockRunExclusive,
+      emitSessionUpdate: mockEmitSessionUpdate,
+      requestPermissionFromClient: mockRequestPermission,
+      finalizeJob: mockFinalizeJob,
+    });
+
+    const job: JobState = {
+      jobId: 'job_workspace',
+      type: 'bash',
+      status: 'running',
+      command: 'pwd',
+      startedAt: new Date().toISOString(),
+      outputPath: '/tmp/test-output',
+      finished: false,
+      completion: Promise.resolve(),
+      resolveCompletion: vi.fn(),
+      runtimeBinding: {
+        schemaVersion: 1,
+        identity: { runtimeId: 'rt_workspace_job' },
+        agentPlacement: 'host',
+        toolRuntime: {
+          type: 'workspace',
+          projectRoot: '/project',
+          workspaceRoot: process.cwd(),
+          cwd: '/project',
+        },
+      },
+    };
+
+    runShellJobProcess(job);
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(mockSpawn).toHaveBeenCalledWith('/bin/bash', ['-c', 'pwd'], {
+      cwd: process.cwd(),
+      env: expect.any(Object),
+      stdio: ['pipe', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
+      signal: undefined,
+    });
+  });
 });
