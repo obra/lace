@@ -75,6 +75,9 @@ export class RuntimeStdioClientTransport implements Transport {
       handle.stdout?.on('error', (error) => {
         this.onerror?.(error);
       });
+      handle.stderr?.on('data', () => {
+        // Drain diagnostics so a noisy MCP server cannot block on a full stderr pipe.
+      });
       handle.stderr?.on('error', (error) => {
         this.onerror?.(error);
       });

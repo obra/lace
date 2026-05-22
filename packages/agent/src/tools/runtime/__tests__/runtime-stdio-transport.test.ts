@@ -89,4 +89,27 @@ describe('RuntimeStdioClientTransport', () => {
       envMode: 'inherit',
     });
   });
+
+  it('drains stderr from runtime processes', async () => {
+    const stderr = new PassThrough();
+    const runtime = createFakeRuntime();
+    runtime.process.start = vi.fn(async () => ({
+      pid: 123,
+      stdin: new PassThrough(),
+      stdout: Readable.from([]),
+      stderr,
+      kill: vi.fn(),
+      completion: Promise.resolve({ exitCode: 0, signal: undefined }),
+    }));
+    const transport = new RuntimeStdioClientTransport({
+      runtime,
+      command: 'node',
+    });
+
+    await transport.start();
+    stderr.write('diagnostic output\n');
+
+    expect(stderr.listenerCount('data')).toBeGreaterThan(0);
+    expect(stderr.readableFlowing).toBe(true);
+  });
 });

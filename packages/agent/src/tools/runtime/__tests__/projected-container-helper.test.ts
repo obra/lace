@@ -134,6 +134,7 @@ describe('ProjectedContainerToolRuntime helper', () => {
   });
 
   it('passes fetch options to helper-backed fetch', async () => {
+    const responseBytes = Uint8Array.from([0, 255, 65, 66]);
     const stdin = new PassThrough();
     let request = '';
     stdin.on('data', (chunk: Buffer | string) => {
@@ -150,7 +151,11 @@ describe('ProjectedContainerToolRuntime helper', () => {
         stdout: Readable.from([
           `${JSON.stringify({
             ok: true,
-            value: { status: 200, headers: {}, body: Buffer.from('ok').toString('base64') },
+            value: {
+              status: 200,
+              headers: {},
+              body: Buffer.from(responseBytes).toString('base64'),
+            },
           })}\n`,
         ]),
         stderr: Readable.from([]),
@@ -164,11 +169,12 @@ describe('ProjectedContainerToolRuntime helper', () => {
       descriptor: containerDescriptorWithHelper(),
     });
 
-    await runtime.network.fetch('https://example.test/redirect', {
+    const result = await runtime.network.fetch('https://example.test/redirect', {
       redirect: 'manual',
       maxBytes: 4096,
     });
 
+    expect(Array.from(result.body)).toEqual(Array.from(responseBytes));
     expect(JSON.parse(request)).toMatchObject({
       op: 'fetch',
       url: 'https://example.test/redirect',

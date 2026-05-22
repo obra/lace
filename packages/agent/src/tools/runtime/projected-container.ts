@@ -340,10 +340,8 @@ function parseReaddirValue(value: unknown): Array<{ name: string; type: 'file' |
 }
 
 function parseFetchBody(value: unknown): Uint8Array {
-  if (value instanceof Uint8Array) return value;
-  if (typeof value === 'string') return new TextEncoder().encode(value);
-  if (Array.isArray(value) && value.every((entry) => typeof entry === 'number')) {
-    return new Uint8Array(value);
+  if (typeof value === 'string') {
+    return new Uint8Array(Buffer.from(value, 'base64'));
   }
   throw new Error('Invalid helper fetch response');
 }
