@@ -8,6 +8,30 @@ import { atomicWriteJson } from './atomic-write';
 import { SessionStorageError } from '../errors/agent-errors';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 
+/**
+ * MCP server entry as stored in state.json. Extends the protocol's
+ * McpServerConfig shape with a lace-internal `source` tag identifying who
+ * owns the entry. The tag is purely lace-side metadata: it never crosses the
+ * embedder wire boundary and is added by lace itself when storing entries
+ * supplied through embedder calls (session/new, session/load, session/resume,
+ * session/fork) versus user-facing calls (ent/mcp/servers/upsert).
+ *
+ * Missing `source` is treated as `embedder` for migration compatibility with
+ * state.json files written before this field existed (see PRI-1754).
+ */
+export type McpServerSource = 'embedder' | 'user';
+
+export type StoredMcpServer = {
+  name: string;
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+  transport?: 'stdio' | 'sse' | 'http';
+  enabled?: boolean;
+  tools?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
+  source?: McpServerSource;
+};
+
 export type SessionMeta = {
   sessionId: string;
   workDir: string;
@@ -44,15 +68,7 @@ export type SessionState = {
     maxThinkingTokens?: number;
     environment?: Record<string, string>;
     runtimeBinding?: RuntimeExecutionBinding;
-    mcpServers?: Array<{
-      name: string;
-      command: string;
-      args?: string[];
-      env?: Record<string, string>;
-      transport?: 'stdio' | 'sse' | 'http';
-      enabled?: boolean;
-      tools?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
-    }>;
+    mcpServers?: StoredMcpServer[];
     /** Allowlist of tool names for this session; undefined means no scope filter. */
     toolScope?: string[];
   };

@@ -1,6 +1,7 @@
 // ABOUTME: MCP server management RPC handlers for external tool integration
 // Handles server lifecycle management (list, create, update, delete, test) and tool discovery
 
+import { z } from 'zod';
 import type { JsonRpcPeer } from '@lace/ent-protocol';
 import { AcpErrorCodes, EntErrorCodes, McpServerConfigSchema } from '@lace/ent-protocol';
 import type { ToolPolicy } from '../../tools/types';
@@ -13,7 +14,11 @@ import {
   mcpServerConfigEquivalent,
 } from '../utils';
 import { logger } from '../../utils/logger';
-import { readSessionState, writeSessionState } from '../../storage/session-store';
+import {
+  readSessionState,
+  writeSessionState,
+  type StoredMcpServer,
+} from '../../storage/session-store';
 import { loadSession } from '../../storage/session-store';
 import { invalidateSessionToolExecutor } from '../../server';
 import { defaultMcpServerPlacements } from '../session-config';
@@ -154,6 +159,13 @@ async function syncDisabledMcpServerForActiveSession(
   });
 }
 
+// Lace-internal storage schema: protocol's McpServerConfigSchema plus an
+// optional `source` tag (see session-store.ts). The strict protocol schema
+// would reject this tag, so reading state.json uses the extended shape.
+const StoredMcpServerSchema = McpServerConfigSchema.extend({
+  source: z.enum(['embedder', 'user']).optional(),
+});
+
 /**
  * Reconcile MCP servers for the active session.
  * Compares configured servers to running servers and starts/stops as needed.
@@ -166,7 +178,7 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
 
   const configured = state.activeSession.state.config?.mcpServers;
   const parsed = Array.isArray(configured)
-    ? McpServerConfigSchema.array().safeParse(configured)
+    ? StoredMcpServerSchema.array().safeParse(configured)
     : { success: true as const, data: [] as Array<any> };
 
   if (!parsed.success) {
@@ -376,8 +388,9 @@ export function registerMcpHandlers(
         ? sessionState.config.mcpServers
         : [];
 
-      // Find and replace or add the server config
-      const updatedServers = existingMcpServers.filter(
+      // Find and replace or add the server config. Tag as 'user'-owned so
+      // it survives subsequent embedder session/resume calls (see PRI-1754).
+      const updatedServers: StoredMcpServer[] = existingMcpServers.filter(
         (s: { name: string }) => s.name !== serverId
       );
       updatedServers.push({
@@ -390,6 +403,7 @@ export function registerMcpHandlers(
         ...(config.placement ? { placement: config.placement } : {}),
         enabled: config.enabled,
         ...(Object.keys(config.tools).length > 0 ? { tools: config.tools } : {}),
+        source: 'user',
       });
 
       writeSessionState(state.activeSession!.dir, {

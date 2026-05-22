@@ -38,9 +38,11 @@ import { getEffectiveConfig } from '@lace/agent/core/session';
 import { PersonaNotFoundError, PersonaParseError } from '../../config/persona-registry';
 import { LACE_BUILTIN_TOOL_NAMES } from '../../tools/executor';
 import {
+  applyEmbedderMcpServers,
   buildSessionConfigOptions,
   defaultMcpServerPlacements,
   mergeMcpServers,
+  tagMcpServers,
 } from '../session-config';
 import { cancelPendingPermissionRequests } from '../permissions';
 import {
@@ -120,7 +122,7 @@ function mergeMcpServersIntoLoadedSession(
     ...currentState,
     config: {
       ...currentConfig,
-      mcpServers: mergeMcpServers(currentConfig.mcpServers, mcpServers),
+      mcpServers: applyEmbedderMcpServers(currentConfig.mcpServers, mcpServers),
       ...(runtimeBinding ? { runtimeBinding } : {}),
     },
   };
@@ -350,6 +352,10 @@ export function registerSessionHandlers(
         : personaDefaults.mcpServers
           ? defaultMcpServerPlacements(personaDefaults.mcpServers)
           : undefined;
+    // Both persona-defaults and request-level entries come from the embedder.
+    const effectiveStoredMcpServers = effectiveMcpServers
+      ? tagMcpServers(effectiveMcpServers, 'embedder')
+      : undefined;
     const effectiveToolScope = personaDefaults.toolScope;
 
     const sessionId = `sess_${randomUUID()}`;
@@ -380,7 +386,7 @@ export function registerSessionHandlers(
           modelId: effectiveModelId,
           maxBudgetUsd: state.config.maxBudgetUsd,
           maxThinkingTokens: state.config.maxThinkingTokens,
-          ...(effectiveMcpServers ? { mcpServers: effectiveMcpServers } : {}),
+          ...(effectiveStoredMcpServers ? { mcpServers: effectiveStoredMcpServers } : {}),
           ...(effectiveToolScope ? { toolScope: effectiveToolScope } : {}),
           runtimeBinding: activeRuntimeBinding,
         },
@@ -554,10 +560,16 @@ export function registerSessionHandlers(
       },
     };
 
-    // Apply MCP server overrides if provided
+    // Apply MCP server overrides if provided. Caller is the embedder, so tag
+    // the new entries as 'embedder'-owned. Any 'user'-source entries from the
+    // source session are discarded when an override is supplied (no merge):
+    // a fork with explicit mcpServers is requesting a fresh embedder set.
     if (parsed.mcpServers) {
       forkedState.config = forkedState.config ?? {};
-      forkedState.config.mcpServers = defaultMcpServerPlacements(parsed.mcpServers);
+      forkedState.config.mcpServers = tagMcpServers(
+        defaultMcpServerPlacements(parsed.mcpServers),
+        'embedder'
+      );
     }
 
     writeSessionState(forkedSessionDir, forkedState);

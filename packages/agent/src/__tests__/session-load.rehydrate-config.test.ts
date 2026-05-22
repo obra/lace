@@ -144,9 +144,18 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     expect(loadState.activeSession?.state.config?.modelId).toBe('model_test');
     expect(loadState.config.connectionId).toBe('conn_test');
     expect(loadState.config.modelId).toBe('model_test');
+    // session/load applies the embedder's mcpServers authoritatively: entries
+    // present in the loaded state but absent from the incoming list are
+    // removed (see PRI-1754). 'initial' came from session/new and is
+    // embedder-owned, so it gets replaced by 'loaded'.
     expect(loadState.activeSession?.state.config?.mcpServers).toEqual([
-      { name: 'initial', command: process.execPath, enabled: false, placement: 'toolRuntime' },
-      { name: 'loaded', command: process.execPath, enabled: false, placement: 'toolRuntime' },
+      {
+        name: 'loaded',
+        command: process.execPath,
+        enabled: false,
+        placement: 'toolRuntime',
+        source: 'embedder',
+      },
     ]);
   });
 
@@ -230,6 +239,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         args: ['new'],
         enabled: false,
         placement: 'toolRuntime',
+        source: 'embedder',
       },
     ]);
   });
@@ -474,7 +484,13 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       runtimeBinding: storedRuntimeBinding,
     });
     expect(loadSession(created.sessionId).state.config?.mcpServers).toEqual([
-      { name: 'loaded', command: process.execPath, enabled: false, placement: 'toolRuntime' },
+      {
+        name: 'loaded',
+        command: process.execPath,
+        enabled: false,
+        placement: 'toolRuntime',
+        source: 'embedder',
+      },
     ]);
   });
 
@@ -511,7 +527,13 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       runtimeBinding: storedRuntimeBinding,
     });
     expect(loadSession(created.sessionId).state.config?.mcpServers).toEqual([
-      { name: 'resumed', command: process.execPath, enabled: false, placement: 'toolRuntime' },
+      {
+        name: 'resumed',
+        command: process.execPath,
+        enabled: false,
+        placement: 'toolRuntime',
+        source: 'embedder',
+      },
     ]);
   });
 
@@ -590,6 +612,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         transport: 'http',
         secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
         placement: 'host',
+        source: 'embedder',
       },
       {
         name: 'sse-server',
@@ -597,6 +620,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         args: ['-e', 'process.exit(0)'],
         transport: 'sse',
         placement: 'host',
+        source: 'embedder',
       },
     ]);
     expect(loadState.mcpServerManager.getServer('http-server')).toMatchObject({
@@ -694,6 +718,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
         enabled: true,
         placement: 'host',
+        source: 'user',
       },
     ]);
     expect(startServer).not.toHaveBeenCalled();
@@ -822,6 +847,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         transport: 'stdio',
         placement: 'host',
         enabled: false,
+        source: 'user',
       },
     ]);
     expect(stopServer).toHaveBeenCalledWith(connectionKey);
@@ -1000,6 +1026,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         transport: 'stdio',
         placement: 'host',
         enabled: true,
+        source: 'user',
       },
     ]);
   });
@@ -1051,6 +1078,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
           transport,
           enabled: true,
           placement: 'host',
+          source: 'user',
         },
       ]);
       expect(stopServer).toHaveBeenCalledWith('remote-server');
@@ -1360,6 +1388,84 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       expect(startServer).not.toHaveBeenCalled();
     }
   );
+
+  it('removes embedder-owned mcp servers absent from the resume mcpServers list (PRI-1754)', async () => {
+    // Reproduces the production bug: a session was created when the embedder's
+    // mcpServers list still included an entry (here, "scheduler"). After the
+    // embedder later removes that entry, session/resume should drop it from
+    // state.json — instead, the old union-merge kept it and lace crash-looped
+    // trying to spawn the deleted command.
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+
+    await setupClient.request('initialize', defaultInitializeParams());
+    const created = (await setupClient.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [
+        { name: 'keeper', command: process.execPath, enabled: false },
+        { name: 'scheduler', command: process.execPath, enabled: false },
+      ],
+    })) as { sessionId: string };
+
+    const resumeState = createAgentServerState();
+    const { client: resumeClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, resumeState)
+    );
+    await resumeClient.request('initialize', defaultInitializeParams());
+    await resumeClient.request('session/resume', {
+      sessionId: created.sessionId,
+      cwd: tempDir,
+      // Embedder no longer reports 'scheduler' — only 'keeper'.
+      mcpServers: [{ name: 'keeper', command: process.execPath, enabled: false }],
+    });
+
+    const resumedNames = (resumeState.activeSession?.state.config?.mcpServers ?? []).map(
+      (s) => s.name
+    );
+    expect(resumedNames).toEqual(['keeper']);
+  });
+
+  it('preserves user-owned (upsert) mcp servers across an embedder session/resume', async () => {
+    // Operator added an MCP server through ent/mcp/servers/upsert during a
+    // session. The next embedder-driven session/resume must not silently
+    // remove it: the embedder owns its declared subset, the user owns theirs.
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+    await setupClient.request('initialize', defaultInitializeParams());
+    const created = (await setupClient.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [{ name: 'core', command: process.execPath, enabled: false }],
+    })) as { sessionId: string };
+    await setupClient.request('ent/mcp/servers/upsert', {
+      name: 'user-added',
+      command: process.execPath,
+      enabled: false,
+    });
+
+    const resumeState = createAgentServerState();
+    const { client: resumeClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, resumeState)
+    );
+    await resumeClient.request('initialize', defaultInitializeParams());
+    await resumeClient.request('session/resume', {
+      sessionId: created.sessionId,
+      cwd: tempDir,
+      mcpServers: [{ name: 'core', command: process.execPath, enabled: false }],
+    });
+
+    const resumedServers = resumeState.activeSession?.state.config?.mcpServers ?? [];
+    const bySource = resumedServers.reduce<Record<string, string[]>>((acc, server) => {
+      const key = server.source ?? 'untagged';
+      (acc[key] ??= []).push(server.name);
+      return acc;
+    }, {});
+    expect(bySource.user).toEqual(['user-added']);
+    expect(bySource.embedder).toEqual(['core']);
+  });
 
   it('keeps the current session and jobs when load rejects invalid MCP servers', async () => {
     const state = createAgentServerState();

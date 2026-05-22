@@ -102,6 +102,7 @@ You are a frontmatter persona.`
         args: ['--root', '/tmp'],
         enabled: false,
         placement: 'toolRuntime',
+        source: 'embedder',
       },
     ]);
   });
@@ -141,9 +142,27 @@ You are a persona with MCP defaults.`
 
     const loaded = loadSession(created.sessionId);
     expect(loaded.state.config?.mcpServers).toEqual([
-      { name: 'shared', command: 'request-shared', enabled: false, placement: 'toolRuntime' },
-      { name: 'persona-only', command: 'persona-only', enabled: false, placement: 'toolRuntime' },
-      { name: 'request-only', command: 'request-only', enabled: false, placement: 'toolRuntime' },
+      {
+        name: 'shared',
+        command: 'request-shared',
+        enabled: false,
+        placement: 'toolRuntime',
+        source: 'embedder',
+      },
+      {
+        name: 'persona-only',
+        command: 'persona-only',
+        enabled: false,
+        placement: 'toolRuntime',
+        source: 'embedder',
+      },
+      {
+        name: 'request-only',
+        command: 'request-only',
+        enabled: false,
+        placement: 'toolRuntime',
+        source: 'embedder',
+      },
     ]);
   });
 
@@ -191,6 +210,7 @@ Persona with MCP placement.`
         secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
         enabled: true,
         placement: 'host',
+        source: 'embedder',
       },
       {
         name: 'explicit-stdio-host',
@@ -198,6 +218,7 @@ Persona with MCP placement.`
         transport: 'stdio',
         placement: 'host',
         enabled: false,
+        source: 'embedder',
       },
     ]);
   });
