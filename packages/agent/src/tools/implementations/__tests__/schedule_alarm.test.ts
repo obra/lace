@@ -501,4 +501,78 @@ describe('schedule_alarm', () => {
     expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('does not accept schedule');
   });
+
+  it('interval: caller-supplied timezone is used for next_fire_at_iso display', async () => {
+    const { sessionId, sessionDir, scheduler } = setup();
+    const tool = new ScheduleAlarmTool();
+    const result = await tool.execute(
+      { kind: 'interval', minutes: 5, timezone: 'America/Los_Angeles', prompt: 'ping' },
+      {
+        signal: new AbortController().signal,
+        alarmScheduler: scheduler,
+        activeSessionId: sessionId,
+        activeSessionDir: sessionDir,
+      }
+    );
+    expect(result.status).toBe('completed');
+    const body = JSON.parse(result.content[0].text) as {
+      next_fire_at_iso: string;
+      timezone: string;
+    };
+    expect(body.next_fire_at_iso).toMatch(/-0[78]:00 \(America\/Los_Angeles\)$/);
+    expect(body.timezone).toBe('America/Los_Angeles');
+  });
+
+  it('interval: defaults to UTC when no timezone is provided', async () => {
+    const { sessionId, sessionDir, scheduler } = setup();
+    const tool = new ScheduleAlarmTool();
+    const result = await tool.execute(
+      { kind: 'interval', minutes: 5, prompt: 'ping' },
+      {
+        signal: new AbortController().signal,
+        alarmScheduler: scheduler,
+        activeSessionId: sessionId,
+        activeSessionDir: sessionDir,
+      }
+    );
+    expect(result.status).toBe('completed');
+    const body = JSON.parse(result.content[0].text) as {
+      next_fire_at_iso: string;
+      timezone: string;
+    };
+    expect(body.next_fire_at_iso).toContain('+00:00 (UTC)');
+    expect(body.timezone).toBe('UTC');
+  });
+
+  it('interval: invalid timezone is rejected', async () => {
+    const { sessionId, sessionDir, scheduler } = setup();
+    const tool = new ScheduleAlarmTool();
+    const result = await tool.execute(
+      { kind: 'interval', minutes: 5, timezone: 'Not/A/Zone', prompt: 'p' },
+      {
+        signal: new AbortController().signal,
+        alarmScheduler: scheduler,
+        activeSessionId: sessionId,
+        activeSessionDir: sessionDir,
+      }
+    );
+    expect(result.status).toBe('failed');
+    expect(result.content[0].text).toMatch(/timezone/i);
+  });
+
+  it('interval: still rejects args.schedule even when timezone is provided', async () => {
+    const { sessionId, sessionDir, scheduler } = setup();
+    const tool = new ScheduleAlarmTool();
+    const result = await tool.execute(
+      { kind: 'interval', minutes: 5, schedule: '0 9 * * *', timezone: 'UTC', prompt: 'p' },
+      {
+        signal: new AbortController().signal,
+        alarmScheduler: scheduler,
+        activeSessionId: sessionId,
+        activeSessionDir: sessionDir,
+      }
+    );
+    expect(result.status).toBe('failed');
+    expect(result.content[0].text).toMatch(/does not accept schedule/);
+  });
 });

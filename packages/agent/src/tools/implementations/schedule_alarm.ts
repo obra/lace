@@ -170,8 +170,8 @@ function resolveInputs(
   }
 
   // kind === 'interval'
-  if (args.schedule !== undefined || args.timezone !== undefined) {
-    return { ok: false, error: "kind='interval' does not accept schedule or timezone" };
+  if (args.schedule !== undefined) {
+    return { ok: false, error: "kind='interval' does not accept schedule" };
   }
   if (args.minutes === undefined) {
     return { ok: false, error: "kind='interval' requires minutes" };
@@ -181,6 +181,13 @@ function resolveInputs(
       ok: false,
       error: `kind='interval' requires minutes >= ${MIN_INTERVAL_MINUTES} (got ${args.minutes})`,
     };
+  }
+  if (args.timezone !== undefined) {
+    try {
+      assertValidIanaTimezone(args.timezone);
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
   }
   if (args.endTime !== undefined && args.durationMinutes !== undefined) {
     return {
@@ -218,7 +225,7 @@ function resolveInputs(
     ok: true,
     value: {
       spec: { kind: 'interval', minutes: args.minutes },
-      timezone: 'UTC',
+      timezone: args.timezone ?? 'UTC',
       nextFireAt,
       endAt,
     },
