@@ -1199,14 +1199,19 @@ For each failure:
 
 - [ ] **Step 9: Commit final fixes if needed**
 
-```bash
-git status --short
-git commit -m "fix: complete bounded host runtime migration"
-```
-
 Stage only the exact modified file paths shown by `git status --short` that are
 part of the root-cause fix. If no fixes were needed, do not create an empty
 commit.
+
+```bash
+git status --short
+```
+
+Then run `git add` with only the exact root-cause fix file paths.
+
+```bash
+git commit -m "fix: complete bounded host runtime migration"
+```
 
 ### Task 12: Implementation Completion Notes
 
