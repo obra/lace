@@ -42,6 +42,7 @@ import { AlarmScheduler } from './alarms/alarm-scheduler';
 import { AlarmStore } from './alarms/alarm-store';
 import {
   injectNotification,
+  buildNotification,
   composeAlarmFiredBody,
   composeSubagentExitedBody,
 } from './notifications';
@@ -237,12 +238,14 @@ export async function shutdownAlarms(state: AgentServerState): Promise<void> {
  * On graceful subagent shutdown, ask the PARENT agent (via the existing
  * JSON-RPC peer connection) to record a `subagent-exited` notification in
  * its events.jsonl if the subagent still has pending alarms that won't
- * fire now. The parent runs the actual write under its `runExclusive`
- * mutex, so this serializes with the parent runner's own appends and
- * avoids the cross-process eventSeq race.
+ * fire now. The subagent builds the `<notification>` wrapper locally and
+ * sends it as content via the standard `ent/session/inject` RPC; the
+ * parent's handler runs the durable-event write under its `runExclusive`
+ * mutex, serializing with the parent runner's own appends.
  *
  * Best-effort: 2s timeout; on timeout or error we log and drop. The brief
- * already documents subagent-exited as best-effort delivery.
+ * documents subagent-exited as best-effort delivery. The parent reorders
+ * its teardown (SIGTERM-then-close-pipe) so this RPC has time to land.
  */
 export async function emitSubagentExitedIfNeeded(state: AgentServerState): Promise<void> {
   if (!state.activeSession) return;
@@ -258,29 +261,31 @@ export async function emitSubagentExitedIfNeeded(state: AgentServerState): Promi
     });
     return;
   }
-  const body = composeSubagentExitedBody({
-    persona: meta.parent.personaName ?? '',
-    pendingAlarms: pending.map((r) => ({
-      id: r.id,
-      kind: r.kind,
-      schedule: r.schedule,
-      prompt: r.prompt,
-    })),
+  const text = buildNotification({
+    kind: 'subagent-exited',
+    identifiers: {
+      'subagent-session-id': meta.sessionId,
+      'job-id': meta.parent.jobId,
+      persona: meta.parent.personaName ?? '',
+    },
+    body: composeSubagentExitedBody({
+      persona: meta.parent.personaName ?? '',
+      pendingAlarms: pending.map((r) => ({
+        id: r.id,
+        kind: r.kind,
+        schedule: r.schedule,
+        prompt: r.prompt,
+      })),
+    }),
   });
   try {
-    const requestPromise = state.peer.request('ent/session/inject_notification', {
-      sessionId: meta.parent.sessionId,
-      kind: 'subagent-exited',
-      identifiers: {
-        'subagent-session-id': meta.sessionId,
-        'job-id': meta.parent.jobId,
-        persona: meta.parent.personaName ?? '',
-      },
-      body,
+    const requestPromise = state.peer.request('ent/session/inject', {
+      content: [{ type: 'text', text }],
+      priority: 'immediate',
     });
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutHandle = setTimeout(() => reject(new Error('inject_notification timeout')), 2_000);
+      timeoutHandle = setTimeout(() => reject(new Error('inject timeout')), 2_000);
     });
     try {
       await Promise.race([requestPromise, timeoutPromise]);
@@ -405,6 +410,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       requestPermissionFromClient: _requestPermissionFromClient,
       finalizeJob,
       runPromptInternalRef,
+      topLevelPeer: peer,
     });
   };
 
@@ -493,15 +499,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   const ensureAlarmScheduler = (): Promise<void> =>
     ensureAlarmSchedulerForActiveSession(state, runPromptInternalRef, runExclusive);
-
-  // Subagent → parent: asked by the parent right before peer teardown so the
-  // subagent has a window to flush un-fireable alarms back. Only meaningful
-  // for subagent processes (those with meta.parent); for root agents this
-  // becomes a quick no-op.
-  peer.onRequest('ent/agent/prepare_shutdown', async () => {
-    await emitSubagentExitedIfNeeded(state);
-    return { ok: true };
-  });
 
   // Register all RPC handlers with dependencies
   registerAllHandlers(peer, state, {

@@ -27,7 +27,7 @@ Move alarm storage, scheduling, and tool surface into lace, scoped per-session. 
 3. **Process isolation per session.** Each lace session runs in its own lace process. Sen-core spawns a lace child for Ada. Subagents spawn their own lace processes via `packages/agent/src/jobs/subagent-spawn.ts` (native child or in-container `docker exec` / `container exec`). The host's LACE_DIR is shared across these processes via bind-mount.
 4. **Conversation runner already reads `context_injected priority='immediate'` between iterations.** `packages/agent/src/core/conversation/runner.ts:71-90` (`readImmediateInjectsSince`) and the call site at `runner.ts:217-227`. It folds the injected text into the next `role: 'user'` message inside the agentic loop. This is the existing primitive we ride.
 5. **`atomicWriteJson` exists** at `packages/agent/src/storage/atomic-write.ts:14` — write-tmp-then-rename, used for `meta.json` and `state.json`. We reuse it for `alarms.json`.
-6. **`appendDurableEvent(sessionDir, ...)` is path-keyed**, not active-session-keyed (`packages/agent/src/storage/event-log.ts:84`). It works for any session directory, including one owned by a different lace process. That's how a subagent process writes a `subagent-exited` notification into the parent's `events.jsonl`.
+6. **`appendDurableEvent(sessionDir, ...)` is path-keyed**, not active-session-keyed (`packages/agent/src/storage/event-log.ts:84`). It works for any session directory in theory; we deliberately do **not** use it across process boundaries (see the architectural invariant in "Subagent exit handling"). All cross-process writes to a session's `events.jsonl` go through an RPC to that session's owning process.
 
 ## Architecture
 
@@ -236,14 +236,20 @@ When a subagent's lace process shuts down gracefully (SIGTERM during the shutdow
 2. Read `<own-sessionId>/alarms.json` from disk.
 3. If any rows have `status === 'pending'`:
    - Look up `parent.sessionId` from this session's `meta.json`. If `meta.parent` is missing, skip (we're a top-level session — no one to notify).
-   - Call `ent/session/inject_notification` on the parent's JSON-RPC peer with `{ sessionId: parent.sessionId, kind: 'subagent-exited', identifiers: { 'subagent-session-id': sessionId, 'job-id': parent.jobId, persona: parent.personaName ?? '' }, body: composeSubagentExitedBody(...) }`. The request has a 2-second timeout; on timeout/error the subagent logs and drops the notification (best-effort delivery).
+   - Build the `<notification kind="subagent-exited" ...>` wrapper locally via `buildNotification` and call **`ent/session/inject`** on the parent's JSON-RPC peer (the existing top-level peer, no new method) with `{ content: [{ type: 'text', text }], priority: 'immediate' }`. The request has a 2-second timeout; on timeout/error the subagent logs and drops the notification (best-effort delivery).
 4. Exit.
 
 Pending alarms remain in the subagent's `alarms.json` but never fire — no scheduler is running for that session. This is documented as a known limitation (today's behavior is already to lose them).
 
-**Why RPC and not a direct cross-process file write?** Writing to the parent's `events.jsonl` from a different process races with the parent's own runner: both compute `nextEventSeq` from the same on-disk snapshot and write lines with the same seq. The parent's `ent/session/inject_notification` handler runs the actual `injectNotification` call under the parent runner's `runExclusive` mutex, so all writes to the parent session's `events.jsonl` serialize through one queue in one process. The parent gives the subagent a window to deliver this RPC by sending `ent/agent/prepare_shutdown` immediately before tearing down the JSON-RPC peer; the subagent runs its graceful-shutdown bookkeeping inside that handler while both peers are still open.
+**Why RPC and not a direct cross-process file write?** Writing to the parent's `events.jsonl` from a different process races with the parent's own runner: both compute `nextEventSeq` from the same on-disk snapshot and write lines with the same seq. The parent's `ent/session/inject` handler runs the durable-event write under the parent runner's `runExclusive` mutex, so all writes to the parent session's `events.jsonl` serialize through one queue in one process. The same handler logic is registered twice — once on the top-level CLI peer (where external clients call `ent/session/inject`) and once on the per-subagent `childPeer` (where the subagent's own shutdown handler calls it). Both registrations share `injectIntoActiveSession`, which wraps the read/append/write/notify sequence in `runExclusive`.
 
-The intra-process variant of the same race — the `AlarmScheduler`'s notifier firing outside the runner's mutex — is closed by wrapping the scheduler's `injectNotification` call in `runExclusive` from `ensureAlarmSchedulerForActiveSession`.
+The parent gives the subagent a window to deliver this RPC by reordering its job teardown: SIGTERM is sent **first**, then the parent waits up to 3 seconds for the child to exit, **then** it closes the JSON-RPC peer. The subagent's natural shutdown handler (run on its own SIGTERM signal handler) makes the `ent/session/inject` request back to the parent while the peer is still open. No new `prepare_shutdown` RPC is needed.
+
+The intra-process variant of the same race — the `AlarmScheduler`'s notifier firing outside the runner's mutex — is closed by wrapping the scheduler's `injectNotification` call in `runExclusive` from `ensureAlarmSchedulerForActiveSession`. After this refactor, every writer to the parent's `events.jsonl` (runner, alarm scheduler, child-injected notifications) goes through the same `runExclusive` queue.
+
+### Architectural invariant
+
+**A lace process writes only to its own active session's files.** Cross-session effects — including a subagent dropping a notification into its parent's `events.jsonl` — go through RPC to the owning process, which writes under its `runExclusive` mutex. No code path writes `events.jsonl`, `alarms.json`, `meta.json`, or `state.json` of a session it does not own. The single auditable point of entry for the parent's events.jsonl writes is `injectIntoActiveSession` (for inject events) + the runner + the alarm scheduler — all three serialized through one mutex.
 
 Crash exit (uncaught exception, SIGKILL, OOM, host kill) does not notify. The parent learns via the existing job-lifecycle path (`job-failed` notification fires when the parent's job-manager detects the subagent process died).
 

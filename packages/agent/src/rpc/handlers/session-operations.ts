@@ -184,6 +184,67 @@ async function computeContextBreakdownForActiveSession(
 }
 
 /**
+ * Append a `context_injected` durable event to the active session and notify
+ * the supplied top-level peer with a `session/update` for the inject. Wraps
+ * the read/append/write/notify sequence in `runExclusive` so it serializes
+ * with the runner's own appends and any other concurrent writers (alarm
+ * scheduler, subagent-exited deliveries from a child process).
+ *
+ * Both the on-process `ent/session/inject` handler and the per-subagent
+ * `childPeer.onRequest('ent/session/inject', ...)` registration share this
+ * helper. The `peer` argument is always the top-level CLI peer (the one we
+ * notify session/update on), never the childPeer.
+ */
+export async function injectIntoActiveSession(
+  state: AgentServerState,
+  peer: JsonRpcPeer,
+  runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
+  parsed: { content: unknown[]; priority: 'immediate' | 'normal' | 'deferred' }
+): Promise<void> {
+  await runExclusive(() => {
+    if (!state.activeSession) {
+      throw {
+        code: AcpErrorCodes.SessionNotFound,
+        message: 'SessionNotFound',
+        data: { category: 'session' },
+      };
+    }
+
+    let sessionState: SessionState = readSessionState(state.activeSession.dir);
+    const { nextState } = appendDurableEvent(state.activeSession.dir, sessionState, {
+      type: 'context_injected',
+      data: {
+        content: Array.isArray(parsed.content) ? parsed.content : [],
+        priority: parsed.priority,
+      },
+    });
+    sessionState = nextState;
+    writeSessionState(state.activeSession.dir, sessionState);
+    state.activeSession = { ...state.activeSession, state: sessionState };
+
+    peer.notify('session/update', {
+      sessionId: state.activeSession.meta.sessionId,
+      streamSeq: sessionState.nextStreamSeq,
+      turnId: state.activeTurn?.turnId,
+      turnSeq: state.activeTurn ? 0 : undefined,
+      type: 'context_injected',
+      priority: parsed.priority,
+      messageCount: 0,
+    });
+
+    writeSessionState(state.activeSession.dir, {
+      ...sessionState,
+      nextStreamSeq: sessionState.nextStreamSeq + 1,
+    });
+
+    state.activeSession = {
+      ...state.activeSession,
+      state: readSessionState(state.activeSession.dir),
+    };
+  });
+}
+
+/**
  * Register session operation handlers with the peer.
  * - ent/session/configure: Configure Ent-owned session settings (connection, runtime limits, etc.)
  * - ent/session/compact: Compact conversation history using various strategies
@@ -599,13 +660,6 @@ export function registerSessionOperationHandlers(
 
   peer.onRequest('ent/session/inject', async (params: unknown) => {
     assertInitialized(state);
-    if (!state.activeSession)
-      throw {
-        code: AcpErrorCodes.SessionNotFound,
-        message: 'SessionNotFound',
-        data: { category: 'session' },
-      };
-
     const parsed = params as { content: unknown[]; priority: 'immediate' | 'normal' | 'deferred' };
     const priority =
       parsed?.priority === 'immediate' ||
@@ -613,35 +667,10 @@ export function registerSessionOperationHandlers(
       parsed?.priority === 'deferred'
         ? parsed.priority
         : 'normal';
-
-    let sessionState: SessionState = readSessionState(state.activeSession.dir);
-    const { nextState } = appendDurableEvent(state.activeSession.dir, sessionState, {
-      type: 'context_injected',
-      data: { content: Array.isArray(parsed?.content) ? parsed.content : [], priority },
-    });
-    sessionState = nextState;
-    writeSessionState(state.activeSession.dir, sessionState);
-    state.activeSession = { ...state.activeSession!, state: sessionState };
-
-    peer.notify('session/update', {
-      sessionId: state.activeSession.meta.sessionId,
-      streamSeq: sessionState.nextStreamSeq,
-      turnId: state.activeTurn?.turnId,
-      turnSeq: state.activeTurn ? 0 : undefined,
-      type: 'context_injected',
+    await injectIntoActiveSession(state, peer, runExclusive, {
+      content: Array.isArray(parsed?.content) ? parsed.content : [],
       priority,
-      messageCount: 0,
     });
-
-    writeSessionState(state.activeSession.dir, {
-      ...sessionState,
-      nextStreamSeq: sessionState.nextStreamSeq + 1,
-    });
-
-    state.activeSession = {
-      ...state.activeSession,
-      state: readSessionState(state.activeSession.dir),
-    };
     return undefined;
   });
 
