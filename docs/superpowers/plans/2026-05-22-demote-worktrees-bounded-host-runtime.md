@@ -1261,5 +1261,6 @@ Only do this if the execution session actually checked boxes in the plan.
 
 Plan complete. Implement with `superpowers:subagent-driven-development` if the
 harness permits subagents; otherwise use `superpowers:executing-plans` and
-complete one task at a time. Do not start coding until the wire-compatibility
-decision above is accepted or revised.
+complete one task at a time. The wire-compatibility decision is final for this
+plan: public schemas accept only `host`, `boundedHost`, and `container`; legacy
+`local` and `workspace` descriptors are persisted-state migration inputs only.
