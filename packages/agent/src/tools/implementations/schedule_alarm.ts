@@ -10,6 +10,7 @@ import {
   computeNextOnceFire,
 } from '../../alarms/cron';
 import { MAX_ACTIVE_ALARMS } from '../../alarms/types';
+import { formatAbsoluteTime } from '../../notifications/format-time';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
 const scheduleSchema = z
@@ -93,7 +94,7 @@ export class ScheduleAlarmTool extends Tool {
       schedule: row.schedule,
       prompt: row.prompt,
       timezone: row.timezone,
-      next_fire_at_iso: new Date(row.next_fire_at).toISOString(),
+      next_fire_at_iso: formatAbsoluteTime(row.next_fire_at, row.timezone),
     });
   }
 }

@@ -46,7 +46,7 @@ describe('schedule_alarm', () => {
       next_fire_at_iso: string;
     };
     expect(body.id).toMatch(/^alarm_/);
-    expect(body.next_fire_at_iso).toBe('2030-01-02T00:00:00.000Z');
+    expect(body.next_fire_at_iso).toBe('2030-01-02T00:00:00+00:00 (UTC)');
   });
 
   it('rejects past one-shot', async () => {
