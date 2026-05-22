@@ -92,13 +92,20 @@ function resolveInputs(
       };
     }
     // once + minutes (relative timer)
+    if (args.timezone !== undefined) {
+      try {
+        assertValidIanaTimezone(args.timezone);
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    }
     const minutes = args.minutes as number;
     const nextFireAt = now + minutes * 60_000;
     return {
       ok: true,
       value: {
         spec: { kind: 'once-relative', minutes },
-        timezone: 'UTC',
+        timezone: args.timezone ?? 'UTC',
         nextFireAt,
         endAt: null,
       },

@@ -328,6 +328,60 @@ describe('schedule_alarm', () => {
     expect(store.get(body.id)?.end_at).toBe(FROZEN_NOW + 360 * 60_000);
   });
 
+  it('once-relative: caller-supplied timezone is used for next_fire_at_iso display', async () => {
+    const { sessionId, sessionDir, scheduler } = setup();
+    const tool = new ScheduleAlarmTool();
+    const result = await tool.execute(
+      { kind: 'once', minutes: 5, timezone: 'America/Los_Angeles', prompt: 'stretch' },
+      {
+        signal: new AbortController().signal,
+        alarmScheduler: scheduler,
+        activeSessionId: sessionId,
+        activeSessionDir: sessionDir,
+      }
+    );
+    expect(result.status).toBe('completed');
+    const body = parseBody(result.content[0].text);
+    // The next_fire_at_iso should show an LA offset (-07:00 or -08:00 depending
+    // on DST), not the UTC '+00:00' offset, and the zone name in parens.
+    expect(body.next_fire_at_iso).toMatch(/-0[78]:00 \(America\/Los_Angeles\)$/);
+    expect(body.timezone).toBe('America/Los_Angeles');
+  });
+
+  it('once-relative: defaults to UTC when no timezone is provided', async () => {
+    const { sessionId, sessionDir, scheduler } = setup();
+    const tool = new ScheduleAlarmTool();
+    const result = await tool.execute(
+      { kind: 'once', minutes: 5, prompt: 'stretch' },
+      {
+        signal: new AbortController().signal,
+        alarmScheduler: scheduler,
+        activeSessionId: sessionId,
+        activeSessionDir: sessionDir,
+      }
+    );
+    expect(result.status).toBe('completed');
+    const body = parseBody(result.content[0].text);
+    expect(body.next_fire_at_iso).toContain('+00:00 (UTC)');
+    expect(body.timezone).toBe('UTC');
+  });
+
+  it('once-relative: invalid timezone is rejected', async () => {
+    const { sessionId, sessionDir, scheduler } = setup();
+    const tool = new ScheduleAlarmTool();
+    const result = await tool.execute(
+      { kind: 'once', minutes: 5, timezone: 'Not/A/Zone', prompt: 'p' },
+      {
+        signal: new AbortController().signal,
+        alarmScheduler: scheduler,
+        activeSessionId: sessionId,
+        activeSessionDir: sessionDir,
+      }
+    );
+    expect(result.status).toBe('failed');
+    expect(result.content[0].text).toMatch(/timezone/i);
+  });
+
   it('interval rejects schedule/timezone fields', async () => {
     const { sessionId, sessionDir, scheduler } = setup();
     const tool = new ScheduleAlarmTool();
