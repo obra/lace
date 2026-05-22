@@ -946,6 +946,17 @@ describe('lace-agent process (E2E over stdio)', () => {
         );
       }
 
+      for (let index = 0; index < 9; index += 1) {
+        await withTimeout(
+          ctx.agent.peer.request('ent/session/inject', {
+            content: [{ type: 'text', text: `summarize context item ${index}` }],
+            priority: 'normal',
+          }),
+          2_000,
+          `ent/session/inject ${index}`
+        );
+      }
+
       const compact = (await withTimeout(
         ctx.agent.peer.request('ent/session/compact', { strategy: 'summarize', preserveRecent: 0 }),
         10_000,

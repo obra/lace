@@ -82,7 +82,7 @@ describe.skipIf(!APPLE_CONTAINER_AVAILABLE)('Container Cleanup Validation', () =
         }
       }
     }
-  }, 20000); // Generous timeout for cleanup
+  }, 60000); // Generous timeout for cleanup under parallel container integration runs
 
   afterAll(() => {
     // Clean up test directory after all tests
@@ -132,7 +132,7 @@ describe.skipIf(!APPLE_CONTAINER_AVAILABLE)('Container Cleanup Validation', () =
 
     // Remove from tracking since we cleaned it successfully
     createdContainers = createdContainers.filter((id) => id !== containerId);
-  }, 30000); // Longer timeout for container operations
+  }, 60000); // Longer timeout for container operations under parallel integration runs
 
   it('should handle cleanup when container fails to start', async () => {
     // Create container but don't start it

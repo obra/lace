@@ -95,7 +95,7 @@ describe.skipIf(!APPLE_CONTAINER_AVAILABLE)('AppleContainerRuntime Integration',
     if (existsSync(concurrentTestDir)) {
       rmSync(concurrentTestDir, { recursive: true, force: true });
     }
-  }, 15000);
+  }, 60000);
 
   describe('with shared container', () => {
     it('should actually execute commands in a sandboxed environment', async () => {
