@@ -9,6 +9,7 @@ import {
   SUBAGENT_USER_PERSONAS_TARGET,
   SUBAGENT_LACE_DATA_TARGET,
   SUBAGENT_CREDENTIALS_TARGET,
+  SUBAGENT_LACE_TARGET,
 } from '@lace/agent/jobs/persona-container-spec';
 
 const baseRuntime = {
@@ -248,6 +249,51 @@ describe('buildPersonaContainerSpec', () => {
     ).toThrow(/reserved/);
   });
 
+  it('auto-injects the lace registry mount at the well-known target (PRI-1774)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      runtime: baseRuntime,
+      containerMounts: {
+        lace: { hostPath: '/host/lace', readonly: true },
+      },
+    });
+
+    expect(spec.mounts).toContainEqual({
+      source: '/host/lace',
+      target: SUBAGENT_LACE_TARGET,
+      readonly: true,
+    });
+    expect(spec.env).toEqual({});
+  });
+
+  it('does not inject the lace mount when the registry omits it (PRI-1774)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      runtime: baseRuntime,
+      containerMounts: {},
+    });
+
+    expect(spec.mounts).toEqual([]);
+  });
+
+  it('rejects a persona file declaring runtime.mounts.lace — reserved name (PRI-1774)', () => {
+    expect(() =>
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess1',
+        personaName: 'shell',
+        runtime: {
+          ...baseRuntime,
+          mounts: { lace: '/somewhere' },
+        },
+        containerMounts: {
+          lace: { hostPath: '/host/lace', readonly: true },
+        },
+      })
+    ).toThrow(/reserved/);
+  });
+
   it('auto-injects persona + lace-data + credentials together when registry has all three', () => {
     const spec = buildPersonaContainerSpec({
       parentSessionId: 'sess1',
@@ -370,6 +416,22 @@ describe('buildPersonaBoxSpec (kata #62)', () => {
       readonly: true,
     });
     expect(spec.env.LACE_DIR).toBe(SUBAGENT_LACE_DATA_TARGET);
+  });
+
+  it('auto-injects the lace registry mount at /lace for box runtimes too (PRI-1774)', () => {
+    const spec = buildPersonaBoxSpec({
+      personaName: 'sen',
+      runtime: baseBoxRuntime,
+      containerMounts: {
+        lace: { hostPath: '/host/lace', readonly: true },
+      },
+    });
+
+    expect(spec.mounts).toContainEqual({
+      source: '/host/lace',
+      target: SUBAGENT_LACE_TARGET,
+      readonly: true,
+    });
   });
 
   it('rejects unknown mount name', () => {

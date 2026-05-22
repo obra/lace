@@ -40,6 +40,18 @@ export const SUBAGENT_LACE_DATA_TARGET = '/var/lace/data';
 // `/var/lace/data/`), so the credentials registry must mount there.
 export const SUBAGENT_CREDENTIALS_TARGET = '/var/credentials';
 
+// Fixed in-container path where the embedder's lace source tree is exposed
+// (PRI-1774). Persona container images are expected to exec lace-agent from
+// `${SUBAGENT_LACE_TARGET}/packages/agent/dist/main.js` (the
+// IN_CONTAINER_LACE_ENTRY constant in subagent-spawn.ts). Auto-injected when
+// the embedder registers a `lace` entry in containerMounts; skipped silently
+// otherwise, in which case the image MUST bake lace at `/lace` or the child
+// will fail with MODULE_NOT_FOUND on startup. Personas have no business
+// picking the target path (it's an architectural constant), so this mount
+// belongs to the auto-inject set alongside persona / lace-data / credentials,
+// not to the persona-declared `runtime.mounts` map.
+export const SUBAGENT_LACE_TARGET = '/lace';
+
 export class PersonaContainerSpecError extends Error {
   constructor(message: string) {
     super(message);
@@ -85,6 +97,13 @@ function resolvePersonaMountsAndEnv(input: {
         `Persona '${personaName}' declares mount 'credentials' — reserved ` +
           `for lace's auto-injection of the embedder's credentials dir into ` +
           `subagent containers. Remove it from the persona file's runtime.mounts.`
+      );
+    }
+    if (mountName === 'lace') {
+      throw new PersonaContainerSpecError(
+        `Persona '${personaName}' declares mount 'lace' — reserved for ` +
+          `lace's auto-injection of the lace source tree into subagent ` +
+          `containers. Remove it from the persona file's runtime.mounts.`
       );
     }
     const entry = containerMounts[mountName];
@@ -140,6 +159,24 @@ function resolvePersonaMountsAndEnv(input: {
       source: credentialsRegistryEntry.hostPath,
       target: SUBAGENT_CREDENTIALS_TARGET,
       readonly: credentialsRegistryEntry.readonly,
+    });
+  }
+
+  // Auto-inject the embedder's lace source tree at /lace so the child
+  // lace-agent can exec from `${SUBAGENT_LACE_TARGET}/packages/agent/dist/main.js`
+  // (the path baked into IN_CONTAINER_LACE_ENTRY). Skipped silently when
+  // absent — the image is then expected to bake lace at /lace, otherwise the
+  // child crashes with MODULE_NOT_FOUND on startup. PRI-1774: this auto-inject
+  // replaces the older pattern of personas declaring `lace: /lace` in
+  // runtime.mounts, which mismatched the embedder's containerMounts registry
+  // shape (the embedder owns the host path, the persona has no business
+  // picking it).
+  const laceRegistryEntry = containerMounts.lace;
+  if (laceRegistryEntry) {
+    mounts.push({
+      source: laceRegistryEntry.hostPath,
+      target: SUBAGENT_LACE_TARGET,
+      readonly: laceRegistryEntry.readonly,
     });
   }
 
