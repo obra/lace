@@ -178,8 +178,9 @@ function describeSpecForExit(row: AlarmRow): string {
 /**
  * Map a row's spec into the discriminated input the alarm-fired composer expects.
  * Exhaustive over `spec.kind` so TS catches new arms.
+ * Exported for unit-testing the server wiring without spawning a process.
  */
-function specToFiredCompose(row: AlarmRow): AlarmFiredCompose {
+export function specToFiredCompose(row: AlarmRow): AlarmFiredCompose {
   switch (row.spec.kind) {
     case 'once-absolute':
       return {
@@ -217,8 +218,9 @@ function specToFiredCompose(row: AlarmRow): AlarmFiredCompose {
 /**
  * Map a row's spec into the alarm-expired composer input. Returns null for
  * specs that cannot expire (no end_at, or once-* kinds which never recur).
+ * Exported for unit-testing the server wiring without spawning a process.
  */
-function specToExpiredCompose(row: AlarmRow): AlarmExpiredCompose | null {
+export function specToExpiredCompose(row: AlarmRow): AlarmExpiredCompose | null {
   if (row.end_at === null) return null;
   if (row.spec.kind === 'cron') {
     return {
