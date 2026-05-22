@@ -65,7 +65,8 @@ normal SIGTERM-during-cleanup exit that follows a successful prompt.
 | Date | Run by | Layer | Result |
 |------|--------|-------|--------|
 | 2026-05-22 | Bot | unit | `subagent-child-exit.test.ts` 4/4 pass against `subagent-exit-handler` helper |
-| 2026-05-22 | Bot | live smoke (Ada) | pending — needs deploy |
+| 2026-05-22 | Bot | integration | `subagent-job-child-exit-propagation.test.ts` 1/1: mocked spawn + simulated child crash → `finalizeJob` called with `status='failed'`, per-job .log contains `[SUBAGENT CHILD EXITED]` block + persisted stderr |
+| 2026-05-22 | Ada (live) | live smoke | `job_6a759d33-...` ran box-shell delegate post-deploy. Failed in 0.3s with `job-failed` notification fired. `.log` 1592 bytes, fully populated with `[SUBAGENT CHILD EXITED]` + `Cannot find module '/lace/packages/agent/dist/main.js'`. `job_output` returns the persisted text. Ada confirmed in #bot-debugging thread `1779483281.490559`. |
 
 ## Known gotchas / Fail criteria
 
