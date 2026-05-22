@@ -42,16 +42,17 @@ plan as history, but do not implement new `WorkspaceToolRuntime` or
 - Git worktree lifecycle is outside runtime/session/MCP/tool execution.
 - `WorktreeManager` is deleted from this branch.
 
-## Decision To Confirm Before Execution
+## Wire Compatibility
 
-The spec leaves one wire-compatibility question open. This plan assumes:
+Public protocol schemas accept only:
 
-- New protocol schemas accept `host`, `boundedHost`, and `container`.
-- Agent-side persisted-state parsing can still read old `local` and `workspace`
-  bindings and immediately normalize them to the new descriptor shape.
-- Do not accept legacy `local` or `workspace` over the public protocol as a
-  client compatibility feature unless Jesse explicitly approves that backward
-  compatibility.
+- `host`
+- `boundedHost`
+- `container`
+
+Agent-side persisted-state parsing may still read old `local` and `workspace`
+bindings, but only to normalize them immediately to new descriptors during
+migration.
 
 ## File Structure
 
