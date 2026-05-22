@@ -10,24 +10,23 @@ import {
   SessionRequestPermissionResponseSchema,
 } from '../methods';
 
-function localRuntimeBinding(cwd = '/tmp') {
+function boundedHostRuntimeBinding(cwd = '/tmp') {
   return {
     schemaVersion: 1,
     identity: { runtimeId: 'rt_local_protocol' },
     agentPlacement: 'host',
-    toolRuntime: { type: 'local', cwd },
+    toolRuntime: { type: 'boundedHost', root: cwd, cwd },
   };
 }
 
-function workspaceRuntimeBinding(cwd = '/project') {
+function boundedHostWorkspaceRuntimeBinding(cwd = '/project') {
   return {
     schemaVersion: 1,
     identity: { runtimeId: 'rt_workspace_protocol' },
     agentPlacement: 'host',
     toolRuntime: {
-      type: 'workspace',
-      projectRoot: '/project',
-      workspaceRoot: '/tmp/workspace',
+      type: 'boundedHost',
+      root: '/tmp/workspace',
       cwd,
     },
   };
@@ -182,7 +181,7 @@ describe('protocol shapes (representative examples)', () => {
         params: {
           cwd: '/tmp',
           mcpServers: [],
-          config: { runtimeBinding: localRuntimeBinding() },
+          config: { runtimeBinding: boundedHostRuntimeBinding() },
         },
       },
       {
@@ -191,7 +190,7 @@ describe('protocol shapes (representative examples)', () => {
           sessionId: 'sess_00000000-0000-0000-0000-000000000001',
           cwd: '/tmp',
           mcpServers: [],
-          config: { runtimeBinding: localRuntimeBinding() },
+          config: { runtimeBinding: boundedHostRuntimeBinding() },
         },
       },
       {
@@ -200,7 +199,7 @@ describe('protocol shapes (representative examples)', () => {
           sessionId: 'sess_00000000-0000-0000-0000-000000000001',
           cwd: '/tmp',
           mcpServers: [],
-          config: { runtimeBinding: localRuntimeBinding() },
+          config: { runtimeBinding: boundedHostRuntimeBinding() },
         },
       },
     ]) {
@@ -214,7 +213,10 @@ describe('protocol shapes (representative examples)', () => {
       ).not.toThrow();
     }
 
-    for (const runtimeBinding of [workspaceRuntimeBinding(), containerRuntimeBinding()]) {
+    for (const runtimeBinding of [
+      boundedHostWorkspaceRuntimeBinding(),
+      containerRuntimeBinding(),
+    ]) {
       expect(() =>
         EntProtocolRequestSchema.parse({
           jsonrpc: '2.0',

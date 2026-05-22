@@ -35,18 +35,17 @@ export const RuntimeSecretReferenceSchema = z
   .strict();
 export type RuntimeSecretReference = z.infer<typeof RuntimeSecretReferenceSchema>;
 
-const LocalRuntimeDescriptorSchema = z
+const HostRuntimeDescriptorSchema = z
   .object({
-    type: z.literal('local'),
+    type: z.literal('host'),
     cwd: NonEmptyStringSchema,
   })
   .strict();
 
-const WorkspaceRuntimeDescriptorSchema = z
+const BoundedHostRuntimeDescriptorSchema = z
   .object({
-    type: z.literal('workspace'),
-    projectRoot: NonEmptyStringSchema,
-    workspaceRoot: NonEmptyStringSchema,
+    type: z.literal('boundedHost'),
+    root: NonEmptyStringSchema,
     cwd: NonEmptyStringSchema,
   })
   .strict();
@@ -108,8 +107,8 @@ export const RuntimeExecutionBindingSchema = z
       .strict(),
     agentPlacement: z.enum(['host', 'container']),
     toolRuntime: z.discriminatedUnion('type', [
-      LocalRuntimeDescriptorSchema,
-      WorkspaceRuntimeDescriptorSchema,
+      HostRuntimeDescriptorSchema,
+      BoundedHostRuntimeDescriptorSchema,
       ContainerRuntimeDescriptorSchema,
     ]),
   })

@@ -2,6 +2,38 @@ import { z } from 'zod';
 import { buildLegacyRuntimeId } from './identity';
 import { normalizeImagePlatform, validateResolvedImageDigest } from './image-identity';
 import type { RuntimeExecutionBinding } from './types';
+import { relative, resolve } from 'node:path';
+
+const sep = '/';
+
+function isAbsolutePath(input: string): boolean {
+  return input.startsWith(sep);
+}
+
+function pathIsInside(root: string, path: string): boolean {
+  const relativePath = relative(root, path);
+  return (
+    relativePath === '' ||
+    (!relativePath.startsWith(`..${sep}`) && relativePath !== '..' && !isAbsolutePath(relativePath))
+  );
+}
+
+function migrateWorkspaceCwd(input: {
+  projectRoot: string;
+  workspaceRoot: string;
+  cwd: string;
+}): string {
+  const workspaceRoot = resolve(input.workspaceRoot);
+  const cwd = resolve(input.cwd);
+  if (pathIsInside(workspaceRoot, cwd)) return cwd;
+
+  const projectRoot = resolve(input.projectRoot);
+  if (pathIsInside(projectRoot, cwd)) {
+    return resolve(workspaceRoot, relative(projectRoot, cwd));
+  }
+
+  throw new Error(`Cannot migrate workspace runtime cwd outside workspace root: ${input.cwd}`);
+}
 
 const RuntimeSecretReferenceSchema = z
   .object({
@@ -10,11 +42,23 @@ const RuntimeSecretReferenceSchema = z
   })
   .strict();
 
-const LocalRuntimeDescriptorSchema = z
+const HostRuntimeDescriptorSchema = z
+  .object({ type: z.literal('host'), cwd: z.string().min(1) })
+  .strict();
+
+const BoundedHostRuntimeDescriptorSchema = z
+  .object({
+    type: z.literal('boundedHost'),
+    root: z.string().min(1),
+    cwd: z.string().min(1),
+  })
+  .strict();
+
+const LegacyLocalRuntimeDescriptorSchema = z
   .object({ type: z.literal('local'), cwd: z.string().min(1) })
   .strict();
 
-const WorkspaceRuntimeDescriptorSchema = z
+const LegacyWorkspaceRuntimeDescriptorSchema = z
   .object({
     type: z.literal('workspace'),
     projectRoot: z.string().min(1),
@@ -70,14 +114,18 @@ const RuntimeExecutionBindingSchema = z
     identity: z.object({ runtimeId: z.string().min(1) }).strict(),
     agentPlacement: z.enum(['host', 'container']),
     toolRuntime: z.discriminatedUnion('type', [
-      LocalRuntimeDescriptorSchema,
-      WorkspaceRuntimeDescriptorSchema,
+      HostRuntimeDescriptorSchema,
+      BoundedHostRuntimeDescriptorSchema,
+      LegacyLocalRuntimeDescriptorSchema,
+      LegacyWorkspaceRuntimeDescriptorSchema,
       ContainerRuntimeDescriptorSchema,
     ]),
   })
   .strict();
 
-export function parseRuntimeExecutionBinding(value: unknown): RuntimeExecutionBinding {
+type ParsedRuntimeExecutionBinding = z.infer<typeof RuntimeExecutionBindingSchema>;
+
+function parseRuntimeExecutionBindingFromSchema(value: unknown): ParsedRuntimeExecutionBinding {
   const version =
     value && typeof value === 'object'
       ? (value as { schemaVersion?: unknown }).schemaVersion
@@ -90,7 +138,38 @@ export function parseRuntimeExecutionBinding(value: unknown): RuntimeExecutionBi
   throw new Error(`Invalid runtime binding: ${parsed.error.message}`);
 }
 
-export function buildDefaultLocalRuntimeBinding(input: {
+function normalizeMigrationBinding(parsed: ParsedRuntimeExecutionBinding): RuntimeExecutionBinding {
+  if (parsed.toolRuntime.type === 'local') {
+    return {
+      ...parsed,
+      toolRuntime: {
+        type: 'boundedHost',
+        root: parsed.toolRuntime.cwd,
+        cwd: parsed.toolRuntime.cwd,
+      },
+    };
+  }
+
+  if (parsed.toolRuntime.type === 'workspace') {
+    const cwd = migrateWorkspaceCwd({
+      projectRoot: parsed.toolRuntime.projectRoot,
+      workspaceRoot: parsed.toolRuntime.workspaceRoot,
+      cwd: parsed.toolRuntime.cwd,
+    });
+    return {
+      ...parsed,
+      toolRuntime: {
+        type: 'boundedHost',
+        root: parsed.toolRuntime.workspaceRoot,
+        cwd,
+      },
+    };
+  }
+
+  return parsed as RuntimeExecutionBinding;
+}
+
+export function buildDefaultBoundedHostRuntimeBinding(input: {
   sessionId: string;
   cwd: string;
 }): RuntimeExecutionBinding {
@@ -98,7 +177,7 @@ export function buildDefaultLocalRuntimeBinding(input: {
     schemaVersion: 1,
     identity: { runtimeId: 'pending' },
     agentPlacement: 'host',
-    toolRuntime: { type: 'local', cwd: input.cwd },
+    toolRuntime: { type: 'boundedHost', root: input.cwd, cwd: input.cwd },
   };
   return {
     ...binding,
@@ -110,4 +189,9 @@ export function buildDefaultLocalRuntimeBinding(input: {
       }),
     },
   };
+}
+
+export function parseRuntimeExecutionBinding(value: unknown): RuntimeExecutionBinding {
+  const parsed = parseRuntimeExecutionBindingFromSchema(value);
+  return normalizeMigrationBinding(parsed);
 }

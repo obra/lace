@@ -61,17 +61,16 @@ function sortedRecord<T>(value: Record<string, T> | undefined): Record<string, T
 }
 
 function normalizeToolRuntimeForLegacyIdentity(toolRuntime: ToolRuntimeDescriptor): unknown {
-  if (toolRuntime.type === 'local') {
+  if (toolRuntime.type === 'host') {
     return {
       type: toolRuntime.type,
       cwd: toolRuntime.cwd,
     };
   }
-  if (toolRuntime.type === 'workspace') {
+  if (toolRuntime.type === 'boundedHost') {
     return {
       type: toolRuntime.type,
-      projectRoot: toolRuntime.projectRoot,
-      workspaceRoot: toolRuntime.workspaceRoot,
+      root: toolRuntime.root,
       cwd: toolRuntime.cwd,
     };
   }

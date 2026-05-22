@@ -2,7 +2,7 @@ import type { Readable, Writable } from 'node:stream';
 
 export type RuntimeBindingSchemaVersion = 1;
 export type RuntimeSecretNamespace = 'session' | 'project' | 'host-service';
-export type ToolRuntimeKind = 'local' | 'workspace' | 'container';
+export type ToolRuntimeKind = 'host' | 'boundedHost' | 'container';
 export type AgentPlacement = 'host' | 'container';
 
 export interface RuntimeSecretReference {
@@ -33,11 +33,10 @@ export interface RuntimeHelperDescriptor {
 }
 
 export type ToolRuntimeDescriptor =
-  | { type: 'local'; cwd: string }
+  | { type: 'host'; cwd: string }
   | {
-      type: 'workspace';
-      projectRoot: string;
-      workspaceRoot: string;
+      type: 'boundedHost';
+      root: string;
       cwd: string;
     }
   | {

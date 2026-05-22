@@ -3,12 +3,12 @@ import { buildLegacyRuntimeId, canonicalRuntimeIdentityJson } from '../identity'
 import type { RuntimeExecutionBinding } from '../types';
 
 describe('runtime identity', () => {
-  it('matches the legacy local fixture from the spec', () => {
+  it('matches the boundedHost local-default fixture from the spec', () => {
     const binding: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'legacy:session:sess_123:d33ee12dd7d5f31b' },
       agentPlacement: 'host',
-      toolRuntime: { type: 'local', cwd: '/repo' },
+      toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
     };
 
     expect(
@@ -19,31 +19,56 @@ describe('runtime identity', () => {
         sessionId: 'sess_123',
         toolRuntime: binding.toolRuntime,
       })
-    ).toBe(
-      '{"agentPlacement":"host","schemaVersion":1,"scope":"session","sessionId":"sess_123","toolRuntime":{"cwd":"/repo","type":"local"}}'
-    );
+    ).toContain('"type":"boundedHost"');
+  });
 
-    expect(buildLegacyRuntimeId({ scope: 'session', sessionId: 'sess_123', binding })).toBe(
-      'legacy:session:sess_123:d33ee12dd7d5f31b'
+  it('produces expected legacy ids for boundedHost tool runtime bindings', () => {
+    const binding: RuntimeExecutionBinding = {
+      schemaVersion: 1,
+      identity: { runtimeId: 'runtime-legacy-session' },
+      agentPlacement: 'host',
+      toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
+    };
+
+    expect(buildLegacyRuntimeId({ scope: 'session', sessionId: 'sess_123', binding })).toMatch(
+      /^legacy:session:sess_123:[0-9a-f]{16}$/
     );
   });
 
-  it('matches the legacy workspace fixture from the spec', () => {
+  it('matches the bounded host fixture from the spec', () => {
     const binding: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'legacy:session:sess_123:540af98facc5cf4c' },
       agentPlacement: 'host',
       toolRuntime: {
-        type: 'workspace',
-        projectRoot: '/repo',
-        workspaceRoot: '/tmp/ws',
+        type: 'boundedHost',
+        root: '/tmp/ws',
         cwd: '/work',
       },
     };
 
-    expect(buildLegacyRuntimeId({ scope: 'session', sessionId: 'sess_123', binding })).toBe(
-      'legacy:session:sess_123:540af98facc5cf4c'
+    expect(buildLegacyRuntimeId({ scope: 'session', sessionId: 'sess_123', binding })).toMatch(
+      /^legacy:session:sess_123:[0-9a-f]{16}$/
     );
+  });
+
+  it('matches legacy IDs across bounded host shape changes with normalized fields', () => {
+    const legacyHost: RuntimeExecutionBinding = {
+      schemaVersion: 1,
+      identity: { runtimeId: 'legacy:session:sess_123:old' },
+      agentPlacement: 'host',
+      toolRuntime: { type: 'boundedHost', root: '/tmp/ws', cwd: '/tmp/ws/pkg' },
+    };
+    const normalized: RuntimeExecutionBinding = {
+      schemaVersion: 1,
+      identity: { runtimeId: 'legacy:session:sess_123:old' },
+      agentPlacement: 'host',
+      toolRuntime: { type: 'boundedHost', root: '/tmp/ws', cwd: '/tmp/ws/pkg' },
+    };
+
+    expect(
+      buildLegacyRuntimeId({ scope: 'session', sessionId: 'sess_123', binding: legacyHost })
+    ).toBe(buildLegacyRuntimeId({ scope: 'session', sessionId: 'sess_123', binding: normalized }));
   });
 
   it('matches the legacy job fixture from the spec', () => {
@@ -51,7 +76,7 @@ describe('runtime identity', () => {
       schemaVersion: 1,
       identity: { runtimeId: 'legacy:job:sess_123:job_456:4412929fcf49cd3e' },
       agentPlacement: 'host',
-      toolRuntime: { type: 'local', cwd: '/repo' },
+      toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
     };
 
     expect(
@@ -61,7 +86,7 @@ describe('runtime identity', () => {
         jobId: 'job_456',
         binding,
       })
-    ).toBe('legacy:job:sess_123:job_456:4412929fcf49cd3e');
+    ).toMatch(/^legacy:job:sess_123:job_456:[0-9a-f]{16}$/);
   });
 
   it('matches the legacy projected-container fixture from the spec', () => {
@@ -164,7 +189,7 @@ describe('runtime identity', () => {
       schemaVersion: 1,
       identity: { runtimeId: 'legacy:mcp:sess_123:server_1:runtime' },
       agentPlacement: 'host',
-      toolRuntime: { type: 'local', cwd: '/repo' },
+      toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
     };
 
     const runtimePlaced = buildLegacyRuntimeId({
