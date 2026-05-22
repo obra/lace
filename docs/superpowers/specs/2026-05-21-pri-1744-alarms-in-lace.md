@@ -37,27 +37,39 @@ Three lace native tools in `packages/agent/src/tools/implementations/`, alongsid
 
 #### `schedule_alarm`
 
-```ts
-// input
-{
-  kind: 'cron' | 'once',
-  schedule: string,        // cron expr for cron, ISO-8601 for once
-  prompt: string,
-  timezone?: string,       // IANA; required for cron, defaults UTC for once
-}
+Input shape depends on `kind`:
 
+**`kind: 'once'`** — one-shot alarm. Exactly one of:
+- `schedule`: ISO-8601 absolute timestamp
+- `minutes`: positive integer (relative delay from now)
+
+Optional: `timezone` (IANA; defaults to `'UTC'` when omitted).
+
+**`kind: 'cron'`** — calendar-recurring. Required: `schedule` (cron expression, min interval 1 hour), `timezone` (IANA). Optional: `endTime` (ISO-8601 absolute; alarm expires when next fire would exceed this).
+
+**`kind: 'interval'`** — repeating every N minutes. Required: `minutes` (integer ≥ `MIN_INTERVAL_MINUTES` = 5). At most one of: `endTime` (ISO-8601 absolute) or `durationMinutes` (positive integer — total runtime from creation).
+
+`prompt` is required for all kinds.
+
+```ts
 // success output
 {
   id: 'alarm_<12hex>',
-  kind, schedule, prompt, timezone,
-  next_fire_at_iso: '2026-05-22T16:00:00.000Z',
+  kind: 'once' | 'cron' | 'interval',
+  spec: AlarmSpec,          // structured original input — see Storage section
+  prompt: string,
+  timezone: string,
+  next_fire_at_iso: '2026-12-25T09:00:00-08:00 (America/Los_Angeles)',
+  end_at_iso: '2027-01-01T00:00:00-08:00 (America/Los_Angeles)' | null,
 }
 
-// failure output (uses Tool's existing error envelope)
-{ isError: true, content: [{ type: 'text', text: '<reason>' }] }
+// failure output
+{ status: 'failed', content: [{ type: 'text', text: '<reason>' }] }
 ```
 
-Validation: same as today's sen-core tool — IANA timezone, cron min-interval 1 hour, MAX_ACTIVE_ALARMS=50.
+`next_fire_at_iso` and `end_at_iso` are formatted via `formatAbsoluteTime(epochMs, timezone)` — full ISO-8601 with explicit offset plus IANA zone in parens.
+
+Cap: MAX_ACTIVE_ALARMS = 50 active alarms per session.
 
 #### `cancel_alarm`
 
@@ -72,8 +84,8 @@ Validation: same as today's sen-core tool — IANA timezone, cron min-interval 1
 ```ts
 // input: {}
 // output: { alarms: Array<{
-//   id, kind, schedule, prompt, timezone, status,
-//   next_fire_at_iso, created_at_iso
+//   id, kind, spec, prompt, timezone, status,
+//   next_fire_at_iso, created_at_iso, end_at_iso
 // }> }
 ```
 
@@ -82,17 +94,25 @@ Validation: same as today's sen-core tool — IANA timezone, cron min-interval 1
 **Per-session snapshot** at `<LACE_DIR>/agent-sessions/<sessionId>/alarms.json`. Single JSON file, atomically rewritten on every state change via `atomicWriteJson`.
 
 ```ts
+type AlarmSpec =
+  | { kind: 'once-absolute'; iso: string }
+  | { kind: 'once-relative'; minutes: number }
+  | { kind: 'cron'; expr: string }
+  | { kind: 'interval'; minutes: number };
+
 type AlarmsSnapshot = {
   alarms: Array<{
     id: string;                  // alarm_<12hex>
-    kind: 'cron' | 'once';
-    schedule: string;
-    timezone: string;
+    kind: 'once' | 'cron' | 'interval';
+    spec: AlarmSpec;             // original user input — drives reschedule + body wording
+    timezone: string;            // IANA; 'UTC' for once-relative + interval
     prompt: string;
     status: 'pending' | 'firing' | 'fired' | 'cancelled';
+    // Note: 'expired' is not a status — expired rows are DELETED from alarms.json.
     next_fire_at: number;        // epoch ms
     created_at: number;          // epoch ms
     fired_at: number | null;     // epoch ms; null until first fire
+    end_at: number | null;       // epoch ms; set for cron + interval with endTime/durationMinutes
   }>;
 };
 ```
@@ -120,12 +140,21 @@ loop:
     else:                         fire(soonest)
 
 fire(row):
-  - snapshot status: pending → firing; rewrite alarms.json
-  - call injectNotification({ sessionDir, kind: 'alarm-fired',
+  - claim row: pending → firing; rewrite alarms.json
+  - call notifier → injectNotification({ sessionDir, kind: 'alarm-fired',
                               identifiers: { 'alarm-id': row.id }, body })
+    (notifier errors are caught; state transition always completes)
   - if once: status → fired; rewrite
-  - if cron: compute next jittered occurrence; status → pending,
-             next_fire_at updated; rewrite; re-insert into heap
+  - if cron: compute next jittered occurrence
+      if next > end_at:
+        call expiredNotifier → injectNotification({ kind: 'alarm-expired', ... })
+        delete row from alarms.json  (no 'expired' status — row is gone)
+      else: status → pending, next_fire_at updated; rewrite; re-insert into heap
+  - if interval: next_fire_at = firedAt + minutes * 60_000
+      if next > end_at:
+        call expiredNotifier → injectNotification({ kind: 'alarm-expired', ... })
+        delete row from alarms.json
+      else: status → pending, next_fire_at updated; rewrite; re-insert into heap
 ```
 
 `notify()` wakes the loop in-process when `schedule_alarm` inserts a new alarm — same shape as today's `SchedulerService.notify()`, just no cross-process boundary.
@@ -176,24 +205,69 @@ All lace-side agent-facing notifications share one wrapper, produced by a single
 - Identifiers as attributes (`alarm-id`, `job-id`, `subagent-session-id`, `persona`, ...) for machine parsing. XML-escape attribute values.
 - Body is prose, not labeled fields. Lists in body get a one-sentence prose preamble plus indented bullets. End with the next-step tool-call hint when applicable.
 
-**Kinds the implementer will write composers for:**
+**Kinds (implemented in `notification-wrapper.ts` + `composers.ts`):**
 
 | `kind` | Identifiers | Composer | Replaces today |
 | --- | --- | --- | --- |
-| `alarm-fired` | `alarm-id` | `composeAlarmFiredBody(row)` | (new) |
-| `job-completed` | `job-id` | `composeJobCompletedBody(job)` | `formatJobNotification(type='completed')` |
-| `job-failed` | `job-id` | `composeJobFailedBody(job)` | `formatJobNotification(type='failed')` |
-| `job-cancelled` | `job-id` | `composeJobCancelledBody(job)` | `formatJobNotification(type='cancelled')` |
-| `job-progress` | `job-id` | `composeJobProgressBody(job, recentLines)` | `formatJobNotification(type='progress')` |
-| `subagent-exited` | `subagent-session-id`, `job-id`, `persona` | `composeSubagentExitedBody({ subagent, pendingAlarms })` | (new) |
+| `alarm-fired` | `alarm-id` | `composeAlarmFiredBody` | (new) |
+| `alarm-expired` | `alarm-id` | `composeAlarmExpiredBody` | (new) |
+| `job-completed` | `job-id` | `composeJobCompletedBody` | `formatJobNotification(type='completed')` |
+| `job-failed` | `job-id` | `composeJobFailedBody` | `formatJobNotification(type='failed')` |
+| `job-cancelled` | `job-id` | `composeJobCancelledBody` | `formatJobNotification(type='cancelled')` |
+| `job-progress` | `job-id` | `composeJobProgressBody` | `formatJobNotification(type='progress')` |
+| `subagent-exited` | `subagent-session-id`, `job-id`, `persona` | `composeSubagentExitedBody` | (new) |
 
-**Example bodies (verbatim from the ticket):**
+**`alarm-fired` body wording by sub-kind:**
 
 ```
 <notification kind="alarm-fired" alarm-id="alarm_a1b2c3">
-The cron alarm you scheduled (0 9 * * * in America/Los_Angeles) just fired. The note you left for your future self: "Time to check the test status board". Call list_alarms() to see other pending alarms.
+Your alarm for 2026-12-25T09:00:00-08:00 (America/Los_Angeles) just fired. Note: "Check the test status board".
 </notification>
 ```
+
+```
+<notification kind="alarm-fired" alarm-id="alarm_b2c3d4">
+Your 30-minute timer just fired. Note: "Check on the build".
+</notification>
+```
+
+```
+<notification kind="alarm-fired" alarm-id="alarm_c3d4e5">
+Your cron alarm alarm_c3d4e5 (0 9 * * * in America/Los_Angeles) just fired. Note: "Morning standup check".
+</notification>
+```
+
+```
+<notification kind="alarm-fired" alarm-id="alarm_d4e5f6">
+Your interval alarm alarm_d4e5f6 (every 30 minutes) just fired. Note: "Check build progress".
+</notification>
+```
+
+**`alarm-expired` body wording (cron or interval reaching `end_at`):**
+
+```
+<notification kind="alarm-expired" alarm-id="alarm_c3d4e5">
+Your cron alarm alarm_c3d4e5 (0 9 * * * in America/Los_Angeles) reached its end time (2027-01-01T00:00:00-08:00 (America/Los_Angeles)) and won't fire again. Last note: "Morning standup check".
+</notification>
+```
+
+```
+<notification kind="alarm-expired" alarm-id="alarm_d4e5f6">
+Your interval alarm alarm_d4e5f6 (every 30 minutes) reached its end time (2026-06-01T00:00:00+00:00 (UTC)) and won't fire again. Last note: "Check build progress".
+</notification>
+```
+
+Expiry semantics: cron and interval alarms with `end_at` expire when their next computed fire would exceed `end_at`. The expiry check occurs at reschedule time (after the final fire). On expiry: the `expiredNotifier` is called (which calls `injectNotification` with `kind: 'alarm-expired'`), then the row is deleted from `alarms.json`. The row does **not** transition to an `'expired'` status — it is gone.
+
+**`formatAbsoluteTime` helper:**
+
+All time display in notification bodies and tool output goes through `formatAbsoluteTime(epochMs, timezone)` in `packages/agent/src/notifications/format-time.ts`. It returns full ISO-8601 with explicit UTC offset plus IANA zone name in parentheses:
+
+```
+2026-12-25T09:00:00-08:00 (America/Los_Angeles)
+```
+
+Used by `composeAlarmFiredBody`, `composeAlarmExpiredBody`, the `schedule_alarm` result fields (`next_fire_at_iso`, `end_at_iso`), and `list_alarms` output. This centralizes formatting so all time strings are consistent and unambiguous across notification kinds.
 
 ```
 <notification kind="job-completed" job-id="job_xyz">
@@ -233,9 +307,26 @@ The unified shape lets us collapse the existing job-notification queue + flush p
 When a subagent's lace process shuts down gracefully (SIGTERM during the shutdown sequence, normal stdin EOF, etc., **not** crash):
 
 1. Stop the scheduler loop (so no fires are in flight).
-2. Read `<own-sessionId>/alarms.json` from disk.
+2. Read `<own-sessionId>/alarms.json` from disk (via `AlarmStore.listPending()`).
 3. If any rows have `status === 'pending'`:
-   - Emit a one-way `session/update` notification on the JSON-RPC peer back to the parent with the `pending_alarms_on_exit` discriminant: `{ sessionId, streamSeq: 0, type: 'pending_alarms_on_exit', alarms: [...] }`. Each entry carries `id`, `kind`, `schedule`, `prompt`, and `next_fire_at_iso`. No `<notification>` wrapper is built on the subagent side — only structured data leaves the process.
+   - Emit a one-way `session/update` notification on the JSON-RPC peer back to the parent with the `pending_alarms_on_exit` discriminant:
+     ```ts
+     {
+       sessionId: string,
+       streamSeq: 0,
+       type: 'pending_alarms_on_exit',
+       alarms: Array<{
+         id: string,
+         kind: 'once' | 'cron' | 'interval',
+         schedule: string,   // human description via describeSpecForExit(), e.g.
+                             // once-absolute → ISO string; once-relative → "in N minutes";
+                             // cron → cron expression; interval → "every N minutes"
+         prompt: string,
+         next_fire_at_iso: string,  // toISOString() of next_fire_at
+       }>
+     }
+     ```
+   - No `<notification>` wrapper is built on the subagent side — only structured data leaves the process.
 4. Close the peer; exit.
 
 The parent's per-subagent `session/update` relay in `packages/agent/src/jobs/subagent-job.ts` handles the new discriminant. In the parent's own process, the relay:
