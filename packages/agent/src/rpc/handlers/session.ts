@@ -186,7 +186,13 @@ async function activateStoredSession(
     loaded.state.config?.runtimeBinding !== undefined
       ? parseSessionRuntimeBinding(loaded.state.config.runtimeBinding)
       : undefined;
-  const activeRuntimeBinding = params.runtimeBinding ?? persistedRuntimeBinding;
+  const activeRuntimeBinding =
+    params.runtimeBinding ??
+    persistedRuntimeBinding ??
+    buildDefaultBoundedHostRuntimeBinding({
+      sessionId: params.sessionId,
+      cwd: loaded.meta.workDir,
+    });
 
   const loadedWithMcpServers = mergeMcpServersIntoLoadedSession(
     loaded,
@@ -348,6 +354,12 @@ export function registerSessionHandlers(
 
     const sessionId = `sess_${randomUUID()}`;
     const created = new Date().toISOString();
+    const activeRuntimeBinding =
+      runtimeBinding ??
+      buildDefaultBoundedHostRuntimeBinding({
+        sessionId,
+        cwd: parsed.cwd,
+      });
 
     let sessionDir: string;
     try {
@@ -370,7 +382,7 @@ export function registerSessionHandlers(
           maxThinkingTokens: state.config.maxThinkingTokens,
           ...(effectiveMcpServers ? { mcpServers: effectiveMcpServers } : {}),
           ...(effectiveToolScope ? { toolScope: effectiveToolScope } : {}),
-          ...(runtimeBinding ? { runtimeBinding } : {}),
+          runtimeBinding: activeRuntimeBinding,
         },
       });
       ensureSessionFiles(sessionDir);

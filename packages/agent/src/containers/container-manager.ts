@@ -44,6 +44,7 @@ function specNameFromContainerId(containerId: string): string {
 
 export class ContainerManager {
   private readonly specs = new Map<string, ContainerSpec>();
+  private readonly containerIdsBySpecName = new Map<string, string>();
   private readonly materializations = new Map<string, Promise<ContainerHandle>>();
 
   constructor(private readonly runtime: ContainerRuntime) {}
@@ -62,20 +63,27 @@ export class ContainerManager {
     spec: ContainerSpec,
     hooks?: ContainerLifecycleHooks
   ): Promise<ContainerHandle> {
-    const containerId = resolveContainerId(spec);
-    const inFlight = this.materializations.get(containerId);
+    const resolvedContainerId = resolveContainerId(spec);
+    const knownContainerId = this.containerIdsBySpecName.get(spec.name);
+    const materializationKey = knownContainerId ?? resolvedContainerId;
+    const inFlight = this.materializations.get(materializationKey);
     if (inFlight) {
       return await inFlight;
     }
 
-    const materialization = this.materializeOnce(spec, hooks, containerId);
-    this.materializations.set(containerId, materialization);
+    const materialization = this.materializeOnce(
+      spec,
+      hooks,
+      resolvedContainerId,
+      knownContainerId
+    );
+    this.materializations.set(materializationKey, materialization);
 
     try {
       return await materialization;
     } finally {
-      if (this.materializations.get(containerId) === materialization) {
-        this.materializations.delete(containerId);
+      if (this.materializations.get(materializationKey) === materialization) {
+        this.materializations.delete(materializationKey);
       }
     }
   }
@@ -83,7 +91,8 @@ export class ContainerManager {
   private async materializeOnce(
     spec: ContainerSpec,
     hooks: ContainerLifecycleHooks | undefined,
-    containerId: string
+    containerId: string,
+    knownContainerId?: string
   ): Promise<ContainerHandle> {
     const config: ContainerConfig = {
       id: containerId,
@@ -99,12 +108,14 @@ export class ContainerManager {
     // Box specs may have a daemon-side container that survived this process —
     // the docker --restart policy keeps `sen-box` alive across agent restarts.
     // Consult the daemon directly so we adopt instead of recreating.
+    const inspectContainerId = knownContainerId ?? containerId;
     const adoptable = spec.containerId
       ? await this.runtime.daemonInspect(containerId)
-      : await this.tryInspect(containerId);
+      : await this.tryInspect(inspectContainerId);
 
     if (adoptable) {
       this.specs.set(spec.name, spec);
+      this.containerIdsBySpecName.set(spec.name, adoptable.id);
       // Adopt the daemon-side container into the runtime's in-process caches
       // so subsequent start/exec calls succeed. No-op when the runtime has no
       // caches to populate (apple-container falls back to its own create-path
@@ -114,16 +125,22 @@ export class ContainerManager {
       }
 
       if (adoptable.state === 'running') {
-        return { spec, containerId, state: adoptable.state };
+        return { spec, containerId: adoptable.id, state: adoptable.state };
       }
-      await this.runtime.start(containerId);
-      const after = await this.tryInspect(containerId);
+      await this.runtime.start(adoptable.id);
+      const after = await this.tryInspect(adoptable.id);
       // Fallback rationale: we just successfully called runtime.start(). If a
       // subsequent tryInspect cannot see the container, the runtime is in an
       // inconsistent state we cannot recover from here. We report 'running'
       // because that's what start() was asked to produce; the caller will
       // discover staleness on the next operation.
-      return { spec, containerId, state: after?.state ?? 'running' };
+      const activeContainerId = after?.id ?? adoptable.id;
+      this.containerIdsBySpecName.set(spec.name, activeContainerId);
+      return { spec, containerId: activeContainerId, state: after?.state ?? 'running' };
+    }
+
+    if (knownContainerId && knownContainerId !== containerId) {
+      this.containerIdsBySpecName.delete(spec.name);
     }
 
     if (hooks?.beforeCreate) {
@@ -134,6 +151,7 @@ export class ContainerManager {
     await this.runtime.start(createdId);
 
     this.specs.set(spec.name, spec);
+    this.containerIdsBySpecName.set(spec.name, createdId);
     const info = await this.tryInspect(createdId);
     // Same fallback rationale as the stopped-resume branch above: we just
     // successfully called runtime.create()+start(); if tryInspect cannot see
@@ -171,6 +189,7 @@ export class ContainerManager {
     }
 
     this.specs.delete(specName);
+    this.containerIdsBySpecName.delete(specName);
 
     if (hooks?.afterDestroy) {
       await hooks.afterDestroy();
@@ -189,6 +208,8 @@ export class ContainerManager {
    * containers the manager has never seen.
    */
   private resolveBySpecName(specName: string): string {
+    const createdId = this.containerIdsBySpecName.get(specName);
+    if (createdId) return createdId;
     const cached = this.specs.get(specName);
     return resolveContainerId({ name: specName, containerId: cached?.containerId });
   }

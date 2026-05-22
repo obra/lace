@@ -286,6 +286,75 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     expect(loadSession(created.sessionId).state.config?.runtimeBinding).toEqual(runtimeBinding);
   });
 
+  it('persists a default boundedHost runtimeBinding during session/new', async () => {
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', defaultInitializeParams());
+
+    const created = (await client.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    const runtimeBinding = loadSession(created.sessionId).state.config?.runtimeBinding;
+    expect(state.activeSession?.state.config?.runtimeBinding).toEqual(runtimeBinding);
+    expect(runtimeBinding).toMatchObject({
+      schemaVersion: 1,
+      agentPlacement: 'host',
+      toolRuntime: { type: 'boundedHost', root: tempDir, cwd: tempDir },
+    });
+    expect(runtimeBinding?.identity.runtimeId).toMatch(
+      new RegExp(`^runtime:session:${created.sessionId}:`)
+    );
+  });
+
+  it.each(['session/load', 'session/resume'] as const)(
+    'persists a default boundedHost runtimeBinding for legacy sessions during %s',
+    async (method) => {
+      const setupState = createAgentServerState();
+      const { client: setupClient } = createPairedPeers((peer) =>
+        registerAgentRpcMethods(peer, setupState)
+      );
+
+      await setupClient.request('initialize', defaultInitializeParams());
+      const created = (await setupClient.request('session/new', {
+        cwd: tempDir,
+        mcpServers: [],
+      })) as { sessionId: string };
+
+      const legacySession = loadSession(created.sessionId);
+      writeSessionState(legacySession.dir, {
+        ...legacySession.state,
+        config: {
+          ...legacySession.state.config,
+          runtimeBinding: undefined,
+        },
+      });
+
+      const state = createAgentServerState();
+      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+      await client.request('initialize', defaultInitializeParams());
+      await client.request(method, {
+        sessionId: created.sessionId,
+        cwd: tempDir,
+        mcpServers: [],
+      });
+
+      const runtimeBinding = loadSession(created.sessionId).state.config?.runtimeBinding;
+      expect(state.activeSession?.state.config?.runtimeBinding).toEqual(runtimeBinding);
+      expect(runtimeBinding).toMatchObject({
+        schemaVersion: 1,
+        agentPlacement: 'host',
+        toolRuntime: { type: 'boundedHost', root: tempDir, cwd: tempDir },
+      });
+      expect(runtimeBinding?.identity.runtimeId).toMatch(
+        new RegExp(`^runtime:session:${created.sessionId}:`)
+      );
+    }
+  );
+
   it('persists non-local runtimeBinding during session/resume', async () => {
     const setupState = createAgentServerState();
     const { client: setupClient } = createPairedPeers((peer) =>

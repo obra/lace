@@ -18,9 +18,11 @@ import type { ContainerSpec } from '../spec';
 class MockContainerRuntime extends BaseContainerRuntime {
   public readonly callLog: string[] = [];
   public execStreamImpl: ((id: string, opts: ExecStreamOptions) => ExecStreamHandle) | null = null;
+  public createIdOverride: ((config: ContainerConfig) => string) | null = null;
 
   create(config: ContainerConfig): string {
-    const containerId = config.id ?? `mock-${Math.random().toString(36).slice(2)}`;
+    const containerId =
+      this.createIdOverride?.(config) ?? config.id ?? `mock-${Math.random().toString(36).slice(2)}`;
     this.callLog.push(`create:${containerId}`);
     const info: ContainerInfo = { id: containerId, state: 'created' };
     this.containers.set(containerId, info);
@@ -387,6 +389,30 @@ describe('ContainerManager', () => {
 
       expect(spy).toHaveBeenCalledWith('lace-sess1-worker', { command: ['echo', 'hi'] });
       expect(result).toBe(fakeHandle);
+    });
+
+    it('delegates to the actual created container id when the runtime returns a generated id', async () => {
+      const fakeHandle = {} as ExecStreamHandle;
+      runtime.createIdOverride = (config) => `${config.id}-generated`;
+      runtime.execStreamImpl = () => fakeHandle;
+      const spy = vi.spyOn(runtime, 'execStream');
+
+      const materialized = await manager.materialize(baseSpec);
+      const result = await manager.execStream('sess1-worker', { command: ['echo', 'hi'] });
+
+      expect(materialized.containerId).toBe('lace-sess1-worker-generated');
+      expect(spy).toHaveBeenCalledWith('lace-sess1-worker-generated', {
+        command: ['echo', 'hi'],
+      });
+      expect(result).toBe(fakeHandle);
+      await expect(manager.inspect('sess1-worker')).resolves.toMatchObject({
+        containerId: 'lace-sess1-worker-generated',
+      });
+
+      await manager.destroy('sess1-worker');
+
+      expect(runtime.callLog).toContain('stop:lace-sess1-worker-generated');
+      expect(runtime.callLog).toContain('remove:lace-sess1-worker-generated');
     });
   });
 
