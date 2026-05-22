@@ -164,13 +164,13 @@ export function getOrCreateSessionToolExecutor(
  * event into the active session's events.jsonl and triggers an internal
  * turn if the agent is idle, so the next turn picks up the alarm body.
  */
-export function ensureAlarmSchedulerForActiveSession(
+export async function ensureAlarmSchedulerForActiveSession(
   state: AgentServerState,
   runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null }
-): void {
+): Promise<void> {
   if (!state.activeSession) return;
   if (state.alarmScheduler) {
-    void state.alarmScheduler.stop();
+    await state.alarmScheduler.stop();
     state.alarmScheduler = undefined;
   }
   const sessionDir = state.activeSession.dir;
@@ -459,7 +459,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   const _startSubagentJob = (options: CreateSubagentJobOptions): Promise<{ jobId: string }> =>
     wrapJobCreation(() => createSubagentJob(options, jobCreationDeps));
 
-  const ensureAlarmScheduler = (): void =>
+  const ensureAlarmScheduler = (): Promise<void> =>
     ensureAlarmSchedulerForActiveSession(state, runPromptInternalRef);
 
   // Register all RPC handlers with dependencies

@@ -125,7 +125,7 @@ async function activateStoredSession(
   params: SessionRestoreParams,
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
   reissuePendingPermissionRequests: () => Promise<void>,
-  ensureAlarmScheduler: () => void
+  ensureAlarmScheduler: () => Promise<void>
 ): Promise<LoadedSession> {
   if (state.activeTurn) {
     throw {
@@ -160,7 +160,7 @@ async function activateStoredSession(
 
   state.activeSession = loadedWithMcpServers;
   rehydrateServerConfigFromSession(state, state.activeSession.state);
-  ensureAlarmScheduler();
+  await ensureAlarmScheduler();
 
   await reconcileMcpServersForActiveSession(state);
   await reissuePendingPermissionRequests();
@@ -184,7 +184,7 @@ export function registerSessionHandlers(
   createToolExecutorForMode: CreateToolExecutorFn,
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
   reissuePendingPermissionRequests: () => Promise<void>,
-  ensureAlarmScheduler: () => void
+  ensureAlarmScheduler: () => Promise<void>
 ): void {
   peer.onRequest('session/new', async (params: unknown) => {
     assertInitialized(state);
@@ -335,7 +335,7 @@ export function registerSessionHandlers(
     }
 
     state.activeSession = loadSession(sessionId);
-    ensureAlarmScheduler();
+    await ensureAlarmScheduler();
     await reconcileMcpServersForActiveSession(state);
 
     // Inject system prompt as context_injected event

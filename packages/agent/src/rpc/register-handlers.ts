@@ -51,7 +51,7 @@ interface HandlerDependencies {
    * Called after every session switch (session/new, session/load, session/resume)
    * and after session/close (which is a no-op since activeSession is null).
    */
-  ensureAlarmScheduler: () => void;
+  ensureAlarmScheduler: () => Promise<void>;
 }
 
 /**
