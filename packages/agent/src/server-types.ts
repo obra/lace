@@ -176,6 +176,12 @@ export type AgentServerState = {
   // Created/replaced on session switch via ensureAlarmSchedulerForActiveSession;
   // stopped on shutdown. Absent when no session is active.
   alarmScheduler?: AlarmScheduler;
+  // The JsonRpcPeer this agent process uses to talk to its supervisor (the
+  // CLI for a root agent, or the parent lace-agent for a subagent). Set by
+  // main.ts after peer construction. Used by emitSubagentExitedIfNeeded to
+  // ask the parent to record a `subagent-exited` notification under its
+  // runExclusive mutex (avoids cross-process events.jsonl write races).
+  peer: JsonRpcPeer | null;
 };
 
 // Single entry in the embedder-supplied containerMounts registry.

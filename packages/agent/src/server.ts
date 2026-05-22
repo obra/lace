@@ -38,7 +38,6 @@ import {
 import { toolKindFromName } from './rpc/utils';
 import { requestPermissionFromClient, reissuePendingPermissionRequests } from './rpc/permissions';
 import { registerAllHandlers } from './rpc/register-handlers';
-import { join } from 'node:path';
 import { AlarmScheduler } from './alarms/alarm-scheduler';
 import { AlarmStore } from './alarms/alarm-store';
 import {
@@ -46,7 +45,6 @@ import {
   composeAlarmFiredBody,
   composeSubagentExitedBody,
 } from './notifications';
-import { agentSessionsDir } from './storage/session-store';
 import { logger } from './utils/logger';
 
 // Re-export public API from message-builder for backwards compatibility
@@ -116,6 +114,7 @@ export function createAgentServerState(): AgentServerState {
     personaRegistry: defaultPersonaRegistry,
     containerMounts: {},
     containerManager: createDefaultContainerManager(),
+    peer: null,
   };
 }
 
@@ -166,7 +165,8 @@ export function getOrCreateSessionToolExecutor(
  */
 export async function ensureAlarmSchedulerForActiveSession(
   state: AgentServerState,
-  runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null }
+  runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null },
+  runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>
 ): Promise<void> {
   if (!state.activeSession) return;
   if (state.alarmScheduler) {
@@ -183,28 +183,33 @@ export async function ensureAlarmSchedulerForActiveSession(
     now: () => Date.now(),
     jitterMaxMs,
     notifier: ({ row }) => {
-      injectNotification({
-        sessionDir,
-        kind: 'alarm-fired',
-        identifiers: { 'alarm-id': row.id },
-        body: composeAlarmFiredBody({
-          kind: row.kind,
-          schedule: row.schedule,
-          timezone: row.timezone,
-          prompt: row.prompt,
-        }),
-        idleWake: {
-          isActive: (d) => d === state.activeSession?.dir,
-          hasActiveTurn: () => !!state.activeTurn,
-          triggerInternalTurn: () => {
-            if (!runPromptInternalRef.current) return;
-            setImmediate(() => {
-              if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
-                void runPromptInternalRef.current([]);
-              }
-            });
+      // The scheduler fires outside the runner's lock. Serialize the write
+      // through runExclusive so the eventSeq it computes is unique vs. the
+      // runner's concurrent appends.
+      void runExclusive(() => {
+        injectNotification({
+          sessionDir,
+          kind: 'alarm-fired',
+          identifiers: { 'alarm-id': row.id },
+          body: composeAlarmFiredBody({
+            kind: row.kind,
+            schedule: row.schedule,
+            timezone: row.timezone,
+            prompt: row.prompt,
+          }),
+          idleWake: {
+            isActive: (d) => d === state.activeSession?.dir,
+            hasActiveTurn: () => !!state.activeTurn,
+            triggerInternalTurn: () => {
+              if (!runPromptInternalRef.current) return;
+              setImmediate(() => {
+                if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
+                  void runPromptInternalRef.current([]);
+                }
+              });
+            },
           },
-        },
+        });
       });
     },
     onError: (err) => {
@@ -229,40 +234,66 @@ export async function shutdownAlarms(state: AgentServerState): Promise<void> {
 }
 
 /**
- * On graceful subagent shutdown, write a `subagent-exited` notification
- * into the PARENT session's events.jsonl if the subagent still had
- * pending alarms that won't fire now.
+ * On graceful subagent shutdown, ask the PARENT agent (via the existing
+ * JSON-RPC peer connection) to record a `subagent-exited` notification in
+ * its events.jsonl if the subagent still has pending alarms that won't
+ * fire now. The parent runs the actual write under its `runExclusive`
+ * mutex, so this serializes with the parent runner's own appends and
+ * avoids the cross-process eventSeq race.
  *
- * Reads pending rows from the alarms.json snapshot directly (the
- * scheduler is already stopped at this point). No idle-wake — the
- * parent agent runs in a separate process.
+ * Best-effort: 2s timeout; on timeout or error we log and drop. The brief
+ * already documents subagent-exited as best-effort delivery.
  */
-export function emitSubagentExitedIfNeeded(state: AgentServerState): void {
+export async function emitSubagentExitedIfNeeded(state: AgentServerState): Promise<void> {
   if (!state.activeSession) return;
   const meta = state.activeSession.meta;
   if (!meta.parent) return;
   const store = new AlarmStore(state.activeSession.dir);
   const pending = store.listPending();
   if (pending.length === 0) return;
-  const parentDir = join(agentSessionsDir(), meta.parent.sessionId);
-  injectNotification({
-    sessionDir: parentDir,
-    kind: 'subagent-exited',
-    identifiers: {
-      'subagent-session-id': meta.sessionId,
-      'job-id': meta.parent.jobId,
-      persona: meta.parent.personaName ?? '',
-    },
-    body: composeSubagentExitedBody({
-      persona: meta.parent.personaName ?? '',
-      pendingAlarms: pending.map((r) => ({
-        id: r.id,
-        kind: r.kind,
-        schedule: r.schedule,
-        prompt: r.prompt,
-      })),
-    }),
+  if (!state.peer) {
+    logger.warn('subagent.exit.no_peer', {
+      sessionId: meta.sessionId,
+      parentSessionId: meta.parent.sessionId,
+    });
+    return;
+  }
+  const body = composeSubagentExitedBody({
+    persona: meta.parent.personaName ?? '',
+    pendingAlarms: pending.map((r) => ({
+      id: r.id,
+      kind: r.kind,
+      schedule: r.schedule,
+      prompt: r.prompt,
+    })),
   });
+  try {
+    const requestPromise = state.peer.request('ent/session/inject_notification', {
+      sessionId: meta.parent.sessionId,
+      kind: 'subagent-exited',
+      identifiers: {
+        'subagent-session-id': meta.sessionId,
+        'job-id': meta.parent.jobId,
+        persona: meta.parent.personaName ?? '',
+      },
+      body,
+    });
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => reject(new Error('inject_notification timeout')), 2_000);
+    });
+    try {
+      await Promise.race([requestPromise, timeoutPromise]);
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
+  } catch (err) {
+    logger.warn('subagent.exit.inject_failed', {
+      sessionId: meta.sessionId,
+      parentSessionId: meta.parent.sessionId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 export function invalidateSessionToolExecutor(cache: ToolExecutorCache, sessionId: string): void {
@@ -373,6 +404,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       emitSessionUpdate,
       requestPermissionFromClient: _requestPermissionFromClient,
       finalizeJob,
+      runPromptInternalRef,
     });
   };
 
@@ -460,7 +492,16 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     wrapJobCreation(() => createSubagentJob(options, jobCreationDeps));
 
   const ensureAlarmScheduler = (): Promise<void> =>
-    ensureAlarmSchedulerForActiveSession(state, runPromptInternalRef);
+    ensureAlarmSchedulerForActiveSession(state, runPromptInternalRef, runExclusive);
+
+  // Subagent → parent: asked by the parent right before peer teardown so the
+  // subagent has a window to flush un-fireable alarms back. Only meaningful
+  // for subagent processes (those with meta.parent); for root agents this
+  // becomes a quick no-op.
+  peer.onRequest('ent/agent/prepare_shutdown', async () => {
+    await emitSubagentExitedIfNeeded(state);
+    return { ok: true };
+  });
 
   // Register all RPC handlers with dependencies
   registerAllHandlers(peer, state, {

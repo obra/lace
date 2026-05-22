@@ -11,6 +11,8 @@ import {
 } from '@lace/agent/storage/session-store';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
+import { injectNotification } from '@lace/agent/notifications';
+import type { NotificationKind } from '@lace/agent/notifications';
 import { getJobOutputPath } from './job-file-utils';
 import {
   applyEffectiveJobConfig,
@@ -94,6 +96,13 @@ export interface SubagentJobDependencies {
   }) => Promise<{ decision?: string; updatedInput?: Record<string, unknown> }>;
   /** Finalize job completion */
   finalizeJob: (job: JobState, options?: { exitCode?: number }) => Promise<void>;
+  /**
+   * Shared reference to the parent's internal-turn driver. Used by the
+   * `ent/session/inject_notification` handler so a subagent-triggered
+   * write into the parent's events.jsonl can kick an idle parent into a
+   * fresh turn the same way an in-process alarm fire would.
+   */
+  runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null };
 }
 
 /**
@@ -103,8 +112,14 @@ export interface SubagentJobDependencies {
  * job's persona runtime.
  */
 export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependencies): void {
-  const { getState, runExclusive, emitSessionUpdate, requestPermissionFromClient, finalizeJob } =
-    deps;
+  const {
+    getState,
+    runExclusive,
+    emitSessionUpdate,
+    requestPermissionFromClient,
+    finalizeJob,
+    runPromptInternalRef,
+  } = deps;
 
   // Helper to write error output directly to the job output file.
   // This is used for error reporting and doesn't depend on state.activeSession.
@@ -621,6 +636,71 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       return { decision: decision.decision ?? 'deny', updatedInput: decision.updatedInput };
     });
 
+    // Subagent → parent: record a `<notification>` block in the parent's
+    // events.jsonl. Runs in the parent's process under runExclusive so the
+    // eventSeq it computes serializes with the parent runner's appends and
+    // doesn't collide with concurrent writes.
+    childPeer.onRequest('ent/session/inject_notification', async (params) => {
+      const p = (params ?? {}) as Record<string, unknown>;
+      const targetSessionId = typeof p.sessionId === 'string' ? p.sessionId : '';
+      const rawKind = typeof p.kind === 'string' ? p.kind : '';
+      const body = typeof p.body === 'string' ? p.body : '';
+      const identifiers =
+        p.identifiers && typeof p.identifiers === 'object' && !Array.isArray(p.identifiers)
+          ? (p.identifiers as Record<string, string>)
+          : undefined;
+
+      const validKinds: NotificationKind[] = [
+        'alarm-fired',
+        'job-completed',
+        'job-failed',
+        'job-cancelled',
+        'job-progress',
+        'subagent-exited',
+      ];
+      if (!validKinds.includes(rawKind as NotificationKind)) {
+        throw {
+          code: -32602,
+          message: `invalid notification kind: ${rawKind}`,
+        };
+      }
+      const kind = rawKind as NotificationKind;
+
+      const currentState = getState();
+      const activeSessionId = currentState.activeSession?.meta.sessionId;
+      if (!activeSessionId || activeSessionId !== targetSessionId) {
+        throw {
+          code: -32602,
+          message: 'sessionId does not match parent active session',
+          data: { activeSessionId: activeSessionId ?? null, requested: targetSessionId },
+        };
+      }
+
+      const sessionDir = currentState.activeSession!.dir;
+      await runExclusive(() => {
+        injectNotification({
+          sessionDir,
+          kind,
+          ...(identifiers ? { identifiers } : {}),
+          body,
+          idleWake: {
+            isActive: (d) => d === getState().activeSession?.dir,
+            hasActiveTurn: () => !!getState().activeTurn,
+            triggerInternalTurn: () => {
+              if (!runPromptInternalRef.current) return;
+              setImmediate(() => {
+                const s = getState();
+                if (!s.activeTurn && s.activeSession && runPromptInternalRef.current) {
+                  void runPromptInternalRef.current([]);
+                }
+              });
+            },
+          },
+        });
+      });
+      return { ok: true };
+    });
+
     try {
       const currentState = getState();
 
@@ -780,6 +860,32 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         stderr: stderrBuffer.trim() || undefined,
       });
     } finally {
+      // Graceful pre-shutdown: ask the subagent to flush any un-fireable
+      // alarms back to the parent's events.jsonl while the JSON-RPC peer
+      // connection is still open. The subagent handles this synchronously
+      // and the inject lands under the parent's runExclusive mutex (no
+      // cross-process write race). We bound the wait so a misbehaving
+      // subagent can't stall job teardown.
+      if (childPeer && subagentProc && subagentProc.exitCode === null) {
+        try {
+          const shutdownPromise = childPeer.request('ent/agent/prepare_shutdown', {});
+          let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+          const timeoutPromise = new Promise<void>((_, reject) => {
+            timeoutHandle = setTimeout(() => reject(new Error('prepare_shutdown timeout')), 3_000);
+          });
+          try {
+            await Promise.race([shutdownPromise, timeoutPromise]);
+          } finally {
+            if (timeoutHandle) clearTimeout(timeoutHandle);
+          }
+        } catch (error) {
+          logger.debug('job.subagent.prepare_shutdown.failed', {
+            jobId: job.jobId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
       try {
         childPeer?.close();
       } catch (error) {

@@ -75,6 +75,7 @@ void runStartupReaper(createContainerManagerForPlatform());
 
 const transport = createNdjsonStdioTransport({ readable, writable });
 const peer = new JsonRpcPeer(transport, { idPrefix: 'a_' });
+state.peer = peer;
 registerAgentRpcMethods(peer, state);
 
 let shuttingDown = false;
@@ -83,7 +84,7 @@ const shutdown = async () => {
   shuttingDown = true;
   try {
     await shutdownAlarms(state);
-    emitSubagentExitedIfNeeded(state);
+    await emitSubagentExitedIfNeeded(state);
   } catch {
     // Best-effort; never block process exit on alarm bookkeeping.
   }

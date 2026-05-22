@@ -66,7 +66,8 @@ describe('ensureAlarmSchedulerForActiveSession', () => {
       alarmScheduler: fakeOldScheduler,
     } as unknown as AgentServerState;
 
-    await ensureAlarmSchedulerForActiveSession(state, { current: null });
+    const runExclusive = async <T>(work: () => Promise<T> | T): Promise<T> => work();
+    await ensureAlarmSchedulerForActiveSession(state, { current: null }, runExclusive);
 
     // stop() must have been called exactly once …
     expect(slowStop).toHaveBeenCalledTimes(1);

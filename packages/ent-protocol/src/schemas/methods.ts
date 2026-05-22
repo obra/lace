@@ -762,6 +762,69 @@ export const EntSessionInjectNotificationSchema = z
   })
   .strict();
 
+// ent/agent/prepare_shutdown — parent→subagent RPC asking the subagent to
+// run its graceful-shutdown bookkeeping (write `subagent-exited` notifications
+// for un-fireable alarms back to the parent) while both peers are still open.
+// The parent calls this immediately before tearing down the JSON-RPC peer so
+// the subagent's outgoing `ent/session/inject_notification` request can land.
+export const EntAgentPrepareShutdownRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/agent/prepare_shutdown'),
+    params: z.object({}).strict().optional(),
+  })
+  .strict();
+
+export const EntAgentPrepareShutdownResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: z.object({ ok: z.literal(true) }).strict(),
+  })
+  .strict();
+
+// ent/session/inject_notification — subagent→parent RPC used to write a
+// `<notification>` block (alarm-fired, subagent-exited, etc.) into the parent
+// session's events.jsonl under the parent's runExclusive mutex. Replaces
+// direct cross-process file writes that race with the parent's own runner.
+const EntSessionInjectNotificationParamsSchema = z
+  .object({
+    sessionId: SessionIdSchema,
+    kind: z.enum([
+      'alarm-fired',
+      'job-completed',
+      'job-failed',
+      'job-cancelled',
+      'job-progress',
+      'subagent-exited',
+    ]),
+    identifiers: z.record(z.string(), z.string()).optional(),
+    body: z.string(),
+  })
+  .strict();
+
+export const EntSessionInjectNotificationRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/inject_notification'),
+    params: EntSessionInjectNotificationParamsSchema,
+  })
+  .strict();
+
+export const EntSessionInjectNotificationResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: z.object({ ok: z.literal(true) }).strict(),
+  })
+  .strict();
+
+export type EntSessionInjectNotificationParams = z.infer<
+  typeof EntSessionInjectNotificationParamsSchema
+>;
+
 const EntSessionEventsParamsSchema = z
   .object({
     afterEventSeq: z.number().optional(),
@@ -2105,6 +2168,8 @@ export const EntProtocolRequestSchema = z.union([
   EntSessionRewindRequestSchema,
   EntSessionCheckpointRequestSchema,
   EntSessionEventsRequestSchema,
+  EntSessionInjectNotificationRequestSchema,
+  EntAgentPrepareShutdownRequestSchema,
   EntProvidersListRequestSchema,
   EntConnectionsListRequestSchema,
   EntConnectionsUpsertRequestSchema,

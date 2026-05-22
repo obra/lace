@@ -236,11 +236,14 @@ When a subagent's lace process shuts down gracefully (SIGTERM during the shutdow
 2. Read `<own-sessionId>/alarms.json` from disk.
 3. If any rows have `status === 'pending'`:
    - Look up `parent.sessionId` from this session's `meta.json`. If `meta.parent` is missing, skip (we're a top-level session — no one to notify).
-   - Build the parent's session dir path: `<LACE_DIR>/agent-sessions/<parent.sessionId>/`.
-   - Call `injectNotification({ sessionDir: parentDir, kind: 'subagent-exited', identifiers: { 'subagent-session-id': sessionId, 'job-id': parent.jobId, persona: parent.personaName ?? '' }, body: composeSubagentExitedBody(...) })`.
+   - Call `ent/session/inject_notification` on the parent's JSON-RPC peer with `{ sessionId: parent.sessionId, kind: 'subagent-exited', identifiers: { 'subagent-session-id': sessionId, 'job-id': parent.jobId, persona: parent.personaName ?? '' }, body: composeSubagentExitedBody(...) }`. The request has a 2-second timeout; on timeout/error the subagent logs and drops the notification (best-effort delivery).
 4. Exit.
 
 Pending alarms remain in the subagent's `alarms.json` but never fire — no scheduler is running for that session. This is documented as a known limitation (today's behavior is already to lose them).
+
+**Why RPC and not a direct cross-process file write?** Writing to the parent's `events.jsonl` from a different process races with the parent's own runner: both compute `nextEventSeq` from the same on-disk snapshot and write lines with the same seq. The parent's `ent/session/inject_notification` handler runs the actual `injectNotification` call under the parent runner's `runExclusive` mutex, so all writes to the parent session's `events.jsonl` serialize through one queue in one process. The parent gives the subagent a window to deliver this RPC by sending `ent/agent/prepare_shutdown` immediately before tearing down the JSON-RPC peer; the subagent runs its graceful-shutdown bookkeeping inside that handler while both peers are still open.
+
+The intra-process variant of the same race — the `AlarmScheduler`'s notifier firing outside the runner's mutex — is closed by wrapping the scheduler's `injectNotification` call in `runExclusive` from `ensureAlarmSchedulerForActiveSession`.
 
 Crash exit (uncaught exception, SIGKILL, OOM, host kill) does not notify. The parent learns via the existing job-lifecycle path (`job-failed` notification fires when the parent's job-manager detects the subagent process died).
 
