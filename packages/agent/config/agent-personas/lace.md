@@ -7,14 +7,14 @@
 @sections/tools.md
 
 {{#availableSkills}}
+
 ## Available Skills
 
 The following skills are available. Use the `use_skill` tool to activate a skill
 when it's relevant to your task. Skills provide expert guidance for specific
 workflows.
 
-{{{availableSkills}}}
-{{/availableSkills}}
+{{{availableSkills}}} {{/availableSkills}}
 
 @sections/delegation.md
 

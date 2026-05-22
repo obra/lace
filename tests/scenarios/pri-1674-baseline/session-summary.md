@@ -29,5 +29,3 @@ currently working on. You:
 - Focus on the deliverable or specific problem being solved
 - Use present tense and active voice
 - Be direct and specific, not generic
-
-

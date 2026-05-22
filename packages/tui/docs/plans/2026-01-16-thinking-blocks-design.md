@@ -4,12 +4,14 @@
 
 ## Overview
 
-Display extended thinking/reasoning content from LLMs in the TUI. Shows what the model is thinking, with progressive disclosure: indicator while streaming, full content always visible when complete.
+Display extended thinking/reasoning content from LLMs in the TUI. Shows what the
+model is thinking, with progressive disclosure: indicator while streaming, full
+content always visible when complete.
 
 ## Goals
 
 - **Visibility**: Users see that the model is thinking
-- **Transparency**: Users see what the model is thinking  
+- **Transparency**: Users see what the model is thinking
 - **Debugging**: Developers can inspect reasoning to debug agent behavior
 - Full support with always-expanded display
 
@@ -30,7 +32,8 @@ Three new event types for thinking:
 
 ### Event Ordering
 
-Thinking can be interleaved with text and tools within a turn. Each block is distinct:
+Thinking can be interleaved with text and tools within a turn. Each block is
+distinct:
 
 ```
 turn_start
@@ -43,7 +46,8 @@ turn_start
 turn_end
 ```
 
-Each thinking block identified by `(turn_id, turn_seq)` stays distinct - no merging.
+Each thinking block identified by `(turn_id, turn_seq)` stays distinct - no
+merging.
 
 ## TUI State
 
@@ -61,15 +65,18 @@ pub thinking_blocks: Vec<ThinkingBlock>,
 ```
 
 Reducer:
+
 - `thinking_start` → Push new ThinkingBlock with `streaming: true`
 - `thinking_delta` → Append text to current streaming block
 - `thinking_end` → Set `tokens`, mark `streaming: false`
 
 ## Rendering
 
-Thinking blocks render inline in chat, positioned by `turn_seq` relative to other content. Always expanded (never collapsed).
+Thinking blocks render inline in chat, positioned by `turn_seq` relative to
+other content. Always expanded (never collapsed).
 
 **Display format:**
+
 ```
 Thinking (2.3K tokens):
 I need to understand the codebase structure first.
@@ -82,18 +89,20 @@ Here's what I found in the codebase...
 ```
 
 **Styling:**
+
 - Header: `Thinking (N tokens):` or `Thinking...` while streaming, in `fg_muted`
 - Content: `fg_muted` + italic modifier (dimmed italic)
 - No collapse affordance
 
-**Ordering:**
-All content within a turn (thinking, text, tools) sorted by `turn_seq` to preserve interleaved order.
+**Ordering:** All content within a turn (thinking, text, tools) sorted by
+`turn_seq` to preserve interleaved order.
 
 ## Provider Implementations
 
 ### Base Provider
 
 Add new event types to EventEmitter:
+
 - `thinking_start` - `{}`
 - `thinking_delta` - `{ text: string }`
 - `thinking_end` - `{ tokens: number }`
@@ -146,7 +155,8 @@ for (const part of response.candidates[0].content.parts) {
 
 ### Ollama/LMStudio
 
-No standard thinking format. Skip for now, can be added for specific models later.
+No standard thinking format. Skip for now, can be added for specific models
+later.
 
 ## Runner Changes
 
@@ -154,16 +164,30 @@ Forward thinking events from provider to client:
 
 ```typescript
 provider.on('thinking_start', () => {
-  await onUpdate(streamTurnSeq++, { type: 'thinking_start', turnId, turnSeq: durableTurnSeq++ });
+  await onUpdate(streamTurnSeq++, {
+    type: 'thinking_start',
+    turnId,
+    turnSeq: durableTurnSeq++,
+  });
 });
 
 provider.on('thinking_delta', ({ text }) => {
   // Throttle to ~100ms batches to reduce render churn
-  await onUpdate(streamTurnSeq, { type: 'thinking_delta', text, turnId, turnSeq: currentThinkingSeq });
+  await onUpdate(streamTurnSeq, {
+    type: 'thinking_delta',
+    text,
+    turnId,
+    turnSeq: currentThinkingSeq,
+  });
 });
 
 provider.on('thinking_end', ({ tokens }) => {
-  await onUpdate(streamTurnSeq++, { type: 'thinking_end', tokens, turnId, turnSeq: durableTurnSeq++ });
+  await onUpdate(streamTurnSeq++, {
+    type: 'thinking_end',
+    tokens,
+    turnId,
+    turnSeq: durableTurnSeq++,
+  });
 });
 ```
 

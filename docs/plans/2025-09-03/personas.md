@@ -11,8 +11,8 @@ prompts (personas).
 
 - **Persona**: A system prompt template that defines an agent's
   behavior/capabilities
-- **Template System**: Personas use `@sections/...` to reuse shared
-  prompt sections
+- **Template System**: Personas use `@sections/...` to reuse shared prompt
+  sections
 - **Override System**: User-defined personas (in `~/.lace/`) override built-in
   ones by name
 - **NewAgentSpec**: Format for specifying new agents:
