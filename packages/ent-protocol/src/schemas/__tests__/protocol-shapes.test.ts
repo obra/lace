@@ -13,7 +13,7 @@ import {
 function boundedHostRuntimeBinding(cwd = '/tmp') {
   return {
     schemaVersion: 1,
-    identity: { runtimeId: 'rt_local_protocol' },
+    identity: { runtimeId: 'rt_bounded_host_protocol' },
     agentPlacement: 'host',
     toolRuntime: { type: 'boundedHost', root: cwd, cwd },
   };
@@ -22,7 +22,7 @@ function boundedHostRuntimeBinding(cwd = '/tmp') {
 function boundedHostWorkspaceRuntimeBinding(cwd = '/project') {
   return {
     schemaVersion: 1,
-    identity: { runtimeId: 'rt_workspace_protocol' },
+    identity: { runtimeId: 'rt_bounded_host_wide_root_protocol' },
     agentPlacement: 'host',
     toolRuntime: {
       type: 'boundedHost',

@@ -8,7 +8,7 @@ describe('runtime binding validation', () => {
     ).toMatchObject({
       schemaVersion: 1,
       identity: {
-        runtimeId: expect.stringMatching(/^legacy:session:sess_123:/),
+        runtimeId: expect.stringMatching(/^runtime:session:sess_123:/),
       },
       agentPlacement: 'host',
       toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
@@ -52,27 +52,25 @@ describe('runtime binding validation', () => {
     });
   });
 
-  it('migrates legacy local runtime to boundedHost', () => {
-    expect(
+  it('rejects local runtime descriptors', () => {
+    expect(() =>
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
-        identity: { runtimeId: 'legacy_local' },
+        identity: { runtimeId: 'old_local' },
         agentPlacement: 'host',
         toolRuntime: {
           type: 'local',
           cwd: '/repo',
         },
       })
-    ).toMatchObject({
-      toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
-    });
+    ).toThrow(/invalid runtime binding/i);
   });
 
-  it('migrates legacy workspace runtime into boundedHost', () => {
-    expect(
+  it('rejects workspace runtime descriptors', () => {
+    expect(() =>
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
-        identity: { runtimeId: 'legacy_workspace' },
+        identity: { runtimeId: 'old_workspace' },
         agentPlacement: 'host',
         toolRuntime: {
           type: 'workspace',
@@ -81,9 +79,7 @@ describe('runtime binding validation', () => {
           cwd: '/project/pkg',
         },
       })
-    ).toMatchObject({
-      toolRuntime: { type: 'boundedHost', root: '/tmp/workspace', cwd: '/tmp/workspace/pkg' },
-    });
+    ).toThrow(/invalid runtime binding/i);
   });
 
   it('rejects unknown schema versions', () => {

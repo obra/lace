@@ -3,7 +3,7 @@ import type { RuntimeExecutionBinding, ToolRuntimeDescriptor } from './types';
 
 type RuntimeMcpPlacement = 'host' | 'toolRuntime';
 
-type LegacyRuntimeIdInput =
+type RuntimeIdInput =
   | {
       scope: 'session';
       sessionId: string;
@@ -46,7 +46,7 @@ export function canonicalRuntimeIdentityJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-export function legacyRuntimeFingerprint(input: unknown): string {
+export function runtimeFingerprint(input: unknown): string {
   return createHash('sha256')
     .update(canonicalRuntimeIdentityJson(input))
     .digest('hex')
@@ -60,7 +60,7 @@ function sortedRecord<T>(value: Record<string, T> | undefined): Record<string, T
   );
 }
 
-function normalizeToolRuntimeForLegacyIdentity(toolRuntime: ToolRuntimeDescriptor): unknown {
+function normalizeToolRuntimeForIdentity(toolRuntime: ToolRuntimeDescriptor): unknown {
   if (toolRuntime.type === 'host') {
     return {
       type: toolRuntime.type,
@@ -105,7 +105,7 @@ function normalizeToolRuntimeForLegacyIdentity(toolRuntime: ToolRuntimeDescripto
   };
 }
 
-function normalizeLegacyRuntimeIdentityInput(input: LegacyRuntimeIdInput): unknown {
+function normalizeRuntimeIdentityInput(input: RuntimeIdInput): unknown {
   const common = {
     schemaVersion: input.binding.schemaVersion,
     agentPlacement: input.binding.agentPlacement,
@@ -120,19 +120,19 @@ function normalizeLegacyRuntimeIdentityInput(input: LegacyRuntimeIdInput): unkno
           effectiveCwd: input.effectiveCwd,
         }
       : {}),
-    toolRuntime: normalizeToolRuntimeForLegacyIdentity(input.binding.toolRuntime),
+    toolRuntime: normalizeToolRuntimeForIdentity(input.binding.toolRuntime),
   };
   return common;
 }
 
-export function buildLegacyRuntimeId(input: LegacyRuntimeIdInput): string {
-  const common = normalizeLegacyRuntimeIdentityInput(input);
-  const fingerprint = legacyRuntimeFingerprint(common);
+export function buildRuntimeId(input: RuntimeIdInput): string {
+  const common = normalizeRuntimeIdentityInput(input);
+  const fingerprint = runtimeFingerprint(common);
   if (input.scope === 'job') {
-    return `legacy:job:${input.sessionId}:${input.jobId}:${fingerprint}`;
+    return `runtime:job:${input.sessionId}:${input.jobId}:${fingerprint}`;
   }
   if (input.scope === 'mcp') {
-    return `legacy:mcp:${input.sessionId}:${input.serverId}:${fingerprint}`;
+    return `runtime:mcp:${input.sessionId}:${input.serverId}:${fingerprint}`;
   }
-  return `legacy:session:${input.sessionId}:${fingerprint}`;
+  return `runtime:session:${input.sessionId}:${fingerprint}`;
 }

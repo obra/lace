@@ -6,7 +6,7 @@
 
 **Goal:** Replace the current `local`/`workspace` runtime model with
 `host`/`boundedHost`/`container`, make `boundedHost` the default host-session
-runtime, migrate old persisted bindings, and remove first-class git worktree
+runtime, reject old runtime descriptors, and remove first-class git worktree
 runtime code.
 
 **Architecture:** Keep the existing `ToolRuntime` capability abstraction, but
@@ -38,7 +38,7 @@ plan as history, but do not implement new `WorkspaceToolRuntime` or
 - User-facing host sessions default to `boundedHost`.
 - Raw `host` must be requested explicitly and is not used as fallback when
   bounded host construction fails.
-- Old persisted `local` and `workspace` bindings are migration inputs only.
+- Old `local` and `workspace` bindings are invalid everywhere.
 - Git worktree lifecycle is outside runtime/session/MCP/tool execution.
 - `WorktreeManager` is deleted from this branch.
 
@@ -50,16 +50,15 @@ Public protocol schemas accept only:
 - `boundedHost`
 - `container`
 
-Agent-side persisted-state parsing may still read old `local` and `workspace`
-bindings, but only to normalize them immediately to new descriptors during
-migration.
+Agent-side persisted-state parsing also rejects old `local` and `workspace`
+bindings. There is no compatibility parser for old runtime descriptors.
 
 ## File Structure
 
 - Modify `packages/agent/src/tools/runtime/types.ts`: runtime kind and
   descriptor union become `host`/`boundedHost`/`container`.
 - Modify `packages/agent/src/tools/runtime/validation.ts`: parse new bindings,
-  normalize old persisted bindings, and build default bounded host bindings.
+  reject old descriptors, and build default bounded host bindings.
 - Modify `packages/agent/src/tools/runtime/identity.ts`: identity hashing uses
   `host` and `boundedHost` descriptors with no worktree fields.
 - Modify `packages/ent-protocol/src/schemas/shared.ts`: public schema accepts
@@ -80,15 +79,15 @@ migration.
   coverage for all new runtime kinds.
 - Modify `packages/agent/src/tools/runtime/__tests__/validation.test.ts` and
   `packages/agent/src/tools/runtime/__tests__/identity.test.ts`: new defaults
-  and legacy migration fixtures.
+  and old descriptor rejection fixtures.
 - Modify `packages/agent/src/tools/runtime/__tests__/fake-runtime.ts`: fake kind
   becomes `boundedHost` unless a test needs another kind.
 - Modify `packages/agent/src/core/conversation/runner.ts`: default runtime
   binding and host-path file tracking use `boundedHost`.
 - Modify `packages/agent/src/rpc/handlers/session.ts`: session
   new/load/resume/fork normalize bindings and default to bounded host.
-- Modify `packages/agent/src/jobs/shell-job.ts`: legacy jobs default to bounded
-  host.
+- Modify `packages/agent/src/jobs/shell-job.ts`: jobs without an explicit
+  runtime binding default to bounded host.
 - Modify runtime-binding tests under `packages/agent/src/__tests__/`,
   `packages/agent/src/jobs/__tests__/`, and
   `packages/agent/src/storage/__tests__/`.
@@ -164,28 +163,26 @@ Add tests that `parseRuntimeExecutionBinding()` accepts these descriptors:
 }
 ```
 
-- [x] **Step 3: Write failing migration tests for old persisted bindings**
+- [x] **Step 3: Write failing rejection tests for old descriptors**
 
-Add tests that old bindings normalize to bounded host:
+Add tests that old bindings are rejected:
 
 ```typescript
 expect(
   parseRuntimeExecutionBinding({
     schemaVersion: 1,
-    identity: { runtimeId: 'legacy_local' },
+    identity: { runtimeId: 'old_local' },
     agentPlacement: 'host',
     toolRuntime: { type: 'local', cwd: '/repo' },
   })
-).toMatchObject({
-  toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
-});
+).toThrow(/invalid runtime binding/i);
 ```
 
 ```typescript
 expect(
   parseRuntimeExecutionBinding({
     schemaVersion: 1,
-    identity: { runtimeId: 'legacy_workspace' },
+    identity: { runtimeId: 'old_workspace' },
     agentPlacement: 'host',
     toolRuntime: {
       type: 'workspace',
@@ -194,13 +191,7 @@ expect(
       cwd: '/project/pkg',
     },
   })
-).toMatchObject({
-  toolRuntime: {
-    type: 'boundedHost',
-    root: '/tmp/workspace',
-    cwd: '/tmp/workspace/pkg',
-  },
-});
+).toThrow(/invalid runtime binding/i);
 ```
 
 - [x] **Step 4: Run tests to verify they fail**
@@ -251,38 +242,16 @@ In `packages/agent/src/tools/runtime/validation.ts`:
 
 - Add `HostRuntimeDescriptorSchema`.
 - Add `BoundedHostRuntimeDescriptorSchema`.
-- Keep local `LegacyLocalRuntimeDescriptorSchema` and
-  `LegacyWorkspaceRuntimeDescriptorSchema` inside this file only.
-- Parse persisted values through a union that accepts legacy descriptors, then
-  normalize to `RuntimeExecutionBinding`.
+- Do not keep `LegacyLocalRuntimeDescriptorSchema` or
+  `LegacyWorkspaceRuntimeDescriptorSchema`.
+- Parse persisted values through the same descriptor union used for new
+  bindings; old descriptors should fail validation.
 - Replace `buildDefaultLocalRuntimeBinding()` with
   `buildDefaultBoundedHostRuntimeBinding()`.
 - Do not keep a public alias named `buildDefaultLocalRuntimeBinding` after all
   callers are updated.
 
-The workspace migration helper should map `cwd` once and then discard
-`projectRoot`:
-
-```typescript
-function migrateWorkspaceCwd(input: {
-  projectRoot: string;
-  workspaceRoot: string;
-  cwd: string;
-}): string {
-  const workspaceRoot = resolve(input.workspaceRoot);
-  const cwd = resolve(input.cwd);
-  if (pathIsInside(workspaceRoot, cwd)) return cwd;
-
-  const projectRoot = resolve(input.projectRoot);
-  if (pathIsInside(projectRoot, cwd)) {
-    return resolve(workspaceRoot, relative(projectRoot, cwd));
-  }
-
-  throw new Error(
-    `Cannot migrate workspace runtime cwd outside workspace root: ${input.cwd}`
-  );
-}
-```
+There should be no workspace migration helper.
 
 - [x] **Step 7: Update runtime identity normalization**
 
@@ -301,7 +270,7 @@ In `packages/ent-protocol/src/schemas/shared.ts`, replace the public
 `LocalRuntimeDescriptorSchema` and `WorkspaceRuntimeDescriptorSchema` with
 `HostRuntimeDescriptorSchema` and `BoundedHostRuntimeDescriptorSchema`.
 
-Public protocol schemas must not accept legacy wire formats after migration.
+Public protocol schemas must not accept old wire formats after migration.
 
 - [x] **Step 9: Update protocol-shape tests**
 
@@ -696,7 +665,7 @@ git commit -m "feat: default sessions to bounded host runtime"
 
 - [x] **Step 1: Write failing job tests**
 
-Update legacy job tests so jobs without stored `runtimeBinding` default to:
+Update job tests so jobs without stored `runtimeBinding` default to:
 
 ```typescript
 toolRuntime: { type: 'boundedHost', root: activeWorkDir, cwd: activeWorkDir }
@@ -918,7 +887,7 @@ Run:
 rg -n "type: 'local'|type: 'workspace'|WorkspaceToolRuntime|workspaceRoot|projectRoot|kind: 'local'|kind = 'local'" packages/agent/src packages/ent-protocol/src
 ```
 
-Expected: matches remain in tests and maybe migration tests only.
+Expected: matches remain only in rejection tests or historical plan text.
 
 - [x] **Step 2: Update non-migration fixtures**
 
@@ -936,8 +905,8 @@ toolRuntime: {
 }
 ```
 
-Leave `local` and `workspace` strings only in migration tests that intentionally
-parse legacy persisted state.
+Leave `local` and `workspace` strings only in tests that intentionally assert
+old descriptors are rejected.
 
 - [x] **Step 3: Run broad targeted tests**
 
@@ -1047,25 +1016,23 @@ Run:
 rg -n "WorkspaceToolRuntime|workspaceRoot|projectRoot|buildDefaultLocalRuntimeBinding|ToolRuntimeKind = 'local'|type: 'local'|type: 'workspace'|kind: 'local'" packages/agent/src packages/ent-protocol/src
 ```
 
-Expected: matches only in migration tests and legacy migration helper names.
+Expected: matches only in old-descriptor rejection tests.
 
 - [x] **Step 2: Remove old public names**
 
 Remove `buildDefaultLocalRuntimeBinding` completely. Any call site should use
 `buildDefaultBoundedHostRuntimeBinding`.
 
-If `buildLegacyRuntimeId` is still exported, either:
-
-- rename it to `buildRuntimeId` and update call sites in the same commit; or
-- leave it only if it is specifically used to identify migrated legacy records.
+If `buildLegacyRuntimeId` is still exported, rename it to `buildRuntimeId` and
+update call sites in the same commit.
 
 Do not leave names that imply new runtime behavior is still local/workspace.
 
-- [x] **Step 3: Keep migration helper scope narrow**
+- [x] **Step 3: Remove migration helper scope**
 
-If legacy descriptor schemas remain, keep them private to `validation.ts`.
-Migration tests may mention `local`, `workspace`, `projectRoot`, and
-`workspaceRoot`; production runtime/session/MCP/tool code must not.
+Do not keep legacy descriptor schemas in `validation.ts`. Tests may mention
+`local`, `workspace`, `projectRoot`, and `workspaceRoot` only when asserting
+that old descriptors are rejected.
 
 - [x] **Step 4: Run cleanup search again**
 
@@ -1175,8 +1142,8 @@ rg -n "WorktreeManager|WorkspaceToolRuntime|buildDefaultLocalRuntimeBinding" pac
 rg -n "type: 'local'|type: 'workspace'|kind: 'local'|workspaceRoot|projectRoot" packages/agent/src packages/ent-protocol/src
 ```
 
-Expected: no production matches. Legacy migration tests/helpers may mention old
-descriptor fields if they are clearly testing migration from persisted state.
+Expected: no production matches. Rejection tests may mention old descriptor
+fields only when asserting that old descriptors are invalid.
 
 - [x] **Step 7: Run format check and diff check**
 
@@ -1236,7 +1203,7 @@ Verify each spec acceptance criterion:
 - runtime-placed MCP uses active runtime cwd;
 - host-orchestrated sessions reject `agentPlacement: 'container'`;
 - `WorktreeManager` is removed;
-- tests cover legacy workspace migration into bounded host;
+- tests cover rejecting old `local` and `workspace` runtime descriptors;
 - tests cover rejecting paths outside bounded root.
 
 - [x] **Step 2: Record spec mismatches only if real**
@@ -1262,5 +1229,5 @@ Only do this if the execution session actually checked boxes in the plan.
 Plan complete. Implement with `superpowers:subagent-driven-development` if the
 harness permits subagents; otherwise use `superpowers:executing-plans` and
 complete one task at a time. The wire-compatibility decision is final for this
-plan: public schemas accept only `host`, `boundedHost`, and `container`; legacy
-`local` and `workspace` descriptors are persisted-state migration inputs only.
+plan: public schemas accept only `host`, `boundedHost`, and `container`; old
+`local` and `workspace` descriptors are invalid everywhere.

@@ -1,39 +1,7 @@
 import { z } from 'zod';
-import { buildLegacyRuntimeId } from './identity';
+import { buildRuntimeId } from './identity';
 import { normalizeImagePlatform, validateResolvedImageDigest } from './image-identity';
 import type { RuntimeExecutionBinding } from './types';
-import { relative, resolve } from 'node:path';
-
-const sep = '/';
-
-function isAbsolutePath(input: string): boolean {
-  return input.startsWith(sep);
-}
-
-function pathIsInside(root: string, path: string): boolean {
-  const relativePath = relative(root, path);
-  return (
-    relativePath === '' ||
-    (!relativePath.startsWith(`..${sep}`) && relativePath !== '..' && !isAbsolutePath(relativePath))
-  );
-}
-
-function migrateWorkspaceCwd(input: {
-  projectRoot: string;
-  workspaceRoot: string;
-  cwd: string;
-}): string {
-  const workspaceRoot = resolve(input.workspaceRoot);
-  const cwd = resolve(input.cwd);
-  if (pathIsInside(workspaceRoot, cwd)) return cwd;
-
-  const projectRoot = resolve(input.projectRoot);
-  if (pathIsInside(projectRoot, cwd)) {
-    return resolve(workspaceRoot, relative(projectRoot, cwd));
-  }
-
-  throw new Error(`Cannot migrate workspace runtime cwd outside workspace root: ${input.cwd}`);
-}
 
 const RuntimeSecretReferenceSchema = z
   .object({
@@ -50,19 +18,6 @@ const BoundedHostRuntimeDescriptorSchema = z
   .object({
     type: z.literal('boundedHost'),
     root: z.string().min(1),
-    cwd: z.string().min(1),
-  })
-  .strict();
-
-const LegacyLocalRuntimeDescriptorSchema = z
-  .object({ type: z.literal('local'), cwd: z.string().min(1) })
-  .strict();
-
-const LegacyWorkspaceRuntimeDescriptorSchema = z
-  .object({
-    type: z.literal('workspace'),
-    projectRoot: z.string().min(1),
-    workspaceRoot: z.string().min(1),
     cwd: z.string().min(1),
   })
   .strict();
@@ -116,58 +71,10 @@ const RuntimeExecutionBindingSchema = z
     toolRuntime: z.discriminatedUnion('type', [
       HostRuntimeDescriptorSchema,
       BoundedHostRuntimeDescriptorSchema,
-      LegacyLocalRuntimeDescriptorSchema,
-      LegacyWorkspaceRuntimeDescriptorSchema,
       ContainerRuntimeDescriptorSchema,
     ]),
   })
   .strict();
-
-type ParsedRuntimeExecutionBinding = z.infer<typeof RuntimeExecutionBindingSchema>;
-
-function parseRuntimeExecutionBindingFromSchema(value: unknown): ParsedRuntimeExecutionBinding {
-  const version =
-    value && typeof value === 'object'
-      ? (value as { schemaVersion?: unknown }).schemaVersion
-      : undefined;
-  if (version !== 1) {
-    throw new Error(`Unsupported runtime binding version: ${String(version)}`);
-  }
-  const parsed = RuntimeExecutionBindingSchema.safeParse(value);
-  if (parsed.success) return parsed.data;
-  throw new Error(`Invalid runtime binding: ${parsed.error.message}`);
-}
-
-function normalizeMigrationBinding(parsed: ParsedRuntimeExecutionBinding): RuntimeExecutionBinding {
-  if (parsed.toolRuntime.type === 'local') {
-    return {
-      ...parsed,
-      toolRuntime: {
-        type: 'boundedHost',
-        root: parsed.toolRuntime.cwd,
-        cwd: parsed.toolRuntime.cwd,
-      },
-    };
-  }
-
-  if (parsed.toolRuntime.type === 'workspace') {
-    const cwd = migrateWorkspaceCwd({
-      projectRoot: parsed.toolRuntime.projectRoot,
-      workspaceRoot: parsed.toolRuntime.workspaceRoot,
-      cwd: parsed.toolRuntime.cwd,
-    });
-    return {
-      ...parsed,
-      toolRuntime: {
-        type: 'boundedHost',
-        root: parsed.toolRuntime.workspaceRoot,
-        cwd,
-      },
-    };
-  }
-
-  return parsed as RuntimeExecutionBinding;
-}
 
 export function buildDefaultBoundedHostRuntimeBinding(input: {
   sessionId: string;
@@ -182,7 +89,7 @@ export function buildDefaultBoundedHostRuntimeBinding(input: {
   return {
     ...binding,
     identity: {
-      runtimeId: buildLegacyRuntimeId({
+      runtimeId: buildRuntimeId({
         scope: 'session',
         sessionId: input.sessionId,
         binding,
@@ -192,6 +99,14 @@ export function buildDefaultBoundedHostRuntimeBinding(input: {
 }
 
 export function parseRuntimeExecutionBinding(value: unknown): RuntimeExecutionBinding {
-  const parsed = parseRuntimeExecutionBindingFromSchema(value);
-  return normalizeMigrationBinding(parsed);
+  const version =
+    value && typeof value === 'object'
+      ? (value as { schemaVersion?: unknown }).schemaVersion
+      : undefined;
+  if (version !== 1) {
+    throw new Error(`Unsupported runtime binding version: ${String(version)}`);
+  }
+  const parsed = RuntimeExecutionBindingSchema.safeParse(value);
+  if (parsed.success) return parsed.data;
+  throw new Error(`Invalid runtime binding: ${parsed.error.message}`);
 }

@@ -69,7 +69,7 @@ Git worktree semantics add noise without solving those core runtime problems.
 - Keep path identity, file access tracking, MCP placement, and job rehydration
   based on runtime identity plus runtime paths.
 - Keep host-agent and lace-in-container agent placement distinct.
-- Make the revised design easier to explain, validate, and migrate.
+- Make the revised design easier to explain and validate.
 
 ## Non-Goals
 
@@ -299,28 +299,16 @@ projected-runtime work. If a future feature needs first-class git worktree
 operations, it should introduce that behind an explicit workflow boundary rather
 than reattach it to runtime, session, MCP, or tool execution code.
 
-## Migration
+## Legacy Runtime Descriptors
 
-Persisted runtime bindings should migrate as follows:
+There is no legacy runtime descriptor compatibility path in this branch. Stored
+or client-supplied `toolRuntime.type: 'local'` and
+`toolRuntime.type: 'workspace'` bindings are invalid and must be rejected before
+session activation, job rehydration, or tool execution.
 
-| Existing binding                                     | New binding                                                              |
-| ---------------------------------------------------- | ------------------------------------------------------------------------ |
-| `toolRuntime.type: 'local'`                          | `toolRuntime.type: 'boundedHost'` with `root: cwd`, `cwd`                |
-| `toolRuntime.type: 'workspace'` with `workspaceRoot` | `toolRuntime.type: 'boundedHost'` with `root: workspaceRoot`, mapped cwd |
-| `toolRuntime.type: 'container'`                      | unchanged except enum naming if needed                                   |
-
-For old workspace bindings:
-
-- If `cwd` was already inside `workspaceRoot`, keep it.
-- If `cwd` was inside `projectRoot`, map it once into `workspaceRoot`.
-- After migration, discard `projectRoot`; future path resolution does not use
-  project-root coordinates.
-- If the binding cannot be mapped safely, reject the stored binding before
-  session activation with a clear recovery error.
-
-The migration should be one-way for runtime semantics. We should not preserve a
-compatibility path where future tools continue accepting project-root paths in a
-bounded host runtime.
+If a deployment still has sessions persisted with old descriptors, the recovery
+path is to start a new session with an explicit `boundedHost` binding or no
+binding at all, which creates the default bounded host binding.
 
 ## Acceptance Criteria
 
@@ -334,9 +322,8 @@ bounded host runtime.
 - Host-orchestrated sessions reject `agentPlacement: 'container'`.
 - `WorktreeManager` is removed from this runtime branch unless a separate
   approved workflow owns it.
-- Tests cover migration from old workspace bindings into bounded host bindings.
-- Tests cover rejecting project-root paths after migration when they are outside
-  the active bounded root.
+- Tests cover rejecting old `local` and `workspace` runtime descriptors.
+- Tests cover rejecting paths outside the active bounded root.
 
 ## Verification Strategy
 
@@ -344,10 +331,9 @@ The implementation plan should include targeted tests for:
 
 - descriptor schema parsing for `host`, `boundedHost`, and `container`;
 - default session binding creation as `boundedHost`;
-- migration from old `local` and `workspace` bindings;
+- rejection of old `local` and `workspace` bindings;
 - bounded host path containment and realpath escape rejection;
 - process cwd rejection when requested cwd escapes bounded host `root`;
-- session load/resume rejecting unmappable old workspace bindings;
 - session new/load/resume rejecting container-agent placement for host sessions;
 - MCP `toolRuntime` placement with bounded host and container runtimes; and
 - job runtime binding persistence and rehydration without worktree fields.
@@ -360,7 +346,5 @@ runtime/session/MCP/tool execution code must not import WorktreeManager
 
 ## Open Questions
 
-1. Should the externally visible runtime descriptor use `type: 'host'` or keep
-   `type: 'local'` for wire compatibility?
-2. Should raw unbounded `host` runtime be exposed to clients at all, or kept as
+1. Should raw unbounded `host` runtime be exposed to clients at all, or kept as
    an internal-only runtime for host-service MCP and infrastructure paths?
