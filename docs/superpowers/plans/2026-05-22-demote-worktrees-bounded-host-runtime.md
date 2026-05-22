@@ -117,7 +117,7 @@ migration.
 - Modify: `packages/ent-protocol/src/schemas/shared.ts`
 - Modify: `packages/ent-protocol/src/schemas/__tests__/protocol-shapes.test.ts`
 
-- [ ] **Step 1: Write failing validation tests for the new default**
+- [x] **Step 1: Write failing validation tests for the new default**
 
 Update `packages/agent/src/tools/runtime/__tests__/validation.test.ts`:
 
@@ -142,7 +142,7 @@ it('defaults missing host state to boundedHost runtime', () => {
 });
 ```
 
-- [ ] **Step 2: Write failing validation tests for new descriptor parsing**
+- [x] **Step 2: Write failing validation tests for new descriptor parsing**
 
 Add tests that `parseRuntimeExecutionBinding()` accepts these descriptors:
 
@@ -164,7 +164,7 @@ Add tests that `parseRuntimeExecutionBinding()` accepts these descriptors:
 }
 ```
 
-- [ ] **Step 3: Write failing migration tests for old persisted bindings**
+- [x] **Step 3: Write failing migration tests for old persisted bindings**
 
 Add tests that old bindings normalize to bounded host:
 
@@ -203,7 +203,7 @@ expect(
 });
 ```
 
-- [ ] **Step 4: Run tests to verify they fail**
+- [x] **Step 4: Run tests to verify they fail**
 
 Run:
 
@@ -214,7 +214,7 @@ npm run test --workspace=packages/agent -- src/tools/runtime/__tests__/validatio
 Expected: FAIL because `boundedHost` types and
 `buildDefaultBoundedHostRuntimeBinding()` do not exist yet.
 
-- [ ] **Step 5: Update agent runtime types**
+- [x] **Step 5: Update agent runtime types**
 
 In `packages/agent/src/tools/runtime/types.ts`, replace the descriptor union
 with:
@@ -245,7 +245,7 @@ export type ToolRuntimeDescriptor =
     };
 ```
 
-- [ ] **Step 6: Update validation parsing and default builder**
+- [x] **Step 6: Update validation parsing and default builder**
 
 In `packages/agent/src/tools/runtime/validation.ts`:
 
@@ -284,7 +284,7 @@ function migrateWorkspaceCwd(input: {
 }
 ```
 
-- [ ] **Step 7: Update runtime identity normalization**
+- [x] **Step 7: Update runtime identity normalization**
 
 In `packages/agent/src/tools/runtime/identity.ts`:
 
@@ -295,15 +295,15 @@ In `packages/agent/src/tools/runtime/identity.ts`:
   updated in this task. If not, leave the rename for Task 10 to avoid mixing
   behavior and naming churn.
 
-- [ ] **Step 8: Update ent-protocol public schema**
+- [x] **Step 8: Update ent-protocol public schema**
 
 In `packages/ent-protocol/src/schemas/shared.ts`, replace the public
 `LocalRuntimeDescriptorSchema` and `WorkspaceRuntimeDescriptorSchema` with
 `HostRuntimeDescriptorSchema` and `BoundedHostRuntimeDescriptorSchema`.
 
-Do not add legacy public schema support here without Jesse's approval.
+Public protocol schemas must not accept legacy wire formats after migration.
 
-- [ ] **Step 9: Update protocol-shape tests**
+- [x] **Step 9: Update protocol-shape tests**
 
 In `packages/ent-protocol/src/schemas/__tests__/protocol-shapes.test.ts`:
 
@@ -312,7 +312,7 @@ In `packages/ent-protocol/src/schemas/__tests__/protocol-shapes.test.ts`:
 - Keep container fixtures unchanged except for any enum naming required by
   shared schemas.
 
-- [ ] **Step 10: Run targeted tests**
+- [x] **Step 10: Run targeted tests**
 
 Run:
 
@@ -323,7 +323,7 @@ npm run test --workspace=packages/ent-protocol -- src/schemas/__tests__/protocol
 
 Expected: PASS.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git status --short
@@ -349,7 +349,7 @@ git commit -m "feat: revise runtime descriptors for bounded host"
 - Modify: `packages/agent/src/tools/runtime/__tests__/host.test.ts`
 - Modify: `packages/agent/src/tools/runtime/__tests__/fake-runtime.ts`
 
-- [ ] **Step 1: Move the workspace runtime files**
+- [x] **Step 1: Move the workspace runtime files**
 
 Run:
 
@@ -360,7 +360,7 @@ git mv packages/agent/src/tools/runtime/__tests__/workspace.test.ts packages/age
 
 This preserves the containment code history while changing the domain model.
 
-- [ ] **Step 2: Rewrite tests around bounded host semantics**
+- [x] **Step 2: Rewrite tests around bounded host semantics**
 
 In `bounded-host.test.ts`, replace project/workspace mapping tests with these
 behaviors:
@@ -393,7 +393,7 @@ it('rejects absolute paths outside the bounded host root', async () => {
 });
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run:
 
@@ -404,7 +404,7 @@ npm run test --workspace=packages/agent -- src/tools/runtime/__tests__/bounded-h
 Expected: FAIL because the moved implementation still exports
 `WorkspaceToolRuntime` and still maps `projectRoot`.
 
-- [ ] **Step 4: Implement `BoundedHostToolRuntime`**
+- [x] **Step 4: Implement `BoundedHostToolRuntime`**
 
 In `bounded-host.ts`:
 
@@ -452,7 +452,7 @@ class BoundedHostPathService implements RuntimePathService {
 }
 ```
 
-- [ ] **Step 5: Update raw host runtime kind**
+- [x] **Step 5: Update raw host runtime kind**
 
 In `packages/agent/src/tools/runtime/host.ts`, change:
 
@@ -468,7 +468,7 @@ readonly kind = 'host' as const;
 
 Update any host tests that assert the kind.
 
-- [ ] **Step 6: Update fake runtime default kind**
+- [x] **Step 6: Update fake runtime default kind**
 
 In `fake-runtime.ts`, default to:
 
@@ -479,7 +479,7 @@ kind: 'boundedHost',
 Only override to `container` or `host` in tests that care about kind-specific
 behavior.
 
-- [ ] **Step 7: Run targeted tests**
+- [x] **Step 7: Run targeted tests**
 
 Run:
 
@@ -489,7 +489,7 @@ npm run test --workspace=packages/agent -- src/tools/runtime/__tests__/bounded-h
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git status --short
@@ -511,7 +511,7 @@ git commit -m "feat: add bounded host tool runtime"
 - Modify: `packages/agent/src/tools/runtime/__tests__/factory.test.ts`
 - Modify: `packages/agent/src/tools/runtime/projected-container.ts`
 
-- [ ] **Step 1: Write failing factory tests**
+- [x] **Step 1: Write failing factory tests**
 
 Add factory tests:
 
@@ -545,7 +545,7 @@ it('creates bounded host runtime for boundedHost descriptors', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 
@@ -555,7 +555,7 @@ npm run test --workspace=packages/agent -- src/tools/runtime/__tests__/factory.t
 
 Expected: FAIL because the factory still imports `WorkspaceToolRuntime`.
 
-- [ ] **Step 3: Update the factory implementation**
+- [x] **Step 3: Update the factory implementation**
 
 In `factory.ts`:
 
@@ -566,14 +566,14 @@ In `factory.ts`:
   `runtime.type === 'container'`.
 - Keep the existing `agentPlacement !== 'host'` rejection.
 
-- [ ] **Step 4: Keep projected container descriptor extraction typed**
+- [x] **Step 4: Keep projected container descriptor extraction typed**
 
 If `ProjectedContainerToolRuntimeDescriptor` depends on
 `Extract<ToolRuntimeDescriptor, { type: 'container' }>`, verify
 `packages/agent/src/tools/runtime/projected-container.ts` still typechecks after
 the descriptor union changes.
 
-- [ ] **Step 5: Run targeted tests**
+- [x] **Step 5: Run targeted tests**
 
 Run:
 
@@ -583,7 +583,7 @@ npm run test --workspace=packages/agent -- src/tools/runtime/__tests__/factory.t
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git status --short
@@ -607,7 +607,7 @@ git commit -m "feat: create bounded host runtime from bindings"
 - Modify: `packages/agent/src/__tests__/session-load.rehydrate-config.test.ts`
 - Modify: `packages/agent/src/__tests__/agent-process.delegate.e2e.test.ts`
 
-- [ ] **Step 1: Write failing default-session tests**
+- [x] **Step 1: Write failing default-session tests**
 
 Update tests that currently expect `toolRuntime.type: 'local'` so new sessions
 and forks expect:
@@ -623,7 +623,7 @@ toolRuntime: {
 Add at least one explicit assertion that a missing runtime binding does not
 produce raw `host`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 
@@ -634,7 +634,7 @@ npm run test --workspace=packages/agent -- src/__tests__/session-fork.durable-hi
 Expected: FAIL because session code still imports
 `buildDefaultLocalRuntimeBinding()`.
 
-- [ ] **Step 3: Replace default builder imports**
+- [x] **Step 3: Replace default builder imports**
 
 In `runner.ts` and `session.ts`:
 
@@ -653,7 +653,7 @@ const runtimeBinding =
   });
 ```
 
-- [ ] **Step 4: Normalize loaded stored bindings before activation**
+- [x] **Step 4: Normalize loaded stored bindings before activation**
 
 In `session.ts`, when loading stored state:
 
@@ -661,7 +661,7 @@ In `session.ts`, when loading stored state:
 - Use the parsed value when writing the active session state.
 - Ensure invalid stored bindings fail before `state.activeSession` is replaced.
 
-- [ ] **Step 5: Run targeted tests**
+- [x] **Step 5: Run targeted tests**
 
 Run:
 
@@ -671,7 +671,7 @@ npm run test --workspace=packages/agent -- src/__tests__/session-fork.durable-hi
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git status --short
@@ -694,7 +694,7 @@ git commit -m "feat: default sessions to bounded host runtime"
   `packages/agent/src/__tests__/agent-process.async-workflow.e2e.test.ts`
 - Modify: `packages/agent/src/__tests__/server-job-runtime-binding.test.ts`
 
-- [ ] **Step 1: Write failing job tests**
+- [x] **Step 1: Write failing job tests**
 
 Update legacy job tests so jobs without stored `runtimeBinding` default to:
 
@@ -705,7 +705,7 @@ toolRuntime: { type: 'boundedHost', root: activeWorkDir, cwd: activeWorkDir }
 Keep explicit job runtime-binding tests, but update fixtures from `local` to
 `boundedHost`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 
@@ -715,14 +715,14 @@ npm run test --workspace=packages/agent -- src/jobs/__tests__/shell-job.test.ts 
 
 Expected: FAIL because shell jobs still build local default bindings.
 
-- [ ] **Step 3: Update shell-job default builder**
+- [x] **Step 3: Update shell-job default builder**
 
 In `shell-job.ts`, replace `buildDefaultLocalRuntimeBinding()` with
 `buildDefaultBoundedHostRuntimeBinding()`.
 
 Do not change job output paths; job logs remain host-owned artifacts.
 
-- [ ] **Step 4: Run targeted tests**
+- [x] **Step 4: Run targeted tests**
 
 Run:
 
@@ -732,7 +732,7 @@ npm run test --workspace=packages/agent -- src/jobs/__tests__/shell-job.test.ts 
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git status --short
@@ -754,14 +754,14 @@ git commit -m "feat: default shell jobs to bounded host runtime"
   `packages/agent/src/tools/runtime/__tests__/file-access-tracker.test.ts`
 - Modify: `packages/agent/src/core/conversation/__tests__/runner.test.ts`
 
-- [ ] **Step 1: Write failing runner/file-tracking tests**
+- [x] **Step 1: Write failing runner/file-tracking tests**
 
 Update or add a runner test proving a bounded host read records the real host
 path when `RuntimePath.hostPath` is present.
 
 The test should fail if code checks `runtime.kind === 'local'`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 
@@ -771,7 +771,7 @@ npm run test --workspace=packages/agent -- src/core/conversation/__tests__/runne
 
 Expected: FAIL if runner still treats only `local` as host-readable.
 
-- [ ] **Step 3: Update runner host-path tracking**
+- [x] **Step 3: Update runner host-path tracking**
 
 In `runner.ts`, change this shape:
 
@@ -790,12 +790,12 @@ const hostPath =
 Because `boundedHost` path resolution should set `hostPath`, the fallback only
 belongs to raw host.
 
-- [ ] **Step 4: Update old runner fixtures**
+- [x] **Step 4: Update old runner fixtures**
 
 In `runner.test.ts`, replace `local` and `workspace` runtime fixtures with
 `boundedHost` unless a test is specifically checking explicit raw host.
 
-- [ ] **Step 5: Run targeted tests**
+- [x] **Step 5: Run targeted tests**
 
 Run:
 
@@ -805,7 +805,7 @@ npm run test --workspace=packages/agent -- src/core/conversation/__tests__/runne
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git status --short
@@ -832,7 +832,7 @@ git commit -m "fix: track bounded host file reads by runtime path"
   `packages/agent/src/tools/runtime/__tests__/runtime-stdio-transport.test.ts`
 - Modify: `packages/agent/src/rpc/handlers/mcp-servers.ts`
 
-- [ ] **Step 1: Write failing MCP fixture updates**
+- [x] **Step 1: Write failing MCP fixture updates**
 
 Replace workspace-shaped runtime bindings in MCP tests with bounded host
 bindings:
@@ -849,7 +849,7 @@ runtimeBinding: {
 Add one assertion that `placement: 'toolRuntime'` starts stdio MCP with
 `runtime.cwd` from bounded host.
 
-- [ ] **Step 2: Run tests to verify they fail if old types remain**
+- [x] **Step 2: Run tests to verify they fail if old types remain**
 
 Run:
 
@@ -859,7 +859,7 @@ npm run test --workspace=packages/agent -- src/mcp/server-manager.test.ts src/mc
 
 Expected: FAIL until all runtime kinds and fixtures are updated.
 
-- [ ] **Step 3: Update runtime stdio transport kind checks**
+- [x] **Step 3: Update runtime stdio transport kind checks**
 
 In `runtime-stdio-transport.ts`, keep container-specific environment handling:
 
@@ -870,14 +870,14 @@ return runtime.kind === 'container' ? {} : getDefaultEnvironment();
 Do not add special handling for `boundedHost`; it behaves like host for env
 inheritance while bounded process cwd validation remains in the runtime.
 
-- [ ] **Step 4: Update MCP manager tests and runtime creation**
+- [x] **Step 4: Update MCP manager tests and runtime creation**
 
 Use `new BoundedHostToolRuntime({ id, root: cwd, cwd })` for tool-runtime
 placement tests that need host filesystem behavior.
 
 Use `new HostToolRuntime({ id, cwd })` only for explicit host-service tests.
 
-- [ ] **Step 5: Run targeted tests**
+- [x] **Step 5: Run targeted tests**
 
 Run:
 
@@ -887,7 +887,7 @@ npm run test --workspace=packages/agent -- src/mcp/server-manager.test.ts src/mc
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git status --short
@@ -910,7 +910,7 @@ git commit -m "test: use bounded host runtime for MCP placement"
 - Modify: `packages/agent/src/tools/file-edit-actual.test.ts`
 - Modify: any remaining test files found by `rg`.
 
-- [ ] **Step 1: Find remaining old runtime fixture text**
+- [x] **Step 1: Find remaining old runtime fixture text**
 
 Run:
 
@@ -920,7 +920,7 @@ rg -n "type: 'local'|type: 'workspace'|WorkspaceToolRuntime|workspaceRoot|projec
 
 Expected: matches remain in tests and maybe migration tests only.
 
-- [ ] **Step 2: Update non-migration fixtures**
+- [x] **Step 2: Update non-migration fixtures**
 
 For ordinary host-run tests, use:
 
@@ -939,7 +939,7 @@ toolRuntime: {
 Leave `local` and `workspace` strings only in migration tests that intentionally
 parse legacy persisted state.
 
-- [ ] **Step 3: Run broad targeted tests**
+- [x] **Step 3: Run broad targeted tests**
 
 Run:
 
@@ -949,7 +949,7 @@ npm run test --workspace=packages/agent -- src/storage/__tests__/session-store.t
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git status --short
@@ -976,7 +976,7 @@ before the commit. Do not use `git add -A`.
 - Delete: `packages/agent/src/workspace/worktree-manager.test.ts`
 - Delete: `packages/agent/src/workspace/.gitkeep` if the directory is empty
 
-- [ ] **Step 1: Verify there are no production imports**
+- [x] **Step 1: Verify there are no production imports**
 
 Run:
 
@@ -987,7 +987,7 @@ rg -n "WorktreeManager|worktree-manager" packages docs --glob '!docs/specs/**'
 Expected: only `packages/agent/src/workspace/worktree-manager.ts` and
 `packages/agent/src/workspace/worktree-manager.test.ts`.
 
-- [ ] **Step 2: Delete WorktreeManager files**
+- [x] **Step 2: Delete WorktreeManager files**
 
 Run:
 
@@ -1001,7 +1001,7 @@ If `packages/agent/src/workspace` contains only `.gitkeep`, remove it too:
 git rm packages/agent/src/workspace/.gitkeep
 ```
 
-- [ ] **Step 3: Verify WorktreeManager is gone**
+- [x] **Step 3: Verify WorktreeManager is gone**
 
 Run:
 
@@ -1011,7 +1011,7 @@ rg -n "WorktreeManager|worktree-manager" packages docs --glob '!docs/specs/**'
 
 Expected: no matches.
 
-- [ ] **Step 4: Run agent tests that previously included workspace directory**
+- [x] **Step 4: Run agent tests that previously included workspace directory**
 
 Run:
 
@@ -1021,7 +1021,7 @@ npm run test --workspace=packages/agent -- src/tools/runtime/__tests__/bounded-h
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git status --short
@@ -1039,7 +1039,7 @@ git commit -m "chore: remove worktree manager"
 - Modify: `packages/agent/src/tools/runtime/__tests__/identity.test.ts`
 - Modify: any source file found by the cleanup search.
 
-- [ ] **Step 1: Search for old runtime concepts**
+- [x] **Step 1: Search for old runtime concepts**
 
 Run:
 
@@ -1049,7 +1049,7 @@ rg -n "WorkspaceToolRuntime|workspaceRoot|projectRoot|buildDefaultLocalRuntimeBi
 
 Expected: matches only in migration tests and legacy migration helper names.
 
-- [ ] **Step 2: Remove old public names**
+- [x] **Step 2: Remove old public names**
 
 Remove `buildDefaultLocalRuntimeBinding` completely. Any call site should use
 `buildDefaultBoundedHostRuntimeBinding`.
@@ -1061,13 +1061,13 @@ If `buildLegacyRuntimeId` is still exported, either:
 
 Do not leave names that imply new runtime behavior is still local/workspace.
 
-- [ ] **Step 3: Keep migration helper scope narrow**
+- [x] **Step 3: Keep migration helper scope narrow**
 
 If legacy descriptor schemas remain, keep them private to `validation.ts`.
 Migration tests may mention `local`, `workspace`, `projectRoot`, and
 `workspaceRoot`; production runtime/session/MCP/tool code must not.
 
-- [ ] **Step 4: Run cleanup search again**
+- [x] **Step 4: Run cleanup search again**
 
 Run:
 
@@ -1078,7 +1078,7 @@ rg -n "WorkspaceToolRuntime|workspaceRoot|projectRoot|buildDefaultLocalRuntimeBi
 Expected: no production matches. Migration-test/helper matches are acceptable
 only if they are obviously scoped to parsing old persisted bindings.
 
-- [ ] **Step 5: Run typecheck**
+- [x] **Step 5: Run typecheck**
 
 Run:
 
@@ -1089,7 +1089,7 @@ npm run typecheck --workspace=packages/agent
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git status --short
@@ -1114,7 +1114,7 @@ the commit. Do not use `git add -A`.
 
 - Modify only files needed to fix failures found by verification.
 
-- [ ] **Step 1: Run all runtime tests**
+- [x] **Step 1: Run all runtime tests**
 
 Run:
 
@@ -1124,7 +1124,7 @@ npm run test --workspace=packages/agent -- src/tools/runtime
 
 Expected: PASS.
 
-- [ ] **Step 2: Run agent tests**
+- [x] **Step 2: Run agent tests**
 
 Run:
 
@@ -1134,7 +1134,7 @@ npm run test --workspace=packages/agent
 
 Expected: PASS.
 
-- [ ] **Step 3: Run protocol tests**
+- [x] **Step 3: Run protocol tests**
 
 Run:
 
@@ -1144,7 +1144,7 @@ npm run test --workspace=packages/ent-protocol
 
 Expected: PASS.
 
-- [ ] **Step 4: Run typecheck**
+- [x] **Step 4: Run typecheck**
 
 Run:
 
@@ -1155,7 +1155,7 @@ npm run typecheck --workspace=packages/agent
 
 Expected: PASS.
 
-- [ ] **Step 5: Run lint**
+- [x] **Step 5: Run lint**
 
 Run:
 
@@ -1166,7 +1166,7 @@ npm run lint --workspace=packages/agent
 
 Expected: PASS.
 
-- [ ] **Step 6: Run final concept searches**
+- [x] **Step 6: Run final concept searches**
 
 Run:
 
@@ -1178,7 +1178,7 @@ rg -n "type: 'local'|type: 'workspace'|kind: 'local'|workspaceRoot|projectRoot" 
 Expected: no production matches. Legacy migration tests/helpers may mention old
 descriptor fields if they are clearly testing migration from persisted state.
 
-- [ ] **Step 7: Run format check and diff check**
+- [x] **Step 7: Run format check and diff check**
 
 Run:
 
@@ -1189,7 +1189,7 @@ git diff --check
 
 Expected: PASS.
 
-- [ ] **Step 8: Fix any failures with root-cause patches**
+- [x] **Step 8: Fix any failures with root-cause patches**
 
 For each failure:
 
@@ -1198,7 +1198,7 @@ For each failure:
 - rerun the failed command;
 - do not bypass hooks or skip failing checks.
 
-- [ ] **Step 9: Commit final fixes if needed**
+- [x] **Step 9: Commit final fixes if needed**
 
 Stage only the exact modified file paths shown by `git status --short` that are
 part of the root-cause fix. If no fixes were needed, do not create an empty
@@ -1224,7 +1224,7 @@ git commit -m "fix: complete bounded host runtime migration"
   `docs/superpowers/plans/2026-05-22-demote-worktrees-bounded-host-runtime.md`
   only to check off completed tasks during execution.
 
-- [ ] **Step 1: Compare final behavior to acceptance criteria**
+- [x] **Step 1: Compare final behavior to acceptance criteria**
 
 Verify each spec acceptance criterion:
 
@@ -1239,13 +1239,13 @@ Verify each spec acceptance criterion:
 - tests cover legacy workspace migration into bounded host;
 - tests cover rejecting paths outside bounded root.
 
-- [ ] **Step 2: Record spec mismatches only if real**
+- [x] **Step 2: Record spec mismatches only if real**
 
 If implementation required changing a spec decision, update the spec in a
 separate commit. Do not add implementation notes to the spec just because the
 work is done.
 
-- [ ] **Step 3: Commit plan checkbox updates if execution tracked them**
+- [x] **Step 3: Commit plan checkbox updates if execution tracked them**
 
 ```bash
 git status --short
