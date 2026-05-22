@@ -351,6 +351,43 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(containerHandle.kill).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects completion when aborted after the container process starts', async () => {
+    let resolveWait!: (result: { exitCode: number }) => void;
+    const wait = new Promise<{ exitCode: number }>((resolve) => {
+      resolveWait = resolve;
+    });
+    const containerHandle = {
+      ...createFakeExecStreamHandle(),
+      stdout: Readable.from([]),
+      stderr: Readable.from([]),
+      wait: vi.fn().mockReturnValue(wait),
+      kill: vi.fn(() => resolveWait({ exitCode: 143 })),
+    };
+    const manager = {
+      materialize: vi.fn().mockResolvedValue({
+        spec: descriptor().spec,
+        containerId: 'container_123',
+        state: 'running' as const,
+      }),
+      execStream: vi.fn().mockResolvedValue(containerHandle),
+    };
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: descriptor(),
+    });
+    const abortController = new AbortController();
+
+    const handle = await runtime.process.start(['/bin/sh', '-lc', 'sleep 60'], {
+      cwd: runtime.cwd,
+      signal: abortController.signal,
+    });
+    abortController.abort();
+
+    await expect(handle.completion).rejects.toMatchObject({ name: 'AbortError' });
+    expect(containerHandle.kill).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects writes through readonly host mounts without mutating the host file', async () => {
     const hostRoot = await mkdtemp(join(tmpdir(), 'lace-projected-readonly-'));
     const hostFile = join(hostRoot, 'file.txt');

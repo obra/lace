@@ -15,6 +15,12 @@ export function createToolRuntimeFromBinding(input: {
   sessionId?: string;
   secretResolver?: RuntimeSecretResolver;
 }): ToolRuntime {
+  if (input.binding.agentPlacement !== 'host') {
+    throw new Error(
+      `Cannot create host-side tool runtime for ${input.binding.agentPlacement} agent placement`
+    );
+  }
+
   const runtime = input.binding.toolRuntime;
 
   if (runtime.type === 'local') {

@@ -133,6 +133,16 @@ function writeStreamAndClose(stream: Writable, content: string): Promise<void> {
   });
 }
 
+function abortErrorFromSignal(signal: AbortSignal | undefined): Error {
+  if (signal?.reason instanceof Error) {
+    return signal.reason;
+  }
+
+  const error = new Error('The operation was aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
 function firstResponseLine(output: string): string {
   const line = output.split(/\r?\n/, 1)[0];
   if (!line) {
@@ -677,17 +687,25 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
       opts.signal.throwIfAborted();
     }
 
-    const abortHandler = () => containerHandle.kill();
+    let aborted = false;
+    const abortHandler = () => {
+      aborted = true;
+      containerHandle.kill();
+    };
     opts.signal?.addEventListener('abort', abortHandler, { once: true });
 
-    const completion = containerHandle.wait().then((result) => ({
-      exitCode: result.exitCode,
-      signal: undefined,
-    }));
-    void completion.then(
-      () => opts.signal?.removeEventListener('abort', abortHandler),
-      () => opts.signal?.removeEventListener('abort', abortHandler)
-    );
+    const completion = containerHandle
+      .wait()
+      .then((result) => {
+        if (aborted) {
+          throw abortErrorFromSignal(opts.signal);
+        }
+        return {
+          exitCode: result.exitCode,
+          signal: undefined,
+        };
+      })
+      .finally(() => opts.signal?.removeEventListener('abort', abortHandler));
 
     return {
       stdin: containerHandle.stdin,
