@@ -159,6 +159,16 @@ class WorkspacePathService implements RuntimePathService {
 
   async resolve(inputPath: string): Promise<RuntimePath> {
     if (isAbsolute(inputPath)) {
+      const workspacePath = resolve(inputPath);
+      if (pathIsInside(this.workspaceRoot, workspacePath)) {
+        return {
+          original: inputPath,
+          runtimePath: workspacePath,
+          hostPath: workspacePath,
+          displayPath: inputPath,
+        };
+      }
+
       const projectPath = resolve(inputPath);
       requireInside(
         this.projectRoot,

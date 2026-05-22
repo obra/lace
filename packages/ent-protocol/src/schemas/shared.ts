@@ -42,6 +42,62 @@ const LocalRuntimeDescriptorSchema = z
   })
   .strict();
 
+const WorkspaceRuntimeDescriptorSchema = z
+  .object({
+    type: z.literal('workspace'),
+    projectRoot: NonEmptyStringSchema,
+    workspaceRoot: NonEmptyStringSchema,
+    cwd: NonEmptyStringSchema,
+  })
+  .strict();
+
+const RuntimeMountDescriptorSchema = z
+  .object({
+    hostPath: NonEmptyStringSchema,
+    containerPath: NonEmptyStringSchema,
+    readonly: z.boolean(),
+  })
+  .strict();
+
+const RuntimePortDescriptorSchema = z
+  .object({
+    host: z.number().int(),
+    container: z.number().int(),
+  })
+  .strict();
+
+const RuntimeHelperDescriptorSchema = z
+  .object({
+    mode: z.enum(['copy', 'mount', 'image']),
+    hostPath: NonEmptyStringSchema.optional(),
+    containerPath: NonEmptyStringSchema,
+    command: z.array(NonEmptyStringSchema),
+  })
+  .strict();
+
+const ContainerRuntimeDescriptorSchema = z
+  .object({
+    type: z.literal('container'),
+    cwd: NonEmptyStringSchema,
+    spec: z
+      .object({
+        name: NonEmptyStringSchema,
+        containerId: NonEmptyStringSchema.optional(),
+        requestedImage: NonEmptyStringSchema,
+        resolvedImageDigest: NonEmptyStringSchema,
+        imagePlatform: NonEmptyStringSchema,
+        workingDirectory: NonEmptyStringSchema,
+        mounts: z.array(RuntimeMountDescriptorSchema),
+        env: z.record(z.string(), z.string()).optional(),
+        secretEnv: z.record(z.string(), RuntimeSecretReferenceSchema).optional(),
+        ports: z.array(RuntimePortDescriptorSchema).optional(),
+        restartPolicy: z.literal('unless-stopped').optional(),
+      })
+      .strict(),
+    helper: RuntimeHelperDescriptorSchema.optional(),
+  })
+  .strict();
+
 export const RuntimeExecutionBindingSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -51,7 +107,11 @@ export const RuntimeExecutionBindingSchema = z
       })
       .strict(),
     agentPlacement: z.enum(['host', 'container']),
-    toolRuntime: LocalRuntimeDescriptorSchema,
+    toolRuntime: z.discriminatedUnion('type', [
+      LocalRuntimeDescriptorSchema,
+      WorkspaceRuntimeDescriptorSchema,
+      ContainerRuntimeDescriptorSchema,
+    ]),
   })
   .strict();
 export type RuntimeExecutionBinding = z.infer<typeof RuntimeExecutionBindingSchema>;

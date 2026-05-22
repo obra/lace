@@ -36,6 +36,21 @@ describe('WorkspaceToolRuntime', () => {
     });
   });
 
+  it('accepts runtime-visible absolute paths inside workspace root', async () => {
+    const runtime = new WorkspaceToolRuntime({
+      id: 'rt_ws',
+      projectRoot: '/project',
+      workspaceRoot: '/tmp/workspace',
+      cwd: '/tmp/workspace',
+    });
+
+    await expect(runtime.paths.resolve('/tmp/workspace/src/app.ts')).resolves.toMatchObject({
+      runtimePath: '/tmp/workspace/src/app.ts',
+      hostPath: '/tmp/workspace/src/app.ts',
+      displayPath: '/tmp/workspace/src/app.ts',
+    });
+  });
+
   it('resolves relative paths against cwd', async () => {
     const runtime = new WorkspaceToolRuntime({
       id: 'rt_ws',

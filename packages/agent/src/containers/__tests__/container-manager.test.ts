@@ -170,6 +170,22 @@ describe('ContainerManager', () => {
       expect(runtime.callLog).toEqual([]);
     });
 
+    it('shares concurrent materialize calls for the same spec', async () => {
+      const createSpy = vi.spyOn(runtime, 'create');
+      const beforeCreate = vi.fn(async () => {});
+
+      const [first, second] = await Promise.all([
+        manager.materialize(baseSpec, { beforeCreate }),
+        manager.materialize(baseSpec, { beforeCreate }),
+      ]);
+
+      expect(first.containerId).toBe('lace-sess1-worker');
+      expect(second.containerId).toBe(first.containerId);
+      expect(createSpy).toHaveBeenCalledOnce();
+      expect(beforeCreate).toHaveBeenCalledOnce();
+      expect(runtime.callLog).toEqual(['create:lace-sess1-worker', 'start:lace-sess1-worker']);
+    });
+
     it('starts a stopped container instead of creating a new one', async () => {
       await runtime.seedStopped('lace-sess1-worker');
 

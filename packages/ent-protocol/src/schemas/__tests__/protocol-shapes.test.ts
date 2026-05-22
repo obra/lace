@@ -19,6 +19,51 @@ function localRuntimeBinding(cwd = '/tmp') {
   };
 }
 
+function workspaceRuntimeBinding(cwd = '/project') {
+  return {
+    schemaVersion: 1,
+    identity: { runtimeId: 'rt_workspace_protocol' },
+    agentPlacement: 'host',
+    toolRuntime: {
+      type: 'workspace',
+      projectRoot: '/project',
+      workspaceRoot: '/tmp/workspace',
+      cwd,
+    },
+  };
+}
+
+function containerRuntimeBinding() {
+  return {
+    schemaVersion: 1,
+    identity: { runtimeId: 'rt_container_protocol' },
+    agentPlacement: 'host',
+    toolRuntime: {
+      type: 'container',
+      cwd: '/workspace',
+      spec: {
+        name: 'projected-runtime',
+        requestedImage: 'example/app:latest',
+        resolvedImageDigest:
+          'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        imagePlatform: 'linux/arm64',
+        workingDirectory: '/workspace',
+        mounts: [{ hostPath: '/host/repo', containerPath: '/workspace', readonly: false }],
+        env: { NODE_ENV: 'test' },
+        secretEnv: { API_KEY: { namespace: 'session', name: 'api-key' } },
+        ports: [{ host: 3000, container: 3000 }],
+        restartPolicy: 'unless-stopped',
+      },
+      helper: {
+        mode: 'mount',
+        hostPath: '/host/lace-runtime-helper',
+        containerPath: '/usr/local/bin/lace-runtime-helper',
+        command: ['/usr/local/bin/lace-runtime-helper'],
+      },
+    },
+  };
+}
+
 describe('protocol shapes (representative examples)', () => {
   it('parses representative client->agent requests', () => {
     expect(() =>
@@ -165,6 +210,21 @@ describe('protocol shapes (representative examples)', () => {
           id: `${request.method}-runtime-binding`,
           method: request.method,
           params: request.params,
+        })
+      ).not.toThrow();
+    }
+
+    for (const runtimeBinding of [workspaceRuntimeBinding(), containerRuntimeBinding()]) {
+      expect(() =>
+        EntProtocolRequestSchema.parse({
+          jsonrpc: '2.0',
+          id: `session-new-${runtimeBinding.toolRuntime.type}-runtime-binding`,
+          method: 'session/new',
+          params: {
+            cwd: '/tmp',
+            mcpServers: [],
+            config: { runtimeBinding },
+          },
         })
       ).not.toThrow();
     }

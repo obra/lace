@@ -44,6 +44,7 @@ function specNameFromContainerId(containerId: string): string {
 
 export class ContainerManager {
   private readonly specs = new Map<string, ContainerSpec>();
+  private readonly materializations = new Map<string, Promise<ContainerHandle>>();
 
   constructor(private readonly runtime: ContainerRuntime) {}
 
@@ -53,25 +54,37 @@ export class ContainerManager {
    * Idempotent under SEQUENTIAL calls with the same `spec.name`: a second call
    * observes the existing container and returns its handle without recreating.
    *
-   * NOT internally serialized against CONCURRENT calls sharing the same
-   * `spec.name`. There is a benign TOCTOU between `tryInspect` and
-   * `runtime.create`/`start`: two concurrent calls could both observe "no
-   * existing container" and both call `create`, producing duplicate-id errors
-   * from the runtime.
-   *
-   * Callers must ensure at most one concurrent `materialize` per `spec.name`.
-   * The current call shape (single subagent spawn per (session, persona) pair
-   * via `spawnContainerSubagent`) satisfies this.
-   *
-   * If a future caller violates this invariant, the safe fix is an in-flight
-   * `Map<specName, Promise<ContainerHandle>>` that returns the same in-flight
-   * promise; do not introduce that machinery preemptively (YAGNI).
+   * Concurrent calls for the same resolved container id share one in-flight
+   * materialization. This closes the tryInspect/create race without requiring
+   * every caller-created ToolRuntime instance to coordinate externally.
    */
   async materialize(
     spec: ContainerSpec,
     hooks?: ContainerLifecycleHooks
   ): Promise<ContainerHandle> {
     const containerId = resolveContainerId(spec);
+    const inFlight = this.materializations.get(containerId);
+    if (inFlight) {
+      return await inFlight;
+    }
+
+    const materialization = this.materializeOnce(spec, hooks, containerId);
+    this.materializations.set(containerId, materialization);
+
+    try {
+      return await materialization;
+    } finally {
+      if (this.materializations.get(containerId) === materialization) {
+        this.materializations.delete(containerId);
+      }
+    }
+  }
+
+  private async materializeOnce(
+    spec: ContainerSpec,
+    hooks: ContainerLifecycleHooks | undefined,
+    containerId: string
+  ): Promise<ContainerHandle> {
     const config: ContainerConfig = {
       id: containerId,
       name: spec.name,
