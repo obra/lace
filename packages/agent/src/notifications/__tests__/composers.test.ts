@@ -261,4 +261,50 @@ describe('composers', () => {
     );
     expect(body).toContain('  alarm_b was a cron (0 9 * * *) with the prompt "B".');
   });
+
+  it('subagent-exited: cron with end_at_iso renders expiry', () => {
+    const body = composeSubagentExitedBody({
+      persona: 'sen-box',
+      pendingAlarms: [
+        {
+          id: 'alarm_a',
+          kind: 'cron',
+          schedule: '0 9 * * *',
+          prompt: 'ping',
+          end_at_iso: '2027-01-01T00:00:00+00:00 (UTC)',
+        },
+      ],
+    });
+    expect(body).toContain(
+      'alarm_a was a cron (0 9 * * *) with the prompt "ping" (expiring at 2027-01-01T00:00:00+00:00 (UTC)).'
+    );
+  });
+
+  it('subagent-exited: interval with end_at_iso renders expiry in bullet list', () => {
+    const body = composeSubagentExitedBody({
+      persona: 'sen-box',
+      pendingAlarms: [
+        {
+          id: 'alarm_a',
+          kind: 'cron',
+          schedule: '0 9 * * *',
+          prompt: 'ping',
+          end_at_iso: '2027-01-01T00:00:00+00:00 (UTC)',
+        },
+        {
+          id: 'alarm_b',
+          kind: 'interval',
+          schedule: 'every 30 minutes',
+          prompt: 'check',
+          end_at_iso: '2027-06-01T12:00:00+00:00 (UTC)',
+        },
+      ],
+    });
+    expect(body).toContain(
+      '  alarm_a was a cron (0 9 * * *) with the prompt "ping" (expiring at 2027-01-01T00:00:00+00:00 (UTC)).'
+    );
+    expect(body).toContain(
+      '  alarm_b was an interval alarm (every 30 minutes) with the prompt "check" (expiring at 2027-06-01T12:00:00+00:00 (UTC)).'
+    );
+  });
 });

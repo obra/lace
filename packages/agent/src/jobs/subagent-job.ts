@@ -611,6 +611,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
               schedule: string;
               prompt: string;
               next_fire_at_iso: string;
+              end_at_iso: string | null;
             } => {
               if (typeof a !== 'object' || a === null) return false;
               const rec = a as Record<string, unknown>;
@@ -619,11 +620,18 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
                 (rec.kind === 'cron' || rec.kind === 'once' || rec.kind === 'interval') &&
                 typeof rec.schedule === 'string' &&
                 typeof rec.prompt === 'string' &&
-                typeof rec.next_fire_at_iso === 'string'
+                typeof rec.next_fire_at_iso === 'string' &&
+                (rec.end_at_iso === null || typeof rec.end_at_iso === 'string')
               );
             }
           )
-          .map((a) => ({ id: a.id, kind: a.kind, schedule: a.schedule, prompt: a.prompt }));
+          .map((a) => ({
+            id: a.id,
+            kind: a.kind,
+            schedule: a.schedule,
+            prompt: a.prompt,
+            ...(a.end_at_iso !== null ? { end_at_iso: a.end_at_iso } : {}),
+          }));
 
         if (pending.length === 0) return undefined;
 

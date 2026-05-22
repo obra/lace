@@ -152,6 +152,7 @@ export interface SubagentPendingAlarm {
   kind: 'cron' | 'once' | 'interval';
   schedule: string; // human description of what this alarm was (cron expr, ISO, "every N min", "in N min")
   prompt: string;
+  end_at_iso?: string; // formatted absolute time string for bounded recurring alarms
 }
 
 export interface SubagentExitedCompose {
@@ -184,5 +185,6 @@ function formatPendingAlarm(a: SubagentPendingAlarm): string {
       desc = `was a one-shot scheduled for ${a.schedule}`;
       break;
   }
-  return `${a.id} ${desc} with the prompt "${a.prompt}".`;
+  const expiryClause = a.end_at_iso !== undefined ? ` (expiring at ${a.end_at_iso})` : '';
+  return `${a.id} ${desc} with the prompt "${a.prompt}"${expiryClause}.`;
 }

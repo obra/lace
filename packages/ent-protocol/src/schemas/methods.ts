@@ -1957,10 +1957,11 @@ const SessionUpdatePendingAlarmsOnExitSchema = z
       z
         .object({
           id: NonEmptyStringSchema,
-          kind: z.enum(['cron', 'once']),
+          kind: z.enum(['cron', 'once', 'interval']),
           schedule: NonEmptyStringSchema,
           prompt: NonEmptyStringSchema,
           next_fire_at_iso: NonEmptyStringSchema,
+          end_at_iso: z.string().nullable(),
         })
         .strict()
     ),
