@@ -4,18 +4,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { TemplateEngine } from '../../../packages/agent/src/config/template-engine';
+import { TemplateEngine } from '~/config/template-engine';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const bundledPersonasDir = path.resolve(
-  __dirname,
-  '../../../packages/agent/config/agent-personas'
-);
+const bundledPersonasDir = path.resolve(__dirname, '../../../packages/agent/config/agent-personas');
 const outputDir = __dirname;
 
-const personaFiles = fs
-  .readdirSync(bundledPersonasDir)
-  .filter((name) => name.endsWith('.md'));
+const personaFiles = fs.readdirSync(bundledPersonasDir).filter((name) => name.endsWith('.md'));
 
 const engine = new TemplateEngine([bundledPersonasDir]);
 
