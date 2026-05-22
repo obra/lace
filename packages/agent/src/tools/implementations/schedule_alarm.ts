@@ -235,7 +235,7 @@ function resolveInputs(
 export class ScheduleAlarmTool extends Tool {
   name = 'schedule_alarm';
   description =
-    "Schedule an alarm that wakes you with a prompt at a future time. kind='once' fires once: provide schedule=ISO-8601 (absolute) or minutes=N (relative timer). kind='cron' is recurring (schedule=cron expr, e.g. '0 9 * * *', min interval 1 hour; timezone required as IANA name; optional endTime=ISO-8601). kind='interval' fires every minutes=N minutes (N>=5; optional durationMinutes or endTime). Up to 50 active alarms per session. Use list_alarms / cancel_alarm to manage. Alarms fire only while this lace process is alive.";
+    "Schedule an alarm that wakes you with a prompt at a future time. kind='once' fires once: provide schedule=ISO-8601 (absolute) or minutes=N (relative timer). kind='cron' is recurring (schedule=cron expr, e.g. '0 9 * * *', min interval 1 hour; timezone required as IANA name; optional endTime=ISO-8601). kind='interval' fires every minutes=N minutes (N>=5; optional durationMinutes or endTime). Up to 50 active alarms per session. Use list_alarms / cancel_alarm to manage. Alarms persist atomically to disk and survive lace process restarts; any alarm that should have fired during downtime fires immediately when lace next runs. An alarm only goes away on cancel_alarm, natural expiration (once-kind firing, end-time reached, durationMinutes elapsed), or session deletion.";
   schema = scheduleSchema;
   annotations: ToolAnnotations = {
     title: 'Schedule an alarm',
