@@ -63,8 +63,12 @@ export function formatAbsoluteTime(epochMs: number, timezone: string = 'UTC'): s
       offset = suffix;
     }
   } else {
-    // Unknown shape; fall back to UTC offset.
-    offset = '+00:00';
+    // Intl output shape is unrecognized — refuse to silently mislabel
+    // a non-UTC zone as UTC. Surface the unhandled fields so the caller
+    // can decide what to do.
+    throw new Error(
+      `Unsupported Intl timeZoneName output for timezone "${timezone}": ${JSON.stringify(offsetRaw)}`
+    );
   }
 
   return `${year}-${month}-${day}T${hour}:${minute}:${second}${offset} (${timezone})`;
