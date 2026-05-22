@@ -103,7 +103,7 @@ describe('storage/session-store', () => {
           schemaVersion: 1,
           identity: { runtimeId: 'rt_test' },
           agentPlacement: 'host',
-          toolRuntime: { type: 'local', cwd: '/repo' },
+          toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
         },
       },
     });
@@ -112,7 +112,7 @@ describe('storage/session-store', () => {
       schemaVersion: 1,
       identity: { runtimeId: 'rt_test' },
       agentPlacement: 'host',
-      toolRuntime: { type: 'local', cwd: '/repo' },
+      toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
     });
   });
 

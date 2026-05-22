@@ -12,7 +12,7 @@ describe('DelegateTool', () => {
     schemaVersion: 1,
     identity: { runtimeId: 'rt_delegate_host' },
     agentPlacement: 'host',
-    toolRuntime: { type: 'local', cwd: '/repo' },
+    toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
   };
 
   it('returns error when jobManager not in context', async () => {

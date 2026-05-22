@@ -231,7 +231,8 @@ describe('InfrastructureHelper', () => {
         const context = executeSpy.mock.calls[0]?.[1];
         expect(context.runtime).toEqual(
           expect.objectContaining({
-            kind: 'local',
+            kind: 'boundedHost',
+            root: workingDirectory,
             cwd: workingDirectory,
           })
         );
