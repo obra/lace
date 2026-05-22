@@ -24,8 +24,8 @@ MCP placement, job rehydration, or path identity.
 
 The runtime model should be:
 
-- host tools in a host directory;
-- optionally bounded host tools in a host directory with filesystem containment;
+- bounded host tools in a host directory with filesystem containment;
+- explicit unbounded host execution only for host-service/infrastructure cases;
 - projected container tools in a materialized container; and
 - lace-in-container agents as a separate agent-placement mode.
 
@@ -79,9 +79,10 @@ Git worktree semantics add noise without solving those core runtime problems.
   merges, or cleanup.
 - Do not change projected container semantics beyond removing worktree-shaped
   assumptions from runtime binding.
-- Do not solve general host process sandboxing. A bounded host runtime is a
-  filesystem containment contract for Lace file APIs, not a full process
-  sandbox.
+- Do not claim bounded host runtime is a full process sandbox. It constrains
+  Lace file APIs and process starting cwd. It does not prevent an arbitrary host
+  process from reaching outside the root unless the host OS sandbox also
+  enforces that.
 
 ## Design Decision
 
@@ -107,11 +108,15 @@ No runtime kind means "git worktree". No runtime descriptor stores
 `projectRoot`. No runtime descriptor stores enough git metadata to recreate or
 clean up a worktree.
 
+For user-facing host sessions, `boundedHost` is the default. Raw `host` runtime
+exists for explicit host-service/infrastructure execution where containment
+would be wrong, not as the ordinary tool runtime for model-directed work.
+
 ## Runtime Descriptors
 
 ### Host Runtime
 
-The host runtime is the default local session model:
+The host runtime is an explicit unbounded host execution model:
 
 ```typescript
 type HostRuntimeDescriptor = {
@@ -120,12 +125,16 @@ type HostRuntimeDescriptor = {
 };
 ```
 
-It has no containment beyond ordinary host OS behavior.
+It has no containment beyond ordinary host OS behavior. It should be used only
+when the caller intentionally wants host-service behavior, such as a host
+infrastructure MCP server or an internal Lace operation. It is not the default
+for user-facing tool execution.
 
 ### Bounded Host Runtime
 
 The bounded host runtime replaces `WorkspaceToolRuntime` without carrying
-git/worktree semantics:
+git/worktree semantics. It is the default runtime for ordinary host-run
+sessions:
 
 ```typescript
 type BoundedHostRuntimeDescriptor = {
@@ -143,6 +152,11 @@ Rules:
 - absolute paths are accepted only when they resolve inside `root`;
 - file APIs reject lexical or realpath escapes from `root`; and
 - process APIs start inside `root`, but are not a complete sandbox.
+
+By default, session creation should set `root` to the requested session cwd and
+`cwd` to the same path. Embedders that want a wider editable tree may pass a
+larger `root` explicitly, such as the repository root with `cwd` inside a
+subdirectory.
 
 There is no automatic mapping from a separate project checkout into `root`. If a
 caller wants a worktree, it should set `root` and `cwd` to paths inside that
@@ -213,20 +227,24 @@ Rules:
 ## Session Semantics
 
 Session creation receives a cwd and, optionally, a runtime binding. If no
-binding is supplied, Lace creates a host runtime binding:
+binding is supplied, Lace creates a bounded host runtime binding:
 
 ```typescript
 {
   schemaVersion: 1,
-  identity: { runtimeId: "session:<sessionId>:host" },
+  identity: { runtimeId: "session:<sessionId>:boundedHost" },
   agentPlacement: "host",
-  toolRuntime: { type: "host", cwd }
+  toolRuntime: { type: "boundedHost", root: cwd, cwd }
 }
 ```
 
-If a caller wants bounded host behavior, it supplies `type: 'boundedHost'` with
-`root` and `cwd`. If a caller wants a git worktree, it creates the git worktree
-before session creation and passes the worktree path as `root` and `cwd`.
+If a caller wants a broader bounded root, it supplies `type: 'boundedHost'` with
+an explicit `root` and `cwd`. If a caller wants a git worktree, it creates the
+git worktree before session creation and passes the worktree path as `root` and
+`cwd`.
+
+Raw `type: 'host'` must be explicit. Host-orchestrated sessions should not fall
+back to unbounded host execution when bounded host construction fails.
 
 Session load/resume must validate the stored binding before activation. Invalid
 or unsupported runtime bindings fail before replacing the active session.
@@ -276,9 +294,10 @@ Allowed higher-level APIs may still exist:
 Those APIs must not be required for runtime binding, session load, MCP
 placement, file access tracking, or job rehydration.
 
-The existing `WorktreeManager` should either be removed if unused or moved
-behind an explicit workflow boundary. It should not be imported by runtime,
-session, MCP, or tool execution code.
+The existing `WorktreeManager` should be removed as part of this
+projected-runtime work. If a future feature needs first-class git worktree
+operations, it should introduce that behind an explicit workflow boundary rather
+than reattach it to runtime, session, MCP, or tool execution code.
 
 ## Migration
 
@@ -286,7 +305,7 @@ Persisted runtime bindings should migrate as follows:
 
 | Existing binding                                     | New binding                                                              |
 | ---------------------------------------------------- | ------------------------------------------------------------------------ |
-| `toolRuntime.type: 'local'`                          | `toolRuntime.type: 'host'` with same cwd                                 |
+| `toolRuntime.type: 'local'`                          | `toolRuntime.type: 'boundedHost'` with `root: cwd`, `cwd`                |
 | `toolRuntime.type: 'workspace'` with `workspaceRoot` | `toolRuntime.type: 'boundedHost'` with `root: workspaceRoot`, mapped cwd |
 | `toolRuntime.type: 'container'`                      | unchanged except enum naming if needed                                   |
 
@@ -307,13 +326,14 @@ bounded host runtime.
 
 - `ToolRuntime` and runtime descriptors contain no git/worktree fields.
 - Session runtime binding persistence does not record `projectRoot`.
+- Default host-orchestrated sessions use `boundedHost`, not raw `host`.
 - Runtime path resolution has a single coordinate system per runtime.
 - Existing projected container behavior continues to work with mounts, helper
   execution, secrets, ports, process aborts, and MCP placement.
 - Runtime-placed MCP servers use the same runtime cwd as built-in process tools.
 - Host-orchestrated sessions reject `agentPlacement: 'container'`.
-- Any remaining `WorktreeManager` usage is outside runtime/session/MCP/tool
-  execution paths.
+- `WorktreeManager` is removed from this runtime branch unless a separate
+  approved workflow owns it.
 - Tests cover migration from old workspace bindings into bounded host bindings.
 - Tests cover rejecting project-root paths after migration when they are outside
   the active bounded root.
@@ -323,8 +343,10 @@ bounded host runtime.
 The implementation plan should include targeted tests for:
 
 - descriptor schema parsing for `host`, `boundedHost`, and `container`;
+- default session binding creation as `boundedHost`;
 - migration from old `local` and `workspace` bindings;
 - bounded host path containment and realpath escape rejection;
+- process cwd rejection when requested cwd escapes bounded host `root`;
 - session load/resume rejecting unmappable old workspace bindings;
 - session new/load/resume rejecting container-agent placement for host sessions;
 - MCP `toolRuntime` placement with bounded host and container runtimes; and
@@ -340,7 +362,5 @@ runtime/session/MCP/tool execution code must not import WorktreeManager
 
 1. Should the externally visible runtime descriptor use `type: 'host'` or keep
    `type: 'local'` for wire compatibility?
-2. Should bounded host runtime be exposed to clients immediately, or should it
-   remain an internal migration target until a caller needs it?
-3. Should `WorktreeManager` be deleted in this branch if no runtime-independent
-   workflow still uses it, or moved to a clearly named git workflow module?
+2. Should raw unbounded `host` runtime be exposed to clients at all, or kept as
+   an internal-only runtime for host-service MCP and infrastructure paths?
