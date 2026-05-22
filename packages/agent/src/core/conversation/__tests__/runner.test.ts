@@ -360,7 +360,7 @@ describe('ConversationRunner', () => {
       expect(readFileSync(targetFile, 'utf8')).toBe('new content');
     });
 
-    it('rehydrates file-read history against active local runtime cwd', async () => {
+    it('rehydrates file-read history against boundedHost runtime cwd', async () => {
       const runtimeCwd = join(tmpdir(), `lace-runner-runtime-cwd-${randomUUID().slice(0, 8)}`);
       mkdirSync(runtimeCwd, { recursive: true });
       const targetFile = join(runtimeCwd, 'tracked.txt');
@@ -440,9 +440,9 @@ describe('ConversationRunner', () => {
       try {
         const runtimeBinding: RuntimeExecutionBinding = {
           schemaVersion: 1,
-          identity: { runtimeId: 'rt_custom_local' },
+          identity: { runtimeId: 'rt_custom_bounded_host' },
           agentPlacement: 'host',
-          toolRuntime: { type: 'local', cwd: runtimeCwd },
+          toolRuntime: { type: 'boundedHost', root: runtimeCwd, cwd: runtimeCwd },
         };
         const executor = new ToolExecutor();
         executor.registerTools([new FileWriteTool()]);
@@ -479,13 +479,9 @@ describe('ConversationRunner', () => {
       }
     });
 
-    it('executes tools through a workspace runtime binding', async () => {
-      const projectRoot = join(tmpdir(), `lace-runner-project-${randomUUID().slice(0, 8)}`);
-      const workspaceRoot = join(tmpdir(), `lace-runner-workspace-${randomUUID().slice(0, 8)}`);
-      const projectCwd = join(projectRoot, 'pkg');
-      const workspaceCwd = join(workspaceRoot, 'pkg');
-      mkdirSync(projectCwd, { recursive: true });
-      mkdirSync(workspaceCwd, { recursive: true });
+    it('executes tools through a boundedHost runtime binding', async () => {
+      const boundedHostCwd = join(tmpdir(), `lace-runner-bounded-host-${randomUUID().slice(0, 8)}`);
+      mkdirSync(boundedHostCwd, { recursive: true });
 
       class WorkspaceToolProvider extends AIProvider {
         get providerName(): string {
@@ -521,7 +517,7 @@ describe('ConversationRunner', () => {
         async createStreamingResponse(): Promise<ProviderResponse> {
           return {
             content: '',
-            toolCalls: [{ id: 'tc_workspace', name: 'bash', arguments: { command: 'pwd' } }],
+            toolCalls: [{ id: 'tc_bounded_host', name: 'bash', arguments: { command: 'pwd' } }],
             stopReason: 'tool_use',
           };
         }
@@ -530,13 +526,12 @@ describe('ConversationRunner', () => {
       try {
         const runtimeBinding: RuntimeExecutionBinding = {
           schemaVersion: 1,
-          identity: { runtimeId: 'rt_workspace_runner' },
+          identity: { runtimeId: 'rt_bounded_host_runner' },
           agentPlacement: 'host',
           toolRuntime: {
-            type: 'workspace',
-            projectRoot,
-            workspaceRoot,
-            cwd: projectCwd,
+            type: 'boundedHost',
+            root: boundedHostCwd,
+            cwd: boundedHostCwd,
           },
         };
         const mockTool = { name: 'bash', description: 'mock bash', schema: {} } as unknown as Tool;
@@ -558,7 +553,7 @@ describe('ConversationRunner', () => {
           {
             sessionDir,
             sessionId: 'sess_test',
-            cwd: projectCwd,
+            cwd: boundedHostCwd,
             runtimeBinding,
             executionMode: 'execute',
             approvalMode: 'approve',
@@ -577,15 +572,14 @@ describe('ConversationRunner', () => {
         expect(execute).toHaveBeenCalledOnce();
         expect(execute.mock.calls[0][1]).toMatchObject({
           runtime: {
-            kind: 'workspace',
-            id: 'rt_workspace_runner',
-            cwd: workspaceCwd,
+            kind: 'boundedHost',
+            id: 'rt_bounded_host_runner',
+            cwd: boundedHostCwd,
           },
           runtimeBinding,
         });
       } finally {
-        rmSync(projectRoot, { recursive: true, force: true });
-        rmSync(workspaceRoot, { recursive: true, force: true });
+        rmSync(boundedHostCwd, { recursive: true, force: true });
       }
     });
 
