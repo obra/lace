@@ -931,13 +931,20 @@ describe('lace-agent process (E2E over stdio)', () => {
 
       writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello from disk\n', 'utf8');
 
-      await withTimeout(
-        ctx.agent.peer.request('session/prompt', {
-          content: [{ type: 'text', text: 'read file hello.txt' }],
-        }),
-        10_000,
-        'session/prompt read hello.txt'
-      );
+      // Drive enough turns to exceed SummarizeCompactionStrategy.RECENT_EVENT_COUNT
+      // (PRI-1719: short conversations stay verbatim and skip summarization).
+      // Each "read file" turn emits ~4 events (user msg, assistant+tool_call,
+      // tool_result, assistant text), so three turns gives ~12 events — safely
+      // over the 8-event verbatim window.
+      for (let i = 0; i < 3; i++) {
+        await withTimeout(
+          ctx.agent.peer.request('session/prompt', {
+            content: [{ type: 'text', text: 'read file hello.txt' }],
+          }),
+          10_000,
+          `session/prompt read hello.txt #${i + 1}`
+        );
+      }
 
       const compact = (await withTimeout(
         ctx.agent.peer.request('ent/session/compact', { strategy: 'summarize', preserveRecent: 0 }),
