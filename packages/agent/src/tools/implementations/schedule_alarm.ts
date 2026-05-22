@@ -150,10 +150,10 @@ function resolveInputs(
       if (parsed <= now) {
         return { ok: false, error: `endTime ${args.endTime} is in the past` };
       }
-      if (parsed <= nextFireAt) {
+      if (parsed < nextFireAt) {
         return {
           ok: false,
-          error: `endTime ${args.endTime} is at or before the first scheduled fire`,
+          error: `endTime ${args.endTime} is before the first scheduled fire`,
         };
       }
       endAt = parsed;
@@ -198,19 +198,19 @@ function resolveInputs(
     if (parsed <= now) {
       return { ok: false, error: `endTime ${args.endTime} is in the past` };
     }
-    if (parsed <= nextFireAt) {
+    if (parsed < nextFireAt) {
       return {
         ok: false,
-        error: `endTime ${args.endTime} is at or before the first scheduled fire`,
+        error: `endTime ${args.endTime} is before the first scheduled fire`,
       };
     }
     endAt = parsed;
   } else if (args.durationMinutes !== undefined) {
     endAt = now + args.durationMinutes * 60_000;
-    if (endAt <= nextFireAt) {
+    if (endAt < nextFireAt) {
       return {
         ok: false,
-        error: `durationMinutes=${args.durationMinutes} ends at or before the first scheduled fire`,
+        error: `durationMinutes=${args.durationMinutes} ends before the first scheduled fire`,
       };
     }
   }

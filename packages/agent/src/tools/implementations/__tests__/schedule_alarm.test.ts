@@ -382,6 +382,110 @@ describe('schedule_alarm', () => {
     expect(result.content[0].text).toMatch(/timezone/i);
   });
 
+  // Boundary semantics: endTime == firstFire is now ACCEPTED (fire once, then expire)
+  it('interval: endTime exactly equal to firstFire is accepted (fires once then expires)', async () => {
+    const { sessionId, sessionDir, scheduler, store } = setup();
+    const tool = new ScheduleAlarmTool();
+    // FROZEN_NOW = 2030-01-01T00:00:00Z; minutes=5 → firstFire = now + 5min
+    const fiveMinFromNow = new Date(FROZEN_NOW + 5 * 60_000).toISOString();
+    const result = await tool.execute(
+      { kind: 'interval', minutes: 5, endTime: fiveMinFromNow, prompt: 'p' },
+      {
+        signal: new AbortController().signal,
+        alarmScheduler: scheduler,
+        activeSessionId: sessionId,
+        activeSessionDir: sessionDir,
+      }
+    );
+    expect(result.status).toBe('completed');
+    // The first fire is at +5min; end_at is also +5min.
+    // The alarm fires once, then the scheduler computes next at +10min > end_at and expires it.
+    const body = parseBody(result.content[0].text);
+    expect(store.get(body.id)?.end_at).toBe(FROZEN_NOW + 5 * 60_000);
+  });
+
+  it('interval: durationMinutes equal to minutes is accepted (fires once then expires)', async () => {
+    const { sessionId, sessionDir, scheduler, store } = setup();
+    const tool = new ScheduleAlarmTool();
+    const result = await tool.execute(
+      { kind: 'interval', minutes: 5, durationMinutes: 5, prompt: 'p' },
+      {
+        signal: new AbortController().signal,
+        alarmScheduler: scheduler,
+        activeSessionId: sessionId,
+        activeSessionDir: sessionDir,
+      }
+    );
+    expect(result.status).toBe('completed');
+    const body = parseBody(result.content[0].text);
+    // end_at = now + 5min = firstFire; accepted as "fire once then expire"
+    expect(store.get(body.id)?.end_at).toBe(FROZEN_NOW + 5 * 60_000);
+  });
+
+  it('interval: durationMinutes strictly less than minutes is rejected', async () => {
+    const { sessionId, sessionDir, scheduler } = setup();
+    const tool = new ScheduleAlarmTool();
+    const result = await tool.execute(
+      { kind: 'interval', minutes: 10, durationMinutes: 5, prompt: 'p' },
+      {
+        signal: new AbortController().signal,
+        alarmScheduler: scheduler,
+        activeSessionId: sessionId,
+        activeSessionDir: sessionDir,
+      }
+    );
+    expect(result.status).toBe('failed');
+    expect(result.content[0].text).toMatch(/ends before the first scheduled fire/);
+  });
+
+  it('cron: endTime exactly equal to firstFire is accepted (fires once then expires)', async () => {
+    const { sessionId, sessionDir, scheduler, store } = setup();
+    const tool = new ScheduleAlarmTool();
+    // FROZEN_NOW = 2030-01-01T00:00:00Z; cron '0 9 * * *' UTC → firstFire = 2030-01-01T09:00:00Z
+    const firstFire = '2030-01-01T09:00:00.000Z';
+    const result = await tool.execute(
+      {
+        kind: 'cron',
+        schedule: '0 9 * * *',
+        timezone: 'UTC',
+        endTime: firstFire,
+        prompt: 'p',
+      },
+      {
+        signal: new AbortController().signal,
+        alarmScheduler: scheduler,
+        activeSessionId: sessionId,
+        activeSessionDir: sessionDir,
+      }
+    );
+    expect(result.status).toBe('completed');
+    const body = parseBody(result.content[0].text);
+    expect(store.get(body.id)?.end_at).toBe(Date.parse(firstFire));
+  });
+
+  it('cron: endTime strictly before firstFire is still rejected', async () => {
+    const { sessionId, sessionDir, scheduler } = setup();
+    const tool = new ScheduleAlarmTool();
+    // firstFire = 2030-01-01T09:00:00Z; endTime 05:00 is before that
+    const result = await tool.execute(
+      {
+        kind: 'cron',
+        schedule: '0 9 * * *',
+        timezone: 'UTC',
+        endTime: '2030-01-01T05:00:00Z',
+        prompt: 'p',
+      },
+      {
+        signal: new AbortController().signal,
+        alarmScheduler: scheduler,
+        activeSessionId: sessionId,
+        activeSessionDir: sessionDir,
+      }
+    );
+    expect(result.status).toBe('failed');
+    expect(result.content[0].text).toMatch(/before the first scheduled fire/);
+  });
+
   it('interval rejects schedule/timezone fields', async () => {
     const { sessionId, sessionDir, scheduler } = setup();
     const tool = new ScheduleAlarmTool();

@@ -45,6 +45,8 @@ Cap: 50 active alarms per session.
 
 Cron and interval alarms with an `end_at` (set via `endTime` or `durationMinutes`) expire when their next scheduled fire would exceed the end time. On expiry, lace writes a `<notification kind="alarm-expired" alarm-id="...">` block into the session and **deletes** the row from `alarms.json` — it no longer appears in `list_alarms`.
 
+`end_at` is INCLUSIVE: a fire whose `next_fire_at` exactly equals `end_at` still fires. The alarm expires when computing the NEXT fire (because next would be > end_at). This means `{ kind: 'interval', minutes: 5, durationMinutes: 5 }` is a valid "fire once then expire" pattern — the alarm fires at +5 min and expires when the scheduler computes the next fire at +10 min > end_at.
+
 Body: `Your cron alarm <id> (<expr> in <tz>) reached its end time (<formatted-time>) and won't fire again. Last note: "..."`.
 
 (Or the equivalent interval variant.)
