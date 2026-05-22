@@ -3,6 +3,7 @@
 
 export type NotificationKind =
   | 'alarm-fired'
+  | 'alarm-expired'
   | 'job-completed'
   | 'job-failed'
   | 'job-cancelled'

@@ -187,12 +187,25 @@ export async function ensureAlarmSchedulerForActiveSession(
           sessionDir,
           kind: 'alarm-fired',
           identifiers: { 'alarm-id': row.id },
-          body: composeAlarmFiredBody({
-            kind: row.kind,
-            schedule: row.schedule,
-            timezone: row.timezone,
-            prompt: row.prompt,
-          }),
+          body: composeAlarmFiredBody(
+            row.kind === 'cron'
+              ? {
+                  kind: 'cron',
+                  expr: row.schedule,
+                  timezone: row.timezone,
+                  prompt: row.prompt,
+                  alarmId: row.id,
+                }
+              : {
+                  // Transitional: all once-shots present as once-absolute until
+                  // the alarm-core schema adds presentation-aware mapping.
+                  kind: 'once-absolute',
+                  scheduledFor: row.next_fire_at,
+                  timezone: row.timezone,
+                  prompt: row.prompt,
+                  alarmId: row.id,
+                }
+          ),
           idleWake: {
             isActive: (d) => d === state.activeSession?.dir,
             hasActiveTurn: () => !!state.activeTurn,

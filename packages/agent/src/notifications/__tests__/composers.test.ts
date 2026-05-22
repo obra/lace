@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   composeAlarmFiredBody,
+  composeAlarmExpiredBody,
   composeJobCompletedBody,
   composeJobFailedBody,
   composeJobCancelledBody,
@@ -11,33 +12,114 @@ import {
   composeSubagentExitedBody,
 } from '../composers';
 
-describe('composers', () => {
-  it('alarm-fired: cron alarm', () => {
+describe('composeAlarmFiredBody', () => {
+  it('once-absolute: ISO time + zone', () => {
+    expect(
+      composeAlarmFiredBody({
+        kind: 'once-absolute',
+        scheduledFor: Date.parse('2026-12-25T17:00:00Z'), // 09:00 PST on this date
+        timezone: 'America/Los_Angeles',
+        prompt: 'Check the deploy',
+        alarmId: 'alarm_abs1',
+      })
+    ).toBe(
+      'Your alarm for 2026-12-25T09:00:00-08:00 (America/Los_Angeles) just fired. Note: "Check the deploy".'
+    );
+  });
+
+  it('once-relative: pluralized correctly', () => {
+    expect(
+      composeAlarmFiredBody({
+        kind: 'once-relative',
+        minutes: 5,
+        prompt: 'Stretch your legs',
+        alarmId: 'alarm_rel1',
+      })
+    ).toBe('Your 5-minute timer just fired. Note: "Stretch your legs".');
+  });
+
+  it('once-relative: 1 minute', () => {
+    expect(
+      composeAlarmFiredBody({
+        kind: 'once-relative',
+        minutes: 1,
+        prompt: 'Now',
+        alarmId: 'alarm_rel2',
+      })
+    ).toBe('Your 1-minute timer just fired. Note: "Now".');
+  });
+
+  it('cron: includes alarm id in body', () => {
     expect(
       composeAlarmFiredBody({
         kind: 'cron',
-        schedule: '0 9 * * *',
+        expr: '0 9 * * *',
         timezone: 'America/Los_Angeles',
         prompt: 'Time to check the test status board',
+        alarmId: 'alarm_cron1',
       })
     ).toBe(
-      'The cron alarm you scheduled (0 9 * * * in America/Los_Angeles) just fired. The note you left for your future self: "Time to check the test status board". Call list_alarms() to see other pending alarms.'
+      'Your cron alarm alarm_cron1 (0 9 * * * in America/Los_Angeles) just fired. Note: "Time to check the test status board".'
     );
   });
 
-  it('alarm-fired: one-shot alarm', () => {
+  it('interval: plural minutes (>1)', () => {
     expect(
       composeAlarmFiredBody({
-        kind: 'once',
-        schedule: '2026-05-22T17:00:00Z',
-        timezone: 'UTC',
-        prompt: 'Check the deploy',
+        kind: 'interval',
+        minutes: 73,
+        prompt: 'Ping the team',
+        alarmId: 'alarm_int1',
+      })
+    ).toBe('Your interval alarm alarm_int1 (every 73 minutes) just fired. Note: "Ping the team".');
+  });
+
+  it('interval: singular minute (1)', () => {
+    expect(
+      composeAlarmFiredBody({
+        kind: 'interval',
+        minutes: 1,
+        prompt: 'Heartbeat',
+        alarmId: 'alarm_int2',
+      })
+    ).toBe('Your interval alarm alarm_int2 (every 1 minute) just fired. Note: "Heartbeat".');
+  });
+});
+
+describe('composeAlarmExpiredBody', () => {
+  it('cron: shows expr, zone, formatted endTime', () => {
+    expect(
+      composeAlarmExpiredBody({
+        kind: 'cron',
+        expr: '0 9 * * *',
+        timezone: 'America/Los_Angeles',
+        endTime: Date.parse('2027-01-01T00:00:00Z'),
+        endTimezone: 'UTC',
+        prompt: 'check standup',
+        alarmId: 'alarm_cron1',
       })
     ).toBe(
-      'The one-shot alarm you scheduled for 2026-05-22T17:00:00Z just fired. The note you left for your future self: "Check the deploy". Call list_alarms() to see other pending alarms.'
+      'Your cron alarm alarm_cron1 (0 9 * * * in America/Los_Angeles) reached its end time (2027-01-01T00:00:00+00:00 (UTC)) and won\'t fire again. Last note: "check standup".'
     );
   });
 
+  it('interval: pluralizes correctly', () => {
+    expect(
+      composeAlarmExpiredBody({
+        kind: 'interval',
+        minutes: 73,
+        endTime: Date.parse('2027-01-01T00:00:00Z'),
+        endTimezone: 'UTC',
+        prompt: 'pings',
+        alarmId: 'alarm_int1',
+      })
+    ).toBe(
+      'Your interval alarm alarm_int1 (every 73 minutes) reached its end time (2027-01-01T00:00:00+00:00 (UTC)) and won\'t fire again. Last note: "pings".'
+    );
+  });
+});
+
+describe('composers', () => {
   it('job-completed: shell exit 0', () => {
     expect(
       composeJobCompletedBody({

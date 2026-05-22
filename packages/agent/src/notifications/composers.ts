@@ -1,6 +1,8 @@
 // ABOUTME: Pure body-composer functions for each notification kind. No side effects.
 // ABOUTME: Output strings are wrapped by buildNotification in inject-notification.ts.
 
+import { formatAbsoluteTime } from './format-time';
+
 const MAX_LINE_LENGTH = 200;
 
 function formatDuration(ms: number): string {
@@ -18,19 +20,64 @@ function truncate(line: string, maxLen = MAX_LINE_LENGTH): string {
   return line.length <= maxLen ? line : line.slice(0, maxLen - 3) + '...';
 }
 
-export interface AlarmFiredCompose {
-  kind: 'cron' | 'once';
-  schedule: string;
-  timezone: string;
-  prompt: string;
-}
+export type AlarmFiredCompose =
+  | {
+      kind: 'once-absolute';
+      scheduledFor: number;
+      timezone: string;
+      prompt: string;
+      alarmId: string;
+    }
+  | { kind: 'once-relative'; minutes: number; prompt: string; alarmId: string }
+  | { kind: 'cron'; expr: string; timezone: string; prompt: string; alarmId: string }
+  | { kind: 'interval'; minutes: number; prompt: string; alarmId: string };
 
 export function composeAlarmFiredBody(a: AlarmFiredCompose): string {
-  const head =
-    a.kind === 'cron'
-      ? `The cron alarm you scheduled (${a.schedule} in ${a.timezone}) just fired.`
-      : `The one-shot alarm you scheduled for ${a.schedule} just fired.`;
-  return `${head} The note you left for your future self: "${a.prompt}". Call list_alarms() to see other pending alarms.`;
+  switch (a.kind) {
+    case 'once-absolute': {
+      const when = formatAbsoluteTime(a.scheduledFor, a.timezone);
+      return `Your alarm for ${when} just fired. Note: "${a.prompt}".`;
+    }
+    case 'once-relative':
+      return `Your ${a.minutes}-minute timer just fired. Note: "${a.prompt}".`;
+    case 'cron':
+      return `Your cron alarm ${a.alarmId} (${a.expr} in ${a.timezone}) just fired. Note: "${a.prompt}".`;
+    case 'interval': {
+      const unit = a.minutes === 1 ? 'minute' : 'minutes';
+      return `Your interval alarm ${a.alarmId} (every ${a.minutes} ${unit}) just fired. Note: "${a.prompt}".`;
+    }
+  }
+}
+
+export type AlarmExpiredCompose =
+  | {
+      kind: 'cron';
+      expr: string;
+      timezone: string;
+      endTime: number;
+      endTimezone: string;
+      prompt: string;
+      alarmId: string;
+    }
+  | {
+      kind: 'interval';
+      minutes: number;
+      endTime: number;
+      endTimezone: string;
+      prompt: string;
+      alarmId: string;
+    };
+
+export function composeAlarmExpiredBody(a: AlarmExpiredCompose): string {
+  const endStr = formatAbsoluteTime(a.endTime, a.endTimezone);
+  switch (a.kind) {
+    case 'cron':
+      return `Your cron alarm ${a.alarmId} (${a.expr} in ${a.timezone}) reached its end time (${endStr}) and won't fire again. Last note: "${a.prompt}".`;
+    case 'interval': {
+      const unit = a.minutes === 1 ? 'minute' : 'minutes';
+      return `Your interval alarm ${a.alarmId} (every ${a.minutes} ${unit}) reached its end time (${endStr}) and won't fire again. Last note: "${a.prompt}".`;
+    }
+  }
 }
 
 export interface JobCompletedCompose {
