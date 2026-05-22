@@ -85,6 +85,69 @@ describe('AlarmScheduler', () => {
     expect(woken).toHaveBeenCalled();
   });
 
+  it('still completes state transition when notifier throws (once)', async () => {
+    const sessionDir = setupDir();
+    const store = new AlarmStore(sessionDir);
+    store.insert({
+      kind: 'once',
+      schedule: '2030-01-01T00:00:01Z',
+      timezone: 'UTC',
+      prompt: 'p',
+      next_fire_at: 100,
+      now: 0,
+    });
+    const onError = vi.fn();
+    const sched = new AlarmScheduler({
+      sessionDir,
+      store,
+      now: () => 1000,
+      jitterMaxMs: 0,
+      randomFn: () => 0,
+      notifier: () => {
+        throw new Error('boom');
+      },
+      onError,
+    });
+    sched.bootRecover();
+    await sched.tickForTest();
+    // Alarm should still transition out of `firing` to `fired` even though notifier threw.
+    const rows = store.listActive();
+    expect(rows).toHaveLength(0);
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'boom' }));
+  });
+
+  it('still reschedules cron when notifier throws', async () => {
+    const sessionDir = setupDir();
+    const store = new AlarmStore(sessionDir);
+    store.insert({
+      kind: 'cron',
+      schedule: '0 9 * * *',
+      timezone: 'UTC',
+      prompt: 'p',
+      next_fire_at: Date.parse('2030-01-01T09:00:00Z'),
+      now: 0,
+    });
+    const onError = vi.fn();
+    const sched = new AlarmScheduler({
+      sessionDir,
+      store,
+      now: () => Date.parse('2030-01-01T09:00:01Z'),
+      jitterMaxMs: 0,
+      randomFn: () => 0,
+      notifier: () => {
+        throw new Error('boom');
+      },
+      onError,
+    });
+    sched.bootRecover();
+    await sched.tickForTest();
+    // Cron should still be pending with next occurrence scheduled.
+    const pending = store.listPending();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].next_fire_at).toBe(Date.parse('2030-01-02T09:00:00Z'));
+    expect(onError).toHaveBeenCalled();
+  });
+
   it('boot repairs firing → pending', () => {
     const sessionDir = setupDir();
     const store = new AlarmStore(sessionDir);

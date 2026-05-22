@@ -162,7 +162,12 @@ export class AlarmScheduler {
     if (!row) return;
     if (!this.store.claim(row.id)) return;
     const firedAt = this.now();
-    this.notifier({ row, firedAt });
+    try {
+      this.notifier({ row, firedAt });
+    } catch (err) {
+      this.onError?.(err);
+      // Fall through: still complete the state transition so the row exits 'firing'.
+    }
     if (row.kind === 'once') {
       this.store.markFired(row.id, firedAt);
       return;
