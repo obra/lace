@@ -13,6 +13,7 @@ import { getEffectiveConfig } from '@lace/agent/core/session';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
 import { buildNotification, composeSubagentExitedBody } from '@lace/agent/notifications';
 import { getJobOutputPath } from './job-file-utils';
+import { persistSubagentChildExit } from './subagent-exit-handler';
 import {
   applyEffectiveJobConfig,
   buildSubagentInitConfig,
@@ -164,6 +165,10 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
     let subagentProc: SubagentProcessHandle | undefined;
     let childTransport: ReturnType<typeof createNdjsonStdioTransport> | undefined;
     let childPeer: JsonRpcPeer | undefined;
+    // Set true once the finally block deliberately tears the child down. The
+    // onExit handler uses this to distinguish unexpected child death (persist
+    // diagnostic, close peer to wake pending RPCs) from clean teardown (no-op).
+    let teardownInitiated = false;
 
     try {
       subagentProc = await spawnSubagent({
@@ -191,12 +196,42 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       });
 
       subagentProc.onExit(({ code, signal }) => {
-        if (code !== 0 && code !== null) {
-          logger.debug('job.subagent.child_exit', {
+        // Normal shutdown (code === 0) follows the happy path through the
+        // finally block. For abnormal exits (non-zero OR killed by signal
+        // before we asked it to) we must do two things synchronously here:
+        //   1. Persist the buffered stderr to the per-job .log file so the
+        //      diagnostic survives even if the parent's pending RPC hangs.
+        //   2. Close the childPeer so any pending RPC requests reject with
+        //      'Closed' — otherwise the parent's `await childPeer.request(...)`
+        //      sits forever (the stdio transport closes silently and the
+        //      JsonRpcPeer never learns the transport is dead). Rejecting
+        //      the await is what triggers the catch + finally below, which
+        //      transitions the job to terminal state and fires job_notify
+        //      subscriber fanout.
+        if (code === 0) return;
+        // The finally block also SIGTERMs the child as part of normal teardown
+        // after a successful prompt; in that case onExit fires with code=null
+        // and signal='SIGTERM'. Don't treat that as a crash.
+        if (teardownInitiated) return;
+        logger.debug('job.subagent.child_exit', {
+          jobId: job.jobId,
+          exitCode: code,
+          signal,
+          stderrLength: stderrBuffer.length,
+        });
+        persistSubagentChildExit({
+          jobId: job.jobId,
+          outputPath: job.outputPath,
+          exitCode: code,
+          signal,
+          stderr: stderrBuffer,
+        });
+        try {
+          childPeer?.close();
+        } catch (closeErr) {
+          logger.debug('job.subagent.close_peer_on_exit_failed', {
             jobId: job.jobId,
-            exitCode: code,
-            signal,
-            stderrLength: stderrBuffer.length,
+            error: closeErr instanceof Error ? closeErr.message : String(closeErr),
           });
         }
       });
@@ -904,6 +939,12 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         stderr: stderrBuffer.trim() || undefined,
       });
     } finally {
+      // Mark teardown initiated so onExit treats the upcoming SIGTERM as
+      // expected (no [SUBAGENT CHILD EXITED] block, no childPeer.close from
+      // onExit — the explicit close below sequences it correctly relative to
+      // the subagent's `pending_alarms_on_exit` notify).
+      teardownInitiated = true;
+
       // SIGTERM first, then close the JSON-RPC channel after the child has
       // exited. The subagent's natural shutdown handler runs
       // emitSubagentExitedIfNeeded, which emits a one-way `session/update`
