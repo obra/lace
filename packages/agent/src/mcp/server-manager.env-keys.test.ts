@@ -255,7 +255,7 @@ describe.skipIf(skipOnWindows)(
       expect(env.KATA47_RECONCILE_C).toBe('charlie');
     });
 
-    it('starts default runtime-placed MCP servers with workspace runtime bindings', async () => {
+    it('starts default runtime-placed MCP servers with boundedHost runtime bindings', async () => {
       const state = buildState({
         nextEventSeq: 1,
         nextStreamSeq: 1,
@@ -265,9 +265,8 @@ describe.skipIf(skipOnWindows)(
             identity: { runtimeId: 'rt_workspace_reconcile' },
             agentPlacement: 'host',
             toolRuntime: {
-              type: 'workspace',
-              projectRoot: tmpRoot,
-              workspaceRoot: tmpRoot,
+              type: 'boundedHost',
+              root: tmpRoot,
               cwd: tmpRoot,
             },
           },
@@ -301,7 +300,7 @@ describe.skipIf(skipOnWindows)(
       );
     });
 
-    it('starts explicit host-placed MCP servers with non-local runtime bindings', async () => {
+    it('starts explicit host-placed MCP servers with boundedHost runtime bindings', async () => {
       const state = buildState({
         nextEventSeq: 1,
         nextStreamSeq: 1,
@@ -311,9 +310,8 @@ describe.skipIf(skipOnWindows)(
             identity: { runtimeId: 'rt_workspace_reconcile' },
             agentPlacement: 'host',
             toolRuntime: {
-              type: 'workspace',
-              projectRoot: tmpRoot,
-              workspaceRoot: tmpRoot,
+              type: 'boundedHost',
+              root: tmpRoot,
               cwd: tmpRoot,
             },
           },
@@ -376,7 +374,8 @@ describe.skipIf(skipOnWindows)(
             identity: { runtimeId: 'rt_stale_reconcile' },
             agentPlacement: 'host',
             toolRuntime: {
-              type: 'local',
+              type: 'boundedHost',
+              root: tmpRoot,
               cwd: runtimeCwd,
             },
           },
@@ -420,7 +419,8 @@ describe.skipIf(skipOnWindows)(
             identity: { runtimeId: 'rt_alias_reconcile' },
             agentPlacement: 'host',
             toolRuntime: {
-              type: 'local',
+              type: 'boundedHost',
+              root: tmpRoot,
               cwd: runtimeCwd,
             },
           },
