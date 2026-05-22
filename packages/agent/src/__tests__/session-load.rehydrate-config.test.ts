@@ -56,6 +56,15 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     };
   }
 
+  function containerAgentRuntimeBinding(cwd: string): RuntimeExecutionBinding {
+    return {
+      schemaVersion: 1,
+      identity: { runtimeId: 'rt_container_agent_session' },
+      agentPlacement: 'container',
+      toolRuntime: { type: 'local', cwd },
+    };
+  }
+
   function persistRuntimeBinding(sessionId: string, runtimeBinding: RuntimeExecutionBinding): void {
     const loaded = loadSession(sessionId);
     writeSessionState(loaded.dir, {
@@ -338,6 +347,32 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     expect(loadState.activeSession?.state.config?.runtimeBinding).toEqual(runtimeBinding);
   });
 
+  it.each(['session/new', 'session/load', 'session/resume'] as const)(
+    'rejects container-agent runtimeBinding during %s',
+    async (method) => {
+      const setupState = createAgentServerState();
+      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, setupState));
+
+      await client.request('initialize', defaultInitializeParams());
+      const created =
+        method === 'session/new'
+          ? undefined
+          : ((await client.request('session/new', {
+              cwd: tempDir,
+              mcpServers: [],
+            })) as { sessionId: string });
+
+      await expect(
+        client.request(method, {
+          ...(created ? { sessionId: created.sessionId } : {}),
+          cwd: tempDir,
+          mcpServers: [],
+          config: { runtimeBinding: containerAgentRuntimeBinding(tempDir) },
+        })
+      ).rejects.toMatchObject({ code: -32602 });
+    }
+  );
+
   it('activates stored non-local runtimeBinding during session/load', async () => {
     const setupState = createAgentServerState();
     const { client: setupClient } = createPairedPeers((peer) =>
@@ -410,6 +445,35 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     expect(loadSession(created.sessionId).state.config?.mcpServers).toEqual([
       { name: 'resumed', command: process.execPath, enabled: false, placement: 'toolRuntime' },
     ]);
+  });
+
+  it('rejects stored container-agent runtimeBinding during session/load', async () => {
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+
+    await setupClient.request('initialize', defaultInitializeParams());
+    const created = (await setupClient.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+    persistRuntimeBinding(created.sessionId, containerAgentRuntimeBinding(tempDir));
+
+    const loadState = createAgentServerState();
+    const { client: loadClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, loadState)
+    );
+
+    await loadClient.request('initialize', defaultInitializeParams());
+
+    await expect(
+      loadClient.request('session/load', {
+        sessionId: created.sessionId,
+        cwd: tempDir,
+        mcpServers: [],
+      })
+    ).rejects.toMatchObject({ code: -32602 });
   });
 
   it('persists HTTP/SSE MCP configs without spawning them as stdio during load', async () => {
@@ -700,6 +764,54 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
         enabled: false,
       }),
     });
+  });
+
+  it('removes deleted MCP servers from manager state', async () => {
+    const state = createAgentServerState();
+    const startServer = vi
+      .spyOn(state.mcpServerManager, 'startServer')
+      .mockResolvedValue(undefined);
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', defaultInitializeParams());
+    const created = (await client.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    const initial = (await client.request('ent/mcp/servers/upsert', {
+      name: 'deleted-server',
+      command: process.execPath,
+      transport: 'stdio',
+      placement: 'host',
+      enabled: false,
+    })) as { created: boolean };
+
+    expect(initial.created).toBe(true);
+    expect(state.mcpServerManager.getServer('deleted-server')).toBeDefined();
+
+    await client.request('ent/mcp/servers/delete', {
+      serverId: 'deleted-server',
+    });
+
+    expect(loadSession(created.sessionId).state.config?.mcpServers).toEqual([]);
+    expect(state.mcpServerManager.getServer('deleted-server')).toBeUndefined();
+
+    const list = (await client.request('ent/mcp/servers/list', {})) as {
+      servers: Array<{ serverId: string }>;
+    };
+    expect(list.servers).toEqual([]);
+
+    const recreated = (await client.request('ent/mcp/servers/upsert', {
+      name: 'deleted-server',
+      command: process.execPath,
+      transport: 'stdio',
+      placement: 'host',
+      enabled: false,
+    })) as { created: boolean };
+
+    expect(recreated.created).toBe(true);
+    expect(startServer).not.toHaveBeenCalled();
   });
 
   it('removes stale same-id connections when an enabled upsert changes placement', async () => {

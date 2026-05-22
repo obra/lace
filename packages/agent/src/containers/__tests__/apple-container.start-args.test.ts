@@ -86,6 +86,30 @@ describe('AppleContainerRuntime.start - CLI arg shaping', () => {
     }
   });
 
+  it('emits Apple read-only mount syntax for readonly mounts', async () => {
+    const runtime = makeRuntime();
+    const containerId = runtime.create({
+      id: 'readonly-mount',
+      image: 'alpine:latest',
+      workingDirectory: '/w',
+      mounts: [
+        { source: '/host/work', target: '/workspace', readonly: false },
+        { source: '/host/identity', target: '/identity', readonly: true },
+      ],
+    });
+
+    await runtime.start(containerId);
+
+    const args = findRunCall();
+    expect(args).toBeDefined();
+    expect(args).toContain('--mount');
+    expect(args).toContain('type=bind,source=/host/identity,target=/identity,readonly');
+    const imageIdx = args!.indexOf('alpine:latest');
+    expect(args!.indexOf('type=bind,source=/host/identity,target=/identity,readonly')).toBeLessThan(
+      imageIdx
+    );
+  });
+
   it('emits no -p flags when ports is undefined or empty (kata #68)', async () => {
     const runtime = makeRuntime();
 

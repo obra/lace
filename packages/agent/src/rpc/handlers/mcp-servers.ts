@@ -439,8 +439,8 @@ export function registerMcpHandlers(
     const serverId = toNonEmptyString(parsed?.serverId);
     if (!serverId) throwInvalidParams('serverId is required');
 
-    // Stop the server if running
-    await state.mcpServerManager.stopServer(serverId);
+    // Stop the server if running and remove all in-memory connection state.
+    await state.mcpServerManager.removeServer(serverId);
 
     invalidateSessionToolExecutor(state.toolExecutorCache, state.activeSession.meta.sessionId);
 

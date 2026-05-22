@@ -26,6 +26,14 @@ interface AppleContainerInfo extends ContainerInfo {
   config?: ContainerConfig;
 }
 
+function appleMountArg(mount: ContainerConfig['mounts'][number]): string {
+  const parts = [`type=bind`, `source=${mount.source}`, `target=${mount.target}`];
+  if (mount.readonly) {
+    parts.push('readonly');
+  }
+  return parts.join(',');
+}
+
 export class AppleContainerRuntime extends BaseContainerRuntime {
   private readonly readyPromise: Promise<void>;
 
@@ -170,7 +178,7 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
 
       // Add volume mounts
       for (const mount of config.mounts) {
-        args.push('-v', `${mount.source}:${mount.target}`);
+        args.push('--mount', appleMountArg(mount));
       }
 
       // Add environment variables

@@ -88,6 +88,11 @@ function parseSessionRuntimeBinding(value: unknown): RuntimeExecutionBinding {
     const message = error instanceof Error ? error.message : String(error);
     throwInvalidParams(`config.runtimeBinding is invalid: ${message}`);
   }
+  if (runtimeBinding.agentPlacement !== 'host') {
+    throwInvalidParams(
+      `config.runtimeBinding is invalid: agentPlacement '${runtimeBinding.agentPlacement}' is not supported for host-orchestrated sessions`
+    );
+  }
   return runtimeBinding;
 }
 
