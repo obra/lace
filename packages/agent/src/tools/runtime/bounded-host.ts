@@ -35,55 +35,26 @@ function requireInside(root: string, path: string, message: string): void {
   }
 }
 
-function mapWorkspaceCwd(input: {
-  cwd: string;
-  projectRoot: string;
-  workspaceRoot: string;
-  baseCwd: string;
-}): string {
-  if (!isAbsolute(input.cwd)) {
-    const resolvedCwd = resolve(input.baseCwd, input.cwd);
-    requireInside(
-      input.workspaceRoot,
-      resolvedCwd,
-      `Access denied: cwd resolves outside workspace root: ${input.cwd}`
-    );
-    return resolvedCwd;
-  }
+class BoundedHostContainment {
+  private realRoot?: Promise<string>;
 
-  const resolvedCwd = resolve(input.cwd);
-
-  if (pathIsInside(input.workspaceRoot, resolvedCwd)) {
-    return resolvedCwd;
-  }
-
-  if (pathIsInside(input.projectRoot, resolvedCwd)) {
-    return resolve(input.workspaceRoot, relative(input.projectRoot, resolvedCwd));
-  }
-
-  throw new Error(`Access denied: cwd resolves outside workspace root: ${input.cwd}`);
-}
-
-class WorkspaceContainment {
-  private realWorkspaceRoot?: Promise<string>;
-
-  constructor(private readonly workspaceRoot: string) {}
+  constructor(private readonly root: string) {}
 
   private assertLexicalInside(hostPath: string): string {
     const resolvedPath = resolve(hostPath);
     requireInside(
-      this.workspaceRoot,
+      this.root,
       resolvedPath,
-      `Access denied: path resolves outside workspace root: ${hostPath}`
+      `Access denied: path resolves outside bounded host root: ${hostPath}`
     );
     return resolvedPath;
   }
 
   private async assertRealInside(realPath: string, originalPath: string): Promise<void> {
-    this.realWorkspaceRoot ??= realpath(this.workspaceRoot);
-    const root = await this.realWorkspaceRoot;
+    this.realRoot ??= realpath(this.root);
+    const root = await this.realRoot;
     if (!pathIsInside(root, realPath)) {
-      throw new Error(`Access denied: path resolves outside workspace root: ${originalPath}`);
+      throw new Error(`Access denied: path resolves outside bounded host root: ${originalPath}`);
     }
   }
 
@@ -123,7 +94,7 @@ class WorkspaceContainment {
     try {
       const targetStat = await lstat(resolvedPath);
       if (targetStat.isSymbolicLink()) {
-        throw new Error(`Access denied: path resolves outside workspace root: ${hostPath}`);
+        throw new Error(`Access denied: path resolves outside bounded host root: ${hostPath}`);
       }
     } catch (error) {
       if (!isNotFoundError(error)) throw error;
@@ -149,53 +120,19 @@ class WorkspaceContainment {
   }
 }
 
-class WorkspacePathService implements RuntimePathService {
+class BoundedHostPathService implements RuntimePathService {
   constructor(
-    private readonly projectRoot: string,
-    private readonly workspaceRoot: string,
+    private readonly root: string,
     private readonly cwd: string,
     private readonly runtimeId: string
   ) {}
 
   async resolve(inputPath: string): Promise<RuntimePath> {
-    if (isAbsolute(inputPath)) {
-      const workspacePath = resolve(inputPath);
-      if (pathIsInside(this.workspaceRoot, workspacePath)) {
-        return {
-          original: inputPath,
-          runtimePath: workspacePath,
-          hostPath: workspacePath,
-          displayPath: inputPath,
-        };
-      }
-
-      const projectPath = resolve(inputPath);
-      requireInside(
-        this.projectRoot,
-        projectPath,
-        `Access denied: path is outside workspace project root: ${inputPath}`
-      );
-
-      const runtimePath = resolve(this.workspaceRoot, relative(this.projectRoot, projectPath));
-      requireInside(
-        this.workspaceRoot,
-        runtimePath,
-        `Access denied: path resolves outside workspace root: ${inputPath}`
-      );
-
-      return {
-        original: inputPath,
-        runtimePath,
-        hostPath: runtimePath,
-        displayPath: inputPath,
-      };
-    }
-
-    const runtimePath = resolve(this.cwd, inputPath);
+    const runtimePath = isAbsolute(inputPath) ? resolve(inputPath) : resolve(this.cwd, inputPath);
     requireInside(
-      this.workspaceRoot,
+      this.root,
       runtimePath,
-      `Access denied: path resolves outside workspace root: ${inputPath}`
+      `Access denied: path resolves outside bounded host root: ${inputPath}`
     );
 
     return {
@@ -207,14 +144,14 @@ class WorkspacePathService implements RuntimePathService {
   }
 
   canonicalKey(path: RuntimePath): string {
-    return `workspace:${this.runtimeId}:${resolve(path.runtimePath)}`;
+    return `boundedHost:${this.runtimeId}:${resolve(path.runtimePath)}`;
   }
 }
 
-class WorkspaceFileSystem implements RuntimeFileSystem {
+class BoundedHostFileSystem implements RuntimeFileSystem {
   constructor(
     private readonly delegate: RuntimeFileSystem,
-    private readonly containment: WorkspaceContainment
+    private readonly containment: BoundedHostContainment
   ) {}
 
   private hostPath(path: RuntimePath): string {
@@ -249,13 +186,12 @@ class WorkspaceFileSystem implements RuntimeFileSystem {
   }
 }
 
-class WorkspaceProcessRunner implements RuntimeProcessRunner {
+class BoundedHostProcessRunner implements RuntimeProcessRunner {
   constructor(
     private readonly delegate: RuntimeProcessRunner,
-    private readonly projectRoot: string,
-    private readonly workspaceRoot: string,
+    private readonly root: string,
     private readonly cwd: string,
-    private readonly containment: WorkspaceContainment
+    private readonly containment: BoundedHostContainment
   ) {}
 
   private async optionsFor(opts: RuntimeProcessOptions = {}): Promise<RuntimeProcessOptions> {
@@ -264,12 +200,12 @@ class WorkspaceProcessRunner implements RuntimeProcessRunner {
       return opts;
     }
 
-    const cwd = mapWorkspaceCwd({
-      cwd: opts.cwd,
-      projectRoot: this.projectRoot,
-      workspaceRoot: this.workspaceRoot,
-      baseCwd: this.cwd,
-    });
+    const cwd = isAbsolute(opts.cwd) ? resolve(opts.cwd) : resolve(this.cwd, opts.cwd);
+    requireInside(
+      this.root,
+      cwd,
+      `Access denied: process cwd resolves outside bounded host root: ${opts.cwd}`
+    );
     await this.containment.requireExistingPath(cwd);
     return { ...opts, cwd };
   }
@@ -283,33 +219,21 @@ class WorkspaceProcessRunner implements RuntimeProcessRunner {
   }
 }
 
-export class WorkspaceToolRuntime implements ToolRuntime {
-  readonly kind = 'workspace' as const;
-  readonly label = 'Workspace';
+export class BoundedHostToolRuntime implements ToolRuntime {
+  readonly kind = 'boundedHost' as const;
+  readonly label = 'Bounded Host';
   readonly paths: RuntimePathService;
   readonly fs: RuntimeFileSystem;
   readonly process: RuntimeProcessRunner;
   readonly network: RuntimeNetworkClient;
 
-  constructor(input: {
-    id: string;
-    projectRoot: string;
-    workspaceRoot: string;
-    cwd: string;
-    env?: NodeJS.ProcessEnv;
-  }) {
+  constructor(input: { id: string; root: string; cwd: string; env?: NodeJS.ProcessEnv }) {
     this.id = input.id;
+    const root = resolve(input.root);
+    const cwd = resolve(input.cwd);
+    requireInside(root, cwd, `Access denied: cwd resolves outside bounded host root: ${input.cwd}`);
 
-    const projectRoot = resolve(input.projectRoot);
-    const workspaceRoot = resolve(input.workspaceRoot);
-    const cwd = mapWorkspaceCwd({
-      cwd: input.cwd,
-      projectRoot,
-      workspaceRoot,
-      baseCwd: workspaceRoot,
-    });
-    const containment = new WorkspaceContainment(workspaceRoot);
-
+    const containment = new BoundedHostContainment(root);
     const hostRuntime = new HostToolRuntime({
       id: input.id,
       cwd,
@@ -317,15 +241,9 @@ export class WorkspaceToolRuntime implements ToolRuntime {
     });
 
     this.cwd = cwd;
-    this.paths = new WorkspacePathService(projectRoot, workspaceRoot, cwd, input.id);
-    this.fs = new WorkspaceFileSystem(hostRuntime.fs, containment);
-    this.process = new WorkspaceProcessRunner(
-      hostRuntime.process,
-      projectRoot,
-      workspaceRoot,
-      cwd,
-      containment
-    );
+    this.paths = new BoundedHostPathService(root, cwd, input.id);
+    this.fs = new BoundedHostFileSystem(hostRuntime.fs, containment);
+    this.process = new BoundedHostProcessRunner(hostRuntime.process, root, cwd, containment);
     this.network = hostRuntime.network;
   }
 

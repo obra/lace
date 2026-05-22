@@ -47,7 +47,7 @@ export function createFakeRuntime(input: FakeRuntimeInput = {}): ToolRuntime {
   const resolved = input.resolve ?? defaultPath();
   const runtime: ToolRuntime = {
     id: 'rt_fake',
-    kind: 'local',
+    kind: 'boundedHost',
     cwd: '/runtime',
     label: 'Fake',
     paths: {

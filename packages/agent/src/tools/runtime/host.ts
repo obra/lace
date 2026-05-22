@@ -208,7 +208,7 @@ class HostNetworkClient implements RuntimeNetworkClient {
 }
 
 export class HostToolRuntime implements ToolRuntime {
-  readonly kind = 'local' as const;
+  readonly kind = 'host' as const;
   readonly label = 'Host';
   readonly paths: RuntimePathService;
   readonly fs = new HostFileSystem();
