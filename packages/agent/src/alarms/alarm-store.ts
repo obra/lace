@@ -5,16 +5,17 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { atomicWriteJson } from '../storage/atomic-write';
-import type { AlarmKind, AlarmRow, AlarmsSnapshot } from './types';
+import type { AlarmKind, AlarmRow, AlarmSpec, AlarmsSnapshot } from './types';
 import { MAX_ACTIVE_ALARMS } from './types';
 import { logger } from '@lace/agent/utils/logger';
 
 export interface InsertAlarmArgs {
   kind: AlarmKind;
-  schedule: string;
+  spec: AlarmSpec;
   timezone: string;
   prompt: string;
   next_fire_at: number;
+  end_at: number | null;
   now: number;
 }
 
@@ -61,13 +62,14 @@ export class AlarmStore {
     const row: AlarmRow = {
       id,
       kind: args.kind,
-      schedule: args.schedule,
+      spec: args.spec,
       timezone: args.timezone,
       prompt: args.prompt,
       status: 'pending',
       next_fire_at: args.next_fire_at,
       created_at: args.now,
       fired_at: null,
+      end_at: args.end_at,
     };
     this.alarms.set(id, row);
     this.persist();
@@ -100,10 +102,24 @@ export class AlarmStore {
     this.persist();
   }
 
+  rescheduleInterval(id: string, nextFireAt: number, firedAt: number): void {
+    const row = this.alarms.get(id);
+    if (!row) return;
+    this.alarms.set(id, { ...row, status: 'pending', next_fire_at: nextFireAt, fired_at: firedAt });
+    this.persist();
+  }
+
   rescheduleStale(id: string, nextFireAt: number): void {
     const row = this.alarms.get(id);
     if (!row || row.status !== 'pending' || row.kind !== 'cron') return;
     this.alarms.set(id, { ...row, next_fire_at: nextFireAt });
+    this.persist();
+  }
+
+  /** Remove a row entirely (used on alarm expiry, after the expired notification fires). */
+  delete(id: string): void {
+    if (!this.alarms.has(id)) return;
+    this.alarms.delete(id);
     this.persist();
   }
 

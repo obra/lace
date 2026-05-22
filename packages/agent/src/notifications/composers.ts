@@ -149,8 +149,8 @@ function trailingLineHint(lines: string[]): string {
 
 export interface SubagentPendingAlarm {
   id: string;
-  kind: 'cron' | 'once';
-  schedule: string;
+  kind: 'cron' | 'once' | 'interval';
+  schedule: string; // human description of what this alarm was (cron expr, ISO, "every N min", "in N min")
   prompt: string;
 }
 
@@ -172,7 +172,17 @@ export function composeSubagentExitedBody(s: SubagentExitedCompose): string {
 }
 
 function formatPendingAlarm(a: SubagentPendingAlarm): string {
-  const desc =
-    a.kind === 'cron' ? `was a cron (${a.schedule})` : `was a one-shot scheduled for ${a.schedule}`;
+  let desc: string;
+  switch (a.kind) {
+    case 'cron':
+      desc = `was a cron (${a.schedule})`;
+      break;
+    case 'interval':
+      desc = `was an interval alarm (${a.schedule})`;
+      break;
+    case 'once':
+      desc = `was a one-shot scheduled for ${a.schedule}`;
+      break;
+  }
   return `${a.id} ${desc} with the prompt "${a.prompt}".`;
 }

@@ -26,10 +26,11 @@ describe('AlarmScheduler cron reschedule', () => {
     const firstFire = Date.parse('2030-01-01T09:00:00Z');
     const row = store.insert({
       kind: 'cron',
-      schedule: '0 9 * * *',
+      spec: { kind: 'cron', expr: '0 9 * * *' },
       timezone: 'UTC',
       prompt: 'morning ping',
       next_fire_at: firstFire,
+      end_at: null,
       now: firstFire - 1_000,
     });
 

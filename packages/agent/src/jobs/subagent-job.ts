@@ -607,7 +607,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
               a
             ): a is {
               id: string;
-              kind: 'cron' | 'once';
+              kind: 'cron' | 'once' | 'interval';
               schedule: string;
               prompt: string;
               next_fire_at_iso: string;
@@ -616,7 +616,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
               const rec = a as Record<string, unknown>;
               return (
                 typeof rec.id === 'string' &&
-                (rec.kind === 'cron' || rec.kind === 'once') &&
+                (rec.kind === 'cron' || rec.kind === 'once' || rec.kind === 'interval') &&
                 typeof rec.schedule === 'string' &&
                 typeof rec.prompt === 'string' &&
                 typeof rec.next_fire_at_iso === 'string'

@@ -20,10 +20,11 @@ describe('AlarmScheduler', () => {
     const store = new AlarmStore(sessionDir);
     store.insert({
       kind: 'once',
-      schedule: '2030-01-01T00:00:01Z',
+      spec: { kind: 'once-absolute', iso: '2030-01-01T00:00:01Z' },
       timezone: 'UTC',
       prompt: 'p',
       next_fire_at: 100,
+      end_at: null,
       now: 0,
     });
     const notify = vi.fn();
@@ -38,7 +39,7 @@ describe('AlarmScheduler', () => {
     sched.bootRecover();
     await sched.tickForTest();
     expect(notify).toHaveBeenCalledTimes(1);
-    const arg = notify.mock.calls[0][0];
+    const arg = notify.mock.calls[0][0] as { row: { id: string } };
     expect(arg.row.id).toMatch(/^alarm_/);
     expect(store.get(arg.row.id)?.status).toBe('fired');
   });
@@ -48,10 +49,11 @@ describe('AlarmScheduler', () => {
     const store = new AlarmStore(sessionDir);
     store.insert({
       kind: 'cron',
-      schedule: '0 9 * * *',
+      spec: { kind: 'cron', expr: '0 9 * * *' },
       timezone: 'UTC',
       prompt: 'p',
       next_fire_at: Date.parse('2030-01-01T09:00:00Z'),
+      end_at: null,
       now: 0,
     });
     const sched = new AlarmScheduler({
@@ -90,10 +92,11 @@ describe('AlarmScheduler', () => {
     const store = new AlarmStore(sessionDir);
     store.insert({
       kind: 'once',
-      schedule: '2030-01-01T00:00:01Z',
+      spec: { kind: 'once-absolute', iso: '2030-01-01T00:00:01Z' },
       timezone: 'UTC',
       prompt: 'p',
       next_fire_at: 100,
+      end_at: null,
       now: 0,
     });
     const onError = vi.fn();
@@ -121,10 +124,11 @@ describe('AlarmScheduler', () => {
     const store = new AlarmStore(sessionDir);
     store.insert({
       kind: 'cron',
-      schedule: '0 9 * * *',
+      spec: { kind: 'cron', expr: '0 9 * * *' },
       timezone: 'UTC',
       prompt: 'p',
       next_fire_at: Date.parse('2030-01-01T09:00:00Z'),
+      end_at: null,
       now: 0,
     });
     const onError = vi.fn();
@@ -153,10 +157,11 @@ describe('AlarmScheduler', () => {
     const store = new AlarmStore(sessionDir);
     const row = store.insert({
       kind: 'once',
-      schedule: '2030-01-01T00:00:00Z',
+      spec: { kind: 'once-absolute', iso: '2030-01-01T00:00:00Z' },
       timezone: 'UTC',
       prompt: 'p',
       next_fire_at: 1,
+      end_at: null,
       now: 0,
     });
     store.claim(row.id);

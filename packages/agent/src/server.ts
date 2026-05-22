@@ -40,7 +40,14 @@ import { requestPermissionFromClient, reissuePendingPermissionRequests } from '.
 import { registerAllHandlers } from './rpc/register-handlers';
 import { AlarmScheduler } from './alarms/alarm-scheduler';
 import { AlarmStore } from './alarms/alarm-store';
-import { injectNotification, composeAlarmFiredBody } from './notifications';
+import {
+  injectNotification,
+  composeAlarmFiredBody,
+  composeAlarmExpiredBody,
+  type AlarmFiredCompose,
+  type AlarmExpiredCompose,
+} from './notifications';
+import type { AlarmRow } from './alarms/types';
 import { logger } from './utils/logger';
 
 // Re-export public API from message-builder for backwards compatibility
@@ -151,6 +158,93 @@ export function getOrCreateSessionToolExecutor(
 }
 
 /**
+ * Build a short human description of an alarm's spec for the wire-format
+ * `pending_alarms_on_exit` notify. The receiving end embeds this string in
+ * the subagent-exited notification body. Format is presentation-only.
+ */
+function describeSpecForExit(row: AlarmRow): string {
+  switch (row.spec.kind) {
+    case 'once-absolute':
+      return row.spec.iso;
+    case 'once-relative':
+      return `in ${row.spec.minutes} minute${row.spec.minutes === 1 ? '' : 's'}`;
+    case 'cron':
+      return row.spec.expr;
+    case 'interval':
+      return `every ${row.spec.minutes} minute${row.spec.minutes === 1 ? '' : 's'}`;
+  }
+}
+
+/**
+ * Map a row's spec into the discriminated input the alarm-fired composer expects.
+ * Exhaustive over `spec.kind` so TS catches new arms.
+ */
+function specToFiredCompose(row: AlarmRow): AlarmFiredCompose {
+  switch (row.spec.kind) {
+    case 'once-absolute':
+      return {
+        kind: 'once-absolute',
+        scheduledFor: row.next_fire_at,
+        timezone: row.timezone,
+        prompt: row.prompt,
+        alarmId: row.id,
+      };
+    case 'once-relative':
+      return {
+        kind: 'once-relative',
+        minutes: row.spec.minutes,
+        prompt: row.prompt,
+        alarmId: row.id,
+      };
+    case 'cron':
+      return {
+        kind: 'cron',
+        expr: row.spec.expr,
+        timezone: row.timezone,
+        prompt: row.prompt,
+        alarmId: row.id,
+      };
+    case 'interval':
+      return {
+        kind: 'interval',
+        minutes: row.spec.minutes,
+        prompt: row.prompt,
+        alarmId: row.id,
+      };
+  }
+}
+
+/**
+ * Map a row's spec into the alarm-expired composer input. Returns null for
+ * specs that cannot expire (no end_at, or once-* kinds which never recur).
+ */
+function specToExpiredCompose(row: AlarmRow): AlarmExpiredCompose | null {
+  if (row.end_at === null) return null;
+  if (row.spec.kind === 'cron') {
+    return {
+      kind: 'cron',
+      expr: row.spec.expr,
+      timezone: row.timezone,
+      endTime: row.end_at,
+      endTimezone: row.timezone,
+      prompt: row.prompt,
+      alarmId: row.id,
+    };
+  }
+  if (row.spec.kind === 'interval') {
+    return {
+      kind: 'interval',
+      minutes: row.spec.minutes,
+      endTime: row.end_at,
+      endTimezone: row.timezone,
+      prompt: row.prompt,
+      alarmId: row.id,
+    };
+  }
+  return null;
+}
+
+/**
  * Bind a fresh AlarmScheduler to the currently active session.
  * Idempotent: if a scheduler already exists, it is stopped first.
  * No-op when there is no active session (e.g., after session/close).
@@ -173,6 +267,19 @@ export async function ensureAlarmSchedulerForActiveSession(
   const store = new AlarmStore(sessionDir);
   const jitterEnv = Number(process.env.LACE_ALARM_JITTER_MS ?? 60_000);
   const jitterMaxMs = Number.isFinite(jitterEnv) && jitterEnv >= 0 ? jitterEnv : 60_000;
+  const idleWake = {
+    isActive: (d: string): boolean => d === state.activeSession?.dir,
+    hasActiveTurn: (): boolean => !!state.activeTurn,
+    triggerInternalTurn: (): void => {
+      if (!runPromptInternalRef.current) return;
+      setImmediate(() => {
+        if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
+          void runPromptInternalRef.current([]);
+        }
+      });
+    },
+  };
+
   state.alarmScheduler = new AlarmScheduler({
     sessionDir,
     store,
@@ -187,37 +294,21 @@ export async function ensureAlarmSchedulerForActiveSession(
           sessionDir,
           kind: 'alarm-fired',
           identifiers: { 'alarm-id': row.id },
-          body: composeAlarmFiredBody(
-            row.kind === 'cron'
-              ? {
-                  kind: 'cron',
-                  expr: row.schedule,
-                  timezone: row.timezone,
-                  prompt: row.prompt,
-                  alarmId: row.id,
-                }
-              : {
-                  // Transitional: all once-shots present as once-absolute until
-                  // the alarm-core schema adds presentation-aware mapping.
-                  kind: 'once-absolute',
-                  scheduledFor: row.next_fire_at,
-                  timezone: row.timezone,
-                  prompt: row.prompt,
-                  alarmId: row.id,
-                }
-          ),
-          idleWake: {
-            isActive: (d) => d === state.activeSession?.dir,
-            hasActiveTurn: () => !!state.activeTurn,
-            triggerInternalTurn: () => {
-              if (!runPromptInternalRef.current) return;
-              setImmediate(() => {
-                if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
-                  void runPromptInternalRef.current([]);
-                }
-              });
-            },
-          },
+          body: composeAlarmFiredBody(specToFiredCompose(row)),
+          idleWake,
+        });
+      });
+    },
+    expiredNotifier: ({ row }) => {
+      const compose = specToExpiredCompose(row);
+      if (!compose) return;
+      void runExclusive(() => {
+        injectNotification({
+          sessionDir,
+          kind: 'alarm-expired',
+          identifiers: { 'alarm-id': row.id },
+          body: composeAlarmExpiredBody(compose),
+          idleWake,
         });
       });
     },
@@ -284,7 +375,7 @@ export async function emitSubagentExitedIfNeeded(state: AgentServerState): Promi
       alarms: pending.map((r) => ({
         id: r.id,
         kind: r.kind,
-        schedule: r.schedule,
+        schedule: describeSpecForExit(r),
         prompt: r.prompt,
         next_fire_at_iso: new Date(r.next_fire_at).toISOString(),
       })),

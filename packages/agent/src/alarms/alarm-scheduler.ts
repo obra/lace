@@ -20,6 +20,11 @@ export interface SchedulerDependencies {
   now: () => number;
   jitterMaxMs: number;
   notifier: (arg: SchedulerNotifierArg) => void;
+  /**
+   * Called when a recurring alarm (cron or interval) passes its end_at.
+   * Fires once per expiry, immediately before the row is deleted.
+   */
+  expiredNotifier?: (arg: SchedulerNotifierArg) => void;
   randomFn?: () => number;
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
   onError?: (err: unknown) => void;
@@ -54,6 +59,7 @@ export class AlarmScheduler {
   private readonly now: () => number;
   private readonly jitterMaxMs: number;
   private readonly notifier: (arg: SchedulerNotifierArg) => void;
+  private readonly expiredNotifier: ((arg: SchedulerNotifierArg) => void) | undefined;
   private readonly onError: ((e: unknown) => void) | undefined;
   private readonly sleep: (ms: number, signal: AbortSignal) => Promise<void>;
   private readonly randomFn: () => number;
@@ -70,6 +76,7 @@ export class AlarmScheduler {
     this.now = deps.now;
     this.jitterMaxMs = deps.jitterMaxMs;
     this.notifier = deps.notifier;
+    this.expiredNotifier = deps.expiredNotifier;
     this.onError = deps.onError;
     this.sleep = deps.sleep ?? defaultSleep;
     this.randomFn = deps.randomFn ?? Math.random;
@@ -168,21 +175,61 @@ export class AlarmScheduler {
       this.onError?.(err);
       // Fall through: still complete the state transition so the row exits 'firing'.
     }
-    if (row.kind === 'once') {
-      this.store.markFired(row.id, firedAt);
-      return;
+
+    switch (row.kind) {
+      case 'once':
+        this.store.markFired(row.id, firedAt);
+        return;
+      case 'cron':
+        this.handleCronReschedule(row, firedAt);
+        return;
+      case 'interval':
+        this.handleIntervalReschedule(row, firedAt);
+        return;
     }
+  }
+
+  private handleCronReschedule(row: AlarmRow, firedAt: number): void {
     try {
+      if (row.spec.kind !== 'cron') return;
       const { jitteredMs } = computeNextCronFire({
-        expr: row.schedule,
+        expr: row.spec.expr,
         timezone: row.timezone,
         after: new Date(firedAt),
         jitterMaxMs: this.jitterMaxMs,
         randomFn: this.randomFn,
       });
+      if (row.end_at !== null && jitteredMs > row.end_at) {
+        // Past end-of-life: emit expired notification, delete the row.
+        this.emitExpired(row, firedAt);
+        this.store.delete(row.id);
+        return;
+      }
       this.store.rescheduleCron(row.id, jitteredMs, firedAt);
       this.heap.push({ alarmId: row.id, next_fire_at: jitteredMs });
       this.heap.sort((a, b) => a.next_fire_at - b.next_fire_at);
+    } catch (err) {
+      this.onError?.(err);
+    }
+  }
+
+  private handleIntervalReschedule(row: AlarmRow, firedAt: number): void {
+    if (row.spec.kind !== 'interval') return;
+    const nextFireAt = firedAt + row.spec.minutes * 60_000;
+    if (row.end_at !== null && nextFireAt > row.end_at) {
+      this.emitExpired(row, firedAt);
+      this.store.delete(row.id);
+      return;
+    }
+    this.store.rescheduleInterval(row.id, nextFireAt, firedAt);
+    this.heap.push({ alarmId: row.id, next_fire_at: nextFireAt });
+    this.heap.sort((a, b) => a.next_fire_at - b.next_fire_at);
+  }
+
+  private emitExpired(row: AlarmRow, firedAt: number): void {
+    if (!this.expiredNotifier) return;
+    try {
+      this.expiredNotifier({ row, firedAt });
     } catch (err) {
       this.onError?.(err);
     }
@@ -192,8 +239,9 @@ export class AlarmScheduler {
     const cutoff = this.now() - STALENESS_WINDOW_MS;
     for (const row of this.store.staleRecurring(cutoff)) {
       try {
+        if (row.spec.kind !== 'cron') continue;
         const { jitteredMs } = computeNextCronFire({
-          expr: row.schedule,
+          expr: row.spec.expr,
           timezone: row.timezone,
           after: new Date(this.now()),
           jitterMaxMs: this.jitterMaxMs,

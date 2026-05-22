@@ -55,9 +55,15 @@ describe('list_alarms', () => {
     expect(result.status).toBe('completed');
 
     const body = JSON.parse(result.content[0].text ?? '') as {
-      alarms: Array<{ prompt: string }>;
+      alarms: Array<{
+        prompt: string;
+        spec: { kind: string };
+        end_at_iso: string | null;
+      }>;
     };
     expect(body.alarms.map((a) => a.prompt)).toEqual(['a', 'b']);
+    expect(body.alarms[0].spec.kind).toBe('once-absolute');
+    expect(body.alarms[0].end_at_iso).toBeNull();
   });
 
   it('returns empty alarms array when no active alarms', async () => {

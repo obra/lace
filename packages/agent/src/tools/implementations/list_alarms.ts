@@ -34,12 +34,13 @@ export class ListAlarmsTool extends Tool {
     const alarms = rows.map((r) => ({
       id: r.id,
       kind: r.kind,
-      schedule: r.schedule,
+      spec: r.spec,
       prompt: r.prompt,
       timezone: r.timezone,
       status: r.status,
       next_fire_at_iso: formatAbsoluteTime(r.next_fire_at, r.timezone),
       created_at_iso: formatAbsoluteTime(r.created_at, r.timezone),
+      end_at_iso: r.end_at !== null ? formatAbsoluteTime(r.end_at, r.timezone) : null,
     }));
     return await Promise.resolve({
       status: 'completed',

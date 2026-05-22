@@ -358,16 +358,25 @@ export class TestAgentProvider extends AIProvider {
       | 'schedule_alarm';
     args: Record<string, unknown>;
   } {
-    // Handle "alarm: schedule=<ISO> prompt=<text>" pattern for one-shot alarms.
+    // Handle "alarm: schedule=<ISO> prompt=<text>" pattern for absolute one-shot.
     // Anchored at the start of the (trimmed) text so a parent prompt of
     // `subagent: alarm: schedule=…` correctly delegates first — the subagent
     // process then sees `alarm: schedule=…` as its turn-1 input and matches
     // the alarm pattern itself.
-    const alarmMatch = text.trim().match(/^alarm:\s*schedule=(\S+)\s+prompt=(.+)\s*$/i);
-    if (alarmMatch) {
+    const alarmAbsMatch = text.trim().match(/^alarm:\s*schedule=(\S+)\s+prompt=(.+)\s*$/i);
+    if (alarmAbsMatch) {
       return {
         name: 'schedule_alarm',
-        args: { kind: 'once', schedule: alarmMatch[1], prompt: alarmMatch[2].trim() },
+        args: { kind: 'once', schedule: alarmAbsMatch[1], prompt: alarmAbsMatch[2].trim() },
+      };
+    }
+
+    // Handle "alarm: minutes=<N> prompt=<text>" pattern for relative one-shot timers.
+    const alarmRelMatch = text.trim().match(/^alarm:\s*minutes=(\d+)\s+prompt=(.+)\s*$/i);
+    if (alarmRelMatch) {
+      return {
+        name: 'schedule_alarm',
+        args: { kind: 'once', minutes: Number(alarmRelMatch[1]), prompt: alarmRelMatch[2].trim() },
       };
     }
 
