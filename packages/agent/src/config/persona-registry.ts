@@ -77,6 +77,13 @@ const mcpSecretReferenceSchema = z
   })
   .strict();
 
+// PRI-1769: tolerate persona frontmatter that carries `timezone:`. PRI-1696
+// moved the source of truth for rotation timezone from persona frontmatter to
+// env vars (SEN_PERSONA_TIMEZONE / EMPLOYEE_TIMEZONE), but live persona files
+// on existing coworker disks may still have the key; strict-rejecting it
+// crash-loops the embedder at boot. The field is accepted-and-ignored at the
+// lace layer; sen-core reads its env var directly. Other unknown keys still
+// fail strict so genuine typos get caught.
 const personaConfigSchema = z
   .object({
     model: z.string().optional(),
@@ -98,6 +105,7 @@ const personaConfigSchema = z
       .optional(),
     runtime: runtimeSchema.optional().default({ type: 'root' }),
     maxTurns: z.number().int().positive().optional(),
+    timezone: z.string().optional(),
   })
   .strict();
 
