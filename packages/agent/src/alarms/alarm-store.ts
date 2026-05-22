@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { atomicWriteJson } from '../storage/atomic-write';
 import type { AlarmKind, AlarmRow, AlarmsSnapshot } from './types';
 import { MAX_ACTIVE_ALARMS } from './types';
+import { logger } from '@lace/agent/utils/logger';
 
 export interface InsertAlarmArgs {
   kind: AlarmKind;
@@ -42,8 +43,11 @@ export class AlarmStore {
         if (typeof row.id !== 'string') continue;
         this.alarms.set(row.id, row);
       }
-    } catch {
-      // corrupted snapshot — treat as empty
+    } catch (err) {
+      logger.warn('alarm.store.corrupt_snapshot', {
+        path: this.path,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

@@ -106,6 +106,45 @@ describe('composers', () => {
     );
   });
 
+  it('job-progress: truncates lines >200 chars with ... suffix', () => {
+    const longLine = 'x'.repeat(250);
+    const body = composeJobProgressBody({
+      jobId: 'job_p',
+      durationMs: 1000,
+      outputBytes: 500,
+      deltaBytes: 100,
+      lastLines: [longLine],
+    });
+    // Each line is prefixed with two spaces; truncated content is 197 chars + '...'
+    expect(body).toContain('  ' + 'x'.repeat(197) + '...');
+    expect(body).not.toContain('  ' + 'x'.repeat(250));
+  });
+
+  it('job-completed: omits "Last line:" hint when lastLines is empty', () => {
+    const body = composeJobCompletedBody({
+      jobId: 'job_e',
+      jobType: 'bash',
+      exitCode: 0,
+      durationMs: 1000,
+      outputBytes: 0,
+      lastLines: [],
+    });
+    expect(body).not.toContain('Last line');
+    expect(body).toContain('Call job_output');
+  });
+
+  it('job-progress: omits "Recent output:" block when lastLines is empty', () => {
+    const body = composeJobProgressBody({
+      jobId: 'job_p',
+      durationMs: 1000,
+      outputBytes: 50,
+      deltaBytes: 10,
+      lastLines: [],
+    });
+    expect(body).not.toContain('Recent output');
+    expect(body).toContain('Call job_output');
+  });
+
   it('subagent-exited: one pending alarm', () => {
     expect(
       composeSubagentExitedBody({

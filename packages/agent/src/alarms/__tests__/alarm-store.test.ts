@@ -1,12 +1,13 @@
 // ABOUTME: Unit tests for AlarmStore — single-snapshot JSON storage, in-memory mirror,
 // ABOUTME: atomic rewrite via atomicWriteJson on every change, MAX_ACTIVE_ALARMS cap.
 
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { AlarmStore } from '../alarm-store';
 import { MAX_ACTIVE_ALARMS } from '../types';
+import { logger } from '@lace/agent/utils/logger';
 
 function tempSessionDir(): string {
   return mkdtempSync(join(tmpdir(), 'lace-alarmstore-'));
@@ -110,5 +111,15 @@ describe('AlarmStore', () => {
     const s2 = new AlarmStore(dir);
     s2.repairFiringOnBoot();
     expect(s2.get(row.id)?.status).toBe('pending');
+  });
+
+  it('warns and treats corrupt JSON as empty', () => {
+    const dir = tempSessionDir();
+    writeFileSync(join(dir, 'alarms.json'), 'not valid json{');
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const s = new AlarmStore(dir);
+    expect(s.listActive()).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledWith('alarm.store.corrupt_snapshot', expect.anything());
+    warnSpy.mockRestore();
   });
 });
