@@ -1,5 +1,5 @@
 // ABOUTME: Tests for the supervisor-backed workspace information API endpoint
-// ABOUTME: Workspace sessions always report local mode for now
+// ABOUTME: Workspace sessions report bounded host mode for host-contained tools
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { loader } from '@lace/web/app/routes/api.sessions.$sessionId.workspace';
@@ -61,12 +61,12 @@ describe('GET /api/sessions/:sessionId/workspace', () => {
       createLoaderArgs(request, { sessionId: created.workspaceSessionId })
     );
     const data = await parseResponse<{
-      mode: 'container' | 'worktree' | 'local';
+      mode: 'container' | 'boundedHost';
       info: { sessionId: string; state: string; projectDir: string; clonePath: string } | null;
     }>(response);
 
     expect(response.status).toBe(200);
-    expect(data.mode).toBe('local');
+    expect(data.mode).toBe('boundedHost');
     expect(data.info).toBeDefined();
     expect(data.info?.sessionId).toBe(created.workspaceSessionId);
     expect(data.info?.state).toBe('running');

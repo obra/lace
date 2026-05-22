@@ -38,7 +38,7 @@ export async function loader({ params }: { params: LoaderParams }) {
       state: 'running',
     };
 
-    return createSuperjsonResponse({ mode: 'local', info });
+    return createSuperjsonResponse({ mode: 'boundedHost', info });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('Failed to fetch workspace info', { error, sessionId, errorMessage });

@@ -2,7 +2,7 @@
 // ABOUTME: Validates workspace data fetching and state management
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { useWorkspaceDetails } from '@lace/web/hooks/useWorkspaceDetails';
 import { api } from '@lace/web/lib/api-client';
 
@@ -32,7 +32,7 @@ describe('useWorkspaceDetails', () => {
 
   it('fetches workspace data on mount', async () => {
     const mockWorkspaceData = {
-      mode: 'local' as const,
+      mode: 'boundedHost' as const,
       info: {
         sessionId: 'test-session',
         state: 'running',
@@ -49,7 +49,7 @@ describe('useWorkspaceDetails', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.workspaceMode).toBe('local');
+    expect(result.current.workspaceMode).toBe('boundedHost');
     expect(result.current.workspaceInfo).toEqual(mockWorkspaceData.info);
     expect(result.current.error).toBeNull();
   });
@@ -78,7 +78,7 @@ describe('useWorkspaceDetails', () => {
 
   it('handles null workspace info', async () => {
     const mockWorkspaceData = {
-      mode: 'local' as const,
+      mode: 'boundedHost' as const,
       info: null,
     };
 
@@ -90,8 +90,25 @@ describe('useWorkspaceDetails', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.workspaceMode).toBe('local');
+    expect(result.current.workspaceMode).toBe('boundedHost');
     expect(result.current.workspaceInfo).toBeNull();
+  });
+
+  it('rejects legacy workspace modes from the API', async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      mode: 'worktree',
+      info: { sessionId: 'test-session', state: 'running' },
+    });
+
+    const { result } = renderHook(() => useWorkspaceDetails('test-session'));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.workspaceMode).toBeNull();
+    expect(result.current.workspaceInfo).toBeNull();
+    expect(result.current.error?.message).toMatch(/invalid workspace mode/i);
   });
 
   it('handles fetch errors gracefully', async () => {
@@ -111,7 +128,7 @@ describe('useWorkspaceDetails', () => {
 
   it('refetches when sessionId changes', async () => {
     const mockWorkspaceData1 = {
-      mode: 'local' as const,
+      mode: 'boundedHost' as const,
       info: { sessionId: 'session-1', state: 'running' },
     };
     const mockWorkspaceData2 = {
@@ -129,7 +146,7 @@ describe('useWorkspaceDetails', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.workspaceMode).toBe('local');
+    expect(result.current.workspaceMode).toBe('boundedHost');
 
     // Change sessionId
     vi.mocked(api.get).mockResolvedValueOnce(mockWorkspaceData2);
@@ -142,7 +159,7 @@ describe('useWorkspaceDetails', () => {
 
   it('does not fetch when sessionId changes to null', async () => {
     const mockWorkspaceData = {
-      mode: 'local' as const,
+      mode: 'boundedHost' as const,
       info: { sessionId: 'session-1', state: 'running' },
     };
 
@@ -171,7 +188,7 @@ describe('useWorkspaceDetails', () => {
 
   it('provides reload function to refresh workspace data', async () => {
     const mockWorkspaceData1 = {
-      mode: 'local' as const,
+      mode: 'boundedHost' as const,
       info: { sessionId: 'test-session', state: 'running' },
     };
     const mockWorkspaceData2 = {
@@ -189,10 +206,12 @@ describe('useWorkspaceDetails', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.workspaceMode).toBe('local');
+    expect(result.current.workspaceMode).toBe('boundedHost');
 
     // Reload
-    await result.current.reload();
+    await act(async () => {
+      await result.current.reload();
+    });
 
     await waitFor(() => {
       expect(result.current.workspaceMode).toBe('container');

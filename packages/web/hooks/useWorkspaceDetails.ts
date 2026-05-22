@@ -3,25 +3,27 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '@lace/web/lib/api-client';
-import type { WorkspaceInfo } from '@lace/web/types/core';
+import type { WorkspaceInfo, WorkspaceMode } from '@lace/web/types/core';
 
 export interface WorkspaceDetails {
-  mode: 'container' | 'worktree' | 'local';
+  mode: WorkspaceMode;
   info: WorkspaceInfo | null;
 }
 
 export interface UseWorkspaceDetailsReturn {
-  workspaceMode: 'container' | 'worktree' | 'local' | null;
+  workspaceMode: WorkspaceMode | null;
   workspaceInfo: WorkspaceInfo | null;
   loading: boolean;
   error: Error | null;
   reload: () => Promise<void>;
 }
 
+function isWorkspaceMode(value: unknown): value is WorkspaceMode {
+  return value === 'container' || value === 'boundedHost';
+}
+
 export function useWorkspaceDetails(sessionId: string | null): UseWorkspaceDetailsReturn {
-  const [workspaceMode, setWorkspaceMode] = useState<'container' | 'worktree' | 'local' | null>(
-    null
-  );
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode | null>(null);
   const [workspaceInfo, setWorkspaceInfo] = useState<WorkspaceInfo | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
@@ -39,7 +41,13 @@ export function useWorkspaceDetails(sessionId: string | null): UseWorkspaceDetai
     setError(null);
 
     try {
-      const data = await api.get<WorkspaceDetails>(`/api/sessions/${sessionId}/workspace`);
+      const data = await api.get<{ mode: unknown; info: WorkspaceInfo | null }>(
+        `/api/sessions/${sessionId}/workspace`
+      );
+
+      if (!isWorkspaceMode(data.mode)) {
+        throw new Error(`Invalid workspace mode: ${String(data.mode)}`);
+      }
 
       setWorkspaceMode(data.mode);
       setWorkspaceInfo(data.info);

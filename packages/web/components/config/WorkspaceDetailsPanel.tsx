@@ -6,10 +6,10 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBox, faFolder, faCircle } from '@lace/web/lib/fontawesome';
-import type { WorkspaceInfo } from '@lace/web/types/core';
+import type { WorkspaceInfo, WorkspaceMode } from '@lace/web/types/core';
 
 interface WorkspaceDetailsPanelProps {
-  mode: 'container' | 'worktree' | 'local';
+  mode: WorkspaceMode;
   info: WorkspaceInfo | null | undefined;
   isLoading?: boolean;
 }
@@ -37,8 +37,7 @@ export function WorkspaceDetailsPanel({
   }
 
   const isContainer = mode === 'container';
-  const isWorktree = mode === 'worktree';
-  const isLocal = mode === 'local';
+  const isBoundedHost = mode === 'boundedHost';
 
   // State indicator
   const getStateColor = (state: string) => {
@@ -62,19 +61,11 @@ export function WorkspaceDetailsPanel({
         iconClass: 'text-primary',
       };
     }
-    if (isWorktree) {
-      return {
-        title: 'Worktree Workspace',
-        icon: faFolder,
-        bgClass: 'bg-info/10',
-        iconClass: 'text-info',
-      };
-    }
     return {
-      title: 'Local Workspace',
+      title: 'Bounded Host Workspace',
       icon: faFolder,
-      bgClass: 'bg-base-200',
-      iconClass: 'text-base-content/70',
+      bgClass: 'bg-warning/10',
+      iconClass: 'text-warning',
     };
   };
 
@@ -106,29 +97,6 @@ export function WorkspaceDetailsPanel({
         <DetailRow label="Session ID" value={info.sessionId} mono />
       </div>
 
-      {/* Worktree-Specific Information */}
-      {isWorktree && (
-        <div className="space-y-4">
-          <h4 className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">
-            Git Isolation
-          </h4>
-
-          {info.branchName && <DetailRow label="Branch" value={info.branchName} mono />}
-          <DetailRow label="Worktree Path" value={info.clonePath} mono />
-          <DetailRow label="Original Project" value={info.projectDir} mono />
-
-          <div className="alert alert-info">
-            <div className="flex flex-col gap-1">
-              <div className="font-medium">Git Worktree Isolation</div>
-              <div className="text-sm opacity-80">
-                This session uses a separate git worktree on its own branch. Changes are isolated
-                from the main working tree but remain connected to the repository.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Container-Specific Information */}
       {isContainer && (
         <>
@@ -145,30 +113,30 @@ export function WorkspaceDetailsPanel({
 
           <div className="space-y-4">
             <h4 className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">
-              Git Configuration
+              Host Source
             </h4>
 
             {info.branchName && <DetailRow label="Branch" value={info.branchName} mono />}
-            <DetailRow label="Worktree Path" value={info.clonePath} mono />
-            <DetailRow label="Original Project" value={info.projectDir} mono />
+            <DetailRow label="Host Directory" value={info.clonePath} mono />
+            <DetailRow label="Project Directory" value={info.projectDir} mono />
           </div>
         </>
       )}
 
-      {/* Local Mode Information */}
-      {isLocal && (
+      {/* Bounded Host Information */}
+      {isBoundedHost && (
         <div className="space-y-4">
           <h4 className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">
-            Local Details
+            Host Containment
           </h4>
 
-          <DetailRow label="Project Directory" value={info.projectDir} mono />
+          <DetailRow label="Host Root" value={info.projectDir} mono />
           <div className="alert alert-warning">
             <div className="flex flex-col gap-1">
-              <div className="font-medium">Direct Project Access</div>
+              <div className="font-medium">Bounded Host Containment</div>
               <div className="text-sm opacity-80">
-                This session runs directly in your project directory without isolation. Changes
-                affect the working tree immediately. Consider using worktree mode for isolation.
+                Tools are constrained to this host root. File access and commands resolve inside
+                this directory unless an explicit policy allows otherwise.
               </div>
             </div>
           </div>

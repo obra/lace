@@ -17,7 +17,7 @@ const CreateSessionSchema = z.object({
   description: z.string().optional(),
   providerInstanceId: z.string().min(1, 'Provider instance ID is required'),
   modelId: z.string().min(1, 'Model ID is required'),
-  workspaceMode: z.enum(['container', 'local']).optional(),
+  workspaceMode: z.enum(['container', 'boundedHost']).optional(),
   configuration: z.record(z.unknown()).optional(),
 });
 

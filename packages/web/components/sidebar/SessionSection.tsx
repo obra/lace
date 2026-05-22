@@ -17,6 +17,7 @@ import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvi
 import { useURLState } from '@lace/web/hooks/useURLState';
 import { api } from '@lace/web/lib/api-client';
 import type { PermissionOverrideMode } from '@lace/web/types/permissions';
+import type { WorkspaceMode } from '@lace/web/types/core';
 
 interface SessionSectionProps {
   isMobile?: boolean;
@@ -109,7 +110,7 @@ export const SessionSection = memo(function SessionSection({
   ) : null;
 
   // Workspace mode badge - clickable to open config on workspace tab
-  const getWorkspaceBadgeStyle = (mode: 'container' | 'worktree' | 'local') => {
+  const getWorkspaceBadgeStyle = (mode: WorkspaceMode) => {
     switch (mode) {
       case 'container':
         return {
@@ -117,17 +118,11 @@ export const SessionSection = memo(function SessionSection({
           borderColor: '#2563eb',
           label: 'Container',
         };
-      case 'worktree':
-        return {
-          backgroundColor: '#06b6d4', // cyan
-          borderColor: '#0891b2',
-          label: 'Worktree',
-        };
-      case 'local':
+      case 'boundedHost':
         return {
           backgroundColor: '#eab308', // yellow
           borderColor: '#ca8a04',
-          label: 'Local',
+          label: 'Bounded Host',
         };
     }
   };
@@ -142,7 +137,7 @@ export const SessionSection = memo(function SessionSection({
           borderColor: getWorkspaceBadgeStyle(workspaceMode).borderColor,
           color: 'white',
         }}
-        title={`Workspace: ${workspaceMode} (click to configure)`}
+        title={`Workspace: ${getWorkspaceBadgeStyle(workspaceMode).label} (click to configure)`}
         data-testid="workspace-mode-badge"
       >
         {getWorkspaceBadgeStyle(workspaceMode).label}

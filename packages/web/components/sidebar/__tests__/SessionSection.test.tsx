@@ -242,4 +242,22 @@ describe('SessionSection', () => {
       expect(container.firstChild).toBeNull();
     });
   });
+
+  describe('Workspace Badge', () => {
+    it('labels bounded host workspace mode without legacy language', () => {
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
+          sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
+          workspaceMode: 'boundedHost',
+          workspaceLoading: false,
+        })
+      );
+
+      render(<SessionSection {...defaultProps} />);
+
+      const badge = screen.getByTestId('workspace-mode-badge');
+      expect(badge).toHaveTextContent('Bounded Host');
+      expect(badge).toHaveAttribute('title', 'Workspace: Bounded Host (click to configure)');
+    });
+  });
 });

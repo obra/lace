@@ -70,6 +70,8 @@ export { ApprovalDecision } from '@lace/ent-protocol';
 // Project and workspace types from ent-protocol
 export type { ProjectInfo, WorkspaceInfo } from '@lace/ent-protocol';
 
+export type WorkspaceMode = 'container' | 'boundedHost';
+
 export interface SessionInfo {
   id: WorkspaceSessionId;
   name: string;

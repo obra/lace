@@ -15,7 +15,13 @@ import React, {
 import { useAgentManagement } from '@lace/web/hooks/useAgentManagement';
 import { useEventStream, type AgentEvent } from '@lace/web/hooks/useEventStream';
 import { useWorkspaceDetails } from '@lace/web/hooks/useWorkspaceDetails';
-import type { SessionInfo, AgentInfo, ThreadId, WorkspaceInfo } from '@lace/web/types/core';
+import type {
+  SessionInfo,
+  AgentInfo,
+  ThreadId,
+  WorkspaceInfo,
+  WorkspaceMode,
+} from '@lace/web/types/core';
 import { asThreadId } from '@lace/web/types/core';
 import type { CreateAgentRequest } from '@lace/web/types/api';
 
@@ -26,7 +32,7 @@ export interface SessionContextType {
   loading: boolean;
 
   // Workspace data (from useWorkspaceDetails hook)
-  workspaceMode: 'container' | 'worktree' | 'local' | null;
+  workspaceMode: WorkspaceMode | null;
   workspaceInfo: WorkspaceInfo | null;
   workspaceLoading: boolean;
 
