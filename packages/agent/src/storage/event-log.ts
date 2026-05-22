@@ -33,6 +33,38 @@ export function deriveNextEventSeqFromEventLog(sessionDir: string): number {
 }
 
 /**
+ * Returns true if there are any `context_injected` events with
+ * `priority='immediate'` in events.jsonl whose `eventSeq` is strictly
+ * greater than `afterEventSeq`. Used by the prompt handler to detect
+ * notifications that landed during a turn but were not picked up
+ * before turn_end was written (Bug 3 race condition).
+ */
+export function hasPendingImmediateInjects(sessionDir: string, afterEventSeq: number): boolean {
+  const eventsPath = path.join(sessionDir, 'events.jsonl');
+  let raw = '';
+  try {
+    raw = fs.readFileSync(eventsPath, 'utf8');
+  } catch {
+    return false;
+  }
+  for (const line of raw.split('\n')) {
+    if (!line) continue;
+    try {
+      const parsed = JSON.parse(line) as Partial<DurableEvent>;
+      if (parsed.type !== 'context_injected') continue;
+      if (typeof parsed.eventSeq !== 'number') continue;
+      if (parsed.eventSeq <= afterEventSeq) continue;
+      const data = parsed.data as { priority?: unknown } | undefined;
+      if (data?.priority !== 'immediate') continue;
+      return true;
+    } catch {
+      // ignore malformed line
+    }
+  }
+  return false;
+}
+
+/**
  * Find the eventSeq of the most recent `turn_end` event in the log, or `null`
  * if no turn has completed yet. Used by the conversation runner to compute its
  * initial immediate-inject watermark — any context_injected event newer than

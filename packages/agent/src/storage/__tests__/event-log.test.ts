@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { appendDurableEvent, findLastTurnEndEventSeq, readDurableEvents } from '../event-log';
+import {
+  appendDurableEvent,
+  findLastTurnEndEventSeq,
+  hasPendingImmediateInjects,
+  readDurableEvents,
+} from '../event-log';
 
 describe('storage/event-log', () => {
   it('appends and replays events in order', () => {
@@ -91,6 +96,89 @@ describe('storage/event-log', () => {
     } finally {
       rmSync(sessionDir, { recursive: true, force: true });
     }
+  });
+
+  describe('hasPendingImmediateInjects', () => {
+    it('returns false on an empty / missing log', () => {
+      const sessionDir = mkdtempSync(join(tmpdir(), 'lace-pending-inject-'));
+      try {
+        expect(hasPendingImmediateInjects(sessionDir, 0)).toBe(false);
+      } finally {
+        rmSync(sessionDir, { recursive: true, force: true });
+      }
+    });
+
+    it('returns true when a context_injected priority=immediate event exists past the watermark', () => {
+      const sessionDir = mkdtempSync(join(tmpdir(), 'lace-pending-inject-'));
+      try {
+        let state = { nextEventSeq: 1, nextStreamSeq: 1 };
+        ({ nextState: state } = appendDurableEvent(sessionDir, state, {
+          type: 'prompt',
+          data: {},
+        }));
+        ({ nextState: state } = appendDurableEvent(sessionDir, state, {
+          type: 'turn_end',
+          data: { stopReason: 'end_turn' },
+        }));
+        const lastTurnEnd = findLastTurnEndEventSeq(sessionDir);
+        expect(lastTurnEnd).toBe(2);
+        // Nothing past turn_end yet — should be false.
+        expect(hasPendingImmediateInjects(sessionDir, lastTurnEnd!)).toBe(false);
+        // Inject an immediate event that lands AFTER turn_end.
+        ({ nextState: state } = appendDurableEvent(sessionDir, state, {
+          type: 'context_injected',
+          data: { priority: 'immediate', content: [{ type: 'text', text: 'late' }] },
+        }));
+        expect(hasPendingImmediateInjects(sessionDir, lastTurnEnd!)).toBe(true);
+      } finally {
+        rmSync(sessionDir, { recursive: true, force: true });
+      }
+    });
+
+    it('ignores context_injected events with non-immediate priority', () => {
+      const sessionDir = mkdtempSync(join(tmpdir(), 'lace-pending-inject-'));
+      try {
+        let state = { nextEventSeq: 1, nextStreamSeq: 1 };
+        ({ nextState: state } = appendDurableEvent(sessionDir, state, {
+          type: 'context_injected',
+          data: { priority: 'normal', content: [{ type: 'text', text: 'normal' }] },
+        }));
+        expect(hasPendingImmediateInjects(sessionDir, 0)).toBe(false);
+      } finally {
+        rmSync(sessionDir, { recursive: true, force: true });
+      }
+    });
+
+    it('ignores context_injected events at or before the watermark', () => {
+      const sessionDir = mkdtempSync(join(tmpdir(), 'lace-pending-inject-'));
+      try {
+        let state = { nextEventSeq: 1, nextStreamSeq: 1 };
+        ({ nextState: state } = appendDurableEvent(sessionDir, state, {
+          type: 'context_injected',
+          data: { priority: 'immediate', content: [{ type: 'text', text: 'old' }] },
+        }));
+        // eventSeq will be 1 — at-watermark should be excluded, before-watermark too.
+        expect(hasPendingImmediateInjects(sessionDir, 1)).toBe(false);
+        // But it IS visible if the watermark is 0.
+        expect(hasPendingImmediateInjects(sessionDir, 0)).toBe(true);
+      } finally {
+        rmSync(sessionDir, { recursive: true, force: true });
+      }
+    });
+
+    it('ignores non-context_injected event types', () => {
+      const sessionDir = mkdtempSync(join(tmpdir(), 'lace-pending-inject-'));
+      try {
+        let state = { nextEventSeq: 1, nextStreamSeq: 1 };
+        ({ nextState: state } = appendDurableEvent(sessionDir, state, {
+          type: 'turn_start',
+          data: { priority: 'immediate' },
+        }));
+        expect(hasPendingImmediateInjects(sessionDir, 0)).toBe(false);
+      } finally {
+        rmSync(sessionDir, { recursive: true, force: true });
+      }
+    });
   });
 
   it('ignores a partial last line (crash safety)', () => {

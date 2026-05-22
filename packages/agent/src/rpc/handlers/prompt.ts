@@ -8,7 +8,11 @@ import {
   writeSessionState,
   type SessionState,
 } from '@lace/agent/storage/session-store';
-import { appendDurableEvent } from '@lace/agent/storage/event-log';
+import {
+  appendDurableEvent,
+  findLastTurnEndEventSeq,
+  hasPendingImmediateInjects,
+} from '@lace/agent/storage/event-log';
 import { findUserCommand } from '@lace/agent/user-commands';
 import type {
   SessionUpdate,
@@ -320,6 +324,27 @@ export function registerPromptHandler(
 
       state.activeSession = loadSession(state.activeSession.meta.sessionId);
       state.activeTurn = null;
+
+      // Bug 3 fix: catch immediate-inject events that landed in the closing
+      // microseconds of the turn (after the runner's last iteration but before
+      // turn_end). The setImmediate-based wake in injectNotification's
+      // triggerInternalTurn callback can no-op if it observes state.activeTurn=true
+      // before the turn ends, then the turn ends with the event unprocessed.
+      // We re-scan here, after activeTurn is cleared, and fire a synthetic
+      // internal turn if anything is waiting.
+      if (state.activeSession) {
+        const lastTurnEnd = findLastTurnEndEventSeq(state.activeSession.dir) ?? 0;
+        if (
+          hasPendingImmediateInjects(state.activeSession.dir, lastTurnEnd) &&
+          runPromptInternalRef.current
+        ) {
+          setImmediate(() => {
+            if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
+              void runPromptInternalRef.current([]);
+            }
+          });
+        }
+      }
 
       return result;
     } finally {
