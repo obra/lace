@@ -21,6 +21,7 @@ body prose
 | `kind` | Identifiers | Composer |
 | --- | --- | --- |
 | `alarm-fired` | `alarm-id` | `composeAlarmFiredBody` |
+| `alarm-expired` | `alarm-id` | `composeAlarmExpiredBody` |
 | `job-completed` | `job-id` | `composeJobCompletedBody` |
 | `job-failed` | `job-id` | `composeJobFailedBody` |
 | `job-cancelled` | `job-id` | `composeJobCancelledBody` |
