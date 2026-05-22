@@ -1,4 +1,5 @@
 import { HostToolRuntime } from './host';
+import { BoundedHostToolRuntime } from './bounded-host';
 import {
   ProjectedContainerToolRuntime,
   type ProjectedContainerManager,
@@ -6,7 +7,6 @@ import {
 } from './projected-container';
 import type { RuntimeSecretResolver } from './secrets';
 import type { RuntimeExecutionBinding, ToolRuntime } from './types';
-import { WorkspaceToolRuntime } from './workspace';
 
 export function createToolRuntimeFromBinding(input: {
   binding: RuntimeExecutionBinding;
@@ -23,7 +23,7 @@ export function createToolRuntimeFromBinding(input: {
 
   const runtime = input.binding.toolRuntime;
 
-  if (runtime.type === 'local') {
+  if (runtime.type === 'host') {
     return new HostToolRuntime({
       id: input.binding.identity.runtimeId,
       cwd: runtime.cwd,
@@ -31,14 +31,17 @@ export function createToolRuntimeFromBinding(input: {
     });
   }
 
-  if (runtime.type === 'workspace') {
-    return new WorkspaceToolRuntime({
+  if (runtime.type === 'boundedHost') {
+    return new BoundedHostToolRuntime({
       id: input.binding.identity.runtimeId,
-      projectRoot: runtime.projectRoot,
-      workspaceRoot: runtime.workspaceRoot,
+      root: runtime.root,
       cwd: runtime.cwd,
       env: input.env,
     });
+  }
+
+  if (runtime.type !== 'container') {
+    throw new Error(`Unsupported tool runtime type: ${(runtime as { type: string }).type}`);
   }
 
   if (!input.containerManager) {
