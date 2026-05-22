@@ -171,24 +171,16 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
         exitCode: number | null;
         signal?: NodeJS.Signals;
       }) => void;
-      let rejectCompletion!: (error: Error) => void;
       const completion = new Promise<{ exitCode: number | null; signal?: NodeJS.Signals }>(
-        (resolve, reject) => {
+        (resolve) => {
           resolveCompletion = resolve;
-          rejectCompletion = reject;
         }
       );
       const kill = vi.fn((signal?: NodeJS.Signals) => {
         resolveCompletion({ exitCode: null, signal });
       });
 
-      runtime.process.start = vi.fn(async (_command, opts) => {
-        opts?.signal?.addEventListener('abort', () => {
-          const error = new Error('The operation was aborted');
-          error.name = 'AbortError';
-          rejectCompletion(error);
-        });
-
+      runtime.process.start = vi.fn(async () => {
         return {
           pid: 123,
           stdout,
@@ -217,10 +209,63 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
       const result = await resultPromise;
       const startOptions = vi.mocked(runtime.process.start).mock.calls[0][1];
 
-      expect(startOptions).not.toHaveProperty('signal');
+      expect(startOptions).toHaveProperty('signal', abortController.signal);
       expect(result.status).toBe('aborted');
       expect(result.content[0].text).toContain('Partial output');
       expect(result.content[0].text).toContain('before cancel');
+    });
+
+    it('kills the runtime process when cancellation happens while process start is pending', async () => {
+      const tool = new BashTool();
+      const runtime = createStreamingFakeRuntime();
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      let resolveStart!: (handle: Awaited<ReturnType<typeof runtime.process.start>>) => void;
+      let resolveCompletion!: (result: {
+        exitCode: number | null;
+        signal?: NodeJS.Signals;
+      }) => void;
+      const completion = new Promise<{ exitCode: number | null; signal?: NodeJS.Signals }>(
+        (resolve) => {
+          resolveCompletion = resolve;
+        }
+      );
+      const kill = vi.fn((signal?: NodeJS.Signals) => {
+        stdout.end();
+        stderr.end();
+        resolveCompletion({ exitCode: null, signal });
+      });
+
+      runtime.process.start = vi.fn((_command, _opts) => {
+        return new Promise((resolve) => {
+          resolveStart = resolve;
+        });
+      });
+
+      const abortController = new AbortController();
+      const resultPromise = tool.execute(
+        { command: 'sleep 10' },
+        {
+          signal: abortController.signal,
+          runtime,
+          toolTempDir: testTempDir,
+        }
+      );
+
+      await waitForToolListeners();
+      abortController.abort();
+      resolveStart({
+        pid: 123,
+        stdout,
+        stderr,
+        kill,
+        completion,
+      });
+
+      const result = await resultPromise;
+
+      expect(kill).toHaveBeenCalledWith('SIGTERM');
+      expect(result.status).toBe('aborted');
     });
 
     it('reports non-user signal termination as tool failure', async () => {

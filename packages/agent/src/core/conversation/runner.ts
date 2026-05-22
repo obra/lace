@@ -29,9 +29,9 @@ import {
 import { deriveFilesReadFromDurableEvents } from '@lace/agent/storage/files-from-events';
 import { executeTodoRead, executeTodoWrite } from '@lace/agent/todo/todo-tools';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
+import { bashSchema } from '@lace/agent/tools/implementations/bash';
 import {
   toNonEmptyString,
-  toPositiveInt,
   toolKindFromName,
   protocolToolResultFromCore,
   shouldAskPermission,
@@ -713,12 +713,14 @@ export class ConversationRunner {
     // Handle bash with background=true BEFORE permission check.
     // Background jobs handle their own permission flow via shell-job.ts.
     if (toolName === 'bash' && toolInput.background === true) {
-      const command = toNonEmptyString(toolInput.command);
-      const description = toNonEmptyString(toolInput.description);
-      if (!command) {
+      const parsedBashInput = bashSchema.safeParse(toolInput);
+      if (!parsedBashInput.success) {
+        const validationMessage = parsedBashInput.error.issues
+          .map((issue) => `${issue.path.join('.') || 'root'}: ${issue.message}`)
+          .join('\n');
         const failed: ToolResult = {
           outcome: 'failed',
-          content: [{ type: 'error', message: 'bash.command is required' }],
+          content: [{ type: 'error', message: validationMessage }],
         };
         await this.deps.onUpdate(toolTurnSeq, {
           type: 'tool_use',
@@ -738,22 +740,22 @@ export class ConversationRunner {
           coreResult: {
             id: toolCallId,
             status: 'failed',
-            content: [{ type: 'text', text: 'bash.command is required' }],
+            content: [{ type: 'text', text: validationMessage }],
           },
           shouldContinue: false,
         };
       }
 
+      const { command, description, progressIntervalMs } = parsedBashInput.data;
       // Forward operator-configured progressIntervalMs (PRI-1707) — without
       // this, the bash tool's schema-documented progressIntervalMs is
       // silently dropped here and the job's progress timer never arms.
-      const progressIntervalMs = toPositiveInt(toolInput.progressIntervalMs);
       const { jobId } = await this.deps.startShellJob({
         command,
         description: description || command.substring(0, 50),
         turnContext: { turnId, turnSeq: toolTurnSeq },
         runtimeBinding,
-        ...(progressIntervalMs !== null ? { progressIntervalMs } : {}),
+        ...(progressIntervalMs !== undefined ? { progressIntervalMs } : {}),
       });
 
       const completed: ToolResult = {

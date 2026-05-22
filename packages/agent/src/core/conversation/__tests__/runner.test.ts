@@ -1631,6 +1631,46 @@ describe('ConversationRunner', () => {
         const arg = startShellJob.mock.calls[0][0] as Record<string, unknown>;
         expect(arg.progressIntervalMs).toBeUndefined();
       });
+
+      it.each([
+        ['below minimum', 4999],
+        ['above maximum', 600001],
+        ['non-integer', 5000.5],
+      ])(
+        'rejects %s progressIntervalMs before starting a background job',
+        async (_label, value) => {
+          const startShellJob = vi.fn().mockResolvedValue({ jobId: 'job_test' });
+          const onUpdate = vi.fn().mockResolvedValue(undefined);
+          const provider = new BashBackgroundProvider({
+            command: 'sleep 60',
+            background: true,
+            progressIntervalMs: value,
+          });
+          const config: RunnerConfig = {
+            sessionDir,
+            sessionId: 'sess_test',
+            cwd,
+            executionMode: 'execute',
+            approvalMode: 'approve',
+          };
+          const deps = createToolAwareMockDeps(() => provider, { startShellJob, onUpdate });
+          const runner = new ConversationRunner(config, deps);
+
+          await runner.run({
+            content: [{ type: 'text', text: 'Run a background job' }],
+            abortController: new AbortController(),
+            turnId: `turn_${randomUUID()}`,
+            startedAt: new Date().toISOString(),
+          });
+
+          expect(startShellJob).not.toHaveBeenCalled();
+          const failedUpdate = onUpdate.mock.calls.find(
+            ([_turnSeq, update]) => update.type === 'tool_use' && update.status === 'failed'
+          )?.[1];
+          expect(failedUpdate).toBeDefined();
+          expect(failedUpdate?.result?.content[0]?.message).toContain('progressIntervalMs');
+        }
+      );
     });
   });
 });

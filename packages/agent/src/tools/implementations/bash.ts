@@ -30,7 +30,7 @@ export interface BashOutput {
   };
 }
 
-const bashSchema = z.object({
+export const bashSchema = z.object({
   command: NonEmptyString,
   background: z.boolean().default(false),
   description: z.string().optional(),
@@ -106,6 +106,7 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
       const childProcess = await context.runtime.process.start(['/bin/bash', '-c', command], {
         cwd: context.runtime.cwd,
         env: context.processEnv,
+        signal: context.signal,
       });
 
       // Set up output streams after the runtime process is started so a start failure
@@ -257,6 +258,9 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
         };
 
         context.signal.addEventListener('abort', abortHandler);
+        if (context.signal.aborted) {
+          abortHandler();
+        }
 
         // Handle stdout
         childProcess.stdout?.on('data', (data: Buffer) => {
@@ -312,6 +316,10 @@ Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain w
           .catch(handleProcessError);
       });
     } catch (error: unknown) {
+      if (context.signal.aborted) {
+        return this.createCancellationResult();
+      }
+
       const runtime = Date.now() - startTime;
       const err = error as { message: string };
 
