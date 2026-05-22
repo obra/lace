@@ -11,7 +11,7 @@ import type { ToolResult } from '@lace/ent-protocol';
 import { createToolRuntimeFromBinding } from '../tools/runtime/factory';
 import type { ProjectedContainerManager } from '../tools/runtime/projected-container';
 import type { RuntimeSecretResolver } from '../tools/runtime/secrets';
-import { buildDefaultLocalRuntimeBinding } from '../tools/runtime/validation';
+import { buildDefaultBoundedHostRuntimeBinding } from '../tools/runtime/validation';
 import type { RuntimeProcessHandle } from '../tools/runtime/types';
 
 export type ShellJobContext = {
@@ -207,7 +207,7 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
       try {
         const runtimeBinding =
           job.runtimeBinding ??
-          buildDefaultLocalRuntimeBinding({
+          buildDefaultBoundedHostRuntimeBinding({
             sessionId: state.activeSession.meta.sessionId,
             cwd: state.activeSession.meta.workDir,
           });

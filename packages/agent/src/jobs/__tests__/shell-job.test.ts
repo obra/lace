@@ -99,7 +99,7 @@ describe('createRunShellJobProcess', () => {
       dir: '/tmp/test-session',
       meta: {
         sessionId: 'test-session',
-        workDir: '/tmp/work',
+        workDir: '/tmp',
         projectId: 'test-project',
         rootDir: '/tmp',
         personaId: 'default',
@@ -122,7 +122,7 @@ describe('createRunShellJobProcess', () => {
         schemaVersion: 1,
         identity: { runtimeId: 'rt_test' },
         agentPlacement: 'host',
-        toolRuntime: { type: 'local', cwd: '/tmp/work' },
+        toolRuntime: { type: 'boundedHost', root: '/tmp', cwd: '/tmp' },
       },
     };
 
@@ -143,7 +143,7 @@ describe('createRunShellJobProcess', () => {
     // skipped and spawn was never called. The fix is to use getState()
     // to get current state each time the job runs.
     expect(mockSpawn).toHaveBeenCalledWith('/bin/bash', ['-c', 'echo hello'], {
-      cwd: '/tmp/work',
+      cwd: '/tmp',
       env: expect.any(Object),
       stdio: ['pipe', 'pipe', 'pipe'],
       detached: process.platform !== 'win32',
@@ -160,7 +160,7 @@ describe('createRunShellJobProcess', () => {
         dir: '/tmp/test-session',
         meta: {
           sessionId: 'sess_legacy',
-          workDir: '/tmp/legacy-work',
+          workDir: '/tmp',
           projectId: 'test-project',
           rootDir: '/tmp',
           personaId: 'default',
@@ -202,7 +202,7 @@ describe('createRunShellJobProcess', () => {
     await new Promise((r) => setTimeout(r, 50));
 
     expect(mockSpawn).toHaveBeenCalledWith('/bin/bash', ['-c', 'pwd'], {
-      cwd: '/tmp/legacy-work',
+      cwd: '/tmp',
       env: expect.any(Object),
       stdio: ['pipe', 'pipe', 'pipe'],
       detached: process.platform !== 'win32',
@@ -210,7 +210,7 @@ describe('createRunShellJobProcess', () => {
     });
   });
 
-  it('starts workspace runtime jobs in the mapped workspace cwd', async () => {
+  it('starts bounded-host runtime jobs in the runtime cwd', async () => {
     const mutableState = {
       activeSession: {
         dir: '/tmp/test-session',
@@ -253,13 +253,12 @@ describe('createRunShellJobProcess', () => {
       resolveCompletion: vi.fn(),
       runtimeBinding: {
         schemaVersion: 1,
-        identity: { runtimeId: 'rt_workspace_job' },
+        identity: { runtimeId: 'rt_bounded_host_job' },
         agentPlacement: 'host',
         toolRuntime: {
-          type: 'workspace',
-          projectRoot: '/project',
-          workspaceRoot: process.cwd(),
-          cwd: '/project',
+          type: 'boundedHost',
+          root: process.cwd(),
+          cwd: process.cwd(),
         },
       },
     };

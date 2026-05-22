@@ -746,7 +746,7 @@ describe('JobManager', () => {
         schemaVersion: 1,
         identity: { runtimeId: 'rt_job_manager' },
         agentPlacement: 'host',
-        toolRuntime: { type: 'local', cwd: '/repo' },
+        toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
       };
 
       const result = await manager.createJob('delegate', {

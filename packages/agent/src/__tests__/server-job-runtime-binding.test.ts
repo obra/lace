@@ -77,7 +77,7 @@ describe('server job runtime binding persistence', () => {
       schemaVersion: 1,
       identity: { runtimeId: 'rt_server_job' },
       agentPlacement: 'host',
-      toolRuntime: { type: 'local', cwd: '/repo' },
+      toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
     };
 
     await registeredHandlers.deps!.startShellJob({

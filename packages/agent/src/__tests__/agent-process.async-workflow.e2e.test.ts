@@ -81,7 +81,7 @@ describe('async job workflow (E2E)', () => {
       runtimeBinding: {
         schemaVersion: 1,
         agentPlacement: 'host',
-        toolRuntime: { type: 'local' },
+        toolRuntime: { type: 'boundedHost', root: ctx.workDir, cwd: ctx.workDir },
       },
     });
   });
