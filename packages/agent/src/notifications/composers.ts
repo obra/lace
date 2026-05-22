@@ -153,6 +153,7 @@ export interface SubagentPendingAlarm {
   schedule: string; // human description of what this alarm was (cron expr, ISO, "every N min", "in N min")
   prompt: string;
   end_at_iso?: string; // formatted absolute time string for bounded recurring alarms
+  minutes?: number; // present when this is a once-relative alarm; renders as "N-minute timer"
 }
 
 export interface SubagentExitedCompose {
@@ -182,7 +183,11 @@ function formatPendingAlarm(a: SubagentPendingAlarm): string {
       desc = `was an interval alarm (${a.schedule})`;
       break;
     case 'once':
-      desc = `was a one-shot scheduled for ${a.schedule}`;
+      if (a.minutes !== undefined) {
+        desc = `was a ${a.minutes}-minute timer`;
+      } else {
+        desc = `was a one-shot scheduled for ${a.schedule}`;
+      }
       break;
   }
   const expiryClause = a.end_at_iso !== undefined ? ` (expiring at ${a.end_at_iso})` : '';

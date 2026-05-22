@@ -280,6 +280,40 @@ describe('composers', () => {
     );
   });
 
+  it('subagent-exited: once-relative renders "N-minute timer"', () => {
+    const body = composeSubagentExitedBody({
+      persona: 'sen-box',
+      pendingAlarms: [
+        { id: 'alarm_r1', kind: 'once', schedule: 'in 5 minutes', prompt: 'stretch', minutes: 5 },
+      ],
+    });
+    expect(body).toBe(
+      'Your sen-box subagent exited gracefully but had 1 pending alarm that won\'t fire now: alarm_r1 was a 5-minute timer with the prompt "stretch".'
+    );
+  });
+
+  it('subagent-exited: once-relative singular (1 minute) still hyphenated', () => {
+    const body = composeSubagentExitedBody({
+      persona: '',
+      pendingAlarms: [
+        { id: 'alarm_r2', kind: 'once', schedule: 'in 1 minute', prompt: 'now', minutes: 1 },
+      ],
+    });
+    expect(body).toContain('alarm_r2 was a 1-minute timer with the prompt "now".');
+  });
+
+  it('subagent-exited: once without minutes falls back to "one-shot scheduled for ..." wording', () => {
+    const body = composeSubagentExitedBody({
+      persona: 'sen-box',
+      pendingAlarms: [
+        { id: 'alarm_a1', kind: 'once', schedule: '2026-12-25T09:00:00Z', prompt: 'eggnog' },
+      ],
+    });
+    expect(body).toContain(
+      'alarm_a1 was a one-shot scheduled for 2026-12-25T09:00:00Z with the prompt "eggnog".'
+    );
+  });
+
   it('subagent-exited: interval with end_at_iso renders expiry in bullet list', () => {
     const body = composeSubagentExitedBody({
       persona: 'sen-box',

@@ -1962,6 +1962,7 @@ const SessionUpdatePendingAlarmsOnExitSchema = z
           prompt: NonEmptyStringSchema,
           next_fire_at_iso: NonEmptyStringSchema,
           end_at_iso: z.string().nullable(),
+          minutes: z.number().int().positive().optional(),
         })
         .strict()
     ),

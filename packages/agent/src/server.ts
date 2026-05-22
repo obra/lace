@@ -375,14 +375,20 @@ export async function emitSubagentExitedIfNeeded(state: AgentServerState): Promi
       sessionId: meta.sessionId,
       streamSeq: 0,
       type: 'pending_alarms_on_exit',
-      alarms: pending.map((r) => ({
-        id: r.id,
-        kind: r.kind,
-        schedule: describeSpecForExit(r),
-        prompt: r.prompt,
-        next_fire_at_iso: formatAbsoluteTime(r.next_fire_at, r.timezone),
-        end_at_iso: r.end_at !== null ? formatAbsoluteTime(r.end_at, r.timezone) : null,
-      })),
+      alarms: pending.map((r) => {
+        const base = {
+          id: r.id,
+          kind: r.kind,
+          schedule: describeSpecForExit(r),
+          prompt: r.prompt,
+          next_fire_at_iso: formatAbsoluteTime(r.next_fire_at, r.timezone),
+          end_at_iso: r.end_at !== null ? formatAbsoluteTime(r.end_at, r.timezone) : null,
+        };
+        if (r.spec.kind === 'once-relative') {
+          return { ...base, minutes: r.spec.minutes };
+        }
+        return base;
+      }),
     });
   } catch (err) {
     logger.warn('subagent.exit.notify_failed', {

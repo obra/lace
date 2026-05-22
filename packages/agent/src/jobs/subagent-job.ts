@@ -612,6 +612,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
               prompt: string;
               next_fire_at_iso: string;
               end_at_iso: string | null;
+              minutes?: number;
             } => {
               if (typeof a !== 'object' || a === null) return false;
               const rec = a as Record<string, unknown>;
@@ -621,7 +622,8 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
                 typeof rec.schedule === 'string' &&
                 typeof rec.prompt === 'string' &&
                 typeof rec.next_fire_at_iso === 'string' &&
-                (rec.end_at_iso === null || typeof rec.end_at_iso === 'string')
+                (rec.end_at_iso === null || typeof rec.end_at_iso === 'string') &&
+                (rec.minutes === undefined || typeof rec.minutes === 'number')
               );
             }
           )
@@ -631,6 +633,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
             schedule: a.schedule,
             prompt: a.prompt,
             ...(a.end_at_iso !== null ? { end_at_iso: a.end_at_iso } : {}),
+            ...(a.minutes !== undefined ? { minutes: a.minutes } : {}),
           }));
 
         if (pending.length === 0) return undefined;
