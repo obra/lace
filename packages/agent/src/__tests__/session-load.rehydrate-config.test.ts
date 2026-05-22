@@ -42,15 +42,14 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  function workspaceRuntimeBinding(cwd: string): RuntimeExecutionBinding {
+  function boundedHostRuntimeBinding(cwd: string): RuntimeExecutionBinding {
     return {
       schemaVersion: 1,
       identity: { runtimeId: 'rt_workspace_session' },
       agentPlacement: 'host',
       toolRuntime: {
-        type: 'workspace',
-        projectRoot: tempDir,
-        workspaceRoot: tempDir,
+        type: 'boundedHost',
+        root: tempDir,
         cwd,
       },
     };
@@ -61,7 +60,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       schemaVersion: 1,
       identity: { runtimeId: 'rt_container_agent_session' },
       agentPlacement: 'container',
-      toolRuntime: { type: 'local', cwd },
+      toolRuntime: { type: 'boundedHost', root: tempDir, cwd },
     };
   }
 
@@ -251,7 +250,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       schemaVersion: 1,
       identity: { runtimeId: 'rt_resume_inherited' },
       agentPlacement: 'host',
-      toolRuntime: { type: 'local', cwd: tempDir },
+      toolRuntime: { type: 'boundedHost', root: tempDir, cwd: tempDir },
     };
     const resumeState = createAgentServerState();
     const { client: resumeClient } = createPairedPeers((peer) =>
@@ -273,7 +272,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
   it('persists non-local runtimeBinding during session/new', async () => {
     const state = createAgentServerState();
     const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
-    const runtimeBinding = workspaceRuntimeBinding(tempDir);
+    const runtimeBinding = boundedHostRuntimeBinding(tempDir);
 
     await client.request('initialize', defaultInitializeParams());
 
@@ -305,7 +304,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     );
 
     await resumeClient.request('initialize', defaultInitializeParams());
-    const runtimeBinding = workspaceRuntimeBinding(tempDir);
+    const runtimeBinding = boundedHostRuntimeBinding(tempDir);
     await resumeClient.request('session/resume', {
       sessionId: created.sessionId,
       cwd: tempDir,
@@ -335,7 +334,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     );
 
     await loadClient.request('initialize', defaultInitializeParams());
-    const runtimeBinding = workspaceRuntimeBinding(tempDir);
+    const runtimeBinding = boundedHostRuntimeBinding(tempDir);
     await loadClient.request('session/load', {
       sessionId: created.sessionId,
       cwd: tempDir,
@@ -384,7 +383,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       cwd: tempDir,
       mcpServers: [],
     })) as { sessionId: string };
-    const storedRuntimeBinding = workspaceRuntimeBinding(tempDir);
+    const storedRuntimeBinding = boundedHostRuntimeBinding(tempDir);
     persistRuntimeBinding(created.sessionId, storedRuntimeBinding);
 
     const loadState = createAgentServerState();
@@ -421,7 +420,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       cwd: tempDir,
       mcpServers: [],
     })) as { sessionId: string };
-    const storedRuntimeBinding = workspaceRuntimeBinding(tempDir);
+    const storedRuntimeBinding = boundedHostRuntimeBinding(tempDir);
     persistRuntimeBinding(created.sessionId, storedRuntimeBinding);
 
     const resumeState = createAgentServerState();

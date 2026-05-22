@@ -7,7 +7,7 @@ import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
 import { defaultInitializeParams } from './helpers/initialize';
 import { loadSession, writeSessionState } from '../storage/session-store';
-import { buildDefaultLocalRuntimeBinding } from '../tools/runtime/validation';
+import { buildDefaultBoundedHostRuntimeBinding } from '../tools/runtime/validation';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
@@ -127,7 +127,7 @@ describe('session/fork durable history', () => {
       schemaVersion: 1,
       identity: { runtimeId: 'rt_source_session' },
       agentPlacement: 'host',
-      toolRuntime: { type: 'local', cwd: sourceCwd },
+      toolRuntime: { type: 'boundedHost', root: sourceCwd, cwd: sourceCwd },
     };
 
     try {
@@ -147,7 +147,7 @@ describe('session/fork durable history', () => {
         sourceRuntimeBinding
       );
       expect(loadSession(forked.sessionId).state.config?.runtimeBinding).toEqual(
-        buildDefaultLocalRuntimeBinding({ sessionId: forked.sessionId, cwd: forkedCwd })
+        buildDefaultBoundedHostRuntimeBinding({ sessionId: forked.sessionId, cwd: forkedCwd })
       );
     } finally {
       client.close();

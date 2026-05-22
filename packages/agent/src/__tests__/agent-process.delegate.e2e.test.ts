@@ -497,7 +497,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       expect(readSessionState(subagentSessionDir).config?.runtimeBinding).toMatchObject({
         schemaVersion: 1,
         agentPlacement: 'host',
-        toolRuntime: { type: 'local', cwd: ctx.workDir },
+        toolRuntime: { type: 'boundedHost', root: ctx.workDir, cwd: ctx.workDir },
       });
 
       // Verify ent/job/list returns the subagentSessionId

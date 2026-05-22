@@ -9,7 +9,7 @@ import type { ToolResult as CoreToolResult, ToolCall, ToolContext } from '@lace/
 import type { Tool } from '@lace/agent/tools/tool';
 import { createToolRuntimeFromBinding } from '@lace/agent/tools/runtime/factory';
 import { FileAccessTracker } from '@lace/agent/tools/runtime/file-access-tracker';
-import { buildDefaultLocalRuntimeBinding } from '@lace/agent/tools/runtime/validation';
+import { buildDefaultBoundedHostRuntimeBinding } from '@lace/agent/tools/runtime/validation';
 import type {
   RuntimeExecutionBinding,
   RuntimePath,
@@ -1047,7 +1047,7 @@ export class ConversationRunner {
     const runtime = this.createRuntime(runtimeBinding, envOverlay);
     const markRuntimeFileRead = (path: RuntimePath): void => {
       runtimeFileAccessTracker.markRead(path, runtime.paths.canonicalKey(path));
-      const hostPath = path.hostPath ?? (runtime.kind === 'local' ? path.runtimePath : undefined);
+      const hostPath = path.hostPath ?? (runtime.kind === 'host' ? path.runtimePath : undefined);
       if (hostPath) filesRead.add(isAbsolutePath(hostPath) ? hostPath : resolvePath(cwd, hostPath));
     };
 
@@ -1075,7 +1075,7 @@ export class ConversationRunner {
   private resolveActiveRuntimeBinding(cwd: string): RuntimeExecutionBinding {
     const runtimeBinding =
       this.config.runtimeBinding ??
-      buildDefaultLocalRuntimeBinding({
+      buildDefaultBoundedHostRuntimeBinding({
         sessionId: this.config.sessionId,
         cwd,
       });

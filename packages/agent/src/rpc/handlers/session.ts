@@ -44,7 +44,7 @@ import {
 } from '../session-config';
 import { cancelPendingPermissionRequests } from '../permissions';
 import {
-  buildDefaultLocalRuntimeBinding,
+  buildDefaultBoundedHostRuntimeBinding,
   parseRuntimeExecutionBinding,
 } from '../../tools/runtime/validation';
 import type { RuntimeExecutionBinding } from '../../tools/runtime/types';
@@ -181,14 +181,17 @@ async function activateStoredSession(
     }
     throw error;
   }
-  if (loaded.state.config?.runtimeBinding !== undefined) {
-    parseSessionRuntimeBinding(loaded.state.config.runtimeBinding);
-  }
+
+  const persistedRuntimeBinding =
+    loaded.state.config?.runtimeBinding !== undefined
+      ? parseSessionRuntimeBinding(loaded.state.config.runtimeBinding)
+      : undefined;
+  const activeRuntimeBinding = params.runtimeBinding ?? persistedRuntimeBinding;
 
   const loadedWithMcpServers = mergeMcpServersIntoLoadedSession(
     loaded,
     params.mcpServers,
-    params.runtimeBinding
+    activeRuntimeBinding
   );
   const switchingSessions =
     state.activeSession && state.activeSession.meta.sessionId !== params.sessionId;
@@ -518,7 +521,7 @@ export function registerSessionHandlers(
     const forkedSessionId = `sess_${randomUUID()}`;
     const created = new Date().toISOString();
     const forkedCwd = parsed.cwd ?? sourceSession.meta.workDir;
-    const runtimeBinding = buildDefaultLocalRuntimeBinding({
+    const runtimeBinding = buildDefaultBoundedHostRuntimeBinding({
       sessionId: forkedSessionId,
       cwd: forkedCwd,
     });
