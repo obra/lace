@@ -151,7 +151,7 @@ Effect:
 
 For a fire targeting THIS process's session: written directly into the session we're already in.
 
-For a `subagent-exited` notification written by a subagent process targeting its parent: the subagent's lace process has access to the host LACE_DIR (mounted), so `<parent.sessionId>/events.jsonl` is reachable. The parent lace process picks the event up via its runner's existing immediate-inject loop on the next turn. The subagent does not (and cannot) trigger the parent's internal-turn wake; it relies on the next external prompt or job-lifecycle wake reaching the parent.
+For a `subagent-exited` notification: the subagent never touches the parent's files. On graceful shutdown it emits a `session/update(pending_alarms_on_exit)` notification over its JSON-RPC peer; the parent's per-subagent relay composes the `<notification kind="subagent-exited" ...>` body in the parent's own process and appends a `context_injected priority='immediate'` event to the parent's events.jsonl under `runExclusive`. The parent lace process then picks the event up via its runner's existing immediate-inject loop on the next turn. The subagent does not (and cannot) trigger the parent's internal-turn wake; it relies on the next external prompt or job-lifecycle wake reaching the parent.
 
 #### Conversation runner watermark fix
 
@@ -235,21 +235,28 @@ When a subagent's lace process shuts down gracefully (SIGTERM during the shutdow
 1. Stop the scheduler loop (so no fires are in flight).
 2. Read `<own-sessionId>/alarms.json` from disk.
 3. If any rows have `status === 'pending'`:
-   - Look up `parent.sessionId` from this session's `meta.json`. If `meta.parent` is missing, skip (we're a top-level session — no one to notify).
-   - Build the `<notification kind="subagent-exited" ...>` wrapper locally via `buildNotification` and call **`ent/session/inject`** on the parent's JSON-RPC peer (the existing top-level peer, no new method) with `{ content: [{ type: 'text', text }], priority: 'immediate' }`. The request has a 2-second timeout; on timeout/error the subagent logs and drops the notification (best-effort delivery).
-4. Exit.
+   - Emit a one-way `session/update` notification on the JSON-RPC peer back to the parent with the `pending_alarms_on_exit` discriminant: `{ sessionId, streamSeq: 0, type: 'pending_alarms_on_exit', alarms: [...] }`. Each entry carries `id`, `kind`, `schedule`, `prompt`, and `next_fire_at_iso`. No `<notification>` wrapper is built on the subagent side — only structured data leaves the process.
+4. Close the peer; exit.
+
+The parent's per-subagent `session/update` relay in `packages/agent/src/jobs/subagent-job.ts` handles the new discriminant. In the parent's own process, the relay:
+
+1. Validates the structured `alarms` array.
+2. Composes the `<notification kind="subagent-exited" ...>` wrapper via `buildNotification` + `composeSubagentExitedBody`, using the parent's `job.subagentSessionId`, `job.jobId`, and `job.persona`.
+3. Appends a `context_injected` durable event with `priority='immediate'` to the parent's own `<sessionDir>/events.jsonl` under `runExclusive`, then forwards a `session/update(context_injected)` to the client on the top-level peer so the existing inject-observation path works unchanged.
 
 Pending alarms remain in the subagent's `alarms.json` but never fire — no scheduler is running for that session. This is documented as a known limitation (today's behavior is already to lose them).
 
-**Why RPC and not a direct cross-process file write?** Writing to the parent's `events.jsonl` from a different process races with the parent's own runner: both compute `nextEventSeq` from the same on-disk snapshot and write lines with the same seq. The parent's `ent/session/inject` handler runs the durable-event write under the parent runner's `runExclusive` mutex, so all writes to the parent session's `events.jsonl` serialize through one queue in one process. The same handler logic is registered twice — once on the top-level CLI peer (where external clients call `ent/session/inject`) and once on the per-subagent `childPeer` (where the subagent's own shutdown handler calls it). Both registrations share `injectIntoActiveSession`, which wraps the read/append/write/notify sequence in `runExclusive`.
+**Why session/update and not a direct cross-process file write?** Writing to the parent's `events.jsonl` from a different process races with the parent's own runner: both compute `nextEventSeq` from the same on-disk snapshot and write lines with the same seq. The parent's relay runs the durable-event write under the parent runner's `runExclusive` mutex, so all writes to the parent session's `events.jsonl` serialize through one queue in one process.
 
-The parent gives the subagent a window to deliver this RPC by reordering its job teardown: SIGTERM is sent **first**, then the parent waits up to 3 seconds for the child to exit, **then** it closes the JSON-RPC peer. The subagent's natural shutdown handler (run on its own SIGTERM signal handler) makes the `ent/session/inject` request back to the parent while the peer is still open. No new `prepare_shutdown` RPC is needed.
+**Why session/update and not a new RPC?** session/update is already the channel subagents use to push job lifecycle events, tool updates, text deltas, and context injections to the parent. The relay is already factored to dispatch on `type`; adding a new discriminant is a single branch instead of a new RPC method, schema, and handler-registration site.
 
-The intra-process variant of the same race — the `AlarmScheduler`'s notifier firing outside the runner's mutex — is closed by wrapping the scheduler's `injectNotification` call in `runExclusive` from `ensureAlarmSchedulerForActiveSession`. After this refactor, every writer to the parent's `events.jsonl` (runner, alarm scheduler, child-injected notifications) goes through the same `runExclusive` queue.
+The parent gives the subagent a window to deliver the notify by ordering its job teardown SIGTERM-first: SIGTERM is sent, the parent waits up to 3 seconds for the child to exit, **then** it closes the JSON-RPC peer. The subagent's natural shutdown handler (run on its own SIGTERM signal handler) emits the `session/update` while the peer is still open.
+
+The intra-process variant of the same race — the `AlarmScheduler`'s notifier firing outside the runner's mutex — is closed by wrapping the scheduler's `injectNotification` call in `runExclusive` from `ensureAlarmSchedulerForActiveSession`. The same `runExclusive` wrap was applied to the top-level `ent/session/inject` handler, which had a pre-existing intra-process race that the factored `injectIntoActiveSession` helper now closes. After this refactor, every writer to the parent's `events.jsonl` (runner, alarm scheduler, top-level inject handler, subagent-exit relay) goes through the same `runExclusive` queue.
 
 ### Architectural invariant
 
-**A lace process writes only to its own active session's files.** Cross-session effects — including a subagent dropping a notification into its parent's `events.jsonl` — go through RPC to the owning process, which writes under its `runExclusive` mutex. No code path writes `events.jsonl`, `alarms.json`, `meta.json`, or `state.json` of a session it does not own. The single auditable point of entry for the parent's events.jsonl writes is `injectIntoActiveSession` (for inject events) + the runner + the alarm scheduler — all three serialized through one mutex.
+**A lace process writes only to its own active session's files.** Cross-session effects — including a subagent informing its parent of unfireable alarms on exit — flow through `session/update` from the subagent to the parent, which the parent's relay translates into local writes in its own process under its `runExclusive` mutex. No subagent writes `events.jsonl`, `alarms.json`, `meta.json`, or `state.json` of a session it does not own.
 
 Crash exit (uncaught exception, SIGKILL, OOM, host kill) does not notify. The parent learns via the existing job-lifecycle path (`job-failed` notification fires when the parent's job-manager detects the subagent process died).
 

@@ -11,7 +11,7 @@ import {
 } from '@lace/agent/storage/session-store';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
-import { injectIntoActiveSession } from '@lace/agent/rpc/handlers/session-operations';
+import { buildNotification, composeSubagentExitedBody } from '@lace/agent/notifications';
 import { getJobOutputPath } from './job-file-utils';
 import {
   applyEffectiveJobConfig,
@@ -101,10 +101,10 @@ export interface SubagentJobDependencies {
    */
   runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null };
   /**
-   * Top-level CLI peer for the parent process. The `ent/session/inject`
-   * handler registered on the per-subagent `childPeer` notifies session/update
-   * on this peer, not the childPeer — clients observe inject events on the
-   * same connection they use to drive the parent.
+   * Top-level CLI peer for the parent process. The per-subagent
+   * `session/update` relay uses it to forward the parent's own
+   * `session/update(context_injected)` notification to clients when the
+   * relay translates a `pending_alarms_on_exit` update into a local inject.
    */
   topLevelPeer: JsonRpcPeer;
 }
@@ -590,6 +590,94 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         return undefined;
       }
 
+      // Subagent → parent: on graceful exit, the subagent notifies its peer
+      // about alarms that were still pending. We compose the
+      // <notification kind="subagent-exited"> body here (in the parent's own
+      // process, using the parent's composers) and append it as a
+      // context_injected priority='immediate' event to the parent's
+      // events.jsonl under runExclusive. The subagent never writes the
+      // parent's files directly — architectural invariant.
+      if (type === 'pending_alarms_on_exit') {
+        const alarmsParam = p.alarms;
+        if (!Array.isArray(alarmsParam)) return undefined;
+
+        const pending = alarmsParam
+          .filter(
+            (
+              a
+            ): a is {
+              id: string;
+              kind: 'cron' | 'once';
+              schedule: string;
+              prompt: string;
+              next_fire_at_iso: string;
+            } => {
+              if (typeof a !== 'object' || a === null) return false;
+              const rec = a as Record<string, unknown>;
+              return (
+                typeof rec.id === 'string' &&
+                (rec.kind === 'cron' || rec.kind === 'once') &&
+                typeof rec.schedule === 'string' &&
+                typeof rec.prompt === 'string' &&
+                typeof rec.next_fire_at_iso === 'string'
+              );
+            }
+          )
+          .map((a) => ({ id: a.id, kind: a.kind, schedule: a.schedule, prompt: a.prompt }));
+
+        if (pending.length === 0) return undefined;
+
+        const subagentSessionId = job.subagentSessionId ?? '';
+        const personaName = job.persona ?? '';
+        const text = buildNotification({
+          kind: 'subagent-exited',
+          identifiers: {
+            'subagent-session-id': subagentSessionId,
+            'job-id': job.jobId,
+            persona: personaName,
+          },
+          body: composeSubagentExitedBody({
+            persona: personaName,
+            pendingAlarms: pending,
+          }),
+        });
+
+        await runExclusive(() => {
+          const currentState = getState();
+          if (!currentState.activeSession) return;
+          let sessionState = readSessionState(currentState.activeSession.dir);
+          const { nextState } = appendDurableEvent(currentState.activeSession.dir, sessionState, {
+            type: 'context_injected',
+            data: {
+              content: [{ type: 'text', text }],
+              priority: 'immediate',
+            },
+          });
+          sessionState = nextState;
+          writeSessionState(currentState.activeSession.dir, sessionState);
+
+          // Forward a session/update(context_injected) to the client on the
+          // top-level peer so the existing inject-observation path works
+          // unchanged (matches injectIntoActiveSession's behaviour).
+          topLevelPeer.notify('session/update', {
+            sessionId: currentState.activeSession.meta.sessionId,
+            streamSeq: sessionState.nextStreamSeq,
+            type: 'context_injected',
+            priority: 'immediate',
+            messageCount: 0,
+          });
+          writeSessionState(currentState.activeSession.dir, {
+            ...sessionState,
+            nextStreamSeq: sessionState.nextStreamSeq + 1,
+          });
+
+          const updatedState = getState();
+          updatedState.activeSession = loadSession(currentState.activeSession.meta.sessionId);
+        });
+
+        return undefined;
+      }
+
       return undefined;
     });
 
@@ -638,31 +726,6 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       }
 
       return { decision: decision.decision ?? 'deny', updatedInput: decision.updatedInput };
-    });
-
-    // Subagent → parent: write a `context_injected` event into the parent's
-    // events.jsonl. Reuses the same handler logic as the top-level peer's
-    // ent/session/inject, which wraps the read/append/write/notify sequence
-    // in runExclusive — so eventSeq serializes with the parent runner's own
-    // appends and with the alarm scheduler's writes. The session/update
-    // notification fires on the top-level peer so clients observe the inject
-    // on their existing connection.
-    childPeer.onRequest('ent/session/inject', async (params) => {
-      const parsed = params as {
-        content: unknown[];
-        priority: 'immediate' | 'normal' | 'deferred';
-      };
-      const priority =
-        parsed?.priority === 'immediate' ||
-        parsed?.priority === 'normal' ||
-        parsed?.priority === 'deferred'
-          ? parsed.priority
-          : 'normal';
-      await injectIntoActiveSession(getState(), topLevelPeer, runExclusive, {
-        content: Array.isArray(parsed?.content) ? parsed.content : [],
-        priority,
-      });
-      return undefined;
     });
 
     try {
@@ -824,12 +887,13 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         stderr: stderrBuffer.trim() || undefined,
       });
     } finally {
-      // SIGTERM first, close the JSON-RPC channel after the child has exited.
-      // The subagent's natural shutdown handler runs emitSubagentExitedIfNeeded
-      // and makes an `ent/session/inject` request back to us over the
-      // still-open childPeer — closing the peer before SIGTERM would orphan
-      // that pre-exit RPC. Bounded waits prevent a misbehaving subagent from
-      // stalling job teardown.
+      // SIGTERM first, then close the JSON-RPC channel after the child has
+      // exited. The subagent's natural shutdown handler runs
+      // emitSubagentExitedIfNeeded, which emits a one-way `session/update`
+      // notification over the still-open childPeer carrying the
+      // `pending_alarms_on_exit` discriminant. Closing the peer before the
+      // subagent finishes would drop those bytes. Bounded waits prevent a
+      // misbehaving subagent from stalling job teardown.
       if (subagentProc && subagentProc.exitCode === null) {
         try {
           subagentProc.kill('SIGTERM');
@@ -841,8 +905,8 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         }
 
         // Wait up to 3 seconds for graceful exit. The subagent gets this
-        // window to fire pre-exit RPCs (subagent-exited notification) before
-        // we tear down its peer.
+        // window to emit its `pending_alarms_on_exit` notify before we tear
+        // down its peer.
         await Promise.race([
           subagentProc.wait().then(() => undefined),
           new Promise<void>((resolve) => setTimeout(resolve, 3_000)),

@@ -40,12 +40,7 @@ import { requestPermissionFromClient, reissuePendingPermissionRequests } from '.
 import { registerAllHandlers } from './rpc/register-handlers';
 import { AlarmScheduler } from './alarms/alarm-scheduler';
 import { AlarmStore } from './alarms/alarm-store';
-import {
-  injectNotification,
-  buildNotification,
-  composeAlarmFiredBody,
-  composeSubagentExitedBody,
-} from './notifications';
+import { injectNotification, composeAlarmFiredBody } from './notifications';
 import { logger } from './utils/logger';
 
 // Re-export public API from message-builder for backwards compatibility
@@ -235,17 +230,24 @@ export async function shutdownAlarms(state: AgentServerState): Promise<void> {
 }
 
 /**
- * On graceful subagent shutdown, ask the PARENT agent (via the existing
- * JSON-RPC peer connection) to record a `subagent-exited` notification in
- * its events.jsonl if the subagent still has pending alarms that won't
- * fire now. The subagent builds the `<notification>` wrapper locally and
- * sends it as content via the standard `ent/session/inject` RPC; the
- * parent's handler runs the durable-event write under its `runExclusive`
- * mutex, serializing with the parent runner's own appends.
+ * On graceful subagent shutdown, tell the PARENT (via the existing JSON-RPC
+ * peer connection) about any alarms that were still pending when this
+ * subagent exited. We emit a one-way `session/update` notification with the
+ * `pending_alarms_on_exit` discriminant — pure structured data, no wrapper
+ * text. The parent's per-subagent `session/update` relay
+ * (`childPeer.onRequest('session/update', ...)` in `jobs/subagent-job.ts`)
+ * composes the `<notification kind="subagent-exited">` body in its own
+ * process and appends it as a `context_injected priority='immediate'` event
+ * to its own `events.jsonl` under its `runExclusive` mutex.
  *
- * Best-effort: 2s timeout; on timeout or error we log and drop. The brief
- * documents subagent-exited as best-effort delivery. The parent reorders
- * its teardown (SIGTERM-then-close-pipe) so this RPC has time to land.
+ * This preserves the architectural invariant: a lace process writes only to
+ * its own active session's files. Cross-session effects flow through
+ * `session/update` to the owning process.
+ *
+ * Best-effort: notify is fire-and-forget. If the peer is already closed
+ * (non-graceful exit), the call is a no-op. The parent's teardown waits up
+ * to 3s for the subagent to exit before closing the JSON-RPC channel, so a
+ * graceful shutdown notify has time to flush.
  */
 export async function emitSubagentExitedIfNeeded(state: AgentServerState): Promise<void> {
   if (!state.activeSession) return;
@@ -261,39 +263,21 @@ export async function emitSubagentExitedIfNeeded(state: AgentServerState): Promi
     });
     return;
   }
-  const text = buildNotification({
-    kind: 'subagent-exited',
-    identifiers: {
-      'subagent-session-id': meta.sessionId,
-      'job-id': meta.parent.jobId,
-      persona: meta.parent.personaName ?? '',
-    },
-    body: composeSubagentExitedBody({
-      persona: meta.parent.personaName ?? '',
-      pendingAlarms: pending.map((r) => ({
+  try {
+    state.peer.notify('session/update', {
+      sessionId: meta.sessionId,
+      streamSeq: 0,
+      type: 'pending_alarms_on_exit',
+      alarms: pending.map((r) => ({
         id: r.id,
         kind: r.kind,
         schedule: r.schedule,
         prompt: r.prompt,
+        next_fire_at_iso: new Date(r.next_fire_at).toISOString(),
       })),
-    }),
-  });
-  try {
-    const requestPromise = state.peer.request('ent/session/inject', {
-      content: [{ type: 'text', text }],
-      priority: 'immediate',
     });
-    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutHandle = setTimeout(() => reject(new Error('inject timeout')), 2_000);
-    });
-    try {
-      await Promise.race([requestPromise, timeoutPromise]);
-    } finally {
-      if (timeoutHandle) clearTimeout(timeoutHandle);
-    }
   } catch (err) {
-    logger.warn('subagent.exit.inject_failed', {
+    logger.warn('subagent.exit.notify_failed', {
       sessionId: meta.sessionId,
       parentSessionId: meta.parent.sessionId,
       error: err instanceof Error ? err.message : String(err),

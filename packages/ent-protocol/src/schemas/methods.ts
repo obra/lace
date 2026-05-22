@@ -1944,6 +1944,32 @@ const SessionUpdateSessionChangedSchema = z
   .strict();
 export type SessionUpdateSessionChanged = z.infer<typeof SessionUpdateSessionChangedSchema>;
 
+// Pending alarms on graceful subagent exit. The subagent emits this on its
+// JSON-RPC peer immediately before shutting down; the parent's per-subagent
+// session/update relay composes the <notification kind="subagent-exited">
+// wrapper in its own process and appends it as a context_injected event to
+// the parent's own events.jsonl under runExclusive. No subagent writes the
+// parent's files directly.
+const SessionUpdatePendingAlarmsOnExitSchema = z
+  .object({
+    type: z.literal('pending_alarms_on_exit'),
+    alarms: z.array(
+      z
+        .object({
+          id: NonEmptyStringSchema,
+          kind: z.enum(['cron', 'once']),
+          schedule: NonEmptyStringSchema,
+          prompt: NonEmptyStringSchema,
+          next_fire_at_iso: NonEmptyStringSchema,
+        })
+        .strict()
+    ),
+  })
+  .strict();
+export type SessionUpdatePendingAlarmsOnExit = z.infer<
+  typeof SessionUpdatePendingAlarmsOnExitSchema
+>;
+
 const SessionUpdateBaseParamsSchema = z
   .object({
     sessionId: SessionIdSchema,
@@ -1975,6 +2001,7 @@ const SessionUpdateInnerNonJobSchema = z.discriminatedUnion('type', [
   SessionUpdateContextWindowSchema,
   SessionUpdateErrorSchema,
   SessionUpdateSessionChangedSchema,
+  SessionUpdatePendingAlarmsOnExitSchema,
 ]);
 
 const SessionUpdateJobUpdateSchema = z
@@ -2012,6 +2039,7 @@ const _SessionUpdateInnerSchema = z.discriminatedUnion('type', [
   SessionUpdateContextWindowSchema,
   SessionUpdateErrorSchema,
   SessionUpdateSessionChangedSchema,
+  SessionUpdatePendingAlarmsOnExitSchema,
 ]);
 
 const SessionUpdateParamsSchema = z.discriminatedUnion('type', [
@@ -2038,6 +2066,7 @@ const SessionUpdateParamsSchema = z.discriminatedUnion('type', [
   SessionUpdateBaseParamsSchema.merge(SessionUpdateContextWindowSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateErrorSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateSessionChangedSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdatePendingAlarmsOnExitSchema),
 ]);
 
 export const SessionUpdateNotificationSchema = z
