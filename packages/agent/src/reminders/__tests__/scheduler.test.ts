@@ -1,6 +1,7 @@
 // ABOUTME: Tests for ReminderScheduler fire path (Task 5).
 // ABOUTME: Covers one-shot delete, count-interval reschedule/terminal,
 // ABOUTME: cron reschedule, notifier failure, and persist failure recovery.
+// ABOUTME: Also covers schedule/cancel/list APIs (Task 7).
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync } from 'node:fs';
@@ -411,5 +412,176 @@ describe('ReminderScheduler boot recovery', () => {
     await sched.stop();
 
     expect(saveCount).toBe(1);
+  });
+});
+
+describe('ReminderScheduler schedule', () => {
+  const origTZ = process.env.TZ;
+  beforeEach(() => { process.env.TZ = 'UTC'; });
+  afterEach(() => { process.env.TZ = origTZ; });
+
+  it('persists a one-shot row, returns id and next_fire_at', async () => {
+    const dir = tempSessionDir();
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 1_700_000_000_000,
+      notifier: async () => {},
+    });
+    await sched.start();
+
+    const result = await sched.schedule({
+      prompt: 'follow up',
+      delaySeconds: 300,
+      recurs: null,
+    });
+
+    expect(result.id).toMatch(/^reminder_[0-9a-f]{12}$/);
+    expect(result.row.next_fire_at).toBe(1_700_000_000_000 + 300_000);
+    expect(result.row.recurs).toBe(null);
+    expect(new ReminderStore(dir).list()).toHaveLength(1);
+
+    await sched.stop();
+  });
+
+  it('persists a cron row, computes initial next_fire_at', async () => {
+    process.env.TZ = 'UTC';
+    const now = new Date('2026-05-22T08:00:00Z').getTime();
+    const dir = tempSessionDir();
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => now,
+      notifier: async () => {},
+    });
+    await sched.start();
+
+    const result = await sched.schedule({
+      prompt: 'daily',
+      delaySeconds: null,
+      recurs: { kind: 'cron', expr: '0 9 * * *' },
+    });
+
+    expect(result.row.next_fire_at).toBe(new Date('2026-05-22T09:00:00Z').getTime());
+    await sched.stop();
+  });
+
+  it('rejects schedule when over the 50-cap', async () => {
+    const dir = tempSessionDir();
+    const store = new ReminderStore(dir);
+    const rows: ReminderRow[] = [];
+    for (let i = 0; i < 50; i++) {
+      rows.push({
+        id: `reminder_${i.toString(16).padStart(12, '0')}`,
+        created_at: 0,
+        next_fire_at: 10_000_000_000 + i,
+        prompt: 'p',
+        recurs: null,
+        fired_at: null,
+        fire_count: 0,
+      });
+    }
+    store.save(rows);
+
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 0,
+      notifier: async () => {},
+    });
+    await sched.start();
+    await expect(
+      sched.schedule({ prompt: 'one more', delaySeconds: 300, recurs: null })
+    ).rejects.toThrow(/over the 50-active cap/i);
+    await sched.stop();
+  });
+});
+
+describe('ReminderScheduler cancel', () => {
+  beforeEach(() => { process.env.TZ = 'UTC'; });
+
+  it('deletes a pending row and returns cancelled:true', async () => {
+    const dir = tempSessionDir();
+    const row = makeRow({ id: 'reminder_111111111111', next_fire_at: 10_000_000_000 });
+    new ReminderStore(dir).save([row]);
+
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 0,
+      notifier: async () => {},
+    });
+    await sched.start();
+
+    const result = await sched.cancel('reminder_111111111111');
+    expect(result).toEqual({ cancelled: true });
+    expect(new ReminderStore(dir).list()).toEqual([]);
+    await sched.stop();
+  });
+
+  it('returns not_found for unknown ids', async () => {
+    const sched = new ReminderScheduler({
+      sessionDir: tempSessionDir(),
+      now: () => 0,
+      notifier: async () => {},
+    });
+    await sched.start();
+    const result = await sched.cancel('reminder_does_not_exist');
+    expect(result).toEqual({ cancelled: false, reason: 'not_found' });
+    await sched.stop();
+  });
+
+  it('returns persist_failed when store.save throws; heap and disk unchanged', async () => {
+    const dir = tempSessionDir();
+    const row = makeRow({ id: 'reminder_777777777777', next_fire_at: 10_000_000_000 });
+    new ReminderStore(dir).save([row]);
+
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 0,
+      notifier: async () => {},
+    });
+    await sched.start();
+
+    // Force save to throw on next call.
+    const origSave = sched.store.save.bind(sched.store);
+    let calls = 0;
+    sched.store.save = ((rows: ReminderRow[]) => {
+      calls++;
+      if (calls === 1) throw new Error('disk full');
+      return origSave(rows);
+    }) as typeof origSave;
+
+    const result = await sched.cancel('reminder_777777777777');
+    expect(result).toEqual({ cancelled: false, reason: 'persist_failed' });
+
+    // Disk row still present (write failed).
+    expect(new ReminderStore(dir).list()).toHaveLength(1);
+    expect(new ReminderStore(dir).list()[0].id).toBe('reminder_777777777777');
+
+    await sched.stop();
+  });
+});
+
+describe('ReminderScheduler list', () => {
+  beforeEach(() => { process.env.TZ = 'UTC'; });
+
+  it('returns all current rows sorted by next_fire_at ascending', async () => {
+    const dir = tempSessionDir();
+    new ReminderStore(dir).save([
+      makeRow({ id: 'reminder_222222222222', next_fire_at: 2000 }),
+      makeRow({ id: 'reminder_111111111111', next_fire_at: 1000 }),
+      makeRow({ id: 'reminder_333333333333', next_fire_at: 3000 }),
+    ]);
+
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 0,
+      notifier: async () => {},
+    });
+    await sched.start();
+    const rows = await sched.list();
+    expect(rows.map((r) => r.id)).toEqual([
+      'reminder_111111111111',
+      'reminder_222222222222',
+      'reminder_333333333333',
+    ]);
+    await sched.stop();
   });
 });

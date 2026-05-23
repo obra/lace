@@ -3,10 +3,12 @@
 // ABOUTME: is one atomic write per fire; cancel and schedule serialize via the mutex.
 
 import { CronExpressionParser } from 'cron-parser';
+import { randomUUID } from 'node:crypto';
 import { AsyncMutex } from './async-mutex';
 import { ReminderStore } from './store';
 import { computeNextCronFire, getAgentTimezone } from './cron';
-import type { ReminderRow } from './types';
+import type { ReminderRecurs, ReminderRow } from './types';
+import { MAX_ACTIVE_REMINDERS } from './types';
 import { logger } from '@lace/agent/utils/logger';
 
 /**
@@ -64,6 +66,23 @@ export interface SchedulerDeps {
   onError?: (err: unknown) => void;
 }
 
+export interface ScheduleInput {
+  prompt: string;
+  /** seconds-from-now to first fire, or null for cron-driven. */
+  delaySeconds: number | null;
+  /** null for one-shot; cron string; or { kind:'count', interval_ms, remaining }. */
+  recurs: ReminderRecurs;
+}
+
+export interface ScheduleResult {
+  id: string;
+  row: ReminderRow;
+}
+
+export type CancelResult =
+  | { cancelled: true }
+  | { cancelled: false; reason: 'not_found' | 'persist_failed' };
+
 interface HeapEntry {
   id: string;
   nextFireAt: number;
@@ -117,6 +136,69 @@ export class ReminderScheduler {
     for (const id of due) {
       await this.fire(id);
     }
+  }
+
+  // ============================================================
+  // Public action handlers — schedule / cancel / list.
+  // ============================================================
+
+  async schedule(input: ScheduleInput): Promise<ScheduleResult> {
+    return this.mutex.runExclusive(async () => {
+      const rows = this.store.list();
+      if (rows.length >= MAX_ACTIVE_REMINDERS) {
+        throw new Error(
+          `Cannot schedule: ${rows.length} reminders are currently pending (over the ${MAX_ACTIVE_REMINDERS}-active cap). Call manage_reminders({action:"list"}) to see them and cancel ones you no longer need.`
+        );
+      }
+      const id = `reminder_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+      const now = this.now();
+      let nextFireAt: number;
+      if (input.recurs && input.recurs.kind === 'cron') {
+        const tz = getAgentTimezone();
+        nextFireAt = computeNextCronFire(input.recurs.expr, tz, new Date(now));
+      } else if (input.delaySeconds !== null) {
+        nextFireAt = now + input.delaySeconds * 1000;
+      } else {
+        throw new Error('schedule requires `delaySeconds` or `recurs:cron`');
+      }
+      const newRow: ReminderRow = {
+        id,
+        created_at: now,
+        next_fire_at: nextFireAt,
+        prompt: input.prompt,
+        recurs: input.recurs,
+        fired_at: null,
+        fire_count: 0,
+      };
+      this.store.save([...rows, newRow]);
+      this.heap.push({ id, nextFireAt });
+      this.heap.sort((a, b) => a.nextFireAt - b.nextFireAt);
+      this.rescheduleNextTick();
+      return { id, row: newRow };
+    });
+  }
+
+  async cancel(id: string): Promise<CancelResult> {
+    return this.mutex.runExclusive(async () => {
+      const rows = this.store.list();
+      const idx = rows.findIndex((r) => r.id === id);
+      if (idx < 0) return { cancelled: false, reason: 'not_found' } as CancelResult;
+      const nextRows = [...rows.slice(0, idx), ...rows.slice(idx + 1)];
+      try {
+        this.store.save(nextRows);
+      } catch {
+        return { cancelled: false, reason: 'persist_failed' } as CancelResult;
+      }
+      this.heap = this.heap.filter((e) => e.id !== id);
+      this.rescheduleNextTick();
+      return { cancelled: true } as CancelResult;
+    });
+  }
+
+  /** Read-only; does NOT acquire the mutex (POSIX rename atomicity). */
+  async list(): Promise<ReminderRow[]> {
+    const rows = this.store.list();
+    return [...rows].sort((a, b) => a.next_fire_at - b.next_fire_at);
   }
 
   // ============================================================
