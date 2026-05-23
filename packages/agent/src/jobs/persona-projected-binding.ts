@@ -33,10 +33,15 @@ export function buildPersonaProjectedRuntimeBinding(input: {
   personaName: string;
   runtime: PersonaContainerRuntime;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
+  // Required for per_invocation; ignored for persistent.
+  childSessionId?: string;
+  scratchDirHostPath?: string;
 }): RuntimeExecutionBinding {
   const spec = buildPersonaContainerSpec({
     parentSessionId: input.parentSessionId,
     personaName: input.personaName,
+    childSessionId: input.childSessionId,
+    scratchDirHostPath: input.scratchDirHostPath,
     runtime: input.runtime,
     containerMounts: input.containerMounts,
   });
@@ -51,6 +56,10 @@ export function buildPersonaProjectedRuntimeBinding(input: {
       cwd: input.runtime.workingDirectory,
       helper: resolveRuntimeHelperDescriptor(),
     },
+    // Tag the binding with the lifecycle so post-exit handlers (Chunk E) can
+    // branch on per_invocation vs persistent without inspecting toolRuntime
+    // internals (PRI-1796).
+    containerSharing: input.runtime.containerSharing,
   };
 
   return {

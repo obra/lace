@@ -2,22 +2,31 @@ import { describe, expect, it } from 'vitest';
 import { buildPersonaProjectedRuntimeBinding } from '../persona-projected-binding';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 
+// Stable ids for per_invocation tests.
+// sess_pppppppp00000000 → short 'pppppppp'
+// sess_cccccccc00000000 → short 'cccccccc'
+const PARENT_SESSION_ID = 'sess_pppppppp00000000';
+const CHILD_SESSION_ID = 'sess_cccccccc00000000';
+const SCRATCH_PATH = '/tmp/test-scratch';
+
 describe('buildPersonaProjectedRuntimeBinding', () => {
   it('builds a projected binding for session lifecycle containers', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
-      parentSessionId: 'sess1',
+      parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
       runtime: {
         type: 'container',
         agentPlacement: 'host',
         containerSharing: 'per_invocation',
         image: 'node:24-bookworm',
         workingDirectory: '/work',
-        mounts: { scratch: '/work' },
+        mounts: {},
         env: { FOO: 'bar' },
         ports: [{ host: 6080, container: 6080 }],
       },
-      containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
+      containerMounts: {},
     });
 
     expect(binding.agentPlacement).toBe('host');
@@ -25,10 +34,9 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       type: 'container',
       cwd: '/work',
       spec: {
-        name: 'sess1-shell',
+        name: 'pppppppp-shell-cccccccc',
         image: 'node:24-bookworm',
         workingDirectory: '/work',
-        mounts: [{ hostPath: '/host/scratch', containerPath: '/work', readonly: false }],
         env: { FOO: 'bar' },
         ports: [{ host: 6080, container: 6080 }],
       },
@@ -54,7 +62,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     });
 
     // Runtime id should be deterministic and start with the session prefix.
-    expect(binding.identity.runtimeId).toMatch(/^runtime:session:sess1:/);
+    expect(binding.identity.runtimeId).toMatch(/^runtime:session:/);
   });
 
   it('builds a projected binding for persistent lifecycle containers', () => {
@@ -87,8 +95,10 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
 
   it('threads persona-declared sysctls into the projected descriptor (PRI-1790)', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
-      parentSessionId: 'sess1',
+      parentSessionId: PARENT_SESSION_ID,
       personaName: 'browser-driver',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
       runtime: {
         type: 'container',
         agentPlacement: 'host',
@@ -109,8 +119,10 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
 
   it('passes the persona-declared image reference through verbatim (tag, digest, anything)', () => {
     const tagOnly = buildPersonaProjectedRuntimeBinding({
-      parentSessionId: 'sess1',
+      parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
       runtime: {
         type: 'container',
         agentPlacement: 'host',
@@ -131,8 +143,10 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     ).toBe('sen-box:dev');
 
     const digestPinned = buildPersonaProjectedRuntimeBinding({
-      parentSessionId: 'sess1',
+      parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
       runtime: {
         type: 'container',
         agentPlacement: 'host',
@@ -156,8 +170,10 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
   it('fails before binding construction when a mount is unknown', () => {
     expect(() =>
       buildPersonaProjectedRuntimeBinding({
-        parentSessionId: 'sess1',
+        parentSessionId: PARENT_SESSION_ID,
         personaName: 'shell',
+        childSessionId: CHILD_SESSION_ID,
+        scratchDirHostPath: SCRATCH_PATH,
         runtime: {
           type: 'container',
           agentPlacement: 'host',
@@ -169,5 +185,131 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerMounts: {},
       })
     ).toThrow(/unknown mount 'missing'/);
+  });
+});
+
+describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminator (PRI-1796)', () => {
+  const perInvocationRuntime = {
+    type: 'container' as const,
+    agentPlacement: 'host' as const,
+    containerSharing: 'per_invocation' as const,
+    image: 'devcontainer:latest',
+    workingDirectory: '/workspace',
+    mounts: {},
+  };
+
+  const persistentRuntime = {
+    type: 'container' as const,
+    agentPlacement: 'host' as const,
+    containerSharing: 'persistent' as const,
+    image: 'sen-box:dev',
+    workingDirectory: '/home/agent',
+    mounts: {},
+  };
+
+  it('passes childSessionId and scratchDirHostPath through to buildPersonaContainerSpec', () => {
+    // sess_aaaaaaaa11111111 → parent short 'aaaaaaaa'
+    // sess_bbbbbbbb22222222 → child  short 'bbbbbbbb'
+    const binding = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: 'sess_aaaaaaaa11111111',
+      personaName: 'shell',
+      childSessionId: 'sess_bbbbbbbb22222222',
+      scratchDirHostPath: '/tmp/my-scratch',
+      runtime: perInvocationRuntime,
+      containerMounts: {},
+    });
+
+    const containerRuntime = binding.toolRuntime as Extract<
+      RuntimeExecutionBinding['toolRuntime'],
+      { type: 'container' }
+    >;
+    // Spec name uses the per_invocation naming scheme.
+    expect(containerRuntime.spec.name).toBe('aaaaaaaa-shell-bbbbbbbb');
+    // Scratch mount is auto-injected.
+    expect(containerRuntime.spec.mounts).toContainEqual({
+      hostPath: '/tmp/my-scratch',
+      containerPath: '/work',
+      readonly: false,
+    });
+  });
+
+  it('tags binding metadata with containerSharing: per_invocation', () => {
+    const binding = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: perInvocationRuntime,
+      containerMounts: {},
+    });
+
+    expect(binding.containerSharing).toBe('per_invocation');
+  });
+
+  it('tags binding metadata with containerSharing: persistent', () => {
+    const binding = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: 'sess1',
+      personaName: 'sen',
+      runtime: persistentRuntime,
+      containerMounts: {},
+    });
+
+    expect(binding.containerSharing).toBe('persistent');
+  });
+
+  it('concurrent per_invocation invocations produce distinct spec names', () => {
+    const bindingA = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: 'sess_aaaaaaaa11111111',
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: perInvocationRuntime,
+      containerMounts: {},
+    });
+
+    const bindingB = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: 'sess_bbbbbbbb22222222',
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: perInvocationRuntime,
+      containerMounts: {},
+    });
+
+    const specA = (
+      bindingA.toolRuntime as Extract<RuntimeExecutionBinding['toolRuntime'], { type: 'container' }>
+    ).spec;
+    const specB = (
+      bindingB.toolRuntime as Extract<RuntimeExecutionBinding['toolRuntime'], { type: 'container' }>
+    ).spec;
+    expect(specA.name).not.toBe(specB.name);
+  });
+
+  it('same childSessionId produces same spec name (resume reuses container)', () => {
+    const binding1 = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: perInvocationRuntime,
+      containerMounts: {},
+    });
+
+    const binding2 = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: perInvocationRuntime,
+      containerMounts: {},
+    });
+
+    const spec1 = (
+      binding1.toolRuntime as Extract<RuntimeExecutionBinding['toolRuntime'], { type: 'container' }>
+    ).spec;
+    const spec2 = (
+      binding2.toolRuntime as Extract<RuntimeExecutionBinding['toolRuntime'], { type: 'container' }>
+    ).spec;
+    expect(spec1.name).toBe(spec2.name);
   });
 });

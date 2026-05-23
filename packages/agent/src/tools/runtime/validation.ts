@@ -74,6 +74,9 @@ const RuntimeExecutionBindingSchema = z
       BoundedHostRuntimeDescriptorSchema,
       ContainerRuntimeDescriptorSchema,
     ]),
+    // Present on persona container bindings; absent on host/bounded-host bindings.
+    // Lets post-exit handlers branch on lifecycle without inspecting toolRuntime (PRI-1796).
+    containerSharing: z.enum(['per_invocation', 'persistent']).optional(),
   })
   .strict();
 

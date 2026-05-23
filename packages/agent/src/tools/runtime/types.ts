@@ -71,6 +71,10 @@ export interface RuntimeExecutionBinding {
   identity: RuntimeBindingIdentity;
   toolRuntime: ToolRuntimeDescriptor;
   agentPlacement: AgentPlacement;
+  // Present on persona container bindings; absent on host/bounded-host bindings.
+  // Lets post-exit handlers (Chunk E) branch on lifecycle without inspecting
+  // toolRuntime internals (PRI-1796).
+  containerSharing?: 'per_invocation' | 'persistent';
 }
 
 export interface RuntimePath {
