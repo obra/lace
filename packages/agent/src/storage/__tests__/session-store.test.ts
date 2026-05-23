@@ -16,6 +16,7 @@ import {
   getSessionDir,
   listSessions,
   loadSession,
+  readSessionMeta,
   readSessionState,
   writeSessionMeta,
   writeSessionState,
@@ -233,6 +234,36 @@ describe('storage/session-store', () => {
         updatedAt: '2026-01-04T00:00:03Z',
       },
     ]);
+  });
+
+  it('round-trips persona through write/read of session meta', () => {
+    const sessionDir = getSessionDir(TEST_SESSION_ID);
+    writeSessionMeta(sessionDir, {
+      sessionId: TEST_SESSION_ID,
+      workDir: '/tmp',
+      created: '2026-01-04T00:00:00Z',
+      persona: 'ada',
+    });
+
+    const read = readSessionMeta(sessionDir);
+    expect(read.persona).toBe('ada');
+  });
+
+  it('reads meta with no persona field as persona=undefined (back-compat)', () => {
+    const sessionDir = getSessionDir(TEST_SESSION_ID);
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(
+      join(sessionDir, 'meta.json'),
+      JSON.stringify({
+        sessionId: TEST_SESSION_ID,
+        workDir: '/tmp',
+        created: '2026-01-04T00:00:00Z',
+      }),
+      'utf8'
+    );
+
+    const read = readSessionMeta(sessionDir);
+    expect(read.persona).toBeUndefined();
   });
 
   it('derives nextEventSeq from durable event log even when final JSONL line is truncated', () => {

@@ -36,6 +36,7 @@ export type SessionMeta = {
   sessionId: string;
   workDir: string;
   created: string;
+  persona?: string;
   parent?: {
     sessionId: string;
     jobId: string;
