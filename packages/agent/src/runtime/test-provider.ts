@@ -263,17 +263,6 @@ export class TestAgentProvider extends AIProvider {
               }
               break;
             }
-            case 'schedule_alarm': {
-              const args = requested.args as Record<string, unknown>;
-              if (args.kind === 'interval') {
-                content = `Scheduling interval alarm every ${args.minutes as number} minutes...`;
-              } else if (args.minutes !== undefined) {
-                content = `Scheduling alarm in ${args.minutes as number} minutes...`;
-              } else {
-                content = `Scheduling alarm at ${args.schedule as string}...`;
-              }
-              break;
-            }
             default:
               content = `Writing ${(requested.args as Record<string, unknown>).path as string}...`;
           }
@@ -360,45 +349,9 @@ export class TestAgentProvider extends AIProvider {
       | 'file_write'
       | 'bash'
       | 'todo_read'
-      | 'todo_write'
-      | 'schedule_alarm';
+      | 'todo_write';
     args: Record<string, unknown>;
   } {
-    // Handle "alarm: schedule=<ISO> prompt=<text>" pattern for absolute one-shot.
-    // Anchored at the start of the (trimmed) text so a parent prompt of
-    // `subagent: alarm: schedule=…` correctly delegates first — the subagent
-    // process then sees `alarm: schedule=…` as its turn-1 input and matches
-    // the alarm pattern itself.
-    const alarmAbsMatch = text.trim().match(/^alarm:\s*schedule=(\S+)\s+prompt=(.+)\s*$/i);
-    if (alarmAbsMatch) {
-      return {
-        name: 'schedule_alarm',
-        args: { kind: 'once', schedule: alarmAbsMatch[1], prompt: alarmAbsMatch[2].trim() },
-      };
-    }
-
-    // Handle "alarm: minutes=<N> prompt=<text>" pattern for relative one-shot timers.
-    const alarmRelMatch = text.trim().match(/^alarm:\s*minutes=(\d+)\s+prompt=(.+)\s*$/i);
-    if (alarmRelMatch) {
-      return {
-        name: 'schedule_alarm',
-        args: { kind: 'once', minutes: Number(alarmRelMatch[1]), prompt: alarmRelMatch[2].trim() },
-      };
-    }
-
-    // Handle "alarm: interval=<N> prompt=<text>" pattern for recurring interval alarms.
-    const alarmIntMatch = text.trim().match(/^alarm:\s*interval=(\d+)\s+prompt=(.+)\s*$/i);
-    if (alarmIntMatch) {
-      return {
-        name: 'schedule_alarm',
-        args: {
-          kind: 'interval',
-          minutes: Number(alarmIntMatch[1]),
-          prompt: alarmIntMatch[2].trim(),
-        },
-      };
-    }
-
     // Handle "add todo: <title>" or "todo add: <title>" pattern
     const todoAddMatch = text.match(/(?:add\s+todo|todo\s+add)[:\s]\s*(.+)\s*$/i);
     const todoTitle = todoAddMatch?.[1]?.trim();
