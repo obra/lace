@@ -191,11 +191,6 @@ function resolvePersonaMountsAndEnv(input: {
   return { mounts, env };
 }
 
-// Fixed daemon-side id for the single-tenant persistent persona container.
-// No per-session suffix, no `lace-` prefix (so the startup reaper's `lace-*`
-// scan ignores it).
-export const PERSISTENT_PERSONA_CONTAINER_ID = 'sen-box';
-
 export function buildPersonaContainerSpec(input: {
   parentSessionId: string;
   personaName: string;
@@ -224,8 +219,8 @@ export function buildPersonaContainerSpec(input: {
 
   if (runtime.containerSharing === 'persistent') {
     return {
-      name: 'box',
-      containerId: PERSISTENT_PERSONA_CONTAINER_ID,
+      name: personaName,
+      containerId: `sen-${personaName}`,
       image: runtime.image,
       workingDirectory: runtime.workingDirectory,
       mounts,

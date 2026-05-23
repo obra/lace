@@ -3,7 +3,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildPersonaContainerSpec,
-  PERSISTENT_PERSONA_CONTAINER_ID,
   PersonaContainerSpecError,
   SUBAGENT_USER_PERSONAS_TARGET,
   SUBAGENT_LACE_DATA_TARGET,
@@ -377,17 +376,16 @@ describe('buildPersonaContainerSpec with containerSharing: persistent', () => {
     mounts: {},
   };
 
-  it('produces a single-tenant spec with fixed name, containerId, and restartPolicy', () => {
+  it('produces a per-persona spec with personaName, containerId, and restartPolicy', () => {
     const spec = buildPersonaContainerSpec({
       parentSessionId: 'sess1',
-      personaName: 'sen',
+      personaName: 'box-shell',
       runtime: basePersistentRuntime,
       containerMounts: {},
     });
 
-    expect(spec.name).toBe('box');
-    expect(spec.containerId).toBe(PERSISTENT_PERSONA_CONTAINER_ID);
-    expect(spec.containerId).toBe('sen-box');
+    expect(spec.name).toBe('box-shell');
+    expect(spec.containerId).toBe('sen-box-shell');
     expect(spec.restartPolicy).toBe('unless-stopped');
     expect(spec.image).toBe('sen-box:dev');
     expect(spec.workingDirectory).toBe('/home/agent');
@@ -395,6 +393,18 @@ describe('buildPersonaContainerSpec with containerSharing: persistent', () => {
     expect(spec.env).toEqual({});
     // Persistent lifecycle has no ports.
     expect(spec.ports).toBeUndefined();
+  });
+
+  it('derives spec.name and spec.containerId from personaName (PRI-1796)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'box-shell',
+      runtime: basePersistentRuntime,
+      containerMounts: {},
+    });
+
+    expect(spec.name).toBe('box-shell');
+    expect(spec.containerId).toBe('sen-box-shell');
   });
 
   it('passes through sysctls for persistent lifecycle (PRI-1790)', () => {
