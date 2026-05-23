@@ -1,7 +1,7 @@
 // ABOUTME: Session lifecycle RPC handlers for creating, loading, and managing sessions
 
 import { randomUUID } from 'node:crypto';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   AcpErrorCodes,
@@ -303,6 +303,10 @@ export function registerSessionHandlers(
 
     const parsed = params as {
       cwd: string;
+      // Host-preallocated session id (PRI-1796). When present and valid, used
+      // instead of minting a fresh id. Must be a valid sess_<uuid> format and
+      // must not collide with an existing session on disk.
+      sessionId?: unknown;
       mcpServers?: Array<{
         name: string;
         command: string;
@@ -327,6 +331,31 @@ export function registerSessionHandlers(
       };
     };
     if (!parsed?.cwd) throwInvalidParams('cwd is required');
+
+    // Validate and apply host-preallocated sessionId when present.
+    if (parsed.sessionId !== undefined) {
+      if (typeof parsed.sessionId !== 'string' || !isSessionId(parsed.sessionId)) {
+        throw {
+          code: -32602,
+          message: 'InvalidParams',
+          data: { category: 'protocol', reason: 'sessionId must be sess_<uuid> format' },
+        };
+      }
+      // Defensive: reject if the session already exists on disk to prevent
+      // accidental re-use of an id the host was supposed to mint fresh.
+      const candidateDir = getSessionDir(parsed.sessionId);
+      const metaPath = join(candidateDir, 'meta.json');
+      if (existsSync(metaPath)) {
+        throw {
+          code: -32602,
+          message: 'InvalidParams',
+          data: {
+            category: 'protocol',
+            reason: 'sessionId already exists on disk — host must supply a fresh id',
+          },
+        };
+      }
+    }
     const runtimeBinding =
       parsed.config?.runtimeBinding !== undefined
         ? parseSessionRuntimeBinding(parsed.config.runtimeBinding)
@@ -411,7 +440,10 @@ export function registerSessionHandlers(
       : undefined;
     const effectiveToolScope = personaDefaults.toolScope;
 
-    const sessionId = `sess_${randomUUID()}`;
+    const sessionId =
+      typeof parsed.sessionId === 'string' && isSessionId(parsed.sessionId)
+        ? parsed.sessionId
+        : `sess_${randomUUID()}`;
     const created = new Date().toISOString();
     const activeRuntimeBinding =
       runtimeBinding ??
