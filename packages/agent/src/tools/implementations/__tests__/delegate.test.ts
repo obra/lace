@@ -1,11 +1,16 @@
 // ABOUTME: Tests for DelegateTool - subagent job creation via JobManager
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { tmpdir } from 'node:os';
 import { DelegateTool } from '../delegate';
+import { _resetEnsuredThisSessionForTest } from '../scratch-gc-reminder';
 import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { JobState } from '@lace/agent/server-types';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
+import type { ReminderScheduler } from '@lace/agent/reminders';
 
 describe('DelegateTool', () => {
   const runtimeBinding: RuntimeExecutionBinding = {
@@ -14,6 +19,26 @@ describe('DelegateTool', () => {
     agentPlacement: 'host',
     toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
   };
+
+  // Temp dir used as LACE_WORK_DIR for tests that exercise scratch dir creation.
+  let scratchBase: string;
+  let originalLaceWorkDir: string | undefined;
+
+  beforeEach(() => {
+    scratchBase = fs.mkdtempSync(path.join(tmpdir(), 'lace-d3-test-'));
+    originalLaceWorkDir = process.env.LACE_WORK_DIR;
+    process.env.LACE_WORK_DIR = scratchBase;
+    _resetEnsuredThisSessionForTest();
+  });
+
+  afterEach(() => {
+    if (originalLaceWorkDir === undefined) {
+      delete process.env.LACE_WORK_DIR;
+    } else {
+      process.env.LACE_WORK_DIR = originalLaceWorkDir;
+    }
+    fs.rmSync(scratchBase, { recursive: true, force: true });
+  });
 
   it('returns error when jobManager not in context', async () => {
     const tool = new DelegateTool();
@@ -191,7 +216,12 @@ describe('DelegateTool', () => {
 
     await tool.execute(
       { prompt: 'do something', background: true, persona: 'container-persona' },
-      { signal: new AbortController().signal, jobManager, runtimeBinding }
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_parent',
+      }
     );
 
     const options = createJob.mock.calls[0]![1] as Record<string, unknown>;
@@ -236,7 +266,12 @@ describe('DelegateTool', () => {
 
     await tool.execute(
       { prompt: 'do something', background: true, persona: 'tag-only' },
-      { signal: new AbortController().signal, jobManager, runtimeBinding }
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_parent',
+      }
     );
 
     const options = createJob.mock.calls[0]![1] as Record<string, unknown>;
@@ -300,10 +335,12 @@ describe('DelegateTool', () => {
           runtime: {
             type: 'container',
             agentPlacement: 'host',
-            containerSharing: 'per_invocation',
+            // Use persistent so we can test a named mount without triggering
+            // the 'scratch' reservation error for per_invocation.
+            containerSharing: 'persistent',
             image: 'example/subagent@sha256:' + 'a'.repeat(64),
             workingDirectory: '/work',
-            mounts: { scratch: '/work' },
+            mounts: { data: '/work' },
             env: {},
           },
         },
@@ -330,7 +367,7 @@ describe('DelegateTool', () => {
         signal: new AbortController().signal,
         jobManager,
         runtimeBinding,
-        containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
+        containerMounts: { data: { hostPath: '/host/data', readonly: false } },
       }
     );
 
@@ -344,7 +381,7 @@ describe('DelegateTool', () => {
         >
       ).spec.mounts
     ).toContainEqual({
-      hostPath: '/host/scratch',
+      hostPath: '/host/data',
       containerPath: '/work',
       readonly: false,
     });
@@ -482,5 +519,528 @@ describe('DelegateTool', () => {
         modelId: 'gpt-4',
       })
     );
+  });
+
+  // ---------------------------------------------------------------------------
+  // PRI-1796 per_invocation response shape tests
+  // ---------------------------------------------------------------------------
+
+  it('background per_invocation response includes subagentSessionId and scratchDir', async () => {
+    const personaRegistry = {
+      parsePersona: vi.fn().mockReturnValue({
+        config: {
+          runtime: {
+            type: 'container',
+            agentPlacement: 'host',
+            containerSharing: 'per_invocation',
+            image: 'example/subagent:latest',
+            workingDirectory: '/workspace',
+            mounts: {},
+            env: {},
+          },
+        },
+        body: 'per_invocation persona',
+      }),
+    } as unknown as PersonaRegistry;
+    const tool = new DelegateTool({ personaRegistry });
+
+    const mockJob = {
+      jobId: 'job_per_inv',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_per_inv', job: mockJob });
+    const jobManager = {
+      createJob,
+      listJobs: vi.fn().mockReturnValue([]),
+    } as unknown as JobManager;
+
+    const result = await tool.execute(
+      { prompt: 'work', background: true, persona: 'inv-persona' },
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_parent123',
+      }
+    );
+
+    expect(result.status).toBe('completed');
+    const body = JSON.parse(result.content[0].text) as Record<string, unknown>;
+    expect(body.jobId).toBe('job_per_inv');
+    expect(body.status).toBe('started');
+    expect(typeof body.subagentSessionId).toBe('string');
+    expect((body.subagentSessionId as string).startsWith('sess_')).toBe(true);
+    expect(typeof body.scratchDir).toBe('string');
+    const expectedScratchDir = path.join(scratchBase, body.subagentSessionId as string);
+    expect(body.scratchDir).toBe(expectedScratchDir);
+    // The scratch directory must exist on disk
+    expect(fs.existsSync(expectedScratchDir)).toBe(true);
+  });
+
+  it('sync per_invocation preamble includes scratchDir', async () => {
+    const personaRegistry = {
+      parsePersona: vi.fn().mockReturnValue({
+        config: {
+          runtime: {
+            type: 'container',
+            agentPlacement: 'host',
+            containerSharing: 'per_invocation',
+            image: 'example/subagent:latest',
+            workingDirectory: '/workspace',
+            mounts: {},
+            env: {},
+          },
+        },
+        body: 'per_invocation persona',
+      }),
+    } as unknown as PersonaRegistry;
+    const tool = new DelegateTool({ personaRegistry });
+
+    let resolveJob!: () => void;
+    const completion = new Promise<void>((r) => {
+      resolveJob = r;
+    });
+    const mockJob = {
+      jobId: 'job_sync_inv',
+      type: 'delegate' as const,
+      status: 'completed' as const,
+      completion,
+    } as unknown as JobState;
+    setTimeout(() => resolveJob(), 10);
+
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_sync_inv', job: mockJob });
+    const jobManager = {
+      createJob,
+      listJobs: vi.fn().mockReturnValue([]),
+      getJobOutput: vi.fn().mockReturnValue('subagent output'),
+      finalizeJob: vi.fn(),
+    } as unknown as JobManager;
+
+    const result = await tool.execute(
+      { prompt: 'work', persona: 'inv-persona' },
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_parent456',
+      }
+    );
+
+    expect(result.status).toBe('completed');
+    const text = result.content[0].text;
+    expect(text).toMatch(/^delegate jobId=job_sync_inv scratchDir=/);
+  });
+
+  it('resume reuses prior subagent session id and scratch dir for per_invocation', async () => {
+    const personaRegistry = {
+      parsePersona: vi.fn().mockReturnValue({
+        config: {
+          runtime: {
+            type: 'container',
+            agentPlacement: 'host',
+            containerSharing: 'per_invocation',
+            image: 'example/subagent:latest',
+            workingDirectory: '/workspace',
+            mounts: {},
+            env: {},
+          },
+        },
+        body: 'per_invocation persona',
+      }),
+    } as unknown as PersonaRegistry;
+    const tool = new DelegateTool({ personaRegistry });
+
+    const mockJob1 = {
+      jobId: 'job_first',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_first', job: mockJob1 });
+    const jobManager = {
+      createJob,
+      listJobs: vi.fn().mockReturnValue([]),
+    } as unknown as JobManager;
+
+    // First invocation
+    const firstResult = await tool.execute(
+      { prompt: 'first task', background: true, persona: 'inv-persona' },
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_parent789',
+      }
+    );
+
+    const firstBody = JSON.parse(firstResult.content[0].text) as Record<string, unknown>;
+    const mintedSessionId = firstBody.subagentSessionId as string;
+    const mintedScratchDir = firstBody.scratchDir as string;
+    expect(mintedSessionId.startsWith('sess_')).toBe(true);
+
+    // Second invocation with resume
+    const mockJob2 = {
+      jobId: 'job_second',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+    createJob.mockResolvedValue({ jobId: 'job_second', job: mockJob2 });
+    jobManager.listJobs = vi
+      .fn()
+      .mockReturnValue([{ jobId: 'job_first', subagentSessionId: mintedSessionId }]);
+
+    const secondResult = await tool.execute(
+      { prompt: 'continue', background: true, persona: 'inv-persona', resume: 'job_first' },
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_parent789',
+      }
+    );
+
+    const secondBody = JSON.parse(secondResult.content[0].text) as Record<string, unknown>;
+    expect(secondBody.subagentSessionId).toBe(mintedSessionId);
+    expect(secondBody.scratchDir).toBe(mintedScratchDir);
+  });
+
+  it('persistent persona background response omits subagentSessionId and scratchDir', async () => {
+    const personaRegistry = {
+      parsePersona: vi.fn().mockReturnValue({
+        config: {
+          runtime: {
+            type: 'container',
+            agentPlacement: 'host',
+            containerSharing: 'persistent',
+            image: 'example/sen-box:latest',
+            workingDirectory: '/home/agent',
+            mounts: {},
+            env: {},
+          },
+        },
+        body: 'persistent persona',
+      }),
+    } as unknown as PersonaRegistry;
+    const tool = new DelegateTool({ personaRegistry });
+
+    const mockJob = {
+      jobId: 'job_pers_bg',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_pers_bg', job: mockJob });
+    const jobManager = {
+      createJob,
+      listJobs: vi.fn().mockReturnValue([]),
+    } as unknown as JobManager;
+
+    const result = await tool.execute(
+      { prompt: 'work', background: true, persona: 'box-shell' },
+      { signal: new AbortController().signal, jobManager, runtimeBinding }
+    );
+
+    expect(result.status).toBe('completed');
+    const body = JSON.parse(result.content[0].text) as Record<string, unknown>;
+    expect(body.jobId).toBe('job_pers_bg');
+    expect(body.status).toBe('started');
+    expect(body.subagentSessionId).toBeUndefined();
+    expect(body.scratchDir).toBeUndefined();
+  });
+
+  it('per_invocation resume: createJob receives resumeSessionId, NOT newSubagentSessionId', async () => {
+    const personaRegistry = {
+      parsePersona: vi.fn().mockReturnValue({
+        config: {
+          runtime: {
+            type: 'container',
+            agentPlacement: 'host',
+            containerSharing: 'per_invocation',
+            image: 'example/subagent:latest',
+            workingDirectory: '/workspace',
+            mounts: {},
+            env: {},
+          },
+        },
+        body: 'per_invocation persona',
+      }),
+    } as unknown as PersonaRegistry;
+    const tool = new DelegateTool({ personaRegistry });
+
+    const mockJob = {
+      jobId: 'job_resume_check',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_resume_check', job: mockJob });
+    const jobManager = {
+      createJob,
+      listJobs: vi
+        .fn()
+        .mockReturnValue([{ jobId: 'job_prev_inv', subagentSessionId: 'sess_abc123xyz' }]),
+    } as unknown as JobManager;
+
+    await tool.execute(
+      { prompt: 'resume work', background: true, persona: 'inv-persona', resume: 'job_prev_inv' },
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_parent',
+      }
+    );
+
+    const opts = createJob.mock.calls[0]![1] as Record<string, unknown>;
+    expect(opts.resumeSessionId).toBe('sess_abc123xyz');
+    expect(opts.newSubagentSessionId).toBeUndefined();
+  });
+
+  // ---------------------------------------------------------------------------
+  // GC-1: After per_invocation delegate, GC reminder is scheduled
+  // ---------------------------------------------------------------------------
+  it('GC-1: per_invocation delegate schedules scratch GC reminder', async () => {
+    const personaRegistry = {
+      parsePersona: vi.fn().mockReturnValue({
+        config: {
+          runtime: {
+            type: 'container',
+            agentPlacement: 'host',
+            containerSharing: 'per_invocation',
+            image: 'example/subagent:latest',
+            workingDirectory: '/workspace',
+            mounts: {},
+            env: {},
+          },
+        },
+        body: 'per_invocation persona',
+      }),
+    } as unknown as PersonaRegistry;
+    const tool = new DelegateTool({ personaRegistry });
+
+    const mockJob = {
+      jobId: 'job_gc1',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_gc1', job: mockJob });
+    const jobManager = {
+      createJob,
+      listJobs: vi.fn().mockReturnValue([]),
+    } as unknown as JobManager;
+
+    // Create a temp dir for the reminder store
+    const reminderDir = fs.mkdtempSync(path.join(tmpdir(), 'lace-reminders-'));
+    try {
+      const { ReminderScheduler } = await import('@lace/agent/reminders');
+      const reminderScheduler = new ReminderScheduler({
+        sessionDir: reminderDir,
+        now: () => Date.now(),
+        notifier: vi.fn(),
+      });
+
+      await tool.execute(
+        { prompt: 'gc1 work', background: true, persona: 'inv-persona' },
+        {
+          signal: new AbortController().signal,
+          jobManager,
+          runtimeBinding,
+          activeSessionId: 'sess_gc1',
+          reminderScheduler,
+        }
+      );
+
+      const reminders = reminderScheduler.store.list();
+      const gcReminder = reminders.find((r) => r.prompt.startsWith('<scratch-gc>'));
+      expect(gcReminder).toBeDefined();
+      expect(gcReminder?.recurs).toEqual({ kind: 'cron', expr: '0 6 * * *' });
+    } finally {
+      fs.rmSync(reminderDir, { recursive: true, force: true });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // GC-2: Two per_invocation delegates in the same session = exactly one reminder
+  // ---------------------------------------------------------------------------
+  it('GC-2: two per_invocation delegates in same session schedule exactly one GC reminder', async () => {
+    const personaRegistry = {
+      parsePersona: vi.fn().mockReturnValue({
+        config: {
+          runtime: {
+            type: 'container',
+            agentPlacement: 'host',
+            containerSharing: 'per_invocation',
+            image: 'example/subagent:latest',
+            workingDirectory: '/workspace',
+            mounts: {},
+            env: {},
+          },
+        },
+        body: 'per_invocation persona',
+      }),
+    } as unknown as PersonaRegistry;
+    const tool = new DelegateTool({ personaRegistry });
+
+    const mkMockJob = (id: string): JobState =>
+      ({
+        jobId: id,
+        type: 'delegate' as const,
+        status: 'running' as const,
+        completion: new Promise<void>(() => {}),
+      }) as unknown as JobState;
+
+    const createJob = vi
+      .fn()
+      .mockResolvedValueOnce({ jobId: 'job_gc2a', job: mkMockJob('job_gc2a') })
+      .mockResolvedValueOnce({ jobId: 'job_gc2b', job: mkMockJob('job_gc2b') });
+    const jobManager = {
+      createJob,
+      listJobs: vi.fn().mockReturnValue([]),
+    } as unknown as JobManager;
+
+    const reminderDir = fs.mkdtempSync(path.join(tmpdir(), 'lace-reminders-gc2-'));
+    try {
+      const { ReminderScheduler } = await import('@lace/agent/reminders');
+      const reminderScheduler = new ReminderScheduler({
+        sessionDir: reminderDir,
+        now: () => Date.now(),
+        notifier: vi.fn(),
+      });
+
+      const ctx = {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_gc2',
+        reminderScheduler,
+      };
+
+      await tool.execute({ prompt: 'first', background: true, persona: 'inv-persona' }, ctx);
+      await tool.execute({ prompt: 'second', background: true, persona: 'inv-persona' }, ctx);
+
+      const gcReminders = reminderScheduler.store
+        .list()
+        .filter((r) => r.prompt.startsWith('<scratch-gc>'));
+      expect(gcReminders).toHaveLength(1);
+    } finally {
+      fs.rmSync(reminderDir, { recursive: true, force: true });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // GC-3: Scheduler throws — delegate still succeeds
+  // ---------------------------------------------------------------------------
+  it('GC-3: scheduler failure does not block delegate', async () => {
+    const personaRegistry = {
+      parsePersona: vi.fn().mockReturnValue({
+        config: {
+          runtime: {
+            type: 'container',
+            agentPlacement: 'host',
+            containerSharing: 'per_invocation',
+            image: 'example/subagent:latest',
+            workingDirectory: '/workspace',
+            mounts: {},
+            env: {},
+          },
+        },
+        body: 'per_invocation persona',
+      }),
+    } as unknown as PersonaRegistry;
+    const tool = new DelegateTool({ personaRegistry });
+
+    const mockJob = {
+      jobId: 'job_gc3',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_gc3', job: mockJob });
+    const jobManager = {
+      createJob,
+      listJobs: vi.fn().mockReturnValue([]),
+    } as unknown as JobManager;
+
+    // Fake scheduler that throws on schedule()
+    const fakeScheduler = {
+      store: { list: vi.fn().mockReturnValue([]) },
+      schedule: vi.fn().mockRejectedValue(new Error('scheduler unavailable')),
+    } as unknown as ReminderScheduler;
+
+    const result = await tool.execute(
+      { prompt: 'gc3 work', background: true, persona: 'inv-persona' },
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_gc3',
+        reminderScheduler: fakeScheduler,
+      }
+    );
+
+    // Delegate must still succeed
+    expect(result.status).toBe('completed');
+    const body = JSON.parse(result.content[0].text) as Record<string, unknown>;
+    expect(body.jobId).toBe('job_gc3');
+    expect(body.status).toBe('started');
+  });
+
+  // ---------------------------------------------------------------------------
+  // GC-4: Persistent persona — GC reminder NOT scheduled
+  // ---------------------------------------------------------------------------
+  it('GC-4: persistent persona does not schedule GC reminder', async () => {
+    const personaRegistry = {
+      parsePersona: vi.fn().mockReturnValue({
+        config: {
+          runtime: {
+            type: 'container',
+            agentPlacement: 'host',
+            containerSharing: 'persistent',
+            image: 'example/sen-box:latest',
+            workingDirectory: '/home/agent',
+            mounts: {},
+            env: {},
+          },
+        },
+        body: 'persistent persona',
+      }),
+    } as unknown as PersonaRegistry;
+    const tool = new DelegateTool({ personaRegistry });
+
+    const mockJob = {
+      jobId: 'job_gc4',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_gc4', job: mockJob });
+    const jobManager = {
+      createJob,
+      listJobs: vi.fn().mockReturnValue([]),
+    } as unknown as JobManager;
+
+    const fakeScheduler = {
+      store: { list: vi.fn().mockReturnValue([]) },
+      schedule: vi.fn(),
+    } as unknown as ReminderScheduler;
+
+    await tool.execute(
+      { prompt: 'gc4 work', background: true, persona: 'box-shell' },
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_gc4',
+        reminderScheduler: fakeScheduler,
+      }
+    );
+
+    expect(fakeScheduler.schedule).not.toHaveBeenCalled();
   });
 });

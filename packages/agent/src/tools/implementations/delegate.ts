@@ -2,6 +2,9 @@
 // Uses JobManager from ToolContext for all job operations
 
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
 import {
@@ -14,6 +17,7 @@ import type { PersonaContainerRuntime } from '@lace/agent/jobs/persona-container
 import { buildPersonaProjectedRuntimeBinding } from '@lace/agent/jobs/persona-projected-binding';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
+import { ensureScratchGcReminder } from './scratch-gc-reminder';
 
 const delegateSchema = z
   .object({
@@ -98,7 +102,55 @@ Parameters:
       persona,
     } = args;
 
-    // Resolve persona bundle (if any) before any job creation so we fail fast.
+    // --- Step 1: Resolve childSessionId BEFORE building the persona binding ---
+    //
+    // For per_invocation personas we need the child session id to compose a
+    // unique container name. Resolve it here so it's available to the binding
+    // builder and to createJob.
+    //
+    // Resume case: the prior job's subagentSessionId becomes the childSessionId.
+    // Fresh case:  mint a new one (cheap, deterministic format).
+    //
+    // For persistent personas and non-persona delegates we compute it
+    // unconditionally (cheap) but never use it — the host doesn't preallocate
+    // for those cases.
+    let resumeSessionId: string | undefined;
+    let childSessionId: string | undefined;
+
+    if (resume) {
+      const jobs = jobManager.listJobs();
+      const previousJob = jobs.find((j) => j.jobId === resume);
+      if (!previousJob?.subagentSessionId) {
+        const jobIds = jobs.map((j) => j.jobId).join(', ');
+        const withSession = jobs
+          .filter((j) => j.subagentSessionId)
+          .map((j) => `${j.jobId}=${j.subagentSessionId}`)
+          .join(', ');
+        return {
+          status: 'failed',
+          content: [
+            {
+              type: 'text',
+              text:
+                `Cannot resume job ${resume}: no subagentSessionId found.\n` +
+                `Available jobs: [${jobIds}]\n` +
+                `Jobs with sessionId: [${withSession || 'none'}]`,
+            },
+          ],
+        };
+      }
+      resumeSessionId = previousJob.subagentSessionId;
+      // For per_invocation resume, the child session id is the prior one (same
+      // session, same container name prefix). The host reuses the pre-existing
+      // scratch directory idempotently via mkdirSync({ recursive: true }).
+      childSessionId = resumeSessionId;
+    } else {
+      // Fresh spawn — mint a new session id. Used only when the persona is
+      // per_invocation and host-placed; ignored for all other paths.
+      childSessionId = `sess_${randomUUID().replace(/-/g, '')}`;
+    }
+
+    // --- Step 2: Resolve persona bundle (if any) before any job creation ---
     let personaModelDefault: string | undefined;
     // Set ONLY for the explicit in-container path (`agentPlacement: 'container'`)
     // — i.e. the lace-agent itself runs inside the persona container.
@@ -107,6 +159,10 @@ Parameters:
     // — the host-side lace-agent reaches into the container for tool exec via
     // this projected binding.
     let projectedRuntimeBinding: RuntimeExecutionBinding | undefined;
+    // Scratch dir host path; only set for per_invocation host-placed personas.
+    let scratchDirHostPath: string | undefined;
+    // Container sharing mode from the resolved persona runtime.
+    let containerSharing: 'per_invocation' | 'persistent' | undefined;
 
     if (persona) {
       try {
@@ -114,6 +170,7 @@ Parameters:
         personaModelDefault = parsed.config.model;
         if (parsed.config.runtime.type === 'container') {
           const runtime = parsed.config.runtime;
+          containerSharing = runtime.containerSharing;
           if (runtime.agentPlacement === 'host') {
             // Host-placed: project the persona container into a host-side
             // RuntimeExecutionBinding. The session runner threads the
@@ -126,12 +183,39 @@ Parameters:
             // verbatim — no pre-resolution. The projected runtime captures
             // the daemon's `.Image` field post-create for audit (see
             // projected-container.ts).
-            projectedRuntimeBinding = buildPersonaProjectedRuntimeBinding({
-              parentSessionId: context.activeSessionId ?? 'delegate',
-              personaName: persona,
-              runtime,
-              containerMounts: context.containerMounts ?? {},
-            });
+
+            if (runtime.containerSharing === 'per_invocation') {
+              // Compute and mkdir the per-invocation scratch directory on the
+              // host. Idempotent: the resume path finds an existing dir; the
+              // fresh path creates a new one. mode 0o700 applies only to
+              // newly created dirs — existing dirs keep their mode.
+              const scratchBase = process.env.LACE_WORK_DIR ?? '/var/sen/instance/work';
+              scratchDirHostPath = path.join(scratchBase, childSessionId!);
+              fs.mkdirSync(scratchDirHostPath, { recursive: true, mode: 0o700 });
+
+              projectedRuntimeBinding = buildPersonaProjectedRuntimeBinding({
+                parentSessionId: context.activeSessionId ?? 'delegate',
+                personaName: persona,
+                runtime,
+                containerMounts: context.containerMounts ?? {},
+                childSessionId: childSessionId!,
+                scratchDirHostPath,
+              });
+
+              // Schedule GC reminder (best-effort — the helper wraps in try/catch).
+              if (context.reminderScheduler && context.activeSessionId) {
+                await ensureScratchGcReminder(context.reminderScheduler, context.activeSessionId);
+              }
+            } else {
+              // Persistent host-placed persona — no per-invocation scratch or
+              // preallocated session id needed.
+              projectedRuntimeBinding = buildPersonaProjectedRuntimeBinding({
+                parentSessionId: context.activeSessionId ?? 'delegate',
+                personaName: persona,
+                runtime,
+                containerMounts: context.containerMounts ?? {},
+              });
+            }
           } else {
             personaContainerRuntime = runtime;
           }
@@ -156,38 +240,10 @@ Parameters:
       !personaContainerRuntime && !projectedRuntimeBinding ? runtimeBinding : undefined;
     const effectiveRuntimeBinding = projectedRuntimeBinding ?? inheritedRuntimeBinding;
 
-    // Handle resume - look up previous job's session
-    let resumeSessionId: string | undefined;
-    if (resume) {
-      const jobs = jobManager.listJobs();
-      const previousJob = jobs.find((j) => j.jobId === resume);
-      if (!previousJob?.subagentSessionId) {
-        const jobIds = jobs.map((j) => j.jobId).join(', ');
-        const withSession = jobs
-          .filter((j) => j.subagentSessionId)
-          .map((j) => `${j.jobId}=${j.subagentSessionId}`)
-          .join(', ');
-        return {
-          status: 'failed',
-          content: [
-            {
-              type: 'text',
-              text:
-                `Cannot resume job ${resume}: no subagentSessionId found.\n` +
-                `Available jobs: [${jobIds}]\n` +
-                `Jobs with sessionId: [${withSession || 'none'}]`,
-            },
-          ],
-        };
-      }
-      resumeSessionId = previousJob.subagentSessionId;
-    }
-
     // Create the job
     const { jobId, job } = await jobManager.createJob('delegate', {
       prompt,
       description,
-      resumeSessionId,
       progressIntervalMs,
       connectionId,
       modelId: effectiveModelId,
@@ -198,13 +254,30 @@ Parameters:
       ...(persona ? { persona } : {}),
       ...(personaContainerRuntime ? { personaContainerRuntime } : {}),
       ...(effectiveRuntimeBinding ? { runtimeBinding: effectiveRuntimeBinding } : {}),
+      // Resume: pass prior session id via resumeSessionId (mutually exclusive
+      // with newSubagentSessionId — enforced by JobManager).
+      ...(resumeSessionId ? { resumeSessionId } : {}),
+      // Fresh per_invocation spawn: preallocate the child session id so the
+      // container name can be resolved at job-creation time.
+      ...(containerSharing === 'per_invocation' && !resume
+        ? { newSubagentSessionId: childSessionId }
+        : {}),
+      ...(containerSharing === 'per_invocation' && scratchDirHostPath
+        ? { scratchDirHostPath, containerSharing: 'per_invocation' }
+        : {}),
+      ...(containerSharing === 'persistent' ? { containerSharing: 'persistent' } : {}),
     });
 
     // Background mode - return immediately
     if (background) {
+      const responseObj: Record<string, unknown> = { jobId, status: 'started' };
+      if (containerSharing === 'per_invocation') {
+        responseObj.subagentSessionId = childSessionId;
+        responseObj.scratchDir = scratchDirHostPath;
+      }
       return {
         status: 'completed',
-        content: [{ type: 'text', text: JSON.stringify({ jobId, status: 'started' }) }],
+        content: [{ type: 'text', text: JSON.stringify(responseObj) }],
       };
     }
 
@@ -225,15 +298,18 @@ Parameters:
     // Read output
     const output = jobManager.getJobOutput(jobId);
 
+    const preamble =
+      containerSharing === 'per_invocation'
+        ? `delegate jobId=${jobId} scratchDir=${scratchDirHostPath ?? ''}\n\n`
+        : `delegate jobId=${jobId}\n\n`;
+
     const status = job.status ?? 'failed';
     return {
       status: status === 'completed' ? 'completed' : status === 'cancelled' ? 'aborted' : 'failed',
       content: [
         {
           type: 'text',
-          text:
-            `delegate jobId=${jobId}\n\n` +
-            (output.trim().length > 0 ? output.trim() : '(no output)'),
+          text: preamble + (output.trim().length > 0 ? output.trim() : '(no output)'),
         },
       ],
     };
