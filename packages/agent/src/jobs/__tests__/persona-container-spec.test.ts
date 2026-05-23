@@ -14,7 +14,7 @@ import {
 const baseRuntime = {
   type: 'container' as const,
   agentPlacement: 'host' as const,
-  containerLifecycle: 'session' as const,
+  containerSharing: 'per_invocation' as const,
   image: 'devcontainer:latest',
   workingDirectory: '/workspace',
   mounts: {},
@@ -367,11 +367,11 @@ describe('buildPersonaContainerSpec', () => {
   });
 });
 
-describe('buildPersonaContainerSpec with containerLifecycle: persistent', () => {
+describe('buildPersonaContainerSpec with containerSharing: persistent', () => {
   const basePersistentRuntime = {
     type: 'container' as const,
     agentPlacement: 'host' as const,
-    containerLifecycle: 'persistent' as const,
+    containerSharing: 'persistent' as const,
     image: 'sen-box:dev',
     workingDirectory: '/home/agent',
     mounts: {},

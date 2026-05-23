@@ -87,7 +87,7 @@ Body.`;
 runtime:
   type: container
   agentPlacement: host
-  containerLifecycle: session
+  containerSharing: per_invocation
   image: ghcr.io/example/lace-shell:latest
   workingDirectory: /workspace
   mounts:
@@ -107,7 +107,7 @@ Body.`;
     expect(result.config.runtime).toEqual({
       type: 'container',
       agentPlacement: 'host',
-      containerLifecycle: 'session',
+      containerSharing: 'per_invocation',
       image: 'ghcr.io/example/lace-shell:latest',
       workingDirectory: '/workspace',
       mounts: { scratch: '/workspace/scratch', knowledge: '/workspace/knowledge' },
@@ -121,7 +121,7 @@ Body.`;
 runtime:
   type: container
   agentPlacement: host
-  containerLifecycle: session
+  containerSharing: per_invocation
   image: img:latest
   workingDirectory: /w
   mounts: {}
@@ -134,7 +134,7 @@ Body.`;
     expect(result.config.runtime).toEqual({
       type: 'container',
       agentPlacement: 'host',
-      containerLifecycle: 'session',
+      containerSharing: 'per_invocation',
       image: 'img:latest',
       workingDirectory: '/w',
       mounts: {},
@@ -147,7 +147,7 @@ Body.`;
 runtime:
   type: container
   agentPlacement: host
-  containerLifecycle: persistent
+  containerSharing: persistent
   image: ghcr.io/example/sen-box:latest
   workingDirectory: /home/agent
   mounts:
@@ -162,7 +162,7 @@ Body.`;
     expect(registry.parsePersona('persistent-runtime').config.runtime).toEqual({
       type: 'container',
       agentPlacement: 'host',
-      containerLifecycle: 'persistent',
+      containerSharing: 'persistent',
       image: 'ghcr.io/example/sen-box:latest',
       workingDirectory: '/home/agent',
       mounts: { home: '/home/agent' },
@@ -175,7 +175,7 @@ Body.`;
 runtime:
   type: container
   agentPlacement: host
-  containerLifecycle: session
+  containerSharing: per_invocation
   image: sen-browser:dev
   workingDirectory: /work
   mounts: {}
@@ -197,7 +197,7 @@ Body.`;
 runtime:
   type: container
   agentPlacement: container
-  containerLifecycle: session
+  containerSharing: per_invocation
   image: img:latest
   workingDirectory: /w
   mounts: {}
@@ -209,7 +209,7 @@ Body.`;
     expect(registry.parsePersona('container-placement').config.runtime).toMatchObject({
       type: 'container',
       agentPlacement: 'container',
-      containerLifecycle: 'session',
+      containerSharing: 'per_invocation',
     });
   });
 
@@ -217,7 +217,7 @@ Body.`;
     const content = `---
 runtime:
   type: container
-  containerLifecycle: session
+  containerSharing: per_invocation
   workingDirectory: /w
   mounts: {}
 ---
@@ -232,7 +232,7 @@ Body.`;
     const content = `---
 runtime:
   type: container
-  containerLifecycle: session
+  containerSharing: per_invocation
   image: img:latest
   workingDirectory: /w
 ---
@@ -247,7 +247,7 @@ Body.`;
     const upper = `---
 runtime:
   type: container
-  containerLifecycle: session
+  containerSharing: per_invocation
   image: img:latest
   workingDirectory: /w
   mounts:
@@ -261,7 +261,7 @@ Body.`;
     const leadingDigit = `---
 runtime:
   type: container
-  containerLifecycle: session
+  containerSharing: per_invocation
   image: img:latest
   workingDirectory: /w
   mounts:
@@ -288,12 +288,32 @@ Body.`;
     expect(() => registry.parsePersona('old-box')).toThrow(/runtime/i);
   });
 
+  it('rejects the old containerLifecycle field name with a helpful error', () => {
+    // After the rename to containerSharing, containerLifecycle is an unknown
+    // key. The .strict() schema rejects it with "Unrecognized key(s)" which
+    // includes the key name, giving the persona author a clear migration hint.
+    const content = `---
+runtime:
+  type: container
+  containerLifecycle: session
+  image: node:24-bookworm
+  workingDirectory: /work
+  mounts: {}
+---
+body
+`;
+    writeFileSync(path.join(tempBundledDir, 'old-lifecycle-field.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(() => registry.parsePersona('old-lifecycle-field')).toThrow(/containerLifecycle/);
+  });
+
   it('rejects persistent container runtime with ports', () => {
     const content = `---
 runtime:
   type: container
   agentPlacement: host
-  containerLifecycle: persistent
+  containerSharing: persistent
   image: img:latest
   workingDirectory: /home/agent
   mounts: {}

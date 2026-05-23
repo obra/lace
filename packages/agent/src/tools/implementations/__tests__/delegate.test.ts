@@ -164,7 +164,7 @@ describe('DelegateTool', () => {
           runtime: {
             type: 'container',
             agentPlacement: 'host',
-            containerLifecycle: 'session',
+            containerSharing: 'per_invocation',
             image: 'example/subagent@sha256:' + 'a'.repeat(64),
             workingDirectory: '/workspace',
             mounts: {},
@@ -209,7 +209,7 @@ describe('DelegateTool', () => {
           runtime: {
             type: 'container',
             agentPlacement: 'host',
-            containerLifecycle: 'session',
+            containerSharing: 'per_invocation',
             image: 'sen-box:dev',
             workingDirectory: '/workspace',
             mounts: {},
@@ -255,7 +255,7 @@ describe('DelegateTool', () => {
           runtime: {
             type: 'container',
             agentPlacement: 'host',
-            containerLifecycle: 'persistent',
+            containerSharing: 'persistent',
             image: 'example/sen-box@sha256:' + 'a'.repeat(64),
             workingDirectory: '/home/agent',
             mounts: {},
@@ -300,7 +300,7 @@ describe('DelegateTool', () => {
           runtime: {
             type: 'container',
             agentPlacement: 'host',
-            containerLifecycle: 'session',
+            containerSharing: 'per_invocation',
             image: 'example/subagent@sha256:' + 'a'.repeat(64),
             workingDirectory: '/work',
             mounts: { scratch: '/work' },
@@ -357,7 +357,7 @@ describe('DelegateTool', () => {
           runtime: {
             type: 'container',
             agentPlacement: 'container',
-            containerLifecycle: 'session',
+            containerSharing: 'per_invocation',
             image: 'example/subagent:latest',
             workingDirectory: '/workspace',
             mounts: {},
@@ -392,7 +392,7 @@ describe('DelegateTool', () => {
     expect(options.personaContainerRuntime).toMatchObject({
       type: 'container',
       agentPlacement: 'container',
-      containerLifecycle: 'session',
+      containerSharing: 'per_invocation',
     });
   });
 

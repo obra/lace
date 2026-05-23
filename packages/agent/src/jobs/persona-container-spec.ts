@@ -1,5 +1,5 @@
 // ABOUTME: Build ContainerSpec from a persona's container runtime + mount registry
-// ABOUTME: Branches on containerLifecycle (session vs persistent) and resolves mounts against the registry
+// ABOUTME: Branches on containerSharing (per_invocation vs persistent) and resolves mounts against the registry
 
 import type { ContainerSpec } from '@lace/agent/containers/spec';
 import type { ContainerMount } from '@lace/agent/containers/types';
@@ -222,7 +222,7 @@ export function buildPersonaContainerSpec(input: {
     containerMounts,
   });
 
-  if (runtime.containerLifecycle === 'persistent') {
+  if (runtime.containerSharing === 'persistent') {
     return {
       name: 'box',
       containerId: PERSISTENT_PERSONA_CONTAINER_ID,

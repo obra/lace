@@ -10,7 +10,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       runtime: {
         type: 'container',
         agentPlacement: 'host',
-        containerLifecycle: 'session',
+        containerSharing: 'per_invocation',
         image: 'node:24-bookworm',
         workingDirectory: '/work',
         mounts: { scratch: '/work' },
@@ -64,7 +64,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       runtime: {
         type: 'container',
         agentPlacement: 'host',
-        containerLifecycle: 'persistent',
+        containerSharing: 'persistent',
         image: 'sen-box:dev',
         workingDirectory: '/home/agent',
         mounts: { home: '/home/agent' },
@@ -92,7 +92,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       runtime: {
         type: 'container',
         agentPlacement: 'host',
-        containerLifecycle: 'session',
+        containerSharing: 'per_invocation',
         image: 'sen-browser:dev',
         workingDirectory: '/work',
         mounts: {},
@@ -114,7 +114,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       runtime: {
         type: 'container',
         agentPlacement: 'host',
-        containerLifecycle: 'session',
+        containerSharing: 'per_invocation',
         image: 'sen-box:dev',
         workingDirectory: '/work',
         mounts: {},
@@ -136,7 +136,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       runtime: {
         type: 'container',
         agentPlacement: 'host',
-        containerLifecycle: 'session',
+        containerSharing: 'per_invocation',
         image: 'example/app@sha256:' + 'a'.repeat(64),
         workingDirectory: '/work',
         mounts: {},
@@ -161,7 +161,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         runtime: {
           type: 'container',
           agentPlacement: 'host',
-          containerLifecycle: 'session',
+          containerSharing: 'per_invocation',
           image: 'node:24-bookworm',
           workingDirectory: '/work',
           mounts: { missing: '/work' },

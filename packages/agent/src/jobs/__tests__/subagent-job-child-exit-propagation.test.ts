@@ -114,7 +114,7 @@ describe('runSubagentJobProcess — child_exit propagation (PRI-1774)', () => {
       personaContainerRuntime: {
         type: 'container',
         agentPlacement: 'container',
-        containerLifecycle: 'persistent',
+        containerSharing: 'persistent',
         image: 'sen-box:dev',
         workingDirectory: '/home/agent',
         mounts: {},

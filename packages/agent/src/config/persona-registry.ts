@@ -36,11 +36,10 @@ const portMappingSchema = z
 // agentPlacement controls where the lace agent process executes for this
 // persona. 'host' (default) runs the agent on the embedder host and reaches
 // into the container via docker exec; 'container' runs lace itself inside the
-// container. containerLifecycle controls whether the container is created and
-// destroyed per session ('session') or adopted across restarts ('persistent',
-// formerly the 'box' runtime).
+// container. containerSharing declares the sharing model: 'per_invocation'
+// creates a fresh container each session; 'persistent' adopts a long-lived one.
 const agentPlacementSchema = z.enum(['host', 'container']).optional().default('host');
-const containerLifecycleSchema = z.enum(['session', 'persistent']);
+const containerSharingSchema = z.enum(['per_invocation', 'persistent']);
 
 // Linux sysctl keys are dot-separated lowercase tokens (e.g.
 // net.ipv6.conf.lo.disable_ipv6). Validate the shape here so a typo in the
@@ -51,7 +50,7 @@ const runtimeContainerSchema = z
   .object({
     type: z.literal('container'),
     agentPlacement: agentPlacementSchema,
-    containerLifecycle: containerLifecycleSchema,
+    containerSharing: containerSharingSchema,
     image: z.string().min(1),
     workingDirectory: z.string().min(1),
     // mountName → containerTarget. Resolved against the embedder-provided
@@ -117,7 +116,7 @@ const personaConfigSchema = z
     const runtime = config.runtime;
     if (
       runtime?.type === 'container' &&
-      runtime.containerLifecycle === 'persistent' &&
+      runtime.containerSharing === 'persistent' &&
       runtime.ports?.length
     ) {
       ctx.addIssue({

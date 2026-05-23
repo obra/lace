@@ -36,7 +36,7 @@ class FakeContainerManager {
 const containerRuntime = {
   type: 'container' as const,
   agentPlacement: 'container' as const,
-  containerLifecycle: 'session' as const,
+  containerSharing: 'per_invocation' as const,
   image: 'devcontainer:latest',
   workingDirectory: '/workspace',
   mounts: { scratch: '/scratch' },
@@ -181,7 +181,7 @@ describe('spawnSubagent', () => {
     const persistentRuntime = {
       type: 'container' as const,
       agentPlacement: 'container' as const,
-      containerLifecycle: 'persistent' as const,
+      containerSharing: 'persistent' as const,
       image: 'sen-box:dev',
       workingDirectory: '/home/agent',
       mounts: {},
@@ -221,7 +221,7 @@ describe('spawnSubagent', () => {
         personaContainerRuntime: {
           type: 'container',
           agentPlacement: 'container',
-          containerLifecycle: 'persistent',
+          containerSharing: 'persistent',
           image: 'sen-box:dev',
           workingDirectory: '/home/agent',
           mounts: {},
@@ -241,7 +241,7 @@ describe('spawnSubagent', () => {
         personaContainerRuntime: {
           type: 'container',
           agentPlacement: 'container',
-          containerLifecycle: 'persistent',
+          containerSharing: 'persistent',
           image: 'sen-box:dev',
           workingDirectory: '/home/agent',
           mounts: {},
