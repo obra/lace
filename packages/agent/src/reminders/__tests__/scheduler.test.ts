@@ -717,6 +717,72 @@ describe('ReminderScheduler exception handling', () => {
 
     // onError was called.
     expect(errors).toBe(1);
+
+    // Heap entry was restored — direct inspection (independent of tickForTest's rebuild).
+    const heapState = (sched as unknown as { heap: Array<{ id: string }> }).heap;
+    expect(heapState.find((e) => e.id === row.id)).toBeDefined();
+  });
+
+  it('restores heap entry via prior snapshot even if store.list() fails during finally', async () => {
+    const dir = tempSessionDir();
+    const store = new ReminderStore(dir);
+    const row = makeRow({
+      id: 'reminder_eeeeeeeeeeee',
+      next_fire_at: 1000,
+      recurs: { kind: 'count', interval_ms: 5 * 60_000, remaining: 3 },
+    });
+    store.save([row]);
+
+    let errors = 0;
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 2000,
+      notifier: async () => {},
+      onError: () => { errors++; },
+    });
+
+    // Force store.save to throw on the first call (fire's persist attempt).
+    // Also force store.list to throw on its second call (which would be the
+    // finally block re-reading disk in the pre-fix code path).
+    const origSave = sched.store.save.bind(sched.store);
+    const origList = sched.store.list.bind(sched.store);
+    let saveCalls = 0;
+    let listCalls = 0;
+    sched.store.save = ((rows: ReminderRow[]) => {
+      saveCalls++;
+      if (saveCalls === 1) throw new Error('disk full');
+      return origSave(rows);
+    }) as typeof origSave;
+    sched.store.list = (() => {
+      listCalls++;
+      // list() call order inside a single tick:
+      //   call 1: tickForTest rebuilds heap
+      //   call 2: fire() reads rows at top of try block
+      //   call 3: pre-fix finally block re-reads disk for heap restore
+      // Post-fix, the finally block uses `prior` instead of list(), so call 3
+      // never happens — and heap restore works even if list() would throw here.
+      if (listCalls === 3) throw new Error('disk failure during restore');
+      return origList();
+    }) as typeof origList;
+
+    await sched.tickForTest(2000);
+
+    // At minimum the save-failure onError should have fired.
+    expect(errors).toBeGreaterThanOrEqual(1);
+
+    // Heap entry must be restored despite list() throwing on second call.
+    const heapState = (sched as unknown as { heap: Array<{ id: string }> }).heap;
+    expect(heapState.find((e) => e.id === row.id)).toBeDefined();
+
+    // Restore patched methods and verify the row fires successfully on next tick.
+    sched.store.save = origSave;
+    sched.store.list = origList;
+    const fired: number[] = [];
+    (sched as unknown as { notifier: (ctx: { firedAt: number }) => Promise<void> }).notifier =
+      async (ctx: { firedAt: number }) => { fired.push(ctx.firedAt); };
+
+    await sched.tickForTest(3000);
+    expect(fired).toHaveLength(1);
   });
 });
 

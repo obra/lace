@@ -328,6 +328,10 @@ export class ReminderScheduler {
   private async fire(id: string): Promise<void> {
     await this.mutex.runExclusive(async () => {
       let committed = false;
+      // Declared outside try so finally can use it for heap restore without
+      // a second disk read. The disk write either failed (so disk still matches
+      // prior) or never happened (e.g. computePostFire threw).
+      let prior: ReminderRow | null = null;
       try {
         const rows = this.store.list();
         const idx = rows.findIndex((r) => r.id === id);
@@ -336,7 +340,7 @@ export class ReminderScheduler {
           return;
         }
 
-        const prior: ReminderRow = JSON.parse(JSON.stringify(rows[idx])) as ReminderRow;
+        prior = JSON.parse(JSON.stringify(rows[idx])) as ReminderRow;
         const firedAt = this.now();
 
         // Compute post-fire state.
@@ -382,13 +386,12 @@ export class ReminderScheduler {
         // Unexpected exception in computePostFire or elsewhere before disk commit.
         this.onError(err);
       } finally {
-        if (!committed) {
-          // Restore the heap entry so a future tick can retry.
-          const row = this.store.list().find((r) => r.id === id);
-          if (row) {
-            this.heap.push({ id, nextFireAt: row.next_fire_at });
-            this.heap.sort((a, b) => a.nextFireAt - b.nextFireAt);
-          }
+        if (!committed && prior) {
+          // Use the in-scope prior snapshot rather than re-reading disk.
+          // The write failed (disk is unchanged) or computePostFire threw
+          // before any write, so prior.next_fire_at is the correct retry time.
+          this.heap.push({ id, nextFireAt: prior.next_fire_at });
+          this.heap.sort((a, b) => a.nextFireAt - b.nextFireAt);
         }
       }
     });
