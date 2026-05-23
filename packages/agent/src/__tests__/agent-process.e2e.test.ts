@@ -111,11 +111,11 @@ describe('lace-agent process (E2E over stdio)', () => {
       )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
 
       expect(durable.hasMore).toBe(false);
-      // context_injected is added on session creation with the system prompt
+      // system_prompt_set is written on session creation with the rendered system prompt
       // After the tool result, the LLM returns bare text which triggers a
       // tool_choice=required retry, producing an extra message event
       expect(durable.events.map((e) => e.type)).toEqual([
-        'context_injected',
+        'system_prompt_set',
         'prompt',
         'turn_start',
         'message',
@@ -186,11 +186,11 @@ describe('lace-agent process (E2E over stdio)', () => {
       'ent/session/events (restart)'
     )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
 
-    // context_injected is added on session creation with the system prompt
+    // system_prompt_set is written on session creation with the rendered system prompt
     // After the tool result, the LLM returns bare text which triggers a
     // tool_choice=required retry, producing an extra message event
     expect(durable.events.map((e) => e.type)).toEqual([
-      'context_injected',
+      'system_prompt_set',
       'prompt',
       'turn_start',
       'message',
@@ -310,13 +310,13 @@ describe('lace-agent process (E2E over stdio)', () => {
         'ent/session/events'
       )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
 
-      // context_injected is added on session creation with the system prompt
+      // system_prompt_set is written on session creation with the rendered system prompt
       // The LLM (test provider) emits a message before the tool call ("Running echo hi..."),
       // so we expect an extra message event before permission_requested.
       // After the tool result, the LLM returns bare text which triggers a
       // tool_choice=required retry, producing an extra message event.
       expect(durable.events.map((e) => e.type)).toEqual([
-        'context_injected',
+        'system_prompt_set',
         'prompt',
         'turn_start',
         'message', // LLM's initial response before tool call
@@ -681,8 +681,9 @@ describe('lace-agent process (E2E over stdio)', () => {
       'ent/session/events'
     )) as { events: Array<{ eventSeq: number; type: string; data: Record<string, unknown> }> };
 
-    expect(durable.events[0]?.type).toBe('context_injected');
-    expect(durable.events[0]?.data.priority).toBe('normal');
+    const injectEvent = durable.events.find((e) => e.type === 'context_injected');
+    expect(injectEvent).toBeDefined();
+    expect(injectEvent!.data.priority).toBe('normal');
   });
 
   it('can cancel a turn that is awaiting permission', { timeout: 15_000 }, async () => {

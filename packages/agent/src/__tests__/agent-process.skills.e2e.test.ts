@@ -52,15 +52,15 @@ describe('skills e2e', () => {
       );
       await client.request('session/new', { cwd: ctx.workDir, mcpServers: [] });
 
-      // Get events to find the context_injected event with system prompt
+      // Get events to find the system_prompt_set event with rendered system prompt
       const events = (await client.request('ent/session/events', { limit: 10 })) as {
-        events: Array<{ type: string; data: { content?: Array<{ type: string; text: string }> } }>;
+        events: Array<{ type: string; data: { text?: string } }>;
       };
 
-      const contextEvent = events.events.find((e) => e.type === 'context_injected');
+      const contextEvent = events.events.find((e) => e.type === 'system_prompt_set');
       expect(contextEvent).toBeDefined();
 
-      const systemPrompt = contextEvent?.data?.content?.find((c) => c.type === 'text')?.text ?? '';
+      const systemPrompt = contextEvent?.data?.text ?? '';
 
       // Verify skill is in the system prompt
       expect(systemPrompt).toContain('<available_skills>');
@@ -125,13 +125,13 @@ describe('skills e2e', () => {
       );
       await client.request('session/new', { cwd: ctx.workDir, mcpServers: [] });
 
-      // Get events to find the context_injected event
+      // Get events to find the system_prompt_set event with rendered system prompt
       const events = (await client.request('ent/session/events', { limit: 10 })) as {
-        events: Array<{ type: string; data: { content?: Array<{ type: string; text: string }> } }>;
+        events: Array<{ type: string; data: { text?: string } }>;
       };
 
-      const contextEvent = events.events.find((e) => e.type === 'context_injected');
-      const systemPrompt = contextEvent?.data?.content?.find((c) => c.type === 'text')?.text ?? '';
+      const contextEvent = events.events.find((e) => e.type === 'system_prompt_set');
+      const systemPrompt = contextEvent?.data?.text ?? '';
 
       // Verify project version is in the system prompt (not global)
       expect(systemPrompt).toContain('Project version');

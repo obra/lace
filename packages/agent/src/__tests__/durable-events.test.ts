@@ -61,9 +61,9 @@ describe('durable events', () => {
       });
 
       const types = (eventsResult as any).events.map((e: any) => e.type);
-      // Session creation injects context_injected event first, then prompt events follow
-      expect(types).toEqual(['context_injected', 'prompt', 'turn_start', 'message', 'turn_end']);
-      // First event is context_injected (system prompt), second is the user prompt
+      // Session creation writes a single system_prompt_set event first, then prompt events follow
+      expect(types).toEqual(['system_prompt_set', 'prompt', 'turn_start', 'message', 'turn_end']);
+      // First event is system_prompt_set, second is the user prompt
       expect((eventsResult as any).events[1]).toMatchObject({
         eventSeq: 2,
         turnId: promptResult.turnId,

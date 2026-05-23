@@ -68,9 +68,9 @@ describe('agent abort reliability (E2E)', () => {
       'ent/session/events'
     )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
 
-    // Should have context_injected (from session creation), prompt, turn_start, turn_end (cancelled) - no partial events
+    // Should have system_prompt_set (from session creation), prompt, turn_start, turn_end (cancelled) - no partial events
     expect(durable.events.map((e) => e.type)).toEqual([
-      'context_injected',
+      'system_prompt_set',
       'prompt',
       'turn_start',
       'turn_end',
