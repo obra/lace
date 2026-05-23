@@ -85,6 +85,28 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     });
   });
 
+  it('threads persona-declared sysctls into the projected descriptor (PRI-1790)', () => {
+    const binding = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: 'sess1',
+      personaName: 'browser-driver',
+      runtime: {
+        type: 'container',
+        agentPlacement: 'host',
+        containerLifecycle: 'session',
+        image: 'sen-browser:dev',
+        workingDirectory: '/work',
+        mounts: {},
+        sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' },
+      },
+      containerMounts: {},
+    });
+
+    expect(binding.toolRuntime).toMatchObject({
+      type: 'container',
+      spec: { sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' } },
+    });
+  });
+
   it('passes the persona-declared image reference through verbatim (tag, digest, anything)', () => {
     const tagOnly = buildPersonaProjectedRuntimeBinding({
       parentSessionId: 'sess1',

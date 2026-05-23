@@ -170,6 +170,28 @@ Body.`;
     });
   });
 
+  it('parses runtime.type=container with sysctls (PRI-1790)', () => {
+    const content = `---
+runtime:
+  type: container
+  agentPlacement: host
+  containerLifecycle: session
+  image: sen-browser:dev
+  workingDirectory: /work
+  mounts: {}
+  sysctls:
+    net.ipv6.conf.lo.disable_ipv6: "0"
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'sysctls-runtime.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(registry.parsePersona('sysctls-runtime').config.runtime).toMatchObject({
+      type: 'container',
+      sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' },
+    });
+  });
+
   it('parses runtime.agentPlacement=container for explicit lace-in-container execution', () => {
     const content = `---
 runtime:

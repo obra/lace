@@ -117,6 +117,10 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       args.push('-p', `${port.host}:${port.container}`);
     }
 
+    for (const [key, value] of Object.entries(config.sysctls || {})) {
+      args.push('--sysctl', `${key}=${value}`);
+    }
+
     args.push(config.image);
 
     if (config.command && config.command.length > 0) {

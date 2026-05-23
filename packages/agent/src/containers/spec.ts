@@ -20,6 +20,11 @@ export interface ContainerSpec {
   // Forwarded to ContainerConfig.restartPolicy. Used by boxes so the daemon
   // auto-restarts them after host reboot.
   restartPolicy?: 'unless-stopped';
+  // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
+  // Personas declare these in `runtime.sysctls`; PRI-1790 added support so
+  // sen-browser can enable `net.ipv6.conf.lo.disable_ipv6=0` for the chrome
+  // launcher's port-availability check.
+  sysctls?: Record<string, string>;
 }
 
 export interface ContainerHandle {

@@ -246,6 +246,9 @@ async function containerSpecFromDescriptor(
   if (descriptor.spec.restartPolicy) {
     spec.restartPolicy = descriptor.spec.restartPolicy;
   }
+  if (descriptor.spec.sysctls) {
+    spec.sysctls = descriptor.spec.sysctls;
+  }
 
   return helper.hooks ? { spec, hooks: helper.hooks } : { spec };
 }

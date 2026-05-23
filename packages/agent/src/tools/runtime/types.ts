@@ -57,6 +57,10 @@ export type ToolRuntimeDescriptor =
         secretEnv?: Record<string, RuntimeSecretReference>;
         ports?: RuntimePortDescriptor[];
         restartPolicy?: 'unless-stopped';
+        // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
+        // PRI-1790: sen-browser declares `net.ipv6.conf.lo.disable_ipv6=0`
+        // so superpowers-chrome's port-availability check can bind to `::1`.
+        sysctls?: Record<string, string>;
       };
       cwd: string;
       helper?: RuntimeHelperDescriptor;

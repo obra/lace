@@ -36,6 +36,12 @@ export interface ContainerConfig {
   // persistent container runtimes so the daemon resurrects them after host reboot.
   // Absent ⇒ no restart flag emitted (default no-restart behavior).
   restartPolicy?: 'unless-stopped';
+
+  // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
+  // Absent or empty ⇒ no --sysctl flag emitted. PRI-1790: sen-browser needs
+  // `net.ipv6.conf.lo.disable_ipv6=0` so chrome's port-availability check
+  // can bind to `::1`.
+  sysctls?: Record<string, string>;
 }
 
 export interface ContainerMount {

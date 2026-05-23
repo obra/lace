@@ -42,6 +42,11 @@ const portMappingSchema = z
 const agentPlacementSchema = z.enum(['host', 'container']).optional().default('host');
 const containerLifecycleSchema = z.enum(['session', 'persistent']);
 
+// Linux sysctl keys are dot-separated lowercase tokens (e.g.
+// net.ipv6.conf.lo.disable_ipv6). Validate the shape here so a typo in the
+// persona file fails at parse time instead of mid-`docker create`.
+const sysctlKeySchema = z.string().regex(/^[a-z0-9_]+(\.[a-z0-9_]+)+$/);
+
 const runtimeContainerSchema = z
   .object({
     type: z.literal('container'),
@@ -54,6 +59,10 @@ const runtimeContainerSchema = z
     mounts: z.record(mountNameSchema, z.string().min(1)),
     env: z.record(z.string(), z.string()).optional().default({}),
     ports: z.array(portMappingSchema).optional(),
+    // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
+    // PRI-1790: sen-browser needs `net.ipv6.conf.lo.disable_ipv6=0` so the
+    // container has an `::1` for superpowers-chrome's port-availability check.
+    sysctls: z.record(sysctlKeySchema, z.string()).optional(),
   })
   .strict();
 

@@ -340,6 +340,31 @@ describe('buildPersonaContainerSpec', () => {
     expect(spec.env).toEqual({ FOO: 'bar' });
     expect(spec.ports).toEqual([{ host: 9222, container: 9222 }]);
   });
+
+  it('passes through sysctls when provided (PRI-1790)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      runtime: {
+        ...baseRuntime,
+        sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' },
+      },
+      containerMounts: {},
+    });
+
+    expect(spec.sysctls).toEqual({ 'net.ipv6.conf.lo.disable_ipv6': '0' });
+  });
+
+  it('leaves spec.sysctls undefined when persona declares none', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      runtime: baseRuntime,
+      containerMounts: {},
+    });
+
+    expect(spec.sysctls).toBeUndefined();
+  });
 });
 
 describe('buildPersonaContainerSpec with containerLifecycle: persistent', () => {
@@ -370,6 +395,20 @@ describe('buildPersonaContainerSpec with containerLifecycle: persistent', () => 
     expect(spec.env).toEqual({});
     // Persistent lifecycle has no ports.
     expect(spec.ports).toBeUndefined();
+  });
+
+  it('passes through sysctls for persistent lifecycle (PRI-1790)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'sen',
+      runtime: {
+        ...basePersistentRuntime,
+        sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' },
+      },
+      containerMounts: {},
+    });
+
+    expect(spec.sysctls).toEqual({ 'net.ipv6.conf.lo.disable_ipv6': '0' });
   });
 
   it('resolves runtime.mounts against the registry', () => {

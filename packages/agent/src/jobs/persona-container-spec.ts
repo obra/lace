@@ -231,6 +231,7 @@ export function buildPersonaContainerSpec(input: {
       mounts,
       env,
       restartPolicy: 'unless-stopped',
+      ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
     };
   }
 
@@ -241,6 +242,7 @@ export function buildPersonaContainerSpec(input: {
     mounts,
     env,
     ...(runtime.ports ? { ports: runtime.ports } : {}),
+    ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
   };
 }
 
@@ -265,5 +267,6 @@ export function containerSpecToRuntimeSpec(input: {
     ...(spec.env ? { env: spec.env } : {}),
     ...(spec.ports ? { ports: spec.ports } : {}),
     ...(spec.restartPolicy ? { restartPolicy: spec.restartPolicy } : {}),
+    ...(spec.sysctls ? { sysctls: spec.sysctls } : {}),
   };
 }

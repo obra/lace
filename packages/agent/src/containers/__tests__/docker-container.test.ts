@@ -708,6 +708,64 @@ describe('DockerContainerRuntime', () => {
       const hasRestart = args!.some((a) => a.startsWith('--restart'));
       expect(hasRestart).toBe(false);
     });
+  });
+
+  describe('sysctls (PRI-1790)', () => {
+    it('emits --sysctl key=value for each entry in config.sysctls', async () => {
+      await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+        sysctls: {
+          'net.ipv6.conf.lo.disable_ipv6': '0',
+          'net.ipv4.ip_local_port_range': '9222 12111',
+        },
+      });
+
+      const args = findCallWithSubcommand('create');
+      expect(args).toBeDefined();
+      // Each sysctl is emitted as a separate --sysctl flag with key=value.
+      const sysctlFlags: string[] = [];
+      for (let i = 0; i < args!.length; i++) {
+        if (args![i] === '--sysctl' && i + 1 < args!.length) {
+          sysctlFlags.push(args![i + 1]);
+        }
+      }
+      expect(sysctlFlags).toEqual(
+        expect.arrayContaining([
+          'net.ipv6.conf.lo.disable_ipv6=0',
+          'net.ipv4.ip_local_port_range=9222 12111',
+        ])
+      );
+      expect(sysctlFlags).toHaveLength(2);
+    });
+
+    it('emits no --sysctl flag when sysctls is absent or empty', async () => {
+      await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+
+      const args = findCallWithSubcommand('create');
+      expect(args).toBeDefined();
+      expect(args!.some((a) => a === '--sysctl')).toBe(false);
+
+      mockExecFile.mockClear();
+
+      await runtime.create({
+        name: 'svc2',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+        sysctls: {},
+      });
+      const args2 = findCallWithSubcommand('create');
+      expect(args2).toBeDefined();
+      expect(args2!.some((a) => a === '--sysctl')).toBe(false);
+    });
 
     it('uses config.id verbatim (no lace- prefix) when id+name both set with distinct id', async () => {
       // This shape is produced by ContainerManager when spec.containerId is

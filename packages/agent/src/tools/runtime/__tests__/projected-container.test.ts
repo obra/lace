@@ -134,6 +134,28 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
+  it('threads descriptor sysctls into the materialized spec (PRI-1790)', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    projectedDescriptor.spec.sysctls = { 'net.ipv6.conf.lo.disable_ipv6': '0' };
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
+
+    expect(manager.materialize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' },
+      })
+    );
+    expect(manager.materialize.mock.invocationCallOrder[0]).toBeLessThan(
+      manager.execStream.mock.invocationCallOrder[0]
+    );
+  });
+
   it('mounts host-provided runtime helpers read-only when helper mode is mount', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = {
