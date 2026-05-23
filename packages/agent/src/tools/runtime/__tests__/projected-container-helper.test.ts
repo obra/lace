@@ -133,6 +133,43 @@ describe('ProjectedContainerToolRuntime helper', () => {
     }
   });
 
+  it('times out helper-backed operations that do not produce a response', async () => {
+    vi.useFakeTimers();
+    try {
+      const manager = {
+        materialize: vi.fn().mockResolvedValue({
+          spec: containerDescriptorWithHelper().spec,
+          containerId: 'container_123',
+          state: 'running' as const,
+        }),
+        execStream: vi.fn().mockResolvedValue({
+          stdin: new PassThrough(),
+          stdout: new PassThrough(),
+          stderr: new PassThrough(),
+          wait: vi.fn().mockReturnValue(new Promise(() => undefined)),
+          kill: vi.fn(),
+        }),
+      };
+      const runtime = new ProjectedContainerToolRuntime({
+        id: 'rt_container',
+        containerManager: manager,
+        descriptor: containerDescriptorWithHelper(),
+      });
+
+      const path = await runtime.paths.resolve('/tmp/hangs.txt');
+      const read = runtime.fs.readTextFile(path);
+      // Attach a handler eagerly so vitest does not log a transient
+      // unhandled rejection when fake timers drive the abort synchronously.
+      read.catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(30_001);
+
+      await expect(read).rejects.toThrow(/timed out/i);
+      expect((await manager.execStream.mock.results[0].value).kill).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('passes fetch options to helper-backed fetch', async () => {
     const responseBytes = Uint8Array.from([0, 255, 65, 66]);
     const stdin = new PassThrough();

@@ -736,6 +736,8 @@ class ProjectedContainerNetworkClient implements RuntimeNetworkClient {
   }
 }
 
+const DEFAULT_HELPER_REQUEST_TIMEOUT_MS = 30_000;
+
 class ProjectedContainerRuntimeHelper {
   constructor(
     private readonly descriptor: ProjectedContainerToolRuntimeDescriptor,
@@ -748,35 +750,62 @@ class ProjectedContainerRuntimeHelper {
       helperUnavailable();
     }
 
-    const handle = await this.processRunner.start(helper.command, {
-      cwd: this.descriptor.cwd,
-      signal,
-    });
-    if (!handle.stdin || !handle.stdout) {
-      handle.kill();
-      throw new Error('Projected runtime helper stream unavailable');
-    }
+    const timeoutController = new AbortController();
+    const timeout = setTimeout(
+      () => timeoutController.abort(new Error('Projected runtime helper request timed out')),
+      DEFAULT_HELPER_REQUEST_TIMEOUT_MS
+    );
+    timeout.unref?.();
+    const effectiveSignal = signal ?? timeoutController.signal;
 
-    const stdout = streamToString(handle.stdout);
-    const stderr = streamToString(handle.stderr);
-    await writeStreamAndClose(handle.stdin, encodeHelperRequest(request));
+    try {
+      const handle = await this.processRunner.start(helper.command, {
+        cwd: this.descriptor.cwd,
+        signal: effectiveSignal,
+      });
+      if (!handle.stdin || !handle.stdout) {
+        handle.kill();
+        throw new Error('Projected runtime helper stream unavailable');
+      }
 
-    const [stdoutOutput, stderrOutput, completion] = await Promise.all([
-      stdout,
-      stderr,
-      handle.completion,
-    ]);
-    if (completion.exitCode !== 0) {
-      const message =
-        stderrOutput.trim() || `Projected runtime helper exited ${completion.exitCode}`;
-      throw new Error(message);
-    }
+      const stdout = streamToString(handle.stdout);
+      const stderr = streamToString(handle.stderr);
+      await writeStreamAndClose(handle.stdin, encodeHelperRequest(request));
 
-    const response = decodeHelperResponse(firstResponseLine(stdoutOutput));
-    if (!response.ok) {
-      throw new Error(response.error.message);
+      // Prevent unhandled rejection if the race resolves to the data side
+      // before this rejection is awaited.
+      const timeoutRejection = new Promise<never>((_, reject) => {
+        const onAbort = () => {
+          handle.kill('SIGKILL');
+          reject(timeoutController.signal.reason as Error);
+        };
+        if (timeoutController.signal.aborted) {
+          onAbort();
+          return;
+        }
+        timeoutController.signal.addEventListener('abort', onAbort, { once: true });
+      });
+      timeoutRejection.catch(() => undefined);
+
+      const [stdoutOutput, stderrOutput, completion] = await Promise.race([
+        Promise.all([stdout, stderr, handle.completion]),
+        timeoutRejection,
+      ]);
+
+      if (completion.exitCode !== 0) {
+        const message =
+          stderrOutput.trim() || `Projected runtime helper exited ${completion.exitCode}`;
+        throw new Error(message);
+      }
+
+      const response = decodeHelperResponse(firstResponseLine(stdoutOutput));
+      if (!response.ok) {
+        throw new Error(response.error.message);
+      }
+      return response.value;
+    } finally {
+      clearTimeout(timeout);
     }
-    return response.value;
   }
 }
 
