@@ -220,13 +220,19 @@ export async function handleSlashCommand(
       try {
         const workDir = state.activeSession.meta.workDir;
         const sessionConfig = state.activeSession.state.config;
+        const persona = state.activeSession.meta.persona;
 
         // Create a new session
         const newSessionId = `sess_${randomUUID()}`;
         const created = new Date().toISOString();
         const newSessionDir = getSessionDir(newSessionId);
 
-        writeSessionMeta(newSessionDir, { sessionId: newSessionId, workDir, created });
+        writeSessionMeta(newSessionDir, {
+          sessionId: newSessionId,
+          workDir,
+          created,
+          ...(persona ? { persona } : {}),
+        });
         writeSessionState(newSessionDir, {
           nextEventSeq: 0,
           nextStreamSeq: 0,

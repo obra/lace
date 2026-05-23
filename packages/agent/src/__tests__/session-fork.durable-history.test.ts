@@ -444,4 +444,36 @@ describe('session/fork durable history', () => {
       server.close();
     }
   });
+
+  it('inherits the source session persona on session/fork', async () => {
+    const userPersonasDir = join(tempDir, 'personas');
+    mkdirSync(userPersonasDir, { recursive: true });
+    writeFileSync(join(userPersonasDir, 'forkpersona.md'), 'You are forkpersona.');
+
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      await client.request(
+        'initialize',
+        defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+      );
+
+      const created = (await client.request('session/new', {
+        cwd: tempDir,
+        mcpServers: [],
+        persona: 'forkpersona',
+      })) as { sessionId: string };
+      expect(loadSession(created.sessionId).meta.persona).toBe('forkpersona');
+
+      const forked = (await client.request('session/fork', {
+        sessionId: created.sessionId,
+      })) as { sessionId: string };
+
+      expect(loadSession(forked.sessionId).meta.persona).toBe('forkpersona');
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
 });

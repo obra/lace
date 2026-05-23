@@ -320,6 +320,63 @@ scoped persona`
     expect(loaded.state.config?.toolScope).toContain('ripgrep_search');
   });
 
+  it('persists the requested persona name in session meta.json', async () => {
+    writeFileSync(join(userPersonasDir, 'recall-persona.md'), 'You are a recall persona.');
+
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request(
+      'initialize',
+      defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+    );
+
+    const created = (await client.request('session/new', {
+      cwd: tempDir,
+      persona: 'recall-persona',
+    })) as { sessionId: string };
+
+    const loaded = loadSession(created.sessionId);
+    expect(loaded.meta.persona).toBe('recall-persona');
+  });
+
+  it('persists nested config.persona in session meta.json', async () => {
+    writeFileSync(join(userPersonasDir, 'nested-persona.md'), 'You are a nested persona.');
+
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request(
+      'initialize',
+      defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+    );
+
+    const created = (await client.request('session/new', {
+      cwd: tempDir,
+      config: { persona: 'nested-persona' },
+    })) as { sessionId: string };
+
+    const loaded = loadSession(created.sessionId);
+    expect(loaded.meta.persona).toBe('nested-persona');
+  });
+
+  it('omits persona from meta.json when none is supplied', async () => {
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request(
+      'initialize',
+      defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+    );
+
+    const created = (await client.request('session/new', {
+      cwd: tempDir,
+    })) as { sessionId: string };
+
+    const loaded = loadSession(created.sessionId);
+    expect(loaded.meta.persona).toBeUndefined();
+  });
+
   it('persona tools are additive over lace builtins (MCP-only persona keeps builtins)', async () => {
     // Models the kata-#31 scenario: a persona declares only specialized
     // (e.g. MCP-namespaced) tools. Lace builtins are part of the platform and

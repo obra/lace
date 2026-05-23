@@ -459,6 +459,7 @@ export function registerSessionHandlers(
         sessionId,
         workDir: parsed.cwd,
         created,
+        ...(requestedPersona ? { persona: requestedPersona } : {}),
         ...(parsed.parent ? { parent: parsed.parent } : {}),
       });
       writeSessionState(sessionDir, {
@@ -595,7 +596,12 @@ export function registerSessionHandlers(
     });
 
     const forkedSessionDir = getSessionDir(forkedSessionId);
-    writeSessionMeta(forkedSessionDir, { sessionId: forkedSessionId, workDir: forkedCwd, created });
+    writeSessionMeta(forkedSessionDir, {
+      sessionId: forkedSessionId,
+      workDir: forkedCwd,
+      created,
+      ...(sourceSession.meta.persona ? { persona: sourceSession.meta.persona } : {}),
+    });
 
     // Copy state from source session with optional MCP server overrides
     const forkedState: SessionState = {
