@@ -170,6 +170,58 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
+  it('uses a stable mounted helper when adopting an existing persistent container', async () => {
+    const helperPath = '/host/lace-runtime-helper.js';
+    const projectedDescriptor = {
+      ...descriptor(),
+      spec: {
+        ...descriptor().spec,
+        name: 'box',
+        containerId: 'sen-box',
+        restartPolicy: 'unless-stopped' as const,
+      },
+      helper: {
+        mode: 'mount' as const,
+        hostPath: helperPath,
+        containerPath: '/usr/local/bin/lace-runtime-helper.js',
+        command: ['node', '/usr/local/bin/lace-runtime-helper.js'],
+      },
+    };
+    const manager = createFakeContainerManager();
+    manager.materialize.mockResolvedValueOnce({
+      spec: {
+        name: 'box',
+        containerId: 'sen-box',
+        image: `example/app@${projectedDescriptor.spec.resolvedImageDigest}`,
+        workingDirectory: '/workspace',
+        mounts: [
+          { source: helperPath, target: '/usr/local/bin/lace-runtime-helper.js', readonly: true },
+        ],
+        restartPolicy: 'unless-stopped',
+      },
+      containerId: 'sen-box',
+      state: 'running',
+    });
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_persistent',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await runtime.process.exec(['true']);
+
+    expect(manager.materialize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'box',
+        containerId: 'sen-box',
+        restartPolicy: 'unless-stopped',
+        mounts: expect.arrayContaining([
+          { source: helperPath, target: '/usr/local/bin/lace-runtime-helper.js', readonly: true },
+        ]),
+      })
+    );
+  });
+
   it('copies host-provided runtime helpers before creating copy-mode containers', async () => {
     const helperRoot = await mkdtemp(join(tmpdir(), 'lace-helper-source-'));
     const helperPath = join(helperRoot, 'runtime-helper.js');
