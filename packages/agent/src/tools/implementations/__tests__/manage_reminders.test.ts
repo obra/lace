@@ -1,5 +1,22 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { parseManageRemindersInput } from '../manage_reminders';
+import { parseManageRemindersInput, ManageRemindersTool } from '../manage_reminders';
+import { ReminderScheduler, ReminderStore } from '@lace/agent/reminders';
+import type { ReminderRow } from '@lace/agent/reminders';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { ToolContext } from '@lace/agent/tools/types';
+
+function tempSessionDir(): string {
+  return mkdtempSync(join(tmpdir(), 'lace-mr-tool-'));
+}
+
+function ctxWithScheduler(sched: ReminderScheduler): ToolContext {
+  return {
+    signal: new AbortController().signal,
+    reminderScheduler: sched,
+  } as ToolContext;
+}
 
 describe('parseManageRemindersInput', () => {
   const origTZ = process.env.TZ;
@@ -110,5 +127,110 @@ describe('parseManageRemindersInput', () => {
     expect(() =>
       parseManageRemindersInput({ action: 'frobnicate' } as never)
     ).toThrow(/action/i);
+  });
+});
+
+describe('ManageRemindersTool execution', () => {
+  const origTZ = process.env.TZ;
+  beforeEach(() => { process.env.TZ = 'UTC'; });
+  afterEach(() => { process.env.TZ = origTZ; });
+
+  it('schedule returns the new row as JSON', async () => {
+    const dir = tempSessionDir();
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 1_700_000_000_000,
+      notifier: async () => {},
+    });
+    await sched.start();
+    const tool = new ManageRemindersTool();
+    const result = await tool.execute(
+      { action: 'schedule', prompt: 'hi', next: 300 },
+      ctxWithScheduler(sched)
+    );
+    expect(result.status).toBe('completed');
+    const body = JSON.parse((result.content?.[0] as { text: string }).text) as Record<string, unknown>;
+    expect(body.id).toMatch(/^reminder_[0-9a-f]{12}$/);
+    expect(body.next_fire_at).toBeDefined();
+    expect(body.recurs).toBe(null);
+    await sched.stop();
+  });
+
+  it('cancel returns cancelled:true for an existing reminder', async () => {
+    const dir = tempSessionDir();
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 0,
+      notifier: async () => {},
+    });
+    await sched.start();
+    const { id } = await sched.schedule({
+      prompt: 'p',
+      delaySeconds: 300,
+      recurs: null,
+    });
+    const tool = new ManageRemindersTool();
+    const result = await tool.execute({ action: 'cancel', id }, ctxWithScheduler(sched));
+    const body = JSON.parse((result.content?.[0] as { text: string }).text) as { cancelled: boolean };
+    expect(body.cancelled).toBe(true);
+    await sched.stop();
+  });
+
+  it('list returns rows in next_fire_at order with wire-shape recurs', async () => {
+    const dir = tempSessionDir();
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 1_700_000_000_000,
+      notifier: async () => {},
+    });
+    await sched.start();
+    await sched.schedule({ prompt: 'cron', delaySeconds: null, recurs: { kind: 'cron', expr: '0 9 * * 1-5' } });
+    await sched.schedule({
+      prompt: 'count',
+      delaySeconds: 1800,
+      recurs: { kind: 'count', interval_ms: 1800_000, remaining: 5 },
+    });
+    await sched.schedule({ prompt: 'oneshot', delaySeconds: 300, recurs: null });
+
+    const tool = new ManageRemindersTool();
+    const result = await tool.execute({ action: 'list' }, ctxWithScheduler(sched));
+    const body = JSON.parse((result.content?.[0] as { text: string }).text) as {
+      reminders: Array<{ recurs: unknown }>;
+    };
+    expect(body.reminders).toHaveLength(3);
+    // The cron row's recurs is the cron string; count is the remaining number; one-shot is null.
+    expect(body.reminders.find((r) => r.recurs === '0 9 * * 1-5')).toBeDefined();
+    expect(body.reminders.find((r) => r.recurs === 5)).toBeDefined();
+    expect(body.reminders.find((r) => r.recurs === null)).toBeDefined();
+    await sched.stop();
+  });
+
+  it('list returns recurs:null for count-interval rows with remaining=1', async () => {
+    const dir = tempSessionDir();
+    new ReminderStore(dir).save([
+      {
+        id: 'reminder_aaaaaaaaaaaa',
+        created_at: 0,
+        next_fire_at: 1000,
+        prompt: 'p',
+        recurs: { kind: 'count', interval_ms: 300_000, remaining: 1 },
+        fired_at: null,
+        fire_count: 0,
+      } satisfies ReminderRow,
+    ]);
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 0,
+      notifier: async () => {},
+    });
+    await sched.start();
+    const tool = new ManageRemindersTool();
+    const result = await tool.execute({ action: 'list' }, ctxWithScheduler(sched));
+    const body = JSON.parse((result.content?.[0] as { text: string }).text) as {
+      reminders: Array<{ recurs: unknown; next?: number }>;
+    };
+    expect(body.reminders[0].recurs).toBe(null);
+    expect(body.reminders[0].next).toBe(300);
+    await sched.stop();
   });
 });

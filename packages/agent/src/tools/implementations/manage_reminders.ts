@@ -175,3 +175,117 @@ export function parseManageRemindersInput(rawInput: unknown): ParsedInput {
 }
 
 export { schema as manageRemindersSchema };
+
+import { Tool } from '../tool';
+import { formatAbsoluteTime } from '@lace/agent/notifications/format-time';
+import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
+
+function recursToWire(recurs: ReminderRecurs):
+  | { recurs: string }
+  | { recurs: number; next: number }
+  | { recurs: null; next?: number } {
+  if (recurs === null) return { recurs: null };
+  if (recurs.kind === 'cron') return { recurs: recurs.expr };
+  if (recurs.kind === 'count') {
+    // Special-case remaining=1 → present as one-shot for clean clone round-trip (spec §2.4).
+    if (recurs.remaining === 1) {
+      return { recurs: null, next: Math.round(recurs.interval_ms / 1000) };
+    }
+    return { recurs: recurs.remaining, next: Math.round(recurs.interval_ms / 1000) };
+  }
+  return { recurs: null };
+}
+
+function rowToWire(row: {
+  id: string;
+  created_at: number;
+  next_fire_at: number;
+  prompt: string;
+  recurs: ReminderRecurs;
+  fired_at: number | null;
+  fire_count: number;
+}): Record<string, unknown> {
+  const tz = getAgentTimezone();
+  return {
+    id: row.id,
+    prompt: row.prompt,
+    next_fire_at: formatAbsoluteTime(row.next_fire_at, tz),
+    set_at: formatAbsoluteTime(row.created_at, tz),
+    last_fired_at: row.fired_at !== null ? formatAbsoluteTime(row.fired_at, tz) : null,
+    fire_count: row.fire_count,
+    ...recursToWire(row.recurs),
+  };
+}
+
+function ok(body: Record<string, unknown>): ToolResult {
+  return { status: 'completed', content: [{ type: 'text', text: JSON.stringify(body) }] };
+}
+
+function err(text: string): ToolResult {
+  return { status: 'failed', content: [{ type: 'text', text }] };
+}
+
+const MANAGE_REMINDERS_DESCRIPTION = [
+  'Schedule, list, or cancel reminders for your future self. A reminder fires a <notification kind="reminder"> block into your next turn at the scheduled time, carrying the prompt you wrote when you scheduled it.',
+  '',
+  'Actions:',
+  '- schedule {prompt, next?, recurs?} — Create a reminder.',
+  '  next: <seconds> for relative delay; or "<ISO with Z or ±HH:MM offset>" for absolute. Required unless recurs is cron.',
+  '  recurs: "<cron>" for calendar-aware recurrence (evaluated in your local timezone, accounting for DST). For absolute scheduling more than a few days out, prefer cron over `next: <ISO>` — cron tracks DST correctly while ISO+offset is instant-locked.',
+  '  recurs: <count> for "fire N times at next-second intervals." Requires next as seconds. Minimum interval is 5 minutes.',
+  '- cancel {id} — Stop a reminder. Does not retract notifications already in your event log.',
+  '- list — Return all pending reminders, sorted by next fire time. For partly-fired count-interval reminders, recurs echoes the remaining count (or null when 1 remains) so you can copy fields into a new schedule call.',
+].join('\n');
+
+export class ManageRemindersTool extends Tool {
+  name = 'manage_reminders';
+  description = MANAGE_REMINDERS_DESCRIPTION;
+  schema = schema;
+  annotations: ToolAnnotations = {
+    title: 'Manage reminders',
+    safeInternal: true,
+  };
+
+  protected async executeValidated(
+    rawArgs: ManageRemindersWireInput,
+    context: ToolContext
+  ): Promise<ToolResult> {
+    const { reminderScheduler } = context;
+    if (!reminderScheduler) {
+      return err('manage_reminders requires a reminderScheduler in context');
+    }
+
+    let parsed: ParsedInput;
+    try {
+      parsed = parseManageRemindersInput(rawArgs);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+
+    if (parsed.kind === 'list') {
+      const rows = await reminderScheduler.list();
+      return ok({ reminders: rows.map(rowToWire) });
+    }
+
+    if (parsed.kind === 'cancel') {
+      const result = await reminderScheduler.cancel(parsed.id);
+      return ok(result as Record<string, unknown>);
+    }
+
+    // schedule
+    try {
+      const delaySeconds =
+        parsed.absoluteFireAt !== null
+          ? Math.max(0, Math.round((parsed.absoluteFireAt - Date.now()) / 1000))
+          : parsed.delaySeconds;
+      const result = await reminderScheduler.schedule({
+        prompt: parsed.prompt,
+        delaySeconds,
+        recurs: parsed.recurs,
+      });
+      return ok(rowToWire(result.row));
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+}

@@ -4,6 +4,7 @@
 import type { CombinedTokenUsage } from '@lace/agent/token-management/types';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { AlarmScheduler } from '@lace/agent/alarms/alarm-scheduler';
+import type { ReminderScheduler } from '@lace/agent/reminders';
 import type { MountRegistryEntry } from '@lace/agent/server-types';
 import type { RuntimeExecutionBinding, RuntimePath, ToolRuntime } from './runtime/types';
 
@@ -41,6 +42,9 @@ export interface ToolContext {
   alarmScheduler?: AlarmScheduler;
   activeSessionId?: string;
   activeSessionDir?: string;
+
+  // Reminder scheduling (provided by the session runner for manage_reminders).
+  reminderScheduler?: ReminderScheduler;
 
   // Read-only view of the embedder-supplied named-mount registry. Set by the
   // session runner when available. Used by tools that need to translate
