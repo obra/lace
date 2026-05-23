@@ -3,8 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildPersonaContainerSpec,
-  buildPersonaBoxSpec,
-  PERSONA_BOX_CONTAINER_ID,
+  PERSISTENT_PERSONA_CONTAINER_ID,
   PersonaContainerSpecError,
   SUBAGENT_USER_PERSONAS_TARGET,
   SUBAGENT_LACE_DATA_TARGET,
@@ -14,6 +13,8 @@ import {
 
 const baseRuntime = {
   type: 'container' as const,
+  agentPlacement: 'host' as const,
+  containerLifecycle: 'session' as const,
   image: 'devcontainer:latest',
   workingDirectory: '/workspace',
   mounts: {},
@@ -341,38 +342,42 @@ describe('buildPersonaContainerSpec', () => {
   });
 });
 
-describe('buildPersonaBoxSpec (kata #62)', () => {
-  const baseBoxRuntime = {
-    type: 'box' as const,
+describe('buildPersonaContainerSpec with containerLifecycle: persistent', () => {
+  const basePersistentRuntime = {
+    type: 'container' as const,
+    agentPlacement: 'host' as const,
+    containerLifecycle: 'persistent' as const,
     image: 'sen-box:dev',
     workingDirectory: '/home/agent',
     mounts: {},
   };
 
   it('produces a single-tenant spec with fixed name, containerId, and restartPolicy', () => {
-    const spec = buildPersonaBoxSpec({
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
       personaName: 'sen',
-      runtime: baseBoxRuntime,
+      runtime: basePersistentRuntime,
       containerMounts: {},
     });
 
     expect(spec.name).toBe('box');
-    expect(spec.containerId).toBe(PERSONA_BOX_CONTAINER_ID);
+    expect(spec.containerId).toBe(PERSISTENT_PERSONA_CONTAINER_ID);
     expect(spec.containerId).toBe('sen-box');
     expect(spec.restartPolicy).toBe('unless-stopped');
     expect(spec.image).toBe('sen-box:dev');
     expect(spec.workingDirectory).toBe('/home/agent');
     expect(spec.mounts).toEqual([]);
     expect(spec.env).toEqual({});
-    // Box has no ports in v1.
+    // Persistent lifecycle has no ports.
     expect(spec.ports).toBeUndefined();
   });
 
   it('resolves runtime.mounts against the registry', () => {
-    const spec = buildPersonaBoxSpec({
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
       personaName: 'sen',
       runtime: {
-        ...baseBoxRuntime,
+        ...basePersistentRuntime,
         mounts: { work: '/work', knowledge: '/knowledge' },
       },
       containerMounts: {
@@ -390,9 +395,10 @@ describe('buildPersonaBoxSpec (kata #62)', () => {
   });
 
   it('auto-injects persona + lace-data + credentials and sets LACE_DIR', () => {
-    const spec = buildPersonaBoxSpec({
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
       personaName: 'sen',
-      runtime: baseBoxRuntime,
+      runtime: basePersistentRuntime,
       containerMounts: {
         persona: { hostPath: '/host/agent-personas', readonly: true },
         'lace-data': { hostPath: '/host/lace-data', readonly: false },
@@ -418,10 +424,11 @@ describe('buildPersonaBoxSpec (kata #62)', () => {
     expect(spec.env.LACE_DIR).toBe(SUBAGENT_LACE_DATA_TARGET);
   });
 
-  it('auto-injects the lace registry mount at /lace for box runtimes too (PRI-1774)', () => {
-    const spec = buildPersonaBoxSpec({
+  it('auto-injects the lace registry mount at /lace for persistent runtimes too (PRI-1774)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
       personaName: 'sen',
-      runtime: baseBoxRuntime,
+      runtime: basePersistentRuntime,
       containerMounts: {
         lace: { hostPath: '/host/lace', readonly: true },
       },
@@ -436,9 +443,10 @@ describe('buildPersonaBoxSpec (kata #62)', () => {
 
   it('rejects unknown mount name', () => {
     expect(() =>
-      buildPersonaBoxSpec({
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess1',
         personaName: 'sen',
-        runtime: { ...baseBoxRuntime, mounts: { phantom: '/phantom' } },
+        runtime: { ...basePersistentRuntime, mounts: { phantom: '/phantom' } },
         containerMounts: {},
       })
     ).toThrow(/unknown mount 'phantom'/);
@@ -446,25 +454,28 @@ describe('buildPersonaBoxSpec (kata #62)', () => {
 
   it('rejects reserved mount names', () => {
     expect(() =>
-      buildPersonaBoxSpec({
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess1',
         personaName: 'sen',
-        runtime: { ...baseBoxRuntime, mounts: { persona: '/p' } },
+        runtime: { ...basePersistentRuntime, mounts: { persona: '/p' } },
         containerMounts: { persona: { hostPath: '/h', readonly: true } },
       })
     ).toThrow(/reserved/);
 
     expect(() =>
-      buildPersonaBoxSpec({
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess1',
         personaName: 'sen',
-        runtime: { ...baseBoxRuntime, mounts: { 'lace-data': '/p' } },
+        runtime: { ...basePersistentRuntime, mounts: { 'lace-data': '/p' } },
         containerMounts: { 'lace-data': { hostPath: '/h', readonly: false } },
       })
     ).toThrow(/reserved/);
 
     expect(() =>
-      buildPersonaBoxSpec({
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess1',
         personaName: 'sen',
-        runtime: { ...baseBoxRuntime, mounts: { credentials: '/p' } },
+        runtime: { ...basePersistentRuntime, mounts: { credentials: '/p' } },
         containerMounts: { credentials: { hostPath: '/h', readonly: true } },
       })
     ).toThrow(/reserved/);
@@ -472,18 +483,20 @@ describe('buildPersonaBoxSpec (kata #62)', () => {
 
   it('rejects unsafe personaName', () => {
     expect(() =>
-      buildPersonaBoxSpec({
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess1',
         personaName: '../etc/passwd',
-        runtime: baseBoxRuntime,
+        runtime: basePersistentRuntime,
         containerMounts: {},
       })
     ).toThrow(/Invalid personaName/);
   });
 
   it('passes through runtime.env', () => {
-    const spec = buildPersonaBoxSpec({
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
       personaName: 'sen',
-      runtime: { ...baseBoxRuntime, env: { FOO: 'bar' } },
+      runtime: { ...basePersistentRuntime, env: { FOO: 'bar' } },
       containerMounts: {},
     });
 
@@ -492,9 +505,10 @@ describe('buildPersonaBoxSpec (kata #62)', () => {
 
   it('throws PersonaContainerSpecError for invalid input', () => {
     expect(() =>
-      buildPersonaBoxSpec({
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess1',
         personaName: 'sen',
-        runtime: { ...baseBoxRuntime, mounts: { phantom: '/p' } },
+        runtime: { ...basePersistentRuntime, mounts: { phantom: '/p' } },
         containerMounts: {},
       })
     ).toThrow(PersonaContainerSpecError);

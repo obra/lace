@@ -35,6 +35,8 @@ class FakeContainerManager {
 
 const containerRuntime = {
   type: 'container' as const,
+  agentPlacement: 'container' as const,
+  containerLifecycle: 'session' as const,
   image: 'devcontainer:latest',
   workingDirectory: '/workspace',
   mounts: { scratch: '/scratch' },
@@ -175,18 +177,21 @@ describe('spawnSubagent', () => {
     expect(fakeManager.materialize).not.toHaveBeenCalled();
   });
 
-  it('box runtime materializes box spec and execStreams the in-container lace-agent (kata #62)', async () => {
-    const boxRuntime = {
-      type: 'box' as const,
+  it('persistent lifecycle materializes persistent spec and execStreams the in-container lace-agent', async () => {
+    const persistentRuntime = {
+      type: 'container' as const,
+      agentPlacement: 'container' as const,
+      containerLifecycle: 'persistent' as const,
       image: 'sen-box:dev',
       workingDirectory: '/home/agent',
       mounts: {},
+      env: {},
     };
 
     const handle = await spawnSubagent({
       parentSessionId: 'sess1',
       personaName: 'sen',
-      personaBoxRuntime: boxRuntime,
+      personaContainerRuntime: persistentRuntime,
       containerManager: fakeManager as unknown as ContainerManager,
       containerMounts: {},
     });
@@ -208,16 +213,19 @@ describe('spawnSubagent', () => {
     expect(handle.nativeProcess).toBeNull();
   });
 
-  it('box runtime without a containerManager throws (kata #62)', async () => {
+  it('persistent lifecycle without a containerManager throws', async () => {
     await expect(
       spawnSubagent({
         parentSessionId: 'sess1',
         personaName: 'sen',
-        personaBoxRuntime: {
-          type: 'box',
+        personaContainerRuntime: {
+          type: 'container',
+          agentPlacement: 'container',
+          containerLifecycle: 'persistent',
           image: 'sen-box:dev',
           workingDirectory: '/home/agent',
           mounts: {},
+          env: {},
         },
         containerManager: null,
         containerMounts: {},
@@ -225,16 +233,19 @@ describe('spawnSubagent', () => {
     ).rejects.toThrow(SubagentSpawnError);
   });
 
-  it('box runtime without a personaName throws (kata #62)', async () => {
+  it('persistent lifecycle without a personaName throws', async () => {
     await expect(
       spawnSubagent({
         parentSessionId: 'sess1',
         personaName: undefined,
-        personaBoxRuntime: {
-          type: 'box',
+        personaContainerRuntime: {
+          type: 'container',
+          agentPlacement: 'container',
+          containerLifecycle: 'persistent',
           image: 'sen-box:dev',
           workingDirectory: '/home/agent',
           mounts: {},
+          env: {},
         },
         containerManager: fakeManager as unknown as ContainerManager,
         containerMounts: {},

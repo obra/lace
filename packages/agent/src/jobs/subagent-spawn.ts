@@ -7,12 +7,7 @@ import type { ContainerManager } from '@lace/agent/containers/container-manager'
 import type { ContainerSpec } from '@lace/agent/containers/spec';
 import type { ExecStreamHandle } from '@lace/agent/containers/types';
 import type { MountRegistryEntry } from '@lace/agent/server-types';
-import {
-  buildPersonaContainerSpec,
-  buildPersonaBoxSpec,
-  type PersonaContainerRuntime,
-  type PersonaBoxRuntime,
-} from './persona-container-spec';
+import { buildPersonaContainerSpec, type PersonaContainerRuntime } from './persona-container-spec';
 
 /**
  * Uniform handle over a subagent process — either a native child process
@@ -58,12 +53,6 @@ export interface SpawnSubagentOptions {
   parentSessionId: string;
   personaName?: string;
   personaContainerRuntime?: PersonaContainerRuntime;
-  // Box runtime (kata #62) is plumbed in parallel rather than via a unified
-  // field; mutually exclusive with personaContainerRuntime at the persona
-  // level (the runtime discriminator picks one), so two optional fields are
-  // simpler than renaming and updating every call site. spawnSubagent
-  // dispatches on whichever is set.
-  personaBoxRuntime?: PersonaBoxRuntime;
   containerManager: ContainerManager | null;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
 }
@@ -97,26 +86,6 @@ export async function spawnSubagent(options: SpawnSubagentOptions): Promise<Suba
       parentSessionId: options.parentSessionId,
       personaName: options.personaName,
       runtime: options.personaContainerRuntime,
-      containerManager: options.containerManager,
-      containerMounts: options.containerMounts,
-    });
-  }
-
-  if (options.personaBoxRuntime) {
-    if (!options.personaName) {
-      throw new SubagentSpawnError(
-        'Box runtime spawn requires a persona name (delegate must pass persona arg)'
-      );
-    }
-    if (!options.containerManager) {
-      throw new SubagentSpawnError(
-        `Persona '${options.personaName}' requests a box runtime but the host ` +
-          `platform '${process.platform}' has no supported container runtime.`
-      );
-    }
-    return spawnBoxSubagent({
-      personaName: options.personaName,
-      runtime: options.personaBoxRuntime,
       containerManager: options.containerManager,
       containerMounts: options.containerMounts,
     });
@@ -180,24 +149,6 @@ async function spawnContainerSubagent(input: {
   // are cheap and clearly attributable.
   const spec = buildPersonaContainerSpec({
     parentSessionId: input.parentSessionId,
-    personaName: input.personaName,
-    runtime: input.runtime,
-    containerMounts: input.containerMounts,
-  });
-
-  return materializeAndExecStream(spec, input.containerManager);
-}
-
-async function spawnBoxSubagent(input: {
-  personaName: string;
-  runtime: PersonaBoxRuntime;
-  containerManager: ContainerManager;
-  containerMounts: Readonly<Record<string, MountRegistryEntry>>;
-}): Promise<SubagentProcessHandle> {
-  // buildPersonaBoxSpec validates and produces a single-tenant spec with a
-  // fixed daemon-side container id (sen-box) — materialize will adopt the
-  // existing daemon-side container on subsequent delegates after host reboot.
-  const spec = buildPersonaBoxSpec({
     personaName: input.personaName,
     runtime: input.runtime,
     containerMounts: input.containerMounts,

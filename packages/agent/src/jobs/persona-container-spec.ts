@@ -1,5 +1,5 @@
 // ABOUTME: Build ContainerSpec from a persona's container runtime + mount registry
-// ABOUTME: Validates spec name components and resolves mount names against the registry
+// ABOUTME: Branches on containerLifecycle (session vs persistent) and resolves mounts against the registry
 
 import type { ContainerSpec } from '@lace/agent/containers/spec';
 import type { ContainerMount } from '@lace/agent/containers/types';
@@ -10,8 +10,6 @@ import type { MountRegistryEntry } from '@lace/agent/server-types';
 // Other call sites (JobState, delegate, job-manager options) import this.
 import type { PersonaRuntime } from '@lace/agent/config/persona-registry';
 export type PersonaContainerRuntime = Extract<PersonaRuntime, { type: 'container' }>;
-// Box runtime is single-tenant and long-lived — see kata #62 design notes.
-export type PersonaBoxRuntime = Extract<PersonaRuntime, { type: 'box' }>;
 
 // Spec-name components compose into a container name on the host; defend with
 // an allowlist before composing. Same shape on both sides keeps the rule
@@ -64,9 +62,9 @@ export class PersonaContainerSpecError extends Error {
  * registry, applies the auto-injection rules (persona / lace-data / credentials),
  * and merges runtime.env with the LACE_DIR auto-inject.
  *
- * Used by both `buildPersonaContainerSpec` (per-delegate containers) and
- * `buildPersonaBoxSpec` (single-tenant boxes) so the mount/env contract stays
- * identical across runtime arms.
+ * Used by both lifecycle branches of `buildPersonaContainerSpec` (per-session
+ * and persistent) so the mount/env contract stays identical regardless of
+ * lifecycle.
  */
 function resolvePersonaMountsAndEnv(input: {
   personaName: string;
@@ -192,6 +190,11 @@ function resolvePersonaMountsAndEnv(input: {
   return { mounts, env };
 }
 
+// Fixed daemon-side id for the single-tenant persistent persona container.
+// No per-session suffix, no `lace-` prefix (so the startup reaper's `lace-*`
+// scan ignores it).
+export const PERSISTENT_PERSONA_CONTAINER_ID = 'sen-box';
+
 export function buildPersonaContainerSpec(input: {
   parentSessionId: string;
   personaName: string;
@@ -218,6 +221,18 @@ export function buildPersonaContainerSpec(input: {
     containerMounts,
   });
 
+  if (runtime.containerLifecycle === 'persistent') {
+    return {
+      name: 'box',
+      containerId: PERSISTENT_PERSONA_CONTAINER_ID,
+      image: runtime.image,
+      workingDirectory: runtime.workingDirectory,
+      mounts,
+      env,
+      restartPolicy: 'unless-stopped',
+    };
+  }
+
   return {
     name: `${parentSessionId}-${personaName}`,
     image: runtime.image,
@@ -225,45 +240,5 @@ export function buildPersonaContainerSpec(input: {
     mounts,
     env,
     ...(runtime.ports ? { ports: runtime.ports } : {}),
-  };
-}
-
-// Fixed daemon-side id for the personal box (kata #62). Single-tenant: no
-// per-session suffix, no `lace-` prefix (so the startup reaper's `lace-*`
-// scan ignores it).
-export const PERSONA_BOX_CONTAINER_ID = 'sen-box';
-
-/**
- * Build a ContainerSpec for a persona's `runtime.type: box`. Unlike
- * `buildPersonaContainerSpec`, the box is single-tenant: no parentSessionId
- * in the spec name, fixed daemon-side container id `sen-box`, and a
- * `restartPolicy` so docker auto-restarts it after a host reboot.
- */
-export function buildPersonaBoxSpec(input: {
-  personaName: string;
-  runtime: PersonaBoxRuntime;
-  containerMounts: Readonly<Record<string, MountRegistryEntry>>;
-}): ContainerSpec {
-  const { personaName, runtime, containerMounts } = input;
-
-  if (!SPEC_NAME_COMPONENT_RE.test(personaName)) {
-    throw new PersonaContainerSpecError(`Invalid personaName for box spec name: '${personaName}'`);
-  }
-
-  const { mounts, env } = resolvePersonaMountsAndEnv({
-    personaName,
-    runtimeMounts: runtime.mounts,
-    runtimeEnv: runtime.env,
-    containerMounts,
-  });
-
-  return {
-    name: 'box',
-    containerId: PERSONA_BOX_CONTAINER_ID,
-    image: runtime.image,
-    workingDirectory: runtime.workingDirectory,
-    mounts,
-    env,
-    restartPolicy: 'unless-stopped',
   };
 }
