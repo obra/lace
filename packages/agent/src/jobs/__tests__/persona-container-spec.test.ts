@@ -10,6 +10,7 @@ import {
   SUBAGENT_LACE_TARGET,
 } from '@lace/agent/jobs/persona-container-spec';
 
+// per_invocation requires childSessionId + scratchDirHostPath
 const baseRuntime = {
   type: 'container' as const,
   agentPlacement: 'host' as const,
@@ -19,32 +20,49 @@ const baseRuntime = {
   mounts: {},
 };
 
+// Stable ids for existing tests migrated to the new per_invocation signature.
+// parentSessionId 'sess_pppppppp00000000' → short 'pppppppp'
+// childSessionId  'sess_cccccccc00000000' → short 'cccccccc'
+const BASE_PARENT_SESSION_ID = 'sess_pppppppp00000000';
+const BASE_CHILD_SESSION_ID = 'sess_cccccccc00000000';
+const BASE_SCRATCH_PATH = '/tmp/test-scratch';
+
+// The auto-injected scratch mount present on every per_invocation spec.
+const SCRATCH_MOUNT = {
+  source: BASE_SCRATCH_PATH,
+  target: '/work',
+  readonly: false,
+};
+
 describe('buildPersonaContainerSpec', () => {
-  it('composes spec.name as parentSessionId-personaName', () => {
+  it('composes spec.name from parent8 + personaName + child8 for per_invocation', () => {
+    // parentSessionId 'sess_aaaaaaaa11111111' → short 'aaaaaaaa'
+    // childSessionId  'sess_bbbbbbbb22222222' → short 'bbbbbbbb'
     const spec = buildPersonaContainerSpec({
-      parentSessionId: 'session-abc',
+      parentSessionId: 'sess_aaaaaaaa11111111',
       personaName: 'shell',
+      childSessionId: 'sess_bbbbbbbb22222222',
+      scratchDirHostPath: '/tmp/scratch',
       runtime: baseRuntime,
       containerMounts: {},
     });
 
-    expect(spec.name).toBe('session-abc-shell');
+    expect(spec.name).toBe('aaaaaaaa-shell-bbbbbbbb');
     expect(spec.image).toBe('devcontainer:latest');
     expect(spec.workingDirectory).toBe('/workspace');
-    expect(spec.mounts).toEqual([]);
-    expect(spec.env).toEqual({});
   });
 
   it('resolves runtime.mounts against the registry into ContainerMount entries', () => {
     const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess1',
+      parentSessionId: BASE_PARENT_SESSION_ID,
       personaName: 'browser',
+      childSessionId: BASE_CHILD_SESSION_ID,
+      scratchDirHostPath: BASE_SCRATCH_PATH,
       runtime: {
         ...baseRuntime,
-        mounts: { scratch: '/scratch', identity: '/etc/identity' },
+        mounts: { identity: '/etc/identity' },
       },
       containerMounts: {
-        scratch: { hostPath: '/host/scratch', readonly: false },
         identity: { hostPath: '/host/identity', readonly: true },
         unused: { hostPath: '/host/unused', readonly: false },
       },
@@ -52,21 +70,24 @@ describe('buildPersonaContainerSpec', () => {
 
     expect(spec.mounts).toEqual(
       expect.arrayContaining([
-        { source: '/host/scratch', target: '/scratch', readonly: false },
         { source: '/host/identity', target: '/etc/identity', readonly: true },
+        SCRATCH_MOUNT,
       ])
     );
+    // identity + auto-injected scratch
     expect(spec.mounts).toHaveLength(2);
   });
 
   it('throws PersonaContainerSpecError on unknown mount name', () => {
     expect(() =>
       buildPersonaContainerSpec({
-        parentSessionId: 'sess1',
+        parentSessionId: BASE_PARENT_SESSION_ID,
         personaName: 'shell',
+        childSessionId: BASE_CHILD_SESSION_ID,
+        scratchDirHostPath: BASE_SCRATCH_PATH,
         runtime: {
           ...baseRuntime,
-          mounts: { scratch: '/scratch' },
+          mounts: { phantom: '/phantom' },
         },
         containerMounts: {},
       })
@@ -78,6 +99,8 @@ describe('buildPersonaContainerSpec', () => {
       buildPersonaContainerSpec({
         parentSessionId: 'evil; rm -rf /',
         personaName: 'shell',
+        childSessionId: BASE_CHILD_SESSION_ID,
+        scratchDirHostPath: BASE_SCRATCH_PATH,
         runtime: baseRuntime,
         containerMounts: {},
       })
@@ -87,8 +110,10 @@ describe('buildPersonaContainerSpec', () => {
   it('rejects personaName containing unsafe characters', () => {
     expect(() =>
       buildPersonaContainerSpec({
-        parentSessionId: 'sess1',
+        parentSessionId: BASE_PARENT_SESSION_ID,
         personaName: '../etc/passwd',
+        childSessionId: BASE_CHILD_SESSION_ID,
+        scratchDirHostPath: BASE_SCRATCH_PATH,
         runtime: baseRuntime,
         containerMounts: {},
       })
@@ -97,8 +122,10 @@ describe('buildPersonaContainerSpec', () => {
 
   it('auto-injects the persona registry mount at the well-known target', () => {
     const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess1',
+      parentSessionId: BASE_PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: BASE_CHILD_SESSION_ID,
+      scratchDirHostPath: BASE_SCRATCH_PATH,
       runtime: baseRuntime,
       containerMounts: {
         persona: { hostPath: '/host/agent-personas', readonly: true },
@@ -112,22 +139,27 @@ describe('buildPersonaContainerSpec', () => {
     });
   });
 
-  it('does not inject the persona mount when the registry omits it', () => {
+  it('only auto-injects scratch when registry has no other entries', () => {
     const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess1',
+      parentSessionId: BASE_PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: BASE_CHILD_SESSION_ID,
+      scratchDirHostPath: BASE_SCRATCH_PATH,
       runtime: baseRuntime,
       containerMounts: {},
     });
 
-    expect(spec.mounts).toEqual([]);
+    // Only the scratch mount is auto-injected; no other entries.
+    expect(spec.mounts).toEqual([SCRATCH_MOUNT]);
   });
 
   it('rejects a persona file declaring runtime.mounts.persona — reserved name', () => {
     expect(() =>
       buildPersonaContainerSpec({
-        parentSessionId: 'sess1',
+        parentSessionId: BASE_PARENT_SESSION_ID,
         personaName: 'shell',
+        childSessionId: BASE_CHILD_SESSION_ID,
+        scratchDirHostPath: BASE_SCRATCH_PATH,
         runtime: {
           ...baseRuntime,
           mounts: { persona: '/somewhere' },
@@ -141,8 +173,10 @@ describe('buildPersonaContainerSpec', () => {
 
   it('auto-injects the lace-data registry mount and LACE_DIR env at the well-known target', () => {
     const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess1',
+      parentSessionId: BASE_PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: BASE_CHILD_SESSION_ID,
+      scratchDirHostPath: BASE_SCRATCH_PATH,
       runtime: baseRuntime,
       containerMounts: {
         'lace-data': { hostPath: '/host/history/lace', readonly: false },
@@ -157,15 +191,16 @@ describe('buildPersonaContainerSpec', () => {
     expect(spec.env).toEqual({ LACE_DIR: SUBAGENT_LACE_DATA_TARGET });
   });
 
-  it('does not inject the lace-data mount or LACE_DIR when the registry omits it', () => {
+  it('does not inject LACE_DIR env when the registry omits lace-data', () => {
     const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess1',
+      parentSessionId: BASE_PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: BASE_CHILD_SESSION_ID,
+      scratchDirHostPath: BASE_SCRATCH_PATH,
       runtime: baseRuntime,
       containerMounts: {},
     });
 
-    expect(spec.mounts).toEqual([]);
     expect(spec.env).toEqual({});
     expect(spec.env).not.toHaveProperty('LACE_DIR');
   });
@@ -173,8 +208,10 @@ describe('buildPersonaContainerSpec', () => {
   it('rejects a persona file declaring runtime.mounts["lace-data"] — reserved name', () => {
     expect(() =>
       buildPersonaContainerSpec({
-        parentSessionId: 'sess1',
+        parentSessionId: BASE_PARENT_SESSION_ID,
         personaName: 'shell',
+        childSessionId: BASE_CHILD_SESSION_ID,
+        scratchDirHostPath: BASE_SCRATCH_PATH,
         runtime: {
           ...baseRuntime,
           mounts: { 'lace-data': '/somewhere' },
@@ -188,8 +225,10 @@ describe('buildPersonaContainerSpec', () => {
 
   it('LACE_DIR auto-inject overrides a persona-supplied LACE_DIR in runtime.env', () => {
     const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess1',
+      parentSessionId: BASE_PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: BASE_CHILD_SESSION_ID,
+      scratchDirHostPath: BASE_SCRATCH_PATH,
       runtime: {
         ...baseRuntime,
         env: { LACE_DIR: '/wrong/path', OTHER: 'keep' },
@@ -205,8 +244,10 @@ describe('buildPersonaContainerSpec', () => {
 
   it('auto-injects the credentials registry mount at the well-known target', () => {
     const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess1',
+      parentSessionId: BASE_PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: BASE_CHILD_SESSION_ID,
+      scratchDirHostPath: BASE_SCRATCH_PATH,
       runtime: baseRuntime,
       containerMounts: {
         credentials: { hostPath: '/host/credentials', readonly: true },
@@ -222,22 +263,13 @@ describe('buildPersonaContainerSpec', () => {
     expect(spec.env).toEqual({});
   });
 
-  it('does not inject the credentials mount when the registry omits it', () => {
-    const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess1',
-      personaName: 'shell',
-      runtime: baseRuntime,
-      containerMounts: {},
-    });
-
-    expect(spec.mounts).toEqual([]);
-  });
-
   it('rejects a persona file declaring runtime.mounts.credentials — reserved name', () => {
     expect(() =>
       buildPersonaContainerSpec({
-        parentSessionId: 'sess1',
+        parentSessionId: BASE_PARENT_SESSION_ID,
         personaName: 'shell',
+        childSessionId: BASE_CHILD_SESSION_ID,
+        scratchDirHostPath: BASE_SCRATCH_PATH,
         runtime: {
           ...baseRuntime,
           mounts: { credentials: '/somewhere' },
@@ -251,8 +283,10 @@ describe('buildPersonaContainerSpec', () => {
 
   it('auto-injects the lace registry mount at the well-known target (PRI-1774)', () => {
     const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess1',
+      parentSessionId: BASE_PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: BASE_CHILD_SESSION_ID,
+      scratchDirHostPath: BASE_SCRATCH_PATH,
       runtime: baseRuntime,
       containerMounts: {
         lace: { hostPath: '/host/lace', readonly: true },
@@ -267,22 +301,13 @@ describe('buildPersonaContainerSpec', () => {
     expect(spec.env).toEqual({});
   });
 
-  it('does not inject the lace mount when the registry omits it (PRI-1774)', () => {
-    const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess1',
-      personaName: 'shell',
-      runtime: baseRuntime,
-      containerMounts: {},
-    });
-
-    expect(spec.mounts).toEqual([]);
-  });
-
   it('rejects a persona file declaring runtime.mounts.lace — reserved name (PRI-1774)', () => {
     expect(() =>
       buildPersonaContainerSpec({
-        parentSessionId: 'sess1',
+        parentSessionId: BASE_PARENT_SESSION_ID,
         personaName: 'shell',
+        childSessionId: BASE_CHILD_SESSION_ID,
+        scratchDirHostPath: BASE_SCRATCH_PATH,
         runtime: {
           ...baseRuntime,
           mounts: { lace: '/somewhere' },
@@ -296,8 +321,10 @@ describe('buildPersonaContainerSpec', () => {
 
   it('auto-injects persona + lace-data + credentials together when registry has all three', () => {
     const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess1',
+      parentSessionId: BASE_PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: BASE_CHILD_SESSION_ID,
+      scratchDirHostPath: BASE_SCRATCH_PATH,
       runtime: baseRuntime,
       containerMounts: {
         persona: { hostPath: '/host/agent-personas', readonly: true },
@@ -326,8 +353,10 @@ describe('buildPersonaContainerSpec', () => {
 
   it('passes through env and ports when provided', () => {
     const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess1',
+      parentSessionId: BASE_PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: BASE_CHILD_SESSION_ID,
+      scratchDirHostPath: BASE_SCRATCH_PATH,
       runtime: {
         ...baseRuntime,
         env: { FOO: 'bar' },
@@ -342,8 +371,10 @@ describe('buildPersonaContainerSpec', () => {
 
   it('passes through sysctls when provided (PRI-1790)', () => {
     const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess1',
+      parentSessionId: BASE_PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: BASE_CHILD_SESSION_ID,
+      scratchDirHostPath: BASE_SCRATCH_PATH,
       runtime: {
         ...baseRuntime,
         sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' },
@@ -356,13 +387,193 @@ describe('buildPersonaContainerSpec', () => {
 
   it('leaves spec.sysctls undefined when persona declares none', () => {
     const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess1',
+      parentSessionId: BASE_PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: BASE_CHILD_SESSION_ID,
+      scratchDirHostPath: BASE_SCRATCH_PATH,
       runtime: baseRuntime,
       containerMounts: {},
     });
 
     expect(spec.sysctls).toBeUndefined();
+  });
+});
+
+describe('buildPersonaContainerSpec with containerSharing: per_invocation (PRI-1796)', () => {
+  const perInvocationRuntime = {
+    type: 'container' as const,
+    agentPlacement: 'host' as const,
+    containerSharing: 'per_invocation' as const,
+    image: 'devcontainer:latest',
+    workingDirectory: '/workspace',
+    mounts: {},
+  };
+
+  it('composes name from parentSessionId8 + persona + childSessionId8', () => {
+    // sess_aaaaaaaa11111111 → strip 'sess_' → 'aaaaaaaa11111111' → first 8 → 'aaaaaaaa'
+    // sess_bbbbbbbb22222222 → strip 'sess_' → 'bbbbbbbb22222222' → first 8 → 'bbbbbbbb'
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess_aaaaaaaa11111111',
+      personaName: 'shell',
+      childSessionId: 'sess_bbbbbbbb22222222',
+      scratchDirHostPath: '/tmp/scratch',
+      runtime: perInvocationRuntime,
+      containerMounts: {},
+    });
+
+    expect(spec.name).toBe('aaaaaaaa-shell-bbbbbbbb');
+  });
+
+  it('auto-injects scratch mount at /work for per_invocation', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess_aaaaaaaa11111111',
+      personaName: 'shell',
+      childSessionId: 'sess_bbbbbbbb22222222',
+      scratchDirHostPath: '/tmp/scratch',
+      runtime: perInvocationRuntime,
+      containerMounts: {},
+    });
+
+    expect(spec.mounts).toEqual(
+      expect.arrayContaining([{ source: '/tmp/scratch', target: '/work', readonly: false }])
+    );
+  });
+
+  it('rejects mounts.scratch declared by per_invocation persona', () => {
+    // per_invocation persona cannot declare 'scratch' — reserved for auto-injection of /work
+    expect(() =>
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess_aaaaaaaa11111111',
+        personaName: 'shell',
+        childSessionId: 'sess_bbbbbbbb22222222',
+        scratchDirHostPath: '/tmp/scratch',
+        runtime: {
+          ...perInvocationRuntime,
+          mounts: { scratch: '/work' },
+        },
+        containerMounts: { scratch: { hostPath: '/somewhere', readonly: false } },
+      })
+    ).toThrow(PersonaContainerSpecError);
+
+    expect(() =>
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess_aaaaaaaa11111111',
+        personaName: 'shell',
+        childSessionId: 'sess_bbbbbbbb22222222',
+        scratchDirHostPath: '/tmp/scratch',
+        runtime: {
+          ...perInvocationRuntime,
+          mounts: { scratch: '/work' },
+        },
+        containerMounts: { scratch: { hostPath: '/somewhere', readonly: false } },
+      })
+    ).toThrow(/scratch/);
+
+    expect(() =>
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess_aaaaaaaa11111111',
+        personaName: 'shell',
+        childSessionId: 'sess_bbbbbbbb22222222',
+        scratchDirHostPath: '/tmp/scratch',
+        runtime: {
+          ...perInvocationRuntime,
+          mounts: { scratch: '/work' },
+        },
+        containerMounts: { scratch: { hostPath: '/somewhere', readonly: false } },
+      })
+    ).toThrow(/per_invocation/);
+  });
+
+  it('allows mounts.scratch on persistent persona (not reserved for persistent)', () => {
+    // For persistent personas, 'scratch' is resolved through the registry like any other mount.
+    const persistentRuntime = {
+      type: 'container' as const,
+      agentPlacement: 'host' as const,
+      containerSharing: 'persistent' as const,
+      image: 'sen-box:dev',
+      workingDirectory: '/home/agent',
+      mounts: { scratch: '/work' },
+    };
+
+    expect(() =>
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess1',
+        personaName: 'sen',
+        runtime: persistentRuntime,
+        containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
+      })
+    ).not.toThrow();
+
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'sen',
+      runtime: persistentRuntime,
+      containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
+    });
+    expect(spec.mounts).toContainEqual({
+      source: '/host/scratch',
+      target: '/work',
+      readonly: false,
+    });
+  });
+
+  it('rejects invalid childSessionId for spec name', () => {
+    expect(() =>
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess_aaaaaaaa11111111',
+        personaName: 'shell',
+        childSessionId: '!!!',
+        scratchDirHostPath: '/tmp/scratch',
+        runtime: perInvocationRuntime,
+        containerMounts: {},
+      })
+    ).toThrow(PersonaContainerSpecError);
+  });
+
+  it('throws when childSessionId is missing for per_invocation', () => {
+    expect(() =>
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess_aaaaaaaa11111111',
+        personaName: 'shell',
+        scratchDirHostPath: '/tmp/scratch',
+        runtime: perInvocationRuntime,
+        containerMounts: {},
+      })
+    ).toThrow(PersonaContainerSpecError);
+  });
+
+  it('throws when scratchDirHostPath is missing for per_invocation', () => {
+    expect(() =>
+      buildPersonaContainerSpec({
+        parentSessionId: 'sess_aaaaaaaa11111111',
+        personaName: 'shell',
+        childSessionId: 'sess_bbbbbbbb22222222',
+        runtime: perInvocationRuntime,
+        containerMounts: {},
+      })
+    ).toThrow(PersonaContainerSpecError);
+  });
+
+  it('does not auto-inject scratch mount for persistent containers', () => {
+    const persistentRuntime = {
+      type: 'container' as const,
+      agentPlacement: 'host' as const,
+      containerSharing: 'persistent' as const,
+      image: 'sen-box:dev',
+      workingDirectory: '/home/agent',
+      mounts: {},
+    };
+
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: 'sess1',
+      personaName: 'sen',
+      runtime: persistentRuntime,
+      containerMounts: {},
+    });
+
+    // No scratch auto-injection for persistent containers.
+    const hasScratch = spec.mounts.some((m) => m.target === '/work');
+    expect(hasScratch).toBe(false);
   });
 });
 

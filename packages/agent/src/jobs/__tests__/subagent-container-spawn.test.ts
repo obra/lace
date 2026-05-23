@@ -33,13 +33,20 @@ class FakeContainerManager {
   );
 }
 
+// per_invocation: no explicit mounts (scratch is auto-injected at /work).
+// sess_pppppppp00000000 → parent short 'pppppppp'
+// sess_cccccccc00000000 → child  short 'cccccccc'
+const PARENT_SESSION_ID = 'sess_pppppppp00000000';
+const CHILD_SESSION_ID = 'sess_cccccccc00000000';
+const SCRATCH_PATH = '/tmp/test-scratch';
+
 const containerRuntime = {
   type: 'container' as const,
   agentPlacement: 'container' as const,
   containerSharing: 'per_invocation' as const,
   image: 'devcontainer:latest',
   workingDirectory: '/workspace',
-  mounts: { scratch: '/scratch' },
+  mounts: {},
 };
 
 describe('spawnSubagent', () => {
@@ -51,21 +58,25 @@ describe('spawnSubagent', () => {
 
   it('container persona materializes and execStreams with composed spec', async () => {
     const handle = await spawnSubagent({
-      parentSessionId: 'sess1',
+      parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
       personaContainerRuntime: containerRuntime,
       containerManager: fakeManager as unknown as ContainerManager,
-      containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
+      containerMounts: {},
     });
 
     expect(fakeManager.materialize).toHaveBeenCalledOnce();
     const spec = fakeManager.materialize.mock.calls[0][0];
-    expect(spec.name).toBe('sess1-shell');
-    expect(spec.mounts).toEqual([{ source: '/host/scratch', target: '/scratch', readonly: false }]);
+    // Per-invocation name: parent8-persona-child8
+    expect(spec.name).toBe('pppppppp-shell-cccccccc');
+    // Auto-injected scratch mount at /work
+    expect(spec.mounts).toEqual([{ source: SCRATCH_PATH, target: '/work', readonly: false }]);
 
     expect(fakeManager.execStream).toHaveBeenCalledOnce();
     const [specName, options] = fakeManager.execStream.mock.calls[0];
-    expect(specName).toBe('sess1-shell');
+    expect(specName).toBe('pppppppp-shell-cccccccc');
     expect(options.command).toEqual(['node', '/lace/packages/agent/dist/main.js']);
     expect(options.workingDirectory).toBe('/workspace');
 
@@ -76,8 +87,10 @@ describe('spawnSubagent', () => {
   it('container persona with unknown mount fails before materialize', async () => {
     await expect(
       spawnSubagent({
-        parentSessionId: 'sess1',
+        parentSessionId: PARENT_SESSION_ID,
         personaName: 'shell',
+        childSessionId: CHILD_SESSION_ID,
+        scratchDirHostPath: SCRATCH_PATH,
         personaContainerRuntime: {
           ...containerRuntime,
           mounts: { phantom: '/phantom' },
@@ -94,11 +107,13 @@ describe('spawnSubagent', () => {
   it('container persona without a containerManager surfaces unsupported-platform error', async () => {
     await expect(
       spawnSubagent({
-        parentSessionId: 'sess1',
+        parentSessionId: PARENT_SESSION_ID,
         personaName: 'shell',
+        childSessionId: CHILD_SESSION_ID,
+        scratchDirHostPath: SCRATCH_PATH,
         personaContainerRuntime: containerRuntime,
         containerManager: null,
-        containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
+        containerMounts: {},
       })
     ).rejects.toThrow(SubagentSpawnError);
   });
@@ -108,33 +123,37 @@ describe('spawnSubagent', () => {
       spawnSubagent({
         parentSessionId: 'bad; rm -rf /',
         personaName: 'shell',
+        childSessionId: CHILD_SESSION_ID,
+        scratchDirHostPath: SCRATCH_PATH,
         personaContainerRuntime: containerRuntime,
         containerManager: fakeManager as unknown as ContainerManager,
-        containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
+        containerMounts: {},
       })
     ).rejects.toThrow(/Invalid parentSessionId/);
 
     expect(fakeManager.materialize).not.toHaveBeenCalled();
   });
 
-  it('two spawns for the same persona+session call materialize twice with identical name', async () => {
+  it('two spawns with same childSessionId produce identical spec names (resume reuses container)', async () => {
     // ContainerManager.materialize itself is idempotent by name (covered by its
     // own tests). spawnSubagent's role is to invoke it consistently so the
     // second call sees the same spec.name and reuses the existing container.
     const params = {
-      parentSessionId: 'sess1',
+      parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
       personaContainerRuntime: containerRuntime,
       containerManager: fakeManager as unknown as ContainerManager,
-      containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
+      containerMounts: {},
     };
 
     await spawnSubagent(params);
     await spawnSubagent(params);
 
     expect(fakeManager.materialize).toHaveBeenCalledTimes(2);
-    expect(fakeManager.materialize.mock.calls[0][0].name).toBe('sess1-shell');
-    expect(fakeManager.materialize.mock.calls[1][0].name).toBe('sess1-shell');
+    expect(fakeManager.materialize.mock.calls[0][0].name).toBe('pppppppp-shell-cccccccc');
+    expect(fakeManager.materialize.mock.calls[1][0].name).toBe('pppppppp-shell-cccccccc');
   });
 
   it('kill() on a container-path handle routes to the exec stream (not the container)', async () => {
@@ -153,11 +172,13 @@ describe('spawnSubagent', () => {
     });
 
     const handle = await spawnSubagent({
-      parentSessionId: 'sess1',
+      parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
       personaContainerRuntime: containerRuntime,
       containerManager: fakeManager as unknown as ContainerManager,
-      containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
+      containerMounts: {},
     });
 
     handle.kill('SIGTERM');
@@ -167,11 +188,13 @@ describe('spawnSubagent', () => {
   it('container runtime without a personaName throws before materialize', async () => {
     await expect(
       spawnSubagent({
-        parentSessionId: 'sess1',
+        parentSessionId: PARENT_SESSION_ID,
         personaName: undefined,
+        childSessionId: CHILD_SESSION_ID,
+        scratchDirHostPath: SCRATCH_PATH,
         personaContainerRuntime: containerRuntime,
         containerManager: fakeManager as unknown as ContainerManager,
-        containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
+        containerMounts: {},
       })
     ).rejects.toThrow(SubagentSpawnError);
     expect(fakeManager.materialize).not.toHaveBeenCalled();

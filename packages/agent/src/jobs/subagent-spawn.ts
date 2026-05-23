@@ -55,6 +55,10 @@ export interface SpawnSubagentOptions {
   personaContainerRuntime?: PersonaContainerRuntime;
   containerManager: ContainerManager | null;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
+  // Required when personaContainerRuntime.containerSharing === 'per_invocation'.
+  // Provides the child subagent's session id for unique container naming (PRI-1796).
+  childSessionId?: string;
+  scratchDirHostPath?: string;
 }
 
 export class SubagentSpawnError extends Error {
@@ -88,6 +92,8 @@ export async function spawnSubagent(options: SpawnSubagentOptions): Promise<Suba
       runtime: options.personaContainerRuntime,
       containerManager: options.containerManager,
       containerMounts: options.containerMounts,
+      childSessionId: options.childSessionId,
+      scratchDirHostPath: options.scratchDirHostPath,
     });
   }
 
@@ -143,6 +149,8 @@ async function spawnContainerSubagent(input: {
   runtime: PersonaContainerRuntime;
   containerManager: ContainerManager;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
+  childSessionId?: string;
+  scratchDirHostPath?: string;
 }): Promise<SubagentProcessHandle> {
   // buildPersonaContainerSpec performs strict input validation and surfaces
   // unknown mount names before any container materialization, so failures here
@@ -150,6 +158,8 @@ async function spawnContainerSubagent(input: {
   const spec = buildPersonaContainerSpec({
     parentSessionId: input.parentSessionId,
     personaName: input.personaName,
+    childSessionId: input.childSessionId,
+    scratchDirHostPath: input.scratchDirHostPath,
     runtime: input.runtime,
     containerMounts: input.containerMounts,
   });

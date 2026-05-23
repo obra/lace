@@ -69,11 +69,12 @@ export class PersonaContainerSpecError extends Error {
  */
 function resolvePersonaMountsAndEnv(input: {
   personaName: string;
+  containerSharing: 'per_invocation' | 'persistent';
   runtimeMounts: Record<string, string>;
   runtimeEnv: Record<string, string> | undefined;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
 }): { mounts: ContainerMount[]; env: Record<string, string> } {
-  const { personaName, runtimeMounts, runtimeEnv, containerMounts } = input;
+  const { personaName, containerSharing, runtimeMounts, runtimeEnv, containerMounts } = input;
 
   const mounts: ContainerMount[] = [];
   for (const [mountName, target] of Object.entries(runtimeMounts)) {
@@ -103,6 +104,16 @@ function resolvePersonaMountsAndEnv(input: {
         `Persona '${personaName}' declares mount 'lace' — reserved for ` +
           `lace's auto-injection of the lace source tree into subagent ` +
           `containers. Remove it from the persona file's runtime.mounts.`
+      );
+    }
+    // 'scratch' is reserved for per_invocation personas only — lace auto-injects
+    // the per-invocation work directory at /work. Persistent personas may still
+    // use 'scratch' as a named mount resolved through the registry (PRI-1796).
+    if (mountName === 'scratch' && containerSharing === 'per_invocation') {
+      throw new PersonaContainerSpecError(
+        `containerSharing: per_invocation persona '${personaName}' declares mount 'scratch' — ` +
+          `reserved for lace's auto-injection of the per-invocation work directory ` +
+          `at /work. Remove it from the persona file (PRI-1796).`
       );
     }
     const entry = containerMounts[mountName];
@@ -191,11 +202,22 @@ function resolvePersonaMountsAndEnv(input: {
   return { mounts, env };
 }
 
+// Extract the first 8 meaningful characters from a session id for use in
+// container spec names. Strips the 'sess_' prefix if present (the UUID
+// portion is hex and passes SPEC_NAME_COMPONENT_RE); otherwise takes the
+// first 8 characters of the raw id.
+function sessionIdShort(id: string): string {
+  return id.startsWith('sess_') ? id.slice(5, 13) : id.slice(0, 8);
+}
+
 export function buildPersonaContainerSpec(input: {
   parentSessionId: string;
   personaName: string;
   runtime: PersonaContainerRuntime;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
+  // Required for per_invocation; ignored for persistent.
+  childSessionId?: string;
+  scratchDirHostPath?: string;
 }): ContainerSpec {
   const { parentSessionId, personaName, runtime, containerMounts } = input;
 
@@ -210,8 +232,35 @@ export function buildPersonaContainerSpec(input: {
     );
   }
 
+  // Validate and short-form per_invocation fields before doing any mount work.
+  let parentSessionIdShort: string | undefined;
+  let childSessionIdShort: string | undefined;
+  if (runtime.containerSharing === 'per_invocation') {
+    if (!input.childSessionId) {
+      throw new PersonaContainerSpecError(
+        `Per-invocation persona '${personaName}' requires childSessionId — ` +
+          `provide the child subagent's session id so container names are unique per delegate.`
+      );
+    }
+    if (!input.scratchDirHostPath) {
+      throw new PersonaContainerSpecError(
+        `Per-invocation persona '${personaName}' requires scratchDirHostPath — ` +
+          `provide the host path to auto-inject as the per-invocation work directory at /work.`
+      );
+    }
+    parentSessionIdShort = sessionIdShort(parentSessionId);
+    childSessionIdShort = sessionIdShort(input.childSessionId);
+    if (!SPEC_NAME_COMPONENT_RE.test(childSessionIdShort)) {
+      throw new PersonaContainerSpecError(
+        `Invalid childSessionId for container spec name: '${input.childSessionId}' ` +
+          `(short form '${childSessionIdShort}' fails component validation)`
+      );
+    }
+  }
+
   const { mounts, env } = resolvePersonaMountsAndEnv({
     personaName,
+    containerSharing: runtime.containerSharing,
     runtimeMounts: runtime.mounts,
     runtimeEnv: runtime.env,
     containerMounts,
@@ -230,11 +279,20 @@ export function buildPersonaContainerSpec(input: {
     };
   }
 
+  // per_invocation: compose a name unique to this child session so concurrent
+  // delegates of the same persona from the same parent don't collide (PRI-1796).
+  // Auto-inject the per-invocation scratch directory at /work so the subagent
+  // has an isolated writable workspace for the duration of this invocation.
+  const perInvocationMounts: ContainerMount[] = [
+    ...mounts,
+    { source: input.scratchDirHostPath!, target: '/work', readonly: false },
+  ];
+
   return {
-    name: `${parentSessionId}-${personaName}`,
+    name: `${parentSessionIdShort!}-${personaName}-${childSessionIdShort!}`,
     image: runtime.image,
     workingDirectory: runtime.workingDirectory,
-    mounts,
+    mounts: perInvocationMounts,
     env,
     ...(runtime.ports ? { ports: runtime.ports } : {}),
     ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
