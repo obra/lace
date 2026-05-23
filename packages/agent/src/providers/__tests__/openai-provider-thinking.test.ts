@@ -154,6 +154,43 @@ describe('OpenAIProvider thinking events', () => {
     });
   });
 
+  describe('system prompt handling (Responses API path)', () => {
+    it('routes multiple role:system messages through getEffectiveSystemPrompt (regression: PRI-1804 #3)', async () => {
+      // After PRI-1804 #3, getEffectiveSystemPrompt joins multiple role:system messages
+      // with \n\n. The Responses-API path used its own inline join with \n AND
+      // stringified content arrays naively — that divergence is the bug.
+      // Verify both are now consistent by checking the \n\n separator here.
+      mockResponsesCreate.mockResolvedValue({
+        id: 'resp_123',
+        status: 'completed',
+        output: [
+          {
+            type: 'message',
+            content: [{ type: 'output_text', text: 'Hello!' }],
+          },
+        ],
+        usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+      });
+
+      await provider.createResponse(
+        [
+          { role: 'system', content: 'First system block.' },
+          { role: 'system', content: 'Second system block.' },
+          { role: 'user', content: 'Hello' },
+        ],
+        [],
+        'gpt-4o'
+      );
+
+      expect(mockResponsesCreate).toHaveBeenCalled();
+      const callArgs = mockResponsesCreate.mock.calls[0][0] as {
+        instructions?: string;
+      };
+      // getEffectiveSystemPrompt joins with \n\n; the old inline code used \n
+      expect(callArgs.instructions).toBe('First system block.\n\nSecond system block.');
+    });
+  });
+
   describe('streaming responses', () => {
     it('should emit thinking events when stream contains reasoning events', async () => {
       const thinkingStartEvents: StreamingEvents['thinking_start'][] = [];

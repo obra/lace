@@ -504,9 +504,14 @@ export class OpenAIProvider extends AIProvider {
     previousResponseId?: string,
     options?: RequestOptions
   ): ResponseCreateParams {
-    // Extract system/developer instructions
-    const systemMessages = messages.filter((m) => m.role === 'system');
-    const instructions = systemMessages.map((m) => m.content).join('\n') || undefined;
+    // Extract system/developer instructions via the base helper so both
+    // the Chat Completions path and this Responses-API path produce identical
+    // system prompts (same \n\n separator, same content-block handling).
+    // The old inline join used '\n' and stringified content arrays naively,
+    // producing '[object Object]' for block-style content (PRI-1804 #3).
+    const systemText = this.getEffectiveSystemPrompt(messages);
+    // instructions is optional in the SDK; map '' → undefined to omit the field.
+    const instructions = systemText || undefined;
 
     // Transform tools to Responses API format (flatter structure, not nested in 'function')
     const responsesTools: ResponseTool[] = tools.map((tool) => ({
