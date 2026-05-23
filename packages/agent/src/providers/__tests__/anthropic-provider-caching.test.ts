@@ -94,7 +94,7 @@ describe('AnthropicProvider caching format', () => {
     expect(systemBlocks).toHaveLength(1);
     expect(systemBlocks[0].type).toBe('text');
     expect(systemBlocks[0].text).toBe('Test system prompt');
-    expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral' });
+    expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
   });
 
   it('should add cache_control to the last tool for caching', async () => {
@@ -133,6 +133,7 @@ describe('AnthropicProvider caching format', () => {
     expect(callArgs.tools![1]).toHaveProperty('cache_control');
     expect((callArgs.tools![1] as { cache_control?: { type: string } }).cache_control).toEqual({
       type: 'ephemeral',
+      ttl: '1h',
     });
   });
 
@@ -152,6 +153,7 @@ describe('AnthropicProvider caching format', () => {
     expect(callArgs.tools![0]).toHaveProperty('cache_control');
     expect((callArgs.tools![0] as { cache_control?: { type: string } }).cache_control).toEqual({
       type: 'ephemeral',
+      ttl: '1h',
     });
   });
 

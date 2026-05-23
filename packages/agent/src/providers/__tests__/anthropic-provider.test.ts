@@ -146,9 +146,20 @@ describe('AnthropicProvider', () => {
 
       const callArgs = mockCreateResponse.mock
         .calls[0][0] as Anthropic.Messages.MessageCreateParams;
+      // PRI-1799: last message is converted to a content-block array so we
+      // can attach a 1h cache_control breakpoint to its final block.
       expect(callArgs.messages).toEqual([
         { role: 'user', content: 'User message' },
-        { role: 'assistant', content: 'Assistant message' },
+        {
+          role: 'assistant',
+          content: [
+            {
+              type: 'text',
+              text: 'Assistant message',
+              cache_control: { type: 'ephemeral', ttl: '1h' },
+            },
+          ],
+        },
       ]);
       // System prompt is now an array with cache_control for prompt caching
       expect(Array.isArray(callArgs.system)).toBe(true);
@@ -158,7 +169,7 @@ describe('AnthropicProvider', () => {
         cache_control?: { type: string };
       }>;
       expect(systemBlocks[0].text).toBe('System message');
-      expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral' });
+      expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
     });
   });
 
@@ -380,7 +391,7 @@ describe('AnthropicProvider', () => {
         cache_control?: { type: string };
       }>;
       expect(systemBlocks[0].text).toBe('You are a helpful assistant.');
-      expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral' });
+      expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
     });
   });
 

@@ -21,6 +21,58 @@ interface AnthropicProviderConfig extends ProviderConfig {
   [key: string]: unknown; // Allow for additional properties
 }
 
+// SDK 0.54 types `cache_control` as `{type: 'ephemeral'}` only, but the
+// runtime API accepts `ttl: '1h'` and reports back via
+// `usage.cache_creation.ephemeral_1h_input_tokens`. Use a casted constant
+// rather than splattering `as` everywhere.
+const ONE_HOUR_EPHEMERAL = { type: 'ephemeral', ttl: '1h' } as unknown as {
+  type: 'ephemeral';
+};
+
+// Walk `messages` backwards and attach a 1h ephemeral cache_control marker to
+// the last non-empty content block. Plain-string content is lifted to a
+// single-element text block so the marker has somewhere to land. Returns a
+// new array; inputs are not mutated.
+function attachMessageCacheBreakpoint(
+  messages: Anthropic.MessageParam[]
+): Anthropic.MessageParam[] {
+  if (messages.length === 0) return messages;
+
+  const result = messages.slice();
+
+  for (let i = result.length - 1; i >= 0; i--) {
+    const msg = result[i];
+
+    if (typeof msg.content === 'string') {
+      if (msg.content.length === 0) continue;
+      result[i] = {
+        ...msg,
+        content: [
+          {
+            type: 'text',
+            text: msg.content,
+            cache_control: ONE_HOUR_EPHEMERAL,
+          },
+        ],
+      };
+      return result;
+    }
+
+    if (Array.isArray(msg.content) && msg.content.length > 0) {
+      const blocks = msg.content.slice();
+      const lastIndex = blocks.length - 1;
+      blocks[lastIndex] = {
+        ...blocks[lastIndex],
+        cache_control: ONE_HOUR_EPHEMERAL,
+      } as (typeof blocks)[number];
+      result[i] = { ...msg, content: blocks };
+      return result;
+    }
+  }
+
+  return result;
+}
+
 export class AnthropicProvider extends AIProvider {
   private _anthropic: Anthropic | null = null;
 
@@ -175,6 +227,12 @@ export class AnthropicProvider extends AIProvider {
     // Convert our enhanced generic messages to Anthropic format
     const anthropicMessages = convertToAnthropicFormat(messages);
 
+    // PRI-1799: also attach a cache_control breakpoint to the most recent
+    // message-content block so the conversation prefix stays cached across
+    // long idle gaps (1h TTL). Without this, only system+tools cache and
+    // every multi-minute-idle turn re-bills the whole prefix.
+    const messagesWithCaching = attachMessageCacheBreakpoint(anthropicMessages);
+
     // Extract system message if present
     const systemPrompt = this.getEffectiveSystemPrompt(messages);
 
@@ -183,7 +241,7 @@ export class AnthropicProvider extends AIProvider {
       {
         type: 'text',
         text: systemPrompt,
-        cache_control: { type: 'ephemeral' },
+        cache_control: ONE_HOUR_EPHEMERAL,
       },
     ];
 
@@ -200,7 +258,7 @@ export class AnthropicProvider extends AIProvider {
       if (index === tools.length - 1) {
         return {
           ...baseTool,
-          cache_control: { type: 'ephemeral' as const },
+          cache_control: ONE_HOUR_EPHEMERAL,
         };
       }
 
@@ -210,7 +268,7 @@ export class AnthropicProvider extends AIProvider {
     const payload = {
       model,
       max_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 8192),
-      messages: anthropicMessages,
+      messages: messagesWithCaching,
       system: systemWithCaching,
       tools: anthropicTools,
     };
