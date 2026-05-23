@@ -154,4 +154,25 @@ describe('runtime binding validation', () => {
       })
     ).not.toThrow();
   });
+
+  it('accepts projected container binding with sysctls (PRI-1790)', () => {
+    expect(() =>
+      parseRuntimeExecutionBinding({
+        schemaVersion: 1,
+        identity: { runtimeId: 'rt_container_sysctls' },
+        agentPlacement: 'host',
+        toolRuntime: {
+          type: 'container',
+          cwd: '/work',
+          spec: {
+            name: 'sess1-browser-driver',
+            image: 'sen-browser:dev',
+            workingDirectory: '/work',
+            mounts: [],
+            sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' },
+          },
+        },
+      })
+    ).not.toThrow();
+  });
 });

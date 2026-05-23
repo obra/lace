@@ -46,6 +46,10 @@ const ContainerRuntimeDescriptorSchema = z
           .array(z.object({ host: z.number().int(), container: z.number().int() }).strict())
           .optional(),
         restartPolicy: z.literal('unless-stopped').optional(),
+        // PRI-1790: forwarded verbatim to `docker create --sysctl key=value`.
+        // Validated as opaque key/value pairs at this layer — the persona
+        // schema enforces the dot-separated key shape upstream.
+        sysctls: z.record(z.string(), z.string()).optional(),
       })
       .strict(),
     helper: z
