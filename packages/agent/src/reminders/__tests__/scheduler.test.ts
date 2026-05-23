@@ -202,6 +202,13 @@ describe('ReminderScheduler fire path', () => {
     const rows = new ReminderStore(dir).list();
     expect(rows[0].fire_count).toBe(0);
     expect(rows[0].next_fire_at).toBe(1000);
+
+    // Heap entry was restored — direct inspection proves the finally block ran.
+    // Previously this test only checked disk state, meaning a silent heap-restore
+    // skip would not be caught. tickForTest rebuilds from disk each call so it
+    // cannot distinguish a restored heap from a rebuilt one.
+    const heapState = (sched as unknown as { heap: Array<{ id: string }> }).heap;
+    expect(heapState.find((e) => e.id === row.id)).toBeDefined();
   });
 });
 
