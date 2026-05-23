@@ -1070,6 +1070,7 @@ export class ConversationRunner {
         ...(this.deps.alarmScheduler ? { alarmScheduler: this.deps.alarmScheduler } : {}),
         ...(this.deps.activeSessionId ? { activeSessionId: this.deps.activeSessionId } : {}),
         activeSessionDir: this.config.sessionDir,
+        ...(this.deps.containerMounts ? { containerMounts: this.deps.containerMounts } : {}),
       }
     );
   }

@@ -4,6 +4,7 @@
 import type { CombinedTokenUsage } from '@lace/agent/token-management/types';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { AlarmScheduler } from '@lace/agent/alarms/alarm-scheduler';
+import type { MountRegistryEntry } from '@lace/agent/server-types';
 import type { RuntimeExecutionBinding, RuntimePath, ToolRuntime } from './runtime/types';
 
 export interface ToolContext {
@@ -40,6 +41,12 @@ export interface ToolContext {
   alarmScheduler?: AlarmScheduler;
   activeSessionId?: string;
   activeSessionDir?: string;
+
+  // Read-only view of the embedder-supplied named-mount registry. Set by the
+  // session runner when available. Used by tools that need to translate
+  // persona-declared mount names into host paths (delegate → projected
+  // container runtime).
+  containerMounts?: Readonly<Record<string, MountRegistryEntry>>;
 }
 
 export interface ToolAnnotations {

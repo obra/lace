@@ -157,15 +157,18 @@ describe('DelegateTool', () => {
     );
   });
 
-  it('does not pass host runtimeBinding to persona container delegate jobs', async () => {
+  it('passes projected runtimeBinding for host-placed session-lifecycle container personas', async () => {
     const personaRegistry = {
       parsePersona: vi.fn().mockReturnValue({
         config: {
           runtime: {
             type: 'container',
-            image: 'example/subagent:latest',
+            agentPlacement: 'host',
+            containerLifecycle: 'session',
+            image: 'example/subagent@sha256:' + 'a'.repeat(64),
             workingDirectory: '/workspace',
             mounts: {},
+            env: {},
           },
         },
         body: 'container persona',
@@ -174,13 +177,160 @@ describe('DelegateTool', () => {
     const tool = new DelegateTool({ personaRegistry });
 
     const mockJob = {
-      jobId: 'job_container',
+      jobId: 'job_projected',
       type: 'delegate' as const,
       status: 'running' as const,
       completion: new Promise<void>(() => {}),
     } as unknown as JobState;
 
-    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_container', job: mockJob });
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_projected', job: mockJob });
+    const jobManager = {
+      createJob,
+      listJobs: vi.fn().mockReturnValue([]),
+    } as unknown as JobManager;
+
+    await tool.execute(
+      { prompt: 'do something', background: true, persona: 'container-persona' },
+      { signal: new AbortController().signal, jobManager, runtimeBinding }
+    );
+
+    const options = createJob.mock.calls[0]![1] as Record<string, unknown>;
+    expect(options.personaContainerRuntime).toBeUndefined();
+    expect(options.runtimeBinding).toMatchObject({
+      agentPlacement: 'host',
+      toolRuntime: { type: 'container', cwd: '/workspace' },
+    });
+  });
+
+  it('passes projected runtimeBinding for host-placed persistent-lifecycle container personas', async () => {
+    const personaRegistry = {
+      parsePersona: vi.fn().mockReturnValue({
+        config: {
+          runtime: {
+            type: 'container',
+            agentPlacement: 'host',
+            containerLifecycle: 'persistent',
+            image: 'example/sen-box@sha256:' + 'a'.repeat(64),
+            workingDirectory: '/home/agent',
+            mounts: {},
+            env: {},
+          },
+        },
+        body: 'persistent persona',
+      }),
+    } as unknown as PersonaRegistry;
+    const tool = new DelegateTool({ personaRegistry });
+
+    const mockJob = {
+      jobId: 'job_persistent',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_persistent', job: mockJob });
+    const jobManager = {
+      createJob,
+      listJobs: vi.fn().mockReturnValue([]),
+    } as unknown as JobManager;
+
+    await tool.execute(
+      { prompt: 'do something', background: true, persona: 'box-shell' },
+      { signal: new AbortController().signal, jobManager, runtimeBinding }
+    );
+
+    const options = createJob.mock.calls[0]![1] as Record<string, unknown>;
+    expect(options.personaContainerRuntime).toBeUndefined();
+    expect((options.runtimeBinding as RuntimeExecutionBinding).toolRuntime).toMatchObject({
+      type: 'container',
+      spec: { name: 'box', containerId: 'sen-box', restartPolicy: 'unless-stopped' },
+    });
+  });
+
+  it('uses containerMounts from context when building projected binding', async () => {
+    const personaRegistry = {
+      parsePersona: vi.fn().mockReturnValue({
+        config: {
+          runtime: {
+            type: 'container',
+            agentPlacement: 'host',
+            containerLifecycle: 'session',
+            image: 'example/subagent@sha256:' + 'a'.repeat(64),
+            workingDirectory: '/work',
+            mounts: { scratch: '/work' },
+            env: {},
+          },
+        },
+        body: 'mounts persona',
+      }),
+    } as unknown as PersonaRegistry;
+    const tool = new DelegateTool({ personaRegistry });
+
+    const mockJob = {
+      jobId: 'job_mounts',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_mounts', job: mockJob });
+    const jobManager = {
+      createJob,
+      listJobs: vi.fn().mockReturnValue([]),
+    } as unknown as JobManager;
+
+    await tool.execute(
+      { prompt: 'do something', background: true, persona: 'mounts-persona' },
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
+      }
+    );
+
+    const options = createJob.mock.calls[0]![1] as Record<string, unknown>;
+    const binding = options.runtimeBinding as RuntimeExecutionBinding;
+    expect(
+      (
+        binding.toolRuntime as Extract<
+          RuntimeExecutionBinding['toolRuntime'],
+          { type: 'container' }
+        >
+      ).spec.mounts
+    ).toContainEqual({
+      hostPath: '/host/scratch',
+      containerPath: '/work',
+      readonly: false,
+    });
+  });
+
+  it('keeps explicit agentPlacement=container on the in-container path', async () => {
+    const personaRegistry = {
+      parsePersona: vi.fn().mockReturnValue({
+        config: {
+          runtime: {
+            type: 'container',
+            agentPlacement: 'container',
+            containerLifecycle: 'session',
+            image: 'example/subagent:latest',
+            workingDirectory: '/workspace',
+            mounts: {},
+            env: {},
+          },
+        },
+        body: 'in-container persona',
+      }),
+    } as unknown as PersonaRegistry;
+    const tool = new DelegateTool({ personaRegistry });
+
+    const mockJob = {
+      jobId: 'job_container_agent',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_container_agent', job: mockJob });
     const jobManager = {
       createJob,
       listJobs: vi.fn().mockReturnValue([]),
@@ -195,49 +345,8 @@ describe('DelegateTool', () => {
     expect(options.runtimeBinding).toBeUndefined();
     expect(options.personaContainerRuntime).toMatchObject({
       type: 'container',
-      workingDirectory: '/workspace',
-    });
-  });
-
-  it('does not pass host runtimeBinding to persona box delegate jobs', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'box',
-            image: 'example/subagent-box:latest',
-            workingDirectory: '/box-workspace',
-            mounts: {},
-          },
-        },
-        body: 'box persona',
-      }),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
-
-    const mockJob = {
-      jobId: 'job_box',
-      type: 'delegate' as const,
-      status: 'running' as const,
-      completion: new Promise<void>(() => {}),
-    } as unknown as JobState;
-
-    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_box', job: mockJob });
-    const jobManager = {
-      createJob,
-      listJobs: vi.fn().mockReturnValue([]),
-    } as unknown as JobManager;
-
-    await tool.execute(
-      { prompt: 'do something', background: true, persona: 'box-persona' },
-      { signal: new AbortController().signal, jobManager, runtimeBinding }
-    );
-
-    const options = createJob.mock.calls[0]![1] as Record<string, unknown>;
-    expect(options.runtimeBinding).toBeUndefined();
-    expect(options.personaBoxRuntime).toMatchObject({
-      type: 'box',
-      workingDirectory: '/box-workspace',
+      agentPlacement: 'container',
+      containerLifecycle: 'session',
     });
   });
 

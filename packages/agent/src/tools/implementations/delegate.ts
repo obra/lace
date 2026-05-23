@@ -10,11 +10,31 @@ import {
   PersonaNotFoundError,
   PersonaParseError,
 } from '@lace/agent/config/persona-registry';
-import type {
-  PersonaContainerRuntime,
-  PersonaBoxRuntime,
-} from '@lace/agent/jobs/persona-container-spec';
+import type { PersonaContainerRuntime } from '@lace/agent/jobs/persona-container-spec';
+import {
+  buildPersonaProjectedRuntimeBinding,
+  type PersonaProjectedImageIdentity,
+} from '@lace/agent/jobs/persona-projected-binding';
+import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
+
+// Projected persona containers must run against a digest-pinned image — the
+// projected binding describes the EXACT image the host-side lace-agent will
+// reach into, so a floating tag would silently drift away from what the
+// embedder validated at startup.
+function buildPinnedImageIdentity(image: string): PersonaProjectedImageIdentity {
+  const digest = image.match(/@(?<digest>sha256:[a-f0-9]{64})$/)?.groups?.digest;
+  if (!digest) {
+    throw new Error(
+      `Projected persona container image '${image}' must be pinned by digest before delegate startup`
+    );
+  }
+  return {
+    requestedImage: image,
+    resolvedImageDigest: digest,
+    imagePlatform: process.arch === 'arm64' ? 'linux/arm64' : 'linux/amd64',
+  };
+}
 
 const delegateSchema = z
   .object({
@@ -101,17 +121,37 @@ Parameters:
 
     // Resolve persona bundle (if any) before any job creation so we fail fast.
     let personaModelDefault: string | undefined;
+    // Set ONLY for the explicit in-container path (`agentPlacement: 'container'`)
+    // — i.e. the lace-agent itself runs inside the persona container.
     let personaContainerRuntime: PersonaContainerRuntime | undefined;
-    let personaBoxRuntime: PersonaBoxRuntime | undefined;
+    // Set ONLY for host-placed persona containers (`agentPlacement: 'host'`)
+    // — the host-side lace-agent reaches into the container for tool exec via
+    // this projected binding.
+    let projectedRuntimeBinding: RuntimeExecutionBinding | undefined;
 
     if (persona) {
       try {
         const parsed = this.personaRegistry.parsePersona(persona);
         personaModelDefault = parsed.config.model;
         if (parsed.config.runtime.type === 'container') {
-          personaContainerRuntime = parsed.config.runtime;
-        } else if (parsed.config.runtime.type === 'box') {
-          personaBoxRuntime = parsed.config.runtime;
+          const runtime = parsed.config.runtime;
+          if (runtime.agentPlacement === 'host') {
+            // Host-placed: project the persona container into a host-side
+            // RuntimeExecutionBinding. The session runner threads the
+            // embedder-supplied named-mount registry into ToolContext;
+            // when absent (e.g. unit-test fixtures), fall back to {} so
+            // personas with `mounts: {}` still resolve and personas that
+            // DO declare mounts fail with a clear "unknown mount" error.
+            projectedRuntimeBinding = buildPersonaProjectedRuntimeBinding({
+              parentSessionId: context.activeSessionId ?? 'delegate',
+              personaName: persona,
+              runtime,
+              containerMounts: context.containerMounts ?? {},
+              imageIdentity: buildPinnedImageIdentity(runtime.image),
+            });
+          } else {
+            personaContainerRuntime = runtime;
+          }
         }
       } catch (err) {
         if (err instanceof PersonaNotFoundError || err instanceof PersonaParseError) {
@@ -126,8 +166,12 @@ Parameters:
 
     // Per-call modelId wins; otherwise fall back to persona default (if any).
     const effectiveModelId = modelId ?? personaModelDefault;
-    const shouldInheritRuntimeBinding =
-      !!runtimeBinding && !personaContainerRuntime && !personaBoxRuntime;
+    // Inherit the parent's host binding only when the persona doesn't impose
+    // its own runtime — i.e. neither a projected (host-placed) binding nor
+    // an in-container lace-agent runtime.
+    const inheritedRuntimeBinding =
+      !personaContainerRuntime && !projectedRuntimeBinding ? runtimeBinding : undefined;
+    const effectiveRuntimeBinding = projectedRuntimeBinding ?? inheritedRuntimeBinding;
 
     // Handle resume - look up previous job's session
     let resumeSessionId: string | undefined;
@@ -170,8 +214,7 @@ Parameters:
           : undefined,
       ...(persona ? { persona } : {}),
       ...(personaContainerRuntime ? { personaContainerRuntime } : {}),
-      ...(personaBoxRuntime ? { personaBoxRuntime } : {}),
-      ...(shouldInheritRuntimeBinding ? { runtimeBinding } : {}),
+      ...(effectiveRuntimeBinding ? { runtimeBinding: effectiveRuntimeBinding } : {}),
     });
 
     // Background mode - return immediately

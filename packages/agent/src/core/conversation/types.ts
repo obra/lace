@@ -3,7 +3,7 @@
 import type { AIProvider } from '@lace/agent/providers/base-provider';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { ToolResult as CoreToolResult, ToolCall, ToolContext } from '@lace/agent/tools/types';
-import type { SessionUpdate } from '@lace/agent/server-types';
+import type { MountRegistryEntry, SessionUpdate } from '@lace/agent/server-types';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { MCPServerManager } from '@lace/agent/mcp/server-manager';
 import type { SkillRegistry } from '@lace/agent/skills';
@@ -148,6 +148,13 @@ export interface RunnerDependencies {
 
   /** Current session's id (used by alarm tools that need session-scoped context) */
   activeSessionId?: string;
+
+  /**
+   * Embedder-supplied named-mount registry. Threaded into ToolContext so the
+   * delegate tool can translate persona-declared mount names into host paths
+   * when projecting a host-placed persona container.
+   */
+  containerMounts?: Readonly<Record<string, MountRegistryEntry>>;
 }
 
 /**

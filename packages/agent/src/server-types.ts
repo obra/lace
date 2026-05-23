@@ -18,7 +18,7 @@ import type { SkillRegistry } from './skills';
 import type { PersonaRegistry } from './config/persona-registry';
 import type { ContainerManager } from './containers/container-manager';
 import type { ExecStreamHandle } from './containers/types';
-import type { PersonaContainerRuntime, PersonaBoxRuntime } from './jobs/persona-container-spec';
+import type { PersonaContainerRuntime } from './jobs/persona-container-spec';
 import type { AlarmScheduler } from './alarms/alarm-scheduler';
 import type { RuntimeExecutionBinding } from './tools/runtime/types';
 import type { RuntimeSecretResolver } from './tools/runtime/secrets';
@@ -107,13 +107,12 @@ export type JobState = {
   runtimeBinding?: RuntimeExecutionBinding;
   // Persona bundle applied to subagent session (delegate jobs only)
   persona?: string;
-  // When the delegate's persona declares `runtime.type: container`, the parsed
-  // runtime block flows through to subagent-job to drive container
-  // materialization at spawn time. Absent ⇒ native spawn (root runtime).
+  // Carries the parsed persona runtime ONLY when `agentPlacement: 'container'`
+  // — i.e. the lace-agent itself runs inside the persona container. Host-placed
+  // persona containers flow through `runtimeBinding` instead (the projected
+  // binding describes how the host-side lace-agent reaches into the container
+  // for tool execution).
   personaContainerRuntime?: PersonaContainerRuntime;
-  // Mirror field for `runtime.type: box` personas (kata #62). Mutually
-  // exclusive with personaContainerRuntime at the persona level.
-  personaBoxRuntime?: PersonaBoxRuntime;
 };
 
 // Server State Type

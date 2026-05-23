@@ -267,6 +267,7 @@ export function registerPromptHandler(
         startShellJob,
         jobManager: state.jobManager,
         containerManager: state.containerManager,
+        containerMounts: state.containerMounts,
         runtimeSecretResolver: state.runtimeSecretResolver,
         mcpServerManager: state.mcpServerManager,
         skillRegistry,
