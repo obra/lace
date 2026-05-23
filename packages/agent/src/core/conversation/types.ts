@@ -9,6 +9,7 @@ import type { MCPServerManager } from '@lace/agent/mcp/server-manager';
 import type { SkillRegistry } from '@lace/agent/skills';
 import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
 import type { AlarmScheduler } from '@lace/agent/alarms/alarm-scheduler';
+import type { ReminderScheduler } from '@lace/agent/reminders';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import type { ProjectedContainerManager } from '@lace/agent/tools/runtime/projected-container';
 import type { RuntimeSecretResolver } from '@lace/agent/tools/runtime/secrets';
@@ -145,6 +146,9 @@ export interface RunnerDependencies {
 
   /** Optional alarm scheduler for the current session's alarm tools */
   alarmScheduler?: AlarmScheduler;
+
+  /** Optional reminder scheduler for the current session's reminder tools */
+  reminderScheduler?: ReminderScheduler;
 
   /** Current session's id (used by alarm tools that need session-scoped context) */
   activeSessionId?: string;
