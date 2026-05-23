@@ -398,6 +398,36 @@ describe('MCPServerManager', () => {
     );
   });
 
+  it('starts toolRuntime-placed stdio MCP servers through the active runtime', async () => {
+    const runtime = createFakeRuntime();
+    const start = vi.fn(runtime.process.start.bind(runtime.process));
+    Object.assign(runtime, {
+      id: 'rt_container_browser',
+      kind: 'container',
+      cwd: '/work',
+      process: { ...runtime.process, start },
+    });
+
+    await manager.startServer({
+      serverId: 'superpowers-chrome',
+      config: {
+        command: 'node',
+        args: ['/opt/superpowers-chrome/mcp/dist/index.js'],
+        transport: 'stdio',
+        placement: 'toolRuntime',
+        enabled: true,
+        tools: {},
+      },
+      runtime,
+      hostCwd: '/host/session',
+    });
+
+    expect(start).toHaveBeenCalledWith(
+      ['node', '/opt/superpowers-chrome/mcp/dist/index.js'],
+      expect.objectContaining({ cwd: '/work' })
+    );
+  });
+
   it('merges resolved secret env into host stdio transport env', async () => {
     const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
     const config: MCPServerConfig = {
