@@ -86,6 +86,8 @@ Body.`;
     const content = `---
 runtime:
   type: container
+  agentPlacement: host
+  containerLifecycle: session
   image: ghcr.io/example/lace-shell:latest
   workingDirectory: /workspace
   mounts:
@@ -104,6 +106,8 @@ Body.`;
     const result = registry.parsePersona('container-runtime');
     expect(result.config.runtime).toEqual({
       type: 'container',
+      agentPlacement: 'host',
+      containerLifecycle: 'session',
       image: 'ghcr.io/example/lace-shell:latest',
       workingDirectory: '/workspace',
       mounts: { scratch: '/workspace/scratch', knowledge: '/workspace/knowledge' },
@@ -116,6 +120,8 @@ Body.`;
     const content = `---
 runtime:
   type: container
+  agentPlacement: host
+  containerLifecycle: session
   image: img:latest
   workingDirectory: /w
   mounts: {}
@@ -127,6 +133,8 @@ Body.`;
     const result = registry.parsePersona('container-minimal');
     expect(result.config.runtime).toEqual({
       type: 'container',
+      agentPlacement: 'host',
+      containerLifecycle: 'session',
       image: 'img:latest',
       workingDirectory: '/w',
       mounts: {},
@@ -134,10 +142,60 @@ Body.`;
     });
   });
 
+  it('parses runtime.type=container with persistent lifecycle', () => {
+    const content = `---
+runtime:
+  type: container
+  agentPlacement: host
+  containerLifecycle: persistent
+  image: ghcr.io/example/sen-box:latest
+  workingDirectory: /home/agent
+  mounts:
+    home: /home/agent
+  env:
+    HOME: /home/agent
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'persistent-runtime.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(registry.parsePersona('persistent-runtime').config.runtime).toEqual({
+      type: 'container',
+      agentPlacement: 'host',
+      containerLifecycle: 'persistent',
+      image: 'ghcr.io/example/sen-box:latest',
+      workingDirectory: '/home/agent',
+      mounts: { home: '/home/agent' },
+      env: { HOME: '/home/agent' },
+    });
+  });
+
+  it('parses runtime.agentPlacement=container for explicit lace-in-container execution', () => {
+    const content = `---
+runtime:
+  type: container
+  agentPlacement: container
+  containerLifecycle: session
+  image: img:latest
+  workingDirectory: /w
+  mounts: {}
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'container-placement.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(registry.parsePersona('container-placement').config.runtime).toMatchObject({
+      type: 'container',
+      agentPlacement: 'container',
+      containerLifecycle: 'session',
+    });
+  });
+
   it('throws when runtime.type=container is missing image', () => {
     const content = `---
 runtime:
   type: container
+  containerLifecycle: session
   workingDirectory: /w
   mounts: {}
 ---
@@ -152,6 +210,7 @@ Body.`;
     const content = `---
 runtime:
   type: container
+  containerLifecycle: session
   image: img:latest
   workingDirectory: /w
 ---
@@ -166,6 +225,7 @@ Body.`;
     const upper = `---
 runtime:
   type: container
+  containerLifecycle: session
   image: img:latest
   workingDirectory: /w
   mounts:
@@ -179,6 +239,7 @@ Body.`;
     const leadingDigit = `---
 runtime:
   type: container
+  containerLifecycle: session
   image: img:latest
   workingDirectory: /w
   mounts:
@@ -190,33 +251,7 @@ Body.`;
     expect(() => registry.parsePersona('bad-mount-digit')).toThrow(/mounts/i);
   });
 
-  it('parses runtime.type=box with required fields (kata #62)', () => {
-    const content = `---
-runtime:
-  type: box
-  image: ghcr.io/example/sen-box:latest
-  workingDirectory: /home/agent
-  mounts:
-    work: /work
-    knowledge: /knowledge
-  env:
-    FOO: bar
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'box-runtime.md'), content);
-    registry = makeRegistry([userPersonaDir]);
-
-    const result = registry.parsePersona('box-runtime');
-    expect(result.config.runtime).toEqual({
-      type: 'box',
-      image: 'ghcr.io/example/sen-box:latest',
-      workingDirectory: '/home/agent',
-      mounts: { work: '/work', knowledge: '/knowledge' },
-      env: { FOO: 'bar' },
-    });
-  });
-
-  it('parses runtime.type=box with empty mounts and defaulted env (kata #62)', () => {
+  it('rejects old persona runtime.type=box', () => {
     const content = `---
 runtime:
   type: box
@@ -225,37 +260,18 @@ runtime:
   mounts: {}
 ---
 Body.`;
-    writeFileSync(path.join(tempBundledDir, 'box-minimal.md'), content);
+    writeFileSync(path.join(tempBundledDir, 'old-box.md'), content);
     registry = makeRegistry([userPersonaDir]);
 
-    const result = registry.parsePersona('box-minimal');
-    expect(result.config.runtime).toEqual({
-      type: 'box',
-      image: 'img:latest',
-      workingDirectory: '/home/agent',
-      mounts: {},
-      env: {},
-    });
+    expect(() => registry.parsePersona('old-box')).toThrow(/runtime/i);
   });
 
-  it('throws when runtime.type=box is missing image (kata #62)', () => {
+  it('rejects persistent container runtime with ports', () => {
     const content = `---
 runtime:
-  type: box
-  workingDirectory: /home/agent
-  mounts: {}
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'box-no-image.md'), content);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(() => registry.parsePersona('box-no-image')).toThrow(/image/i);
-  });
-
-  it('rejects runtime.type=box with ports (kata #62 — boxes have no ports in v1)', () => {
-    const content = `---
-runtime:
-  type: box
+  type: container
+  agentPlacement: host
+  containerLifecycle: persistent
   image: img:latest
   workingDirectory: /home/agent
   mounts: {}
@@ -264,10 +280,10 @@ runtime:
       container: 80
 ---
 Body.`;
-    writeFileSync(path.join(tempBundledDir, 'box-with-ports.md'), content);
+    writeFileSync(path.join(tempBundledDir, 'persistent-with-ports.md'), content);
     registry = makeRegistry([userPersonaDir]);
 
-    expect(() => registry.parsePersona('box-with-ports')).toThrow(/ports/i);
+    expect(() => registry.parsePersona('persistent-with-ports')).toThrow(/ports/i);
   });
 
   it('rejects unknown runtime discriminator', () => {

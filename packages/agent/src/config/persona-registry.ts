@@ -33,9 +33,20 @@ const portMappingSchema = z
   })
   .strict();
 
+// agentPlacement controls where the lace agent process executes for this
+// persona. 'host' (default) runs the agent on the embedder host and reaches
+// into the container via docker exec; 'container' runs lace itself inside the
+// container. containerLifecycle controls whether the container is created and
+// destroyed per session ('session') or adopted across restarts ('persistent',
+// formerly the 'box' runtime).
+const agentPlacementSchema = z.enum(['host', 'container']).optional().default('host');
+const containerLifecycleSchema = z.enum(['session', 'persistent']);
+
 const runtimeContainerSchema = z
   .object({
     type: z.literal('container'),
+    agentPlacement: agentPlacementSchema,
+    containerLifecycle: containerLifecycleSchema,
     image: z.string().min(1),
     workingDirectory: z.string().min(1),
     // mountName → containerTarget. Resolved against the embedder-provided
@@ -46,26 +57,7 @@ const runtimeContainerSchema = z
   })
   .strict();
 
-// The 'box' runtime is a single-tenant long-lived container owned by the agent.
-// Differs from 'container': fixed daemon-side id (no per-session suffix), reused
-// across agent restarts via docker --restart=unless-stopped, and adopted on
-// boot rather than created+destroyed per delegate. No host port publishing in
-// v1 — boxes are reached by `docker exec` only.
-const runtimeBoxSchema = z
-  .object({
-    type: z.literal('box'),
-    image: z.string().min(1),
-    workingDirectory: z.string().min(1),
-    mounts: z.record(mountNameSchema, z.string().min(1)),
-    env: z.record(z.string(), z.string()).optional().default({}),
-  })
-  .strict();
-
-const runtimeSchema = z.discriminatedUnion('type', [
-  runtimeRootSchema,
-  runtimeContainerSchema,
-  runtimeBoxSchema,
-]);
+const runtimeSchema = z.discriminatedUnion('type', [runtimeRootSchema, runtimeContainerSchema]);
 
 export type PersonaRuntime = z.infer<typeof runtimeSchema>;
 
@@ -107,7 +99,25 @@ const personaConfigSchema = z
     maxTurns: z.number().int().positive().optional(),
     timezone: z.string().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((config, ctx) => {
+    // Persistent containers are long-lived daemons reached via docker exec;
+    // they intentionally do not publish host ports. Reject at parse time so
+    // misconfiguration fails loudly rather than producing a silently-broken
+    // container.
+    const runtime = config.runtime;
+    if (
+      runtime?.type === 'container' &&
+      runtime.containerLifecycle === 'persistent' &&
+      runtime.ports?.length
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['runtime', 'ports'],
+        message: 'persistent container runtimes do not support host ports',
+      });
+    }
+  });
 
 export type PersonaConfig = z.infer<typeof personaConfigSchema>;
 
