@@ -4,6 +4,7 @@
 import type { ContainerSpec } from '@lace/agent/containers/spec';
 import type { ContainerMount } from '@lace/agent/containers/types';
 import type { MountRegistryEntry } from '@lace/agent/server-types';
+import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 
 // Single source of truth for the persona container runtime shape: the
 // `type: 'container'` arm of the persona schema's discriminated union.
@@ -240,5 +241,32 @@ export function buildPersonaContainerSpec(input: {
     mounts,
     env,
     ...(runtime.ports ? { ports: runtime.ports } : {}),
+  };
+}
+
+export function containerSpecToRuntimeSpec(input: {
+  spec: ContainerSpec;
+  imageIdentity: {
+    requestedImage: string;
+    resolvedImageDigest: string;
+    imagePlatform: string;
+  };
+}): Extract<RuntimeExecutionBinding['toolRuntime'], { type: 'container' }>['spec'] {
+  const { spec, imageIdentity } = input;
+  return {
+    name: spec.name,
+    ...(spec.containerId ? { containerId: spec.containerId } : {}),
+    requestedImage: imageIdentity.requestedImage,
+    resolvedImageDigest: imageIdentity.resolvedImageDigest,
+    imagePlatform: imageIdentity.imagePlatform,
+    workingDirectory: spec.workingDirectory,
+    mounts: spec.mounts.map((mount) => ({
+      hostPath: mount.source,
+      containerPath: mount.target,
+      readonly: mount.readonly,
+    })),
+    ...(spec.env ? { env: spec.env } : {}),
+    ...(spec.ports ? { ports: spec.ports } : {}),
+    ...(spec.restartPolicy ? { restartPolicy: spec.restartPolicy } : {}),
   };
 }
