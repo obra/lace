@@ -11,7 +11,7 @@ import {
 } from '@lace/agent/storage/session-store';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
-import { buildNotification, composeSubagentExitedBody } from '@lace/agent/notifications';
+import { buildNotification, composeSubagentExitedAlarmsBody } from '@lace/agent/notifications';
 import { getJobOutputPath } from './job-file-utils';
 import { persistSubagentChildExit } from './subagent-exit-handler';
 import {
@@ -681,7 +681,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
             'job-id': job.jobId,
             persona: personaName,
           },
-          body: composeSubagentExitedBody({
+          body: composeSubagentExitedAlarmsBody({
             persona: personaName,
             pendingAlarms: pending,
           }),

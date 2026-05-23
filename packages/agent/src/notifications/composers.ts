@@ -161,7 +161,7 @@ export interface SubagentExitedCompose {
   pendingAlarms: SubagentPendingAlarm[];
 }
 
-export function composeSubagentExitedBody(s: SubagentExitedCompose): string {
+export function composeSubagentExitedAlarmsBody(s: SubagentExitedCompose): string {
   const personaWord = s.persona.length > 0 ? `${s.persona} ` : '';
   const n = s.pendingAlarms.length;
   const head = `Your ${personaWord}subagent exited gracefully but had ${n} pending alarm${n === 1 ? '' : 's'} that won't fire now`;
@@ -170,6 +170,69 @@ export function composeSubagentExitedBody(s: SubagentExitedCompose): string {
     return `${head}: ${formatPendingAlarm(a)}`;
   }
   const lines = s.pendingAlarms.map((a) => `  ${formatPendingAlarm(a)}`).join('\n');
+  return `${head}:\n${lines}`;
+}
+
+// ---------- Reminders ----------
+
+export interface ReminderBodyCompose {
+  prompt: string;
+}
+
+export function composeReminderBody(c: ReminderBodyCompose): string {
+  // Body is the prompt verbatim. The wrapper handles XML escaping.
+  return c.prompt;
+}
+
+// ---------- Subagent exited (reminders variant) ----------
+
+export interface SubagentPendingReminder {
+  id: string;
+  prompt: string;
+  next_fire_at_iso: string;
+}
+
+export interface SubagentExitedReminderCompose {
+  persona: string;
+  pendingReminders: SubagentPendingReminder[];
+}
+
+const SUBAGENT_BUBBLE_INLINE_THRESHOLD = 5;
+const SUBAGENT_BUBBLE_PROMPT_TRUNCATE = 200;
+
+function truncateAtWordBoundary(s: string, max: number): string {
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  const sliced = lastSpace > max - 30 ? cut.slice(0, lastSpace) : cut;
+  return `${sliced}...`;
+}
+
+export function composeSubagentExitedBody(s: SubagentExitedReminderCompose): string {
+  const personaWord = s.persona.length > 0 ? `${s.persona} ` : '';
+  const n = s.pendingReminders.length;
+  const head = `Your ${personaWord}subagent exited gracefully but had ${n} pending reminder${
+    n === 1 ? '' : 's'
+  } that won't fire now`;
+
+  if (n === 0) return `${head}.`;
+
+  if (n <= SUBAGENT_BUBBLE_INLINE_THRESHOLD) {
+    const lines = s.pendingReminders
+      .map((r) => `  ${r.id} (next fire ${r.next_fire_at_iso}): "${r.prompt}"`)
+      .join('\n');
+    return `${head}:\n${lines}`;
+  }
+
+  // Compact format: one line per reminder, line truncated to 200 chars at word boundary.
+  const lines = s.pendingReminders
+    .map((r) => {
+      const prefix = `  ${r.id} [${r.next_fire_at_iso}]: `;
+      const promptBudget = SUBAGENT_BUBBLE_PROMPT_TRUNCATE - prefix.length;
+      const truncated = truncateAtWordBoundary(r.prompt, promptBudget);
+      return `${prefix}${truncated}`;
+    })
+    .join('\n');
   return `${head}:\n${lines}`;
 }
 

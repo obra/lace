@@ -9,7 +9,7 @@ import {
   composeJobFailedBody,
   composeJobCancelledBody,
   composeJobProgressBody,
-  composeSubagentExitedBody,
+  composeSubagentExitedAlarmsBody,
 } from '../composers';
 
 describe('composeAlarmFiredBody', () => {
@@ -229,7 +229,7 @@ describe('composers', () => {
 
   it('subagent-exited: one pending alarm', () => {
     expect(
-      composeSubagentExitedBody({
+      composeSubagentExitedAlarmsBody({
         persona: 'sen-box',
         pendingAlarms: [
           {
@@ -246,7 +246,7 @@ describe('composers', () => {
   });
 
   it('subagent-exited: multiple pending alarms', () => {
-    const body = composeSubagentExitedBody({
+    const body = composeSubagentExitedAlarmsBody({
       persona: 'sen-box',
       pendingAlarms: [
         { id: 'alarm_a', kind: 'once', schedule: '2026-05-22T17:00:00Z', prompt: 'A' },
@@ -263,7 +263,7 @@ describe('composers', () => {
   });
 
   it('subagent-exited: cron with end_at_iso renders expiry', () => {
-    const body = composeSubagentExitedBody({
+    const body = composeSubagentExitedAlarmsBody({
       persona: 'sen-box',
       pendingAlarms: [
         {
@@ -281,7 +281,7 @@ describe('composers', () => {
   });
 
   it('subagent-exited: once-relative renders "N-minute timer"', () => {
-    const body = composeSubagentExitedBody({
+    const body = composeSubagentExitedAlarmsBody({
       persona: 'sen-box',
       pendingAlarms: [
         { id: 'alarm_r1', kind: 'once', schedule: 'in 5 minutes', prompt: 'stretch', minutes: 5 },
@@ -293,7 +293,7 @@ describe('composers', () => {
   });
 
   it('subagent-exited: once-relative singular (1 minute) still hyphenated', () => {
-    const body = composeSubagentExitedBody({
+    const body = composeSubagentExitedAlarmsBody({
       persona: '',
       pendingAlarms: [
         { id: 'alarm_r2', kind: 'once', schedule: 'in 1 minute', prompt: 'now', minutes: 1 },
@@ -303,7 +303,7 @@ describe('composers', () => {
   });
 
   it('subagent-exited: once without minutes falls back to "one-shot scheduled for ..." wording', () => {
-    const body = composeSubagentExitedBody({
+    const body = composeSubagentExitedAlarmsBody({
       persona: 'sen-box',
       pendingAlarms: [
         { id: 'alarm_a1', kind: 'once', schedule: '2026-12-25T09:00:00Z', prompt: 'eggnog' },
@@ -315,7 +315,7 @@ describe('composers', () => {
   });
 
   it('subagent-exited: interval with end_at_iso renders expiry in bullet list', () => {
-    const body = composeSubagentExitedBody({
+    const body = composeSubagentExitedAlarmsBody({
       persona: 'sen-box',
       pendingAlarms: [
         {
@@ -340,5 +340,45 @@ describe('composers', () => {
     expect(body).toContain(
       '  alarm_b was an interval alarm (every 30 minutes) with the prompt "check" (expiring at 2027-06-01T12:00:00+00:00 (UTC)).'
     );
+  });
+});
+
+import { composeReminderBody, composeSubagentExitedBody as composeSubagentExitedBodyReminders } from '../composers';
+
+describe('composeReminderBody', () => {
+  it("returns the prompt verbatim (escaping is the wrapper's job)", () => {
+    expect(composeReminderBody({ prompt: 'follow up' })).toBe('follow up');
+  });
+});
+
+describe('composeSubagentExitedBody (reminders)', () => {
+  it('full list when ≤5 reminders', () => {
+    const body = composeSubagentExitedBodyReminders({
+      persona: 'sen-box',
+      pendingReminders: [
+        { id: 'reminder_aaaa', prompt: 'check the deploy', next_fire_at_iso: '2026-05-22T16:00:00-07:00' },
+        { id: 'reminder_bbbb', prompt: 'ping ops', next_fire_at_iso: '2026-05-22T17:00:00-07:00' },
+      ],
+    });
+    expect(body).toContain('check the deploy');
+    expect(body).toContain('ping ops');
+  });
+
+  it('compact format when >5 reminders, no truncation past 200 chars and no silent drops', () => {
+    const longPrompt = 'a'.repeat(250);
+    const body = composeSubagentExitedBodyReminders({
+      persona: 'sen-box',
+      pendingReminders: Array.from({ length: 7 }).map((_, i) => ({
+        id: `reminder_${i.toString().padStart(12, '0')}`,
+        prompt: i === 0 ? longPrompt : `prompt ${i}`,
+        next_fire_at_iso: '2026-05-22T16:00:00-07:00',
+      })),
+    });
+    // Long prompt is truncated to 200 chars with ellipsis.
+    expect(body).toMatch(/^.{200}\.\.\./m);
+    // Bubble does not silently drop any of the 7 reminders.
+    for (let i = 0; i < 7; i++) {
+      expect(body).toContain(`reminder_${i.toString().padStart(12, '0')}`);
+    }
   });
 });
