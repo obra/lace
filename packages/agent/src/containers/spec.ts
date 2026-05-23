@@ -14,7 +14,7 @@ export interface ContainerSpec {
   ports?: PortMapping[];
   // Verbatim container id used by the daemon. When set, ContainerManager
   // bypasses the `lace-` prefix and uses this id directly. Used by the box
-  // runtime so the daemon-side container id (e.g. `sen-box`) is stable
+  // runtime so the daemon-side container id (e.g. `sen-box-shell`) is stable
   // across agent restarts and avoids the startup reaper's `lace-` scan.
   containerId?: string;
   // Forwarded to ContainerConfig.restartPolicy. Used by boxes so the daemon

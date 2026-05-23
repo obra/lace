@@ -20,7 +20,7 @@ const CONTAINER_ID_PREFIX = 'lace-';
 
 function resolveContainerId(spec: Pick<ContainerSpec, 'name' | 'containerId'>): string {
   // Persistent container runtime opts out of the `lace-` namespace by supplying a verbatim
-  // containerId (e.g. `sen-box`). Using a non-`lace-` id is intentional: it
+  // containerId (e.g. `sen-box-shell`). Using a non-`lace-` id is intentional: it
   // makes boxes invisible to the startup reaper, which only lists `lace-*`.
   if (spec.containerId && spec.containerId.length > 0) {
     return spec.containerId;
@@ -107,7 +107,7 @@ export class ContainerManager {
     };
 
     // Box specs may have a daemon-side container that survived this process —
-    // the docker --restart policy keeps `sen-box` alive across agent restarts.
+    // the docker --restart policy keeps `sen-box-shell` alive across agent restarts.
     // Consult the daemon directly so we adopt instead of recreating.
     const inspectContainerId = knownContainerId ?? containerId;
     const adoptable = spec.containerId

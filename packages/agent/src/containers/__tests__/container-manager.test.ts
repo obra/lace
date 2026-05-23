@@ -227,8 +227,8 @@ describe('ContainerManager', () => {
 
   describe('materialize with spec.containerId (kata #62 box)', () => {
     const boxSpec: ContainerSpec = {
-      name: 'box',
-      containerId: 'sen-box',
+      name: 'box-shell',
+      containerId: 'sen-box-shell',
       image: 'sen-box:dev',
       workingDirectory: '/home/agent',
       mounts: [],
@@ -239,8 +239,8 @@ describe('ContainerManager', () => {
     it('uses verbatim containerId (no lace- prefix)', async () => {
       const handle = await manager.materialize(boxSpec);
 
-      expect(handle.containerId).toBe('sen-box');
-      expect(runtime.callLog).toEqual(['create:sen-box', 'start:sen-box']);
+      expect(handle.containerId).toBe('sen-box-shell');
+      expect(runtime.callLog).toEqual(['create:sen-box-shell', 'start:sen-box-shell']);
     });
 
     it('passes restartPolicy through to ContainerConfig', async () => {
@@ -249,14 +249,14 @@ describe('ContainerManager', () => {
 
       const [config] = createSpy.mock.calls[0] as [ContainerConfig];
       expect(config.restartPolicy).toBe('unless-stopped');
-      expect(config.id).toBe('sen-box');
+      expect(config.id).toBe('sen-box-shell');
     });
 
     it('adopts an existing daemon-side container without creating', async () => {
-      // Simulate a running daemon-side `sen-box` that this process has never
+      // Simulate a running daemon-side `sen-box-shell` that this process has never
       // seen — daemonInspect returns it.
       vi.spyOn(runtime, 'daemonInspect').mockResolvedValueOnce({
-        id: 'sen-box',
+        id: 'sen-box-shell',
         state: 'running',
       });
       const adoptSpy = vi.spyOn(runtime, 'adopt');
@@ -264,7 +264,7 @@ describe('ContainerManager', () => {
 
       const handle = await manager.materialize(boxSpec);
 
-      expect(handle.containerId).toBe('sen-box');
+      expect(handle.containerId).toBe('sen-box-shell');
       expect(handle.state).toBe('running');
       expect(adoptSpy).toHaveBeenCalledOnce();
       expect(createSpy).not.toHaveBeenCalled();
@@ -272,7 +272,7 @@ describe('ContainerManager', () => {
 
     it('adopts a stopped daemon-side container and starts it', async () => {
       vi.spyOn(runtime, 'daemonInspect').mockResolvedValueOnce({
-        id: 'sen-box',
+        id: 'sen-box-shell',
         state: 'stopped',
       });
       const adoptSpy = vi.spyOn(runtime, 'adopt').mockImplementation(async (cfg, state) => {
@@ -285,7 +285,7 @@ describe('ContainerManager', () => {
 
       expect(adoptSpy).toHaveBeenCalledOnce();
       expect(createSpy).not.toHaveBeenCalled();
-      expect(runtime.callLog).toEqual(['start:sen-box']);
+      expect(runtime.callLog).toEqual(['start:sen-box-shell']);
       expect(handle.state).toBe('running');
     });
 
@@ -296,12 +296,12 @@ describe('ContainerManager', () => {
       await manager.materialize(boxSpec);
 
       expect(adoptSpy).not.toHaveBeenCalled();
-      expect(runtime.callLog).toEqual(['create:sen-box', 'start:sen-box']);
+      expect(runtime.callLog).toEqual(['create:sen-box-shell', 'start:sen-box-shell']);
     });
 
     it('skips beforeCreate hook when adopting an existing container', async () => {
       vi.spyOn(runtime, 'daemonInspect').mockResolvedValueOnce({
-        id: 'sen-box',
+        id: 'sen-box-shell',
         state: 'running',
       });
       const beforeCreate = vi.fn(async () => {});

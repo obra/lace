@@ -194,8 +194,8 @@ describe('ProjectedContainerToolRuntime', () => {
       ...descriptor(),
       spec: {
         ...descriptor().spec,
-        name: 'box',
-        containerId: 'sen-box',
+        name: 'box-shell',
+        containerId: 'sen-box-shell',
         restartPolicy: 'unless-stopped' as const,
       },
       helper: {
@@ -208,8 +208,8 @@ describe('ProjectedContainerToolRuntime', () => {
     const manager = createFakeContainerManager();
     manager.materialize.mockResolvedValueOnce({
       spec: {
-        name: 'box',
-        containerId: 'sen-box',
+        name: 'box-shell',
+        containerId: 'sen-box-shell',
         image: projectedDescriptor.spec.image,
         workingDirectory: '/workspace',
         mounts: [
@@ -217,7 +217,7 @@ describe('ProjectedContainerToolRuntime', () => {
         ],
         restartPolicy: 'unless-stopped',
       },
-      containerId: 'sen-box',
+      containerId: 'sen-box-shell',
       state: 'running',
     });
     const runtime = new ProjectedContainerToolRuntime({
@@ -230,8 +230,8 @@ describe('ProjectedContainerToolRuntime', () => {
 
     expect(manager.materialize).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: 'box',
-        containerId: 'sen-box',
+        name: 'box-shell',
+        containerId: 'sen-box-shell',
         restartPolicy: 'unless-stopped',
         mounts: expect.arrayContaining([
           { source: helperPath, target: '/usr/local/bin/lace-runtime-helper.js', readonly: true },

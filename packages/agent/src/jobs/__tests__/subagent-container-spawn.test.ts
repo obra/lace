@@ -190,7 +190,7 @@ describe('spawnSubagent', () => {
 
     const handle = await spawnSubagent({
       parentSessionId: 'sess1',
-      personaName: 'sen',
+      personaName: 'box-shell',
       personaContainerRuntime: persistentRuntime,
       containerManager: fakeManager as unknown as ContainerManager,
       containerMounts: {},
@@ -198,14 +198,14 @@ describe('spawnSubagent', () => {
 
     expect(fakeManager.materialize).toHaveBeenCalledOnce();
     const spec = fakeManager.materialize.mock.calls[0][0];
-    expect(spec.name).toBe('box');
-    expect(spec.containerId).toBe('sen-box');
+    expect(spec.name).toBe('box-shell');
+    expect(spec.containerId).toBe('sen-box-shell');
     expect(spec.restartPolicy).toBe('unless-stopped');
     expect(spec.ports).toBeUndefined();
 
     expect(fakeManager.execStream).toHaveBeenCalledOnce();
     const [specName, options] = fakeManager.execStream.mock.calls[0];
-    expect(specName).toBe('box');
+    expect(specName).toBe('box-shell');
     expect(options.command).toEqual(['node', '/lace/packages/agent/dist/main.js']);
     expect(options.workingDirectory).toBe('/home/agent');
 

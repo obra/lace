@@ -289,7 +289,7 @@ describe('DelegateTool', () => {
     expect(options.personaContainerRuntime).toBeUndefined();
     expect((options.runtimeBinding as RuntimeExecutionBinding).toolRuntime).toMatchObject({
       type: 'container',
-      spec: { name: 'box', containerId: 'sen-box', restartPolicy: 'unless-stopped' },
+      spec: { name: 'box-shell', containerId: 'sen-box-shell', restartPolicy: 'unless-stopped' },
     });
   });
 

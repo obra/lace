@@ -647,20 +647,20 @@ describe('DockerContainerRuntime', () => {
       expect(result[1]).toEqual({ id: 'lace-b', state: 'stopped' });
     });
 
-    it('list() filter excludes non-lace containers such as sen-box (kata #62)', async () => {
+    it('list() filter excludes non-lace containers such as sen-box-shell (kata #62)', async () => {
       // The persistent container runtime intentionally lives outside the lace- namespace so the
       // startup reaper (which uses list()) never considers it for reaping.
       // The CLI itself returns whatever the daemon gives back; the filter is
       // both at the CLI (`--filter name=lace-`) and the JSON post-parse loop.
       const lines = [
         JSON.stringify({ ID: 'a', Names: 'lace-a', State: 'running' }),
-        JSON.stringify({ ID: 'b', Names: 'sen-box', State: 'running' }),
+        JSON.stringify({ ID: 'b', Names: 'sen-box-shell', State: 'running' }),
       ].join('\n');
       setExecFileResponses([{ stdout: lines, stderr: '' }]);
 
       const result = await runtime.list();
 
-      expect(result.map((c) => c.id)).not.toContain('sen-box');
+      expect(result.map((c) => c.id)).not.toContain('sen-box-shell');
       expect(result.map((c) => c.id)).toContain('lace-a');
     });
 
@@ -771,20 +771,20 @@ describe('DockerContainerRuntime', () => {
       // This shape is produced by ContainerManager when spec.containerId is
       // present: id is the daemon-side identifier, name is the spec name.
       const id = await runtime.create({
-        id: 'sen-box',
-        name: 'box',
+        id: 'sen-box-shell',
+        name: 'box-shell',
         image: 'alpine:latest',
         workingDirectory: '/w',
         mounts: [],
       });
 
-      expect(id).toBe('sen-box');
+      expect(id).toBe('sen-box-shell');
       const args = findCallWithSubcommand('create');
       expect(args).toContain('--name');
-      expect(args).toContain('sen-box');
+      expect(args).toContain('sen-box-shell');
       // Must NOT have been auto-prefixed.
-      expect(args).not.toContain('lace-sen-box');
-      expect(args).not.toContain('lace-box');
+      expect(args).not.toContain('lace-sen-box-shell');
+      expect(args).not.toContain('lace-box-shell');
     });
 
     it('still prefixes ids that lack the lace- prefix only when set via config.name', async () => {
@@ -815,7 +815,7 @@ describe('DockerContainerRuntime', () => {
     it('shells out to docker inspect and returns parsed info without requiring cache', async () => {
       const payload = {
         Id: 'sha256:abc',
-        Name: '/sen-box',
+        Name: '/sen-box-shell',
         State: {
           Status: 'running',
           Running: true,
@@ -827,13 +827,13 @@ describe('DockerContainerRuntime', () => {
       };
       setExecFileResponses([{ stdout: JSON.stringify(payload), stderr: '' }]);
 
-      const info = await runtime.daemonInspect('sen-box');
+      const info = await runtime.daemonInspect('sen-box-shell');
       expect(info).not.toBeNull();
-      expect(info!.id).toBe('sen-box');
+      expect(info!.id).toBe('sen-box-shell');
       expect(info!.state).toBe('running');
 
       const args = findCallWithSubcommand('inspect');
-      expect(args).toEqual(['inspect', 'sen-box', '--format', '{{json .}}']);
+      expect(args).toEqual(['inspect', 'sen-box-shell', '--format', '{{json .}}']);
     });
 
     it('returns null when docker reports no such container', async () => {
@@ -841,12 +841,12 @@ describe('DockerContainerRuntime', () => {
         {
           error: Object.assign(new Error('inspect failed'), {
             code: 1,
-            stderr: 'Error: No such object: sen-box',
+            stderr: 'Error: No such object: sen-box-shell',
           }),
         },
       ]);
 
-      const info = await runtime.daemonInspect('sen-box');
+      const info = await runtime.daemonInspect('sen-box-shell');
       expect(info).toBeNull();
     });
 
@@ -855,7 +855,7 @@ describe('DockerContainerRuntime', () => {
         { error: Object.assign(new Error('spawn docker ENOENT'), { code: 'ENOENT' }) },
       ]);
 
-      const info = await runtime.daemonInspect('sen-box');
+      const info = await runtime.daemonInspect('sen-box-shell');
       expect(info).toBeNull();
     });
   });
@@ -864,7 +864,7 @@ describe('DockerContainerRuntime', () => {
     it('registers an existing container in cache so start/execStream see it', async () => {
       await runtime.adopt(
         {
-          id: 'sen-box',
+          id: 'sen-box-shell',
           image: 'alpine:latest',
           workingDirectory: '/work',
           mounts: [{ source: '/host/work', target: '/work' }],
@@ -873,11 +873,13 @@ describe('DockerContainerRuntime', () => {
       );
 
       // Adopted container is now in the cache.
-      const info = runtime.inspect('sen-box');
-      expect(info.id).toBe('sen-box');
+      const info = runtime.inspect('sen-box-shell');
+      expect(info.id).toBe('sen-box-shell');
       expect(info.state).toBe('running');
       // Mount registration is in place.
-      expect(runtime.translateToContainer('/host/work/index.ts', 'sen-box')).toBe('/work/index.ts');
+      expect(runtime.translateToContainer('/host/work/index.ts', 'sen-box-shell')).toBe(
+        '/work/index.ts'
+      );
     });
 
     it('throws when config.id is missing', async () => {
