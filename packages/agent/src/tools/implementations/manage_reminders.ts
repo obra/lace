@@ -233,7 +233,7 @@ const MANAGE_REMINDERS_DESCRIPTION = [
   '  next: <seconds> for relative delay; or "<ISO with Z or ±HH:MM offset>" for absolute. Required unless recurs is cron.',
   '  recurs: "<cron>" for calendar-aware recurrence (evaluated in your local timezone, accounting for DST). For absolute scheduling more than a few days out, prefer cron over `next: <ISO>` — cron tracks DST correctly while ISO+offset is instant-locked.',
   '  recurs: <count> for "fire N times at next-second intervals." Requires next as seconds. Minimum interval is 5 minutes.',
-  '- cancel {id} — Stop a reminder. Does not retract notifications already in your event log.',
+  '- cancel {id} — Stop a reminder. Returns {cancelled: true} on success, {cancelled: false, reason: "not_found"} if no such reminder, or {cancelled: false, reason: "persist_failed", retry_safe: true} on transient disk failure (safe to retry — disk and in-memory state unchanged). Does not retract notifications already in your event log.',
   '- list — Return all pending reminders, sorted by next fire time. For partly-fired count-interval reminders, recurs echoes the remaining count (or null when 1 remains) so you can copy fields into a new schedule call.',
 ].join('\n');
 

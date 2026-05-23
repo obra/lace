@@ -83,7 +83,8 @@ export interface ScheduleResult {
 
 export type CancelResult =
   | { cancelled: true }
-  | { cancelled: false; reason: 'not_found' | 'persist_failed' };
+  | { cancelled: false; reason: 'not_found' }
+  | { cancelled: false; reason: 'persist_failed'; retry_safe: true };
 
 interface HeapEntry {
   id: string;
@@ -197,7 +198,7 @@ export class ReminderScheduler {
       try {
         this.store.save(nextRows);
       } catch {
-        return { cancelled: false, reason: 'persist_failed' } as CancelResult;
+        return { cancelled: false, reason: 'persist_failed', retry_safe: true } as CancelResult;
       }
       this.heap = this.heap.filter((e) => e.id !== id);
       this.rescheduleNextTick();

@@ -235,6 +235,52 @@ describe('ManageRemindersTool execution', () => {
   });
 });
 
+describe('ManageRemindersTool cancel persist_failed', () => {
+  const origTZ = process.env.TZ;
+  beforeEach(() => { process.env.TZ = 'UTC'; });
+  afterEach(() => { process.env.TZ = origTZ; });
+
+  it('cancel surfaces retry_safe:true on persist_failed', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lace-mr-tool-'));
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 0,
+      notifier: async () => {},
+    });
+    await sched.start();
+    const { id } = await sched.schedule({
+      prompt: 'p',
+      delaySeconds: 300,
+      recurs: null,
+    });
+
+    // Force the next store.save to throw — the persist for the cancel.
+    const origSave = sched.store.save.bind(sched.store);
+    let saveCalls = 0;
+    sched.store.save = ((rows: ReminderRow[]) => {
+      saveCalls++;
+      if (saveCalls === 1) throw new Error('disk full');
+      return origSave(rows);
+    }) as typeof origSave;
+
+    const tool = new ManageRemindersTool();
+    const result = await tool.execute(
+      { action: 'cancel', id },
+      { signal: new AbortController().signal, reminderScheduler: sched } as ToolContext
+    );
+    const body = JSON.parse((result.content?.[0] as { text: string }).text) as {
+      cancelled: boolean;
+      reason?: string;
+      retry_safe?: boolean;
+    };
+    expect(body.cancelled).toBe(false);
+    expect(body.reason).toBe('persist_failed');
+    expect(body.retry_safe).toBe(true);
+
+    await sched.stop();
+  });
+});
+
 describe('ManageRemindersTool ISO absolute-time precision', () => {
   const origTZ = process.env.TZ;
   beforeEach(() => { process.env.TZ = 'UTC'; });

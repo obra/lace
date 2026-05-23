@@ -549,7 +549,7 @@ describe('ReminderScheduler cancel', () => {
     }) as typeof origSave;
 
     const result = await sched.cancel('reminder_777777777777');
-    expect(result).toEqual({ cancelled: false, reason: 'persist_failed' });
+    expect(result).toEqual({ cancelled: false, reason: 'persist_failed', retry_safe: true });
 
     // Disk row still present (write failed).
     expect(new ReminderStore(dir).list()).toHaveLength(1);
