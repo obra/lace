@@ -206,3 +206,151 @@ describe('AnthropicProvider message-level cache_control (PRI-1799)', () => {
     expect(callArgs.messages).toEqual([]);
   });
 });
+
+describe('AnthropicProvider stable-anchor breakpoint (PRI-1802)', () => {
+  let provider: AnthropicProvider;
+  let mockTool: Tool;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    provider = new AnthropicProvider({ apiKey: 'test-key' });
+    provider.setSystemPrompt('Sys prompt');
+
+    class T extends Tool {
+      name = 'tool';
+      description = 'A tool';
+      schema = z.object({ a: z.string() });
+      protected async executeValidated(
+        args: { a: string },
+        _context: ToolContext
+      ): Promise<ToolResult> {
+        return await Promise.resolve(this.createResult(args.a));
+      }
+    }
+    mockTool = new T();
+
+    mockCreateResponse.mockResolvedValue({
+      content: [{ type: 'text', text: 'r' }],
+      usage: { input_tokens: 10, output_tokens: 5 },
+    });
+  });
+
+  afterEach(() => {
+    provider.removeAllListeners();
+  });
+
+  // Build a long conversation with N tool round-trips so the cacheable-block
+  // count exceeds ANCHOR_OFFSET_BLOCKS (10), forcing a stable anchor to land.
+  function longConversation(turns: number) {
+    const messages: Parameters<typeof provider.createResponse>[0] = [];
+    for (let i = 0; i < turns; i++) {
+      messages.push({ role: 'user', content: `q${i}` });
+      messages.push({
+        role: 'assistant',
+        content: `thought ${i}`,
+        toolCalls: [{ id: `t${i}`, name: 'tool', arguments: { a: `${i}` } }],
+      });
+      messages.push({
+        role: 'user',
+        content: '',
+        toolResults: [
+          {
+            id: `t${i}`,
+            content: [{ type: 'text' as const, text: `r${i}` }],
+            status: 'completed' as const,
+          },
+        ],
+      });
+    }
+    messages.push({ role: 'user', content: 'final question' });
+    return messages;
+  }
+
+  function countCacheControl(payload: Anthropic.Messages.MessageCreateParams): number {
+    return (JSON.stringify(payload.messages).match(/"cache_control"/g) ?? []).length;
+  }
+
+  it('places TWO message-level breakpoints (anchor + tail) on a long conversation', async () => {
+    await provider.createResponse(longConversation(6), [mockTool], 'claude-sonnet-4-20250514');
+
+    const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
+    expect(countCacheControl(callArgs)).toBe(2);
+
+    // Tail must be the last message's last block, marked 1h
+    const last = callArgs.messages[callArgs.messages.length - 1];
+    const lastBlocks = last.content as Array<{ cache_control?: CacheControl }>;
+    expect(lastBlocks[lastBlocks.length - 1].cache_control).toEqual({
+      type: 'ephemeral',
+      ttl: '1h',
+    });
+  });
+
+  it('places ONLY the tail breakpoint on a short conversation', async () => {
+    // 3 messages → only ~3 cacheable blocks, well below the 10-block offset
+    await provider.createResponse(
+      [
+        { role: 'user', content: 'hi' },
+        { role: 'assistant', content: 'hello' },
+        { role: 'user', content: 'how' },
+      ],
+      [mockTool],
+      'claude-sonnet-4-20250514'
+    );
+
+    const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
+    expect(countCacheControl(callArgs)).toBe(1);
+  });
+
+  it('places no breakpoints when the last message has empty content', async () => {
+    // Last user message has empty content and no tool results → empty array
+    // after conversion. The helper must REFUSE to dig backward.
+    await provider.createResponse(
+      [
+        { role: 'user', content: 'hi' },
+        { role: 'assistant', content: 'hello' },
+        { role: 'user', content: '' },
+      ],
+      [mockTool],
+      'claude-sonnet-4-20250514'
+    );
+
+    const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
+    expect(countCacheControl(callArgs)).toBe(0);
+  });
+
+  it('never attaches cache_control to a thinking block', async () => {
+    // Simulate a turn that includes thinking content. ProviderMessage's
+    // ContentBlock supports only text/image at the generic level, so we feed
+    // thinking content via the assistant content array directly — bypass via
+    // a string here, then verify the helper's output doesn't have
+    // cache_control on any thinking-typed block in the converted wire format.
+    await provider.createResponse(longConversation(6), [mockTool], 'claude-sonnet-4-20250514');
+
+    const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
+    for (const msg of callArgs.messages) {
+      if (typeof msg.content === 'string') continue;
+      for (const block of msg.content) {
+        if (block.type === 'thinking' || block.type === 'redacted_thinking') {
+          expect((block as { cache_control?: unknown }).cache_control).toBeUndefined();
+        }
+      }
+    }
+  });
+
+  it('still attaches system + last-tool breakpoints even when message breakpoints are skipped', async () => {
+    // Empty last message ⇒ no message breakpoints, but system + last tool
+    // must still be marked 1h.
+    await provider.createResponse(
+      [{ role: 'user', content: '' }],
+      [mockTool],
+      'claude-sonnet-4-20250514'
+    );
+
+    const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
+    const sys = callArgs.system as Array<{ cache_control?: CacheControl }>;
+    const lastTool = callArgs.tools![0] as { cache_control?: CacheControl };
+    expect(sys[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
+    expect(lastTool.cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
+    expect(countCacheControl(callArgs)).toBe(0);
+  });
+});

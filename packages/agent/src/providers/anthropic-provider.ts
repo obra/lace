@@ -21,53 +21,129 @@ interface AnthropicProviderConfig extends ProviderConfig {
   [key: string]: unknown; // Allow for additional properties
 }
 
-// SDK 0.54 types `cache_control` as `{type: 'ephemeral'}` only, but the
-// runtime API accepts `ttl: '1h'` and reports back via
-// `usage.cache_creation.ephemeral_1h_input_tokens`. Use a casted constant
-// rather than splattering `as` everywhere.
-const ONE_HOUR_EPHEMERAL = { type: 'ephemeral', ttl: '1h' } as unknown as {
-  type: 'ephemeral';
+const ONE_HOUR_EPHEMERAL: Anthropic.CacheControlEphemeral = {
+  type: 'ephemeral',
+  ttl: '1h',
 };
 
-// Walk `messages` backwards and attach a 1h ephemeral cache_control marker to
-// the last non-empty content block. Plain-string content is lifted to a
-// single-element text block so the marker has somewhere to land. Returns a
-// new array; inputs are not mutated.
-function attachMessageCacheBreakpoint(
+// Distance (in cacheable content blocks) between the rolling tail breakpoint
+// and the stable anchor breakpoint. Anthropic's cache lookup looks back ~20
+// content blocks from a breakpoint; placing the anchor 10 blocks behind the
+// tail gives ~10 blocks of headroom for new blocks to land before the
+// previous request's breakpoints fall out of range.
+const ANCHOR_OFFSET_BLOCKS = 10;
+
+// Thinking blocks (`type: 'thinking'` / `type: 'redacted_thinking'`) do not
+// support `cache_control` — they have no such field in the SDK type and
+// Anthropic's docs explicitly forbid it. They must be skipped when picking
+// breakpoint targets.
+type CacheableBlock = Exclude<
+  Anthropic.ContentBlockParam,
+  Anthropic.ThinkingBlockParam | Anthropic.RedactedThinkingBlockParam
+>;
+
+function isCacheableBlock(block: Anthropic.ContentBlockParam): block is CacheableBlock {
+  return block.type !== 'thinking' && block.type !== 'redacted_thinking';
+}
+
+// A pointer into the messages array. `blockIdx` is `null` when the message's
+// content is a plain string — in that case we'll lift it to a single text
+// block before attaching cache_control.
+interface BlockPosition {
+  msgIdx: number;
+  blockIdx: number | null;
+}
+
+// Walk every cacheable block across all messages. Used to compute the anchor
+// position relative to the tail.
+function collectCacheablePositions(messages: Anthropic.MessageParam[]): BlockPosition[] {
+  const positions: BlockPosition[] = [];
+  for (let m = 0; m < messages.length; m++) {
+    const content = messages[m].content;
+    if (typeof content === 'string') {
+      if (content.length > 0) positions.push({ msgIdx: m, blockIdx: null });
+    } else {
+      for (let b = 0; b < content.length; b++) {
+        if (isCacheableBlock(content[b])) positions.push({ msgIdx: m, blockIdx: b });
+      }
+    }
+  }
+  return positions;
+}
+
+function isMessageEmpty(msg: Anthropic.MessageParam): boolean {
+  return typeof msg.content === 'string' ? msg.content.length === 0 : msg.content.length === 0;
+}
+
+// Attach up to two 1h cache_control breakpoints to message content:
+//   • rolling tail — last cacheable block of the last non-empty message
+//   • stable anchor — 10 cacheable blocks behind the tail
+//
+// The anchor exists to defeat Anthropic's 20-block lookback window: in a
+// tool-heavy loop, the prior request's tail breakpoint can be pushed beyond
+// 20 blocks by intervening tool_result / tool_use blocks, busting the cache.
+// A second breakpoint ~10 blocks back guarantees the next request finds at
+// least one matching cached prefix even after several new blocks arrive.
+//
+// Refuses to attach anything when the last message has empty content — the
+// rolling write must always move forward, never freeze on a stale block deep
+// in history.
+//
+// Thinking blocks are never used as breakpoint targets.
+//
+// Returns a new array; inputs are not mutated.
+function attachMessageCacheBreakpoints(
   messages: Anthropic.MessageParam[]
 ): Anthropic.MessageParam[] {
   if (messages.length === 0) return messages;
+  if (isMessageEmpty(messages[messages.length - 1])) return messages;
 
+  const positions = collectCacheablePositions(messages);
+  if (positions.length === 0) return messages;
+
+  // Tail must live in the last message — otherwise refuse rather than
+  // anchoring on history. (E.g. last message contains only thinking blocks.)
+  const tail = positions[positions.length - 1];
+  if (tail.msgIdx !== messages.length - 1) return messages;
+
+  const anchor =
+    positions.length > ANCHOR_OFFSET_BLOCKS
+      ? positions[positions.length - 1 - ANCHOR_OFFSET_BLOCKS]
+      : null;
+
+  return applyBreakpoints(messages, anchor ? [anchor, tail] : [tail]);
+}
+
+function applyBreakpoints(
+  messages: Anthropic.MessageParam[],
+  positions: BlockPosition[]
+): Anthropic.MessageParam[] {
   const result = messages.slice();
+  const dirtyMsgIdxs = new Set(positions.map((p) => p.msgIdx));
 
-  for (let i = result.length - 1; i >= 0; i--) {
-    const msg = result[i];
-
+  // Clone every message we'll touch and lift any string content to an array.
+  for (const idx of dirtyMsgIdxs) {
+    const msg = result[idx];
     if (typeof msg.content === 'string') {
-      if (msg.content.length === 0) continue;
-      result[i] = {
+      result[idx] = {
         ...msg,
-        content: [
-          {
-            type: 'text',
-            text: msg.content,
-            cache_control: ONE_HOUR_EPHEMERAL,
-          },
-        ],
+        content: [{ type: 'text', text: msg.content }],
       };
-      return result;
+    } else {
+      result[idx] = { ...msg, content: msg.content.slice() };
     }
+  }
 
-    if (Array.isArray(msg.content) && msg.content.length > 0) {
-      const blocks = msg.content.slice();
-      const lastIndex = blocks.length - 1;
-      blocks[lastIndex] = {
-        ...blocks[lastIndex],
-        cache_control: ONE_HOUR_EPHEMERAL,
-      } as (typeof blocks)[number];
-      result[i] = { ...msg, content: blocks };
-      return result;
-    }
+  // Now stamp cache_control on each target block. Type juggling: after the
+  // clone above, all dirty messages have array content.
+  for (const pos of positions) {
+    const blocks = (result[pos.msgIdx].content as CacheableBlock[]).slice();
+    const targetIdx = pos.blockIdx ?? 0;
+    blocks[targetIdx] = {
+      ...blocks[targetIdx],
+      cache_control: ONE_HOUR_EPHEMERAL,
+    };
+    result[pos.msgIdx] = { ...result[pos.msgIdx], content: blocks };
   }
 
   return result;
@@ -231,7 +307,7 @@ export class AnthropicProvider extends AIProvider {
     // message-content block so the conversation prefix stays cached across
     // long idle gaps (1h TTL). Without this, only system+tools cache and
     // every multi-minute-idle turn re-bills the whole prefix.
-    const messagesWithCaching = attachMessageCacheBreakpoint(anthropicMessages);
+    const messagesWithCaching = attachMessageCacheBreakpoints(anthropicMessages);
 
     // Extract system message if present
     const systemPrompt = this.getEffectiveSystemPrompt(messages);
