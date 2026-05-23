@@ -632,6 +632,44 @@ describe('ReminderScheduler exception handling', () => {
   beforeEach(() => { process.env.TZ = 'UTC'; });
   afterEach(() => { process.env.TZ = origTZ; });
 
+  it('cron exhaustion onError includes the row id', async () => {
+    const dir = tempSessionDir();
+    const store = new ReminderStore(dir);
+    const row: ReminderRow = {
+      id: 'reminder_ffffffffffff',
+      created_at: 0,
+      next_fire_at: 1000,
+      prompt: 'p',
+      recurs: { kind: 'cron', expr: '0 9 29 2 *' },
+      fired_at: null,
+      fire_count: 0,
+    };
+    store.save([row]);
+
+    const errors: unknown[] = [];
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 2000,
+      notifier: async () => {},
+      onError: (err) => { errors.push(err); },
+    });
+
+    const cronMod = await import('../cron');
+    const spy = vi.spyOn(cronMod, 'computeNextCronFire').mockImplementation(() => {
+      throw new Error('cron exhausted');
+    });
+
+    await sched.tickForTest(2000);
+
+    expect(errors).toHaveLength(1);
+    const err = errors[0];
+    // The error should carry the row id in the message.
+    const repr = err instanceof Error ? err.message : JSON.stringify(err);
+    expect(repr).toContain('reminder_ffffffffffff');
+
+    spy.mockRestore();
+  });
+
   it('treats exhausted cron as terminal fire (no zombie row)', async () => {
     const dir = tempSessionDir();
     const store = new ReminderStore(dir);

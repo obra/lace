@@ -443,7 +443,12 @@ export class ReminderScheduler {
       };
     } catch (err) {
       // Cron exhausted — treat as terminal fire so the row is deleted.
-      this.onError(err);
+      // Wrap with the row id so operators can correlate the log entry to a specific reminder.
+      const wrapped = new Error(
+        `reminder ${prior.id}: cron expression "${prior.recurs.expr}" has no future matches (terminal fire)`
+      );
+      (wrapped as Error & { cause?: unknown }).cause = err;
+      this.onError(wrapped);
       return { nextRow: null };
     }
   }
