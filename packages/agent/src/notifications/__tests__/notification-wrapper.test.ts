@@ -6,8 +6,8 @@ import { buildNotification } from '../notification-wrapper';
 
 describe('buildNotification', () => {
   it('wraps body in <notification kind="..."> with no attrs', () => {
-    expect(buildNotification({ kind: 'alarm-fired', body: 'Hello.' })).toBe(
-      '<notification kind="alarm-fired">\nHello.\n</notification>'
+    expect(buildNotification({ kind: 'reminder', body: 'Hello.' })).toBe(
+      '<notification kind="reminder">\nHello.\n</notification>'
     );
   });
 
@@ -24,11 +24,11 @@ describe('buildNotification', () => {
 
   it('escapes attribute values', () => {
     const out = buildNotification({
-      kind: 'alarm-fired',
-      identifiers: { 'alarm-id': 'a&b"<c>' },
+      kind: 'reminder',
+      identifiers: { id: 'a&b"<c>' },
       body: 'x',
     });
-    expect(out).toContain('alarm-id="a&amp;b&quot;&lt;c&gt;"');
+    expect(out).toContain('id="a&amp;b&quot;&lt;c&gt;"');
   });
 
   it('drops empty-string identifiers (e.g. missing persona)', () => {

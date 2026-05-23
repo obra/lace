@@ -30,8 +30,8 @@ describe('injectNotification', () => {
     const dir = tempSessionDir();
     injectNotification({
       sessionDir: dir,
-      kind: 'alarm-fired',
-      identifiers: { 'alarm-id': 'alarm_abc' },
+      kind: 'reminder',
+      identifiers: { id: 'reminder_abc123abc123' },
       body: 'fired',
     });
     const events = readEventsJsonl(dir);
@@ -39,7 +39,7 @@ describe('injectNotification', () => {
     expect(events[0].type).toBe('context_injected');
     expect((events[0].data as { priority?: string }).priority).toBe('immediate');
     const content = (events[0].data as { content: Array<{ text: string }> }).content;
-    expect(content[0].text).toContain('<notification kind="alarm-fired" alarm-id="alarm_abc">');
+    expect(content[0].text).toContain('<notification kind="reminder" id="reminder_abc123abc123">');
     expect(content[0].text).toContain('fired');
   });
 
