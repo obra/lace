@@ -298,5 +298,19 @@ export function enforceBreakpointBudget(payload: {
     });
     return touched ? { ...msg, content: blocks.reverse() } : msg;
   });
-  return stripped.reverse();
+  const result = stripped.reverse();
+
+  // If toDrop is still > 0 after the message-stripping pass, system/tools
+  // markers alone are pushing the total over cap. We can't safely strip
+  // those here (that would mask a programmer error upstream). Warn loudly
+  // so the regression surfaces in production logs before Anthropic 400s the
+  // request.
+  if (toDrop > 0) {
+    console.warn(
+      `[cache-control] enforceBreakpointBudget: cache_control budget exceeded: ${total} markers but only ${MAX_CACHE_BREAKPOINTS} allowed. ` +
+        `Could not reduce — system/tools markers consumed too many slots. Request will likely 400.`
+    );
+  }
+
+  return result;
 }

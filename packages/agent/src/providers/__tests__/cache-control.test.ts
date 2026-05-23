@@ -2,7 +2,7 @@
 // anchor math (PRI-1805), block-type whitelist (PRI-1806 #5), and the
 // 4-marker budget cap (PRI-1806 #1).
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
 import {
   ANCHOR_OFFSET_RAW_BLOCKS,
@@ -326,5 +326,30 @@ describe('budget enforcement (PRI-1806 #1)', () => {
     ];
     const result = enforceBreakpointBudget({ messages });
     expect(result).toBe(messages);
+  });
+
+  it('logs a warning when system/tools markers push the total over cap (PRI-1806 #1 follow-up)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      // 4 markers in system + 1 in tools = 5 total, all message-level slots empty
+      const result = enforceBreakpointBudget({
+        system: [
+          { type: 'text', text: 'a', cache_control: MARKER_1H },
+          { type: 'text', text: 'b', cache_control: MARKER_1H },
+          { type: 'text', text: 'c', cache_control: MARKER_1H },
+          { type: 'text', text: 'd', cache_control: MARKER_1H },
+        ] as Anthropic.TextBlockParam[],
+        tools: [{ cache_control: MARKER_1H }],
+        messages: [user(text('plain'))],
+      });
+
+      // Messages array unchanged (no message markers to strip).
+      expect(result).toHaveLength(1);
+      // Warning fired so we surface this in production logs.
+      expect(warnSpy).toHaveBeenCalled();
+      expect(warnSpy.mock.calls[0][0]).toMatch(/cache_control budget/i);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });
