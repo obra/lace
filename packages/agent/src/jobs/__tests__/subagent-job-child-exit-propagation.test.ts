@@ -111,8 +111,10 @@ describe('runSubagentJobProcess — child_exit propagation (PRI-1774)', () => {
       resolveCompletion,
       persona: 'box-shell',
       subagentContent: [{ type: 'text', text: 'echo hello' }],
-      personaBoxRuntime: {
-        type: 'box',
+      personaContainerRuntime: {
+        type: 'container',
+        agentPlacement: 'container',
+        containerLifecycle: 'persistent',
         image: 'sen-box:dev',
         workingDirectory: '/home/agent',
         mounts: {},

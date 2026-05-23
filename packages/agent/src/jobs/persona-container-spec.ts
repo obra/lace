@@ -263,7 +263,7 @@ export function containerSpecToRuntimeSpec(input: {
     mounts: spec.mounts.map((mount) => ({
       hostPath: mount.source,
       containerPath: mount.target,
-      readonly: mount.readonly,
+      readonly: mount.readonly ?? false,
     })),
     ...(spec.env ? { env: spec.env } : {}),
     ...(spec.ports ? { ports: spec.ports } : {}),

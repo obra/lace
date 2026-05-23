@@ -175,7 +175,6 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         parentSessionId: state.activeSession.meta.sessionId,
         personaName: job.persona,
         personaContainerRuntime: job.personaContainerRuntime,
-        personaBoxRuntime: job.personaBoxRuntime,
         containerManager: state.containerManager,
         containerMounts: state.containerMounts,
       });
@@ -792,9 +791,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       // the user-personas dir is auto-mounted at a fixed in-container path. For
       // native subagents, the child shares the parent's filesystem so the
       // parent's host paths apply directly.
-      // Both container and box runtimes run the child lace-agent inside a
-      // container where user personas are auto-mounted at the fixed target.
-      const isContainerizedSubagent = !!job.personaContainerRuntime || !!job.personaBoxRuntime;
+      const isContainerizedSubagent = !!job.personaContainerRuntime;
       const subagentUserPersonasPaths: string[] = isContainerizedSubagent
         ? [SUBAGENT_USER_PERSONAS_TARGET]
         : [...currentState.personaRegistry.getUserPersonasPaths()];
@@ -815,9 +812,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       const resumedSession = !!job.subagentSessionId;
       const subagentWorkDir = job.personaContainerRuntime
         ? job.personaContainerRuntime.workingDirectory
-        : job.personaBoxRuntime
-          ? job.personaBoxRuntime.workingDirectory
-          : currentState.activeSession!.meta.workDir;
+        : currentState.activeSession!.meta.workDir;
       const inheritedRuntimeConfig =
         !isContainerizedSubagent && job.runtimeBinding
           ? { config: { runtimeBinding: job.runtimeBinding } }
