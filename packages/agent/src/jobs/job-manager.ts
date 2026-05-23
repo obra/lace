@@ -30,10 +30,17 @@ export type CreateJobOptions = {
   parentJobId?: string;
   turnContext?: { turnId: string; turnSeq: number };
   resumeSessionId?: string; // for delegate resume
+  // Host-preallocated session id for the fresh-spawn case (PRI-1796).
+  // Mutually exclusive with resumeSessionId.
+  newSubagentSessionId?: string;
   connectionId?: string;
   modelId?: string;
   progressIntervalMs?: number;
   runtimeBinding?: RuntimeExecutionBinding;
+  // Host scratch-directory path reserved for this invocation (PRI-1796).
+  scratchDirHostPath?: string;
+  // Container-sharing mode for this delegate job (PRI-1796).
+  containerSharing?: 'per_invocation' | 'persistent';
   // Persona-bundle support for delegate jobs
   persona?: string;
   // Parsed persona container runtime for the in-container lace-agent path
@@ -680,6 +687,15 @@ export class JobManager {
     type: 'shell' | 'delegate',
     options: CreateJobOptions
   ): Promise<{ jobId: string; job: JobState }> {
+    // Validate mutual exclusion of preallocated vs resume session ids
+    if (options.newSubagentSessionId && options.resumeSessionId) {
+      throw new JobCreationError(
+        'newSubagentSessionId and resumeSessionId are mutually exclusive — only one may be set',
+        -32602,
+        'params'
+      );
+    }
+
     // 1. Check for active session
     const activeSession = this.deps.getActiveSession();
     if (!activeSession) {
@@ -728,10 +744,18 @@ export class JobManager {
       connectionId: options.connectionId,
       modelId: options.modelId,
       ...(options.runtimeBinding ? { runtimeBinding: options.runtimeBinding } : {}),
+      ...(options.scratchDirHostPath ? { scratchDirHostPath: options.scratchDirHostPath } : {}),
+      ...(options.containerSharing ? { containerSharing: options.containerSharing } : {}),
       ...(type === 'delegate'
         ? {
             subagentContent: [{ type: 'text', text: options.prompt }],
             ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
+            ...(options.newSubagentSessionId
+              ? {
+                  subagentSessionId: options.newSubagentSessionId,
+                  subagentSessionPreallocated: true,
+                }
+              : {}),
             ...(options.persona ? { persona: options.persona } : {}),
             ...(options.personaContainerRuntime
               ? { personaContainerRuntime: options.personaContainerRuntime }
@@ -754,6 +778,8 @@ export class JobManager {
         command,
         turnContext: options.turnContext,
         ...(options.runtimeBinding ? { runtimeBinding: options.runtimeBinding } : {}),
+        ...(options.scratchDirHostPath ? { scratchDirHostPath: options.scratchDirHostPath } : {}),
+        ...(options.containerSharing ? { containerSharing: options.containerSharing } : {}),
       },
     });
 

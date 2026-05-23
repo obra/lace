@@ -30,10 +30,17 @@ export type CreateSubagentJobOptions = {
   parentJobId?: string;
   turnContext?: { turnId: string; turnSeq: number };
   resumeSessionId?: string;
+  // Host-preallocated session id for the fresh-spawn case (PRI-1796).
+  // Mutually exclusive with resumeSessionId.
+  newSubagentSessionId?: string;
   progressIntervalMs?: number;
   connectionId?: string;
   modelId?: string;
   runtimeBinding?: RuntimeExecutionBinding;
+  // Host scratch-directory path reserved for this invocation (PRI-1796).
+  scratchDirHostPath?: string;
+  // Container-sharing mode for this delegate job (PRI-1796).
+  containerSharing?: 'per_invocation' | 'persistent';
 };
 
 /**
@@ -53,6 +60,8 @@ export type JobCreationDeps = {
     command?: string;
     turnContext?: { turnId: string; turnSeq: number };
     runtimeBinding?: RuntimeExecutionBinding;
+    scratchDirHostPath?: string;
+    containerSharing?: 'per_invocation' | 'persistent';
   }) => Promise<void>;
   /** Emit a session update notification. */
   emitSessionUpdate: (
@@ -220,6 +229,14 @@ export async function createSubagentJob(
   options: CreateSubagentJobOptions,
   deps: JobCreationDeps
 ): Promise<{ jobId: string }> {
+  if (options.newSubagentSessionId && options.resumeSessionId) {
+    throw new JobCreationError(
+      'newSubagentSessionId and resumeSessionId are mutually exclusive — only one may be set',
+      -32602,
+      'params'
+    );
+  }
+
   const scaffold = scaffoldJob(deps, options);
   const description = options.description ?? 'Subagent';
 
@@ -242,7 +259,12 @@ export async function createSubagentJob(
     connectionId: options.connectionId,
     modelId: options.modelId,
     ...(options.resumeSessionId ? { subagentSessionId: options.resumeSessionId } : {}),
+    ...(options.newSubagentSessionId
+      ? { subagentSessionId: options.newSubagentSessionId, subagentSessionPreallocated: true }
+      : {}),
     ...(options.runtimeBinding ? { runtimeBinding: options.runtimeBinding } : {}),
+    ...(options.scratchDirHostPath ? { scratchDirHostPath: options.scratchDirHostPath } : {}),
+    ...(options.containerSharing ? { containerSharing: options.containerSharing } : {}),
   };
 
   return finalizeJobCreation(
@@ -256,6 +278,8 @@ export async function createSubagentJob(
       command: options.prompt,
       turnContext: options.turnContext,
       ...(options.runtimeBinding ? { runtimeBinding: options.runtimeBinding } : {}),
+      ...(options.scratchDirHostPath ? { scratchDirHostPath: options.scratchDirHostPath } : {}),
+      ...(options.containerSharing ? { containerSharing: options.containerSharing } : {}),
     },
     deps.runSubagentJobProcess
   );

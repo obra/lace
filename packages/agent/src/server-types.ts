@@ -92,6 +92,14 @@ export type JobState = {
   permissionAbortController?: AbortController;
   childPeer?: JsonRpcPeer;
   subagentSessionId?: string;
+  // True when the host pre-allocated subagentSessionId before session/new (PRI-1796).
+  // Distinguishes from the resume case, where subagentSessionId is set because a
+  // prior job already ran with that session.
+  subagentSessionPreallocated?: boolean;
+  // Host scratch-directory path reserved for this invocation (PRI-1796).
+  scratchDirHostPath?: string;
+  // Container-sharing mode for this delegate job (PRI-1796).
+  containerSharing?: 'per_invocation' | 'persistent';
   childTransportClose?: () => void;
   finished: boolean;
   completion: Promise<void>;

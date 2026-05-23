@@ -1020,4 +1020,106 @@ describe('JobManager', () => {
       expect(output).toBe('');
     });
   });
+
+  describe('createJob — preallocated subagent session fields (PRI-1796)', () => {
+    it('createJob with newSubagentSessionId stores it and marks subagentSessionPreallocated', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const result = await manager.createJob('delegate', {
+        prompt: 'do work',
+        newSubagentSessionId: 'sess_aaaaaaaa-0000-0000-0000-000000000001',
+      });
+
+      const job = manager.getJob(result.jobId);
+      expect(job!.subagentSessionId).toBe('sess_aaaaaaaa-0000-0000-0000-000000000001');
+      expect(job!.subagentSessionPreallocated).toBe(true);
+    });
+
+    it('createJob with resumeSessionId stores id without preallocated flag', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const result = await manager.createJob('delegate', {
+        prompt: 'resume work',
+        resumeSessionId: 'sess_bbbbbbbb-0000-0000-0000-000000000002',
+      });
+
+      const job = manager.getJob(result.jobId);
+      expect(job!.subagentSessionId).toBe('sess_bbbbbbbb-0000-0000-0000-000000000002');
+      expect(job!.subagentSessionPreallocated).toBeFalsy();
+    });
+
+    it('createJob rejects both newSubagentSessionId and resumeSessionId set simultaneously', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      await expect(
+        manager.createJob('delegate', {
+          prompt: 'do work',
+          newSubagentSessionId: 'sess_aaaaaaaa-0000-0000-0000-000000000001',
+          resumeSessionId: 'sess_bbbbbbbb-0000-0000-0000-000000000002',
+        })
+      ).rejects.toThrow(JobCreationError);
+    });
+
+    it('createJob with scratchDirHostPath stores it on the job', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const result = await manager.createJob('delegate', {
+        prompt: 'do work',
+        scratchDirHostPath: '/tmp/scratch/sess_abc',
+      });
+
+      const job = manager.getJob(result.jobId);
+      expect(job!.scratchDirHostPath).toBe('/tmp/scratch/sess_abc');
+    });
+
+    it('createJob with containerSharing stores it on the job', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const result = await manager.createJob('delegate', {
+        prompt: 'do work',
+        containerSharing: 'per_invocation',
+      });
+
+      const job = manager.getJob(result.jobId);
+      expect(job!.containerSharing).toBe('per_invocation');
+    });
+
+    it('createJob with containerSharing:persistent stores it on the job', async () => {
+      const deps = createDeps();
+      const manager = new JobManager(deps);
+
+      const result = await manager.createJob('delegate', {
+        prompt: 'do work',
+        containerSharing: 'persistent',
+      });
+
+      const job = manager.getJob(result.jobId);
+      expect(job!.containerSharing).toBe('persistent');
+    });
+
+    it('persists scratchDirHostPath and containerSharing in job_started event', async () => {
+      const persistEvent = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ persistEvent });
+      const manager = new JobManager(deps);
+
+      await manager.createJob('delegate', {
+        prompt: 'do work',
+        scratchDirHostPath: '/tmp/scratch/abc',
+        containerSharing: 'per_invocation',
+      });
+
+      const eventArg = persistEvent.mock.calls[0][0] as {
+        type: string;
+        data: Record<string, unknown>;
+      };
+      expect(eventArg.type).toBe('job_started');
+      expect(eventArg.data.scratchDirHostPath).toBe('/tmp/scratch/abc');
+      expect(eventArg.data.containerSharing).toBe('per_invocation');
+    });
+  });
 });
