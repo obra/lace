@@ -42,3 +42,52 @@ describe('buildNotification', () => {
     );
   });
 });
+
+describe('buildNotification — typed attributes', () => {
+  it('emits numeric attributes via String(v)', () => {
+    const out = buildNotification({
+      kind: 'reminder',
+      attributes: { 'fire-count': 6 },
+      body: 'hi',
+    });
+    expect(out).toContain('fire-count="6"');
+  });
+
+  it('omits attributes whose value is undefined or null', () => {
+    const out = buildNotification({
+      kind: 'reminder',
+      attributes: { 'last-fired-at': undefined as unknown as string, 'fire-count': 1 },
+      body: 'hi',
+    });
+    expect(out).not.toContain('last-fired-at');
+    expect(out).toContain('fire-count="1"');
+  });
+
+  it('throws on NaN attribute values', () => {
+    expect(() =>
+      buildNotification({ kind: 'reminder', attributes: { 'fire-count': NaN }, body: 'hi' })
+    ).toThrow(/non-finite/i);
+  });
+
+  it('escapes & and < in body but leaves > alone', () => {
+    const out = buildNotification({
+      kind: 'reminder',
+      body: '5 < 10 & </notification> done',
+    });
+    expect(out).toContain('5 &lt; 10 &amp; &lt;/notification> done');
+  });
+
+  it('does not double-escape: & first then <', () => {
+    const out = buildNotification({ kind: 'reminder', body: 'plain text' });
+    expect(out).toContain('plain text');
+    // Empty body still produces a wrapped notification.
+    expect(buildNotification({ kind: 'reminder', body: '' })).toMatch(
+      /<notification kind="reminder">\s*\n\s*<\/notification>/
+    );
+  });
+
+  it('accepts kind="reminder"', () => {
+    const out = buildNotification({ kind: 'reminder', body: 'ok' });
+    expect(out).toContain('kind="reminder"');
+  });
+});
