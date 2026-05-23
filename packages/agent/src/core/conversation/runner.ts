@@ -201,7 +201,16 @@ export class ConversationRunner {
       });
     };
 
-    let { messages: providerMessages } = buildProviderMessagesFromDurableEvents(sessionDir);
+    const { messages: rebuiltMessages, systemPrompt: frozenSystemPrompt } =
+      buildProviderMessagesFromDurableEvents(sessionDir);
+    let providerMessages = rebuiltMessages;
+
+    // PRI-1804 invariant: the system prompt is computed once at session
+    // creation and never changes for the session lifetime. Push it into
+    // the provider here; it stays in `_systemPrompt` for every turn.
+    if (frozenSystemPrompt) {
+      provider.setSystemPrompt(frozenSystemPrompt);
+    }
     // Watermark for mid-turn re-reads of durable events. Events with
     // eventSeq <= this value are already reflected in providerMessages (either
     // from the initial build above or appended on a previous iteration).
