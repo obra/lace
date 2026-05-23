@@ -410,7 +410,7 @@ export function registerSessionHandlers(
     await ensureSchedulers();
     await reconcileMcpServersForActiveSession(state);
 
-    // Inject system prompt as context_injected event
+    // Inject system prompt as system_prompt_set event
     const persona = requestedPersona ?? 'lace';
 
     // Create skill registry for this session. Embedder-supplied skillDirs
@@ -440,25 +440,21 @@ export function registerSessionHandlers(
       personaRegistry: state.personaRegistry,
     });
     let sessionState: SessionState = readSessionState(sessionDir);
+
+    // Compose the full system prompt text (persona + user instructions).
+    // Persisted as a single `system_prompt_set` event so the system prompt
+    // is byte-stable for the lifetime of the session — the combined text
+    // must not change across turns so that provider-side prompt caching hits.
+    const fullSystemPrompt = promptConfig.userInstructions.trim()
+      ? `${promptConfig.systemPrompt}\n\n${promptConfig.userInstructions}`
+      : promptConfig.systemPrompt;
+
     const { nextState } = appendDurableEvent(sessionDir, sessionState, {
-      type: 'context_injected',
-      data: { content: [{ type: 'text', text: promptConfig.systemPrompt }], priority: 'normal' },
+      type: 'system_prompt_set',
+      data: { type: 'system_prompt_set', text: fullSystemPrompt },
     });
     sessionState = nextState;
     writeSessionState(sessionDir, sessionState);
-
-    // Also inject user instructions if present
-    if (promptConfig.userInstructions.trim()) {
-      const { nextState: userInstrState } = appendDurableEvent(sessionDir, sessionState, {
-        type: 'context_injected',
-        data: {
-          content: [{ type: 'text', text: promptConfig.userInstructions }],
-          priority: 'normal',
-        },
-      });
-      sessionState = userInstrState;
-      writeSessionState(sessionDir, sessionState);
-    }
 
     state.activeSession = { ...state.activeSession, state: sessionState };
 

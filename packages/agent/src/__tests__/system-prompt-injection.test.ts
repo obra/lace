@@ -1,5 +1,5 @@
 // ABOUTME: E2E test for system prompt injection on session/new
-// Verifies that calling session/new writes a context_injected durable event with the system prompt
+// Verifies that calling session/new writes a system_prompt_set durable event with the system prompt
 // Also includes unit tests for buildProviderMessagesFromDurableEvents conversion
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -35,7 +35,7 @@ describe('system prompt injection on session/new', () => {
     rmSync(workDir, { recursive: true, force: true });
   });
 
-  it('writes a context_injected durable event with system prompt on session/new', async () => {
+  it('writes a system_prompt_set durable event with system prompt on session/new', async () => {
     agent = spawnAgentProcess({ laceDir });
 
     await withTimeout(
@@ -63,30 +63,23 @@ describe('system prompt injection on session/new', () => {
 
     expect(eventLines.length).toBeGreaterThan(0);
 
-    // Parse first event - should be context_injected with system prompt
+    // Parse first event - should be system_prompt_set with the full system prompt text
     const firstEvent = JSON.parse(eventLines[0]) as {
       type: string;
       eventSeq: number;
-      data: {
-        content: Array<{ type: string; text: string }>;
-        priority: string;
-      };
+      data: { type: string; text: string };
     };
 
-    expect(firstEvent.type).toBe('context_injected');
+    expect(firstEvent.type).toBe('system_prompt_set');
     expect(firstEvent.eventSeq).toBe(1);
-    expect(firstEvent.data.priority).toBe('normal');
-    expect(firstEvent.data.content).toBeInstanceOf(Array);
-    expect(firstEvent.data.content.length).toBeGreaterThan(0);
-    expect(firstEvent.data.content[0].type).toBe('text');
 
     // System prompt should contain persona-related content (Lace is the default persona)
-    const systemPromptText = firstEvent.data.content[0].text;
+    const systemPromptText = firstEvent.data.text;
     expect(systemPromptText.length).toBeGreaterThan(100); // Should be a substantial prompt
     expect(systemPromptText).toContain('Lace'); // Default persona name should appear
   });
 
-  it('writes a context_injected event with custom persona when provided', async () => {
+  it('writes a system_prompt_set event with custom persona when provided', async () => {
     agent = spawnAgentProcess({ laceDir });
 
     await withTimeout(
@@ -114,16 +107,14 @@ describe('system prompt injection on session/new', () => {
 
     const firstEvent = JSON.parse(eventLines[0]) as {
       type: string;
-      data: {
-        content: Array<{ type: string; text: string }>;
-      };
+      data: { type: string; text: string };
     };
 
-    expect(firstEvent.type).toBe('context_injected');
-    expect(firstEvent.data.content[0].text).toContain('Lace');
+    expect(firstEvent.type).toBe('system_prompt_set');
+    expect(firstEvent.data.text).toContain('Lace');
   });
 
-  it('context_injected event is returned via ent/session/events endpoint', async () => {
+  it('system_prompt_set event is returned via ent/session/events endpoint', async () => {
     agent = spawnAgentProcess({ laceDir });
 
     await withTimeout(
@@ -147,19 +138,18 @@ describe('system prompt injection on session/new', () => {
       events: Array<{
         eventSeq: number;
         type: string;
-        data: { content: Array<{ type: string; text: string }>; priority: string };
+        data: { type: string; text: string };
       }>;
       hasMore: boolean;
     };
 
     expect(durable.events.length).toBeGreaterThan(0);
-    expect(durable.events[0].type).toBe('context_injected');
+    expect(durable.events[0].type).toBe('system_prompt_set');
     expect(durable.events[0].eventSeq).toBe(1);
-    expect(durable.events[0].data.priority).toBe('normal');
-    expect(durable.events[0].data.content[0].text).toContain('Lace');
+    expect(durable.events[0].data.text).toContain('Lace');
   });
 
-  it('injects user instructions from instructions.md as second context_injected event', async () => {
+  it('includes user instructions from instructions.md in the single system_prompt_set event', async () => {
     // Create instructions.md with custom user instructions in the LACE_DIR
     const userInstructions = 'Custom user instruction: always be helpful and concise';
     writeFileSync(join(laceDir, 'instructions.md'), userInstructions);
@@ -189,32 +179,22 @@ describe('system prompt injection on session/new', () => {
     const eventsRaw = readFileSync(eventsPath, 'utf8');
     const eventLines = eventsRaw.trim().split('\n').filter(Boolean);
 
-    // Should have at least 2 events: system prompt + user instructions
-    expect(eventLines.length).toBeGreaterThanOrEqual(2);
+    // Should have exactly 1 system_prompt_set event combining persona + user instructions
+    expect(eventLines.length).toBeGreaterThanOrEqual(1);
 
-    // First event should be system prompt with "Lace"
     const firstEvent = JSON.parse(eventLines[0]) as {
       type: string;
       eventSeq: number;
-      data: { content: Array<{ type: string; text: string }>; priority: string };
+      data: { type: string; text: string };
     };
-    expect(firstEvent.type).toBe('context_injected');
+    expect(firstEvent.type).toBe('system_prompt_set');
     expect(firstEvent.eventSeq).toBe(1);
-    expect(firstEvent.data.content[0].text).toContain('Lace');
-
-    // Second event should be user instructions
-    const secondEvent = JSON.parse(eventLines[1]) as {
-      type: string;
-      eventSeq: number;
-      data: { content: Array<{ type: string; text: string }>; priority: string };
-    };
-    expect(secondEvent.type).toBe('context_injected');
-    expect(secondEvent.eventSeq).toBe(2);
-    expect(secondEvent.data.priority).toBe('normal');
-    expect(secondEvent.data.content[0].text).toContain('Custom user instruction');
+    // Both persona content and user instructions should appear in the combined text
+    expect(firstEvent.data.text).toContain('Lace');
+    expect(firstEvent.data.text).toContain('Custom user instruction');
   });
 
-  it('does not inject user instructions event when instructions.md is empty', async () => {
+  it('writes a single system_prompt_set event when instructions.md is empty', async () => {
     // Create empty instructions.md
     writeFileSync(join(laceDir, 'instructions.md'), '   '); // whitespace only
 
@@ -238,10 +218,11 @@ describe('system prompt injection on session/new', () => {
     const eventsRaw = readFileSync(eventsPath, 'utf8');
     const eventLines = eventsRaw.trim().split('\n').filter(Boolean);
 
-    // Should only have 1 event (system prompt), no user instructions event
+    // Should have exactly 1 system_prompt_set event (no separate user instructions event)
     expect(eventLines.length).toBe(1);
-    expect(JSON.parse(eventLines[0]).type).toBe('context_injected');
-    expect(JSON.parse(eventLines[0]).data.content[0].text).toContain('Lace');
+    const firstEvent = JSON.parse(eventLines[0]) as { type: string; data: { text: string } };
+    expect(firstEvent.type).toBe('system_prompt_set');
+    expect(firstEvent.data.text).toContain('Lace');
   });
 
   it('system prompt contains the session working directory', async () => {
@@ -260,7 +241,7 @@ describe('system prompt injection on session/new', () => {
       'session/new'
     )) as { sessionId: string };
 
-    // Read the system prompt from the context_injected event
+    // Read the system prompt from the system_prompt_set event
     const sessionDir = join(laceDir, 'agent-sessions', created.sessionId);
     const eventsPath = join(sessionDir, 'events.jsonl');
 
@@ -269,12 +250,12 @@ describe('system prompt injection on session/new', () => {
 
     const firstEvent = JSON.parse(eventLines[0]) as {
       type: string;
-      data: { content: Array<{ type: string; text: string }> };
+      data: { type: string; text: string };
     };
 
     // The system prompt should contain the working directory we passed
     // The template uses {{{project.cwd}}} which should be populated with workDir
-    const systemPromptText = firstEvent.data.content[0].text;
+    const systemPromptText = firstEvent.data.text;
     expect(systemPromptText).toContain(workDir);
   });
 
@@ -301,13 +282,13 @@ describe('system prompt injection on session/new', () => {
 
     const firstEvent = JSON.parse(eventLines[0]) as {
       type: string;
-      data: { content: Array<{ type: string; text: string }> };
+      data: { type: string; text: string };
     };
 
     // The system prompt should contain dynamically generated tool descriptions
     // The template uses {{#tools}}...{{/tools}} to list available tools
     // This text comes from the bash tool's description, not the static template
-    const systemPromptText = firstEvent.data.content[0].text;
+    const systemPromptText = firstEvent.data.text;
     expect(systemPromptText).toContain('Execute shell commands in isolated bash processes');
   });
 });
