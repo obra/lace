@@ -10,7 +10,9 @@ import type {
   MountRegistryEntry,
 } from '../../server-types';
 import { PersonaRegistry } from '../../config/persona-registry';
+import { warnMountConflicts } from '../../config/persona-mount-conflict';
 import { resolveResourcePath } from '../../utils/resource-resolver';
+import { logger } from '../../utils/logger';
 
 const MOUNT_NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
 
@@ -89,6 +91,19 @@ export function registerInitializeHandler(
       state.personaRegistry = new PersonaRegistry({
         bundledPersonasPath: resolveResourcePath(import.meta.url, 'agent-personas'),
         userPersonasPaths: userPaths,
+      });
+    }
+
+    // R6 boot-time invariant: log a WARN for any per_invocation persona that
+    // declares a mount-registry name also claimed by a persistent persona.
+    // Never throws — a bad persona config is surfaced here but doesn't
+    // prevent the embedder from finishing initialization. The spawn-time
+    // assertNoMountConflict in delegate.ts provides the hard reject (PRI-1796).
+    try {
+      warnMountConflicts(state.personaRegistry);
+    } catch (err) {
+      logger.warn('persona_mount_conflict.boot_scan_error', {
+        error: err instanceof Error ? err.message : String(err),
       });
     }
 

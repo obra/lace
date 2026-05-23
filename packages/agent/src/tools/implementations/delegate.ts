@@ -13,6 +13,10 @@ import {
   PersonaNotFoundError,
   PersonaParseError,
 } from '@lace/agent/config/persona-registry';
+import {
+  assertNoMountConflict,
+  PersonaSharingViolationError,
+} from '@lace/agent/config/persona-mount-conflict';
 import type { PersonaContainerRuntime } from '@lace/agent/jobs/persona-container-spec';
 import { buildPersonaProjectedRuntimeBinding } from '@lace/agent/jobs/persona-projected-binding';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
@@ -167,6 +171,9 @@ Parameters:
     if (persona) {
       try {
         const parsed = this.personaRegistry.parsePersona(persona);
+        // R6 security invariant: per_invocation personas must not share
+        // mount-registry names with persistent personas (PRI-1796 Chunk F).
+        assertNoMountConflict(persona, parsed, this.personaRegistry);
         personaModelDefault = parsed.config.model;
         if (parsed.config.runtime.type === 'container') {
           const runtime = parsed.config.runtime;
@@ -221,7 +228,11 @@ Parameters:
           }
         }
       } catch (err) {
-        if (err instanceof PersonaNotFoundError || err instanceof PersonaParseError) {
+        if (
+          err instanceof PersonaNotFoundError ||
+          err instanceof PersonaParseError ||
+          err instanceof PersonaSharingViolationError
+        ) {
           return {
             status: 'failed',
             content: [{ type: 'text', text: err.message }],

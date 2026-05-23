@@ -198,6 +198,7 @@ describe('DelegateTool', () => {
         },
         body: 'container persona',
       }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
     } as unknown as PersonaRegistry;
     const tool = new DelegateTool({ personaRegistry });
 
@@ -248,6 +249,7 @@ describe('DelegateTool', () => {
         },
         body: 'tag-only persona',
       }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
     } as unknown as PersonaRegistry;
     const tool = new DelegateTool({ personaRegistry });
 
@@ -299,6 +301,7 @@ describe('DelegateTool', () => {
         },
         body: 'persistent persona',
       }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
     } as unknown as PersonaRegistry;
     const tool = new DelegateTool({ personaRegistry });
 
@@ -346,6 +349,7 @@ describe('DelegateTool', () => {
         },
         body: 'mounts persona',
       }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
     } as unknown as PersonaRegistry;
     const tool = new DelegateTool({ personaRegistry });
 
@@ -403,6 +407,7 @@ describe('DelegateTool', () => {
         },
         body: 'in-container persona',
       }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
     } as unknown as PersonaRegistry;
     const tool = new DelegateTool({ personaRegistry });
 
@@ -541,6 +546,7 @@ describe('DelegateTool', () => {
         },
         body: 'per_invocation persona',
       }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
     } as unknown as PersonaRegistry;
     const tool = new DelegateTool({ personaRegistry });
 
@@ -596,6 +602,7 @@ describe('DelegateTool', () => {
         },
         body: 'per_invocation persona',
       }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
     } as unknown as PersonaRegistry;
     const tool = new DelegateTool({ personaRegistry });
 
@@ -650,6 +657,7 @@ describe('DelegateTool', () => {
         },
         body: 'per_invocation persona',
       }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
     } as unknown as PersonaRegistry;
     const tool = new DelegateTool({ personaRegistry });
 
@@ -725,6 +733,7 @@ describe('DelegateTool', () => {
         },
         body: 'persistent persona',
       }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
     } as unknown as PersonaRegistry;
     const tool = new DelegateTool({ personaRegistry });
 
@@ -769,6 +778,7 @@ describe('DelegateTool', () => {
         },
         body: 'per_invocation persona',
       }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
     } as unknown as PersonaRegistry;
     const tool = new DelegateTool({ personaRegistry });
 
@@ -820,6 +830,7 @@ describe('DelegateTool', () => {
         },
         body: 'per_invocation persona',
       }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
     } as unknown as PersonaRegistry;
     const tool = new DelegateTool({ personaRegistry });
 
@@ -884,6 +895,7 @@ describe('DelegateTool', () => {
         },
         body: 'per_invocation persona',
       }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
     } as unknown as PersonaRegistry;
     const tool = new DelegateTool({ personaRegistry });
 
@@ -952,6 +964,7 @@ describe('DelegateTool', () => {
         },
         body: 'per_invocation persona',
       }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
     } as unknown as PersonaRegistry;
     const tool = new DelegateTool({ personaRegistry });
 
@@ -1010,6 +1023,7 @@ describe('DelegateTool', () => {
         },
         body: 'persistent persona',
       }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
     } as unknown as PersonaRegistry;
     const tool = new DelegateTool({ personaRegistry });
 
@@ -1062,6 +1076,7 @@ describe('DelegateTool', () => {
           },
           body: 'per_invocation persona',
         }),
+        listAvailablePersonas: vi.fn().mockReturnValue([]),
       } as unknown as PersonaRegistry;
     }
 
@@ -1198,6 +1213,7 @@ describe('DelegateTool', () => {
           },
           body: 'persistent persona',
         }),
+        listAvailablePersonas: vi.fn().mockReturnValue([]),
       } as unknown as PersonaRegistry;
 
       const tool = new DelegateTool({ personaRegistry: persistentPersonaRegistry });
@@ -1229,5 +1245,74 @@ describe('DelegateTool', () => {
 
       expect(reaper.cancelReap).not.toHaveBeenCalled();
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // PRI-1796 Chunk F: PersonaSharingViolationError propagation
+  // ---------------------------------------------------------------------------
+  it('delegate fails with PersonaSharingViolationError when per_invocation persona conflicts with persistent', async () => {
+    // box-shell: persistent with mounts.home
+    // shell: per_invocation with mounts.home (conflict!)
+    const personaRegistry = {
+      parsePersona: vi.fn((name: string) => {
+        if (name === 'box-shell') {
+          return {
+            config: {
+              runtime: {
+                type: 'container',
+                agentPlacement: 'host',
+                containerSharing: 'persistent',
+                image: 'img:latest',
+                workingDirectory: '/home',
+                mounts: { home: '/home' },
+                env: {},
+              },
+            },
+            body: 'box-shell body',
+          };
+        }
+        // 'shell' — per_invocation with the same mount name
+        return {
+          config: {
+            runtime: {
+              type: 'container',
+              agentPlacement: 'host',
+              containerSharing: 'per_invocation',
+              image: 'img:latest',
+              workingDirectory: '/shared',
+              mounts: { home: '/shared' },
+              env: {},
+            },
+          },
+          body: 'shell body',
+        };
+      }),
+      listAvailablePersonas: vi.fn().mockReturnValue([
+        { name: 'box-shell', isUserDefined: false, path: '/fake/box-shell.md' },
+        { name: 'shell', isUserDefined: false, path: '/fake/shell.md' },
+      ]),
+    } as unknown as PersonaRegistry;
+
+    const tool = new DelegateTool({ personaRegistry });
+
+    const jobManager = {
+      listJobs: vi.fn().mockReturnValue([]),
+      createJob: vi.fn(),
+    } as unknown as JobManager;
+
+    const result = await tool.execute(
+      { prompt: 'task', background: true, persona: 'shell' },
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_parent',
+      }
+    );
+
+    expect(result.status).toBe('failed');
+    // The error message must name the mount and the conflicting persistent persona
+    expect(result.content[0].text).toContain('home');
+    expect(result.content[0].text).toContain('box-shell');
   });
 });
