@@ -1,0 +1,226 @@
+// ABOUTME: ReminderScheduler — single-thread, per-session async-mutex scheduler.
+// ABOUTME: Owns the in-memory min-heap and the wake timer. Fire path (§3.3 of spec)
+// ABOUTME: is one atomic write per fire; cancel and schedule serialize via the mutex.
+
+import { AsyncMutex } from './async-mutex';
+import { ReminderStore } from './store';
+import { computeNextCronFire, getAgentTimezone } from './cron';
+import type { ReminderRow } from './types';
+
+export interface FireContext {
+  row: ReminderRow;
+  /** Epoch ms — when this fire was committed (also the `fired-at` attribute value). */
+  firedAt: number;
+  /** 1-indexed: this is the Nth fire of this reminder. */
+  fireCount: number;
+  /** Previous successful fire, or null if this was the first. */
+  lastFiredAt: number | null;
+  /** Next scheduled fire after this one, or null if terminal. */
+  nextFireAt: number | null;
+}
+
+export interface SchedulerDeps {
+  sessionDir: string;
+  now: () => number;
+  notifier: (ctx: FireContext) => Promise<void> | void;
+  onError?: (err: unknown) => void;
+}
+
+interface HeapEntry {
+  id: string;
+  nextFireAt: number;
+}
+
+export class ReminderScheduler {
+  // Public for the schedule/cancel/list handlers added in later tasks.
+  readonly store: ReminderStore;
+  readonly mutex = new AsyncMutex();
+
+  private readonly now: () => number;
+  private readonly notifier: SchedulerDeps['notifier'];
+  private readonly onError: (err: unknown) => void;
+
+  private heap: HeapEntry[] = [];
+  private wakeTimer: NodeJS.Timeout | null = null;
+  private running = false;
+
+  constructor(deps: SchedulerDeps) {
+    this.store = new ReminderStore(deps.sessionDir);
+    this.now = deps.now;
+    this.notifier = deps.notifier;
+    this.onError = deps.onError ?? (() => {});
+  }
+
+  async start(): Promise<void> {
+    if (this.running) return;
+    this.running = true;
+    await this.bootRecover();
+    this.rescheduleNextTick();
+  }
+
+  async stop(): Promise<void> {
+    this.running = false;
+    if (this.wakeTimer) {
+      clearTimeout(this.wakeTimer);
+      this.wakeTimer = null;
+    }
+  }
+
+  /** For tests: process all rows whose next_fire_at <= now, then return. */
+  async tickForTest(now: number): Promise<void> {
+    this.heap = this.store
+      .list()
+      .map((r) => ({ id: r.id, nextFireAt: r.next_fire_at }))
+      .sort((a, b) => a.nextFireAt - b.nextFireAt);
+    // Snapshot due IDs before processing to avoid re-firing entries that
+    // the persist-failure path restores to the heap during this sweep.
+    const due = this.heap.filter((e) => e.nextFireAt <= now).map((e) => e.id);
+    this.heap = this.heap.filter((e) => e.nextFireAt > now);
+    for (const id of due) {
+      await this.fire(id);
+    }
+  }
+
+  // ============================================================
+  // Internal — boot recovery and tick loop.
+  // ============================================================
+
+  private async bootRecover(): Promise<void> {
+    const rows = this.store.list();
+    this.heap = rows
+      .map((r) => ({ id: r.id, nextFireAt: r.next_fire_at }))
+      .sort((a, b) => a.nextFireAt - b.nextFireAt);
+  }
+
+  private rescheduleNextTick(): void {
+    if (!this.running) return;
+    if (this.wakeTimer) {
+      clearTimeout(this.wakeTimer);
+      this.wakeTimer = null;
+    }
+    const head = this.heap[0];
+    if (!head) return;
+    const delay = Math.max(0, head.nextFireAt - this.now());
+    this.wakeTimer = setTimeout(() => {
+      void this.onTick();
+    }, delay);
+  }
+
+  private async onTick(): Promise<void> {
+    if (!this.running) return;
+    const head = this.heap[0];
+    if (!head) return;
+    if (head.nextFireAt > this.now()) {
+      this.rescheduleNextTick();
+      return;
+    }
+    this.heap.shift();
+    await this.fire(head.id);
+    this.rescheduleNextTick();
+  }
+
+  /**
+   * Fire one row. Implements §3.3 of the spec under the mutex.
+   *
+   * Ordering guarantees:
+   * 1. Compute post-fire state.
+   * 2. Commit to disk. If commit fails: restore heap entry, call onError, skip notify.
+   * 3. Update heap with next fire time (for recurring rows).
+   * 4. Call notifier. If notifier throws: call onError (row already committed, at-most-one-missed).
+   */
+  private async fire(id: string): Promise<void> {
+    await this.mutex.runExclusive(async () => {
+      const rows = this.store.list();
+      const idx = rows.findIndex((r) => r.id === id);
+      if (idx < 0) return; // Cancelled between tick and mutex acquire.
+
+      const prior: ReminderRow = JSON.parse(JSON.stringify(rows[idx])) as ReminderRow;
+      const firedAt = this.now();
+
+      // Compute post-fire state.
+      const post = this.computePostFire(prior, firedAt);
+      // post.nextRow === null means delete.
+
+      const nextRows = [...rows];
+      if (post.nextRow === null) {
+        nextRows.splice(idx, 1);
+      } else {
+        nextRows[idx] = post.nextRow;
+      }
+
+      // Commit to disk first. On failure: restore heap entry, skip notify.
+      try {
+        this.store.save(nextRows);
+      } catch (err) {
+        // Restore heap entry so the row will be retried on the next tick.
+        this.heap.push({ id, nextFireAt: prior.next_fire_at });
+        this.heap.sort((a, b) => a.nextFireAt - b.nextFireAt);
+        this.onError(err);
+        return;
+      }
+
+      // Update heap for recurring rows (next fire entry).
+      if (post.nextRow) {
+        this.heap.push({ id, nextFireAt: post.nextRow.next_fire_at });
+        this.heap.sort((a, b) => a.nextFireAt - b.nextFireAt);
+      }
+
+      // Notify after commit. Failure here is at-most-one-missed: row is already updated.
+      try {
+        await this.notifier({
+          row: post.nextRow ?? prior,
+          firedAt,
+          fireCount: prior.fire_count + 1,
+          lastFiredAt: prior.fired_at,
+          nextFireAt: post.nextRow ? post.nextRow.next_fire_at : null,
+        });
+      } catch (err) {
+        this.onError(err);
+        // Row is already in post-fire state on disk — at-most-one-missed semantics.
+      }
+    });
+  }
+
+  private computePostFire(
+    prior: ReminderRow,
+    firedAt: number
+  ): { nextRow: ReminderRow | null } {
+    if (prior.recurs === null) {
+      // One-shot: delete after firing.
+      return { nextRow: null };
+    }
+
+    if (prior.recurs.kind === 'count') {
+      if (prior.recurs.remaining <= 1) {
+        // Terminal fire: delete.
+        return { nextRow: null };
+      }
+      // Continuing: reschedule with interval_ms from firedAt, decrement remaining.
+      return {
+        nextRow: {
+          ...prior,
+          next_fire_at: firedAt + prior.recurs.interval_ms,
+          fired_at: firedAt,
+          fire_count: prior.fire_count + 1,
+          recurs: {
+            kind: 'count',
+            interval_ms: prior.recurs.interval_ms,
+            remaining: prior.recurs.remaining - 1,
+          },
+        },
+      };
+    }
+
+    // Cron: compute next match strictly > firedAt.
+    const tz = getAgentTimezone();
+    const nextFireAt = computeNextCronFire(prior.recurs.expr, tz, new Date(firedAt));
+    return {
+      nextRow: {
+        ...prior,
+        next_fire_at: nextFireAt,
+        fired_at: firedAt,
+        fire_count: prior.fire_count + 1,
+      },
+    };
+  }
+}
