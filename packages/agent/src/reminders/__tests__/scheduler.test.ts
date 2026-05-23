@@ -719,3 +719,64 @@ describe('ReminderScheduler exception handling', () => {
     expect(errors).toBe(1);
   });
 });
+
+describe('ReminderScheduler.stop drains in-flight fire', () => {
+  const origTZ = process.env.TZ;
+  beforeEach(() => { process.env.TZ = 'UTC'; });
+  afterEach(() => { process.env.TZ = origTZ; });
+
+  it('does not return until any in-flight fire has committed to disk', async () => {
+    const dir = tempSessionDir();
+    const store = new ReminderStore(dir);
+    const row = makeRow({
+      id: 'reminder_dddddddddddd',
+      next_fire_at: 1000,
+      recurs: null, // one-shot
+    });
+    store.save([row]);
+
+    // notifier blocks until we resolve the gate, simulating a slow inject.
+    let resolveNotify: () => void;
+    const notifyGate = new Promise<void>((r) => { resolveNotify = r; });
+    let notifyCallCount = 0;
+
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 2000,
+      notifier: async () => {
+        notifyCallCount++;
+        await notifyGate; // hold the fire path inside the mutex
+      },
+    });
+
+    // Manually trigger a fire path by directly calling tickForTest in the
+    // background — DON'T await it yet. This simulates the scheduler being
+    // mid-fire when stop() is called.
+    await sched.start();
+    // We can't directly hook into the scheduler's running fire path without
+    // making fire() public. Use tickForTest as a proxy: it acquires the same
+    // mutex via fire() and notifier blocks inside it.
+    const firePromise = sched.tickForTest(2000);
+
+    // Give the scheduler a microtask to enter the notifier.
+    await new Promise((r) => setImmediate(r));
+    expect(notifyCallCount).toBe(1); // notifier is now blocked inside mutex
+
+    // Call stop. It MUST not resolve until the notifier resolves.
+    let stopResolved = false;
+    const stopPromise = sched.stop().then(() => { stopResolved = true; });
+
+    // Yield a few microtasks; stop should still be pending because mutex held.
+    for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+    expect(stopResolved).toBe(false);
+
+    // Release the notifier; the fire path commits, then stop resolves.
+    resolveNotify!();
+    await firePromise;
+    await stopPromise;
+    expect(stopResolved).toBe(true);
+
+    // Disk reflects post-fire state (one-shot was deleted).
+    expect(new ReminderStore(dir).list()).toEqual([]);
+  });
+});

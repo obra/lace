@@ -121,6 +121,11 @@ export class ReminderScheduler {
       clearTimeout(this.wakeTimer);
       this.wakeTimer = null;
     }
+    // Drain any in-flight fire: acquire the mutex (no-op work) so we don't
+    // return until the previous holder has released. This ensures the
+    // post-fire disk state is durable before callers (e.g.,
+    // emitSubagentExitedIfNeeded) read reminders.json.
+    await this.mutex.runExclusive(() => {});
   }
 
   /** For tests: process all rows whose next_fire_at <= now, then return. */
