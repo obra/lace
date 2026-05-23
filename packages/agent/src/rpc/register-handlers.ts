@@ -49,11 +49,11 @@ interface HandlerDependencies {
   }) => Promise<{ jobId: string }>;
   runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null };
   /**
-   * Rebind the per-process AlarmScheduler to the currently active session.
-   * Called after every session switch (session/new, session/load, session/resume)
-   * and after session/close (which is a no-op since activeSession is null).
+   * Rebind the per-process ReminderScheduler to the currently active session.
+   * Called after every session switch (session/new, session/load, session/resume).
+   * No-op when there is no active session (e.g., after session/close).
    */
-  ensureAlarmScheduler: () => Promise<void>;
+  ensureSchedulers: () => Promise<void>;
 }
 
 /**
@@ -84,7 +84,7 @@ export function registerAllHandlers(
     deps.createToolExecutorForMode,
     deps.runExclusive,
     deps.reissuePendingPermissions,
-    deps.ensureAlarmScheduler
+    deps.ensureSchedulers
   );
   registerSessionOperationHandlers(peer, state, deps.runExclusive, deps.createToolExecutorForMode);
 

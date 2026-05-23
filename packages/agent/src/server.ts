@@ -38,19 +38,12 @@ import {
 import { toolKindFromName } from './rpc/utils';
 import { requestPermissionFromClient, reissuePendingPermissionRequests } from './rpc/permissions';
 import { registerAllHandlers } from './rpc/register-handlers';
-import { AlarmScheduler } from './alarms/alarm-scheduler';
-import { AlarmStore } from './alarms/alarm-store';
 import {
   injectNotification,
-  composeAlarmFiredBody,
-  composeAlarmExpiredBody,
   composeReminderBody,
   formatAbsoluteTime,
-  type AlarmFiredCompose,
-  type AlarmExpiredCompose,
 } from './notifications';
-import type { AlarmRow } from './alarms/types';
-import { ReminderScheduler, getAgentTimezone } from './reminders';
+import { ReminderScheduler, ReminderStore, getAgentTimezone } from './reminders';
 import { logger } from './utils/logger';
 import type { RuntimeExecutionBinding } from './tools/runtime/types';
 import { EnvironmentRuntimeSecretResolver } from './tools/runtime/secrets';
@@ -164,184 +157,6 @@ export function getOrCreateSessionToolExecutor(
 }
 
 /**
- * Build a short human description of an alarm's spec for the wire-format
- * `pending_alarms_on_exit` notify. The receiving end embeds this string in
- * the subagent-exited notification body. Format is presentation-only.
- */
-function describeSpecForExit(row: AlarmRow): string {
-  switch (row.spec.kind) {
-    case 'once-absolute':
-      return row.spec.iso;
-    case 'once-relative':
-      return `in ${row.spec.minutes} minute${row.spec.minutes === 1 ? '' : 's'}`;
-    case 'cron':
-      return row.spec.expr;
-    case 'interval':
-      return `every ${row.spec.minutes} minute${row.spec.minutes === 1 ? '' : 's'}`;
-  }
-}
-
-/**
- * Map a row's spec into the discriminated input the alarm-fired composer expects.
- * Exhaustive over `spec.kind` so TS catches new arms.
- * Exported for unit-testing the server wiring without spawning a process.
- */
-export function specToFiredCompose(row: AlarmRow): AlarmFiredCompose {
-  switch (row.spec.kind) {
-    case 'once-absolute':
-      return {
-        kind: 'once-absolute',
-        scheduledFor: row.next_fire_at,
-        timezone: row.timezone,
-        prompt: row.prompt,
-        alarmId: row.id,
-      };
-    case 'once-relative':
-      return {
-        kind: 'once-relative',
-        minutes: row.spec.minutes,
-        prompt: row.prompt,
-        alarmId: row.id,
-      };
-    case 'cron':
-      return {
-        kind: 'cron',
-        expr: row.spec.expr,
-        timezone: row.timezone,
-        prompt: row.prompt,
-        alarmId: row.id,
-      };
-    case 'interval':
-      return {
-        kind: 'interval',
-        minutes: row.spec.minutes,
-        prompt: row.prompt,
-        alarmId: row.id,
-      };
-  }
-}
-
-/**
- * Map a row's spec into the alarm-expired composer input. Returns null for
- * specs that cannot expire (no end_at, or once-* kinds which never recur).
- * Exported for unit-testing the server wiring without spawning a process.
- */
-export function specToExpiredCompose(row: AlarmRow): AlarmExpiredCompose | null {
-  if (row.end_at === null) return null;
-  if (row.spec.kind === 'cron') {
-    return {
-      kind: 'cron',
-      expr: row.spec.expr,
-      timezone: row.timezone,
-      endTime: row.end_at,
-      endTimezone: row.timezone,
-      prompt: row.prompt,
-      alarmId: row.id,
-    };
-  }
-  if (row.spec.kind === 'interval') {
-    return {
-      kind: 'interval',
-      minutes: row.spec.minutes,
-      endTime: row.end_at,
-      endTimezone: row.timezone,
-      prompt: row.prompt,
-      alarmId: row.id,
-    };
-  }
-  return null;
-}
-
-/**
- * Bind a fresh AlarmScheduler to the currently active session.
- * Idempotent: if a scheduler already exists, it is stopped first.
- * No-op when there is no active session (e.g., after session/close).
- *
- * The scheduler's notifier writes an immediate-priority context_injected
- * event into the active session's events.jsonl and triggers an internal
- * turn if the agent is idle, so the next turn picks up the alarm body.
- */
-export async function ensureAlarmSchedulerForActiveSession(
-  state: AgentServerState,
-  runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null },
-  runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>
-): Promise<void> {
-  if (!state.activeSession) return;
-  if (state.alarmScheduler) {
-    await state.alarmScheduler.stop();
-    state.alarmScheduler = undefined;
-  }
-  const sessionDir = state.activeSession.dir;
-  const store = new AlarmStore(sessionDir);
-  const jitterEnv = Number(process.env.LACE_ALARM_JITTER_MS ?? 60_000);
-  const jitterMaxMs = Number.isFinite(jitterEnv) && jitterEnv >= 0 ? jitterEnv : 60_000;
-  const idleWake = {
-    isActive: (d: string): boolean => d === state.activeSession?.dir,
-    hasActiveTurn: (): boolean => !!state.activeTurn,
-    triggerInternalTurn: (): void => {
-      if (!runPromptInternalRef.current) return;
-      setImmediate(() => {
-        if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
-          void runPromptInternalRef.current([]);
-        }
-      });
-    },
-  };
-
-  state.alarmScheduler = new AlarmScheduler({
-    sessionDir,
-    store,
-    now: () => Date.now(),
-    jitterMaxMs,
-    notifier: ({ row }) => {
-      // The scheduler fires outside the runner's lock. Serialize the write
-      // through runExclusive so the eventSeq it computes is unique vs. the
-      // runner's concurrent appends.
-      void runExclusive(() => {
-        injectNotification({
-          sessionDir,
-          kind: 'alarm-fired',
-          identifiers: { 'alarm-id': row.id },
-          body: composeAlarmFiredBody(specToFiredCompose(row)),
-          idleWake,
-        });
-      });
-    },
-    expiredNotifier: ({ row }) => {
-      const compose = specToExpiredCompose(row);
-      if (!compose) return;
-      void runExclusive(() => {
-        injectNotification({
-          sessionDir,
-          kind: 'alarm-expired',
-          identifiers: { 'alarm-id': row.id },
-          body: composeAlarmExpiredBody(compose),
-          idleWake,
-        });
-      });
-    },
-    onError: (err) => {
-      logger.warn('alarm.scheduler.error', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    },
-  });
-  void state.alarmScheduler.start();
-}
-
-/**
- * Stop the per-process AlarmScheduler if one is bound.
- * Called from the process shutdown handler so the loop's setTimeout
- * and AbortController are torn down before exit.
- */
-export async function shutdownAlarms(state: AgentServerState): Promise<void> {
-  if (state.alarmScheduler) {
-    await state.alarmScheduler.stop();
-    state.alarmScheduler = undefined;
-  }
-}
-
-/**
  * Bind a fresh ReminderScheduler to the currently active session.
  * Idempotent: if a scheduler already exists, it is stopped first.
  * No-op when there is no active session (e.g., after session/close).
@@ -422,9 +237,9 @@ export async function shutdownReminders(state: AgentServerState): Promise<void> 
 
 /**
  * On graceful subagent shutdown, tell the PARENT (via the existing JSON-RPC
- * peer connection) about any alarms that were still pending when this
+ * peer connection) about any reminders that were still pending when this
  * subagent exited. We emit a one-way `session/update` notification with the
- * `pending_alarms_on_exit` discriminant — pure structured data, no wrapper
+ * `pending_reminders_on_exit` discriminant — pure structured data, no wrapper
  * text. The parent's per-subagent `session/update` relay
  * (`childPeer.onRequest('session/update', ...)` in `jobs/subagent-job.ts`)
  * composes the `<notification kind="subagent-exited">` body in its own
@@ -444,8 +259,8 @@ export async function emitSubagentExitedIfNeeded(state: AgentServerState): Promi
   if (!state.activeSession) return;
   const meta = state.activeSession.meta;
   if (!meta.parent) return;
-  const store = new AlarmStore(state.activeSession.dir);
-  const pending = store.listPending();
+  const store = new ReminderStore(state.activeSession.dir);
+  const pending = store.list();
   if (pending.length === 0) return;
   if (!state.peer) {
     logger.warn('subagent.exit.no_peer', {
@@ -454,25 +269,17 @@ export async function emitSubagentExitedIfNeeded(state: AgentServerState): Promi
     });
     return;
   }
+  const tz = getAgentTimezone();
   try {
     state.peer.notify('session/update', {
       sessionId: meta.sessionId,
       streamSeq: 0,
-      type: 'pending_alarms_on_exit',
-      alarms: pending.map((r) => {
-        const base = {
-          id: r.id,
-          kind: r.kind,
-          schedule: describeSpecForExit(r),
-          prompt: r.prompt,
-          next_fire_at_iso: formatAbsoluteTime(r.next_fire_at, r.timezone),
-          end_at_iso: r.end_at !== null ? formatAbsoluteTime(r.end_at, r.timezone) : null,
-        };
-        if (r.spec.kind === 'once-relative') {
-          return { ...base, minutes: r.spec.minutes };
-        }
-        return base;
-      }),
+      type: 'pending_reminders_on_exit',
+      reminders: pending.map((r) => ({
+        id: r.id,
+        prompt: r.prompt,
+        next_fire_at_iso: formatAbsoluteTime(r.next_fire_at, tz),
+      })),
     });
   } catch (err) {
     logger.warn('subagent.exit.notify_failed', {
@@ -683,11 +490,8 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   const _startSubagentJob = (options: CreateSubagentJobOptions): Promise<{ jobId: string }> =>
     wrapJobCreation(() => createSubagentJob(options, jobCreationDeps));
 
-  const ensureAlarmScheduler = (): Promise<void> =>
-    Promise.all([
-      ensureAlarmSchedulerForActiveSession(state, runPromptInternalRef, runExclusive),
-      ensureReminderSchedulerForActiveSession(state, runPromptInternalRef, runExclusive),
-    ]).then(() => undefined);
+  const ensureSchedulers = (): Promise<void> =>
+    ensureReminderSchedulerForActiveSession(state, runPromptInternalRef, runExclusive);
 
   // Register all RPC handlers with dependencies
   registerAllHandlers(peer, state, {
@@ -698,6 +502,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     requestPermissionFromClient: _requestPermissionFromClient,
     startShellJob: _startShellJob,
     runPromptInternalRef,
-    ensureAlarmScheduler,
+    ensureSchedulers,
   });
 }

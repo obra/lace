@@ -11,7 +11,7 @@ import {
 } from '@lace/agent/storage/session-store';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { appendDurableEvent } from '@lace/agent/storage/event-log';
-import { buildNotification, composeSubagentExitedAlarmsBody } from '@lace/agent/notifications';
+import { buildNotification, composeSubagentExitedBody } from '@lace/agent/notifications';
 import { getJobOutputPath } from './job-file-utils';
 import { persistSubagentChildExit } from './subagent-exit-handler';
 import {
@@ -105,7 +105,7 @@ export interface SubagentJobDependencies {
    * Top-level CLI peer for the parent process. The per-subagent
    * `session/update` relay uses it to forward the parent's own
    * `session/update(context_injected)` notification to clients when the
-   * relay translates a `pending_alarms_on_exit` update into a local inject.
+   * relay translates a `pending_reminders_on_exit` update into a local inject.
    */
   topLevelPeer: JsonRpcPeer;
 }
@@ -625,50 +625,27 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       }
 
       // Subagent → parent: on graceful exit, the subagent notifies its peer
-      // about alarms that were still pending. We compose the
+      // about reminders that were still pending. We compose the
       // <notification kind="subagent-exited"> body here (in the parent's own
       // process, using the parent's composers) and append it as a
       // context_injected priority='immediate' event to the parent's
       // events.jsonl under runExclusive. The subagent never writes the
       // parent's files directly — architectural invariant.
-      if (type === 'pending_alarms_on_exit') {
-        const alarmsParam = p.alarms;
-        if (!Array.isArray(alarmsParam)) return undefined;
+      if (type === 'pending_reminders_on_exit') {
+        const remindersParam = p.reminders;
+        if (!Array.isArray(remindersParam)) return undefined;
 
-        const pending = alarmsParam
-          .filter(
-            (
-              a
-            ): a is {
-              id: string;
-              kind: 'cron' | 'once' | 'interval';
-              schedule: string;
-              prompt: string;
-              next_fire_at_iso: string;
-              end_at_iso: string | null;
-              minutes?: number;
-            } => {
-              if (typeof a !== 'object' || a === null) return false;
-              const rec = a as Record<string, unknown>;
-              return (
-                typeof rec.id === 'string' &&
-                (rec.kind === 'cron' || rec.kind === 'once' || rec.kind === 'interval') &&
-                typeof rec.schedule === 'string' &&
-                typeof rec.prompt === 'string' &&
-                typeof rec.next_fire_at_iso === 'string' &&
-                (rec.end_at_iso === null || typeof rec.end_at_iso === 'string') &&
-                (rec.minutes === undefined || typeof rec.minutes === 'number')
-              );
-            }
-          )
-          .map((a) => ({
-            id: a.id,
-            kind: a.kind,
-            schedule: a.schedule,
-            prompt: a.prompt,
-            ...(a.end_at_iso !== null ? { end_at_iso: a.end_at_iso } : {}),
-            ...(a.minutes !== undefined ? { minutes: a.minutes } : {}),
-          }));
+        const pending = remindersParam.filter(
+          (r): r is { id: string; prompt: string; next_fire_at_iso: string } => {
+            if (typeof r !== 'object' || r === null) return false;
+            const rec = r as Record<string, unknown>;
+            return (
+              typeof rec.id === 'string' &&
+              typeof rec.prompt === 'string' &&
+              typeof rec.next_fire_at_iso === 'string'
+            );
+          }
+        );
 
         if (pending.length === 0) return undefined;
 
@@ -681,9 +658,9 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
             'job-id': job.jobId,
             persona: personaName,
           },
-          body: composeSubagentExitedAlarmsBody({
+          body: composeSubagentExitedBody({
             persona: personaName,
-            pendingAlarms: pending,
+            pendingReminders: pending,
           }),
         });
 
@@ -937,14 +914,14 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       // Mark teardown initiated so onExit treats the upcoming SIGTERM as
       // expected (no [SUBAGENT CHILD EXITED] block, no childPeer.close from
       // onExit — the explicit close below sequences it correctly relative to
-      // the subagent's `pending_alarms_on_exit` notify).
+      // the subagent's `pending_reminders_on_exit` notify).
       teardownInitiated = true;
 
       // SIGTERM first, then close the JSON-RPC channel after the child has
       // exited. The subagent's natural shutdown handler runs
       // emitSubagentExitedIfNeeded, which emits a one-way `session/update`
       // notification over the still-open childPeer carrying the
-      // `pending_alarms_on_exit` discriminant. Closing the peer before the
+      // `pending_reminders_on_exit` discriminant. Closing the peer before the
       // subagent finishes would drop those bytes. Bounded waits prevent a
       // misbehaving subagent from stalling job teardown.
       if (subagentProc && subagentProc.exitCode === null) {
@@ -958,7 +935,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         }
 
         // Wait up to 3 seconds for graceful exit. The subagent gets this
-        // window to emit its `pending_alarms_on_exit` notify before we tear
+        // window to emit its `pending_reminders_on_exit` notify before we tear
         // down its peer.
         await Promise.race([
           subagentProc.wait().then(() => undefined),

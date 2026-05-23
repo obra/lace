@@ -1067,7 +1067,6 @@ export class ConversationRunner {
         markFileRead: markRuntimeFileRead,
         turnId,
         turnSeq: toolTurnSeq,
-        ...(this.deps.alarmScheduler ? { alarmScheduler: this.deps.alarmScheduler } : {}),
         ...(this.deps.reminderScheduler ? { reminderScheduler: this.deps.reminderScheduler } : {}),
         ...(this.deps.activeSessionId ? { activeSessionId: this.deps.activeSessionId } : {}),
         activeSessionDir: this.config.sessionDir,

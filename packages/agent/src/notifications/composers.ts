@@ -1,8 +1,6 @@
 // ABOUTME: Pure body-composer functions for each notification kind. No side effects.
 // ABOUTME: Output strings are wrapped by buildNotification in inject-notification.ts.
 
-import { formatAbsoluteTime } from './format-time';
-
 const MAX_LINE_LENGTH = 200;
 
 function formatDuration(ms: number): string {
@@ -18,66 +16,6 @@ function formatBytes(bytes: number): string {
 
 function truncate(line: string, maxLen = MAX_LINE_LENGTH): string {
   return line.length <= maxLen ? line : line.slice(0, maxLen - 3) + '...';
-}
-
-export type AlarmFiredCompose =
-  | {
-      kind: 'once-absolute';
-      scheduledFor: number;
-      timezone: string;
-      prompt: string;
-      alarmId: string;
-    }
-  | { kind: 'once-relative'; minutes: number; prompt: string; alarmId: string }
-  | { kind: 'cron'; expr: string; timezone: string; prompt: string; alarmId: string }
-  | { kind: 'interval'; minutes: number; prompt: string; alarmId: string };
-
-export function composeAlarmFiredBody(a: AlarmFiredCompose): string {
-  switch (a.kind) {
-    case 'once-absolute': {
-      const when = formatAbsoluteTime(a.scheduledFor, a.timezone);
-      return `Your alarm for ${when} just fired. Note: "${a.prompt}".`;
-    }
-    case 'once-relative':
-      return `Your ${a.minutes}-minute timer just fired. Note: "${a.prompt}".`;
-    case 'cron':
-      return `Your cron alarm ${a.alarmId} (${a.expr} in ${a.timezone}) just fired. Note: "${a.prompt}".`;
-    case 'interval': {
-      const unit = a.minutes === 1 ? 'minute' : 'minutes';
-      return `Your interval alarm ${a.alarmId} (every ${a.minutes} ${unit}) just fired. Note: "${a.prompt}".`;
-    }
-  }
-}
-
-export type AlarmExpiredCompose =
-  | {
-      kind: 'cron';
-      expr: string;
-      timezone: string;
-      endTime: number;
-      endTimezone: string;
-      prompt: string;
-      alarmId: string;
-    }
-  | {
-      kind: 'interval';
-      minutes: number;
-      endTime: number;
-      endTimezone: string;
-      prompt: string;
-      alarmId: string;
-    };
-
-export function composeAlarmExpiredBody(a: AlarmExpiredCompose): string {
-  const endStr = formatAbsoluteTime(a.endTime, a.endTimezone);
-  switch (a.kind) {
-    case 'cron':
-      return `Your cron alarm ${a.alarmId} (${a.expr} in ${a.timezone}) reached its end time (${endStr}) and won't fire again. Last note: "${a.prompt}".`;
-    case 'interval': {
-      const unit = a.minutes === 1 ? 'minute' : 'minutes';
-      return `Your interval alarm ${a.alarmId} (every ${a.minutes} ${unit}) reached its end time (${endStr}) and won't fire again. Last note: "${a.prompt}".`;
-    }
-  }
 }
 
 export interface JobCompletedCompose {
@@ -147,32 +85,6 @@ function trailingLineHint(lines: string[]): string {
   return ` The last line was: "${last}".`;
 }
 
-export interface SubagentPendingAlarm {
-  id: string;
-  kind: 'cron' | 'once' | 'interval';
-  schedule: string; // human description of what this alarm was (cron expr, ISO, "every N min", "in N min")
-  prompt: string;
-  end_at_iso?: string; // formatted absolute time string for bounded recurring alarms
-  minutes?: number; // present when this is a once-relative alarm; renders as "N-minute timer"
-}
-
-export interface SubagentExitedCompose {
-  persona: string;
-  pendingAlarms: SubagentPendingAlarm[];
-}
-
-export function composeSubagentExitedAlarmsBody(s: SubagentExitedCompose): string {
-  const personaWord = s.persona.length > 0 ? `${s.persona} ` : '';
-  const n = s.pendingAlarms.length;
-  const head = `Your ${personaWord}subagent exited gracefully but had ${n} pending alarm${n === 1 ? '' : 's'} that won't fire now`;
-  if (n === 1) {
-    const a = s.pendingAlarms[0];
-    return `${head}: ${formatPendingAlarm(a)}`;
-  }
-  const lines = s.pendingAlarms.map((a) => `  ${formatPendingAlarm(a)}`).join('\n');
-  return `${head}:\n${lines}`;
-}
-
 // ---------- Reminders ----------
 
 export interface ReminderBodyCompose {
@@ -236,23 +148,3 @@ export function composeSubagentExitedBody(s: SubagentExitedReminderCompose): str
   return `${head}:\n${lines}`;
 }
 
-function formatPendingAlarm(a: SubagentPendingAlarm): string {
-  let desc: string;
-  switch (a.kind) {
-    case 'cron':
-      desc = `was a cron (${a.schedule})`;
-      break;
-    case 'interval':
-      desc = `was an interval alarm (${a.schedule})`;
-      break;
-    case 'once':
-      if (a.minutes !== undefined) {
-        desc = `was a ${a.minutes}-minute timer`;
-      } else {
-        desc = `was a one-shot scheduled for ${a.schedule}`;
-      }
-      break;
-  }
-  const expiryClause = a.end_at_iso !== undefined ? ` (expiring at ${a.end_at_iso})` : '';
-  return `${a.id} ${desc} with the prompt "${a.prompt}"${expiryClause}.`;
-}

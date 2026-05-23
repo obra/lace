@@ -3,7 +3,6 @@
 
 import type { CombinedTokenUsage } from '@lace/agent/token-management/types';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
-import type { AlarmScheduler } from '@lace/agent/alarms/alarm-scheduler';
 import type { ReminderScheduler } from '@lace/agent/reminders';
 import type { MountRegistryEntry } from '@lace/agent/server-types';
 import type { RuntimeExecutionBinding, RuntimePath, ToolRuntime } from './runtime/types';
@@ -38,8 +37,6 @@ export interface ToolContext {
   turnId?: string;
   turnSeq?: number;
 
-  // Alarm scheduling (provided by the session runner for alarm tools)
-  alarmScheduler?: AlarmScheduler;
   activeSessionId?: string;
   activeSessionDir?: string;
 

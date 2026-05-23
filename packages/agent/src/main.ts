@@ -2,7 +2,6 @@ import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import {
   createAgentServerState,
   registerAgentRpcMethods,
-  shutdownAlarms,
   shutdownReminders,
   emitSubagentExitedIfNeeded,
 } from './server';
@@ -84,10 +83,10 @@ const shutdown = async () => {
   if (shuttingDown) return;
   shuttingDown = true;
   try {
-    await Promise.all([shutdownAlarms(state), shutdownReminders(state)]);
+    await shutdownReminders(state);
     await emitSubagentExitedIfNeeded(state);
   } catch {
-    // Best-effort; never block process exit on alarm bookkeeping.
+    // Best-effort; never block process exit on reminder bookkeeping.
   }
   peer.close();
   await state.mcpServerManager.shutdown();
