@@ -785,8 +785,15 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         config: buildSubagentInitConfig(parentEffective),
       });
 
-      // Resume existing session or create a new one
-      const resumedSession = !!job.subagentSessionId;
+      // Determine whether to resume an existing session or create a new one.
+      // Three cases:
+      //   1. isResume: subagentSessionId set WITHOUT preallocated flag → session/resume
+      //   2. isPreallocatedFresh: subagentSessionId set WITH preallocated flag → session/new (passing the id)
+      //   3. neither: no id at all (legacy / non-persona delegates) → session/new (child mints id)
+      const isResume = !!job.subagentSessionId && !job.subagentSessionPreallocated;
+      const isPreallocatedFresh =
+        !!job.subagentSessionId && job.subagentSessionPreallocated === true;
+
       const subagentWorkDir = job.personaContainerRuntime
         ? job.personaContainerRuntime.workingDirectory
         : currentState.activeSession!.meta.workDir;
@@ -794,7 +801,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         !isContainerizedSubagent && job.runtimeBinding
           ? { config: { runtimeBinding: job.runtimeBinding } }
           : {};
-      if (resumedSession) {
+      if (isResume) {
         await childPeer.request('session/resume', {
           sessionId: job.subagentSessionId,
           cwd: subagentWorkDir,
@@ -802,13 +809,14 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           ...inheritedRuntimeConfig,
         });
       } else {
-        // New session - thread persona through so subagent's system prompt
-        // template comes from the persona's body.
+        // New session (either preallocated-fresh or legacy no-id case).
+        // Thread persona through so subagent's system prompt template comes
+        // from the persona's body.
         // For container subagents the parent's host workDir does not exist
         // inside the child's container, so use the persona's declared
         // runtime.workingDirectory instead. Native subagents share the
         // parent's filesystem and continue using the parent workDir.
-        const created = (await childPeer.request('session/new', {
+        const newRequest = {
           cwd: subagentWorkDir,
           ...(job.persona ? { persona: job.persona } : {}),
           parent: {
@@ -817,7 +825,17 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
             ...(job.persona ? { personaName: job.persona } : {}),
           },
           ...inheritedRuntimeConfig,
-        })) as { sessionId: string };
+          ...(isPreallocatedFresh ? { sessionId: job.subagentSessionId } : {}),
+        };
+        const created = (await childPeer.request('session/new', newRequest)) as {
+          sessionId: string;
+        };
+        // If preallocated, the child must echo back the same id — assert to catch bugs.
+        if (isPreallocatedFresh && created.sessionId !== job.subagentSessionId) {
+          throw new Error(
+            `Child session/new returned mismatched sessionId: expected ${job.subagentSessionId}, got ${created.sessionId}`
+          );
+        }
         job.subagentSessionId = created.sessionId;
       }
 
