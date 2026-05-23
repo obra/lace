@@ -172,9 +172,12 @@ describe('OpenAIProvider', () => {
       ]);
     });
 
-    it('should handle system messages correctly', async () => {
+    it('should use setSystemPrompt as system message and ignore role:system messages in input (PRI-1804 invariant)', async () => {
+      // setSystemPrompt('Test system prompt') was called in beforeEach.
+      // role:system messages in the input are ignored by getEffectiveSystemPrompt;
+      // only the value set via setSystemPrompt() is used.
       const messages = [
-        { role: 'system' as const, content: 'Override system message' },
+        { role: 'system' as const, content: 'This must be ignored.' },
         { role: 'user' as const, content: 'User message' },
         { role: 'assistant' as const, content: 'Assistant message' },
       ];
@@ -187,7 +190,7 @@ describe('OpenAIProvider', () => {
         messages: Array<{ role: string; content: string }>;
         tools?: Array<{ type: string; function: { name: string } }>;
       };
-      expect(callArgs.messages[0]).toEqual({ role: 'system', content: 'Override system message' });
+      expect(callArgs.messages[0]).toEqual({ role: 'system', content: 'Test system prompt' });
       expect(callArgs.messages[1]).toEqual({ role: 'user', content: 'User message' });
       expect(callArgs.messages[2]).toEqual({ role: 'assistant', content: 'Assistant message' });
     });

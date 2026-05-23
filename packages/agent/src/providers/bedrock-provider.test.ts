@@ -198,7 +198,10 @@ describe('BedrockProvider', () => {
       ]);
     });
 
-    it('sends system message as cache-controlled block array and filters system from messages', async () => {
+    it('sends system prompt (from setSystemPrompt) as cache-controlled block array and filters system from messages (PRI-1804 invariant)', async () => {
+      // setSystemPrompt('Test system prompt') was called in beforeEach.
+      // role:system messages in the input are ignored by getEffectiveSystemPrompt;
+      // the system block in the API request comes only from setSystemPrompt().
       mockCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'ok' }],
         usage: { input_tokens: 1, output_tokens: 1 },
@@ -207,7 +210,7 @@ describe('BedrockProvider', () => {
 
       await provider.createResponse(
         [
-          { role: 'system', content: 'System message' },
+          { role: 'system', content: 'This must be ignored.' },
           { role: 'user', content: 'User message' },
           { role: 'assistant', content: 'Assistant message' },
         ],
@@ -238,7 +241,7 @@ describe('BedrockProvider', () => {
         text: string;
         cache_control?: { type: string; ttl?: string };
       }>;
-      expect(systemBlocks[0].text).toBe('System message');
+      expect(systemBlocks[0].text).toBe('Test system prompt');
       expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
     });
 

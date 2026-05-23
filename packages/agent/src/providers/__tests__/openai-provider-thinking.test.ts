@@ -155,11 +155,11 @@ describe('OpenAIProvider thinking events', () => {
   });
 
   describe('system prompt handling (Responses API path)', () => {
-    it('routes multiple role:system messages through getEffectiveSystemPrompt (regression: PRI-1804 #3)', async () => {
-      // After PRI-1804 #3, getEffectiveSystemPrompt joins multiple role:system messages
-      // with \n\n. The Responses-API path used its own inline join with \n AND
-      // stringified content arrays naively — that divergence is the bug.
-      // Verify both are now consistent by checking the \n\n separator here.
+    it('uses _systemPrompt (set via setSystemPrompt) and ignores role:system messages in input (PRI-1804 invariant)', async () => {
+      // The system prompt is set once at session start via setSystemPrompt() (done in
+      // beforeEach). role:system messages in the input are ignored — the invariant
+      // ensures the system prompt is byte-stable for the session, keeping the
+      // system+tools cache prefix reusable across requests.
       mockResponsesCreate.mockResolvedValue({
         id: 'resp_123',
         status: 'completed',
@@ -174,8 +174,8 @@ describe('OpenAIProvider thinking events', () => {
 
       await provider.createResponse(
         [
-          { role: 'system', content: 'First system block.' },
-          { role: 'system', content: 'Second system block.' },
+          { role: 'system', content: 'This must be ignored.' },
+          { role: 'system', content: 'This too.' },
           { role: 'user', content: 'Hello' },
         ],
         [],
@@ -186,8 +186,8 @@ describe('OpenAIProvider thinking events', () => {
       const callArgs = mockResponsesCreate.mock.calls[0][0] as {
         instructions?: string;
       };
-      // getEffectiveSystemPrompt joins with \n\n; the old inline code used \n
-      expect(callArgs.instructions).toBe('First system block.\n\nSecond system block.');
+      // instructions comes from setSystemPrompt(), not from role:system messages
+      expect(callArgs.instructions).toBe('Test system prompt');
     });
   });
 

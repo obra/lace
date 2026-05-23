@@ -30,6 +30,7 @@ vi.mock('../../../utils/logger.js', () => ({
   logger: {
     debug: vi.fn(),
     error: vi.fn(),
+    warn: vi.fn(),
   },
 }));
 
@@ -136,6 +137,8 @@ describe('AnthropicProvider', () => {
     });
 
     it('should filter out system messages correctly', async () => {
+      // role:system messages are stripped from messages[] by convertToAnthropicFormat.
+      // The actual system prompt comes from setSystemPrompt(), called in beforeEach.
       const messages = [
         { role: 'system' as const, content: 'System message' },
         { role: 'user' as const, content: 'User message' },
@@ -146,6 +149,7 @@ describe('AnthropicProvider', () => {
 
       const callArgs = mockCreateResponse.mock
         .calls[0][0] as Anthropic.Messages.MessageCreateParams;
+      // role:system is filtered out of messages[] by convertToAnthropicFormat;
       // PRI-1799: last message is converted to a content-block array so we
       // can attach a 1h cache_control breakpoint to its final block.
       expect(callArgs.messages).toEqual([
@@ -161,31 +165,35 @@ describe('AnthropicProvider', () => {
           ],
         },
       ]);
-      // System prompt is now an array with cache_control for prompt caching
+      // System prompt is sourced from setSystemPrompt(), not from role:system messages
+      // (PRI-1804 invariant: system prompt is set once at session start and never
+      // changes; role:system entries in input are ignored).
       expect(Array.isArray(callArgs.system)).toBe(true);
       const systemBlocks = callArgs.system as Array<{
         type: string;
         text: string;
         cache_control?: { type: string };
       }>;
-      expect(systemBlocks[0].text).toBe('System message');
+      expect(systemBlocks[0].text).toBe('Test system prompt');
       expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
     });
 
-    it('concatenates multiple role:system messages into the system prompt (PRI-1804 #3)', async () => {
+    it('uses _systemPrompt (set via setSystemPrompt) and ignores any role:system messages in input (PRI-1804 invariant)', async () => {
       mockCreateResponse.mockResolvedValue({
         content: [{ type: 'text', text: 'r' }],
         usage: { input_tokens: 1, output_tokens: 1 },
       });
 
-      // Two `role: 'system'` messages — both must reach the model. Before
-      // PRI-1804 #3, only the first was used and the second was silently
-      // dropped (since convertToAnthropicFormat filters role:system out of
-      // messages[]).
+      provider.setSystemPrompt('Frozen prompt set at session start.');
+
+      // role:system messages in the input must NOT influence the request's
+      // system block. The system prompt is set once at session start via
+      // setSystemPrompt() and is byte-stable for the session lifetime —
+      // this is what makes the system+tools cache prefix reusable.
       await provider.createResponse(
         [
-          { role: 'system', content: 'Primary system prompt.' },
-          { role: 'system', content: 'Secondary user-instructions block.' },
+          { role: 'system', content: 'This must be ignored.' },
+          { role: 'system', content: 'This too.' },
           { role: 'user', content: 'Hello' },
         ],
         [],
@@ -195,9 +203,7 @@ describe('AnthropicProvider', () => {
       const callArgs = mockCreateResponse.mock
         .calls[0][0] as Anthropic.Messages.MessageCreateParams;
       const sysBlocks = callArgs.system as Array<{ text: string }>;
-      expect(sysBlocks[0].text).toBe(
-        'Primary system prompt.\n\nSecondary user-instructions block.'
-      );
+      expect(sysBlocks[0].text).toBe('Frozen prompt set at session start.');
     });
   });
 

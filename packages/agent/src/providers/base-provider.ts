@@ -554,46 +554,28 @@ export abstract class AIProvider extends EventEmitter {
 
   // System prompt handling.
   //
-  // PRI-1804 #3: every `role: 'system'` message in `messages` is concatenated
-  // (joined by blank lines). Previously we only picked the first one via
-  // `messages.find(...)`, which silently dropped subsequent context_injected
-  // events — including session-level user instructions. This is both a
-  // correctness fix (user instructions actually reach the model now) and a
-  // caching fix (later system updates ride the cached prefix instead of
-  // disappearing).
+  // The system prompt is the bytes set via setSystemPrompt() at session
+  // start. It is byte-invariant for the lifetime of the session — this is
+  // what makes the system+tools cache prefix actually reusable across
+  // requests. role:'system' messages in the input are IGNORED here (they
+  // are session-foundational context handled at the storage layer; see
+  // buildProviderMessagesFromDurableEvents which sources systemPrompt from
+  // the system_prompt_set event).
   //
-  // PRI-1804 #5: when neither the messages nor `setSystemPrompt` provide a
-  // prompt, throw rather than returning a literal "You are a helpful
-  // assistant." fallback — the fallback masked boot-time race conditions
-  // and silently invalidated the system cache the moment the real prompt
-  // arrived. Callers must wire `setSystemPrompt` (or pass system messages)
-  // before invoking the provider.
-  protected getEffectiveSystemPrompt(messages: ProviderMessage[]): string {
-    const systemTexts: string[] = [];
-    for (const msg of messages) {
-      if (msg.role !== 'system') continue;
-      if (typeof msg.content === 'string') {
-        if (msg.content.length > 0) systemTexts.push(msg.content);
-      } else {
-        const textContent = msg.content
-          .filter((b): b is TextContentBlock => b.type === 'text')
-          .map((b) => b.text)
-          .join('\n');
-        if (textContent.length > 0) systemTexts.push(textContent);
-      }
-    }
-
-    if (systemTexts.length > 0) return systemTexts.join('\n\n');
+  // If setSystemPrompt() was never called, we log loudly and return a
+  // stable fallback string. The fallback is byte-stable so the cache still
+  // works in tests/edge cases, but the warning should surface in production
+  // telemetry as a real bug — every legitimate request path must call
+  // setSystemPrompt() at session start.
+  //
+  // Note: Task 3E will refine the warning to skip empty-messages calls
+  // (the legitimate calibration path) to suppress noise there.
+  protected getEffectiveSystemPrompt(_messages: ProviderMessage[]): string {
     if (this._systemPrompt) return this._systemPrompt;
 
-    // PRI-1804 #5: warn loudly. Falling through to a default literal busts
-    // the system+tools cache the moment the real prompt arrives. Use a
-    // byte-stable fallback so a steady-state fallback session is at least
-    // internally cache-coherent, but the warning should fire so we notice
-    // it in production logs.
     logger.warn(
-      '[base-provider] getEffectiveSystemPrompt fell through to default — caller did not setSystemPrompt() or supply a role:system message. ' +
-        'The system+tools cache will be busted as soon as the real prompt arrives.'
+      '[base-provider] getEffectiveSystemPrompt called with no _systemPrompt — caller must setSystemPrompt() at session start. ' +
+        'Returning stable fallback so the cache stays warm, but production telemetry should surface this as a real bug.'
     );
     return 'You are a helpful assistant.';
   }
