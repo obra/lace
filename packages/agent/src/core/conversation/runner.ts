@@ -243,23 +243,16 @@ export class ConversationRunner {
         lastSeenEventSeq = newWatermark;
 
         // Inject a reminder every LOOP_CHECK_INTERVAL turns to help detect
-        // stuck loops. PRI-1804 #4: persist as a durable context_injected
-        // event rather than mutating providerMessages in-memory only —
-        // otherwise the message sequence diverges between pre- and
-        // post-restart, busting the cache for everything after the missing
-        // reminder. Also drop the per-turn `completedTurns` value from the
-        // text so the reminder is byte-identical at every checkpoint
-        // (otherwise each reminder is a distinct cache-key prefix).
+        // stuck loops. PRI-1804 #4 (revised after adversarial review): push
+        // the reminder into providerMessages in-memory ONLY. Do NOT persist
+        // it as a context_injected event — persisting caused the next
+        // iteration's readImmediateInjectsSince to re-read and re-append
+        // the same reminder, doubling it in the message stream. The
+        // reminder is intentionally ephemeral runtime guidance; if the
+        // session restarts mid-run, missing one nudge at turn 50 is fine.
         if (completedTurns > 0 && completedTurns % ConversationRunner.LOOP_CHECK_INTERVAL === 0) {
           const reminder =
             '<system-reminder>You have completed many agentic turns. If you believe you are stuck in a loop or not making progress, stop and ask the user for guidance. Otherwise, continue.</system-reminder>';
-          await writeAndAdvance({
-            type: 'context_injected',
-            data: {
-              content: [{ type: 'text', text: reminder }],
-              priority: 'immediate',
-            },
-          });
           providerMessages = [...providerMessages, { role: 'user' as const, content: reminder }];
         }
 
