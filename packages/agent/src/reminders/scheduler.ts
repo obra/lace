@@ -304,56 +304,76 @@ export class ReminderScheduler {
    * 2. Commit to disk. If commit fails: restore heap entry, call onError, skip notify.
    * 3. Update heap with next fire time (for recurring rows).
    * 4. Call notifier. If notifier throws: call onError (row already committed, at-most-one-missed).
+   *
+   * The try/finally ensures that if ANY exception escapes before disk commit
+   * (e.g. an unexpected throw in computePostFire), the heap entry is restored
+   * so a future tick can retry.
    */
   private async fire(id: string): Promise<void> {
     await this.mutex.runExclusive(async () => {
-      const rows = this.store.list();
-      const idx = rows.findIndex((r) => r.id === id);
-      if (idx < 0) return; // Cancelled between tick and mutex acquire.
-
-      const prior: ReminderRow = JSON.parse(JSON.stringify(rows[idx])) as ReminderRow;
-      const firedAt = this.now();
-
-      // Compute post-fire state.
-      const post = this.computePostFire(prior, firedAt);
-      // post.nextRow === null means delete.
-
-      const nextRows = [...rows];
-      if (post.nextRow === null) {
-        nextRows.splice(idx, 1);
-      } else {
-        nextRows[idx] = post.nextRow;
-      }
-
-      // Commit to disk first. On failure: restore heap entry, skip notify.
+      let committed = false;
       try {
-        this.store.save(nextRows);
-      } catch (err) {
-        // Restore heap entry so the row will be retried on the next tick.
-        this.heap.push({ id, nextFireAt: prior.next_fire_at });
-        this.heap.sort((a, b) => a.nextFireAt - b.nextFireAt);
-        this.onError(err);
-        return;
-      }
+        const rows = this.store.list();
+        const idx = rows.findIndex((r) => r.id === id);
+        if (idx < 0) {
+          committed = true; // Nothing to do; not an error.
+          return;
+        }
 
-      // Update heap for recurring rows (next fire entry).
-      if (post.nextRow) {
-        this.heap.push({ id, nextFireAt: post.nextRow.next_fire_at });
-        this.heap.sort((a, b) => a.nextFireAt - b.nextFireAt);
-      }
+        const prior: ReminderRow = JSON.parse(JSON.stringify(rows[idx])) as ReminderRow;
+        const firedAt = this.now();
 
-      // Notify after commit. Failure here is at-most-one-missed: row is already updated.
-      try {
-        await this.notifier({
-          row: post.nextRow ?? prior,
-          firedAt,
-          fireCount: prior.fire_count + 1,
-          lastFiredAt: prior.fired_at,
-          nextFireAt: post.nextRow ? post.nextRow.next_fire_at : null,
-        });
+        // Compute post-fire state.
+        const post = this.computePostFire(prior, firedAt);
+        // post.nextRow === null means delete.
+
+        const nextRows = [...rows];
+        if (post.nextRow === null) {
+          nextRows.splice(idx, 1);
+        } else {
+          nextRows[idx] = post.nextRow;
+        }
+
+        // Commit to disk first. On failure: skip notify (heap restored in finally).
+        try {
+          this.store.save(nextRows);
+        } catch (err) {
+          this.onError(err);
+          return; // committed stays false → heap restored in finally.
+        }
+
+        // Update heap for recurring rows (next fire entry).
+        if (post.nextRow) {
+          this.heap.push({ id, nextFireAt: post.nextRow.next_fire_at });
+          this.heap.sort((a, b) => a.nextFireAt - b.nextFireAt);
+        }
+        committed = true;
+
+        // Notify after commit. Failure here is at-most-one-missed: row is already updated.
+        try {
+          await this.notifier({
+            row: post.nextRow ?? prior,
+            firedAt,
+            fireCount: prior.fire_count + 1,
+            lastFiredAt: prior.fired_at,
+            nextFireAt: post.nextRow ? post.nextRow.next_fire_at : null,
+          });
+        } catch (err) {
+          this.onError(err);
+          // Row is already in post-fire state on disk — at-most-one-missed semantics.
+        }
       } catch (err) {
+        // Unexpected exception in computePostFire or elsewhere before disk commit.
         this.onError(err);
-        // Row is already in post-fire state on disk — at-most-one-missed semantics.
+      } finally {
+        if (!committed) {
+          // Restore the heap entry so a future tick can retry.
+          const row = this.store.list().find((r) => r.id === id);
+          if (row) {
+            this.heap.push({ id, nextFireAt: row.next_fire_at });
+            this.heap.sort((a, b) => a.nextFireAt - b.nextFireAt);
+          }
+        }
       }
     });
   }
@@ -389,15 +409,23 @@ export class ReminderScheduler {
     }
 
     // Cron: compute next match strictly > firedAt.
+    // If computeNextCronFire throws (e.g. cron has no more matches in its
+    // lookahead window), treat this as a terminal fire and delete the row.
     const tz = getAgentTimezone();
-    const nextFireAt = computeNextCronFire(prior.recurs.expr, tz, new Date(firedAt));
-    return {
-      nextRow: {
-        ...prior,
-        next_fire_at: nextFireAt,
-        fired_at: firedAt,
-        fire_count: prior.fire_count + 1,
-      },
-    };
+    try {
+      const nextFireAt = computeNextCronFire(prior.recurs.expr, tz, new Date(firedAt));
+      return {
+        nextRow: {
+          ...prior,
+          next_fire_at: nextFireAt,
+          fired_at: firedAt,
+          fire_count: prior.fire_count + 1,
+        },
+      };
+    } catch (err) {
+      // Cron exhausted — treat as terminal fire so the row is deleted.
+      this.onError(err);
+      return { nextRow: null };
+    }
   }
 }

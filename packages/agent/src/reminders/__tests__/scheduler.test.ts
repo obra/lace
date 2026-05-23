@@ -585,3 +585,96 @@ describe('ReminderScheduler list', () => {
     await sched.stop();
   });
 });
+
+describe('ReminderScheduler exception handling', () => {
+  const origTZ = process.env.TZ;
+  beforeEach(() => { process.env.TZ = 'UTC'; });
+  afterEach(() => { process.env.TZ = origTZ; });
+
+  it('treats exhausted cron as terminal fire (no zombie row)', async () => {
+    const dir = tempSessionDir();
+    const store = new ReminderStore(dir);
+    const row: ReminderRow = {
+      id: 'reminder_aaaaaaaaaaaa',
+      created_at: 0,
+      next_fire_at: 1000,
+      prompt: 'p',
+      recurs: { kind: 'cron', expr: '0 9 29 2 *' }, // valid cron, only leap years
+      fired_at: null,
+      fire_count: 0,
+    };
+    store.save([row]);
+
+    let notified = 0;
+    let errors = 0;
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 2000,
+      notifier: async () => { notified++; },
+      onError: () => { errors++; },
+    });
+
+    // Monkey-patch computeNextCronFire to throw, simulating an exhausted cron.
+    const cronMod = await import('../cron');
+    const spy = vi.spyOn(cronMod, 'computeNextCronFire').mockImplementation(() => {
+      throw new Error('cron exhausted');
+    });
+
+    await sched.tickForTest(2000);
+
+    // Expected: row deleted (terminal semantics on cron exhaustion).
+    expect(store.list()).toEqual([]);
+    // Notifier was called (the fire still happens; it's just terminal).
+    expect(notified).toBe(1);
+    // onError called for observability.
+    expect(errors).toBe(1);
+
+    spy.mockRestore();
+  });
+
+  it('restores heap entry if computePostFire throws unexpectedly', async () => {
+    const dir = tempSessionDir();
+    const store = new ReminderStore(dir);
+    const row: ReminderRow = {
+      id: 'reminder_bbbbbbbbbbbb',
+      created_at: 0,
+      next_fire_at: 1000,
+      prompt: 'p',
+      recurs: { kind: 'count', interval_ms: 5 * 60_000, remaining: 3 },
+      fired_at: null,
+      fire_count: 0,
+    };
+    store.save([row]);
+
+    let errors = 0;
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 2000,
+      notifier: async () => {},
+      onError: () => { errors++; },
+    });
+
+    // Monkey-patch the scheduler's computePostFire to throw, simulating an
+    // unexpected exception. The heap restore in fire() must catch it.
+    type FireScheduler = ReminderScheduler & { computePostFire: (...args: unknown[]) => unknown };
+    const ps = sched as unknown as FireScheduler;
+    const orig = ps.computePostFire.bind(ps);
+    let calls = 0;
+    ps.computePostFire = (...args: unknown[]) => {
+      calls++;
+      if (calls === 1) throw new Error('unexpected');
+      return orig(...args);
+    };
+
+    await sched.tickForTest(2000);
+
+    // Row unchanged on disk (no commit happened).
+    const rows = store.list();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].fire_count).toBe(0);
+    expect(rows[0].next_fire_at).toBe(1000);
+
+    // onError was called.
+    expect(errors).toBe(1);
+  });
+});
