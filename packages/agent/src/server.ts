@@ -221,7 +221,19 @@ export async function ensureReminderSchedulerForActiveSession(
       });
     },
   });
-  await state.reminderScheduler.start();
+  try {
+    await state.reminderScheduler.start();
+  } catch (err) {
+    // start() → bootRecover() → getAgentTimezone() throws when TZ is unset.
+    // Per spec §1.4: degrade gracefully — the session continues, and the
+    // manage_reminders tool will surface a clear error when the agent tries to
+    // use it (its existing "no scheduler" path handles this).
+    logger.warn('reminders.scheduler.init_failed', {
+      error: err instanceof Error ? err.message : String(err),
+      session_dir: sessionDir,
+    });
+    state.reminderScheduler = undefined;
+  }
 }
 
 /**
