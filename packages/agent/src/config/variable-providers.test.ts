@@ -32,16 +32,16 @@ describe('Variable Providers', () => {
       expect(variables).toHaveProperty('system');
       expect(variables.system).toHaveProperty('os');
       expect(variables.system).toHaveProperty('arch');
-      expect(variables.system).toHaveProperty('sessionTime');
+      expect(variables.system).toHaveProperty('sessionDate');
 
       expect(typeof (variables.system as Record<string, unknown>).os).toBe('string');
       expect(typeof (variables.system as Record<string, unknown>).arch).toBe('string');
-      expect(typeof (variables.system as Record<string, unknown>).sessionTime).toBe('string');
+      expect(typeof (variables.system as Record<string, unknown>).sessionDate).toBe('string');
 
-      // Verify sessionTime is a valid ISO string
-      expect(
-        () => new Date((variables.system as Record<string, unknown>).sessionTime as string)
-      ).not.toThrow();
+      // PRI-1804 #1: sessionDate is YYYY-MM-DD (stable within a UTC day so
+      // the system prompt cache stays warm across sessions).
+      const date = (variables.system as Record<string, unknown>).sessionDate as string;
+      expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
 
     it('should handle errors gracefully', () => {
@@ -53,7 +53,7 @@ describe('Variable Providers', () => {
       expect(variables).toHaveProperty('system');
       expect(variables.system).toHaveProperty('os');
       expect(variables.system).toHaveProperty('arch');
-      expect(variables.system).toHaveProperty('sessionTime');
+      expect(variables.system).toHaveProperty('sessionDate');
     });
   });
 

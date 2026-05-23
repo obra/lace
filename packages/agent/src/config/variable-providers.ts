@@ -43,11 +43,16 @@ export class CommandRunner {
 export class SystemVariableProvider implements VariableProvider {
   getVariables(): Record<string, unknown> {
     try {
+      // PRI-1804 #1: emit date only (YYYY-MM-DD) rather than a precise
+      // ISO-8601 timestamp. The precise timestamp made the rendered system
+      // prompt byte-different on every new session, so the system+tools
+      // cache never read across sessions. Date-only is stable within a UTC
+      // day; system prompt stays cache-warm for ~24h.
       return {
         system: {
           os: os.platform(),
           arch: os.arch(),
-          sessionTime: new Date().toISOString(),
+          sessionDate: new Date().toISOString().slice(0, 10),
         },
       };
     } catch (error) {

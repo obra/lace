@@ -105,8 +105,13 @@ export class ToolExecutor {
   }
 
   getAllTools(): Tool[] {
-    const nativeTools = this.getNativeTools();
-    const mcpTools = this.getMCPTools();
+    // PRI-1804 #2: tools must be returned in a deterministic order so the
+    // tools-array prefix is byte-stable across sessions. Otherwise MCP
+    // discovery race ordering busts the system+tools cache on every new
+    // session. Sort by name within each group (native first, MCP second)
+    // so the relative grouping is preserved.
+    const nativeTools = this.getNativeTools().sort((a, b) => a.name.localeCompare(b.name));
+    const mcpTools = this.getMCPTools().sort((a, b) => a.name.localeCompare(b.name));
     return [...nativeTools, ...mcpTools];
   }
 

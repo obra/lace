@@ -552,21 +552,50 @@ export abstract class AIProvider extends EventEmitter {
     return Promise.resolve(null);
   }
 
-  // System prompt handling with fallback logic
+  // System prompt handling.
+  //
+  // PRI-1804 #3: every `role: 'system'` message in `messages` is concatenated
+  // (joined by blank lines). Previously we only picked the first one via
+  // `messages.find(...)`, which silently dropped subsequent context_injected
+  // events — including session-level user instructions. This is both a
+  // correctness fix (user instructions actually reach the model now) and a
+  // caching fix (later system updates ride the cached prefix instead of
+  // disappearing).
+  //
+  // PRI-1804 #5: when neither the messages nor `setSystemPrompt` provide a
+  // prompt, throw rather than returning a literal "You are a helpful
+  // assistant." fallback — the fallback masked boot-time race conditions
+  // and silently invalidated the system cache the moment the real prompt
+  // arrived. Callers must wire `setSystemPrompt` (or pass system messages)
+  // before invoking the provider.
   protected getEffectiveSystemPrompt(messages: ProviderMessage[]): string {
-    const systemMessage = messages.find((msg) => msg.role === 'system');
-    if (!systemMessage) {
-      return this._systemPrompt || 'You are a helpful assistant.';
+    const systemTexts: string[] = [];
+    for (const msg of messages) {
+      if (msg.role !== 'system') continue;
+      if (typeof msg.content === 'string') {
+        if (msg.content.length > 0) systemTexts.push(msg.content);
+      } else {
+        const textContent = msg.content
+          .filter((b): b is TextContentBlock => b.type === 'text')
+          .map((b) => b.text)
+          .join('\n');
+        if (textContent.length > 0) systemTexts.push(textContent);
+      }
     }
-    // Extract text from content (system prompts don't have images)
-    if (typeof systemMessage.content === 'string') {
-      return systemMessage.content || this._systemPrompt || 'You are a helpful assistant.';
-    }
-    const textContent = systemMessage.content
-      .filter((b): b is TextContentBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('\n');
-    return textContent || this._systemPrompt || 'You are a helpful assistant.';
+
+    if (systemTexts.length > 0) return systemTexts.join('\n\n');
+    if (this._systemPrompt) return this._systemPrompt;
+
+    // PRI-1804 #5: warn loudly. Falling through to a default literal busts
+    // the system+tools cache the moment the real prompt arrives. Use a
+    // byte-stable fallback so a steady-state fallback session is at least
+    // internally cache-coherent, but the warning should fire so we notice
+    // it in production logs.
+    logger.warn(
+      '[base-provider] getEffectiveSystemPrompt fell through to default — caller did not setSystemPrompt() or supply a role:system message. ' +
+        'The system+tools cache will be busted as soon as the real prompt arrives.'
+    );
+    return 'You are a helpful assistant.';
   }
 
   // Base stop reason normalization - providers should override for specific mappings

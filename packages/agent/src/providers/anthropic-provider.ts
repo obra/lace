@@ -15,139 +15,24 @@ import { ToolCall } from '@lace/agent/tools/types';
 import { logger } from '@lace/agent/utils/logger';
 import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
 import { convertToAnthropicFormat } from './format-converters';
+import {
+  attachMessageCacheBreakpoints,
+  buildSystemWithCaching,
+  enforceBreakpointBudget,
+  markLastToolForCaching,
+  type CacheControlOptions,
+} from './cache-control';
 
 interface AnthropicProviderConfig extends ProviderConfig {
   apiKey: string | null;
   [key: string]: unknown; // Allow for additional properties
 }
 
-const ONE_HOUR_EPHEMERAL: Anthropic.CacheControlEphemeral = {
-  type: 'ephemeral',
-  ttl: '1h',
-};
-
-// Distance (in cacheable content blocks) between the rolling tail breakpoint
-// and the stable anchor breakpoint. Anthropic's cache lookup looks back ~20
-// content blocks from a breakpoint; placing the anchor 10 blocks behind the
-// tail gives ~10 blocks of headroom for new blocks to land before the
-// previous request's breakpoints fall out of range.
-const ANCHOR_OFFSET_BLOCKS = 10;
-
-// Thinking blocks (`type: 'thinking'` / `type: 'redacted_thinking'`) do not
-// support `cache_control` — they have no such field in the SDK type and
-// Anthropic's docs explicitly forbid it. They must be skipped when picking
-// breakpoint targets.
-type CacheableBlock = Exclude<
-  Anthropic.ContentBlockParam,
-  Anthropic.ThinkingBlockParam | Anthropic.RedactedThinkingBlockParam
->;
-
-function isCacheableBlock(block: Anthropic.ContentBlockParam): block is CacheableBlock {
-  return block.type !== 'thinking' && block.type !== 'redacted_thinking';
-}
-
-// A pointer into the messages array. `blockIdx` is `null` when the message's
-// content is a plain string — in that case we'll lift it to a single text
-// block before attaching cache_control.
-interface BlockPosition {
-  msgIdx: number;
-  blockIdx: number | null;
-}
-
-// Walk every cacheable block across all messages. Used to compute the anchor
-// position relative to the tail.
-function collectCacheablePositions(messages: Anthropic.MessageParam[]): BlockPosition[] {
-  const positions: BlockPosition[] = [];
-  for (let m = 0; m < messages.length; m++) {
-    const content = messages[m].content;
-    if (typeof content === 'string') {
-      if (content.length > 0) positions.push({ msgIdx: m, blockIdx: null });
-    } else {
-      for (let b = 0; b < content.length; b++) {
-        if (isCacheableBlock(content[b])) positions.push({ msgIdx: m, blockIdx: b });
-      }
-    }
-  }
-  return positions;
-}
-
-function isMessageEmpty(msg: Anthropic.MessageParam): boolean {
-  return typeof msg.content === 'string' ? msg.content.length === 0 : msg.content.length === 0;
-}
-
-// Attach up to two 1h cache_control breakpoints to message content:
-//   • rolling tail — last cacheable block of the last non-empty message
-//   • stable anchor — 10 cacheable blocks behind the tail
-//
-// The anchor exists to defeat Anthropic's 20-block lookback window: in a
-// tool-heavy loop, the prior request's tail breakpoint can be pushed beyond
-// 20 blocks by intervening tool_result / tool_use blocks, busting the cache.
-// A second breakpoint ~10 blocks back guarantees the next request finds at
-// least one matching cached prefix even after several new blocks arrive.
-//
-// Refuses to attach anything when the last message has empty content — the
-// rolling write must always move forward, never freeze on a stale block deep
-// in history.
-//
-// Thinking blocks are never used as breakpoint targets.
-//
-// Returns a new array; inputs are not mutated.
-function attachMessageCacheBreakpoints(
-  messages: Anthropic.MessageParam[]
-): Anthropic.MessageParam[] {
-  if (messages.length === 0) return messages;
-  if (isMessageEmpty(messages[messages.length - 1])) return messages;
-
-  const positions = collectCacheablePositions(messages);
-  if (positions.length === 0) return messages;
-
-  // Tail must live in the last message — otherwise refuse rather than
-  // anchoring on history. (E.g. last message contains only thinking blocks.)
-  const tail = positions[positions.length - 1];
-  if (tail.msgIdx !== messages.length - 1) return messages;
-
-  const anchor =
-    positions.length > ANCHOR_OFFSET_BLOCKS
-      ? positions[positions.length - 1 - ANCHOR_OFFSET_BLOCKS]
-      : null;
-
-  return applyBreakpoints(messages, anchor ? [anchor, tail] : [tail]);
-}
-
-function applyBreakpoints(
-  messages: Anthropic.MessageParam[],
-  positions: BlockPosition[]
-): Anthropic.MessageParam[] {
-  const result = messages.slice();
-  const dirtyMsgIdxs = new Set(positions.map((p) => p.msgIdx));
-
-  // Clone every message we'll touch and lift any string content to an array.
-  for (const idx of dirtyMsgIdxs) {
-    const msg = result[idx];
-    if (typeof msg.content === 'string') {
-      result[idx] = {
-        ...msg,
-        content: [{ type: 'text', text: msg.content }],
-      };
-    } else {
-      result[idx] = { ...msg, content: msg.content.slice() };
-    }
-  }
-
-  // Now stamp cache_control on each target block. Type juggling: after the
-  // clone above, all dirty messages have array content.
-  for (const pos of positions) {
-    const blocks = (result[pos.msgIdx].content as CacheableBlock[]).slice();
-    const targetIdx = pos.blockIdx ?? 0;
-    blocks[targetIdx] = {
-      ...blocks[targetIdx],
-      cache_control: ONE_HOUR_EPHEMERAL,
-    };
-    result[pos.msgIdx] = { ...result[pos.msgIdx], content: blocks };
-  }
-
-  return result;
-}
+// PRI-1806 #4: Anthropic-direct API supports 1h ephemeral cache TTL GA — no
+// `anthropic-beta` header required (verified against
+// platform.claude.com/docs/en/build-with-claude/prompt-caching on 2026-05-23).
+// SDK 0.60 types `ttl: '5m' | '1h'`.
+const ANTHROPIC_CACHE_OPTIONS: CacheControlOptions = { ttl: '1h' };
 
 export class AnthropicProvider extends AIProvider {
   private _anthropic: Anthropic | null = null;
@@ -187,8 +72,16 @@ export class AnthropicProvider extends AIProvider {
   }
 
   /**
-   * Helper method for token counting with explicit control over all parameters
-   * Allows precise counting of individual components (system, tools, messages)
+   * Helper method for token counting with explicit control over all parameters.
+   * Allows precise counting of individual components (system, tools, messages).
+   *
+   * PRI-1806 #2: mirrors the wire shape of `_createRequestPayload` — same
+   * cache_control breakpoints on system, last tool, and message tail/anchor.
+   * Without this, the counted token total drifts from what we actually send
+   * (cache_control fields add a small but real overhead, and the array-shaped
+   * system block is counted differently than a bare string by countTokens).
+   * Callers that use this number for compaction or budget decisions need it
+   * to match reality.
    */
   private async countTokensExplicit(
     messages: ProviderMessage[],
@@ -198,16 +91,24 @@ export class AnthropicProvider extends AIProvider {
   ): Promise<number | null> {
     try {
       const anthropicMessages = convertToAnthropicFormat(messages);
-      const anthropicTools: Anthropic.Tool[] = tools.map((tool) => ({
+      const messagesWithCaching = attachMessageCacheBreakpoints(
+        anthropicMessages,
+        ANTHROPIC_CACHE_OPTIONS
+      );
+
+      const systemWithCaching = buildSystemWithCaching(systemPrompt, ANTHROPIC_CACHE_OPTIONS);
+
+      const baseTools: Anthropic.Tool[] = tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
         input_schema: tool.inputSchema,
       }));
+      const anthropicTools = markLastToolForCaching(baseTools, ANTHROPIC_CACHE_OPTIONS);
 
       const result = await this.getAnthropicClient().beta.messages.countTokens({
         model,
-        messages: anthropicMessages,
-        system: systemPrompt,
+        messages: messagesWithCaching,
+        system: systemWithCaching,
         tools: anthropicTools,
       });
 
@@ -300,51 +201,41 @@ export class AnthropicProvider extends AIProvider {
     tools: WireTool[],
     model: string
   ): Anthropic.Messages.MessageCreateParams {
-    // Convert our enhanced generic messages to Anthropic format
     const anthropicMessages = convertToAnthropicFormat(messages);
 
-    // PRI-1799: also attach a cache_control breakpoint to the most recent
-    // message-content block so the conversation prefix stays cached across
-    // long idle gaps (1h TTL). Without this, only system+tools cache and
-    // every multi-minute-idle turn re-bills the whole prefix.
-    const messagesWithCaching = attachMessageCacheBreakpoints(anthropicMessages);
+    // PRI-1799/1802/1805: attach a rolling-tail + stable-anchor pair of
+    // cache_control breakpoints on the message stream so the conversation
+    // prefix stays cached across idle gaps and survives Anthropic's
+    // 20-raw-block lookback window even on heavy tool-use turns.
+    const messagesWithCaching = attachMessageCacheBreakpoints(
+      anthropicMessages,
+      ANTHROPIC_CACHE_OPTIONS
+    );
 
-    // Extract system message if present
     const systemPrompt = this.getEffectiveSystemPrompt(messages);
+    const systemWithCaching = buildSystemWithCaching(systemPrompt, ANTHROPIC_CACHE_OPTIONS);
 
-    // Format system prompt as array with cache_control for Anthropic's prompt caching
-    const systemWithCaching: Anthropic.TextBlockParam[] = [
-      {
-        type: 'text',
-        text: systemPrompt,
-        cache_control: ONE_HOUR_EPHEMERAL,
-      },
-    ];
+    const baseTools: Anthropic.Tool[] = tools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      input_schema: tool.inputSchema,
+    }));
+    const anthropicTools = markLastToolForCaching(baseTools, ANTHROPIC_CACHE_OPTIONS);
 
-    // Convert tools to Anthropic format with cache_control on the last tool only
-    // Adding cache_control to the last tool enables caching of the entire tool list
-    const anthropicTools: Anthropic.Tool[] = tools.map((tool, index) => {
-      const baseTool: Anthropic.Tool = {
-        name: tool.name,
-        description: tool.description,
-        input_schema: tool.inputSchema,
-      };
-
-      // Add cache_control to the last tool only
-      if (index === tools.length - 1) {
-        return {
-          ...baseTool,
-          cache_control: ONE_HOUR_EPHEMERAL,
-        };
-      }
-
-      return baseTool;
+    // PRI-1806 #1: defensive cap at Anthropic's 4-marker hard limit. With
+    // current placement (system + last-tool + anchor + tail) we're at 4
+    // exactly; this enforces it if anything upstream stamps additional
+    // markers.
+    const cappedMessages = enforceBreakpointBudget({
+      system: systemWithCaching,
+      tools: anthropicTools,
+      messages: messagesWithCaching,
     });
 
     const payload = {
       model,
       max_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 8192),
-      messages: messagesWithCaching,
+      messages: cappedMessages,
       system: systemWithCaching,
       tools: anthropicTools,
     };

@@ -262,7 +262,7 @@ describe('PromptManager', () => {
 
       fs.writeFileSync(
         path.join(sectionsDir, 'environment.md'),
-        '## Environment\n\nOS: {{system.os}}\nSession: {{system.sessionTime}}\n{{#git.branch}}Git Branch: {{git.branch}}{{/git.branch}}'
+        '## Environment\n\nOS: {{system.os}}\nDate: {{system.sessionDate}}\n{{#git.branch}}Git Branch: {{git.branch}}{{/git.branch}}'
       );
 
       fs.writeFileSync(
@@ -289,7 +289,7 @@ describe('PromptManager', () => {
       expect(prompt).toContain('You are'); // Agent name
       expect(prompt).toContain('## Environment');
       expect(prompt).toContain('OS:');
-      expect(prompt).toContain('Session:');
+      expect(prompt).toContain('Date:');
       expect(prompt).toContain('## Available Tools');
       expect(prompt).toContain('- **bash**: Execute shell commands');
       expect(prompt).toContain('- **file_edit**: Edit files');

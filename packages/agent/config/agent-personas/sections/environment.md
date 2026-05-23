@@ -2,7 +2,7 @@
 
 - OS: {{{system.os}}} {{{system.arch}}}
 - Working Directory: {{{project.cwd}}}
-- Session Started: {{{system.sessionTime}}}
+- Current Date: {{{system.sessionDate}}}
 
 **Git:** {{#git.branch}}
 

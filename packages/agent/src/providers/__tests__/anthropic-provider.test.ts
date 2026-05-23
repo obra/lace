@@ -171,6 +171,34 @@ describe('AnthropicProvider', () => {
       expect(systemBlocks[0].text).toBe('System message');
       expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
     });
+
+    it('concatenates multiple role:system messages into the system prompt (PRI-1804 #3)', async () => {
+      mockCreateResponse.mockResolvedValue({
+        content: [{ type: 'text', text: 'r' }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+      });
+
+      // Two `role: 'system'` messages — both must reach the model. Before
+      // PRI-1804 #3, only the first was used and the second was silently
+      // dropped (since convertToAnthropicFormat filters role:system out of
+      // messages[]).
+      await provider.createResponse(
+        [
+          { role: 'system', content: 'Primary system prompt.' },
+          { role: 'system', content: 'Secondary user-instructions block.' },
+          { role: 'user', content: 'Hello' },
+        ],
+        [],
+        'claude-sonnet-4-20250514'
+      );
+
+      const callArgs = mockCreateResponse.mock
+        .calls[0][0] as Anthropic.Messages.MessageCreateParams;
+      const sysBlocks = callArgs.system as Array<{ text: string }>;
+      expect(sysBlocks[0].text).toBe(
+        'Primary system prompt.\n\nSecondary user-instructions block.'
+      );
+    });
   });
 
   describe('streaming responses', () => {

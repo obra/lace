@@ -118,10 +118,15 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
             content,
           };
         } else {
-          // Pure text assistant message
+          // Pure text assistant message. PRI-1806 #6: Anthropic 400s on
+          // assistant turns whose content is whitespace-only. Trim and
+          // substitute a deterministic placeholder if empty so we never
+          // ship an unsendable payload (the substitution is byte-stable so
+          // cache stays warm).
+          const trimmed = textContent.trim();
           return {
             role: 'assistant',
-            content: textContent,
+            content: trimmed.length > 0 ? trimmed : '(no response)',
           };
         }
       } else {

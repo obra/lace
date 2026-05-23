@@ -15,6 +15,14 @@ import { ToolCall } from '@lace/agent/tools/types';
 import { logger } from '@lace/agent/utils/logger';
 import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
 import { convertToAnthropicFormat } from './format-converters';
+import {
+  attachMessageCacheBreakpoints,
+  bedrockCacheTtlFor,
+  buildSystemWithCaching,
+  enforceBreakpointBudget,
+  markLastToolForCaching,
+  type CacheControlOptions,
+} from './cache-control';
 
 interface BedrockProviderConfig extends ProviderConfig {
   /** AWS region to call Bedrock in (e.g., "us-west-1"). */
@@ -76,33 +84,32 @@ export class BedrockProvider extends AIProvider {
     const anthropicMessages = convertToAnthropicFormat(messages);
     const systemPrompt = this.getEffectiveSystemPrompt(messages);
 
-    const systemWithCaching: Anthropic.TextBlockParam[] = [
-      {
-        type: 'text',
-        text: systemPrompt,
-        cache_control: { type: 'ephemeral' },
-      },
-    ];
+    // PRI-1803: Bedrock supports 1h TTL only on an explicit model allowlist
+    // (Opus/Sonnet/Haiku 4.5). Anything else silently falls back to 5m if
+    // 1h is sent — wasteful since 1h writes cost 2× 5m writes. Gate per
+    // model so we always ship the longest TTL the model actually accepts.
+    const cacheOptions: CacheControlOptions = { ttl: bedrockCacheTtlFor(model) };
 
-    const anthropicTools: Anthropic.Tool[] = tools.map((tool, index) => {
-      const baseTool: Anthropic.Tool = {
-        name: tool.name,
-        description: tool.description,
-        input_schema: tool.inputSchema,
-      };
-      if (index === tools.length - 1) {
-        return {
-          ...baseTool,
-          cache_control: { type: 'ephemeral' as const },
-        };
-      }
-      return baseTool;
+    const messagesWithCaching = attachMessageCacheBreakpoints(anthropicMessages, cacheOptions);
+    const systemWithCaching = buildSystemWithCaching(systemPrompt, cacheOptions);
+
+    const baseTools: Anthropic.Tool[] = tools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      input_schema: tool.inputSchema,
+    }));
+    const anthropicTools = markLastToolForCaching(baseTools, cacheOptions);
+
+    const cappedMessages = enforceBreakpointBudget({
+      system: systemWithCaching,
+      tools: anthropicTools,
+      messages: messagesWithCaching,
     });
 
     const payload = {
       model,
       max_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 8192),
-      messages: anthropicMessages,
+      messages: cappedMessages,
       system: systemWithCaching,
       tools: anthropicTools,
     };

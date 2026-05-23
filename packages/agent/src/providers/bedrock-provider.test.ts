@@ -216,18 +216,54 @@ describe('BedrockProvider', () => {
       );
 
       const callArgs = mockCreate.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
+      // PRI-1803: Bedrock provider now also stamps the last message block
+      // with cache_control. MODEL (`claude-sonnet-4-5`) is on the 1h-TTL
+      // allowlist so the marker reads `ttl: '1h'`.
       expect(callArgs.messages).toEqual([
         { role: 'user', content: 'User message' },
-        { role: 'assistant', content: 'Assistant message' },
+        {
+          role: 'assistant',
+          content: [
+            {
+              type: 'text',
+              text: 'Assistant message',
+              cache_control: { type: 'ephemeral', ttl: '1h' },
+            },
+          ],
+        },
       ]);
       expect(Array.isArray(callArgs.system)).toBe(true);
       const systemBlocks = callArgs.system as Array<{
         type: string;
         text: string;
-        cache_control?: { type: string };
+        cache_control?: { type: string; ttl?: string };
       }>;
       expect(systemBlocks[0].text).toBe('System message');
-      expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral' });
+      expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
+    });
+
+    it('uses 5m TTL for Bedrock models not on the 1h-TTL allowlist (PRI-1803)', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ok' }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+        stop_reason: 'end_turn',
+      });
+
+      // claude-3-7-sonnet does NOT support 1h on Bedrock
+      const SHORT_TTL_MODEL = 'anthropic.claude-3-7-sonnet-20250219-v1:0';
+      await provider.createResponse([{ role: 'user', content: 'hi' }], [], SHORT_TTL_MODEL);
+
+      const callArgs = mockCreate.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
+      const systemBlocks = callArgs.system as Array<{ cache_control?: { ttl?: string } }>;
+      expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral', ttl: '5m' });
+
+      // Last message tail should also be 5m
+      const lastMsg = callArgs.messages[callArgs.messages.length - 1];
+      const lastBlocks = lastMsg.content as Array<{ cache_control?: { ttl?: string } }>;
+      expect(lastBlocks[lastBlocks.length - 1].cache_control).toEqual({
+        type: 'ephemeral',
+        ttl: '5m',
+      });
     });
 
     it('uses Bedrock-style model IDs verbatim', async () => {

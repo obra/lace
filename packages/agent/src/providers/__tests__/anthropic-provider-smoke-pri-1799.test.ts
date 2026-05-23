@@ -173,6 +173,10 @@ describe('PRI-1799 smoke: real outgoing request body has three 1h cache_control 
     expect(lastBlock.text).toBe('Now summarise it.');
 
     // ── Count: exactly three cache_control markers in the whole body ────
+    // (PRI-1806 #3) This conversation has 7 cacheable blocks — fewer than
+    // ANCHOR_OFFSET_RAW_BLOCKS (10), so no stable anchor is attached and
+    // the total is system + last-tool + tail = 3. See the PRI-1802 smoke
+    // for the long-conversation 4-marker case.
     const allMarkers = JSON.stringify(body).match(/"cache_control"/g) ?? [];
     expect(allMarkers).toHaveLength(3);
     const oneHourMarkers = JSON.stringify(body).match(/"ttl":"1h"/g) ?? [];
