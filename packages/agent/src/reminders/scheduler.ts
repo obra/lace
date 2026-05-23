@@ -2,10 +2,48 @@
 // ABOUTME: Owns the in-memory min-heap and the wake timer. Fire path (§3.3 of spec)
 // ABOUTME: is one atomic write per fire; cancel and schedule serialize via the mutex.
 
+import { CronExpressionParser } from 'cron-parser';
 import { AsyncMutex } from './async-mutex';
 import { ReminderStore } from './store';
 import { computeNextCronFire, getAgentTimezone } from './cron';
 import type { ReminderRow } from './types';
+import { logger } from '@lace/agent/utils/logger';
+
+/**
+ * Count the number of cron matches in the half-open window (startMs, endMs].
+ * The lower bound is exclusive because cron-parser's next() returns strictly
+ * > currentDate, so a match at exactly startMs is not counted — that is the
+ * persisted fire instant that was simply rescheduled, not a fire dropped
+ * during downtime. The upper bound is inclusive because a match at exactly
+ * endMs is counted (if (next > endMs) breaks only on strictly-greater values).
+ * Capped at 1000 to prevent infinite loops on pathological expressions.
+ */
+function countCronMatchesInWindow(
+  expr: string,
+  tz: string,
+  startMs: number,
+  endMs: number
+): number {
+  if (startMs >= endMs) return 0;
+  // Use startMs as the exclusive lower bound: next() returns strictly > currentDate,
+  // so we count fires that occurred after the persisted next_fire_at, not the fire itself.
+  const interval = CronExpressionParser.parse(expr, {
+    tz,
+    currentDate: new Date(startMs),
+  });
+  let count = 0;
+  while (count < 1000) {
+    let next: number;
+    try {
+      next = interval.next().toDate().getTime();
+    } catch {
+      break;
+    }
+    if (next > endMs) break;
+    count++;
+  }
+  return count;
+}
 
 export interface FireContext {
   row: ReminderRow;
@@ -86,7 +124,64 @@ export class ReminderScheduler {
   // ============================================================
 
   private async bootRecover(): Promise<void> {
+    // Refuse to start if TZ is unset (throws with /timezone is unset/ message).
+    const tz = getAgentTimezone();
+
     const rows = this.store.list();
+    const now = this.now();
+    let mutated = false;
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.recurs && row.recurs.kind === 'cron') {
+        // Recompute next_fire_at against the current TZ.
+        const newNext = computeNextCronFire(row.recurs.expr, tz, new Date(now));
+        if (newNext !== row.next_fire_at) {
+          // If the persisted time is meaningfully in the past, count fires dropped during downtime.
+          if (row.next_fire_at < now - 60_000) {
+            const dropped = countCronMatchesInWindow(
+              row.recurs.expr,
+              tz,
+              row.next_fire_at,
+              now
+            );
+            logger.warn('reminders.dropped_fires', {
+              row_id: row.id,
+              prompt: row.prompt,
+              dropped_count: dropped,
+            });
+          }
+          rows[i] = { ...row, next_fire_at: newNext };
+          mutated = true;
+        }
+      } else if (row.recurs && row.recurs.kind === 'count') {
+        // Shift schedule forward if the stored next_fire_at is stale (more than 1 min past).
+        if (row.next_fire_at + 60_000 < now) {
+          const newNext = now + row.recurs.interval_ms;
+          logger.warn('reminders.schedule_shifted', {
+            row_id: row.id,
+            prompt: row.prompt,
+            old_next_fire_at: row.next_fire_at,
+            new_next_fire_at: newNext,
+          });
+          rows[i] = { ...row, next_fire_at: newNext };
+          mutated = true;
+        }
+      }
+    }
+
+    // Write all recovery changes in a single atomic call.
+    if (mutated) {
+      try {
+        this.store.save(rows);
+      } catch (err) {
+        // Spec §3.4 step 5: log and continue with in-memory state.
+        logger.warn('reminders.recovery_persist_failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     this.heap = rows
       .map((r) => ({ id: r.id, nextFireAt: r.next_fire_at }))
       .sort((a, b) => a.nextFireAt - b.nextFireAt);

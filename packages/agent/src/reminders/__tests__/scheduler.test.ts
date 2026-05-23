@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { ReminderScheduler } from '../scheduler';
 import { ReminderStore } from '../store';
 import type { ReminderRow } from '../types';
+import { logger } from '@lace/agent/utils/logger';
 
 function tempSessionDir(): string {
   return mkdtempSync(join(tmpdir(), 'lace-rsched-'));
@@ -200,5 +201,215 @@ describe('ReminderScheduler fire path', () => {
     const rows = new ReminderStore(dir).list();
     expect(rows[0].fire_count).toBe(0);
     expect(rows[0].next_fire_at).toBe(1000);
+  });
+});
+
+describe('ReminderScheduler boot recovery', () => {
+  const origTZ = process.env.TZ;
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
+  afterEach(() => {
+    process.env.TZ = origTZ;
+  });
+
+  it('refuses to start when TZ is unset', async () => {
+    delete process.env.TZ;
+    // Force Intl to also return empty to simulate stripped container; mock via stub.
+    const origResolvedOptions = Intl.DateTimeFormat.prototype.resolvedOptions;
+    Intl.DateTimeFormat.prototype.resolvedOptions = function () {
+      return { ...origResolvedOptions.call(this), timeZone: '' } as Intl.ResolvedDateTimeFormatOptions;
+    };
+    try {
+      const sched = new ReminderScheduler({
+        sessionDir: tempSessionDir(),
+        now: () => 0,
+        notifier: async () => {},
+      });
+      await expect(sched.start()).rejects.toThrow(/timezone is unset/i);
+    } finally {
+      Intl.DateTimeFormat.prototype.resolvedOptions = origResolvedOptions;
+    }
+  });
+
+  it('recomputes cron next_fire_at against current TZ on boot', async () => {
+    process.env.TZ = 'UTC';
+    const dir = tempSessionDir();
+    // Persisted next_fire_at is stale (cron should fire at 9am UTC today, but persisted is yesterday).
+    const yesterday = new Date('2026-05-21T09:00:00Z').getTime();
+    new ReminderStore(dir).save([
+      {
+        id: 'reminder_aaaaaaaaaaaa',
+        created_at: yesterday,
+        next_fire_at: yesterday,
+        prompt: 'daily',
+        recurs: { kind: 'cron', expr: '0 9 * * *' },
+        fired_at: null,
+        fire_count: 0,
+      },
+    ]);
+
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => new Date('2026-05-22T10:00:00Z').getTime(),
+      notifier: async () => {},
+    });
+    await sched.start();
+    await sched.stop();
+
+    const rows = new ReminderStore(dir).list();
+    expect(rows[0].next_fire_at).toBe(new Date('2026-05-23T09:00:00Z').getTime());
+  });
+
+  it('logs dropped_fires for cron when downtime skipped matches', async () => {
+    process.env.TZ = 'UTC';
+    const dir = tempSessionDir();
+    // Persisted = 3 days ago; current = today. Cron is daily.
+    const threeDaysAgo = new Date('2026-05-19T09:00:00Z').getTime();
+    new ReminderStore(dir).save([
+      {
+        id: 'reminder_bbbbbbbbbbbb',
+        created_at: threeDaysAgo,
+        next_fire_at: threeDaysAgo,
+        prompt: 'daily',
+        recurs: { kind: 'cron', expr: '0 9 * * *' },
+        fired_at: null,
+        fire_count: 0,
+      },
+    ]);
+    const warnSpy = vi.spyOn(logger, 'warn');
+
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => new Date('2026-05-22T10:00:00Z').getTime(),
+      notifier: async () => {},
+    });
+    await sched.start();
+    await sched.stop();
+
+    const calls = warnSpy.mock.calls.filter((c) => c[0] === 'reminders.dropped_fires');
+    expect(calls).toHaveLength(1);
+    expect(calls[0][1]).toMatchObject({ row_id: 'reminder_bbbbbbbbbbbb', dropped_count: 3 });
+  });
+
+  it('logs schedule_shifted for count-interval with stale next_fire_at', async () => {
+    process.env.TZ = 'UTC';
+    const dir = tempSessionDir();
+    const stale = new Date('2026-05-22T08:00:00Z').getTime();
+    new ReminderStore(dir).save([
+      {
+        id: 'reminder_cccccccccccc',
+        created_at: stale,
+        next_fire_at: stale,
+        prompt: 'ping',
+        recurs: { kind: 'count', interval_ms: 30 * 60_000, remaining: 5 },
+        fired_at: null,
+        fire_count: 0,
+      },
+    ]);
+    const warnSpy = vi.spyOn(logger, 'warn');
+
+    const now = new Date('2026-05-22T10:00:00Z').getTime();
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => now,
+      notifier: async () => {},
+    });
+    await sched.start();
+    await sched.stop();
+
+    const rows = new ReminderStore(dir).list();
+    expect(rows[0].next_fire_at).toBe(now + 30 * 60_000);
+    // remaining is preserved.
+    expect((rows[0].recurs as { kind: 'count'; remaining: number }).remaining).toBe(5);
+
+    const calls = warnSpy.mock.calls.filter((c) => c[0] === 'reminders.schedule_shifted');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('on boot-recovery persist failure: continues with in-memory state and logs', async () => {
+    process.env.TZ = 'UTC';
+    const dir = tempSessionDir();
+    const yesterday = new Date('2026-05-21T09:00:00Z').getTime();
+    new ReminderStore(dir).save([
+      {
+        id: 'reminder_ffffffffffff',
+        created_at: yesterday,
+        next_fire_at: yesterday,
+        prompt: 'daily',
+        recurs: { kind: 'cron', expr: '0 9 * * *' },
+        fired_at: null,
+        fire_count: 0,
+      },
+    ]);
+    const warnSpy = vi.spyOn(logger, 'warn');
+
+    const now = new Date('2026-05-22T10:00:00Z').getTime();
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => now,
+      notifier: async () => {},
+    });
+    // Force the recovery save to throw.
+    const origSave = sched.store.save.bind(sched.store);
+    let calls = 0;
+    sched.store.save = ((rows: ReminderRow[]) => {
+      calls++;
+      if (calls === 1) throw new Error('disk full');
+      return origSave(rows);
+    }) as typeof origSave;
+
+    await sched.start();
+    await sched.stop();
+
+    // On-disk row was unchanged (write failed).
+    expect(new ReminderStore(dir).list()[0].next_fire_at).toBe(yesterday);
+    // recovery_persist_failed was logged.
+    const calls2 = warnSpy.mock.calls.filter((c) => c[0] === 'reminders.recovery_persist_failed');
+    expect(calls2).toHaveLength(1);
+  });
+
+  it('persists all recovery changes in a single write', async () => {
+    process.env.TZ = 'UTC';
+    const dir = tempSessionDir();
+    const threeDaysAgo = new Date('2026-05-19T09:00:00Z').getTime();
+    new ReminderStore(dir).save([
+      {
+        id: 'reminder_dddddddddddd',
+        created_at: threeDaysAgo,
+        next_fire_at: threeDaysAgo,
+        prompt: 'a',
+        recurs: { kind: 'cron', expr: '0 9 * * *' },
+        fired_at: null,
+        fire_count: 0,
+      },
+      {
+        id: 'reminder_eeeeeeeeeeee',
+        created_at: threeDaysAgo,
+        next_fire_at: threeDaysAgo,
+        prompt: 'b',
+        recurs: { kind: 'count', interval_ms: 30 * 60_000, remaining: 4 },
+        fired_at: null,
+        fire_count: 0,
+      },
+    ]);
+
+    // Count writes by spying on the store's save method.
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => new Date('2026-05-22T10:00:00Z').getTime(),
+      notifier: async () => {},
+    });
+    let saveCount = 0;
+    const origSave = sched.store.save.bind(sched.store);
+    sched.store.save = (rows) => {
+      saveCount++;
+      return origSave(rows);
+    };
+
+    await sched.start();
+    await sched.stop();
+
+    expect(saveCount).toBe(1);
   });
 });
