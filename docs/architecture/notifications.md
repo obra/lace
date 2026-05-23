@@ -7,7 +7,7 @@ built this way and *how* the pieces fit together. Design context lives in
 
 ## 1. Overview
 
-Lace delivers every agent-facing notification — alarm fires, alarm expirations,
+Lace delivers every agent-facing notification — reminder fires,
 background-job lifecycle events, and graceful-subagent-exit warnings — by
 writing a single durable event:
 
@@ -64,7 +64,7 @@ across processes without a lock, and we'd rather not introduce one.
 ```
 +---------------------+       +-----------------------+       +-----------------+
 | producer subsystem  | --1-> | composer (pure)       | --2-> | injectNotif.    |
-| (alarm scheduler /  |       | composeAlarmFiredBody |       | buildNotification|
+| (reminder scheduler /|       | composeReminderBody   |       | buildNotification|
 |  job manager /      |       | composeJob*           |       | appendDurable   |
 |  subagent-exit relay)|      | composeSubagentExited |       | (events.jsonl)  |
 +---------------------+       +-----------------------+       +-----------------+
@@ -89,8 +89,8 @@ across processes without a lock, and we'd rather not introduce one.
                                                               +-----------------+
 ```
 
-1. A subsystem decides to notify (alarm fires; job transitions; subagent
-   exits with pending alarms).
+1. A subsystem decides to notify (reminder fires; job transitions; subagent
+   exits with pending reminders).
 2. It composes a body via a pure composer (no side effects, no I/O).
 3. It calls `injectNotification(...)`, which calls `buildNotification` to
    wrap the body and `appendDurableEvent` to write the event under
@@ -109,8 +109,8 @@ across processes without a lock, and we'd rather not introduce one.
 `buildNotification(opts)` is the single source of truth for the wrapper.
 It owns:
 
-- the `NotificationKind` union (lines 4–11) — seven kinds today:
-  `alarm-fired`, `alarm-expired`, `job-completed`, `job-failed`,
+- the `NotificationKind` union (lines 5–11) — six kinds today:
+  `reminder`, `job-completed`, `job-failed`,
   `job-cancelled`, `job-progress`, `subagent-exited`.
 - XML attribute escaping for `&`, `<`, `>`, `"` (lines 19–25).
 - The empty-string identifier drop rule (line 31: `if (v === '') continue`).
@@ -122,20 +122,18 @@ Pure function. No I/O. No state.
 `packages/agent/src/notifications/composers.ts` — one composer per `kind`,
 each a pure function from typed input to prose body. Examples:
 
-- `composeAlarmFiredBody` (line 35) — four sub-kinds (`once-absolute`,
-  `once-relative`, `cron`, `interval`).
-- `composeAlarmExpiredBody` (line 71) — `cron` or `interval` reaching
-  `endTime`.
-- `composeJobCompletedBody` / `composeJobFailedBody` (lines 92, 103) — share
+- `composeReminderBody` (line 94) — emits the prompt the agent wrote at
+  schedule time.
+- `composeJobCompletedBody` / `composeJobFailedBody` (lines 30, 41) — share
   the same input shape; differ only in verb tense.
-- `composeJobCancelledBody` (line 121) — optional `reason` string.
-- `composeJobProgressBody` (line 135) — emits a "recent output:" tail when
+- `composeJobCancelledBody` (line 59) — optional `reason` string.
+- `composeJobProgressBody` (line 73) — emits a "recent output:" tail when
   `lastLines` is non-empty.
-- `composeSubagentExitedBody` (line 162) — singular vs. multiple pending
-  alarm formatting.
+- `composeSubagentExitedBody` (line 123) — singular vs. multiple pending
+  reminder formatting.
 
 Helpers (`formatDuration`, `formatBytes`, `truncate`,
-`trailingLineHint`, `formatPendingAlarm`) are all local pure functions.
+`trailingLineHint`, `formatPendingReminder`) are all local pure functions.
 Time formatting always goes through `formatAbsoluteTime`.
 
 ### `inject-notification.ts` — the single writer
@@ -243,7 +241,7 @@ hasActiveTurn: () => boolean;
 triggerInternalTurn: () => void;
 ```
 
-All three callers (alarm scheduler at `server.ts:270-281`, job notification
+All three callers (reminder scheduler at `server.ts:195-217`, job notification
 at `job-notifications.ts:124-136`, subagent-exit relay does not need a wake
 because it writes from inside `runExclusive` and relies on the post-turn
 rescan) implement these the same way:
@@ -295,11 +293,11 @@ A Promise-chain mutex. Writers in this process:
 - The runner's main loop (`runner.ts:181`, via `writeAndAdvance`).
 - The `ent/session/inject` handler, via `injectIntoActiveSession`
   (`session-operations.ts:198-245`).
-- The alarm scheduler's `notifier` and `expiredNotifier` callbacks
-  (`server.ts:288-313`) — both wrap their `injectNotification` calls in
-  `runExclusive` because the scheduler fires outside the runner's lock.
+- The reminder scheduler's `notifier` callback (`server.ts:195-217`) —
+  wraps its `injectNotification` call in `runExclusive` because the
+  scheduler fires outside the runner's lock.
 - The subagent-job's `session/update` relay branches: `job_started`,
-  `job_finished`, `pending_alarms_on_exit` (`subagent-job.ts:645-676`).
+  `job_finished`, `pending_reminders_on_exit` (`subagent-job.ts:635-676`).
 - `createFinalizeJob` (`job-notifications.ts:218-232`) when writing the
   `job_finished` event.
 
@@ -334,13 +332,13 @@ guarantee.
 Subagent exit flows through the existing parent ↔ child JSON-RPC peer:
 
 1. The subagent's graceful-shutdown handler calls
-   `emitSubagentExitedIfNeeded` (`server.ts:356-390`). If there are pending
-   alarms, it sends a one-way `session/update` notify with discriminant
-   `'pending_alarms_on_exit'` carrying structured alarm rows (no XML, no
+   `emitSubagentExitedIfNeeded` (`server.ts:258-290`). If there are pending
+   reminders, it sends a one-way `session/update` notify with discriminant
+   `'pending_reminders_on_exit'` carrying structured reminder rows (no XML, no
    prose).
 2. The parent's per-subagent peer registration in `subagent-job.ts`
    already has a `session/update` handler. The
-   `'pending_alarms_on_exit'` branch (lines 600–678) validates the payload,
+   `'pending_reminders_on_exit'` branch (lines 635–676) validates the payload,
    builds the `<notification kind="subagent-exited">` wrapper in the
    *parent's* process using the parent's composers, and appends it under
    the parent's `runExclusive`.
@@ -374,8 +372,8 @@ parent's own runner and any other concurrent writers.
 
 | Failure | Outcome | Notes |
 | --- | --- | --- |
-| Subagent SIGKILL / OOM / hard crash | `subagent-exited` notification is lost. Job-level `job-failed` notification still fires via the lifecycle path. | The shutdown hook never runs, so no `pending_alarms_on_exit` notify is sent. Documented loss; not worth the complexity to recover. |
-| Notifier callback throws | Alarm scheduler catches and still completes the state transition. | Bug 2 fix. Avoids stranding rows in `'firing'` indefinitely. |
+| Subagent SIGKILL / OOM / hard crash | `subagent-exited` notification is lost. Job-level `job-failed` notification still fires via the lifecycle path. | The shutdown hook never runs, so no `pending_reminders_on_exit` notify is sent. Documented loss; not worth the complexity to recover. |
+| Notifier callback throws | Reminder scheduler catches and still completes the state transition. | Bug 2 fix. Avoids stranding rows in `'firing'` indefinitely. |
 | Composer throws | Propagates. | Composers are pure functions over typed inputs; failure means a producer constructed bad input. Caller paths run inside `runExclusive`; the mutex still releases via the `finally` in step §7. |
 | Runner aborts mid-turn | Immediate-inject event survives in `events.jsonl`. | Next `run()`'s `findLastTurnEndEventSeq` watermark picks it up. Abort does not change the last `turn_end` position. |
 | Parent's peer closed before subagent emits exit notify | Notify is fire-and-forget; payload is lost. | Subagent-job teardown (`subagent-job.ts:890-913`) waits up to 3s post-SIGTERM for the subagent to exit before closing the peer — the graceful-shutdown window. |
@@ -428,13 +426,8 @@ relevant decisions:
 
 ## 12. Open questions and known limitations
 
-- **Cron `endTime` expiry granularity**: expiry is checked at reschedule
-  time via "next fire would exceed `end_at`". The final fire-before-expiry
-  can therefore land slightly before `end_at`. We accepted this because
-  the alternative — a separate timer per cron — was complexity for no
-  user-visible benefit.
-- **Per-active-session scheduler**: `ensureAlarmSchedulerForActiveSession`
-  (`server.ts:256-322`) is idempotent and awaits `stop()` on the old
+- **Per-active-session scheduler**: `ensureReminderSchedulerForActiveSession`
+  (`server.ts:168-225`) is idempotent and awaits `stop()` on the old
   scheduler before starting a new one (Bug 4 fix). Switching sessions
   drains the old scheduler's in-flight `setTimeout` before the new one
   starts. The intra-process mutex naturally resets because each scheduler
