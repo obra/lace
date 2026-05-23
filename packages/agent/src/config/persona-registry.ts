@@ -37,7 +37,8 @@ const portMappingSchema = z
 // persona. 'host' (default) runs the agent on the embedder host and reaches
 // into the container via docker exec; 'container' runs lace itself inside the
 // container. containerSharing declares the sharing model: 'per_invocation'
-// creates a fresh container each session; 'persistent' adopts a long-lived one.
+// creates a fresh container per delegate invocation; 'persistent' adopts a
+// long-lived one shared across delegates.
 const agentPlacementSchema = z.enum(['host', 'container']).optional().default('host');
 const containerSharingSchema = z.enum(['per_invocation', 'persistent']);
 
