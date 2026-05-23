@@ -1,5 +1,6 @@
-// ABOUTME: Tests for buildProviderMessagesFromDurableEvents — read-time recovery
-// ABOUTME: Validates that orphaned tool_result blocks in context_compacted preserved arrays are dropped
+// ABOUTME: Tests for buildProviderMessagesFromDurableEvents — read-time recovery,
+// ABOUTME: system prompt recovery from system_prompt_set events, and
+// ABOUTME: context_injected → role:user conversion.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -65,7 +66,7 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_result recovery
 
     writeEvents(tempDir, [event]);
 
-    const messages = buildProviderMessagesFromDurableEvents(tempDir);
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
 
     // First message is the summary as a system message.
     // The orphan user msg should be dropped entirely (empty content + only orphaned toolResults).
@@ -125,7 +126,7 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_result recovery
 
     writeEvents(tempDir, [event]);
 
-    const messages = buildProviderMessagesFromDurableEvents(tempDir);
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
 
     const userTR = messages.find(
       (m) => m.role === 'user' && Array.isArray(m.toolResults) && m.toolResults.length > 0
@@ -164,7 +165,7 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_result recovery
 
     writeEvents(tempDir, [event]);
 
-    const messages = buildProviderMessagesFromDurableEvents(tempDir);
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
 
     // The all-orphan user message should be dropped entirely.
     const userMsgsWithToolResults = messages.filter(
@@ -218,7 +219,7 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_result recovery
 
     writeEvents(tempDir, [event]);
 
-    const messages = buildProviderMessagesFromDurableEvents(tempDir);
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
 
     // Validate no orphan tool_results survive.
     for (let i = 0; i < messages.length; i++) {
@@ -233,5 +234,100 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_result recovery
         }
       }
     }
+  });
+});
+
+describe('buildProviderMessagesFromDurableEvents — system_prompt_set and context_injected', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'lace-msg-builder-sps-'));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('returns the system prompt text from a system_prompt_set event', () => {
+    writeEvents(tempDir, [
+      {
+        eventSeq: 1,
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'You are Lace.' },
+      },
+      {
+        eventSeq: 2,
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+      },
+    ]);
+
+    const result = buildProviderMessagesFromDurableEvents(tempDir);
+    expect(result.systemPrompt).toBe('You are Lace.');
+    expect(result.messages).toEqual([{ role: 'user', content: 'hi' }]);
+  });
+
+  it('converts context_injected events to role:user messages (not role:system)', () => {
+    writeEvents(tempDir, [
+      {
+        eventSeq: 1,
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'sys' },
+      },
+      {
+        eventSeq: 2,
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+      },
+      {
+        eventSeq: 3,
+        type: 'context_injected',
+        data: { type: 'context_injected', content: [{ type: 'text', text: 'runtime nudge' }] },
+      },
+    ]);
+
+    const result = buildProviderMessagesFromDurableEvents(tempDir);
+    expect(result.systemPrompt).toBe('sys');
+    expect(result.messages).toEqual([
+      { role: 'user', content: 'hi' },
+      { role: 'user', content: 'runtime nudge' },
+    ]);
+  });
+
+  it('returns empty systemPrompt when no system_prompt_set event is present (legacy — Task 2F migrates)', () => {
+    writeEvents(tempDir, [
+      {
+        eventSeq: 1,
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+      },
+    ]);
+
+    const result = buildProviderMessagesFromDurableEvents(tempDir);
+    expect(result.systemPrompt).toBe('');
+    expect(result.messages).toEqual([{ role: 'user', content: 'hi' }]);
+  });
+
+  it('uses the LAST system_prompt_set event when multiple exist (defensive)', () => {
+    writeEvents(tempDir, [
+      {
+        eventSeq: 1,
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'first' },
+      },
+      {
+        eventSeq: 2,
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'second' },
+      },
+      {
+        eventSeq: 3,
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+      },
+    ]);
+
+    const result = buildProviderMessagesFromDurableEvents(tempDir);
+    expect(result.systemPrompt).toBe('second');
   });
 });

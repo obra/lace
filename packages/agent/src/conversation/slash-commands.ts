@@ -131,7 +131,7 @@ export async function handleSlashCommand(
         // Use the summarize strategy for compaction
         const sessionDir = state.activeSession.dir;
         const sessionId = state.activeSession.meta.sessionId;
-        const providerMessages = buildProviderMessagesFromDurableEvents(sessionDir);
+        const { messages: providerMessages } = buildProviderMessagesFromDurableEvents(sessionDir);
 
         if (providerMessages.length < 2) {
           return finishTurn('Context is already minimal. Nothing to compact.');

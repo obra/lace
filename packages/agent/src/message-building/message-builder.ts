@@ -14,6 +14,7 @@ type TextBlock = { type: 'text'; text: string };
 type ContentBlockShape = { type?: unknown; text?: unknown };
 type ContextInjectedData = { content?: unknown[] };
 type ContextCompactedData = { summary?: string; preserved?: unknown[] };
+type SystemPromptSetData = { text?: unknown };
 type MessageData = { content?: string | unknown[] };
 type ToolUseData = { toolCallId?: unknown; name?: unknown; input?: unknown; result?: ToolResult };
 type PreservedMessage = {
@@ -137,20 +138,37 @@ function dropOrphanedToolResults(messages: ProviderMessage[]): void {
 }
 
 /**
+ * Return type for buildProviderMessagesFromDurableEvents.
+ * systemPrompt is sourced exclusively from system_prompt_set events (last one wins).
+ * Sessions without a system_prompt_set event return systemPrompt: '' — legacy migration
+ * is handled in Task 2F.
+ */
+export type BuiltProviderMessages = {
+  messages: ProviderMessage[];
+  systemPrompt: string;
+};
+
+/**
  * Builds provider messages from durable events stored in a session directory.
  * Reconstructs the conversation history by reading and parsing events.jsonl.
  * Exported for testing - converts durable events to provider message format.
+ *
+ * Returns { messages, systemPrompt } where systemPrompt comes from the last
+ * system_prompt_set event in the log. context_injected events are emitted as
+ * role:user messages (they are runtime context, not part of the session-foundational
+ * system prompt).
  */
-export function buildProviderMessagesFromDurableEvents(sessionDir: string): ProviderMessage[] {
+export function buildProviderMessagesFromDurableEvents(sessionDir: string): BuiltProviderMessages {
   const eventsPath = join(sessionDir, 'events.jsonl');
   let raw = '';
   try {
     raw = readFileSync(eventsPath, 'utf8');
   } catch {
-    return [];
+    return { messages: [], systemPrompt: '' };
   }
 
   const messages: ProviderMessage[] = [];
+  let systemPrompt = '';
   const lines = raw.split('\n');
 
   for (const line of lines) {
@@ -159,6 +177,14 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Prov
       const parsed = JSON.parse(line) as { type?: string; data?: Record<string, unknown> };
       const type = typeof parsed.type === 'string' ? parsed.type : '';
       const data = typeof parsed.data === 'object' && parsed.data ? parsed.data : {};
+
+      if (type === 'system_prompt_set') {
+        const eventData = data as SystemPromptSetData;
+        if (typeof eventData.text === 'string') {
+          systemPrompt = eventData.text; // last-one-wins for defensive multi-event support
+        }
+        continue;
+      }
 
       if (type === 'prompt') {
         const content = extractContentBlocks((data as Record<string, unknown>).content);
@@ -169,10 +195,13 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Prov
       }
 
       if (type === 'context_injected') {
+        // context_injected carries runtime context (reminders, nudges) — NOT part of the
+        // session-foundational system prompt. Emit as role:user so it is visible to the
+        // model in the messages array while remaining distinct from the stable system prompt.
         const eventData = data as ContextInjectedData;
         const contentArr = Array.isArray(eventData.content) ? eventData.content : [];
         const content = extractTextFromContentBlocks(contentArr);
-        if (content.trim()) messages.push({ role: 'system', content });
+        if (content.trim()) messages.push({ role: 'user', content });
         continue;
       }
 
@@ -260,7 +289,7 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Prov
     }
   }
 
-  return messages;
+  return { messages, systemPrompt };
 }
 
 /**

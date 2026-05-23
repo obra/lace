@@ -38,11 +38,7 @@ import {
 import { toolKindFromName } from './rpc/utils';
 import { requestPermissionFromClient, reissuePendingPermissionRequests } from './rpc/permissions';
 import { registerAllHandlers } from './rpc/register-handlers';
-import {
-  injectNotification,
-  composeReminderBody,
-  formatAbsoluteTime,
-} from './notifications';
+import { injectNotification, composeReminderBody, formatAbsoluteTime } from './notifications';
 import { ReminderScheduler, ReminderStore, getAgentTimezone } from './reminders';
 import { logger } from './utils/logger';
 import type { RuntimeExecutionBinding } from './tools/runtime/types';
@@ -53,6 +49,7 @@ export {
   buildProviderMessagesFromDurableEvents,
   estimateProviderTokens,
 } from './message-building/message-builder';
+export type { BuiltProviderMessages } from './message-building/message-builder';
 
 export async function createToolExecutorForMode(
   executionMode: 'plan' | 'execute',

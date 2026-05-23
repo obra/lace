@@ -55,7 +55,7 @@ describe.skipIf(!existsSync(ADA_EVENTS))(
     it('rebuilds without producing any orphan tool_result blocks', () => {
       const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
 
-      const messages = buildProviderMessagesFromDurableEvents(tempDir);
+      const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
 
       expect(messages.length).toBeGreaterThan(0);
 

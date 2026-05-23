@@ -59,7 +59,9 @@ async function computeContextBreakdownForActiveSession(
   const _connectionId = effectiveConfig.connectionId;
   const modelId = effectiveConfig.modelId ?? 'unknown-model';
 
-  const providerMessages = buildProviderMessagesFromDurableEvents(state.activeSession!.dir);
+  const { messages: providerMessages } = buildProviderMessagesFromDurableEvents(
+    state.activeSession!.dir
+  );
 
   let systemPromptTokens = 0;
   let userTokens = 0;
@@ -458,7 +460,9 @@ export function registerSessionOperationHandlers(
         : 10;
 
     return await runExclusive(async () => {
-      const beforeMessages = buildProviderMessagesFromDurableEvents(state.activeSession!.dir);
+      const { messages: beforeMessages } = buildProviderMessagesFromDurableEvents(
+        state.activeSession!.dir
+      );
       const previousTokens = estimateProviderTokens(beforeMessages);
 
       const sessionStateForConfig = readSessionState(state.activeSession!.dir);

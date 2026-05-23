@@ -201,7 +201,7 @@ export class ConversationRunner {
       });
     };
 
-    let providerMessages = buildProviderMessagesFromDurableEvents(sessionDir);
+    let { messages: providerMessages } = buildProviderMessagesFromDurableEvents(sessionDir);
     // Watermark for mid-turn re-reads of durable events. Events with
     // eventSeq <= this value are already reflected in providerMessages (either
     // from the initial build above or appended on a previous iteration).

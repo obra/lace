@@ -304,8 +304,9 @@ describe('buildProviderMessagesFromDurableEvents', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('converts context_injected event to provider message with role system', () => {
-    // Create a mock events.jsonl with a context_injected event
+  it('converts context_injected event to provider message with role user (runtime context, not system prompt)', () => {
+    // context_injected carries runtime nudges — they are NOT part of the foundational
+    // system prompt, so they are emitted as role:user messages (Task 2C).
     const contextInjectedEvent = {
       type: 'context_injected',
       eventSeq: 1,
@@ -318,16 +319,16 @@ describe('buildProviderMessagesFromDurableEvents', () => {
 
     writeFileSync(join(tempDir, 'events.jsonl'), JSON.stringify(contextInjectedEvent) + '\n');
 
-    const messages = buildProviderMessagesFromDurableEvents(tempDir);
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
 
     expect(messages.length).toBe(1);
     expect(messages[0]).toEqual({
-      role: 'system',
+      role: 'user',
       content: 'You are Lace, a helpful AI assistant.',
     });
   });
 
-  it('converts context_injected with multi-block content to single system message', () => {
+  it('converts context_injected with multi-block content to single user message', () => {
     const contextInjectedEvent = {
       type: 'context_injected',
       eventSeq: 1,
@@ -343,15 +344,15 @@ describe('buildProviderMessagesFromDurableEvents', () => {
 
     writeFileSync(join(tempDir, 'events.jsonl'), JSON.stringify(contextInjectedEvent) + '\n');
 
-    const messages = buildProviderMessagesFromDurableEvents(tempDir);
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
 
     expect(messages.length).toBe(1);
-    expect(messages[0].role).toBe('system');
+    expect(messages[0].role).toBe('user');
     expect(messages[0].content).toContain('You are Lace.');
     expect(messages[0].content).toContain('You help with coding.');
   });
 
-  it('places system message before user message in correct order', () => {
+  it('places context_injected user message before prompt user message in correct order', () => {
     const events = [
       {
         type: 'context_injected',
@@ -379,11 +380,11 @@ describe('buildProviderMessagesFromDurableEvents', () => {
       events.map((e) => JSON.stringify(e)).join('\n') + '\n'
     );
 
-    const messages = buildProviderMessagesFromDurableEvents(tempDir);
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
 
     expect(messages.length).toBe(2);
     expect(messages[0]).toEqual({
-      role: 'system',
+      role: 'user',
       content: 'System prompt content',
     });
     expect(messages[1]).toEqual({
@@ -405,14 +406,15 @@ describe('buildProviderMessagesFromDurableEvents', () => {
 
     writeFileSync(join(tempDir, 'events.jsonl'), JSON.stringify(contextInjectedEvent) + '\n');
 
-    const messages = buildProviderMessagesFromDurableEvents(tempDir);
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
 
     expect(messages.length).toBe(0);
   });
 
-  it('returns empty array when events.jsonl does not exist', () => {
-    const messages = buildProviderMessagesFromDurableEvents(tempDir);
+  it('returns empty messages and empty systemPrompt when events.jsonl does not exist', () => {
+    const { messages, systemPrompt } = buildProviderMessagesFromDurableEvents(tempDir);
 
     expect(messages).toEqual([]);
+    expect(systemPrompt).toBe('');
   });
 });

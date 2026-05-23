@@ -30,3 +30,4 @@ export {
   buildProviderMessagesFromDurableEvents,
   estimateProviderTokens,
 } from './message-building/message-builder';
+export type { BuiltProviderMessages } from './message-building/message-builder';
