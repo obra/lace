@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { buildRuntimeId } from './identity';
-import { normalizeImagePlatform, validateResolvedImageDigest } from './image-identity';
 import type { RuntimeExecutionBinding } from './types';
 
 const RuntimeSecretReferenceSchema = z
@@ -30,9 +29,7 @@ const ContainerRuntimeDescriptorSchema = z
       .object({
         name: z.string().min(1),
         containerId: z.string().min(1).optional(),
-        requestedImage: z.string().min(1),
-        resolvedImageDigest: z.string().min(1).transform(validateResolvedImageDigest),
-        imagePlatform: z.string().min(1).transform(normalizeImagePlatform),
+        image: z.string().min(1),
         workingDirectory: z.string().min(1),
         mounts: z.array(
           z

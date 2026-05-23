@@ -1,7 +1,6 @@
 // ABOUTME: Delegate tool - spawns subagent jobs using JobManager
 // Uses JobManager from ToolContext for all job operations
 
-import { spawn } from 'node:child_process';
 import { z } from 'zod';
 import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
@@ -12,110 +11,9 @@ import {
   PersonaParseError,
 } from '@lace/agent/config/persona-registry';
 import type { PersonaContainerRuntime } from '@lace/agent/jobs/persona-container-spec';
-import {
-  buildPersonaProjectedRuntimeBinding,
-  type PersonaProjectedImageIdentity,
-} from '@lace/agent/jobs/persona-projected-binding';
+import { buildPersonaProjectedRuntimeBinding } from '@lace/agent/jobs/persona-projected-binding';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
-import { validateResolvedImageDigest } from '@lace/agent/tools/runtime/image-identity';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
-
-// Locally-built persona images (sen-box, sen-browser) have no registry digest,
-// so we resolve their immutable content id via `docker inspect` on the local
-// daemon. Registry network calls are intentionally avoided.
-export type ImageInspector = (image: string) => Promise<{
-  resolvedImageDigest: string;
-  imagePlatform: string;
-}>;
-
-function defaultImagePlatform(): string {
-  return process.arch === 'arm64' ? 'linux/arm64' : 'linux/amd64';
-}
-
-// Run `docker inspect` against the local daemon and pick out an immutable
-// sha256 reference for the requested image. Prefers a RepoDigest whose
-// repository matches the requested image; falls back to the image's content
-// id (`.Id`) when nothing has been pushed.
-export const dockerLocalImageInspector: ImageInspector = async (image) => {
-  const format = '{{.Id}}\n{{range .RepoDigests}}{{.}}\n{{end}}';
-  const { stdout, stderr, code, spawnError } = await new Promise<{
-    stdout: string;
-    stderr: string;
-    code: number | null;
-    spawnError?: Error;
-  }>((resolve) => {
-    const child = spawn('docker', ['inspect', '--format', format, image]);
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString('utf8')));
-    child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')));
-    child.on('error', (err) => resolve({ stdout, stderr, code: null, spawnError: err }));
-    child.on('close', (code) => resolve({ stdout, stderr, code }));
-  });
-
-  if (spawnError) {
-    throw new Error(
-      `Projected persona container image '${image}' could not be inspected: ${spawnError.message}`
-    );
-  }
-  if (code !== 0) {
-    throw new Error(
-      `Projected persona container image '${image}' is not present locally; pull it before delegate startup` +
-        (stderr.trim().length > 0 ? ` (docker: ${stderr.trim()})` : '')
-    );
-  }
-
-  const lines = stdout
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  if (lines.length === 0) {
-    throw new Error(
-      `Projected persona container image '${image}' is not present locally; pull it before delegate startup`
-    );
-  }
-
-  const contentId = lines[0]!;
-  const repoDigests = lines.slice(1);
-
-  const repoPrefix = image.split('@')[0]!.split(':')[0]!;
-  const matchingRepoDigest = repoDigests.find((entry) => entry.startsWith(`${repoPrefix}@`));
-  const digestSource = matchingRepoDigest
-    ? matchingRepoDigest.slice(matchingRepoDigest.indexOf('@') + 1)
-    : contentId;
-
-  return {
-    resolvedImageDigest: validateResolvedImageDigest(digestSource),
-    imagePlatform: defaultImagePlatform(),
-  };
-};
-
-// Projected persona containers must run against an immutable image reference
-// — the projected binding describes the EXACT image the host-side lace-agent
-// will reach into, so a floating tag would silently drift away from what the
-// embedder validated at startup. Digest-pinned references short-circuit;
-// tag-only references are resolved against the local docker daemon via the
-// injected inspector.
-async function buildPinnedImageIdentity(
-  image: string,
-  inspector: ImageInspector
-): Promise<PersonaProjectedImageIdentity> {
-  const digest = image.match(/@(?<digest>sha256:[a-f0-9]{64})$/)?.groups?.digest;
-  if (digest) {
-    return {
-      requestedImage: image,
-      resolvedImageDigest: digest,
-      imagePlatform: defaultImagePlatform(),
-    };
-  }
-
-  const resolved = await inspector(image);
-  return {
-    requestedImage: image,
-    resolvedImageDigest: resolved.resolvedImageDigest,
-    imagePlatform: resolved.imagePlatform,
-  };
-}
 
 const delegateSchema = z
   .object({
@@ -132,7 +30,6 @@ const delegateSchema = z
 
 export interface DelegateToolOptions {
   personaRegistry?: PersonaRegistry;
-  imageInspector?: ImageInspector;
 }
 
 export class DelegateTool extends Tool {
@@ -171,12 +68,10 @@ Parameters:
   };
 
   private readonly personaRegistry: PersonaRegistry;
-  private readonly imageInspector: ImageInspector;
 
   constructor(opts: DelegateToolOptions = {}) {
     super();
     this.personaRegistry = opts.personaRegistry ?? defaultPersonaRegistry;
-    this.imageInspector = opts.imageInspector ?? dockerLocalImageInspector;
   }
 
   protected async executeValidated(
@@ -226,12 +121,16 @@ Parameters:
             // when absent (e.g. unit-test fixtures), fall back to {} so
             // personas with `mounts: {}` still resolve and personas that
             // DO declare mounts fail with a clear "unknown mount" error.
+            //
+            // The persona-declared image string (tag or digest) flows through
+            // verbatim — no pre-resolution. The projected runtime captures
+            // the daemon's `.Image` field post-create for audit (see
+            // projected-container.ts).
             projectedRuntimeBinding = buildPersonaProjectedRuntimeBinding({
               parentSessionId: context.activeSessionId ?? 'delegate',
               personaName: persona,
               runtime,
               containerMounts: context.containerMounts ?? {},
-              imageIdentity: await buildPinnedImageIdentity(runtime.image, this.imageInspector),
             });
           } else {
             personaContainerRuntime = runtime;

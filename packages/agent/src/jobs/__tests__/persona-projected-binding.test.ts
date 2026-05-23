@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { buildPersonaProjectedRuntimeBinding } from '../persona-projected-binding';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 
-const digest = 'sha256:' + 'a'.repeat(64);
-
 describe('buildPersonaProjectedRuntimeBinding', () => {
   it('builds a projected binding for session lifecycle containers', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
@@ -20,11 +18,6 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         ports: [{ host: 6080, container: 6080 }],
       },
       containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
-      imageIdentity: {
-        requestedImage: 'node:24-bookworm',
-        resolvedImageDigest: digest,
-        imagePlatform: 'linux/arm64',
-      },
     });
 
     expect(binding.agentPlacement).toBe('host');
@@ -33,9 +26,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       cwd: '/work',
       spec: {
         name: 'sess1-shell',
-        requestedImage: 'node:24-bookworm',
-        resolvedImageDigest: digest,
-        imagePlatform: 'linux/arm64',
+        image: 'node:24-bookworm',
         workingDirectory: '/work',
         mounts: [{ hostPath: '/host/scratch', containerPath: '/work', readonly: false }],
         env: { FOO: 'bar' },
@@ -80,11 +71,6 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         env: { HOME: '/home/agent' },
       },
       containerMounts: { home: { hostPath: '/host/home', readonly: false } },
-      imageIdentity: {
-        requestedImage: 'sen-box:dev',
-        resolvedImageDigest: digest,
-        imagePlatform: 'linux/arm64',
-      },
     });
 
     expect(binding.toolRuntime).toMatchObject({
@@ -93,9 +79,56 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       spec: {
         name: 'box',
         containerId: 'sen-box',
+        image: 'sen-box:dev',
         restartPolicy: 'unless-stopped',
       },
     });
+  });
+
+  it('passes the persona-declared image reference through verbatim (tag, digest, anything)', () => {
+    const tagOnly = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      runtime: {
+        type: 'container',
+        agentPlacement: 'host',
+        containerLifecycle: 'session',
+        image: 'sen-box:dev',
+        workingDirectory: '/work',
+        mounts: {},
+      },
+      containerMounts: {},
+    });
+    expect(
+      (
+        tagOnly.toolRuntime as Extract<
+          RuntimeExecutionBinding['toolRuntime'],
+          { type: 'container' }
+        >
+      ).spec.image
+    ).toBe('sen-box:dev');
+
+    const digestPinned = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: 'sess1',
+      personaName: 'shell',
+      runtime: {
+        type: 'container',
+        agentPlacement: 'host',
+        containerLifecycle: 'session',
+        image: 'example/app@sha256:' + 'a'.repeat(64),
+        workingDirectory: '/work',
+        mounts: {},
+      },
+      containerMounts: {},
+    });
+    expect(
+      (
+        digestPinned.toolRuntime as Extract<
+          RuntimeExecutionBinding['toolRuntime'],
+          { type: 'container' }
+        >
+      ).spec.image
+    ).toBe('example/app@sha256:' + 'a'.repeat(64));
   });
 
   it('fails before binding construction when a mount is unknown', () => {
@@ -112,11 +145,6 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
           mounts: { missing: '/work' },
         },
         containerMounts: {},
-        imageIdentity: {
-          requestedImage: 'node:24-bookworm',
-          resolvedImageDigest: digest,
-          imagePlatform: 'linux/arm64',
-        },
       })
     ).toThrow(/unknown mount 'missing'/);
   });

@@ -71,9 +71,7 @@ function containerDescriptorWithHelper() {
     spec: {
       name: 'projected-runtime',
       containerId: 'container_123',
-      requestedImage: 'example/app@sha256:' + 'b'.repeat(64),
-      resolvedImageDigest: 'sha256:' + 'a'.repeat(64),
-      imagePlatform: 'linux/arm64',
+      image: 'example/app@sha256:' + 'b'.repeat(64),
       workingDirectory: '/workspace',
       mounts: [],
     },

@@ -33,9 +33,7 @@ function descriptor() {
     spec: {
       name: 'projected-runtime',
       containerId: 'container_123',
-      requestedImage: 'example/app@sha256:' + 'b'.repeat(64),
-      resolvedImageDigest: 'sha256:' + 'a'.repeat(64),
-      imagePlatform: 'linux/arm64',
+      image: 'example/app@sha256:' + 'b'.repeat(64),
       workingDirectory: '/workspace',
       mounts: [
         {
@@ -54,9 +52,7 @@ function descriptorWithMount(input: { hostPath: string; readonly?: boolean }) {
     spec: {
       name: 'projected-runtime',
       containerId: 'container_123',
-      requestedImage: 'example/app@sha256:' + 'b'.repeat(64),
-      resolvedImageDigest: 'sha256:' + 'a'.repeat(64),
-      imagePlatform: 'linux/arm64',
+      image: 'example/app@sha256:' + 'b'.repeat(64),
       workingDirectory: '/workspace',
       mounts: [
         {
@@ -126,7 +122,7 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(manager.materialize).toHaveBeenCalledWith({
       name: 'projected-runtime',
       containerId: 'container_123',
-      image: `example/app@${projectedDescriptor.spec.resolvedImageDigest}`,
+      image: projectedDescriptor.spec.image,
       workingDirectory: '/workspace',
       mounts: [{ source: '/host/repo', target: '/workspace', readonly: false }],
       env: { BASE: 'yes' },
@@ -192,7 +188,7 @@ describe('ProjectedContainerToolRuntime', () => {
       spec: {
         name: 'box',
         containerId: 'sen-box',
-        image: `example/app@${projectedDescriptor.spec.resolvedImageDigest}`,
+        image: projectedDescriptor.spec.image,
         workingDirectory: '/workspace',
         mounts: [
           { source: helperPath, target: '/usr/local/bin/lace-runtime-helper.js', readonly: true },
@@ -316,10 +312,10 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(manager.materialize).not.toHaveBeenCalled();
   });
 
-  it('materializes tag-requested descriptors with a digest-pinned image reference', async () => {
+  it('passes the persona-declared image reference through to docker create verbatim', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
-    projectedDescriptor.spec.requestedImage = 'registry.example.test:5000/team/app:dev';
+    projectedDescriptor.spec.image = 'sen-box:dev';
     const runtime = new ProjectedContainerToolRuntime({
       id: 'rt_container',
       containerManager: manager,
@@ -329,9 +325,7 @@ describe('ProjectedContainerToolRuntime', () => {
     await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
 
     expect(manager.materialize).toHaveBeenCalledWith(
-      expect.objectContaining({
-        image: `registry.example.test:5000/team/app@${projectedDescriptor.spec.resolvedImageDigest}`,
-      })
+      expect.objectContaining({ image: 'sen-box:dev' })
     );
   });
 

@@ -170,9 +170,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
         cwd: '/work',
         spec: {
           name: 'sess_parent-shell',
-          requestedImage: 'node:24-bookworm',
-          resolvedImageDigest: 'sha256:' + 'a'.repeat(64),
-          imagePlatform: 'linux/arm64',
+          image: 'node:24-bookworm',
           workingDirectory: '/work',
           mounts: [],
         },

@@ -202,7 +202,7 @@ describe('DelegateTool', () => {
     });
   });
 
-  it('resolves tag-only persona images via the injected image inspector', async () => {
+  it('passes tag-only persona images through verbatim (no pre-resolution)', async () => {
     const personaRegistry = {
       parsePersona: vi.fn().mockReturnValue({
         config: {
@@ -219,12 +219,7 @@ describe('DelegateTool', () => {
         body: 'tag-only persona',
       }),
     } as unknown as PersonaRegistry;
-    const inspectorDigest = 'sha256:' + 'b'.repeat(64);
-    const imageInspector = vi.fn().mockResolvedValue({
-      resolvedImageDigest: inspectorDigest,
-      imagePlatform: 'linux/arm64',
-    });
-    const tool = new DelegateTool({ personaRegistry, imageInspector });
+    const tool = new DelegateTool({ personaRegistry });
 
     const mockJob = {
       jobId: 'job_tag_only',
@@ -244,94 +239,13 @@ describe('DelegateTool', () => {
       { signal: new AbortController().signal, jobManager, runtimeBinding }
     );
 
-    expect(imageInspector).toHaveBeenCalledWith('sen-box:dev');
     const options = createJob.mock.calls[0]![1] as Record<string, unknown>;
     const binding = options.runtimeBinding as RuntimeExecutionBinding;
     const containerRuntime = binding.toolRuntime as Extract<
       RuntimeExecutionBinding['toolRuntime'],
       { type: 'container' }
     >;
-    expect(containerRuntime.spec.requestedImage).toBe('sen-box:dev');
-    expect(containerRuntime.spec.resolvedImageDigest).toBe(inspectorDigest);
-  });
-
-  it('does not invoke the image inspector when the persona image is digest-pinned', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            agentPlacement: 'host',
-            containerLifecycle: 'session',
-            image: 'example/subagent@sha256:' + 'c'.repeat(64),
-            workingDirectory: '/workspace',
-            mounts: {},
-            env: {},
-          },
-        },
-        body: 'pinned persona',
-      }),
-    } as unknown as PersonaRegistry;
-    const imageInspector = vi.fn();
-    const tool = new DelegateTool({ personaRegistry, imageInspector });
-
-    const mockJob = {
-      jobId: 'job_pinned',
-      type: 'delegate' as const,
-      status: 'running' as const,
-      completion: new Promise<void>(() => {}),
-    } as unknown as JobState;
-    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_pinned', job: mockJob });
-    const jobManager = {
-      createJob,
-      listJobs: vi.fn().mockReturnValue([]),
-    } as unknown as JobManager;
-
-    await tool.execute(
-      { prompt: 'do something', background: true, persona: 'pinned' },
-      { signal: new AbortController().signal, jobManager, runtimeBinding }
-    );
-
-    expect(imageInspector).not.toHaveBeenCalled();
-  });
-
-  it('surfaces image inspector failures as delegate failures', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            agentPlacement: 'host',
-            containerLifecycle: 'session',
-            image: 'sen-box:dev',
-            workingDirectory: '/workspace',
-            mounts: {},
-            env: {},
-          },
-        },
-        body: 'missing persona',
-      }),
-    } as unknown as PersonaRegistry;
-    const imageInspector = vi
-      .fn()
-      .mockRejectedValue(
-        new Error(
-          "Projected persona container image 'sen-box:dev' is not present locally; pull it before delegate startup"
-        )
-      );
-    const tool = new DelegateTool({ personaRegistry, imageInspector });
-
-    const jobManager = {
-      createJob: vi.fn(),
-      listJobs: vi.fn().mockReturnValue([]),
-    } as unknown as JobManager;
-
-    await expect(
-      tool.execute(
-        { prompt: 'do something', background: true, persona: 'missing' },
-        { signal: new AbortController().signal, jobManager, runtimeBinding }
-      )
-    ).rejects.toThrow(/not present locally/);
+    expect(containerRuntime.spec.image).toBe('sen-box:dev');
   });
 
   it('passes projected runtimeBinding for host-placed persistent-lifecycle container personas', async () => {

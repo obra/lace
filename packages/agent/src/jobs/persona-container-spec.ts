@@ -244,21 +244,18 @@ export function buildPersonaContainerSpec(input: {
   };
 }
 
+// Convert a daemon-shaped ContainerSpec into the projected runtime's spec
+// shape. The persona-declared image string flows through verbatim — the
+// projected runtime's identity for tracking comes from a post-create
+// `.Image` capture (see projected-container.ts), not from pre-resolution.
 export function containerSpecToRuntimeSpec(input: {
   spec: ContainerSpec;
-  imageIdentity: {
-    requestedImage: string;
-    resolvedImageDigest: string;
-    imagePlatform: string;
-  };
 }): Extract<RuntimeExecutionBinding['toolRuntime'], { type: 'container' }>['spec'] {
-  const { spec, imageIdentity } = input;
+  const { spec } = input;
   return {
     name: spec.name,
     ...(spec.containerId ? { containerId: spec.containerId } : {}),
-    requestedImage: imageIdentity.requestedImage,
-    resolvedImageDigest: imageIdentity.resolvedImageDigest,
-    imagePlatform: imageIdentity.imagePlatform,
+    image: spec.image,
     workingDirectory: spec.workingDirectory,
     mounts: spec.mounts.map((mount) => ({
       hostPath: mount.source,

@@ -77,9 +77,7 @@ function normalizeToolRuntimeForIdentity(toolRuntime: ToolRuntimeDescriptor): un
   return {
     type: toolRuntime.type,
     spec: {
-      requestedImage: toolRuntime.spec.requestedImage,
-      resolvedImageDigest: toolRuntime.spec.resolvedImageDigest,
-      imagePlatform: toolRuntime.spec.imagePlatform,
+      image: toolRuntime.spec.image,
       workingDirectory: toolRuntime.spec.workingDirectory,
       mounts: [...toolRuntime.spec.mounts].sort((left, right) =>
         left.containerPath < right.containerPath

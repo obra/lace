@@ -44,9 +44,13 @@ export type ToolRuntimeDescriptor =
       spec: {
         name: string;
         containerId?: string;
-        requestedImage: string;
-        resolvedImageDigest: string;
-        imagePlatform: string;
+        // Persona-declared image reference. Passed verbatim to docker create —
+        // may be a tag, a RepoDigest, or anything else docker accepts. The
+        // post-create `.Image` capture (see projected-container.ts) is the
+        // immutable identity used for audit/tracking. Pre-resolution was
+        // dropped because locally-built images (sen-box:dev, sen-browser:dev)
+        // have no registry digest to pin to.
+        image: string;
         workingDirectory: string;
         mounts: RuntimeMountDescriptor[];
         env?: Record<string, string>;

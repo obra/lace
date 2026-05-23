@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import {
   cp,
   lstat,
@@ -27,8 +28,8 @@ import type {
   ContainerSpec,
 } from '../../containers/spec';
 import type { ExecStreamHandle, ExecStreamOptions } from '../../containers/types';
+import { logger } from '@lace/agent/utils/logger';
 import { decodeHelperResponse, encodeHelperRequest, type HelperRequest } from './helper-protocol';
-import { imageReferenceForResolvedDigest } from './image-identity';
 import {
   RuntimeSecretResolutionError,
   type RuntimeSecretResolver,
@@ -79,6 +80,46 @@ export interface ProjectedContainerManager {
 
 function isNotFoundError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as NodeError).code === 'ENOENT';
+}
+
+// Best-effort post-create capture of the daemon's `.Image` field. The audit
+// trail for projected container runtimes lives here: persona images may be
+// floating tags (e.g. sen-box:dev), so the only way to know what actually got
+// used is to ask docker after create. Failures degrade to a warning log;
+// never throw — runtime startup must not depend on this.
+async function captureContainerImageId(input: {
+  containerId: string;
+  runtimeId: string;
+  requestedImage: string;
+}): Promise<void> {
+  try {
+    const child = spawn('docker', ['inspect', '--format', '{{.Image}}', input.containerId]);
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString('utf8')));
+    child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')));
+    const exitCode: number | null = await new Promise((resolve, reject) => {
+      child.on('error', reject);
+      child.on('close', resolve);
+    });
+    const capturedImageId = stdout.trim();
+    if (exitCode !== 0 || capturedImageId.length === 0) {
+      logger.warn(
+        `Projected container image-id capture failed for ${input.containerId}: ${stderr.trim()}`,
+        { runtimeId: input.runtimeId, requestedImage: input.requestedImage }
+      );
+      return;
+    }
+    logger.info(
+      `Projected container materialized: ${input.containerId} runs ${capturedImageId} (requested ${input.requestedImage})`,
+      { runtimeId: input.runtimeId, containerId: input.containerId, capturedImageId }
+    );
+  } catch (err) {
+    logger.warn(
+      `Projected container image-id capture errored for ${input.containerId}: ${(err as Error).message}`,
+      { runtimeId: input.runtimeId, requestedImage: input.requestedImage }
+    );
+  }
 }
 
 function containerPathIsInside(root: string, path: string): boolean {
@@ -186,10 +227,11 @@ async function containerSpecFromDescriptor(
   }
   const spec: ContainerSpec = {
     name: descriptor.spec.name,
-    image: imageReferenceForResolvedDigest(
-      descriptor.spec.requestedImage,
-      descriptor.spec.resolvedImageDigest
-    ),
+    // Pass the persona-declared image reference through verbatim. Pre-resolution
+    // to a digest was dropped because locally-built images (sen-box:dev,
+    // sen-browser:dev) have no registry digest. The post-create `.Image`
+    // capture below is the immutable runtime identity for audit purposes.
+    image: descriptor.spec.image,
     workingDirectory: descriptor.spec.workingDirectory,
     mounts,
     env: { ...(descriptor.spec.env ?? {}), ...resolvedSecrets },
@@ -632,11 +674,18 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
         this.descriptor,
         this.secretContext
       );
-      if (materialization.hooks) {
-        await this.containerManager.materialize(materialization.spec, materialization.hooks);
-      } else {
-        await this.containerManager.materialize(materialization.spec);
-      }
+      const handle = materialization.hooks
+        ? await this.containerManager.materialize(materialization.spec, materialization.hooks)
+        : await this.containerManager.materialize(materialization.spec);
+      // Audit-only: capture the daemon's `.Image` field for the running
+      // container so logs record what actually got pulled/used (the persona
+      // image ref may be a floating tag). Best-effort — failure logs a warning
+      // but doesn't abort runtime startup.
+      void captureContainerImageId({
+        containerId: handle.containerId,
+        runtimeId: this.secretContext.runtimeId,
+        requestedImage: this.descriptor.spec.image,
+      });
     })();
     this.materialized = materialized;
 

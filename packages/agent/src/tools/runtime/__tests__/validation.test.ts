@@ -107,9 +107,7 @@ describe('runtime binding validation', () => {
           cwd: '/workspace',
           spec: {
             name: 'proj',
-            requestedImage: 'example/app:dev',
-            resolvedImageDigest: 'latest',
-            imagePlatform: 'linux/arm64',
+            image: 'example/app:dev',
             workingDirectory: '/workspace',
             mounts: [],
           },
@@ -118,7 +116,7 @@ describe('runtime binding validation', () => {
     ).toThrow(/unsupported runtime binding version/i);
   });
 
-  it('rejects projected container binding without image platform', () => {
+  it('rejects projected container binding without an image reference', () => {
     expect(() =>
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
@@ -129,14 +127,31 @@ describe('runtime binding validation', () => {
           cwd: '/workspace',
           spec: {
             name: 'proj',
-            requestedImage: 'example/app:dev',
-            resolvedImageDigest:
-              'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
             workingDirectory: '/workspace',
             mounts: [],
           },
         },
       })
-    ).toThrow(/imagePlatform/i);
+    ).toThrow(/image/i);
+  });
+
+  it('accepts projected container binding with a tag-only image reference', () => {
+    expect(() =>
+      parseRuntimeExecutionBinding({
+        schemaVersion: 1,
+        identity: { runtimeId: 'rt_container_tag' },
+        agentPlacement: 'host',
+        toolRuntime: {
+          type: 'container',
+          cwd: '/workspace',
+          spec: {
+            name: 'proj',
+            image: 'sen-box:dev',
+            workingDirectory: '/workspace',
+            mounts: [],
+          },
+        },
+      })
+    ).not.toThrow();
   });
 });

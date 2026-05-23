@@ -90,6 +90,8 @@ Helper-backed projected operations are slower than lace-in-container direct `fs/
 
 Persistent container secret env is resolved at materialization time. If `OP_SERVICE_ACCOUNT_TOKEN` or another projected container env value rotates while `sen-box` is already running, the running container keeps old env until destroy/recreate. Document this in the Sen runbook as the operator behavior for now; do not add secret hot-reload in this branch.
 
+**Image references are persona-declared, not pre-resolved.** Persona `runtime.image` values (tags, RepoDigests, anything docker accepts) flow through to `docker create` verbatim. The projected runtime captures the daemon's `.Image` field post-create and logs it for audit. Pre-resolution to a digest was the original design but it broke locally-built images (`sen-box:dev`, `sen-browser:dev` have no RepoDigest) and the fallback to content `.Id` was a hack. Tag drift across delegates is accepted — dev images are expected to change underneath us, and the post-create captured ID is the truth for what actually ran. If two delegates spawned seconds apart end up on different image layers, the audit log records both; that is the correct behavior, not a bug.
+
 ---
 
 ## Chunk 0: Runtime Helper Prerequisite
@@ -710,8 +712,6 @@ Create `packages/agent/src/jobs/__tests__/persona-projected-binding.test.ts`:
 import { describe, expect, it } from 'vitest';
 import { buildPersonaProjectedRuntimeBinding } from '../persona-projected-binding';
 
-const digest = 'sha256:' + 'a'.repeat(64);
-
 describe('buildPersonaProjectedRuntimeBinding', () => {
   it('builds a projected binding for session lifecycle containers', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
@@ -728,22 +728,15 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         ports: [{ host: 6080, container: 6080 }],
       },
       containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
-      imageIdentity: {
-        requestedImage: 'node:24-bookworm',
-        resolvedImageDigest: digest,
-        imagePlatform: 'linux/arm64',
-      },
     });
 
     expect(binding.agentPlacement).toBe('host');
-  expect(binding.toolRuntime).toMatchObject({
+    expect(binding.toolRuntime).toMatchObject({
       type: 'container',
       cwd: '/work',
       spec: {
         name: 'sess1-shell',
-        requestedImage: 'node:24-bookworm',
-        resolvedImageDigest: digest,
-        imagePlatform: 'linux/arm64',
+        image: 'node:24-bookworm',
         workingDirectory: '/work',
         mounts: [{ hostPath: '/host/scratch', containerPath: '/work', readonly: false }],
         env: { FOO: 'bar' },
@@ -756,63 +749,10 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       },
     });
   });
-
-  it('builds a projected binding for persistent lifecycle containers', () => {
-    const binding = buildPersonaProjectedRuntimeBinding({
-      parentSessionId: 'sess1',
-      personaName: 'box-shell',
-      runtime: {
-        type: 'container',
-        agentPlacement: 'host',
-        containerLifecycle: 'persistent',
-        image: 'sen-box:dev',
-        workingDirectory: '/home/agent',
-        mounts: { home: '/home/agent' },
-        env: { HOME: '/home/agent' },
-      },
-      containerMounts: { home: { hostPath: '/host/home', readonly: false } },
-      imageIdentity: {
-        requestedImage: 'sen-box:dev',
-        resolvedImageDigest: digest,
-        imagePlatform: 'linux/arm64',
-      },
-    });
-
-    expect(binding.toolRuntime).toMatchObject({
-      type: 'container',
-      cwd: '/home/agent',
-      spec: {
-        name: 'box',
-        containerId: 'sen-box',
-        restartPolicy: 'unless-stopped',
-      },
-    });
-  });
-
-  it('fails before binding construction when a mount is unknown', () => {
-    expect(() =>
-      buildPersonaProjectedRuntimeBinding({
-        parentSessionId: 'sess1',
-        personaName: 'shell',
-        runtime: {
-          type: 'container',
-          agentPlacement: 'host',
-          containerLifecycle: 'session',
-          image: 'node:24-bookworm',
-          workingDirectory: '/work',
-          mounts: { missing: '/work' },
-        },
-        containerMounts: {},
-        imageIdentity: {
-          requestedImage: 'node:24-bookworm',
-          resolvedImageDigest: digest,
-          imagePlatform: 'linux/arm64',
-        },
-      })
-    ).toThrow(/unknown mount 'missing'/);
-  });
 });
 ```
+
+The persona's `runtime.image` (tag, digest, anything) flows through to `spec.image` verbatim. See "Known Tradeoffs" for why pre-resolution was dropped.
 
 - [ ] **Step 2: Run projected binding tests and verify failure**
 
@@ -831,24 +771,17 @@ In `packages/agent/src/jobs/persona-container-spec.ts`, export:
 ```typescript
 export function containerSpecToRuntimeSpec(input: {
   spec: ContainerSpec;
-  imageIdentity: {
-    requestedImage: string;
-    resolvedImageDigest: string;
-    imagePlatform: string;
-  };
 }): Extract<RuntimeExecutionBinding['toolRuntime'], { type: 'container' }>['spec'] {
-  const { spec, imageIdentity } = input;
+  const { spec } = input;
   return {
     name: spec.name,
     ...(spec.containerId ? { containerId: spec.containerId } : {}),
-    requestedImage: imageIdentity.requestedImage,
-    resolvedImageDigest: imageIdentity.resolvedImageDigest,
-    imagePlatform: imageIdentity.imagePlatform,
+    image: spec.image,
     workingDirectory: spec.workingDirectory,
     mounts: spec.mounts.map((mount) => ({
       hostPath: mount.source,
       containerPath: mount.target,
-      readonly: mount.readonly,
+      readonly: mount.readonly ?? false,
     })),
     ...(spec.env ? { env: spec.env } : {}),
     ...(spec.ports ? { ports: spec.ports } : {}),
@@ -874,12 +807,6 @@ import {
   type PersonaContainerRuntime,
 } from './persona-container-spec';
 
-export interface PersonaProjectedImageIdentity {
-  requestedImage: string;
-  resolvedImageDigest: string;
-  imagePlatform: string;
-}
-
 const HELPER_CONTAINER_PATH = '/usr/local/bin/lace-runtime-helper.js';
 
 function resolveRuntimeHelperDescriptor(): RuntimeHelperDescriptor {
@@ -899,7 +826,6 @@ export function buildPersonaProjectedRuntimeBinding(input: {
   personaName: string;
   runtime: PersonaContainerRuntime;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
-  imageIdentity: PersonaProjectedImageIdentity;
 }): RuntimeExecutionBinding {
   const spec = buildPersonaContainerSpec({
     parentSessionId: input.parentSessionId,
@@ -914,10 +840,7 @@ export function buildPersonaProjectedRuntimeBinding(input: {
     agentPlacement: 'host',
     toolRuntime: {
       type: 'container',
-      spec: containerSpecToRuntimeSpec({
-        spec,
-        imageIdentity: input.imageIdentity,
-      }),
+      spec: containerSpecToRuntimeSpec({ spec }),
       cwd: input.runtime.workingDirectory,
       helper: resolveRuntimeHelperDescriptor(),
     },
@@ -999,7 +922,7 @@ it('uses a stable mounted helper when adopting an existing persistent container'
     spec: {
       name: 'box',
       containerId: 'sen-box',
-      image: `example/app@${descriptor.spec.resolvedImageDigest}`,
+      image: descriptor.spec.image,
       workingDirectory: '/workspace',
       mounts: [
         { source: helperPath, target: '/usr/local/bin/lace-runtime-helper.js', readonly: true },
@@ -1207,25 +1130,7 @@ In `packages/agent/src/tools/implementations/delegate.ts`:
 - If runtime is `container` and `agentPlacement === 'container'`, pass `personaContainerRuntime`.
 - Never pass both `runtimeBinding` and `personaContainerRuntime`.
 
-Add a small helper that accepts digest-pinned images only. Do not add tag resolution in this branch:
-
-```typescript
-function buildPinnedImageIdentity(image: string): PersonaProjectedImageIdentity {
-  const digest = image.match(/@(?<digest>sha256:[a-f0-9]{64})$/)?.groups?.digest;
-  if (!digest) {
-    throw new Error(
-      `Projected persona container image '${image}' must be pinned by digest before delegate startup`
-    );
-  }
-  return {
-    requestedImage: image,
-    resolvedImageDigest: digest,
-    imagePlatform: process.arch === 'arm64' ? 'linux/arm64' : 'linux/amd64',
-  };
-}
-```
-
-The required behavior is fail-fast before job creation when immutable image identity is unavailable. Sen images must be digest-pinned before projected delegates are started.
+Do NOT pre-resolve the image to a digest. The persona's `runtime.image` flows through to `docker create` verbatim — see the "Known Tradeoffs" section. The projected runtime captures the daemon's `.Image` post-create for audit (in `projected-container.ts`); that captured ID is what gets logged as the runtime identity for tracking.
 
 - [ ] **Step 6: Run delegate tests and verify pass**
 
@@ -1351,9 +1256,7 @@ const runtimeBinding: RuntimeExecutionBinding = {
     cwd: '/work',
     spec: {
       name: 'sess_parent-shell',
-      requestedImage: 'node:24-bookworm',
-      resolvedImageDigest: 'sha256:' + 'a'.repeat(64),
-      imagePlatform: 'linux/arm64',
+      image: 'node:24-bookworm',
       workingDirectory: '/work',
       mounts: [],
     },

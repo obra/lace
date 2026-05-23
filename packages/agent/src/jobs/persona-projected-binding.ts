@@ -14,12 +14,6 @@ import {
   type PersonaContainerRuntime,
 } from './persona-container-spec';
 
-export interface PersonaProjectedImageIdentity {
-  requestedImage: string;
-  resolvedImageDigest: string;
-  imagePlatform: string;
-}
-
 const HELPER_CONTAINER_PATH = '/usr/local/bin/lace-runtime-helper.js';
 
 function resolveRuntimeHelperDescriptor(): RuntimeHelperDescriptor {
@@ -39,7 +33,6 @@ export function buildPersonaProjectedRuntimeBinding(input: {
   personaName: string;
   runtime: PersonaContainerRuntime;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
-  imageIdentity: PersonaProjectedImageIdentity;
 }): RuntimeExecutionBinding {
   const spec = buildPersonaContainerSpec({
     parentSessionId: input.parentSessionId,
@@ -54,10 +47,7 @@ export function buildPersonaProjectedRuntimeBinding(input: {
     agentPlacement: 'host',
     toolRuntime: {
       type: 'container',
-      spec: containerSpecToRuntimeSpec({
-        spec,
-        imageIdentity: input.imageIdentity,
-      }),
+      spec: containerSpecToRuntimeSpec({ spec }),
       cwd: input.runtime.workingDirectory,
       helper: resolveRuntimeHelperDescriptor(),
     },
