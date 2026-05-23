@@ -261,8 +261,8 @@ export function countCacheBreakpoints(payload: {
 
 /**
  * If a payload would exceed MAX_CACHE_BREAKPOINTS, drop message-level
- * breakpoints from the OLDEST first (anchor before tail) so the request
- * still goes through. Returns a possibly-modified messages array.
+ * breakpoints from the NEWEST first so the stable anchor (oldest) survives.
+ * Returns a possibly-modified messages array.
  */
 export function enforceBreakpointBudget(payload: {
   system?: Anthropic.TextBlockParam[] | string;
@@ -272,13 +272,21 @@ export function enforceBreakpointBudget(payload: {
   const total = countCacheBreakpoints(payload);
   if (total <= MAX_CACHE_BREAKPOINTS) return payload.messages;
 
-  // Strip cache_control off message blocks oldest first until we're under.
+  // PRI-1806 #1 (revised after adversarial review): strip NEWEST message
+  // markers first so the stable anchor (oldest) survives. The anchor is
+  // expensive to position (PRI-1805 raw-block math) and exists specifically
+  // to defeat Anthropic's 20-block lookback. The rolling tail is
+  // regenerated on every turn and cheap to lose.
   let toDrop = total - MAX_CACHE_BREAKPOINTS;
-  const messages = payload.messages.map((msg) => {
+
+  // Walk messages newest-to-oldest, dropping markers as we go.
+  const reversed = [...payload.messages].reverse();
+  const stripped = reversed.map((msg) => {
     if (toDrop === 0) return msg;
     if (!Array.isArray(msg.content)) return msg;
     let touched = false;
-    const blocks = msg.content.map((block) => {
+    // Within a message, also walk blocks newest-to-oldest (right-to-left).
+    const blocks = [...msg.content].reverse().map((block) => {
       if (toDrop === 0) return block;
       if ((block as { cache_control?: unknown }).cache_control) {
         toDrop--;
@@ -288,7 +296,7 @@ export function enforceBreakpointBudget(payload: {
       }
       return block;
     });
-    return touched ? { ...msg, content: blocks } : msg;
+    return touched ? { ...msg, content: blocks.reverse() } : msg;
   });
-  return messages;
+  return stripped.reverse();
 }

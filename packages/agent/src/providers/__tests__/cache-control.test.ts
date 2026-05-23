@@ -287,8 +287,11 @@ describe('budget enforcement (PRI-1806 #1)', () => {
     expect(countCacheBreakpoints(payload)).toBe(3);
   });
 
-  it('enforceBreakpointBudget strips oldest message-level markers first when over cap', () => {
-    // 5 markers in messages — over the cap of 4. Strip the oldest one.
+  it('enforceBreakpointBudget strips NEWEST message-level markers first when over cap (PRI-1802 anchor preservation)', () => {
+    // 5 markers in messages — over the cap of 4. Strip the NEWEST first
+    // so the stable anchor (oldest) survives. This is the breakpoint that
+    // PRI-1802 added specifically to defeat Anthropic's 20-block lookback
+    // window; evicting it first would defeat the whole point.
     const messages = [
       user({ ...text('first'), cache_control: MARKER_1H } as Anthropic.TextBlockParam),
       user({ ...text('second'), cache_control: MARKER_1H } as Anthropic.TextBlockParam),
@@ -305,15 +308,15 @@ describe('budget enforcement (PRI-1806 #1)', () => {
     );
     expect(remainingMarkers).toHaveLength(MAX_CACHE_BREAKPOINTS);
 
-    // First message lost its marker
-    expect(
-      Array.isArray(result[0].content) &&
-        (result[0].content[0] as { cache_control?: unknown }).cache_control
-    ).toBeFalsy();
-    // Last message kept it
+    // Last (newest) message lost its marker
     expect(
       Array.isArray(result[4].content) &&
         (result[4].content[0] as { cache_control?: unknown }).cache_control
+    ).toBeFalsy();
+    // First (oldest = anchor position) kept it
+    expect(
+      Array.isArray(result[0].content) &&
+        (result[0].content[0] as { cache_control?: unknown }).cache_control
     ).toEqual(MARKER_1H);
   });
 
