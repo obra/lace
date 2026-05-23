@@ -56,6 +56,11 @@ export type ContextInjectedEventData = {
   priority?: string;
 };
 
+export type SystemPromptSetEventData = {
+  type: 'system_prompt_set';
+  text: string;
+};
+
 export type JobStartedEventData = {
   type: 'job_started';
   jobId: string;
@@ -135,6 +140,7 @@ export type DurableEventData =
   | TurnEndEventData
   | ContextCompactedEventData
   | ContextInjectedEventData
+  | SystemPromptSetEventData
   | JobStartedEventData
   | JobFinishedEventData
   | JobUpdateEventData
