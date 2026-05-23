@@ -24,6 +24,7 @@ import { UseSkillTool } from './implementations/use-skill-tool';
 import { ScheduleAlarmTool } from './implementations/schedule_alarm';
 import { CancelAlarmTool } from './implementations/cancel_alarm';
 import { ListAlarmsTool } from './implementations/list_alarms';
+import { ManageRemindersTool } from './implementations/manage_reminders';
 import { MCPServerManager } from '../mcp/server-manager';
 import type { SkillRegistry } from '@lace/agent/skills';
 import type { MCPServerConnection } from '@lace/agent/config/mcp-types';
@@ -66,6 +67,7 @@ export const LACE_BUILTIN_TOOL_NAMES = [
   'schedule_alarm',
   'cancel_alarm',
   'list_alarms',
+  'manage_reminders',
   'use_skill',
 ] as const;
 
@@ -301,6 +303,7 @@ export class ToolExecutor {
       new ScheduleAlarmTool(),
       new CancelAlarmTool(),
       new ListAlarmsTool(),
+      new ManageRemindersTool(),
     ];
 
     // Add skill tool if registry is provided

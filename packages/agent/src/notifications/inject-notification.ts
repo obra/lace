@@ -22,6 +22,7 @@ export interface InjectNotificationOptions {
   sessionDir: string;
   kind: NotificationKind;
   identifiers?: Record<string, string>;
+  attributes?: Record<string, string | number | null | undefined>;
   body: string;
   /** Optional — omit for cross-process writes (e.g. subagent → parent). */
   idleWake?: IdleWakeHooks;
@@ -45,6 +46,7 @@ export function injectNotification(opts: InjectNotificationOptions): void {
   const text = buildNotification({
     kind: opts.kind,
     ...(opts.identifiers ? { identifiers: opts.identifiers } : {}),
+    ...(opts.attributes ? { attributes: opts.attributes } : {}),
     body: opts.body,
   });
   const state = readSessionStateBestEffort(opts.sessionDir);

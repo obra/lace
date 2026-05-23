@@ -44,11 +44,13 @@ import {
   injectNotification,
   composeAlarmFiredBody,
   composeAlarmExpiredBody,
+  composeReminderBody,
   formatAbsoluteTime,
   type AlarmFiredCompose,
   type AlarmExpiredCompose,
 } from './notifications';
 import type { AlarmRow } from './alarms/types';
+import { ReminderScheduler, getAgentTimezone } from './reminders';
 import { logger } from './utils/logger';
 import type { RuntimeExecutionBinding } from './tools/runtime/types';
 import { EnvironmentRuntimeSecretResolver } from './tools/runtime/secrets';
@@ -340,6 +342,85 @@ export async function shutdownAlarms(state: AgentServerState): Promise<void> {
 }
 
 /**
+ * Bind a fresh ReminderScheduler to the currently active session.
+ * Idempotent: if a scheduler already exists, it is stopped first.
+ * No-op when there is no active session (e.g., after session/close).
+ *
+ * The scheduler's notifier writes an immediate-priority context_injected
+ * event into the active session's events.jsonl and triggers an internal
+ * turn if the agent is idle, so the next turn picks up the reminder body.
+ */
+export async function ensureReminderSchedulerForActiveSession(
+  state: AgentServerState,
+  runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null },
+  runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>
+): Promise<void> {
+  if (!state.activeSession) return;
+  if (state.reminderScheduler) {
+    await state.reminderScheduler.stop();
+    state.reminderScheduler = undefined;
+  }
+  const sessionDir = state.activeSession.dir;
+  const idleWake = {
+    isActive: (d: string): boolean => d === state.activeSession?.dir,
+    hasActiveTurn: (): boolean => !!state.activeTurn,
+    triggerInternalTurn: (): void => {
+      if (!runPromptInternalRef.current) return;
+      setImmediate(() => {
+        if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
+          void runPromptInternalRef.current([]);
+        }
+      });
+    },
+  };
+
+  state.reminderScheduler = new ReminderScheduler({
+    sessionDir,
+    now: () => Date.now(),
+    notifier: async (ctx) => {
+      const tz = getAgentTimezone();
+      // Build attributes — undefined entries are omitted by buildNotification.
+      const attributes: Record<string, string | number | null | undefined> = {
+        'set-at': formatAbsoluteTime(ctx.row.created_at, tz),
+        'fired-at': formatAbsoluteTime(ctx.firedAt, tz),
+        'last-fired-at':
+          ctx.lastFiredAt !== null ? formatAbsoluteTime(ctx.lastFiredAt, tz) : undefined,
+        'next-fire-at':
+          ctx.nextFireAt !== null ? formatAbsoluteTime(ctx.nextFireAt, tz) : undefined,
+        'fire-count': ctx.row.recurs === null ? undefined : ctx.fireCount,
+      };
+      await runExclusive(() =>
+        injectNotification({
+          sessionDir,
+          kind: 'reminder',
+          identifiers: { id: ctx.row.id },
+          attributes,
+          body: composeReminderBody({ prompt: ctx.row.prompt }),
+          idleWake,
+        })
+      );
+    },
+    onError: (err) => {
+      logger.warn('reminders.scheduler.error', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    },
+  });
+  await state.reminderScheduler.start();
+}
+
+/**
+ * Stop the per-process ReminderScheduler if one is bound.
+ * Called from the process shutdown handler so the timer is torn down before exit.
+ */
+export async function shutdownReminders(state: AgentServerState): Promise<void> {
+  if (state.reminderScheduler) {
+    await state.reminderScheduler.stop();
+    state.reminderScheduler = undefined;
+  }
+}
+
+/**
  * On graceful subagent shutdown, tell the PARENT (via the existing JSON-RPC
  * peer connection) about any alarms that were still pending when this
  * subagent exited. We emit a one-way `session/update` notification with the
@@ -603,7 +684,10 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     wrapJobCreation(() => createSubagentJob(options, jobCreationDeps));
 
   const ensureAlarmScheduler = (): Promise<void> =>
-    ensureAlarmSchedulerForActiveSession(state, runPromptInternalRef, runExclusive);
+    Promise.all([
+      ensureAlarmSchedulerForActiveSession(state, runPromptInternalRef, runExclusive),
+      ensureReminderSchedulerForActiveSession(state, runPromptInternalRef, runExclusive),
+    ]).then(() => undefined);
 
   // Register all RPC handlers with dependencies
   registerAllHandlers(peer, state, {

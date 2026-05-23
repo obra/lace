@@ -3,6 +3,7 @@ import {
   createAgentServerState,
   registerAgentRpcMethods,
   shutdownAlarms,
+  shutdownReminders,
   emitSubagentExitedIfNeeded,
 } from './server';
 import { getLaceDir } from '@lace/agent/config/lace-dir';
@@ -83,7 +84,7 @@ const shutdown = async () => {
   if (shuttingDown) return;
   shuttingDown = true;
   try {
-    await shutdownAlarms(state);
+    await Promise.all([shutdownAlarms(state), shutdownReminders(state)]);
     await emitSubagentExitedIfNeeded(state);
   } catch {
     // Best-effort; never block process exit on alarm bookkeeping.
