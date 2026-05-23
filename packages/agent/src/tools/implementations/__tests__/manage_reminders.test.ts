@@ -234,3 +234,37 @@ describe('ManageRemindersTool execution', () => {
     await sched.stop();
   });
 });
+
+describe('ManageRemindersTool ISO absolute-time precision', () => {
+  const origTZ = process.env.TZ;
+  beforeEach(() => { process.env.TZ = 'UTC'; });
+  afterEach(() => { process.env.TZ = origTZ; });
+
+  it('preserves millisecond precision when given an ISO timestamp', async () => {
+    const dir = tempSessionDir();
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => Date.now(),
+      notifier: async () => {},
+    });
+    await sched.start();
+
+    // A specific instant with non-zero milliseconds.
+    const targetIso = '2030-06-01T09:00:00.500Z';
+    const targetMs = new Date(targetIso).getTime();
+
+    const tool = new ManageRemindersTool();
+    const result = await tool.execute(
+      { action: 'schedule', prompt: 'test', next: targetIso },
+      { signal: new AbortController().signal, reminderScheduler: sched } as ToolContext
+    );
+    expect(result.status).toBe('completed');
+
+    // Read the row back from disk and verify next_fire_at is EXACTLY targetMs.
+    const rows = new ReminderStore(dir).list();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].next_fire_at).toBe(targetMs);
+
+    await sched.stop();
+  });
+});

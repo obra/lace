@@ -274,13 +274,10 @@ export class ManageRemindersTool extends Tool {
 
     // schedule
     try {
-      const delaySeconds =
-        parsed.absoluteFireAt !== null
-          ? Math.max(0, Math.round((parsed.absoluteFireAt - Date.now()) / 1000))
-          : parsed.delaySeconds;
       const result = await reminderScheduler.schedule({
         prompt: parsed.prompt,
-        delaySeconds,
+        delaySeconds: parsed.delaySeconds,
+        absoluteFireAt: parsed.absoluteFireAt,
         recurs: parsed.recurs,
       });
       return ok(rowToWire(result.row));

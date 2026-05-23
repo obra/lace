@@ -68,8 +68,10 @@ export interface SchedulerDeps {
 
 export interface ScheduleInput {
   prompt: string;
-  /** seconds-from-now to first fire, or null for cron-driven. */
+  /** seconds-from-now to first fire, or null for cron-driven or absolute. */
   delaySeconds: number | null;
+  /** absolute epoch ms; takes precedence over delaySeconds when non-null. */
+  absoluteFireAt?: number | null;
   /** null for one-shot; cron string; or { kind:'count', interval_ms, remaining }. */
   recurs: ReminderRecurs;
 }
@@ -161,10 +163,13 @@ export class ReminderScheduler {
       if (input.recurs && input.recurs.kind === 'cron') {
         const tz = getAgentTimezone();
         nextFireAt = computeNextCronFire(input.recurs.expr, tz, new Date(now));
+      } else if (input.absoluteFireAt != null) {
+        // Exact absolute instant; preserve millisecond precision from the wire input.
+        nextFireAt = input.absoluteFireAt;
       } else if (input.delaySeconds !== null) {
         nextFireAt = now + input.delaySeconds * 1000;
       } else {
-        throw new Error('schedule requires `delaySeconds` or `recurs:cron`');
+        throw new Error('schedule requires `delaySeconds`, `absoluteFireAt`, or `recurs:cron`');
       }
       const newRow: ReminderRow = {
         id,
