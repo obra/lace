@@ -1043,4 +1043,191 @@ describe('DelegateTool', () => {
 
     expect(fakeScheduler.schedule).not.toHaveBeenCalled();
   });
+
+  // PRI-1796 Chunk E: reaper cancel wiring
+  describe('per_invocation reaper cancel wiring', () => {
+    function makePerInvocationPersonaRegistry(): PersonaRegistry {
+      return {
+        parsePersona: vi.fn().mockReturnValue({
+          config: {
+            runtime: {
+              type: 'container',
+              agentPlacement: 'host',
+              containerSharing: 'per_invocation',
+              image: 'example/subagent:latest',
+              workingDirectory: '/workspace',
+              mounts: {},
+              env: {},
+            },
+          },
+          body: 'per_invocation persona',
+        }),
+      } as unknown as PersonaRegistry;
+    }
+
+    function makeReaper() {
+      return {
+        scheduleReap: vi.fn(),
+        cancelReap: vi.fn(),
+        dispose: vi.fn(),
+        hasPendingReap: vi.fn().mockReturnValue(false),
+        ttlMs: 1800000,
+      };
+    }
+
+    it('calls cancelReap with the fresh childSessionId on a fresh per_invocation delegate', async () => {
+      const personaRegistry = makePerInvocationPersonaRegistry();
+      const tool = new DelegateTool({ personaRegistry });
+      const reaper = makeReaper();
+
+      const mockJob = {
+        jobId: 'job_fresh',
+        type: 'delegate' as const,
+        status: 'running' as const,
+        completion: new Promise<void>(() => {}),
+      } as unknown as JobState;
+
+      const createJob = vi.fn().mockResolvedValue({ jobId: 'job_fresh', job: mockJob });
+      const jobManager = {
+        createJob,
+        listJobs: vi.fn().mockReturnValue([]),
+      } as unknown as JobManager;
+
+      await tool.execute(
+        { prompt: 'fresh task', background: true, persona: 'per-inv-persona' },
+        {
+          signal: new AbortController().signal,
+          jobManager,
+          runtimeBinding,
+          activeSessionId: 'sess_parent',
+
+          perInvocationReaper: reaper as any,
+        }
+      );
+
+      // cancelReap must have been called with the minted childSessionId
+      expect(reaper.cancelReap).toHaveBeenCalledOnce();
+      const [calledSessionId] = reaper.cancelReap.mock.calls[0]!;
+      expect(typeof calledSessionId).toBe('string');
+      expect(calledSessionId).toMatch(/^sess_/);
+    });
+
+    it('calls cancelReap with the resumed childSessionId on a resume per_invocation delegate', async () => {
+      const personaRegistry = makePerInvocationPersonaRegistry();
+      const tool = new DelegateTool({ personaRegistry });
+      const reaper = makeReaper();
+
+      const existingSessionId = 'sess_existing_child';
+      const mockJob = {
+        jobId: 'job_resume',
+        type: 'delegate' as const,
+        status: 'running' as const,
+        completion: new Promise<void>(() => {}),
+      } as unknown as JobState;
+
+      const createJob = vi.fn().mockResolvedValue({ jobId: 'job_resume', job: mockJob });
+      const jobManager = {
+        createJob,
+        listJobs: vi
+          .fn()
+          .mockReturnValue([{ jobId: 'job_prev', subagentSessionId: existingSessionId }]),
+      } as unknown as JobManager;
+
+      await tool.execute(
+        { prompt: 'resume task', background: true, persona: 'per-inv-persona', resume: 'job_prev' },
+        {
+          signal: new AbortController().signal,
+          jobManager,
+          runtimeBinding,
+          activeSessionId: 'sess_parent',
+
+          perInvocationReaper: reaper as any,
+        }
+      );
+
+      // cancelReap must have been called with the PRIOR session id
+      expect(reaper.cancelReap).toHaveBeenCalledOnce();
+      expect(reaper.cancelReap).toHaveBeenCalledWith(existingSessionId);
+    });
+
+    it('does NOT call cancelReap when reaper is absent from context', async () => {
+      const personaRegistry = makePerInvocationPersonaRegistry();
+      const tool = new DelegateTool({ personaRegistry });
+
+      const mockJob = {
+        jobId: 'job_no_reaper',
+        type: 'delegate' as const,
+        status: 'running' as const,
+        completion: new Promise<void>(() => {}),
+      } as unknown as JobState;
+
+      const createJob = vi.fn().mockResolvedValue({ jobId: 'job_no_reaper', job: mockJob });
+      const jobManager = {
+        createJob,
+        listJobs: vi.fn().mockReturnValue([]),
+      } as unknown as JobManager;
+
+      // Should not throw when reaper is absent
+      await expect(
+        tool.execute(
+          { prompt: 'task', background: true, persona: 'per-inv-persona' },
+          {
+            signal: new AbortController().signal,
+            jobManager,
+            runtimeBinding,
+            activeSessionId: 'sess_parent',
+            // perInvocationReaper intentionally absent
+          }
+        )
+      ).resolves.not.toThrow();
+    });
+
+    it('does NOT call cancelReap for a persistent persona delegate', async () => {
+      const persistentPersonaRegistry = {
+        parsePersona: vi.fn().mockReturnValue({
+          config: {
+            runtime: {
+              type: 'container',
+              agentPlacement: 'host',
+              containerSharing: 'persistent',
+              image: 'example/sen-box:latest',
+              workingDirectory: '/home/agent',
+              mounts: {},
+              env: {},
+            },
+          },
+          body: 'persistent persona',
+        }),
+      } as unknown as PersonaRegistry;
+
+      const tool = new DelegateTool({ personaRegistry: persistentPersonaRegistry });
+      const reaper = makeReaper();
+
+      const mockJob = {
+        jobId: 'job_persistent2',
+        type: 'delegate' as const,
+        status: 'running' as const,
+        completion: new Promise<void>(() => {}),
+      } as unknown as JobState;
+
+      const createJob = vi.fn().mockResolvedValue({ jobId: 'job_persistent2', job: mockJob });
+      const jobManager = {
+        createJob,
+        listJobs: vi.fn().mockReturnValue([]),
+      } as unknown as JobManager;
+
+      await tool.execute(
+        { prompt: 'persistent task', background: true, persona: 'box-shell' },
+        {
+          signal: new AbortController().signal,
+          jobManager,
+          runtimeBinding,
+
+          perInvocationReaper: reaper as any,
+        }
+      );
+
+      expect(reaper.cancelReap).not.toHaveBeenCalled();
+    });
+  });
 });

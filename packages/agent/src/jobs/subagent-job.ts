@@ -23,6 +23,7 @@ import {
 import { logger } from '@lace/agent/utils/logger';
 import { SUBAGENT_USER_PERSONAS_TARGET } from './persona-container-spec';
 import { spawnSubagent, type SubagentProcessHandle } from './subagent-spawn';
+import type { PerInvocationReaper } from './per-invocation-reaper';
 import type { ToolResult } from '@lace/ent-protocol';
 import { logToolUpdateToJobLog } from './job-log-formatter';
 import {
@@ -108,6 +109,29 @@ export interface SubagentJobDependencies {
    * relay translates a `pending_reminders_on_exit` update into a local inject.
    */
   topLevelPeer: JsonRpcPeer;
+  /**
+   * Idle TTL reaper for per_invocation containers (PRI-1796 Chunk E).
+   * When present, schedules container destruction after the subagent exits.
+   * Optional so callers that have no container runtime can omit it.
+   */
+  reaper?: PerInvocationReaper;
+}
+
+/**
+ * Schedule a container reap for a per_invocation job after its subagent exits.
+ * Safe to call from all exit paths — no-ops when conditions aren't met.
+ * Exported for unit-testing; not part of the public module API.
+ */
+export function maybeScheduleReapAfter(
+  job: JobState,
+  reaper: PerInvocationReaper | undefined
+): void {
+  if (!reaper) return;
+  if (job.containerSharing !== 'per_invocation') return;
+  if (!job.subagentSessionId) return;
+  if (!job.runtimeBinding) return;
+  if (job.runtimeBinding.toolRuntime.type !== 'container') return;
+  reaper.scheduleReap(job.subagentSessionId, job.runtimeBinding.toolRuntime.spec.name);
 }
 
 /**
@@ -124,6 +148,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
     requestPermissionFromClient,
     finalizeJob,
     topLevelPeer,
+    reaper,
   } = deps;
 
   // Helper to write error output directly to the job output file.
@@ -150,6 +175,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       job.status = 'failed';
       writeErrorToJobOutput('[SUBAGENT ERROR]\nMessage: No active session\n');
       await finalizeJob(job);
+      // Container never materialized — no reap needed.
       return;
     }
     if (job.proc || job.finished) return;
@@ -157,6 +183,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       job.status = 'failed';
       writeErrorToJobOutput('[SUBAGENT ERROR]\nMessage: Missing subagentContent\n');
       await finalizeJob(job);
+      // Container never materialized — no reap needed.
       return;
     }
 
@@ -261,6 +288,9 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         stderr: stderrBuffer.trim() || undefined,
       });
       await finalizeJob(job);
+      // Schedule reap in case the container was partially materialized before the error.
+      // destroy() on a non-existent container is safe (ContainerManager handles it gracefully).
+      maybeScheduleReapAfter(job, reaper);
       return;
     }
 
@@ -999,6 +1029,10 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       }
 
       await finalizeJob(job);
+      // Schedule idle TTL teardown for per_invocation containers (PRI-1796 Chunk E).
+      // The reaper cancels this timer when a resume delegate call arrives, preserving
+      // the container for the next invocation window.
+      maybeScheduleReapAfter(job, reaper);
     }
   })();
 }

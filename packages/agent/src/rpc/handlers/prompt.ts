@@ -275,6 +275,7 @@ export function registerPromptHandler(
         personaRegistry: state.personaRegistry,
         ...(state.reminderScheduler ? { reminderScheduler: state.reminderScheduler } : {}),
         ...(state.activeSession ? { activeSessionId: state.activeSession.meta.sessionId } : {}),
+        perInvocationReaper: state.perInvocationReaper,
         setActiveTurnStatus: (status, ac) => {
           if (status === null) {
             state.activeTurn = null;

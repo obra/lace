@@ -6,6 +6,7 @@ import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { ReminderScheduler } from '@lace/agent/reminders';
 import type { MountRegistryEntry } from '@lace/agent/server-types';
 import type { RuntimeExecutionBinding, RuntimePath, ToolRuntime } from './runtime/types';
+import type { PerInvocationReaper } from '@lace/agent/jobs/per-invocation-reaper';
 
 export interface ToolContext {
   // Execution control - required for cancellation
@@ -48,6 +49,12 @@ export interface ToolContext {
   // persona-declared mount names into host paths (delegate → projected
   // container runtime).
   containerMounts?: Readonly<Record<string, MountRegistryEntry>>;
+
+  // Idle TTL reaper for per_invocation containers (PRI-1796 Chunk E).
+  // When a delegate invocation starts (fresh or resume), the tool calls
+  // cancelReap so the container survives for the new invocation window.
+  // The subagent-job exit handler schedules a new reap after each child exits.
+  perInvocationReaper?: PerInvocationReaper;
 }
 
 export interface ToolAnnotations {

@@ -12,6 +12,7 @@ import type { ReminderScheduler } from '@lace/agent/reminders';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import type { ProjectedContainerManager } from '@lace/agent/tools/runtime/projected-container';
 import type { RuntimeSecretResolver } from '@lace/agent/tools/runtime/secrets';
+import type { PerInvocationReaper } from '@lace/agent/jobs/per-invocation-reaper';
 
 /**
  * Approval mode for tool permissions.
@@ -155,6 +156,13 @@ export interface RunnerDependencies {
    * when projecting a host-placed persona container.
    */
   containerMounts?: Readonly<Record<string, MountRegistryEntry>>;
+
+  /**
+   * Idle TTL reaper for per_invocation containers (PRI-1796 Chunk E).
+   * Threaded into ToolContext so the delegate tool can cancel a pending
+   * destruction timer when a resume invocation arrives.
+   */
+  perInvocationReaper?: PerInvocationReaper;
 }
 
 /**

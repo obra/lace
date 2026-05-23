@@ -22,6 +22,7 @@ import type { PersonaContainerRuntime } from './jobs/persona-container-spec';
 import type { ReminderScheduler } from './reminders';
 import type { RuntimeExecutionBinding } from './tools/runtime/types';
 import type { RuntimeSecretResolver } from './tools/runtime/secrets';
+import type { PerInvocationReaper } from './jobs/per-invocation-reaper';
 
 /**
  * Per-build allowlist of tool names. `undefined` means "no scope filter" (all tools available).
@@ -195,6 +196,10 @@ export type AgentServerState = {
   // runExclusive mutex (avoids cross-process events.jsonl write races).
   peer: JsonRpcPeer | null;
   runtimeSecretResolver?: RuntimeSecretResolver;
+  // Idle TTL reaper for per_invocation containers (PRI-1796 Chunk E).
+  // Schedules destroy calls after a subagent exits; canceled on resume.
+  // Always present after boot — cost is a Map with zero entries until used.
+  perInvocationReaper: PerInvocationReaper;
 };
 
 // Single entry in the embedder-supplied containerMounts registry.

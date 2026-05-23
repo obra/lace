@@ -82,7 +82,7 @@ Parameters:
     args: z.infer<typeof delegateSchema>,
     context: ToolContext
   ): Promise<ToolResult> {
-    const { jobManager, runtimeBinding } = context;
+    const { jobManager, runtimeBinding, perInvocationReaper } = context;
 
     if (!jobManager) {
       return {
@@ -229,6 +229,14 @@ Parameters:
         }
         throw err;
       }
+    }
+
+    // Cancel any pending idle-TTL reap for this per_invocation container (PRI-1796 Chunk E).
+    // Fresh delegates call cancelReap idempotently (no timer exists — safe no-op).
+    // Resume delegates cancel the timer that was set when the prior invocation's
+    // subagent exited, preserving the container for this new invocation window.
+    if (containerSharing === 'per_invocation' && childSessionId && perInvocationReaper) {
+      perInvocationReaper.cancelReap(childSessionId);
     }
 
     // Per-call modelId wins; otherwise fall back to persona default (if any).
