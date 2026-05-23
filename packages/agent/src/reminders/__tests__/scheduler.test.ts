@@ -815,7 +815,14 @@ describe('ReminderScheduler exception handling', () => {
     // At minimum the save-failure onError should have fired.
     expect(errors).toBeGreaterThanOrEqual(1);
 
-    // Heap entry must be restored despite list() throwing on second call.
+    // The fix is that the finally block uses the in-scope `prior` snapshot
+    // instead of calling store.list() a second time. Assert directly that
+    // list() was called exactly twice (once in tickForTest's heap rebuild,
+    // once at the start of fire()) — a regression that re-introduced a
+    // disk read in the finally block would bump this to 3+.
+    expect(listCalls).toBe(2);
+
+    // Heap entry must be restored despite list() throwing on a third call.
     const heapState = (sched as unknown as { heap: Array<{ id: string }> }).heap;
     expect(heapState.find((e) => e.id === row.id)).toBeDefined();
 
