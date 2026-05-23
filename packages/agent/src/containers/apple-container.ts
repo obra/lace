@@ -613,7 +613,7 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
     throw new ContainerExecError(containerId, 1, errorMessage);
   }
 
-  // Box runtime support (kata #62): macOS does not host long-lived boxes in v1
+  // Persistent container runtime support (kata #62): macOS does not host long-lived persistent containers in v1
   // (sen-core deploys on linux). Inherit BaseContainerRuntime's default
   // daemonInspect (falls back to cached inspect, null on NotFound) and adopt
   // (populates the in-process cache) — adequate for the macOS dev path and

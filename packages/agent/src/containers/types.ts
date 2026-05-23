@@ -33,7 +33,7 @@ export interface ContainerConfig {
   cpuShares?: number;
 
   // Docker --restart policy. Only 'unless-stopped' is supported in v1; used by
-  // box-runtime containers so the daemon resurrects them after host reboot.
+  // persistent container runtimes so the daemon resurrects them after host reboot.
   // Absent ⇒ no restart flag emitted (default no-restart behavior).
   restartPolicy?: 'unless-stopped';
 }

@@ -648,7 +648,7 @@ describe('DockerContainerRuntime', () => {
     });
 
     it('list() filter excludes non-lace containers such as sen-box (kata #62)', async () => {
-      // The box runtime intentionally lives outside the lace- namespace so the
+      // The persistent container runtime intentionally lives outside the lace- namespace so the
       // startup reaper (which uses list()) never considers it for reaping.
       // The CLI itself returns whatever the daemon gives back; the filter is
       // both at the CLI (`--filter name=lace-`) and the JSON post-parse loop.
@@ -680,7 +680,7 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
-  describe('box runtime: restart policy + verbatim id (kata #62)', () => {
+  describe('persistent container runtime: restart policy + verbatim id (kata #62)', () => {
     it('emits --restart=unless-stopped when config.restartPolicy set', async () => {
       await runtime.create({
         name: 'svc',

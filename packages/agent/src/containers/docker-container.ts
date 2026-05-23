@@ -66,7 +66,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
   }
 
   private resolveContainerName(config: ContainerConfig): string {
-    // Box runtime supplies a verbatim id that intentionally lacks the `lace-`
+    // Persistent container runtime supplies a verbatim id that intentionally lacks the `lace-`
     // prefix (so the startup reaper's `name=lace-` scan ignores it). Honor
     // config.id directly when BOTH id and name are present and id is already a
     // distinct, fully-qualified daemon-side identifier — that pattern is only
