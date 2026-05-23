@@ -586,6 +586,47 @@ describe('ReminderScheduler list', () => {
   });
 });
 
+describe('ReminderScheduler far-future timer', () => {
+  const origTZ = process.env.TZ;
+  beforeEach(() => { process.env.TZ = 'UTC'; });
+  afterEach(() => { process.env.TZ = origTZ; });
+
+  it('does not emit TimeoutOverflowWarning for reminders >24.8 days out', async () => {
+    const dir = tempSessionDir();
+    const row = makeRow({
+      id: 'reminder_cccccccccccc',
+      // 100 days in the future from frozen clock — well past the 2^31-1 ms boundary.
+      next_fire_at: 100 * 24 * 60 * 60 * 1000, // 100 days in ms
+    });
+    new ReminderStore(dir).save([row]);
+
+    // Capture process warnings during start. Node emits TimeoutOverflowWarning
+    // when setTimeout receives a value > 2^31-1.
+    const warnings: string[] = [];
+    const warningListener = (warning: Error): void => {
+      warnings.push(warning.name);
+    };
+    process.on('warning', warningListener);
+
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 0,
+      notifier: async () => {},
+    });
+    try {
+      await sched.start();
+      // Yield a few microtasks to let any setTimeout fire.
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+    } finally {
+      await sched.stop();
+      process.off('warning', warningListener);
+    }
+
+    expect(warnings.filter((w) => w === 'TimeoutOverflowWarning')).toEqual([]);
+  });
+});
+
 describe('ReminderScheduler exception handling', () => {
   const origTZ = process.env.TZ;
   beforeEach(() => { process.env.TZ = 'UTC'; });

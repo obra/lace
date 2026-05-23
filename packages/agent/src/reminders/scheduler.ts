@@ -277,7 +277,12 @@ export class ReminderScheduler {
     }
     const head = this.heap[0];
     if (!head) return;
-    const delay = Math.max(0, head.nextFireAt - this.now());
+    const rawDelay = Math.max(0, head.nextFireAt - this.now());
+    // setTimeout silently clamps delays > 2^31-1 to 1ms, which would create a
+    // 1ms busy loop for reminders more than ~24.8 days out. Cap the delay so the
+    // wake fires within the safe range; onTick re-arms if the row isn't due yet.
+    const MAX_TIMEOUT_MS = 2_147_483_647 - 1;
+    const delay = Math.min(rawDelay, MAX_TIMEOUT_MS);
     this.wakeTimer = setTimeout(() => {
       void this.onTick();
     }, delay);
