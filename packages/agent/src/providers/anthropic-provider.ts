@@ -11,6 +11,7 @@ import type {
 import { AIProvider, type WireTool } from './base-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderInfo } from './base-provider';
 import { normalizeAnthropicStop } from './stop-reason';
+import { tryClassifyAsContextWindow } from './utils/error-classifier';
 import type { CatalogProvider } from './catalog/types';
 import { ToolCall } from '@lace/agent/tools/types';
 import { logger } from '@lace/agent/utils/logger';
@@ -219,10 +220,17 @@ export class AnthropicProvider extends AIProvider {
         logProviderRequest('anthropic', requestPayload as unknown as Record<string, unknown>);
 
         const extraHeaders = this.getExtraHeadersForModel(model);
-        const response = (await this.getAnthropicClient().messages.create(requestPayload, {
-          signal,
-          ...(extraHeaders ? { headers: extraHeaders } : {}),
-        })) as Anthropic.Messages.Message;
+        let response: Anthropic.Messages.Message;
+        try {
+          response = (await this.getAnthropicClient().messages.create(requestPayload, {
+            signal,
+            ...(extraHeaders ? { headers: extraHeaders } : {}),
+          })) as Anthropic.Messages.Message;
+        } catch (providerError) {
+          const classified = tryClassifyAsContextWindow(providerError, 'AnthropicProvider');
+          if (classified) return classified;
+          throw providerError;
+        }
 
         // Log response with pretty formatting
         logProviderResponse('anthropic', response);
@@ -444,6 +452,10 @@ export class AnthropicProvider extends AIProvider {
 
           return response;
         } catch (error) {
+          // Run the classifier BEFORE emitting an error log: recoverable
+          // context-window 400s shouldn't surface as ERROR-level noise.
+          const classified = tryClassifyAsContextWindow(error, 'AnthropicProvider (streaming)');
+          if (classified) return classified;
           const errorObj = error as Error;
           logger.error('Streaming error from Anthropic', { error: errorObj.message });
           throw error;

@@ -12,6 +12,7 @@ import type {
 import { AIProvider, type WireTool } from './base-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderInfo } from './base-provider';
 import { normalizeAnthropicStop } from './stop-reason';
+import { tryClassifyAsContextWindow } from './utils/error-classifier';
 import { ToolCall } from '@lace/agent/tools/types';
 import { logger } from '@lace/agent/utils/logger';
 import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
@@ -145,9 +146,16 @@ export class BedrockProvider extends AIProvider {
 
         logProviderRequest('bedrock', requestPayload as unknown as Record<string, unknown>);
 
-        const response = (await this.getBedrockClient().messages.create(requestPayload, {
-          signal,
-        })) as Anthropic.Messages.Message;
+        let response: Anthropic.Messages.Message;
+        try {
+          response = (await this.getBedrockClient().messages.create(requestPayload, {
+            signal,
+          })) as Anthropic.Messages.Message;
+        } catch (providerError) {
+          const classified = tryClassifyAsContextWindow(providerError, 'BedrockProvider');
+          if (classified) return classified;
+          throw providerError;
+        }
 
         logProviderResponse('bedrock', response);
 
@@ -346,6 +354,10 @@ export class BedrockProvider extends AIProvider {
 
           return response;
         } catch (error) {
+          // Run the classifier BEFORE emitting an error log: recoverable
+          // context-window 400s shouldn't surface as ERROR-level noise.
+          const classified = tryClassifyAsContextWindow(error, 'BedrockProvider (streaming)');
+          if (classified) return classified;
           const errorObj = error as Error;
           logger.error('Streaming error from Bedrock', { error: errorObj.message });
           throw error;

@@ -34,6 +34,7 @@ import {
 } from './base-provider';
 import { normalizeOpenAIChatStop, normalizeOpenAIResponsesStop } from './stop-reason';
 import type { LaceStopReason, LaceStopDetails } from './stop-reason';
+import { tryClassifyAsContextWindow } from './utils/error-classifier';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 import { ToolCall } from '@lace/agent/tools/types';
 import { logger } from '@lace/agent/utils/logger';
@@ -695,9 +696,19 @@ export class OpenAIProvider extends AIProvider {
         // Log request with pretty formatting
         logProviderRequest('openai', requestPayload as unknown as Record<string, unknown>);
 
-        const response = (await this.getOpenAIClient().chat.completions.create(requestPayload, {
-          signal,
-        })) as OpenAI.Chat.ChatCompletion;
+        let response: OpenAI.Chat.ChatCompletion;
+        try {
+          response = (await this.getOpenAIClient().chat.completions.create(requestPayload, {
+            signal,
+          })) as OpenAI.Chat.ChatCompletion;
+        } catch (providerError) {
+          const classified = tryClassifyAsContextWindow(
+            providerError,
+            'OpenAIProvider (ChatCompletions)'
+          );
+          if (classified) return classified;
+          throw providerError;
+        }
 
         // Log response with pretty formatting
         logProviderResponse('openai', response);
@@ -796,9 +807,19 @@ export class OpenAIProvider extends AIProvider {
         // Log request with pretty formatting
         logProviderRequest('openai', requestPayload as unknown as Record<string, unknown>);
 
-        const response = (await this.getOpenAIClient().responses.create(requestPayload, {
-          signal,
-        })) as Response;
+        let response: Response;
+        try {
+          response = (await this.getOpenAIClient().responses.create(requestPayload, {
+            signal,
+          })) as Response;
+        } catch (providerError) {
+          const classified = tryClassifyAsContextWindow(
+            providerError,
+            'OpenAIProvider (Responses API)'
+          );
+          if (classified) return classified;
+          throw providerError;
+        }
 
         // Log response with pretty formatting
         logProviderResponse('openai', response);
@@ -1078,8 +1099,13 @@ export class OpenAIProvider extends AIProvider {
 
           return response;
         } catch (error) {
-          const errorObj = error as Error;
-          logger.error('Streaming error from OpenAI', { error: errorObj.message });
+          // Run the classifier BEFORE emitting an error log: recoverable
+          // context-window 400s shouldn't surface as ERROR-level noise.
+          const classified = tryClassifyAsContextWindow(
+            error,
+            'OpenAIProvider (ChatCompletions streaming)'
+          );
+          if (classified) return classified;
 
           // Check for streaming verification error FIRST (special case fallback)
           if (this.isStreamingVerificationError(error)) {
@@ -1090,6 +1116,9 @@ export class OpenAIProvider extends AIProvider {
             // Fall back to non-streaming mode
             return this._createResponseImpl(messages, tools, model, signal);
           }
+
+          const errorObj = error as Error;
+          logger.error('Streaming error from OpenAI', { error: errorObj.message });
 
           // If stream wasn't created yet, let error bubble up for retry handling
           // This allows rate limit errors during stream creation to be retried
@@ -1395,8 +1424,13 @@ export class OpenAIProvider extends AIProvider {
 
           return response;
         } catch (error) {
-          const errorObj = error as Error;
-          logger.error('Streaming error from OpenAI Responses API', { error: errorObj.message });
+          // Run the classifier BEFORE emitting an error log: recoverable
+          // context-window 400s shouldn't surface as ERROR-level noise.
+          const classified = tryClassifyAsContextWindow(
+            error,
+            'OpenAIProvider (Responses API streaming)'
+          );
+          if (classified) return classified;
 
           // Check for streaming verification error FIRST (special case fallback)
           if (this.isStreamingVerificationError(error)) {
@@ -1407,6 +1441,9 @@ export class OpenAIProvider extends AIProvider {
             // Fall back to non-streaming Responses API
             return this._createResponsesAPIResponse(messages, tools, model, signal);
           }
+
+          const errorObj = error as Error;
+          logger.error('Streaming error from OpenAI Responses API', { error: errorObj.message });
 
           // If stream wasn't created yet, let error bubble up for retry handling
           // This allows rate limit errors during stream creation to be retried
