@@ -219,6 +219,59 @@ async function activateStoredSession(
 }
 
 /**
+ * Render the session's system prompt via loadPromptConfig and append a
+ * system_prompt_set event to the session's durable event log. Shared by
+ * session/new (RPC), session/fork (cwd-change re-render), and the /clear
+ * slash command — every code path that creates a session that the runner
+ * will later prompt must satisfy the system_prompt_set invariant
+ * (runner.ts throws on empty frozenSystemPrompt).
+ *
+ * Returns the updated session state with the new event appended. Callers
+ * are responsible for writing the returned state to disk.
+ */
+export async function composeAndWriteSystemPromptSet(params: {
+  sessionDir: string;
+  sessionState: SessionState;
+  persona: string;
+  cwd: string;
+  state: AgentServerState;
+  createToolExecutorForMode: CreateToolExecutorFn;
+}): Promise<SessionState> {
+  const { sessionDir, sessionState, persona, cwd, state, createToolExecutorForMode } = params;
+
+  const skillDirs = state.skillDirs ?? getSkillDirectories(cwd);
+  const skillRegistry = new SkillRegistry({ skillDirs });
+
+  const { toolsForProvider } = await createToolExecutorForMode(
+    state.config.executionMode,
+    state.mcpServerManager,
+    undefined, // jobManager
+    skillRegistry,
+    undefined, // toolScope
+    state.personaRegistry
+  );
+  const tools = toolsForProvider.map((t) => ({ name: t.name, description: t.description }));
+
+  const promptConfig = await loadPromptConfig({
+    persona,
+    tools,
+    session: { getWorkingDirectory: () => cwd },
+    skillRegistry,
+    personaRegistry: state.personaRegistry,
+  });
+
+  const fullSystemPrompt = promptConfig.userInstructions.trim()
+    ? `${promptConfig.systemPrompt}\n\n${promptConfig.userInstructions}`
+    : promptConfig.systemPrompt;
+
+  const { nextState } = appendDurableEvent(sessionDir, sessionState, {
+    type: 'system_prompt_set',
+    data: { type: 'system_prompt_set', text: fullSystemPrompt },
+  });
+  return nextState;
+}
+
+/**
  * Register session lifecycle handlers with the peer.
  * - session/new: Create a new session
  * - session/list: List all available sessions
@@ -411,50 +464,18 @@ export function registerSessionHandlers(
     await ensureSchedulers();
     await reconcileMcpServersForActiveSession(state);
 
-    // Inject system prompt as system_prompt_set event
+    // Inject system prompt as system_prompt_set event. Every session that the
+    // runner will prompt must have this event — runner throws on empty
+    // frozenSystemPrompt. Use the shared helper so all creation paths agree.
     const persona = requestedPersona ?? 'lace';
-
-    // Create skill registry for this session. Embedder-supplied skillDirs
-    // (set during initialize) override the default workDir-based discovery.
-    const skillDirs = state.skillDirs ?? getSkillDirectories(parsed.cwd);
-    const skillRegistry = new SkillRegistry({ skillDirs });
-
-    // Get available tools for system prompt context
-    const { toolsForProvider } = await createToolExecutorForMode(
-      state.config.executionMode,
-      state.mcpServerManager,
-      undefined, // jobManager
-      skillRegistry,
-      undefined, // toolScope
-      state.personaRegistry
-    );
-    const tools = toolsForProvider.map((t) => ({ name: t.name, description: t.description }));
-
-    // Create session context for working directory
-    const sessionContext = { getWorkingDirectory: () => parsed.cwd };
-
-    const promptConfig = await loadPromptConfig({
+    const sessionState = await composeAndWriteSystemPromptSet({
+      sessionDir,
+      sessionState: readSessionState(sessionDir),
       persona,
-      tools,
-      session: sessionContext,
-      skillRegistry,
-      personaRegistry: state.personaRegistry,
+      cwd: parsed.cwd,
+      state,
+      createToolExecutorForMode,
     });
-    let sessionState: SessionState = readSessionState(sessionDir);
-
-    // Compose the full system prompt text (persona + user instructions).
-    // Persisted as a single `system_prompt_set` event so the system prompt
-    // is byte-stable for the lifetime of the session — the combined text
-    // must not change across turns so that provider-side prompt caching hits.
-    const fullSystemPrompt = promptConfig.userInstructions.trim()
-      ? `${promptConfig.systemPrompt}\n\n${promptConfig.userInstructions}`
-      : promptConfig.systemPrompt;
-
-    const { nextState } = appendDurableEvent(sessionDir, sessionState, {
-      type: 'system_prompt_set',
-      data: { type: 'system_prompt_set', text: fullSystemPrompt },
-    });
-    sessionState = nextState;
     writeSessionState(sessionDir, sessionState);
 
     state.activeSession = { ...state.activeSession, state: sessionState };
@@ -593,40 +614,17 @@ export function registerSessionHandlers(
     // Re-render with the new cwd and append a second system_prompt_set event;
     // the message-builder uses last-wins semantics so this overrides the cloned one.
     if (forkedCwd !== sourceSession.meta.workDir) {
-      const skillDirs = state.skillDirs ?? getSkillDirectories(forkedCwd);
-      const skillRegistry = new SkillRegistry({ skillDirs });
-
-      const { toolsForProvider } = await createToolExecutorForMode(
-        state.config.executionMode,
-        state.mcpServerManager,
-        undefined, // jobManager
-        skillRegistry,
-        undefined, // toolScope
-        state.personaRegistry
-      );
-      const tools = toolsForProvider.map((t) => ({ name: t.name, description: t.description }));
-
       // Preserve the source session's persona; fall back to 'lace' only if the
       // source has none recorded (corrupt session or non-persona creation path).
       const sourcePersona = sourceSession.state.config?.personaName ?? 'lace';
-      const promptConfig = await loadPromptConfig({
+      const forkedSessionState = await composeAndWriteSystemPromptSet({
+        sessionDir: forkedSessionDir,
+        sessionState: readSessionState(forkedSessionDir),
         persona: sourcePersona,
-        tools,
-        session: { getWorkingDirectory: () => forkedCwd },
-        skillRegistry,
-        personaRegistry: state.personaRegistry,
+        cwd: forkedCwd,
+        state,
+        createToolExecutorForMode,
       });
-
-      const fullSystemPrompt = promptConfig.userInstructions.trim()
-        ? `${promptConfig.systemPrompt}\n\n${promptConfig.userInstructions}`
-        : promptConfig.systemPrompt;
-
-      let forkedSessionState = readSessionState(forkedSessionDir);
-      const { nextState } = appendDurableEvent(forkedSessionDir, forkedSessionState, {
-        type: 'system_prompt_set',
-        data: { type: 'system_prompt_set', text: fullSystemPrompt },
-      });
-      forkedSessionState = nextState;
       writeSessionState(forkedSessionDir, forkedSessionState);
     }
 

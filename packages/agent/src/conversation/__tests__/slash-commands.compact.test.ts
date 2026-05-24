@@ -46,7 +46,13 @@ import { handleSlashCommand } from '../slash-commands';
 import { createProviderForTurn } from '@lace/agent/providers/turn-factory';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import { compactDroppedMessagesWithCore } from '@lace/agent/compaction/compact-dropped-messages';
-import type { AgentServerState } from '@lace/agent/server-types';
+import type { AgentServerState, CreateToolExecutorFn } from '@lace/agent/server-types';
+
+function makeMockCreateToolExecutorForMode(): CreateToolExecutorFn {
+  return vi
+    .fn()
+    .mockResolvedValue({ executor: {}, toolsForProvider: [] }) as unknown as CreateToolExecutorFn;
+}
 
 function makeMinimalState(sessionDir: string): AgentServerState {
   return {
@@ -120,7 +126,8 @@ describe('/compact slash command — summarizer prompt', () => {
       '',
       'turn-001',
       vi.fn().mockResolvedValue(undefined),
-      vi.fn().mockResolvedValue(undefined)
+      vi.fn().mockResolvedValue(undefined),
+      makeMockCreateToolExecutorForMode()
     );
 
     expect(setSystemPromptSpy).toHaveBeenCalledWith(SUMMARIZER_SYSTEM_PROMPT);
@@ -144,7 +151,8 @@ describe('/compact slash command — summarizer prompt', () => {
       '',
       'turn-001',
       vi.fn().mockResolvedValue(undefined),
-      vi.fn().mockResolvedValue(undefined)
+      vi.fn().mockResolvedValue(undefined),
+      makeMockCreateToolExecutorForMode()
     );
 
     expect(callOrder).toEqual(['setSystemPrompt', 'compact']);

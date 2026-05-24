@@ -157,7 +157,8 @@ export function registerPromptHandler(
           slashArgs,
           turnId,
           writeAndAdvance,
-          emitUpdate
+          emitUpdate,
+          createToolExecutorForMode
         );
         if (slashResult) {
           state.activeTurn = null;

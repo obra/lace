@@ -13,7 +13,12 @@ import { compactDroppedMessagesWithCore } from '@lace/agent/compaction/compact-d
 import { SUMMARIZER_SYSTEM_PROMPT } from '@lace/agent/compaction/summarize-strategy';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
-import { type SessionUpdate, type AgentServerState } from '@lace/agent/server-types';
+import {
+  type SessionUpdate,
+  type AgentServerState,
+  type CreateToolExecutorFn,
+} from '@lace/agent/server-types';
+import { composeAndWriteSystemPromptSet } from '@lace/agent/rpc/handlers/session';
 import { createProviderForTurn } from './provider-factory';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 
@@ -97,7 +102,8 @@ export async function handleSlashCommand(
   args: string,
   turnId: string,
   writeAndAdvance: WriteAndAdvanceFn,
-  emitUpdate: EmitUpdateFn
+  emitUpdate: EmitUpdateFn,
+  createToolExecutorForMode: CreateToolExecutorFn
 ): Promise<SlashCommandResult | null> {
   const finishTurn = async (text: string): Promise<SlashCommandResult> => {
     // Write the message event for durability
@@ -208,7 +214,21 @@ export async function handleSlashCommand(
         });
         ensureSessionFiles(newSessionDir);
 
-        // Switch to the new session
+        // Satisfy the runner's system_prompt_set invariant for the new session.
+        // Inherit the previous session's persona; default to 'lace' if unset.
+        const persona = sessionConfig?.personaName ?? 'lace';
+        const newSessionState = readSessionState(newSessionDir);
+        const updatedState = await composeAndWriteSystemPromptSet({
+          sessionDir: newSessionDir,
+          sessionState: newSessionState,
+          persona,
+          cwd: workDir,
+          state,
+          createToolExecutorForMode,
+        });
+        writeSessionState(newSessionDir, updatedState);
+
+        // Switch to the new session (reload to pick up the new event).
         state.activeSession = loadSession(newSessionId);
 
         // Notify the client that the session has changed
