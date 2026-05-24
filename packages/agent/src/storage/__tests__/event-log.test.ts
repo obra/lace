@@ -594,6 +594,39 @@ describe('storage/event-log', () => {
       }
     });
 
+    it('sees legacy events in LACE_SESSION_DIR fallback (H9)', () => {
+      const laceDir = mkdtempSync(join(tmpdir(), 'lace-derive-l-'));
+      const sessionDir = mkdtempSync(join(tmpdir(), 'lace-derive-s-'));
+      process.env.LACE_DIR = laceDir;
+      process.env.LACE_SESSION_DIR = sessionDir;
+      const sessionId = `sess_${randomUUID()}`;
+      invalidatePersonaCache(`${sessionDir}/${sessionId}`);
+      try {
+        const legacySessionDir = join(sessionDir, sessionId);
+        mkdirSync(legacySessionDir, { recursive: true });
+        writeFileSync(
+          join(legacySessionDir, 'events.jsonl'),
+          [1, 2, 3]
+            .map((seq) =>
+              JSON.stringify({
+                eventSeq: seq,
+                timestamp: 'x',
+                type: 'prompt',
+                data: { type: 'prompt', content: [] },
+              })
+            )
+            .join('\n') + '\n'
+        );
+
+        const next = deriveNextEventSeqAcrossSessionFiles(laceDir, sessionId);
+        expect(next).toBe(4);
+      } finally {
+        delete process.env.LACE_SESSION_DIR;
+        rmSync(sessionDir, { recursive: true, force: true });
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
     it('reads max eventSeq across legacy + new layouts', () => {
       const { laceDir, sessionDir, sessionId } = makeTestSessionDirs('ada');
       // Legacy events.jsonl with seqs 1, 2, 3.

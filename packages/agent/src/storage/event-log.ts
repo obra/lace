@@ -126,7 +126,7 @@ export function deriveNextEventSeqFromEventLog(sessionDir: string): number {
  */
 export function deriveNextEventSeqAcrossSessionFiles(laceDir: string, sessionId: string): number {
   const files: string[] = [];
-  const legacyPath = path.join(laceDir, 'agent-sessions', sessionId, 'events.jsonl');
+  const legacyPath = legacyEventLogPath(sessionId);
   if (fs.existsSync(legacyPath)) files.push(legacyPath);
   try {
     for (const f of listTranscriptFiles(laceDir, sessionId)) files.push(f);
