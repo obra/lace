@@ -213,7 +213,10 @@ export class OllamaProvider extends AIProvider {
         return {
           content,
           toolCalls,
-          stopReason: response.done ? 'stop' : undefined,
+          // Ollama's stop surface is minimal — `done: true` maps to canonical
+          // end_turn; mid-stream chunks have no stop reason.
+          stopReason: response.done ? 'end_turn' : undefined,
+          stopDetails: null,
           usage: this._extractUsage(response),
           performance: this._extractPerformance(response),
         };
@@ -347,7 +350,9 @@ export class OllamaProvider extends AIProvider {
           const result = {
             content,
             toolCalls,
-            stopReason: 'stop', // Streaming always completes normally
+            // Streaming always completes normally → canonical end_turn.
+            stopReason: 'end_turn' as const,
+            stopDetails: null,
             usage: finalMessage ? this._extractUsageFromMessage(finalMessage) : undefined,
             performance: this._extractPerformanceFromStream(finalMessage),
           };

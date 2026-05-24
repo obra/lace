@@ -32,6 +32,8 @@ import {
   ConversationState,
   RequestOptions,
 } from './base-provider';
+import { normalizeOpenAIChatStop, normalizeOpenAIResponsesStop } from './stop-reason';
+import type { LaceStopReason, LaceStopDetails } from './stop-reason';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 import { ToolCall } from '@lace/agent/tools/types';
 import { logger } from '@lace/agent/utils/logger';
@@ -576,10 +578,26 @@ export class OpenAIProvider extends AIProvider {
       textContent = response.output_text;
     }
 
+    // response.status is typed as string | undefined by the SDK but in practice
+    // the Responses API always sets a terminal status by the time we parse the
+    // final response object. Fall back to 'unknown' so the normalizer's WARN
+    // path catches the SDK-shouldn't-do-this case rather than silently mapping
+    // to end_turn.
+    const { stopReason, stopDetails } = normalizeOpenAIResponsesStop(
+      response.status ?? 'unknown',
+      response.incomplete_details as Parameters<typeof normalizeOpenAIResponsesStop>[1],
+      response.error as Parameters<typeof normalizeOpenAIResponsesStop>[2],
+      // Refusal-item capture lands in chunk F; until then we never see a
+      // refusal item at parse time so this is always null.
+      null,
+      toolCalls.length > 0
+    );
+
     return {
       content: textContent,
       toolCalls,
-      stopReason: response.status === 'completed' ? 'stop' : 'error',
+      stopReason,
+      stopDetails,
       usage: {
         promptTokens: response.usage?.input_tokens || 0,
         completionTokens: response.usage?.output_tokens || 0,
@@ -739,10 +757,13 @@ export class OpenAIProvider extends AIProvider {
           };
         }
 
+        const { stopReason, stopDetails } = normalizeOpenAIChatStop(choice.finish_reason);
+
         return {
           content: textContent,
           toolCalls,
-          stopReason: this.normalizeStopReason(choice.finish_reason),
+          stopReason,
+          stopDetails,
           usage,
         };
       },
@@ -1041,10 +1062,14 @@ export class OpenAIProvider extends AIProvider {
             };
           }
 
+          const { stopReason: canonicalStopReason, stopDetails } =
+            normalizeOpenAIChatStop(stopReason);
+
           const response = {
             content,
             toolCalls,
-            stopReason: this.normalizeStopReason(stopReason),
+            stopReason: canonicalStopReason,
+            stopDetails,
             usage: finalUsage,
           };
 
@@ -1125,11 +1150,20 @@ export class OpenAIProvider extends AIProvider {
           let content = '';
           const toolCalls: ToolCall[] = [];
           let estimatedOutputTokens = 0;
-          let receivedCompletedEvent = false;
           let responseId: string | undefined;
           let hasThinkingBlock = false;
           let completionUsage:
             | { input_tokens: number; output_tokens: number; total_tokens: number }
+            | undefined;
+          // Capture the terminal response object so we can route status,
+          // incomplete_details, and error fields through the shared
+          // OpenAI-Responses normalizer below.
+          let completedResponse:
+            | {
+                status?: string | null;
+                incomplete_details?: { reason: string } | null;
+                error?: { code: string; message: string } | null;
+              }
             | undefined;
 
           // Track tool calls by output index
@@ -1201,9 +1235,13 @@ export class OpenAIProvider extends AIProvider {
               }
 
               case 'response.completed':
-                receivedCompletedEvent = true;
                 // Capture response ID for conversation chaining
                 responseId = event.response.id;
+                // Capture the terminal response object for stop-reason
+                // normalization. We use a structural type to avoid coupling
+                // to the SDK's internal Response type just for these three
+                // fields.
+                completedResponse = event.response as typeof completedResponse;
                 logger.trace('Responses API: Received completion event', {
                   status: event.response.status,
                   hasUsage: !!event.response.usage,
@@ -1247,14 +1285,6 @@ export class OpenAIProvider extends AIProvider {
                 break;
               }
             }
-          }
-
-          // Check if stream ended prematurely
-          if (!receivedCompletedEvent && toolCallsByIndex.size > 0) {
-            logger.warn('Responses API stream ended without completion event', {
-              toolCallCount: toolCallsByIndex.size,
-              toolNames: Array.from(toolCallsByIndex.values()).map((tc) => tc.name),
-            });
           }
 
           // Convert accumulated tool calls to final format
@@ -1308,10 +1338,45 @@ export class OpenAIProvider extends AIProvider {
           const estimatedPromptTokens =
             countedTokens ?? this.estimateTokens(promptText + toolsText);
 
+          // Normalize the terminal stop signal via the shared Responses-API
+          // normalizer. If we never saw a `response.completed` event, branch
+          // on the abort signal: user-aborted streams map to 'cancelled', but
+          // streams that ended early for any other reason (connection drop,
+          // malformed SDK behavior) map to 'failed' with an incomplete_stream
+          // code so downstream consumers can distinguish them.
+          let stopReason: LaceStopReason;
+          let stopDetails: LaceStopDetails | null;
+          if (completedResponse) {
+            ({ stopReason, stopDetails } = normalizeOpenAIResponsesStop(
+              completedResponse.status ?? 'unknown',
+              completedResponse.incomplete_details ?? null,
+              completedResponse.error ?? null,
+              // Refusal-item capture lands in chunk F.
+              null,
+              toolCalls.length > 0
+            ));
+          } else if (signal?.aborted) {
+            stopReason = 'cancelled';
+            stopDetails = { type: 'cancelled', reason: 'abort_signal' };
+          } else {
+            logger.warn('Responses API stream ended without completion event', {
+              toolCallCount: toolCalls.length,
+              toolNames: toolCalls.map((tc) => tc.name),
+            });
+            stopReason = 'failed';
+            stopDetails = {
+              type: 'failed',
+              code: 'incomplete_stream',
+              message: 'Responses API stream ended without completion event',
+              source: 'openai_responses_failed_status',
+            };
+          }
+
           const response = {
             content,
             toolCalls,
-            stopReason: 'stop',
+            stopReason,
+            stopDetails,
             usage: completionUsage
               ? {
                   promptTokens: completionUsage.input_tokens,
@@ -1358,23 +1423,6 @@ export class OpenAIProvider extends AIProvider {
         canRetry: () => !streamCreated && !streamingStarted,
       }
     );
-  }
-
-  protected normalizeStopReason(stopReason: string | null | undefined): string | undefined {
-    if (!stopReason) return undefined;
-
-    switch (stopReason) {
-      case 'length':
-        return 'max_tokens';
-      case 'stop':
-        return 'stop';
-      case 'tool_calls':
-        return 'tool_use';
-      case 'content_filter':
-        return 'stop';
-      default:
-        return 'stop';
-    }
   }
 
   getProviderInfo(): ProviderInfo {

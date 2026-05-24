@@ -355,6 +355,30 @@ export function normalizeOpenAIResponsesStop(
 }
 
 /**
+ * Normalize a Gemini `finishReason` into the canonical form. Gemini's stop
+ * surface is minimal — `STOP` / `FINISH_REASON_UNSPECIFIED` for normal end,
+ * `MAX_TOKENS` for output-length cutoff, and a family of safety codes
+ * (`SAFETY`, `BLOCKLIST`, `PROHIBITED_CONTENT`, `SPII`, etc.) that don't fit
+ * cleanly into the existing `LaceStopDetails.refusal.source` union. The
+ * spec did not define a Gemini source variant for refusal or max_output_tokens,
+ * so we emit `stopDetails: null` for these cases rather than inventing a new
+ * provenance value here. Adding `'gemini_finish_reason'` to the source unions
+ * is a deliberate non-goal of chunk B.
+ */
+export function normalizeGeminiStop(rawReason: string | null | undefined): NormalizedStop {
+  switch (rawReason) {
+    case 'STOP':
+    case 'FINISH_REASON_UNSPECIFIED':
+      return { stopReason: 'end_turn', stopDetails: null };
+    case 'MAX_TOKENS':
+      return { stopReason: 'max_output_tokens', stopDetails: null };
+    default:
+      logger.warn('Unknown Gemini finishReason, falling back to end_turn', { rawReason });
+      return { stopReason: 'end_turn', stopDetails: null };
+  }
+}
+
+/**
  * Normalize an LMStudio stop value into the canonical form. LMStudio's surface
  * is minimal — `tool_use`, `stop`, or unknown.
  */

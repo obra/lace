@@ -431,7 +431,10 @@ export class ConversationRunner {
 
         const toolCalls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
         if (toolCalls.length === 0) {
-          if (response.stopReason === 'max_tokens') {
+          // Providers now emit the canonical 'max_output_tokens' value via the
+          // shared stop-reason normalizers. The RunResult shape still uses
+          // 'max_tokens' externally — chunk C/F will rename that surface.
+          if (response.stopReason === 'max_output_tokens') {
             stopReason = 'max_tokens';
             break;
           }

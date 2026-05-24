@@ -20,7 +20,13 @@ vi.mock('@anthropic-ai/sdk', () => {
 });
 
 vi.mock('../../utils/logger.js', () => ({
-  logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), trace: vi.fn() },
+  logger: {
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    trace: vi.fn(),
+    warn: vi.fn(),
+  },
 }));
 
 vi.mock('../../utils/provider-logging.js', () => ({

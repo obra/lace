@@ -15,6 +15,7 @@ import { ToolCall } from '@lace/agent/tools/types';
 import type { WireTool } from './base-provider';
 import { logger } from '@lace/agent/utils/logger';
 import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
+import { normalizeLMStudioStop } from './stop-reason';
 
 // Interface for LMStudio model objects
 interface LMStudioModel {
@@ -553,10 +554,12 @@ export class LMStudioProvider extends AIProvider {
                 // Return immediately with tool calls (like other providers)
                 if (!resolved) {
                   resolved = true;
+                  const { stopReason, stopDetails } = normalizeLMStudioStop('tool_use');
                   const response = {
                     content: allContent.trim(),
                     toolCalls,
-                    stopReason: 'tool_use',
+                    stopReason,
+                    stopDetails,
                     usage: this._estimateUsage(allContent, lmMessages),
                     performance: this._calculatePerformance(chunkCount, allContent.length),
                   };
@@ -580,10 +583,14 @@ export class LMStudioProvider extends AIProvider {
                 // Only resolve here if we haven't already resolved due to tool calls
                 if (!resolved) {
                   resolved = true;
+                  const { stopReason, stopDetails } = normalizeLMStudioStop(
+                    msg.stats?.stopReason || 'stop'
+                  );
                   const response = {
                     content: allContent.trim(),
                     toolCalls,
-                    stopReason: msg.stats?.stopReason || 'stop',
+                    stopReason,
+                    stopDetails,
                     usage: msg.stats
                       ? {
                           promptTokens: msg.stats.promptTokensCount || msg.stats.promptTokens || 0,

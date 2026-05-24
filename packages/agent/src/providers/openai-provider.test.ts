@@ -29,6 +29,9 @@ vi.mock('../../utils/logger.js', () => ({
   logger: {
     debug: vi.fn(),
     error: vi.fn(),
+    info: vi.fn(),
+    trace: vi.fn(),
+    warn: vi.fn(),
   },
 }));
 
@@ -274,7 +277,7 @@ describe('OpenAIProvider', () => {
 
       // Should successfully return with non-streaming response
       expect(response.content).toBe('Non-streaming response');
-      expect(response.stopReason).toBe('stop');
+      expect(response.stopReason).toBe('end_turn');
 
       // Should have called create twice: once for streaming (failed), once for non-streaming (succeeded)
       expect(mockCreate).toHaveBeenCalledTimes(2);
@@ -330,7 +333,7 @@ describe('OpenAIProvider', () => {
 
       expect(response.content).toBe('Hello world!');
       expect(response.toolCalls).toEqual([]);
-      expect(response.stopReason).toBe('stop');
+      expect(response.stopReason).toBe('end_turn');
       expect(response.usage).toEqual({
         promptTokens: 15,
         completionTokens: 8,
@@ -571,12 +574,17 @@ describe('OpenAIProvider', () => {
   describe('stop reason normalization', () => {
     it('should normalize stop reasons correctly', async () => {
       const testCases = [
-        { openai: 'length', expected: 'max_tokens' },
-        { openai: 'stop', expected: 'stop' },
+        { openai: 'length', expected: 'max_output_tokens' },
+        { openai: 'stop', expected: 'end_turn' },
         { openai: 'tool_calls', expected: 'tool_use' },
-        { openai: 'content_filter', expected: 'stop' },
-        { openai: 'unknown_reason', expected: 'stop' },
-        { openai: null, expected: undefined },
+        // content_filter now maps to canonical 'refusal' via the shared
+        // normalizer (was 'stop' under the legacy per-provider normalizer).
+        { openai: 'content_filter', expected: 'refusal' },
+        { openai: 'unknown_reason', expected: 'end_turn' },
+        // Non-terminal chunks (null/undefined finish_reason) now map to
+        // 'end_turn' rather than undefined; the shared normalizer treats
+        // them as the safe terminal default.
+        { openai: null, expected: 'end_turn' },
       ];
 
       for (const { openai, expected } of testCases) {

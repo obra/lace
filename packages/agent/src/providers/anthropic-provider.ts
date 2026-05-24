@@ -10,6 +10,7 @@ import type {
 } from '@anthropic-ai/sdk/resources/messages';
 import { AIProvider, type WireTool } from './base-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderInfo } from './base-provider';
+import { normalizeAnthropicStop } from './stop-reason';
 import type { CatalogProvider } from './catalog/types';
 import { ToolCall } from '@lace/agent/tools/types';
 import { logger } from '@lace/agent/utils/logger';
@@ -261,10 +262,18 @@ export class AnthropicProvider extends AIProvider {
           normalizedUsage,
         });
 
+        const { stopReason, stopDetails } = normalizeAnthropicStop(
+          response.stop_reason,
+          response.stop_details as Parameters<typeof normalizeAnthropicStop>[1],
+          response.stop_sequence,
+          'anthropic_direct'
+        );
+
         return {
           content: textContent,
           toolCalls,
-          stopReason: this.normalizeStopReason(response.stop_reason),
+          stopReason,
+          stopDetails,
           usage: normalizedUsage,
         };
       },
@@ -409,10 +418,18 @@ export class AnthropicProvider extends AIProvider {
             usage: finalMessage.usage,
           });
 
+          const { stopReason, stopDetails } = normalizeAnthropicStop(
+            finalMessage.stop_reason,
+            finalMessage.stop_details as Parameters<typeof normalizeAnthropicStop>[1],
+            finalMessage.stop_sequence,
+            'anthropic_direct'
+          );
+
           const response = {
             content: textContent,
             toolCalls,
-            stopReason: this.normalizeStopReason(finalMessage.stop_reason),
+            stopReason,
+            stopDetails,
             usage: finalMessage.usage
               ? {
                   promptTokens: finalMessage.usage.input_tokens,
@@ -438,23 +455,6 @@ export class AnthropicProvider extends AIProvider {
         canRetry: () => !streamingStarted,
       }
     );
-  }
-
-  protected normalizeStopReason(stopReason: string | null | undefined): string | undefined {
-    if (!stopReason) return undefined;
-
-    switch (stopReason) {
-      case 'max_tokens':
-        return 'max_tokens';
-      case 'end_turn':
-        return 'stop';
-      case 'tool_use':
-        return 'tool_use';
-      case 'stop_sequence':
-        return 'stop';
-      default:
-        return 'stop';
-    }
   }
 
   getProviderInfo(): ProviderInfo {

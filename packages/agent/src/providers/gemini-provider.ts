@@ -4,6 +4,7 @@
 import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
 import { AIProvider } from './base-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderInfo } from './base-provider';
+import { normalizeGeminiStop } from './stop-reason';
 import { ToolCall } from '@lace/agent/tools/types';
 import type { WireTool } from './base-provider';
 import { logger } from '@lace/agent/utils/logger';
@@ -140,10 +141,13 @@ export class GeminiProvider extends AIProvider {
       usage,
     });
 
+    const { stopReason, stopDetails } = normalizeGeminiStop(candidate.finishReason);
+
     return {
       content,
       toolCalls,
-      stopReason: this.normalizeStopReason(candidate.finishReason),
+      stopReason,
+      stopDetails,
       usage,
     };
   }
@@ -258,21 +262,6 @@ export class GeminiProvider extends AIProvider {
         canRetry: () => !streamCreated && !streamingStarted,
       }
     );
-  }
-
-  protected normalizeStopReason(stopReason: string | null | undefined): string | undefined {
-    if (!stopReason) return undefined;
-
-    switch (stopReason) {
-      case 'STOP':
-        return 'stop';
-      case 'MAX_TOKENS':
-        return 'max_tokens';
-      case 'FINISH_REASON_UNSPECIFIED':
-        return 'stop';
-      default:
-        return 'stop';
-    }
   }
 
   getProviderInfo(): ProviderInfo {

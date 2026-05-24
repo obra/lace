@@ -82,7 +82,7 @@ describe('GeminiProvider', () => {
 
       expect(response.content).toBe('Hi there!');
       expect(response.toolCalls).toEqual([]);
-      expect(response.stopReason).toBe('stop');
+      expect(response.stopReason).toBe('end_turn');
       expect(response.usage?.promptTokens).toBe(5);
       expect(response.usage?.completionTokens).toBe(5);
       expect(response.usage?.totalTokens).toBe(10);
@@ -194,12 +194,15 @@ describe('GeminiProvider', () => {
     it('should normalize stop reasons correctly', async () => {
       const messages: ProviderMessage[] = [{ role: 'user', content: 'Hello' }];
 
+      // null / undefined now fall through to the shared normalizer's
+      // unknown-input branch (end_turn + WARN), aligning Gemini with the
+      // rest of the per-provider normalizers in stop-reason.ts.
       const testCases = [
-        { geminiReason: 'STOP', expected: 'stop' },
-        { geminiReason: 'MAX_TOKENS', expected: 'max_tokens' },
-        { geminiReason: 'FINISH_REASON_UNSPECIFIED', expected: 'stop' },
-        { geminiReason: null, expected: undefined },
-        { geminiReason: undefined, expected: undefined },
+        { geminiReason: 'STOP', expected: 'end_turn' },
+        { geminiReason: 'MAX_TOKENS', expected: 'max_output_tokens' },
+        { geminiReason: 'FINISH_REASON_UNSPECIFIED', expected: 'end_turn' },
+        { geminiReason: null, expected: 'end_turn' },
+        { geminiReason: undefined, expected: 'end_turn' },
       ];
 
       for (const { geminiReason, expected } of testCases) {

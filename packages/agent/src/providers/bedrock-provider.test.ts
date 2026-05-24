@@ -162,7 +162,7 @@ describe('BedrockProvider', () => {
 
       expect(response.content).toBe('Test response');
       expect(response.toolCalls).toEqual([]);
-      expect(response.stopReason).toBe('stop');
+      expect(response.stopReason).toBe('end_turn');
       expect(response.usage).toEqual({
         promptTokens: 10,
         completionTokens: 5,

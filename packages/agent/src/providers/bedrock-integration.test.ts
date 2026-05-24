@@ -33,6 +33,6 @@ describeIf('BedrockProvider live integration', () => {
     );
 
     expect(response.content.length).toBeGreaterThan(0);
-    expect(response.stopReason).toBe('stop');
+    expect(response.stopReason).toBe('end_turn');
   }, 30_000);
 });

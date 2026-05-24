@@ -17,6 +17,7 @@ import {
 // importing them from `@lace/agent/providers/base-provider`. Implementation
 // lives in `./stop-reason`.
 export type { LaceStopReason, LaceStopDetails, NormalizedStop } from './stop-reason';
+import type { LaceStopReason, LaceStopDetails } from './stop-reason';
 
 /**
  * The minimal duck-typed view of a tool that providers need to build a wire-format
@@ -43,7 +44,19 @@ export interface ProviderConfig {
 export interface ProviderResponse {
   content: string;
   toolCalls: ToolCall[];
-  stopReason?: string; // Normalized: "max_tokens" | "stop" | "tool_use" | "error"
+  /**
+   * Canonical stop reason normalized from the provider's raw stop surface via
+   * the shared per-provider normalizers in `./stop-reason`. Optional because
+   * non-terminal streaming chunks may not have a stop reason set yet.
+   */
+  stopReason?: LaceStopReason;
+  /**
+   * Structured detail accompanying `stopReason` when extra context is useful
+   * (refusal category, stop sequence, failure code, etc.). `null` when the
+   * canonical reason needs no extra context. Always assigned alongside
+   * `stopReason`.
+   */
+  stopDetails?: LaceStopDetails | null;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -541,15 +554,6 @@ export abstract class AIProvider extends EventEmitter {
         'Returning stable fallback so the cache stays warm, but production telemetry should surface this as a real bug.'
     );
     return 'You are a helpful assistant.';
-  }
-
-  // Base stop reason normalization - providers should override for specific mappings
-  protected normalizeStopReason(stopReason: string | null | undefined): string | undefined {
-    if (!stopReason) return undefined;
-
-    // Providers should override this method to handle their specific stop reasons
-    // This base implementation provides a safe default
-    return 'stop';
   }
 
   // Cleanup method to close connections and free resources

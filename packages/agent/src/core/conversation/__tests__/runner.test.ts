@@ -1100,11 +1100,11 @@ describe('ConversationRunner', () => {
                 usage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
               };
             }
-            // max_tokens stop — should NOT trigger retry
+            // max_output_tokens stop — should NOT trigger retry
             return {
               content: 'partial output...',
               toolCalls: [],
-              stopReason: 'max_tokens',
+              stopReason: 'max_output_tokens',
               usage: { promptTokens: 100, completionTokens: 4096, totalTokens: 4196 },
             };
           }

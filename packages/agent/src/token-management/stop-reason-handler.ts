@@ -28,7 +28,7 @@ export class StopReasonHandler {
    */
   handleResponse(response: ProviderResponse, availableTools: Tool[]): ProviderResponse {
     // Check for token exhaustion
-    if (response.stopReason === 'max_tokens') {
+    if (response.stopReason === 'max_output_tokens') {
       if (this._config.logTokenExhaustion) {
         logger.warn('Token limit reached during response generation', {
           stopReason: response.stopReason,
@@ -147,7 +147,7 @@ export class StopReasonHandler {
    * Checks if a response indicates token exhaustion
    */
   isTokenExhausted(response: ProviderResponse): boolean {
-    return response.stopReason === 'max_tokens';
+    return response.stopReason === 'max_output_tokens';
   }
 
   /**

@@ -183,7 +183,7 @@ export class TestAgentProvider extends AIProvider {
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     if (signal?.aborted) {
-      return { content: '', toolCalls: [], stopReason: 'error' };
+      return { content: '', toolCalls: [], stopReason: 'cancelled' };
     }
 
     // Wrap in withRetry to test retry behavior, matching how real providers work
@@ -215,7 +215,7 @@ export class TestAgentProvider extends AIProvider {
             await sleep(streamingDelayMs, signal);
           } catch {
             // Aborted during delay
-            return { content: '', toolCalls: [], stopReason: 'error' };
+            return { content: '', toolCalls: [], stopReason: 'cancelled' };
           }
         }
 
@@ -233,8 +233,8 @@ export class TestAgentProvider extends AIProvider {
         if (lastUserText?.includes('Conversation Compaction Required')) {
           const content = 'Summary of conversation (test provider).';
           this.emit('token', { token: content });
-          this.emit('complete', { response: { content, toolCalls: [], stopReason: 'stop' } });
-          return { content, toolCalls: [], stopReason: 'stop', usage: mockUsage };
+          this.emit('complete', { response: { content, toolCalls: [], stopReason: 'end_turn' } });
+          return { content, toolCalls: [], stopReason: 'end_turn', usage: mockUsage };
         }
 
         const requested = this.extractRequestedTool(lastUserText ?? '');
@@ -278,9 +278,11 @@ export class TestAgentProvider extends AIProvider {
             const toolIsAvailable = _tools.some((t) => t.name === requested.name);
             if (!toolIsAvailable) {
               this.emit('token', { token: content });
-              this.emit('complete', { response: { content, toolCalls: [], stopReason: 'stop' } });
+              this.emit('complete', {
+                response: { content, toolCalls: [], stopReason: 'end_turn' },
+              });
               this.state.phase = 'final';
-              return { content, toolCalls: [], stopReason: 'stop', usage: mockUsage };
+              return { content, toolCalls: [], stopReason: 'end_turn', usage: mockUsage };
             }
           }
 
@@ -322,15 +324,15 @@ export class TestAgentProvider extends AIProvider {
         if (intentText && toolResultInfo) {
           this.emit('token', { token: intentText });
           this.emit('complete', {
-            response: { content: intentText, toolCalls: [], stopReason: 'stop' },
+            response: { content: intentText, toolCalls: [], stopReason: 'end_turn' },
           });
-          return { content: intentText, toolCalls: [], stopReason: 'stop', usage: mockUsage };
+          return { content: intentText, toolCalls: [], stopReason: 'end_turn', usage: mockUsage };
         }
 
         const content = toolResultText ? `Result:\n${toolResultText}` : 'No tool result found.';
         this.emit('token', { token: content });
-        this.emit('complete', { response: { content, toolCalls: [], stopReason: 'stop' } });
-        return { content, toolCalls: [], stopReason: 'stop', usage: mockUsage };
+        this.emit('complete', { response: { content, toolCalls: [], stopReason: 'end_turn' } });
+        return { content, toolCalls: [], stopReason: 'end_turn', usage: mockUsage };
       },
       { signal }
     );
@@ -343,13 +345,7 @@ export class TestAgentProvider extends AIProvider {
   }
 
   private extractRequestedTool(text: string): null | {
-    name:
-      | 'delegate'
-      | 'file_read'
-      | 'file_write'
-      | 'bash'
-      | 'todo_read'
-      | 'todo_write';
+    name: 'delegate' | 'file_read' | 'file_write' | 'bash' | 'todo_read' | 'todo_write';
     args: Record<string, unknown>;
   } {
     // Handle "add todo: <title>" or "todo add: <title>" pattern

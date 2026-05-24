@@ -7,6 +7,7 @@ import {
   normalizeOpenAIChatStop,
   normalizeOpenAIResponsesStop,
   normalizeLMStudioStop,
+  normalizeGeminiStop,
   normalizeLegacyStopReason,
 } from '../stop-reason';
 
@@ -493,6 +494,70 @@ describe('normalizeLMStudioStop', () => {
       stopDetails: null,
     });
     expect(logger.warn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('normalizeGeminiStop', () => {
+  it("maps 'STOP' to end_turn with null details", () => {
+    expect(normalizeGeminiStop('STOP')).toEqual({
+      stopReason: 'end_turn',
+      stopDetails: null,
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("maps 'FINISH_REASON_UNSPECIFIED' to end_turn with null details", () => {
+    expect(normalizeGeminiStop('FINISH_REASON_UNSPECIFIED')).toEqual({
+      stopReason: 'end_turn',
+      stopDetails: null,
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("maps 'MAX_TOKENS' to max_output_tokens with null details", () => {
+    expect(normalizeGeminiStop('MAX_TOKENS')).toEqual({
+      stopReason: 'max_output_tokens',
+      stopDetails: null,
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("maps 'SAFETY' (Gemini safety block) to end_turn and WARNs", () => {
+    const result = normalizeGeminiStop('SAFETY');
+    expect(result).toEqual({
+      stopReason: 'end_turn',
+      stopDetails: null,
+    });
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(logger.warn).mock.calls[0]?.[0]).toMatch(/unknown.*gemini.*finishReason/i);
+  });
+
+  it('maps undefined to end_turn and WARNs', () => {
+    const result = normalizeGeminiStop(undefined);
+    expect(result).toEqual({
+      stopReason: 'end_turn',
+      stopDetails: null,
+    });
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps null to end_turn and WARNs', () => {
+    const result = normalizeGeminiStop(null);
+    expect(result).toEqual({
+      stopReason: 'end_turn',
+      stopDetails: null,
+    });
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps unknown finishReason to end_turn and WARNs', () => {
+    const result = normalizeGeminiStop('QUANTUM_COLLAPSE');
+    expect(result).toEqual({
+      stopReason: 'end_turn',
+      stopDetails: null,
+    });
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(logger.warn).mock.calls[0]?.[0]).toMatch(/unknown.*gemini.*finishReason/i);
   });
 });
 
