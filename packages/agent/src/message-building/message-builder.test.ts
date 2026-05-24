@@ -237,6 +237,95 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_result recovery
   });
 });
 
+describe('buildProviderMessagesFromDurableEvents — context_compacted summary routing', () => {
+  let tempDir: string;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'lace-msg-builder-compacted-'));
+    warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+    warnSpy.mockRestore();
+  });
+
+  it('emits the compaction summary as role:user, not role:system', () => {
+    writeEvents(tempDir, [
+      {
+        type: 'context_compacted',
+        eventSeq: 1,
+        timestamp: new Date().toISOString(),
+        data: {
+          summary: 'Previously: the user asked about foo and bar.',
+          preserved: [],
+        },
+      },
+    ]);
+
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]!.role).toBe('user');
+  });
+
+  it('wraps the compaction summary in <previous-context-summary> tags', () => {
+    const summaryText = 'Previously: the user asked about foo and bar.';
+    writeEvents(tempDir, [
+      {
+        type: 'context_compacted',
+        eventSeq: 1,
+        timestamp: new Date().toISOString(),
+        data: {
+          summary: summaryText,
+          preserved: [],
+        },
+      },
+    ]);
+
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+
+    expect(messages).toHaveLength(1);
+    const content = messages[0]!.content as string;
+    expect(content).toContain('<previous-context-summary>');
+    expect(content).toContain('</previous-context-summary>');
+    expect(content).toContain(summaryText);
+    // Summary text must appear between the tags
+    const openTag = '<previous-context-summary>';
+    const closeTag = '</previous-context-summary>';
+    const openIdx = content.indexOf(openTag);
+    const closeIdx = content.indexOf(closeTag);
+    const textIdx = content.indexOf(summaryText);
+    expect(openIdx).toBeLessThan(textIdx);
+    expect(textIdx).toBeLessThan(closeIdx);
+  });
+
+  it('omits the summary message entirely when the summary is empty', () => {
+    writeEvents(tempDir, [
+      {
+        type: 'context_compacted',
+        eventSeq: 1,
+        timestamp: new Date().toISOString(),
+        data: {
+          summary: '',
+          preserved: [{ role: 'user', content: 'preserved turn' }],
+        },
+      },
+    ]);
+
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+
+    // No summary message should be emitted; only the preserved turn.
+    expect(
+      messages.some(
+        (m) => typeof m.content === 'string' && m.content.includes('<previous-context-summary>')
+      )
+    ).toBe(false);
+    expect(messages.some((m) => m.content === 'preserved turn')).toBe(true);
+  });
+});
+
 describe('buildProviderMessagesFromDurableEvents — system_prompt_set and context_injected', () => {
   let tempDir: string;
 
@@ -406,5 +495,156 @@ describe('buildProviderMessagesFromDurableEvents — system_prompt_set and conte
       { role: 'user', content: 'hi' },
       { role: 'user', content: 'Post-prompt runtime nudge.' },
     ]);
+  });
+
+  describe('Fix #2 — legacy session: peer context_injected after non-context_injected events', () => {
+    // A peer process (e.g. reminder scheduler) can write a context_injected
+    // event to a legacy session BEFORE the user's first prompt but AFTER some
+    // other event type (e.g. turn_start). That inject must NOT be absorbed into
+    // the synthesized systemPrompt; it must appear as a role:user message.
+
+    it('only absorbs creation-time context_injected events (leading run) into systemPrompt', () => {
+      writeEvents(tempDir, [
+        // Creation-time inject — should become systemPrompt
+        {
+          eventSeq: 1,
+          type: 'context_injected',
+          data: { content: [{ type: 'text', text: 'Creation-time persona.' }] },
+        },
+        // A non-context_injected event written by an early run() invocation
+        {
+          eventSeq: 2,
+          type: 'turn_start',
+          data: {},
+        },
+        // Peer inject written AFTER the turn_start — must NOT be in systemPrompt
+        {
+          eventSeq: 3,
+          type: 'context_injected',
+          data: { content: [{ type: 'text', text: 'Peer reminder inject.' }] },
+        },
+        // The actual user prompt
+        {
+          eventSeq: 4,
+          type: 'prompt',
+          data: { content: [{ type: 'text', text: 'Hello.' }] },
+        },
+      ]);
+
+      const { systemPrompt, messages } = buildProviderMessagesFromDurableEvents(tempDir);
+
+      // Only the leading creation-time inject makes it into the system prompt.
+      expect(systemPrompt).toBe('Creation-time persona.');
+
+      // The peer inject must appear as a role:user message, not be absorbed.
+      const peerMsg = messages.find(
+        (m) =>
+          m.role === 'user' &&
+          typeof m.content === 'string' &&
+          m.content.includes('Peer reminder inject.')
+      );
+      expect(peerMsg).toBeDefined();
+
+      // The prompt also appears as role:user.
+      const promptMsg = messages.find(
+        (m) => m.role === 'user' && typeof m.content === 'string' && m.content === 'Hello.'
+      );
+      expect(promptMsg).toBeDefined();
+    });
+
+    it('treats a context_injected immediately following a turn_start as peer inject (role:user)', () => {
+      // Specifically tests the turn_start-as-separator scenario mentioned in the spec.
+      writeEvents(tempDir, [
+        {
+          eventSeq: 1,
+          type: 'turn_start',
+          data: {},
+        },
+        {
+          eventSeq: 2,
+          type: 'context_injected',
+          data: { content: [{ type: 'text', text: 'Late inject.' }] },
+        },
+        {
+          eventSeq: 3,
+          type: 'prompt',
+          data: { content: [{ type: 'text', text: 'Hi.' }] },
+        },
+      ]);
+
+      const { systemPrompt, messages } = buildProviderMessagesFromDurableEvents(tempDir);
+
+      // No creation-time context_injected events — systemPrompt must be empty.
+      expect(systemPrompt).toBe('');
+
+      // The late inject appears as a role:user message.
+      expect(messages.some((m) => m.role === 'user' && m.content === 'Late inject.')).toBe(true);
+    });
+  });
+
+  describe('Fix #3 — multiple system_prompt_set events warn', () => {
+    let warnSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      warnSpy.mockRestore();
+    });
+
+    it('does NOT warn when exactly one system_prompt_set event is present', () => {
+      writeEvents(tempDir, [
+        {
+          eventSeq: 1,
+          type: 'system_prompt_set',
+          data: { text: 'Only one.' },
+        },
+        {
+          eventSeq: 2,
+          type: 'prompt',
+          data: { content: [{ type: 'text', text: 'hi' }] },
+        },
+      ]);
+
+      buildProviderMessagesFromDurableEvents(tempDir);
+
+      // No warn should have been called about multiple system_prompt_set events.
+      const multiWarnCall = warnSpy.mock.calls.find(
+        (args) => typeof args[0] === 'string' && args[0].includes('system_prompt_set')
+      );
+      expect(multiWarnCall).toBeUndefined();
+    });
+
+    it('warns when two system_prompt_set events appear and still uses the last value', () => {
+      writeEvents(tempDir, [
+        {
+          eventSeq: 1,
+          type: 'system_prompt_set',
+          data: { text: 'First prompt.' },
+        },
+        {
+          eventSeq: 2,
+          type: 'system_prompt_set',
+          data: { text: 'Second (last) prompt.' },
+        },
+        {
+          eventSeq: 3,
+          type: 'prompt',
+          data: { content: [{ type: 'text', text: 'hi' }] },
+        },
+      ]);
+
+      const { systemPrompt } = buildProviderMessagesFromDurableEvents(tempDir);
+
+      // Must use the last value defensively.
+      expect(systemPrompt).toBe('Second (last) prompt.');
+
+      // Must have warned exactly once with an appropriate message.
+      const multiWarnCall = warnSpy.mock.calls.find(
+        (args) => typeof args[0] === 'string' && args[0].includes('system_prompt_set')
+      );
+      expect(multiWarnCall).toBeDefined();
+    });
   });
 });
