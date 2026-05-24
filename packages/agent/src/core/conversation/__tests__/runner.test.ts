@@ -1746,6 +1746,149 @@ describe('ConversationRunner', () => {
       });
     });
 
+    describe('runner — retry path role alternation (Fix #3)', () => {
+      it('emits an assistant turn before the retry reminder even when model returns empty text', async () => {
+        // Sequence:
+        //  Turn 1: model returns empty text + one tool_use → tool executes
+        //  Turn 2: model returns empty text + no tool calls → retry block fires
+        //  Turn 3 (retry, toolChoice=required): we capture providerMessages and
+        //    assert last three are user[toolResults], assistant[*], user[reminder]
+        //
+        // Without the fix the assistant push is skipped when assistantText is '',
+        // so providerMessages ends …user[toolResults], user[reminder] — two
+        // consecutive user messages that Anthropic rejects with a 400.
+
+        const captured: ProviderMessage[][] = [];
+        let callCount = 0;
+
+        class RoleAlternationTestProvider extends AIProvider {
+          get providerName(): string {
+            return 'role-alternation-test';
+          }
+
+          getProviderInfo() {
+            return {
+              name: 'role-alternation-test',
+              displayName: 'Role Alternation Test',
+              requiresApiKey: false,
+            };
+          }
+
+          isConfigured(): boolean {
+            return true;
+          }
+
+          get supportsStreaming(): boolean {
+            return true;
+          }
+
+          async createResponse(
+            messages: ProviderMessage[],
+            tools: Tool[],
+            model: string,
+            signal?: AbortSignal,
+            conversationState?: ConversationState,
+            options?: RequestOptions
+          ): Promise<ProviderResponse> {
+            return this.createStreamingResponse(
+              messages,
+              tools,
+              model,
+              signal,
+              conversationState,
+              options
+            );
+          }
+
+          async createStreamingResponse(messages: ProviderMessage[]): Promise<ProviderResponse> {
+            callCount++;
+            captured.push([...messages]);
+
+            if (callCount === 1) {
+              // Turn 1: empty text + one tool call so the retry block's
+              // `completedTurns > 0` guard is satisfied on Turn 2.
+              return {
+                content: '',
+                toolCalls: [{ id: 't1', name: 'noop', arguments: {} }],
+                stopReason: 'tool_use',
+                usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+              };
+            }
+
+            if (callCount === 2) {
+              // Turn 2: empty text, no tool calls → triggers retry block.
+              return {
+                content: '',
+                toolCalls: [],
+                stopReason: 'end_turn',
+                usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+              };
+            }
+
+            // Turn 3 (retry with tool_choice=required): stop cleanly.
+            return {
+              content: 'done',
+              toolCalls: [],
+              stopReason: 'end_turn',
+              usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+            };
+          }
+        }
+
+        const provider = new RoleAlternationTestProvider();
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+        // Register 'noop' so getTool returns a mock tool and the runner can
+        // complete the tool round-trip (shouldContinue: true).  Without this
+        // the runner stops after the first provider call because tool-not-found
+        // sets shouldContinue: false.
+        const mockTool = { name: 'noop', description: 'noop', schema: {} } as unknown as Tool;
+        const deps = createMockDeps({
+          createProvider: vi.fn().mockImplementation(async () => provider),
+          createToolExecutor: vi.fn().mockReturnValue({
+            executor: {
+              getTool: vi
+                .fn()
+                .mockImplementation((name: string) => (name === 'noop' ? mockTool : null)),
+              execute: vi.fn().mockResolvedValue({
+                status: 'completed',
+                content: [{ type: 'text', text: 'noop result' }],
+              }),
+            },
+            toolsForProvider: [mockTool],
+          }),
+        });
+        const runner = new ConversationRunner(config, deps);
+
+        await runner.run({
+          content: [{ type: 'text', text: 'do work' }],
+          abortController: new AbortController(),
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+        });
+
+        // Turn 3 (index 2) is the retry request — providerMessages at that point.
+        expect(callCount).toBeGreaterThanOrEqual(3);
+        const retryRequest = captured[2];
+        const lastThree = retryRequest.slice(-3);
+
+        // Last three must be: user[toolResults], assistant[placeholder], user[reminder]
+        expect(lastThree[0].role).toBe('user'); // tool result from Turn 1
+        expect(lastThree[1].role).toBe('assistant'); // placeholder (was missing before fix)
+        expect(lastThree[2].role).toBe('user'); // system-reminder
+
+        // The reminder must contain the expected tag so downstream tests remain stable.
+        const reminderContent =
+          typeof lastThree[2].content === 'string' ? lastThree[2].content : '';
+        expect(reminderContent).toContain('system-reminder');
+      });
+    });
+
     describe('empty assistant turn not persisted (Fix #2)', () => {
       /**
        * Provider that returns an empty response on turn 1, then stops.

@@ -438,20 +438,23 @@ export class ConversationRunner {
           // text or empty responses instead of calling a verification tool.
           if (!retriedWithToolChoice && completedTurns > 0) {
             retriedWithToolChoice = true;
-            // Only inject an assistant turn when there is actual text — an empty
-            // assistant message followed immediately by a user message would create
-            // consecutive user/user pairs when rebuilt (the empty assistant is dropped
-            // by the format-converter), which the Anthropic API rejects.
-            const retryMessages: Array<{ role: 'assistant' | 'user'; content: string }> = [];
-            if (assistantText.trim().length > 0) {
-              retryMessages.push({ role: 'assistant' as const, content: assistantText });
-            }
-            retryMessages.push({
-              role: 'user' as const,
-              content:
-                '<system-reminder>You must use a tool to verify your work before stopping. Do not respond with text — call a tool.</system-reminder>',
-            });
-            providerMessages = [...providerMessages, ...retryMessages];
+            // Always push an assistant turn before the user reminder, even when
+            // assistantText is empty — Anthropic requires alternating roles, and
+            // the previous message in providerMessages is user[toolResults].
+            // Without a placeholder we'd ship consecutive user messages and get a
+            // 400. The placeholder is in-memory only; durable events.jsonl is
+            // untouched.
+            const assistantPlaceholder =
+              assistantText.trim().length > 0 ? assistantText : '(no response)';
+            providerMessages = [
+              ...providerMessages,
+              { role: 'assistant' as const, content: assistantPlaceholder },
+              {
+                role: 'user' as const,
+                content:
+                  '<system-reminder>You must use a tool to verify your work before stopping. Do not respond with text — call a tool.</system-reminder>',
+              },
+            ];
             nextRequestOptions = { toolChoice: 'required' };
             continue;
           }
