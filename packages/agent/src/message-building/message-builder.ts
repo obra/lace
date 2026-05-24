@@ -14,7 +14,7 @@ import { logger } from '@lace/agent/utils/logger';
 type TextBlock = { type: 'text'; text: string };
 type ContentBlockShape = { type?: unknown; text?: unknown };
 type ContextInjectedData = { content?: unknown[] };
-type ContextCompactedData = { summary?: string; preserved?: unknown[] };
+type ContextCompactedData = { preserved?: unknown[] };
 type SystemPromptSetData = { text?: unknown };
 type MessageData = { content?: string | unknown[] };
 type ToolUseData = { toolCallId?: unknown; name?: unknown; input?: unknown; result?: ToolResult };
@@ -241,15 +241,13 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
 
     if (type === 'context_compacted') {
       const eventData = data as ContextCompactedData;
-      const summary = typeof eventData.summary === 'string' ? eventData.summary : '';
       const preserved = Array.isArray(eventData.preserved) ? eventData.preserved : [];
 
+      // Reset messages: the preserved array is the complete rebuilt conversation.
+      // The summary (if any) lives as the first entry in preserved — placed there
+      // by the compaction strategy. Do not read a separate data.summary field;
+      // no writer produces that shape and doing so would duplicate the summary.
       messages.length = 0;
-      if (summary.trim())
-        messages.push({
-          role: 'user',
-          content: summary,
-        });
 
       for (const msg of preserved) {
         if (!msg || typeof msg !== 'object') continue;

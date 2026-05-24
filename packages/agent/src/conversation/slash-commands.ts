@@ -187,13 +187,17 @@ export async function handleSlashCommand(
           // ent/session/compact RPC handler so message-builder picks it up on
           // rebuild. The old 'compaction' type had no 'preserved' field and was
           // silently ignored, making /compact a no-op across process restarts.
+          //
+          // Do NOT write data.summary: the strategy already puts the summary as
+          // the first entry in result.messages (which lands in preserved[0]).
+          // Writing data.summary as well causes message-builder to inject a second
+          // role:user message with the same text, producing a duplicate on rebuild.
           await writeAndAdvance({
             type: 'context_compacted',
             data: {
               strategy: 'summarize',
               preserveRecent: 1,
               messagesCompacted: providerMessages.length - 1,
-              summary: result.summary,
               preserved: serializedPreserved,
             },
           });

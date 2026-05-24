@@ -237,7 +237,7 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_result recovery
   });
 });
 
-describe('buildProviderMessagesFromDurableEvents — context_compacted summary routing', () => {
+describe('buildProviderMessagesFromDurableEvents — context_compacted preserved routing', () => {
   let tempDir: string;
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
@@ -251,26 +251,10 @@ describe('buildProviderMessagesFromDurableEvents — context_compacted summary r
     warnSpy.mockRestore();
   });
 
-  it('emits the compaction summary as role:user, not role:system', () => {
-    writeEvents(tempDir, [
-      {
-        type: 'context_compacted',
-        eventSeq: 1,
-        timestamp: new Date().toISOString(),
-        data: {
-          summary: 'Previously: the user asked about foo and bar.',
-          preserved: [],
-        },
-      },
-    ]);
-
-    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
-
-    expect(messages).toHaveLength(1);
-    expect(messages[0]!.role).toBe('user');
-  });
-
-  it('emits the compaction summary as plain text (no markup wrapper)', () => {
+  it('rebuilds messages solely from the preserved array (no data.summary injection)', () => {
+    // The compaction strategy puts the summary as the first entry in preserved.
+    // message-builder must NOT look at data.summary — doing so would produce a
+    // duplicate if preserved[0] already contains the summary text.
     const summaryText = 'Previously: the user asked about foo and bar.';
     writeEvents(tempDir, [
       {
@@ -278,26 +262,40 @@ describe('buildProviderMessagesFromDurableEvents — context_compacted summary r
         eventSeq: 1,
         timestamp: new Date().toISOString(),
         data: {
-          summary: summaryText,
-          preserved: [],
+          // data.summary is intentionally absent — no writer produces this field.
+          // Even if present it must be ignored; the summary lives in preserved[0].
+          preserved: [
+            { role: 'user', content: summaryText },
+            { role: 'user', content: 'preserved turn' },
+          ],
         },
       },
     ]);
 
     const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
 
-    expect(messages).toHaveLength(1);
-    expect(messages[0]!.content).toBe(summaryText);
+    // Both preserved entries are emitted; the summary appears exactly once.
+    expect(messages).toHaveLength(2);
+    const allText = messages
+      .map((m) => (typeof m.content === 'string' ? m.content : ''))
+      .join('\n');
+    const occurrences = (
+      allText.match(new RegExp(summaryText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? []
+    ).length;
+    expect(occurrences).toBe(1);
   });
 
-  it('omits the summary message entirely when the summary is empty', () => {
+  it('rebuilds only the preserved entries and ignores any stale data.summary field', () => {
+    // Defensive: even if a legacy event carries data.summary, message-builder
+    // must not inject it as a separate message. Only preserved entries are used.
+    const summaryText = 'Legacy summary text.';
     writeEvents(tempDir, [
       {
         type: 'context_compacted',
         eventSeq: 1,
         timestamp: new Date().toISOString(),
         data: {
-          summary: '',
+          summary: summaryText, // legacy field — must be ignored
           preserved: [{ role: 'user', content: 'preserved turn' }],
         },
       },
@@ -305,13 +303,27 @@ describe('buildProviderMessagesFromDurableEvents — context_compacted summary r
 
     const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
 
-    // No summary message should be emitted; only the preserved turn.
-    expect(
-      messages.some(
-        (m) => typeof m.content === 'string' && m.content.includes('<previous-context-summary>')
-      )
-    ).toBe(false);
-    expect(messages.some((m) => m.content === 'preserved turn')).toBe(true);
+    // Only the preserved entry is emitted; legacy data.summary is ignored.
+    expect(messages).toHaveLength(1);
+    expect(messages[0]!.content).toBe('preserved turn');
+    // The legacy summary text must NOT appear as an extra message.
+    expect(messages.some((m) => m.content === summaryText)).toBe(false);
+  });
+
+  it('emits an empty messages array when preserved is empty', () => {
+    writeEvents(tempDir, [
+      {
+        type: 'context_compacted',
+        eventSeq: 1,
+        timestamp: new Date().toISOString(),
+        data: {
+          preserved: [],
+        },
+      },
+    ]);
+
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+    expect(messages).toHaveLength(0);
   });
 });
 
