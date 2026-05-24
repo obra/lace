@@ -6,7 +6,7 @@ const PATTERNS: Array<{ tag: string; re: RegExp }> = [
   { tag: 'anthropic-or-openai', re: /sk-(?:ant|proj)-[A-Za-z0-9_-]{20,}/g },
   { tag: 'aws-access-key', re: /AKIA[0-9A-Z]{16}/g },
   { tag: 'github', re: /gh[pousr]_[A-Za-z0-9]{36,}(?![A-Za-z0-9])/g },
-  { tag: '1password', re: /ops_[A-Za-z0-9_+/=-]{20,}/g },
+  { tag: '1password', re: /ops_[A-Za-z0-9_-]{20,}/g },
   { tag: 'google', re: /AIza[0-9A-Za-z_-]{35}/g },
 ];
 

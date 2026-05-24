@@ -135,13 +135,24 @@ describe('redact', () => {
 
   describe('1password tokens', () => {
     it('redacts ops_ tokens', () => {
-      const input = 'OP_SERVICE_ACCOUNT_TOKEN=ops_abcdefghijklmnopqrstuvwxyz==';
+      // 1Password service-account tokens are base64url (no `=` padding, no `/`).
+      const input = 'OP_SERVICE_ACCOUNT_TOKEN=ops_abcdefghijklmnopqrstuvwxyz';
       expect(redact(input)).toBe('OP_SERVICE_ACCOUNT_TOKEN=<REDACTED:1password>');
     });
 
     it('does not redact ops_ followed by too few chars', () => {
       const input = 'ops_short';
       expect(redact(input)).toBe(input);
+    });
+
+    it('does NOT redact path-like strings starting with ops_', () => {
+      const input = 'ops_logger/some/long/path/with/at/least/twenty/chars';
+      expect(redact(input)).toBe(input);
+    });
+
+    it('still redacts actual 1Password tokens', () => {
+      const token = 'ops_' + 'A'.repeat(20);
+      expect(redact(`tok=${token}`)).toBe('tok=<REDACTED:1password>');
     });
   });
 
