@@ -61,11 +61,10 @@ describe('durable events', () => {
       });
 
       const types = (eventsResult as any).events.map((e: any) => e.type);
-      // system_prompt_set is filtered from ent/session/events (use ent/session/system_prompt instead)
-      // Session creation writes system_prompt_set (seq=1), then prompt events follow from seq=2
-      expect(types).toEqual(['prompt', 'turn_start', 'message', 'turn_end']);
-      // First visible event is the user prompt (eventSeq=2 because system_prompt_set was seq=1)
-      expect((eventsResult as any).events[0]).toMatchObject({
+      // Session creation writes a single system_prompt_set event first, then prompt events follow
+      expect(types).toEqual(['system_prompt_set', 'prompt', 'turn_start', 'message', 'turn_end']);
+      // First event is system_prompt_set, second is the user prompt
+      expect((eventsResult as any).events[1]).toMatchObject({
         eventSeq: 2,
         turnId: promptResult.turnId,
       });

@@ -52,11 +52,15 @@ describe('skills e2e', () => {
       );
       await client.request('session/new', { cwd: ctx.workDir, mcpServers: [] });
 
-      // Use the dedicated endpoint to read the system prompt text
-      // (ent/session/events filters out system_prompt_set for security)
-      const { text: systemPrompt } = (await client.request('ent/session/system_prompt', {})) as {
-        text: string;
+      // Get events to find the system_prompt_set event with rendered system prompt
+      const events = (await client.request('ent/session/events', { limit: 10 })) as {
+        events: Array<{ type: string; data: { text?: string } }>;
       };
+
+      const contextEvent = events.events.find((e) => e.type === 'system_prompt_set');
+      expect(contextEvent).toBeDefined();
+
+      const systemPrompt = contextEvent?.data?.text ?? '';
 
       // Verify skill is in the system prompt
       expect(systemPrompt).toContain('<available_skills>');
@@ -121,11 +125,13 @@ describe('skills e2e', () => {
       );
       await client.request('session/new', { cwd: ctx.workDir, mcpServers: [] });
 
-      // Use the dedicated endpoint to read the system prompt text
-      // (ent/session/events filters out system_prompt_set for security)
-      const { text: systemPrompt } = (await client.request('ent/session/system_prompt', {})) as {
-        text: string;
+      // Get events to find the system_prompt_set event with rendered system prompt
+      const events = (await client.request('ent/session/events', { limit: 10 })) as {
+        events: Array<{ type: string; data: { text?: string } }>;
       };
+
+      const contextEvent = events.events.find((e) => e.type === 'system_prompt_set');
+      const systemPrompt = contextEvent?.data?.text ?? '';
 
       // Verify project version is in the system prompt (not global)
       expect(systemPrompt).toContain('Project version');

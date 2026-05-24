@@ -698,36 +698,7 @@ export function registerSessionOperationHandlers(
       types: parsed?.types,
     });
 
-    // Filter system_prompt_set events — they embed the full system prompt text including
-    // user instructions, internal URLs, and secrets. Callers wanting the system prompt
-    // should use ent/session/system_prompt. This is a response-boundary filter only;
-    // the underlying event log is not modified.
-    return {
-      ...result,
-      events: result.events.filter((e) => e.type !== 'system_prompt_set'),
-    };
-  });
-
-  peer.onRequest('ent/session/system_prompt', async (_params: unknown) => {
-    assertInitialized(state);
-    if (!state.activeSession)
-      throw {
-        code: AcpErrorCodes.SessionNotFound,
-        message: 'SessionNotFound',
-        data: { category: 'session' },
-      };
-
-    // Read the system_prompt_set event(s) directly. The last one wins (fork
-    // with a different cwd re-renders and appends a second event).
-    const result = readDurableEvents(state.activeSession.dir, {
-      types: ['system_prompt_set'],
-    });
-    const last = result.events.at(-1);
-    const text =
-      typeof (last?.data as { text?: unknown })?.text === 'string'
-        ? (last!.data as { text: string }).text
-        : '';
-    return { text };
+    return result;
   });
 
   peer.onRequest('ent/session/token_usage', async (_params: unknown) => {

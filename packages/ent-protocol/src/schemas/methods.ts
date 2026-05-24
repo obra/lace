@@ -819,23 +819,6 @@ export const EntSessionEventsResponseSchema = z
   })
   .strict();
 
-export const EntSessionSystemPromptRequestSchema = z
-  .object({
-    jsonrpc: JsonRpcVersionSchema,
-    id: JsonRpcIdSchema,
-    method: z.literal('ent/session/system_prompt'),
-    params: EmptyParamsSchema.optional(),
-  })
-  .strict();
-
-export const EntSessionSystemPromptResponseSchema = z
-  .object({
-    jsonrpc: JsonRpcVersionSchema,
-    id: JsonRpcIdSchema,
-    result: z.object({ text: z.string() }).strict(),
-  })
-  .strict();
-
 const EntSessionTokenUsageResultSchema = z
   .object({
     totalPromptTokens: z.number(),
@@ -2180,7 +2163,6 @@ export const EntProtocolRequestSchema = z.union([
   EntSessionRewindRequestSchema,
   EntSessionCheckpointRequestSchema,
   EntSessionEventsRequestSchema,
-  EntSessionSystemPromptRequestSchema,
   EntProvidersListRequestSchema,
   EntConnectionsListRequestSchema,
   EntConnectionsUpsertRequestSchema,

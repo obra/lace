@@ -53,8 +53,6 @@ import {
   EntSessionConfigureResponseSchema,
   EntSessionEventsRequestSchema,
   EntSessionEventsResponseSchema,
-  EntSessionSystemPromptRequestSchema,
-  EntSessionSystemPromptResponseSchema,
   EntSessionContextBreakdownRequestSchema,
   EntSessionContextBreakdownResponseSchema,
   EntSessionInjectNotificationSchema,
@@ -133,11 +131,6 @@ export const agentMethodHandlers: Record<string, AgentMethodHandler> = {
     kind: 'request',
     paramsSchema: EntSessionEventsRequestSchema.shape.params.optional(),
     resultSchema: EntSessionEventsResponseSchema.shape.result,
-  },
-  'ent/session/system_prompt': {
-    kind: 'request',
-    paramsSchema: EntSessionSystemPromptRequestSchema.shape.params.optional(),
-    resultSchema: EntSessionSystemPromptResponseSchema.shape.result,
   },
   'ent/session/token_usage': {
     kind: 'request',

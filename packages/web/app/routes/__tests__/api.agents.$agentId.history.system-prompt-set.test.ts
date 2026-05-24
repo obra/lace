@@ -1,5 +1,5 @@
 // ABOUTME: Unit tests for system_prompt_set durable event mapping in agent history route
-// ABOUTME: Verifies Phase 2 cache-control hardening: system prompt fetched via dedicated endpoint
+// ABOUTME: Verifies system_prompt_set events are converted to SYSTEM_PROMPT app events directly from the event stream
 
 /**
  * @vitest-environment node
@@ -29,13 +29,11 @@ import { loader as getHistory } from '@lace/web/app/routes/api.agents.$agentId.h
 const SYSTEM_PROMPT_TEXT = 'You are a helpful coding assistant.';
 
 function makeSupervisorMock(overrides: {
-  systemPromptText?: string;
-  extraEvents?: Array<{ eventSeq: number; timestamp: string; type: string; data: unknown }>;
+  events?: Array<{ eventSeq: number; timestamp: string; type: string; data: unknown }>;
 }) {
   const agentId = testSessionId(1);
   const workspaceSessionId = testWorkspaceSessionId(1);
-  const systemPromptText = overrides.systemPromptText ?? SYSTEM_PROMPT_TEXT;
-  const extraEvents = overrides.extraEvents ?? [];
+  const events = overrides.events ?? [];
 
   return {
     agentId,
@@ -44,10 +42,7 @@ function makeSupervisorMock(overrides: {
       listWorkspaceSessions: () => [{ workspaceSessionId, agents: [{ sessionId: agentId }] }],
       agentRequest: ({ method }: { method: string }) => {
         if (method === 'ent/session/events') {
-          return Promise.resolve({ events: extraEvents });
-        }
-        if (method === 'ent/session/system_prompt') {
-          return Promise.resolve({ text: systemPromptText });
+          return Promise.resolve({ events });
         }
         return Promise.resolve({});
       },
@@ -55,13 +50,22 @@ function makeSupervisorMock(overrides: {
   };
 }
 
-describe('history route: Phase 2 system prompt via ent/session/system_prompt', () => {
+describe('history route: system_prompt_set event mapping', () => {
   beforeEach(() => {
     mockGetSupervisor.mockReset();
   });
 
-  it('fetches system prompt via dedicated endpoint and emits SYSTEM_PROMPT app event', async () => {
-    const { agentId, supervisor } = makeSupervisorMock({});
+  it('converts system_prompt_set event to SYSTEM_PROMPT app event', async () => {
+    const { agentId, supervisor } = makeSupervisorMock({
+      events: [
+        {
+          eventSeq: 1,
+          timestamp: new Date().toISOString(),
+          type: 'system_prompt_set',
+          data: { text: SYSTEM_PROMPT_TEXT },
+        },
+      ],
+    });
     mockGetSupervisor.mockReturnValue(supervisor);
 
     const req = new Request(`http://localhost/api/agents/${agentId}/history`, { method: 'GET' });
@@ -75,8 +79,17 @@ describe('history route: Phase 2 system prompt via ent/session/system_prompt', (
     expect(promptEvent?.data).toBe(SYSTEM_PROMPT_TEXT);
   });
 
-  it('emits no SYSTEM_PROMPT when system prompt text is empty', async () => {
-    const { agentId, supervisor } = makeSupervisorMock({ systemPromptText: '' });
+  it('emits no SYSTEM_PROMPT when system_prompt_set has empty text', async () => {
+    const { agentId, supervisor } = makeSupervisorMock({
+      events: [
+        {
+          eventSeq: 1,
+          timestamp: new Date().toISOString(),
+          type: 'system_prompt_set',
+          data: { text: '' },
+        },
+      ],
+    });
     mockGetSupervisor.mockReturnValue(supervisor);
 
     const req = new Request(`http://localhost/api/agents/${agentId}/history`, { method: 'GET' });
@@ -87,11 +100,21 @@ describe('history route: Phase 2 system prompt via ent/session/system_prompt', (
     expect(events.find((e) => e.type === 'SYSTEM_PROMPT')).toBeUndefined();
   });
 
-  it('does not duplicate SYSTEM_PROMPT for legacy sessions that have context_injected events', async () => {
-    // Legacy sessions: context_injected event in the stream already produces
-    // a SYSTEM_PROMPT event, so the system_prompt_set path should not add a second one.
+  it('emits no SYSTEM_PROMPT when there are no system_prompt_set events', async () => {
+    const { agentId, supervisor } = makeSupervisorMock({ events: [] });
+    mockGetSupervisor.mockReturnValue(supervisor);
+
+    const req = new Request(`http://localhost/api/agents/${agentId}/history`, { method: 'GET' });
+    const res = await getHistory(createActionArgs(req, { agentId }));
+
+    expect(res.status).toBe(200);
+    const events = await parseResponse<Array<{ type?: string }>>(res);
+    expect(events.find((e) => e.type === 'SYSTEM_PROMPT')).toBeUndefined();
+  });
+
+  it('converts legacy context_injected event to SYSTEM_PROMPT app event', async () => {
     const { agentId, supervisor } = makeSupervisorMock({
-      extraEvents: [
+      events: [
         {
           eventSeq: 1,
           timestamp: new Date().toISOString(),
@@ -99,8 +122,6 @@ describe('history route: Phase 2 system prompt via ent/session/system_prompt', (
           data: { content: [{ type: 'text', text: 'Legacy system prompt' }] },
         },
       ],
-      // For legacy sessions the dedicated endpoint returns empty text.
-      systemPromptText: '',
     });
     mockGetSupervisor.mockReturnValue(supervisor);
 

@@ -111,10 +111,11 @@ describe('lace-agent process (E2E over stdio)', () => {
       )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
 
       expect(durable.hasMore).toBe(false);
-      // system_prompt_set is filtered from ent/session/events (use ent/session/system_prompt instead)
+      // system_prompt_set is written on session creation with the rendered system prompt
       // After the tool result, the LLM returns bare text which triggers a
       // tool_choice=required retry, producing an extra message event
       expect(durable.events.map((e) => e.type)).toEqual([
+        'system_prompt_set',
         'prompt',
         'turn_start',
         'message',
@@ -123,7 +124,7 @@ describe('lace-agent process (E2E over stdio)', () => {
         'message', // bare text retry response
         'turn_end',
       ]);
-      expect(durable.events.map((e) => e.eventSeq)).toEqual([2, 3, 4, 5, 6, 7, 8]);
+      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
 
       const list = (await withTimeout(
         ctx.agent.peer.request('session/list', { cwd: ctx.workDir }),
@@ -185,10 +186,11 @@ describe('lace-agent process (E2E over stdio)', () => {
       'ent/session/events (restart)'
     )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
 
-    // system_prompt_set is filtered from ent/session/events (use ent/session/system_prompt instead)
+    // system_prompt_set is written on session creation with the rendered system prompt
     // After the tool result, the LLM returns bare text which triggers a
     // tool_choice=required retry, producing an extra message event
     expect(durable.events.map((e) => e.type)).toEqual([
+      'system_prompt_set',
       'prompt',
       'turn_start',
       'message',
@@ -197,7 +199,7 @@ describe('lace-agent process (E2E over stdio)', () => {
       'message', // bare text retry response
       'turn_end',
     ]);
-    expect(durable.events.map((e) => e.eventSeq)).toEqual([2, 3, 4, 5, 6, 7, 8]);
+    expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
   it('reports currentSession.messageCount in ent/agent/status', { timeout: 15_000 }, async () => {
@@ -308,12 +310,13 @@ describe('lace-agent process (E2E over stdio)', () => {
         'ent/session/events'
       )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
 
-      // system_prompt_set is filtered from ent/session/events (use ent/session/system_prompt instead)
+      // system_prompt_set is written on session creation with the rendered system prompt
       // The LLM (test provider) emits a message before the tool call ("Running echo hi..."),
       // so we expect an extra message event before permission_requested.
       // After the tool result, the LLM returns bare text which triggers a
       // tool_choice=required retry, producing an extra message event.
       expect(durable.events.map((e) => e.type)).toEqual([
+        'system_prompt_set',
         'prompt',
         'turn_start',
         'message', // LLM's initial response before tool call
@@ -325,7 +328,7 @@ describe('lace-agent process (E2E over stdio)', () => {
         'turn_end',
       ]);
 
-      expect(durable.events.map((e) => e.eventSeq)).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     }
   );
 
