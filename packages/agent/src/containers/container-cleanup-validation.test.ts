@@ -16,7 +16,13 @@ const execFileAsync = promisify(execFile);
 
 const TEST_IMAGE = 'mcr.microsoft.com/devcontainers/base:ubuntu';
 
+function allowsAppleContainerRuntime(): boolean {
+  const override = process.env.LACE_CONTAINER_RUNTIME;
+  return override === undefined || override === '' || override === 'auto' || override === 'apple';
+}
+
 function hasAppleContainerAvailable(): boolean {
+  if (!allowsAppleContainerRuntime()) return false;
   if (process.platform !== 'darwin') return false;
   try {
     execFileSync('container', ['list'], { stdio: 'ignore', timeout: 5000 });

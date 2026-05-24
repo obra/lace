@@ -10,7 +10,13 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
 
+function allowsAppleContainerRuntime(): boolean {
+  const override = process.env.LACE_CONTAINER_RUNTIME;
+  return override === undefined || override === '' || override === 'auto' || override === 'apple';
+}
+
 function hasAppleContainerAvailable(): boolean {
+  if (!allowsAppleContainerRuntime()) return false;
   if (process.platform !== 'darwin') return false;
   try {
     // `container list` exits non-zero if the daemon isn't running or CLI is missing.
