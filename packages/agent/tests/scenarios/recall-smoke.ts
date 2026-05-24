@@ -18,7 +18,9 @@ const laceDir = mkdtempSync(join(tmpdir(), 'recall-smoke-'));
 process.env.LACE_DIR = laceDir;
 
 // Dynamic imports so the env var is in place before module-init code runs.
-const { Session } = await import('../../src/core/session.js');
+const { getSessionDir, writeSessionMeta, writeSessionState, ensureSessionFiles } = await import(
+  '../../src/storage/session-store.js'
+);
 const { appendDurableEvent, invalidatePersonaCache } = await import(
   '../../src/storage/event-log.js'
 );
@@ -52,7 +54,21 @@ try {
 
   // ---- 1. Create the session -------------------------------------------------
   step('1. Session.create');
-  const session = Session.create({ cwd: laceDir, persona: 'smoke-test' });
+  const sessionId = `sess_${randomUUID()}`;
+  const sessionDir = getSessionDir(sessionId);
+  writeSessionMeta(sessionDir, {
+    sessionId,
+    workDir: laceDir,
+    created: new Date().toISOString(),
+    persona: 'smoke-test',
+  });
+  writeSessionState(sessionDir, {
+    nextEventSeq: 1,
+    nextStreamSeq: 1,
+    config: {},
+  });
+  ensureSessionFiles(sessionDir);
+  const session = { sessionId, sessionDir };
   console.log(`  sessionId: ${session.sessionId}`);
   console.log(`  sessionDir: ${session.sessionDir}`);
   // The persona cache may have been populated with a stale "null" earlier in
