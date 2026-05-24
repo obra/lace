@@ -39,6 +39,7 @@ import {
   type AgentServerState,
   type ContainerExecutionMetadata,
 } from '../server-types';
+import { fingerprintContainerExecutionToken } from './container-execution-metadata';
 
 // Types for tool_use update payloads from child processes
 type ToolKind = 'read' | 'edit' | 'delete' | 'search' | 'execute' | 'think' | 'fetch' | 'other';
@@ -224,12 +225,12 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       return;
     }
 
-    if (job.executionEnv && job.runtimeBinding) {
-      job.runtimeBinding = buildRuntimeBindingWithExecutionEnv(
-        job.runtimeBinding,
-        job.executionEnv
-      );
-    }
+    const executionEnv = job.executionEnv;
+    delete job.executionEnv;
+    const runtimeBindingForChild =
+      executionEnv && job.runtimeBinding
+        ? buildRuntimeBindingWithExecutionEnv(job.runtimeBinding, executionEnv)
+        : job.runtimeBinding;
 
     // Buffer for collecting stderr output
     let stderrBuffer = '';
@@ -259,7 +260,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           ? { childSessionId: job.subagentSessionId }
           : {}),
         ...(job.scratchDirHostPath ? { scratchDirHostPath: job.scratchDirHostPath } : {}),
-        ...(job.executionEnv ? { executionEnv: job.executionEnv } : {}),
+        ...(executionEnv ? { executionEnv } : {}),
       });
 
       if (subagentProc.nativeProcess) {
@@ -393,16 +394,22 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       const metadata = value as Record<string, unknown>;
       if (
         typeof metadata.tokenEnvName !== 'string' ||
-        typeof metadata.token !== 'string' ||
         typeof metadata.personaName !== 'string' ||
         typeof metadata.parentSessionId !== 'string'
       ) {
         return undefined;
       }
+      const tokenFingerprint =
+        typeof metadata.tokenFingerprint === 'string'
+          ? metadata.tokenFingerprint
+          : typeof metadata.token === 'string'
+            ? fingerprintContainerExecutionToken(metadata.token)
+            : undefined;
+      if (!tokenFingerprint) return undefined;
 
       return {
         tokenEnvName: metadata.tokenEnvName,
-        token: metadata.token,
+        tokenFingerprint,
         personaName: metadata.personaName,
         parentSessionId: metadata.parentSessionId as SessionId,
         jobId: mappedJobId,
@@ -935,8 +942,8 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         ? job.personaContainerRuntime.workingDirectory
         : currentState.activeSession!.meta.workDir;
       const inheritedRuntimeConfig =
-        !isContainerizedSubagent && job.runtimeBinding
-          ? { config: { runtimeBinding: job.runtimeBinding } }
+        !isContainerizedSubagent && runtimeBindingForChild
+          ? { config: { runtimeBinding: runtimeBindingForChild } }
           : {};
       if (isResume) {
         await childPeer.request('session/resume', {

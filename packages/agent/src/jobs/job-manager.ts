@@ -19,6 +19,7 @@ import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 import { readAllSessionEventLines } from '../storage/event-log';
 import type { SessionId } from '@lace/ent-protocol';
 import { resolveContainerId } from '../containers/container-manager';
+import { fingerprintContainerExecutionToken } from './container-execution-metadata';
 
 export type JobManagerDeps = {
   getActiveSession: () => { sessionId: string; dir: string } | null;
@@ -174,7 +175,7 @@ function buildContainerExecutionContext(input: {
     executionEnv: { [input.identity.tokenEnvName]: token },
     metadata: {
       tokenEnvName: input.identity.tokenEnvName,
-      token,
+      tokenFingerprint: fingerprintContainerExecutionToken(token),
       personaName: input.persona,
       parentSessionId: input.parentSessionId as SessionId,
       jobId: input.jobId,

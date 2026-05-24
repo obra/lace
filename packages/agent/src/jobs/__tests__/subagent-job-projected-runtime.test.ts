@@ -9,7 +9,7 @@ import { PassThrough } from 'node:stream';
 import { appendFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { JsonRpcPeer } from '@lace/ent-protocol';
 import {
   writeSessionMeta,
@@ -22,6 +22,10 @@ import type { MountRegistryEntry, JobState } from '@lace/agent/server-types';
 import type { SubagentProcessHandle } from '@lace/agent/jobs/subagent-spawn';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import { JobManager } from '@lace/agent/jobs/job-manager';
+
+function fingerprintToken(token: string): string {
+  return createHash('sha256').update(token, 'utf8').digest('hex');
+}
 
 // Mock spawnSubagent so we don't exec a real child process — return a fake
 // handle whose stdout/stdin are PassThroughs we don't actually drive. The
@@ -434,8 +438,24 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
       containerSpecName: 'parent-browser-child',
       containerId: 'lace-parent-browser-child',
     });
-    expect(typeof metadata.token).toBe('string');
-    expect(metadata.token).not.toBe('');
+    expect(metadata).not.toHaveProperty('token');
+    expect(typeof metadata.tokenFingerprint).toBe('string');
+    expect(metadata.tokenFingerprint).not.toBe('');
+
+    const executionToken = (
+      sessionNewRequests[0] as {
+        config?: {
+          runtimeBinding?: {
+            toolRuntime?: {
+              spec?: { env?: Record<string, string> };
+            };
+          };
+        };
+      }
+    ).config?.runtimeBinding?.toolRuntime?.spec?.env?.SEN_AGENT_TOKEN;
+    expect(typeof executionToken).toBe('string');
+    expect(executionToken).not.toBe('');
+    expect(metadata.tokenFingerprint).toBe(fingerprintToken(executionToken));
 
     expect(sessionNewRequests[0]).toMatchObject({
       config: {
@@ -444,7 +464,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
             spec: {
               env: {
                 EXISTING: '1',
-                SEN_AGENT_TOKEN: metadata.token,
+                SEN_AGENT_TOKEN: executionToken,
               },
             },
           },
@@ -470,6 +490,9 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
       jobId: job.jobId,
       containerExecutionMetadata: metadata,
     });
+    expect(job.executionEnv).toBeUndefined();
+    expect(job.runtimeBinding?.toolRuntime.type).toBe('container');
+    expect(job.runtimeBinding?.toolRuntime.spec.env).toEqual({ EXISTING: '1' });
   });
 
   it('does not mint container execution metadata for native persona delegates', async () => {
@@ -602,6 +625,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
           containerExecutionMetadata: {
             tokenEnvName: 'SEN_AGENT_TOKEN',
             token: 'child-token',
+            tokenFingerprint: fingerprintToken('child-token'),
             personaName: 'browser-driver',
             parentSessionId,
             jobId: 'job_child_container',
@@ -646,7 +670,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
     const mappedJobId = 'job_parent_delegate_job_child_container';
     const expectedMetadata = {
       tokenEnvName: 'SEN_AGENT_TOKEN',
-      token: 'child-token',
+      tokenFingerprint: fingerprintToken('child-token'),
       personaName: 'browser-driver',
       parentSessionId,
       jobId: mappedJobId,

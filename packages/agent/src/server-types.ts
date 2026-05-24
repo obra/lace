@@ -71,7 +71,7 @@ export type ContainerExecutionIdentityConfig = { tokenEnvName: string };
 
 export type ContainerExecutionMetadata = {
   tokenEnvName: string;
-  token: string;
+  tokenFingerprint: string;
   personaName: string;
   parentSessionId: SessionId;
   jobId: string;

@@ -464,7 +464,7 @@ describe('protocol shapes (representative examples)', () => {
           jobType: 'delegate',
           containerExecutionMetadata: {
             tokenEnvName: 'AGENT_TOKEN',
-            token: 'abc123',
+            tokenFingerprint: 'token-fingerprint',
             personaName: 'browser-driver',
             parentSessionId: 'sess_00000000-0000-0000-0000-000000000001',
             jobId: 'job_container_identity',
@@ -488,7 +488,7 @@ describe('protocol shapes (representative examples)', () => {
           jobType: 'delegate',
           containerExecutionMetadata: {
             tokenEnvName: 'AGENT_TOKEN',
-            token: 'abc123',
+            tokenFingerprint: 'token-fingerprint',
             personaName: 'browser-driver',
             parentSessionId: 'sess_00000000-0000-0000-0000-000000000001',
             jobId: 'job_container_identity_without_container_id',
@@ -511,7 +511,7 @@ describe('protocol shapes (representative examples)', () => {
           jobType: 'delegate',
           containerExecutionMetadata: {
             tokenEnvName: 'bad-name',
-            token: 'abc123',
+            tokenFingerprint: 'token-fingerprint',
             personaName: 'browser-driver',
             parentSessionId: 'sess_00000000-0000-0000-0000-000000000001',
             jobId: 'job_container_identity',

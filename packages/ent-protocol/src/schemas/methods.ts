@@ -1983,7 +1983,7 @@ const SessionUpdateToolUseSchema = z
 const ContainerExecutionMetadataSchema = z
   .object({
     tokenEnvName: ContainerExecutionTokenEnvNameSchema,
-    token: NonEmptyStringSchema,
+    tokenFingerprint: NonEmptyStringSchema,
     personaName: NonEmptyStringSchema,
     parentSessionId: SessionIdSchema,
     jobId: NonEmptyStringSchema,
