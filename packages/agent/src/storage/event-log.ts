@@ -5,7 +5,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getLaceDir } from '../config/lace-dir';
 import { readSessionMeta, type SessionState } from './session-store';
-import { listTranscriptFiles, transcriptFilePath } from './transcript-paths';
+import {
+  listTranscriptFiles,
+  transcriptFilePath,
+  SECURE_DIR_MODE,
+  SECURE_FILE_MODE,
+} from './transcript-paths';
 import { eventToRow } from './recall/event-to-row';
 import { getRecallIndex } from './recall/index-db';
 import { insertRow } from './recall/index-writer';
@@ -243,7 +248,7 @@ export function appendDurableEvent(
     date: new Date(),
     sessionId,
   });
-  fs.mkdirSync(path.dirname(eventsPath), { recursive: true });
+  fs.mkdirSync(path.dirname(eventsPath), { recursive: true, mode: SECURE_DIR_MODE });
 
   // Derive from all transcript files (and the legacy events.jsonl) so seqs
   // stay monotonic across day rollovers and across the legacy→new transition.
@@ -276,6 +281,17 @@ export function appendDurableEvent(
   };
 
   fs.appendFileSync(eventsPath, `${JSON.stringify(written)}\n`, { encoding: 'utf8' });
+
+  // Apply secure file mode if this was the first write (file didn't exist before).
+  // stat-check avoids chmod on every append.
+  try {
+    const stat = fs.statSync(eventsPath);
+    if ((stat.mode & 0o777) !== SECURE_FILE_MODE) {
+      fs.chmodSync(eventsPath, SECURE_FILE_MODE);
+    }
+  } catch {
+    // file doesn't exist somehow — write would have already failed; ignore
+  }
 
   // Write-through indexing: mirror the event into the FTS index so /recall
   // queries can find it without a separate scan pass. Failures here must

@@ -6,6 +6,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   writeFileSync,
   appendFileSync,
 } from 'node:fs';
@@ -316,6 +317,76 @@ describe('storage/event-log', () => {
 
         // Legacy path should NOT be written.
         expect(existsSync(join(sessionDir, 'events.jsonl'))).toBe(false);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('creates transcript directory with mode 0o700', () => {
+      const laceDir = mkdtempSync(join(tmpdir(), 'lace-mode-dir-'));
+      process.env.LACE_DIR = laceDir;
+      const sessionId = `sess_${randomUUID()}`;
+      const sessionDir = join(laceDir, 'agent-sessions', sessionId);
+      mkdirSync(sessionDir, { recursive: true });
+      writeFileSync(
+        join(sessionDir, 'meta.json'),
+        JSON.stringify({
+          sessionId,
+          workDir: laceDir,
+          created: 'x',
+          persona: 'ada',
+        })
+      );
+      invalidatePersonaCache();
+      try {
+        appendDurableEvent(
+          sessionDir,
+          { nextEventSeq: 1, nextStreamSeq: 1 },
+          {
+            type: 'prompt',
+            data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+          }
+        );
+
+        const today = new Date().toISOString().slice(0, 10);
+        const dateDir = join(laceDir, 'transcripts', 'ada', today);
+        const dirStat = statSync(dateDir);
+        expect(dirStat.mode & 0o777).toBe(0o700);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('creates transcript file with mode 0o600', () => {
+      const laceDir = mkdtempSync(join(tmpdir(), 'lace-mode-file-'));
+      process.env.LACE_DIR = laceDir;
+      const sessionId = `sess_${randomUUID()}`;
+      const sessionDir = join(laceDir, 'agent-sessions', sessionId);
+      mkdirSync(sessionDir, { recursive: true });
+      writeFileSync(
+        join(sessionDir, 'meta.json'),
+        JSON.stringify({
+          sessionId,
+          workDir: laceDir,
+          created: 'x',
+          persona: 'ada',
+        })
+      );
+      invalidatePersonaCache();
+      try {
+        appendDurableEvent(
+          sessionDir,
+          { nextEventSeq: 1, nextStreamSeq: 1 },
+          {
+            type: 'prompt',
+            data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+          }
+        );
+
+        const today = new Date().toISOString().slice(0, 10);
+        const transcriptPath = join(laceDir, 'transcripts', 'ada', today, `${sessionId}.jsonl`);
+        const fileStat = statSync(transcriptPath);
+        expect(fileStat.mode & 0o777).toBe(0o600);
       } finally {
         rmSync(laceDir, { recursive: true, force: true });
       }
