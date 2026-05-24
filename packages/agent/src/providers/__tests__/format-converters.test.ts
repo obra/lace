@@ -135,6 +135,45 @@ describe('Format Converters', () => {
     });
   });
 
+  describe('convertToAnthropicFormat — empty assistant content (PRI-1799 Task 3D)', () => {
+    it('drops the (no response) placeholder; omits empty assistant turns entirely', () => {
+      const messages: ProviderMessage[] = [
+        { role: 'user', content: 'hi' },
+        { role: 'assistant', content: '   ' }, // whitespace only, no tool calls
+        { role: 'user', content: 'are you there?' },
+      ];
+
+      const out = convertToAnthropicFormat(messages);
+
+      // The empty assistant turn is omitted entirely.
+      expect(out).toHaveLength(2);
+      expect(out[0]).toEqual({ role: 'user', content: 'hi' });
+      expect(out[1]).toEqual({ role: 'user', content: 'are you there?' });
+
+      // Placeholder text must not appear anywhere.
+      expect(JSON.stringify(out)).not.toContain('(no response)');
+    });
+
+    it('preserves assistant messages with non-empty text', () => {
+      const messages: ProviderMessage[] = [{ role: 'assistant', content: 'Hello there.' }];
+      const out = convertToAnthropicFormat(messages);
+      expect(out).toEqual([{ role: 'assistant', content: 'Hello there.' }]);
+    });
+
+    it('preserves assistant messages with tool calls but no text', () => {
+      const messages: ProviderMessage[] = [
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [{ id: 't1', name: 'tool', arguments: {} }],
+        },
+      ];
+      const out = convertToAnthropicFormat(messages);
+      expect(out).toHaveLength(1);
+      expect((out[0].content as Array<{ type: string }>)[0]?.type).toBe('tool_use');
+    });
+  });
+
   describe('convertToAnthropicFormat', () => {
     it('should handle string content for user messages', () => {
       const messages: ProviderMessage[] = [

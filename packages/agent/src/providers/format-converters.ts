@@ -47,7 +47,7 @@ function hasContent(content: string | ContentBlock[]): boolean {
 export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic.MessageParam[] {
   return messages
     .filter((msg) => msg.role !== 'system')
-    .map((msg): Anthropic.MessageParam => {
+    .map((msg): Anthropic.MessageParam | null => {
       if (msg.role === 'user') {
         // User messages can have tool results
         if (msg.toolResults && msg.toolResults.length > 0) {
@@ -118,15 +118,18 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
             content,
           };
         } else {
-          // Pure text assistant message. PRI-1806 #6: Anthropic 400s on
-          // assistant turns whose content is whitespace-only. Trim and
-          // substitute a deterministic placeholder if empty so we never
-          // ship an unsendable payload (the substitution is byte-stable so
-          // cache stays warm).
+          // Pure text assistant message. If there is no text content at all,
+          // this turn is semantically empty — upstream code that produces such
+          // a turn is a bug. Returning null signals "drop this message" so it
+          // never pollutes the cached prefix with a placeholder the model will
+          // learn to mimic.
           const trimmed = textContent.trim();
+          if (trimmed.length === 0) {
+            return null;
+          }
           return {
             role: 'assistant',
-            content: trimmed.length > 0 ? trimmed : '(no response)',
+            content: trimmed,
           };
         }
       } else {
@@ -136,7 +139,8 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
           content: getTextContent(msg.content),
         };
       }
-    });
+    })
+    .filter((m): m is Anthropic.MessageParam => m !== null);
 }
 
 /**
