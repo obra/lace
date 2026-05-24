@@ -19,7 +19,7 @@ import type { ContainerHandle, ContainerLifecycleHooks, ContainerSpec } from './
 // cross-process orphan reaping can scope its scan.
 const CONTAINER_ID_PREFIX = 'lace-';
 
-function resolveContainerId(spec: Pick<ContainerSpec, 'name' | 'containerId'>): string {
+export function resolveContainerId(spec: Pick<ContainerSpec, 'name' | 'containerId'>): string {
   // Persistent container runtime opts out of the `lace-` namespace by supplying a verbatim
   // containerId (e.g. `sen-box-shell`). Using a non-`lace-` id is intentional: it
   // makes boxes invisible to the startup reaper, which only lists `lace-*`.

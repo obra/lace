@@ -18,6 +18,7 @@ import { getJobOutputPath } from './job-file-utils';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 import { readAllSessionEventLines } from '../storage/event-log';
 import type { SessionId } from '@lace/ent-protocol';
+import { resolveContainerId } from '../containers/container-manager';
 
 export type JobManagerDeps = {
   getActiveSession: () => { sessionId: string; dir: string } | null;
@@ -163,6 +164,12 @@ function buildContainerExecutionContext(input: {
   }
 
   const token = randomBytes(32).toString('base64url');
+  const containerId =
+    input.runtimeBinding?.toolRuntime.type === 'container'
+      ? resolveContainerId(input.runtimeBinding.toolRuntime.spec)
+      : input.containerSpecName
+        ? resolveContainerId({ name: input.containerSpecName })
+        : undefined;
   return {
     executionEnv: { [input.identity.tokenEnvName]: token },
     metadata: {
@@ -175,6 +182,7 @@ function buildContainerExecutionContext(input: {
         ? { runtimeId: input.runtimeBinding.identity.runtimeId }
         : {}),
       ...(input.containerSpecName ? { containerSpecName: input.containerSpecName } : {}),
+      ...(containerId ? { containerId } : {}),
     },
   };
 }

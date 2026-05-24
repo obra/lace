@@ -432,10 +432,10 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
       jobId: job.jobId,
       runtimeId: 'rt_projected_identity',
       containerSpecName: 'parent-browser-child',
+      containerId: 'lace-parent-browser-child',
     });
     expect(typeof metadata.token).toBe('string');
     expect(metadata.token).not.toBe('');
-    expect(metadata).not.toHaveProperty('containerId');
 
     expect(sessionNewRequests[0]).toMatchObject({
       config: {
