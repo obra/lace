@@ -57,12 +57,18 @@ export function backfillIndex(db: Db, laceDir: string): BackfillStats {
     // C2 requires that one malformed row not roll back unrelated sessions'
     // inserts. Per-row try/catch inside the transaction skips bad rows
     // without aborting the rest of this session.
+    //
+    // `.immediate()` opens the transaction with `BEGIN IMMEDIATE` so the
+    // write lock is acquired upfront, serializing this session's
+    // check-then-insert against concurrent backfill / runtime writers from
+    // other processes (H2). With default DEFERRED, two backfills could both
+    // pass the existence check and both INSERT, duplicating FTS rows.
     try {
       const run = db.transaction(() => {
         for (const pass of sessionPasses) {
           catchUpFile(db, pass, have, stats);
         }
-      });
+      }).immediate;
       run();
     } catch (err) {
       // Transaction-level failure (rare: e.g. SQLite I/O). Count as a session

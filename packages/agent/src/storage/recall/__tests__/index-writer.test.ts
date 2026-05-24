@@ -75,4 +75,21 @@ describe('insertRow', () => {
     };
     expect(row.persona).toBeNull();
   });
+
+  it('stays idempotent across 100 same-row inserts (single-process; cross-process covered by probe)', () => {
+    // Single-process can't reproduce the FTS duplicate-row race (no concurrency
+    // here), but this guards against regressions in the existence check and
+    // exercises the BEGIN IMMEDIATE wrapping path 100 times. Real verification
+    // of cross-process serialization lives in
+    // tests/scenarios/recall-probe-concurrent-cross-process.ts.
+    for (let i = 0; i < 100; i++) {
+      insertRow(db, ROW);
+    }
+    const count = (
+      db.prepare(`SELECT COUNT(*) AS n FROM events WHERE event_id = ?`).get(ROW.event_id) as {
+        n: number;
+      }
+    ).n;
+    expect(count).toBe(1);
+  });
 });
