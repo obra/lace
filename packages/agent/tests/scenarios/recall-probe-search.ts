@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -5,14 +6,26 @@ import { join } from 'node:path';
 const laceDir = mkdtempSync(join(tmpdir(), 'recall-probe-'));
 process.env.LACE_DIR = laceDir;
 
-const { Session } = await import('../../src/core/session.js');
+const { getSessionDir, writeSessionMeta, writeSessionState, ensureSessionFiles } = await import(
+  '../../src/storage/session-store.js'
+);
 const { appendDurableEvent, invalidatePersonaCache } = await import(
   '../../src/storage/event-log.js'
 );
 const { RecallTool } = await import('../../src/tools/implementations/recall.js');
 const { closeRecallIndex } = await import('../../src/storage/recall/index-db.js');
 
-const session = Session.create({ cwd: laceDir, persona: 'probe' });
+const sessionId = `sess_${randomUUID()}`;
+const sessionDir = getSessionDir(sessionId);
+writeSessionMeta(sessionDir, {
+  sessionId,
+  workDir: laceDir,
+  created: new Date().toISOString(),
+  persona: 'probe',
+});
+writeSessionState(sessionDir, { nextEventSeq: 1, nextStreamSeq: 1, config: {} });
+ensureSessionFiles(sessionDir);
+const session = { sessionId, sessionDir };
 invalidatePersonaCache(session.sessionDir);
 
 let state = { nextEventSeq: 1, nextStreamSeq: 1 };
