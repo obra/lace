@@ -14,49 +14,68 @@ import type { DurableEvent } from '../event-log';
 export type BackfillStats = {
   scanned: number;
   inserted: number;
+  skipped: number;
+  errors: number;
+};
+
+type SessionPass = {
+  sessionId: string;
+  filePath: string;
+  persona: string | null;
 };
 
 export function backfillIndex(db: Db, laceDir: string): BackfillStats {
-  let scanned = 0;
-  let inserted = 0;
+  const stats: BackfillStats = { scanned: 0, inserted: 0, skipped: 0, errors: 0 };
 
-  const haveStmt = db.prepare(
-    `SELECT MAX(CAST(SUBSTR(event_id, INSTR(event_id, ':') + 1) AS INTEGER)) AS maxSeq
-     FROM events WHERE session_id = ?`
-  );
-  const maxSeqFor = (sessionId: string): number => {
-    const row = haveStmt.get(sessionId) as { maxSeq: number | null } | undefined;
-    return row?.maxSeq ?? 0;
-  };
+  // Collect every file we need to scan up front. The order matters less now
+  // that we use a per-session set of indexed event_ids (instead of a single
+  // MAX watermark): each pass enumerates one file, but a session can be
+  // present in both legacy and new-layout files and we must dedupe by
+  // event_id across passes.
+  const passes: SessionPass[] = [];
+  collectNewLayout(laceDir, passes);
+  collectLegacyLayout(laceDir, passes);
 
-  // Wrap inserts in a transaction. Each `insertRow` is a SELECT-then-INSERT
-  // pair; without a transaction better-sqlite3 fsyncs the WAL on every
-  // statement, which dominates wall time on real datasets (~3s for ~4k
-  // inserts versus a fraction of that inside a transaction).
-  const run = db.transaction(() => {
-    backfillNewLayout(db, laceDir, maxSeqFor, (delta) => {
-      scanned += delta.scanned;
-      inserted += delta.inserted;
-    });
-    backfillLegacyLayout(db, laceDir, maxSeqFor, (delta) => {
-      scanned += delta.scanned;
-      inserted += delta.inserted;
-    });
-  });
-  run();
+  // Group passes by sessionId so we issue ONE "what do we already have?" query
+  // per session, then iterate every file for that session against the same
+  // in-memory set. Memory cost is bounded by events-per-session, not total
+  // events, and we never compare against a moving MAX watermark.
+  const passesBySession = new Map<string, SessionPass[]>();
+  for (const p of passes) {
+    const list = passesBySession.get(p.sessionId) ?? [];
+    list.push(p);
+    passesBySession.set(p.sessionId, list);
+  }
 
-  return { scanned, inserted };
+  const haveStmt = db.prepare(`SELECT event_id FROM events WHERE session_id = ?`);
+
+  for (const [sessionId, sessionPasses] of passesBySession) {
+    const have = new Set<string>(
+      (haveStmt.all(sessionId) as Array<{ event_id: string }>).map((r) => r.event_id)
+    );
+    // One transaction per session, NOT one transaction for the whole pass.
+    // C2 requires that one malformed row not roll back unrelated sessions'
+    // inserts. Per-row try/catch inside the transaction skips bad rows
+    // without aborting the rest of this session.
+    try {
+      const run = db.transaction(() => {
+        for (const pass of sessionPasses) {
+          catchUpFile(db, pass, have, stats);
+        }
+      });
+      run();
+    } catch (err) {
+      // Transaction-level failure (rare: e.g. SQLite I/O). Count as a session
+      // error and move on so we don't poison other sessions.
+      stats.errors++;
+      console.error(`recall backfill: session ${sessionId} transaction failed:`, err);
+    }
+  }
+
+  return stats;
 }
 
-type Tally = { scanned: number; inserted: number };
-type TallyFn = (delta: Tally) => void;
-
-function backfillNewLayout(
-  db: Db,
-  laceDir: string,
-  maxSeqFor: (sessionId: string) => number,
-  tally: TallyFn
-): void {
+function collectNewLayout(laceDir: string, out: SessionPass[]): void {
   const root = transcriptsRoot(laceDir);
   if (!existsAsDir(root)) return;
   for (const persona of safeReaddir(root)) {
@@ -69,18 +88,13 @@ function backfillNewLayout(
       for (const file of safeReaddir(dateDir)) {
         if (!file.endsWith('.jsonl')) continue;
         const sessionId = file.slice(0, -'.jsonl'.length);
-        catchUpSession(db, path.join(dateDir, file), sessionId, personaForRow, maxSeqFor, tally);
+        out.push({ sessionId, filePath: path.join(dateDir, file), persona: personaForRow });
       }
     }
   }
 }
 
-function backfillLegacyLayout(
-  db: Db,
-  laceDir: string,
-  maxSeqFor: (sessionId: string) => number,
-  tally: TallyFn
-): void {
+function collectLegacyLayout(laceDir: string, out: SessionPass[]): void {
   const legacyRoot = path.join(laceDir, 'agent-sessions');
   if (!existsAsDir(legacyRoot)) return;
   for (const sessionId of safeReaddir(legacyRoot)) {
@@ -89,30 +103,46 @@ function backfillLegacyLayout(
     const eventsFile = path.join(sessionDir, 'events.jsonl');
     if (!fs.existsSync(eventsFile)) continue;
     const persona = readPersonaSafe(sessionDir);
-    catchUpSession(db, eventsFile, sessionId, persona, maxSeqFor, tally);
+    out.push({ sessionId, filePath: eventsFile, persona });
   }
 }
 
-function catchUpSession(
-  db: Db,
-  filePath: string,
-  sessionId: string,
-  persona: string | null,
-  maxSeqFor: (sessionId: string) => number,
-  tally: TallyFn
-): void {
-  const have = maxSeqFor(sessionId);
-  let scanned = 0;
-  let inserted = 0;
-  for (const ev of readEvents(filePath)) {
-    scanned++;
-    if (ev.eventSeq <= have) continue;
-    const row = eventToRow(ev as TypedDurableEvent, { sessionId, persona });
-    if (!row) continue;
-    insertRow(db, row);
-    inserted++;
+function catchUpFile(db: Db, pass: SessionPass, have: Set<string>, stats: BackfillStats): void {
+  for (const ev of readEvents(pass.filePath)) {
+    stats.scanned++;
+    if (typeof ev.eventSeq !== 'number') {
+      stats.skipped++;
+      continue;
+    }
+    const eventId = `${pass.sessionId}:${ev.eventSeq}`;
+    if (have.has(eventId)) {
+      stats.skipped++;
+      continue;
+    }
+    let row;
+    try {
+      row = eventToRow(ev as TypedDurableEvent, {
+        sessionId: pass.sessionId,
+        persona: pass.persona,
+      });
+    } catch (err) {
+      stats.errors++;
+      console.error(`recall backfill: eventToRow failed for ${eventId}:`, err);
+      continue;
+    }
+    if (!row) {
+      stats.skipped++;
+      continue;
+    }
+    try {
+      insertRow(db, row);
+      have.add(eventId);
+      stats.inserted++;
+    } catch (err) {
+      stats.errors++;
+      console.error(`recall backfill: insertRow failed for ${eventId}:`, err);
+    }
   }
-  tally({ scanned, inserted });
 }
 
 function existsAsDir(p: string): boolean {

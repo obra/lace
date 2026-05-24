@@ -226,7 +226,158 @@ describe('backfillIndex', () => {
 
   it('returns zero stats when there are no transcript or session directories', () => {
     const stats = backfillIndex(db, laceDir);
-    expect(stats).toEqual({ scanned: 0, inserted: 0 });
+    expect(stats).toEqual({ scanned: 0, inserted: 0, skipped: 0, errors: 0 });
+  });
+
+  it('repairs gaps in FTS even when index has higher seqs than the gap (C1/B2)', () => {
+    // FTS has {1, 2, 3, 5} but JSONL has {1, 2, 3, 4, 5}. The previous
+    // MAX(eventSeq) watermark logic saw MAX=5 and skipped seq 4 forever.
+    // The fix uses a per-session set of event_ids, so seq 4 is detected
+    // as missing regardless of higher-numbered neighbors.
+    const sessionId = 'sess_aaaaaaaa-1111-4111-8111-111111111111';
+    const dir = join(laceDir, 'transcripts', 'ada', '2026-05-23');
+    mkdirSync(dir, { recursive: true });
+    writeJsonl(join(dir, `${sessionId}.jsonl`), [
+      promptEvent(1, 'one'),
+      promptEvent(2, 'two'),
+      promptEvent(3, 'three'),
+      promptEvent(4, 'four'),
+      promptEvent(5, 'five'),
+    ]);
+    insertRow(db, {
+      event_id: `${sessionId}:1`,
+      session_id: sessionId,
+      ts: '2026-05-23T00:00:01Z',
+      persona: 'ada',
+      kind: 'user_message',
+      content: 'one',
+    });
+    insertRow(db, {
+      event_id: `${sessionId}:2`,
+      session_id: sessionId,
+      ts: '2026-05-23T00:00:02Z',
+      persona: 'ada',
+      kind: 'user_message',
+      content: 'two',
+    });
+    insertRow(db, {
+      event_id: `${sessionId}:3`,
+      session_id: sessionId,
+      ts: '2026-05-23T00:00:03Z',
+      persona: 'ada',
+      kind: 'user_message',
+      content: 'three',
+    });
+    insertRow(db, {
+      event_id: `${sessionId}:5`,
+      session_id: sessionId,
+      ts: '2026-05-23T00:00:05Z',
+      persona: 'ada',
+      kind: 'user_message',
+      content: 'five',
+    });
+
+    const stats = backfillIndex(db, laceDir);
+
+    expect(stats.inserted).toBe(1);
+    const rows = allRows(db).filter((r) => r.session_id === sessionId);
+    expect(rows.map((r) => r.event_id).sort()).toEqual([
+      `${sessionId}:1`,
+      `${sessionId}:2`,
+      `${sessionId}:3`,
+      `${sessionId}:4`,
+      `${sessionId}:5`,
+    ]);
+  });
+
+  it('does not skip legacy events when new-layout for same session is processed first (C1/A1)', () => {
+    // The previous code computed MAX(eventSeq) once per file. When the
+    // new-layout pass ran first for a session, it raised the per-session
+    // MAX above the legacy file's seqs, and the legacy events were silently
+    // dropped from the index forever. Per-session set of event_ids fixes it.
+    const sessionId = 'sess_bbbbbbbb-2222-4222-8222-222222222222';
+    const legacyDir = join(laceDir, 'agent-sessions', sessionId);
+    mkdirSync(legacyDir, { recursive: true });
+    writeMeta(legacyDir, sessionId, 'ada');
+    writeJsonl(join(legacyDir, 'events.jsonl'), [
+      promptEvent(1, 'legacy-1'),
+      promptEvent(2, 'legacy-2'),
+      promptEvent(3, 'legacy-3'),
+    ]);
+    const newDir = join(laceDir, 'transcripts', 'ada', '2026-05-23');
+    mkdirSync(newDir, { recursive: true });
+    writeJsonl(join(newDir, `${sessionId}.jsonl`), [
+      promptEvent(4, 'new-4'),
+      promptEvent(5, 'new-5'),
+    ]);
+
+    const stats = backfillIndex(db, laceDir);
+
+    expect(stats.inserted).toBe(5);
+    const rows = allRows(db).filter((r) => r.session_id === sessionId);
+    expect(rows.map((r) => r.event_id).sort()).toEqual([
+      `${sessionId}:1`,
+      `${sessionId}:2`,
+      `${sessionId}:3`,
+      `${sessionId}:4`,
+      `${sessionId}:5`,
+    ]);
+  });
+
+  it('one malformed event does not roll back inserts from other rows in the session (C2)', () => {
+    // A message event without `content` would throw inside eventToRow under
+    // the old implementation; the throw aborted the whole-pass transaction
+    // and rolled back every other insert. With per-session txn + hardened
+    // eventToRow, the bad row is skipped (or counted as an error) but the
+    // good rows commit.
+    const sessionId = 'sess_cccccccc-3333-4333-8333-333333333333';
+    const sessionDir = join(laceDir, 'agent-sessions', sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    writeMeta(sessionDir, sessionId, 'ada');
+    const badMessage: DurableEvent = {
+      eventSeq: 2,
+      timestamp: '2026-05-23T00:00:02Z',
+      type: 'message',
+      data: { role: 'assistant' }, // NO content
+    };
+    writeJsonl(join(sessionDir, 'events.jsonl'), [
+      promptEvent(1, 'good-1'),
+      badMessage,
+      promptEvent(3, 'good-3'),
+    ]);
+
+    const stats = backfillIndex(db, laceDir);
+
+    // Two good rows landed; the bad row was skipped (returned null) not
+    // counted as error since eventToRow tolerates missing content now.
+    expect(stats.inserted).toBe(2);
+    const rows = allRows(db).filter((r) => r.session_id === sessionId);
+    expect(rows.map((r) => r.event_id).sort()).toEqual([`${sessionId}:1`, `${sessionId}:3`]);
+  });
+
+  it('one malformed event in session A does not roll back session B (C2)', () => {
+    // Cross-session isolation: per-session transactions ensure a bad row in
+    // one session can't poison another. Even if session A throws inside its
+    // transaction, session B's rows still commit.
+    const sessionA = 'sess_dddddddd-4444-4444-8444-444444444444';
+    const sessionB = 'sess_eeeeeeee-5555-4555-8555-555555555555';
+    const dirA = join(laceDir, 'agent-sessions', sessionA);
+    mkdirSync(dirA, { recursive: true });
+    writeMeta(dirA, sessionA, 'ada');
+    writeJsonl(join(dirA, 'events.jsonl'), [
+      promptEvent(1, 'a-good'),
+      { eventSeq: 2, timestamp: 'x', type: 'message', data: { role: 'assistant' } },
+    ]);
+
+    const dirB = join(laceDir, 'agent-sessions', sessionB);
+    mkdirSync(dirB, { recursive: true });
+    writeMeta(dirB, sessionB, 'bea');
+    writeJsonl(join(dirB, 'events.jsonl'), [promptEvent(1, 'b-one'), promptEvent(2, 'b-two')]);
+
+    backfillIndex(db, laceDir);
+
+    const rowsB = allRows(db).filter((r) => r.session_id === sessionB);
+    expect(rowsB.map((r) => r.event_id).sort()).toEqual([`${sessionB}:1`, `${sessionB}:2`]);
   });
 
   it('handles both layouts present at once', () => {
