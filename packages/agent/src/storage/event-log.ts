@@ -4,7 +4,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getLaceDir } from '../config/lace-dir';
-import { readSessionMeta, type SessionState } from './session-store';
+import { agentSessionsDir, readSessionMeta, type SessionState } from './session-store';
 import {
   listTranscriptFiles,
   transcriptFilePath,
@@ -38,6 +38,16 @@ export function invalidatePersonaCache(sessionDir?: string): void {
   } else {
     personaCache.delete(sessionDir);
   }
+}
+
+/**
+ * Resolves the legacy events.jsonl path for a session, honoring the same
+ * fallback chain (LACE_SESSION_DIR / XDG_STATE_HOME / HOME / tmpdir) that
+ * agentSessionsDir() uses. Use everywhere the legacy file location is needed
+ * so that LACE_SESSION_DIR overrides remain visible to readers and writers.
+ */
+export function legacyEventLogPath(sessionId: string): string {
+  return path.join(agentSessionsDir(), sessionId, 'events.jsonl');
 }
 
 function personaForSessionDir(sessionDir: string): string | null {

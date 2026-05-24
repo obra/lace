@@ -19,6 +19,8 @@ import {
   findLastTurnEndEventSeq,
   hasPendingImmediateInjects,
   invalidatePersonaCache,
+  legacyEventLogPath,
+  readAllSessionEventLines,
   readDurableEvents,
   summarizeDurableEvents,
 } from '../event-log';
@@ -528,6 +530,35 @@ describe('storage/event-log', () => {
         expect(personas).toEqual(['ada']);
         expect(existsSync(adaPath)).toBe(true);
       } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('legacyEventLogPath', () => {
+    it('returns the path under agentSessionsDir() default location', () => {
+      const laceDir = mkdtempSync(join(tmpdir(), 'lace-legacy-default-'));
+      process.env.LACE_DIR = laceDir;
+      delete process.env.LACE_SESSION_DIR;
+      try {
+        const p = legacyEventLogPath('sess_xyz');
+        expect(p).toBe(join(laceDir, 'agent-sessions', 'sess_xyz', 'events.jsonl'));
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('honors LACE_SESSION_DIR override', () => {
+      const sessionDir = mkdtempSync(join(tmpdir(), 'lace-sessoverride-'));
+      const laceDir = mkdtempSync(join(tmpdir(), 'lace-legacy-override-'));
+      process.env.LACE_DIR = laceDir;
+      process.env.LACE_SESSION_DIR = sessionDir;
+      try {
+        const p = legacyEventLogPath('sess_xyz');
+        expect(p).toBe(join(sessionDir, 'sess_xyz', 'events.jsonl'));
+      } finally {
+        delete process.env.LACE_SESSION_DIR;
+        rmSync(sessionDir, { recursive: true, force: true });
         rmSync(laceDir, { recursive: true, force: true });
       }
     });
