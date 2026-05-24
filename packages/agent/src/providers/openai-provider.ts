@@ -432,7 +432,7 @@ export class OpenAIProvider extends AIProvider {
     tools: WireTool[],
     model: string,
     stream: boolean,
-    previousResponseId?: string,
+    previousResponseId?: string | null,
     options?: RequestOptions
   ): ResponseCreateParams {
     // Extract system/developer instructions via the base helper so both
@@ -800,7 +800,7 @@ export class OpenAIProvider extends AIProvider {
           tools,
           model,
           false,
-          conversationState?.openaiResponseId,
+          conversationState?.previousResponseId,
           options
         );
 
@@ -1158,7 +1158,7 @@ export class OpenAIProvider extends AIProvider {
           tools,
           model,
           true,
-          conversationState?.openaiResponseId,
+          conversationState?.previousResponseId,
           options
         );
 

@@ -38,7 +38,11 @@ import {
   shouldAskPermission,
 } from '@lace/agent/rpc/utils';
 import type { RunnerConfig, RunnerDependencies, RunParams, RunResult, ApprovalMode } from './types';
-import type { LaceStopDetails, RequestOptions } from '@lace/agent/providers/base-provider';
+import type {
+  BetaCacheMissReason,
+  LaceStopDetails,
+  RequestOptions,
+} from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import { logger } from '@lace/agent/utils/logger';
 
@@ -257,6 +261,13 @@ export class ConversationRunner {
     let retriedWithToolChoice = false;
     let nextRequestOptions: RequestOptions | undefined;
     let lastResponseId: string | undefined;
+    // Cache-diagnosis-2026-04-07 only meaningful on Anthropic-direct. We carry
+    // forward the LAST provider response's cache_miss_reason for this turn so
+    // turn_end records whether the most recent request hit the cache. Inner
+    // tool-use loop iterations within the same turn reuse the same prefix, so
+    // their miss reasons would not be a meaningful "vs previous request"
+    // comparison — we intentionally drop them.
+    let lastCacheMissReason: BetaCacheMissReason | null | undefined = undefined;
 
     // pause_turn auto-resume bookkeeping. `partialAssistantText` accumulates
     // text fragments across consecutive `pause_turn` iterations so the durable
@@ -378,11 +389,12 @@ export class ConversationRunner {
             toolsForProvider,
             modelId || 'unknown-model',
             abortController.signal,
-            lastResponseId ? { openaiResponseId: lastResponseId } : undefined,
+            lastResponseId ? { previousResponseId: lastResponseId } : undefined,
             nextRequestOptions
           );
           nextRequestOptions = undefined; // Reset after use
           lastResponseId = response.responseId;
+          lastCacheMissReason = response.cacheMissReason ?? null;
         } catch (providerError) {
           provider.off('token', onToken);
           provider.off('thinking_start', onThinkingStart);
@@ -732,6 +744,7 @@ export class ConversationRunner {
       data: {
         stopReason,
         stopDetails,
+        cacheMissReason: lastCacheMissReason ?? null,
         usage: {
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,

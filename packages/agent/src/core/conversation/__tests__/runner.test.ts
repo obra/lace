@@ -1330,13 +1330,13 @@ describe('ConversationRunner', () => {
         expect(provider.receivedStates[0]).toBeUndefined();
 
         // Second call: should have the responseId from the first call
-        expect(provider.receivedStates[1]).toEqual({ openaiResponseId: 'resp_first' });
+        expect(provider.receivedStates[1]).toEqual({ previousResponseId: 'resp_first' });
 
         // Third call: should have the responseId from the second call
-        expect(provider.receivedStates[2]).toEqual({ openaiResponseId: 'resp_second' });
+        expect(provider.receivedStates[2]).toEqual({ previousResponseId: 'resp_second' });
 
         // Fourth call (bare text retry): should have the responseId from the third call
-        expect(provider.receivedStates[3]).toEqual({ openaiResponseId: 'resp_third' });
+        expect(provider.receivedStates[3]).toEqual({ previousResponseId: 'resp_third' });
       });
 
       it('handles provider returning no responseId gracefully', async () => {
@@ -1550,10 +1550,10 @@ describe('ConversationRunner', () => {
         expect(provider.receivedStates[0]).toBeUndefined();
 
         // Second call: chained from first
-        expect(provider.receivedStates[1]).toEqual({ openaiResponseId: 'resp_work' });
+        expect(provider.receivedStates[1]).toEqual({ previousResponseId: 'resp_work' });
 
         // Third call (retry): chained from second (bare text response still has responseId)
-        expect(provider.receivedStates[2]).toEqual({ openaiResponseId: 'resp_bare' });
+        expect(provider.receivedStates[2]).toEqual({ previousResponseId: 'resp_bare' });
       });
     });
 

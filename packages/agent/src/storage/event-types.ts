@@ -3,7 +3,11 @@
 
 import type { ToolResult } from '@lace/ent-protocol';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
-import type { LaceStopReason, LaceStopDetails } from '@lace/agent/providers/base-provider';
+import type {
+  LaceStopReason,
+  LaceStopDetails,
+  BetaCacheMissReason,
+} from '@lace/agent/providers/base-provider';
 
 // Content block types used in prompts and messages
 export type ContentBlock =
@@ -46,6 +50,15 @@ export type TurnEndEventData = {
    * the stop reason carries no extra context.
    */
   stopDetails?: LaceStopDetails | null;
+  /**
+   * Anthropic cache-diagnosis-2026-04-07 beta only. The cache_miss_reason from
+   * the LAST provider response of this turn (multi-call tool-use loops reuse
+   * the same prefix within a turn, so inner calls' miss reasons aren't a
+   * meaningful "vs previous request" comparison). `null` means a cache hit (or
+   * diagnostics not opted in). `undefined` on legacy events written before
+   * chunk K. Consumers treat `undefined` and `null` identically.
+   */
+  cacheMissReason?: BetaCacheMissReason | null;
   usage?: {
     inputTokens: number;
     outputTokens: number;

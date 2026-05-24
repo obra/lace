@@ -18,6 +18,10 @@ import {
 // lives in `./stop-reason`.
 export type { LaceStopReason, LaceStopDetails, NormalizedStop } from './stop-reason';
 import type { LaceStopReason, LaceStopDetails } from './stop-reason';
+// Re-export the BetaCacheMissReason union so downstream consumers (event-types,
+// protocol schemas, runner) can import it from a single agent-package boundary.
+export type { BetaCacheMissReason } from './anthropic/cache-miss';
+import type { BetaCacheMissReason } from './anthropic/cache-miss';
 
 /**
  * The minimal duck-typed view of a tool that providers need to build a wire-format
@@ -68,7 +72,30 @@ export interface ProviderResponse {
     timeToFirstToken?: number;
     totalDuration?: number;
   };
-  responseId?: string; // OpenAI Responses API response.id (for conversation chaining)
+  /**
+   * The current request's response id, captured for downstream features that
+   * need to chain or compare requests across turns:
+   * - OpenAI Responses API: the `response.id` used as `previous_response_id`
+   *   on the next request for conversation chaining.
+   * - Anthropic cache-diagnosis beta: the `BetaMessage.id` used as
+   *   `diagnostics.previous_message_id` on the next request so the server can
+   *   report cache_miss_reason vs the previous request.
+   */
+  responseId?: string;
+  /**
+   * Anthropic-direct only: the `diagnostics.cache_miss_reason` value from the
+   * response when the cache-diagnosis-2026-04-07 beta is enabled and the server
+   * could not fully reuse the prompt-cache prefix from the previous request.
+   * `null` means no miss (or diagnosis pending). `undefined` means the request
+   * did not opt into diagnostics. Non-Anthropic providers always leave this
+   * undefined.
+   *
+   * Imported from `@anthropic-ai/sdk@0.98.0` as the discriminated union of:
+   *   BetaCacheMissModelChanged | BetaCacheMissSystemChanged
+   * | BetaCacheMissToolsChanged | BetaCacheMissMessagesChanged
+   * | BetaCacheMissPreviousMessageNotFound | BetaCacheMissUnavailable
+   */
+  cacheMissReason?: BetaCacheMissReason | null;
 }
 
 export interface ModelInfo {
@@ -89,7 +116,14 @@ export interface ProviderInfo {
 }
 
 export interface ConversationState {
-  openaiResponseId?: string; // Last response.id from OpenAI Responses API (for conversation chaining)
+  /**
+   * The previous request's response id, threaded forward for provider features
+   * that compare requests across turns:
+   * - OpenAI Responses API: sent as `previous_response_id` for conversation chaining.
+   * - Anthropic cache-diagnosis beta: sent as `diagnostics.previous_message_id`
+   *   so the server can report cache_miss_reason vs the previous request.
+   */
+  previousResponseId?: string | null;
 }
 
 export interface RequestOptions {

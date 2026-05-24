@@ -486,7 +486,7 @@ export interface Thread {
     isSession?: boolean;
     provider?: string;
     model?: string;
-    openaiResponseId?: string; // Last response.id from OpenAI Responses API (for conversation chaining)
+    previousResponseId?: string; // Last response id from the previous provider request (OpenAI Responses API conversation chaining; Anthropic cache-diagnosis)
     [key: string]: unknown;
   };
 }

@@ -12,6 +12,7 @@ import type {
   BetaToolUseBlock,
   BetaMessageParam,
 } from '@anthropic-ai/sdk/resources/beta/messages/messages';
+import type { BetaCacheMissReason } from './anthropic/cache-miss';
 import type { AnthropicBeta } from '@anthropic-ai/sdk/resources/beta/beta';
 import { AIProvider, type WireTool } from './base-provider';
 import {
@@ -161,11 +162,42 @@ export class AnthropicProvider extends AIProvider {
     return true;
   }
 
+  /**
+   * Extract `diagnostics.cache_miss_reason` from a BetaMessage and emit an INFO
+   * log when a miss is present. Returns the miss reason (or null) for the
+   * caller to attach to the ProviderResponse. The SDK types `diagnostics` as
+   * `BetaDiagnostics | null` on BetaMessage and `cache_miss_reason` on
+   * BetaDiagnostics as the union (or null for a hit / pending diagnosis).
+   *
+   * The `context` carries the request's model and the previous-turn response
+   * id we compared against, so the INFO log gives the on-call engineer enough
+   * to pivot from a Loki line straight to the specific request/response pair
+   * in the SDK logs (PRI-1796).
+   */
+  private _extractCacheMissReason(
+    message: BetaMessage,
+    context: { model: string; previousResponseId: string | null }
+  ): BetaCacheMissReason | null {
+    const reason = message.diagnostics?.cache_miss_reason ?? null;
+    if (reason) {
+      logger.info('Anthropic cache miss', {
+        type: reason.type,
+        missedTokens:
+          'cache_missed_input_tokens' in reason ? reason.cache_missed_input_tokens : undefined,
+        model: context.model,
+        previousResponseId: context.previousResponseId,
+        currentResponseId: message.id ?? null,
+      });
+    }
+    return reason;
+  }
+
   private _createRequestPayload(
     messages: ProviderMessage[],
     tools: WireTool[],
     model: string,
-    opts?: RequestOptions
+    opts?: RequestOptions,
+    conversationState?: { previousResponseId?: string | null }
   ): Anthropic.Beta.Messages.MessageCreateParams {
     const anthropicMessages = convertToAnthropicFormat(messages);
 
@@ -221,6 +253,16 @@ export class AnthropicProvider extends AIProvider {
         : undefined
     );
 
+    // Opt into request-level cache diagnostics when the beta is enabled.
+    // `previous_message_id: null` opts in for the first turn of a session (no
+    // prior response to compare against); subsequent turns thread the prior
+    // BetaMessage.id forward via ConversationState.previousResponseId so the
+    // server can report cache_miss_reason vs the previous request.
+    const cacheDiagEnabled = betas.includes('cache-diagnosis-2026-04-07');
+    const diagnosticsField = cacheDiagEnabled
+      ? { diagnostics: { previous_message_id: conversationState?.previousResponseId ?? null } }
+      : {};
+
     // The beta endpoint param shape is structurally compatible with the
     // base MessageParam (same `role` + `content` fields), but the SDK's
     // declared content-block union differs. Cast at this single boundary
@@ -233,6 +275,7 @@ export class AnthropicProvider extends AIProvider {
       system: systemWithCaching,
       tools: anthropicTools,
       betas,
+      ...diagnosticsField,
     };
 
     // Comprehensive debug logging of request metadata (excluding message content)
@@ -262,12 +305,18 @@ export class AnthropicProvider extends AIProvider {
     tools: WireTool[] = [],
     model: string,
     signal?: AbortSignal,
-    _conversationState?: unknown,
+    conversationState?: { previousResponseId?: string | null },
     options?: RequestOptions
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
-        const requestPayload = this._createRequestPayload(messages, tools, model, options);
+        const requestPayload = this._createRequestPayload(
+          messages,
+          tools,
+          model,
+          options,
+          conversationState
+        );
 
         // Log request with pretty formatting
         logProviderRequest('anthropic', requestPayload as unknown as Record<string, unknown>);
@@ -331,6 +380,11 @@ export class AnthropicProvider extends AIProvider {
           stopReason,
           stopDetails,
           usage: normalizedUsage,
+          responseId: response.id,
+          cacheMissReason: this._extractCacheMissReason(response, {
+            model: requestPayload.model,
+            previousResponseId: conversationState?.previousResponseId ?? null,
+          }),
         };
       },
       { signal }
@@ -342,14 +396,20 @@ export class AnthropicProvider extends AIProvider {
     tools: WireTool[] = [],
     model: string,
     signal?: AbortSignal,
-    _conversationState?: unknown,
+    conversationState?: { previousResponseId?: string | null },
     options?: RequestOptions
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
 
     return this.withRetry(
       async () => {
-        const requestPayload = this._createRequestPayload(messages, tools, model, options);
+        const requestPayload = this._createRequestPayload(
+          messages,
+          tools,
+          model,
+          options,
+          conversationState
+        );
 
         // Log streaming request with pretty formatting
         logProviderRequest('anthropic', requestPayload as unknown as Record<string, unknown>, {
@@ -492,6 +552,11 @@ export class AnthropicProvider extends AIProvider {
                   totalTokens: finalMessage.usage.input_tokens + finalMessage.usage.output_tokens,
                 }
               : undefined,
+            responseId: finalMessage.id,
+            cacheMissReason: this._extractCacheMissReason(finalMessage, {
+              model: requestPayload.model,
+              previousResponseId: conversationState?.previousResponseId ?? null,
+            }),
           };
 
           // Emit completion event

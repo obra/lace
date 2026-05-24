@@ -495,6 +495,50 @@ const SessionPromptParamsSchema = z
   })
   .strict();
 
+// Discriminated union mirroring @anthropic-ai/sdk's BetaDiagnostics.cache_miss_reason.
+// SDK 0.98.0 exposes each variant as an individual interface — we mirror the
+// shape here in Zod so durable turn_end events and session/update streams can
+// carry the value through the protocol boundary with the same type-narrowing
+// guarantees as on the TS side. Variants with a comparable prefix carry the
+// approximate cache_missed_input_tokens count; variants without (`unavailable`,
+// `previous_message_not_found`) omit it.
+const BetaCacheMissReasonSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('model_changed'),
+      cache_missed_input_tokens: z.number(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('system_changed'),
+      cache_missed_input_tokens: z.number(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('tools_changed'),
+      cache_missed_input_tokens: z.number(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('messages_changed'),
+      cache_missed_input_tokens: z.number(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('previous_message_not_found'),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('unavailable'),
+    })
+    .strict(),
+]);
+
 // Structured detail accompanying a canonical stop reason. Mirrors
 // `LaceStopDetails` in @lace/agent/providers/stop-reason. The discriminator
 // `type` matches the subset of stop reasons that carry extra context; reasons
@@ -1958,6 +2002,7 @@ const SessionUpdateTurnEndSchema = z
       'failed',
     ]),
     stopDetails: LaceStopDetailsSchema.nullable().optional(),
+    cacheMissReason: BetaCacheMissReasonSchema.nullable().optional(),
     content: z.array(ContentBlockSchema),
     usage: UsageInfoSchema,
   })
