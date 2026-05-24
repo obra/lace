@@ -92,15 +92,28 @@ function extractContentBlocks(content: unknown): string | ContentBlock[] {
 
 /**
  * Defensive post-pass for messages rebuilt from a `context_compacted` event's
- * `preserved` array. Drops `toolResult` entries from `user` messages when the
- * immediately-prior message is not an `assistant` carrying a matching `tool_use`
- * id. Anthropic rejects orphaned tool_results with a 400; this pass keeps a
- * broken preserved array from bricking a session at read time.
+ * `preserved` array. Strips orphan tool blocks in BOTH directions, because
+ * Anthropic 400s on either:
  *
- * If a user message ends up with no toolResults and empty content, it is dropped.
- * Every dropped toolResult is logged at WARN with its toolCallId for visibility.
+ *   - a `user` message carrying a `tool_result` whose `tool_use_id` has no
+ *     matching `tool_use` in the immediately-prior `assistant` message
+ *     ("unexpected tool_use_id found in tool_result blocks"); and
+ *
+ *   - an `assistant` message carrying a `tool_use` whose `id` has no matching
+ *     `tool_result` in the immediately-following `user` message
+ *     ("tool_use ids were found without tool_result blocks immediately after").
+ *
+ * Both halves of the pair can be lost to compaction, so we run two passes:
+ * one that strips orphan user-side tool_results, one that strips orphan
+ * assistant-side tool_uses. If a message ends up empty after a strip (no
+ * tool blocks left and no text content), it is dropped entirely.
+ *
+ * Every dropped tool block is logged at WARN with its toolCallId so we can
+ * spot compaction bugs that produce these orphans in the first place.
  */
-function dropOrphanedToolResults(messages: ProviderMessage[]): void {
+function dropOrphanedToolBlocks(messages: ProviderMessage[]): void {
+  // Pass A: drop user tool_results whose matching tool_use is missing in the
+  // immediately-prior assistant message.
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i]!;
     if (m.role !== 'user' || !Array.isArray(m.toolResults) || m.toolResults.length === 0) continue;
@@ -132,6 +145,45 @@ function dropOrphanedToolResults(messages: ProviderMessage[]): void {
       typeof m.content === 'string' ? m.content.trim() === '' : m.content.length === 0;
     const hasToolResults = Array.isArray(m.toolResults) && m.toolResults.length > 0;
     if (!hasToolResults && contentIsEmpty) {
+      messages.splice(i, 1);
+    }
+  }
+
+  // Pass B: drop assistant tool_uses whose matching tool_result is missing in
+  // the immediately-following user message. This is the case that bricked Ada
+  // in PRI-1820: a tool_use survived into messages[1298] without its result and
+  // every subsequent Anthropic call 400'd on the same toolu id.
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!;
+    if (m.role !== 'assistant' || !Array.isArray(m.toolCalls) || m.toolCalls.length === 0) continue;
+
+    const next = messages[i + 1];
+    const followingResultIds =
+      next && next.role === 'user' && Array.isArray(next.toolResults)
+        ? new Set(next.toolResults.map((r) => r.id))
+        : new Set<string>();
+
+    const kept: CoreToolCall[] = [];
+    for (const tc of m.toolCalls) {
+      if (tc.id && followingResultIds.has(tc.id)) {
+        kept.push(tc);
+      } else {
+        logger.warn('Dropping orphaned tool_use from compacted preserved messages', {
+          toolCallId: tc.id ?? '<missing>',
+        });
+      }
+    }
+
+    if (kept.length === 0) {
+      delete m.toolCalls;
+    } else {
+      m.toolCalls = kept;
+    }
+
+    const contentIsEmpty =
+      typeof m.content === 'string' ? m.content.trim() === '' : m.content.length === 0;
+    const hasToolCalls = Array.isArray(m.toolCalls) && m.toolCalls.length > 0;
+    if (!hasToolCalls && contentIsEmpty) {
       messages.splice(i, 1);
     }
   }
@@ -264,7 +316,7 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
         });
       }
 
-      dropOrphanedToolResults(messages);
+      dropOrphanedToolBlocks(messages);
 
       continue;
     }
