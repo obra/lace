@@ -177,6 +177,25 @@ export class ConversationRunner {
       this.deps.personaRegistry
     );
 
+    // Build provider messages and validate the system-prompt invariant BEFORE
+    // constructing the provider. If we threw after createProvider() but outside
+    // the try/finally that calls provider.cleanup(), the provider would leak
+    // EventEmitter listeners and open HTTP sockets.
+    const { messages: rebuiltMessages, systemPrompt: frozenSystemPrompt } =
+      buildProviderMessagesFromDurableEvents(sessionDir);
+    let providerMessages = rebuiltMessages;
+
+    // The system prompt is invariant for the session lifetime and is written
+    // by session/new as a system_prompt_set event. An empty result means the
+    // session is corrupt or was created without one — fail loudly rather
+    // than letting the provider's fallback string silently mask the bug.
+    if (!frozenSystemPrompt) {
+      throw new Error(
+        `Session ${sessionDir} has no system_prompt_set event; ` +
+          `the session is corrupt or was created before the invariant was enforced.`
+      );
+    }
+
     const provider = await this.deps.createProvider();
     const modelPricing = await this.deps.getModelPricing();
 
@@ -202,20 +221,6 @@ export class ConversationRunner {
       });
     };
 
-    const { messages: rebuiltMessages, systemPrompt: frozenSystemPrompt } =
-      buildProviderMessagesFromDurableEvents(sessionDir);
-    let providerMessages = rebuiltMessages;
-
-    // The system prompt is invariant for the session lifetime and is written
-    // by session/new as a system_prompt_set event. An empty result means the
-    // session is corrupt or was created without one — fail loudly rather
-    // than letting the provider's fallback string silently mask the bug.
-    if (!frozenSystemPrompt) {
-      throw new Error(
-        `Session ${sessionDir} has no system_prompt_set event; ` +
-          `the session is corrupt or was created before the invariant was enforced.`
-      );
-    }
     provider.setSystemPrompt(frozenSystemPrompt);
     // Watermark for mid-turn re-reads of durable events. Events with
     // eventSeq <= this value are already reflected in providerMessages (either

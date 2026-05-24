@@ -1698,6 +1698,63 @@ describe('ConversationRunner', () => {
       );
     });
 
+    describe('runner — no provider construction on empty-systemPrompt path', () => {
+      it('does not call createProvider when systemPrompt is empty', async () => {
+        // This test verifies that the empty-systemPrompt check runs BEFORE
+        // createProvider(), so a corrupt session doesn't leak a provider
+        // (EventEmitter listeners + HTTP sockets).
+        const createProviderSpy = vi.fn(async () => {
+          throw new Error('createProvider should NOT have been called');
+        });
+
+        const testId = randomUUID().substring(0, 8);
+        const isolatedDir = join(tmpdir(), `lace-runner-leak-${testId}`);
+        mkdirSync(isolatedDir, { recursive: true });
+
+        // Seed events.jsonl with a prompt event but NO system_prompt_set event.
+        writeFileSync(
+          join(isolatedDir, 'state.json'),
+          JSON.stringify({ nextEventSeq: 2, nextStreamSeq: 1 })
+        );
+        writeFileSync(
+          join(isolatedDir, 'events.jsonl'),
+          JSON.stringify({
+            eventSeq: 1,
+            timestamp: new Date().toISOString(),
+            type: 'prompt',
+            data: { content: [{ type: 'text', text: 'hi' }] },
+          }) + '\n'
+        );
+
+        try {
+          const config: RunnerConfig = {
+            sessionDir: isolatedDir,
+            sessionId: 'sess_leak_test',
+            cwd,
+            executionMode: 'execute',
+            approvalMode: 'approve',
+          };
+          const deps = createMockDeps({ createProvider: createProviderSpy });
+          const runner = new ConversationRunner(config, deps);
+
+          // Runner should throw the "no system_prompt_set" error WITHOUT calling
+          // createProvider — the build + check now run before provider construction.
+          await expect(
+            runner.run({
+              content: [{ type: 'text', text: 'hi' }],
+              abortController: new AbortController(),
+              turnId: `turn_${randomUUID()}`,
+              startedAt: new Date().toISOString(),
+            })
+          ).rejects.toThrow(/no system_prompt_set/i);
+
+          expect(createProviderSpy).not.toHaveBeenCalled();
+        } finally {
+          rmSync(isolatedDir, { recursive: true, force: true });
+        }
+      });
+    });
+
     describe('empty systemPrompt is a hard error', () => {
       it('throws when buildProviderMessagesFromDurableEvents returns systemPrompt=""', async () => {
         // Use a fresh directory not set up by beforeEach so we control the events.jsonl content.
