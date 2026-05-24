@@ -6,6 +6,10 @@ import * as path from 'node:path';
 import { getLaceDir } from '../config/lace-dir';
 import { readSessionMeta, type SessionState } from './session-store';
 import { listTranscriptFiles, transcriptFilePath } from './transcript-paths';
+import { eventToRow } from './recall/event-to-row';
+import { getRecallIndex } from './recall/index-db';
+import { insertRow } from './recall/index-writer';
+import type { TypedDurableEvent } from './event-types';
 
 /**
  * Cache: sessionDir → persona, populated on first lookup. Persona is immutable
@@ -263,6 +267,17 @@ export function appendDurableEvent(
   };
 
   fs.appendFileSync(eventsPath, `${JSON.stringify(written)}\n`, { encoding: 'utf8' });
+
+  // Write-through indexing: mirror the event into the FTS index so /recall
+  // queries can find it without a separate scan pass. Failures here must
+  // never break event-write — JSONL is source of truth and the backfill
+  // pass on next startup will repair anything the index missed.
+  try {
+    const row = eventToRow(written as TypedDurableEvent, { sessionId, persona });
+    if (row) insertRow(getRecallIndex(), row);
+  } catch (err) {
+    console.error('recall indexer write failed:', err);
+  }
 
   return {
     written,

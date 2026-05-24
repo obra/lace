@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   existsSync,
   mkdirSync,
@@ -21,6 +21,7 @@ import {
   readDurableEvents,
   summarizeDurableEvents,
 } from '../event-log';
+import { closeRecallIndex, getRecallIndex } from '../recall/index-db';
 
 /**
  * Helper: stand up a fresh laceDir + sessionDir (with persona) and set LACE_DIR.
@@ -61,6 +62,12 @@ describe('storage/event-log', () => {
   });
 
   afterEach(() => {
+    // Write-through indexing opens a process-singleton FTS DB rooted at the
+    // active LACE_DIR. Tests in this file repeatedly change LACE_DIR and
+    // remove the underlying tempdir, so we must release the handle between
+    // cases to avoid the singleton pointing at a deleted file (and to keep
+    // each case's index isolated).
+    closeRecallIndex();
     if (savedLaceDir === undefined) {
       delete process.env.LACE_DIR;
     } else {
@@ -534,5 +541,113 @@ describe('storage/event-log', () => {
         rmSync(laceDir, { recursive: true, force: true });
       }
     });
+  });
+});
+
+describe('appendDurableEvent — write-through indexing', () => {
+  let savedLaceDir: string | undefined;
+  let laceDir: string;
+  let sessionDir: string;
+  let sessionId: string;
+
+  beforeEach(() => {
+    savedLaceDir = process.env.LACE_DIR;
+    laceDir = mkdtempSync(join(tmpdir(), 'recall-writethru-'));
+    sessionId = `sess_${randomUUID()}`;
+    sessionDir = join(laceDir, 'agent-sessions', sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(
+      join(sessionDir, 'meta.json'),
+      JSON.stringify({
+        sessionId,
+        workDir: laceDir,
+        created: new Date().toISOString(),
+        persona: 'ada',
+      })
+    );
+    process.env.LACE_DIR = laceDir;
+    invalidatePersonaCache();
+  });
+
+  afterEach(() => {
+    closeRecallIndex();
+    if (savedLaceDir === undefined) {
+      delete process.env.LACE_DIR;
+    } else {
+      process.env.LACE_DIR = savedLaceDir;
+    }
+    rmSync(laceDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it('indexes a prompt event into FTS with the session persona', () => {
+    const startState = { nextEventSeq: 1, nextStreamSeq: 1 };
+    const { written } = appendDurableEvent(sessionDir, startState, {
+      type: 'prompt',
+      data: { type: 'prompt', content: [{ type: 'text', text: 'hello world' }] },
+    });
+
+    // Filter by this session's id so we don't conflict with earlier tests
+    // that share the singleton FTS index for the test process.
+    const db = getRecallIndex();
+    const rows = db
+      .prepare(
+        `SELECT event_id, session_id, persona, kind, content FROM events WHERE session_id = ?`
+      )
+      .all(sessionId) as Array<Record<string, unknown>>;
+    expect(rows).toEqual([
+      {
+        event_id: `${sessionId}:${written.eventSeq}`,
+        session_id: sessionId,
+        persona: 'ada',
+        kind: 'user_message',
+        content: 'hello world',
+      },
+    ]);
+  });
+
+  it('skips events that eventToRow returns null for (e.g. turn_start)', () => {
+    const startState = { nextEventSeq: 1, nextStreamSeq: 1 };
+    appendDurableEvent(sessionDir, startState, { type: 'turn_start', data: {} });
+
+    const db = getRecallIndex();
+    const count = (
+      db.prepare(`SELECT COUNT(*) AS n FROM events WHERE session_id = ?`).get(sessionId) as {
+        n: number;
+      }
+    ).n;
+    expect(count).toBe(0);
+  });
+
+  it('event-write still succeeds when the indexer throws', () => {
+    // Make sure the singleton instance is open BEFORE we mock prepare so the
+    // open path isn't what fails. Then break prepare on the live handle so
+    // insertRow throws.
+    const db = getRecallIndex();
+    const originalPrepare = db.prepare.bind(db);
+    vi.spyOn(db, 'prepare').mockImplementation(() => {
+      throw new Error('synthetic FTS prepare failure');
+    });
+    // Swallow the recall error log so test output stays pristine.
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const startState = { nextEventSeq: 1, nextStreamSeq: 1 };
+    expect(() =>
+      appendDurableEvent(sessionDir, startState, {
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'survives indexer failure' }] },
+      })
+    ).not.toThrow();
+
+    // The event must have landed in JSONL even though FTS failed.
+    const read = readDurableEvents(sessionDir, { afterEventSeq: 0, limit: 100 });
+    expect(read.events).toHaveLength(1);
+    expect(read.events[0]?.type).toBe('prompt');
+    expect(errSpy).toHaveBeenCalled();
+
+    // Restore prepare on the same handle so afterEach close() doesn't trip.
+    (db.prepare as unknown as { mockRestore?: () => void }).mockRestore?.();
+    // Sanity: we can read from the live handle after restore.
+    expect(() => originalPrepare(`SELECT 1`).get()).not.toThrow();
   });
 });
