@@ -568,15 +568,18 @@ export abstract class AIProvider extends EventEmitter {
   // telemetry as a real bug — every legitimate request path must call
   // setSystemPrompt() at session start.
   //
-  // Note: Task 3E will refine the warning to skip empty-messages calls
-  // (the legitimate calibration path) to suppress noise there.
-  protected getEffectiveSystemPrompt(_messages: ProviderMessage[]): string {
+  protected getEffectiveSystemPrompt(messages: ProviderMessage[]): string {
     if (this._systemPrompt) return this._systemPrompt;
 
-    logger.warn(
-      '[base-provider] getEffectiveSystemPrompt called with no _systemPrompt — caller must setSystemPrompt() at session start. ' +
-        'Returning stable fallback so the cache stays warm, but production telemetry should surface this as a real bug.'
-    );
+    // Calibration paths intentionally call us with empty messages and
+    // already-resolved-or-empty prompts. Only warn when we're actually
+    // serving a request that's about to send to the model.
+    if (messages.length > 0) {
+      logger.warn(
+        '[base-provider] getEffectiveSystemPrompt called with no _systemPrompt — caller must setSystemPrompt() at session start. ' +
+          'Returning stable fallback so the cache stays warm, but production telemetry should surface this as a real bug.'
+      );
+    }
     return 'You are a helpful assistant.';
   }
 
