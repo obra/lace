@@ -18,6 +18,17 @@ export type BackfillStats = {
   errors: number;
 };
 
+// Sessions are minted as `sess_<uuid>` (see ent-protocol/src/ids.ts). Stray
+// directories under agent-sessions/ (e.g. `tmp-*`, leftover test scaffolding)
+// must NOT pollute the FTS index — they end up as garbage rows like
+// `tmp-foo:1` (H3). Same shape applies to `<sessionId>.jsonl` files in the
+// new layout.
+const SESSION_ID_RE = /^sess_[0-9a-f][0-9a-f-]*$/;
+
+function isValidSessionId(name: string): boolean {
+  return SESSION_ID_RE.test(name);
+}
+
 type SessionPass = {
   sessionId: string;
   filePath: string;
@@ -94,6 +105,7 @@ function collectNewLayout(laceDir: string, out: SessionPass[]): void {
       for (const file of safeReaddir(dateDir)) {
         if (!file.endsWith('.jsonl')) continue;
         const sessionId = file.slice(0, -'.jsonl'.length);
+        if (!isValidSessionId(sessionId)) continue;
         out.push({ sessionId, filePath: path.join(dateDir, file), persona: personaForRow });
       }
     }
@@ -108,6 +120,7 @@ function collectLegacyLayout(laceDir: string, out: SessionPass[]): void {
   const legacyRoot = agentSessionsDir();
   if (!existsAsDir(legacyRoot)) return;
   for (const sessionId of safeReaddir(legacyRoot)) {
+    if (!isValidSessionId(sessionId)) continue;
     const sessionDir = path.join(legacyRoot, sessionId);
     if (!existsAsDir(sessionDir)) continue;
     const eventsFile = path.join(sessionDir, 'events.jsonl');

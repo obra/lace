@@ -458,6 +458,55 @@ describe('backfillIndex', () => {
     ]);
   });
 
+  it('ignores directories that do not match sessionId shape (H3)', () => {
+    const legacyRoot = join(laceDir, 'agent-sessions');
+    mkdirSync(legacyRoot, { recursive: true });
+
+    // Stray directory with events.jsonl but non-session name — must be ignored
+    const stray = join(legacyRoot, 'tmp-leftover');
+    mkdirSync(stray, { recursive: true });
+    writeJsonl(join(stray, 'events.jsonl'), [promptEvent(1, 'stray garbage')]);
+
+    // Another stray with a vaguely-session-looking-but-wrong name
+    const stray2 = join(legacyRoot, 'sessionXYZ');
+    mkdirSync(stray2, { recursive: true });
+    writeJsonl(join(stray2, 'events.jsonl'), [promptEvent(1, 'wrong prefix')]);
+
+    // Legitimate session
+    const realId = 'sess_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    const realDir = join(legacyRoot, realId);
+    mkdirSync(realDir, { recursive: true });
+    writeMeta(realDir, realId, 'ada');
+    writeJsonl(join(realDir, 'events.jsonl'), [promptEvent(1, 'real event')]);
+
+    backfillIndex(db, laceDir);
+
+    const sessions = db.prepare(`SELECT DISTINCT session_id FROM events`).all() as Array<{
+      session_id: string;
+    }>;
+    expect(sessions.map((s) => s.session_id)).toEqual([realId]);
+  });
+
+  it('ignores new-layout files whose basename is not a valid sessionId (H3)', () => {
+    const personaDir = join(laceDir, 'transcripts', 'ada', '2026-05-23');
+    mkdirSync(personaDir, { recursive: true });
+
+    // Stray jsonl with non-session name
+    writeJsonl(join(personaDir, 'tmp-foo.jsonl'), [promptEvent(1, 'tmp garbage')]);
+    writeJsonl(join(personaDir, 'notsess.jsonl'), [promptEvent(1, 'wrong prefix')]);
+
+    // Legitimate session file
+    const realId = 'sess_bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
+    writeJsonl(join(personaDir, `${realId}.jsonl`), [promptEvent(1, 'real event')]);
+
+    backfillIndex(db, laceDir);
+
+    const sessions = db.prepare(`SELECT DISTINCT session_id FROM events`).all() as Array<{
+      session_id: string;
+    }>;
+    expect(sessions.map((s) => s.session_id)).toEqual([realId]);
+  });
+
   it('handles both layouts present at once', () => {
     // Legacy
     const legacyId = SESSION_IDS.legacyMix;
