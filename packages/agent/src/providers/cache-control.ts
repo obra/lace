@@ -139,7 +139,7 @@ function collectAllBlockPositions(messages: Anthropic.MessageParam[]): BlockPosi
 }
 
 function isMessageEmpty(msg: Anthropic.MessageParam): boolean {
-  return typeof msg.content === 'string' ? msg.content.length === 0 : msg.content.length === 0;
+  return msg.content.length === 0;
 }
 
 /**
