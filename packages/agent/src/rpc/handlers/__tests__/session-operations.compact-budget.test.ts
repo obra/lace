@@ -65,7 +65,7 @@ function writeConversationWithLargeSystemPrompt(
   }
 }
 
-describe('ent/session/compact — previousTokens includes systemPrompt (PRI-1799 Task 4)', () => {
+describe('ent/session/compact — systemPrompt token inclusion (PRI-1799 Task 4)', () => {
   let originalLaceDir: string | undefined;
   let originalTestProvider: string | undefined;
   let tempDir: string;
@@ -136,6 +136,47 @@ describe('ent/session/compact — previousTokens includes systemPrompt (PRI-1799
       // If the fix is absent, previousTokens ≈ messageOnlyBaseline < expectedSystemPromptTokens.
       // If the fix is present, previousTokens ≥ expectedSystemPromptTokens + some message tokens.
       expect(response.previousTokens).toBeGreaterThanOrEqual(expectedSystemPromptTokens);
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('currentTokens includes systemPromptTokens for comparability with previousTokens', async () => {
+    // A large system prompt whose token contribution is easily distinguishable.
+    const systemPromptText = 'You are TestPersona. '.repeat(50);
+    const expectedSystemPromptTokens = estimateTokens(systemPromptText);
+    expect(expectedSystemPromptTokens).toBeGreaterThan(50);
+
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      const newResult = (await client.request('session/new', { cwd: workDir, mcpServers: [] })) as {
+        sessionId: string;
+      };
+
+      const sessionDir = getSessionDir(newResult.sessionId);
+      writeConversationWithLargeSystemPrompt(sessionDir, systemPromptText);
+
+      const response = (await client.request('ent/session/compact', {
+        strategy: 'truncate',
+        preserveRecent: 0,
+      })) as { previousTokens: number; currentTokens: number; messagesCompacted: number };
+
+      // currentTokens must be >= the system prompt's token count.
+      // Without the fix, currentTokens would exclude systemPromptTokens and be
+      // much smaller (e.g., ~60 tokens for 12 messages vs ~250 for system prompt).
+      // With the fix, currentTokens >= expectedSystemPromptTokens.
+      expect(response.currentTokens).toBeGreaterThanOrEqual(expectedSystemPromptTokens);
+
+      // Both previousTokens and currentTokens should include the system prompt.
+      // The difference (previousTokens - currentTokens) represents only the
+      // compacted and removed message tokens, not the system prompt.
+      // Both must be >= system prompt tokens for the math to make sense.
+      expect(response.previousTokens).toBeGreaterThanOrEqual(expectedSystemPromptTokens);
+      expect(response.currentTokens).toBeGreaterThanOrEqual(expectedSystemPromptTokens);
     } finally {
       client.close();
       server.close();

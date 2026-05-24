@@ -525,12 +525,12 @@ export function registerSessionOperationHandlers(
       ];
 
       let _removedForBudget = 0;
-      let currentTokens = estimateProviderTokens(nextProviderMessages);
+      let currentTokens = estimateProviderTokens(nextProviderMessages) + systemPromptTokens;
       if (targetTokens !== undefined) {
         while (nextProviderMessages.length > 0 && currentTokens > targetTokens) {
           nextProviderMessages.shift();
           _removedForBudget += 1;
-          currentTokens = estimateProviderTokens(nextProviderMessages);
+          currentTokens = estimateProviderTokens(nextProviderMessages) + systemPromptTokens;
         }
       }
 
