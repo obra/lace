@@ -25,6 +25,10 @@ const recallSchema = z.object({
   since: z.string().optional(),
   until: z.string().optional(),
   limit: z.number().int().positive().max(100).optional(),
+  // 'relevance' (default) sorts by FTS rank; 'recent' sorts by timestamp DESC.
+  // When you want the latest mentions of a term (rather than the most
+  // textually-relevant), pass `order: 'recent'`.
+  order: z.enum(['relevance', 'recent']).optional(),
   // read fields
   event_id: z.string().min(1).optional(),
   context: z.number().int().nonnegative().max(50).optional(),
@@ -42,6 +46,9 @@ const RECALL_DESCRIPTION = [
   'world; re-check live for facts that can change.',
   '',
   'Actions: `search`, `read`.',
+  '',
+  '`search.order` defaults to `relevance` (FTS rank). Pass `order: "recent"` when you want',
+  'the most recent mentions of a term (e.g. "what\'s the last thing I said about compaction?").',
 ].join('\n');
 
 // Truncation caps, calibrated for a 200k-token main context per spec §Truncation.
@@ -112,10 +119,12 @@ export class RecallTool extends Tool {
     }
 
     const limit = args.limit ?? 10;
+    const order = args.order ?? 'relevance';
+    const orderBy = order === 'recent' ? 'ts DESC' : 'rank';
     const sql =
       `SELECT event_id, session_id, ts, persona, kind, ` +
       `snippet(events, 5, '', '', '...', 32) AS preview ` +
-      `FROM events WHERE ${where.join(' AND ')} ORDER BY rank LIMIT ?`;
+      `FROM events WHERE ${where.join(' AND ')} ORDER BY ${orderBy} LIMIT ?`;
     params.push(limit);
 
     let rows: SearchHitRow[];

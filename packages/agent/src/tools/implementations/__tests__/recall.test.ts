@@ -372,6 +372,44 @@ describe('RecallTool search', () => {
     expect(parsed.hint as string).toContain('<REDACTED:aws-access-key>');
   });
 
+  it('order: recent sorts hits by ts DESC (I5)', async () => {
+    // Seed FTS rows directly with distinct timestamps so the ordering test
+    // is deterministic (appendDurableEvent uses new Date().toISOString()
+    // which can collide within a tight loop).
+    const { getRecallIndex } = await import('@lace/agent/storage/recall/index-db');
+    const { insertRow } = await import('@lace/agent/storage/recall/index-writer');
+    const sessionId = `sess_${randomUUID()}`;
+    const db = getRecallIndex();
+    // Events 1..5 are "old" (2024); 6..10 are "new" (2026). All match
+    // the query "needle".
+    for (let i = 1; i <= 10; i++) {
+      const year = i <= 5 ? 2024 : 2026;
+      const ts = `${year}-01-01T00:00:${String(i).padStart(2, '0')}Z`;
+      insertRow(db, {
+        event_id: `${sessionId}:${i}`,
+        session_id: sessionId,
+        ts,
+        persona: 'ada',
+        kind: 'user_message',
+        content: `needle ${i}`,
+      });
+    }
+
+    const result = await new RecallTool().execute(
+      { action: 'search', query: 'needle', order: 'recent', limit: 5 },
+      makeCtx()
+    );
+    const hits = parseResult(result).hits as Array<{ ts: string; event_id: string }>;
+    expect(hits).toHaveLength(5);
+    // ts strings sorted DESC
+    const tsList = hits.map((h) => h.ts);
+    const sorted = [...tsList].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+    expect(tsList).toEqual(sorted);
+    // The newest 5 (seq 6..10) must be present; the older 5 (1..5) must not.
+    const seqs = hits.map((h) => parseInt(h.event_id.split(':')[1], 10));
+    for (const s of seqs) expect(s).toBeGreaterThanOrEqual(6);
+  });
+
   it('returns the FTS5-syntax-error hint envelope instead of throwing on broken queries (C3)', async () => {
     const fx = makeSession(laceDir, 'ada');
     appendPrompt(fx, 'something');
