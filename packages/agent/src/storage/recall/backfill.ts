@@ -7,7 +7,7 @@ import type { Db } from './index-db';
 import { transcriptsRoot, UNKNOWN_PERSONA_BUCKET } from '../transcript-paths';
 import { eventToRow } from './event-to-row';
 import { insertRow } from './index-writer';
-import { readSessionMeta } from '../session-store';
+import { agentSessionsDir, readSessionMeta } from '../session-store';
 import type { TypedDurableEvent } from '../event-types';
 import type { DurableEvent } from '../event-log';
 
@@ -94,8 +94,12 @@ function collectNewLayout(laceDir: string, out: SessionPass[]): void {
   }
 }
 
-function collectLegacyLayout(laceDir: string, out: SessionPass[]): void {
-  const legacyRoot = path.join(laceDir, 'agent-sessions');
+function collectLegacyLayout(_laceDir: string, out: SessionPass[]): void {
+  // Use agentSessionsDir() so LACE_SESSION_DIR / XDG_STATE_HOME / HOME / tmpdir
+  // fallback paths are visible to backfill. Previously hardcoded to
+  // <laceDir>/agent-sessions which silently missed sessions under any override
+  // (H11).
+  const legacyRoot = agentSessionsDir();
   if (!existsAsDir(legacyRoot)) return;
   for (const sessionId of safeReaddir(legacyRoot)) {
     const sessionDir = path.join(legacyRoot, sessionId);

@@ -64,15 +64,20 @@ function allRows(db: Db): Row[] {
 describe('backfillIndex', () => {
   let laceDir: string;
   let db: Db;
+  let savedLaceDir: string | undefined;
 
   beforeEach(() => {
+    savedLaceDir = process.env.LACE_DIR;
     laceDir = mkdtempSync(join(tmpdir(), 'recall-backfill-'));
+    process.env.LACE_DIR = laceDir;
     db = openRecallIndex(join(laceDir, 'recall', 'index.sqlite'));
   });
 
   afterEach(() => {
     db.close();
     rmSync(laceDir, { recursive: true, force: true });
+    if (savedLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = savedLaceDir;
   });
 
   it('backfills events from legacy <laceDir>/agent-sessions layout', () => {
@@ -99,6 +104,32 @@ describe('backfillIndex', () => {
     expect(rows.every((r) => r.session_id === sessionId)).toBe(true);
     expect(rows.every((r) => r.persona === 'ada')).toBe(true);
     expect(rows.every((r) => r.kind === 'user_message')).toBe(true);
+  });
+
+  it('discovers sessions under LACE_SESSION_DIR fallback (H11)', () => {
+    const sessionRoot = mkdtempSync(join(tmpdir(), 'lace-bf-s-'));
+    const savedSessionDir = process.env.LACE_SESSION_DIR;
+    process.env.LACE_SESSION_DIR = sessionRoot;
+    try {
+      const sessionId = 'sess_ffffffff-ffff-4fff-8fff-ffffffffffff';
+      // Seed a legacy session under the override location — NOT under laceDir.
+      const legacySession = join(sessionRoot, sessionId);
+      mkdirSync(legacySession, { recursive: true });
+      writeMeta(legacySession, sessionId, 'ada');
+      writeJsonl(join(legacySession, 'events.jsonl'), [promptEvent(1, 'hello')]);
+
+      const stats = backfillIndex(db, laceDir);
+      expect(stats.inserted).toBeGreaterThanOrEqual(1);
+
+      const rows = allRows(db).filter((r) => r.session_id === sessionId);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].kind).toBe('user_message');
+      expect(rows[0].persona).toBe('ada');
+    } finally {
+      if (savedSessionDir === undefined) delete process.env.LACE_SESSION_DIR;
+      else process.env.LACE_SESSION_DIR = savedSessionDir;
+      rmSync(sessionRoot, { recursive: true, force: true });
+    }
   });
 
   it('backfills events from new transcripts/<persona>/<date> layout', () => {
