@@ -153,10 +153,11 @@ export type BuiltProviderMessages = {
  * Reconstructs the conversation history by reading and parsing events.jsonl.
  * Exported for testing - converts durable events to provider message format.
  *
- * Returns { messages, systemPrompt } where systemPrompt comes from the last
- * system_prompt_set event in the log. context_injected events are emitted as
- * role:user messages (they are runtime context, not part of the session-foundational
- * system prompt).
+ * Returns { messages, systemPrompt } where systemPrompt comes from:
+ * - New sessions: the last system_prompt_set event in the log.
+ * - Legacy sessions (no system_prompt_set): the concatenation of context_injected
+ *   events that appear before the first prompt event. Those sessions wrote the
+ *   persona and userInstructions as context_injected events at creation time.
  */
 export function buildProviderMessagesFromDurableEvents(sessionDir: string): BuiltProviderMessages {
   const eventsPath = join(sessionDir, 'events.jsonl');
@@ -167,125 +168,169 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
     return { messages: [], systemPrompt: '' };
   }
 
-  const messages: ProviderMessage[] = [];
-  let systemPrompt = '';
-  const lines = raw.split('\n');
-
-  for (const line of lines) {
+  // Parse all lines once and reuse in both passes.
+  type ParsedEvent = { type: string; data: Record<string, unknown> };
+  const parsedEvents: ParsedEvent[] = [];
+  for (const line of raw.split('\n')) {
     if (!line) continue;
     try {
       const parsed = JSON.parse(line) as { type?: string; data?: Record<string, unknown> };
       const type = typeof parsed.type === 'string' ? parsed.type : '';
       const data = typeof parsed.data === 'object' && parsed.data ? parsed.data : {};
-
-      if (type === 'system_prompt_set') {
-        const eventData = data as SystemPromptSetData;
-        if (typeof eventData.text === 'string') {
-          systemPrompt = eventData.text; // last-one-wins for defensive multi-event support
-        }
-        continue;
-      }
-
-      if (type === 'prompt') {
-        const content = extractContentBlocks((data as Record<string, unknown>).content);
-        // Check if content is non-empty (string or array with items)
-        const hasContent = typeof content === 'string' ? content.trim() : content.length > 0;
-        if (hasContent) messages.push({ role: 'user', content });
-        continue;
-      }
-
-      if (type === 'context_injected') {
-        // context_injected carries runtime context (reminders, nudges) — NOT part of the
-        // session-foundational system prompt. Emit as role:user so it is visible to the
-        // model in the messages array while remaining distinct from the stable system prompt.
-        const eventData = data as ContextInjectedData;
-        const contentArr = Array.isArray(eventData.content) ? eventData.content : [];
-        const content = extractTextFromContentBlocks(contentArr);
-        if (content.trim()) messages.push({ role: 'user', content });
-        continue;
-      }
-
-      if (type === 'context_compacted') {
-        const eventData = data as ContextCompactedData;
-        const summary = typeof eventData.summary === 'string' ? eventData.summary : '';
-        const preserved = Array.isArray(eventData.preserved) ? eventData.preserved : [];
-
-        messages.length = 0;
-        if (summary.trim()) messages.push({ role: 'system', content: summary });
-
-        for (const msg of preserved) {
-          if (!msg || typeof msg !== 'object') continue;
-          const msgObj = msg as PreservedMessage;
-          const role = msgObj.role;
-          const content = msgObj.content;
-          if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
-          if (typeof content !== 'string') continue;
-
-          const toolCalls = Array.isArray(msgObj.toolCalls) ? msgObj.toolCalls : undefined;
-          const toolResults = Array.isArray(msgObj.toolResults) ? msgObj.toolResults : undefined;
-
-          messages.push({
-            role,
-            content,
-            ...(toolCalls ? { toolCalls } : {}),
-            ...(toolResults ? { toolResults } : {}),
-          });
-        }
-
-        dropOrphanedToolResults(messages);
-
-        continue;
-      }
-
-      if (type === 'message') {
-        const eventData = data as MessageData;
-        const content =
-          typeof eventData.content === 'string'
-            ? eventData.content
-            : extractTextFromContentBlocks(
-                Array.isArray(eventData.content) ? eventData.content : []
-              );
-        messages.push({ role: 'assistant', content: content ?? '' });
-        continue;
-      }
-
-      if (type === 'tool_use') {
-        const eventData = data as ToolUseData;
-        const toolCallId = toNonEmptyString(eventData.toolCallId);
-        const name = toNonEmptyString(eventData.name);
-        const input = eventData.input;
-        const result = eventData.result;
-        if (!toolCallId || !name) continue;
-
-        const toolCall: CoreToolCall = {
-          id: toolCallId,
-          name,
-          arguments: typeof input === 'object' && input ? (input as Record<string, unknown>) : {},
-        };
-
-        if (messages.length === 0 || messages[messages.length - 1]!.role !== 'assistant') {
-          messages.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
-        } else {
-          const last = messages[messages.length - 1]!;
-          last.toolCalls = [...(last.toolCalls || []), toolCall];
-        }
-
-        if (result) {
-          const coreResult = coreToolResultFromProtocol(result, toolCallId);
-          const last = messages[messages.length - 1];
-          const canAppendToUser =
-            last && last.role === 'user' && last.toolResults && last.toolResults.length > 0;
-          if (canAppendToUser) {
-            last.toolResults!.push(coreResult);
-          } else {
-            messages.push({ role: 'user', content: '', toolResults: [coreResult] });
-          }
-        }
-
-        continue;
-      }
+      parsedEvents.push({ type, data });
     } catch {
       // Ignore malformed lines.
+    }
+  }
+
+  // Pass 1: determine systemPrompt.
+  // New sessions have an explicit system_prompt_set event (last one wins).
+  // Legacy sessions instead had context_injected events written before the first
+  // prompt event for the persona and userInstructions — collect those as a fallback.
+  let systemPrompt = '';
+  let hasSystemPromptSet = false;
+  for (const e of parsedEvents) {
+    if (e.type === 'system_prompt_set') {
+      const eventData = e.data as SystemPromptSetData;
+      if (typeof eventData.text === 'string') {
+        systemPrompt = eventData.text; // last-one-wins for defensive multi-event support
+        hasSystemPromptSet = true;
+      }
+    }
+  }
+
+  if (!hasSystemPromptSet) {
+    // Legacy migration: concatenate context_injected events that precede the first
+    // prompt event and use them as the system prompt. After the first prompt they
+    // become ordinary role:user messages (handled in Pass 2).
+    const legacyTexts: string[] = [];
+    for (const e of parsedEvents) {
+      if (e.type === 'prompt') break;
+      if (e.type === 'context_injected') {
+        const eventData = e.data as ContextInjectedData;
+        const contentArr = Array.isArray(eventData.content) ? eventData.content : [];
+        const text = extractTextFromContentBlocks(contentArr);
+        if (text.trim()) legacyTexts.push(text);
+      }
+    }
+    systemPrompt = legacyTexts.join('\n\n');
+  }
+
+  // Pass 2: build the messages array.
+  // Bind the session regime once so the read-site guard below is self-documenting.
+  const isLegacySession = !hasSystemPromptSet;
+  const messages: ProviderMessage[] = [];
+  let sawFirstPrompt = false;
+
+  for (const e of parsedEvents) {
+    const { type, data } = e;
+
+    if (type === 'system_prompt_set') {
+      // Already consumed in Pass 1 — skip here.
+      continue;
+    }
+
+    if (type === 'prompt') {
+      const content = extractContentBlocks((data as Record<string, unknown>).content);
+      // Check if content is non-empty (string or array with items)
+      const hasContent = typeof content === 'string' ? content.trim() : content.length > 0;
+      if (hasContent) messages.push({ role: 'user', content });
+      sawFirstPrompt = true;
+      continue;
+    }
+
+    if (type === 'context_injected') {
+      // Legacy sessions: pre-prompt context_injected events were consumed as the
+      // system prompt in Pass 1 — skip them here so they don't also appear in
+      // the messages array.
+      if (isLegacySession && !sawFirstPrompt) continue;
+
+      // New sessions (hasSystemPromptSet) and post-prompt context_injected events:
+      // emit as role:user so runtime context is visible to the model in the
+      // messages array while remaining distinct from the stable system prompt.
+      const eventData = data as ContextInjectedData;
+      const contentArr = Array.isArray(eventData.content) ? eventData.content : [];
+      const content = extractTextFromContentBlocks(contentArr);
+      if (content.trim()) messages.push({ role: 'user', content });
+      continue;
+    }
+
+    if (type === 'context_compacted') {
+      const eventData = data as ContextCompactedData;
+      const summary = typeof eventData.summary === 'string' ? eventData.summary : '';
+      const preserved = Array.isArray(eventData.preserved) ? eventData.preserved : [];
+
+      messages.length = 0;
+      if (summary.trim()) messages.push({ role: 'system', content: summary });
+
+      for (const msg of preserved) {
+        if (!msg || typeof msg !== 'object') continue;
+        const msgObj = msg as PreservedMessage;
+        const role = msgObj.role;
+        const content = msgObj.content;
+        if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
+        if (typeof content !== 'string') continue;
+
+        const toolCalls = Array.isArray(msgObj.toolCalls) ? msgObj.toolCalls : undefined;
+        const toolResults = Array.isArray(msgObj.toolResults) ? msgObj.toolResults : undefined;
+
+        messages.push({
+          role,
+          content,
+          ...(toolCalls ? { toolCalls } : {}),
+          ...(toolResults ? { toolResults } : {}),
+        });
+      }
+
+      dropOrphanedToolResults(messages);
+
+      continue;
+    }
+
+    if (type === 'message') {
+      const eventData = data as MessageData;
+      const content =
+        typeof eventData.content === 'string'
+          ? eventData.content
+          : extractTextFromContentBlocks(Array.isArray(eventData.content) ? eventData.content : []);
+      messages.push({ role: 'assistant', content: content ?? '' });
+      continue;
+    }
+
+    if (type === 'tool_use') {
+      const eventData = data as ToolUseData;
+      const toolCallId = toNonEmptyString(eventData.toolCallId);
+      const name = toNonEmptyString(eventData.name);
+      const input = eventData.input;
+      const result = eventData.result;
+      if (!toolCallId || !name) continue;
+
+      const toolCall: CoreToolCall = {
+        id: toolCallId,
+        name,
+        arguments: typeof input === 'object' && input ? (input as Record<string, unknown>) : {},
+      };
+
+      if (messages.length === 0 || messages[messages.length - 1]!.role !== 'assistant') {
+        messages.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
+      } else {
+        const last = messages[messages.length - 1]!;
+        last.toolCalls = [...(last.toolCalls || []), toolCall];
+      }
+
+      if (result) {
+        const coreResult = coreToolResultFromProtocol(result, toolCallId);
+        const last = messages[messages.length - 1];
+        const canAppendToUser =
+          last && last.role === 'user' && last.toolResults && last.toolResults.length > 0;
+        if (canAppendToUser) {
+          last.toolResults!.push(coreResult);
+        } else {
+          messages.push({ role: 'user', content: '', toolResults: [coreResult] });
+        }
+      }
+
+      continue;
     }
   }
 

@@ -304,9 +304,10 @@ describe('buildProviderMessagesFromDurableEvents', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('converts context_injected event to provider message with role user (runtime context, not system prompt)', () => {
-    // context_injected carries runtime nudges — they are NOT part of the foundational
-    // system prompt, so they are emitted as role:user messages (Task 2C).
+  it('legacy migration: pre-prompt context_injected event (no system_prompt_set) becomes systemPrompt, not a user message', () => {
+    // Without a system_prompt_set event, context_injected events that appear before the
+    // first prompt are treated as the legacy system prompt (they were written at session
+    // creation time to hold the persona + userInstructions).
     const contextInjectedEvent = {
       type: 'context_injected',
       eventSeq: 1,
@@ -319,16 +320,15 @@ describe('buildProviderMessagesFromDurableEvents', () => {
 
     writeFileSync(join(tempDir, 'events.jsonl'), JSON.stringify(contextInjectedEvent) + '\n');
 
-    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+    const { messages, systemPrompt } = buildProviderMessagesFromDurableEvents(tempDir);
 
-    expect(messages.length).toBe(1);
-    expect(messages[0]).toEqual({
-      role: 'user',
-      content: 'You are Lace, a helpful AI assistant.',
-    });
+    expect(messages.length).toBe(0);
+    expect(systemPrompt).toBe('You are Lace, a helpful AI assistant.');
   });
 
-  it('converts context_injected with multi-block content to single user message', () => {
+  it('legacy migration: pre-prompt context_injected with multi-block content becomes systemPrompt', () => {
+    // Without a system_prompt_set event, context_injected events before the first
+    // prompt are consumed as the legacy system prompt — even multi-block ones.
     const contextInjectedEvent = {
       type: 'context_injected',
       eventSeq: 1,
@@ -344,15 +344,16 @@ describe('buildProviderMessagesFromDurableEvents', () => {
 
     writeFileSync(join(tempDir, 'events.jsonl'), JSON.stringify(contextInjectedEvent) + '\n');
 
-    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+    const { messages, systemPrompt } = buildProviderMessagesFromDurableEvents(tempDir);
 
-    expect(messages.length).toBe(1);
-    expect(messages[0].role).toBe('user');
-    expect(messages[0].content).toContain('You are Lace.');
-    expect(messages[0].content).toContain('You help with coding.');
+    expect(messages.length).toBe(0);
+    expect(systemPrompt).toContain('You are Lace.');
+    expect(systemPrompt).toContain('You help with coding.');
   });
 
-  it('places context_injected user message before prompt user message in correct order', () => {
+  it('legacy migration: pre-prompt context_injected becomes systemPrompt and prompt becomes the only message', () => {
+    // Without system_prompt_set, the pre-prompt context_injected is the legacy system
+    // prompt; only the prompt event ends up in the messages array.
     const events = [
       {
         type: 'context_injected',
@@ -380,14 +381,11 @@ describe('buildProviderMessagesFromDurableEvents', () => {
       events.map((e) => JSON.stringify(e)).join('\n') + '\n'
     );
 
-    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+    const { messages, systemPrompt } = buildProviderMessagesFromDurableEvents(tempDir);
 
-    expect(messages.length).toBe(2);
+    expect(systemPrompt).toBe('System prompt content');
+    expect(messages.length).toBe(1);
     expect(messages[0]).toEqual({
-      role: 'user',
-      content: 'System prompt content',
-    });
-    expect(messages[1]).toEqual({
       role: 'user',
       content: 'Hello, how are you?',
     });

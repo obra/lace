@@ -294,7 +294,7 @@ describe('buildProviderMessagesFromDurableEvents — system_prompt_set and conte
     ]);
   });
 
-  it('returns empty systemPrompt when no system_prompt_set event is present (legacy — Task 2F migrates)', () => {
+  it('returns empty systemPrompt when no system_prompt_set or pre-prompt context_injected events exist', () => {
     writeEvents(tempDir, [
       {
         eventSeq: 1,
@@ -329,5 +329,82 @@ describe('buildProviderMessagesFromDurableEvents — system_prompt_set and conte
 
     const result = buildProviderMessagesFromDurableEvents(tempDir);
     expect(result.systemPrompt).toBe('second');
+  });
+
+  it('legacy session — uses pre-prompt context_injected events as systemPrompt when no system_prompt_set exists', () => {
+    writeEvents(tempDir, [
+      // Two pre-prompt context_injected events: legacy persona + userInstructions
+      {
+        eventSeq: 1,
+        type: 'context_injected',
+        data: { type: 'context_injected', content: [{ type: 'text', text: 'Legacy persona.' }] },
+      },
+      {
+        eventSeq: 2,
+        type: 'context_injected',
+        data: {
+          type: 'context_injected',
+          content: [{ type: 'text', text: 'Legacy user instructions.' }],
+        },
+      },
+      // First prompt event ends the "system prompt" run
+      {
+        eventSeq: 3,
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+      },
+      // Post-prompt context_injected → role:user
+      {
+        eventSeq: 4,
+        type: 'context_injected',
+        data: { type: 'context_injected', content: [{ type: 'text', text: 'runtime nudge' }] },
+      },
+    ]);
+
+    const result = buildProviderMessagesFromDurableEvents(tempDir);
+    expect(result.systemPrompt).toBe('Legacy persona.\n\nLegacy user instructions.');
+    expect(result.messages).toEqual([
+      { role: 'user', content: 'hi' },
+      { role: 'user', content: 'runtime nudge' },
+    ]);
+  });
+
+  it('legacy migration is bypassed when a system_prompt_set event is present (new session takes precedence)', () => {
+    writeEvents(tempDir, [
+      {
+        eventSeq: 1,
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'New session sys prompt.' },
+      },
+      {
+        eventSeq: 2,
+        type: 'context_injected',
+        data: {
+          type: 'context_injected',
+          content: [{ type: 'text', text: 'Pre-prompt context.' }],
+        },
+      },
+      {
+        eventSeq: 3,
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+      },
+      {
+        eventSeq: 4,
+        type: 'context_injected',
+        data: {
+          type: 'context_injected',
+          content: [{ type: 'text', text: 'Post-prompt runtime nudge.' }],
+        },
+      },
+    ]);
+
+    const result = buildProviderMessagesFromDurableEvents(tempDir);
+    expect(result.systemPrompt).toBe('New session sys prompt.');
+    expect(result.messages).toEqual([
+      { role: 'user', content: 'Pre-prompt context.' },
+      { role: 'user', content: 'hi' },
+      { role: 'user', content: 'Post-prompt runtime nudge.' },
+    ]);
   });
 });
