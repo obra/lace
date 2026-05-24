@@ -2,9 +2,29 @@
 // ABOUTME: the runner's frozenSystemPrompt invariant is satisfied for the next prompt.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+/**
+ * Walk the transcripts/<persona>/<date>/<sessionId>.jsonl tree to find the
+ * (single) on-disk transcript for this session. The /clear handler creates a
+ * new session and the runner writes events under the new persona/date layout.
+ */
+function readSessionEventsFromDisk(laceDir: string, sessionId: string): string[] {
+  const root = join(laceDir, 'transcripts');
+  if (!existsSync(root)) return [];
+  for (const persona of readdirSync(root)) {
+    const personaDir = join(root, persona);
+    for (const date of readdirSync(personaDir)) {
+      const candidate = join(personaDir, date, `${sessionId}.jsonl`);
+      if (existsSync(candidate)) {
+        return readFileSync(candidate, 'utf8').trim().split('\n').filter(Boolean);
+      }
+    }
+  }
+  return [];
+}
 
 // Mock loadPromptConfig to avoid real persona/skill loading.
 vi.mock('@lace/agent/config/prompts', () => ({
@@ -136,17 +156,11 @@ describe('/clear writes system_prompt_set in the new session', () => {
     expect(capturedNewSessionId).not.toBeNull();
 
     // Verify the new session has a system_prompt_set event as first event.
-    const newSessionDir = getSessionDir(capturedNewSessionId!);
-    const eventsPath = join(newSessionDir, 'events.jsonl');
-    expect(existsSync(eventsPath)).toBe(true);
+    // Events are written under the persona/date transcript layout.
+    const eventLines = readSessionEventsFromDisk(laceDir, capturedNewSessionId!);
+    expect(eventLines.length).toBeGreaterThan(0);
 
-    const eventsRaw = readFileSync(eventsPath, 'utf8').trim();
-    expect(eventsRaw).not.toBe('');
-
-    const events = eventsRaw
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as { type: string });
+    const events = eventLines.map((line) => JSON.parse(line) as { type: string });
 
     expect(events[0]?.type).toBe('system_prompt_set');
   });

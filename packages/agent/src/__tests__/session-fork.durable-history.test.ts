@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
@@ -11,6 +19,25 @@ import { buildDefaultBoundedHostRuntimeBinding } from '../tools/runtime/validati
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 import { logger } from '@lace/agent/utils/logger';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
+
+/**
+ * Walk the transcripts/<persona>/<date>/<sessionId>.jsonl tree to read a
+ * forked session's events from the new persona/date layout.
+ */
+function readSessionEventsFromDisk(laceDir: string, sessionId: string): string[] {
+  const root = join(laceDir, 'transcripts');
+  if (!existsSync(root)) return [];
+  for (const persona of readdirSync(root)) {
+    const personaDir = join(root, persona);
+    for (const date of readdirSync(personaDir)) {
+      const candidate = join(personaDir, date, `${sessionId}.jsonl`);
+      if (existsSync(candidate)) {
+        return readFileSync(candidate, 'utf8').trim().split('\n').filter(Boolean);
+      }
+    }
+  }
+  return [];
+}
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -269,14 +296,10 @@ describe('session/fork durable history', () => {
         cwd: forkedCwd,
       })) as { sessionId: string };
 
-      // Read the forked session's events.jsonl directly to inspect the events.
-      const forkedDir = join(tempDir, 'agent-sessions', forked.sessionId);
-      const eventsRaw = readFileSync(join(forkedDir, 'events.jsonl'), 'utf8');
-      const allEvents = eventsRaw
-        .trim()
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as { type: string; data: { text?: string } });
+      // Read the forked session's transcript via the persona/date layout.
+      const allEvents = readSessionEventsFromDisk(tempDir, forked.sessionId).map(
+        (line) => JSON.parse(line) as { type: string; data: { text?: string } }
+      );
 
       const systemPromptEvents = allEvents.filter((e) => e.type === 'system_prompt_set');
 
@@ -310,13 +333,9 @@ describe('session/fork durable history', () => {
         sessionId: created.sessionId,
       })) as { sessionId: string };
 
-      const forkedDir = join(tempDir, 'agent-sessions', forked.sessionId);
-      const eventsRaw = readFileSync(join(forkedDir, 'events.jsonl'), 'utf8');
-      const allEvents = eventsRaw
-        .trim()
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as { type: string });
+      const allEvents = readSessionEventsFromDisk(tempDir, forked.sessionId).map(
+        (line) => JSON.parse(line) as { type: string }
+      );
 
       const systemPromptEvents = allEvents.filter((e) => e.type === 'system_prompt_set');
 
@@ -369,14 +388,10 @@ describe('session/fork durable history', () => {
         cwd: forkedCwd,
       })) as { sessionId: string };
 
-      // Read all events from the forked session's event log.
-      const forkedDir = join(tempDir, 'agent-sessions', forked.sessionId);
-      const eventsRaw = readFileSync(join(forkedDir, 'events.jsonl'), 'utf8');
-      const allEvents = eventsRaw
-        .trim()
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as { type: string; data: { text?: string } });
+      // Read all events from the forked session's transcript (persona/date layout).
+      const allEvents = readSessionEventsFromDisk(tempDir, forked.sessionId).map(
+        (line) => JSON.parse(line) as { type: string; data: { text?: string } }
+      );
 
       const systemPromptEvents = allEvents.filter((e) => e.type === 'system_prompt_set');
 
@@ -429,13 +444,10 @@ describe('session/fork durable history', () => {
       );
       expect(violationWarns).toHaveLength(0);
 
-      // Also assert exactly one system_prompt_set event in the file itself.
-      const eventsRaw = readFileSync(join(forkedDir, 'events.jsonl'), 'utf8');
-      const events = eventsRaw
-        .trim()
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as { type: string });
+      // Also assert exactly one system_prompt_set event in the on-disk transcript.
+      const events = readSessionEventsFromDisk(tempDir, forked.sessionId).map(
+        (line) => JSON.parse(line) as { type: string }
+      );
       const sysPromptEvents = events.filter((e) => e.type === 'system_prompt_set');
       expect(sysPromptEvents).toHaveLength(1);
     } finally {

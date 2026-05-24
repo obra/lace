@@ -221,13 +221,13 @@ export async function handleSlashCommand(
       try {
         const workDir = state.activeSession.meta.workDir;
         const sessionConfig = state.activeSession.state.config;
-        const persona = state.activeSession.meta.persona;
+        const inheritedPersona = state.activeSession.meta.persona;
 
         // Reject shape-invalid inherited persona before creating the new
         // session. A legacy active session may carry a persona that personaSegment
         // now rejects; we refuse to propagate it into a freshly created session.
-        if (persona !== undefined) {
-          validatePersonaName(persona);
+        if (inheritedPersona !== undefined) {
+          validatePersonaName(inheritedPersona);
         }
 
         // Create a new session
@@ -239,7 +239,7 @@ export async function handleSlashCommand(
           sessionId: newSessionId,
           workDir,
           created,
-          ...(persona ? { persona } : {}),
+          ...(inheritedPersona ? { persona: inheritedPersona } : {}),
         });
         writeSessionState(newSessionDir, {
           nextEventSeq: 0,
