@@ -270,7 +270,7 @@ describe('buildProviderMessagesFromDurableEvents — context_compacted summary r
     expect(messages[0]!.role).toBe('user');
   });
 
-  it('wraps the compaction summary in <previous-context-summary> tags', () => {
+  it('emits the compaction summary as plain text (no markup wrapper)', () => {
     const summaryText = 'Previously: the user asked about foo and bar.';
     writeEvents(tempDir, [
       {
@@ -287,18 +287,7 @@ describe('buildProviderMessagesFromDurableEvents — context_compacted summary r
     const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
 
     expect(messages).toHaveLength(1);
-    const content = messages[0]!.content as string;
-    expect(content).toContain('<previous-context-summary>');
-    expect(content).toContain('</previous-context-summary>');
-    expect(content).toContain(summaryText);
-    // Summary text must appear between the tags
-    const openTag = '<previous-context-summary>';
-    const closeTag = '</previous-context-summary>';
-    const openIdx = content.indexOf(openTag);
-    const closeIdx = content.indexOf(closeTag);
-    const textIdx = content.indexOf(summaryText);
-    expect(openIdx).toBeLessThan(textIdx);
-    expect(textIdx).toBeLessThan(closeIdx);
+    expect(messages[0]!.content).toBe(summaryText);
   });
 
   it('omits the summary message entirely when the summary is empty', () => {
@@ -418,168 +407,6 @@ describe('buildProviderMessagesFromDurableEvents — system_prompt_set and conte
 
     const result = buildProviderMessagesFromDurableEvents(tempDir);
     expect(result.systemPrompt).toBe('second');
-  });
-
-  it('legacy session — uses pre-prompt context_injected events as systemPrompt when no system_prompt_set exists', () => {
-    writeEvents(tempDir, [
-      // Two pre-prompt context_injected events: legacy persona + userInstructions
-      {
-        eventSeq: 1,
-        type: 'context_injected',
-        data: { type: 'context_injected', content: [{ type: 'text', text: 'Legacy persona.' }] },
-      },
-      {
-        eventSeq: 2,
-        type: 'context_injected',
-        data: {
-          type: 'context_injected',
-          content: [{ type: 'text', text: 'Legacy user instructions.' }],
-        },
-      },
-      // First prompt event ends the "system prompt" run
-      {
-        eventSeq: 3,
-        type: 'prompt',
-        data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
-      },
-      // Post-prompt context_injected → role:user
-      {
-        eventSeq: 4,
-        type: 'context_injected',
-        data: { type: 'context_injected', content: [{ type: 'text', text: 'runtime nudge' }] },
-      },
-    ]);
-
-    const result = buildProviderMessagesFromDurableEvents(tempDir);
-    expect(result.systemPrompt).toBe('Legacy persona.\n\nLegacy user instructions.');
-    expect(result.messages).toEqual([
-      { role: 'user', content: 'hi' },
-      { role: 'user', content: 'runtime nudge' },
-    ]);
-  });
-
-  it('legacy migration is bypassed when a system_prompt_set event is present (new session takes precedence)', () => {
-    writeEvents(tempDir, [
-      {
-        eventSeq: 1,
-        type: 'system_prompt_set',
-        data: { type: 'system_prompt_set', text: 'New session sys prompt.' },
-      },
-      {
-        eventSeq: 2,
-        type: 'context_injected',
-        data: {
-          type: 'context_injected',
-          content: [{ type: 'text', text: 'Pre-prompt context.' }],
-        },
-      },
-      {
-        eventSeq: 3,
-        type: 'prompt',
-        data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
-      },
-      {
-        eventSeq: 4,
-        type: 'context_injected',
-        data: {
-          type: 'context_injected',
-          content: [{ type: 'text', text: 'Post-prompt runtime nudge.' }],
-        },
-      },
-    ]);
-
-    const result = buildProviderMessagesFromDurableEvents(tempDir);
-    expect(result.systemPrompt).toBe('New session sys prompt.');
-    expect(result.messages).toEqual([
-      { role: 'user', content: 'Pre-prompt context.' },
-      { role: 'user', content: 'hi' },
-      { role: 'user', content: 'Post-prompt runtime nudge.' },
-    ]);
-  });
-
-  describe('Fix #2 — legacy session: peer context_injected after non-context_injected events', () => {
-    // A peer process (e.g. reminder scheduler) can write a context_injected
-    // event to a legacy session BEFORE the user's first prompt but AFTER some
-    // other event type (e.g. turn_start). That inject must NOT be absorbed into
-    // the synthesized systemPrompt; it must appear as a role:user message.
-
-    it('only absorbs creation-time context_injected events (leading run) into systemPrompt', () => {
-      writeEvents(tempDir, [
-        // Creation-time inject — should become systemPrompt
-        {
-          eventSeq: 1,
-          type: 'context_injected',
-          data: { content: [{ type: 'text', text: 'Creation-time persona.' }] },
-        },
-        // A non-context_injected event written by an early run() invocation
-        {
-          eventSeq: 2,
-          type: 'turn_start',
-          data: {},
-        },
-        // Peer inject written AFTER the turn_start — must NOT be in systemPrompt
-        {
-          eventSeq: 3,
-          type: 'context_injected',
-          data: { content: [{ type: 'text', text: 'Peer reminder inject.' }] },
-        },
-        // The actual user prompt
-        {
-          eventSeq: 4,
-          type: 'prompt',
-          data: { content: [{ type: 'text', text: 'Hello.' }] },
-        },
-      ]);
-
-      const { systemPrompt, messages } = buildProviderMessagesFromDurableEvents(tempDir);
-
-      // Only the leading creation-time inject makes it into the system prompt.
-      expect(systemPrompt).toBe('Creation-time persona.');
-
-      // The peer inject must appear as a role:user message, not be absorbed.
-      const peerMsg = messages.find(
-        (m) =>
-          m.role === 'user' &&
-          typeof m.content === 'string' &&
-          m.content.includes('Peer reminder inject.')
-      );
-      expect(peerMsg).toBeDefined();
-
-      // The prompt also appears as role:user.
-      const promptMsg = messages.find(
-        (m) => m.role === 'user' && typeof m.content === 'string' && m.content === 'Hello.'
-      );
-      expect(promptMsg).toBeDefined();
-    });
-
-    it('treats a context_injected immediately following a turn_start as peer inject (role:user)', () => {
-      // Specifically tests the turn_start-as-separator scenario mentioned in the spec.
-      writeEvents(tempDir, [
-        {
-          eventSeq: 1,
-          type: 'turn_start',
-          data: {},
-        },
-        {
-          eventSeq: 2,
-          type: 'context_injected',
-          data: { content: [{ type: 'text', text: 'Late inject.' }] },
-        },
-        {
-          eventSeq: 3,
-          type: 'prompt',
-          data: { content: [{ type: 'text', text: 'Hi.' }] },
-        },
-      ]);
-
-      const { systemPrompt, messages } = buildProviderMessagesFromDurableEvents(tempDir);
-
-      // No creation-time context_injected events — systemPrompt must be empty.
-      expect(systemPrompt).toBe('');
-
-      // The late inject appears as a role:user message.
-      expect(messages.some((m) => m.role === 'user' && m.content === 'Late inject.')).toBe(true);
-    });
   });
 
   describe('Fix #3 — multiple system_prompt_set events warn', () => {

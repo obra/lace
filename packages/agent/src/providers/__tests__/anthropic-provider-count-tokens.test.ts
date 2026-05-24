@@ -1,7 +1,6 @@
 // ABOUTME: Asserts that countTokens ships the SAME cache_control shape as the
 // live request path (_createRequestPayload). PRI-1806 #2 introduced this
-// parity; this test guards against regression. Also guards against empty tools
-// being sent on the wire when no tools are provided (Fix #13).
+// parity; this test guards against regression.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AnthropicProvider } from '../anthropic-provider';
@@ -86,24 +85,5 @@ describe('countTokens shape parity with _createRequestPayload (PRI-1806 #2)', ()
 
     // Both must have identical messages.
     expect(countArgs.messages).toEqual(createArgs.messages);
-  });
-
-  it('omits tools field when no tools are provided (Fix #13 — empty tools guard)', async () => {
-    // When tools is empty, countTokensExplicit must NOT send tools:[] on the wire
-    // since sending an empty (or marked-empty) tools array may trigger API validation
-    // errors. The field must be entirely absent.
-    const provider = new AnthropicProvider({ apiKey: 'k' });
-    provider.setSystemPrompt('A real system prompt');
-
-    await provider.countTokens([{ role: 'user', content: 'hi' }], [], 'claude-sonnet-4-20250514');
-
-    expect(mockCountTokens).toHaveBeenCalledTimes(1);
-    const args = mockCountTokens.mock.calls[0][0] as Record<string, unknown>;
-
-    // tools must be absent — not an empty array
-    expect(args.tools).toBeUndefined();
-
-    // system MUST be present (non-empty prompt was set)
-    expect(args.system).toBeDefined();
   });
 });

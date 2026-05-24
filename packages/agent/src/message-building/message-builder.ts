@@ -140,8 +140,7 @@ function dropOrphanedToolResults(messages: ProviderMessage[]): void {
 /**
  * Return type for buildProviderMessagesFromDurableEvents.
  * systemPrompt is sourced exclusively from system_prompt_set events (last one wins).
- * Sessions without a system_prompt_set event return systemPrompt: '' — legacy migration
- * is handled in Task 2F.
+ * Sessions without a system_prompt_set event return systemPrompt: ''.
  */
 export type BuiltProviderMessages = {
   messages: ProviderMessage[];
@@ -153,11 +152,9 @@ export type BuiltProviderMessages = {
  * Reconstructs the conversation history by reading and parsing events.jsonl.
  * Exported for testing - converts durable events to provider message format.
  *
- * Returns { messages, systemPrompt } where systemPrompt comes from:
- * - New sessions: the last system_prompt_set event in the log.
- * - Legacy sessions (no system_prompt_set): the concatenation of context_injected
- *   events that appear before the first prompt event. Those sessions wrote the
- *   persona and userInstructions as context_injected events at creation time.
+ * Returns { messages, systemPrompt } where systemPrompt comes from the last
+ * system_prompt_set event in the log. Sessions without a system_prompt_set
+ * event return systemPrompt: ''.
  */
 export function buildProviderMessagesFromDurableEvents(sessionDir: string): BuiltProviderMessages {
   const eventsPath = join(sessionDir, 'events.jsonl');
@@ -183,19 +180,14 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
     }
   }
 
-  // Pass 1: determine systemPrompt.
-  // New sessions have an explicit system_prompt_set event (last one wins).
-  // Legacy sessions instead had context_injected events written before the first
-  // prompt event for the persona and userInstructions — collect those as a fallback.
+  // Pass 1: determine systemPrompt from system_prompt_set events (last one wins).
   let systemPrompt = '';
-  let hasSystemPromptSet = false;
   let systemPromptSetCount = 0;
   for (const e of parsedEvents) {
     if (e.type === 'system_prompt_set') {
       const eventData = e.data as SystemPromptSetData;
       if (typeof eventData.text === 'string') {
         systemPrompt = eventData.text; // last-one-wins for defensive multi-event support
-        hasSystemPromptSet = true;
         systemPromptSetCount++;
       }
     }
@@ -210,35 +202,8 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
     });
   }
 
-  if (!hasSystemPromptSet) {
-    // Legacy migration: concatenate context_injected events that appear at the
-    // very START of the log (before any other event type) and use them as the
-    // system prompt. Those are the creation-time persona + userInstructions
-    // writes. We stop as soon as we see ANY event that is not context_injected
-    // — a turn_start, prompt, tool_use, etc. — because those indicate we've
-    // moved past session-creation into runtime operation. Any context_injected
-    // event that appears after a different event type was written by a peer
-    // process at runtime and must not be absorbed into the system prompt.
-    const legacyTexts: string[] = [];
-    for (const e of parsedEvents) {
-      if (e.type !== 'context_injected') break;
-      const eventData = e.data as ContextInjectedData;
-      const contentArr = Array.isArray(eventData.content) ? eventData.content : [];
-      const text = extractTextFromContentBlocks(contentArr);
-      if (text.trim()) legacyTexts.push(text);
-    }
-    systemPrompt = legacyTexts.join('\n\n');
-  }
-
   // Pass 2: build the messages array.
-  // Bind the session regime once so the read-site guard below is self-documenting.
-  const isLegacySession = !hasSystemPromptSet;
   const messages: ProviderMessage[] = [];
-  // Tracks whether we've seen any event type other than context_injected. Used
-  // only for legacy sessions to identify which context_injected events were
-  // creation-time writes (absorbed into systemPrompt in Pass 1) vs. peer
-  // runtime writes that must appear as role:user messages.
-  let sawNonContextInjected = false;
 
   for (const e of parsedEvents) {
     const { type, data } = e;
@@ -246,10 +211,6 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
     if (type === 'system_prompt_set') {
       // Already consumed in Pass 1 — skip here.
       continue;
-    }
-
-    if (type !== 'context_injected') {
-      sawNonContextInjected = true;
     }
 
     if (type === 'prompt') {
@@ -261,15 +222,7 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
     }
 
     if (type === 'context_injected') {
-      // Legacy sessions: creation-time context_injected events (those that
-      // appeared before any other event type) were consumed as the system prompt
-      // in Pass 1 — skip them here so they don't also appear in the messages
-      // array. Once sawNonContextInjected is true, any subsequent
-      // context_injected is a runtime peer inject and must appear as role:user.
-      if (isLegacySession && !sawNonContextInjected) continue;
-
-      // New sessions (hasSystemPromptSet) and post-prompt context_injected events:
-      // emit as role:user so runtime context is visible to the model in the
+      // Emit as role:user so runtime context is visible to the model in the
       // messages array while remaining distinct from the stable system prompt.
       const eventData = data as ContextInjectedData;
       const contentArr = Array.isArray(eventData.content) ? eventData.content : [];
@@ -287,7 +240,7 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
       if (summary.trim())
         messages.push({
           role: 'user',
-          content: `<previous-context-summary>\n${summary}\n</previous-context-summary>`,
+          content: summary,
         });
 
       for (const msg of preserved) {

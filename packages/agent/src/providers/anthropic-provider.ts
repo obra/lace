@@ -96,29 +96,20 @@ export class AnthropicProvider extends AIProvider {
         ANTHROPIC_CACHE_OPTIONS
       );
 
-      // Omit system entirely when the prompt is blank — Anthropic rejects
-      // empty text blocks, and cache_control on an empty block is also invalid.
-      const systemWithCaching = systemPrompt.trim()
-        ? buildSystemWithCaching(systemPrompt, ANTHROPIC_CACHE_OPTIONS)
-        : undefined;
+      const systemWithCaching = buildSystemWithCaching(systemPrompt, ANTHROPIC_CACHE_OPTIONS);
 
-      // Omit tools entirely when none are provided — sending [] or a marked
-      // empty array is unnecessary and may trigger API validation errors.
       const baseTools: Anthropic.Tool[] = tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
         input_schema: tool.inputSchema,
       }));
-      const anthropicTools =
-        baseTools.length > 0
-          ? markLastToolForCaching(baseTools, ANTHROPIC_CACHE_OPTIONS)
-          : undefined;
+      const anthropicTools = markLastToolForCaching(baseTools, ANTHROPIC_CACHE_OPTIONS);
 
       const result = await this.getAnthropicClient().beta.messages.countTokens({
         model,
         messages: messagesWithCaching,
-        ...(systemWithCaching !== undefined ? { system: systemWithCaching } : {}),
-        ...(anthropicTools !== undefined ? { tools: anthropicTools } : {}),
+        system: systemWithCaching,
+        ...(anthropicTools.length > 0 ? { tools: anthropicTools } : {}),
       });
 
       return result.input_tokens;

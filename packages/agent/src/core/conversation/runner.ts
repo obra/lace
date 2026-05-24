@@ -206,18 +206,9 @@ export class ConversationRunner {
       buildProviderMessagesFromDurableEvents(sessionDir);
     let providerMessages = rebuiltMessages;
 
-    // PRI-1804 invariant: the system prompt is computed once at session
-    // creation and never changes for the session lifetime. Always push it
-    // into the provider (even if empty) so the provider's _systemPrompt is
-    // explicitly set rather than left at its null default, which would
-    // cause getEffectiveSystemPrompt to emit a fallback warn on every request.
-    if (!frozenSystemPrompt) {
-      logger.error(
-        `[runner] session ${sessionDir} has no system prompt (no system_prompt_set event ` +
-          `and no legacy migration source). Pushing empty string deterministically.`
-      );
+    if (frozenSystemPrompt) {
+      provider.setSystemPrompt(frozenSystemPrompt);
     }
-    provider.setSystemPrompt(frozenSystemPrompt);
     // Watermark for mid-turn re-reads of durable events. Events with
     // eventSeq <= this value are already reflected in providerMessages (either
     // from the initial build above or appended on a previous iteration).

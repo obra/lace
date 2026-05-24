@@ -89,8 +89,7 @@ export interface RequestOptions {
  */
 export abstract class AIProvider extends EventEmitter {
   protected readonly _config: ProviderConfig;
-  // null means setSystemPrompt() was never called (distinct from intentionally empty '').
-  protected _systemPrompt: string | null = null;
+  protected _systemPrompt: string = '';
   protected _catalogData?: CatalogProvider;
 
   // Retry configuration - can be modified in tests but must be validated
@@ -360,7 +359,7 @@ export abstract class AIProvider extends EventEmitter {
   }
 
   get systemPrompt(): string {
-    return this._systemPrompt ?? '';
+    return this._systemPrompt;
   }
 
   abstract get providerName(): string;
@@ -529,20 +528,13 @@ export abstract class AIProvider extends EventEmitter {
   // telemetry as a real bug — every legitimate request path must call
   // setSystemPrompt() at session start.
   //
-  protected getEffectiveSystemPrompt(messages: ProviderMessage[]): string {
-    // null means setSystemPrompt() was never called (runner.ts always calls it now).
-    // An explicitly-set empty string ('') is returned as-is so the provider
-    // sends no system prompt rather than silently falling back to a canned one.
-    if (this._systemPrompt !== null) return this._systemPrompt;
+  protected getEffectiveSystemPrompt(_messages: ProviderMessage[]): string {
+    if (this._systemPrompt) return this._systemPrompt;
 
-    // Only warn when we're actually serving a request that's about to send to
-    // the model (not during token-counting calls with empty message arrays).
-    if (messages.length > 0) {
-      logger.warn(
-        '[base-provider] getEffectiveSystemPrompt called with no _systemPrompt — caller must setSystemPrompt() at session start. ' +
-          'Returning stable fallback so the cache stays warm, but production telemetry should surface this as a real bug.'
-      );
-    }
+    logger.warn(
+      '[base-provider] getEffectiveSystemPrompt called with no _systemPrompt — caller must setSystemPrompt() at session start. ' +
+        'Returning stable fallback so the cache stays warm, but production telemetry should surface this as a real bug.'
+    );
     return 'You are a helpful assistant.';
   }
 

@@ -3,7 +3,6 @@
 // system, last tool, and a rolling-tail + stable-anchor pair on messages.
 
 import type Anthropic from '@anthropic-ai/sdk';
-import { logger } from '@lace/agent/utils/logger';
 
 // Anthropic enforces a hard limit of 4 explicit cache_control breakpoints per
 // request. Per the cookbook: "automatic caching consumes one of these
@@ -298,18 +297,6 @@ export function enforceBreakpointBudget(payload: {
     return touched ? { ...msg, content: blocks.reverse() } : msg;
   });
   const result = stripped.reverse();
-
-  // If toDrop is still > 0 after the message-stripping pass, system/tools
-  // markers alone are pushing the total over cap. We can't safely strip
-  // those here (that would mask a programmer error upstream). This is a hard
-  // failure — the request WILL 400 at Anthropic.
-  if (toDrop > 0) {
-    logger.error(
-      '[cache-control] enforceBreakpointBudget: cache_control budget exceeded — ' +
-        `${total} markers present but Anthropic allows only ${MAX_CACHE_BREAKPOINTS}. ` +
-        'Could not reduce: system/tools markers consumed too many slots. Request will likely 400.'
-    );
-  }
 
   return result;
 }
