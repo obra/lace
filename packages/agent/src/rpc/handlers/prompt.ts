@@ -284,6 +284,9 @@ export function registerPromptHandler(
         jobManager: state.jobManager,
         containerManager: state.containerManager,
         containerMounts: state.containerMounts,
+        ...(state.containerExecutionIdentity
+          ? { containerExecutionIdentity: state.containerExecutionIdentity }
+          : {}),
         runtimeSecretResolver: state.runtimeSecretResolver,
         mcpServerManager: state.mcpServerManager,
         skillRegistry,

@@ -4,7 +4,10 @@
 import type { CombinedTokenUsage } from '@lace/agent/token-management/types';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { ReminderScheduler } from '@lace/agent/reminders';
-import type { MountRegistryEntry } from '@lace/agent/server-types';
+import type {
+  ContainerExecutionIdentityConfig,
+  MountRegistryEntry,
+} from '@lace/agent/server-types';
 import type { RuntimeExecutionBinding, RuntimePath, ToolRuntime } from './runtime/types';
 import type { PerInvocationReaper } from '@lace/agent/jobs/per-invocation-reaper';
 
@@ -49,6 +52,7 @@ export interface ToolContext {
   // persona-declared mount names into host paths (delegate → projected
   // container runtime).
   containerMounts?: Readonly<Record<string, MountRegistryEntry>>;
+  containerExecutionIdentity?: ContainerExecutionIdentityConfig;
 
   // Idle TTL reaper for per_invocation containers (PRI-1796 Chunk E).
   // When a delegate invocation starts (fresh or resume), the tool calls

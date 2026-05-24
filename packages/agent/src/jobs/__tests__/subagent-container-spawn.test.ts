@@ -84,6 +84,23 @@ describe('spawnSubagent', () => {
     expect(handle.nativeProcess).toBeNull();
   });
 
+  it('passes execution env to in-container execStream without replacing container env', async () => {
+    await spawnSubagent({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      personaContainerRuntime: containerRuntime,
+      containerManager: fakeManager as unknown as ContainerManager,
+      containerMounts: {},
+      executionEnv: { SEN_AGENT_TOKEN: 'token' },
+    });
+
+    const [, options] = fakeManager.execStream.mock.calls[0];
+    expect(options.environment).toEqual({ SEN_AGENT_TOKEN: 'token' });
+    expect(options.environmentMode).toBe('inherit');
+  });
+
   it('container persona with unknown mount fails before materialize', async () => {
     await expect(
       spawnSubagent({

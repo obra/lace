@@ -69,4 +69,38 @@ describe('createSubagentJob — opt-in progress (PRI-1707)', () => {
     const job = setupProgressTimer.mock.calls[0][0] as JobState;
     expect(job.progressIntervalMs).toBe(30000);
   });
+
+  it('does not accept caller-supplied container execution metadata', async () => {
+    const deps = makeDeps();
+
+    await createSubagentJob(
+      {
+        prompt: 'do work',
+        executionEnv: { SEN_AGENT_TOKEN: 'token' },
+        containerExecutionMetadata: {
+          tokenEnvName: 'SEN_AGENT_TOKEN',
+          token: 'token',
+          personaName: 'shell',
+          parentSessionId: 'sess_parent',
+          jobId: 'job_child',
+        },
+      } as Parameters<typeof createSubagentJob>[0],
+      deps
+    );
+
+    const job = [...deps.getJobs().values()][0];
+    expect(job.executionEnv).toBeUndefined();
+    expect(job.containerExecutionMetadata).toBeUndefined();
+    expect(deps.persistJobStartedEvent).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        containerExecutionMetadata: expect.anything(),
+      })
+    );
+    expect(deps.emitSessionUpdate).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        containerExecutionMetadata: expect.anything(),
+      }),
+      undefined
+    );
+  });
 });

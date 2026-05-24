@@ -5,7 +5,7 @@
 import type { ChildProcess } from 'node:child_process';
 import type { z } from 'zod';
 import { SessionUpdateNotificationSchema } from '@lace/ent-protocol';
-import type { JsonRpcId, JsonRpcPeer } from '@lace/ent-protocol';
+import type { JsonRpcId, JsonRpcPeer, SessionId } from '@lace/ent-protocol';
 import type { LoadedSession } from './storage/session-store';
 import type { PendingPermissionRecord } from './storage/permissions-from-events';
 import { ProviderCatalogManager } from './providers/catalog/manager';
@@ -73,9 +73,9 @@ export type ContainerExecutionMetadata = {
   tokenEnvName: string;
   token: string;
   personaName: string;
-  parentSessionId: string;
+  parentSessionId: SessionId;
   jobId: string;
-  containerId: string;
+  containerId?: string;
   runtimeId?: string;
   containerSpecName?: string;
 };
@@ -131,6 +131,8 @@ export type JobState = {
   connectionId?: string;
   modelId?: string;
   runtimeBinding?: RuntimeExecutionBinding;
+  executionEnv?: Record<string, string>;
+  containerExecutionMetadata?: ContainerExecutionMetadata;
   // Persona bundle applied to subagent session (delegate jobs only)
   persona?: string;
   // Carries the parsed persona runtime ONLY when `agentPlacement: 'container'`

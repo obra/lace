@@ -3,7 +3,7 @@
 // and kicking off job execution. Designed for use via library API or RPC.
 
 import { randomUUID } from 'node:crypto';
-import type { JobState, JobType, SessionUpdate } from '../server-types';
+import type { ContainerExecutionMetadata, JobState, JobType, SessionUpdate } from '../server-types';
 import { MAX_CONCURRENT_JOBS } from '../server-types';
 import { getJobOutputPath } from './job-file-utils';
 import type { LoadedSession } from '../storage/session-store';
@@ -37,6 +37,9 @@ export type CreateSubagentJobOptions = {
   connectionId?: string;
   modelId?: string;
   runtimeBinding?: RuntimeExecutionBinding;
+  // Direct RPC-created subagent jobs do not resolve persona container
+  // placement. The delegate tool's JobManager path owns container execution
+  // identity minting because it has persona and placement inputs.
   // Host scratch-directory path reserved for this invocation (PRI-1796).
   scratchDirHostPath?: string;
   // Container-sharing mode for this delegate job (PRI-1796).
@@ -62,6 +65,8 @@ export type JobCreationDeps = {
     runtimeBinding?: RuntimeExecutionBinding;
     scratchDirHostPath?: string;
     containerSharing?: 'per_invocation' | 'persistent';
+    containerSpecName?: string;
+    containerExecutionMetadata?: ContainerExecutionMetadata;
   }) => Promise<void>;
   /** Emit a session update notification. */
   emitSessionUpdate: (
@@ -146,6 +151,10 @@ async function finalizeJobCreation(
     command?: string;
     turnContext?: { turnId: string; turnSeq: number };
     runtimeBinding?: RuntimeExecutionBinding;
+    scratchDirHostPath?: string;
+    containerSharing?: 'per_invocation' | 'persistent';
+    containerSpecName?: string;
+    containerExecutionMetadata?: ContainerExecutionMetadata;
   },
   runJobProcess: (job: JobState) => void
 ): Promise<{ jobId: string }> {
@@ -160,6 +169,9 @@ async function finalizeJobCreation(
       parentJobId: event.parentJobId,
       jobType: event.jobType,
       description: event.description,
+      ...(event.containerExecutionMetadata
+        ? { containerExecutionMetadata: event.containerExecutionMetadata }
+        : {}),
     },
     event.turnContext
       ? { turnId: event.turnContext.turnId, turnSeq: event.turnContext.turnSeq }

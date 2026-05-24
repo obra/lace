@@ -451,6 +451,75 @@ describe('protocol shapes (representative examples)', () => {
         },
       })
     ).not.toThrow();
+
+    expect(() =>
+      EntProtocolNotificationSchema.parse({
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId: 'sess_00000000-0000-0000-0000-000000000001',
+          streamSeq: 2,
+          type: 'job_started',
+          jobId: 'job_container_identity',
+          jobType: 'delegate',
+          containerExecutionMetadata: {
+            tokenEnvName: 'AGENT_TOKEN',
+            token: 'abc123',
+            personaName: 'browser-driver',
+            parentSessionId: 'sess_00000000-0000-0000-0000-000000000001',
+            jobId: 'job_container_identity',
+            containerId: 'lace-parent-browser-child',
+            runtimeId: 'rt_projected_identity',
+            containerSpecName: 'parent-browser-child',
+          },
+        },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProtocolNotificationSchema.parse({
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId: 'sess_00000000-0000-0000-0000-000000000001',
+          streamSeq: 3,
+          type: 'job_started',
+          jobId: 'job_container_identity_without_container_id',
+          jobType: 'delegate',
+          containerExecutionMetadata: {
+            tokenEnvName: 'AGENT_TOKEN',
+            token: 'abc123',
+            personaName: 'browser-driver',
+            parentSessionId: 'sess_00000000-0000-0000-0000-000000000001',
+            jobId: 'job_container_identity_without_container_id',
+            runtimeId: 'rt_projected_identity',
+            containerSpecName: 'parent-browser-child',
+          },
+        },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProtocolNotificationSchema.parse({
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId: 'sess_00000000-0000-0000-0000-000000000001',
+          streamSeq: 4,
+          type: 'job_started',
+          jobId: 'job_container_identity',
+          jobType: 'delegate',
+          containerExecutionMetadata: {
+            tokenEnvName: 'bad-name',
+            token: 'abc123',
+            personaName: 'browser-driver',
+            parentSessionId: 'sess_00000000-0000-0000-0000-000000000001',
+            jobId: 'job_container_identity',
+            containerId: 'lace-parent-browser-child',
+          },
+        },
+      })
+    ).toThrow();
   });
 
   it('parses representative responses', () => {

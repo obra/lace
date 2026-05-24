@@ -27,7 +27,8 @@ import { getSkillDirectories } from '@lace/agent/skills';
 import { SUBAGENT_SKILLS_TARGET, SUBAGENT_USER_PERSONAS_TARGET } from './persona-container-spec';
 import { spawnSubagent, type SubagentProcessHandle } from './subagent-spawn';
 import type { PerInvocationReaper } from './per-invocation-reaper';
-import type { ToolResult } from '@lace/ent-protocol';
+import type { SessionId, ToolResult } from '@lace/ent-protocol';
+import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import { logToolUpdateToJobLog } from './job-log-formatter';
 import {
   MAX_JOB_OUTPUT_BYTES,
@@ -36,6 +37,7 @@ import {
   type JobType,
   type JobState,
   type AgentServerState,
+  type ContainerExecutionMetadata,
 } from '../server-types';
 
 // Types for tool_use update payloads from child processes
@@ -146,6 +148,29 @@ export function maybeScheduleReapAfter(
   reaper.scheduleReap(job.subagentSessionId, job.containerSpecName);
 }
 
+function buildRuntimeBindingWithExecutionEnv(
+  binding: RuntimeExecutionBinding,
+  executionEnv: Record<string, string>
+): RuntimeExecutionBinding {
+  if (binding.agentPlacement !== 'host' || binding.toolRuntime.type !== 'container') {
+    return binding;
+  }
+
+  return {
+    ...binding,
+    toolRuntime: {
+      ...binding.toolRuntime,
+      spec: {
+        ...binding.toolRuntime.spec,
+        env: {
+          ...binding.toolRuntime.spec.env,
+          ...executionEnv,
+        },
+      },
+    },
+  };
+}
+
 /**
  * Runs a subagent job process by spawning (or exec'ing into a persona
  * container) a lace-agent process and communicating with it via JSON-RPC
@@ -199,6 +224,13 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       return;
     }
 
+    if (job.executionEnv && job.runtimeBinding) {
+      job.runtimeBinding = buildRuntimeBindingWithExecutionEnv(
+        job.runtimeBinding,
+        job.executionEnv
+      );
+    }
+
     // Buffer for collecting stderr output
     let stderrBuffer = '';
     let subagentProc: SubagentProcessHandle | undefined;
@@ -227,6 +259,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           ? { childSessionId: job.subagentSessionId }
           : {}),
         ...(job.scratchDirHostPath ? { scratchDirHostPath: job.scratchDirHostPath } : {}),
+        ...(job.executionEnv ? { executionEnv: job.executionEnv } : {}),
       });
 
       if (subagentProc.nativeProcess) {
@@ -352,15 +385,50 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       return mapped;
     };
 
+    const mapContainerExecutionMetadata = (
+      value: unknown,
+      mappedJobId: string
+    ): ContainerExecutionMetadata | undefined => {
+      if (!value || typeof value !== 'object') return undefined;
+      const metadata = value as Record<string, unknown>;
+      if (
+        typeof metadata.tokenEnvName !== 'string' ||
+        typeof metadata.token !== 'string' ||
+        typeof metadata.personaName !== 'string' ||
+        typeof metadata.parentSessionId !== 'string'
+      ) {
+        return undefined;
+      }
+
+      return {
+        tokenEnvName: metadata.tokenEnvName,
+        token: metadata.token,
+        personaName: metadata.personaName,
+        parentSessionId: metadata.parentSessionId as SessionId,
+        jobId: mappedJobId,
+        ...(typeof metadata.containerId === 'string' ? { containerId: metadata.containerId } : {}),
+        ...(typeof metadata.runtimeId === 'string' ? { runtimeId: metadata.runtimeId } : {}),
+        ...(typeof metadata.containerSpecName === 'string'
+          ? { containerSpecName: metadata.containerSpecName }
+          : {}),
+      };
+    };
+
     const ensureForwardedJobRecord = (options: {
       jobId: string;
       parentJobId?: string;
       type: JobType;
       description?: string;
+      containerExecutionMetadata?: ContainerExecutionMetadata;
     }): JobState => {
       const currentState = getState();
       const existing = currentState.jobManager.getJob(options.jobId);
-      if (existing) return existing;
+      if (existing) {
+        if (options.containerExecutionMetadata) {
+          existing.containerExecutionMetadata = options.containerExecutionMetadata;
+        }
+        return existing;
+      }
 
       let resolveCompletion!: () => void;
       const completion = new Promise<void>((resolve) => {
@@ -378,6 +446,9 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         finished: false,
         completion,
         resolveCompletion,
+        ...(options.containerExecutionMetadata
+          ? { containerExecutionMetadata: options.containerExecutionMetadata }
+          : {}),
       };
 
       currentState.jobManager.addJob(record);
@@ -394,12 +465,17 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           typeof p.parentJobId === 'string' ? mapChildJobId(p.parentJobId) : job.jobId;
         const jobType = p.jobType === 'delegate' ? 'delegate' : 'bash';
         const description = typeof p.description === 'string' ? p.description : undefined;
+        const containerExecutionMetadata = mapContainerExecutionMetadata(
+          p.containerExecutionMetadata,
+          mappedJobId
+        );
 
         ensureForwardedJobRecord({
           jobId: mappedJobId,
           parentJobId: mappedParentJobId,
           type: jobType,
           description,
+          ...(containerExecutionMetadata ? { containerExecutionMetadata } : {}),
         });
 
         await runExclusive(() => {
@@ -412,6 +488,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
               parentJobId: mappedParentJobId,
               jobType,
               description,
+              ...(containerExecutionMetadata ? { containerExecutionMetadata } : {}),
             },
           });
           sessionState = nextState;
@@ -426,6 +503,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           parentJobId: mappedParentJobId,
           jobType,
           description,
+          ...(containerExecutionMetadata ? { containerExecutionMetadata } : {}),
         });
 
         return undefined;

@@ -60,6 +60,7 @@ export interface SpawnSubagentOptions {
   // Provides the child subagent's session id for unique container naming (PRI-1796).
   childSessionId?: string;
   scratchDirHostPath?: string;
+  executionEnv?: Record<string, string>;
 }
 
 export class SubagentSpawnError extends Error {
@@ -96,6 +97,7 @@ export async function spawnSubagent(options: SpawnSubagentOptions): Promise<Suba
       skillDirs: options.skillDirs,
       childSessionId: options.childSessionId,
       scratchDirHostPath: options.scratchDirHostPath,
+      executionEnv: options.executionEnv,
     });
   }
 
@@ -154,6 +156,7 @@ async function spawnContainerSubagent(input: {
   skillDirs?: readonly string[];
   childSessionId?: string;
   scratchDirHostPath?: string;
+  executionEnv?: Record<string, string>;
 }): Promise<SubagentProcessHandle> {
   // buildPersonaContainerSpec performs strict input validation and surfaces
   // unknown mount names before any container materialization, so failures here
@@ -168,18 +171,25 @@ async function spawnContainerSubagent(input: {
     skillDirs: input.skillDirs,
   });
 
-  return materializeAndExecStream(spec, input.containerManager);
+  return materializeAndExecStream(spec, input.containerManager, input.executionEnv);
 }
 
 async function materializeAndExecStream(
   spec: ContainerSpec,
-  containerManager: ContainerManager
+  containerManager: ContainerManager,
+  executionEnv?: Record<string, string>
 ): Promise<SubagentProcessHandle> {
   await containerManager.materialize(spec);
 
   const handle = await containerManager.execStream(spec.name, {
     command: ['node', IN_CONTAINER_LACE_ENTRY],
     workingDirectory: spec.workingDirectory,
+    ...(executionEnv
+      ? {
+          environment: executionEnv,
+          environmentMode: 'inherit' as const,
+        }
+      : {}),
   });
 
   // Track exit so .exitCode reflects state without forcing every caller to

@@ -23,6 +23,7 @@ import {
 } from './shared';
 
 const EmptyParamsSchema = z.object({}).strict();
+const ContainerExecutionTokenEnvNameSchema = z.string().regex(/^[A-Z_][A-Z0-9_]*$/);
 
 const ClientCapabilitiesSchema = z
   .object({
@@ -147,7 +148,7 @@ const InitializeParamsSchema = z
       .default({}),
     containerExecutionIdentity: z
       .object({
-        tokenEnvName: z.string().regex(/^[A-Z_][A-Z0-9_]*$/),
+        tokenEnvName: ContainerExecutionTokenEnvNameSchema,
       })
       .strict()
       .optional(),
@@ -1979,6 +1980,19 @@ const SessionUpdateToolUseSchema = z
   })
   .strict();
 
+const ContainerExecutionMetadataSchema = z
+  .object({
+    tokenEnvName: ContainerExecutionTokenEnvNameSchema,
+    token: NonEmptyStringSchema,
+    personaName: NonEmptyStringSchema,
+    parentSessionId: SessionIdSchema,
+    jobId: NonEmptyStringSchema,
+    containerId: NonEmptyStringSchema.optional(),
+    runtimeId: NonEmptyStringSchema.optional(),
+    containerSpecName: NonEmptyStringSchema.optional(),
+  })
+  .strict();
+
 const SessionUpdateJobStartedSchema = z
   .object({
     type: z.literal('job_started'),
@@ -1986,6 +2000,7 @@ const SessionUpdateJobStartedSchema = z
     parentJobId: NonEmptyStringSchema.optional(),
     jobType: z.enum(['bash', 'delegate']),
     description: z.string().optional(),
+    containerExecutionMetadata: ContainerExecutionMetadataSchema.optional(),
   })
   .strict();
 

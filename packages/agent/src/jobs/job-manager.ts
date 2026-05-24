@@ -1,15 +1,23 @@
 // ABOUTME: Unified job management - state, operations, and notifications
 // Consolidates scattered job code into single session-scoped service
 
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import type { JobState, JobStatus, JobType, JobNotificationType } from '../server-types';
+import type {
+  ContainerExecutionIdentityConfig,
+  ContainerExecutionMetadata,
+  JobState,
+  JobStatus,
+  JobType,
+  JobNotificationType,
+} from '../server-types';
 import { MAX_CONCURRENT_JOBS } from '../server-types';
 import type { PersonaContainerRuntime } from './persona-container-spec';
 import { toNonEmptyString } from '../rpc/utils';
 import { getJobOutputPath } from './job-file-utils';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 import { readAllSessionEventLines } from '../storage/event-log';
+import type { SessionId } from '@lace/ent-protocol';
 
 export type JobManagerDeps = {
   getActiveSession: () => { sessionId: string; dir: string } | null;
@@ -52,6 +60,7 @@ export type CreateJobOptions = {
   // use it regardless of whether runtimeBinding or personaContainerRuntime
   // was the placement path.
   containerSpecName?: string;
+  containerExecutionIdentity?: ContainerExecutionIdentityConfig;
 };
 
 /**
@@ -132,6 +141,43 @@ type ProgressBatch = {
 };
 
 const PROGRESS_BATCH_WINDOW_MS = 200;
+
+function buildContainerExecutionContext(input: {
+  identity?: ContainerExecutionIdentityConfig;
+  jobId: string;
+  persona?: string;
+  parentSessionId: string;
+  runtimeBinding?: RuntimeExecutionBinding;
+  personaContainerRuntime?: PersonaContainerRuntime;
+  containerSpecName?: string;
+}): { executionEnv: Record<string, string>; metadata: ContainerExecutionMetadata } | undefined {
+  if (!input.identity || !input.persona) return undefined;
+  if (
+    !input.personaContainerRuntime &&
+    !(
+      input.runtimeBinding?.agentPlacement === 'host' &&
+      input.runtimeBinding.toolRuntime.type === 'container'
+    )
+  ) {
+    return undefined;
+  }
+
+  const token = randomBytes(32).toString('base64url');
+  return {
+    executionEnv: { [input.identity.tokenEnvName]: token },
+    metadata: {
+      tokenEnvName: input.identity.tokenEnvName,
+      token,
+      personaName: input.persona,
+      parentSessionId: input.parentSessionId as SessionId,
+      jobId: input.jobId,
+      ...(input.runtimeBinding?.identity.runtimeId
+        ? { runtimeId: input.runtimeBinding.identity.runtimeId }
+        : {}),
+      ...(input.containerSpecName ? { containerSpecName: input.containerSpecName } : {}),
+    },
+  };
+}
 
 export class JobManager {
   private jobs = new Map<string, JobState>();
@@ -717,6 +763,19 @@ export class JobManager {
     const command = type === 'shell' ? options.command : options.prompt;
     const description = options.description ?? (type === 'delegate' ? 'Subagent' : undefined);
 
+    const containerExecutionContext =
+      type === 'delegate'
+        ? buildContainerExecutionContext({
+            identity: options.containerExecutionIdentity,
+            jobId,
+            persona: options.persona,
+            parentSessionId: activeSession.sessionId,
+            runtimeBinding: options.runtimeBinding,
+            personaContainerRuntime: options.personaContainerRuntime,
+            containerSpecName: options.containerSpecName,
+          })
+        : undefined;
+
     const job: JobState = {
       jobId,
       parentJobId: options.parentJobId,
@@ -735,6 +794,12 @@ export class JobManager {
       connectionId: options.connectionId,
       modelId: options.modelId,
       ...(options.runtimeBinding ? { runtimeBinding: options.runtimeBinding } : {}),
+      ...(containerExecutionContext
+        ? {
+            executionEnv: containerExecutionContext.executionEnv,
+            containerExecutionMetadata: containerExecutionContext.metadata,
+          }
+        : {}),
       ...(options.scratchDirHostPath ? { scratchDirHostPath: options.scratchDirHostPath } : {}),
       ...(options.containerSharing ? { containerSharing: options.containerSharing } : {}),
       ...(options.containerSpecName ? { containerSpecName: options.containerSpecName } : {}),
@@ -772,6 +837,10 @@ export class JobManager {
         ...(options.runtimeBinding ? { runtimeBinding: options.runtimeBinding } : {}),
         ...(options.scratchDirHostPath ? { scratchDirHostPath: options.scratchDirHostPath } : {}),
         ...(options.containerSharing ? { containerSharing: options.containerSharing } : {}),
+        ...(options.containerSpecName ? { containerSpecName: options.containerSpecName } : {}),
+        ...(containerExecutionContext
+          ? { containerExecutionMetadata: containerExecutionContext.metadata }
+          : {}),
       },
     });
 
@@ -782,6 +851,9 @@ export class JobManager {
       parentJobId: options.parentJobId,
       jobType,
       description,
+      ...(containerExecutionContext
+        ? { containerExecutionMetadata: containerExecutionContext.metadata }
+        : {}),
     });
 
     // 7. Set up progress timer ONLY when the operator explicitly opted in

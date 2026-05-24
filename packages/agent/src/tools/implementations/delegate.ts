@@ -296,6 +296,9 @@ Parameters:
         : {}),
       ...(containerSharing === 'persistent' ? { containerSharing: 'persistent' } : {}),
       ...(containerSpecName ? { containerSpecName } : {}),
+      ...(context.containerExecutionIdentity
+        ? { containerExecutionIdentity: context.containerExecutionIdentity }
+        : {}),
     });
 
     // Background mode - return immediately

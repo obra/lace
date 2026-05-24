@@ -65,6 +65,35 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     expect(binding.identity.runtimeId).toMatch(/^runtime:session:/);
   });
 
+  it('applies execution env after persona runtime env', () => {
+    const binding = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: {
+        type: 'container',
+        agentPlacement: 'host',
+        containerSharing: 'per_invocation',
+        image: 'node:24-bookworm',
+        workingDirectory: '/work',
+        mounts: {},
+        env: { FOO: 'persona', KEEP: 'runtime' },
+      },
+      containerMounts: {},
+      executionEnv: { FOO: 'execution', SEN_AGENT_TOKEN: 'token' },
+    });
+
+    expect(
+      (
+        binding.toolRuntime as Extract<
+          RuntimeExecutionBinding['toolRuntime'],
+          { type: 'container' }
+        >
+      ).spec.env
+    ).toEqual({ FOO: 'execution', KEEP: 'runtime', SEN_AGENT_TOKEN: 'token' });
+  });
+
   it('builds a projected binding for persistent lifecycle containers', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: 'sess1',

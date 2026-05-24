@@ -33,6 +33,7 @@ export function buildPersonaProjectedRuntimeBinding(input: {
   personaName: string;
   runtime: PersonaContainerRuntime;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
+  executionEnv?: Record<string, string>;
   // Required for per_invocation; ignored for persistent.
   childSessionId?: string;
   scratchDirHostPath?: string;
@@ -46,13 +47,16 @@ export function buildPersonaProjectedRuntimeBinding(input: {
     containerMounts: input.containerMounts,
   });
 
+  const runtimeSpec = containerSpecToRuntimeSpec({ spec });
+  runtimeSpec.env = { ...runtimeSpec.env, ...(input.executionEnv ?? {}) };
+
   const binding: RuntimeExecutionBinding = {
     schemaVersion: 1,
     identity: { runtimeId: 'pending' },
     agentPlacement: 'host',
     toolRuntime: {
       type: 'container',
-      spec: containerSpecToRuntimeSpec({ spec }),
+      spec: runtimeSpec,
       cwd: input.runtime.workingDirectory,
       helper: resolveRuntimeHelperDescriptor(),
     },

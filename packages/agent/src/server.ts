@@ -452,6 +452,10 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     command?: string;
     turnContext?: { turnId: string; turnSeq: number };
     runtimeBinding?: RuntimeExecutionBinding;
+    scratchDirHostPath?: string;
+    containerSharing?: 'per_invocation' | 'persistent';
+    containerSpecName?: string;
+    containerExecutionMetadata?: JobState['containerExecutionMetadata'];
   }): Promise<void> => {
     await runExclusive(() => {
       let sessionState = readSessionState(state.activeSession!.dir);
@@ -466,6 +470,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           description: event.description,
           command: event.command,
           ...(event.runtimeBinding ? { runtimeBinding: event.runtimeBinding } : {}),
+          ...(event.scratchDirHostPath ? { scratchDirHostPath: event.scratchDirHostPath } : {}),
+          ...(event.containerSharing ? { containerSharing: event.containerSharing } : {}),
+          ...(event.containerSpecName ? { containerSpecName: event.containerSpecName } : {}),
+          ...(event.containerExecutionMetadata
+            ? { containerExecutionMetadata: event.containerExecutionMetadata }
+            : {}),
         },
       });
       sessionState = nextState;
