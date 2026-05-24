@@ -81,14 +81,40 @@ export class RecallTool extends Tool {
           error: '`search` action requires a `query` field (non-empty string).',
         });
       }
-      return this.search({ ...args, action: 'search', query: args.query }, context);
+      return this.withErrorEnvelope('search', () =>
+        this.search({ ...args, action: 'search', query: args.query as string }, context)
+      );
     }
     if (args.event_id === undefined) {
       return this.createResult({
         error: '`read` action requires an `event_id` field (format `<session_id>:<eventSeq>`).',
       });
     }
-    return this.read({ ...args, action: 'read', event_id: args.event_id }, context);
+    return this.withErrorEnvelope('read', () =>
+      this.read({ ...args, action: 'read', event_id: args.event_id as string }, context)
+    );
+  }
+
+  /**
+   * Wraps a search/read implementation so any unexpected throw — SessionStorageError
+   * from agentSessionsDir(), filesystem ENOENT escapes, SQLite SqliteError, etc. —
+   * surfaces as the standard {error, ...} JSON envelope rather than escaping the
+   * tool wrapper as raw "ValidationError: ..." text (spec §Failure modes A2).
+   * Error messages are redacted because user-supplied strings (event_id, query)
+   * may have been interpolated into them and could carry leaked secrets.
+   */
+  private async withErrorEnvelope(
+    action: 'search' | 'read',
+    fn: () => Promise<ToolResult>
+  ): Promise<ToolResult> {
+    try {
+      return await fn();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return this.createResult({
+        error: redact(`${action}: ${message}`),
+      });
+    }
   }
 
   private async search(args: RecallSearchInput, _context: ToolContext): Promise<ToolResult> {

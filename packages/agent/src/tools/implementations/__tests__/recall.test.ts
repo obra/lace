@@ -793,6 +793,38 @@ describe('RecallTool read', () => {
     expect(parsed.hint as string).toMatch(/2 events in the index/);
   });
 
+  it('returns a structured error envelope (not raw text) when agentSessionsDir() throws', async () => {
+    // Force SessionStorageError by pointing LACE_SESSION_DIR at a path nobody
+    // can mkdir (existing file's "name as a directory"). The thrown error
+    // would otherwise escape the tool wrapper as "ValidationError: recall
+    // failed" plain text; the envelope wrapper converts it to {error: ...}.
+    const blocker = join(laceDir, 'definitely-a-file');
+    writeFileSync(blocker, 'i am a file, not a dir');
+    const savedSessionDir = process.env.LACE_SESSION_DIR;
+    process.env.LACE_SESSION_DIR = join(blocker, 'subpath-that-cannot-exist');
+
+    try {
+      const result = await new RecallTool().execute(
+        {
+          action: 'read',
+          event_id: 'sess_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:1',
+        },
+        makeCtx()
+      );
+      expect(result.content).toHaveLength(1);
+      const first = result.content[0];
+      if (first.type !== 'text') throw new Error('expected text block');
+      expect(first.text).not.toMatch(/^ValidationError:/);
+      const parsed = JSON.parse(first.text) as { error?: string };
+      expect(typeof parsed.error).toBe('string');
+      // Must include enough detail to be actionable but must NOT be raw text.
+      expect(parsed.error as string).toMatch(/read/);
+    } finally {
+      if (savedSessionDir === undefined) delete process.env.LACE_SESSION_DIR;
+      else process.env.LACE_SESSION_DIR = savedSessionDir;
+    }
+  });
+
   it('surfaces non-indexable events in the range minimally without crashing', async () => {
     const fx = makeSession(laceDir, 'ada');
     appendPrompt(fx, 'before');
