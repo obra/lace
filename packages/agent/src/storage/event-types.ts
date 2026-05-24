@@ -60,8 +60,23 @@ export type TurnEndEventData = {
    */
   cacheMissReason?: BetaCacheMissReason | null;
   usage?: {
+    /** Uncached input tokens (Anthropic `input_tokens`). */
     inputTokens: number;
+    /** Output tokens (Anthropic `output_tokens`). */
     outputTokens: number;
+    /**
+     * Cache-creation input tokens (Anthropic `cache_creation_input_tokens`).
+     * Older transcripts written before PRI-1817 omit this; readers must
+     * default to 0 when absent.
+     */
+    cacheCreationInputTokens?: number;
+    /**
+     * Cache-read input tokens (Anthropic `cache_read_input_tokens`).
+     * Older transcripts written before PRI-1817 omit this; readers must
+     * default to 0 when absent.
+     */
+    cacheReadInputTokens?: number;
+    /** Computed USD cost for the turn, including cache-tier pricing. */
     costUsd: number;
   };
 };

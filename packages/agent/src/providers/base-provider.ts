@@ -62,9 +62,26 @@ export interface ProviderResponse {
    */
   stopDetails?: LaceStopDetails | null;
   usage?: {
+    /**
+     * Uncached input tokens. For Anthropic this maps to `input_tokens` from
+     * the SDK response — note this is the tokens that were NOT served from
+     * cache; cache-creation and cache-read tokens are reported separately.
+     */
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
+    /**
+     * Tokens billed at the cache-creation rate (Anthropic
+     * `cache_creation_input_tokens`). Optional — providers that don't expose
+     * cache accounting omit it and runner accumulators treat it as 0.
+     */
+    cacheCreationInputTokens?: number;
+    /**
+     * Tokens served from the prompt cache at the discounted read rate
+     * (Anthropic `cache_read_input_tokens`). Optional — providers that don't
+     * expose cache accounting omit it and runner accumulators treat it as 0.
+     */
+    cacheReadInputTokens?: number;
   };
   performance?: {
     // Unique value for local models
