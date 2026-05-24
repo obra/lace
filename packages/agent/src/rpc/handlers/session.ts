@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { getLaceDir } from '../../config/lace-dir';
-import { transcriptFilePath } from '../../storage/transcript-paths';
+import { transcriptFilePath, validatePersonaName } from '../../storage/transcript-paths';
 import {
   AcpErrorCodes,
   SessionForkParamsSchema,
@@ -371,6 +371,21 @@ export function registerSessionHandlers(
     const requestedPersona =
       toNonEmptyString(parsed.config?.persona) ?? toNonEmptyString(parsed.persona);
 
+    // Reject shape-invalid persona names before any storage writes or registry
+    // lookups so the durable-event hot path (which calls personaSegment) never
+    // sees a name it would reject. See transcript-paths.validatePersonaName.
+    if (requestedPersona !== undefined) {
+      try {
+        validatePersonaName(requestedPersona);
+      } catch (err) {
+        throw {
+          code: -32602,
+          message: err instanceof Error ? err.message : String(err),
+          data: { category: 'protocol', reason: 'PersonaInvalid' },
+        };
+      }
+    }
+
     // Parse persona frontmatter before any storage writes so we fail fast on invalid input.
     const personaDefaults: {
       modelId?: string;
@@ -600,6 +615,22 @@ export function registerSessionHandlers(
       sessionId: forkedSessionId,
       cwd: forkedCwd,
     });
+
+    // Validate the inherited persona before writing meta.json. A legacy source
+    // session may have a shape-invalid persona; we refuse to propagate it into
+    // a freshly created session (the spec amendment requires meta.persona to
+    // pass validatePersonaName at write time).
+    if (sourceSession.meta.persona !== undefined) {
+      try {
+        validatePersonaName(sourceSession.meta.persona);
+      } catch (err) {
+        throw {
+          code: -32602,
+          message: err instanceof Error ? err.message : String(err),
+          data: { category: 'protocol', reason: 'PersonaInvalid' },
+        };
+      }
+    }
 
     const forkedSessionDir = getSessionDir(forkedSessionId);
     writeSessionMeta(forkedSessionDir, {

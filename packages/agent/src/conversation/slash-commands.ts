@@ -9,6 +9,7 @@ import {
   writeSessionMeta,
   writeSessionState,
 } from '@lace/agent/storage/session-store';
+import { validatePersonaName } from '@lace/agent/storage/transcript-paths';
 import { compactDroppedMessagesWithCore } from '@lace/agent/compaction/compact-dropped-messages';
 import { SUMMARIZER_SYSTEM_PROMPT } from '@lace/agent/compaction/summarize-strategy';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
@@ -221,6 +222,13 @@ export async function handleSlashCommand(
         const workDir = state.activeSession.meta.workDir;
         const sessionConfig = state.activeSession.state.config;
         const persona = state.activeSession.meta.persona;
+
+        // Reject shape-invalid inherited persona before creating the new
+        // session. A legacy active session may carry a persona that personaSegment
+        // now rejects; we refuse to propagate it into a freshly created session.
+        if (persona !== undefined) {
+          validatePersonaName(persona);
+        }
 
         // Create a new session
         const newSessionId = `sess_${randomUUID()}`;

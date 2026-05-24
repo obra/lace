@@ -272,6 +272,56 @@ persona body`
     expect(loaded.state.config?.modelId).toBe('request-wins-model');
   });
 
+  it('rejects persona with leading dash even if a matching file exists', async () => {
+    // Seed a persona file matching the invalid name so PersonaNotFoundError
+    // can't be the reason for the rejection — the shape check must fire first.
+    writeFileSync(join(userPersonasDir, '-evil.md'), 'evil');
+
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request(
+      'initialize',
+      defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+    );
+
+    await expect(
+      client.request('session/new', { cwd: tempDir, persona: '-evil' })
+    ).rejects.toThrow();
+  });
+
+  it('rejects persona with whitespace even if a matching file exists', async () => {
+    writeFileSync(join(userPersonasDir, 'two words.md'), 'words');
+
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request(
+      'initialize',
+      defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+    );
+
+    await expect(
+      client.request('session/new', { cwd: tempDir, persona: 'two words' })
+    ).rejects.toThrow();
+  });
+
+  it('rejects _unknown sentinel as persona even if a matching file exists', async () => {
+    writeFileSync(join(userPersonasDir, '_unknown.md'), 'sentinel');
+
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request(
+      'initialize',
+      defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+    );
+
+    await expect(
+      client.request('session/new', { cwd: tempDir, persona: '_unknown' })
+    ).rejects.toThrow();
+  });
+
   it('unknown persona returns a clear error', async () => {
     const state = createAgentServerState();
     const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
