@@ -94,8 +94,18 @@ export interface RunnerDependencies {
   /** Create an AI provider for this turn */
   createProvider: () => Promise<AIProvider>;
 
-  /** Get model pricing for cost calculation */
-  getModelPricing: () => Promise<{ costPer1mIn: number; costPer1mOut: number } | null>;
+  /**
+   * Get model pricing for cost calculation. The runner expects cache pricing
+   * for both creation and read tiers (PRI-1817); providers without cache
+   * pricing must return the base input rate for both so the cost formula
+   * stays correct on uncached workloads.
+   */
+  getModelPricing: () => Promise<{
+    costPer1mIn: number;
+    costPer1mOut: number;
+    costPer1mCacheCreation: number;
+    costPer1mCacheRead: number;
+  } | null>;
 
   /** Start a background shell job (used for bash with background=true) */
   startShellJob: (options: {
@@ -137,11 +147,19 @@ export interface RunnerDependencies {
   /** Get session cost in USD */
   getSessionCostUsd: () => number;
 
-  /** Update session cost and token usage */
+  /**
+   * Update session cost and token usage.
+   *
+   * PRI-1817: `cacheCreationInputTokens` and `cacheReadInputTokens` are
+   * optional so callers/tests that don't track cache accounting can omit
+   * them; the session-state accumulator treats absent fields as zero.
+   */
   updateSessionUsage: (params: {
     costDelta: number;
     inputTokens: number;
     outputTokens: number;
+    cacheCreationInputTokens?: number;
+    cacheReadInputTokens?: number;
   }) => void;
 
   /** Optional reminder scheduler for the current session's reminder tools */
@@ -223,6 +241,15 @@ export interface RunResult {
   stopDetails: LaceStopDetails | null;
   /** Final assistant content */
   content: Array<{ type: 'text'; text: string }>;
-  /** Token usage for this turn */
-  usage: { inputTokens: number; outputTokens: number };
+  /**
+   * Token usage for this turn. Cache fields are optional for back-compat
+   * with non-Anthropic providers that don't report cache accounting.
+   */
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationInputTokens?: number;
+    cacheReadInputTokens?: number;
+    costUsd?: number;
+  };
 }

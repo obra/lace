@@ -462,4 +462,80 @@ describe('AnthropicProvider', () => {
       ).rejects.toThrow('Stream setup failed');
     });
   });
+
+  // PRI-1817: surface cache_creation_input_tokens and cache_read_input_tokens
+  // from the SDK response into ProviderResponse.usage so the runner can
+  // accumulate them and compute real cost.
+  describe('cache token mapping (PRI-1817)', () => {
+    it('maps cache_creation/cache_read fields from non-streaming response', async () => {
+      mockCreateResponse.mockResolvedValue({
+        content: [{ type: 'text', text: 'ok' }],
+        usage: {
+          input_tokens: 2000,
+          output_tokens: 100,
+          cache_creation_input_tokens: 1000,
+          cache_read_input_tokens: 5000,
+        },
+      });
+
+      const response = await provider.createResponse(
+        [{ role: 'user' as const, content: 'hi' }],
+        [],
+        'claude-opus-4-7'
+      );
+
+      expect(response.usage).toBeDefined();
+      expect(response.usage!.promptTokens).toBe(2000);
+      expect(response.usage!.completionTokens).toBe(100);
+      expect(response.usage!.cacheCreationInputTokens).toBe(1000);
+      expect(response.usage!.cacheReadInputTokens).toBe(5000);
+    });
+
+    it('defaults missing cache fields to 0', async () => {
+      // Some Anthropic responses (e.g. on uncached cold-start turns) omit
+      // the cache fields entirely. We must default to 0, not leave undefined,
+      // so the runner's `+= ?? 0` math stays correct.
+      mockCreateResponse.mockResolvedValue({
+        content: [{ type: 'text', text: 'ok' }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
+
+      const response = await provider.createResponse(
+        [{ role: 'user' as const, content: 'hi' }],
+        [],
+        'claude-opus-4-7'
+      );
+
+      expect(response.usage!.cacheCreationInputTokens).toBe(0);
+      expect(response.usage!.cacheReadInputTokens).toBe(0);
+    });
+
+    it('maps cache_creation/cache_read fields from streaming response', async () => {
+      const mockStream = {
+        on: vi.fn(),
+        finalMessage: vi.fn().mockResolvedValue({
+          content: [{ type: 'text', text: 'streamed' }],
+          usage: {
+            input_tokens: 3000,
+            output_tokens: 200,
+            cache_creation_input_tokens: 1500,
+            cache_read_input_tokens: 8000,
+          },
+        }),
+      };
+      mockStreamResponse.mockReturnValue(mockStream);
+
+      const response = await provider.createStreamingResponse(
+        [{ role: 'user' as const, content: 'hi' }],
+        [],
+        'claude-opus-4-7'
+      );
+
+      expect(response.usage).toBeDefined();
+      expect(response.usage!.promptTokens).toBe(3000);
+      expect(response.usage!.completionTokens).toBe(200);
+      expect(response.usage!.cacheCreationInputTokens).toBe(1500);
+      expect(response.usage!.cacheReadInputTokens).toBe(8000);
+    });
+  });
 });

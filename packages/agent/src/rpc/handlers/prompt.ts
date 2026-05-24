@@ -307,6 +307,10 @@ export function registerPromptHandler(
           return sessionState.sessionCostUsd ?? 0;
         },
         updateSessionUsage: ({ costDelta, inputTokens, outputTokens }) => {
+          // PRI-1817: only base input/output flow into session-level
+          // tokenUsage (existing SessionState shape doesn't carry cache
+          // categories). Per-turn cache breakdown lives in turn_end events
+          // — anything wanting cumulative cache totals reads events.jsonl.
           runExclusive(() => {
             if (!state.activeSession) return;
             const sessionState = readSessionState(state.activeSession.dir);
@@ -335,12 +339,30 @@ export function registerPromptHandler(
         startedAt,
       });
 
+      // Translate runner cache field names to the ent-protocol
+      // UsageInfoSchema names (PRI-1817). Runner uses the Anthropic SDK's
+      // category names; the wire protocol pre-dated cache pricing and uses
+      // cacheRead/cacheWrite. Strict schema rejects unknowns, so we cannot
+      // just spread `result.usage`. Used for both the session/update SSE
+      // notification and the session/prompt RPC result.
+      const protocolUsage = {
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+        ...(result.usage.cacheReadInputTokens !== undefined
+          ? { cacheReadTokens: result.usage.cacheReadInputTokens }
+          : {}),
+        ...(result.usage.cacheCreationInputTokens !== undefined
+          ? { cacheWriteTokens: result.usage.cacheCreationInputTokens }
+          : {}),
+        ...(result.usage.costUsd !== undefined ? { costUsd: result.usage.costUsd } : {}),
+      };
+
       await emitSessionUpdate(
         {
           type: 'turn_end',
           stopReason: result.stopReason,
           content: result.content,
-          usage: result.usage,
+          usage: protocolUsage,
         },
         { turnId, turnSeq: result.usage.inputTokens + result.usage.outputTokens }
       );
@@ -369,7 +391,13 @@ export function registerPromptHandler(
         }
       }
 
-      return result;
+      // RPC response uses the protocol-shaped usage (PRI-1817).
+      return {
+        turnId: result.turnId,
+        stopReason: result.stopReason,
+        content: result.content,
+        usage: protocolUsage,
+      };
     } catch (err) {
       // PRI-1818 #2: defense-in-depth fallback turn_end. The runner is
       // supposed to always write turn_end before throwing (PRI-1818 #1),

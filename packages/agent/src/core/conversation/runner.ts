@@ -216,9 +216,14 @@ export class ConversationRunner {
     const provider = await this.deps.createProvider();
     const modelPricing = await this.deps.getModelPricing();
 
-    // Track token usage across the turn
+    // Track token usage across the turn. PRI-1817: track all four Anthropic
+    // categories so events.jsonl carries the full breakdown — without
+    // cache_creation/cache_read, cost reconstruction from disk under-counts
+    // by ~70% on heavily-cached workloads.
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
+    let totalCacheCreationInputTokens = 0;
+    let totalCacheReadInputTokens = 0;
     const previousSessionCostUsd = this.deps.getSessionCostUsd();
     let sessionCostUsd = previousSessionCostUsd;
 
@@ -428,16 +433,30 @@ export class ConversationRunner {
 
         // Track token usage from this response
         if (response.usage) {
-          totalInputTokens += response.usage.promptTokens ?? 0;
-          totalOutputTokens += response.usage.completionTokens ?? 0;
+          const inputTokens = response.usage.promptTokens ?? 0;
+          const outputTokens = response.usage.completionTokens ?? 0;
+          const cacheCreationInputTokens = response.usage.cacheCreationInputTokens ?? 0;
+          const cacheReadInputTokens = response.usage.cacheReadInputTokens ?? 0;
 
-          // Calculate cost for this response if pricing is available
+          totalInputTokens += inputTokens;
+          totalOutputTokens += outputTokens;
+          totalCacheCreationInputTokens += cacheCreationInputTokens;
+          totalCacheReadInputTokens += cacheReadInputTokens;
+
+          // PRI-1817: real cache-aware cost. Anthropic bills cache_creation
+          // at a premium over base input, cache_read at a steep discount.
+          // Pre-cache-aware code computed `input * costPer1mIn` only, which
+          // happens to coincide with reality on the cold-cache path but
+          // under-counts dramatically once the cache is warm. Catalog
+          // entries without cache pricing collapse to base input rate.
           if (modelPricing) {
-            const inputCost =
-              ((response.usage.promptTokens ?? 0) / 1_000_000) * modelPricing.costPer1mIn;
-            const outputCost =
-              ((response.usage.completionTokens ?? 0) / 1_000_000) * modelPricing.costPer1mOut;
-            sessionCostUsd += inputCost + outputCost;
+            const inputCost = (inputTokens / 1_000_000) * modelPricing.costPer1mIn;
+            const outputCost = (outputTokens / 1_000_000) * modelPricing.costPer1mOut;
+            const cacheCreationCost =
+              (cacheCreationInputTokens / 1_000_000) * modelPricing.costPer1mCacheCreation;
+            const cacheReadCost =
+              (cacheReadInputTokens / 1_000_000) * modelPricing.costPer1mCacheRead;
+            sessionCostUsd += inputCost + outputCost + cacheCreationCost + cacheReadCost;
           }
         }
 
@@ -744,10 +763,13 @@ export class ConversationRunner {
     }
 
     // Update session usage
+    const turnCostUsd = sessionCostUsd - previousSessionCostUsd;
     this.deps.updateSessionUsage({
       costDelta: sessionCostUsd - this.deps.getSessionCostUsd(),
       inputTokens: totalInputTokens,
       outputTokens: totalOutputTokens,
+      cacheCreationInputTokens: totalCacheCreationInputTokens,
+      cacheReadInputTokens: totalCacheReadInputTokens,
     });
 
     if (stopReason === 'end_turn' && completedTurns >= maxTurns) {
@@ -763,7 +785,9 @@ export class ConversationRunner {
         usage: {
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
-          costUsd: sessionCostUsd - previousSessionCostUsd,
+          cacheCreationInputTokens: totalCacheCreationInputTokens,
+          cacheReadInputTokens: totalCacheReadInputTokens,
+          costUsd: turnCostUsd,
         },
       },
     });
@@ -776,7 +800,13 @@ export class ConversationRunner {
         finalAssistantContent.length > 0
           ? [{ type: 'text' as const, text: finalAssistantContent }]
           : [],
-      usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+      usage: {
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        cacheCreationInputTokens: totalCacheCreationInputTokens,
+        cacheReadInputTokens: totalCacheReadInputTokens,
+        costUsd: turnCostUsd,
+      },
     };
   }
 

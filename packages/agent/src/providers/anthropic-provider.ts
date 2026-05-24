@@ -355,6 +355,11 @@ export class AnthropicProvider extends AIProvider {
               promptTokens: response.usage.input_tokens,
               completionTokens: response.usage.output_tokens,
               totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+              // PRI-1817: surface cache accounting so the runner can compute
+              // real cost. Anthropic returns these on every Messages API
+              // response — null/missing means zero (no cache activity).
+              cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
+              cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
             }
           : undefined;
 
@@ -445,6 +450,12 @@ export class AnthropicProvider extends AIProvider {
                   promptTokens: usage.input_tokens || 0,
                   completionTokens: usage.output_tokens || 0,
                   totalTokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
+                  // PRI-1817: progressive cache totals so UI consumers (e.g.
+                  // sen-core's bot-debugging channel formatter) can show the
+                  // cache breakdown mid-turn without waiting for the final
+                  // message.
+                  cacheCreationInputTokens: usage.cache_creation_input_tokens ?? 0,
+                  cacheReadInputTokens: usage.cache_read_input_tokens ?? 0,
                 },
               });
             }
@@ -499,6 +510,9 @@ export class AnthropicProvider extends AIProvider {
                   promptTokens: message.usage.input_tokens,
                   completionTokens: message.usage.output_tokens,
                   totalTokens: message.usage.input_tokens + message.usage.output_tokens,
+                  // PRI-1817: final-message cache totals.
+                  cacheCreationInputTokens: message.usage.cache_creation_input_tokens ?? 0,
+                  cacheReadInputTokens: message.usage.cache_read_input_tokens ?? 0,
                 },
               });
             }
@@ -550,6 +564,9 @@ export class AnthropicProvider extends AIProvider {
                   promptTokens: finalMessage.usage.input_tokens,
                   completionTokens: finalMessage.usage.output_tokens,
                   totalTokens: finalMessage.usage.input_tokens + finalMessage.usage.output_tokens,
+                  // PRI-1817: see non-streaming branch above.
+                  cacheCreationInputTokens: finalMessage.usage.cache_creation_input_tokens ?? 0,
+                  cacheReadInputTokens: finalMessage.usage.cache_read_input_tokens ?? 0,
                 }
               : undefined,
             responseId: finalMessage.id,
