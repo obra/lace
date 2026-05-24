@@ -25,6 +25,12 @@ export function openRecallIndex(dbPath: string): Db {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
+  // Multi-process subagent containers share LACE_DIR and contend on this
+  // file. WAL allows concurrent readers + one writer, but contending writers
+  // still get SQLITE_BUSY immediately without a timeout. 5 seconds is long
+  // enough for any single-row insert to complete, short enough to avoid
+  // unbounded blocking of the event-write path on a true deadlock.
+  db.pragma('busy_timeout = 5000');
   db.exec(SCHEMA);
   return db;
 }

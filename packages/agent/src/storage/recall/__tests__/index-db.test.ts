@@ -67,6 +67,21 @@ describe('openRecallIndex', () => {
     }
   });
 
+  it('sets a non-zero busy_timeout so contending writers wait instead of failing immediately', () => {
+    // C5: multi-process subagents share the same index.sqlite. Without
+    // busy_timeout, the second writer throws SQLITE_BUSY and the
+    // write-through indexer drops the row (event-log.ts swallows the throw).
+    dir = mkdtempSync(join(tmpdir(), 'recall-idx-'));
+    const db = openRecallIndex(join(dir, 'index.sqlite'));
+    try {
+      const timeout = db.pragma('busy_timeout', { simple: true });
+      expect(typeof timeout).toBe('number');
+      expect(timeout as number).toBeGreaterThan(0);
+    } finally {
+      db.close();
+    }
+  });
+
   it('roundtrips a row through FTS (insert + MATCH returns expected row)', () => {
     dir = mkdtempSync(join(tmpdir(), 'recall-idx-'));
     const db = openRecallIndex(join(dir, 'index.sqlite'));
