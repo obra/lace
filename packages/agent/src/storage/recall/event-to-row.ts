@@ -54,18 +54,29 @@ function renderKindAndContent(
   type: TypedDurableEvent['type'],
   data: TypedDurableEvent['data']
 ): { kind: RecallKind; content: string } | null {
+  // Every renderer below tolerates a missing/malformed `data` payload — a
+  // production JSONL transcript can contain events written by older callers
+  // or by partial writes. Returning null here causes the row to be skipped
+  // (no FTS index entry) without disturbing the surrounding write/backfill
+  // transaction. Throwing was the original failure mode of C2/I3 (one bad
+  // event poisons backfill or crashes recall.read).
   switch (type) {
-    case 'prompt':
-      return { kind: 'user_message', content: renderPromptContent(data as PromptEventData) };
-    case 'message':
-      return { kind: 'assistant_text', content: renderMessageContent(data as MessageEventData) };
-    case 'tool_use':
-      return { kind: 'tool_call', content: renderToolUseContent(data as ToolUseEventData) };
-    case 'context_injected':
-      return {
-        kind: 'notification',
-        content: renderInjectedContent(data as ContextInjectedEventData),
-      };
+    case 'prompt': {
+      const content = renderPromptContent(data as PromptEventData);
+      return content === null ? null : { kind: 'user_message', content };
+    }
+    case 'message': {
+      const content = renderMessageContent(data as MessageEventData);
+      return content === null ? null : { kind: 'assistant_text', content };
+    }
+    case 'tool_use': {
+      const content = renderToolUseContent(data as ToolUseEventData);
+      return content === null ? null : { kind: 'tool_call', content };
+    }
+    case 'context_injected': {
+      const content = renderInjectedContent(data as ContextInjectedEventData);
+      return content === null ? null : { kind: 'notification', content };
+    }
     case 'context_compacted':
       return {
         kind: 'system',
@@ -76,45 +87,56 @@ function renderKindAndContent(
   }
 }
 
-function renderPromptContent(data: PromptEventData): string {
-  return renderContentBlocks(data.content);
+function renderPromptContent(data: PromptEventData): string | null {
+  return renderContentBlocks(data?.content);
 }
 
-function renderMessageContent(data: MessageEventData): string {
-  if (typeof data.content === 'string') return data.content;
-  return renderContentBlocks(data.content);
+function renderMessageContent(data: MessageEventData): string | null {
+  if (typeof data?.content === 'string') return data.content;
+  return renderContentBlocks(data?.content);
 }
 
-function renderInjectedContent(data: ContextInjectedEventData): string {
-  return renderContentBlocks(data.content);
+function renderInjectedContent(data: ContextInjectedEventData): string | null {
+  return renderContentBlocks(data?.content);
 }
 
-function renderContentBlocks(blocks: ContentBlock[]): string {
-  return blocks
+function renderContentBlocks(blocks: ContentBlock[] | undefined | null): string | null {
+  if (!Array.isArray(blocks)) return null;
+  const parts = blocks
     .map((b) => {
-      if (b.type === 'text') return b.text;
-      // image
-      return `[image: ${b.source.media_type}]`;
+      if (!b || typeof b !== 'object') return '';
+      if (b.type === 'text') return typeof b.text === 'string' ? b.text : '';
+      if (b.type === 'image') {
+        const mediaType = b.source?.media_type ?? 'unknown';
+        return `[image: ${mediaType}]`;
+      }
+      return '';
     })
-    .join('\n');
+    .filter((s) => s.length > 0);
+  if (parts.length === 0) return null;
+  return parts.join('\n');
 }
 
-function renderToolUseContent(data: ToolUseEventData): string {
-  const lines = [`tool=${data.name}`, `input=${JSON.stringify(data.input)}`];
+function renderToolUseContent(data: ToolUseEventData): string | null {
+  if (!data || typeof data.name !== 'string') return null;
+  const lines = [`tool=${data.name}`, `input=${JSON.stringify(data.input ?? null)}`];
   if (data.result !== undefined) {
-    lines.push(`result=${renderToolResultText(data.result)}`);
+    const resultText = renderToolResultText(data.result);
+    if (resultText !== null) lines.push(`result=${resultText}`);
   }
   return lines.join('\n');
 }
 
-function renderToolResultText(result: ToolResult): string {
+function renderToolResultText(result: ToolResult | undefined): string | null {
+  if (!result || !Array.isArray(result.content)) return null;
   return result.content
-    .map((block) => (block.type === 'text' ? (block.text ?? '') : ''))
+    .map((block) => (block && block.type === 'text' ? (block.text ?? '') : ''))
     .filter((s) => s.length > 0)
     .join('\n');
 }
 
 function renderCompactedContent(data: ContextCompactedEventData): string {
-  if (typeof data.summary === 'string' && data.summary.length > 0) return data.summary;
-  return `[compaction: ${data.strategy}]`;
+  if (data && typeof data.summary === 'string' && data.summary.length > 0) return data.summary;
+  const strategy = data?.strategy ?? 'unknown';
+  return `[compaction: ${strategy}]`;
 }

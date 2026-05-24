@@ -203,6 +203,93 @@ describe('eventToRow', () => {
     });
   });
 
+  describe('malformed payloads (C2 / I3 hardening)', () => {
+    // eventToRow must never throw on missing/undefined content fields. The
+    // backfill transaction and the recall.read renderer both depend on this
+    // — a single bad event would otherwise roll back unrelated inserts or
+    // crash a user-visible read request.
+    it('returns null for a message event with no content field', () => {
+      const event = {
+        eventSeq: 1,
+        timestamp: 'x',
+        type: 'message',
+        data: { role: 'assistant' },
+      } as unknown as TypedDurableEvent;
+      expect(() => eventToRow(event, CTX)).not.toThrow();
+      expect(eventToRow(event, CTX)).toBeNull();
+    });
+
+    it('returns null for a prompt event with no content field', () => {
+      const event = {
+        eventSeq: 1,
+        timestamp: 'x',
+        type: 'prompt',
+        data: {},
+      } as unknown as TypedDurableEvent;
+      expect(() => eventToRow(event, CTX)).not.toThrow();
+      expect(eventToRow(event, CTX)).toBeNull();
+    });
+
+    it('returns null for a context_injected event with no content field', () => {
+      const event = {
+        eventSeq: 1,
+        timestamp: 'x',
+        type: 'context_injected',
+        data: { priority: 'normal' },
+      } as unknown as TypedDurableEvent;
+      expect(() => eventToRow(event, CTX)).not.toThrow();
+      expect(eventToRow(event, CTX)).toBeNull();
+    });
+
+    it('returns null for a tool_use event with no name field', () => {
+      const event = {
+        eventSeq: 1,
+        timestamp: 'x',
+        type: 'tool_use',
+        data: { toolCallId: 'tc', input: {} },
+      } as unknown as TypedDurableEvent;
+      expect(() => eventToRow(event, CTX)).not.toThrow();
+      expect(eventToRow(event, CTX)).toBeNull();
+    });
+
+    it('returns null for a prompt event whose content array is empty', () => {
+      const event = {
+        eventSeq: 1,
+        timestamp: 'x',
+        type: 'prompt',
+        data: { content: [] },
+      } as unknown as TypedDurableEvent;
+      expect(eventToRow(event, CTX)).toBeNull();
+    });
+
+    it('still renders a compaction event without summary', () => {
+      // context_compacted is the one indexable kind that should always
+      // produce a row (the fallback "[compaction: <strategy>]" is meaningful).
+      const event = {
+        eventSeq: 1,
+        timestamp: 'x',
+        type: 'context_compacted',
+        data: { strategy: 'summarize' },
+      } as unknown as TypedDurableEvent;
+      const row = eventToRow(event, CTX);
+      expect(row).not.toBeNull();
+      expect(row?.content).toBe('[compaction: summarize]');
+    });
+
+    it('renders compaction event with completely missing data', () => {
+      // Even data:{} should not throw; fall back to "unknown" strategy.
+      const event = {
+        eventSeq: 1,
+        timestamp: 'x',
+        type: 'context_compacted',
+        data: {},
+      } as unknown as TypedDurableEvent;
+      const row = eventToRow(event, CTX);
+      expect(row).not.toBeNull();
+      expect(row?.content).toBe('[compaction: unknown]');
+    });
+  });
+
   describe('on-disk discriminator (event.type, not data.type)', () => {
     // appendDurableEvent serializes data as Record<string, unknown> WITHOUT
     // an embedded type field. The discriminator on disk is event.type. The
