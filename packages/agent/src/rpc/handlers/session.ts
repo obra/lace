@@ -442,7 +442,7 @@ export function registerSessionHandlers(
           ...(effectiveStoredMcpServers ? { mcpServers: effectiveStoredMcpServers } : {}),
           ...(effectiveToolScope ? { toolScope: effectiveToolScope } : {}),
           runtimeBinding: activeRuntimeBinding,
-          ...(requestedPersona ? { personaName: requestedPersona } : {}),
+          personaName: requestedPersona ?? 'lace',
         },
       });
       ensureSessionFiles(sessionDir);

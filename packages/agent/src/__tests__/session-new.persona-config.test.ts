@@ -359,4 +359,42 @@ mcp-only persona`
     // No duplicates from the union.
     expect(new Set(scope).size).toBe(scope.length);
   });
+
+  describe('session/new always persists personaName', () => {
+    it('default-persona (no persona specified) session has config.personaName === "lace"', async () => {
+      const state = createAgentServerState();
+      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+      await client.request('initialize', defaultInitializeParams({}));
+
+      // Create a session WITHOUT specifying persona.
+      const created = (await client.request('session/new', {
+        cwd: tempDir,
+      })) as { sessionId: string };
+
+      const loaded = loadSession(created.sessionId);
+      expect(loaded.state.config?.personaName).toBe('lace');
+    });
+
+    it('explicit-persona session has config.personaName === that persona', async () => {
+      writeFileSync(join(userPersonasDir, 'custom.md'), 'You are a custom persona.');
+
+      const state = createAgentServerState();
+      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+      await client.request(
+        'initialize',
+        defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+      );
+
+      // Create a session WITH persona='custom'.
+      const created = (await client.request('session/new', {
+        cwd: tempDir,
+        persona: 'custom',
+      })) as { sessionId: string };
+
+      const loaded = loadSession(created.sessionId);
+      expect(loaded.state.config?.personaName).toBe('custom');
+    });
+  });
 });
