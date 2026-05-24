@@ -191,7 +191,20 @@ export interface RunParams {
 export interface RunResult {
   /** Unique identifier for this turn */
   turnId: string;
-  /** Reason the turn stopped */
+  /**
+   * Reason the turn stopped.
+   *
+   * The error-shaped values (provider_error_*, tool_error_*, internal_error)
+   * are written by ConversationRunner.run()'s finally block when the agentic
+   * loop threw. Before PRI-1818 those throws abandoned the durable log
+   * without a turn_end (78 of 163 turn_starts on Ada in 4 days). The finally
+   * + classifier guarantees every turn_start has a matching turn_end and
+   * carries enough detail to triage the failure mode from events.jsonl alone.
+   *
+   * `process_died` is intentionally NOT in this list — that label is written
+   * by the crash-recovery scan at session-open time (separate task) when an
+   * unmatched turn_start is found in the durable log.
+   */
   stopReason:
     | 'end_turn'
     | 'max_tokens'
@@ -199,7 +212,14 @@ export interface RunResult {
     | 'cancelled'
     | 'budget_exceeded'
     | 'incomplete'
-    | 'permission_cancelled';
+    | 'permission_cancelled'
+    | 'provider_error_overloaded'
+    | 'provider_error_invalid'
+    | 'provider_error_network'
+    | 'provider_error_other'
+    | 'tool_error_throw'
+    | 'tool_error_timeout'
+    | 'internal_error';
   /** Final assistant content */
   content: Array<{ type: 'text'; text: string }>;
   /** Token usage for this turn */

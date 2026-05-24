@@ -506,6 +506,16 @@ const SessionPromptResultSchema = z
       'budget_exceeded',
       'incomplete',
       'permission_cancelled',
+      // PRI-1818: fine-grained error stopReasons. Written by the runner's
+      // finally block when the agentic loop threw. Surfaced over the wire so
+      // SDK consumers can render the failure mode without re-reading logs.
+      'provider_error_overloaded',
+      'provider_error_invalid',
+      'provider_error_network',
+      'provider_error_other',
+      'tool_error_throw',
+      'tool_error_timeout',
+      'internal_error',
     ]),
     content: z.array(ContentBlockSchema),
     usage: UsageInfoSchema,
@@ -1878,6 +1888,16 @@ const SessionUpdateTurnEndSchema = z
       'budget_exceeded',
       'incomplete',
       'permission_cancelled',
+      // PRI-1818: fine-grained error stopReasons. Written by the runner's
+      // finally block when the agentic loop threw. Surfaced over the wire so
+      // SDK consumers can render the failure mode without re-reading logs.
+      'provider_error_overloaded',
+      'provider_error_invalid',
+      'provider_error_network',
+      'provider_error_other',
+      'tool_error_throw',
+      'tool_error_timeout',
+      'internal_error',
     ]),
     content: z.array(ContentBlockSchema),
     usage: UsageInfoSchema,

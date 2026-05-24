@@ -40,6 +40,166 @@ import {
 import type { RunnerConfig, RunnerDependencies, RunParams, RunResult, ApprovalMode } from './types';
 import type { RequestOptions } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
+import { logger } from '@lace/agent/utils/logger';
+
+/**
+ * Sentinel marker the runner sets on errors thrown out of executeToolCall.
+ * Lets mapErrorToStopReason distinguish a tool throw from a provider throw
+ * without having to inspect the loop's lexical state. Set on a non-enumerable
+ * field so it doesn't pollute JSON serialization of the error.
+ */
+const PHASE_TOOL = 'tool';
+const PHASE_KEY = '__lacePhase';
+
+function tagAsToolError(err: unknown): unknown {
+  if (err && typeof err === 'object') {
+    try {
+      Object.defineProperty(err as object, PHASE_KEY, {
+        value: PHASE_TOOL,
+        enumerable: false,
+        configurable: true,
+        writable: true,
+      });
+    } catch {
+      // Frozen errors are rare; fall through and let the generic classifier
+      // pick a bucket (internal_error). Better to lose precision than to
+      // crash the finally block trying to tag.
+    }
+  }
+  return err;
+}
+
+function phaseOf(err: unknown): string | undefined {
+  if (err && typeof err === 'object' && PHASE_KEY in err) {
+    const v = (err as Record<string, unknown>)[PHASE_KEY];
+    return typeof v === 'string' ? v : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Pick a stopReason for an error caught out of runner.run()'s agentic loop.
+ *
+ * The runner classifies, in order:
+ * 1. Tool-phase throws (tagged via tagAsToolError when executeToolCall threw)
+ *    map to tool_error_* — timeout if the error looks like a timeout,
+ *    otherwise tool_error_throw.
+ * 2. Provider-phase throws (the ProviderError envelope thrown at runner.ts
+ *    after createStreamingResponse fails, plus anything that escapes to
+ *    runner.run() bearing provider-shaped fields) map to provider_error_*
+ *    by inspecting the message and well-known err codes.
+ * 3. Everything else is internal_error.
+ *
+ * The message-string matching is intentionally permissive: the production
+ * samples in scratch/turn-aborts/classified.csv show Anthropic SDK errors
+ * arrive as plain Error objects with the upstream JSON body baked into the
+ * message, so substring tests catch the realistic shapes (overloaded_error,
+ * invalid_request_error, "model: opus", "invalid proxy path", etc.).
+ */
+export function mapErrorToStopReason(err: unknown): RunResult['stopReason'] {
+  if (phaseOf(err) === PHASE_TOOL) {
+    if (looksLikeTimeout(err)) return 'tool_error_timeout';
+    return 'tool_error_throw';
+  }
+
+  if (looksLikeProviderError(err)) {
+    const msg = errorMessage(err).toLowerCase();
+    if (msg.includes('overloaded_error') || msg.includes('overloaded') || hasStatus(err, 529)) {
+      return 'provider_error_overloaded';
+    }
+    if (
+      msg.includes('invalid_request_error') ||
+      msg.includes('invalid proxy path') ||
+      msg.includes('not_found_error') ||
+      /\b(?:400|401|403|404|422)\b/.test(msg) ||
+      hasStatus(err, 400) ||
+      hasStatus(err, 401) ||
+      hasStatus(err, 403) ||
+      hasStatus(err, 404) ||
+      hasStatus(err, 422)
+    ) {
+      return 'provider_error_invalid';
+    }
+    if (looksLikeNetworkError(err)) {
+      return 'provider_error_network';
+    }
+    return 'provider_error_other';
+  }
+
+  // Plain network errors thrown from anywhere — treat as provider_error_network
+  // since the only network call in the loop is the provider one.
+  if (looksLikeNetworkError(err)) {
+    return 'provider_error_network';
+  }
+
+  return 'internal_error';
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object' && 'message' in err) {
+    const m = (err as { message?: unknown }).message;
+    return typeof m === 'string' ? m : String(m);
+  }
+  return String(err);
+}
+
+function hasStatus(err: unknown, status: number): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const v = (err as Record<string, unknown>).status;
+  return typeof v === 'number' && v === status;
+}
+
+function looksLikeProviderError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as Record<string, unknown>;
+  if (e.code === EntErrorCodes.ProviderError) return true;
+  const data = e.data as Record<string, unknown> | undefined;
+  if (data && data.category === 'provider') return true;
+  // The Anthropic/OpenAI SDKs throw subclasses whose constructor name ends in
+  // "APIError" — recognise those even if no envelope wrap fired.
+  const ctorName = (err as { constructor?: { name?: string } }).constructor?.name;
+  if (typeof ctorName === 'string' && /APIError$/.test(ctorName)) return true;
+  return false;
+}
+
+function looksLikeNetworkError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as Record<string, unknown>;
+  const code = e.code;
+  if (typeof code === 'string') {
+    if (
+      code === 'ECONNREFUSED' ||
+      code === 'ECONNRESET' ||
+      code === 'ENOTFOUND' ||
+      code === 'ETIMEDOUT' ||
+      code === 'EAI_AGAIN' ||
+      code === 'EPIPE'
+    ) {
+      return true;
+    }
+  }
+  const name = (err as { name?: unknown }).name;
+  if (name === 'FetchError') return true;
+  const msg = errorMessage(err).toLowerCase();
+  return (
+    msg.includes('econnrefused') ||
+    msg.includes('econnreset') ||
+    msg.includes('enotfound') ||
+    msg.includes('etimedout') ||
+    msg.includes('fetch failed') ||
+    msg.includes('network')
+  );
+}
+
+function looksLikeTimeout(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const name = (err as { name?: unknown }).name;
+  if (name === 'TimeoutError') return true;
+  const code = (err as { code?: unknown }).code;
+  if (code === 'ETIMEDOUT') return true;
+  return /timeout/i.test(errorMessage(err));
+}
 
 // First-person future-tense intent markers. When the model emits one of these
 // on a text-only turn following a tool round-trip, it has declared work it has
@@ -233,6 +393,9 @@ export class ConversationRunner {
     let lastSeenEventSeq = findLastTurnEndEventSeq(sessionDir) ?? 0;
     let finalAssistantContent = '';
     let stopReason: RunResult['stopReason'] = 'end_turn';
+    // PRI-1818: captured by the outer catch and rethrown after finally so the
+    // turn_end write always runs. Undefined means the loop completed cleanly.
+    let caughtError: unknown;
 
     let streamTurnSeq = 0;
     let completedTurns = 0;
@@ -489,23 +652,33 @@ export class ConversationRunner {
         let shouldContinue = true;
 
         for (const toolCall of toolCalls) {
-          const result = await this.executeToolCall({
-            toolCall,
-            streamTurnSeq,
-            toolExecutor,
-            executionMode,
-            approvalMode,
-            cwd,
-            filesRead,
-            runtimeFileAccessTracker,
-            envOverlay,
-            abortController,
-            turnId,
-            startedAt,
-            sessionId,
-            runtimeBinding,
-            writeAndAdvance,
-          });
+          let result;
+          try {
+            result = await this.executeToolCall({
+              toolCall,
+              streamTurnSeq,
+              toolExecutor,
+              executionMode,
+              approvalMode,
+              cwd,
+              filesRead,
+              runtimeFileAccessTracker,
+              envOverlay,
+              abortController,
+              turnId,
+              startedAt,
+              sessionId,
+              runtimeBinding,
+              writeAndAdvance,
+            });
+          } catch (toolErr) {
+            // PRI-1818: tag the throw so the outer catch's classifier can
+            // distinguish a tool-phase failure from a provider-phase failure.
+            // The 19 message_then_no_error_logged turns on Ada all match this
+            // path: provider returned a tool call, message landed, then
+            // executeToolCall threw and the turn abandoned the durable log.
+            throw tagAsToolError(toolErr);
+          }
 
           streamTurnSeq = result.streamTurnSeq;
           providerMessages = [
@@ -540,32 +713,68 @@ export class ConversationRunner {
       if (abortController.signal.aborted) {
         stopReason = 'cancelled';
       }
+    } catch (loopError) {
+      // PRI-1818: never let a throw skip the turn_end write. We capture the
+      // error, derive a fine-grained stopReason from it, and let the finally
+      // block close out the durable log. The error is rethrown after the
+      // finally so callers (prompt.ts, the job layer, SDK consumers) still
+      // see the failure rather than believing the run succeeded.
+      caughtError = loopError;
+      stopReason = mapErrorToStopReason(loopError);
     } finally {
       provider.cleanup();
-    }
 
-    // Update session usage
-    this.deps.updateSessionUsage({
-      costDelta: sessionCostUsd - this.deps.getSessionCostUsd(),
-      inputTokens: totalInputTokens,
-      outputTokens: totalOutputTokens,
-    });
+      // The max_turns reclassification only applies when the loop completed
+      // cleanly with end_turn — an error shouldn't be relabelled max_turns
+      // just because it threw on the last permitted iteration.
+      if (stopReason === 'end_turn' && completedTurns >= maxTurns) {
+        stopReason = 'max_turns';
+      }
 
-    if (stopReason === 'end_turn' && completedTurns >= maxTurns) {
-      stopReason = 'max_turns';
-    }
-
-    await writeAndAdvance({
-      type: 'turn_end',
-      data: {
-        stopReason,
-        usage: {
+      // Update session usage even on failure so the cost we DID incur up to
+      // the throw is recorded. Wrap in try/catch — the process may be dying
+      // and a throw here would shadow the original error AND skip turn_end.
+      try {
+        this.deps.updateSessionUsage({
+          costDelta: sessionCostUsd - this.deps.getSessionCostUsd(),
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
-          costUsd: sessionCostUsd - previousSessionCostUsd,
-        },
-      },
-    });
+        });
+      } catch (usageErr) {
+        logger.error('runner: updateSessionUsage failed during turn finalization', {
+          err: usageErr instanceof Error ? usageErr.message : String(usageErr),
+          turnId,
+        });
+      }
+
+      // The turn_end write itself is wrapped because the process may be in
+      // a degraded state (disk full, mutex stuck, parent crashed). Losing
+      // the write is bad but recoverable on next session-open by the
+      // crash-recovery scan; throwing here would shadow the caught error.
+      try {
+        await writeAndAdvance({
+          type: 'turn_end',
+          data: {
+            stopReason,
+            usage: {
+              inputTokens: totalInputTokens,
+              outputTokens: totalOutputTokens,
+              costUsd: sessionCostUsd - previousSessionCostUsd,
+            },
+          },
+        });
+      } catch (writeErr) {
+        logger.error('runner: turn_end write failed', {
+          err: writeErr instanceof Error ? writeErr.message : String(writeErr),
+          turnId,
+          stopReason,
+        });
+      }
+    }
+
+    if (caughtError !== undefined) {
+      throw caughtError;
+    }
 
     return {
       turnId,
