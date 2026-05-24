@@ -1672,5 +1672,177 @@ describe('ConversationRunner', () => {
         }
       );
     });
+
+    describe('empty assistant turn not persisted (Fix #2)', () => {
+      /**
+       * Provider that returns an empty response on turn 1, then stops.
+       * Simulates a model that produces no text and no tool calls on first turn.
+       */
+      class EmptyTurnProvider extends AIProvider {
+        callCount = 0;
+
+        get providerName(): string {
+          return 'empty-turn';
+        }
+
+        getProviderInfo() {
+          return { name: 'empty-turn', displayName: 'Empty Turn', requiresApiKey: false };
+        }
+
+        isConfigured(): boolean {
+          return true;
+        }
+
+        get supportsStreaming(): boolean {
+          return true;
+        }
+
+        async createResponse(
+          messages: ProviderMessage[],
+          tools: Tool[],
+          model: string,
+          signal?: AbortSignal,
+          conversationState?: ConversationState,
+          options?: RequestOptions
+        ): Promise<ProviderResponse> {
+          return this.createStreamingResponse(
+            messages,
+            tools,
+            model,
+            signal,
+            conversationState,
+            options
+          );
+        }
+
+        async createStreamingResponse(): Promise<ProviderResponse> {
+          this.callCount++;
+          // Always return an empty response — no text, no tool calls
+          return { content: '', toolCalls: [], stopReason: 'end_turn' };
+        }
+      }
+
+      it('does not write a message event for an empty assistant turn', async () => {
+        const provider = new EmptyTurnProvider();
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+        const deps = createMockDeps({
+          createProvider: vi.fn().mockImplementation(async () => provider),
+        });
+        const runner = new ConversationRunner(config, deps);
+
+        await runner.run({
+          content: [{ type: 'text', text: 'Hello' }],
+          abortController: new AbortController(),
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+        });
+
+        const eventsPath = join(sessionDir, 'events.jsonl');
+        const eventsRaw = readFileSync(eventsPath, 'utf8');
+        const events = eventsRaw
+          .split('\n')
+          .filter((line) => line.trim())
+          .map((line) => JSON.parse(line) as { type: string; data: { content?: unknown } });
+
+        // There must be NO message event with empty content.
+        // An empty-content message event would produce a {role:'assistant', content:''}
+        // when rebuilt, causing consecutive user/user messages after the format-converter
+        // drops the empty assistant turn — which the Anthropic API rejects.
+        const emptyMessageEvents = events.filter(
+          (e) =>
+            e.type === 'message' &&
+            Array.isArray(e.data.content) &&
+            (e.data.content as unknown[]).length === 0
+        );
+        expect(emptyMessageEvents).toHaveLength(0);
+      });
+    });
+
+    describe('missing system prompt logs error (Fix #5)', () => {
+      it('logs an error and calls setSystemPrompt with empty string when session has no system_prompt_set event', async () => {
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+
+        // Build a minimal provider spy. We need setSystemPrompt to be a real function
+        // so we can verify it is called with '' when frozenSystemPrompt is empty.
+        // The provider also needs to respond so the runner can complete.
+        const setSystemPromptSpy = vi.fn();
+        class SystemPromptTrackingProvider extends AIProvider {
+          get providerName(): string {
+            return 'sp-tracking';
+          }
+          getProviderInfo() {
+            return { name: 'sp-tracking', displayName: 'SP Tracking', requiresApiKey: false };
+          }
+          isConfigured(): boolean {
+            return true;
+          }
+          get supportsStreaming(): boolean {
+            return true;
+          }
+          setSystemPrompt(prompt: string): void {
+            setSystemPromptSpy(prompt);
+            super.setSystemPrompt(prompt);
+          }
+          async createResponse(
+            messages: ProviderMessage[],
+            tools: Tool[],
+            model: string,
+            signal?: AbortSignal,
+            conversationState?: ConversationState,
+            options?: RequestOptions
+          ): Promise<ProviderResponse> {
+            return this.createStreamingResponse(
+              messages,
+              tools,
+              model,
+              signal,
+              conversationState,
+              options
+            );
+          }
+          async createStreamingResponse(): Promise<ProviderResponse> {
+            return { content: 'ok', toolCalls: [], stopReason: 'end_turn' };
+          }
+        }
+
+        const { logger } = await import('@lace/agent/utils/logger');
+        const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+        try {
+          const deps = createMockDeps({
+            createProvider: vi
+              .fn()
+              .mockImplementation(async () => new SystemPromptTrackingProvider()),
+          });
+          const runner = new ConversationRunner(config, deps);
+
+          await runner.run({
+            content: [{ type: 'text', text: 'Hello' }],
+            abortController: new AbortController(),
+            turnId: `turn_${randomUUID()}`,
+            startedAt: new Date().toISOString(),
+          });
+
+          // Without a system_prompt_set event in events.jsonl, frozenSystemPrompt is ''.
+          // The runner must log an error AND call setSystemPrompt with ''.
+          expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('no system prompt'));
+          expect(setSystemPromptSpy).toHaveBeenCalledWith('');
+        } finally {
+          errorSpy.mockRestore();
+        }
+      });
+    });
   });
 });

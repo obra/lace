@@ -89,7 +89,8 @@ export interface RequestOptions {
  */
 export abstract class AIProvider extends EventEmitter {
   protected readonly _config: ProviderConfig;
-  protected _systemPrompt: string = '';
+  // null means setSystemPrompt() was never called (distinct from intentionally empty '').
+  protected _systemPrompt: string | null = null;
   protected _catalogData?: CatalogProvider;
 
   // Retry configuration - can be modified in tests but must be validated
@@ -359,7 +360,7 @@ export abstract class AIProvider extends EventEmitter {
   }
 
   get systemPrompt(): string {
-    return this._systemPrompt;
+    return this._systemPrompt ?? '';
   }
 
   abstract get providerName(): string;
@@ -512,46 +513,6 @@ export abstract class AIProvider extends EventEmitter {
     return null;
   }
 
-  /**
-   * Calibrate token costs for system prompt and individual tools.
-   * Subclasses override `_calibrateTokenCostsImpl` with WireTool[]; this method
-   * sanitizes input names and un-sanitizes the toolDetails names on the way out so
-   * callers see their original (unsanitized) tool names.
-   */
-  async calibrateTokenCosts(
-    messages: ProviderMessage[],
-    tools: Tool[],
-    model: string
-  ): Promise<{
-    systemTokens: number;
-    toolTokens: number;
-    toolDetails: Array<{ name: string; tokens: number }>;
-  } | null> {
-    const { wireMessages, wireTools, mapping } = this._sanitizeForWire(messages, tools);
-    const result = await this._calibrateTokenCostsImpl(wireMessages, wireTools, model);
-    if (!result) return null;
-    return {
-      ...result,
-      toolDetails: result.toolDetails.map((d) => ({
-        ...d,
-        name: unsanitizeToolName(d.name, mapping),
-      })),
-    };
-  }
-
-  protected _calibrateTokenCostsImpl(
-    _messages: ProviderMessage[],
-    _tools: WireTool[],
-    _model: string
-  ): Promise<{
-    systemTokens: number;
-    toolTokens: number;
-    toolDetails: Array<{ name: string; tokens: number }>;
-  } | null> {
-    // Default: no calibration support
-    return Promise.resolve(null);
-  }
-
   // System prompt handling.
   //
   // The system prompt is the bytes set via setSystemPrompt() at session
@@ -569,11 +530,13 @@ export abstract class AIProvider extends EventEmitter {
   // setSystemPrompt() at session start.
   //
   protected getEffectiveSystemPrompt(messages: ProviderMessage[]): string {
-    if (this._systemPrompt) return this._systemPrompt;
+    // null means setSystemPrompt() was never called (runner.ts always calls it now).
+    // An explicitly-set empty string ('') is returned as-is so the provider
+    // sends no system prompt rather than silently falling back to a canned one.
+    if (this._systemPrompt !== null) return this._systemPrompt;
 
-    // Calibration paths intentionally call us with empty messages and
-    // already-resolved-or-empty prompts. Only warn when we're actually
-    // serving a request that's about to send to the model.
+    // Only warn when we're actually serving a request that's about to send to
+    // the model (not during token-counting calls with empty message arrays).
     if (messages.length > 0) {
       logger.warn(
         '[base-provider] getEffectiveSystemPrompt called with no _systemPrompt — caller must setSystemPrompt() at session start. ' +

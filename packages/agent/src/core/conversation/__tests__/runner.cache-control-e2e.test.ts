@@ -116,10 +116,11 @@ describe('runner → provider → wire cache_control (Phase 2 E2E)', () => {
     captured.length = 0;
     tempDir = mkdtempSync(join(tmpdir(), 'lace-runner-cache-e2e-'));
 
-    // Initialize session files required by ConversationRunner
+    // Initialize session files required by ConversationRunner.
+    // nextEventSeq: 3 because we seed events.jsonl with events at eventSeq 1 and 2.
     writeFileSync(
       join(tempDir, 'state.json'),
-      JSON.stringify({ nextEventSeq: 1, nextStreamSeq: 1 })
+      JSON.stringify({ nextEventSeq: 3, nextStreamSeq: 1 })
     );
 
     // Seed events.jsonl with:

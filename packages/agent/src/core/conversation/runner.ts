@@ -39,6 +39,7 @@ import {
 import type { RunnerConfig, RunnerDependencies, RunParams, RunResult, ApprovalMode } from './types';
 import type { RequestOptions } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
+import { logger } from '@lace/agent/utils/logger';
 
 // First-person future-tense intent markers. When the model emits one of these
 // on a text-only turn following a tool round-trip, it has declared work it has
@@ -206,11 +207,17 @@ export class ConversationRunner {
     let providerMessages = rebuiltMessages;
 
     // PRI-1804 invariant: the system prompt is computed once at session
-    // creation and never changes for the session lifetime. Push it into
-    // the provider here; it stays in `_systemPrompt` for every turn.
-    if (frozenSystemPrompt) {
-      provider.setSystemPrompt(frozenSystemPrompt);
+    // creation and never changes for the session lifetime. Always push it
+    // into the provider (even if empty) so the provider's _systemPrompt is
+    // explicitly set rather than left at its null default, which would
+    // cause getEffectiveSystemPrompt to emit a fallback warn on every request.
+    if (!frozenSystemPrompt) {
+      logger.error(
+        `[runner] session ${sessionDir} has no system prompt (no system_prompt_set event ` +
+          `and no legacy migration source). Pushing empty string deterministically.`
+      );
     }
+    provider.setSystemPrompt(frozenSystemPrompt);
     // Watermark for mid-turn re-reads of durable events. Events with
     // eventSeq <= this value are already reflected in providerMessages (either
     // from the initial build above or appended on a previous iteration).
@@ -411,9 +418,15 @@ export class ConversationRunner {
           await this.deps.onUpdate(messageTurnSeq, { type: 'text_delta', text: assistantText });
         }
 
-        // Store content in array format (standard content block format)
+        // Store content in array format (standard content block format).
+        // Only persist if there is actual content — an empty assistant turn would
+        // produce a {role:'assistant', content:''} when rebuilt, which creates
+        // consecutive user/user messages after the format-converter drops the
+        // empty block. Anthropic's API rejects consecutive same-role messages.
         const contentBlocks = assistantText ? [{ type: 'text', text: assistantText }] : [];
-        await writeAndAdvance({ type: 'message', data: { content: contentBlocks } });
+        if (contentBlocks.length > 0) {
+          await writeAndAdvance({ type: 'message', data: { content: contentBlocks } });
+        }
 
         const toolCalls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
         if (toolCalls.length === 0) {
@@ -426,15 +439,20 @@ export class ConversationRunner {
           // text or empty responses instead of calling a verification tool.
           if (!retriedWithToolChoice && completedTurns > 0) {
             retriedWithToolChoice = true;
-            providerMessages = [
-              ...providerMessages,
-              { role: 'assistant' as const, content: assistantText },
-              {
-                role: 'user' as const,
-                content:
-                  '<system-reminder>You must use a tool to verify your work before stopping. Do not respond with text — call a tool.</system-reminder>',
-              },
-            ];
+            // Only inject an assistant turn when there is actual text — an empty
+            // assistant message followed immediately by a user message would create
+            // consecutive user/user pairs when rebuilt (the empty assistant is dropped
+            // by the format-converter), which the Anthropic API rejects.
+            const retryMessages: Array<{ role: 'assistant' | 'user'; content: string }> = [];
+            if (assistantText.trim().length > 0) {
+              retryMessages.push({ role: 'assistant' as const, content: assistantText });
+            }
+            retryMessages.push({
+              role: 'user' as const,
+              content:
+                '<system-reminder>You must use a tool to verify your work before stopping. Do not respond with text — call a tool.</system-reminder>',
+            });
+            providerMessages = [...providerMessages, ...retryMessages];
             nextRequestOptions = { toolChoice: 'required' };
             continue;
           }
