@@ -252,6 +252,82 @@ describe('attachMessageCacheBreakpoints — block-type whitelist (PRI-1806 #5)',
       expect(b.cache_control).toBeUndefined();
     }
   });
+
+  it('treats SDK-cacheable block types beyond the original 5 as cacheable (PRI-1806 #5 follow-up)', () => {
+    // SDK 0.60 confirms cache_control is accepted on server_tool_use,
+    // web_search_tool_result, and search_result. The previous whitelist
+    // excluded them, leaving cache reach on the floor for hosted-tool workloads.
+    //
+    // This test proves the new types are treated as cacheable by placing
+    // web_search_tool_result as the ONLY block in the last message. Without
+    // it being whitelisted, attachMessageCacheBreakpoints refuses to place
+    // any markers (the tail guard fires: last cacheable block is not in the
+    // last message). With it whitelisted, both tail and anchor are placed.
+    //
+    // Layout (12 raw blocks total):
+    //   0   user  text 'q1'
+    //   1   asst  text '1'
+    //   2   asst  text '2'
+    //   3   asst  text '3'
+    //   4   asst  text '4'
+    //   5   asst  text '5'
+    //   6   asst  text 'a'
+    //   7   asst  text 'b'
+    //   8   asst  text 'c'
+    //   9   asst  text 'd'
+    //  10   asst  server_tool_use 'st1'
+    //  11   user  web_search_tool_result  ← last message, only block
+    //
+    // Before whitelist expansion:
+    //   - web_search_tool_result (idx 11) is non-cacheable
+    //   - last cacheable block is server_tool_use (idx 10) in message[-2]
+    //   - tail guard: tail.msgIdx (3) != messages.length-1 (4) → return unchanged
+    //   - result: 0 markers
+    //
+    // After whitelist expansion:
+    //   - web_search_tool_result IS cacheable → tail = idx 11
+    //   - server_tool_use IS cacheable → appears in cacheablePositions
+    //   - anchor at raw distance >= 10 from tail → idx 1 (distance = 10)
+    //   - result: 2 markers
+    const serverToolUseBlock = {
+      type: 'server_tool_use',
+      id: 'st1',
+      name: 'web_search',
+      input: {},
+    } as unknown as Anthropic.ContentBlockParam;
+
+    const webSearchResultBlock = {
+      type: 'web_search_tool_result',
+      tool_use_id: 'st1',
+      content: [],
+    } as unknown as Anthropic.ContentBlockParam;
+
+    const messages: Anthropic.MessageParam[] = [
+      user(text('q1')),
+      assistant(text('1'), text('2'), text('3'), text('4'), text('5')),
+      assistant(text('a'), text('b'), text('c'), text('d'), serverToolUseBlock),
+      user(webSearchResultBlock),
+    ];
+
+    const out = attachMessageCacheBreakpoints(messages, OPTIONS_1H);
+    const flat = flattenBlocks(out);
+    const markers = flat.filter(
+      (b) => (b as { cache_control?: unknown }).cache_control !== undefined
+    );
+
+    // Both tail (web_search_tool_result) and anchor must be placed.
+    expect(markers).toHaveLength(2);
+
+    // Tail must be the web_search_tool_result block.
+    const tailMarker = markers[markers.length - 1];
+    expect(tailMarker.type).toBe('web_search_tool_result');
+
+    // Anchor at raw distance >= ANCHOR_OFFSET_RAW_BLOCKS from tail.
+    const anchorMarker = markers[0];
+    expect(tailMarker.rawIdx - anchorMarker.rawIdx).toBeGreaterThanOrEqual(
+      ANCHOR_OFFSET_RAW_BLOCKS
+    );
+  });
 });
 
 describe('bedrockCacheTtlFor (PRI-1803)', () => {

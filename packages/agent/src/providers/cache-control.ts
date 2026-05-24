@@ -20,17 +20,20 @@ export const MAX_CACHE_BREAKPOINTS = 4;
 export const ANCHOR_OFFSET_RAW_BLOCKS = 10;
 
 // Whitelist of block types that accept `cache_control` AND are sensible
-// breakpoint targets. PRI-1806 #5: novel block types
-// (SearchResultBlockParam, ServerToolUseBlockParam, WebSearchToolResult,
-// ContainerUploadBlockParam, …) may carry a cache_control field but using
-// them as breakpoint targets is undefined behaviour. Refuse rather than
-// silently stamp.
+// breakpoint targets. PRI-1806 #5: only stamp types confirmed by the SDK
+// type definitions to carry cache_control; refuse unknown types rather than
+// silently stamping them.
+// PRI-1806 #5 follow-up: SDK 0.60 confirms server_tool_use,
+// web_search_tool_result, and search_result accept cache_control too.
 const CACHEABLE_BLOCK_TYPES: ReadonlySet<string> = new Set([
   'text',
   'image',
   'document',
   'tool_use',
   'tool_result',
+  'server_tool_use',
+  'web_search_tool_result',
+  'search_result',
 ]);
 
 export type CacheTtl = '5m' | '1h';
