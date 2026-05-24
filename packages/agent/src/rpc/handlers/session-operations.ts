@@ -463,10 +463,11 @@ export function registerSessionOperationHandlers(
         : 10;
 
     return await runExclusive(async () => {
-      const { messages: beforeMessages } = buildProviderMessagesFromDurableEvents(
+      const { messages: beforeMessages, systemPrompt } = buildProviderMessagesFromDurableEvents(
         state.activeSession!.dir
       );
-      const previousTokens = estimateProviderTokens(beforeMessages);
+      const systemPromptTokens = estimateTokens(systemPrompt);
+      const previousTokens = estimateProviderTokens(beforeMessages) + systemPromptTokens;
 
       const sessionStateForConfig = readSessionState(state.activeSession!.dir);
       const effectiveConfig = getEffectiveConfig(state.config, sessionStateForConfig.config);
@@ -474,7 +475,8 @@ export function registerSessionOperationHandlers(
       if (targetTokens !== undefined) {
         while (
           preserveRecent > 0 &&
-          estimateProviderTokens(beforeMessages.slice(-preserveRecent)) > targetTokens
+          systemPromptTokens + estimateProviderTokens(beforeMessages.slice(-preserveRecent)) >
+            targetTokens
         ) {
           preserveRecent -= 1;
         }
