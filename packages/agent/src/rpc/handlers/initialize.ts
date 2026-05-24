@@ -6,6 +6,7 @@ import { getUserSlashCommands } from '../../user-commands';
 import { protocolToolInfoForCoreTool } from '../utils';
 import type {
   AgentServerState,
+  ContainerExecutionIdentityConfig,
   CreateToolExecutorFn,
   MountRegistryEntry,
 } from '../../server-types';
@@ -15,30 +16,55 @@ import { resolveResourcePath } from '../../utils/resource-resolver';
 import { logger } from '../../utils/logger';
 
 const MOUNT_NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
+const ENV_VAR_NAME_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
+
+function invalidParams(): never {
+  throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+}
 
 function parseContainerMounts(raw: unknown): Record<string, MountRegistryEntry> {
   if (raw === undefined) return {};
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+    invalidParams();
   }
   const result: Record<string, MountRegistryEntry> = {};
   for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
     if (!MOUNT_NAME_PATTERN.test(name)) {
-      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+      invalidParams();
     }
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+      invalidParams();
     }
     const entry = value as Record<string, unknown>;
     if (typeof entry.hostPath !== 'string' || entry.hostPath.length === 0) {
-      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+      invalidParams();
     }
     if (typeof entry.readonly !== 'boolean') {
-      throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+      invalidParams();
     }
     result[name] = { hostPath: entry.hostPath, readonly: entry.readonly };
   }
   return result;
+}
+
+function parseContainerExecutionIdentity(
+  raw: unknown
+): ContainerExecutionIdentityConfig | undefined {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    invalidParams();
+  }
+  const identity = raw as Record<string, unknown>;
+  if (Object.keys(identity).some((key) => key !== 'tokenEnvName')) {
+    invalidParams();
+  }
+  if (
+    typeof identity.tokenEnvName !== 'string' ||
+    !ENV_VAR_NAME_PATTERN.test(identity.tokenEnvName)
+  ) {
+    invalidParams();
+  }
+  return { tokenEnvName: identity.tokenEnvName };
 }
 
 /**
@@ -78,6 +104,9 @@ export function registerInitializeHandler(
       throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
 
     const config = (parsed.config as Record<string, unknown> | undefined) ?? undefined;
+    state.containerExecutionIdentity = parseContainerExecutionIdentity(
+      parsed.containerExecutionIdentity
+    );
 
     // Embedder-controlled persona search paths; ordered, earlier paths win.
     if (Array.isArray(parsed.userPersonasPaths)) {

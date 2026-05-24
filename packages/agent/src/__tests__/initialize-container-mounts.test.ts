@@ -66,6 +66,58 @@ describe('initialize containerMounts', () => {
     server.close();
   });
 
+  it('stores valid containerExecutionIdentity on state', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', {
+      ...defaultInitializeParams(),
+      containerExecutionIdentity: { tokenEnvName: 'SEN_AGENT_TOKEN' },
+    });
+
+    expect(state.containerExecutionIdentity).toEqual({ tokenEnvName: 'SEN_AGENT_TOKEN' });
+
+    client.close();
+    server.close();
+  });
+
+  it('rejects unsafe containerExecutionIdentity env var names', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await expect(
+      client.request('initialize', {
+        ...defaultInitializeParams(),
+        containerExecutionIdentity: { tokenEnvName: 'bad-name' },
+      })
+    ).rejects.toThrow();
+
+    expect(state.containerExecutionIdentity).toBeUndefined();
+
+    client.close();
+    server.close();
+  });
+
+  it('rejects unexpected containerExecutionIdentity keys', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await expect(
+      client.request('initialize', {
+        ...defaultInitializeParams(),
+        containerExecutionIdentity: {
+          tokenEnvName: 'SEN_AGENT_TOKEN',
+          unexpected: 'value',
+        },
+      })
+    ).rejects.toThrow();
+
+    expect(state.containerExecutionIdentity).toBeUndefined();
+
+    client.close();
+    server.close();
+  });
+
   it('rejects invalid mount names (uppercase)', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));

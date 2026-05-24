@@ -67,6 +67,19 @@ export type SessionUpdateParams = z.infer<typeof SessionUpdateNotificationSchema
 export type SessionUpdate = DistributiveOmit<SessionUpdateParams, 'sessionId' | 'streamSeq'>;
 export type JobInnerUpdate = Extract<SessionUpdateParams, { type: 'job_update' }>['update'];
 
+export type ContainerExecutionIdentityConfig = { tokenEnvName: string };
+
+export type ContainerExecutionMetadata = {
+  tokenEnvName: string;
+  token: string;
+  personaName: string;
+  parentSessionId: string;
+  jobId: string;
+  containerId: string;
+  runtimeId?: string;
+  containerSpecName?: string;
+};
+
 // Job Types
 export type JobType = 'bash' | 'delegate';
 export type JobStatus = 'running' | 'completed' | 'failed' | 'cancelled';
@@ -183,6 +196,7 @@ export type AgentServerState = {
   // path + readonly flag. Always present; defaults to {} when initialize
   // omits the param.
   containerMounts: Record<string, MountRegistryEntry>;
+  containerExecutionIdentity?: ContainerExecutionIdentityConfig;
   // Persona-container materialization (K-49e). null when the host platform
   // has no supported container runtime — persona-container delegate calls
   // then fail with a clear error. Tests inject fakes by replacing this field.

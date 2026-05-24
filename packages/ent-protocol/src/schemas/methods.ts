@@ -145,6 +145,12 @@ const InitializeParamsSchema = z
       )
       .optional()
       .default({}),
+    containerExecutionIdentity: z
+      .object({
+        tokenEnvName: z.string().regex(/^[A-Z_][A-Z0-9_]*$/),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type InitializeParams = z.infer<typeof InitializeParamsSchema>;
