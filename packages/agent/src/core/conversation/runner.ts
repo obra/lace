@@ -38,8 +38,9 @@ import {
   shouldAskPermission,
 } from '@lace/agent/rpc/utils';
 import type { RunnerConfig, RunnerDependencies, RunParams, RunResult, ApprovalMode } from './types';
-import type { RequestOptions } from '@lace/agent/providers/base-provider';
+import type { LaceStopDetails, RequestOptions } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
+import { logger } from '@lace/agent/utils/logger';
 
 // First-person future-tense intent markers. When the model emits one of these
 // on a text-only turn following a tool round-trip, it has declared work it has
@@ -233,6 +234,7 @@ export class ConversationRunner {
     let lastSeenEventSeq = findLastTurnEndEventSeq(sessionDir) ?? 0;
     let finalAssistantContent = '';
     let stopReason: RunResult['stopReason'] = 'end_turn';
+    let stopDetails: LaceStopDetails | null = null;
 
     let streamTurnSeq = 0;
     let completedTurns = 0;
@@ -430,14 +432,89 @@ export class ConversationRunner {
         }
 
         const toolCalls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
-        if (toolCalls.length === 0) {
-          // Providers now emit the canonical 'max_output_tokens' value via the
-          // shared stop-reason normalizers. The RunResult shape still uses
-          // 'max_tokens' externally — chunk C/F will rename that surface.
-          if (response.stopReason === 'max_output_tokens') {
-            stopReason = 'max_tokens';
+
+        // Dispatch on the provider's canonical stopReason. Terminal stops other
+        // than 'tool_use' / 'end_turn' exit the loop here; the existing
+        // tool-execution path runs only when stopReason === 'tool_use'.
+        switch (response.stopReason) {
+          case 'refusal':
+          case 'context_window_exceeded':
+          case 'max_output_tokens':
+          case 'stop_sequence': {
+            // Preserve any pending tool_use blocks the model emitted before the
+            // stop. They land in the durable event log without a `result` so the
+            // conversation rebuilder can show what the model intended without
+            // implying it executed.
+            for (const toolCall of toolCalls) {
+              const toolCallId = toNonEmptyString(toolCall.id);
+              const toolName = toNonEmptyString(toolCall.name);
+              if (!toolCallId || !toolName) continue;
+              const toolInput =
+                typeof toolCall.arguments === 'object' && toolCall.arguments
+                  ? (toolCall.arguments as Record<string, unknown>)
+                  : {};
+              await writeAndAdvance({
+                type: 'tool_use',
+                data: {
+                  toolCallId,
+                  name: toolName,
+                  kind: toolKindFromName(toolName),
+                  input: toolInput,
+                },
+              });
+            }
+            stopReason = response.stopReason;
+            stopDetails = response.stopDetails ?? null;
             break;
           }
+          case 'failed':
+            throw {
+              code: EntErrorCodes.ProviderError,
+              message:
+                response.stopDetails?.type === 'failed'
+                  ? response.stopDetails.message
+                  : 'Provider request failed',
+              data: { category: 'provider', stopDetails: response.stopDetails ?? null },
+            };
+          case undefined:
+          case 'end_turn':
+          case 'tool_use':
+          case 'cancelled':
+          case 'permission_cancelled':
+          case 'pause_turn':
+          case 'max_turns':
+          case 'budget_exceeded':
+          case 'incomplete':
+            // These either continue the loop (tool_use / end_turn) or are
+            // handled by the runner-derived paths below (cancelled,
+            // permission_cancelled, budget_exceeded, etc.). 'pause_turn' is
+            // intentionally treated like end_turn here pending chunk D's
+            // dedicated auto-resume handling.
+            break;
+          default:
+            // A future provider may invent a new stopReason. Don't fall through
+            // into the existing tool-execution path silently — log and exit.
+            logger.warn('Unknown provider stopReason; treating as end_turn', {
+              stopReason: response.stopReason,
+            });
+        }
+
+        // Terminal provider stops (refusal / context_window_exceeded /
+        // max_output_tokens / stop_sequence) exit the loop here. budget_exceeded
+        // is set ABOVE the switch on every iteration; it is intentionally
+        // allowed to fall through to the tool-execution path below so the
+        // current turn's tool results get persisted before the next iteration's
+        // budget check fires the actual break (line ~615).
+        if (
+          stopReason === 'refusal' ||
+          stopReason === 'context_window_exceeded' ||
+          stopReason === 'max_output_tokens' ||
+          stopReason === 'stop_sequence'
+        ) {
+          break;
+        }
+
+        if (toolCalls.length === 0) {
           // Retry once with tool_choice=required to force a verification tool call.
           // This catches the NEVER_SUBMITTED pattern where the model produces "Done"
           // text or empty responses instead of calling a verification tool.
@@ -491,41 +568,48 @@ export class ConversationRunner {
 
         let shouldContinue = true;
 
-        for (const toolCall of toolCalls) {
-          const result = await this.executeToolCall({
-            toolCall,
-            streamTurnSeq,
-            toolExecutor,
-            executionMode,
-            approvalMode,
-            cwd,
-            filesRead,
-            runtimeFileAccessTracker,
-            envOverlay,
-            abortController,
-            turnId,
-            startedAt,
-            sessionId,
-            runtimeBinding,
-            writeAndAdvance,
-          });
+        // Load-bearing safety check: execute tool calls ONLY when the provider's
+        // canonical stop reason explicitly says so. Refusal / context_exceeded /
+        // max_output_tokens / stop_sequence have already exited the loop above,
+        // but this guard protects against any future stop reason slipping
+        // through into the tool-execution path.
+        if (response.stopReason === 'tool_use') {
+          for (const toolCall of toolCalls) {
+            const result = await this.executeToolCall({
+              toolCall,
+              streamTurnSeq,
+              toolExecutor,
+              executionMode,
+              approvalMode,
+              cwd,
+              filesRead,
+              runtimeFileAccessTracker,
+              envOverlay,
+              abortController,
+              turnId,
+              startedAt,
+              sessionId,
+              runtimeBinding,
+              writeAndAdvance,
+            });
 
-          streamTurnSeq = result.streamTurnSeq;
-          providerMessages = [
-            ...providerMessages,
-            { role: 'user', content: '', toolResults: [result.coreResult] },
-          ];
+            streamTurnSeq = result.streamTurnSeq;
+            providerMessages = [
+              ...providerMessages,
+              { role: 'user', content: '', toolResults: [result.coreResult] },
+            ];
 
-          if (!result.shouldContinue) {
-            shouldContinue = false;
-            // When the permission request itself was cancelled (kata #37 —
-            // upstream supervisor has no handler, request races out in ~15ms)
-            // the tool never ran. Surface that as a distinct stopReason so
-            // subagent-job (and anything else mapping turn results to job
-            // status) can mark the job as failed instead of silently
-            // reporting 'completed' for a turn that lost its writes.
-            if (result.cancelReason === 'permission_cancelled') {
-              stopReason = 'permission_cancelled';
+            if (!result.shouldContinue) {
+              shouldContinue = false;
+              // When the permission request itself was cancelled (kata #37 —
+              // upstream supervisor has no handler, request races out in ~15ms)
+              // the tool never ran. Surface that as a distinct stopReason so
+              // subagent-job (and anything else mapping turn results to job
+              // status) can mark the job as failed instead of silently
+              // reporting 'completed' for a turn that lost its writes.
+              if (result.cancelReason === 'permission_cancelled') {
+                stopReason = 'permission_cancelled';
+              }
             }
           }
         }
@@ -573,6 +657,7 @@ export class ConversationRunner {
     return {
       turnId,
       stopReason,
+      stopDetails,
       content:
         finalAssistantContent.length > 0
           ? [{ type: 'text' as const, text: finalAssistantContent }]

@@ -1,6 +1,6 @@
 // ABOUTME: Types for ConversationRunner - the extracted agentic loop
 
-import type { AIProvider } from '@lace/agent/providers/base-provider';
+import type { AIProvider, LaceStopDetails } from '@lace/agent/providers/base-provider';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { ToolResult as CoreToolResult, ToolCall, ToolContext } from '@lace/agent/tools/types';
 import type { MountRegistryEntry, SessionUpdate } from '@lace/agent/server-types';
@@ -187,6 +187,17 @@ export interface RunParams {
 
 /**
  * Result from running a prompt through the agentic loop.
+ *
+ * `stopReason` is the canonical reason the turn ended. Provider-derived terminal
+ * reasons (`'refusal'`, `'context_window_exceeded'`, `'max_output_tokens'`,
+ * `'stop_sequence'`) are surfaced verbatim; runner-derived stops
+ * (`'max_turns'`, `'cancelled'`, `'budget_exceeded'`, `'incomplete'`,
+ * `'permission_cancelled'`, `'end_turn'`) are unchanged. `'failed'` is reserved
+ * for callers that catch a runner throw and want to attribute it (the runner
+ * itself throws an EntErrorCodes.ProviderError instead of returning when the
+ * provider reports `stopReason === 'failed'`). Non-terminal provider stops
+ * (`'tool_use'`, `'pause_turn'`) are intentionally excluded — the runner
+ * handles them internally.
  */
 export interface RunResult {
   /** Unique identifier for this turn */
@@ -194,12 +205,22 @@ export interface RunResult {
   /** Reason the turn stopped */
   stopReason:
     | 'end_turn'
-    | 'max_tokens'
+    | 'stop_sequence'
+    | 'max_output_tokens'
+    | 'context_window_exceeded'
+    | 'refusal'
     | 'max_turns'
     | 'cancelled'
     | 'budget_exceeded'
     | 'incomplete'
-    | 'permission_cancelled';
+    | 'permission_cancelled'
+    | 'failed';
+  /**
+   * Structured stop detail when the provider supplied one (refusal category,
+   * stop sequence, max-output-tokens source, etc.). `null` for runner-derived
+   * stops or providers that didn't supply a detail.
+   */
+  stopDetails: LaceStopDetails | null;
   /** Final assistant content */
   content: Array<{ type: 'text'; text: string }>;
   /** Token usage for this turn */

@@ -911,3 +911,78 @@ describe('buildProviderMessagesFromDurableEvents — system_prompt_set and conte
     });
   });
 });
+
+describe('buildProviderMessagesFromDurableEvents — orphan tool_use (no following tool_result)', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'lace-msg-builder-orphan-toolu-'));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  // Runner emits a tool_use event without a `result` field when the provider
+  // stops with refusal / context_window_exceeded / max_output_tokens /
+  // stop_sequence BEFORE the runner had a chance to execute the pending tool
+  // call. The rebuilder must tolerate that durable shape: the conversation
+  // ends with an assistant message carrying the unexecuted tool_use and
+  // NOTHING after.
+  it('rebuilds an assistant tool_use with no following tool_result and no synthetic user message', () => {
+    writeEvents(tempDir, [
+      {
+        eventSeq: 1,
+        type: 'system_prompt_set',
+        data: { text: 'You are a test assistant.' },
+      },
+      {
+        eventSeq: 2,
+        type: 'prompt',
+        data: { content: [{ type: 'text', text: 'do the thing' }] },
+      },
+      {
+        eventSeq: 3,
+        type: 'message',
+        data: { content: [{ type: 'text', text: 'partial answer' }] },
+      },
+      {
+        eventSeq: 4,
+        type: 'tool_use',
+        data: {
+          toolCallId: 'toolu_orphan',
+          name: 'bash',
+          kind: 'execute',
+          input: { command: 'ls' },
+          // No `result` field — the runner stopped before executing.
+        },
+      },
+    ]);
+
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+
+    // Expected:
+    //   user("do the thing")
+    //   assistant("partial answer")
+    //   assistant("", toolCalls=[toolu_orphan])
+    //
+    // Crucially: no user message after the orphan tool_use — every
+    // user-shaped message in the rebuild should still pair with a real
+    // assistant tool_use that has the matching toolCallId.
+    expect(messages.length).toBeGreaterThanOrEqual(2);
+
+    const last = messages[messages.length - 1]!;
+    expect(last.role).toBe('assistant');
+    expect(Array.isArray(last.toolCalls)).toBe(true);
+    expect(last.toolCalls!.some((c) => c.id === 'toolu_orphan')).toBe(true);
+
+    // No user message anywhere claims to have a toolResult matching the
+    // orphan id.
+    const orphanResults = messages.flatMap((m) =>
+      m.role === 'user' && Array.isArray(m.toolResults)
+        ? m.toolResults.filter((r) => r.id === 'toolu_orphan')
+        : []
+    );
+    expect(orphanResults).toEqual([]);
+  });
+});

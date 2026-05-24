@@ -120,6 +120,7 @@ export function registerPromptHandler(
         const result = {
           turnId,
           stopReason: 'cancelled' as const,
+          stopDetails: null,
           content: [] as { type: 'text'; text: string }[],
           usage: { inputTokens: 0, outputTokens: 0 },
         };

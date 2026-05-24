@@ -1051,7 +1051,7 @@ describe('ConversationRunner', () => {
         expect(provider.lastOptions).toBeUndefined(); // call 4 has no options
       });
 
-      it('does not retry on max_tokens stop reason', async () => {
+      it('does not retry on max_output_tokens stop reason', async () => {
         let callCount = 0;
         class MaxTokensProvider extends AIProvider {
           get providerName(): string {
@@ -1128,7 +1128,7 @@ describe('ConversationRunner', () => {
           startedAt: new Date().toISOString(),
         });
 
-        expect(result.stopReason).toBe('max_tokens');
+        expect(result.stopReason).toBe('max_output_tokens');
         expect(callCount).toBe(2); // No retry
       });
 
