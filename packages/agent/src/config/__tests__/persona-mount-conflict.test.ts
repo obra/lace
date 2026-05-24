@@ -89,7 +89,7 @@ describe('persona-mount-conflict validator', () => {
     const parsed = reg.parsePersona('cattle');
 
     // Should not throw
-    expect(() => assertNoMountConflict('cattle', parsed, reg)).not.toThrow();
+    expect(() => assertNoMountConflict('cattle', parsed, reg, {})).not.toThrow();
   });
 
   // ---------------------------------------------------------------------------
@@ -123,7 +123,9 @@ describe('persona-mount-conflict validator', () => {
 
     let caught: unknown;
     try {
-      assertNoMountConflict('worker', parsed, reg);
+      assertNoMountConflict('worker', parsed, reg, {
+        knowledge: { hostPath: '/srv/knowledge', readonly: false },
+      });
     } catch (err) {
       caught = err;
     }
@@ -203,7 +205,8 @@ describe('persona-mount-conflict validator', () => {
       assertNoMountConflict(
         'worker',
         parsed,
-        fakeRegistry as Parameters<typeof assertNoMountConflict>[2]
+        fakeRegistry as Parameters<typeof assertNoMountConflict>[2],
+        {}
       )
     ).not.toThrow();
   });
@@ -238,7 +241,7 @@ describe('persona-mount-conflict validator', () => {
     const parsed = reg.parsePersona('pet-b');
 
     // persistent-on-persistent overlap is fine — no throw
-    expect(() => assertNoMountConflict('pet-b', parsed, reg)).not.toThrow();
+    expect(() => assertNoMountConflict('pet-b', parsed, reg, {})).not.toThrow();
   });
 
   // ---------------------------------------------------------------------------
@@ -271,7 +274,9 @@ describe('persona-mount-conflict validator', () => {
     const { logger } = await import('@lace/agent/utils/logger');
 
     // Should not throw
-    expect(() => warnMountConflicts(reg)).not.toThrow();
+    expect(() =>
+      warnMountConflicts(reg, { knowledge: { hostPath: '/srv/knowledge', readonly: false } })
+    ).not.toThrow();
 
     // Should have logged a warn with the conflict details
     expect(logger.warn).toHaveBeenCalledWith(
@@ -313,7 +318,7 @@ describe('persona-mount-conflict validator', () => {
     const reg = makeRegistry();
     const { logger } = await import('@lace/agent/utils/logger');
 
-    warnMountConflicts(reg);
+    warnMountConflicts(reg, {});
 
     // Check that warn was not called with the conflict key
     const warnCalls = (logger.warn as ReturnType<typeof vi.fn>).mock.calls;
@@ -356,7 +361,7 @@ describe('persona-mount-conflict validator', () => {
     const { logger } = await import('@lace/agent/utils/logger');
 
     // Should not throw even though 'broken' fails to parse
-    expect(() => warnMountConflicts(reg)).not.toThrow();
+    expect(() => warnMountConflicts(reg, {})).not.toThrow();
 
     // The debug skip log should have been emitted for the broken persona
     const debugCalls = (logger.debug as ReturnType<typeof vi.fn>).mock.calls;
@@ -414,7 +419,9 @@ describe('persona-mount-conflict validator', () => {
 
     let caught: unknown;
     try {
-      assertNoMountConflict('cattle-c', parsed, reg);
+      assertNoMountConflict('cattle-c', parsed, reg, {
+        logs: { hostPath: '/srv/logs', readonly: false },
+      });
     } catch (err) {
       caught = err;
     }
@@ -426,5 +433,208 @@ describe('persona-mount-conflict validator', () => {
     expect(err.conflictsWith).toHaveLength(2);
     expect(err.conflictsWith).toContain('pet-a');
     expect(err.conflictsWith).toContain('pet-b');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Test 9: readonly mount in registry — assertNoMountConflict must NOT throw
+  // ---------------------------------------------------------------------------
+  it('assertNoMountConflict allows overlapping readonly mount when registry says so', () => {
+    writePersona(
+      'box-shell',
+      `runtime:
+  type: container
+  agentPlacement: host
+  containerSharing: persistent
+  image: img:latest
+  workingDirectory: /knowledge
+  mounts:
+    knowledge: /knowledge`
+    );
+    writePersona(
+      'shell',
+      `runtime:
+  type: container
+  agentPlacement: host
+  containerSharing: per_invocation
+  image: img:latest
+  workingDirectory: /shared
+  mounts:
+    knowledge: /shared`
+    );
+    const reg = makeRegistry();
+    const parsed = reg.parsePersona('shell');
+
+    // Registry says 'knowledge' is readonly — no threat, should not throw.
+    expect(() =>
+      assertNoMountConflict('shell', parsed, reg, {
+        knowledge: { hostPath: '/srv/knowledge', readonly: true },
+      })
+    ).not.toThrow();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Test 10: read-write mount in registry — assertNoMountConflict must throw
+  // ---------------------------------------------------------------------------
+  it('assertNoMountConflict still throws on overlapping read-write mount', () => {
+    writePersona(
+      'box-shell',
+      `runtime:
+  type: container
+  agentPlacement: host
+  containerSharing: persistent
+  image: img:latest
+  workingDirectory: /knowledge
+  mounts:
+    knowledge: /knowledge`
+    );
+    writePersona(
+      'shell',
+      `runtime:
+  type: container
+  agentPlacement: host
+  containerSharing: per_invocation
+  image: img:latest
+  workingDirectory: /shared
+  mounts:
+    knowledge: /shared`
+    );
+    const reg = makeRegistry();
+    const parsed = reg.parsePersona('shell');
+
+    let caught: unknown;
+    try {
+      assertNoMountConflict('shell', parsed, reg, {
+        knowledge: { hostPath: '/srv/knowledge', readonly: false },
+      });
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(PersonaSharingViolationError);
+    const err = caught as InstanceType<typeof PersonaSharingViolationError>;
+    expect(err.mountName).toBe('knowledge');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Test 11: mount not in registry — conservative default (treat as read-write)
+  // ---------------------------------------------------------------------------
+  it('assertNoMountConflict treats missing-from-registry mounts as read-write (conservative default)', () => {
+    writePersona(
+      'box-shell',
+      `runtime:
+  type: container
+  agentPlacement: host
+  containerSharing: persistent
+  image: img:latest
+  workingDirectory: /knowledge
+  mounts:
+    knowledge: /knowledge`
+    );
+    writePersona(
+      'shell',
+      `runtime:
+  type: container
+  agentPlacement: host
+  containerSharing: per_invocation
+  image: img:latest
+  workingDirectory: /shared
+  mounts:
+    knowledge: /shared`
+    );
+    const reg = makeRegistry();
+    const parsed = reg.parsePersona('shell');
+
+    // Pass an empty registry — 'knowledge' is not listed, so treat as read-write → throw.
+    let caught: unknown;
+    try {
+      assertNoMountConflict('shell', parsed, reg, {});
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(PersonaSharingViolationError);
+    const err = caught as InstanceType<typeof PersonaSharingViolationError>;
+    expect(err.mountName).toBe('knowledge');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Test 12: warnMountConflicts skips readonly mounts — no WARN emitted
+  // ---------------------------------------------------------------------------
+  it('warnMountConflicts skips readonly mounts (no WARN)', async () => {
+    writePersona(
+      'box-shell',
+      `runtime:
+  type: container
+  agentPlacement: host
+  containerSharing: persistent
+  image: img:latest
+  workingDirectory: /knowledge
+  mounts:
+    knowledge: /knowledge`
+    );
+    writePersona(
+      'shell',
+      `runtime:
+  type: container
+  agentPlacement: host
+  containerSharing: per_invocation
+  image: img:latest
+  workingDirectory: /shared
+  mounts:
+    knowledge: /shared`
+    );
+    const reg = makeRegistry();
+    const { logger } = await import('@lace/agent/utils/logger');
+
+    // Registry marks 'knowledge' readonly — not a threat, no WARN expected.
+    expect(() =>
+      warnMountConflicts(reg, { knowledge: { hostPath: '/srv/knowledge', readonly: true } })
+    ).not.toThrow();
+
+    const warnCalls = (logger.warn as ReturnType<typeof vi.fn>).mock.calls;
+    const conflictWarns = warnCalls.filter((args) => args[0] === 'persona_mount_conflict');
+    expect(conflictWarns).toHaveLength(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Test 13: warnMountConflicts still warns on read-write overlap
+  // ---------------------------------------------------------------------------
+  it('warnMountConflicts still warns on read-write overlap', async () => {
+    writePersona(
+      'box-shell',
+      `runtime:
+  type: container
+  agentPlacement: host
+  containerSharing: persistent
+  image: img:latest
+  workingDirectory: /knowledge
+  mounts:
+    knowledge: /knowledge`
+    );
+    writePersona(
+      'shell',
+      `runtime:
+  type: container
+  agentPlacement: host
+  containerSharing: per_invocation
+  image: img:latest
+  workingDirectory: /shared
+  mounts:
+    knowledge: /shared`
+    );
+    const reg = makeRegistry();
+    const { logger } = await import('@lace/agent/utils/logger');
+
+    // Registry marks 'knowledge' read-write — genuine threat → WARN expected.
+    warnMountConflicts(reg, { knowledge: { hostPath: '/srv/knowledge', readonly: false } });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      'persona_mount_conflict',
+      expect.objectContaining({
+        persona: 'shell',
+        mountName: 'knowledge',
+        conflictsWith: expect.arrayContaining(['box-shell']),
+      })
+    );
   });
 });

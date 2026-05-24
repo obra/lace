@@ -94,23 +94,25 @@ export function registerInitializeHandler(
       });
     }
 
+    // Embedder-supplied named-mount registry. Persona containers resolve their
+    // `runtime.mounts[name]` against this map at materialization time. Always
+    // stored on state (defaults to {}). Parse before the R6 boot scan so the
+    // readonly flags are available for conflict filtering.
+    state.containerMounts = parseContainerMounts(parsed.containerMounts);
+
     // R6 boot-time invariant: log a WARN for any per_invocation persona that
-    // declares a mount-registry name also claimed by a persistent persona.
-    // Never throws — a bad persona config is surfaced here but doesn't
-    // prevent the embedder from finishing initialization. The spawn-time
-    // assertNoMountConflict in delegate.ts provides the hard reject (PRI-1796).
+    // declares a read-write mount-registry name also claimed by a persistent
+    // persona. Readonly mounts are not a threat and are excluded. Never throws —
+    // a bad persona config is surfaced here but doesn't prevent the embedder
+    // from finishing initialization. The spawn-time assertNoMountConflict in
+    // delegate.ts provides the hard reject (PRI-1796).
     try {
-      warnMountConflicts(state.personaRegistry);
+      warnMountConflicts(state.personaRegistry, state.containerMounts);
     } catch (err) {
       logger.warn('persona_mount_conflict.boot_scan_error', {
         error: err instanceof Error ? err.message : String(err),
       });
     }
-
-    // Embedder-supplied named-mount registry. Persona containers resolve their
-    // `runtime.mounts[name]` against this map at materialization time. Always
-    // stored on state (defaults to {}).
-    state.containerMounts = parseContainerMounts(parsed.containerMounts);
 
     // Embedder-controlled skill directories; ordered, earlier paths win.
     if (Array.isArray(parsed.skillDirs)) {

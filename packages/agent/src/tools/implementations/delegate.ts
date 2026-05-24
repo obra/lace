@@ -177,7 +177,9 @@ Parameters:
         const parsed = this.personaRegistry.parsePersona(persona);
         // R6 security invariant: per_invocation personas must not share
         // mount-registry names with persistent personas (PRI-1796 Chunk F).
-        assertNoMountConflict(persona, parsed, this.personaRegistry);
+        // Readonly mounts are excluded — they carry no write path so they are
+        // not an adversarial-write threat.
+        assertNoMountConflict(persona, parsed, this.personaRegistry, context.containerMounts ?? {});
         personaModelDefault = parsed.config.model;
         if (parsed.config.runtime.type === 'container') {
           const runtime = parsed.config.runtime;
