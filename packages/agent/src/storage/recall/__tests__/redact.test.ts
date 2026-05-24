@@ -116,6 +116,21 @@ describe('redact', () => {
       const input = 'ghp_short';
       expect(redact(input)).toBe(input);
     });
+
+    it('redacts full GitHub token of length 40 (no trailing leak)', () => {
+      const token = 'ghp_' + 'A'.repeat(40);
+      expect(redact(`auth: ${token}`)).toBe('auth: <REDACTED:github>');
+    });
+
+    it('redacts at non-alphanum boundary', () => {
+      const token = 'ghp_' + 'B'.repeat(40);
+      expect(redact(`(${token}) here`)).toBe('(<REDACTED:github>) here');
+    });
+
+    it('still redacts a 36-char token (minimum length)', () => {
+      const token = 'ghp_' + 'C'.repeat(36);
+      expect(redact(`x ${token} y`)).toBe('x <REDACTED:github> y');
+    });
   });
 
   describe('1password tokens', () => {
