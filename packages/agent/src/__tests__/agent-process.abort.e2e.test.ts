@@ -68,13 +68,9 @@ describe('agent abort reliability (E2E)', () => {
       'ent/session/events'
     )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
 
-    // Should have system_prompt_set (from session creation), prompt, turn_start, turn_end (cancelled) - no partial events
-    expect(durable.events.map((e) => e.type)).toEqual([
-      'system_prompt_set',
-      'prompt',
-      'turn_start',
-      'turn_end',
-    ]);
+    // Should have prompt, turn_start, turn_end (cancelled) - no partial events
+    // (system_prompt_set is filtered from ent/session/events; use ent/session/system_prompt instead)
+    expect(durable.events.map((e) => e.type)).toEqual(['prompt', 'turn_start', 'turn_end']);
 
     // Verify status shows no pending state
     const status = (await withTimeout(
