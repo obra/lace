@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Tool } from '../tool';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 import { getRecallIndex } from '../../storage/recall/index-db';
-import { redact } from '../../storage/recall/redact';
+import { redact, redactSnippet } from '../../storage/recall/redact';
 import { eventToRow, type RecallRow } from '../../storage/recall/event-to-row';
 import { readAllSessionEventLines } from '../../storage/event-log';
 import { getSessionDir, readSessionMeta } from '../../storage/session-store';
@@ -190,7 +190,10 @@ export class RecallTool extends Tool {
           `(AND/OR/NOT/NEAR). Plain words and phrases work best.`,
       });
     }
-    const hits = rows.map((r) => ({ ...r, preview: redact(r.preview) }));
+    // Use redactSnippet (strict + prefix-only) on previews because FTS5's
+    // snippet() can truncate a secret mid-token; the prefix pass catches the
+    // surviving tail. Read content and error envelopes still use strict redact.
+    const hits = rows.map((r) => ({ ...r, preview: redactSnippet(r.preview) }));
 
     if (hits.length === 0) {
       const personaPart = appliedPersonaFilter

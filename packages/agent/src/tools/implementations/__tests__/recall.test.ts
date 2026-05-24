@@ -340,6 +340,27 @@ describe('RecallTool search', () => {
     expect(hits[0].preview).not.toContain('xoxb-');
   });
 
+  it('search preview redacts partial-token prefixes left by snippet truncation', async () => {
+    // FTS5's snippet() shows up to 32 tokens around the match. If the secret
+    // sits beyond that window, the snippet truncates it — but the surviving
+    // prefix is short enough that the strict {20,} regex misses it. Seed a row
+    // where target_word is followed by a partial-looking slack prefix to
+    // exercise the snippet-boundary case: the prefix-pass {5,} must catch it.
+    const fx = makeSession(laceDir, 'ada');
+    // The leading 'xoxb-12345' looks like a truncated slack token but is too
+    // short for the strict {20,} regex. The prefix pass must redact it.
+    appendPrompt(fx, 'target_word xoxb-12345 trailing text');
+
+    const result = await new RecallTool().execute(
+      { action: 'search', query: 'target_word' },
+      makeCtx()
+    );
+    const hits = parseResult(result).hits as Array<{ preview: string }>;
+    expect(hits.length).toBeGreaterThan(0);
+    // Preview must NOT contain a partial slack prefix like `xoxb-12345`
+    expect(hits[0].preview).not.toMatch(/xoxb-[A-Za-z0-9-]{5,}/);
+  });
+
   it('returns a hint-laden empty result on zero hits', async () => {
     const fx = makeSession(laceDir, 'ada');
     appendPrompt(fx, 'something');
