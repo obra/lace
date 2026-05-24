@@ -146,7 +146,7 @@ Agent: I need you to decide: should we use Postgres or SQLite? I'd recommend SQL
 
 - OS:  
 - Working Directory: 
-- Current Date: 
+- Current Date (UTC): 
 
 **Git:**   
 
