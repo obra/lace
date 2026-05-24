@@ -27,7 +27,11 @@ const laceDir = mkdtempSync(join(tmpdir(), 'recall-xproc-'));
 process.env.LACE_DIR = laceDir;
 
 const INSERTS_PER_CHILD = 50;
-const EVENT_ID = 'sess_xproc:1';
+// Multiple rounds, each with a FRESH event_id, to give every race a fresh
+// chance to surface duplicates. Single-row tests can win the race in the
+// racy-version by serializing on process startup; many rounds keep the
+// contention window open while both processes are warm.
+const ROUNDS = 30;
 
 // Tiny driver each child runs. Both children open the SAME index.sqlite,
 // fight over the same row 50 times each.
@@ -37,19 +41,25 @@ import { openRecallIndex } from ${JSON.stringify(indexDbPath)};
 import { insertRow } from ${JSON.stringify(indexWriterPath)};
 
 const dbPath = process.argv[2];
+const startTime = Number(process.argv[3]);
 const db = openRecallIndex(dbPath);
 
-const row = {
-  event_id: ${JSON.stringify(EVENT_ID)},
-  session_id: 'sess_xproc',
-  ts: '2026-05-23T00:00:00Z',
-  persona: 'ada',
-  kind: 'user_message',
-  content: 'concurrent insert test',
-};
+// Block until the agreed start time so both children hit the loop
+// simultaneously. Aligns the contention window across processes.
+while (Date.now() < startTime) { /* spin */ }
 
-for (let i = 0; i < ${INSERTS_PER_CHILD}; i++) {
-  insertRow(db, row);
+for (let round = 0; round < ${ROUNDS}; round++) {
+  const row = {
+    event_id: 'evt_' + round,
+    session_id: 'sess_xproc',
+    ts: '2026-05-23T00:00:00Z',
+    persona: 'ada',
+    kind: 'user_message',
+    content: 'round ' + round,
+  };
+  for (let i = 0; i < ${INSERTS_PER_CHILD}; i++) {
+    insertRow(db, row);
+  }
 }
 db.close();
 console.log('done');
@@ -65,9 +75,9 @@ interface ChildResult {
   stdout: string;
 }
 
-function runChild(): Promise<ChildResult> {
+function runChild(startTime: number): Promise<ChildResult> {
   return new Promise((resolveChild, rejectChild) => {
-    const child = spawn('node', [driverPath, dbPath], {
+    const child = spawn('node', [driverPath, dbPath, String(startTime)], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stderr = '';
@@ -90,8 +100,12 @@ function runChild(): Promise<ChildResult> {
 (async () => {
   let exitCode = 0;
   try {
-    // Spawn both children in parallel.
-    const results = await Promise.all([runChild(), runChild()]);
+    // Aligned start: 500ms in the future so both children finish their
+    // module-load work, then spin-wait until the agreed moment. Without this
+    // the children serialize at process-start and miss the race window.
+    const startTime = Date.now() + 500;
+
+    const results = await Promise.all([runChild(startTime), runChild(startTime)]);
 
     for (const r of results) {
       if (r.code !== 0) {
@@ -101,24 +115,28 @@ function runChild(): Promise<ChildResult> {
       }
     }
 
-    // Verify: only ONE row should exist for the contended event_id.
+    // Verify: every contended event_id should have exactly one row.
     const { openRecallIndex } = (await import(
       indexDbPath
     )) as typeof import('../../dist/storage/recall/index-db.js');
     const db = openRecallIndex(dbPath);
-    const count = (
-      db.prepare(`SELECT COUNT(*) c FROM events WHERE event_id = ?`).get(EVENT_ID) as { c: number }
-    ).c;
+    const rows = db
+      .prepare(`SELECT event_id, COUNT(*) c FROM events GROUP BY event_id ORDER BY event_id`)
+      .all() as Array<{ event_id: string; c: number }>;
     db.close();
 
-    assert.equal(
-      count,
-      1,
-      `expected 1 row, got ${count} — duplicate insertion across processes (BEGIN IMMEDIATE not serializing)`
-    );
+    assert.equal(rows.length, ROUNDS, `expected ${ROUNDS} distinct event_ids, got ${rows.length}`);
+    const dupes = rows.filter((r) => r.c !== 1);
+    if (dupes.length > 0) {
+      throw new Error(
+        `duplicate rows found in ${dupes.length}/${ROUNDS} rounds: ${dupes
+          .map((d) => `${d.event_id}=${d.c}`)
+          .join(', ')}`
+      );
+    }
 
     console.log(
-      `SUMMARY: OK (1 row after ${INSERTS_PER_CHILD * 2} concurrent inserts from 2 processes)`
+      `SUMMARY: OK (${ROUNDS} rounds, ${INSERTS_PER_CHILD * 2} concurrent inserts per round from 2 processes, all single-row)`
     );
   } catch (err) {
     console.error('SUMMARY: FAIL', err instanceof Error ? err.message : err);

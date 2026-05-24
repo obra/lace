@@ -22,6 +22,33 @@ CREATE VIRTUAL TABLE IF NOT EXISTS events USING fts5(
 );
 `;
 
+function ensureWalMode(db: Db): void {
+  // busy_timeout (set just before this call) covers normal write contention
+  // but does NOT cover the EXCLUSIVE lock that journal_mode acquires. During
+  // a concurrent first-open both the SET and the READ pragmas can trip
+  // SQLITE_BUSY. Retry until the deadline; check the mode each cycle so we
+  // exit as soon as a sibling process has WAL in place.
+  const deadline = Date.now() + 5000;
+  let lastErr: unknown;
+  while (Date.now() < deadline) {
+    try {
+      const current = db.pragma('journal_mode', { simple: true }) as string;
+      if (current === 'wal') return;
+      db.pragma('journal_mode = WAL');
+      return;
+    } catch (err) {
+      lastErr = err;
+      // Brief sleep before retry. better-sqlite3 is synchronous, so use a
+      // tight busy-wait — these races resolve in microseconds in practice.
+      const spinUntil = Date.now() + 5;
+      while (Date.now() < spinUntil) {
+        /* spin */
+      }
+    }
+  }
+  throw lastErr;
+}
+
 export function openRecallIndex(dbPath: string): Db {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true, mode: SECURE_DIR_MODE });
   const db = new Database(dbPath);
@@ -38,12 +65,13 @@ export function openRecallIndex(dbPath: string): Db {
   db.pragma('busy_timeout = 5000');
   // Setting journal_mode = WAL needs an EXCLUSIVE lock and busy_timeout
   // does NOT cover that path — a concurrent writer trips SQLITE_BUSY
-  // immediately. Once the file is already in WAL (set on first open,
-  // persists across opens), skip the assignment to avoid taking the lock.
-  const currentMode = db.pragma('journal_mode', { simple: true }) as string;
-  if (currentMode !== 'wal') {
-    db.pragma('journal_mode = WAL');
-  }
+  // immediately. WAL persists across opens, so after the first successful
+  // set every subsequent open already sees mode='wal' and skips the
+  // assignment. We still need to handle the genuinely racy first-open case
+  // (multiple processes simultaneously opening a new DB): if the SET trips
+  // BUSY, re-read the mode — most often a sibling process won the race and
+  // already put it in WAL. Only re-throw if it's still not WAL.
+  ensureWalMode(db);
   db.exec(SCHEMA);
   // Apply 0o600 to the index file and any WAL/SHM sidecars. In-memory
   // databases (dbPath === ':memory:') have no on-disk file; skip them.
