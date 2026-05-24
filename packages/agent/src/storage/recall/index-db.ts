@@ -5,6 +5,7 @@ import Database from 'better-sqlite3';
 import type { Database as Db } from 'better-sqlite3';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { getLaceDir } from '../../config/lace-dir';
 
 export type { Db };
 
@@ -26,4 +27,30 @@ export function openRecallIndex(dbPath: string): Db {
   db.pragma('journal_mode = WAL');
   db.exec(SCHEMA);
   return db;
+}
+
+let _instance: Db | null = null;
+
+/**
+ * Lazily open and return the process-scope recall index. The DB lives at
+ * `<laceDir>/recall/index.sqlite`. All write-through and read callers share
+ * this single handle so we don't fight better-sqlite3 over multiple opens
+ * against the same WAL file.
+ */
+export function getRecallIndex(): Db {
+  if (_instance) return _instance;
+  const dbPath = path.join(getLaceDir(), 'recall', 'index.sqlite');
+  _instance = openRecallIndex(dbPath);
+  return _instance;
+}
+
+/**
+ * Close the singleton index, if any. Safe to call when no instance is open.
+ * Intended for graceful shutdown and for tests that need a fresh DB per case.
+ */
+export function closeRecallIndex(): void {
+  if (_instance) {
+    _instance.close();
+    _instance = null;
+  }
 }

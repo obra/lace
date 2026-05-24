@@ -1,11 +1,11 @@
 // ABOUTME: Tests for index-db.ts — SQLite FTS5 opener for the recall index
 // ABOUTME: Verifies schema creation, idempotency, and FTS round-trip on real SQLite
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openRecallIndex } from '../index-db';
+import { closeRecallIndex, getRecallIndex, openRecallIndex } from '../index-db';
 
 describe('openRecallIndex', () => {
   let dir: string | undefined;
@@ -81,5 +81,55 @@ describe('openRecallIndex', () => {
     } finally {
       db.close();
     }
+  });
+});
+
+describe('getRecallIndex / closeRecallIndex', () => {
+  let dir: string | undefined;
+  let savedLaceDir: string | undefined;
+
+  beforeEach(() => {
+    savedLaceDir = process.env.LACE_DIR;
+    dir = mkdtempSync(join(tmpdir(), 'recall-singleton-'));
+    process.env.LACE_DIR = dir;
+  });
+
+  afterEach(() => {
+    closeRecallIndex();
+    if (savedLaceDir === undefined) {
+      delete process.env.LACE_DIR;
+    } else {
+      process.env.LACE_DIR = savedLaceDir;
+    }
+    if (dir) {
+      rmSync(dir, { recursive: true, force: true });
+      dir = undefined;
+    }
+  });
+
+  it('returns the same instance on repeated calls', () => {
+    const a = getRecallIndex();
+    const b = getRecallIndex();
+    expect(a).toBe(b);
+  });
+
+  it('writes the DB under <laceDir>/recall/index.sqlite', () => {
+    getRecallIndex();
+    expect(existsSync(join(dir!, 'recall', 'index.sqlite'))).toBe(true);
+  });
+
+  it('returns a fresh instance after closeRecallIndex()', () => {
+    const a = getRecallIndex();
+    closeRecallIndex();
+    const b = getRecallIndex();
+    expect(a).not.toBe(b);
+  });
+
+  it('closeRecallIndex() is a no-op when no instance is open', () => {
+    expect(() => closeRecallIndex()).not.toThrow();
+    expect(() => {
+      closeRecallIndex();
+      closeRecallIndex();
+    }).not.toThrow();
   });
 });

@@ -6,6 +6,7 @@ import {
   emitSubagentExitedIfNeeded,
 } from './server';
 import { getLaceDir } from '@lace/agent/config/lace-dir';
+import { closeRecallIndex } from './storage/recall/index-db';
 import { PassThrough, Writable } from 'stream';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -90,6 +91,11 @@ const shutdown = async () => {
   }
   peer.close();
   await state.mcpServerManager.shutdown();
+  try {
+    closeRecallIndex();
+  } catch {
+    // Best-effort; never block process exit on FTS handle teardown.
+  }
   process.exit(0);
 };
 
