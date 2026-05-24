@@ -9,6 +9,7 @@ export { RipgrepSearchTool } from './ripgrep_search';
 export { FileFindTool } from './file_find';
 export { UrlFetchTool } from './url_fetch';
 export { DelegateTool } from './delegate';
+export { RecallTool } from './recall';
 export { JobOutputTool } from './job_output';
 export { JobsListTool } from './jobs_list';
 export { JobKillTool } from './job_kill';

@@ -7,6 +7,7 @@ import { ProjectEnvironmentManager } from '@lace/agent/projects/environment-vari
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { BashTool } from './implementations/bash';
+import { RecallTool } from './implementations/recall';
 import { FileReadTool } from './implementations/file_read';
 import { FileWriteTool } from './implementations/file_write';
 import { FileEditTool } from './implementations/file_edit';
@@ -48,6 +49,7 @@ export interface RegisterToolsOptions {
  */
 export const LACE_BUILTIN_TOOL_NAMES = [
   'bash',
+  'recall',
   'file_read',
   'file_write',
   'file_edit',
@@ -288,6 +290,7 @@ export class ToolExecutor {
   ): void {
     const tools: Tool[] = [
       new BashTool(),
+      new RecallTool(),
       new FileReadTool(), // Schema-based file read tool
       new FileWriteTool(),
       new FileEditTool(),
