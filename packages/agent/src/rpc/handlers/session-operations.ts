@@ -698,7 +698,14 @@ export function registerSessionOperationHandlers(
       types: parsed?.types,
     });
 
-    return result;
+    // Filter system_prompt_set events — they embed the full system prompt text including
+    // user instructions, internal URLs, and secrets. Callers wanting the system prompt
+    // should use a dedicated endpoint. This is a response-boundary filter only;
+    // the underlying event log is not modified.
+    return {
+      ...result,
+      events: result.events.filter((e) => e.type !== 'system_prompt_set'),
+    };
   });
 
   peer.onRequest('ent/session/token_usage', async (_params: unknown) => {

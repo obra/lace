@@ -587,6 +587,45 @@ export function registerSessionHandlers(
       appendFileSync(forkedEventsPath, JSON.stringify(event) + '\n', { encoding: 'utf8' });
     }
 
+    // If the fork uses a different cwd, the cloned system_prompt_set event still
+    // embeds the source's cwd (e.g. {{{project.cwd}}} expanded to source path).
+    // Re-render with the new cwd and append a second system_prompt_set event;
+    // the message-builder uses last-wins semantics so this overrides the cloned one.
+    if (forkedCwd !== sourceSession.meta.workDir) {
+      const skillDirs = state.skillDirs ?? getSkillDirectories(forkedCwd);
+      const skillRegistry = new SkillRegistry({ skillDirs });
+
+      const { toolsForProvider } = await createToolExecutorForMode(
+        state.config.executionMode,
+        state.mcpServerManager,
+        undefined, // jobManager
+        skillRegistry,
+        undefined, // toolScope
+        state.personaRegistry
+      );
+      const tools = toolsForProvider.map((t) => ({ name: t.name, description: t.description }));
+
+      const promptConfig = await loadPromptConfig({
+        persona: 'lace',
+        tools,
+        session: { getWorkingDirectory: () => forkedCwd },
+        skillRegistry,
+        personaRegistry: state.personaRegistry,
+      });
+
+      const fullSystemPrompt = promptConfig.userInstructions.trim()
+        ? `${promptConfig.systemPrompt}\n\n${promptConfig.userInstructions}`
+        : promptConfig.systemPrompt;
+
+      let forkedSessionState = readSessionState(forkedSessionDir);
+      const { nextState } = appendDurableEvent(forkedSessionDir, forkedSessionState, {
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: fullSystemPrompt },
+      });
+      forkedSessionState = nextState;
+      writeSessionState(forkedSessionDir, forkedSessionState);
+    }
+
     // Return fork result with forkedFrom field
     const summary = summarizeDurableEvents(forkedSessionDir);
     return {

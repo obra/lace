@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
@@ -240,6 +240,85 @@ describe('session/fork durable history', () => {
         { name: 'legacy-stdio', command: 'mcp-stdio', placement: 'toolRuntime' },
         { name: 'legacy-http', command: 'mcp-http', transport: 'http', placement: 'host' },
       ]);
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('appends a new system_prompt_set event when forking to a different cwd (Fix #9)', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    const sourceCwd = join(tempDir, 'source-cwd');
+    const forkedCwd = join(tempDir, 'forked-cwd');
+    mkdirSync(sourceCwd, { recursive: true });
+    mkdirSync(forkedCwd, { recursive: true });
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      const created = (await client.request('session/new', {
+        cwd: sourceCwd,
+        mcpServers: [],
+      })) as { sessionId: string };
+
+      const forked = (await client.request('session/fork', {
+        sessionId: created.sessionId,
+        cwd: forkedCwd,
+      })) as { sessionId: string };
+
+      // Read the forked session's events.jsonl directly to inspect the events.
+      const forkedDir = join(tempDir, 'agent-sessions', forked.sessionId);
+      const eventsRaw = readFileSync(join(forkedDir, 'events.jsonl'), 'utf8');
+      const allEvents = eventsRaw
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as { type: string; data: { text?: string } });
+
+      const systemPromptEvents = allEvents.filter((e) => e.type === 'system_prompt_set');
+
+      // Two system_prompt_set events: the cloned source event + the new re-rendered one.
+      expect(systemPromptEvents.length).toBe(2);
+
+      // The LAST event's text must reference forkedCwd, not sourceCwd.
+      const lastSystemPrompt = systemPromptEvents.at(-1)!;
+      expect(lastSystemPrompt.data.text).toContain(forkedCwd);
+      expect(lastSystemPrompt.data.text).not.toContain(sourceCwd);
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('does NOT append an extra system_prompt_set event when forking to the same cwd (Fix #9)', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      const created = (await client.request('session/new', {
+        cwd: tempDir,
+        mcpServers: [],
+      })) as { sessionId: string };
+
+      // Fork without providing cwd — defaults to source's workDir, so no re-render.
+      const forked = (await client.request('session/fork', {
+        sessionId: created.sessionId,
+      })) as { sessionId: string };
+
+      const forkedDir = join(tempDir, 'agent-sessions', forked.sessionId);
+      const eventsRaw = readFileSync(join(forkedDir, 'events.jsonl'), 'utf8');
+      const allEvents = eventsRaw
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as { type: string });
+
+      const systemPromptEvents = allEvents.filter((e) => e.type === 'system_prompt_set');
+
+      // Same cwd: only one system_prompt_set event (the cloned one, no re-render needed).
+      expect(systemPromptEvents.length).toBe(1);
     } finally {
       client.close();
       server.close();

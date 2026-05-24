@@ -114,7 +114,7 @@ describe('system prompt injection on session/new', () => {
     expect(firstEvent.data.text).toContain('Lace');
   });
 
-  it('system_prompt_set event is returned via ent/session/events endpoint', async () => {
+  it('system_prompt_set event is filtered from ent/session/events endpoint (Fix #12)', async () => {
     agent = spawnAgentProcess({ laceDir });
 
     await withTimeout(
@@ -143,10 +143,10 @@ describe('system prompt injection on session/new', () => {
       hasMore: boolean;
     };
 
-    expect(durable.events.length).toBeGreaterThan(0);
-    expect(durable.events[0].type).toBe('system_prompt_set');
-    expect(durable.events[0].eventSeq).toBe(1);
-    expect(durable.events[0].data.text).toContain('Lace');
+    // system_prompt_set is filtered at the response boundary to prevent leaking
+    // the full system prompt text (which may include secrets and internal URLs).
+    const systemPromptEvents = durable.events.filter((e) => e.type === 'system_prompt_set');
+    expect(systemPromptEvents).toHaveLength(0);
   });
 
   it('includes user instructions from instructions.md in the single system_prompt_set event', async () => {
