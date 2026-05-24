@@ -37,6 +37,7 @@ import {
   estimateProviderTokens,
 } from '../../message-building/message-builder';
 import { compactDroppedMessagesWithCore } from '../../compaction/compact-dropped-messages';
+import { SUMMARIZER_SYSTEM_PROMPT } from '@lace/agent/compaction/summarize-strategy';
 import { createProviderForTurn } from '../../providers/turn-factory';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { buildSessionConfigOptions, isApprovalMode } from '../session-config';
@@ -502,6 +503,7 @@ export function registerSessionOperationHandlers(
             connectionId: effectiveConfig.connectionId,
             modelId: effectiveConfig.modelId,
           });
+          provider.setSystemPrompt(SUMMARIZER_SYSTEM_PROMPT);
 
           const result = await compactDroppedMessagesWithCore({
             strategyId: 'summarize',

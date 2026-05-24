@@ -6,6 +6,18 @@ import type { CompactionStrategy, CompactionContext, CompactionResult } from './
 import { generateEventId } from '@lace/agent/utils/generate-event-id';
 import type { ToolCall, ToolResult } from '@lace/agent/tools/types';
 
+/**
+ * System prompt for throwaway summarizer providers.
+ *
+ * Intentionally distinct from any session's agent persona: the summarizer's
+ * job is to produce a faithful condensation of the conversation, not to
+ * roleplay as the session's configured assistant. Setting this explicitly
+ * prevents getEffectiveSystemPrompt from logging a warn-fallback when the
+ * throwaway provider has no session persona attached.
+ */
+export const SUMMARIZER_SYSTEM_PROMPT =
+  'You produce concise, faithful summaries of conversations between users and AI assistants.';
+
 export class SummarizeCompactionStrategy implements CompactionStrategy {
   id = 'summarize';
 

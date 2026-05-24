@@ -10,6 +10,7 @@ import {
   writeSessionState,
 } from '@lace/agent/storage/session-store';
 import { compactDroppedMessagesWithCore } from '@lace/agent/compaction/compact-dropped-messages';
+import { SUMMARIZER_SYSTEM_PROMPT } from '@lace/agent/compaction/summarize-strategy';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import { type SessionUpdate, type AgentServerState } from '@lace/agent/server-types';
@@ -155,6 +156,7 @@ export async function handleSlashCommand(
           connectionId: effectiveConfig.connectionId,
           modelId: effectiveConfig.modelId,
         });
+        provider.setSystemPrompt(SUMMARIZER_SYSTEM_PROMPT);
 
         const result = await compactDroppedMessagesWithCore({
           strategyId: 'summarize',
