@@ -8,6 +8,7 @@ import { agentSessionsDir, readSessionMeta, type SessionState } from './session-
 import {
   listTranscriptFiles,
   transcriptFilePath,
+  validatePersonaName,
   SECURE_DIR_MODE,
   SECURE_FILE_MODE,
 } from './transcript-paths';
@@ -56,9 +57,24 @@ function personaForSessionDir(sessionDir: string): string | null {
   let persona: string | null = null;
   try {
     const meta = readSessionMeta(sessionDir);
-    persona = meta.persona ?? null;
+    if (meta.persona !== undefined) {
+      // A legacy meta.json may have been written before persona validation
+      // tightened (e.g. names with leading dash, whitespace, or `_unknown`).
+      // Route those sessions' events to the `_unknown/` bucket instead of
+      // crashing every event-write. Log once so operators notice the drift.
+      try {
+        validatePersonaName(meta.persona);
+        persona = meta.persona;
+      } catch (err) {
+        console.warn(
+          `recall: legacy meta.json for ${path.basename(sessionDir)} has invalid persona ${JSON.stringify(meta.persona)}; routing events to _unknown bucket. Error: ${err instanceof Error ? err.message : String(err)}`
+        );
+        persona = null;
+      }
+    }
   } catch {
-    persona = null;
+    // meta.json missing or unreadable; treat as null persona (do not cache —
+    // an early append can land before meta.json is committed; see personaCache doc).
   }
   if (persona !== null) personaCache.set(sessionDir, persona);
   return persona;

@@ -299,6 +299,55 @@ describe('storage/event-log', () => {
   });
 
   describe('appendDurableEvent — new layout', () => {
+    it('tolerates legacy meta.json with invalid persona (routes to _unknown, logs warning)', () => {
+      const laceDir = mkdtempSync(join(tmpdir(), 'lace-bcmeta-'));
+      process.env.LACE_DIR = laceDir;
+      const sessionId = `sess_${randomUUID()}`;
+      const sessionDir = join(laceDir, 'agent-sessions', sessionId);
+      mkdirSync(sessionDir, { recursive: true });
+      // Persona with leading dash — invalid under new rules but a legacy session
+      // may have written this to meta.json before the validation tightened.
+      writeFileSync(
+        join(sessionDir, 'meta.json'),
+        JSON.stringify({
+          sessionId,
+          workDir: laceDir,
+          created: 'x',
+          persona: '-bad',
+        })
+      );
+      invalidatePersonaCache(sessionDir);
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        expect(() =>
+          appendDurableEvent(
+            sessionDir,
+            { nextEventSeq: 1, nextStreamSeq: 1 },
+            {
+              type: 'prompt',
+              data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+            }
+          )
+        ).not.toThrow();
+
+        const today = new Date().toISOString().slice(0, 10);
+        const transcriptPath = join(
+          laceDir,
+          'transcripts',
+          '_unknown',
+          today,
+          `${sessionId}.jsonl`
+        );
+        expect(existsSync(transcriptPath)).toBe(true);
+        expect(warnSpy).toHaveBeenCalled();
+        expect(String(warnSpy.mock.calls[0]?.[0] ?? '')).toMatch(/invalid persona/);
+      } finally {
+        warnSpy.mockRestore();
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
     it('writes events under transcripts/<persona>/<date>/<session>.jsonl', () => {
       const { laceDir, sessionDir, sessionId } = makeTestSessionDirs('ada');
       process.env.LACE_DIR = laceDir;
