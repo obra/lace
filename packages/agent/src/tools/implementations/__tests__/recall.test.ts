@@ -793,6 +793,40 @@ describe('RecallTool read', () => {
     expect(parsed.hint as string).toMatch(/2 events in the index/);
   });
 
+  it('read returns error envelope when target event_id is absent and context window is empty', async () => {
+    // Seed events 1..3; ask for seq 99 with context=5 → range [94, 104] picks
+    // up no events. Without the target-presence check the call returns
+    // {events: []} as success, masking a real "this event_id is wrong" signal.
+    const fx = makeSession(laceDir, 'ada');
+    for (let i = 0; i < 3; i++) appendPrompt(fx, `ev${i}`);
+
+    const result = await new RecallTool().execute(
+      { action: 'read', event_id: `${fx.sessionId}:99`, context: 5 },
+      makeCtx()
+    );
+    const parsed = parseResult(result);
+    expect(parsed.error as string).toMatch(/not found/);
+    expect(parsed.events).toBeUndefined();
+  });
+
+  it('read returns error envelope when target is missing but context neighbors exist', async () => {
+    // Seed events 1..5; ask for seq 7 with context=5 → range [2, 12] picks up
+    // events 2..5. Target 7 doesn't exist; old behavior returned 4 events as
+    // success, hiding the divergence.
+    const fx = makeSession(laceDir, 'ada');
+    for (let i = 0; i < 5; i++) appendPrompt(fx, `ev${i}`);
+
+    const result = await new RecallTool().execute(
+      { action: 'read', event_id: `${fx.sessionId}:7`, context: 5 },
+      makeCtx()
+    );
+    const parsed = parseResult(result);
+    expect(parsed.error as string).toMatch(/not found/);
+    expect(parsed.events).toBeUndefined();
+    // The hint should report what IS nearby so the caller can navigate.
+    expect(parsed.hint as string).toMatch(/nearby/);
+  });
+
   it('returns a structured error envelope (not raw text) when agentSessionsDir() throws', async () => {
     // Force SessionStorageError by pointing LACE_SESSION_DIR at a path nobody
     // can mkdir (existing file's "name as a directory"). The thrown error

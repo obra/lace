@@ -269,10 +269,27 @@ export class RecallTool extends Tool {
       });
     }
 
+    inRange.sort((a, b) => a.eventSeq - b.eventSeq);
+
+    // The target event_id must actually be on disk. If the requested seq is
+    // missing from inRange — even when neighbors exist — that's a divergence
+    // between the agent's recollection of an event_id and the JSONL source of
+    // truth. Returning the neighbors as success would silently mask the bad
+    // event_id and let downstream reasoning hang facts on a wrong seq.
+    const targetExists = inRange.some((ev) => ev.eventSeq === targetSeq);
+    if (!targetExists) {
+      const hint =
+        inRange.length > 0
+          ? `Session has ${inRange.length} nearby events (seqs ${inRange[0].eventSeq}..${inRange[inRange.length - 1].eventSeq}) but no event at ${targetSeq}.`
+          : `No events found near seq ${targetSeq} in session.`;
+      return this.createResult({
+        error: `event_id ${JSON.stringify(safeEventId)} not found.`,
+        hint,
+      });
+    }
+
     // Persona comes from meta.json; one read per request, no caching needed.
     const persona = readPersonaForSessionDir(sessionDir);
-
-    inRange.sort((a, b) => a.eventSeq - b.eventSeq);
 
     const events = inRange.map((ev) => {
       const row = eventToRow(ev, { sessionId, persona });
