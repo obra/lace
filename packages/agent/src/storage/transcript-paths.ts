@@ -14,6 +14,12 @@ export type TranscriptPathInput = {
 /** Sentinel persona bucket used when SessionMeta.persona is unset. */
 export const UNKNOWN_PERSONA_BUCKET = '_unknown';
 
+/** Mode for durable transcript files. Matches the pre-migration ensureSessionFiles default. */
+export const SECURE_FILE_MODE = 0o600;
+
+/** Mode for directories holding durable transcript content. Matches agentSessionsDir(). */
+export const SECURE_DIR_MODE = 0o700;
+
 export function transcriptsRoot(laceDir: string): string {
   return path.join(laceDir, 'transcripts');
 }

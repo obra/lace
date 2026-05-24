@@ -10,6 +10,8 @@ import {
   transcriptFilePath,
   transcriptsRoot,
   listTranscriptFiles,
+  SECURE_FILE_MODE,
+  SECURE_DIR_MODE,
 } from '../transcript-paths';
 
 describe('transcript-paths', () => {
@@ -21,6 +23,16 @@ describe('transcript-paths', () => {
 
   afterEach(() => {
     if (tempDir) rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  describe('SECURE_FILE_MODE / SECURE_DIR_MODE', () => {
+    it('exports SECURE_FILE_MODE = 0o600', () => {
+      expect(SECURE_FILE_MODE).toBe(0o600);
+    });
+
+    it('exports SECURE_DIR_MODE = 0o700', () => {
+      expect(SECURE_DIR_MODE).toBe(0o700);
+    });
   });
 
   describe('transcriptsRoot', () => {
