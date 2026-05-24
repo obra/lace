@@ -156,6 +156,45 @@ describe('Provider-Specific Format Conversion', () => {
       ]);
     });
 
+    it('should place tool_result blocks BEFORE text in user messages (Anthropic rejects text-first)', () => {
+      // Regression test: when a user message has both toolResults AND text content
+      // (e.g. a context_injected notification merged via appendOrMergeUser into the
+      // user message that already held the tool_result), the wire format must emit
+      // tool_result blocks FIRST, then the text. Anthropic's API rejects requests
+      // where a text block precedes the tool_result that satisfies the prior
+      // assistant turn's tool_use — even though both are present in the same user
+      // message. Observed in production as: messages.N: tool_use ids were found
+      // without tool_result blocks immediately after.
+      const messages: ProviderMessage[] = [
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [{ id: 'toolu_B', name: 'delegate', arguments: {} }],
+        },
+        {
+          role: 'user',
+          content: '<notification kind="job-completed" job-id="other">…</notification>',
+          toolResults: [
+            {
+              id: 'toolu_B',
+              content: [{ type: 'text', text: '{"jobId":"job_x","status":"started"}' }],
+              status: 'completed',
+            },
+          ],
+        },
+      ];
+
+      const anthropicMessages = convertToAnthropicFormat(messages);
+
+      // The user message at index 1 must place tool_result FIRST, text SECOND.
+      const userMsg = anthropicMessages[1];
+      expect(userMsg.role).toBe('user');
+      expect(Array.isArray(userMsg.content)).toBe(true);
+      const blocks = userMsg.content as Array<{ type: string }>;
+      expect(blocks[0].type).toBe('tool_result');
+      expect(blocks[1].type).toBe('text');
+    });
+
     it('should handle tool results with errors', () => {
       const messagesWithErrors: ProviderMessage[] = [
         {

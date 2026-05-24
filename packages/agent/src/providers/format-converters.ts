@@ -61,7 +61,13 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
             })
           );
 
-          // If there's also text/image content, add it
+          // If there's also text/image content, add it AFTER the tool_result
+          // blocks. Anthropic's tool-use API requires tool_result blocks to come
+          // first in the user response to an assistant turn that contained
+          // tool_use — text-first triggers a 400 ("tool_use ids were found
+          // without tool_result blocks immediately after"). Observed when
+          // context_injected events (e.g. job-completed notifications) merge
+          // into the same user message that holds the tool_result.
           if (hasContent(msg.content)) {
             const contentBlocks: Anthropic.ContentBlockParam[] =
               typeof msg.content === 'string'
@@ -69,7 +75,7 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
                 : msg.content.map(toAnthropicContentBlock);
             return {
               role: 'user',
-              content: [...contentBlocks, ...toolResultBlocks],
+              content: [...toolResultBlocks, ...contentBlocks],
             };
           }
 
