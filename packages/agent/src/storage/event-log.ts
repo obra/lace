@@ -99,6 +99,28 @@ export function readAllSessionEventLines(sessionDir: string): string[] {
       if (line) lines.push(line);
     }
   }
+
+  // Sort by eventSeq so consumers see events in monotonic order regardless of
+  // which file they came from. Tolerates mixed-layout sessions (legacy +
+  // new) and the filesystem-dependent enumeration of persona directories
+  // inside listTranscriptFiles. Malformed lines sort to the front via `?? 0`;
+  // downstream parsers already tolerate them.
+  lines.sort((a, b) => {
+    let seqA = 0;
+    let seqB = 0;
+    try {
+      seqA = (JSON.parse(a) as { eventSeq?: number }).eventSeq ?? 0;
+    } catch {
+      // leave seqA = 0
+    }
+    try {
+      seqB = (JSON.parse(b) as { eventSeq?: number }).eventSeq ?? 0;
+    } catch {
+      // leave seqB = 0
+    }
+    return seqA - seqB;
+  });
+
   return lines;
 }
 

@@ -710,6 +710,56 @@ describe('storage/event-log', () => {
     });
   });
 
+  describe('readAllSessionEventLines sort order', () => {
+    it('returns lines sorted by eventSeq even with mixed-layout interleaving (S6/S4)', () => {
+      const laceDir = mkdtempSync(join(tmpdir(), 'lace-sort-'));
+      process.env.LACE_DIR = laceDir;
+      const sessionId = `sess_${randomUUID()}`;
+      const sessionDir = join(laceDir, 'agent-sessions', sessionId);
+      mkdirSync(sessionDir, { recursive: true });
+      try {
+        // Legacy file with seqs 1, 3, 5 — would be read FIRST under previous order
+        writeFileSync(
+          join(sessionDir, 'events.jsonl'),
+          [1, 3, 5]
+            .map((seq) =>
+              JSON.stringify({
+                eventSeq: seq,
+                timestamp: 'x',
+                type: 'prompt',
+                data: { type: 'prompt', content: [] },
+              })
+            )
+            .join('\n') + '\n'
+        );
+
+        // New-layout file with seqs 2, 4, 6 — would be read SECOND
+        const today = new Date().toISOString().slice(0, 10);
+        const transcriptDir = join(laceDir, 'transcripts', 'ada', today);
+        mkdirSync(transcriptDir, { recursive: true });
+        writeFileSync(
+          join(transcriptDir, `${sessionId}.jsonl`),
+          [2, 4, 6]
+            .map((seq) =>
+              JSON.stringify({
+                eventSeq: seq,
+                timestamp: 'x',
+                type: 'prompt',
+                data: { type: 'prompt', content: [] },
+              })
+            )
+            .join('\n') + '\n'
+        );
+
+        const lines = readAllSessionEventLines(sessionDir);
+        const seqs = lines.map((l) => (JSON.parse(l) as { eventSeq: number }).eventSeq);
+        expect(seqs).toEqual([1, 2, 3, 4, 5, 6]);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe('dual-read: readers see both legacy and new layouts', () => {
     it('readDurableEvents merges events from both layouts in seq order', () => {
       const { laceDir, sessionDir, sessionId } = makeTestSessionDirs('ada');
