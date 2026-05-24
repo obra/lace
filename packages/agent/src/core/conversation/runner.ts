@@ -50,6 +50,18 @@ import { logger } from '@lace/agent/utils/logger';
 const FUTURE_TENSE_INTENT_PATTERN =
   /\b(?:I'll|I will|I'm going to|I am going to|let me|let's|I shall|I'll just|I'll go ahead|going to add|going to write|going to update|going to create)\b/i;
 
+/**
+ * Safety bound on transparent `pause_turn` auto-resumes within a single logical
+ * turn. Anthropic surfaces `pause_turn` when a long-running turn hits an
+ * internal time slice; the runner re-feeds the partial assistant turn back to
+ * the provider to continue generation. A pathological loop where the provider
+ * never advances past `pause_turn` would spin forever without this bound — we
+ * permit exactly `MAX_PAUSE_RESUMES` successful resumes; the next (i.e. the
+ * `MAX_PAUSE_RESUMES + 1`th) consecutive pause surfaces a `'failed'` stop with
+ * `code: 'pause_turn_loop'`.
+ */
+const MAX_PAUSE_RESUMES = 10;
+
 function hasFutureTenseIntent(text: string): boolean {
   if (!text) return false;
   return FUTURE_TENSE_INTENT_PATTERN.test(text);
@@ -246,6 +258,14 @@ export class ConversationRunner {
     let nextRequestOptions: RequestOptions | undefined;
     let lastResponseId: string | undefined;
 
+    // pause_turn auto-resume bookkeeping. `partialAssistantText` accumulates
+    // text fragments across consecutive `pause_turn` iterations so the durable
+    // 'message' event for the logical turn is written ONCE at non-pause
+    // completion with the full concatenated text. `pauseResumeCount` enforces
+    // MAX_PAUSE_RESUMES and is reset on every non-pause iteration.
+    let partialAssistantText = '';
+    let pauseResumeCount = 0;
+
     try {
       for (; completedTurns < maxTurns; completedTurns++) {
         // PRI-1691: pick up any priority='immediate' context_injected events
@@ -415,23 +435,37 @@ export class ConversationRunner {
         }
 
         const assistantText = typeof response.content === 'string' ? response.content : '';
-        finalAssistantContent = assistantText;
 
         if (!streamedAny && assistantText.length > 0) {
           await this.deps.onUpdate(messageTurnSeq, { type: 'text_delta', text: assistantText });
         }
 
-        // Store content in array format (standard content block format).
-        // Only persist if there is actual content — an empty assistant turn would
-        // produce a {role:'assistant', content:''} when rebuilt, which creates
-        // consecutive user/user messages after the format-converter drops the
-        // empty block. Anthropic's API rejects consecutive same-role messages.
-        const contentBlocks = assistantText ? [{ type: 'text', text: assistantText }] : [];
-        if (contentBlocks.length > 0) {
-          await writeAndAdvance({ type: 'message', data: { content: contentBlocks } });
-        }
+        // Accumulate text across consecutive pause_turn iterations so the
+        // durable 'message' event is written ONCE at logical-turn end with the
+        // full concatenated text. On non-pause iterations this still records
+        // only the current iteration's text (partialAssistantText is empty).
+        const concatenatedAssistantText = partialAssistantText + assistantText;
+        finalAssistantContent = concatenatedAssistantText;
 
+        // Defer the durable 'message' event when the provider is asking us to
+        // auto-resume (pause_turn). Writing the partial would surface mid-turn
+        // text fragments as durable events and break the invariant of one
+        // assistant message per logical turn. The non-pause branch below
+        // writes the full concatenated text exactly once.
         const toolCalls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
+        if (response.stopReason !== 'pause_turn') {
+          // Store content in array format (standard content block format).
+          // Only persist if there is actual content — an empty assistant turn would
+          // produce a {role:'assistant', content:''} when rebuilt, which creates
+          // consecutive user/user messages after the format-converter drops the
+          // empty block. Anthropic's API rejects consecutive same-role messages.
+          const contentBlocks = concatenatedAssistantText
+            ? [{ type: 'text', text: concatenatedAssistantText }]
+            : [];
+          if (contentBlocks.length > 0) {
+            await writeAndAdvance({ type: 'message', data: { content: contentBlocks } });
+          }
+        }
 
         // Dispatch on the provider's canonical stopReason. Terminal stops other
         // than 'tool_use' / 'end_turn' exit the loop here; the existing
@@ -476,20 +510,71 @@ export class ConversationRunner {
                   : 'Provider request failed',
               data: { category: 'provider', stopDetails: response.stopDetails ?? null },
             };
+          case 'pause_turn': {
+            // Anthropic surfaced pause_turn — re-feed the partial assistant
+            // turn back to the provider so it can resume generation. The
+            // durable 'message' event has been intentionally skipped above;
+            // we accumulate partialAssistantText and write once when the turn
+            // finally ends with a non-pause stopReason. Pause iterations do
+            // NOT count against maxTurns — we cancel out the for-loop's
+            // increment below.
+            pauseResumeCount++;
+            // MAX_PAUSE_RESUMES=10 means 10 successful resumes are allowed;
+            // the 11th consecutive pause throws. Using `>` (not `>=`) so the
+            // counter measures "how many pauses we've seen" and the check
+            // fires only when that exceeds the budget.
+            if (pauseResumeCount > MAX_PAUSE_RESUMES) {
+              throw {
+                code: EntErrorCodes.ProviderError,
+                message: `pause_turn loop: ${MAX_PAUSE_RESUMES} consecutive pauses`,
+                data: {
+                  category: 'provider',
+                  stopDetails: {
+                    type: 'failed' as const,
+                    code: 'pause_turn_loop',
+                    message: `Provider returned pause_turn ${MAX_PAUSE_RESUMES} times in a row without advancing`,
+                    source: 'http_error' as const,
+                  },
+                },
+              };
+            }
+            partialAssistantText = concatenatedAssistantText;
+            // Anthropic rejects consecutive same-role messages. On the FIRST
+            // pause of a logical turn we append a new assistant message; on
+            // subsequent pauses we MERGE by replacing the last assistant
+            // message with one that carries the concatenated text. We
+            // intentionally DROP toolCalls because pause iterations execute
+            // no tools — emitting tool_use blocks with no following
+            // tool_result would cause Anthropic to 400 on the next request.
+            const last = providerMessages[providerMessages.length - 1];
+            const mergedAssistant = {
+              role: 'assistant' as const,
+              content: concatenatedAssistantText,
+            };
+            providerMessages =
+              last?.role === 'assistant'
+                ? [...providerMessages.slice(0, -1), mergedAssistant]
+                : [...providerMessages, mergedAssistant];
+            // Cancel the for-loop's `completedTurns++` so this pause doesn't
+            // count as a logical turn against maxTurns.
+            completedTurns--;
+            continue;
+          }
           case undefined:
           case 'end_turn':
           case 'tool_use':
           case 'cancelled':
           case 'permission_cancelled':
-          case 'pause_turn':
           case 'max_turns':
           case 'budget_exceeded':
           case 'incomplete':
             // These either continue the loop (tool_use / end_turn) or are
             // handled by the runner-derived paths below (cancelled,
-            // permission_cancelled, budget_exceeded, etc.). 'pause_turn' is
-            // intentionally treated like end_turn here pending chunk D's
-            // dedicated auto-resume handling.
+            // permission_cancelled, budget_exceeded, etc.).
+            // Reset pause-resume accounting: any non-pause iteration ends the
+            // logical turn for pause-tracking purposes.
+            pauseResumeCount = 0;
+            partialAssistantText = '';
             break;
           default:
             // A future provider may invent a new stopReason. Don't fall through
