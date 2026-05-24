@@ -7,12 +7,14 @@
 // fall back to the always-on inject (back-compat with Phase 1).
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { JobManager } from '../job-manager';
 import { createQueueJobNotification, createSetupProgressTimer } from '../job-notifications';
 import type { AgentServerState, JobState } from '../../server-types';
+import { invalidatePersonaCache, readDurableEvents } from '@lace/agent/storage/event-log';
 
 function makeJobManager(): JobManager {
   return new JobManager({
@@ -53,21 +55,16 @@ function makeJobStateWithOutput(jobId: string, outputDir: string, output: string
 }
 
 function readInjectedTexts(sessionDir: string): string[] {
-  const path = join(sessionDir, 'events.jsonl');
-  if (!existsSync(path)) return [];
-  const lines = readFileSync(path, 'utf8').split('\n').filter(Boolean);
+  const { events } = readDurableEvents(sessionDir, {});
   const texts: string[] = [];
-  for (const line of lines) {
-    const evt = JSON.parse(line) as {
-      type?: string;
-      data?: {
-        priority?: string;
-        content?: Array<{ type?: string; text?: string }>;
-      };
-    };
+  for (const evt of events) {
     if (evt.type !== 'context_injected') continue;
-    if (evt.data?.priority !== 'immediate') continue;
-    for (const block of evt.data.content ?? []) {
+    const data = evt.data as {
+      priority?: string;
+      content?: Array<{ type?: string; text?: string }>;
+    };
+    if (data.priority !== 'immediate') continue;
+    for (const block of data.content ?? []) {
       if (block.type === 'text' && typeof block.text === 'string') {
         texts.push(block.text);
       }
@@ -78,18 +75,37 @@ function readInjectedTexts(sessionDir: string): string[] {
 
 describe('progress fanout integration (PRI-1692 Phase 2, PRI-1744)', () => {
   let outputDir: string;
+  let laceDir: string;
   let sessionDir: string;
+  let savedLaceDir: string | undefined;
 
   beforeEach(() => {
     outputDir = mkdtempSync(join(tmpdir(), 'lace-progress-output-'));
-    sessionDir = mkdtempSync(join(tmpdir(), 'lace-progress-session-'));
+    laceDir = mkdtempSync(join(tmpdir(), 'lace-progress-session-'));
+    const sessionId = `sess_${randomUUID()}`;
+    sessionDir = join(laceDir, 'agent-sessions', sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(
+      join(sessionDir, 'meta.json'),
+      JSON.stringify({
+        sessionId,
+        workDir: laceDir,
+        created: new Date().toISOString(),
+        persona: 'test',
+      })
+    );
+    savedLaceDir = process.env.LACE_DIR;
+    process.env.LACE_DIR = laceDir;
+    invalidatePersonaCache();
     vi.useFakeTimers();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    if (savedLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = savedLaceDir;
     rmSync(outputDir, { recursive: true, force: true });
-    rmSync(sessionDir, { recursive: true, force: true });
+    rmSync(laceDir, { recursive: true, force: true });
   });
 
   it('subscribed progress routes through fanout and batches; filter is applied to the preview', () => {

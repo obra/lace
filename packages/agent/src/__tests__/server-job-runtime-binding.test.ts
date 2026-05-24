@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { JsonRpcPeer } from '@lace/ent-protocol';
@@ -11,6 +11,7 @@ import {
   writeSessionState,
 } from '../storage/session-store';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
+import { invalidatePersonaCache, readDurableEvents } from '../storage/event-log';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 
 const registeredHandlers = vi.hoisted(() => ({
@@ -42,6 +43,7 @@ describe('server job runtime binding persistence', () => {
     originalLaceDir = process.env.LACE_DIR;
     tempDir = mkdtempSync(join(tmpdir(), 'lace-server-job-runtime-'));
     process.env.LACE_DIR = tempDir;
+    invalidatePersonaCache();
     registeredHandlers.deps = undefined;
   });
 
@@ -85,11 +87,8 @@ describe('server job runtime binding persistence', () => {
       runtimeBinding,
     });
 
-    const events = readFileSync(join(sessionDir, 'events.jsonl'), 'utf8')
-      .trim()
-      .split('\n')
-      .map((line) => JSON.parse(line));
+    const { events } = readDurableEvents(sessionDir, {});
 
-    expect(events[0].data.runtimeBinding).toEqual(runtimeBinding);
+    expect((events[0].data as { runtimeBinding?: unknown }).runtimeBinding).toEqual(runtimeBinding);
   });
 });

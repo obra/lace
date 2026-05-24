@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs';
-import { isAbsolute as isAbsolutePath, join, resolve as resolvePath } from 'node:path';
+import { isAbsolute as isAbsolutePath, resolve as resolvePath } from 'node:path';
 import { toNonEmptyString } from '@lace/agent/rpc/utils';
+import { readAllSessionEventLines } from './event-log';
 
 type ToolUseEvent = {
   type?: string;
@@ -16,17 +16,8 @@ function absolutePath(workDir: string, raw: string): string {
 }
 
 export function deriveFilesReadFromDurableEvents(sessionDir: string, workDir: string): Set<string> {
-  const eventsPath = join(sessionDir, 'events.jsonl');
-  let raw = '';
-  try {
-    raw = readFileSync(eventsPath, 'utf8');
-  } catch {
-    return new Set();
-  }
-
   const read = new Set<string>();
-  for (const line of raw.split('\n')) {
-    if (!line) continue;
+  for (const line of readAllSessionEventLines(sessionDir)) {
     try {
       const parsed = JSON.parse(line) as ToolUseEvent;
       if (parsed.type !== 'tool_use') continue;
@@ -39,7 +30,6 @@ export function deriveFilesReadFromDurableEvents(sessionDir: string, workDir: st
       // ignore malformed lines
     }
   }
-
   return read;
 }
 
@@ -47,17 +37,8 @@ export function deriveFilesWrittenFromDurableEvents(
   sessionDir: string,
   workDir: string
 ): Set<string> {
-  const eventsPath = join(sessionDir, 'events.jsonl');
-  let raw = '';
-  try {
-    raw = readFileSync(eventsPath, 'utf8');
-  } catch {
-    return new Set();
-  }
-
   const written = new Set<string>();
-  for (const line of raw.split('\n')) {
-    if (!line) continue;
+  for (const line of readAllSessionEventLines(sessionDir)) {
     try {
       const parsed = JSON.parse(line) as ToolUseEvent;
       if (parsed.type !== 'tool_use') continue;
@@ -71,7 +52,6 @@ export function deriveFilesWrittenFromDurableEvents(
       // ignore malformed lines
     }
   }
-
   return written;
 }
 

@@ -1,8 +1,10 @@
 // ABOUTME: Session lifecycle RPC handlers for creating, loading, and managing sessions
 
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { getLaceDir } from '../../config/lace-dir';
+import { transcriptFilePath } from '../../storage/transcript-paths';
 import {
   AcpErrorCodes,
   SessionForkParamsSchema,
@@ -648,7 +650,18 @@ export function registerSessionHandlers(
     // preventing message-builder's "invariant violation" warn on every rebuild.
     const willRerenderSystemPrompt = forkedCwd !== sourceSession.meta.workDir;
 
-    const forkedEventsPath = join(forkedSessionDir, 'events.jsonl');
+    // Write copied events under today's transcript path for the forked
+    // session. Each event preserves its original eventSeq/timestamp, so the
+    // forked session's transcript reads as a chronological replay of the
+    // parent.
+    const forkedPersona = sourceSession.meta.persona ?? null;
+    const forkedEventsPath = transcriptFilePath({
+      laceDir: getLaceDir(),
+      persona: forkedPersona,
+      date: new Date(),
+      sessionId: forkedSessionId,
+    });
+    mkdirSync(dirname(forkedEventsPath), { recursive: true });
     for (const event of sourceEvents) {
       // Skip copying the source's system_prompt_set when we'll re-render it for
       // the new cwd — the re-rendered event written below will be the sole one.

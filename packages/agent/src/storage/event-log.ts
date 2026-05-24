@@ -1,24 +1,82 @@
 // ABOUTME: Durable event persistence layer for session events
-// ABOUTME: Handles reading, writing, and summarizing events from events.jsonl files
+// ABOUTME: Handles reading, writing, and summarizing events from JSONL transcripts
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { SessionState } from './session-store';
+import { getLaceDir } from '../config/lace-dir';
+import { readSessionMeta, type SessionState } from './session-store';
+import { listTranscriptFiles, transcriptFilePath } from './transcript-paths';
+
+/**
+ * Cache: sessionDir → persona, populated on first lookup. Persona is immutable
+ * for a session's lifetime, so the cache survives without invalidation in
+ * production. Tests that reuse a sessionDir across logical sessions (e.g. by
+ * rewriting meta.json) call `invalidatePersonaCache` to reset it.
+ */
+const personaCache = new Map<string, string | null>();
+
+export function invalidatePersonaCache(sessionDir?: string): void {
+  if (sessionDir === undefined) {
+    personaCache.clear();
+  } else {
+    personaCache.delete(sessionDir);
+  }
+}
+
+function personaForSessionDir(sessionDir: string): string | null {
+  if (personaCache.has(sessionDir)) return personaCache.get(sessionDir)!;
+  let persona: string | null = null;
+  try {
+    const meta = readSessionMeta(sessionDir);
+    persona = meta.persona ?? null;
+  } catch {
+    persona = null;
+  }
+  personaCache.set(sessionDir, persona);
+  return persona;
+}
+
+/**
+ * Return every JSONL line that belongs to this session, in eventSeq-emit order.
+ *
+ * The legacy <sessionDir>/events.jsonl path is read alongside the new
+ * <laceDir>/transcripts/<persona>/<date>/<session>.jsonl files. No one-time
+ * migration is performed; the dual-read is permanent. See
+ * docs/specs/recall-spec.md §Migration.
+ *
+ * Lines from the legacy file come first (they were emitted before the layout
+ * change), followed by new-layout files in ascending date order. Within each
+ * file lines are in append order, which is also eventSeq order.
+ */
+export function readAllSessionEventLines(sessionDir: string): string[] {
+  const sessionId = path.basename(sessionDir);
+  let newFiles: string[] = [];
+  try {
+    newFiles = listTranscriptFiles(getLaceDir(), sessionId);
+  } catch {
+    newFiles = [];
+  }
+  const legacyPath = path.join(sessionDir, 'events.jsonl');
+  const files = fs.existsSync(legacyPath) ? [legacyPath, ...newFiles] : newFiles;
+
+  const lines: string[] = [];
+  for (const file of files) {
+    let raw = '';
+    try {
+      raw = fs.readFileSync(file, 'utf8');
+    } catch {
+      continue;
+    }
+    for (const line of raw.split('\n')) {
+      if (line) lines.push(line);
+    }
+  }
+  return lines;
+}
 
 export function deriveNextEventSeqFromEventLog(sessionDir: string): number {
-  const eventsPath = path.join(sessionDir, 'events.jsonl');
-
-  let raw = '';
-  try {
-    raw = fs.readFileSync(eventsPath, 'utf8');
-  } catch {
-    return 1;
-  }
-
   let maxSeq: number | undefined;
-  const lines = raw.split('\n');
-  for (const line of lines) {
-    if (!line) continue;
+  for (const line of readAllSessionEventLines(sessionDir)) {
     try {
       const parsed = JSON.parse(line) as Partial<DurableEvent>;
       const seq = parsed.eventSeq;
@@ -28,27 +86,62 @@ export function deriveNextEventSeqFromEventLog(sessionDir: string): number {
       // Ignore malformed line (e.g. partial write)
     }
   }
-
   return (maxSeq ?? 0) + 1;
 }
 
 /**
+ * Like `deriveNextEventSeqFromEventLog`, but resolves files purely from a
+ * laceDir + sessionId without needing the sessionDir. Used by callers (such as
+ * `appendDurableEvent` itself) that have the sessionId but want to avoid the
+ * indirection through `readAllSessionEventLines`. Reads both the new layout
+ * and the legacy `<laceDir>/agent-sessions/<sessionId>/events.jsonl` path.
+ */
+export function deriveNextEventSeqAcrossSessionFiles(laceDir: string, sessionId: string): number {
+  const files: string[] = [];
+  const legacyPath = path.join(laceDir, 'agent-sessions', sessionId, 'events.jsonl');
+  if (fs.existsSync(legacyPath)) files.push(legacyPath);
+  try {
+    for (const f of listTranscriptFiles(laceDir, sessionId)) files.push(f);
+  } catch {
+    // Ignore — root may not exist yet.
+  }
+
+  let maxSeq = 0;
+  for (const file of files) {
+    let raw = '';
+    try {
+      raw = fs.readFileSync(file, 'utf8');
+    } catch {
+      continue;
+    }
+    for (const line of raw.split('\n')) {
+      if (!line) continue;
+      try {
+        const parsed = JSON.parse(line) as Partial<DurableEvent>;
+        if (
+          typeof parsed.eventSeq === 'number' &&
+          Number.isInteger(parsed.eventSeq) &&
+          parsed.eventSeq > maxSeq
+        ) {
+          maxSeq = parsed.eventSeq;
+        }
+      } catch {
+        // ignore malformed
+      }
+    }
+  }
+  return maxSeq + 1;
+}
+
+/**
  * Returns true if there are any `context_injected` events with
- * `priority='immediate'` in events.jsonl whose `eventSeq` is strictly
+ * `priority='immediate'` in the transcript whose `eventSeq` is strictly
  * greater than `afterEventSeq`. Used by the prompt handler to detect
  * notifications that landed during a turn but were not picked up
  * before turn_end was written (Bug 3 race condition).
  */
 export function hasPendingImmediateInjects(sessionDir: string, afterEventSeq: number): boolean {
-  const eventsPath = path.join(sessionDir, 'events.jsonl');
-  let raw = '';
-  try {
-    raw = fs.readFileSync(eventsPath, 'utf8');
-  } catch {
-    return false;
-  }
-  for (const line of raw.split('\n')) {
-    if (!line) continue;
+  for (const line of readAllSessionEventLines(sessionDir)) {
     try {
       const parsed = JSON.parse(line) as Partial<DurableEvent>;
       if (parsed.type !== 'context_injected') continue;
@@ -65,22 +158,14 @@ export function hasPendingImmediateInjects(sessionDir: string, afterEventSeq: nu
 }
 
 /**
- * Find the eventSeq of the most recent `turn_end` event in the log, or `null`
- * if no turn has completed yet. Used by the conversation runner to compute its
- * initial immediate-inject watermark — any context_injected event newer than
- * the last turn_end is unprocessed.
+ * Find the eventSeq of the most recent `turn_end` event in the transcript, or
+ * `null` if no turn has completed yet. Used by the conversation runner to
+ * compute its initial immediate-inject watermark — any context_injected event
+ * newer than the last turn_end is unprocessed.
  */
 export function findLastTurnEndEventSeq(sessionDir: string): number | null {
-  const eventsPath = path.join(sessionDir, 'events.jsonl');
-  let raw = '';
-  try {
-    raw = fs.readFileSync(eventsPath, 'utf8');
-  } catch {
-    return null;
-  }
   let last: number | null = null;
-  for (const line of raw.split('\n')) {
-    if (!line) continue;
+  for (const line of readAllSessionEventLines(sessionDir)) {
     try {
       const parsed = JSON.parse(line) as Partial<DurableEvent>;
       if (parsed.type !== 'turn_end') continue;
@@ -107,22 +192,11 @@ export function summarizeDurableEvents(sessionDir: string): {
   turnCount: number;
   lastActive?: string;
 } {
-  const eventsPath = path.join(sessionDir, 'events.jsonl');
-
-  let raw = '';
-  try {
-    raw = fs.readFileSync(eventsPath, 'utf8');
-  } catch {
-    return { messageCount: 0, turnCount: 0, lastActive: undefined };
-  }
-
   let messageCount = 0;
   let turnCount = 0;
   let lastActive: string | undefined;
 
-  const lines = raw.split('\n');
-  for (const line of lines) {
-    if (!line) continue;
+  for (const line of readAllSessionEventLines(sessionDir)) {
     try {
       const parsed = JSON.parse(line) as Partial<DurableEvent>;
       if (parsed.type === 'prompt' || parsed.type === 'message') {
@@ -147,13 +221,23 @@ export function appendDurableEvent(
   state: SessionState,
   event: Omit<DurableEvent, 'eventSeq' | 'timestamp'>
 ): { nextState: SessionState; written: DurableEvent } {
-  const eventsPath = path.join(sessionDir, 'events.jsonl');
+  const sessionId = path.basename(sessionDir);
+  const laceDir = getLaceDir();
+  const persona = personaForSessionDir(sessionDir);
+  const eventsPath = transcriptFilePath({
+    laceDir,
+    persona,
+    date: new Date(),
+    sessionId,
+  });
+  fs.mkdirSync(path.dirname(eventsPath), { recursive: true });
 
-  // Derive from the durable log in case state.json was stale/corrupted.
-  const eventSeq = deriveNextEventSeqFromEventLog(sessionDir);
+  // Derive from all transcript files (and the legacy events.jsonl) so seqs
+  // stay monotonic across day rollovers and across the legacy→new transition.
+  const eventSeq = deriveNextEventSeqAcrossSessionFiles(laceDir, sessionId);
 
-  // Ensure we never accidentally join JSON objects when the previous write was truncated
-  // and did not end with a newline.
+  // Ensure we never accidentally join JSON objects when the previous write was
+  // truncated and did not end with a newline.
   try {
     const stat = fs.statSync(eventsPath);
     if (stat.size > 0) {
@@ -190,23 +274,13 @@ export function readDurableEvents(
   sessionDir: string,
   options: { afterEventSeq?: number; limit?: number; types?: string[] }
 ): { events: DurableEvent[]; hasMore: boolean } {
-  const eventsPath = path.join(sessionDir, 'events.jsonl');
   const after = options.afterEventSeq ?? 0;
   const limit = options.limit ?? 100;
   const typeFilter = options.types ? new Set(options.types) : null;
 
-  let raw = '';
-  try {
-    raw = fs.readFileSync(eventsPath, 'utf8');
-  } catch {
-    return { events: [], hasMore: false };
-  }
-
   const events: DurableEvent[] = [];
   let hasMore = false;
-  const lines = raw.split('\n');
-  for (const line of lines) {
-    if (!line) continue;
+  for (const line of readAllSessionEventLines(sessionDir)) {
     try {
       const parsed = JSON.parse(line) as DurableEvent;
       if (typeof parsed.eventSeq !== 'number') continue;

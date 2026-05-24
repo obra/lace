@@ -90,10 +90,13 @@ describe('Ent protocol contract (selected coverage)', () => {
   let laceDir: string;
   let workDir: string;
   let agent: SpawnedAgent | undefined;
+  let savedLaceDir: string | undefined;
 
   beforeEach(() => {
     laceDir = mkdtempSync(join(tmpdir(), 'lace-ent-protocol-'));
     workDir = mkdtempSync(join(tmpdir(), 'lace-ent-workdir-'));
+    savedLaceDir = process.env.LACE_DIR;
+    process.env.LACE_DIR = laceDir;
   });
 
   afterEach(async () => {
@@ -101,6 +104,8 @@ describe('Ent protocol contract (selected coverage)', () => {
       await agent.shutdown();
       agent = undefined;
     }
+    if (savedLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = savedLaceDir;
     rmSync(laceDir, { recursive: true, force: true });
     rmSync(workDir, { recursive: true, force: true });
   });

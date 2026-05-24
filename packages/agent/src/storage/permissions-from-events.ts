@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { toNonEmptyString } from '@lace/agent/rpc/utils';
+import { readAllSessionEventLines } from './event-log';
 
 export type PendingPermissionRecord = {
   toolCallId: string;
@@ -47,18 +46,9 @@ function toOptions(value: unknown): Array<{ optionId: string; label: string }> |
 export function derivePendingPermissionsFromDurableEvents(
   sessionDir: string
 ): PendingPermissionRecord[] {
-  const eventsPath = join(sessionDir, 'events.jsonl');
-  let raw = '';
-  try {
-    raw = readFileSync(eventsPath, 'utf8');
-  } catch {
-    return [];
-  }
-
   const pendingByToolCallId = new Map<string, PendingPermissionRecord>();
 
-  for (const line of raw.split('\n')) {
-    if (!line) continue;
+  for (const line of readAllSessionEventLines(sessionDir)) {
     try {
       const parsed = JSON.parse(line) as DurableEventLine;
 

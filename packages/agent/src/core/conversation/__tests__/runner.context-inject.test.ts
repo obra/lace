@@ -4,14 +4,18 @@
 // Also verifies PRI-1744: context_injected events written between turns (after
 // turn_end but before run()) are picked up via findLastTurnEndEventSeq watermark.
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ConversationRunner } from '../runner';
 import type { RunnerConfig, RunnerDependencies } from '../types';
-import { appendDurableEvent } from '@lace/agent/storage/event-log';
+import {
+  appendDurableEvent,
+  invalidatePersonaCache,
+  readDurableEvents,
+} from '@lace/agent/storage/event-log';
 import { readSessionState, writeSessionState } from '@lace/agent/storage/session-store';
 import {
   AIProvider,
@@ -162,17 +166,30 @@ function injectContextEvent(
 }
 
 describe('ConversationRunner - mid-turn context_injected re-read (PRI-1691)', () => {
+  let laceDir: string;
   let sessionDir: string;
+  let sessionId: string;
   let cwd: string;
+  let savedLaceDir: string | undefined;
 
   beforeEach(() => {
-    const testId = randomUUID().substring(0, 8);
-    sessionDir = join(tmpdir(), `lace-runner-inject-test-session-${testId}`);
-    cwd = join(tmpdir(), `lace-runner-inject-test-cwd-${testId}`);
+    laceDir = mkdtempSync(join(tmpdir(), 'lace-runner-inject-test-'));
+    sessionId = `sess_${randomUUID()}`;
+    sessionDir = join(laceDir, 'agent-sessions', sessionId);
+    cwd = join(tmpdir(), `lace-runner-inject-test-cwd-${randomUUID().substring(0, 8)}`);
     mkdirSync(sessionDir, { recursive: true });
     mkdirSync(cwd, { recursive: true });
     // Seed system_prompt_set at eventSeq 1 so the runner's invariant check passes.
     // All real sessions must have one; nextEventSeq: 2 so appendDurableEvent starts at 2.
+    writeFileSync(
+      join(sessionDir, 'meta.json'),
+      JSON.stringify({
+        sessionId,
+        workDir: cwd,
+        created: new Date().toISOString(),
+        persona: 'test',
+      })
+    );
     writeFileSync(
       join(sessionDir, 'state.json'),
       JSON.stringify({ nextEventSeq: 2, nextStreamSeq: 1 })
@@ -186,10 +203,15 @@ describe('ConversationRunner - mid-turn context_injected re-read (PRI-1691)', ()
         data: { type: 'system_prompt_set', text: 'You are a test assistant.' },
       }) + '\n'
     );
+    savedLaceDir = process.env.LACE_DIR;
+    process.env.LACE_DIR = laceDir;
+    invalidatePersonaCache();
   });
 
   afterEach(() => {
-    if (existsSync(sessionDir)) rmSync(sessionDir, { recursive: true, force: true });
+    if (savedLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = savedLaceDir;
+    if (existsSync(laceDir)) rmSync(laceDir, { recursive: true, force: true });
     if (existsSync(cwd)) rmSync(cwd, { recursive: true, force: true });
   });
 
@@ -489,28 +511,40 @@ describe('ConversationRunner - mid-turn context_injected re-read (PRI-1691)', ()
       startedAt: new Date().toISOString(),
     });
 
-    const eventsRaw = readFileSync(join(sessionDir, 'events.jsonl'), 'utf8');
-    const lines = eventsRaw.split('\n').filter((l) => l.trim());
-    const events = lines.map((l) => JSON.parse(l) as { type: string; data: { priority?: string } });
+    const { events } = readDurableEvents(sessionDir, {});
     const lateInject = events.find(
-      (e) => e.type === 'context_injected' && e.data.priority === 'immediate'
+      (e) =>
+        e.type === 'context_injected' && (e.data as { priority?: string }).priority === 'immediate'
     );
     expect(lateInject).toBeDefined();
   });
 });
 
 describe('ConversationRunner - between-turn context_injected watermark (PRI-1744)', () => {
+  let laceDir: string;
   let sessionDir: string;
+  let sessionId: string;
   let cwd: string;
+  let savedLaceDir: string | undefined;
 
   beforeEach(() => {
-    const testId = randomUUID().substring(0, 8);
-    sessionDir = join(tmpdir(), `lace-runner-between-turn-test-session-${testId}`);
-    cwd = join(tmpdir(), `lace-runner-between-turn-test-cwd-${testId}`);
+    laceDir = mkdtempSync(join(tmpdir(), 'lace-runner-between-turn-test-'));
+    sessionId = `sess_${randomUUID()}`;
+    sessionDir = join(laceDir, 'agent-sessions', sessionId);
+    cwd = join(tmpdir(), `lace-runner-between-turn-test-cwd-${randomUUID().substring(0, 8)}`);
     mkdirSync(sessionDir, { recursive: true });
     mkdirSync(cwd, { recursive: true });
     // Seed system_prompt_set at eventSeq 1 so the runner's invariant check passes.
     // All real sessions must have one; nextEventSeq: 2 so appendDurableEvent starts at 2.
+    writeFileSync(
+      join(sessionDir, 'meta.json'),
+      JSON.stringify({
+        sessionId,
+        workDir: cwd,
+        created: new Date().toISOString(),
+        persona: 'test',
+      })
+    );
     writeFileSync(
       join(sessionDir, 'state.json'),
       JSON.stringify({ nextEventSeq: 2, nextStreamSeq: 1 })
@@ -524,10 +558,15 @@ describe('ConversationRunner - between-turn context_injected watermark (PRI-1744
         data: { type: 'system_prompt_set', text: 'You are a test assistant.' },
       }) + '\n'
     );
+    savedLaceDir = process.env.LACE_DIR;
+    process.env.LACE_DIR = laceDir;
+    invalidatePersonaCache();
   });
 
   afterEach(() => {
-    if (existsSync(sessionDir)) rmSync(sessionDir, { recursive: true, force: true });
+    if (savedLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = savedLaceDir;
+    if (existsSync(laceDir)) rmSync(laceDir, { recursive: true, force: true });
     if (existsSync(cwd)) rmSync(cwd, { recursive: true, force: true });
   });
 

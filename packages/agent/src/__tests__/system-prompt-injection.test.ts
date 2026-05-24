@@ -3,12 +3,33 @@
 // Also includes unit tests for buildProviderMessagesFromDurableEvents conversion
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
 import { defaultInitializeParams } from './helpers/initialize';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/server';
+
+/**
+ * Read the durable events for a session that an in-process agent (running in
+ * another process via spawnAgentProcess) wrote to its on-disk transcript. The
+ * agent writes under `<laceDir>/transcripts/<persona>/<date>/<sessionId>.jsonl`,
+ * so we walk the transcripts tree to find the (single) file for this session.
+ */
+function readSessionEventsFromDisk(laceDir: string, sessionId: string): string[] {
+  const root = join(laceDir, 'transcripts');
+  if (!existsSync(root)) return [];
+  for (const persona of readdirSync(root)) {
+    const personaDir = join(root, persona);
+    for (const date of readdirSync(personaDir)) {
+      const candidate = join(personaDir, date, `${sessionId}.jsonl`);
+      if (existsSync(candidate)) {
+        return readFileSync(candidate, 'utf8').trim().split('\n').filter(Boolean);
+      }
+    }
+  }
+  return [];
+}
 
 describe('system prompt injection on session/new', () => {
   let originalLaceDir: string | undefined;
@@ -52,15 +73,7 @@ describe('system prompt injection on session/new', () => {
 
     expect(created.sessionId).toMatch(/^sess_/);
 
-    // Read the events.jsonl file directly from the session directory
-    const sessionDir = join(laceDir, 'agent-sessions', created.sessionId);
-    const eventsPath = join(sessionDir, 'events.jsonl');
-
-    expect(existsSync(eventsPath)).toBe(true);
-
-    const eventsRaw = readFileSync(eventsPath, 'utf8');
-    const eventLines = eventsRaw.trim().split('\n').filter(Boolean);
-
+    const eventLines = readSessionEventsFromDisk(laceDir, created.sessionId);
     expect(eventLines.length).toBeGreaterThan(0);
 
     // Parse first event - should be system_prompt_set with the full system prompt text
@@ -97,13 +110,8 @@ describe('system prompt injection on session/new', () => {
 
     expect(created.sessionId).toMatch(/^sess_/);
 
-    const sessionDir = join(laceDir, 'agent-sessions', created.sessionId);
-    const eventsPath = join(sessionDir, 'events.jsonl');
-
-    expect(existsSync(eventsPath)).toBe(true);
-
-    const eventsRaw = readFileSync(eventsPath, 'utf8');
-    const eventLines = eventsRaw.trim().split('\n').filter(Boolean);
+    const eventLines = readSessionEventsFromDisk(laceDir, created.sessionId);
+    expect(eventLines.length).toBeGreaterThan(0);
 
     const firstEvent = JSON.parse(eventLines[0]) as {
       type: string;
@@ -171,14 +179,7 @@ describe('system prompt injection on session/new', () => {
 
     expect(created.sessionId).toMatch(/^sess_/);
 
-    // Read the events.jsonl file directly from the session directory
-    const sessionDir = join(laceDir, 'agent-sessions', created.sessionId);
-    const eventsPath = join(sessionDir, 'events.jsonl');
-
-    expect(existsSync(eventsPath)).toBe(true);
-
-    const eventsRaw = readFileSync(eventsPath, 'utf8');
-    const eventLines = eventsRaw.trim().split('\n').filter(Boolean);
+    const eventLines = readSessionEventsFromDisk(laceDir, created.sessionId);
 
     // Should have exactly 1 system_prompt_set event combining persona + user instructions
     expect(eventLines.length).toBeGreaterThanOrEqual(1);
@@ -213,11 +214,7 @@ describe('system prompt injection on session/new', () => {
       'session/new'
     )) as { sessionId: string };
 
-    const sessionDir = join(laceDir, 'agent-sessions', created.sessionId);
-    const eventsPath = join(sessionDir, 'events.jsonl');
-
-    const eventsRaw = readFileSync(eventsPath, 'utf8');
-    const eventLines = eventsRaw.trim().split('\n').filter(Boolean);
+    const eventLines = readSessionEventsFromDisk(laceDir, created.sessionId);
 
     // Should have exactly 1 system_prompt_set event (no separate user instructions event)
     expect(eventLines.length).toBe(1);
@@ -243,11 +240,7 @@ describe('system prompt injection on session/new', () => {
     )) as { sessionId: string };
 
     // Read the system prompt from the system_prompt_set event
-    const sessionDir = join(laceDir, 'agent-sessions', created.sessionId);
-    const eventsPath = join(sessionDir, 'events.jsonl');
-
-    const eventsRaw = readFileSync(eventsPath, 'utf8');
-    const eventLines = eventsRaw.trim().split('\n').filter(Boolean);
+    const eventLines = readSessionEventsFromDisk(laceDir, created.sessionId);
 
     const firstEvent = JSON.parse(eventLines[0]) as {
       type: string;
@@ -275,11 +268,7 @@ describe('system prompt injection on session/new', () => {
       'session/new'
     )) as { sessionId: string };
 
-    const sessionDir = join(laceDir, 'agent-sessions', created.sessionId);
-    const eventsPath = join(sessionDir, 'events.jsonl');
-
-    const eventsRaw = readFileSync(eventsPath, 'utf8');
-    const eventLines = eventsRaw.trim().split('\n').filter(Boolean);
+    const eventLines = readSessionEventsFromDisk(laceDir, created.sessionId);
 
     const firstEvent = JSON.parse(eventLines[0]) as {
       type: string;

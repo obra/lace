@@ -1,40 +1,54 @@
 // ABOUTME: Unit tests for injectNotification — writes context_injected event with
 // ABOUTME: priority='immediate' and triggers idle-wake when targeting active session.
 
-import { mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, it, expect, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { injectNotification } from '../inject-notification';
+import { readDurableEvents, invalidatePersonaCache } from '../../storage/event-log';
 
-function tempSessionDir(): string {
-  const root = mkdtempSync(join(tmpdir(), 'lace-inject-test-'));
-  mkdirSync(root, { recursive: true });
-  return root;
-}
-
-function readEventsJsonl(dir: string): Array<{ type: string; data: Record<string, unknown> }> {
-  try {
-    return readFileSync(join(dir, 'events.jsonl'), 'utf8')
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map((l) => JSON.parse(l));
-  } catch {
-    return [];
-  }
+function tempSessionDir(): { laceDir: string; sessionDir: string } {
+  const laceDir = mkdtempSync(join(tmpdir(), 'lace-inject-test-'));
+  const sessionId = `sess_${randomUUID()}`;
+  const sessionDir = join(laceDir, 'agent-sessions', sessionId);
+  mkdirSync(sessionDir, { recursive: true });
+  writeFileSync(
+    join(sessionDir, 'meta.json'),
+    JSON.stringify({
+      sessionId,
+      workDir: laceDir,
+      created: new Date().toISOString(),
+      persona: 'test',
+    })
+  );
+  return { laceDir, sessionDir };
 }
 
 describe('injectNotification', () => {
+  let savedLaceDir: string | undefined;
+
+  beforeEach(() => {
+    savedLaceDir = process.env.LACE_DIR;
+    invalidatePersonaCache();
+  });
+
+  afterEach(() => {
+    if (savedLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = savedLaceDir;
+  });
+
   it('appends a context_injected event with priority=immediate', () => {
-    const dir = tempSessionDir();
+    const { laceDir, sessionDir } = tempSessionDir();
+    process.env.LACE_DIR = laceDir;
     injectNotification({
-      sessionDir: dir,
+      sessionDir,
       kind: 'reminder',
       identifiers: { id: 'reminder_abc123abc123' },
       body: 'fired',
     });
-    const events = readEventsJsonl(dir);
+    const { events } = readDurableEvents(sessionDir, {});
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe('context_injected');
     expect((events[0].data as { priority?: string }).priority).toBe('immediate');
@@ -44,15 +58,16 @@ describe('injectNotification', () => {
   });
 
   it('triggers idle-wake when target is active and no turn is in flight', () => {
-    const dir = tempSessionDir();
+    const { laceDir, sessionDir } = tempSessionDir();
+    process.env.LACE_DIR = laceDir;
     const triggerInternalTurn = vi.fn();
     injectNotification({
-      sessionDir: dir,
+      sessionDir,
       kind: 'job-completed',
       identifiers: { 'job-id': 'job_x' },
       body: 'done',
       idleWake: {
-        isActive: (d) => d === dir,
+        isActive: (d) => d === sessionDir,
         hasActiveTurn: () => false,
         triggerInternalTurn,
       },
@@ -61,15 +76,16 @@ describe('injectNotification', () => {
   });
 
   it('does NOT trigger idle-wake when a turn is in flight', () => {
-    const dir = tempSessionDir();
+    const { laceDir, sessionDir } = tempSessionDir();
+    process.env.LACE_DIR = laceDir;
     const triggerInternalTurn = vi.fn();
     injectNotification({
-      sessionDir: dir,
+      sessionDir,
       kind: 'job-progress',
       identifiers: { 'job-id': 'job_x' },
       body: 'running',
       idleWake: {
-        isActive: (d) => d === dir,
+        isActive: (d) => d === sessionDir,
         hasActiveTurn: () => true,
         triggerInternalTurn,
       },
@@ -78,10 +94,11 @@ describe('injectNotification', () => {
   });
 
   it('does NOT trigger idle-wake when target is not the active session', () => {
-    const dir = tempSessionDir();
+    const { laceDir, sessionDir } = tempSessionDir();
+    process.env.LACE_DIR = laceDir;
     const triggerInternalTurn = vi.fn();
     injectNotification({
-      sessionDir: dir,
+      sessionDir,
       kind: 'subagent-exited',
       identifiers: { 'subagent-session-id': 'sess_x' },
       body: 'gone',

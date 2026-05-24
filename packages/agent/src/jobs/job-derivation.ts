@@ -1,13 +1,12 @@
 // ABOUTME: Derives job state from durable events.
-// Parses events.jsonl to reconstruct job history for a session.
+// Parses the session's transcript (legacy + new layout) to reconstruct job history.
 // Includes caching to avoid re-parsing on repeated calls.
 
-import { readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
 import type { JobType, JobStatus, JobState } from '../server-types';
 import { toNonEmptyString } from '../rpc/utils';
 import { parseRuntimeExecutionBinding } from '../tools/runtime/validation';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
+import { readAllSessionEventLines } from '../storage/event-log';
 
 /**
  * A derived job record from events.
@@ -68,41 +67,26 @@ export function createJobDerivation(deps: {
     if (!activeSession) return [];
 
     const { sessionId, dir: sessionDir } = activeSession;
-    const eventsPath = join(sessionDir, 'events.jsonl');
 
-    // Check cache validity
-    let fileSize = 0;
-    let fileMtime = 0;
-    try {
-      const stats = statSync(eventsPath);
-      fileSize = stats.size;
-      fileMtime = stats.mtimeMs;
-    } catch {
-      return [];
-    }
+    // Pull every line from both legacy and new layouts; the dual-read helper
+    // returns them in eventSeq order. Cache by sessionId + lineCount: line
+    // counts grow monotonically with appends, so any change busts the cache.
+    const lines = readAllSessionEventLines(sessionDir);
+    const lineCount = lines.length;
 
     const runningJobs = deps.getRunningJobs();
 
     if (
       cache &&
       cache.sessionId === sessionId &&
-      cache.fileSize === fileSize &&
-      cache.fileMtime === fileMtime
+      cache.fileSize === lineCount &&
+      cache.fileMtime === 0
     ) {
       return applyRunningJobStatus(cache.result, runningJobs);
     }
 
-    // Cache miss - read and parse the file
-    let raw = '';
-    try {
-      raw = readFileSync(eventsPath, 'utf8');
-    } catch {
-      return [];
-    }
-
     const byId = new Map<string, DerivedJob>();
 
-    const lines = raw.split('\n');
     for (const line of lines) {
       if (!line) continue;
       try {
@@ -176,12 +160,13 @@ export function createJobDerivation(deps: {
       }
     }
 
-    // Update cache with parsed results (before applying running status updates)
+    // Update cache with parsed results (before applying running status updates).
+    // fileSize holds the lineCount; fileMtime is unused (always 0).
     const parsedResult = Array.from(byId.values());
     cache = {
       sessionId,
-      fileSize,
-      fileMtime,
+      fileSize: lineCount,
+      fileMtime: 0,
       result: parsedResult,
     };
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { writeFileSync, existsSync, readFileSync } from 'node:fs';
+import { writeFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import {
@@ -469,12 +469,23 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
       expect((JSON.parse(stateRaw) as any).pendingPermissions).toBeUndefined();
 
-      const eventsRaw = readFileSync(
-        join(ctx.laceDir, 'agent-sessions', created.sessionId, 'events.jsonl'),
-        'utf8'
-      );
-      expect(eventsRaw).toContain('"permission_requested"');
-      expect(eventsRaw).not.toContain('"permission_decided"');
+      // Transcript files now live under <laceDir>/transcripts/<persona>/<date>/.
+      // Read every line from the session's transcript and verify the events.
+      const transcriptsRoot = join(ctx.laceDir, 'transcripts');
+      let allTranscriptText = '';
+      if (existsSync(transcriptsRoot)) {
+        for (const persona of readdirSync(transcriptsRoot)) {
+          const personaDir = join(transcriptsRoot, persona);
+          for (const date of readdirSync(personaDir)) {
+            const candidate = join(personaDir, date, `${created.sessionId}.jsonl`);
+            if (existsSync(candidate)) {
+              allTranscriptText += readFileSync(candidate, 'utf8');
+            }
+          }
+        }
+      }
+      expect(allTranscriptText).toContain('"permission_requested"');
+      expect(allTranscriptText).not.toContain('"permission_decided"');
 
       ctx.agent.proc.kill('SIGKILL');
       await withTimeout(

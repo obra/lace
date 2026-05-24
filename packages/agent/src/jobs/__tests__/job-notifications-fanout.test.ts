@@ -7,12 +7,14 @@
 // fallback. Wire shape stays identical between the two paths.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { JobManager } from '../job-manager';
 import { createQueueJobNotification } from '../job-notifications';
 import type { AgentServerState, JobState } from '../../server-types';
+import { invalidatePersonaCache, readDurableEvents } from '@lace/agent/storage/event-log';
 
 function makeJobManager(): JobManager {
   return new JobManager({
@@ -38,25 +40,21 @@ function makeJobState(jobId: string): JobState {
 }
 
 /**
- * Read context_injected events from the session's events.jsonl. Returns the
- * text payloads in order — one entry per injectNotification call.
+ * Read context_injected events from the session's transcript via the durable
+ * event API. Returns text payloads in order — one entry per injectNotification
+ * call.
  */
 function readInjectedNotificationTexts(sessionDir: string): string[] {
-  const path = join(sessionDir, 'events.jsonl');
-  if (!existsSync(path)) return [];
-  const lines = readFileSync(path, 'utf8').split('\n').filter(Boolean);
+  const { events } = readDurableEvents(sessionDir, {});
   const texts: string[] = [];
-  for (const line of lines) {
-    const evt = JSON.parse(line) as {
-      type?: string;
-      data?: {
-        priority?: string;
-        content?: Array<{ type?: string; text?: string }>;
-      };
-    };
+  for (const evt of events) {
     if (evt.type !== 'context_injected') continue;
-    if (evt.data?.priority !== 'immediate') continue;
-    for (const block of evt.data.content ?? []) {
+    const data = evt.data as {
+      priority?: string;
+      content?: Array<{ type?: string; text?: string }>;
+    };
+    if (data.priority !== 'immediate') continue;
+    for (const block of data.content ?? []) {
       if (block.type === 'text' && typeof block.text === 'string') {
         texts.push(block.text);
       }
@@ -74,14 +72,33 @@ function makeStateStub(jobManager: JobManager, sessionDir: string): AgentServerS
 }
 
 describe('createFinalizeJob → fanoutToInject integration (PRI-1744)', () => {
+  let laceDir: string;
   let sessionDir: string;
+  let savedLaceDir: string | undefined;
 
   beforeEach(() => {
-    sessionDir = mkdtempSync(join(tmpdir(), 'lace-fanout-inject-'));
+    laceDir = mkdtempSync(join(tmpdir(), 'lace-fanout-inject-'));
+    const sessionId = `sess_${randomUUID()}`;
+    sessionDir = join(laceDir, 'agent-sessions', sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(
+      join(sessionDir, 'meta.json'),
+      JSON.stringify({
+        sessionId,
+        workDir: laceDir,
+        created: new Date().toISOString(),
+        persona: 'test',
+      })
+    );
+    savedLaceDir = process.env.LACE_DIR;
+    process.env.LACE_DIR = laceDir;
+    invalidatePersonaCache();
   });
 
   afterEach(() => {
-    rmSync(sessionDir, { recursive: true, force: true });
+    if (savedLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = savedLaceDir;
+    rmSync(laceDir, { recursive: true, force: true });
   });
 
   it('subscribed jobId: completion routes through fanout and writes one context_injected event', () => {

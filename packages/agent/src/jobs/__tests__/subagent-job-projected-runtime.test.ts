@@ -16,6 +16,7 @@ import {
   writeSessionState,
   ensureSessionFiles,
 } from '@lace/agent/storage/session-store';
+import { invalidatePersonaCache, readDurableEvents } from '@lace/agent/storage/event-log';
 import type { ContainerManager } from '@lace/agent/containers/container-manager';
 import type { MountRegistryEntry, JobState } from '@lace/agent/server-types';
 import type { SubagentProcessHandle } from '@lace/agent/jobs/subagent-spawn';
@@ -90,6 +91,7 @@ function makeFakeSubagent(): FakeSubagentHandle {
 }
 
 describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', () => {
+  let laceDir: string;
   let sessionRootDir: string;
   let parentSessionId: string;
   let parentSessionDir: string;
@@ -98,21 +100,29 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
   let requestSpy: ReturnType<typeof vi.spyOn>;
   const sessionNewRequests: Array<Record<string, unknown>> = [];
   const previousLaceSessionDir = process.env.LACE_SESSION_DIR;
+  const previousLaceDir = process.env.LACE_DIR;
 
   beforeEach(() => {
     sessionNewRequests.length = 0;
-    sessionRootDir = mkdtempSync(join(tmpdir(), 'projected-subagent-'));
+    laceDir = mkdtempSync(join(tmpdir(), 'projected-subagent-'));
+    // Keep LACE_SESSION_DIR pointing at the laceDir's agent-sessions root so
+    // session-store and the new transcript layout agree on the laceDir base.
+    sessionRootDir = join(laceDir, 'agent-sessions');
+    mkdirSync(sessionRootDir, { recursive: true });
+    process.env.LACE_DIR = laceDir;
     process.env.LACE_SESSION_DIR = sessionRootDir;
+    invalidatePersonaCache();
 
     parentSessionId = `sess_${randomUUID()}`;
     parentSessionDir = join(sessionRootDir, parentSessionId);
-    parentWorkDir = join(sessionRootDir, 'parent-cwd');
+    parentWorkDir = join(laceDir, 'parent-cwd');
     mkdirSync(parentWorkDir, { recursive: true });
 
     writeSessionMeta(parentSessionDir, {
       sessionId: parentSessionId,
       workDir: parentWorkDir,
       created: new Date().toISOString(),
+      persona: 'test',
     });
     writeSessionState(parentSessionDir, { nextEventSeq: 1, nextStreamSeq: 1 });
     ensureSessionFiles(parentSessionDir);
@@ -149,11 +159,16 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
 
   afterEach(() => {
     requestSpy.mockRestore();
-    rmSync(sessionRootDir, { recursive: true, force: true });
+    rmSync(laceDir, { recursive: true, force: true });
     if (previousLaceSessionDir === undefined) {
       delete process.env.LACE_SESSION_DIR;
     } else {
       process.env.LACE_SESSION_DIR = previousLaceSessionDir;
+    }
+    if (previousLaceDir === undefined) {
+      delete process.env.LACE_DIR;
+    } else {
+      process.env.LACE_DIR = previousLaceDir;
     }
   });
 
@@ -258,13 +273,9 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
 
     // The subagent session id must be persisted to the parent host events log
     // via the existing runExclusive() path.
-    const eventLines = readFileSync(join(parentSessionDir, 'events.jsonl'), 'utf8')
-      .trim()
-      .split('\n')
-      .filter((line) => line.length > 0)
-      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    const { events } = readDurableEvents(parentSessionDir, {});
 
-    expect(eventLines).toContainEqual(
+    expect(events).toContainEqual(
       expect.objectContaining({
         type: 'job_session_assigned',
         data: expect.objectContaining({

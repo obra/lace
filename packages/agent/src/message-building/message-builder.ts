@@ -1,7 +1,5 @@
 // ABOUTME: Message building utilities for converting durable events to provider messages
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { ToolResult } from '@lace/ent-protocol';
 import type { ContentBlock, ProviderMessage } from '../providers/base-provider';
 import { toNonEmptyString, coreToolResultFromProtocol } from '../rpc/utils';
@@ -9,6 +7,7 @@ import { appendOrMergeUser } from './append-or-merge';
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import { logger } from '@lace/agent/utils/logger';
+import { readAllSessionEventLines } from '../storage/event-log';
 
 // Typed shapes for parsing event data
 type TextBlock = { type: 'text'; text: string };
@@ -158,18 +157,15 @@ export type BuiltProviderMessages = {
  * event return systemPrompt: ''.
  */
 export function buildProviderMessagesFromDurableEvents(sessionDir: string): BuiltProviderMessages {
-  const eventsPath = join(sessionDir, 'events.jsonl');
-  let raw = '';
-  try {
-    raw = readFileSync(eventsPath, 'utf8');
-  } catch {
+  const lines = readAllSessionEventLines(sessionDir);
+  if (lines.length === 0) {
     return { messages: [], systemPrompt: '' };
   }
 
   // Parse all lines once and reuse in both passes.
   type ParsedEvent = { type: string; data: Record<string, unknown> };
   const parsedEvents: ParsedEvent[] = [];
-  for (const line of raw.split('\n')) {
+  for (const line of lines) {
     if (!line) continue;
     try {
       const parsed = JSON.parse(line) as { type?: string; data?: Record<string, unknown> };

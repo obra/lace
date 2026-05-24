@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   createE2EContext,
@@ -8,6 +8,28 @@ import {
   defaultInitializeParams,
 } from './helpers';
 import { readSessionState } from '../storage/session-store';
+
+/**
+ * Read durable events for a given sessionId out of the on-disk transcript
+ * layout (new layout: `<laceDir>/transcripts/<persona>/<date>/<id>.jsonl`).
+ */
+function readTranscriptEvents(laceDir: string, sessionId: string): unknown[] {
+  const root = join(laceDir, 'transcripts');
+  if (!existsSync(root)) return [];
+  for (const persona of readdirSync(root)) {
+    const personaDir = join(root, persona);
+    for (const date of readdirSync(personaDir)) {
+      const candidate = join(personaDir, date, `${sessionId}.jsonl`);
+      if (existsSync(candidate)) {
+        return readFileSync(candidate, 'utf8')
+          .split('\n')
+          .filter(Boolean)
+          .map((line) => JSON.parse(line));
+      }
+    }
+  }
+  return [];
+}
 
 describe('lace-agent delegate tool (E2E over stdio)', () => {
   const ctx = createE2EContext({ prefix: 'lace-agent-delegate' });
@@ -476,24 +498,21 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
         'job completion'
       );
 
-      // Check events.jsonl for job_session_assigned
+      // Check the transcript for job_session_assigned
       const sessionsDir = join(ctx.laceDir, 'agent-sessions');
-      const sessionDir = join(sessionsDir, sessionId);
-      const eventsPath = join(sessionDir, 'events.jsonl');
-      const eventsContent = readFileSync(eventsPath, 'utf8');
-      const events = eventsContent
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => JSON.parse(line));
+      const events = readTranscriptEvents(ctx.laceDir, sessionId) as Array<{
+        type?: string;
+        data?: { jobId?: string; subagentSessionId?: string };
+      }>;
 
       const sessionAssignedEvent = events.find(
         (e) => e.type === 'job_session_assigned' && e.data?.jobId === delegateJobId
       );
       expect(sessionAssignedEvent).toBeDefined();
-      expect(sessionAssignedEvent.data.subagentSessionId).toBeDefined();
-      expect(typeof sessionAssignedEvent.data.subagentSessionId).toBe('string');
+      expect(sessionAssignedEvent!.data!.subagentSessionId).toBeDefined();
+      expect(typeof sessionAssignedEvent!.data!.subagentSessionId).toBe('string');
 
-      const subagentSessionDir = join(sessionsDir, sessionAssignedEvent.data.subagentSessionId);
+      const subagentSessionDir = join(sessionsDir, sessionAssignedEvent!.data!.subagentSessionId!);
       expect(readSessionState(subagentSessionDir).config?.runtimeBinding).toMatchObject({
         schemaVersion: 1,
         agentPlacement: 'host',
@@ -506,7 +525,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       };
       const job = jobList.jobs.find((j) => j.jobId === delegateJobId);
       expect(job).toBeDefined();
-      expect(job!.subagentSessionId).toBe(sessionAssignedEvent.data.subagentSessionId);
+      expect(job!.subagentSessionId).toBe(sessionAssignedEvent!.data!.subagentSessionId);
     }
   );
 });

@@ -1,17 +1,77 @@
-import { describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+  appendFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import {
   appendDurableEvent,
+  deriveNextEventSeqAcrossSessionFiles,
   findLastTurnEndEventSeq,
   hasPendingImmediateInjects,
+  invalidatePersonaCache,
   readDurableEvents,
+  summarizeDurableEvents,
 } from '../event-log';
 
+/**
+ * Helper: stand up a fresh laceDir + sessionDir (with persona) and set LACE_DIR.
+ *
+ * The new transcript layout writes events to
+ * `<laceDir>/transcripts/<persona>/<date>/<sessionId>.jsonl`. Tests that
+ * previously created an arbitrary sessionDir tempdir now need a laceDir
+ * structure so the writer can resolve the correct file.
+ */
+function makeTestSessionDirs(persona: string | null = 'ada'): {
+  laceDir: string;
+  sessionDir: string;
+  sessionId: string;
+} {
+  const laceDir = mkdtempSync(join(tmpdir(), 'lace-event-log-'));
+  const sessionId = `sess_${randomUUID()}`;
+  const sessionDir = join(laceDir, 'agent-sessions', sessionId);
+  mkdirSync(sessionDir, { recursive: true });
+  if (persona !== null) {
+    writeFileSync(
+      join(sessionDir, 'meta.json'),
+      JSON.stringify({
+        sessionId,
+        workDir: laceDir,
+        created: new Date().toISOString(),
+        persona,
+      })
+    );
+  }
+  return { laceDir, sessionDir, sessionId };
+}
+
 describe('storage/event-log', () => {
+  let savedLaceDir: string | undefined;
+
+  beforeEach(() => {
+    savedLaceDir = process.env.LACE_DIR;
+  });
+
+  afterEach(() => {
+    if (savedLaceDir === undefined) {
+      delete process.env.LACE_DIR;
+    } else {
+      process.env.LACE_DIR = savedLaceDir;
+    }
+  });
+
   it('appends and replays events in order', () => {
-    const sessionDir = mkdtempSync(join(tmpdir(), 'lace-event-log-'));
+    const { laceDir, sessionDir } = makeTestSessionDirs();
+    process.env.LACE_DIR = laceDir;
+    invalidatePersonaCache();
     try {
       const startState = { nextEventSeq: 1, nextStreamSeq: 1 };
 
@@ -34,12 +94,14 @@ describe('storage/event-log', () => {
 
       expect(e2.nextState.nextEventSeq).toBe(3);
     } finally {
-      rmSync(sessionDir, { recursive: true, force: true });
+      rmSync(laceDir, { recursive: true, force: true });
     }
   });
 
   it('supports pagination and hasMore semantics', () => {
-    const sessionDir = mkdtempSync(join(tmpdir(), 'lace-event-log-'));
+    const { laceDir, sessionDir } = makeTestSessionDirs();
+    process.env.LACE_DIR = laceDir;
+    invalidatePersonaCache();
     try {
       let state = { nextEventSeq: 1, nextStreamSeq: 1 };
       for (let i = 0; i < 3; i++) {
@@ -55,12 +117,14 @@ describe('storage/event-log', () => {
       expect(page2.events.map((e) => e.eventSeq)).toEqual([3]);
       expect(page2.hasMore).toBe(false);
     } finally {
-      rmSync(sessionDir, { recursive: true, force: true });
+      rmSync(laceDir, { recursive: true, force: true });
     }
   });
 
   it('supports type filtering with correct hasMore', () => {
-    const sessionDir = mkdtempSync(join(tmpdir(), 'lace-event-log-'));
+    const { laceDir, sessionDir } = makeTestSessionDirs();
+    process.env.LACE_DIR = laceDir;
+    invalidatePersonaCache();
     try {
       let state = { nextEventSeq: 1, nextStreamSeq: 1 };
       for (const type of ['a', 'b', 'a', 'c']) {
@@ -73,12 +137,14 @@ describe('storage/event-log', () => {
       expect(page.events.map((e) => e.eventSeq)).toEqual([1]);
       expect(page.hasMore).toBe(true);
     } finally {
-      rmSync(sessionDir, { recursive: true, force: true });
+      rmSync(laceDir, { recursive: true, force: true });
     }
   });
 
   it('findLastTurnEndEventSeq returns null on empty log and the latest turn_end seq otherwise', () => {
-    const sessionDir = mkdtempSync(join(tmpdir(), 'lace-event-log-'));
+    const { laceDir, sessionDir } = makeTestSessionDirs();
+    process.env.LACE_DIR = laceDir;
+    invalidatePersonaCache();
     try {
       expect(findLastTurnEndEventSeq(sessionDir)).toBeNull();
 
@@ -94,22 +160,26 @@ describe('storage/event-log', () => {
       }));
       expect(findLastTurnEndEventSeq(sessionDir)).toBe(2);
     } finally {
-      rmSync(sessionDir, { recursive: true, force: true });
+      rmSync(laceDir, { recursive: true, force: true });
     }
   });
 
   describe('hasPendingImmediateInjects', () => {
     it('returns false on an empty / missing log', () => {
-      const sessionDir = mkdtempSync(join(tmpdir(), 'lace-pending-inject-'));
+      const { laceDir, sessionDir } = makeTestSessionDirs();
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
       try {
         expect(hasPendingImmediateInjects(sessionDir, 0)).toBe(false);
       } finally {
-        rmSync(sessionDir, { recursive: true, force: true });
+        rmSync(laceDir, { recursive: true, force: true });
       }
     });
 
     it('returns true when a context_injected priority=immediate event exists past the watermark', () => {
-      const sessionDir = mkdtempSync(join(tmpdir(), 'lace-pending-inject-'));
+      const { laceDir, sessionDir } = makeTestSessionDirs();
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
       try {
         let state = { nextEventSeq: 1, nextStreamSeq: 1 };
         ({ nextState: state } = appendDurableEvent(sessionDir, state, {
@@ -131,12 +201,14 @@ describe('storage/event-log', () => {
         }));
         expect(hasPendingImmediateInjects(sessionDir, lastTurnEnd!)).toBe(true);
       } finally {
-        rmSync(sessionDir, { recursive: true, force: true });
+        rmSync(laceDir, { recursive: true, force: true });
       }
     });
 
     it('ignores context_injected events with non-immediate priority', () => {
-      const sessionDir = mkdtempSync(join(tmpdir(), 'lace-pending-inject-'));
+      const { laceDir, sessionDir } = makeTestSessionDirs();
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
       try {
         let state = { nextEventSeq: 1, nextStreamSeq: 1 };
         ({ nextState: state } = appendDurableEvent(sessionDir, state, {
@@ -145,12 +217,14 @@ describe('storage/event-log', () => {
         }));
         expect(hasPendingImmediateInjects(sessionDir, 0)).toBe(false);
       } finally {
-        rmSync(sessionDir, { recursive: true, force: true });
+        rmSync(laceDir, { recursive: true, force: true });
       }
     });
 
     it('ignores context_injected events at or before the watermark', () => {
-      const sessionDir = mkdtempSync(join(tmpdir(), 'lace-pending-inject-'));
+      const { laceDir, sessionDir } = makeTestSessionDirs();
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
       try {
         let state = { nextEventSeq: 1, nextStreamSeq: 1 };
         ({ nextState: state } = appendDurableEvent(sessionDir, state, {
@@ -162,12 +236,14 @@ describe('storage/event-log', () => {
         // But it IS visible if the watermark is 0.
         expect(hasPendingImmediateInjects(sessionDir, 0)).toBe(true);
       } finally {
-        rmSync(sessionDir, { recursive: true, force: true });
+        rmSync(laceDir, { recursive: true, force: true });
       }
     });
 
     it('ignores non-context_injected event types', () => {
-      const sessionDir = mkdtempSync(join(tmpdir(), 'lace-pending-inject-'));
+      const { laceDir, sessionDir } = makeTestSessionDirs();
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
       try {
         let state = { nextEventSeq: 1, nextStreamSeq: 1 };
         ({ nextState: state } = appendDurableEvent(sessionDir, state, {
@@ -176,14 +252,17 @@ describe('storage/event-log', () => {
         }));
         expect(hasPendingImmediateInjects(sessionDir, 0)).toBe(false);
       } finally {
-        rmSync(sessionDir, { recursive: true, force: true });
+        rmSync(laceDir, { recursive: true, force: true });
       }
     });
   });
 
   it('ignores a partial last line (crash safety)', () => {
-    const sessionDir = mkdtempSync(join(tmpdir(), 'lace-event-log-'));
+    const { laceDir, sessionDir } = makeTestSessionDirs();
+    process.env.LACE_DIR = laceDir;
+    invalidatePersonaCache();
     try {
+      // Write directly to the legacy path; the dual-read should still pick it up.
       const eventsPath = join(sessionDir, 'events.jsonl');
       writeFileSync(eventsPath, '', 'utf8');
 
@@ -204,7 +283,256 @@ describe('storage/event-log', () => {
       expect(read.events.map((e) => e.eventSeq)).toEqual([1]);
       expect(read.hasMore).toBe(false);
     } finally {
-      rmSync(sessionDir, { recursive: true, force: true });
+      rmSync(laceDir, { recursive: true, force: true });
     }
+  });
+
+  describe('appendDurableEvent — new layout', () => {
+    it('writes events under transcripts/<persona>/<date>/<session>.jsonl', () => {
+      const { laceDir, sessionDir, sessionId } = makeTestSessionDirs('ada');
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
+      try {
+        const startState = { nextEventSeq: 1, nextStreamSeq: 1 };
+        appendDurableEvent(sessionDir, startState, {
+          type: 'prompt',
+          data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+        });
+
+        const today = new Date().toISOString().slice(0, 10);
+        const transcriptPath = join(laceDir, 'transcripts', 'ada', today, `${sessionId}.jsonl`);
+        expect(existsSync(transcriptPath)).toBe(true);
+        const lines = readFileSync(transcriptPath, 'utf8').trim().split('\n');
+        expect(lines).toHaveLength(1);
+        expect(JSON.parse(lines[0])).toMatchObject({ type: 'prompt', eventSeq: 1 });
+
+        // Legacy path should NOT be written.
+        expect(existsSync(join(sessionDir, 'events.jsonl'))).toBe(false);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('writes successive events on the same UTC day to the same file', () => {
+      const { laceDir, sessionDir, sessionId } = makeTestSessionDirs('ada');
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
+      try {
+        let state = { nextEventSeq: 1, nextStreamSeq: 1 };
+        for (let i = 0; i < 4; i++) {
+          ({ nextState: state } = appendDurableEvent(sessionDir, state, {
+            type: 'message',
+            data: { i },
+          }));
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+        const transcriptPath = join(laceDir, 'transcripts', 'ada', today, `${sessionId}.jsonl`);
+        const lines = readFileSync(transcriptPath, 'utf8').trim().split('\n');
+        expect(lines).toHaveLength(4);
+        const seqs = lines.map((l) => (JSON.parse(l) as { eventSeq: number }).eventSeq);
+        expect(seqs).toEqual([1, 2, 3, 4]);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('routes to _unknown when meta.json is missing or has no persona', () => {
+      const laceDir = mkdtempSync(join(tmpdir(), 'lace-event-log-unk-'));
+      const sessionId = `sess_${randomUUID()}`;
+      const sessionDir = join(laceDir, 'agent-sessions', sessionId);
+      mkdirSync(sessionDir, { recursive: true });
+      // Intentionally no meta.json
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
+      try {
+        appendDurableEvent(
+          sessionDir,
+          { nextEventSeq: 1, nextStreamSeq: 1 },
+          {
+            type: 'prompt',
+            data: {},
+          }
+        );
+
+        const today = new Date().toISOString().slice(0, 10);
+        const transcriptPath = join(
+          laceDir,
+          'transcripts',
+          '_unknown',
+          today,
+          `${sessionId}.jsonl`
+        );
+        expect(existsSync(transcriptPath)).toBe(true);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('persona cache avoids repeated meta.json reads for the same sessionDir', () => {
+      const { laceDir, sessionDir, sessionId } = makeTestSessionDirs('ada');
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
+      try {
+        let state = { nextEventSeq: 1, nextStreamSeq: 1 };
+        ({ nextState: state } = appendDurableEvent(sessionDir, state, {
+          type: 'prompt',
+          data: {},
+        }));
+
+        // Mutate meta.json to a different persona. The cache should keep
+        // returning 'ada' so writes stay in the ada bucket.
+        writeFileSync(
+          join(sessionDir, 'meta.json'),
+          JSON.stringify({ sessionId, workDir: laceDir, created: 'x', persona: 'bea' })
+        );
+
+        ({ nextState: state } = appendDurableEvent(sessionDir, state, {
+          type: 'message',
+          data: {},
+        }));
+
+        const today = new Date().toISOString().slice(0, 10);
+        const adaPath = join(laceDir, 'transcripts', 'ada', today);
+        // Files all under 'ada'; no 'bea' directory at all.
+        const personasDir = join(laceDir, 'transcripts');
+        const personas = readdirSync(personasDir);
+        expect(personas).toEqual(['ada']);
+        expect(existsSync(adaPath)).toBe(true);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('deriveNextEventSeqAcrossSessionFiles', () => {
+    it('returns 1 when no files exist', () => {
+      const laceDir = mkdtempSync(join(tmpdir(), 'lace-derive-empty-'));
+      try {
+        expect(deriveNextEventSeqAcrossSessionFiles(laceDir, 'sess_nothing')).toBe(1);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('reads max eventSeq from a new-layout file', () => {
+      const { laceDir, sessionId } = makeTestSessionDirs('ada');
+      const today = new Date().toISOString().slice(0, 10);
+      const dir = join(laceDir, 'transcripts', 'ada', today);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        join(dir, `${sessionId}.jsonl`),
+        [1, 2, 3]
+          .map((seq) =>
+            JSON.stringify({ eventSeq: seq, timestamp: 'x', type: 'message', data: {} })
+          )
+          .join('\n') + '\n'
+      );
+      try {
+        expect(deriveNextEventSeqAcrossSessionFiles(laceDir, sessionId)).toBe(4);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('reads max eventSeq across legacy + new layouts', () => {
+      const { laceDir, sessionDir, sessionId } = makeTestSessionDirs('ada');
+      // Legacy events.jsonl with seqs 1, 2, 3.
+      writeFileSync(
+        join(sessionDir, 'events.jsonl'),
+        [1, 2, 3]
+          .map((seq) =>
+            JSON.stringify({ eventSeq: seq, timestamp: 'x', type: 'message', data: {} })
+          )
+          .join('\n') + '\n'
+      );
+      // New-layout file with seqs 4, 5.
+      const today = new Date().toISOString().slice(0, 10);
+      const dir = join(laceDir, 'transcripts', 'ada', today);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        join(dir, `${sessionId}.jsonl`),
+        [4, 5]
+          .map((seq) =>
+            JSON.stringify({ eventSeq: seq, timestamp: 'x', type: 'message', data: {} })
+          )
+          .join('\n') + '\n'
+      );
+      try {
+        expect(deriveNextEventSeqAcrossSessionFiles(laceDir, sessionId)).toBe(6);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('dual-read: readers see both legacy and new layouts', () => {
+    it('readDurableEvents merges events from both layouts in seq order', () => {
+      const { laceDir, sessionDir, sessionId } = makeTestSessionDirs('ada');
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
+      try {
+        // 3 events in legacy path
+        writeFileSync(
+          join(sessionDir, 'events.jsonl'),
+          [1, 2, 3]
+            .map((seq) =>
+              JSON.stringify({ eventSeq: seq, timestamp: 'x', type: 'prompt', data: {} })
+            )
+            .join('\n') + '\n'
+        );
+        // 2 events in new layout
+        const newDir = join(laceDir, 'transcripts', 'ada', '2026-05-23');
+        mkdirSync(newDir, { recursive: true });
+        writeFileSync(
+          join(newDir, `${sessionId}.jsonl`),
+          [4, 5]
+            .map((seq) =>
+              JSON.stringify({ eventSeq: seq, timestamp: 'x', type: 'message', data: {} })
+            )
+            .join('\n') + '\n'
+        );
+
+        const { events } = readDurableEvents(sessionDir, {});
+        expect(events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5]);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('summarizeDurableEvents merges across layouts', () => {
+      const { laceDir, sessionDir, sessionId } = makeTestSessionDirs('ada');
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
+      try {
+        writeFileSync(
+          join(sessionDir, 'events.jsonl'),
+          [
+            { eventSeq: 1, timestamp: '2026-01-01T00:00:00Z', type: 'prompt', data: {} },
+            { eventSeq: 2, timestamp: '2026-01-01T00:00:01Z', type: 'turn_start', data: {} },
+          ]
+            .map((e) => JSON.stringify(e))
+            .join('\n') + '\n'
+        );
+        const newDir = join(laceDir, 'transcripts', 'ada', '2026-05-23');
+        mkdirSync(newDir, { recursive: true });
+        writeFileSync(
+          join(newDir, `${sessionId}.jsonl`),
+          JSON.stringify({
+            eventSeq: 3,
+            timestamp: '2026-05-23T00:00:00Z',
+            type: 'message',
+            data: {},
+          }) + '\n'
+        );
+
+        const summary = summarizeDurableEvents(sessionDir);
+        expect(summary.messageCount).toBe(2); // prompt + message
+        expect(summary.turnCount).toBe(1);
+        expect(summary.lastActive).toBe('2026-05-23T00:00:00Z');
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
   });
 });

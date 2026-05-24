@@ -1,10 +1,11 @@
 // ABOUTME: Tests for ConversationRunner - the agentic loop for executing prompts
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { invalidatePersonaCache, readDurableEvents } from '@lace/agent/storage/event-log';
 import { ConversationRunner } from '../runner';
 import type { RunnerConfig, RunnerDependencies } from '../types';
 import { TestAgentProvider } from '@lace/agent/runtime/test-provider';
@@ -121,21 +122,31 @@ describe('ConversationRunner', () => {
   });
 
   describe('run()', () => {
+    let laceDir: string;
     let sessionDir: string;
+    let sessionId: string;
     let cwd: string;
+    let savedLaceDir: string | undefined;
 
     beforeEach(() => {
-      // Create unique temp directories for each test
-      const testId = randomUUID().substring(0, 8);
-      sessionDir = join(tmpdir(), `lace-runner-test-session-${testId}`);
-      cwd = join(tmpdir(), `lace-runner-test-cwd-${testId}`);
+      // Create a laceDir wrapper so the new transcript layout has a base.
+      laceDir = mkdtempSync(join(tmpdir(), 'lace-runner-test-'));
+      sessionId = `sess_${randomUUID()}`;
+      sessionDir = join(laceDir, 'agent-sessions', sessionId);
+      cwd = join(tmpdir(), `lace-runner-test-cwd-${randomUUID().substring(0, 8)}`);
       mkdirSync(sessionDir, { recursive: true });
       mkdirSync(cwd, { recursive: true });
 
-      // Initialize session files (state.json and events.jsonl).
-      // Seed a system_prompt_set event so the runner's invariant check passes.
-      // All real sessions must have one; tests that don't are relying on the
-      // silent fallback that was removed by the empty-systemPrompt guard.
+      // Write the meta.json so personaForSessionDir resolves properly.
+      writeFileSync(
+        join(sessionDir, 'meta.json'),
+        JSON.stringify({
+          sessionId,
+          workDir: cwd,
+          created: new Date().toISOString(),
+          persona: 'test',
+        })
+      );
       writeFileSync(
         join(sessionDir, 'state.json'),
         JSON.stringify({
@@ -143,6 +154,11 @@ describe('ConversationRunner', () => {
           nextStreamSeq: 1,
         })
       );
+      // Seed a system_prompt_set event so the runner's invariant check passes.
+      // All real sessions must have one; tests that don't are relying on the
+      // silent fallback that was removed by the empty-systemPrompt guard.
+      // Written under the legacy events.jsonl path; readAllSessionEventLines
+      // picks it up via the dual-read.
       writeFileSync(
         join(sessionDir, 'events.jsonl'),
         JSON.stringify({
@@ -152,12 +168,18 @@ describe('ConversationRunner', () => {
           data: { type: 'system_prompt_set', text: 'You are a test assistant.' },
         }) + '\n'
       );
+
+      savedLaceDir = process.env.LACE_DIR;
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
     });
 
     afterEach(() => {
+      if (savedLaceDir === undefined) delete process.env.LACE_DIR;
+      else process.env.LACE_DIR = savedLaceDir;
       // Clean up temp directories
-      if (existsSync(sessionDir)) {
-        rmSync(sessionDir, { recursive: true, force: true });
+      if (existsSync(laceDir)) {
+        rmSync(laceDir, { recursive: true, force: true });
       }
       if (existsSync(cwd)) {
         rmSync(cwd, { recursive: true, force: true });
@@ -210,12 +232,7 @@ describe('ConversationRunner', () => {
         startedAt: new Date().toISOString(),
       });
 
-      const eventsPath = join(sessionDir, 'events.jsonl');
-      const eventsRaw = readFileSync(eventsPath, 'utf8');
-      const events = eventsRaw
-        .split('\n')
-        .filter((line) => line.trim())
-        .map((line) => JSON.parse(line));
+      const { events } = readDurableEvents(sessionDir, {});
 
       // Should have at least message and turn_end events (prompt/turn_start are written by the RPC layer)
       expect(events.length).toBeGreaterThanOrEqual(2);

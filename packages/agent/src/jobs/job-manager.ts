@@ -2,14 +2,14 @@
 // Consolidates scattered job code into single session-scoped service
 
 import { randomUUID } from 'node:crypto';
-import { readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import type { JobState, JobStatus, JobType, JobNotificationType } from '../server-types';
 import { MAX_CONCURRENT_JOBS } from '../server-types';
 import type { PersonaContainerRuntime } from './persona-container-spec';
 import { toNonEmptyString } from '../rpc/utils';
 import { getJobOutputPath } from './job-file-utils';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
+import { readAllSessionEventLines } from '../storage/event-log';
 
 export type JobManagerDeps = {
   getActiveSession: () => { sessionId: string; dir: string } | null;
@@ -156,41 +156,24 @@ export class JobManager {
     if (!activeSession) return [];
 
     const { sessionId, dir: sessionDir } = activeSession;
-    const eventsPath = join(sessionDir, 'events.jsonl');
 
-    // Check file stats for cache validation
-    let fileSize = 0;
-    let fileMtime = 0;
-    try {
-      const stats = statSync(eventsPath);
-      fileSize = stats.size;
-      fileMtime = stats.mtimeMs;
-    } catch {
-      // File doesn't exist - return empty
-      return [];
-    }
+    // Pull every line from both legacy and new layouts; dual-read returns
+    // them in eventSeq order. Cache by sessionId + lineCount as a cheap
+    // change detector; line count is monotonic, so any append busts the cache.
+    const lines = readAllSessionEventLines(sessionDir);
+    const lineCount = lines.length;
 
-    // Check if cache is valid
     if (
       this.listJobsCache &&
       this.listJobsCache.sessionId === sessionId &&
-      this.listJobsCache.fileSize === fileSize &&
-      this.listJobsCache.fileMtime === fileMtime
+      this.listJobsCache.fileSize === lineCount &&
+      this.listJobsCache.fileMtime === 0
     ) {
       return this.applyRunningStatus(this.listJobsCache.result);
     }
 
-    // Cache miss - read and parse the file
-    let raw = '';
-    try {
-      raw = readFileSync(eventsPath, 'utf8');
-    } catch {
-      return [];
-    }
-
     const byId = new Map<string, JobRecord>();
 
-    const lines = raw.split('\n');
     for (const line of lines) {
       if (!line) continue;
       try {
@@ -255,12 +238,15 @@ export class JobManager {
       }
     }
 
-    // Update cache with parsed results (before applying running status updates)
+    // Update cache with parsed results (before applying running status updates).
+    // We piggyback on the (sessionId, fileSize, fileMtime) shape: fileSize is
+    // the line count, fileMtime is always 0 — sufficient because line counts
+    // grow monotonically with appends.
     const parsedResult = Array.from(byId.values());
     this.listJobsCache = {
       sessionId,
-      fileSize,
-      fileMtime,
+      fileSize: lineCount,
+      fileMtime: 0,
       result: parsedResult,
     };
 
