@@ -173,12 +173,28 @@ export async function handleSlashCommand(
         });
 
         if (result.summary) {
-          // Write compaction event
+          // Build the preserved array: compacted messages + the last message that
+          // was excluded from `dropped` (providerMessages.slice(-1)).
+          const preservedMessages = [...result.messages, ...providerMessages.slice(-1)];
+          const serializedPreserved = preservedMessages.map((m) => ({
+            role: m.role,
+            content: typeof m.content === 'string' ? m.content : '',
+            ...(Array.isArray(m.toolCalls) ? { toolCalls: m.toolCalls } : {}),
+            ...(Array.isArray(m.toolResults) ? { toolResults: m.toolResults } : {}),
+          }));
+
+          // Write context_compacted event matching the wire shape used by the
+          // ent/session/compact RPC handler so message-builder picks it up on
+          // rebuild. The old 'compaction' type had no 'preserved' field and was
+          // silently ignored, making /compact a no-op across process restarts.
           await writeAndAdvance({
-            type: 'compaction',
+            type: 'context_compacted',
             data: {
+              strategy: 'summarize',
+              preserveRecent: 1,
+              messagesCompacted: providerMessages.length - 1,
               summary: result.summary,
-              droppedCount: providerMessages.length - 1,
+              preserved: serializedPreserved,
             },
           });
           return finishTurn(`Context compacted. Summary:\n\n${result.summary}`);

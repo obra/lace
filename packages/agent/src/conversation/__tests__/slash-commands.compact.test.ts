@@ -1,5 +1,5 @@
-// ABOUTME: Tests that /compact calls setSystemPrompt(SUMMARIZER_SYSTEM_PROMPT) on the
-// ABOUTME: throwaway provider, preventing getEffectiveSystemPrompt warn-fallback noise.
+// ABOUTME: Tests for the /compact slash command: summarizer prompt ordering and
+// ABOUTME: correct context_compacted event wire format so message-builder picks it up on rebuild.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -156,5 +156,101 @@ describe('/compact slash command — summarizer prompt', () => {
     );
 
     expect(callOrder).toEqual(['setSystemPrompt', 'compact']);
+  });
+});
+
+describe('/compact writes context_compacted event that message-builder recognises', () => {
+  let tempDir: string;
+  let mockProvider: { setSystemPrompt: ReturnType<typeof vi.fn> };
+
+  // Three messages: first two are "dropped", last one is preserved as the most recent.
+  const mockMessages = [
+    { role: 'user' as const, content: 'Hello there' },
+    { role: 'assistant' as const, content: 'Hi back' },
+    { role: 'user' as const, content: 'Tell me more' },
+  ];
+
+  // The summarize strategy returns a single synthetic message containing the summary.
+  const summaryMessage = { role: 'assistant' as const, content: 'SUMMARY: previous talk' };
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'lace-compact-event-test-'));
+
+    mockProvider = { setSystemPrompt: vi.fn() };
+    vi.mocked(createProviderForTurn).mockResolvedValue(
+      mockProvider as unknown as Awaited<ReturnType<typeof createProviderForTurn>>
+    );
+
+    vi.mocked(buildProviderMessagesFromDurableEvents).mockReturnValue({
+      messages: mockMessages,
+      systemPrompt: 'some system prompt',
+    });
+
+    vi.mocked(compactDroppedMessagesWithCore).mockResolvedValue({
+      messages: [summaryMessage],
+      summary: 'SUMMARY: previous talk',
+    });
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+    vi.clearAllMocks();
+  });
+
+  it('written event has type "context_compacted" with required fields', async () => {
+    const state = makeMinimalState(tempDir);
+    const writtenEvents: Array<{ type: string; data: Record<string, unknown> }> = [];
+
+    await handleSlashCommand(
+      state,
+      'compact',
+      '',
+      'turn-001',
+      vi.fn().mockImplementation(async (event: { type: string; data: Record<string, unknown> }) => {
+        writtenEvents.push(event);
+      }),
+      vi.fn().mockResolvedValue(undefined),
+      makeMockCreateToolExecutorForMode()
+    );
+
+    const compactionEvents = writtenEvents.filter((e) => e.type === 'context_compacted');
+    expect(compactionEvents).toHaveLength(1);
+
+    const eventData = compactionEvents[0].data;
+    expect(eventData.strategy).toBe('summarize');
+    expect(Array.isArray(eventData.preserved)).toBe(true);
+    expect(typeof eventData.summary).toBe('string');
+    expect((eventData.summary as string).length).toBeGreaterThan(0);
+
+    // No legacy 'compaction'-typed events — those are silently ignored by message-builder.
+    expect(writtenEvents.find((e) => e.type === 'compaction')).toBeUndefined();
+  });
+
+  it('preserved array contains the compacted messages plus the last original message', async () => {
+    const state = makeMinimalState(tempDir);
+    const writtenEvents: Array<{ type: string; data: Record<string, unknown> }> = [];
+
+    await handleSlashCommand(
+      state,
+      'compact',
+      '',
+      'turn-001',
+      vi.fn().mockImplementation(async (event: { type: string; data: Record<string, unknown> }) => {
+        writtenEvents.push(event);
+      }),
+      vi.fn().mockResolvedValue(undefined),
+      makeMockCreateToolExecutorForMode()
+    );
+
+    const eventData = writtenEvents.find((e) => e.type === 'context_compacted')!.data;
+    const preserved = eventData.preserved as Array<{ role: string; content: string }>;
+
+    // Should be: [summaryMessage, lastOriginalMessage]
+    expect(preserved).toHaveLength(2);
+    expect(preserved[0].role).toBe(summaryMessage.role);
+    expect(preserved[0].content).toBe(summaryMessage.content);
+    // Last original message (the one NOT passed to `dropped`)
+    expect(preserved[1].role).toBe(mockMessages[2].role);
+    expect(preserved[1].content).toBe(mockMessages[2].content);
   });
 });
