@@ -6,6 +6,7 @@ import { asSessionId } from '@lace/ent-protocol';
 import {
   deriveNextEventSeqFromEventLog,
   invalidatePersonaCache,
+  repairOrphanTurnStarts,
   summarizeDurableEvents,
 } from './event-log';
 import { atomicWriteJson } from './atomic-write';
@@ -213,13 +214,33 @@ export function listSessions(cwd?: string): Array<{
     .filter((s) => (cwd ? s.cwd === cwd : true));
 }
 
-export function loadSession(sessionId: string): LoadedSession {
+/**
+ * Options for `loadSession`.
+ *
+ * `repairOrphanTurnStarts` is opt-in because `loadSession` is called both
+ * for actual session-open (cold start from disk) AND for mid-flight
+ * in-memory refreshes after a write. The crash-recovery scan must only run
+ * on a true open — synthesizing a turn_end for the active in-flight turn
+ * would corrupt the durable log. See PRI-1818.
+ */
+export type LoadSessionOptions = {
+  /**
+   * When true, scan events.jsonl for orphan turn_starts left by a prior
+   * process and synthesize a `turn_end` event with stopReason='process_died'
+   * for each. Use only at cold session-open (e.g. session/load,
+   * session/resume) before any new event is appended for this session in
+   * the current process. Default: false.
+   */
+  repairOrphanTurnStarts?: boolean;
+};
+
+export function loadSession(sessionId: string, options?: LoadSessionOptions): LoadedSession {
   const sessionDir = getSessionDir(sessionId);
   const metaPath = path.join(sessionDir, 'meta.json');
   if (!fs.existsSync(metaPath)) throw new Error('Session not found');
 
   const meta = readSessionMeta(sessionDir);
-  const state = readSessionState(sessionDir);
+  let state = readSessionState(sessionDir);
   ensureSessionFiles(sessionDir);
 
   // events.jsonl is the durable source of truth; repair state.nextEventSeq on load.
@@ -227,6 +248,20 @@ export function loadSession(sessionId: string): LoadedSession {
   if (state.nextEventSeq !== repairedNextEventSeq) {
     state.nextEventSeq = repairedNextEventSeq;
     writeSessionState(sessionDir, state);
+  }
+
+  if (options?.repairOrphanTurnStarts) {
+    // Crash recovery: if the prior process died between turn_start and turn_end
+    // (SIGKILL, OOM, container restart), synthesize a turn_end with
+    // stopReason='process_died' so the durable log honors the invariant that
+    // every turn_start has a matching turn_end. Must run BEFORE any new event
+    // is appended by the opener so the new turn's eventSeq sits after the
+    // synthesized one. See PRI-1818.
+    const repair = repairOrphanTurnStarts(sessionDir, state);
+    if (repair.synthesized > 0) {
+      state = repair.nextState;
+      writeSessionState(sessionDir, state);
+    }
   }
 
   return { meta, dir: sessionDir, state };
