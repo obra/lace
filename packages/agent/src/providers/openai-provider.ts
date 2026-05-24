@@ -1194,6 +1194,17 @@ export class OpenAIProvider extends AIProvider {
                 error?: { code: string; message: string } | null;
               }
             | undefined;
+          // Refusal-item capture (spec §3.4 / chunk F):
+          //   - response.refusal.done carries the FINAL refusal text; we use that as the
+          //     canonical value passed to the normalizer.
+          //   - response.refusal.delta events are intentionally ignored (the .done event's
+          //     `refusal` field already contains the full text per SDK contract); we still
+          //     handle the case to suppress the default-branch fallthrough.
+          //   - refusalText is preserved across output_item.added boundaries — if multiple
+          //     items emit .done, the last one wins.
+          // refusalText must never be appended to `content` — refusals are policy responses,
+          // not assistant output.
+          let refusalText: string | null = null;
 
           // Track tool calls by output index
           const toolCallsByIndex = new Map<
@@ -1246,6 +1257,24 @@ export class OpenAIProvider extends AIProvider {
                   hasThinkingBlock = true;
                   this.emit('thinking_start', {});
                 }
+                break;
+
+              case 'response.refusal.delta':
+                // Refusal deltas are observed but intentionally not accumulated:
+                // response.refusal.done's `refusal` field carries the full text. We
+                // explicitly handle the case so the default branch doesn't log it as
+                // an unknown event type. Never append to `content` — refusals are
+                // policy responses, not assistant output.
+                break;
+
+              case 'response.refusal.done':
+                // Finalize the refusal text for this item. If multiple refusal-done
+                // events fire across multiple items in one Response, the last one wins
+                // (per chunk F note on the rare multi-item-refusal case).
+                // A refusal in any output item poisons the whole response. Text from later
+                // output items is still captured in `content`, but the normalizer's precedence
+                // (per stop-reason.ts §3.4) makes refusal the canonical stopReason.
+                refusalText = event.refusal;
                 break;
 
               case 'response.function_call_arguments.delta': {
@@ -1380,8 +1409,10 @@ export class OpenAIProvider extends AIProvider {
               completedResponse.status ?? 'unknown',
               completedResponse.incomplete_details ?? null,
               completedResponse.error ?? null,
-              // Refusal-item capture lands in chunk F.
-              null,
+              // Refusal text captured from response.refusal.done above (chunk F).
+              // When non-null, the normalizer's precedence (spec §3.4) puts this
+              // ahead of `status: completed`, yielding stopReason='refusal'.
+              refusalText,
               toolCalls.length > 0
             ));
           } else if (signal?.aborted) {
