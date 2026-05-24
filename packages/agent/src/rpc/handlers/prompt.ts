@@ -13,6 +13,8 @@ import {
   findLastTurnEndEventSeq,
   hasPendingImmediateInjects,
 } from '@lace/agent/storage/event-log';
+import { PROMPT_HANDLER_CAUGHT_STOP_REASON } from '@lace/agent/storage/event-types';
+import { logger } from '@lace/agent/utils/logger';
 import { findUserCommand } from '@lace/agent/user-commands';
 import type {
   SessionUpdate,
@@ -87,28 +89,40 @@ export function registerPromptHandler(
 
     state.activeTurn = { turnId, startedAt, status: 'running', abortController };
 
-    try {
-      let durableTurnSeq = 0;
-      const writeAndAdvance = async (event: { type: string; data: Record<string, unknown> }) => {
-        await runExclusive(() => {
-          if (!state.activeSession) return;
-          let sessionState: SessionState = readSessionState(state.activeSession.dir);
-          const { nextState } = appendDurableEvent(state.activeSession.dir, sessionState, {
-            type: event.type,
-            data: event.data,
-            turnId,
-            turnSeq: durableTurnSeq++,
-          });
-          sessionState = nextState;
-          writeSessionState(state.activeSession.dir, sessionState);
-          state.activeSession = { ...state.activeSession, state: sessionState };
+    // Hoisted outside the try so the catch handler (PRI-1818 #2 fallback) can
+    // reuse the same write path to synthesize a turn_end. The turnSeq counter
+    // is intentionally local to this handler invocation; the runner has its
+    // own counter and the storage layer dedups any duplicate turn_end on this
+    // turnId, so fallback writes don't conflict with the runner's writes.
+    let durableTurnSeq = 0;
+    const writeAndAdvance = async (event: { type: string; data: Record<string, unknown> }) => {
+      await runExclusive(() => {
+        if (!state.activeSession) return;
+        let sessionState: SessionState = readSessionState(state.activeSession.dir);
+        const { nextState } = appendDurableEvent(state.activeSession.dir, sessionState, {
+          type: event.type,
+          data: event.data,
+          turnId,
+          turnSeq: durableTurnSeq++,
         });
-      };
+        sessionState = nextState;
+        writeSessionState(state.activeSession.dir, sessionState);
+        state.activeSession = { ...state.activeSession, state: sessionState };
+      });
+    };
 
+    // Tracks whether turn_start was actually written, so the catch handler
+    // only synthesizes turn_end when there is a turn to close. If we throw
+    // before turn_start (e.g. param-validation failure inside the try), no
+    // fallback turn_end is needed.
+    let turnStartWritten = false;
+
+    try {
       const promptContent = parsed.content as unknown[];
 
       await writeAndAdvance({ type: 'prompt', data: { content: promptContent } });
       await writeAndAdvance({ type: 'turn_start', data: {} });
+      turnStartWritten = true;
       await emitSessionUpdate({ type: 'turn_start' }, { turnId, turnSeq: 0 });
 
       const emitUpdate = async (turnSeq: number, update: SessionUpdate) => {
@@ -356,6 +370,28 @@ export function registerPromptHandler(
       }
 
       return result;
+    } catch (err) {
+      // PRI-1818 #2: defense-in-depth fallback turn_end. The runner is
+      // supposed to always write turn_end before throwing (PRI-1818 #1),
+      // but this catch backstops any path the runner can't cover —
+      // throws between turn_start and runner.run() starting, throws from
+      // runner construction, or future bugs in #1's error classifier.
+      // The storage layer dedups by turnId, so if the runner already wrote
+      // its own turn_end this write is a silent no-op.
+      if (turnStartWritten) {
+        try {
+          await writeAndAdvance({
+            type: 'turn_end',
+            data: { stopReason: PROMPT_HANDLER_CAUGHT_STOP_REASON },
+          });
+        } catch (writeErr) {
+          logger.error('prompt handler: failed to write fallback turn_end', {
+            turnId,
+            writeErr: writeErr instanceof Error ? writeErr.message : String(writeErr),
+          });
+        }
+      }
+      throw err;
     } finally {
       state.activeTurn = null;
     }

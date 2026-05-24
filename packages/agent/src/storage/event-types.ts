@@ -76,6 +76,15 @@ export type TurnEndEventData = {
  */
 export const PROCESS_DIED_STOP_REASON = 'process_died';
 
+/**
+ * stopReason value used by prompt.ts when the conversation runner threw an
+ * unhandled error and the handler had to synthesize a fallback turn_end to
+ * preserve the "every turn_start has a matching turn_end" invariant
+ * (PRI-1818 #2). Distinct from runner-internal stopReasons so cost
+ * accounting and reliability dashboards can identify defense-in-depth fires.
+ */
+export const PROMPT_HANDLER_CAUGHT_STOP_REASON = 'prompt_handler_caught';
+
 export type ContextCompactedEventData = {
   type: 'context_compacted';
   strategy: string;
