@@ -11,6 +11,7 @@ import {
 } from '@lace/agent/storage/session-store';
 import { compactDroppedMessagesWithCore } from '@lace/agent/compaction/compact-dropped-messages';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
+import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import { type SessionUpdate, type AgentServerState } from '@lace/agent/server-types';
 import { createProviderForTurn } from './provider-factory';
 import { getEffectiveConfig } from '@lace/agent/core/session';
@@ -131,9 +132,19 @@ export async function handleSlashCommand(
         // Use the summarize strategy for compaction
         const sessionDir = state.activeSession.dir;
         const sessionId = state.activeSession.meta.sessionId;
-        const { messages: providerMessages } = buildProviderMessagesFromDurableEvents(sessionDir);
+        const { messages: providerMessages, systemPrompt } =
+          buildProviderMessagesFromDurableEvents(sessionDir);
 
-        if (providerMessages.length < 2) {
+        // Check if there's anything worth compacting: either multiple messages
+        // or a substantial system prompt. Include system prompt tokens in the budget.
+        const messageTokens = providerMessages.reduce(
+          (sum, msg) => sum + estimateTokens(String(msg.content)),
+          0
+        );
+        const systemPromptTokens = estimateTokens(systemPrompt);
+        const totalTokens = messageTokens + systemPromptTokens;
+
+        if (providerMessages.length < 2 && totalTokens < 1000) {
           return finishTurn('Context is already minimal. Nothing to compact.');
         }
 

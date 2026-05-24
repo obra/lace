@@ -172,7 +172,7 @@ describe('PRI-1799/streaming smoke — cache_control on the stream path', () => 
     expect(body.tools![0].cache_control).toBeUndefined();
 
     // ── 3. total cache_control marker count: 4 (system + last-tool + anchor + tail)
-    //    This conversation has 19 cacheable blocks (6 rounds × 3 messages + final),
+    //    This conversation has 25 cacheable blocks (system + 6 rounds of 4 blocks each + final),
     //    which exceeds ANCHOR_OFFSET_RAW_BLOCKS (10), so the stable anchor fires.
     const total = (JSON.stringify(body).match(/"cache_control"/g) ?? []).length;
     expect(total).toBe(4);
