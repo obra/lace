@@ -368,15 +368,15 @@ export function registerSessionHandlers(
         : undefined;
 
     // Persona may arrive top-level (subagent/delegate path) or nested under config.
-    const requestedPersona =
-      toNonEmptyString(parsed.config?.persona) ?? toNonEmptyString(parsed.persona);
-
-    // Reject shape-invalid persona names before any storage writes or registry
-    // lookups so the durable-event hot path (which calls personaSegment) never
-    // sees a name it would reject. See transcript-paths.validatePersonaName.
-    if (requestedPersona != null) {
+    // Validate the RAW string value BEFORE any trimming/coercion so we can't
+    // silently accept "  ada  " (whitespace stripped to "ada") or drop "   "
+    // (whitespace-only collapses to null and looks like "no persona"). The
+    // validator rejects leading/trailing whitespace and all-whitespace, so
+    // running it on the raw input surfaces both as PersonaInvalid RPC errors.
+    const rawPersona = parsed.config?.persona ?? parsed.persona;
+    if (typeof rawPersona === 'string') {
       try {
-        validatePersonaName(requestedPersona);
+        validatePersonaName(rawPersona);
       } catch (err) {
         throw {
           code: -32602,
@@ -385,6 +385,14 @@ export function registerSessionHandlers(
         };
       }
     }
+
+    // Only after raw validation passes do we trim/coerce for downstream use.
+    // validatePersonaName already rejected the only shapes where trimming
+    // would change meaning (leading/trailing whitespace, all-whitespace), so
+    // toNonEmptyString is now a no-op coercion that just narrows the type to
+    // string | null.
+    const requestedPersona =
+      toNonEmptyString(parsed.config?.persona) ?? toNonEmptyString(parsed.persona);
 
     // Parse persona frontmatter before any storage writes so we fail fast on invalid input.
     const personaDefaults: {

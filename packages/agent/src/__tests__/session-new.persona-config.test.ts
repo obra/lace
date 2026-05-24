@@ -306,6 +306,41 @@ persona body`
     ).rejects.toThrow();
   });
 
+  it('rejects persona with leading/trailing whitespace (not silently coerced)', async () => {
+    // Seed a file at the trimmed name so the only way the request can succeed
+    // is if validation runs against the trimmed string instead of the raw one.
+    // The raw input "  ada  " MUST be rejected on whitespace shape, not
+    // accepted as "ada".
+    writeFileSync(join(userPersonasDir, 'ada.md'), 'You are ada.');
+
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request(
+      'initialize',
+      defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+    );
+
+    await expect(
+      client.request('session/new', { cwd: tempDir, persona: '  ada  ' })
+    ).rejects.toThrow();
+  });
+
+  it('rejects all-whitespace persona (not silently dropped)', async () => {
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request(
+      'initialize',
+      defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+    );
+
+    // "   " is whitespace-only. Trimming would collapse to "" and the old
+    // toNonEmptyString-then-validate flow silently dropped it (treated as
+    // "no persona"). The validator must reject it as a malformed name.
+    await expect(client.request('session/new', { cwd: tempDir, persona: '   ' })).rejects.toThrow();
+  });
+
   it('rejects _unknown sentinel as persona even if a matching file exists', async () => {
     writeFileSync(join(userPersonasDir, '_unknown.md'), 'sentinel');
 
