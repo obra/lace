@@ -39,6 +39,7 @@ import {
 import type { RunnerConfig, RunnerDependencies, RunParams, RunResult, ApprovalMode } from './types';
 import type { RequestOptions } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
+import { logger } from '@lace/agent/utils/logger';
 
 // First-person future-tense intent markers. When the model emits one of these
 // on a text-only turn following a tool round-trip, it has declared work it has
