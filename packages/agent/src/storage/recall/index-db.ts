@@ -25,13 +25,25 @@ CREATE VIRTUAL TABLE IF NOT EXISTS events USING fts5(
 export function openRecallIndex(dbPath: string): Db {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true, mode: SECURE_DIR_MODE });
   const db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
   // Multi-process subagent containers share LACE_DIR and contend on this
   // file. WAL allows concurrent readers + one writer, but contending writers
   // still get SQLITE_BUSY immediately without a timeout. 5 seconds is long
   // enough for any single-row insert to complete, short enough to avoid
   // unbounded blocking of the event-write path on a true deadlock.
+  //
+  // ORDER MATTERS: busy_timeout must be set BEFORE journal_mode. The
+  // journal_mode pragma briefly acquires the write lock to switch modes; if
+  // another process is mid-write it returns SQLITE_BUSY immediately unless
+  // busy_timeout is already in effect.
   db.pragma('busy_timeout = 5000');
+  // Setting journal_mode = WAL needs an EXCLUSIVE lock and busy_timeout
+  // does NOT cover that path — a concurrent writer trips SQLITE_BUSY
+  // immediately. Once the file is already in WAL (set on first open,
+  // persists across opens), skip the assignment to avoid taking the lock.
+  const currentMode = db.pragma('journal_mode', { simple: true }) as string;
+  if (currentMode !== 'wal') {
+    db.pragma('journal_mode = WAL');
+  }
   db.exec(SCHEMA);
   // Apply 0o600 to the index file and any WAL/SHM sidecars. In-memory
   // databases (dbPath === ':memory:') have no on-disk file; skip them.
