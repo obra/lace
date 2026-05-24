@@ -12,3 +12,4 @@ export { TestProvider } from './test-provider';
 export { mockProviderMethods } from './mock-provider-methods';
 export { createTestProviderInstance, cleanupTestProviderInstances } from './provider-instances';
 export { setupTestProviderDefaults, cleanupTestProviderDefaults } from './provider-defaults';
+export { anthropicBaseMessagesTrap } from './anthropic-base-namespace-trap';

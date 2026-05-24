@@ -8,6 +8,7 @@ import { ToolResult, ToolContext } from '@lace/agent/tools/types';
 import { z } from 'zod';
 import type Anthropic from '@anthropic-ai/sdk';
 import { StreamingEvents } from '../types';
+import { anthropicBaseMessagesTrap } from '@lace/agent/test-utils/anthropic-base-namespace-trap';
 
 // Mock external Anthropic SDK to avoid real API calls during tests
 // Tests focus on provider logic, not Anthropic API implementation
@@ -17,9 +18,16 @@ const mockStreamResponse = vi.fn();
 vi.mock('@anthropic-ai/sdk', () => {
   return {
     default: class MockAnthropic {
-      messages = {
-        create: mockCreateResponse,
-        stream: mockStreamResponse,
+      // The provider routes through beta.messages.* (chunk I migration). The
+      // base messages.* slot is a throwing trap — any call to client.messages.*
+      // means we've regressed and the test must fail loudly.
+      messages = anthropicBaseMessagesTrap();
+      beta = {
+        messages: {
+          create: mockCreateResponse,
+          stream: mockStreamResponse,
+          countTokens: vi.fn().mockResolvedValue({ input_tokens: 100 }),
+        },
       };
     },
   };

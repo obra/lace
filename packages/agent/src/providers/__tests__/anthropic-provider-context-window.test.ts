@@ -3,18 +3,19 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AnthropicProvider } from '../anthropic-provider';
+import { anthropicBaseMessagesTrap } from '@lace/agent/test-utils/anthropic-base-namespace-trap';
 
 const mockCreate = vi.fn();
 const mockStream = vi.fn();
 
 vi.mock('@anthropic-ai/sdk', () => {
   const MockAnthropic = vi.fn().mockImplementation(() => ({
-    messages: {
-      create: mockCreate,
-      stream: mockStream,
-    },
+    // Throwing trap on base namespace — provider must call beta.messages.*
+    messages: anthropicBaseMessagesTrap(),
     beta: {
       messages: {
+        create: mockCreate,
+        stream: mockStream,
         countTokens: vi.fn().mockResolvedValue({ input_tokens: 100 }),
       },
     },

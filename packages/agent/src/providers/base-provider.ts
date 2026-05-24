@@ -94,6 +94,15 @@ export interface ConversationState {
 
 export interface RequestOptions {
   toolChoice?: 'auto' | 'required' | 'none';
+  /**
+   * Anthropic-direct only: additional typed beta opt-ins to add to the
+   * computed betas[] for this single request, on top of catalog + global
+   * observability betas. YAGNI today — slot exists for future internal use
+   * (e.g. an experimental code path that needs a one-off beta). Strings here
+   * are interpreted as AnthropicBeta values by `getBetasForRequest`.
+   * Bedrock and non-Anthropic providers ignore this field.
+   */
+  additionalBetas?: string[];
 }
 
 /**

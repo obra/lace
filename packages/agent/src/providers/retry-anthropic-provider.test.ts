@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AnthropicProvider } from './anthropic-provider';
 import { ProviderMessage } from './base-provider';
+import { anthropicBaseMessagesTrap } from '@lace/agent/test-utils/anthropic-base-namespace-trap';
 
 // Subclass that exposes isRetryableError for direct unit testing
 class TestableAnthropicProvider extends AnthropicProvider {
@@ -19,12 +20,12 @@ const mockStream = vi.fn();
 // Mock the Anthropic SDK
 vi.mock('@anthropic-ai/sdk', () => {
   const MockAnthropic = vi.fn().mockImplementation(() => ({
-    messages: {
-      create: mockCreate,
-      stream: mockStream,
-    },
+    // Throwing trap on base namespace — provider must call beta.messages.*
+    messages: anthropicBaseMessagesTrap(),
     beta: {
       messages: {
+        create: mockCreate,
+        stream: mockStream,
         countTokens: vi.fn().mockResolvedValue({ input_tokens: 100 }),
       },
     },

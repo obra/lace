@@ -13,6 +13,7 @@ import { ProviderCatalogManager } from './catalog/manager';
 // import { Project } from '~/projects/project';
 // import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupCoreTest } from '@lace/agent/test-utils/core-test-setup';
+import { anthropicBaseMessagesTrap } from '@lace/agent/test-utils/anthropic-base-namespace-trap';
 import type { ProviderInstancesConfig, CatalogProvider } from './catalog/types';
 
 // Mock OpenAI-compatible server factory
@@ -471,41 +472,48 @@ describe('Provider Instance E2E Tests', () => {
 
       // Mock the Anthropic provider's getAnthropicClient method to verify baseURL configuration
       const anthropicProvider = provider as unknown as {
-        getAnthropicClient: () => { baseURL: string; messages: unknown };
+        getAnthropicClient: () => { baseURL: string; beta: unknown };
       };
       const originalGetClient = anthropicProvider.getAnthropicClient.bind(
         anthropicProvider
-      ) as () => { baseURL: string; messages: unknown };
+      ) as () => { baseURL: string; beta: unknown };
       let capturedBaseURL: string | undefined;
 
       anthropicProvider.getAnthropicClient = vi.fn().mockImplementation(() => {
         const client = originalGetClient();
         capturedBaseURL = client.baseURL;
 
-        // Mock the messages.create method to return a test response
-        client.messages = {
-          create: vi.fn().mockResolvedValue({
-            id: 'msg_test',
-            type: 'message',
-            role: 'assistant',
-            content: [
-              {
-                type: 'text',
-                text: `Anthropic response from ${capturedBaseURL} with key test-anthropic-key`,
-              },
-            ],
-            model: 'claude-3-sonnet-20241022',
-            stop_reason: 'end_turn',
-            stop_sequence: null,
-            usage: {
-              input_tokens: 10,
-              output_tokens: 20,
+        // Provider now routes through beta.messages.* — see chunk I migration.
+        const stubResponse = {
+          id: 'msg_test',
+          type: 'message',
+          role: 'assistant',
+          content: [
+            {
+              type: 'text',
+              text: `Anthropic response from ${capturedBaseURL} with key test-anthropic-key`,
             },
-          }),
+          ],
+          model: 'claude-3-sonnet-20241022',
+          stop_reason: 'end_turn',
+          stop_sequence: null,
+          usage: {
+            input_tokens: 10,
+            output_tokens: 20,
+          },
+        };
+        // Throwing trap on base namespace — provider must call beta.messages.*
+        (client as { messages: unknown }).messages = anthropicBaseMessagesTrap();
+        (client as { beta: unknown }).beta = {
+          messages: {
+            create: vi.fn().mockResolvedValue(stubResponse),
+            stream: vi.fn(),
+            countTokens: vi.fn().mockResolvedValue({ input_tokens: 100 }),
+          },
         };
 
-        return client as { baseURL: string; messages: unknown };
-      }) as () => { baseURL: string; messages: unknown };
+        return client as { baseURL: string; beta: unknown };
+      }) as () => { baseURL: string; beta: unknown };
 
       const response = await provider.createResponse(
         [{ role: 'user', content: 'Hello Anthropic' }],
@@ -535,11 +543,17 @@ describe('Provider Instance E2E Tests', () => {
 
       // Mock the Anthropic provider to simulate auth failure
       const anthropicProvider = provider as unknown as {
-        getAnthropicClient: () => { messages: unknown };
+        getAnthropicClient: () => { messages: unknown; beta: unknown };
       };
       anthropicProvider.getAnthropicClient = vi.fn().mockImplementation(() => ({
-        messages: {
-          create: vi.fn().mockRejectedValue(new Error('Authentication failed: Invalid API key')),
+        // Throwing trap on base namespace — provider must call beta.messages.*
+        messages: anthropicBaseMessagesTrap(),
+        beta: {
+          messages: {
+            create: vi.fn().mockRejectedValue(new Error('Authentication failed: Invalid API key')),
+            stream: vi.fn(),
+            countTokens: vi.fn().mockResolvedValue({ input_tokens: 100 }),
+          },
         },
       }));
 
@@ -595,35 +609,41 @@ describe('Provider Instance E2E Tests', () => {
 
       // Mock the Anthropic provider to avoid MSW/AbortSignal issues
       const anthropicProviderAny = anthropicProvider as unknown as {
-        getAnthropicClient: () => { messages: unknown };
+        getAnthropicClient: () => { beta: unknown };
       };
       const originalGetClient = anthropicProviderAny.getAnthropicClient.bind(
         anthropicProviderAny
-      ) as () => { messages: unknown };
+      ) as () => { beta: unknown };
       anthropicProviderAny.getAnthropicClient = vi.fn().mockImplementation(() => {
         const client = originalGetClient();
-        client.messages = {
-          create: vi.fn().mockResolvedValue({
-            id: 'msg_test',
-            type: 'message',
-            role: 'assistant',
-            content: [
-              {
-                type: 'text',
-                text: 'Anthropic response from http://mock-anthropic.test with key test-anthropic-key',
+        // Throwing trap on base namespace — provider must call beta.messages.*
+        (client as { messages: unknown }).messages = anthropicBaseMessagesTrap();
+        (client as { beta: unknown }).beta = {
+          messages: {
+            create: vi.fn().mockResolvedValue({
+              id: 'msg_test',
+              type: 'message',
+              role: 'assistant',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Anthropic response from http://mock-anthropic.test with key test-anthropic-key',
+                },
+              ],
+              model: 'claude-3-sonnet-20241022',
+              stop_reason: 'end_turn',
+              stop_sequence: null,
+              usage: {
+                input_tokens: 10,
+                output_tokens: 20,
               },
-            ],
-            model: 'claude-3-sonnet-20241022',
-            stop_reason: 'end_turn',
-            stop_sequence: null,
-            usage: {
-              input_tokens: 10,
-              output_tokens: 20,
-            },
-          }),
+            }),
+            stream: vi.fn(),
+            countTokens: vi.fn().mockResolvedValue({ input_tokens: 100 }),
+          },
         };
-        return client as { messages: unknown };
-      }) as () => { messages: unknown };
+        return client as { beta: unknown };
+      }) as () => { beta: unknown };
 
       // Make concurrent requests
       const [openaiResponse, anthropicResponse, ollamaResponse] = await Promise.all([

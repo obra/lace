@@ -3,13 +3,24 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type {
-  MessageStreamEvent,
-  RawContentBlockStartEvent,
-  RawContentBlockDeltaEvent,
-  ThinkingDelta,
-} from '@anthropic-ai/sdk/resources/messages';
+  BetaRawMessageStreamEvent,
+  BetaRawContentBlockStartEvent,
+  BetaRawContentBlockDeltaEvent,
+  BetaThinkingDelta,
+  BetaMessage,
+  BetaTextBlock,
+  BetaToolUseBlock,
+  BetaMessageParam,
+} from '@anthropic-ai/sdk/resources/beta/messages/messages';
+import type { AnthropicBeta } from '@anthropic-ai/sdk/resources/beta/beta';
 import { AIProvider, type WireTool } from './base-provider';
-import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderInfo } from './base-provider';
+import {
+  ProviderMessage,
+  ProviderResponse,
+  ProviderConfig,
+  ProviderInfo,
+  RequestOptions,
+} from './base-provider';
 import { normalizeAnthropicStop } from './stop-reason';
 import { tryClassifyAsContextWindow } from './utils/error-classifier';
 import type { CatalogProvider } from './catalog/types';
@@ -24,9 +35,16 @@ import {
   markLastToolForCaching,
   type CacheControlOptions,
 } from './cache-control';
+import { getBetasForRequest } from './anthropic/betas';
 
 interface AnthropicProviderConfig extends ProviderConfig {
   apiKey: string | null;
+  /**
+   * Opt out of the global observability betas (cache-diagnosis,
+   * model-context-window-exceeded). Default = on. Explicit `false` disables.
+   * See `./anthropic/betas.ts` for the full list.
+   */
+  observability_betas_enabled?: boolean;
   [key: string]: unknown; // Allow for additional properties
 }
 
@@ -146,8 +164,9 @@ export class AnthropicProvider extends AIProvider {
   private _createRequestPayload(
     messages: ProviderMessage[],
     tools: WireTool[],
-    model: string
-  ): Anthropic.Messages.MessageCreateParams {
+    model: string,
+    opts?: RequestOptions
+  ): Anthropic.Beta.Messages.MessageCreateParams {
     const anthropicMessages = convertToAnthropicFormat(messages);
 
     // PRI-1799/1802/1805: attach a rolling-tail + stable-anchor pair of
@@ -179,12 +198,41 @@ export class AnthropicProvider extends AIProvider {
       messages: messagesWithCaching,
     });
 
-    const payload = {
+    // Compute the typed betas[] once, reading per-model entries from the
+    // attached catalog plus the per-instance observability flag. If no
+    // catalog is attached, parseCatalogBetas returns [] and only the
+    // observability betas (default on) ride along.
+    const catalogForBetas: CatalogProvider =
+      this._catalogData ??
+      ({
+        name: 'anthropic',
+        id: 'anthropic',
+        type: 'anthropic',
+        default_large_model_id: model,
+        default_small_model_id: model,
+        models: [],
+      } as CatalogProvider);
+    const betas = getBetasForRequest(
+      catalogForBetas,
+      model,
+      this._config as AnthropicProviderConfig,
+      opts?.additionalBetas
+        ? { additionalBetas: opts.additionalBetas as AnthropicBeta[] }
+        : undefined
+    );
+
+    // The beta endpoint param shape is structurally compatible with the
+    // base MessageParam (same `role` + `content` fields), but the SDK's
+    // declared content-block union differs. Cast at this single boundary
+    // rather than widening the format-converter return type, which would
+    // ripple into bedrock-provider (no beta namespace on its SDK).
+    const payload: Anthropic.Beta.Messages.MessageCreateParams = {
       model,
       max_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 8192),
-      messages: cappedMessages,
+      messages: cappedMessages as unknown as BetaMessageParam[],
       system: systemWithCaching,
       tools: anthropicTools,
+      betas,
     };
 
     // Comprehensive debug logging of request metadata (excluding message content)
@@ -198,7 +246,10 @@ export class AnthropicProvider extends AIProvider {
       systemPromptLength: systemText?.length || 0,
       systemPromptPreview: systemText?.substring(0, 100) + '...',
       toolCount: payload.tools?.length || 0,
-      toolNames: payload.tools?.map((t) => t.name),
+      // payload.tools is BetaToolUnion[] in the type system. We only ever
+      // construct user-defined `BetaTool`-shaped entries here (which carry a
+      // `name`), so guard the union for the logger.
+      toolNames: payload.tools?.map((t) => ('name' in t ? t.name : '<server-tool>')),
       configKeys: Object.keys(this._config),
       providerName: this.providerName,
     });
@@ -210,22 +261,22 @@ export class AnthropicProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: WireTool[] = [],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    _conversationState?: unknown,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
-        const requestPayload = this._createRequestPayload(messages, tools, model);
+        const requestPayload = this._createRequestPayload(messages, tools, model, options);
 
         // Log request with pretty formatting
         logProviderRequest('anthropic', requestPayload as unknown as Record<string, unknown>);
 
-        const extraHeaders = this.getExtraHeadersForModel(model);
-        let response: Anthropic.Messages.Message;
+        let response: BetaMessage;
         try {
-          response = (await this.getAnthropicClient().messages.create(requestPayload, {
+          response = (await this.getAnthropicClient().beta.messages.create(requestPayload, {
             signal,
-            ...(extraHeaders ? { headers: extraHeaders } : {}),
-          })) as Anthropic.Messages.Message;
+          })) as BetaMessage;
         } catch (providerError) {
           const classified = tryClassifyAsContextWindow(providerError, 'AnthropicProvider');
           if (classified) return classified;
@@ -236,16 +287,13 @@ export class AnthropicProvider extends AIProvider {
         logProviderResponse('anthropic', response);
 
         const textContent = (response.content || [])
-          .filter(
-            (contentBlock): contentBlock is Anthropic.TextBlock => contentBlock.type === 'text'
-          )
+          .filter((contentBlock): contentBlock is BetaTextBlock => contentBlock.type === 'text')
           .map((contentBlock) => contentBlock.text)
           .join('');
 
         const toolCalls: ToolCall[] = (response.content || [])
           .filter(
-            (contentBlock): contentBlock is Anthropic.ToolUseBlock =>
-              contentBlock.type === 'tool_use'
+            (contentBlock): contentBlock is BetaToolUseBlock => contentBlock.type === 'tool_use'
           )
           .map((contentBlock) => ({
             id: contentBlock.id,
@@ -293,24 +341,23 @@ export class AnthropicProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: WireTool[] = [],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    _conversationState?: unknown,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
 
     return this.withRetry(
       async () => {
-        const requestPayload = this._createRequestPayload(messages, tools, model);
+        const requestPayload = this._createRequestPayload(messages, tools, model, options);
 
         // Log streaming request with pretty formatting
         logProviderRequest('anthropic', requestPayload as unknown as Record<string, unknown>, {
           streaming: true,
         });
 
-        // Use the streaming API
-        const extraHeaders = this.getExtraHeadersForModel(model);
-        const stream = this.getAnthropicClient().messages.stream(requestPayload, {
+        const stream = this.getAnthropicClient().beta.messages.stream(requestPayload, {
           signal,
-          ...(extraHeaders ? { headers: extraHeaders } : {}),
         });
 
         let toolCalls: ToolCall[] = [];
@@ -330,7 +377,7 @@ export class AnthropicProvider extends AIProvider {
           let currentBlockType: string | null = null;
 
           // Listen for progressive token usage updates and thinking blocks during streaming
-          stream.on('streamEvent', (event: MessageStreamEvent) => {
+          stream.on('streamEvent', (event: BetaRawMessageStreamEvent) => {
             if (event.type === 'message_delta' && event.usage) {
               const usage = event.usage;
               this.emit('token_usage_update', {
@@ -344,7 +391,7 @@ export class AnthropicProvider extends AIProvider {
 
             // Handle thinking block events
             if (event.type === 'content_block_start') {
-              const startEvent = event as RawContentBlockStartEvent;
+              const startEvent = event as BetaRawContentBlockStartEvent;
               currentBlockType = startEvent.content_block.type;
               if (currentBlockType === 'thinking') {
                 this.emit('thinking_start', {});
@@ -352,9 +399,9 @@ export class AnthropicProvider extends AIProvider {
             }
 
             if (event.type === 'content_block_delta') {
-              const deltaEvent = event as RawContentBlockDeltaEvent;
+              const deltaEvent = event as BetaRawContentBlockDeltaEvent;
               if (deltaEvent.delta.type === 'thinking_delta') {
-                const thinkingDelta = deltaEvent.delta as ThinkingDelta;
+                const thinkingDelta = deltaEvent.delta as BetaThinkingDelta;
                 this.emit('thinking_delta', { text: thinkingDelta.thinking });
               }
             }
@@ -398,17 +445,17 @@ export class AnthropicProvider extends AIProvider {
           });
 
           // Wait for the stream to complete and get the final message
-          const finalMessage = await stream.finalMessage();
+          const finalMessage: BetaMessage = await stream.finalMessage();
 
           // Extract text content from the final message
           const textContent = (finalMessage.content || [])
-            .filter((content): content is Anthropic.TextBlock => content.type === 'text')
+            .filter((content): content is BetaTextBlock => content.type === 'text')
             .map((content) => content.text)
             .join('');
 
           // Extract tool calls from the final message
           toolCalls = (finalMessage.content || [])
-            .filter((content): content is Anthropic.ToolUseBlock => content.type === 'tool_use')
+            .filter((content): content is BetaToolUseBlock => content.type === 'tool_use')
             .map((content) => ({
               id: content.id,
               name: content.name,
@@ -524,15 +571,8 @@ export class AnthropicProvider extends AIProvider {
     return false;
   }
 
-  // Per-model headers from the catalog (e.g. anthropic-beta to opt into the 1M
-  // context window for opus-4-7-1m). Returned undefined when the model has no
-  // declared extra headers so callers can spread without sending {} on the wire.
-  private getExtraHeadersForModel(model: string): Record<string, string> | undefined {
-    const catalogProvider = (this._config as { catalogProvider?: CatalogProvider }).catalogProvider;
-    if (!catalogProvider) return undefined;
-    const entry = catalogProvider.models.find((m) => m.id === model);
-    const headers = entry?.extra_headers;
-    if (!headers || Object.keys(headers).length === 0) return undefined;
-    return headers;
-  }
+  // Note: Anthropic-direct no longer needs per-model HTTP headers. Per-model
+  // beta opt-ins flow through the typed betas[] array on each request — see
+  // `./anthropic/betas.ts`. Bedrock keeps its own header-based opt-in path
+  // (the bedrock SDK does not expose a beta namespace).
 }

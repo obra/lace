@@ -7,15 +7,21 @@ import { Tool } from '@lace/agent/tools/tool';
 import { ToolResult, ToolContext } from '@lace/agent/tools/types';
 import { z } from 'zod';
 import type Anthropic from '@anthropic-ai/sdk';
+import { anthropicBaseMessagesTrap } from '@lace/agent/test-utils/anthropic-base-namespace-trap';
 
 const mockCreateResponse = vi.fn();
 
 vi.mock('@anthropic-ai/sdk', () => {
   return {
     default: class MockAnthropic {
-      messages = {
-        create: mockCreateResponse,
-        stream: vi.fn(),
+      // Throwing trap on base namespace — provider must call beta.messages.*
+      messages = anthropicBaseMessagesTrap();
+      beta = {
+        messages: {
+          create: mockCreateResponse,
+          stream: vi.fn(),
+          countTokens: vi.fn().mockResolvedValue({ input_tokens: 100 }),
+        },
       };
     },
   };
