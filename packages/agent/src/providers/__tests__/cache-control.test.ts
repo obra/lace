@@ -15,6 +15,15 @@ import {
   markLastToolForCaching,
 } from '../cache-control';
 
+vi.mock('@lace/agent/utils/logger', () => ({
+  logger: {
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  },
+}));
+
 const OPTIONS_1H = { ttl: '1h' as const };
 const OPTIONS_5M = { ttl: '5m' as const };
 const MARKER_1H = { type: 'ephemeral', ttl: '1h' };
@@ -411,28 +420,31 @@ describe('budget enforcement (PRI-1806 #1)', () => {
     expect(result).toBe(messages);
   });
 
-  it('logs a warning when system/tools markers push the total over cap (PRI-1806 #1 follow-up)', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    try {
-      // 4 markers in system + 1 in tools = 5 total, all message-level slots empty
-      const result = enforceBreakpointBudget({
-        system: [
-          { type: 'text', text: 'a', cache_control: MARKER_1H },
-          { type: 'text', text: 'b', cache_control: MARKER_1H },
-          { type: 'text', text: 'c', cache_control: MARKER_1H },
-          { type: 'text', text: 'd', cache_control: MARKER_1H },
-        ] as Anthropic.TextBlockParam[],
-        tools: [{ cache_control: MARKER_1H }],
-        messages: [user(text('plain'))],
-      });
+  it('logs an error when system/tools markers push the total over cap (PRI-1806 #1 follow-up)', async () => {
+    // This is a hard-failure scenario: system/tools markers alone exceed the
+    // cap. We cannot strip them here (that would mask a programmer error
+    // upstream), so we log logger.error (not console.warn) because the
+    // request WILL 400 at Anthropic.
+    const { logger } = await import('@lace/agent/utils/logger');
+    const errorSpy = vi.mocked(logger.error);
+    errorSpy.mockClear();
 
-      // Messages array unchanged (no message markers to strip).
-      expect(result).toHaveLength(1);
-      // Warning fired so we surface this in production logs.
-      expect(warnSpy).toHaveBeenCalled();
-      expect(warnSpy.mock.calls[0][0]).toMatch(/cache_control budget/i);
-    } finally {
-      warnSpy.mockRestore();
-    }
+    // 4 markers in system + 1 in tools = 5 total, all message-level slots empty
+    const result = enforceBreakpointBudget({
+      system: [
+        { type: 'text', text: 'a', cache_control: MARKER_1H },
+        { type: 'text', text: 'b', cache_control: MARKER_1H },
+        { type: 'text', text: 'c', cache_control: MARKER_1H },
+        { type: 'text', text: 'd', cache_control: MARKER_1H },
+      ] as Anthropic.TextBlockParam[],
+      tools: [{ cache_control: MARKER_1H }],
+      messages: [user(text('plain'))],
+    });
+
+    // Messages array unchanged (no message markers to strip).
+    expect(result).toHaveLength(1);
+    // Error logged so the hard failure surfaces in production logs.
+    expect(errorSpy).toHaveBeenCalledOnce();
+    expect(String(errorSpy.mock.calls[0][0])).toMatch(/cache_control budget/i);
   });
 });

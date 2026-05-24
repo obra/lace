@@ -96,20 +96,29 @@ export class AnthropicProvider extends AIProvider {
         ANTHROPIC_CACHE_OPTIONS
       );
 
-      const systemWithCaching = buildSystemWithCaching(systemPrompt, ANTHROPIC_CACHE_OPTIONS);
+      // Omit system entirely when the prompt is blank — Anthropic rejects
+      // empty text blocks, and cache_control on an empty block is also invalid.
+      const systemWithCaching = systemPrompt.trim()
+        ? buildSystemWithCaching(systemPrompt, ANTHROPIC_CACHE_OPTIONS)
+        : undefined;
 
+      // Omit tools entirely when none are provided — sending [] or a marked
+      // empty array is unnecessary and may trigger API validation errors.
       const baseTools: Anthropic.Tool[] = tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
         input_schema: tool.inputSchema,
       }));
-      const anthropicTools = markLastToolForCaching(baseTools, ANTHROPIC_CACHE_OPTIONS);
+      const anthropicTools =
+        baseTools.length > 0
+          ? markLastToolForCaching(baseTools, ANTHROPIC_CACHE_OPTIONS)
+          : undefined;
 
       const result = await this.getAnthropicClient().beta.messages.countTokens({
         model,
         messages: messagesWithCaching,
-        system: systemWithCaching,
-        tools: anthropicTools,
+        ...(systemWithCaching !== undefined ? { system: systemWithCaching } : {}),
+        ...(anthropicTools !== undefined ? { tools: anthropicTools } : {}),
       });
 
       return result.input_tokens;
@@ -131,61 +140,6 @@ export class AnthropicProvider extends AIProvider {
 
     const systemPrompt = this.getEffectiveSystemPrompt(messages);
     return this.countTokensExplicit(messages, systemPrompt, tools, model);
-  }
-
-  /**
-   * Calibrates token costs for system prompt and individual tools
-   * Makes separate API calls to measure each component precisely
-   */
-  protected async _calibrateTokenCostsImpl(
-    messages: ProviderMessage[],
-    tools: WireTool[],
-    model: string
-  ): Promise<{
-    systemTokens: number;
-    toolTokens: number;
-    toolDetails: Array<{ name: string; tokens: number }>;
-  } | null> {
-    try {
-      const systemPrompt = this.getEffectiveSystemPrompt(messages);
-
-      logger.debug('[AnthropicProvider] Starting calibration', {
-        model,
-        systemPromptLength: systemPrompt.length,
-        toolCount: tools.length,
-      });
-
-      // Count system prompt only (no messages, no tools)
-      const systemTokens = (await this.countTokensExplicit([], systemPrompt, [], model)) || 0;
-
-      logger.debug('[AnthropicProvider] System prompt counted', { systemTokens });
-
-      // Count each tool individually (no system, no messages)
-      const toolDetails = await Promise.all(
-        tools.map(async (tool) => ({
-          name: tool.name,
-          tokens: (await this.countTokensExplicit([], '', [tool], model)) || 0,
-        }))
-      );
-
-      const toolTokens = toolDetails.reduce((sum, t) => sum + t.tokens, 0);
-
-      logger.debug('[AnthropicProvider] Tools counted', {
-        toolTokens,
-        toolCount: toolDetails.length,
-        sampleTools: toolDetails.slice(0, 3),
-      });
-
-      return {
-        systemTokens,
-        toolTokens,
-        toolDetails,
-      };
-    } catch (error) {
-      logger.error('[AnthropicProvider] Calibration failed', { error });
-      logger.debug('Token calibration failed', { error });
-      return null;
-    }
   }
 
   get providerName(): string {
