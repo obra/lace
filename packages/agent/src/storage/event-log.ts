@@ -15,7 +15,8 @@ import {
 import { eventToRow } from './recall/event-to-row';
 import { getRecallIndex } from './recall/index-db';
 import { insertRow } from './recall/index-writer';
-import type { TypedDurableEvent } from './event-types';
+import { PROCESS_DIED_STOP_REASON, type TypedDurableEvent } from './event-types';
+import { logger } from '@lace/agent/utils/logger';
 
 /**
  * Cache: sessionDir → persona, populated on first lookup. Persona is immutable
@@ -222,6 +223,97 @@ export function hasPendingImmediateInjects(sessionDir: string, afterEventSeq: nu
       const data = parsed.data as { priority?: unknown } | undefined;
       if (data?.priority !== 'immediate') continue;
       return true;
+    } catch {
+      // ignore malformed line
+    }
+  }
+  return false;
+}
+
+/**
+ * Scan a session's durable event log and synthesize a `turn_end` event for
+ * any `turn_start` that lacks a matching `turn_end`. Called once at
+ * session-open time so the prior process's aborted turns are closed in the
+ * log before a new process can append events.
+ *
+ * Pairing is done by `turnId`. An orphan turn_start is one whose turnId never
+ * appears on a turn_end in the same transcript. For each orphan we append a
+ * `turn_end` event with `stopReason: 'process_died'` and `turnSeq` set to
+ * `orphan.turnSeq + 1`. `timestamp` is the current time (recovery time, not
+ * death time) because the death time is unknowable.
+ *
+ * Idempotent: once a synthesized turn_end is written, the next call sees the
+ * matched pair and does nothing. Guards against the unlikely-but-possible
+ * race where a turn_end already exists (e.g. another process or a future
+ * dedup layer wrote one) by re-checking just before append.
+ *
+ * Returns the count of synthesized turn_end events written.
+ */
+export function repairOrphanTurnStarts(
+  sessionDir: string,
+  state: SessionState
+): { nextState: SessionState; synthesized: number } {
+  type TurnStartFingerprint = { eventSeq: number; turnSeq: number };
+  const openTurnStarts = new Map<string, TurnStartFingerprint>();
+
+  for (const line of readAllSessionEventLines(sessionDir)) {
+    let parsed: Partial<DurableEvent>;
+    try {
+      parsed = JSON.parse(line) as Partial<DurableEvent>;
+    } catch {
+      continue;
+    }
+    const turnId = parsed.turnId;
+    if (typeof turnId !== 'string' || turnId.length === 0) continue;
+    if (parsed.type === 'turn_start') {
+      openTurnStarts.set(turnId, {
+        eventSeq: typeof parsed.eventSeq === 'number' ? parsed.eventSeq : 0,
+        turnSeq: typeof parsed.turnSeq === 'number' ? parsed.turnSeq : 0,
+      });
+    } else if (parsed.type === 'turn_end') {
+      openTurnStarts.delete(turnId);
+    }
+  }
+
+  if (openTurnStarts.size === 0) {
+    return { nextState: state, synthesized: 0 };
+  }
+
+  let currentState = state;
+  let synthesized = 0;
+
+  for (const [turnId, orphan] of openTurnStarts) {
+    // Double-check no turn_end snuck in for this turnId between the scan
+    // above and this append. Keeps the scan correct regardless of whether
+    // task #2's storage-layer dedup has landed in the tree yet.
+    if (turnEndExistsForTurnId(sessionDir, turnId)) continue;
+
+    const { nextState, written } = appendDurableEvent(sessionDir, currentState, {
+      type: 'turn_end',
+      turnId,
+      turnSeq: orphan.turnSeq + 1,
+      data: {
+        type: 'turn_end',
+        stopReason: PROCESS_DIED_STOP_REASON,
+      },
+    });
+    currentState = nextState;
+    synthesized++;
+    logger.info(
+      `crash recovery: synthesized turn_end for orphan turn_start eventSeq=${orphan.eventSeq} turnId=${turnId}`,
+      { sessionDir, orphanEventSeq: orphan.eventSeq, turnId, writtenEventSeq: written.eventSeq }
+    );
+  }
+
+  return { nextState: currentState, synthesized };
+}
+
+function turnEndExistsForTurnId(sessionDir: string, turnId: string): boolean {
+  for (const line of readAllSessionEventLines(sessionDir)) {
+    try {
+      const parsed = JSON.parse(line) as Partial<DurableEvent>;
+      if (parsed.type !== 'turn_end') continue;
+      if (parsed.turnId === turnId) return true;
     } catch {
       // ignore malformed line
     }

@@ -66,6 +66,16 @@ export type TurnEndEventData = {
   };
 };
 
+/**
+ * Stop reason written to a synthesized `turn_end` event by
+ * `repairOrphanTurnStarts` when the prior process died (SIGKILL, OOM,
+ * container restart) between `turn_start` and the matching `turn_end`.
+ * Surfaces crash-driven turn aborts in the durable log so downstream
+ * consumers (cost accounting, compaction, UI) can distinguish them from
+ * clean terminations. See PRI-1818.
+ */
+export const PROCESS_DIED_STOP_REASON = 'process_died';
+
 export type ContextCompactedEventData = {
   type: 'context_compacted';
   strategy: string;

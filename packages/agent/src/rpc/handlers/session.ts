@@ -183,7 +183,11 @@ async function activateStoredSession(
 
   let loaded;
   try {
-    loaded = loadSession(params.sessionId);
+    // Cold session-open path: ask loadSession to scan for and synthesize
+    // turn_end events for any orphan turn_starts left by a prior process
+    // (SIGKILL, OOM, container restart). All other loadSession call sites
+    // are mid-flight refreshes that must NOT repair. See PRI-1818.
+    loaded = loadSession(params.sessionId, { repairOrphanTurnStarts: true });
   } catch (error) {
     if (error instanceof Error && error.message === 'Session not found') {
       throw {
