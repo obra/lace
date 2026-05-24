@@ -31,6 +31,12 @@ import type { TypedDurableEvent } from './event-types';
  * Tests that reuse a sessionDir across logical sessions (e.g. by rewriting
  * meta.json) call `invalidatePersonaCache` to reset it.
  */
+// Invariant: `personaCache` is invalidated by `writeSessionMeta` only (via
+// `invalidatePersonaCache`). Any code path that mutates a session's `meta.json`
+// outside `writeSessionMeta` MUST also call `invalidatePersonaCache(sessionDir)`,
+// or subsequent appendDurableEvent calls will route events to a stale persona
+// bucket. All current production writers use `writeSessionMeta`; this comment
+// guards against future refactors that bypass it.
 const personaCache = new Map<string, string>();
 
 export function invalidatePersonaCache(sessionDir?: string): void {
