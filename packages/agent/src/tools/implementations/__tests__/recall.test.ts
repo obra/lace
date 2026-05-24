@@ -529,6 +529,26 @@ describe('RecallTool read', () => {
     expect(parsed.error as string).toMatch(/<session_id>:<eventSeq>/);
   });
 
+  it('returns a structured error envelope when session_id is malformed (not a ZodError)', async () => {
+    // The event_id regex accepts any non-colon prefix, but getSessionDir calls
+    // asSessionId which throws ZodError on non-sess_<uuid> input. The Tool
+    // execute wrapper would turn that into a "ValidationError: recall failed"
+    // text result — NOT the JSON {error, ...} envelope other recall errors
+    // use. Validate the session_id shape inside read() to keep the envelope
+    // consistent.
+    const result = await new RecallTool().execute({ action: 'read', event_id: 'foo:1' }, makeCtx());
+    expect(result.content).toHaveLength(1);
+    const first = result.content[0];
+    if (first.type !== 'text') throw new Error('expected text block');
+    // The wrapper's ValidationError surfaces as raw text starting with
+    // "ValidationError:". Our envelope is JSON-parseable.
+    expect(first.text).not.toMatch(/^ValidationError:/);
+    const parsed = JSON.parse(first.text) as { error?: string };
+    expect(typeof parsed.error).toBe('string');
+    expect(parsed.error as string).toMatch(/malformed session_id/);
+    expect(parsed.error as string).toMatch(/sess_<uuid>/);
+  });
+
   it('returns an error with session-stats hint when event_id is unknown', async () => {
     const fx = makeSession(laceDir, 'ada');
     appendPrompt(fx, 'one');

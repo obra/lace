@@ -141,6 +141,18 @@ export class RecallTool extends Tool {
       });
     }
     const sessionId = match[1];
+    // Validate the session_id shape BEFORE calling getSessionDir — that helper
+    // delegates to asSessionId() which throws a ZodError on non-sess_<uuid>
+    // input. An unguarded ZodError bubbles out of executeValidated, where the
+    // Tool.execute wrapper turns it into a "ValidationError: …" text result
+    // instead of the JSON {error, …} envelope every other recall failure
+    // uses. Mirror the SessionIdSchema regex in @lace/ent-protocol so the
+    // checks stay in sync.
+    if (!/^sess_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)) {
+      return this.createResult({
+        error: `event_id ${JSON.stringify(args.event_id)} has malformed session_id; expected sess_<uuid>:<eventSeq>`,
+      });
+    }
     const targetSeq = parseInt(match[2], 10);
     const context = args.context ?? 5;
     const full = args.full ?? false;
