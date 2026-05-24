@@ -13,6 +13,11 @@ import {
   unsanitizeToolName,
 } from './tool-name-sanitizer';
 
+// Re-export canonical stop-reason types so downstream consumers can keep
+// importing them from `@lace/agent/providers/base-provider`. Implementation
+// lives in `./stop-reason`.
+export type { LaceStopReason, LaceStopDetails, NormalizedStop } from './stop-reason';
+
 /**
  * The minimal duck-typed view of a tool that providers need to build a wire-format
  * request. Every LLM API has a tool-name charset/length constraint stricter than what
