@@ -4,14 +4,19 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
 import { defaultInitializeParams } from './helpers/initialize';
 import { getRecallIndex, closeRecallIndex } from '../storage/recall/index-db';
 import { invalidatePersonaCache } from '../storage/event-log';
+import {
+  listTranscriptFiles,
+  SECURE_DIR_MODE,
+  SECURE_FILE_MODE,
+} from '../storage/transcript-paths';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -98,6 +103,49 @@ describe('session/fork recall index write-through', () => {
         .prepare(`SELECT event_id FROM events WHERE session_id = ? AND content MATCH ?`)
         .all(forked.sessionId, marker) as Array<{ event_id: string }>;
       expect(matched.length).toBeGreaterThan(0);
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('applies SECURE_DIR_MODE/SECURE_FILE_MODE to forked transcript dir and file', async () => {
+    // session/fork copies events to the new session's transcript file with
+    // appendFileSync + mkdirSync using default modes (0o755 dir, 0o644 file).
+    // The durable-event hot path applies SECURE_DIR_MODE=0o700 and
+    // SECURE_FILE_MODE=0o600 in appendDurableEvent; the fork copy must match
+    // so forked transcripts aren't world-readable.
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+
+      const created = (await client.request('session/new', {
+        cwd: process.cwd(),
+        mcpServers: [],
+      })) as { sessionId: string };
+
+      // Seed at least one durable event so the fork has something to copy.
+      await client.request('ent/session/inject', {
+        content: [{ type: 'text', text: 'forkmodes' }],
+        priority: 'normal',
+      });
+
+      const forked = (await client.request('session/fork', {
+        sessionId: created.sessionId,
+      })) as { sessionId: string };
+
+      const files = listTranscriptFiles(tempDir, forked.sessionId);
+      expect(files.length).toBeGreaterThan(0);
+
+      for (const file of files) {
+        const fileMode = statSync(file).mode & 0o777;
+        expect(fileMode).toBe(SECURE_FILE_MODE);
+
+        const dirMode = statSync(dirname(file)).mode & 0o777;
+        expect(dirMode).toBe(SECURE_DIR_MODE);
+      }
     } finally {
       client.close();
       server.close();

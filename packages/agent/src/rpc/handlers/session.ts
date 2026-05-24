@@ -1,10 +1,15 @@
 // ABOUTME: Session lifecycle RPC handlers for creating, loading, and managing sessions
 
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { getLaceDir } from '../../config/lace-dir';
-import { transcriptFilePath, validatePersonaName } from '../../storage/transcript-paths';
+import {
+  SECURE_DIR_MODE,
+  SECURE_FILE_MODE,
+  transcriptFilePath,
+  validatePersonaName,
+} from '../../storage/transcript-paths';
 import {
   AcpErrorCodes,
   SessionForkParamsSchema,
@@ -704,12 +709,31 @@ export function registerSessionHandlers(
       date: new Date(),
       sessionId: forkedSessionId,
     });
-    mkdirSync(dirname(forkedEventsPath), { recursive: true });
+    // Match the secure-mode pattern from appendDurableEvent: forked
+    // transcript dirs are 0o700 and forked transcript files are 0o600.
+    // Otherwise fork lands events at the system defaults (0o755 / 0o644),
+    // making forked sessions world-readable even though the durable-event
+    // hot path enforces the tighter modes.
+    mkdirSync(dirname(forkedEventsPath), { recursive: true, mode: SECURE_DIR_MODE });
     for (const event of sourceEvents) {
       // Skip copying the source's system_prompt_set when we'll re-render it for
       // the new cwd — the re-rendered event written below will be the sole one.
       if (willRerenderSystemPrompt && event.type === 'system_prompt_set') continue;
       appendFileSync(forkedEventsPath, JSON.stringify(event) + '\n', { encoding: 'utf8' });
+
+      // chmod once per write to converge on SECURE_FILE_MODE even if the
+      // file pre-existed at a looser mode (mirrors appendDurableEvent's
+      // stat-check-then-chmod pattern, minus the cost-saving stat — fork
+      // is one-shot per session creation so the extra syscall is fine).
+      try {
+        const stat = statSync(forkedEventsPath);
+        if ((stat.mode & 0o777) !== SECURE_FILE_MODE) {
+          chmodSync(forkedEventsPath, SECURE_FILE_MODE);
+        }
+      } catch {
+        // appendFileSync above would have already failed if the file is
+        // unreadable; ignore so a transient stat error doesn't break fork.
+      }
 
       // Write-through indexing: mirror copied events into the FTS index under
       // the forked sessionId so /recall queries find them immediately, without
