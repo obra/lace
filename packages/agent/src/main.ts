@@ -75,21 +75,27 @@ const writable = new Writable({
 // early callers before the JSON-RPC peer is wired up.
 void runStartupReaper(createContainerManagerForPlatform());
 
-// Catch the FTS index up to anything that landed in JSONL before write-through
-// indexing shipped, or while the process was down. Synchronous so /recall queries
-// against pre-existing sessions return results from the first request onward.
-// Failures must never break startup; the JSONL files are source of truth.
-try {
-  const stats = backfillIndex(getRecallIndex(), laceDir);
-  logger.info(`recall: backfill scanned=${stats.scanned} inserted=${stats.inserted}`);
-} catch (err) {
-  logger.error(`recall: backfill failed: ${err instanceof Error ? err.message : String(err)}`);
-}
-
 const transport = createNdjsonStdioTransport({ readable, writable });
 const peer = new JsonRpcPeer(transport, { idPrefix: 'a_' });
 state.peer = peer;
 registerAgentRpcMethods(peer, state);
+
+// Catch the FTS index up to anything that landed in JSONL before write-through
+// indexing shipped, or while the process was down. Deferred to the next event
+// loop tick so the JSON-RPC peer above is fully wired up before we touch the
+// FTS index — running backfill synchronously here would block bytes that the
+// stdin tee has already started flowing (the data listener on line 44 puts
+// stdin in flowing mode immediately), causing early JSON-RPC frames to be
+// consumed only by the protocol-log listener and never delivered to the peer
+// (H15). Failures must never break startup; the JSONL files are source of truth.
+setImmediate(() => {
+  try {
+    const stats = backfillIndex(getRecallIndex(), laceDir);
+    logger.info(`recall: backfill scanned=${stats.scanned} inserted=${stats.inserted}`);
+  } catch (err) {
+    logger.error(`recall: backfill failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+});
 
 let shuttingDown = false;
 const shutdown = async () => {
