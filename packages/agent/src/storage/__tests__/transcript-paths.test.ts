@@ -10,6 +10,7 @@ import {
   transcriptFilePath,
   transcriptsRoot,
   listTranscriptFiles,
+  personaSegment,
   SECURE_FILE_MODE,
   SECURE_DIR_MODE,
 } from '../transcript-paths';
@@ -23,6 +24,16 @@ describe('transcript-paths', () => {
 
   afterEach(() => {
     if (tempDir) rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  describe('personaSegment', () => {
+    it('rejects literal "_unknown" (reserved as sentinel)', () => {
+      expect(() => personaSegment('_unknown')).toThrow(/reserved/);
+    });
+
+    it('returns the sentinel _unknown when persona is null', () => {
+      expect(personaSegment(null)).toBe('_unknown');
+    });
   });
 
   describe('SECURE_FILE_MODE / SECURE_DIR_MODE', () => {

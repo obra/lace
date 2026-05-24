@@ -38,8 +38,13 @@ function utcDateString(d: Date): string {
  * and control characters are rejected — the caller must pass `null` when
  * persona is unknown.
  */
-function personaSegment(persona: string | null): string {
+export function personaSegment(persona: string | null): string {
   if (persona === null) return UNKNOWN_PERSONA_BUCKET;
+  if (persona === UNKNOWN_PERSONA_BUCKET) {
+    throw new Error(
+      `persona name "${UNKNOWN_PERSONA_BUCKET}" is reserved as the null-persona sentinel`
+    );
+  }
   if (persona.length === 0) {
     throw new Error('persona must be a non-empty string or null');
   }
