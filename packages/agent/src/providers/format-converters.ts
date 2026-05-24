@@ -49,7 +49,34 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
     .filter((msg) => msg.role !== 'system')
     .map((msg): Anthropic.MessageParam | null => {
       if (msg.role === 'user') {
-        // User messages can have tool results
+        // ─────────────────────────────────────────────────────────────────
+        // User messages can have tool results.
+        //
+        // LOAD-BEARING INVARIANT — DO NOT REORDER:
+        //   When this user message responds to a prior assistant turn that
+        //   contained `tool_use` blocks, the `tool_result` blocks MUST appear
+        //   FIRST in this message's content array, BEFORE any text/image.
+        //
+        // Why: Anthropic's Messages API rejects requests where any block
+        //   precedes the tool_result(s) that satisfy the prior turn's
+        //   tool_use ids. The rejection surfaces with a misleading error:
+        //     "messages.N: tool_use ids were found without tool_result
+        //      blocks immediately after: toolu_…"
+        //   The tool_result IS present in messages[N+1], just not at index 0,
+        //   and Anthropic treats anything-before-tool_result as if the
+        //   tool_result is absent.
+        //
+        // How this gets triggered: `appendOrMergeUser` merges injected text
+        //   (e.g. a job-completed notification from a sibling job firing
+        //   mid-turn) into the user message that already carries the
+        //   tool_result. That sets msg.content = '<notification>…' AND
+        //   keeps msg.toolResults intact. Without this ordering, we'd emit
+        //   [text, tool_result] and the API would 400.
+        //
+        // Regression test:
+        //   enhanced-provider-conversion.test.ts:
+        //   "should place tool_result blocks BEFORE text in user messages"
+        // ─────────────────────────────────────────────────────────────────
         if (msg.toolResults && msg.toolResults.length > 0) {
           const toolResultBlocks: Anthropic.ToolResultBlockParam[] = msg.toolResults.map(
             (result) => ({
@@ -61,18 +88,12 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
             })
           );
 
-          // If there's also text/image content, add it AFTER the tool_result
-          // blocks. Anthropic's tool-use API requires tool_result blocks to come
-          // first in the user response to an assistant turn that contained
-          // tool_use — text-first triggers a 400 ("tool_use ids were found
-          // without tool_result blocks immediately after"). Observed when
-          // context_injected events (e.g. job-completed notifications) merge
-          // into the same user message that holds the tool_result.
           if (hasContent(msg.content)) {
             const contentBlocks: Anthropic.ContentBlockParam[] =
               typeof msg.content === 'string'
                 ? [{ type: 'text', text: msg.content }]
                 : msg.content.map(toAnthropicContentBlock);
+            // ORDER IS LOAD-BEARING. See banner comment above. Do not flip.
             return {
               role: 'user',
               content: [...toolResultBlocks, ...contentBlocks],
