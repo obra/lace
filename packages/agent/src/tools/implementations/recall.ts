@@ -118,7 +118,25 @@ export class RecallTool extends Tool {
       `FROM events WHERE ${where.join(' AND ')} ORDER BY rank LIMIT ?`;
     params.push(limit);
 
-    const rows = db.prepare(sql).all(...params) as SearchHitRow[];
+    let rows: SearchHitRow[];
+    try {
+      rows = db.prepare(sql).all(...params) as SearchHitRow[];
+    } catch (err) {
+      // FTS5 has its own query syntax: bareword AND/OR/NOT/NEAR are operators,
+      // a leading '-' is "exclude", '"' opens a phrase, '*' is a prefix marker,
+      // ':' selects a column. Any of those — and a bunch of punctuation
+      // combinations — can throw SqliteError mid-prepare. Surface the failure
+      // as a zero-hit envelope with a hint so the conversation turn doesn't
+      // crash. (User-supplied strings get redacted here too — see I1.)
+      const message = err instanceof Error ? err.message : String(err);
+      return this.createResult({
+        hits: [],
+        hint:
+          `FTS5 syntax error on query=${JSON.stringify(redact(args.query))}: ${redact(message)}. ` +
+          `Try removing quotes, parentheses, leading '-', '*' or ':', or operator keywords ` +
+          `(AND/OR/NOT/NEAR). Plain words and phrases work best.`,
+      });
+    }
     const hits = rows.map((r) => ({ ...r, preview: redact(r.preview) }));
 
     if (hits.length === 0) {

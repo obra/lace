@@ -343,6 +343,25 @@ describe('RecallTool search', () => {
     expect(hint).toMatch(/ada/);
   });
 
+  it('returns the FTS5-syntax-error hint envelope instead of throwing on broken queries (C3)', async () => {
+    const fx = makeSession(laceDir, 'ada');
+    appendPrompt(fx, 'something');
+
+    const tool = new RecallTool();
+    // Each of these triggers an FTS5 SqliteError at prepare/all time. We
+    // catch and convert to a zero-hit envelope with a hint; the conversation
+    // turn must not crash. (Lowercase 'and'/'or' are NOT operators in FTS5
+    // — they're just non-matching words — so they're omitted here.)
+    const broken = ['AND', '"unclosed', '-foo', '*', ':', '(('];
+    for (const q of broken) {
+      const result = await tool.execute({ action: 'search', query: q }, makeCtx());
+      const parsed = parseResult(result);
+      expect(parsed.hits).toEqual([]);
+      expect(typeof parsed.hint).toBe('string');
+      expect(parsed.hint as string).toMatch(/FTS5 syntax error/);
+    }
+  });
+
   it('respects AND semantics across multiple filters', async () => {
     const a = makeSession(laceDir, 'ada');
     const b = makeSession(laceDir, 'bea');
