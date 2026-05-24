@@ -346,6 +346,13 @@ describe('bedrockCacheTtlFor (PRI-1803)', () => {
     expect(bedrockCacheTtlFor('anthropic.claude-3-7-sonnet-20250219-v1:0')).toBe('5m');
     expect(bedrockCacheTtlFor('anthropic.claude-3-5-sonnet-20241022-v2:0')).toBe('5m');
   });
+
+  it('rejects hypothetical bad substring matches (PRI-1806 #5 follow-up)', () => {
+    // 'claude-opus-4-50' should NOT match the 'claude-opus-4-5' substring.
+    expect(bedrockCacheTtlFor('anthropic.claude-opus-4-50-future-v1:0')).toBe('5m');
+    // Reverse — 'claude-opus-4-5-something' SHOULD match.
+    expect(bedrockCacheTtlFor('anthropic.claude-opus-4-5-newvariant-v2:0')).toBe('1h');
+  });
 });
 
 describe('budget enforcement (PRI-1806 #1)', () => {
