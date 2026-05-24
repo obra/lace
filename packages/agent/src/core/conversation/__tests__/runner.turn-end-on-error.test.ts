@@ -107,9 +107,21 @@ class ThrowingProvider extends AIProvider {
  * Provider that returns a tool call on the first request then a clean stop on
  * the second. Used to drive the tool-execution path before injecting a tool
  * throw via the mock executor.
+ *
+ * `content` is configurable so tests can mirror either the empty-content shape
+ * (an assistant turn that ONLY emits a tool_use) or the message_then_no_tool_use
+ * shape from the Ada production trace where the model emitted prose first and
+ * was about to invoke a tool when the throw happened.
  */
 class ToolCallThenStopProvider extends AIProvider {
   callCount = 0;
+  constructor(
+    private readonly content: string = '',
+    private readonly toolName: string = 'bash',
+    private readonly toolArguments: Record<string, unknown> = { command: 'ls' }
+  ) {
+    super();
+  }
   get providerName(): string {
     return 'tool-call-test';
   }
@@ -135,8 +147,8 @@ class ToolCallThenStopProvider extends AIProvider {
   async createStreamingResponse(): Promise<ProviderResponse> {
     this.callCount++;
     return {
-      content: '',
-      toolCalls: [{ id: 'tc_1', name: 'bash', arguments: { command: 'ls' } }],
+      content: this.content,
+      toolCalls: [{ id: 'tc_1', name: this.toolName, arguments: this.toolArguments }],
       stopReason: 'tool_use',
       usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
     };
@@ -342,6 +354,64 @@ describe('ConversationRunner — turn_end on error (PRI-1818)', () => {
 
     const err = await runAndExpectThrow(runner);
     expect(err).toBeDefined();
+
+    const turnEnd = findTurnEnd();
+    expect(turnEnd?.stopReason).toBe('tool_error_throw');
+  });
+
+  it('reproduces Ada message_then_no_tool_use: writes message THEN turn_end(tool_error_throw) when the tool throws after an assistant message landed', async () => {
+    // PRI-1818 #4 — Ada production trace turn_3736e12e (eventSeq 910-911,
+    // 2026-05-23T01:36:24Z). The model returned BOTH prose AND a `delegate`
+    // tool call. Runner wrote the message event, then executeToolCall threw
+    // (likely an onUpdate notify failure on the RPC peer — 18 of 19 cases
+    // happened in a 20-minute burst). Pre-PR-#341 the throw escaped silently;
+    // post-PR-#341 it is caught, classified, logged at ERROR, and turn_end
+    // is written. This test asserts the post-#341 invariant.
+    const adaProse =
+      "Three smoke retries lined up. Personas have been refreshed. Let me fire all three in parallel with notify subscriptions, then return my turn — they'll wake me on completion.";
+    const provider = new ToolCallThenStopProvider(adaProse, 'bash', { command: 'echo hi' });
+    const mockTool = { name: 'bash', description: 'mock', schema: {} } as unknown as Tool;
+    const config: RunnerConfig = {
+      sessionDir,
+      sessionId: 'sess_test',
+      cwd,
+      executionMode: 'execute',
+      approvalMode: 'approve',
+    };
+    const deps = createMockDeps({
+      createProvider: vi.fn().mockImplementation(async () => provider),
+      createToolExecutor: vi.fn().mockReturnValue({
+        executor: {
+          getTool: vi.fn().mockReturnValue(mockTool),
+          execute: vi.fn().mockImplementation(async () => {
+            // Synthesizes the silent-throw mechanism. Concrete cause in
+            // production is unknown — see PRI-1818 followup item #5 — but
+            // any uncaught throw in the tool path now lands in this catch.
+            throw new Error('synthetic tool throw mid-execute');
+          }),
+        },
+        toolsForProvider: [mockTool],
+      }),
+    });
+    const runner = new ConversationRunner(config, deps);
+
+    const err = await runAndExpectThrow(runner);
+    expect(err).toBeDefined();
+
+    // Replay the durable log: the message must land BEFORE turn_end (matching
+    // the Ada trace), there must be NO tool_use event (the throw happened
+    // before the durable write at runner.ts:1210), and the turn must close
+    // out cleanly with tool_error_throw. turn_start is written by prompt.ts
+    // (not the runner) so it does not appear in this runner-only test.
+    const { events } = readDurableEvents(sessionDir, {});
+    const turnEvents = events.filter((e) => ['message', 'tool_use', 'turn_end'].includes(e.type));
+    const types = turnEvents.map((e) => e.type);
+    expect(types).toEqual(['message', 'turn_end']);
+
+    const messageEvent = turnEvents.find((e) => e.type === 'message') as
+      | { type: 'message'; data: { content: Array<{ type: string; text: string }> } }
+      | undefined;
+    expect(messageEvent?.data.content?.[0]?.text).toBe(adaProse);
 
     const turnEnd = findTurnEnd();
     expect(turnEnd?.stopReason).toBe('tool_error_throw');

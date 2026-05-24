@@ -672,11 +672,20 @@ export class ConversationRunner {
               writeAndAdvance,
             });
           } catch (toolErr) {
-            // PRI-1818: tag the throw so the outer catch's classifier can
-            // distinguish a tool-phase failure from a provider-phase failure.
-            // The 19 message_then_no_error_logged turns on Ada all match this
-            // path: provider returned a tool call, message landed, then
-            // executeToolCall threw and the turn abandoned the durable log.
+            // PRI-1818 #4: log at ERROR with toolName + toolCallId so the next
+            // occurrence of message_then_no_tool_use surfaces in agent.log
+            // (the 19 Ada cases had no error logged at all — the throw was
+            // entirely silent). The outer catch + finally still produce the
+            // turn_end(stopReason=tool_error_throw) for durability; this log
+            // is the diagnostic breadcrumb that tells us WHICH tool blew up.
+            logger.error('runner: executeToolCall threw', {
+              err: toolErr instanceof Error ? toolErr.message : String(toolErr),
+              toolName: typeof toolCall?.name === 'string' ? toolCall.name : 'unknown',
+              toolCallId: typeof toolCall?.id === 'string' ? toolCall.id : 'unknown',
+              turnId,
+            });
+            // Tag the throw so the outer catch's classifier can distinguish a
+            // tool-phase failure from a provider-phase failure.
             throw tagAsToolError(toolErr);
           }
 
