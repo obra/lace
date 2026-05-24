@@ -44,7 +44,8 @@ export type LaceStopDetails =
         | 'anthropic_classifier'
         | 'openai_chat_content_filter'
         | 'openai_responses_content_filter'
-        | 'openai_responses_refusal_item';
+        | 'openai_responses_refusal_item'
+        | 'gemini_safety_block';
     }
   | {
       type: 'context_window_exceeded';
@@ -355,15 +356,43 @@ export function normalizeOpenAIResponsesStop(
 }
 
 /**
+ * Set of Gemini finishReason values that represent a safety/policy block on
+ * model output. Anything in this set normalizes to `stopReason: 'refusal'`
+ * with `source: 'gemini_safety_block'` so downstream consumers (subagent
+ * jobs via `jobStatusFromStopReason`, UI surfaces, telemetry) don't silently
+ * treat a blocked turn as a clean completion.
+ *
+ * Sourced from `@google/genai`'s `FinishReason` enum:
+ *   - SAFETY               — generic safety classifier block
+ *   - BLOCKLIST            — content contains forbidden terms
+ *   - PROHIBITED_CONTENT   — content potentially contains prohibited content
+ *   - SPII                 — content may contain sensitive PII
+ *   - RECITATION           — content potentially recites copyrighted material
+ *   - IMAGE_SAFETY         — generated image has safety violations
+ *
+ * `MALFORMED_FUNCTION_CALL`, `UNEXPECTED_TOOL_CALL`, `LANGUAGE`, and `OTHER`
+ * are NOT classified as refusals — they describe a malformed/unsupported
+ * generation rather than a policy block, and would mis-signal "subagent
+ * failed because the user asked something disallowed".
+ */
+const GEMINI_SAFETY_BLOCK_REASONS: ReadonlySet<string> = new Set([
+  'SAFETY',
+  'BLOCKLIST',
+  'PROHIBITED_CONTENT',
+  'SPII',
+  'RECITATION',
+  'IMAGE_SAFETY',
+]);
+
+/**
  * Normalize a Gemini `finishReason` into the canonical form. Gemini's stop
  * surface is minimal — `STOP` / `FINISH_REASON_UNSPECIFIED` for normal end,
  * `MAX_TOKENS` for output-length cutoff, and a family of safety codes
- * (`SAFETY`, `BLOCKLIST`, `PROHIBITED_CONTENT`, `SPII`, etc.) that don't fit
- * cleanly into the existing `LaceStopDetails.refusal.source` union. The
- * spec did not define a Gemini source variant for refusal or max_output_tokens,
- * so we emit `stopDetails: null` for these cases rather than inventing a new
- * provenance value here. Adding `'gemini_finish_reason'` to the source unions
- * is a deliberate non-goal of chunk B.
+ * (`SAFETY`, `BLOCKLIST`, `PROHIBITED_CONTENT`, `SPII`, `RECITATION`,
+ * `IMAGE_SAFETY`) that map to `refusal` with source `'gemini_safety_block'`
+ * (roborev job 803 Finding 3). Before this mapping, a Gemini safety block
+ * fell through to `end_turn` + WARN, and subagent jobs reported a refused
+ * turn as `'completed'`.
  */
 export function normalizeGeminiStop(rawReason: string | null | undefined): NormalizedStop {
   switch (rawReason) {
@@ -373,6 +402,17 @@ export function normalizeGeminiStop(rawReason: string | null | undefined): Norma
     case 'MAX_TOKENS':
       return { stopReason: 'max_output_tokens', stopDetails: null };
     default:
+      if (typeof rawReason === 'string' && GEMINI_SAFETY_BLOCK_REASONS.has(rawReason)) {
+        return {
+          stopReason: 'refusal',
+          stopDetails: {
+            type: 'refusal',
+            category: rawReason,
+            explanation: null,
+            source: 'gemini_safety_block',
+          },
+        };
+      }
       logger.warn('Unknown Gemini finishReason, falling back to end_turn', { rawReason });
       return { stopReason: 'end_turn', stopDetails: null };
   }

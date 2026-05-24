@@ -912,7 +912,7 @@ describe('buildProviderMessagesFromDurableEvents — system_prompt_set and conte
   });
 });
 
-describe('buildProviderMessagesFromDurableEvents — orphan tool_use (no following tool_result)', () => {
+describe('buildProviderMessagesFromDurableEvents — orphan tool_use (rebuilder tolerance)', () => {
   let tempDir: string;
 
   beforeEach(() => {
@@ -923,13 +923,16 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_use (no followi
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  // Runner emits a tool_use event without a `result` field when the provider
-  // stops with refusal / context_window_exceeded / max_output_tokens /
-  // stop_sequence BEFORE the runner had a chance to execute the pending tool
-  // call. The rebuilder must tolerate that durable shape: the conversation
-  // ends with an assistant message carrying the unexecuted tool_use and
-  // NOTHING after.
-  it('rebuilds an assistant tool_use with no following tool_result and no synthetic user message', () => {
+  // Defensive rebuilder behavior. Today's runner ALWAYS synthesizes a
+  // cancelled tool_result alongside any unexecuted tool_use (roborev job 803
+  // Finding 1), so well-formed sessions never contain a `tool_use` durable
+  // event without a `result` field. This test pins the rebuilder's behavior
+  // when a malformed / legacy event slips through anyway: the assistant
+  // tool_use is preserved without fabricating a user message after it. The
+  // runner's contract (synthesize at write time) is what keeps the rebuilt
+  // history valid for follow-up turns — covered separately by
+  // runner.refusal.test.ts and runner.context-exceeded.test.ts.
+  it('preserves an orphan assistant tool_use without inventing a user tool_result', () => {
     writeEvents(tempDir, [
       {
         eventSeq: 1,
@@ -954,7 +957,9 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_use (no followi
           name: 'bash',
           kind: 'execute',
           input: { command: 'ls' },
-          // No `result` field — the runner stopped before executing.
+          // No `result` field — represents a legacy / malformed event. Today's
+          // runner always writes a synthetic cancelled result; this test pins
+          // the rebuilder's defensive behavior if one shows up anyway.
         },
       },
     ]);
@@ -966,9 +971,10 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_use (no followi
     //   assistant("partial answer")
     //   assistant("", toolCalls=[toolu_orphan])
     //
-    // Crucially: no user message after the orphan tool_use — every
-    // user-shaped message in the rebuild should still pair with a real
-    // assistant tool_use that has the matching toolCallId.
+    // Crucially: no user message after the orphan tool_use — the rebuilder
+    // doesn't invent results it didn't see. Producing a valid provider
+    // history for a follow-up turn is the runner's responsibility (which is
+    // why it now writes a synthetic cancelled result; see Finding 1 fix).
     expect(messages.length).toBeGreaterThanOrEqual(2);
 
     const last = messages[messages.length - 1]!;

@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ConversationRunner } from '../runner';
 import type { RunnerConfig, RunnerDependencies } from '../types';
 import { readDurableEvents } from '@lace/agent/storage/event-log';
+import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import {
   AIProvider,
   type ProviderMessage,
@@ -231,15 +232,25 @@ describe('ConversationRunner — refusal stop reason', () => {
     // Tool execution must NOT have happened.
     expect(toolExecutor.execute).not.toHaveBeenCalled();
 
-    // No tool_use event with a result should be present in durable events.
+    // The unexecuted tool_use lands with a SYNTHETIC cancelled tool_result.
+    // We write the synthetic result at runner time (not at rebuild time) so
+    // the next turn's provider message history stays valid: every assistant
+    // tool_use must be paired with a tool_result, or Anthropic/OpenAI reject
+    // the request. The runner did NOT actually execute the tool — the
+    // synthetic result is purely a durable-event artifact.
     const { events } = readDurableEvents(sessionDir, {
       afterEventSeq: 0,
       limit: Number.MAX_SAFE_INTEGER,
     });
     const toolEvents = events.filter((e) => e.type === 'tool_use');
     for (const ev of toolEvents) {
-      const data = ev.data as { result?: unknown };
-      expect(data.result).toBeUndefined();
+      const data = ev.data as {
+        result?: { outcome?: string; content?: Array<{ type?: string; text?: string }> };
+      };
+      expect(data.result).toBeDefined();
+      expect(data.result?.outcome).toBe('cancelled');
+      expect(data.result?.content?.[0]?.type).toBe('text');
+      expect(data.result?.content?.[0]?.text).toMatch(/not executed.*reason refusal/);
     }
 
     // No tool-use update with status='completed' should have been emitted either —
@@ -253,7 +264,7 @@ describe('ConversationRunner — refusal stop reason', () => {
     expect(completedToolUpdates).toEqual([]);
   });
 
-  it('preserves the unexecuted tool_use as a durable event without a result', async () => {
+  it('preserves the unexecuted tool_use as a durable event with a synthetic cancelled result', async () => {
     const provider = new ScriptedProvider([
       {
         content: 'partial answer before refusal',
@@ -285,11 +296,18 @@ describe('ConversationRunner — refusal stop reason', () => {
     const data = toolUseEvents[0]!.data as {
       toolCallId?: string;
       name?: string;
-      result?: unknown;
+      result?: { outcome?: string; content?: Array<{ type?: string; text?: string }> };
     };
     expect(data.toolCallId).toBe('toolu_y');
     expect(data.name).toBe('file_write');
-    expect(data.result).toBeUndefined();
+    // The runner synthesizes a cancelled tool_result for unexecuted tool_use
+    // blocks. Without it, the next turn's rebuilt provider message history
+    // would contain an orphan assistant tool_use that providers reject.
+    expect(data.result).toBeDefined();
+    expect(data.result?.outcome).toBe('cancelled');
+    expect(data.result?.content?.[0]?.type).toBe('text');
+    expect(data.result?.content?.[0]?.text).toContain('not executed');
+    expect(data.result?.content?.[0]?.text).toContain('refusal');
   });
 
   it('persists stopDetails on the turn_end durable event for refusals', async () => {
@@ -362,5 +380,61 @@ describe('ConversationRunner — refusal stop reason', () => {
     // The field is present but null — distinguishes "current writer, no detail"
     // from a legacy event (field absent → undefined).
     expect(turnEnd.stopDetails).toBeNull();
+  });
+
+  it('produces a valid rebuilt provider message history after a refusal with orphan tool_use', async () => {
+    // Regression: roborev job 803 Finding 1. Before the fix, a terminal stop
+    // (refusal / context_window_exceeded / max_output_tokens / stop_sequence)
+    // with unexecuted tool_use blocks would write a tool_use durable event
+    // with no result. On the NEXT turn the rebuilder produced
+    //   [user, assistant{tool_use}, user(new prompt)]
+    // which Anthropic rejects (assistant tool_use must be followed by a
+    // user tool_result). The fix synthesizes a cancelled tool_result at write
+    // time so the durable log rebuilds into a valid provider conversation.
+    const provider = new ScriptedProvider([
+      {
+        content: 'I cannot continue.',
+        toolCalls: [{ id: 'toolu_orphan', name: 'bash', arguments: { command: 'rm -rf /' } }],
+        stopReason: 'refusal',
+        stopDetails: {
+          type: 'refusal',
+          category: 'cyber',
+          explanation: null,
+          source: 'anthropic_classifier',
+        },
+        usage: { promptTokens: 5, completionTokens: 5, totalTokens: 10 },
+      },
+    ]);
+
+    const toolExecutor = makeToolExecutor();
+    const { promise } = runOnce(provider, toolExecutor);
+    await promise;
+
+    // Simulate a follow-up turn: the rebuilt history is what would be fed to
+    // the provider when the user sends their next prompt. Every assistant
+    // tool_use MUST be paired with a user tool_result.
+    const { messages } = buildProviderMessagesFromDurableEvents(sessionDir);
+
+    // Walk every assistant tool_use and assert the immediately-following
+    // message is a user with a tool_result matching the same call id.
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i]!;
+      if (m.role !== 'assistant' || !Array.isArray(m.toolCalls) || m.toolCalls.length === 0) {
+        continue;
+      }
+      const next = messages[i + 1];
+      expect(next).toBeDefined();
+      expect(next!.role).toBe('user');
+      const ids = new Set((next!.toolResults ?? []).map((r) => r.id));
+      for (const call of m.toolCalls) {
+        expect(ids.has(call.id)).toBe(true);
+      }
+    }
+
+    // Sanity: the orphan tool_use we wrote did get paired.
+    const allCallIds = messages
+      .filter((m) => m.role === 'assistant')
+      .flatMap((m) => (m.toolCalls ?? []).map((c) => c.id));
+    expect(allCallIds).toContain('toolu_orphan');
   });
 });

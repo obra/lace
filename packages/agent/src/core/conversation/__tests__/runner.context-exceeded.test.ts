@@ -234,13 +234,26 @@ describe('ConversationRunner — context_window_exceeded stop reason', () => {
       limit: Number.MAX_SAFE_INTEGER,
     });
     const toolUseEvents = events.filter((e) => e.type === 'tool_use');
+    // The unexecuted tool_use lands with a SYNTHETIC cancelled tool_result.
+    // We write the synthetic result at runner time (not at rebuild time) so
+    // the next turn's provider message history stays valid: every assistant
+    // tool_use must be paired with a tool_result. The runner did NOT actually
+    // execute the tool — the synthetic result is purely a durable-event
+    // artifact.
     for (const ev of toolUseEvents) {
-      const data = ev.data as { result?: unknown };
-      expect(data.result).toBeUndefined();
+      const data = ev.data as {
+        result?: { outcome?: string; content?: Array<{ type?: string; text?: string }> };
+      };
+      expect(data.result).toBeDefined();
+      expect(data.result?.outcome).toBe('cancelled');
+      expect(data.result?.content?.[0]?.type).toBe('text');
+      expect(data.result?.content?.[0]?.text).toMatch(
+        /not executed.*reason context_window_exceeded/
+      );
     }
   });
 
-  it('preserves the unexecuted tool_use as a durable event without a result', async () => {
+  it('preserves the unexecuted tool_use as a durable event with a synthetic cancelled result', async () => {
     const provider = new ScriptedProvider([
       {
         content: '',
@@ -270,10 +283,17 @@ describe('ConversationRunner — context_window_exceeded stop reason', () => {
     const data = toolUseEvents[0]!.data as {
       toolCallId?: string;
       name?: string;
-      result?: unknown;
+      result?: { outcome?: string; content?: Array<{ type?: string; text?: string }> };
     };
     expect(data.toolCallId).toBe('toolu_b');
     expect(data.name).toBe('file_write');
-    expect(data.result).toBeUndefined();
+    // The runner synthesizes a cancelled tool_result for unexecuted tool_use
+    // blocks. Without it, the next turn's rebuilt provider message history
+    // would contain an orphan assistant tool_use that providers reject.
+    expect(data.result).toBeDefined();
+    expect(data.result?.outcome).toBe('cancelled');
+    expect(data.result?.content?.[0]?.type).toBe('text');
+    expect(data.result?.content?.[0]?.text).toContain('not executed');
+    expect(data.result?.content?.[0]?.text).toContain('context_window_exceeded');
   });
 });

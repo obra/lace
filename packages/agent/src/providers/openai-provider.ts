@@ -1293,14 +1293,18 @@ export class OpenAIProvider extends AIProvider {
               }
 
               case 'response.completed':
-                // Capture response ID for conversation chaining
+              case 'response.incomplete':
+              case 'response.failed': {
+                // All three terminal events ship the same payload shape: a
+                // Response object with status + incomplete_details + error.
+                // Without the explicit 'response.incomplete' / 'response.failed'
+                // cases we would fall through to the synthetic 'incomplete_stream'
+                // failure path below — losing the real stopReason and details.
+                // (roborev job 803 Finding 2.)
                 responseId = event.response.id;
-                // Capture the terminal response object for stop-reason
-                // normalization. We use a structural type to avoid coupling
-                // to the SDK's internal Response type just for these three
-                // fields.
                 completedResponse = event.response as typeof completedResponse;
-                logger.trace('Responses API: Received completion event', {
+                logger.trace('Responses API: Received terminal event', {
+                  eventType: event.type,
                   status: event.response.status,
                   hasUsage: !!event.response.usage,
                   responseId,
@@ -1326,6 +1330,7 @@ export class OpenAIProvider extends AIProvider {
                   }
                 }
                 break;
+              }
 
               default: {
                 // Handle reasoning summary events (o1/o3 models)

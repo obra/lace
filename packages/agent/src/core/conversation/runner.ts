@@ -488,9 +488,19 @@ export class ConversationRunner {
           case 'max_output_tokens':
           case 'stop_sequence': {
             // Preserve any pending tool_use blocks the model emitted before the
-            // stop. They land in the durable event log without a `result` so the
-            // conversation rebuilder can show what the model intended without
-            // implying it executed.
+            // stop. They land in the durable event log alongside a synthetic
+            // cancelled tool_result so:
+            //   1. The UI can show what the model intended (the tool_use is
+            //      still durable with its input).
+            //   2. The next turn's rebuilt provider message history stays
+            //      valid — every assistant tool_use is paired with a
+            //      tool_result, which Anthropic / OpenAI require.
+            // The synthetic result uses outcome='cancelled' (closest match in
+            // the ToolResult outcome enum) with explanatory text that names
+            // the terminal stopReason. The result is NOT routed through the
+            // provider as a real tool execution — it exists purely so the
+            // durable log can be rebuilt into valid provider input.
+            const cancelledNote = `<tool not executed: turn stopped with reason ${response.stopReason}>`;
             for (const toolCall of toolCalls) {
               const toolCallId = toNonEmptyString(toolCall.id);
               const toolName = toNonEmptyString(toolCall.name);
@@ -499,6 +509,10 @@ export class ConversationRunner {
                 typeof toolCall.arguments === 'object' && toolCall.arguments
                   ? (toolCall.arguments as Record<string, unknown>)
                   : {};
+              const syntheticResult: ToolResult = {
+                outcome: 'cancelled',
+                content: [{ type: 'text', text: cancelledNote }],
+              };
               await writeAndAdvance({
                 type: 'tool_use',
                 data: {
@@ -506,6 +520,7 @@ export class ConversationRunner {
                   name: toolName,
                   kind: toolKindFromName(toolName),
                   input: toolInput,
+                  result: syntheticResult,
                 },
               });
             }

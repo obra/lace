@@ -554,6 +554,7 @@ const LaceStopDetailsSchema = z.discriminatedUnion('type', [
         'openai_chat_content_filter',
         'openai_responses_content_filter',
         'openai_responses_refusal_item',
+        'gemini_safety_block',
       ]),
     })
     .strict(),

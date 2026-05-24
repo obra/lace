@@ -522,14 +522,91 @@ describe('normalizeGeminiStop', () => {
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
-  it("maps 'SAFETY' (Gemini safety block) to end_turn and WARNs", () => {
+  it("maps 'SAFETY' (Gemini safety block) to refusal with source='gemini_safety_block'", () => {
+    // roborev job 803 Finding 3: Gemini safety codes were previously hitting
+    // the WARN-and-end_turn default, silently reporting refused turns as
+    // clean completions. They now map to canonical 'refusal' with provenance.
     const result = normalizeGeminiStop('SAFETY');
     expect(result).toEqual({
-      stopReason: 'end_turn',
-      stopDetails: null,
+      stopReason: 'refusal',
+      stopDetails: {
+        type: 'refusal',
+        category: 'SAFETY',
+        explanation: null,
+        source: 'gemini_safety_block',
+      },
     });
-    expect(logger.warn).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(logger.warn).mock.calls[0]?.[0]).toMatch(/unknown.*gemini.*finishReason/i);
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("maps 'BLOCKLIST' to refusal with source='gemini_safety_block'", () => {
+    const result = normalizeGeminiStop('BLOCKLIST');
+    expect(result).toEqual({
+      stopReason: 'refusal',
+      stopDetails: {
+        type: 'refusal',
+        category: 'BLOCKLIST',
+        explanation: null,
+        source: 'gemini_safety_block',
+      },
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("maps 'PROHIBITED_CONTENT' to refusal with source='gemini_safety_block'", () => {
+    const result = normalizeGeminiStop('PROHIBITED_CONTENT');
+    expect(result).toEqual({
+      stopReason: 'refusal',
+      stopDetails: {
+        type: 'refusal',
+        category: 'PROHIBITED_CONTENT',
+        explanation: null,
+        source: 'gemini_safety_block',
+      },
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("maps 'SPII' to refusal with source='gemini_safety_block'", () => {
+    const result = normalizeGeminiStop('SPII');
+    expect(result).toEqual({
+      stopReason: 'refusal',
+      stopDetails: {
+        type: 'refusal',
+        category: 'SPII',
+        explanation: null,
+        source: 'gemini_safety_block',
+      },
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("maps 'RECITATION' to refusal with source='gemini_safety_block'", () => {
+    const result = normalizeGeminiStop('RECITATION');
+    expect(result).toEqual({
+      stopReason: 'refusal',
+      stopDetails: {
+        type: 'refusal',
+        category: 'RECITATION',
+        explanation: null,
+        source: 'gemini_safety_block',
+      },
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("maps 'IMAGE_SAFETY' to refusal with source='gemini_safety_block'", () => {
+    const result = normalizeGeminiStop('IMAGE_SAFETY');
+    expect(result).toEqual({
+      stopReason: 'refusal',
+      stopDetails: {
+        type: 'refusal',
+        category: 'IMAGE_SAFETY',
+        explanation: null,
+        source: 'gemini_safety_block',
+      },
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it('maps undefined to end_turn and WARNs', () => {
