@@ -47,6 +47,11 @@ export type CreateJobOptions = {
   // (`agentPlacement: 'container'`). Host-placed persona containers do NOT use
   // this field — they flow through `runtimeBinding` as projected bindings.
   personaContainerRuntime?: PersonaContainerRuntime;
+  // Per-invocation container spec name for the idle-TTL reaper (PRI-1796).
+  // Computed by delegate.ts and stored here so maybeScheduleReapAfter can
+  // use it regardless of whether runtimeBinding or personaContainerRuntime
+  // was the placement path.
+  containerSpecName?: string;
 };
 
 /**
@@ -746,6 +751,7 @@ export class JobManager {
       ...(options.runtimeBinding ? { runtimeBinding: options.runtimeBinding } : {}),
       ...(options.scratchDirHostPath ? { scratchDirHostPath: options.scratchDirHostPath } : {}),
       ...(options.containerSharing ? { containerSharing: options.containerSharing } : {}),
+      ...(options.containerSpecName ? { containerSpecName: options.containerSpecName } : {}),
       ...(type === 'delegate'
         ? {
             subagentContent: [{ type: 'text', text: options.prompt }],

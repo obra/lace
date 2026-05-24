@@ -206,8 +206,23 @@ function resolvePersonaMountsAndEnv(input: {
 // container spec names. Strips the 'sess_' prefix if present (the UUID
 // portion is hex and passes SPEC_NAME_COMPONENT_RE); otherwise takes the
 // first 8 characters of the raw id.
-function sessionIdShort(id: string): string {
+export function sessionIdShort(id: string): string {
   return id.startsWith('sess_') ? id.slice(5, 13) : id.slice(0, 8);
+}
+
+/**
+ * Build the per-invocation container spec name from parent session, persona
+ * name, and child session. Exported so delegate.ts can compute it once and
+ * store it on the job state — keeping the formula in a single place.
+ *
+ * Format: <parent8>-<personaName>-<child8>
+ */
+export function buildPerInvocationSpecName(input: {
+  parentSessionId: string;
+  personaName: string;
+  childSessionId: string;
+}): string {
+  return `${sessionIdShort(input.parentSessionId)}-${input.personaName}-${sessionIdShort(input.childSessionId)}`;
 }
 
 export function buildPersonaContainerSpec(input: {
@@ -232,9 +247,7 @@ export function buildPersonaContainerSpec(input: {
     );
   }
 
-  // Validate and short-form per_invocation fields before doing any mount work.
-  let parentSessionIdShort: string | undefined;
-  let childSessionIdShort: string | undefined;
+  // Validate per_invocation fields before doing any mount work.
   if (runtime.containerSharing === 'per_invocation') {
     if (!input.childSessionId) {
       throw new PersonaContainerSpecError(
@@ -248,8 +261,7 @@ export function buildPersonaContainerSpec(input: {
           `provide the host path to auto-inject as the per-invocation work directory at /work.`
       );
     }
-    parentSessionIdShort = sessionIdShort(parentSessionId);
-    childSessionIdShort = sessionIdShort(input.childSessionId);
+    const childSessionIdShort = sessionIdShort(input.childSessionId);
     if (!SPEC_NAME_COMPONENT_RE.test(childSessionIdShort)) {
       throw new PersonaContainerSpecError(
         `Invalid childSessionId for container spec name: '${input.childSessionId}' ` +
@@ -289,7 +301,11 @@ export function buildPersonaContainerSpec(input: {
   ];
 
   return {
-    name: `${parentSessionIdShort!}-${personaName}-${childSessionIdShort!}`,
+    name: buildPerInvocationSpecName({
+      parentSessionId,
+      personaName,
+      childSessionId: input.childSessionId!,
+    }),
     image: runtime.image,
     workingDirectory: runtime.workingDirectory,
     mounts: perInvocationMounts,

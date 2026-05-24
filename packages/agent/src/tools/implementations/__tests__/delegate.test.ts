@@ -1369,4 +1369,188 @@ describe('DelegateTool', () => {
     expect(result.content[0].text).toContain('home');
     expect(result.content[0].text).toContain('box-shell');
   });
+
+  // ---------------------------------------------------------------------------
+  // PRI-1796 Finding #2: container-placed per_invocation gets scratch + spec name
+  // ---------------------------------------------------------------------------
+  describe('container-placed per_invocation (agentPlacement: container)', () => {
+    function makeContainerPlacedPersonaRegistry(): PersonaRegistry {
+      return {
+        parsePersona: vi.fn().mockReturnValue({
+          config: {
+            runtime: {
+              type: 'container',
+              agentPlacement: 'container',
+              containerSharing: 'per_invocation',
+              image: 'example/subagent:latest',
+              workingDirectory: '/workspace',
+              mounts: {},
+              env: {},
+            },
+          },
+          body: 'in-container per_invocation persona',
+        }),
+        listAvailablePersonas: vi.fn().mockReturnValue([]),
+      } as unknown as PersonaRegistry;
+    }
+
+    it('passes scratchDirHostPath and newSubagentSessionId to createJob for container-placed per_invocation', async () => {
+      const personaRegistry = makeContainerPlacedPersonaRegistry();
+      const tool = new DelegateTool({ personaRegistry });
+
+      const mockJob = {
+        jobId: 'job_container_inv',
+        type: 'delegate' as const,
+        status: 'running' as const,
+        completion: new Promise<void>(() => {}),
+      } as unknown as JobState;
+
+      const createJob = vi.fn().mockResolvedValue({ jobId: 'job_container_inv', job: mockJob });
+      const jobManager = {
+        createJob,
+        listJobs: vi.fn().mockReturnValue([]),
+      } as unknown as JobManager;
+
+      await tool.execute(
+        { prompt: 'work', background: true, persona: 'myagent' },
+        {
+          signal: new AbortController().signal,
+          jobManager,
+          runtimeBinding,
+          activeSessionId: 'sess_parent_c1',
+        }
+      );
+
+      const opts = createJob.mock.calls[0]![1] as Record<string, unknown>;
+      // Must have preallocated session id
+      expect(typeof opts.newSubagentSessionId).toBe('string');
+      expect(isSessionId(opts.newSubagentSessionId as string)).toBe(true);
+      // Must have scratch dir path
+      expect(typeof opts.scratchDirHostPath).toBe('string');
+      expect((opts.scratchDirHostPath as string).length).toBeGreaterThan(0);
+      // The scratch dir must exist on disk
+      expect(fs.existsSync(opts.scratchDirHostPath as string)).toBe(true);
+    });
+
+    it('passes containerSpecName to createJob for container-placed per_invocation', async () => {
+      const personaRegistry = makeContainerPlacedPersonaRegistry();
+      const tool = new DelegateTool({ personaRegistry });
+
+      const mockJob = {
+        jobId: 'job_container_specname',
+        type: 'delegate' as const,
+        status: 'running' as const,
+        completion: new Promise<void>(() => {}),
+      } as unknown as JobState;
+
+      const createJob = vi.fn().mockResolvedValue({
+        jobId: 'job_container_specname',
+        job: mockJob,
+      });
+      const jobManager = {
+        createJob,
+        listJobs: vi.fn().mockReturnValue([]),
+      } as unknown as JobManager;
+
+      // Use a known parent session id so we can verify the spec name prefix
+      // Parent: sess_12345678-0000-0000-0000-000000000000 → short = '12345678'
+      await tool.execute(
+        { prompt: 'work', background: true, persona: 'myagent' },
+        {
+          signal: new AbortController().signal,
+          jobManager,
+          runtimeBinding,
+          activeSessionId: 'sess_12345678-0000-0000-0000-000000000000',
+        }
+      );
+
+      const opts = createJob.mock.calls[0]![1] as Record<string, unknown>;
+      expect(typeof opts.containerSpecName).toBe('string');
+      const specName = opts.containerSpecName as string;
+      // Format: <parent8>-<personaName>-<child8>
+      // parent8 = '12345678' from sess_12345678-...
+      expect(specName).toMatch(/^12345678-myagent-[0-9a-f]{8}$/);
+    });
+
+    it('schedules GC reminder for container-placed per_invocation', async () => {
+      const personaRegistry = makeContainerPlacedPersonaRegistry();
+      const tool = new DelegateTool({ personaRegistry });
+
+      const mockJob = {
+        jobId: 'job_container_gc',
+        type: 'delegate' as const,
+        status: 'running' as const,
+        completion: new Promise<void>(() => {}),
+      } as unknown as JobState;
+
+      const createJob = vi.fn().mockResolvedValue({ jobId: 'job_container_gc', job: mockJob });
+      const jobManager = {
+        createJob,
+        listJobs: vi.fn().mockReturnValue([]),
+      } as unknown as JobManager;
+
+      const reminderDir = fs.mkdtempSync(path.join(tmpdir(), 'lace-reminders-container-'));
+      try {
+        const { ReminderScheduler } = await import('@lace/agent/reminders');
+        const reminderScheduler = new ReminderScheduler({
+          sessionDir: reminderDir,
+          now: () => Date.now(),
+          notifier: vi.fn(),
+        });
+
+        await tool.execute(
+          { prompt: 'work', background: true, persona: 'myagent' },
+          {
+            signal: new AbortController().signal,
+            jobManager,
+            runtimeBinding,
+            activeSessionId: 'sess_container_gc',
+            reminderScheduler,
+          }
+        );
+
+        const reminders = reminderScheduler.store.list();
+        const gcReminder = reminders.find((r) => r.prompt.startsWith('<scratch-gc>'));
+        expect(gcReminder).toBeDefined();
+      } finally {
+        fs.rmSync(reminderDir, { recursive: true, force: true });
+      }
+    });
+
+    it('background response includes subagentSessionId and scratchDir for container-placed per_invocation', async () => {
+      const personaRegistry = makeContainerPlacedPersonaRegistry();
+      const tool = new DelegateTool({ personaRegistry });
+
+      const mockJob = {
+        jobId: 'job_container_bg',
+        type: 'delegate' as const,
+        status: 'running' as const,
+        completion: new Promise<void>(() => {}),
+      } as unknown as JobState;
+
+      const createJob = vi.fn().mockResolvedValue({ jobId: 'job_container_bg', job: mockJob });
+      const jobManager = {
+        createJob,
+        listJobs: vi.fn().mockReturnValue([]),
+      } as unknown as JobManager;
+
+      const result = await tool.execute(
+        { prompt: 'work', background: true, persona: 'myagent' },
+        {
+          signal: new AbortController().signal,
+          jobManager,
+          runtimeBinding,
+          activeSessionId: 'sess_container_bg',
+        }
+      );
+
+      expect(result.status).toBe('completed');
+      const body = JSON.parse(result.content[0].text) as Record<string, unknown>;
+      expect(body.jobId).toBe('job_container_bg');
+      expect(body.status).toBe('started');
+      expect(typeof body.subagentSessionId).toBe('string');
+      expect(isSessionId(body.subagentSessionId as string)).toBe(true);
+      expect(typeof body.scratchDir).toBe('string');
+    });
+  });
 });

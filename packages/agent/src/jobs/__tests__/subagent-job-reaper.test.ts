@@ -35,11 +35,14 @@ function makeJob(overrides: Partial<JobState> = {}): JobState {
 }
 
 describe('maybeScheduleReapAfter', () => {
-  it('schedules a reap for a per_invocation job with a container binding and subagentSessionId', () => {
+  it('schedules a reap for a per_invocation job with containerSpecName and subagentSessionId', () => {
     const reaper = makeReaper();
     const job = makeJob({
       containerSharing: 'per_invocation',
       subagentSessionId: 'sess_abc',
+      // containerSpecName is the single source of truth; runtimeBinding is
+      // present here for completeness but not used by maybeScheduleReapAfter.
+      containerSpecName: 'spec-xyz',
       runtimeBinding: {
         schemaVersion: 1,
         identity: { runtimeId: 'rt_test' },
@@ -134,12 +137,12 @@ describe('maybeScheduleReapAfter', () => {
     expect(reaper.scheduleReap).not.toHaveBeenCalled();
   });
 
-  it('does NOT schedule a reap when runtimeBinding is absent', () => {
+  it('does NOT schedule a reap when containerSpecName is absent (runtimeBinding also absent)', () => {
     const reaper = makeReaper();
     const job = makeJob({
       containerSharing: 'per_invocation',
       subagentSessionId: 'sess_abc',
-      // runtimeBinding intentionally absent
+      // containerSpecName intentionally absent (runtimeBinding also absent)
     });
 
     maybeScheduleReapAfter(job, reaper);
@@ -147,7 +150,10 @@ describe('maybeScheduleReapAfter', () => {
     expect(reaper.scheduleReap).not.toHaveBeenCalled();
   });
 
-  it('does NOT schedule a reap when toolRuntime is not a container type', () => {
+  it('does NOT schedule a reap when containerSpecName is absent (runtimeBinding present, non-container toolRuntime)', () => {
+    // Even with a runtimeBinding present, no containerSpecName means no reap.
+    // (Old code checked runtimeBinding.toolRuntime.type === 'container'; new
+    // code uses containerSpecName as the single gate.)
     const reaper = makeReaper();
     const job = makeJob({
       containerSharing: 'per_invocation',
@@ -158,6 +164,7 @@ describe('maybeScheduleReapAfter', () => {
         agentPlacement: 'host',
         toolRuntime: { type: 'host', cwd: '/work' },
       },
+      // containerSpecName intentionally absent
     });
 
     maybeScheduleReapAfter(job, reaper);
@@ -188,5 +195,38 @@ describe('maybeScheduleReapAfter', () => {
     });
 
     expect(() => maybeScheduleReapAfter(job, undefined)).not.toThrow();
+  });
+
+  // ---------------------------------------------------------------------------
+  // PRI-1796: maybeScheduleReapAfter uses job.containerSpecName instead of
+  // digging into runtimeBinding — so in-container lace-agent path (no binding)
+  // also gets reaped.
+  // ---------------------------------------------------------------------------
+  it('schedules reap using job.containerSpecName when runtimeBinding is absent (in-container lace-agent path)', () => {
+    const reaper = makeReaper();
+    const job = makeJob({
+      containerSharing: 'per_invocation',
+      subagentSessionId: 'sess_abc',
+      containerSpecName: 'abc12345-myagent-def67890',
+      // NO runtimeBinding — simulates personaContainerRuntime path
+    });
+
+    maybeScheduleReapAfter(job, reaper);
+
+    expect(reaper.scheduleReap).toHaveBeenCalledOnce();
+    expect(reaper.scheduleReap).toHaveBeenCalledWith('sess_abc', 'abc12345-myagent-def67890');
+  });
+
+  it('does NOT schedule reap when containerSpecName is absent (even with per_invocation and subagentSessionId)', () => {
+    const reaper = makeReaper();
+    const job = makeJob({
+      containerSharing: 'per_invocation',
+      subagentSessionId: 'sess_abc',
+      // containerSpecName intentionally absent, and no runtimeBinding
+    });
+
+    maybeScheduleReapAfter(job, reaper);
+
+    expect(reaper.scheduleReap).not.toHaveBeenCalled();
   });
 });

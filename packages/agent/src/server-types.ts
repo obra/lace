@@ -101,6 +101,10 @@ export type JobState = {
   scratchDirHostPath?: string;
   // Container-sharing mode for this delegate job (PRI-1796).
   containerSharing?: 'per_invocation' | 'persistent';
+  // Per-invocation container spec name used by the reaper (PRI-1796).
+  // Computed once at delegate time; read by maybeScheduleReapAfter so it
+  // works for both host-placed (runtimeBinding) and in-container (personaContainerRuntime) paths.
+  containerSpecName?: string;
   childTransportClose?: () => void;
   finished: boolean;
   completion: Promise<void>;

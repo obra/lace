@@ -18,6 +18,7 @@ import {
   PersonaSharingViolationError,
 } from '@lace/agent/config/persona-mount-conflict';
 import type { PersonaContainerRuntime } from '@lace/agent/jobs/persona-container-spec';
+import { buildPerInvocationSpecName } from '@lace/agent/jobs/persona-container-spec';
 import { buildPersonaProjectedRuntimeBinding } from '@lace/agent/jobs/persona-projected-binding';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
@@ -163,10 +164,13 @@ Parameters:
     // — the host-side lace-agent reaches into the container for tool exec via
     // this projected binding.
     let projectedRuntimeBinding: RuntimeExecutionBinding | undefined;
-    // Scratch dir host path; only set for per_invocation host-placed personas.
+    // Scratch dir host path; set for per_invocation personas (both host and container placement).
     let scratchDirHostPath: string | undefined;
     // Container sharing mode from the resolved persona runtime.
     let containerSharing: 'per_invocation' | 'persistent' | undefined;
+    // Per-invocation container spec name; set for per_invocation personas.
+    // Used by the reaper to identify the container to destroy after idle TTL.
+    let containerSpecName: string | undefined;
 
     if (persona) {
       try {
@@ -178,6 +182,31 @@ Parameters:
         if (parsed.config.runtime.type === 'container') {
           const runtime = parsed.config.runtime;
           containerSharing = runtime.containerSharing;
+
+          // Per-invocation setup runs for BOTH host AND container placements.
+          // The scratch directory and spec name are placement-agnostic; only the
+          // projected binding is host-placement-specific.
+          if (runtime.containerSharing === 'per_invocation') {
+            // Compute and mkdir the per-invocation scratch directory on the
+            // host. Idempotent: the resume path finds an existing dir; the
+            // fresh path creates a new one. mode 0o700 applies only to
+            // newly created dirs — existing dirs keep their mode.
+            const scratchBase = process.env.LACE_WORK_DIR ?? '/var/sen/instance/work';
+            scratchDirHostPath = path.join(scratchBase, childSessionId!);
+            fs.mkdirSync(scratchDirHostPath, { recursive: true, mode: 0o700 });
+
+            containerSpecName = buildPerInvocationSpecName({
+              parentSessionId: context.activeSessionId ?? 'delegate',
+              personaName: persona,
+              childSessionId: childSessionId!,
+            });
+
+            // Schedule GC reminder (best-effort — the helper wraps in try/catch).
+            if (context.reminderScheduler && context.activeSessionId) {
+              await ensureScratchGcReminder(context.reminderScheduler, context.activeSessionId);
+            }
+          }
+
           if (runtime.agentPlacement === 'host') {
             // Host-placed: project the persona container into a host-side
             // RuntimeExecutionBinding. The session runner threads the
@@ -190,40 +219,19 @@ Parameters:
             // verbatim — no pre-resolution. The projected runtime captures
             // the daemon's `.Image` field post-create for audit (see
             // projected-container.ts).
-
-            if (runtime.containerSharing === 'per_invocation') {
-              // Compute and mkdir the per-invocation scratch directory on the
-              // host. Idempotent: the resume path finds an existing dir; the
-              // fresh path creates a new one. mode 0o700 applies only to
-              // newly created dirs — existing dirs keep their mode.
-              const scratchBase = process.env.LACE_WORK_DIR ?? '/var/sen/instance/work';
-              scratchDirHostPath = path.join(scratchBase, childSessionId!);
-              fs.mkdirSync(scratchDirHostPath, { recursive: true, mode: 0o700 });
-
-              projectedRuntimeBinding = buildPersonaProjectedRuntimeBinding({
-                parentSessionId: context.activeSessionId ?? 'delegate',
-                personaName: persona,
-                runtime,
-                containerMounts: context.containerMounts ?? {},
-                childSessionId: childSessionId!,
-                scratchDirHostPath,
-              });
-
-              // Schedule GC reminder (best-effort — the helper wraps in try/catch).
-              if (context.reminderScheduler && context.activeSessionId) {
-                await ensureScratchGcReminder(context.reminderScheduler, context.activeSessionId);
-              }
-            } else {
-              // Persistent host-placed persona — no per-invocation scratch or
-              // preallocated session id needed.
-              projectedRuntimeBinding = buildPersonaProjectedRuntimeBinding({
-                parentSessionId: context.activeSessionId ?? 'delegate',
-                personaName: persona,
-                runtime,
-                containerMounts: context.containerMounts ?? {},
-              });
-            }
+            projectedRuntimeBinding = buildPersonaProjectedRuntimeBinding({
+              parentSessionId: context.activeSessionId ?? 'delegate',
+              personaName: persona,
+              runtime,
+              containerMounts: context.containerMounts ?? {},
+              ...(runtime.containerSharing === 'per_invocation'
+                ? { childSessionId: childSessionId!, scratchDirHostPath }
+                : {}),
+            });
           } else {
+            // Container-placed: lace-agent runs inside the persona container.
+            // childSessionId and scratchDirHostPath are forwarded via createJob
+            // options so subagent-job.ts can pass them to spawnSubagent.
             personaContainerRuntime = runtime;
           }
         }
@@ -285,6 +293,7 @@ Parameters:
         ? { scratchDirHostPath, containerSharing: 'per_invocation' }
         : {}),
       ...(containerSharing === 'persistent' ? { containerSharing: 'persistent' } : {}),
+      ...(containerSpecName ? { containerSpecName } : {}),
     });
 
     // Background mode - return immediately

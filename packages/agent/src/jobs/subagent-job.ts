@@ -129,9 +129,11 @@ export function maybeScheduleReapAfter(
   if (!reaper) return;
   if (job.containerSharing !== 'per_invocation') return;
   if (!job.subagentSessionId) return;
-  if (!job.runtimeBinding) return;
-  if (job.runtimeBinding.toolRuntime.type !== 'container') return;
-  reaper.scheduleReap(job.subagentSessionId, job.runtimeBinding.toolRuntime.spec.name);
+  // Use the pre-computed containerSpecName stored on the job. This works for
+  // both host-placed (runtimeBinding) and container-placed (personaContainerRuntime)
+  // paths — the delegate tool computes and stores it in both cases (PRI-1796).
+  if (!job.containerSpecName) return;
+  reaper.scheduleReap(job.subagentSessionId, job.containerSpecName);
 }
 
 /**
@@ -204,6 +206,12 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         personaContainerRuntime: job.personaContainerRuntime,
         containerManager: state.containerManager,
         containerMounts: state.containerMounts,
+        // PRI-1796: thread per_invocation fields for the in-container lace-agent
+        // path. spawnContainerSubagent forwards these to buildPersonaContainerSpec.
+        ...(job.containerSharing === 'per_invocation' && job.subagentSessionId
+          ? { childSessionId: job.subagentSessionId }
+          : {}),
+        ...(job.scratchDirHostPath ? { scratchDirHostPath: job.scratchDirHostPath } : {}),
       });
 
       if (subagentProc.nativeProcess) {
