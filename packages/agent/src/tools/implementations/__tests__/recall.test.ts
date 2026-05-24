@@ -343,6 +343,35 @@ describe('RecallTool search', () => {
     expect(hint).toMatch(/ada/);
   });
 
+  it('does not echo secrets verbatim in the FTS5 error hint (I1)', async () => {
+    const fx = makeSession(laceDir, 'ada');
+    appendPrompt(fx, 'something');
+
+    // AKIA secret embedded in a broken query so we hit the error path
+    const result = await new RecallTool().execute(
+      { action: 'search', query: 'AKIAIOSFODNN7EXAMPLE AND' },
+      makeCtx()
+    );
+    const parsed = parseResult(result);
+    expect(parsed.hits).toEqual([]);
+    expect(parsed.hint as string).not.toContain('AKIAIOSFODNN7EXAMPLE');
+    expect(parsed.hint as string).toContain('<REDACTED:aws-access-key>');
+  });
+
+  it('does not echo secrets verbatim in the zero-hit hint (I1)', async () => {
+    const fx = makeSession(laceDir, 'ada');
+    appendPrompt(fx, 'unrelated');
+
+    const result = await new RecallTool().execute(
+      { action: 'search', query: 'AKIAIOSFODNN7EXAMPLE' },
+      makeCtx()
+    );
+    const parsed = parseResult(result);
+    expect(parsed.hits).toEqual([]);
+    expect(parsed.hint as string).not.toContain('AKIAIOSFODNN7EXAMPLE');
+    expect(parsed.hint as string).toContain('<REDACTED:aws-access-key>');
+  });
+
   it('returns the FTS5-syntax-error hint envelope instead of throwing on broken queries (C3)', async () => {
     const fx = makeSession(laceDir, 'ada');
     appendPrompt(fx, 'something');
@@ -591,6 +620,139 @@ describe('RecallTool read', () => {
     const parsed = parseResult(result);
     expect(parsed.error as string).toMatch(/not found/);
     expect(parsed.hint as string).toMatch(/No events found/);
+  });
+
+  it('rejects an uppercase-UUID session_id (I2 — regex must not be case-insensitive)', async () => {
+    // asSessionId in @lace/ent-protocol is case-sensitive. Recall's own
+    // validator must match exactly, otherwise an uppercase event_id slips
+    // past our envelope guard and surfaces as a ValidationError text block.
+    const result = await new RecallTool().execute(
+      { action: 'read', event_id: 'sess_AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA:1' },
+      makeCtx()
+    );
+    expect(result.content).toHaveLength(1);
+    const first = result.content[0];
+    if (first.type !== 'text') throw new Error('expected text block');
+    expect(first.text).not.toMatch(/^ValidationError:/);
+    const parsed = JSON.parse(first.text) as { error?: string };
+    expect(typeof parsed.error).toBe('string');
+    expect(parsed.error as string).toMatch(/malformed session_id/);
+  });
+
+  it('redacts secrets in event_id error envelopes (I1)', async () => {
+    // Inject a Slack token into a malformed event_id. The error message
+    // echoes the input; it must be redacted.
+    const result = await new RecallTool().execute(
+      { action: 'read', event_id: 'xoxb-1234567890-abcdefghij-abcdefghij:1' },
+      makeCtx()
+    );
+    const parsed = parseResult(result);
+    expect(parsed.error as string).not.toContain('xoxb-');
+    expect(parsed.error as string).toContain('<REDACTED:slack>');
+  });
+
+  it('does not crash on a malformed event in the context window (I3)', async () => {
+    // C2 hardening of eventToRow plus the recall.read fallback for
+    // null-row events together mean a malformed event inside the requested
+    // window comes back as kind=<event.type>, content="" without throwing.
+    const sessionId = `sess_${randomUUID()}`;
+    const sessionDir = join(laceDir, 'agent-sessions', sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(
+      join(sessionDir, 'meta.json'),
+      JSON.stringify({ sessionId, workDir: laceDir, created: 'x', persona: 'ada' })
+    );
+    // 5 events; seq=3 has no content
+    const lines = [
+      JSON.stringify({
+        eventSeq: 1,
+        timestamp: '2026-05-23T00:00:01Z',
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'one' }] },
+      }),
+      JSON.stringify({
+        eventSeq: 2,
+        timestamp: '2026-05-23T00:00:02Z',
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'two' }] },
+      }),
+      JSON.stringify({
+        eventSeq: 3,
+        timestamp: '2026-05-23T00:00:03Z',
+        type: 'message',
+        data: { role: 'assistant' }, // MALFORMED — no content
+      }),
+      JSON.stringify({
+        eventSeq: 4,
+        timestamp: '2026-05-23T00:00:04Z',
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'four' }] },
+      }),
+      JSON.stringify({
+        eventSeq: 5,
+        timestamp: '2026-05-23T00:00:05Z',
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'five' }] },
+      }),
+    ].join('\n');
+    writeFileSync(join(sessionDir, 'events.jsonl'), lines + '\n');
+
+    const result = await new RecallTool().execute(
+      { action: 'read', event_id: `${sessionId}:3`, context: 2 },
+      makeCtx()
+    );
+    const events = parseResult(result).events as Array<{
+      event_id: string;
+      kind: string;
+      content: string;
+    }>;
+    // The malformed event surfaces minimally; surrounding good events read fine.
+    expect(events.map((e) => e.event_id)).toEqual([
+      `${sessionId}:1`,
+      `${sessionId}:2`,
+      `${sessionId}:3`,
+      `${sessionId}:4`,
+      `${sessionId}:5`,
+    ]);
+    const malformed = events.find((e) => e.event_id === `${sessionId}:3`);
+    expect(malformed).toBeDefined();
+    expect(malformed!.content).toBe('');
+  });
+
+  it('hints about index/disk divergence when JSONL is missing but FTS knows the session (I4)', async () => {
+    // Insert FTS rows for a session whose JSONL doesn't exist on disk —
+    // simulates a pruned/deleted transcript whose index entries linger.
+    // read should not pretend the session is unknown; the hint must
+    // surface the divergence so the agent can act.
+    const { getRecallIndex } = await import('@lace/agent/storage/recall/index-db');
+    const { insertRow } = await import('@lace/agent/storage/recall/index-writer');
+    const sessionId = `sess_${randomUUID()}`;
+    const db = getRecallIndex();
+    insertRow(db, {
+      event_id: `${sessionId}:1`,
+      session_id: sessionId,
+      ts: '2026-05-23T00:00:01Z',
+      persona: 'ada',
+      kind: 'user_message',
+      content: 'phantom',
+    });
+    insertRow(db, {
+      event_id: `${sessionId}:2`,
+      session_id: sessionId,
+      ts: '2026-05-23T00:00:02Z',
+      persona: 'ada',
+      kind: 'user_message',
+      content: 'phantom2',
+    });
+
+    const result = await new RecallTool().execute(
+      { action: 'read', event_id: `${sessionId}:1` },
+      makeCtx()
+    );
+    const parsed = parseResult(result);
+    expect(parsed.error as string).toMatch(/not found/);
+    expect(parsed.hint as string).toMatch(/0 events on disk/);
+    expect(parsed.hint as string).toMatch(/2 events in the index/);
   });
 
   it('surfaces non-indexable events in the range minimally without crashing', async () => {

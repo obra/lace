@@ -141,10 +141,10 @@ export class RecallTool extends Tool {
 
     if (hits.length === 0) {
       const personaPart =
-        args.persona !== undefined ? ` (persona=${JSON.stringify(args.persona)})` : '';
+        args.persona !== undefined ? ` (persona=${redact(JSON.stringify(args.persona))})` : '';
       return this.createResult({
         hits: [],
-        hint: `0 hits for query=${JSON.stringify(args.query)}${personaPart}. Try: drop the persona filter, widen the time range, or check spelling.`,
+        hint: `0 hits for query=${redact(JSON.stringify(args.query))}${personaPart}. Try: drop the persona filter, widen the time range, or check spelling.`,
       });
     }
 
@@ -152,10 +152,15 @@ export class RecallTool extends Tool {
   }
 
   private async read(args: RecallReadInput, _context: ToolContext): Promise<ToolResult> {
+    // Every user-supplied string that lands in an error envelope or hint
+    // must pass through redact() — see spec §Redaction. The raw input may
+    // itself contain a leaked secret (the model just hallucinated an
+    // event_id that includes one) and we must not echo it back unfiltered.
+    const safeEventId = redact(args.event_id);
     const match = /^([^:]+):(\d+)$/.exec(args.event_id);
     if (!match) {
       return this.createResult({
-        error: `event_id ${JSON.stringify(args.event_id)} malformed; expected <session_id>:<eventSeq>`,
+        error: `event_id ${JSON.stringify(safeEventId)} malformed; expected <session_id>:<eventSeq>`,
       });
     }
     const sessionId = match[1];
@@ -165,10 +170,12 @@ export class RecallTool extends Tool {
     // Tool.execute wrapper turns it into a "ValidationError: …" text result
     // instead of the JSON {error, …} envelope every other recall failure
     // uses. Mirror the SessionIdSchema regex in @lace/ent-protocol so the
-    // checks stay in sync.
-    if (!/^sess_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)) {
+    // checks stay in sync. Note: no /i flag — `asSessionId` is case-sensitive
+    // and we must match it exactly, otherwise an uppercase UUID slips past
+    // our guard and triggers the same ZodError this check exists to prevent.
+    if (!/^sess_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(sessionId)) {
       return this.createResult({
-        error: `event_id ${JSON.stringify(args.event_id)} has malformed session_id; expected sess_<uuid>:<eventSeq>`,
+        error: `event_id ${JSON.stringify(safeEventId)} has malformed session_id; expected sess_<uuid>:<eventSeq>`,
       });
     }
     const targetSeq = parseInt(match[2], 10);
@@ -206,12 +213,24 @@ export class RecallTool extends Tool {
     }
 
     if (inRange.length === 0) {
+      // Spec says JSONL is source of truth. When read finds zero events on
+      // disk we still check the FTS index: if FTS knows about this session
+      // the transcript was moved or pruned and the agent needs to know its
+      // memory and its index disagree. The hint surfaces the divergence
+      // without falling back to redacted-but-disk-missing content (option B
+      // in the I4 bug report — simplicity over fallback).
+      const ftsCount = countFtsEventsForSession(sessionId);
+      let hint: string;
+      if (totalForSession > 0) {
+        hint = `Session ${sessionId} has ${totalForSession} events on disk.`;
+      } else if (ftsCount > 0) {
+        hint = `Session ${sessionId} has 0 events on disk but ${ftsCount} events in the index. Transcripts may have been moved or deleted.`;
+      } else {
+        hint = `No events found for session ${sessionId}.`;
+      }
       return this.createResult({
-        error: `event_id ${JSON.stringify(args.event_id)} not found.`,
-        hint:
-          totalForSession > 0
-            ? `Session ${sessionId} has ${totalForSession} events.`
-            : `No events found for session ${sessionId}.`,
+        error: `event_id ${JSON.stringify(safeEventId)} not found.`,
+        hint,
       });
     }
 
@@ -247,6 +266,18 @@ function readPersonaForSessionDir(sessionDir: string): string | null {
     return readSessionMeta(sessionDir).persona ?? null;
   } catch {
     return null;
+  }
+}
+
+function countFtsEventsForSession(sessionId: string): number {
+  try {
+    const db = getRecallIndex();
+    const row = db
+      .prepare(`SELECT COUNT(*) AS n FROM events WHERE session_id = ?`)
+      .get(sessionId) as { n?: number } | undefined;
+    return row?.n ?? 0;
+  } catch {
+    return 0;
   }
 }
 
