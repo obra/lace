@@ -6,6 +6,7 @@ import * as path from 'node:path';
 import { tmpdir } from 'node:os';
 import { DelegateTool } from '../delegate';
 import { _resetEnsuredThisSessionForTest } from '../scratch-gc-reminder';
+import { isSessionId } from '@lace/ent-protocol';
 import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { JobState } from '@lace/agent/server-types';
@@ -1245,6 +1246,59 @@ describe('DelegateTool', () => {
 
       expect(reaper.cancelReap).not.toHaveBeenCalled();
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // PRI-1796: minted childSessionId must satisfy SessionIdSchema (hyphenated UUID)
+  // ---------------------------------------------------------------------------
+  it('mints childSessionId in SessionIdSchema format (hyphenated UUID)', async () => {
+    const personaRegistry = {
+      parsePersona: vi.fn().mockReturnValue({
+        config: {
+          runtime: {
+            type: 'container',
+            agentPlacement: 'host',
+            containerSharing: 'per_invocation',
+            image: 'example/subagent:latest',
+            workingDirectory: '/workspace',
+            mounts: {},
+            env: {},
+          },
+        },
+        body: 'per_invocation persona',
+      }),
+      listAvailablePersonas: vi.fn().mockReturnValue([]),
+    } as unknown as PersonaRegistry;
+    const tool = new DelegateTool({ personaRegistry });
+
+    const mockJob = {
+      jobId: 'job_uuid_check',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_uuid_check', job: mockJob });
+    const jobManager = {
+      createJob,
+      listJobs: vi.fn().mockReturnValue([]),
+    } as unknown as JobManager;
+
+    const result = await tool.execute(
+      { prompt: 'work', background: true, persona: 'inv-persona' },
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_parent_uuid_test',
+      }
+    );
+
+    expect(result.status).toBe('completed');
+    const body = JSON.parse(result.content[0].text) as Record<string, unknown>;
+    const mintedId = body.subagentSessionId as string;
+    // Must satisfy the SessionIdSchema regex: sess_<uuid> with hyphens
+    expect(isSessionId(mintedId)).toBe(true);
   });
 
   // ---------------------------------------------------------------------------

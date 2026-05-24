@@ -151,7 +151,7 @@ Parameters:
     } else {
       // Fresh spawn — mint a new session id. Used only when the persona is
       // per_invocation and host-placed; ignored for all other paths.
-      childSessionId = `sess_${randomUUID().replace(/-/g, '')}`;
+      childSessionId = `sess_${randomUUID()}`;
     }
 
     // --- Step 2: Resolve persona bundle (if any) before any job creation ---
