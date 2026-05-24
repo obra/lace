@@ -29,6 +29,10 @@ import {
   readDurableEvents,
   summarizeDurableEvents,
 } from '../../storage/event-log';
+import { eventToRow } from '../../storage/recall/event-to-row';
+import { getRecallIndex } from '../../storage/recall/index-db';
+import { insertRow } from '../../storage/recall/index-writer';
+import type { TypedDurableEvent } from '../../storage/event-types';
 import type { AgentServerState, CreateToolExecutorFn } from '../../server-types';
 import { assertInitialized, throwInvalidParams, toNonEmptyString } from '../utils';
 import { loadPromptConfig } from '../../config/prompts';
@@ -667,6 +671,22 @@ export function registerSessionHandlers(
       // the new cwd — the re-rendered event written below will be the sole one.
       if (willRerenderSystemPrompt && event.type === 'system_prompt_set') continue;
       appendFileSync(forkedEventsPath, JSON.stringify(event) + '\n', { encoding: 'utf8' });
+
+      // Write-through indexing: mirror copied events into the FTS index under
+      // the forked sessionId so /recall queries find them immediately, without
+      // waiting for the next process restart to re-scan via backfill. Failures
+      // here must never break fork — JSONL is source of truth and the backfill
+      // pass on next startup will repair anything the index missed. Matches
+      // the pattern in `appendDurableEvent` (storage/event-log.ts).
+      try {
+        const row = eventToRow(event as TypedDurableEvent, {
+          sessionId: forkedSessionId,
+          persona: forkedPersona,
+        });
+        if (row) insertRow(getRecallIndex(), row);
+      } catch (err) {
+        console.error('recall indexer write failed during session/fork:', err);
+      }
     }
 
     // If the fork uses a different cwd, the source's system_prompt_set event
