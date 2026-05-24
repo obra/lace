@@ -17,9 +17,11 @@ import { persistSubagentChildExit } from './subagent-exit-handler';
 import {
   applyEffectiveJobConfig,
   buildSubagentInitConfig,
+  formatSubagentStopDetails,
   jobStatusFromStopReason,
   rpcErrorMessage,
 } from './subagent-job-helpers';
+import type { LaceStopDetails } from '@lace/agent/providers/base-provider';
 import { logger } from '@lace/agent/utils/logger';
 import { SUBAGENT_USER_PERSONAS_TARGET } from './persona-container-spec';
 import { spawnSubagent, type SubagentProcessHandle } from './subagent-spawn';
@@ -918,10 +920,25 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
 
       const promptResult = (await childPeer.request('session/prompt', {
         content: job.subagentContent,
-      })) as { stopReason?: string } | undefined;
+      })) as { stopReason?: string; stopDetails?: LaceStopDetails | null } | undefined;
 
       if (job.status !== 'cancelled') {
         job.status = jobStatusFromStopReason(promptResult?.stopReason);
+      }
+
+      // When the subagent reports a stop with diagnostic detail (refusal,
+      // context-window exceeded, provider failure, etc.) append a structured
+      // [SUBAGENT STOP: ...] block to the job output so the parent agent sees
+      // the *why* — both via job_output(jobId) and via the trailing-line hint
+      // surfaced in the job-failed notification body. Without this the parent
+      // would only see the bare 'failed' status and have no recourse.
+      const stopBlock = formatSubagentStopDetails(promptResult?.stopDetails ?? null);
+      if (stopBlock !== null) {
+        try {
+          await appendJobOutput(stopBlock);
+        } catch {
+          writeErrorToJobOutput(stopBlock);
+        }
       }
     } catch (error) {
       if (job.status !== 'cancelled') job.status = 'failed';

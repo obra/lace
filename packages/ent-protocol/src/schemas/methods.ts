@@ -495,6 +495,75 @@ const SessionPromptParamsSchema = z
   })
   .strict();
 
+// Structured detail accompanying a canonical stop reason. Mirrors
+// `LaceStopDetails` in @lace/agent/providers/stop-reason. The discriminator
+// `type` matches the subset of stop reasons that carry extra context; reasons
+// with no extra context (e.g. `end_turn`, `tool_use`) emit `stopDetails: null`.
+const LaceStopDetailsSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('refusal'),
+      category: z.string().nullable(),
+      explanation: z.string().nullable(),
+      source: z.enum([
+        'anthropic_classifier',
+        'openai_chat_content_filter',
+        'openai_responses_content_filter',
+        'openai_responses_refusal_item',
+      ]),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('context_window_exceeded'),
+      source: z.enum([
+        'anthropic_beta_stop_reason',
+        'http_400_prompt_too_long',
+        'preflight_token_estimate',
+      ]),
+      estimatedExcessTokens: z.number().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('max_output_tokens'),
+      source: z.enum([
+        'anthropic_stop_reason',
+        'openai_chat_finish_reason',
+        'openai_responses_incomplete_details',
+      ]),
+      requestedMaxTokens: z.number().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('stop_sequence'),
+      sequence: z.string(),
+      source: z.literal('anthropic_stop_sequence'),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('pause_turn'),
+      source: z.literal('anthropic_stop_reason'),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('failed'),
+      code: z.string(),
+      message: z.string(),
+      source: z.enum(['openai_responses_failed_status', 'http_error']),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('cancelled'),
+      reason: z.enum(['abort_signal', 'permission_cancelled']),
+    })
+    .strict(),
+]);
+
 const SessionPromptResultSchema = z
   .object({
     turnId: NonEmptyStringSchema,
@@ -511,6 +580,7 @@ const SessionPromptResultSchema = z
       'permission_cancelled',
       'failed',
     ]),
+    stopDetails: LaceStopDetailsSchema.nullable().optional(),
     content: z.array(ContentBlockSchema),
     usage: UsageInfoSchema,
     structuredOutput: z.unknown().optional(),
@@ -1887,6 +1957,7 @@ const SessionUpdateTurnEndSchema = z
       'permission_cancelled',
       'failed',
     ]),
+    stopDetails: LaceStopDetailsSchema.nullable().optional(),
     content: z.array(ContentBlockSchema),
     usage: UsageInfoSchema,
   })
