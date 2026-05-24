@@ -374,7 +374,7 @@ export function registerSessionHandlers(
     // Reject shape-invalid persona names before any storage writes or registry
     // lookups so the durable-event hot path (which calls personaSegment) never
     // sees a name it would reject. See transcript-paths.validatePersonaName.
-    if (requestedPersona !== undefined) {
+    if (requestedPersona != null) {
       try {
         validatePersonaName(requestedPersona);
       } catch (err) {
