@@ -70,6 +70,17 @@ export function personaSegment(persona: string | null): string {
   return persona;
 }
 
+/**
+ * Validates a persona name. Throws if invalid. Use at session-creation time
+ * before writing meta.json, so we never store a persona that personaSegment
+ * would later reject on the durable-event-write hot path.
+ */
+export function validatePersonaName(persona: string): void {
+  // Reuse personaSegment's rejection logic. Output is discarded; we only care
+  // that it doesn't throw.
+  personaSegment(persona);
+}
+
 export function transcriptDir(input: Omit<TranscriptPathInput, 'sessionId'>): string {
   return path.join(
     transcriptsRoot(input.laceDir),

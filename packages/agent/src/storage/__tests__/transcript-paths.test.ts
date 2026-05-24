@@ -11,6 +11,7 @@ import {
   transcriptsRoot,
   listTranscriptFiles,
   personaSegment,
+  validatePersonaName,
   SECURE_FILE_MODE,
   SECURE_DIR_MODE,
 } from '../transcript-paths';
@@ -24,6 +25,36 @@ describe('transcript-paths', () => {
 
   afterEach(() => {
     if (tempDir) rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  describe('validatePersonaName', () => {
+    it('accepts a valid persona name', () => {
+      expect(() => validatePersonaName('ada')).not.toThrow();
+      expect(() => validatePersonaName('box-shell')).not.toThrow();
+      expect(() => validatePersonaName('therapist_v2')).not.toThrow();
+    });
+
+    it('rejects leading dash', () => {
+      expect(() => validatePersonaName('-evil')).toThrow();
+    });
+
+    it('rejects whitespace', () => {
+      expect(() => validatePersonaName('two words')).toThrow();
+      expect(() => validatePersonaName('tab\there')).toThrow();
+    });
+
+    it('rejects path separators', () => {
+      expect(() => validatePersonaName('a/b')).toThrow();
+      expect(() => validatePersonaName('a\\b')).toThrow();
+    });
+
+    it('rejects _unknown sentinel', () => {
+      expect(() => validatePersonaName('_unknown')).toThrow();
+    });
+
+    it('rejects empty string', () => {
+      expect(() => validatePersonaName('')).toThrow();
+    });
   });
 
   describe('personaSegment', () => {
