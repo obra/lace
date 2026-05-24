@@ -202,4 +202,37 @@ describe('eventToRow', () => {
       expect(eventToRow(event, CTX)).toBeNull();
     });
   });
+
+  describe('on-disk discriminator (event.type, not data.type)', () => {
+    // appendDurableEvent serializes data as Record<string, unknown> WITHOUT
+    // an embedded type field. The discriminator on disk is event.type. The
+    // earlier implementation switched on data.type and silently dropped every
+    // event read from a JSONL file. These regression tests use the on-disk
+    // shape exactly.
+    it('maps prompt by event.type when data.type is absent', () => {
+      const event = {
+        eventSeq: 7,
+        timestamp: '2026-05-23T00:00:00Z',
+        type: 'prompt',
+        data: { content: [{ type: 'text', text: 'on-disk shape' }] },
+      } as unknown as TypedDurableEvent;
+      const row = eventToRow(event, CTX);
+      expect(row).not.toBeNull();
+      expect(row?.kind).toBe('user_message');
+      expect(row?.content).toBe('on-disk shape');
+    });
+
+    it('maps context_injected by event.type when data.type is absent', () => {
+      const event = {
+        eventSeq: 8,
+        timestamp: '2026-05-23T00:00:00Z',
+        type: 'context_injected',
+        data: { content: [{ type: 'text', text: 'injected' }], priority: 'normal' },
+      } as unknown as TypedDurableEvent;
+      const row = eventToRow(event, CTX);
+      expect(row).not.toBeNull();
+      expect(row?.kind).toBe('notification');
+      expect(row?.content).toBe('injected');
+    });
+  });
 });

@@ -34,7 +34,11 @@ export type RowContext = {
 };
 
 export function eventToRow(event: TypedDurableEvent, ctx: RowContext): RecallRow | null {
-  const kindAndContent = renderKindAndContent(event.data);
+  // The discriminator on disk is `event.type`. `event.data` is a payload object
+  // whose `type` field is NOT serialized by `appendDurableEvent` — callers
+  // construct it as a plain `Record<string, unknown>`. Read the outer type and
+  // narrow the payload to the matching shape for renderers.
+  const kindAndContent = renderKindAndContent(event.type, event.data);
   if (!kindAndContent) return null;
   return {
     event_id: `${ctx.sessionId}:${event.eventSeq}`,
@@ -47,19 +51,26 @@ export function eventToRow(event: TypedDurableEvent, ctx: RowContext): RecallRow
 }
 
 function renderKindAndContent(
+  type: TypedDurableEvent['type'],
   data: TypedDurableEvent['data']
 ): { kind: RecallKind; content: string } | null {
-  switch (data.type) {
+  switch (type) {
     case 'prompt':
-      return { kind: 'user_message', content: renderPromptContent(data) };
+      return { kind: 'user_message', content: renderPromptContent(data as PromptEventData) };
     case 'message':
-      return { kind: 'assistant_text', content: renderMessageContent(data) };
+      return { kind: 'assistant_text', content: renderMessageContent(data as MessageEventData) };
     case 'tool_use':
-      return { kind: 'tool_call', content: renderToolUseContent(data) };
+      return { kind: 'tool_call', content: renderToolUseContent(data as ToolUseEventData) };
     case 'context_injected':
-      return { kind: 'notification', content: renderInjectedContent(data) };
+      return {
+        kind: 'notification',
+        content: renderInjectedContent(data as ContextInjectedEventData),
+      };
     case 'context_compacted':
-      return { kind: 'system', content: renderCompactedContent(data) };
+      return {
+        kind: 'system',
+        content: renderCompactedContent(data as ContextCompactedEventData),
+      };
     default:
       return null;
   }
