@@ -39,7 +39,7 @@
     "update-catalogs": "npx tsx scripts/update-provider-catalogs.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.60.0",
+    "@anthropic-ai/sdk": "^0.98.0",
     "@google/genai": "^1.19.0",
     "@lmstudio/sdk": "^1.2.1",
     "@typescript-eslint/utils": "^8.39.1",
