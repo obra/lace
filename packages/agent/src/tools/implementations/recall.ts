@@ -319,7 +319,7 @@ export class RecallTool extends Tool {
           content: '',
         };
       }
-      return applyTruncation(row, args.event_id, full);
+      return applyTruncation(row, ev.eventSeq, targetSeq, full);
     });
 
     return this.createResult({ events });
@@ -348,10 +348,15 @@ function countFtsEventsForSession(sessionId: string): number {
 
 function applyTruncation(
   row: RecallRow,
-  targetEventId: string,
+  rowEventSeq: number,
+  targetSeq: number,
   full: boolean
 ): RecallRow & { content: string } {
-  const isTarget = row.event_id === targetEventId;
+  // Compare by integer eventSeq, NOT by event_id string equality. The caller
+  // may supply `${sessionId}:01` for what we store as `${sessionId}:1`; a
+  // string-equal check demotes the target to the context-tool-call cap (500),
+  // silently truncating the very event the caller asked for.
+  const isTarget = rowEventSeq === targetSeq;
   const isToolCall = row.kind === 'tool_call';
   let content = redact(row.content);
   // Spec §Truncation: target is always full (capped at 10k); context user/

@@ -850,6 +850,35 @@ describe('RecallTool read', () => {
     expect(parsed.hint as string).toMatch(/nearby/);
   });
 
+  it('read with leading-zero eventSeq still hits the target (10k) cap, not the context (500) cap', async () => {
+    // The target row's event_id has shape `${sessionId}:1` (no zero-pad);
+    // the caller passed `${sessionId}:01`. A string-equality compare against
+    // the caller's input demotes the target to context-tool-call truncation
+    // (500 chars) instead of giving it the full 10k cap. Compare by numeric
+    // seq instead.
+    const fx = makeSession(laceDir, 'ada');
+    appendToolCall(fx, 'big', 'B'.repeat(2000));
+    appendPrompt(fx, 'after');
+
+    const result = await new RecallTool().execute(
+      { action: 'read', event_id: `${fx.sessionId}:01`, context: 0 },
+      makeCtx()
+    );
+    const events = parseResult(result).events as Array<{
+      event_id: string;
+      content: string;
+      kind: string;
+    }>;
+    expect(events).toHaveLength(1);
+    const target = events[0];
+    expect(target.event_id).toBe(`${fx.sessionId}:1`);
+    expect(target.kind).toBe('tool_call');
+    // Full content includes the 2000 B's; would be truncated to 500 if the
+    // numeric compare didn't fire.
+    expect(target.content).toContain('B'.repeat(2000));
+    expect(target.content).not.toMatch(/\[truncated/);
+  });
+
   it('returns a structured error envelope (not raw text) when agentSessionsDir() throws', async () => {
     // Force SessionStorageError by pointing LACE_SESSION_DIR at a path nobody
     // can mkdir (existing file's "name as a directory"). The thrown error
