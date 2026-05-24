@@ -6,7 +6,8 @@ import {
   emitSubagentExitedIfNeeded,
 } from './server';
 import { getLaceDir } from '@lace/agent/config/lace-dir';
-import { closeRecallIndex } from './storage/recall/index-db';
+import { closeRecallIndex, getRecallIndex } from './storage/recall/index-db';
+import { backfillIndex } from './storage/recall/backfill';
 import { PassThrough, Writable } from 'stream';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -73,6 +74,17 @@ const writable = new Writable({
 // listener attaches — blocking startup here drops in-flight bytes from
 // early callers before the JSON-RPC peer is wired up.
 void runStartupReaper(createContainerManagerForPlatform());
+
+// Catch the FTS index up to anything that landed in JSONL before write-through
+// indexing shipped, or while the process was down. Synchronous so /recall queries
+// against pre-existing sessions return results from the first request onward.
+// Failures must never break startup; the JSONL files are source of truth.
+try {
+  const stats = backfillIndex(getRecallIndex(), laceDir);
+  logger.info(`recall: backfill scanned=${stats.scanned} inserted=${stats.inserted}`);
+} catch (err) {
+  logger.error(`recall: backfill failed: ${err instanceof Error ? err.message : String(err)}`);
+}
 
 const transport = createNdjsonStdioTransport({ readable, writable });
 const peer = new JsonRpcPeer(transport, { idPrefix: 'a_' });
