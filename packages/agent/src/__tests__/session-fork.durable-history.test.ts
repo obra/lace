@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PassThrough } from 'node:stream';
 import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -9,6 +9,8 @@ import { defaultInitializeParams } from './helpers/initialize';
 import { loadSession, writeSessionState } from '../storage/session-store';
 import { buildDefaultBoundedHostRuntimeBinding } from '../tools/runtime/validation';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
+import { logger } from '@lace/agent/utils/logger';
+import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -246,7 +248,7 @@ describe('session/fork durable history', () => {
     }
   });
 
-  it('appends a new system_prompt_set event when forking to a different cwd (Fix #9)', async () => {
+  it('writes exactly one system_prompt_set event when forking to a different cwd (Fix #9)', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
@@ -278,13 +280,14 @@ describe('session/fork durable history', () => {
 
       const systemPromptEvents = allEvents.filter((e) => e.type === 'system_prompt_set');
 
-      // Two system_prompt_set events: the cloned source event + the new re-rendered one.
-      expect(systemPromptEvents.length).toBe(2);
+      // Exactly ONE system_prompt_set event: the source's copy is skipped, replaced
+      // by the fresh re-rendered one for the new cwd.
+      expect(systemPromptEvents.length).toBe(1);
 
-      // The LAST event's text must reference forkedCwd, not sourceCwd.
-      const lastSystemPrompt = systemPromptEvents.at(-1)!;
-      expect(lastSystemPrompt.data.text).toContain(forkedCwd);
-      expect(lastSystemPrompt.data.text).not.toContain(sourceCwd);
+      // The sole event's text must reference forkedCwd, not sourceCwd.
+      const onlySystemPrompt = systemPromptEvents[0]!;
+      expect(onlySystemPrompt.data.text).toContain(forkedCwd);
+      expect(onlySystemPrompt.data.text).not.toContain(sourceCwd);
     } finally {
       client.close();
       server.close();
@@ -377,15 +380,66 @@ describe('session/fork durable history', () => {
 
       const systemPromptEvents = allEvents.filter((e) => e.type === 'system_prompt_set');
 
-      // Two system_prompt_set events: cloned source + re-rendered for new cwd.
-      expect(systemPromptEvents.length).toBe(2);
+      // Exactly ONE system_prompt_set event: the source's copy is skipped, replaced
+      // by the fresh re-rendered one for the new cwd.
+      expect(systemPromptEvents.length).toBe(1);
 
-      // The re-rendered (last) event must use the fork-test persona text, not lace's.
-      const lastPrompt = systemPromptEvents.at(-1)!;
-      expect(lastPrompt.data.text).toContain(personaMarker);
+      // The sole re-rendered event must use the fork-test persona text, not lace's.
+      const onlyPrompt = systemPromptEvents[0]!;
+      expect(onlyPrompt.data.text).toContain(personaMarker);
       // Lace's identity text appears in lace but not in fork-test persona.
-      expect(lastPrompt.data.text).not.toContain('You are Lace, a pragmatic AI partner');
+      expect(onlyPrompt.data.text).not.toContain('You are Lace, a pragmatic AI partner');
     } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('does NOT trigger message-builder "invariant violation" warn when forking to a different cwd', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    const sourceCwd = join(tempDir, 'source-cwd');
+    const forkedCwd = join(tempDir, 'forked-cwd');
+    mkdirSync(sourceCwd, { recursive: true });
+    mkdirSync(forkedCwd, { recursive: true });
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      const created = (await client.request('session/new', {
+        cwd: sourceCwd,
+        mcpServers: [],
+      })) as { sessionId: string };
+
+      const forked = (await client.request('session/fork', {
+        sessionId: created.sessionId,
+        cwd: forkedCwd,
+      })) as { sessionId: string };
+
+      const forkedDir = join(tempDir, 'agent-sessions', forked.sessionId);
+
+      // Rebuild the forked session (as happens on every prompt/compact/etc.) and
+      // assert no "invariant violation" warn is emitted.
+      buildProviderMessagesFromDurableEvents(forkedDir);
+
+      const violationWarns = warnSpy.mock.calls.filter((args) =>
+        String(args[0] ?? '').includes('invariant violation')
+      );
+      expect(violationWarns).toHaveLength(0);
+
+      // Also assert exactly one system_prompt_set event in the file itself.
+      const eventsRaw = readFileSync(join(forkedDir, 'events.jsonl'), 'utf8');
+      const events = eventsRaw
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as { type: string });
+      const sysPromptEvents = events.filter((e) => e.type === 'system_prompt_set');
+      expect(sysPromptEvents).toHaveLength(1);
+    } finally {
+      warnSpy.mockRestore();
       client.close();
       server.close();
     }

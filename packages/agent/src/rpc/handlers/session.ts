@@ -604,16 +604,24 @@ export function registerSessionHandlers(
       afterEventSeq = page.events[page.events.length - 1]!.eventSeq;
     }
 
+    // When cwd changes, we'll re-render and write a fresh system_prompt_set
+    // below. Pre-compute the flag so we can skip the source's copy in the loop,
+    // keeping the forked session at exactly one system_prompt_set event and
+    // preventing message-builder's "invariant violation" warn on every rebuild.
+    const willRerenderSystemPrompt = forkedCwd !== sourceSession.meta.workDir;
+
     const forkedEventsPath = join(forkedSessionDir, 'events.jsonl');
     for (const event of sourceEvents) {
+      // Skip copying the source's system_prompt_set when we'll re-render it for
+      // the new cwd — the re-rendered event written below will be the sole one.
+      if (willRerenderSystemPrompt && event.type === 'system_prompt_set') continue;
       appendFileSync(forkedEventsPath, JSON.stringify(event) + '\n', { encoding: 'utf8' });
     }
 
-    // If the fork uses a different cwd, the cloned system_prompt_set event still
-    // embeds the source's cwd (e.g. {{{project.cwd}}} expanded to source path).
-    // Re-render with the new cwd and append a second system_prompt_set event;
-    // the message-builder uses last-wins semantics so this overrides the cloned one.
-    if (forkedCwd !== sourceSession.meta.workDir) {
+    // If the fork uses a different cwd, the source's system_prompt_set event
+    // (which embedded the source cwd) was skipped above. Write a fresh one
+    // rendered with the new cwd so the forked session has exactly one.
+    if (willRerenderSystemPrompt) {
       // Preserve the source session's persona; fall back to 'lace' only if the
       // source has none recorded (corrupt session or non-persona creation path).
       const sourcePersona = sourceSession.state.config?.personaName ?? 'lace';
