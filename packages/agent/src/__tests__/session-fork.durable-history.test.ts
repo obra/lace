@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
@@ -319,6 +319,72 @@ describe('session/fork durable history', () => {
 
       // Same cwd: only one system_prompt_set event (the cloned one, no re-render needed).
       expect(systemPromptEvents.length).toBe(1);
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('uses sourceSession persona (not hardcoded "lace") on cwd-refresh', async () => {
+    // A custom persona with a unique identifying string that does not appear in
+    // any lace shared section.  We write it into a temp personas directory so
+    // the personaRegistry can resolve it without touching the source tree.
+    const personasDir = join(tempDir, 'custom-personas');
+    mkdirSync(personasDir, { recursive: true });
+    // Distinctive marker that appears only in this persona, not in lace.
+    const personaMarker = 'FORK_TEST_PERSONA_UNIQUE_MARKER_XQ9Z';
+    writeFileSync(
+      join(personasDir, 'fork-test.md'),
+      `You are a fork-test agent.\n${personaMarker}`
+    );
+
+    const sourceCwd = join(tempDir, 'source-cwd');
+    const forkedCwd = join(tempDir, 'forked-cwd');
+    mkdirSync(sourceCwd, { recursive: true });
+    mkdirSync(forkedCwd, { recursive: true });
+
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      // Register the custom personas directory so the registry can resolve 'fork-test'.
+      await client.request(
+        'initialize',
+        defaultInitializeParams({}, { userPersonasPaths: [personasDir] })
+      );
+
+      // Create the source session with the non-lace persona.
+      const created = (await client.request('session/new', {
+        cwd: sourceCwd,
+        mcpServers: [],
+        persona: 'fork-test',
+      })) as { sessionId: string };
+
+      // Fork to a different cwd — triggers the cwd-refresh / re-render path.
+      const forked = (await client.request('session/fork', {
+        sessionId: created.sessionId,
+        cwd: forkedCwd,
+      })) as { sessionId: string };
+
+      // Read all events from the forked session's event log.
+      const forkedDir = join(tempDir, 'agent-sessions', forked.sessionId);
+      const eventsRaw = readFileSync(join(forkedDir, 'events.jsonl'), 'utf8');
+      const allEvents = eventsRaw
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as { type: string; data: { text?: string } });
+
+      const systemPromptEvents = allEvents.filter((e) => e.type === 'system_prompt_set');
+
+      // Two system_prompt_set events: cloned source + re-rendered for new cwd.
+      expect(systemPromptEvents.length).toBe(2);
+
+      // The re-rendered (last) event must use the fork-test persona text, not lace's.
+      const lastPrompt = systemPromptEvents.at(-1)!;
+      expect(lastPrompt.data.text).toContain(personaMarker);
+      // Lace's identity text appears in lace but not in fork-test persona.
+      expect(lastPrompt.data.text).not.toContain('You are Lace, a pragmatic AI partner');
     } finally {
       client.close();
       server.close();

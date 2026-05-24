@@ -71,6 +71,8 @@ export type SessionState = {
     mcpServers?: StoredMcpServer[];
     /** Allowlist of tool names for this session; undefined means no scope filter. */
     toolScope?: string[];
+    /** Persona name used to render the session's system prompt. */
+    personaName?: string;
   };
 };
 

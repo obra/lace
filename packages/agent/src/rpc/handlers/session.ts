@@ -389,6 +389,7 @@ export function registerSessionHandlers(
           ...(effectiveStoredMcpServers ? { mcpServers: effectiveStoredMcpServers } : {}),
           ...(effectiveToolScope ? { toolScope: effectiveToolScope } : {}),
           runtimeBinding: activeRuntimeBinding,
+          ...(requestedPersona ? { personaName: requestedPersona } : {}),
         },
       });
       ensureSessionFiles(sessionDir);
@@ -605,8 +606,11 @@ export function registerSessionHandlers(
       );
       const tools = toolsForProvider.map((t) => ({ name: t.name, description: t.description }));
 
+      // Preserve the source session's persona; fall back to 'lace' only if the
+      // source has none recorded (corrupt session or non-persona creation path).
+      const sourcePersona = sourceSession.state.config?.personaName ?? 'lace';
       const promptConfig = await loadPromptConfig({
-        persona: 'lace',
+        persona: sourcePersona,
         tools,
         session: { getWorkingDirectory: () => forkedCwd },
         skillRegistry,
