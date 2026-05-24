@@ -28,8 +28,9 @@ function utcDateString(d: Date): string {
 /**
  * Resolve the persona to a safe directory segment, validating that it cannot
  * escape the persona bucket. Null becomes the `_unknown` sentinel. Empty
- * strings, names with path separators, and `.`/`..` are rejected — the caller
- * must pass `null` when persona is unknown.
+ * strings, names with path separators, `.`/`..`, leading dash, whitespace,
+ * and control characters are rejected — the caller must pass `null` when
+ * persona is unknown.
  */
 function personaSegment(persona: string | null): string {
   if (persona === null) return UNKNOWN_PERSONA_BUCKET;
@@ -44,6 +45,16 @@ function personaSegment(persona: string | null): string {
   }
   if (persona.includes('\0')) {
     throw new Error('persona must not contain NUL bytes');
+  }
+  if (persona.startsWith('-')) {
+    throw new Error(`persona must not start with a dash: ${JSON.stringify(persona)}`);
+  }
+  if (/\s/.test(persona)) {
+    throw new Error(`persona must not contain whitespace: ${JSON.stringify(persona)}`);
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(persona)) {
+    throw new Error(`persona must not contain control characters: ${JSON.stringify(persona)}`);
   }
   return persona;
 }

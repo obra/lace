@@ -136,6 +136,50 @@ describe('transcript-paths', () => {
         })
       ).toThrow(/persona/);
     });
+
+    it('rejects persona starting with a dash', () => {
+      expect(() =>
+        transcriptFilePath({
+          laceDir: '/tmp/lace',
+          persona: '-rf',
+          date: new Date('2026-05-23T10:00:00Z'),
+          sessionId: 'sess_abc',
+        })
+      ).toThrow(/persona/);
+    });
+
+    it('rejects persona containing whitespace', () => {
+      expect(() =>
+        transcriptFilePath({
+          laceDir: '/tmp/lace',
+          persona: 'ada bea',
+          date: new Date('2026-05-23T10:00:00Z'),
+          sessionId: 'sess_abc',
+        })
+      ).toThrow(/persona/);
+    });
+
+    it('rejects persona containing a tab character', () => {
+      expect(() =>
+        transcriptFilePath({
+          laceDir: '/tmp/lace',
+          persona: 'ada\tbea',
+          date: new Date('2026-05-23T10:00:00Z'),
+          sessionId: 'sess_abc',
+        })
+      ).toThrow(/persona/);
+    });
+
+    it('rejects persona containing a control character', () => {
+      expect(() =>
+        transcriptFilePath({
+          laceDir: '/tmp/lace',
+          persona: 'ada\x07evil',
+          date: new Date('2026-05-23T10:00:00Z'),
+          sessionId: 'sess_abc',
+        })
+      ).toThrow(/persona/);
+    });
   });
 
   describe('listTranscriptFiles', () => {
