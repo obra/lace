@@ -355,6 +355,23 @@ describe('RecallTool search', () => {
     expect(parsed.hint as string).toMatch(/xyznevermatches/);
   });
 
+  it('0-hit hint omits persona term when persona filter array is empty', async () => {
+    // persona: [] (and persona: [''] after empty-string filtering) means
+    // "no persona filter was applied". The hint must not lie about a filter
+    // that's not actually narrowing results.
+    const fx = makeSession(laceDir, 'ada');
+    appendPrompt(fx, 'unrelated');
+
+    const result = await new RecallTool().execute(
+      { action: 'search', query: 'xyznevermatches', persona: [] },
+      makeCtx()
+    );
+    const parsed = parseResult(result);
+    expect(parsed.hits).toEqual([]);
+    expect(typeof parsed.hint).toBe('string');
+    expect(parsed.hint as string).not.toMatch(/persona=/);
+  });
+
   it('mentions the persona filter in the zero-hits hint', async () => {
     const fx = makeSession(laceDir, 'ada');
     appendPrompt(fx, 'something');

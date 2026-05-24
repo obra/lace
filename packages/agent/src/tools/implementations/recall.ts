@@ -130,6 +130,10 @@ export class RecallTool extends Tool {
     const where: string[] = ['content MATCH ?'];
     const params: unknown[] = [args.query];
 
+    // Tracks what we ACTUALLY applied (after stripping empties / empty array).
+    // The 0-hit hint reads this — not the raw input — so we never tell the
+    // caller "I filtered by persona=X" when the filter was a no-op.
+    let appliedPersonaFilter: string[] | null = null;
     if (args.persona !== undefined) {
       // Defense in depth: the zod schema already rejects empty-string elements,
       // but if a caller bypasses validation (or the schema rule regresses) an
@@ -142,6 +146,7 @@ export class RecallTool extends Tool {
       if (personas.length > 0) {
         where.push(`persona IN (${personas.map(() => '?').join(',')})`);
         params.push(...personas);
+        appliedPersonaFilter = personas;
       }
     }
     if (args.session_id !== undefined) {
@@ -188,8 +193,9 @@ export class RecallTool extends Tool {
     const hits = rows.map((r) => ({ ...r, preview: redact(r.preview) }));
 
     if (hits.length === 0) {
-      const personaPart =
-        args.persona !== undefined ? ` (persona=${redact(JSON.stringify(args.persona))})` : '';
+      const personaPart = appliedPersonaFilter
+        ? ` (persona=${redact(JSON.stringify(appliedPersonaFilter))})`
+        : '';
       return this.createResult({
         hits: [],
         hint: `0 hits for query=${redact(JSON.stringify(args.query))}${personaPart}. Try: drop the persona filter, widen the time range, or check spelling.`,
