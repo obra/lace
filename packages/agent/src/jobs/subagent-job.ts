@@ -39,7 +39,6 @@ import {
   type AgentServerState,
   type ContainerExecutionMetadata,
 } from '../server-types';
-import { fingerprintContainerExecutionToken } from './container-execution-metadata';
 
 // Types for tool_use update payloads from child processes
 type ToolKind = 'read' | 'edit' | 'delete' | 'search' | 'execute' | 'think' | 'fetch' | 'other';
@@ -399,17 +398,11 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       ) {
         return undefined;
       }
-      const tokenFingerprint =
-        typeof metadata.tokenFingerprint === 'string'
-          ? metadata.tokenFingerprint
-          : typeof metadata.token === 'string'
-            ? fingerprintContainerExecutionToken(metadata.token)
-            : undefined;
-      if (!tokenFingerprint) return undefined;
+      if (typeof metadata.tokenFingerprint !== 'string') return undefined;
 
       return {
         tokenEnvName: metadata.tokenEnvName,
-        tokenFingerprint,
+        tokenFingerprint: metadata.tokenFingerprint,
         personaName: metadata.personaName,
         parentSessionId: metadata.parentSessionId as SessionId,
         jobId: mappedJobId,
