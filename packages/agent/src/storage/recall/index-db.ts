@@ -6,6 +6,7 @@ import type { Database as Db } from 'better-sqlite3';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getLaceDir } from '../../config/lace-dir';
+import { SECURE_DIR_MODE, SECURE_FILE_MODE } from '../transcript-paths';
 
 export type { Db };
 
@@ -22,7 +23,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS events USING fts5(
 `;
 
 export function openRecallIndex(dbPath: string): Db {
-  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true, mode: SECURE_DIR_MODE });
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   // Multi-process subagent containers share LACE_DIR and contend on this
@@ -32,6 +33,19 @@ export function openRecallIndex(dbPath: string): Db {
   // unbounded blocking of the event-write path on a true deadlock.
   db.pragma('busy_timeout = 5000');
   db.exec(SCHEMA);
+  // Apply 0o600 to the index file and any WAL/SHM sidecars. In-memory
+  // databases (dbPath === ':memory:') have no on-disk file; skip them.
+  if (dbPath !== ':memory:') {
+    if (fs.existsSync(dbPath)) {
+      fs.chmodSync(dbPath, SECURE_FILE_MODE);
+    }
+    for (const suffix of ['-wal', '-shm']) {
+      const sidecar = dbPath + suffix;
+      if (fs.existsSync(sidecar)) {
+        fs.chmodSync(sidecar, SECURE_FILE_MODE);
+      }
+    }
+  }
   return db;
 }
 

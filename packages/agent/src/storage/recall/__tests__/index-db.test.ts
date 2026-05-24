@@ -2,7 +2,7 @@
 // ABOUTME: Verifies schema creation, idempotency, and FTS round-trip on real SQLite
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { closeRecallIndex, getRecallIndex, openRecallIndex } from '../index-db';
@@ -77,6 +77,28 @@ describe('openRecallIndex', () => {
       const timeout = db.pragma('busy_timeout', { simple: true });
       expect(typeof timeout).toBe('number');
       expect(timeout as number).toBeGreaterThan(0);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('creates index.sqlite (and WAL/SHM if present) with mode 0o600', () => {
+    dir = mkdtempSync(join(tmpdir(), 'recall-idx-mode-'));
+    const dbPath = join(dir, 'index.sqlite');
+    const db = openRecallIndex(dbPath);
+    try {
+      // Force WAL sidecar by doing a write
+      db.prepare(
+        `INSERT INTO events (event_id, session_id, ts, persona, kind, content) VALUES (?, ?, ?, ?, ?, ?)`
+      ).run('sess_x:1', 'sess_x', '2026-05-23T00:00:00Z', 'ada', 'user_message', 'hi');
+
+      expect(statSync(dbPath).mode & 0o777).toBe(0o600);
+      for (const suffix of ['-wal', '-shm']) {
+        const sidecar = dbPath + suffix;
+        if (existsSync(sidecar)) {
+          expect(statSync(sidecar).mode & 0o777).toBe(0o600);
+        }
+      }
     } finally {
       db.close();
     }
