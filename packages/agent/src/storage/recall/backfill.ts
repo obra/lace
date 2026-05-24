@@ -4,7 +4,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Db } from './index-db';
-import { transcriptsRoot, UNKNOWN_PERSONA_BUCKET } from '../transcript-paths';
+import { listTranscriptFiles, transcriptsRoot, UNKNOWN_PERSONA_BUCKET } from '../transcript-paths';
 import { eventToRow } from './event-to-row';
 import { insertRow } from './index-writer';
 import { agentSessionsDir, readSessionMeta } from '../session-store';
@@ -94,7 +94,7 @@ function collectNewLayout(laceDir: string, out: SessionPass[]): void {
   }
 }
 
-function collectLegacyLayout(_laceDir: string, out: SessionPass[]): void {
+function collectLegacyLayout(laceDir: string, out: SessionPass[]): void {
   // Use agentSessionsDir() so LACE_SESSION_DIR / XDG_STATE_HOME / HOME / tmpdir
   // fallback paths are visible to backfill. Previously hardcoded to
   // <laceDir>/agent-sessions which silently missed sessions under any override
@@ -106,9 +106,40 @@ function collectLegacyLayout(_laceDir: string, out: SessionPass[]): void {
     if (!existsAsDir(sessionDir)) continue;
     const eventsFile = path.join(sessionDir, 'events.jsonl');
     if (!fs.existsSync(eventsFile)) continue;
-    const persona = readPersonaSafe(sessionDir);
+    // When meta.json doesn't carry a persona (legacy sessions, or sessions
+    // whose meta predates persona tracking), fall back to the persona under
+    // which the new-layout transcript files for this same sessionId live.
+    // This keeps legacy events attributed correctly in FTS instead of
+    // landing under persona=null while their new-layout siblings have a
+    // real persona (S5).
+    const persona = readPersonaSafe(sessionDir) ?? newLayoutPersonaForSession(laceDir, sessionId);
     out.push({ sessionId, filePath: eventsFile, persona });
   }
+}
+
+/**
+ * Inspect the new-layout transcript tree for any files belonging to `sessionId`
+ * and return the persona bucket they sit under. Returns `null` if no
+ * new-layout files exist or all of them are in the `_unknown` bucket (in
+ * which case we have no real persona to recover).
+ */
+function newLayoutPersonaForSession(laceDir: string, sessionId: string): string | null {
+  let files: string[] = [];
+  try {
+    files = listTranscriptFiles(laceDir, sessionId);
+  } catch {
+    return null;
+  }
+  for (const file of files) {
+    // file is <laceDir>/transcripts/<persona>/<date>/<sessionId>.jsonl
+    // The persona segment is the parent of the date directory.
+    const dateDir = path.dirname(file);
+    const personaDir = path.basename(path.dirname(dateDir));
+    if (personaDir !== UNKNOWN_PERSONA_BUCKET) {
+      return personaDir;
+    }
+  }
+  return null;
 }
 
 function catchUpFile(db: Db, pass: SessionPass, have: Set<string>, stats: BackfillStats): void {

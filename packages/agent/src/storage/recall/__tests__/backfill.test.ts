@@ -411,6 +411,53 @@ describe('backfillIndex', () => {
     expect(rowsB.map((r) => r.event_id).sort()).toEqual([`${sessionB}:1`, `${sessionB}:2`]);
   });
 
+  it('uses new-layout persona for legacy events when meta.json lacks a persona field (S5)', () => {
+    const sessionId = 'sess_eaeaeaea-1111-4111-8111-aaaaaaaaaaaa';
+
+    // Legacy meta.json without persona field, plus legacy events.jsonl
+    const legacyDir = join(laceDir, 'agent-sessions', sessionId);
+    mkdirSync(legacyDir, { recursive: true });
+    writeMeta(legacyDir, sessionId, null);
+    writeJsonl(join(legacyDir, 'events.jsonl'), [promptEvent(1, 'legacy event')]);
+
+    // New-layout file under persona 'ada' for the SAME sessionId
+    const newDir = join(laceDir, 'transcripts', 'ada', '2026-05-23');
+    mkdirSync(newDir, { recursive: true });
+    writeJsonl(join(newDir, `${sessionId}.jsonl`), [promptEvent(2, 'new event')]);
+
+    backfillIndex(db, laceDir);
+
+    // Both events should be attributed to persona='ada' — legacy via fallback
+    // to the new-layout persona bucket, new via direct path read.
+    const rows = allRows(db).filter((r) => r.session_id === sessionId);
+    expect(rows.map((r) => ({ event_id: r.event_id, persona: r.persona }))).toEqual([
+      { event_id: `${sessionId}:1`, persona: 'ada' },
+      { event_id: `${sessionId}:2`, persona: 'ada' },
+    ]);
+  });
+
+  it('falls back to null when meta lacks persona and all new-layout files are under _unknown (S5)', () => {
+    const sessionId = 'sess_efefefef-2222-4222-8222-bbbbbbbbbbbb';
+
+    const legacyDir = join(laceDir, 'agent-sessions', sessionId);
+    mkdirSync(legacyDir, { recursive: true });
+    writeMeta(legacyDir, sessionId, null);
+    writeJsonl(join(legacyDir, 'events.jsonl'), [promptEvent(1, 'legacy event')]);
+
+    // New-layout file under _unknown bucket — no real persona to recover.
+    const unkDir = join(laceDir, 'transcripts', '_unknown', '2026-05-23');
+    mkdirSync(unkDir, { recursive: true });
+    writeJsonl(join(unkDir, `${sessionId}.jsonl`), [promptEvent(2, 'unknown event')]);
+
+    backfillIndex(db, laceDir);
+
+    const rows = allRows(db).filter((r) => r.session_id === sessionId);
+    expect(rows.map((r) => ({ event_id: r.event_id, persona: r.persona }))).toEqual([
+      { event_id: `${sessionId}:1`, persona: null },
+      { event_id: `${sessionId}:2`, persona: null },
+    ]);
+  });
+
   it('handles both layouts present at once', () => {
     // Legacy
     const legacyId = SESSION_IDS.legacyMix;
