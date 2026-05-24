@@ -3,6 +3,7 @@
 
 import type { ToolResult } from '@lace/ent-protocol';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
+import type { LaceStopReason, LaceStopDetails } from '@lace/agent/providers/base-provider';
 
 // Content block types used in prompts and messages
 export type ContentBlock =
@@ -35,7 +36,16 @@ export type TurnStartEventData = {
 
 export type TurnEndEventData = {
   type: 'turn_end';
-  stopReason: string;
+  stopReason: LaceStopReason;
+  /**
+   * Structured detail accompanying the stop reason (refusal category, max
+   * output tokens source, etc.). Optional for back-compat: legacy durable
+   * events written before chunk G have no `stopDetails` field and deserialize
+   * to `undefined`. Consumers should treat `undefined` and `null` identically
+   * (no detail available). New events always populate the field — `null` when
+   * the stop reason carries no extra context.
+   */
+  stopDetails?: LaceStopDetails | null;
   usage?: {
     inputTokens: number;
     outputTokens: number;

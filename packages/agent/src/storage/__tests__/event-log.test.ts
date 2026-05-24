@@ -175,6 +175,45 @@ describe('storage/event-log', () => {
     }
   });
 
+  it('reads a legacy turn_end event (no stopDetails field) back without synthesis', () => {
+    // Pre-chunk-G events were written with only { stopReason, usage } — no
+    // stopDetails field. Verify they deserialize cleanly: the field is absent
+    // from the parsed object (i.e. undefined), and nothing in the read path
+    // synthesizes a value.
+    const { laceDir, sessionDir } = makeTestSessionDirs();
+    process.env.LACE_DIR = laceDir;
+    invalidatePersonaCache();
+    try {
+      let state = { nextEventSeq: 1, nextStreamSeq: 1 };
+      ({ nextState: state } = appendDurableEvent(sessionDir, state, {
+        type: 'turn_end',
+        data: {
+          stopReason: 'end_turn',
+          usage: { inputTokens: 1, outputTokens: 2, costUsd: 0 },
+        },
+      }));
+
+      const { events } = readDurableEvents(sessionDir, {
+        afterEventSeq: 0,
+        limit: 10,
+      });
+      expect(events).toHaveLength(1);
+      const event = events[0]!;
+      expect(event.type).toBe('turn_end');
+
+      const data = event.data as {
+        stopReason: string;
+        stopDetails?: unknown;
+      };
+      expect(data.stopReason).toBe('end_turn');
+      // Legacy events: field absent → undefined. Read path does not synthesize.
+      expect(data.stopDetails).toBeUndefined();
+      expect('stopDetails' in data).toBe(false);
+    } finally {
+      rmSync(laceDir, { recursive: true, force: true });
+    }
+  });
+
   describe('hasPendingImmediateInjects', () => {
     it('returns false on an empty / missing log', () => {
       const { laceDir, sessionDir } = makeTestSessionDirs();

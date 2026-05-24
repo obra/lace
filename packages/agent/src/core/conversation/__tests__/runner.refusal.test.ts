@@ -291,4 +291,76 @@ describe('ConversationRunner — refusal stop reason', () => {
     expect(data.name).toBe('file_write');
     expect(data.result).toBeUndefined();
   });
+
+  it('persists stopDetails on the turn_end durable event for refusals', async () => {
+    const refusalDetails = {
+      type: 'refusal' as const,
+      category: 'csam',
+      explanation: 'request involves disallowed content',
+      source: 'anthropic_classifier' as const,
+    };
+
+    const provider = new ScriptedProvider([
+      {
+        content: 'I cannot help with that.',
+        toolCalls: [],
+        stopReason: 'refusal',
+        stopDetails: refusalDetails,
+        usage: { promptTokens: 4, completionTokens: 6, totalTokens: 10 },
+      },
+    ]);
+
+    const toolExecutor = makeToolExecutor();
+    const { promise } = runOnce(provider, toolExecutor);
+    await promise;
+
+    const { events } = readDurableEvents(sessionDir, {
+      afterEventSeq: 0,
+      limit: Number.MAX_SAFE_INTEGER,
+    });
+
+    const turnEndEvents = events.filter((e) => e.type === 'turn_end');
+    expect(turnEndEvents).toHaveLength(1);
+
+    const turnEnd = turnEndEvents[0]!.data as {
+      type: 'turn_end';
+      stopReason: string;
+      stopDetails?: unknown;
+    };
+    expect(turnEnd.stopReason).toBe('refusal');
+    expect(turnEnd.stopDetails).toEqual(refusalDetails);
+  });
+
+  it('persists stopDetails as null when the stop reason has no extra context', async () => {
+    const provider = new ScriptedProvider([
+      {
+        content: 'all done',
+        toolCalls: [],
+        stopReason: 'end_turn',
+        usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+      },
+    ]);
+
+    const toolExecutor = makeToolExecutor();
+    const { promise } = runOnce(provider, toolExecutor);
+    await promise;
+
+    const { events } = readDurableEvents(sessionDir, {
+      afterEventSeq: 0,
+      limit: Number.MAX_SAFE_INTEGER,
+    });
+
+    const turnEndEvents = events.filter((e) => e.type === 'turn_end');
+    expect(turnEndEvents).toHaveLength(1);
+
+    const turnEnd = turnEndEvents[0]!.data as {
+      type: 'turn_end';
+      stopReason: string;
+      stopDetails?: unknown;
+    };
+    expect(turnEnd.stopReason).toBe('end_turn');
+    // The field is present but null — distinguishes "current writer, no detail"
+    // from a legacy event (field absent → undefined).
+    expect(turnEnd.stopDetails).toBeNull();
+  });
 });

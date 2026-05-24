@@ -731,6 +731,7 @@ export class ConversationRunner {
       type: 'turn_end',
       data: {
         stopReason,
+        stopDetails,
         usage: {
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
