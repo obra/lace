@@ -59,11 +59,14 @@ async function computeContextBreakdownForActiveSession(
   const _connectionId = effectiveConfig.connectionId;
   const modelId = effectiveConfig.modelId ?? 'unknown-model';
 
-  const { messages: providerMessages } = buildProviderMessagesFromDurableEvents(
+  const { messages: providerMessages, systemPrompt } = buildProviderMessagesFromDurableEvents(
     state.activeSession!.dir
   );
 
-  let systemPromptTokens = 0;
+  // The rebuilt messages array never contains role:'system' entries — the system
+  // prompt now lives exclusively in the returned systemPrompt string (Phase 2 of
+  // cache-control hardening). Estimate its tokens directly.
+  const systemPromptTokens = estimateTokens(systemPrompt);
   let userTokens = 0;
   let assistantTokens = 0;
   let toolCallTokens = 0;
@@ -79,7 +82,6 @@ async function computeContextBreakdownForActiveSession(
             })
             .map((b: ContentBlock & { type: 'text' }) => b.text)
             .join('\n');
-    if (message.role === 'system') systemPromptTokens += estimateTokens(contentText);
     if (message.role === 'user') userTokens += estimateTokens(contentText);
     if (message.role === 'assistant') assistantTokens += estimateTokens(contentText);
 
