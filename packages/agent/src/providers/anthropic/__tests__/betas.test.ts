@@ -39,6 +39,17 @@ const catalog: CatalogProvider = {
   models: [plainModel, oneMillionModel, multiBetaModel],
 };
 
+describe('OBSERVABILITY_BETAS', () => {
+  // Cheap regression guard for chunk J.1: if anyone removes this beta from the
+  // default set, the model_context_window_exceeded signal stops flowing on
+  // Anthropic-direct requests and prompts that overflow the context window
+  // start failing with HTTP 400s again instead of returning a typed
+  // stop_reason. Catch that change here before it ships.
+  it('includes model-context-window-exceeded-2025-08-26 by default', () => {
+    expect(OBSERVABILITY_BETAS).toContain('model-context-window-exceeded-2025-08-26');
+  });
+});
+
 describe('parseCatalogBetas', () => {
   it('returns empty array when the model has no extra_headers entry', () => {
     expect(parseCatalogBetas(catalog, plainModel.id)).toEqual([]);
