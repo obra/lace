@@ -170,11 +170,12 @@ export function writeSessionState(sessionDir: string, state: SessionState): void
 }
 
 export function ensureSessionFiles(sessionDir: string): void {
+  // Post-migration, new sessions write events under transcripts/<persona>/<date>/
+  // and never touch the legacy events.jsonl path. We deliberately do not
+  // pre-create an empty events.jsonl here so readAllSessionEventLines doesn't
+  // open a zero-line file on every read. Pre-migration sessions keep their
+  // legacy file; the dual-read path picks it up when it exists.
   fs.mkdirSync(sessionDir, { recursive: true });
-  const eventsPath = path.join(sessionDir, 'events.jsonl');
-  if (!fs.existsSync(eventsPath)) {
-    fs.writeFileSync(eventsPath, '', { encoding: 'utf8', mode: 0o600 });
-  }
 }
 
 // ACP-aligned: workDir→cwd, lastActive→updatedAt

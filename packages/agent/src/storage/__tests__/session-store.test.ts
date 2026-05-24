@@ -173,7 +173,7 @@ describe('storage/session-store', () => {
     expect(finalState).toMatchObject({ nextEventSeq: 2, nextStreamSeq: 3 });
   });
 
-  it('writes meta, ensures events.jsonl, lists and loads sessions', () => {
+  it('writes meta, does not pre-create empty events.jsonl, lists and loads sessions', () => {
     const sessionDir = getSessionDir(TEST_SESSION_ID);
     writeSessionMeta(sessionDir, {
       sessionId: TEST_SESSION_ID,
@@ -183,8 +183,9 @@ describe('storage/session-store', () => {
     ensureSessionFiles(sessionDir);
 
     expect(existsSync(join(sessionDir, 'meta.json'))).toBe(true);
-    expect(existsSync(join(sessionDir, 'events.jsonl'))).toBe(true);
-    expect(readFileSync(join(sessionDir, 'events.jsonl'), 'utf8')).toBe('');
+    // Post-migration, new sessions must NOT have an empty legacy events.jsonl
+    // — writes go under transcripts/<persona>/<date>/<session>.jsonl instead.
+    expect(existsSync(join(sessionDir, 'events.jsonl'))).toBe(false);
 
     const sessions = listSessions('/tmp');
     expect(sessions).toMatchObject([{ sessionId: TEST_SESSION_ID, cwd: '/tmp' }]);
