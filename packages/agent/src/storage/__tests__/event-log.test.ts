@@ -499,6 +499,58 @@ describe('storage/event-log', () => {
       }
     });
 
+    it('returns nextState.nextEventSeq = written.eventSeq + 1 even when input state is stale (H21)', () => {
+      const laceDir = mkdtempSync(join(tmpdir(), 'lace-stale-'));
+      process.env.LACE_DIR = laceDir;
+      const sessionId = `sess_${randomUUID()}`;
+      const sessionDir = join(laceDir, 'agent-sessions', sessionId);
+      mkdirSync(sessionDir, { recursive: true });
+      writeFileSync(
+        join(sessionDir, 'meta.json'),
+        JSON.stringify({
+          sessionId,
+          workDir: laceDir,
+          created: 'x',
+          persona: 'ada',
+        })
+      );
+      invalidatePersonaCache(sessionDir);
+      try {
+        // Pre-seed disk with events 1..5 in the new layout so derive sees max=5.
+        const today = new Date().toISOString().slice(0, 10);
+        const transcriptDir = join(laceDir, 'transcripts', 'ada', today);
+        mkdirSync(transcriptDir, { recursive: true });
+        writeFileSync(
+          join(transcriptDir, `${sessionId}.jsonl`),
+          [1, 2, 3, 4, 5]
+            .map((seq) =>
+              JSON.stringify({
+                eventSeq: seq,
+                timestamp: 'x',
+                type: 'prompt',
+                data: { type: 'prompt', content: [] },
+              })
+            )
+            .join('\n') + '\n'
+        );
+
+        // Caller has stale state: state.nextEventSeq=3 (out of date with disk).
+        const { written, nextState } = appendDurableEvent(
+          sessionDir,
+          { nextEventSeq: 3, nextStreamSeq: 1 },
+          {
+            type: 'prompt',
+            data: { type: 'prompt', content: [{ type: 'text', text: 'late' }] },
+          }
+        );
+
+        expect(written.eventSeq).toBe(6); // disk-derived, correct
+        expect(nextState.nextEventSeq).toBe(7); // must track disk, not state+1
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
     it('persona cache avoids repeated meta.json reads for the same sessionDir', () => {
       const { laceDir, sessionDir, sessionId } = makeTestSessionDirs('ada');
       process.env.LACE_DIR = laceDir;

@@ -316,7 +316,11 @@ export function appendDurableEvent(
 
   return {
     written,
-    nextState: { ...state, nextEventSeq: state.nextEventSeq + 1 },
+    // Track the disk-derived eventSeq so caller state stays consistent even when
+    // a concurrent process appended events between this caller's last read and
+    // this write. Using `state.nextEventSeq + 1` would drift below disk reality
+    // under cross-process contention (H21).
+    nextState: { ...state, nextEventSeq: written.eventSeq + 1 },
   };
 }
 
