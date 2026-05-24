@@ -3,27 +3,22 @@
 
 import { logger } from '@lace/agent/utils/logger';
 import { ContainerManager } from './container-manager';
-import { AppleContainerRuntime } from './apple-container';
-import { DockerContainerRuntime } from './docker-container';
+import { createDefaultContainerManager } from './manager-factory';
 
 /**
  * Construct a ContainerManager appropriate for the host platform. Returns null
  * when no supported container runtime exists (e.g. Windows). Callers should
  * treat null as "skip container work".
  *
- * Platform mapping:
+ * Honors the same LACE_CONTAINER_RUNTIME override as the agent server.
+ *
+ * Default platform mapping:
  *   - darwin → AppleContainerRuntime (macOS `container` CLI)
  *   - linux  → DockerContainerRuntime (docker CLI)
  *   - other  → null
  */
 export function createContainerManagerForPlatform(): ContainerManager | null {
-  if (process.platform === 'darwin') {
-    return new ContainerManager(new AppleContainerRuntime());
-  }
-  if (process.platform === 'linux') {
-    return new ContainerManager(new DockerContainerRuntime());
-  }
-  return null;
+  return createDefaultContainerManager();
 }
 
 /**
