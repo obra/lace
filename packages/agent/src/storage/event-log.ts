@@ -13,11 +13,19 @@ import type { TypedDurableEvent } from './event-types';
 
 /**
  * Cache: sessionDir → persona, populated on first lookup. Persona is immutable
- * for a session's lifetime, so the cache survives without invalidation in
- * production. Tests that reuse a sessionDir across logical sessions (e.g. by
- * rewriting meta.json) call `invalidatePersonaCache` to reset it.
+ * for a session's lifetime once meta.json is written, so the cache survives
+ * without invalidation in production. We deliberately do NOT cache `null`
+ * results: an early append can land before meta.json is committed (the session
+ * has been mkdir'd but writeSessionMeta hasn't run yet), and caching that
+ * miss would poison every subsequent append in this process — splitting the
+ * session across `_unknown/` and the real persona bucket. The cost of a
+ * miss is one stat() call per append, which is short-lived because
+ * writeSessionMeta also invalidates this cache entry.
+ *
+ * Tests that reuse a sessionDir across logical sessions (e.g. by rewriting
+ * meta.json) call `invalidatePersonaCache` to reset it.
  */
-const personaCache = new Map<string, string | null>();
+const personaCache = new Map<string, string>();
 
 export function invalidatePersonaCache(sessionDir?: string): void {
   if (sessionDir === undefined) {
@@ -28,7 +36,8 @@ export function invalidatePersonaCache(sessionDir?: string): void {
 }
 
 function personaForSessionDir(sessionDir: string): string | null {
-  if (personaCache.has(sessionDir)) return personaCache.get(sessionDir)!;
+  const cached = personaCache.get(sessionDir);
+  if (cached !== undefined) return cached;
   let persona: string | null = null;
   try {
     const meta = readSessionMeta(sessionDir);
@@ -36,7 +45,7 @@ function personaForSessionDir(sessionDir: string): string | null {
   } catch {
     persona = null;
   }
-  personaCache.set(sessionDir, persona);
+  if (persona !== null) personaCache.set(sessionDir, persona);
   return persona;
 }
 

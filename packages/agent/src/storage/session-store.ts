@@ -3,7 +3,11 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { getLaceDir } from '../config/lace-dir';
 import { asSessionId } from '@lace/ent-protocol';
-import { deriveNextEventSeqFromEventLog, summarizeDurableEvents } from './event-log';
+import {
+  deriveNextEventSeqFromEventLog,
+  invalidatePersonaCache,
+  summarizeDurableEvents,
+} from './event-log';
 import { atomicWriteJson } from './atomic-write';
 import { SessionStorageError } from '../errors/agent-errors';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
@@ -129,6 +133,10 @@ export function readSessionMeta(sessionDir: string): SessionMeta {
 export function writeSessionMeta(sessionDir: string, meta: SessionMeta): void {
   fs.mkdirSync(sessionDir, { recursive: true });
   atomicWriteJson(path.join(sessionDir, 'meta.json'), meta, { mode: 0o600 });
+  // Drop any stale persona cache entry from event-log so the next
+  // appendDurableEvent picks up the canonical persona instead of whatever
+  // was visible during an earlier read (commonly null, see C4).
+  invalidatePersonaCache(sessionDir);
 }
 
 export function readSessionState(sessionDir: string): SessionState {

@@ -22,6 +22,7 @@ import {
   summarizeDurableEvents,
 } from '../event-log';
 import { closeRecallIndex, getRecallIndex } from '../recall/index-db';
+import { writeSessionMeta } from '../session-store';
 
 /**
  * Helper: stand up a fresh laceDir + sessionDir (with persona) and set LACE_DIR.
@@ -371,6 +372,55 @@ describe('storage/event-log', () => {
           `${sessionId}.jsonl`
         );
         expect(existsSync(transcriptPath)).toBe(true);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('does NOT permanently cache a null persona — recovers when meta.json appears later (C4)', () => {
+      // C4: an append before meta.json is committed would cache `null` for
+      // the sessionDir, splitting the session across `_unknown/` and the
+      // real persona bucket forever in this process. The fix: never cache
+      // `null` results, and invalidate the cache when writeSessionMeta
+      // commits. The session is still split (the first append legitimately
+      // had no persona) but the SECOND append must land in the canonical
+      // bucket.
+      const laceDir = mkdtempSync(join(tmpdir(), 'lace-event-log-c4-'));
+      const sessionId = `sess_${randomUUID()}`;
+      const sessionDir = join(laceDir, 'agent-sessions', sessionId);
+      mkdirSync(sessionDir, { recursive: true });
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
+      try {
+        // First append BEFORE meta.json — this would poison the cache under
+        // the old behavior.
+        let state = { nextEventSeq: 1, nextStreamSeq: 1 };
+        ({ nextState: state } = appendDurableEvent(sessionDir, state, {
+          type: 'prompt',
+          data: { content: [{ type: 'text', text: 'first' }] },
+        }));
+
+        // Write meta.json with the real persona. writeSessionMeta also
+        // invalidates the persona cache, so the next append picks up 'ada'.
+        writeSessionMeta(sessionDir, {
+          sessionId: sessionId as `sess_${string}`,
+          workDir: laceDir,
+          created: '2026-05-23T00:00:00Z',
+          persona: 'ada',
+        } as Parameters<typeof writeSessionMeta>[1]);
+
+        // Second append — must use 'ada', not stale `null` from the cache.
+        ({ nextState: state } = appendDurableEvent(sessionDir, state, {
+          type: 'prompt',
+          data: { content: [{ type: 'text', text: 'second' }] },
+        }));
+
+        const today = new Date().toISOString().slice(0, 10);
+        const adaPath = join(laceDir, 'transcripts', 'ada', today, `${sessionId}.jsonl`);
+        expect(existsSync(adaPath)).toBe(true);
+        const adaLines = readFileSync(adaPath, 'utf8').trim().split('\n');
+        // The second append landed in 'ada' as expected.
+        expect(adaLines.length).toBeGreaterThanOrEqual(1);
       } finally {
         rmSync(laceDir, { recursive: true, force: true });
       }
