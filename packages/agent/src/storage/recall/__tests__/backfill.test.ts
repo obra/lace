@@ -487,6 +487,56 @@ describe('backfillIndex', () => {
     expect(sessions.map((s) => s.session_id)).toEqual([realId]);
   });
 
+  it('rejects loose sess_ prefix that recall.read would not accept (legacy layout)', () => {
+    // The previous SESSION_ID_RE was `/^sess_[0-9a-f][0-9a-f-]*$/`, which
+    // accepted `sess_a` and `sess_abc` — backfill would index them, recall.search
+    // would surface them, then recall.read (which uses the strict SessionIdSchema
+    // from @lace/ent-protocol) would reject them. Search/read disagreement.
+    // Enforce the canonical sess_<uuid> shape in backfill so the index never
+    // contains rows recall.read can't follow.
+    const legacyRoot = join(laceDir, 'agent-sessions');
+    mkdirSync(legacyRoot, { recursive: true });
+
+    for (const looseId of ['sess_a', 'sess_abc', 'sess_deadbeef']) {
+      const dir = join(legacyRoot, looseId);
+      mkdirSync(dir, { recursive: true });
+      writeMeta(dir, looseId, 'ada');
+      writeJsonl(join(dir, 'events.jsonl'), [promptEvent(1, `loose ${looseId}`)]);
+    }
+
+    const realId = 'sess_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    const realDir = join(legacyRoot, realId);
+    mkdirSync(realDir, { recursive: true });
+    writeMeta(realDir, realId, 'ada');
+    writeJsonl(join(realDir, 'events.jsonl'), [promptEvent(1, 'real event')]);
+
+    backfillIndex(db, laceDir);
+
+    const sessions = db.prepare(`SELECT DISTINCT session_id FROM events`).all() as Array<{
+      session_id: string;
+    }>;
+    expect(sessions.map((s) => s.session_id)).toEqual([realId]);
+  });
+
+  it('rejects loose sess_ prefix in new-layout filenames', () => {
+    const personaDir = join(laceDir, 'transcripts', 'ada', '2026-05-23');
+    mkdirSync(personaDir, { recursive: true });
+
+    // Loose-shape ids matching the old regex but not the strict UUID shape
+    writeJsonl(join(personaDir, 'sess_a.jsonl'), [promptEvent(1, 'loose-a')]);
+    writeJsonl(join(personaDir, 'sess_abc.jsonl'), [promptEvent(1, 'loose-abc')]);
+
+    const realId = 'sess_bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
+    writeJsonl(join(personaDir, `${realId}.jsonl`), [promptEvent(1, 'real event')]);
+
+    backfillIndex(db, laceDir);
+
+    const sessions = db.prepare(`SELECT DISTINCT session_id FROM events`).all() as Array<{
+      session_id: string;
+    }>;
+    expect(sessions.map((s) => s.session_id)).toEqual([realId]);
+  });
+
   it('ignores new-layout files whose basename is not a valid sessionId (H3)', () => {
     const personaDir = join(laceDir, 'transcripts', 'ada', '2026-05-23');
     mkdirSync(personaDir, { recursive: true });

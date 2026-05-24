@@ -3,6 +3,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { isSessionId } from '@lace/ent-protocol';
 import type { Db } from './index-db';
 import { listTranscriptFiles, transcriptsRoot, UNKNOWN_PERSONA_BUCKET } from '../transcript-paths';
 import { eventToRow } from './event-to-row';
@@ -23,10 +24,14 @@ export type BackfillStats = {
 // must NOT pollute the FTS index — they end up as garbage rows like
 // `tmp-foo:1` (H3). Same shape applies to `<sessionId>.jsonl` files in the
 // new layout.
-const SESSION_ID_RE = /^sess_[0-9a-f][0-9a-f-]*$/;
-
+//
+// Reuse the canonical SessionIdSchema-backed validator from ent-protocol so
+// backfill's "is this a real session?" gate stays in lockstep with
+// recall.read's strict sess_<uuid> requirement (asSessionId). A loose match
+// here would let search index rows that recall.read then refuses to follow,
+// causing search/read disagreement.
 function isValidSessionId(name: string): boolean {
-  return SESSION_ID_RE.test(name);
+  return isSessionId(name);
 }
 
 type SessionPass = {
