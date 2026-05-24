@@ -4,6 +4,7 @@
 import { isAgentSessionId, asAgentSessionId } from '@lace/web/lib/validation/session-id-validation';
 import { getSupervisor } from '@lace/web/lib/server/supervisor-service';
 import type { AppEvent, ProtocolEvent, ToolUseUpdate } from '@lace/web/types/app-events';
+import { isWebEvent } from '@lace/web/types/app-events';
 import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import type { Route } from './+types/api.agents.$agentId.history';
@@ -74,6 +75,10 @@ function durableEventsToAppEvents(params: {
       continue;
     }
 
+    // Legacy sessions (pre-Phase 2) used context_injected for the foundational
+    // system prompt. Keep this mapping so old sessions still show a SYSTEM_PROMPT
+    // in the UI. New sessions use system_prompt_set, which is fetched separately
+    // via ent/session/system_prompt and prepended by the loader.
     if (e.type === 'context_injected') {
       const content = toTextContent(e.data?.content);
       if (content.trim()) {
@@ -170,14 +175,25 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const result = (await supervisor.agentRequest({
-      workspaceSessionId: workspace.workspaceSessionId,
-      sessionId: agentId,
-      method: 'ent/session/events',
-      requestParams: {
-        limit: 5000,
-      },
-    })) as { events: DurableEvent[] };
+    // Fetch conversation events and system prompt in parallel.
+    // system_prompt_set events are filtered from ent/session/events (they contain
+    // secrets); use the dedicated ent/session/system_prompt endpoint instead.
+    const [result, systemPromptResult] = await Promise.all([
+      supervisor.agentRequest({
+        workspaceSessionId: workspace.workspaceSessionId,
+        sessionId: agentId,
+        method: 'ent/session/events',
+        requestParams: {
+          limit: 5000,
+        },
+      }) as Promise<{ events: DurableEvent[] }>,
+      supervisor.agentRequest({
+        workspaceSessionId: workspace.workspaceSessionId,
+        sessionId: agentId,
+        method: 'ent/session/system_prompt',
+        requestParams: {},
+      }) as Promise<{ text: string }>,
+    ]);
 
     const events = durableEventsToAppEvents({
       agentSessionId: asAgentSessionId(agentId),
@@ -185,6 +201,27 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       ...(typeof workspace.projectId === 'string' ? { projectId: workspace.projectId } : {}),
       events: Array.isArray(result.events) ? result.events : [],
     });
+
+    // Prepend a synthetic SYSTEM_PROMPT event when the session has a
+    // system_prompt_set event. For legacy sessions the event_injected handler
+    // above already emits one; in that case systemPromptResult.text is '' and
+    // we skip the prepend to avoid a duplicate.
+    const systemPromptText = systemPromptResult.text;
+    if (
+      systemPromptText.trim() &&
+      !events.some((e) => isWebEvent(e) && e.type === 'SYSTEM_PROMPT')
+    ) {
+      const syntheticSystemPrompt: AppEvent = {
+        id: `${agentId}_system_prompt`,
+        type: 'SYSTEM_PROMPT',
+        timestamp: new Date(0),
+        data: systemPromptText,
+        agentSessionId: asAgentSessionId(agentId),
+        workspaceSessionId: workspace.workspaceSessionId,
+        ...(typeof workspace.projectId === 'string' ? { projectId: workspace.projectId } : {}),
+      } as AppEvent;
+      events.unshift(syntheticSystemPrompt);
+    }
 
     return createSuperjsonResponse(events, { status: 200 });
   } catch (error: unknown) {
