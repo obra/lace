@@ -132,15 +132,26 @@ describe('ConversationRunner', () => {
       mkdirSync(sessionDir, { recursive: true });
       mkdirSync(cwd, { recursive: true });
 
-      // Initialize session files (state.json and events.jsonl)
+      // Initialize session files (state.json and events.jsonl).
+      // Seed a system_prompt_set event so the runner's invariant check passes.
+      // All real sessions must have one; tests that don't are relying on the
+      // silent fallback that was removed by the empty-systemPrompt guard.
       writeFileSync(
         join(sessionDir, 'state.json'),
         JSON.stringify({
-          nextEventSeq: 1,
+          nextEventSeq: 2,
           nextStreamSeq: 1,
         })
       );
-      writeFileSync(join(sessionDir, 'events.jsonl'), '');
+      writeFileSync(
+        join(sessionDir, 'events.jsonl'),
+        JSON.stringify({
+          eventSeq: 1,
+          timestamp: new Date().toISOString(),
+          type: 'system_prompt_set',
+          data: { type: 'system_prompt_set', text: 'You are a test assistant.' },
+        }) + '\n'
+      );
     });
 
     afterEach(() => {
@@ -365,22 +376,36 @@ describe('ConversationRunner', () => {
       mkdirSync(runtimeCwd, { recursive: true });
       const targetFile = join(runtimeCwd, 'tracked.txt');
       writeFileSync(targetFile, 'old content');
+      // beforeEach seeds system_prompt_set at eventSeq 1 (nextEventSeq: 2).
+      // Append a tool_use event at eventSeq 2 and bump state to nextEventSeq 3.
+      writeFileSync(
+        join(sessionDir, 'state.json'),
+        JSON.stringify({ nextEventSeq: 3, nextStreamSeq: 1 })
+      );
       writeFileSync(
         join(sessionDir, 'events.jsonl'),
-        `${JSON.stringify({
+        JSON.stringify({
           eventSeq: 1,
           timestamp: new Date().toISOString(),
-          type: 'tool_use',
-          data: {
-            toolCallId: 'previous_read',
-            name: 'file_read',
-            input: { path: 'tracked.txt' },
-            result: {
-              outcome: 'completed',
-              content: [{ type: 'text', text: 'old content' }],
+          type: 'system_prompt_set',
+          data: { type: 'system_prompt_set', text: 'You are a test assistant.' },
+        }) +
+          '\n' +
+          JSON.stringify({
+            eventSeq: 2,
+            timestamp: new Date().toISOString(),
+            type: 'tool_use',
+            data: {
+              toolCallId: 'previous_read',
+              name: 'file_read',
+              input: { path: 'tracked.txt' },
+              result: {
+                outcome: 'completed',
+                content: [{ type: 'text', text: 'old content' }],
+              },
             },
-          },
-        })}\n`
+          }) +
+          '\n'
       );
 
       class RuntimeCwdWriteProvider extends AIProvider {
@@ -1671,6 +1696,54 @@ describe('ConversationRunner', () => {
           expect(failedUpdate?.result?.content[0]?.message).toContain('progressIntervalMs');
         }
       );
+    });
+
+    describe('empty systemPrompt is a hard error', () => {
+      it('throws when buildProviderMessagesFromDurableEvents returns systemPrompt=""', async () => {
+        // Use a fresh directory not set up by beforeEach so we control the events.jsonl content.
+        const testId = randomUUID().substring(0, 8);
+        const isolatedDir = join(tmpdir(), `lace-runner-empty-sp-${testId}`);
+        mkdirSync(isolatedDir, { recursive: true });
+
+        // Seed events.jsonl with a prompt event but NO system_prompt_set event.
+        // buildProviderMessagesFromDurableEvents returns systemPrompt: '' in this case,
+        // which the runner must now reject rather than silently using the provider fallback.
+        writeFileSync(
+          join(isolatedDir, 'state.json'),
+          JSON.stringify({ nextEventSeq: 2, nextStreamSeq: 1 })
+        );
+        writeFileSync(
+          join(isolatedDir, 'events.jsonl'),
+          JSON.stringify({
+            eventSeq: 1,
+            timestamp: new Date().toISOString(),
+            type: 'prompt',
+            data: { content: [{ type: 'text', text: 'hi' }] },
+          }) + '\n'
+        );
+
+        try {
+          const config: RunnerConfig = {
+            sessionDir: isolatedDir,
+            sessionId: 'sess_empty_sp',
+            cwd,
+            executionMode: 'execute',
+            approvalMode: 'approve',
+          };
+          const runner = new ConversationRunner(config, createMockDeps());
+
+          await expect(
+            runner.run({
+              content: [{ type: 'text', text: 'hi' }],
+              abortController: new AbortController(),
+              turnId: `turn_${randomUUID()}`,
+              startedAt: new Date().toISOString(),
+            })
+          ).rejects.toThrow(/no system_prompt_set/i);
+        } finally {
+          rmSync(isolatedDir, { recursive: true, force: true });
+        }
+      });
     });
 
     describe('empty assistant turn not persisted (Fix #2)', () => {

@@ -106,11 +106,21 @@ describe('ConversationRunner threads personaRegistry into deps.createToolExecuto
     mkdirSync(cwd, { recursive: true });
     mkdirSync(userPersonasDir, { recursive: true });
     writeFileSync(join(userPersonasDir, 'test-shell.md'), 'You are a shell tester.');
+    // Seed system_prompt_set at eventSeq 1 so the runner's invariant check passes.
+    // All real sessions must have one; nextEventSeq: 2 so appendDurableEvent starts at 2.
     writeFileSync(
       join(sessionDir, 'state.json'),
-      JSON.stringify({ nextEventSeq: 1, nextStreamSeq: 1 })
+      JSON.stringify({ nextEventSeq: 2, nextStreamSeq: 1 })
     );
-    writeFileSync(join(sessionDir, 'events.jsonl'), '');
+    writeFileSync(
+      join(sessionDir, 'events.jsonl'),
+      JSON.stringify({
+        eventSeq: 1,
+        timestamp: new Date().toISOString(),
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'You are a test assistant.' },
+      }) + '\n'
+    );
   });
 
   afterEach(() => {

@@ -206,9 +206,17 @@ export class ConversationRunner {
       buildProviderMessagesFromDurableEvents(sessionDir);
     let providerMessages = rebuiltMessages;
 
-    if (frozenSystemPrompt) {
-      provider.setSystemPrompt(frozenSystemPrompt);
+    // The system prompt is invariant for the session lifetime and is written
+    // by session/new as a system_prompt_set event. An empty result means the
+    // session is corrupt or was created without one — fail loudly rather
+    // than letting the provider's fallback string silently mask the bug.
+    if (!frozenSystemPrompt) {
+      throw new Error(
+        `Session ${sessionDir} has no system_prompt_set event; ` +
+          `the session is corrupt or was created before the invariant was enforced.`
+      );
     }
+    provider.setSystemPrompt(frozenSystemPrompt);
     // Watermark for mid-turn re-reads of durable events. Events with
     // eventSeq <= this value are already reflected in providerMessages (either
     // from the initial build above or appended on a previous iteration).

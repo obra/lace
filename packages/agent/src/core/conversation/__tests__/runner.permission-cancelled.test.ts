@@ -165,11 +165,21 @@ describe('ConversationRunner — permission cancelled stopReason (kata #37 Layer
     cwd = join(tmpdir(), `lace-runner-perm-cancel-cwd-${testId}`);
     mkdirSync(sessionDir, { recursive: true });
     mkdirSync(cwd, { recursive: true });
+    // Seed system_prompt_set at eventSeq 1 so the runner's invariant check passes.
+    // All real sessions must have one; nextEventSeq: 2 so appendDurableEvent starts at 2.
     writeFileSync(
       join(sessionDir, 'state.json'),
-      JSON.stringify({ nextEventSeq: 1, nextStreamSeq: 1 })
+      JSON.stringify({ nextEventSeq: 2, nextStreamSeq: 1 })
     );
-    writeFileSync(join(sessionDir, 'events.jsonl'), '');
+    writeFileSync(
+      join(sessionDir, 'events.jsonl'),
+      JSON.stringify({
+        eventSeq: 1,
+        timestamp: new Date().toISOString(),
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'You are a test assistant.' },
+      }) + '\n'
+    );
   });
 
   afterEach(() => {
