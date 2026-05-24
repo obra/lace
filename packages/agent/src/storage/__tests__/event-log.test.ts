@@ -848,6 +848,108 @@ describe('storage/event-log', () => {
     });
   });
 
+  describe('turn_end dedup invariant (PRI-1818 #2)', () => {
+    it('silently skips a second turn_end for the same turnId, leaving only the first', () => {
+      const { laceDir, sessionDir } = makeTestSessionDirs();
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
+      try {
+        const turnId = 'turn_dedup_test';
+        let state = { nextEventSeq: 1, nextStreamSeq: 1 };
+
+        // First turn_end: stopReason from the runner (the truthful one).
+        const first = appendDurableEvent(sessionDir, state, {
+          type: 'turn_end',
+          turnId,
+          turnSeq: 0,
+          data: { type: 'turn_end', stopReason: 'end_turn' },
+        });
+        state = first.nextState;
+
+        // Second turn_end (the prompt.ts fallback): must be silently rejected.
+        const second = appendDurableEvent(sessionDir, state, {
+          type: 'turn_end',
+          turnId,
+          turnSeq: 1,
+          data: { type: 'turn_end', stopReason: 'prompt_handler_caught' },
+        });
+
+        // State is unchanged after a deduped write.
+        expect(second.nextState.nextEventSeq).toBe(state.nextEventSeq);
+
+        // Exactly one turn_end for this turnId remains in the log, and it is
+        // the FIRST one (the runner's), not the prompt.ts fallback.
+        const { events } = readDurableEvents(sessionDir, { afterEventSeq: 0, limit: 100 });
+        const turnEnds = events.filter(
+          (e) => e.type === 'turn_end' && (e as { turnId?: string }).turnId === turnId
+        );
+        expect(turnEnds).toHaveLength(1);
+        expect(turnEnds[0]?.data).toMatchObject({ stopReason: 'end_turn' });
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('allows turn_end for a DIFFERENT turnId after a previous turn closed', () => {
+      const { laceDir, sessionDir } = makeTestSessionDirs();
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
+      try {
+        let state = { nextEventSeq: 1, nextStreamSeq: 1 };
+
+        const r1 = appendDurableEvent(sessionDir, state, {
+          type: 'turn_end',
+          turnId: 'turn_one',
+          turnSeq: 0,
+          data: { type: 'turn_end', stopReason: 'end_turn' },
+        });
+        state = r1.nextState;
+
+        const r2 = appendDurableEvent(sessionDir, state, {
+          type: 'turn_end',
+          turnId: 'turn_two',
+          turnSeq: 0,
+          data: { type: 'turn_end', stopReason: 'end_turn' },
+        });
+        state = r2.nextState;
+
+        const { events } = readDurableEvents(sessionDir, { afterEventSeq: 0, limit: 100 });
+        const turnIds = events
+          .filter((e) => e.type === 'turn_end')
+          .map((e) => (e as { turnId?: string }).turnId);
+        expect(turnIds).toEqual(['turn_one', 'turn_two']);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('does not block a turn_end when no turnId is supplied (edge case)', () => {
+      // The dedup invariant is keyed on turnId; events without one (which we
+      // don't expect in production turn_end writes) are not deduped.
+      const { laceDir, sessionDir } = makeTestSessionDirs();
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
+      try {
+        let state = { nextEventSeq: 1, nextStreamSeq: 1 };
+        const r1 = appendDurableEvent(sessionDir, state, {
+          type: 'turn_end',
+          data: { type: 'turn_end', stopReason: 'end_turn' },
+        });
+        state = r1.nextState;
+        const r2 = appendDurableEvent(sessionDir, state, {
+          type: 'turn_end',
+          data: { type: 'turn_end', stopReason: 'end_turn' },
+        });
+        state = r2.nextState;
+
+        const { events } = readDurableEvents(sessionDir, { afterEventSeq: 0, limit: 100 });
+        expect(events.filter((e) => e.type === 'turn_end')).toHaveLength(2);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe('dual-read: readers see both legacy and new layouts', () => {
     it('readDurableEvents merges events from both layouts in seq order', () => {
       const { laceDir, sessionDir, sessionId } = makeTestSessionDirs('ada');

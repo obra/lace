@@ -231,6 +231,33 @@ export function hasPendingImmediateInjects(sessionDir: string, afterEventSeq: nu
 }
 
 /**
+ * Returns the existing `turn_end` event for `turnId` if one has already been
+ * written to this session's transcript, or `null` otherwise. Used by
+ * `appendDurableEvent` to enforce the "at most one turn_end per turnId"
+ * storage invariant (PRI-1818 #2). Also used by `repairOrphanTurnStarts` to
+ * guard against synthesizing a duplicate close for a turn that was already
+ * closed since the initial scan. The invariant exists because two distinct
+ * code paths can each try to close the same turn: the conversation runner's
+ * normal exit AND the prompt.ts catch-handler fallback. We make the runner
+ * authoritative by silently dropping the fallback's write when the runner
+ * already won the race.
+ */
+export function findTurnEndEventByTurnId(sessionDir: string, turnId: string): DurableEvent | null {
+  for (const line of readAllSessionEventLines(sessionDir)) {
+    try {
+      const parsed = JSON.parse(line) as Partial<DurableEvent>;
+      if (parsed.type !== 'turn_end') continue;
+      if (parsed.turnId !== turnId) continue;
+      if (typeof parsed.eventSeq !== 'number') continue;
+      return parsed as DurableEvent;
+    } catch {
+      // ignore malformed line
+    }
+  }
+  return null;
+}
+
+/**
  * Scan a session's durable event log and synthesize a `turn_end` event for
  * any `turn_start` that lacks a matching `turn_end`. Called once at
  * session-open time so the prior process's aborted turns are closed in the
@@ -244,8 +271,8 @@ export function hasPendingImmediateInjects(sessionDir: string, afterEventSeq: nu
  *
  * Idempotent: once a synthesized turn_end is written, the next call sees the
  * matched pair and does nothing. Guards against the unlikely-but-possible
- * race where a turn_end already exists (e.g. another process or a future
- * dedup layer wrote one) by re-checking just before append.
+ * race where a turn_end already exists (e.g. another process or the
+ * appendDurableEvent dedup layer wrote one) by re-checking just before append.
  *
  * Returns the count of synthesized turn_end events written.
  */
@@ -284,9 +311,8 @@ export function repairOrphanTurnStarts(
 
   for (const [turnId, orphan] of openTurnStarts) {
     // Double-check no turn_end snuck in for this turnId between the scan
-    // above and this append. Keeps the scan correct regardless of whether
-    // task #2's storage-layer dedup has landed in the tree yet.
-    if (turnEndExistsForTurnId(sessionDir, turnId)) continue;
+    // above and this append.
+    if (findTurnEndEventByTurnId(sessionDir, turnId) !== null) continue;
 
     const { nextState, written } = appendDurableEvent(sessionDir, currentState, {
       type: 'turn_end',
@@ -306,19 +332,6 @@ export function repairOrphanTurnStarts(
   }
 
   return { nextState: currentState, synthesized };
-}
-
-function turnEndExistsForTurnId(sessionDir: string, turnId: string): boolean {
-  for (const line of readAllSessionEventLines(sessionDir)) {
-    try {
-      const parsed = JSON.parse(line) as Partial<DurableEvent>;
-      if (parsed.type !== 'turn_end') continue;
-      if (parsed.turnId === turnId) return true;
-    } catch {
-      // ignore malformed line
-    }
-  }
-  return false;
 }
 
 /**
@@ -385,6 +398,26 @@ export function appendDurableEvent(
   state: SessionState,
   event: Omit<DurableEvent, 'eventSeq' | 'timestamp'>
 ): { nextState: SessionState; written: DurableEvent } {
+  // Storage-layer invariant (PRI-1818 #2): at most one turn_end per turnId.
+  // The conversation runner closes turns on its happy path; the prompt.ts
+  // catch-handler also writes a fallback turn_end on errors. The runner runs
+  // first, so when both fire, the runner's write wins and the fallback is
+  // silently dropped here. Keyed on turnId — events without a turnId (which
+  // we don't expect in production turn_end writes) are not deduped, since
+  // there's no key to dedup against.
+  if (event.type === 'turn_end' && event.turnId !== undefined) {
+    const existing = findTurnEndEventByTurnId(sessionDir, event.turnId);
+    if (existing !== null) {
+      logger.warn('appendDurableEvent: dropping duplicate turn_end', {
+        turnId: event.turnId,
+        existingEventSeq: existing.eventSeq,
+        existingStopReason: (existing.data as { stopReason?: unknown } | undefined)?.stopReason,
+        attemptedStopReason: (event.data as { stopReason?: unknown } | undefined)?.stopReason,
+      });
+      return { nextState: state, written: existing };
+    }
+  }
+
   const sessionId = path.basename(sessionDir);
   const laceDir = getLaceDir();
   const persona = personaForSessionDir(sessionDir);
