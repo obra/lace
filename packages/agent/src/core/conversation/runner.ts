@@ -29,6 +29,7 @@ import {
 import { deriveFilesReadFromDurableEvents } from '@lace/agent/storage/files-from-events';
 import { executeTodoRead, executeTodoWrite } from '@lace/agent/todo/todo-tools';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
+import { appendOrMergeUser } from '@lace/agent/message-building/append-or-merge';
 import { bashSchema } from '@lace/agent/tools/implementations/bash';
 import {
   toNonEmptyString,
@@ -248,11 +249,8 @@ export class ConversationRunner {
           sessionDir,
           lastSeenEventSeq
         );
-        if (injections.length > 0) {
-          providerMessages = [
-            ...providerMessages,
-            ...injections.map((content) => ({ role: 'user' as const, content })),
-          ];
+        for (const content of injections) {
+          providerMessages = appendOrMergeUser(providerMessages, content);
         }
         lastSeenEventSeq = newWatermark;
 
@@ -267,7 +265,7 @@ export class ConversationRunner {
         if (completedTurns > 0 && completedTurns % ConversationRunner.LOOP_CHECK_INTERVAL === 0) {
           const reminder =
             '<system-reminder>You have completed many agentic turns. If you believe you are stuck in a loop or not making progress, stop and ask the user for guidance. Otherwise, continue.</system-reminder>';
-          providerMessages = [...providerMessages, { role: 'user' as const, content: reminder }];
+          providerMessages = appendOrMergeUser(providerMessages, reminder);
         }
 
         const messageTurnSeq = streamTurnSeq++;

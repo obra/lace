@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { ToolResult } from '@lace/ent-protocol';
 import type { ContentBlock, ProviderMessage } from '../providers/base-provider';
 import { toNonEmptyString, coreToolResultFromProtocol } from '../rpc/utils';
+import { appendOrMergeUser } from './append-or-merge';
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import { logger } from '@lace/agent/utils/logger';
@@ -224,10 +225,17 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
     if (type === 'context_injected') {
       // Emit as role:user so runtime context is visible to the model in the
       // messages array while remaining distinct from the stable system prompt.
+      // Use appendOrMergeUser to avoid consecutive role:user messages when the
+      // prior entry is a user[toolResults] turn — Anthropic combines consecutive
+      // same-role messages in implementation-defined ways and it disrupts cache reach.
       const eventData = data as ContextInjectedData;
       const contentArr = Array.isArray(eventData.content) ? eventData.content : [];
       const content = extractTextFromContentBlocks(contentArr);
-      if (content.trim()) messages.push({ role: 'user', content });
+      if (content.trim()) {
+        const merged = appendOrMergeUser(messages, content);
+        messages.length = 0;
+        messages.push(...merged);
+      }
       continue;
     }
 

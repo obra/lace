@@ -309,20 +309,20 @@ describe('ConversationRunner - mid-turn context_injected re-read (PRI-1691)', ()
     });
 
     const secondCallMessages = provider.receivedMessages[1]!;
-    const userInjects = secondCallMessages
-      .filter(
-        (m) =>
-          m.role === 'user' &&
-          typeof m.content === 'string' &&
-          /INJECT-[ABC]/.test(m.content as string)
-      )
-      .map((m) => m.content as string);
+    // All three injections are consecutive role:'user' entries and get merged via
+    // appendOrMergeUser into a single message joined by newlines.
+    const allUserContent = secondCallMessages
+      .filter((m) => m.role === 'user' && typeof m.content === 'string')
+      .map((m) => m.content as string)
+      .join('\n');
 
-    expect(userInjects).toHaveLength(3);
-    // Order must match insertion (eventSeq) order.
-    expect(userInjects[0]).toContain('INJECT-A');
-    expect(userInjects[1]).toContain('INJECT-B');
-    expect(userInjects[2]).toContain('INJECT-C');
+    // All three labels must appear, and in insertion (eventSeq) order.
+    const posA = allUserContent.indexOf('INJECT-A');
+    const posB = allUserContent.indexOf('INJECT-B');
+    const posC = allUserContent.indexOf('INJECT-C');
+    expect(posA).toBeGreaterThanOrEqual(0);
+    expect(posB).toBeGreaterThan(posA);
+    expect(posC).toBeGreaterThan(posB);
   });
 
   it('does NOT append non-immediate priority injections mid-turn', async () => {

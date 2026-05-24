@@ -345,7 +345,9 @@ describe('buildProviderMessagesFromDurableEvents — system_prompt_set and conte
     expect(result.messages).toEqual([{ role: 'user', content: 'hi' }]);
   });
 
-  it('converts context_injected events to role:user messages (not role:system)', () => {
+  it('converts context_injected events to role:user content (not role:system)', () => {
+    // When context_injected follows prompt, both are role:'user', so they are
+    // merged into a single message to prevent consecutive same-role entries.
     writeEvents(tempDir, [
       {
         eventSeq: 1,
@@ -366,10 +368,85 @@ describe('buildProviderMessagesFromDurableEvents — system_prompt_set and conte
 
     const result = buildProviderMessagesFromDurableEvents(tempDir);
     expect(result.systemPrompt).toBe('sys');
-    expect(result.messages).toEqual([
-      { role: 'user', content: 'hi' },
-      { role: 'user', content: 'runtime nudge' },
+    // The two consecutive role:'user' entries are merged — the injected text
+    // is appended to the prompt's content with a newline separator.
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]!.role).toBe('user');
+    expect(result.messages[0]!.content).toBe('hi\nruntime nudge');
+    // Assert no role:system in the messages array — context_injected is user-only.
+    expect(result.messages.some((m) => m.role === 'system')).toBe(false);
+  });
+
+  it('context_injected after tool_use does NOT produce consecutive role:user messages', () => {
+    // Sequence:
+    //   system_prompt_set
+    //   prompt (user 'hi')
+    //   tool_use (assistant tool call + user toolResult)
+    //   context_injected (runtime nudge)
+    //   tool_use (assistant tool call + user toolResult)
+    //
+    // Without the merge, context_injected would be pushed as a separate role:user
+    // immediately following the user[toolResults] from the first tool_use, producing
+    // consecutive role:user messages on the wire.
+    writeEvents(tempDir, [
+      {
+        eventSeq: 1,
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'sys' },
+      },
+      {
+        eventSeq: 2,
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+      },
+      {
+        eventSeq: 3,
+        type: 'tool_use',
+        data: {
+          type: 'tool_use',
+          toolCallId: 'tc_1',
+          name: 'bash',
+          input: { command: 'echo a' },
+          result: {
+            outcome: 'completed',
+            content: [{ type: 'text', text: 'a' }],
+          },
+        },
+      },
+      {
+        eventSeq: 4,
+        type: 'context_injected',
+        data: { type: 'context_injected', content: [{ type: 'text', text: 'runtime nudge' }] },
+      },
+      {
+        eventSeq: 5,
+        type: 'tool_use',
+        data: {
+          type: 'tool_use',
+          toolCallId: 'tc_2',
+          name: 'bash',
+          input: { command: 'echo b' },
+          result: {
+            outcome: 'completed',
+            content: [{ type: 'text', text: 'b' }],
+          },
+        },
+      },
     ]);
+
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+
+    // No two adjacent messages may both have role === 'user'
+    for (let i = 1; i < messages.length; i++) {
+      const bothUser = messages[i]!.role === 'user' && messages[i - 1]!.role === 'user';
+      expect(bothUser).toBe(false);
+    }
+
+    // The runtime nudge must appear somewhere in the messages
+    const allText = messages
+      .map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content)))
+      .join(' ');
+    expect(allText).toContain('runtime nudge');
   });
 
   it('returns empty systemPrompt when no system_prompt_set or pre-prompt context_injected events exist', () => {
