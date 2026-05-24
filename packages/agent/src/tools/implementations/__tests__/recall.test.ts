@@ -35,6 +35,11 @@ describe('RecallTool registration', () => {
 describe('RecallTool schema', () => {
   const tool = new RecallTool();
 
+  // The schema is intentionally flat (single zod object with optional fields)
+  // because lace's tool-catalog JSON-Schema converter rejects discriminated
+  // unions. Per-action required-field checks live in executeValidated and
+  // are exercised in the "runtime per-action validation" block below.
+
   it('accepts a valid search input', () => {
     expect(() => tool.schema.parse({ action: 'search', query: 'x' })).not.toThrow();
   });
@@ -67,16 +72,9 @@ describe('RecallTool schema', () => {
     expect(() => tool.schema.parse({ action: 'bogus' })).toThrow();
   });
 
-  it('rejects search without a query', () => {
-    expect(() => tool.schema.parse({ action: 'search' })).toThrow();
-  });
-
   it('rejects search with an empty query', () => {
+    // An empty string still fails zod's .min(1) constraint on the optional field.
     expect(() => tool.schema.parse({ action: 'search', query: '' })).toThrow();
-  });
-
-  it('rejects read without event_id', () => {
-    expect(() => tool.schema.parse({ action: 'read' })).toThrow();
   });
 
   it('rejects limit above max', () => {
@@ -85,6 +83,38 @@ describe('RecallTool schema', () => {
 
   it('rejects context above max', () => {
     expect(() => tool.schema.parse({ action: 'read', event_id: 'e', context: 1000 })).toThrow();
+  });
+
+  it('exposes a JSON-Schema-convertible inputSchema (object type, not anyOf)', () => {
+    // Regression guard: the tool-catalog conversion in Tool#inputSchema only
+    // accepts an object-typed top-level schema. A discriminated union compiles
+    // to anyOf and throws "Invalid schema structure for tool recall".
+    expect(() => tool.inputSchema).not.toThrow();
+    expect(tool.inputSchema.type).toBe('object');
+  });
+});
+
+describe('RecallTool runtime per-action validation', () => {
+  it('returns an error result when search is called without query', async () => {
+    const tool = new RecallTool();
+    const result = await tool.execute({ action: 'search' }, makeCtx());
+    expect(result.content).toHaveLength(1);
+    const first = result.content[0];
+    if (first.type !== 'text') throw new Error('expected text block');
+    const parsed = JSON.parse(first.text) as { error?: string };
+    expect(parsed.error).toBeDefined();
+    expect(parsed.error!).toMatch(/`search`.*requires.*`query`/);
+  });
+
+  it('returns an error result when read is called without event_id', async () => {
+    const tool = new RecallTool();
+    const result = await tool.execute({ action: 'read' }, makeCtx());
+    expect(result.content).toHaveLength(1);
+    const first = result.content[0];
+    if (first.type !== 'text') throw new Error('expected text block');
+    const parsed = JSON.parse(first.text) as { error?: string };
+    expect(parsed.error).toBeDefined();
+    expect(parsed.error!).toMatch(/`read`.*requires.*`event_id`/);
   });
 });
 

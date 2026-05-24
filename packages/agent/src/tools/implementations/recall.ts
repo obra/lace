@@ -11,28 +11,29 @@ import { readAllSessionEventLines } from '../../storage/event-log';
 import { getSessionDir, readSessionMeta } from '../../storage/session-store';
 import type { TypedDurableEvent } from '../../storage/event-types';
 
-const searchSchema = z.object({
-  action: z.literal('search'),
-  query: z.string().min(1),
+// Flat schema with an `action` enum discriminator. Per-action required-field
+// checks happen at runtime in executeValidated. The flat shape is required
+// because lace's tool-catalog JSON-Schema conversion (Tool#inputSchema) only
+// accepts an object-typed top-level schema; a zod discriminatedUnion compiles
+// to an anyOf and is rejected at "Invalid schema structure for tool recall".
+const recallSchema = z.object({
+  action: z.enum(['search', 'read']),
+  // search fields
+  query: z.string().min(1).optional(),
   persona: z.union([z.string(), z.array(z.string())]).optional(),
   session_id: z.string().optional(),
   since: z.string().optional(),
   until: z.string().optional(),
   limit: z.number().int().positive().max(100).optional(),
-});
-
-const readSchema = z.object({
-  action: z.literal('read'),
-  event_id: z.string().min(1),
+  // read fields
+  event_id: z.string().min(1).optional(),
   context: z.number().int().nonnegative().max(50).optional(),
   full: z.boolean().optional(),
 });
 
-const recallSchema = z.discriminatedUnion('action', [searchSchema, readSchema]);
-
-export type RecallSearchInput = z.infer<typeof searchSchema>;
-export type RecallReadInput = z.infer<typeof readSchema>;
 export type RecallInput = z.infer<typeof recallSchema>;
+export type RecallSearchInput = RecallInput & { action: 'search'; query: string };
+export type RecallReadInput = RecallInput & { action: 'read'; event_id: string };
 
 const RECALL_DESCRIPTION = [
   'Search your own past lace session transcripts — your episodic memory.',
@@ -68,9 +69,19 @@ export class RecallTool extends Tool {
 
   protected async executeValidated(args: RecallInput, context: ToolContext): Promise<ToolResult> {
     if (args.action === 'search') {
-      return this.search(args, context);
+      if (args.query === undefined) {
+        return this.createResult({
+          error: '`search` action requires a `query` field (non-empty string).',
+        });
+      }
+      return this.search({ ...args, action: 'search', query: args.query }, context);
     }
-    return this.read(args, context);
+    if (args.event_id === undefined) {
+      return this.createResult({
+        error: '`read` action requires an `event_id` field (format `<session_id>:<eventSeq>`).',
+      });
+    }
+    return this.read({ ...args, action: 'read', event_id: args.event_id }, context);
   }
 
   private async search(args: RecallSearchInput, _context: ToolContext): Promise<ToolResult> {
