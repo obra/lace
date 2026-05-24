@@ -237,6 +237,353 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_result recovery
   });
 });
 
+describe('buildProviderMessagesFromDurableEvents — orphan tool_use recovery (PRI-1820)', () => {
+  let tempDir: string;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'lace-msg-builder-orphan-toolu-'));
+    warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+    warnSpy.mockRestore();
+  });
+
+  it('drops an assistant tool_use whose id has no matching following user tool_result', () => {
+    // Mirrors the Ada bricking case (PRI-1820): the matching tool_result was
+    // compacted away, leaving an assistant message carrying an orphan tool_use
+    // that Anthropic 400s on with "tool_use ids were found without tool_result
+    // blocks immediately after".
+    const event = {
+      type: 'context_compacted',
+      eventSeq: 1,
+      timestamp: new Date().toISOString(),
+      data: {
+        preserved: [
+          { role: 'user', content: 'recent user turn' },
+          {
+            role: 'assistant',
+            content: 'thinking out loud',
+            toolCalls: [
+              { id: 'toolu_orphan', name: 'slack/send_message', arguments: { text: 'hi' } },
+            ],
+          },
+          // The next user message has NO tool_result for toolu_orphan — the
+          // matching tool_result was lost to compaction.
+          { role: 'user', content: 'follow-up user turn' },
+        ],
+      },
+    };
+
+    writeEvents(tempDir, [event]);
+
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+
+    // No surviving assistant message should carry the orphan tool_use.
+    for (const m of messages) {
+      if (m.role === 'assistant' && Array.isArray(m.toolCalls)) {
+        for (const c of m.toolCalls) {
+          expect(c.id).not.toBe('toolu_orphan');
+        }
+      }
+    }
+
+    // The assistant message kept its text content (it's not empty), so the
+    // message itself should survive — just stripped of its toolCalls.
+    const survivingAssistant = messages.find(
+      (m) => m.role === 'assistant' && m.content === 'thinking out loud'
+    );
+    expect(survivingAssistant).toBeDefined();
+    expect(survivingAssistant!.toolCalls).toBeUndefined();
+
+    // WARN was logged with the orphan's toolCallId.
+    expect(warnSpy).toHaveBeenCalled();
+    const warnedArgs = warnSpy.mock.calls.flat().map((a) => JSON.stringify(a));
+    expect(warnedArgs.some((s) => s.includes('toolu_orphan'))).toBe(true);
+    expect(warnedArgs.some((s) => s.includes('Dropping orphaned tool_use'))).toBe(true);
+  });
+
+  it('drops the whole assistant message when its only tool_use is orphaned and text is empty', () => {
+    const event = {
+      type: 'context_compacted',
+      eventSeq: 1,
+      timestamp: new Date().toISOString(),
+      data: {
+        preserved: [
+          { role: 'user', content: 'turn 1' },
+          {
+            role: 'assistant',
+            content: '',
+            toolCalls: [{ id: 'toolu_lonely', name: 'bash', arguments: { command: 'ls' } }],
+          },
+          // No following user tool_result — orphan.
+          { role: 'user', content: 'turn 3' },
+        ],
+      },
+    };
+
+    writeEvents(tempDir, [event]);
+
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+
+    // The assistant message should be dropped entirely.
+    const assistantMsgs = messages.filter((m) => m.role === 'assistant');
+    expect(assistantMsgs).toHaveLength(0);
+
+    // The two user messages should both survive.
+    const userMsgContents = messages.filter((m) => m.role === 'user').map((m) => m.content);
+    expect(userMsgContents).toEqual(['turn 1', 'turn 3']);
+  });
+
+  it('keeps only the paired tool_use entries when the assistant has a mix', () => {
+    const event = {
+      type: 'context_compacted',
+      eventSeq: 1,
+      timestamp: new Date().toISOString(),
+      data: {
+        preserved: [
+          {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              { id: 'paired', name: 'bash', arguments: { command: 'echo a' } },
+              { id: 'orphan', name: 'bash', arguments: { command: 'echo b' } },
+            ],
+          },
+          {
+            role: 'user',
+            content: '',
+            toolResults: [
+              { id: 'paired', status: 'completed', content: [{ type: 'text', text: 'a' }] },
+              // No result for 'orphan'.
+            ],
+          },
+        ],
+      },
+    };
+
+    writeEvents(tempDir, [event]);
+
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+
+    const assistantMsg = messages.find((m) => m.role === 'assistant');
+    expect(assistantMsg).toBeDefined();
+    expect(assistantMsg!.toolCalls!.map((c) => c.id)).toEqual(['paired']);
+
+    expect(warnSpy).toHaveBeenCalled();
+    const warnedArgs = warnSpy.mock.calls.flat().map((a) => JSON.stringify(a));
+    expect(warnedArgs.some((s) => s.includes('orphan'))).toBe(true);
+  });
+
+  it('handles both-direction orphans in the same preserved list', () => {
+    // Mix: an orphan user tool_result AND an orphan assistant tool_use in the
+    // same conversation. Both directions must be cleaned.
+    const event = {
+      type: 'context_compacted',
+      eventSeq: 1,
+      timestamp: new Date().toISOString(),
+      data: {
+        preserved: [
+          // Orphan user tool_result (existing pass A catches this).
+          {
+            role: 'user',
+            content: '',
+            toolResults: [
+              { id: 'user_orphan', status: 'completed', content: [{ type: 'text', text: 'x' }] },
+            ],
+          },
+          { role: 'user', content: 'turn 2' },
+          // Properly paired tool_use + tool_result.
+          {
+            role: 'assistant',
+            content: '',
+            toolCalls: [{ id: 'paired', name: 'bash', arguments: {} }],
+          },
+          {
+            role: 'user',
+            content: '',
+            toolResults: [
+              { id: 'paired', status: 'completed', content: [{ type: 'text', text: 'ok' }] },
+            ],
+          },
+          // Orphan assistant tool_use (new pass B catches this).
+          {
+            role: 'assistant',
+            content: 'note',
+            toolCalls: [{ id: 'asst_orphan', name: 'bash', arguments: {} }],
+          },
+          { role: 'user', content: 'final turn' },
+        ],
+      },
+    };
+
+    writeEvents(tempDir, [event]);
+
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+
+    // The paired tool_use survives with its tool_result; both orphans are gone.
+    const allToolCallIds = messages
+      .filter((m) => m.role === 'assistant' && Array.isArray(m.toolCalls))
+      .flatMap((m) => m.toolCalls!.map((c) => c.id));
+    const allToolResultIds = messages
+      .filter((m) => m.role === 'user' && Array.isArray(m.toolResults))
+      .flatMap((m) => m.toolResults!.map((r) => r.id));
+
+    expect(allToolCallIds).toEqual(['paired']);
+    expect(allToolResultIds).toEqual(['paired']);
+
+    // The Anthropic invariant must hold end-to-end: every assistant tool_use
+    // is immediately followed by a user tool_result with the same id, and
+    // every user tool_result has a matching prior assistant tool_use.
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i]!;
+      if (m.role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
+        const next = messages[i + 1];
+        expect(next).toBeDefined();
+        expect(next!.role).toBe('user');
+        const resultIds = (next!.toolResults || []).map((r) => r.id);
+        for (const c of m.toolCalls) {
+          expect(resultIds).toContain(c.id);
+        }
+      }
+      if (m.role === 'user' && Array.isArray(m.toolResults) && m.toolResults.length > 0) {
+        const prev = messages[i - 1];
+        expect(prev).toBeDefined();
+        expect(prev!.role).toBe('assistant');
+        const callIds = (prev!.toolCalls || []).map((c) => c.id);
+        for (const r of m.toolResults) {
+          expect(callIds).toContain(r.id);
+        }
+      }
+    }
+  });
+
+  it('passes through happy-path matched pairs unchanged (no WARNs)', () => {
+    const event = {
+      type: 'context_compacted',
+      eventSeq: 1,
+      timestamp: new Date().toISOString(),
+      data: {
+        preserved: [
+          { role: 'user', content: 'do a thing' },
+          {
+            role: 'assistant',
+            content: 'on it',
+            toolCalls: [{ id: 'tc_1', name: 'bash', arguments: { command: 'echo hi' } }],
+          },
+          {
+            role: 'user',
+            content: '',
+            toolResults: [
+              { id: 'tc_1', status: 'completed', content: [{ type: 'text', text: 'hi' }] },
+            ],
+          },
+          { role: 'assistant', content: 'done' },
+        ],
+      },
+    };
+
+    writeEvents(tempDir, [event]);
+
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+
+    expect(messages).toHaveLength(4);
+    expect(messages[1]!.toolCalls).toHaveLength(1);
+    expect(messages[2]!.toolResults).toHaveLength(1);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('reproduces the Ada bricking shape (toolu_01NK38wAMjBA3eJc76cCBfNj) and strips it', () => {
+    // The exact toolu id from the Ada incident that drove 38/78 unmatched
+    // turn_starts on 2026-05-24 (PRI-1820 / PRI-1818 #5). The orphan tool_use
+    // survived into messages[1298] after compaction; here we model the shape
+    // and assert the symmetric drop fires.
+    const offendingId = 'toolu_01NK38wAMjBA3eJc76cCBfNj';
+    const event = {
+      type: 'context_compacted',
+      eventSeq: 1,
+      timestamp: new Date().toISOString(),
+      data: {
+        preserved: [
+          { role: 'user', content: 'earlier turn' },
+          {
+            role: 'assistant',
+            content: 'sending slack',
+            toolCalls: [
+              { id: offendingId, name: 'slack/send_message', arguments: { text: 'hello' } },
+            ],
+          },
+          // The tool_result for offendingId is missing — compacted away.
+          { role: 'user', content: 'next user turn' },
+        ],
+      },
+    };
+
+    writeEvents(tempDir, [event]);
+
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+
+    // After the symmetric strip, NO message in the rebuilt array should carry
+    // the offending toolu id in toolCalls.
+    const survivingIds = messages
+      .filter((m) => m.role === 'assistant' && Array.isArray(m.toolCalls))
+      .flatMap((m) => m.toolCalls!.map((c) => c.id));
+    expect(survivingIds).not.toContain(offendingId);
+
+    // The WARN names the offending id.
+    const warnedArgs = warnSpy.mock.calls.flat().map((a) => JSON.stringify(a));
+    expect(warnedArgs.some((s) => s.includes(offendingId))).toBe(true);
+  });
+
+  it('also drops user tool_results whose tool_use is missing in the prior assistant (inverse case)', () => {
+    // The investigator noted a 1-of-39 inverse case from 2026-05-21 (PRI-1820
+    // "out of scope" — but worth verifying that the existing user-side strip
+    // covers it). The shape: a user message carrying a tool_result whose
+    // tool_use_id has no matching tool_use in the immediately-prior assistant
+    // message. The existing pass A should catch it; this test confirms.
+    const event = {
+      type: 'context_compacted',
+      eventSeq: 1,
+      timestamp: new Date().toISOString(),
+      data: {
+        preserved: [
+          {
+            role: 'assistant',
+            content: 'no calls here',
+          },
+          {
+            role: 'user',
+            content: '',
+            toolResults: [
+              {
+                id: 'toolu_no_matching_use',
+                status: 'completed',
+                content: [{ type: 'text', text: 'orphan result' }],
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    writeEvents(tempDir, [event]);
+
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+
+    // The orphan user toolResult must be gone (its user message dropped, since
+    // it had no other content).
+    const userToolResultIds = messages
+      .filter((m) => m.role === 'user' && Array.isArray(m.toolResults))
+      .flatMap((m) => m.toolResults!.map((r) => r.id));
+    expect(userToolResultIds).not.toContain('toolu_no_matching_use');
+
+    const warnedArgs = warnSpy.mock.calls.flat().map((a) => JSON.stringify(a));
+    expect(warnedArgs.some((s) => s.includes('toolu_no_matching_use'))).toBe(true);
+  });
+});
+
 describe('buildProviderMessagesFromDurableEvents — context_compacted preserved routing', () => {
   let tempDir: string;
   let warnSpy: ReturnType<typeof vi.spyOn>;
