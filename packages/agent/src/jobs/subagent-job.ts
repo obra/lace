@@ -917,6 +917,9 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         userPersonasPaths: subagentUserPersonasPaths,
         skillDirs: subagentSkillDirs,
         config: buildSubagentInitConfig(parentEffective),
+        ...(currentState.containerExecutionIdentity
+          ? { containerExecutionIdentity: currentState.containerExecutionIdentity }
+          : {}),
       });
 
       // Determine whether to resume an existing session or create a new one.

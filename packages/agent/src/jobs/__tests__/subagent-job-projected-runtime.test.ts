@@ -400,6 +400,13 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
 
     await job.completion;
 
+    const initializeRequest = requestSpy.mock.calls.find(
+      ([method]) => method === 'initialize'
+    )?.[1];
+    expect(initializeRequest).toMatchObject({
+      containerExecutionIdentity: { tokenEnvName: 'SEN_AGENT_TOKEN' },
+    });
+
     const promptIndex = requestSpy.mock.calls.findIndex(([method]) => method === 'session/prompt');
     const metadataUpdateIndex = emittedUpdates.findIndex(
       (update) =>
