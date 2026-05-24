@@ -2,18 +2,10 @@
 
 // Core library (for embedded usage without RPC)
 export { Agent } from './core/agent';
-export { Session } from './core/session';
 export { ConversationRunner } from './core/conversation/runner';
 
 // Core types
-export type {
-  AgentConfig,
-  SessionConfig,
-  PromptParams,
-  TurnResult,
-  SessionUpdate,
-  SessionUpdateHandler,
-} from './core/types';
+export type { AgentConfig, SessionUpdate } from './core/types';
 
 // Conversation types
 export type { RunnerConfig, RunParams, RunResult } from './core/conversation/types';

@@ -1,5 +1,5 @@
 // ABOUTME: Test helper for setting up provider instance defaults in test environment
-// ABOUTME: Ensures tests have fallback provider credentials for Session.create() to work
+// ABOUTME: Ensures tests have fallback provider credentials for provider instance creation
 
 /**
  * Sets up test environment variables to enable default provider instance creation
