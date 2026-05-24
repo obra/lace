@@ -16,14 +16,21 @@ import type { TypedDurableEvent } from '../../storage/event-types';
 // because lace's tool-catalog JSON-Schema conversion (Tool#inputSchema) only
 // accepts an object-typed top-level schema; a zod discriminatedUnion compiles
 // to an anyOf and is rejected at "Invalid schema structure for tool recall".
+// Every string-typed input on this tool must reject the empty string. An empty
+// string would silently bind to ' = ?' in SQL and match nothing (or — in the
+// persona case — produce an `IN ('')` clause that suppresses real hits without
+// signalling the bad input). The .min(1) blocks the model from constructing a
+// filter that always returns zero hits while looking syntactically valid.
+const personaElem = z.string().min(1, 'persona name must be non-empty');
+
 const recallSchema = z.object({
   action: z.enum(['search', 'read']),
   // search fields
   query: z.string().min(1).optional(),
-  persona: z.union([z.string(), z.array(z.string())]).optional(),
-  session_id: z.string().optional(),
-  since: z.string().optional(),
-  until: z.string().optional(),
+  persona: z.union([personaElem, z.array(personaElem)]).optional(),
+  session_id: z.string().min(1, 'session_id must be non-empty').optional(),
+  since: z.string().min(1, 'since must be non-empty').optional(),
+  until: z.string().min(1, 'until must be non-empty').optional(),
   limit: z.number().int().positive().max(100).optional(),
   // 'relevance' (default) sorts by FTS rank; 'recent' sorts by timestamp DESC.
   // When you want the latest mentions of a term (rather than the most
@@ -124,7 +131,13 @@ export class RecallTool extends Tool {
     const params: unknown[] = [args.query];
 
     if (args.persona !== undefined) {
-      const personas = Array.isArray(args.persona) ? args.persona : [args.persona];
+      // Defense in depth: the zod schema already rejects empty-string elements,
+      // but if a caller bypasses validation (or the schema rule regresses) an
+      // empty `''` would bind into `persona IN ('')` and suppress real hits.
+      // Strip empties here too so the SQL is always shaped from real values.
+      const personas = (Array.isArray(args.persona) ? args.persona : [args.persona]).filter(
+        (p) => p.length > 0
+      );
       // Empty array would produce invalid SQL — treat as "no persona filter"
       if (personas.length > 0) {
         where.push(`persona IN (${personas.map(() => '?').join(',')})`);

@@ -77,6 +77,29 @@ describe('RecallTool schema', () => {
     expect(() => tool.schema.parse({ action: 'search', query: '' })).toThrow();
   });
 
+  it('rejects empty session_id', () => {
+    expect(() => tool.schema.parse({ action: 'search', query: 'x', session_id: '' })).toThrow(
+      /session_id/i
+    );
+  });
+
+  it('rejects empty since', () => {
+    expect(() => tool.schema.parse({ action: 'search', query: 'x', since: '' })).toThrow(/since/i);
+  });
+
+  it('rejects empty until', () => {
+    expect(() => tool.schema.parse({ action: 'search', query: 'x', until: '' })).toThrow(/until/i);
+  });
+
+  it('rejects empty persona string element', () => {
+    expect(() => tool.schema.parse({ action: 'search', query: 'x', persona: '' })).toThrow(
+      /persona/i
+    );
+    expect(() => tool.schema.parse({ action: 'search', query: 'x', persona: ['ada', ''] })).toThrow(
+      /persona/i
+    );
+  });
+
   it('rejects limit above max', () => {
     expect(() => tool.schema.parse({ action: 'search', query: 'x', limit: 1000 })).toThrow();
   });
