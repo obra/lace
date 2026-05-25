@@ -438,7 +438,7 @@ describe('ACP session cancellation', () => {
   it('stops session MCP servers on session/close', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
-    const fixturePath = resolve('../web/test-utils/fixtures/mcp-stdio-test-server.cjs');
+    const fixturePath = resolve('./src/__tests__/fixtures/mcp-stdio-test-server.cjs');
 
     try {
       await client.request('initialize', defaultInitializeParams());

@@ -22,7 +22,12 @@ async function callHelper(request: unknown): Promise<unknown> {
     child.on('close', (code) => resolve(code ?? 0));
     child.stdin.end(`${JSON.stringify(request)}\n`);
   });
-  expect(stderr).toBe('');
+  const unexpectedStderr = stderr
+    .split(/\r?\n/)
+    .filter((line) => line.length > 0)
+    .filter((line) => !line.includes('[DEP0205]'))
+    .filter((line) => !line.includes('Use `node --trace-deprecation ...`'));
+  expect(unexpectedStderr).toEqual([]);
   expect(exitCode).toBe(0);
   return JSON.parse(stdout.trim());
 }

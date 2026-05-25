@@ -212,25 +212,39 @@ describe('session/fork durable history', () => {
       })) as { sessionId: string };
 
       expect(loadSession(forked.sessionId).state.config?.mcpServers).toEqual([
-        { name: 'missing-transport', command: 'mcp-default', placement: 'toolRuntime' },
+        {
+          name: 'missing-transport',
+          command: 'mcp-default',
+          placement: 'toolRuntime',
+          source: 'embedder',
+        },
         {
           name: 'stdio-transport',
           command: 'mcp-stdio',
           transport: 'stdio',
           placement: 'toolRuntime',
+          source: 'embedder',
         },
         {
           name: 'http-transport',
           command: 'mcp-http',
           transport: 'http',
           placement: 'host',
+          source: 'embedder',
         },
-        { name: 'sse-transport', command: 'mcp-sse', transport: 'sse', placement: 'host' },
+        {
+          name: 'sse-transport',
+          command: 'mcp-sse',
+          transport: 'sse',
+          placement: 'host',
+          source: 'embedder',
+        },
         {
           name: 'explicit-host',
           command: 'mcp-explicit',
           transport: 'stdio',
           placement: 'host',
+          source: 'embedder',
         },
       ]);
     } finally {
