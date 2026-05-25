@@ -211,17 +211,19 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
     // onExit handler uses this to distinguish unexpected child death (persist
     // diagnostic, close peer to wake pending RPCs) from clean teardown (no-op).
     let teardownInitiated = false;
+    let isContainerizedSubagent = false;
+    let subagentHostSkillDirs: string[] = [];
 
     try {
-      const isContainerizedSubagent = !!job.personaContainerRuntime;
-      const parentSkillDirs = getSubagentHostSkillDirs(state, isContainerizedSubagent);
+      isContainerizedSubagent = !!job.personaContainerRuntime;
+      subagentHostSkillDirs = getSubagentHostSkillDirs(state, isContainerizedSubagent);
       subagentProc = await spawnSubagent({
         parentSessionId: state.activeSession.meta.sessionId,
         personaName: job.persona,
         personaContainerRuntime: job.personaContainerRuntime,
         containerManager: state.containerManager,
         containerMounts: state.containerMounts,
-        skillDirs: parentSkillDirs,
+        skillDirs: subagentHostSkillDirs,
         // PRI-1796: thread per_invocation fields for the in-container lace-agent
         // path. spawnContainerSubagent forwards these to buildPersonaContainerSpec.
         ...(job.containerSharing === 'per_invocation' && job.subagentSessionId
@@ -822,14 +824,12 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       // the user-personas dir is auto-mounted at a fixed in-container path. For
       // native subagents, the child shares the parent's filesystem so the
       // parent's host paths apply directly.
-      const isContainerizedSubagent = !!job.personaContainerRuntime;
       const subagentUserPersonasPaths: string[] = isContainerizedSubagent
         ? [SUBAGENT_USER_PERSONAS_TARGET]
         : [...currentState.personaRegistry.getUserPersonasPaths()];
-      const parentSkillDirs = getSubagentHostSkillDirs(currentState, isContainerizedSubagent);
       const subagentSkillDirs = isContainerizedSubagent
-        ? parentSkillDirs.map((_, index) => `${SUBAGENT_SKILLS_TARGET}/${index}`)
-        : [...parentSkillDirs];
+        ? subagentHostSkillDirs.map((_, index) => `${SUBAGENT_SKILLS_TARGET}/${index}`)
+        : [...subagentHostSkillDirs];
 
       await childPeer.request('initialize', {
         protocolVersion: '1.0',

@@ -418,6 +418,77 @@ describe('runSubagentJobProcess — preallocated sessionId (PRI-1796)', () => {
     });
   });
 
+  it('uses the same container skillDirs for spawn and initialize when defaults change during spawn', async () => {
+    const jobId = 'job_container_stable_skill_dirs_test';
+    const outputPath = join(parentSessionDir, 'jobs', `${jobId}.log`);
+    const projectLaceSkills = join(parentWorkDir, '.lace', 'skills');
+    const defaultSkillDirsAtSpawn = [
+      projectLaceSkills + '/',
+      join(parentWorkDir, '.claude', 'skills') + '/',
+      join(homedir(), '.lace', 'skills') + '/',
+      join(homedir(), '.claude', 'skills') + '/',
+    ].filter((dir) => existsSync(dir));
+    const personaContainerRuntime: PersonaContainerRuntime = {
+      type: 'container',
+      image: 'node:24-bookworm',
+      workingDirectory: '/work',
+      mounts: {},
+      containerSharing: 'persistent',
+    };
+
+    spawnMock.current = (options: unknown) => {
+      spawnOptions.push(options);
+      mkdirSync(projectLaceSkills, { recursive: true });
+      return Promise.resolve(fakeHandle);
+    };
+
+    let resolveCompletion: () => void = () => undefined;
+    const completion = new Promise<void>((r) => {
+      resolveCompletion = r;
+    });
+
+    const job: JobState = {
+      jobId,
+      type: 'delegate',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+      outputPath,
+      finished: false,
+      completion,
+      resolveCompletion,
+      subagentContent: [{ type: 'text', text: 'noop' }],
+      persona: 'shell',
+      personaContainerRuntime,
+    };
+
+    const state = {
+      initialized: true,
+      activeSession: {
+        meta: { sessionId: parentSessionId, workDir: parentWorkDir },
+        dir: parentSessionDir,
+        state: { nextEventSeq: 1, nextStreamSeq: 1, config: {} },
+      },
+      config: {},
+      jobManager: {
+        getJob: vi.fn(),
+        addJob: vi.fn(),
+        getStreamingMode: () => 'full' as const,
+      },
+      containerManager: {} as ContainerManager,
+      containerMounts: {} as Readonly<Record<string, MountRegistryEntry>>,
+      personaRegistry: { getUserPersonasPaths: () => [] },
+    };
+
+    runSubagentJobProcess(job, makeSubagentJobDeps({ state }));
+
+    await completion;
+
+    expect(spawnOptions[0]).toMatchObject({ skillDirs: defaultSkillDirsAtSpawn });
+    expect(initializeRequests[0]).toMatchObject({
+      skillDirs: defaultSkillDirsAtSpawn.map((_, index) => `/var/lace/skills/${index}`),
+    });
+  });
+
   it('calls session/resume (not session/new) when subagentSessionPreallocated is absent', async () => {
     const existingSessionId = `sess_${randomUUID()}`;
     const jobId = 'job_resume_test';
