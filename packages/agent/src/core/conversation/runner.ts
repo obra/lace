@@ -1052,16 +1052,18 @@ export class ConversationRunner {
             allEvents as unknown as TypedDurableEvent[],
             { threadId: sessionId, provider, modelId: modelId ?? undefined }
           );
-          await this.deps.runExclusive(() => {
-            const sessionState = readSessionState(sessionDir);
-            const { nextState } = appendDurableEvent(sessionDir, sessionState, {
-              type: 'context_compacted',
-              // ContextCompactedEventData satisfies Record<string,unknown>; the
-              // cast here is the symmetric inverse of the one above.
-              data: result.compactionEvent.data as Record<string, unknown>,
+          if (!('noop' in result && result.noop)) {
+            await this.deps.runExclusive(() => {
+              const sessionState = readSessionState(sessionDir);
+              const { nextState } = appendDurableEvent(sessionDir, sessionState, {
+                type: 'context_compacted',
+                // ContextCompactedEventData satisfies Record<string,unknown>; the
+                // cast here is the symmetric inverse of the one above.
+                data: result.compactionEvent.data as Record<string, unknown>,
+              });
+              writeSessionState(sessionDir, nextState);
             });
-            writeSessionState(sessionDir, nextState);
-          });
+          }
         }
       } catch (compactionErr) {
         logger.error('runner: track-based compaction failed', {

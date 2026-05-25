@@ -258,12 +258,14 @@ function truncate(s: string, max: number): string {
 
 const TAIL_TURNS = 10;
 
-export interface CompactResult {
-  compactionEvent: {
-    type: 'context_compacted';
-    data: ContextCompactedEventData;
-  };
-}
+export type CompactResult =
+  | {
+      compactionEvent: {
+        type: 'context_compacted';
+        data: ContextCompactedEventData;
+      };
+    }
+  | { noop: true };
 
 /**
  * Split events into [earlier, tail] at the boundary that gives `tailTurns`
@@ -325,10 +327,12 @@ export async function compact(
 ): Promise<CompactResult> {
   const { earlier, tail } = splitAtTailBoundary(events, TAIL_TURNS);
 
-  let prefixContent: string;
   if (earlier.length === 0) {
-    prefixContent = '[Earlier conversation, compacted by track]\n(no earlier content)';
-  } else {
+    return { noop: true };
+  }
+
+  let prefixContent: string;
+  {
     const turnToTrack = buildTurnToTrackMap(events);
     const groups = groupEarlierEventsByTrack(earlier, turnToTrack);
     const blocks: TrackBlock[] = [];

@@ -402,25 +402,37 @@ describe('compact()', () => {
     expect(first.content).toContain('[Earlier conversation');
   });
 
-  it('returns the original tail unchanged when nothing to compact', async () => {
+  it('returns noop when there is nothing to compact (≤10 turns)', async () => {
     const events: TypedDurableEvent[] = [
       event(1, 'prompt', { content: [{ type: 'text', text: 'one' }], track: 'slack:A' }),
       turnStart(2, 'turn_1'),
       turnEnd(3, 'turn_1'),
     ];
     const result = await compact(events, ctx);
-    expect(result.compactionEvent.data.messagesCompacted).toBe(0);
+    expect('noop' in result && result.noop).toBe(true);
   });
 
   it('preserves tool_use events in the tail as PreservedMessage with toolCalls + toolResults', async () => {
-    const events: TypedDurableEvent[] = [
-      event(1, 'prompt', {
+    // Build 11 earlier filler turns so earlier.length > 0 and compact() produces a real event.
+    // The tool_use turn is the 11th — it lands in the tail (last 10 turns preserved verbatim).
+    const events: TypedDurableEvent[] = [];
+    let seq = 1;
+    for (let i = 0; i < 10; i++) {
+      events.push(event(seq++, 'prompt', { content: [], track: `slack:T${i}` }));
+      events.push(turnStart(seq++, `fill_${i}`));
+      events.push(turnEnd(seq++, `fill_${i}`));
+    }
+    // Turn 11 — the one with a tool call (goes to tail)
+    events.push(
+      event(seq++, 'prompt', {
         content: [{ type: 'text', text: 'use bash please' }],
         track: 'slack:A',
-      }),
-      turnStart(2, 'turn_1'),
+      })
+    );
+    events.push(turnStart(seq++, 'turn_tool'));
+    events.push(
       event(
-        3,
+        seq++,
         'tool_use',
         {
           toolCallId: 'tc_1',
@@ -428,20 +440,22 @@ describe('compact()', () => {
           input: { command: 'echo hi' },
           result: { outcome: 'completed', content: [{ type: 'text', text: 'hi\n' }] },
         },
-        'turn_1'
-      ),
-      turnEnd(4, 'turn_1'),
-    ];
+        'turn_tool'
+      )
+    );
+    events.push(turnEnd(seq++, 'turn_tool'));
+
     const result = await compact(events, ctx);
-    // Only 1 turn; with TAIL_TURNS=10 everything goes to tail (earlier=0).
-    expect(result.compactionEvent.data.messagesCompacted).toBe(0);
+    expect('compactionEvent' in result).toBe(true);
+    if (!('compactionEvent' in result)) return;
+    // 11 turns × 3 events = 33 total. Last 10 turns = 30 tail events; 3 earlier events.
+    expect(result.compactionEvent.data.messagesCompacted).toBe(3);
     const preserved = result.compactionEvent.data.preserved as Array<{
       role: string;
       content: string | Array<{ type: string; text?: string }>;
       toolCalls?: unknown[];
       toolResults?: unknown[];
     }>;
-    // preserved[0] is the synthetic prefix (always present)
     const contentText = (c: string | Array<{ type: string; text?: string }>) =>
       typeof c === 'string' ? c : c.map((b) => b.text ?? '').join('');
     const promptEntry = preserved.find(
@@ -525,22 +539,38 @@ describe('compact()', () => {
   it('preserves image content blocks in tail prompts without flattening to text', async () => {
     // A prompt with an image block in the tail must survive compaction with the
     // image intact — extractText would silently drop it, losing visual context.
+    // Build 11 turns so earlier.length > 0; the image prompt is the last turn (tail).
     const imageBlock = {
       type: 'image',
       source: { type: 'base64', media_type: 'image/png', data: 'abc123' },
     };
-    const events: TypedDurableEvent[] = [
-      event(1, 'prompt', { content: [{ type: 'text', text: 'look at this' }, imageBlock] }),
-      turnStart(2, 'turn_1'),
-      turnEnd(3, 'turn_1'),
-    ];
+    const events: TypedDurableEvent[] = [];
+    let seq = 1;
+    for (let i = 0; i < 10; i++) {
+      events.push(event(seq++, 'prompt', { content: [], track: `slack:T${i}` }));
+      events.push(turnStart(seq++, `fill_${i}`));
+      events.push(turnEnd(seq++, `fill_${i}`));
+    }
+    events.push(
+      event(seq++, 'prompt', { content: [{ type: 'text', text: 'look at this' }, imageBlock] })
+    );
+    events.push(turnStart(seq++, 'turn_img'));
+    events.push(turnEnd(seq++, 'turn_img'));
+
     const result = await compact(events, ctx);
-    // Everything is in tail (only 1 turn < TAIL_TURNS=10).
+    expect('compactionEvent' in result).toBe(true);
+    if (!('compactionEvent' in result)) return;
     const preserved = result.compactionEvent.data.preserved as Array<{
       role: string;
       content: unknown;
     }>;
-    const promptEntry = preserved.find((p) => p.role === 'user' && Array.isArray(p.content));
+    // Find the user entry whose content includes an image block
+    const promptEntry = preserved.find(
+      (p) =>
+        p.role === 'user' &&
+        Array.isArray(p.content) &&
+        (p.content as Array<{ type: string }>).some((b) => b.type === 'image')
+    );
     expect(promptEntry).toBeDefined();
     const blocks = promptEntry!.content as Array<{ type: string }>;
     expect(blocks.some((b) => b.type === 'image')).toBe(true);

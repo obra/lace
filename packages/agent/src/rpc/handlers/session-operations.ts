@@ -457,6 +457,14 @@ export function registerSessionOperationHandlers(
           modelId: effectiveConfig.modelId,
         });
 
+        if ('noop' in result && result.noop) {
+          return {
+            previousTokens,
+            currentTokens: previousTokens,
+            messagesCompacted: 0,
+          };
+        }
+
         let sessionState = readSessionState(sessionDir);
         const { nextState } = appendDurableEvent(sessionDir, sessionState, {
           type: 'context_compacted',
