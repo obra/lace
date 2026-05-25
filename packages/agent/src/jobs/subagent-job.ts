@@ -23,6 +23,7 @@ import {
 } from './subagent-job-helpers';
 import type { LaceStopDetails } from '@lace/agent/providers/base-provider';
 import { logger } from '@lace/agent/utils/logger';
+import { getSkillDirectories } from '@lace/agent/skills';
 import { SUBAGENT_SKILLS_TARGET, SUBAGENT_USER_PERSONAS_TARGET } from './persona-container-spec';
 import { spawnSubagent, type SubagentProcessHandle } from './subagent-spawn';
 import type { PerInvocationReaper } from './per-invocation-reaper';
@@ -68,6 +69,10 @@ function isPermissionOptionsArray(value: unknown): value is PermissionOption[] {
 interface RpcErrorLike {
   code?: number | string;
   data?: Record<string, unknown>;
+}
+
+function getEffectiveSkillDirs(state: AgentServerState): string[] {
+  return state.skillDirs ?? getSkillDirectories(state.activeSession?.meta.workDir);
 }
 
 /**
@@ -202,13 +207,14 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
     let teardownInitiated = false;
 
     try {
+      const parentSkillDirs = getEffectiveSkillDirs(state);
       subagentProc = await spawnSubagent({
         parentSessionId: state.activeSession.meta.sessionId,
         personaName: job.persona,
         personaContainerRuntime: job.personaContainerRuntime,
         containerManager: state.containerManager,
         containerMounts: state.containerMounts,
-        ...(state.skillDirs ? { skillDirs: state.skillDirs } : {}),
+        skillDirs: parentSkillDirs,
         // PRI-1796: thread per_invocation fields for the in-container lace-agent
         // path. spawnContainerSubagent forwards these to buildPersonaContainerSpec.
         ...(job.containerSharing === 'per_invocation' && job.subagentSessionId
@@ -813,11 +819,10 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       const subagentUserPersonasPaths: string[] = isContainerizedSubagent
         ? [SUBAGENT_USER_PERSONAS_TARGET]
         : [...currentState.personaRegistry.getUserPersonasPaths()];
-      const subagentSkillDirs = currentState.skillDirs
-        ? isContainerizedSubagent
-          ? currentState.skillDirs.map((_, index) => `${SUBAGENT_SKILLS_TARGET}/${index}`)
-          : [...currentState.skillDirs]
-        : undefined;
+      const parentSkillDirs = getEffectiveSkillDirs(currentState);
+      const subagentSkillDirs = isContainerizedSubagent
+        ? parentSkillDirs.map((_, index) => `${SUBAGENT_SKILLS_TARGET}/${index}`)
+        : [...parentSkillDirs];
 
       await childPeer.request('initialize', {
         protocolVersion: '1.0',
@@ -828,7 +833,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           'ent/jobStreaming': currentState.jobManager.getStreamingMode(),
         },
         userPersonasPaths: subagentUserPersonasPaths,
-        ...(subagentSkillDirs ? { skillDirs: subagentSkillDirs } : {}),
+        skillDirs: subagentSkillDirs,
         config: buildSubagentInitConfig(parentEffective),
       });
 

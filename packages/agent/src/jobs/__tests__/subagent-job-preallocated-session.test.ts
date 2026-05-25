@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PassThrough } from 'node:stream';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { JsonRpcPeer } from '@lace/ent-protocol';
 import {
@@ -343,6 +343,76 @@ describe('runSubagentJobProcess — preallocated sessionId (PRI-1796)', () => {
     expect(initializeRequests).toHaveLength(1);
     expect(initializeRequests[0]).toMatchObject({
       skillDirs: ['/var/lace/skills/0', '/var/lace/skills/1'],
+    });
+  });
+
+  it('uses default parent skillDirs for containerized child initialize', async () => {
+    const jobId = 'job_container_default_skill_dirs_test';
+    const outputPath = join(parentSessionDir, 'jobs', `${jobId}.log`);
+    const defaultSkillDirs = [
+      join(parentWorkDir, '.lace', 'skills') + '/',
+      join(parentWorkDir, '.claude', 'skills') + '/',
+      join(homedir(), '.lace', 'skills') + '/',
+      join(homedir(), '.claude', 'skills') + '/',
+    ];
+    const personaContainerRuntime: PersonaContainerRuntime = {
+      type: 'container',
+      image: 'node:24-bookworm',
+      workingDirectory: '/work',
+      mounts: {},
+      containerSharing: 'persistent',
+    };
+
+    let resolveCompletion: () => void = () => undefined;
+    const completion = new Promise<void>((r) => {
+      resolveCompletion = r;
+    });
+
+    const job: JobState = {
+      jobId,
+      type: 'delegate',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+      outputPath,
+      finished: false,
+      completion,
+      resolveCompletion,
+      subagentContent: [{ type: 'text', text: 'noop' }],
+      persona: 'shell',
+      personaContainerRuntime,
+    };
+
+    const state = {
+      initialized: true,
+      activeSession: {
+        meta: { sessionId: parentSessionId, workDir: parentWorkDir },
+        dir: parentSessionDir,
+        state: { nextEventSeq: 1, nextStreamSeq: 1, config: {} },
+      },
+      config: {},
+      jobManager: {
+        getJob: vi.fn(),
+        addJob: vi.fn(),
+        getStreamingMode: () => 'full' as const,
+      },
+      containerManager: {} as ContainerManager,
+      containerMounts: {} as Readonly<Record<string, MountRegistryEntry>>,
+      personaRegistry: { getUserPersonasPaths: () => [] },
+    };
+
+    runSubagentJobProcess(job, makeSubagentJobDeps({ state }));
+
+    await completion;
+
+    expect(spawnOptions[0]).toMatchObject({ skillDirs: defaultSkillDirs });
+    expect(initializeRequests).toHaveLength(1);
+    expect(initializeRequests[0]).toMatchObject({
+      skillDirs: [
+        '/var/lace/skills/0',
+        '/var/lace/skills/1',
+        '/var/lace/skills/2',
+        '/var/lace/skills/3',
+      ],
     });
   });
 
