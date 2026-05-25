@@ -18,10 +18,15 @@ const HEADER = '[Earlier conversation, compacted by track]';
 export function renderCompactionPrefix(input: RenderInput): string {
   const slackBlocks = input.blocks.filter((b) => b.trackId.startsWith('slack:'));
   const jobBlocks = input.blocks.filter((b) => b.trackId.startsWith('job:'));
-  // Blocks with unknown track-id prefixes silently fall out — callers (salienceForTrack)
-  // must only emit blocks with known prefixes: 'slack:', 'job:', 'system:', or 'untracked'.
   const systemBlocks = input.blocks.filter(
     (b) => b.trackId.startsWith('system:') || b.trackId === 'untracked'
+  );
+  const otherBlocks = input.blocks.filter(
+    (b) =>
+      !b.trackId.startsWith('slack:') &&
+      !b.trackId.startsWith('job:') &&
+      !b.trackId.startsWith('system:') &&
+      b.trackId !== 'untracked'
   );
 
   const parts: string[] = [HEADER];
@@ -47,6 +52,11 @@ export function renderCompactionPrefix(input: RenderInput): string {
   if (systemBlocks.length > 0) {
     parts.push('\n## System events\n');
     parts.push(systemBlocks.map((b) => b.body).join('\n\n'));
+  }
+
+  if (otherBlocks.length > 0) {
+    parts.push('\n## Other\n');
+    parts.push(otherBlocks.map((b) => b.body).join('\n\n'));
   }
 
   return parts.join('\n');

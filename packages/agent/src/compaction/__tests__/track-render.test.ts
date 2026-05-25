@@ -52,4 +52,27 @@ describe('renderCompactionPrefix', () => {
     expect(out).toContain('## System events');
     expect(out).toContain('3 idle-error reports');
   });
+
+  it('renders unknown track prefixes under ## Other section', () => {
+    // A future track type (e.g. webhook:) or a typo must not silently fall out
+    // of the rendered output — it should appear under ## Other.
+    const blocks: TrackBlock[] = [
+      {
+        trackId: 'webhook:foo',
+        body: '### webhook:foo\n- event received',
+        estimatedTokens: 5,
+      },
+    ];
+    const out = renderCompactionPrefix({
+      blocks,
+      scheduler: { alarmsPending: 0, remindersPending: 0 },
+    });
+    expect(out).toContain('## Other');
+    expect(out).toContain('### webhook:foo');
+    expect(out).toContain('event received');
+    // Should not appear under any known-prefix section
+    expect(out).not.toContain('## Slack threads');
+    expect(out).not.toContain('## Subagent jobs');
+    expect(out).not.toContain('## System events');
+  });
 });
