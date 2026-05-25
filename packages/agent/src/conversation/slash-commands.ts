@@ -10,10 +10,9 @@ import {
   writeSessionState,
 } from '@lace/agent/storage/session-store';
 import { validatePersonaName } from '@lace/agent/storage/transcript-paths';
-import { compactDroppedMessagesWithCore } from '@lace/agent/compaction/compact-dropped-messages';
-import { SUMMARIZER_SYSTEM_PROMPT } from '@lace/agent/compaction/summarize-strategy';
-import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
-import { estimateTokens } from '@lace/agent/utils/token-estimation';
+import { compact } from '@lace/agent/compaction/track-compaction';
+import { readDurableEvents } from '@lace/agent/storage/event-log';
+import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import {
   type SessionUpdate,
   type AgentServerState,
@@ -137,75 +136,40 @@ export async function handleSlashCommand(
       }
 
       try {
-        // Use the summarize strategy for compaction
         const sessionDir = state.activeSession.dir;
         const sessionId = state.activeSession.meta.sessionId;
-        const { messages: providerMessages, systemPrompt } =
-          buildProviderMessagesFromDurableEvents(sessionDir);
 
-        // Check if there's anything worth compacting: either multiple messages
-        // or a substantial system prompt. Include system prompt tokens in the budget.
-        const messageTokens = providerMessages.reduce(
-          (sum, msg) => sum + estimateTokens(String(msg.content)),
-          0
-        );
-        const systemPromptTokens = estimateTokens(systemPrompt);
-        const totalTokens = messageTokens + systemPromptTokens;
+        const { events: rawEvents } = readDurableEvents(sessionDir, {
+          limit: Number.MAX_SAFE_INTEGER,
+        });
 
-        if (providerMessages.length < 2 && totalTokens < 1000) {
+        if (rawEvents.length === 0) {
           return finishTurn('Context is already minimal. Nothing to compact.');
         }
 
-        // Get effective config for provider creation
+        // Cast DurableEvent[] → TypedDurableEvent[]: the runtime shape is
+        // identical; TypedDurableEvent just narrows the type/data fields.
+        const events = rawEvents as unknown as TypedDurableEvent[];
+
         const effectiveConfig = getEffectiveConfig(state.config, state.activeSession.state.config);
 
-        const provider = await createProviderForTurn({
-          connectionId: effectiveConfig.connectionId,
-          modelId: effectiveConfig.modelId,
-        });
-        provider.setSystemPrompt(SUMMARIZER_SYSTEM_PROMPT);
-
-        const result = await compactDroppedMessagesWithCore({
-          strategyId: 'summarize',
-          dropped: providerMessages.slice(0, -1),
-          provider,
-          modelId: effectiveConfig.modelId,
+        const result = await compact(events, {
           threadId: sessionId,
+          provider: await createProviderForTurn({
+            connectionId: effectiveConfig.connectionId,
+            modelId: effectiveConfig.modelId,
+          }),
         });
 
-        if (result.summary) {
-          // Build the preserved array: compacted messages + the last message that
-          // was excluded from `dropped` (providerMessages.slice(-1)).
-          const preservedMessages = [...result.messages, ...providerMessages.slice(-1)];
-          const serializedPreserved = preservedMessages.map((m) => ({
-            role: m.role,
-            content: typeof m.content === 'string' ? m.content : '',
-            ...(Array.isArray(m.toolCalls) ? { toolCalls: m.toolCalls } : {}),
-            ...(Array.isArray(m.toolResults) ? { toolResults: m.toolResults } : {}),
-          }));
+        await writeAndAdvance({
+          type: 'context_compacted',
+          data: result.compactionEvent.data as Record<string, unknown>,
+        });
 
-          // Write context_compacted event matching the wire shape used by the
-          // ent/session/compact RPC handler so message-builder picks it up on
-          // rebuild. The old 'compaction' type had no 'preserved' field and was
-          // silently ignored, making /compact a no-op across process restarts.
-          //
-          // Do NOT write data.summary: the strategy already puts the summary as
-          // the first entry in result.messages (which lands in preserved[0]).
-          // Writing data.summary as well causes message-builder to inject a second
-          // role:user message with the same text, producing a duplicate on rebuild.
-          await writeAndAdvance({
-            type: 'context_compacted',
-            data: {
-              strategy: 'summarize',
-              preserveRecent: 1,
-              messagesCompacted: providerMessages.length - 1,
-              preserved: serializedPreserved,
-            },
-          });
-          return finishTurn(`Context compacted. Summary:\n\n${result.summary}`);
-        } else {
-          return finishTurn('Compaction completed but no summary was generated.');
-        }
+        const count = result.compactionEvent.data.messagesCompacted ?? 0;
+        return finishTurn(
+          `Context compacted. ${count} earlier events folded into prefix; last 10 turns preserved verbatim.`
+        );
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         return finishTurn(`Error during compaction: ${msg}`);
