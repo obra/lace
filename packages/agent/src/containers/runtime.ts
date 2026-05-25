@@ -58,9 +58,11 @@ export abstract class BaseContainerRuntime implements ContainerRuntime {
       throw new Error('adopt() requires config.id to identify the existing container');
     }
     if (!this.containers.has(id)) {
-      this.containers.set(id, { id, state });
+      this.containers.set(id, { id, state, mounts: config.mounts });
     } else {
-      this.containers.get(id)!.state = state;
+      const info = this.containers.get(id)!;
+      info.state = state;
+      info.mounts = config.mounts;
     }
     this.registerMounts(id, config);
   }

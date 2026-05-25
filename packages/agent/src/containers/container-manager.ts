@@ -7,11 +7,12 @@ import { logger } from '@lace/agent/utils/logger';
 import type {
   ContainerConfig,
   ContainerInfo,
+  ContainerMount,
   ContainerRuntime,
   ExecStreamHandle,
   ExecStreamOptions,
 } from './types';
-import { ContainerNotFoundError } from './types';
+import { ContainerError, ContainerNotFoundError } from './types';
 import type { ContainerHandle, ContainerLifecycleHooks, ContainerSpec } from './spec';
 
 // See ABOUTME above: every container id is namespaced under this prefix so
@@ -40,6 +41,29 @@ function specNameFromContainerId(containerId: string): string {
     );
   }
   return containerId.slice(CONTAINER_ID_PREFIX.length);
+}
+
+function sameMount(a: ContainerMount, b: ContainerMount): boolean {
+  return (
+    a.source === b.source && a.target === b.target && Boolean(a.readonly) === Boolean(b.readonly)
+  );
+}
+
+function findMissingPersistentMount(
+  spec: ContainerSpec,
+  adoptable: ContainerInfo
+): ContainerMount | null {
+  if (!spec.containerId || adoptable.mounts === undefined) return null;
+  for (const mount of spec.mounts) {
+    if (!adoptable.mounts.some((existing) => sameMount(existing, mount))) {
+      return mount;
+    }
+  }
+  return null;
+}
+
+function formatMount(mount: ContainerMount): string {
+  return `${mount.source}:${mount.target}${mount.readonly ? ':ro' : ''}`;
 }
 
 export class ContainerManager {
@@ -115,6 +139,15 @@ export class ContainerManager {
       : await this.tryInspect(inspectContainerId);
 
     if (adoptable) {
+      const missingMount = findMissingPersistentMount(spec, adoptable);
+      if (missingMount) {
+        throw new ContainerError(
+          `Existing persistent container '${adoptable.id}' is missing required mount ` +
+            `${formatMount(missingMount)}. Remove or recreate the container and retry.`,
+          adoptable.id
+        );
+      }
+
       this.specs.set(spec.name, spec);
       this.containerIdsBySpecName.set(spec.name, adoptable.id);
       // Adopt the daemon-side container into the runtime's in-process caches

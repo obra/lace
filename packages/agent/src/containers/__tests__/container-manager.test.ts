@@ -310,6 +310,27 @@ describe('ContainerManager', () => {
 
       expect(beforeCreate).not.toHaveBeenCalled();
     });
+
+    it('rejects adopting a persistent container missing requested mounts', async () => {
+      const specWithSkillMount: ContainerSpec = {
+        ...boxSpec,
+        mounts: [{ source: '/host/skills', target: '/var/lace/skills/0', readonly: true }],
+      };
+      vi.spyOn(runtime, 'daemonInspect').mockResolvedValueOnce({
+        id: 'sen-box-shell',
+        state: 'running',
+        mounts: [],
+      });
+      const adoptSpy = vi.spyOn(runtime, 'adopt');
+      const createSpy = vi.spyOn(runtime, 'create');
+
+      await expect(manager.materialize(specWithSkillMount)).rejects.toThrow(
+        /missing required mount .*\/var\/lace\/skills\/0/
+      );
+
+      expect(adoptSpy).not.toHaveBeenCalled();
+      expect(createSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('inspect', () => {

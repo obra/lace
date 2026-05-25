@@ -824,6 +824,13 @@ describe('DockerContainerRuntime', () => {
           StartedAt: '2026-05-19T10:00:00Z',
           FinishedAt: '0001-01-01T00:00:00Z',
         },
+        Mounts: [
+          {
+            Source: '/host/skills',
+            Destination: '/var/lace/skills/0',
+            RW: false,
+          },
+        ],
       };
       setExecFileResponses([{ stdout: JSON.stringify(payload), stderr: '' }]);
 
@@ -831,6 +838,9 @@ describe('DockerContainerRuntime', () => {
       expect(info).not.toBeNull();
       expect(info!.id).toBe('sen-box-shell');
       expect(info!.state).toBe('running');
+      expect(info!.mounts).toEqual([
+        { source: '/host/skills', target: '/var/lace/skills/0', readonly: true },
+      ]);
 
       const args = findCallWithSubcommand('inspect');
       expect(args).toEqual(['inspect', 'sen-box-shell', '--format', '{{json .}}']);

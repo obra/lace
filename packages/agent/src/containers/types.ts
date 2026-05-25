@@ -53,6 +53,7 @@ export interface ContainerMount {
 export interface ContainerInfo {
   id: string;
   state: ContainerState;
+  mounts?: ContainerMount[];
   pid?: number;
   startedAt?: Date;
   stoppedAt?: Date;
