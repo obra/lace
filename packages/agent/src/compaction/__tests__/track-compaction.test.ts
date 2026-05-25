@@ -427,4 +427,37 @@ describe('compact()', () => {
     );
     expect(userWithToolResults?.toolResults?.length).toBe(1);
   });
+
+  it('preserves context_injected events in the tail as user-role messages', async () => {
+    // Fixture: one earlier turn (so there IS an earlier section) plus one tail
+    // turn that contains a context_injected event.
+    const events: TypedDurableEvent[] = [];
+    let seq = 1;
+    // 11 filler turns to push earliest into earlier
+    for (let i = 0; i < 11; i++) {
+      events.push(event(seq++, 'prompt', { content: [], track: `slack:T${i}` }));
+      events.push(turnStart(seq++, `turn_${i}`));
+      events.push(turnEnd(seq++, `turn_${i}`));
+    }
+    // One final turn in the tail that has an injected context event
+    events.push(
+      event(seq++, 'context_injected', {
+        content: [{ type: 'text', text: 'alarm fired: stand-up in 5 min' }],
+        track: 'alarm:X',
+      })
+    );
+    events.push(event(seq++, 'prompt', { content: [{ type: 'text', text: 'ack' }] }));
+    events.push(turnStart(seq++, 'turn_tail'));
+    events.push(turnEnd(seq++, 'turn_tail'));
+
+    const result = await compact(events, ctx);
+    const preserved = result.compactionEvent.data.preserved as Array<{
+      role: string;
+      content: string;
+    }>;
+    const injectedEntry = preserved.find(
+      (p) => p.role === 'user' && p.content.includes('alarm fired')
+    );
+    expect(injectedEntry).toBeDefined();
+  });
 });

@@ -376,6 +376,14 @@ function buildPreservedTail(events: TypedDurableEvent[]): PreservedMessage[] {
       continue;
     }
 
+    if (isEventOfType(e, 'context_injected')) {
+      // Mirror message-builder.ts: injected context becomes a user-role message
+      // with the extracted text content. Dropping these would silently remove
+      // recent injected context (Slack threads, fired alarms, etc.) from the tail.
+      result.push({ role: 'user', content: extractText(e) });
+      continue;
+    }
+
     if (isEventOfType(e, 'message')) {
       result.push({ role: 'assistant', content: extractText(e) });
       continue;
