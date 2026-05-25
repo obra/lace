@@ -62,6 +62,14 @@ export function groupEarlierEventsByTrack(
       continue;
     }
 
+    if (isEventOfType(e, 'job_started') || isEventOfType(e, 'job_finished')) {
+      // Top-level job lifecycle events carry jobId, not a track field.
+      // Bucket them under job:<jobId> so salienceForTrack can produce a real
+      // "delegated X → outcome" line instead of (unknown) / ⏳ in-flight.
+      push(`job:${e.data.jobId}`, e);
+      continue;
+    }
+
     if (isEventOfType(e, 'prompt')) {
       push(e.data.track ?? UNTRACKED, e);
       continue;

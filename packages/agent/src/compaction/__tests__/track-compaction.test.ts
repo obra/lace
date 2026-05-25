@@ -8,6 +8,7 @@ import {
   salienceForTrack,
   compact,
   splitAtTailBoundary,
+  UNTRACKED,
 } from '../track-compaction';
 import type { CompactionContext } from '../types';
 import type { DurableEventData, TypedDurableEvent } from '@lace/agent/storage/event-types';
@@ -95,6 +96,17 @@ describe('groupEarlierEventsByTrack', () => {
     const groups = groupEarlierEventsByTrack(events, new Map());
     expect(groups.get('untracked')).toBeUndefined();
     expect(groups.get('slack:A')?.map((e) => e.eventSeq)).toEqual([2]);
+  });
+
+  it('routes top-level job_started and job_finished to job:<jobId> track', () => {
+    const events: TypedDurableEvent[] = [
+      event(1, 'job_started', { jobId: 'job_abc', jobType: 'delegate', description: 'IP check' }),
+      event(2, 'job_finished', { jobId: 'job_abc', outcome: 'completed' }),
+    ];
+    const groups = groupEarlierEventsByTrack(events, new Map());
+    expect(groups.get('job:job_abc')?.map((e) => e.eventSeq)).toEqual([1, 2]);
+    // Must NOT fall through to untracked
+    expect(groups.get(UNTRACKED)).toBeUndefined();
   });
 });
 
@@ -426,6 +438,35 @@ describe('compact()', () => {
       (p) => p.role === 'user' && Array.isArray(p.toolResults)
     );
     expect(userWithToolResults?.toolResults?.length).toBe(1);
+  });
+
+  it('includes Subagent jobs section when job_started/job_finished have no track field', async () => {
+    // job_started and job_finished carry jobId but no track field. They used to
+    // fall through to the untracked bucket, causing (unknown) / ⏳ in-flight.
+    // Place the job events before the last 10 tail turns so they end up in
+    // the "earlier" section that gets compacted into the prefix.
+    const events: TypedDurableEvent[] = [];
+    let seq = 1;
+    // Top-level job events (no track field) — these come first
+    events.push(
+      event(seq++, 'job_started', {
+        jobId: 'job_xyz',
+        jobType: 'delegate',
+        description: 'IP check',
+      })
+    );
+    events.push(event(seq++, 'job_finished', { jobId: 'job_xyz', outcome: 'completed' }));
+    // 11 turns after the job events; last 10 go to tail, 1 goes to earlier
+    for (let i = 0; i < 11; i++) {
+      events.push(event(seq++, 'prompt', { content: [], track: `slack:T${i}` }));
+      events.push(turnStart(seq++, `turn_${i}`));
+      events.push(turnEnd(seq++, `turn_${i}`));
+    }
+
+    const result = await compact(events, ctx);
+    const prefix = (result.compactionEvent.data.preserved[0] as { content: string }).content;
+    expect(prefix).toContain('IP check');
+    expect(prefix).toMatch(/completed/);
   });
 
   it('preserves context_injected events in the tail as user-role messages', async () => {
