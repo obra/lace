@@ -352,6 +352,67 @@ describe('runSubagentJobProcess — preallocated sessionId (PRI-1796)', () => {
     });
   });
 
+  it('preserves explicit container skillDirs even when the host path does not exist yet', async () => {
+    const jobId = 'job_container_explicit_missing_skill_dirs_test';
+    const outputPath = join(parentSessionDir, 'jobs', `${jobId}.log`);
+    const skillDirs = [join(sessionRootDir, 'configured-later', 'skills')];
+    const personaContainerRuntime: PersonaContainerRuntime = {
+      type: 'container',
+      image: 'node:24-bookworm',
+      workingDirectory: '/work',
+      mounts: {},
+      containerSharing: 'persistent',
+    };
+
+    let resolveCompletion: () => void = () => undefined;
+    const completion = new Promise<void>((r) => {
+      resolveCompletion = r;
+    });
+
+    const job: JobState = {
+      jobId,
+      type: 'delegate',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+      outputPath,
+      finished: false,
+      completion,
+      resolveCompletion,
+      subagentContent: [{ type: 'text', text: 'noop' }],
+      persona: 'shell',
+      personaContainerRuntime,
+    };
+
+    const state = {
+      initialized: true,
+      activeSession: {
+        meta: { sessionId: parentSessionId, workDir: parentWorkDir },
+        dir: parentSessionDir,
+        state: { nextEventSeq: 1, nextStreamSeq: 1, config: {} },
+      },
+      config: {},
+      skillDirs,
+      jobManager: {
+        getJob: vi.fn(),
+        addJob: vi.fn(),
+        getStreamingMode: () => 'full' as const,
+      },
+      containerManager: {} as ContainerManager,
+      containerMounts: {} as Readonly<Record<string, MountRegistryEntry>>,
+      personaRegistry: { getUserPersonasPaths: () => [] },
+    };
+
+    runSubagentJobProcess(job, makeSubagentJobDeps({ state }));
+
+    await completion;
+
+    expect(existsSync(skillDirs[0])).toBe(false);
+    expect(spawnOptions[0]).toMatchObject({ skillDirs });
+    expect(initializeRequests[0]).toMatchObject({
+      skillDirs: ['/var/lace/skills/0'],
+    });
+  });
+
   it('uses existing default parent skillDirs for containerized child initialize', async () => {
     const jobId = 'job_container_default_skill_dirs_test';
     const outputPath = join(parentSessionDir, 'jobs', `${jobId}.log`);

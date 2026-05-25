@@ -71,12 +71,9 @@ interface RpcErrorLike {
   data?: Record<string, unknown>;
 }
 
-function getEffectiveSkillDirs(state: AgentServerState): string[] {
-  return state.skillDirs ?? getSkillDirectories(state.activeSession?.meta.workDir);
-}
-
 function getSubagentHostSkillDirs(state: AgentServerState, isContainerized: boolean): string[] {
-  const skillDirs = getEffectiveSkillDirs(state);
+  if (state.skillDirs !== undefined) return state.skillDirs;
+  const skillDirs = getSkillDirectories(state.activeSession?.meta.workDir);
   if (!isContainerized) return skillDirs;
   return skillDirs.filter((dir) => existsSync(dir));
 }
