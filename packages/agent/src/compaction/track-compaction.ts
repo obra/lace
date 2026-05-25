@@ -124,10 +124,10 @@ function jobSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock {
 }
 
 function statusGlyph(outcome: string): string {
-  if (outcome === 'completed') return '✓ completed:';
-  if (outcome === 'failed') return '✗ failed:';
-  if (outcome === 'cancelled') return '⊘ cancelled:';
-  return outcome + ':';
+  if (outcome === 'completed') return '✓ completed';
+  if (outcome === 'failed') return '✗ failed';
+  if (outcome === 'cancelled') return '⊘ cancelled';
+  return outcome;
 }
 
 function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock {
