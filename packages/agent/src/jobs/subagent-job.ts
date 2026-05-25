@@ -23,7 +23,8 @@ import {
 } from './subagent-job-helpers';
 import type { LaceStopDetails } from '@lace/agent/providers/base-provider';
 import { logger } from '@lace/agent/utils/logger';
-import { SUBAGENT_USER_PERSONAS_TARGET } from './persona-container-spec';
+import { getSkillDirectories } from '@lace/agent/skills';
+import { SUBAGENT_SKILLS_TARGET, SUBAGENT_USER_PERSONAS_TARGET } from './persona-container-spec';
 import { spawnSubagent, type SubagentProcessHandle } from './subagent-spawn';
 import type { PerInvocationReaper } from './per-invocation-reaper';
 import type { ToolResult } from '@lace/ent-protocol';
@@ -68,6 +69,13 @@ function isPermissionOptionsArray(value: unknown): value is PermissionOption[] {
 interface RpcErrorLike {
   code?: number | string;
   data?: Record<string, unknown>;
+}
+
+function getSubagentHostSkillDirs(state: AgentServerState, isContainerized: boolean): string[] {
+  if (state.skillDirs !== undefined) return state.skillDirs;
+  const skillDirs = getSkillDirectories(state.activeSession?.meta.workDir);
+  if (!isContainerized) return skillDirs;
+  return skillDirs.filter((dir) => existsSync(dir));
 }
 
 /**
@@ -200,14 +208,19 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
     // onExit handler uses this to distinguish unexpected child death (persist
     // diagnostic, close peer to wake pending RPCs) from clean teardown (no-op).
     let teardownInitiated = false;
+    let isContainerizedSubagent = false;
+    let subagentHostSkillDirs: string[] = [];
 
     try {
+      isContainerizedSubagent = !!job.personaContainerRuntime;
+      subagentHostSkillDirs = getSubagentHostSkillDirs(state, isContainerizedSubagent);
       subagentProc = await spawnSubagent({
         parentSessionId: state.activeSession.meta.sessionId,
         personaName: job.persona,
         personaContainerRuntime: job.personaContainerRuntime,
         containerManager: state.containerManager,
         containerMounts: state.containerMounts,
+        skillDirs: subagentHostSkillDirs,
         // PRI-1796: thread per_invocation fields for the in-container lace-agent
         // path. spawnContainerSubagent forwards these to buildPersonaContainerSpec.
         ...(job.containerSharing === 'per_invocation' && job.subagentSessionId
@@ -808,10 +821,12 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       // the user-personas dir is auto-mounted at a fixed in-container path. For
       // native subagents, the child shares the parent's filesystem so the
       // parent's host paths apply directly.
-      const isContainerizedSubagent = !!job.personaContainerRuntime;
       const subagentUserPersonasPaths: string[] = isContainerizedSubagent
         ? [SUBAGENT_USER_PERSONAS_TARGET]
         : [...currentState.personaRegistry.getUserPersonasPaths()];
+      const subagentSkillDirs = isContainerizedSubagent
+        ? subagentHostSkillDirs.map((_, index) => `${SUBAGENT_SKILLS_TARGET}/${index}`)
+        : [...subagentHostSkillDirs];
 
       await childPeer.request('initialize', {
         protocolVersion: '1.0',
@@ -822,6 +837,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           'ent/jobStreaming': currentState.jobManager.getStreamingMode(),
         },
         userPersonasPaths: subagentUserPersonasPaths,
+        skillDirs: subagentSkillDirs,
         config: buildSubagentInitConfig(parentEffective),
       });
 

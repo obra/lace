@@ -35,6 +35,11 @@ type ExecFileError = Error & {
 interface DockerInspectJson {
   Id?: string;
   Name?: string;
+  Mounts?: Array<{
+    Source?: string;
+    Destination?: string;
+    RW?: boolean;
+  }>;
   State?: {
     Status?: string;
     Running?: boolean;
@@ -210,6 +215,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
     const info: ContainerInfo = {
       id: containerName,
       state: 'created',
+      mounts: config.mounts,
     };
     this.containers.set(containerName, info);
     this.registerMounts(containerName, config);
@@ -520,6 +526,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       const cached = this.containers.get(containerId);
       if (cached) {
         cached.state = info.state;
+        cached.mounts = info.mounts;
         cached.pid = info.pid;
         cached.startedAt = info.startedAt;
         cached.stoppedAt = info.stoppedAt;
@@ -584,6 +591,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
     }
     const info: ContainerInfo = this.containers.get(id) ?? { id, state };
     info.state = state;
+    info.mounts = config.mounts;
     this.containers.set(id, info);
     this.registerMounts(id, config);
   }
@@ -593,10 +601,21 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
     const state = this.mapDockerStateToContainerState(status);
     const startedAt = parsed.State?.StartedAt ? new Date(parsed.State.StartedAt) : undefined;
     const stoppedAt = parsed.State?.FinishedAt ? new Date(parsed.State.FinishedAt) : undefined;
+    const mounts = parsed.Mounts?.flatMap((mount) => {
+      if (!mount.Source || !mount.Destination) return [];
+      return [
+        {
+          source: mount.Source,
+          target: mount.Destination,
+          readonly: mount.RW === undefined ? undefined : !mount.RW,
+        },
+      ];
+    });
 
     return {
       id: containerId,
       state,
+      mounts,
       pid: parsed.State?.Pid && parsed.State.Pid > 0 ? parsed.State.Pid : undefined,
       startedAt: startedAt && !isNaN(startedAt.getTime()) ? startedAt : undefined,
       stoppedAt:

@@ -51,11 +51,31 @@ export const SUBAGENT_CREDENTIALS_TARGET = '/var/credentials';
 // not to the persona-declared `runtime.mounts` map.
 export const SUBAGENT_LACE_TARGET = '/lace';
 
+// Fixed in-container root for embedder-supplied skill directories. Each parent
+// skill dir is mounted read-only at `${SUBAGENT_SKILLS_TARGET}/<index>` and the
+// child initialize request receives those in-container paths as `skillDirs`.
+export const SUBAGENT_SKILLS_TARGET = '/var/lace/skills';
+
 export class PersonaContainerSpecError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'PersonaContainerSpecError';
   }
+}
+
+function normalizeContainerTarget(target: string): string {
+  let out = target;
+  while (out.length > 1 && out.endsWith('/')) {
+    out = out.slice(0, -1);
+  }
+  return out;
+}
+
+function isUnderManagedSkillTarget(target: string): boolean {
+  const normalized = normalizeContainerTarget(target);
+  return (
+    normalized === SUBAGENT_SKILLS_TARGET || normalized.startsWith(`${SUBAGENT_SKILLS_TARGET}/`)
+  );
 }
 
 /**
@@ -73,8 +93,10 @@ function resolvePersonaMountsAndEnv(input: {
   runtimeMounts: Record<string, string>;
   runtimeEnv: Record<string, string> | undefined;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
+  skillDirs?: readonly string[];
 }): { mounts: ContainerMount[]; env: Record<string, string> } {
-  const { personaName, containerSharing, runtimeMounts, runtimeEnv, containerMounts } = input;
+  const { personaName, containerSharing, runtimeMounts, runtimeEnv, containerMounts, skillDirs } =
+    input;
 
   const mounts: ContainerMount[] = [];
   for (const [mountName, target] of Object.entries(runtimeMounts)) {
@@ -104,6 +126,12 @@ function resolvePersonaMountsAndEnv(input: {
         `Persona '${personaName}' declares mount 'lace' — reserved for ` +
           `lace's auto-injection of the lace source tree into subagent ` +
           `containers. Remove it from the persona file's runtime.mounts.`
+      );
+    }
+    if (isUnderManagedSkillTarget(target)) {
+      throw new PersonaContainerSpecError(
+        `Persona '${personaName}' declares mount '${mountName}' targeting '${target}' — ` +
+          `reserved for lace's managed skill mount namespace. Choose a different target.`
       );
     }
     // 'scratch' is reserved for per_invocation personas only — lace auto-injects
@@ -190,6 +218,14 @@ function resolvePersonaMountsAndEnv(input: {
     });
   }
 
+  for (const [index, skillDir] of (skillDirs ?? []).entries()) {
+    mounts.push({
+      source: skillDir,
+      target: `${SUBAGENT_SKILLS_TARGET}/${index}`,
+      readonly: true,
+    });
+  }
+
   // Merge persona-declared env with auto-injected LACE_DIR. The auto-inject
   // wins: the mount IS the source of truth for where LACE_DIR resolves
   // inside the container, so a persona-supplied LACE_DIR pointing elsewhere
@@ -230,6 +266,7 @@ export function buildPersonaContainerSpec(input: {
   personaName: string;
   runtime: PersonaContainerRuntime;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
+  skillDirs?: readonly string[];
   // Required for per_invocation; ignored for persistent.
   childSessionId?: string;
   scratchDirHostPath?: string;
@@ -276,6 +313,7 @@ export function buildPersonaContainerSpec(input: {
     runtimeMounts: runtime.mounts,
     runtimeEnv: runtime.env,
     containerMounts,
+    skillDirs: input.skillDirs,
   });
 
   if (runtime.containerSharing === 'persistent') {
@@ -286,6 +324,7 @@ export function buildPersonaContainerSpec(input: {
       workingDirectory: runtime.workingDirectory,
       mounts,
       env,
+      managedMountTargetPrefixes: [`${SUBAGENT_SKILLS_TARGET}/`],
       restartPolicy: 'unless-stopped',
       ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
     };
@@ -310,6 +349,7 @@ export function buildPersonaContainerSpec(input: {
     workingDirectory: runtime.workingDirectory,
     mounts: perInvocationMounts,
     env,
+    managedMountTargetPrefixes: [`${SUBAGENT_SKILLS_TARGET}/`],
     ...(runtime.ports ? { ports: runtime.ports } : {}),
     ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
   };

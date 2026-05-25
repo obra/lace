@@ -7,11 +7,12 @@ import { logger } from '@lace/agent/utils/logger';
 import type {
   ContainerConfig,
   ContainerInfo,
+  ContainerMount,
   ContainerRuntime,
   ExecStreamHandle,
   ExecStreamOptions,
 } from './types';
-import { ContainerNotFoundError } from './types';
+import { ContainerError, ContainerNotFoundError } from './types';
 import type { ContainerHandle, ContainerLifecycleHooks, ContainerSpec } from './spec';
 
 // See ABOUTME above: every container id is namespaced under this prefix so
@@ -40,6 +41,76 @@ function specNameFromContainerId(containerId: string): string {
     );
   }
   return containerId.slice(CONTAINER_ID_PREFIX.length);
+}
+
+function normalizeMountPath(value: string): string {
+  if (/^[A-Za-z]:[\\/]$/.test(value)) return value;
+  let out = value;
+  while (out.length > 1 && /[\\/]$/.test(out)) {
+    out = out.slice(0, -1);
+  }
+  return out;
+}
+
+function sameMount(a: ContainerMount, b: ContainerMount): boolean {
+  return (
+    normalizeMountPath(a.source) === normalizeMountPath(b.source) &&
+    normalizeMountPath(a.target) === normalizeMountPath(b.target) &&
+    Boolean(a.readonly) === Boolean(b.readonly)
+  );
+}
+
+function targetMatchesPrefix(target: string, prefix: string): boolean {
+  const normalizedTarget = normalizeMountPath(target);
+  const normalizedPrefix = normalizeMountPath(prefix);
+  return (
+    normalizedTarget === normalizedPrefix || normalizedTarget.startsWith(`${normalizedPrefix}/`)
+  );
+}
+
+function findMissingPersistentMount(
+  spec: ContainerSpec,
+  adoptable: ContainerInfo
+): ContainerMount | null {
+  if (!spec.containerId || adoptable.mounts === undefined) return null;
+  for (const mount of spec.mounts) {
+    if (!adoptable.mounts.some((existing) => sameMount(existing, mount))) {
+      return mount;
+    }
+  }
+  return null;
+}
+
+function findMissingManagedMount(
+  spec: ContainerSpec,
+  adoptable: ContainerInfo
+): ContainerMount | null {
+  if (adoptable.mounts === undefined) return null;
+  const prefixes = spec.managedMountTargetPrefixes ?? [];
+  if (prefixes.length === 0) return null;
+  for (const mount of spec.mounts) {
+    if (!prefixes.some((prefix) => targetMatchesPrefix(mount.target, prefix))) continue;
+    if (!adoptable.mounts.some((existing) => sameMount(existing, mount))) return mount;
+  }
+  return null;
+}
+
+function findUnexpectedManagedMount(
+  spec: ContainerSpec,
+  adoptable: ContainerInfo
+): ContainerMount | null {
+  if (adoptable.mounts === undefined) return null;
+  const prefixes = spec.managedMountTargetPrefixes ?? [];
+  if (prefixes.length === 0) return null;
+  for (const mount of adoptable.mounts) {
+    if (!prefixes.some((prefix) => targetMatchesPrefix(mount.target, prefix))) continue;
+    if (!spec.mounts.some((expected) => sameMount(expected, mount))) return mount;
+  }
+  return null;
+}
+
+function formatMount(mount: ContainerMount): string {
+  return `${mount.source}:${mount.target}${mount.readonly ? ':ro' : ''}`;
 }
 
 export class ContainerManager {
@@ -115,6 +186,24 @@ export class ContainerManager {
       : await this.tryInspect(inspectContainerId);
 
     if (adoptable) {
+      const missingMount =
+        findMissingPersistentMount(spec, adoptable) ?? findMissingManagedMount(spec, adoptable);
+      if (missingMount) {
+        throw new ContainerError(
+          `Existing persistent container '${adoptable.id}' is missing required mount ` +
+            `${formatMount(missingMount)}. Remove or recreate the container and retry.`,
+          adoptable.id
+        );
+      }
+      const unexpectedMount = findUnexpectedManagedMount(spec, adoptable);
+      if (unexpectedMount) {
+        throw new ContainerError(
+          `Existing persistent container '${adoptable.id}' has unexpected managed mount ` +
+            `${formatMount(unexpectedMount)}. Remove or recreate the container and retry.`,
+          adoptable.id
+        );
+      }
+
       this.specs.set(spec.name, spec);
       this.containerIdsBySpecName.set(spec.name, adoptable.id);
       // Adopt the daemon-side container into the runtime's in-process caches

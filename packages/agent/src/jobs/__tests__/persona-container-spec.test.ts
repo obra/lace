@@ -8,6 +8,7 @@ import {
   SUBAGENT_LACE_DATA_TARGET,
   SUBAGENT_CREDENTIALS_TARGET,
   SUBAGENT_LACE_TARGET,
+  SUBAGENT_SKILLS_TARGET,
 } from '@lace/agent/jobs/persona-container-spec';
 
 // per_invocation requires childSessionId + scratchDirHostPath
@@ -78,6 +79,27 @@ describe('buildPersonaContainerSpec', () => {
     expect(spec.mounts).toHaveLength(2);
   });
 
+  it('mounts inherited skillDirs read-only at stable in-container targets', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: BASE_PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: BASE_CHILD_SESSION_ID,
+      scratchDirHostPath: BASE_SCRATCH_PATH,
+      runtime: baseRuntime,
+      containerMounts: {},
+      skillDirs: ['/host/skills/innate', '/host/skills/learned'],
+    });
+
+    expect(spec.mounts).toEqual(
+      expect.arrayContaining([
+        { source: '/host/skills/innate', target: `${SUBAGENT_SKILLS_TARGET}/0`, readonly: true },
+        { source: '/host/skills/learned', target: `${SUBAGENT_SKILLS_TARGET}/1`, readonly: true },
+        SCRATCH_MOUNT,
+      ])
+    );
+    expect(spec.managedMountTargetPrefixes).toContain(`${SUBAGENT_SKILLS_TARGET}/`);
+  });
+
   it('throws PersonaContainerSpecError on unknown mount name', () => {
     expect(() =>
       buildPersonaContainerSpec({
@@ -92,6 +114,40 @@ describe('buildPersonaContainerSpec', () => {
         containerMounts: {},
       })
     ).toThrow(PersonaContainerSpecError);
+  });
+
+  it('rejects persona-declared mount targets in the managed skill namespace', () => {
+    expect(() =>
+      buildPersonaContainerSpec({
+        parentSessionId: BASE_PARENT_SESSION_ID,
+        personaName: 'shell',
+        childSessionId: BASE_CHILD_SESSION_ID,
+        scratchDirHostPath: BASE_SCRATCH_PATH,
+        runtime: {
+          ...baseRuntime,
+          mounts: { identity: SUBAGENT_SKILLS_TARGET },
+        },
+        containerMounts: {
+          identity: { hostPath: '/host/identity', readonly: true },
+        },
+      })
+    ).toThrow(/managed skill mount namespace/);
+
+    expect(() =>
+      buildPersonaContainerSpec({
+        parentSessionId: BASE_PARENT_SESSION_ID,
+        personaName: 'shell',
+        childSessionId: BASE_CHILD_SESSION_ID,
+        scratchDirHostPath: BASE_SCRATCH_PATH,
+        runtime: {
+          ...baseRuntime,
+          mounts: { identity: `${SUBAGENT_SKILLS_TARGET}/0` },
+        },
+        containerMounts: {
+          identity: { hostPath: '/host/identity', readonly: true },
+        },
+      })
+    ).toThrow(/managed skill mount namespace/);
   });
 
   it('rejects parentSessionId containing unsafe characters', () => {

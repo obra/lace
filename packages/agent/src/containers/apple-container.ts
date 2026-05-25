@@ -144,6 +144,7 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
     const info: AppleContainerInfo = {
       id: containerId,
       state: 'created',
+      mounts: config.mounts,
     };
     this.containers.set(containerId, info);
     this.registerMounts(containerId, config);
