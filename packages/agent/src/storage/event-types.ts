@@ -122,6 +122,12 @@ export type ContextCompactedEventData = {
   strategy: string;
   preserved: unknown[];
   summary?: string;
+  /**
+   * Count of canonical events that were summarized into the prefix. Used by
+   * track-based compaction analytics + message-builder's "earlier" counter.
+   * Optional because legacy events written before this field shipped lack it.
+   */
+  messagesCompacted?: number;
 };
 
 export type ContextInjectedEventData = {

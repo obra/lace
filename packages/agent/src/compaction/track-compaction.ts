@@ -2,7 +2,9 @@
 // ABOUTME: Replaces summarize-strategy.ts; reuses context_compacted event type
 
 import { isEventDataOfType } from '@lace/agent/storage/event-types';
-import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
+import type { TypedDurableEvent, ContextCompactedEventData } from '@lace/agent/storage/event-types';
+import { renderCompactionPrefix } from './track-render';
+import type { CompactionContext } from './types';
 
 export const UNTRACKED = 'untracked' as const;
 
@@ -204,4 +206,143 @@ function extractCurrentMessages(envelopeText: string): string[] | null {
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
   return s.slice(0, max - 1) + '…';
+}
+
+const TAIL_TURNS = 10;
+
+export interface CompactResult {
+  compactionEvent: {
+    type: 'context_compacted';
+    data: ContextCompactedEventData;
+  };
+}
+
+/**
+ * Split events into [earlier, tail] at the boundary that gives `tailTurns`
+ * complete turns at the end. A turn is `prompt + turn_start ... turn_end`.
+ * Snaps leftward if the boundary would split an assistant tool_use from its
+ * matching tool_result.
+ */
+export function splitAtTailBoundary(
+  events: TypedDurableEvent[],
+  tailTurns: number
+): { earlier: TypedDurableEvent[]; tail: TypedDurableEvent[] } {
+  // Walk backwards counting turn_end events; the boundary is just before the
+  // prompt that opens the (tailTurns)-th turn from the end.
+  const turnEndIdxs: number[] = [];
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (events[i].type === 'turn_end') turnEndIdxs.push(i);
+    if (turnEndIdxs.length >= tailTurns) break;
+  }
+  if (turnEndIdxs.length < tailTurns) {
+    return { earlier: [], tail: events.slice() };
+  }
+  const earliestTailTurnEndIdx = turnEndIdxs[turnEndIdxs.length - 1];
+  const targetTurnId = events[earliestTailTurnEndIdx].turnId;
+  let boundary = earliestTailTurnEndIdx;
+  for (let i = earliestTailTurnEndIdx; i >= 0; i--) {
+    if (events[i].type === 'turn_start' && events[i].turnId === targetTurnId) {
+      if (i > 0 && events[i - 1].type === 'prompt') {
+        boundary = i - 1;
+      } else {
+        boundary = i;
+      }
+      break;
+    }
+  }
+  boundary = snapLeftIfOrphanedTool(events, boundary);
+  return { earlier: events.slice(0, boundary), tail: events.slice(boundary) };
+}
+
+/**
+ * If the given boundary would leave a tool_use in the "earlier" slice whose
+ * matching tool_result lives in the "tail" slice, snap the boundary leftward
+ * until no such orphan exists. This preserves the tool_use/tool_result pairing
+ * invariant required for valid Anthropic conversation turns.
+ */
+function snapLeftIfOrphanedTool(events: TypedDurableEvent[], boundary: number): number {
+  while (boundary > 0) {
+    const oldToolCallIds = new Set<string>();
+    for (let i = 0; i < boundary; i++) {
+      const e = events[i];
+      if (isEventDataOfType(e.data, 'tool_use')) {
+        oldToolCallIds.add(e.data.toolCallId);
+      }
+    }
+    let hasOrphan = false;
+    for (let i = boundary; i < events.length && !hasOrphan; i++) {
+      const e = events[i];
+      if (!isEventDataOfType(e.data, 'message')) continue;
+      const content = e.data.content;
+      if (!Array.isArray(content)) continue;
+      for (const block of content) {
+        if (
+          typeof block === 'object' &&
+          block !== null &&
+          (block as { type?: unknown }).type === 'tool_result'
+        ) {
+          const tcid = (block as { toolCallId?: unknown }).toolCallId;
+          if (typeof tcid === 'string' && oldToolCallIds.has(tcid)) {
+            hasOrphan = true;
+            break;
+          }
+        }
+      }
+    }
+    if (!hasOrphan) return boundary;
+    boundary -= 1;
+  }
+  return boundary;
+}
+
+/**
+ * Track-based compaction orchestrator. Pure: returns the event the caller
+ * should write, without writing it.
+ */
+export async function compact(
+  events: TypedDurableEvent[],
+  _ctx: CompactionContext
+): Promise<CompactResult> {
+  const { earlier, tail } = splitAtTailBoundary(events, TAIL_TURNS);
+
+  let prefixContent: string;
+  if (earlier.length === 0) {
+    prefixContent = '[Earlier conversation, compacted by track]\n(no earlier content)';
+  } else {
+    const turnToTrack = buildTurnToTrackMap(events);
+    const groups = groupEarlierEventsByTrack(earlier, turnToTrack);
+    const blocks: TrackBlock[] = [];
+    for (const [trackId, trackEvents] of groups) {
+      const block = salienceForTrack(trackId, trackEvents);
+      if (block) blocks.push(block);
+    }
+    prefixContent = renderCompactionPrefix({
+      blocks,
+      scheduler: { alarmsPending: 0, remindersPending: 0 },
+    });
+  }
+
+  const preservedTail = tail
+    .filter((e) => e.type === 'message' || e.type === 'prompt')
+    .map((e) => preservedMessageFromEvent(e));
+
+  return {
+    compactionEvent: {
+      type: 'context_compacted',
+      data: {
+        type: 'context_compacted',
+        strategy: 'track-based',
+        messagesCompacted: earlier.length,
+        preserved: [{ role: 'user', content: prefixContent }, ...preservedTail],
+      },
+    },
+  };
+}
+
+function preservedMessageFromEvent(e: TypedDurableEvent): {
+  role: 'user' | 'assistant';
+  content: string;
+} {
+  const text = extractText(e);
+  return { role: e.type === 'prompt' ? 'user' : 'assistant', content: text };
 }

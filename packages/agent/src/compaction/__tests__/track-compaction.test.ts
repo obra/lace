@@ -6,7 +6,10 @@ import {
   buildTurnToTrackMap,
   groupEarlierEventsByTrack,
   salienceForTrack,
+  compact,
+  splitAtTailBoundary,
 } from '../track-compaction';
+import type { CompactionContext } from '../types';
 import type { DurableEventData, TypedDurableEvent } from '@lace/agent/storage/event-types';
 
 const event = (
@@ -186,5 +189,100 @@ describe('salienceForTrack', () => {
     const block = salienceForTrack('untracked', events);
     expect(block?.body).toContain('a legacy prompt');
     expect(block?.body).toContain('an assistant reply');
+  });
+});
+
+const turnEnd = (seq: number, turnId: string): TypedDurableEvent =>
+  event(seq, 'turn_end', { stopReason: 'end_turn' }, turnId);
+const turnStart = (seq: number, turnId: string): TypedDurableEvent =>
+  event(seq, 'turn_start', {}, turnId);
+
+describe('splitAtTailBoundary', () => {
+  it('keeps last 10 turns verbatim', () => {
+    const events: TypedDurableEvent[] = [];
+    let seq = 1;
+    for (let t = 0; t < 12; t++) {
+      events.push(event(seq++, 'prompt', { content: [], track: `slack:T${t}` }));
+      events.push(turnStart(seq++, `turn_${t}`));
+      events.push(turnEnd(seq++, `turn_${t}`));
+    }
+    const { earlier, tail } = splitAtTailBoundary(events, 10);
+    // 12 turns × 3 events = 36; last 10 turns = events 7..36 (3 × 10 = 30 events tail).
+    expect(tail.length).toBe(30);
+    expect(earlier.length).toBe(6);
+  });
+
+  it('snaps leftward to avoid splitting tool_use from tool_result', () => {
+    // Construct a 2-turn fixture where the boundary cuts mid-tool-pair.
+    // Tail size 1 turn: boundary should snap left to include the whole turn.
+    const events: TypedDurableEvent[] = [
+      event(1, 'prompt', { content: [], track: 'slack:A' }),
+      turnStart(2, 'turn_1'),
+      event(3, 'tool_use', { toolCallId: 't1', name: 'bash', input: {} }, 'turn_1'),
+      // No turn_end yet — multi-call turn, tool_result for t1 lives in turn_1.
+      event(
+        4,
+        'message',
+        { content: [{ type: 'tool_result', toolCallId: 't1', content: 'ok' }] },
+        'turn_1'
+      ),
+      turnEnd(5, 'turn_1'),
+      // Second turn starts; if we asked for tail=1, it would include only turn_2.
+      event(6, 'prompt', { content: [], track: 'slack:B' }),
+      turnStart(7, 'turn_2'),
+      turnEnd(8, 'turn_2'),
+    ];
+    const { earlier, tail } = splitAtTailBoundary(events, 1);
+    // turn_2 is 3 events (prompt + turn_start + turn_end).
+    expect(tail.length).toBe(3);
+    expect(earlier.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('returns all events as tail when total turns <= tail size', () => {
+    const events: TypedDurableEvent[] = [
+      event(1, 'prompt', { content: [], track: 'slack:A' }),
+      turnStart(2, 'turn_1'),
+      turnEnd(3, 'turn_1'),
+    ];
+    const { earlier, tail } = splitAtTailBoundary(events, 10);
+    expect(earlier).toEqual([]);
+    expect(tail.length).toBe(3);
+  });
+});
+
+describe('compact()', () => {
+  const ctx: CompactionContext = { threadId: 'sess_test' };
+
+  it('produces a context_compacted event with strategy="track-based"', async () => {
+    const events: TypedDurableEvent[] = [];
+    let seq = 1;
+    for (let t = 0; t < 12; t++) {
+      events.push(
+        event(seq++, 'prompt', {
+          content: [{ type: 'text', text: `msg ${t}` }],
+          track: `slack:T:C:${t}`,
+        })
+      );
+      events.push(turnStart(seq++, `turn_${t}`));
+      events.push(turnEnd(seq++, `turn_${t}`));
+    }
+    const result = await compact(events, ctx);
+    expect(result.compactionEvent.type).toBe('context_compacted');
+    expect(result.compactionEvent.data.strategy).toBe('track-based');
+    expect(result.compactionEvent.data.messagesCompacted).toBe(6); // earlier events count
+    expect(Array.isArray(result.compactionEvent.data.preserved)).toBe(true);
+    const first = result.compactionEvent.data.preserved[0] as { role: string; content: string };
+    expect(first.role).toBe('user');
+    expect(first.content).toContain('[Earlier conversation');
+  });
+
+  it('returns the original tail unchanged when nothing to compact', async () => {
+    const events: TypedDurableEvent[] = [
+      event(1, 'prompt', { content: [{ type: 'text', text: 'one' }], track: 'slack:A' }),
+      turnStart(2, 'turn_1'),
+      turnEnd(3, 'turn_1'),
+    ];
+    const result = await compact(events, ctx);
+    expect(result.compactionEvent.data.messagesCompacted).toBe(0);
   });
 });
