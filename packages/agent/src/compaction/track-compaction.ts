@@ -211,6 +211,9 @@ function untrackedSalience(trackId: string, events: TypedDurableEvent[]): TrackB
     } else if (isEventOfType(e, 'message')) {
       const t = typeof e.data.content === 'string' ? e.data.content : extractText(e);
       if (t.trim()) lines.push(`Assistant: ${truncate(t.trim(), 500)}`);
+    } else if (isEventOfType(e, 'context_injected')) {
+      const t = extractText(e).trim();
+      if (t) lines.push(`Note: ${truncate(t, 500)}`);
     }
   }
   const body = lines.length > 0 ? lines.join('\n') : '(empty)';

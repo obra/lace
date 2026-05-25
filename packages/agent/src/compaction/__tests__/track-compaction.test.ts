@@ -203,6 +203,20 @@ describe('salienceForTrack', () => {
     expect(block?.body).toContain('a legacy prompt');
     expect(block?.body).toContain('an assistant reply');
   });
+
+  it('untracked context_injected events appear as Note: lines in prose', () => {
+    // Legacy/non-stamped context_injected events (no track field) end up in the
+    // untracked bucket. They must appear in the prose output, not be silently dropped.
+    const events: TypedDurableEvent[] = [
+      event(1, 'context_injected', {
+        content: [{ type: 'text', text: 'alarm fired: stand-up now' }],
+      }),
+      event(2, 'prompt', { content: [{ type: 'text', text: 'ack' }] }),
+    ];
+    const block = salienceForTrack('untracked', events);
+    expect(block?.body).toContain('Note: alarm fired: stand-up now');
+    expect(block?.body).toContain('User: ack');
+  });
 });
 
 const turnEnd = (seq: number, turnId: string): TypedDurableEvent =>
