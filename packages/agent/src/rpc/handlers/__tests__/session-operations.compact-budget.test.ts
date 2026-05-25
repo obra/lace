@@ -114,7 +114,7 @@ describe('ent/session/compact — systemPrompt token inclusion (PRI-1799 Task 4)
       writeConversationWithLargeSystemPrompt(sessionDir, systemPromptText);
 
       const response = (await client.request('ent/session/compact', {
-        strategy: 'truncate',
+        strategy: 'trim-tool-results',
         // preserveRecent:0 to maximise dropped messages; avoids needing a real LLM.
         preserveRecent: 0,
       })) as { previousTokens: number; currentTokens: number; messagesCompacted: number };
@@ -161,7 +161,7 @@ describe('ent/session/compact — systemPrompt token inclusion (PRI-1799 Task 4)
       writeConversationWithLargeSystemPrompt(sessionDir, systemPromptText);
 
       const response = (await client.request('ent/session/compact', {
-        strategy: 'truncate',
+        strategy: 'trim-tool-results',
         preserveRecent: 0,
       })) as { previousTokens: number; currentTokens: number; messagesCompacted: number };
 

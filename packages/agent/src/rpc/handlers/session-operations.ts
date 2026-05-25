@@ -426,7 +426,7 @@ export function registerSessionOperationHandlers(
 
     const parsed = params as
       | {
-          strategy?: 'summarize' | 'truncate' | 'selective';
+          strategy?: 'summarize' | 'trim-tool-results' | 'selective';
           targetTokens?: number;
           preserveRecent?: number;
         }
@@ -435,10 +435,10 @@ export function registerSessionOperationHandlers(
     if (
       parsed?.strategy &&
       parsed.strategy !== 'summarize' &&
-      parsed.strategy !== 'truncate' &&
+      parsed.strategy !== 'trim-tool-results' &&
       parsed.strategy !== 'selective'
     ) {
-      throwInvalidParams('strategy must be summarize|truncate|selective');
+      throwInvalidParams('strategy must be summarize|trim-tool-results|selective');
     }
 
     // Default to 'summarize' (PRI-1824). 'truncate' only crops TOOL_RESULT
@@ -446,7 +446,7 @@ export function registerSessionOperationHandlers(
     // the default was a near-no-op for callers that don't specify a strategy.
     const strategy =
       parsed?.strategy === 'summarize' ||
-      parsed?.strategy === 'truncate' ||
+      parsed?.strategy === 'trim-tool-results' ||
       parsed?.strategy === 'selective'
         ? parsed.strategy
         : 'summarize';
@@ -496,7 +496,7 @@ export function registerSessionOperationHandlers(
       let summary: string | undefined;
 
       if (dropped.length > 0) {
-        if (strategy === 'truncate') {
+        if (strategy === 'trim-tool-results') {
           const result = await compactDroppedMessagesWithCore({
             strategyId: 'trim-tool-results',
             dropped,

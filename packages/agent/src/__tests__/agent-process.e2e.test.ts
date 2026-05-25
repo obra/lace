@@ -872,7 +872,7 @@ describe('lace-agent process (E2E over stdio)', () => {
   );
 
   it(
-    'supports ent/session/compact truncate and trims tool results in provider context',
+    'supports ent/session/compact trim-tool-results and trims tool results in provider context',
     { timeout: 15_000 },
     async () => {
       ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
@@ -903,7 +903,10 @@ describe('lace-agent process (E2E over stdio)', () => {
       );
 
       const compact = (await withTimeout(
-        ctx.agent.peer.request('ent/session/compact', { strategy: 'truncate', preserveRecent: 0 }),
+        ctx.agent.peer.request('ent/session/compact', {
+          strategy: 'trim-tool-results',
+          preserveRecent: 0,
+        }),
         2_000,
         'ent/session/compact'
       )) as { messagesCompacted: number };
