@@ -2,10 +2,9 @@
 // ABOUTME: Defines context type for track-based conversation compaction
 
 import type { AIProvider } from '@lace/agent/providers/base-provider';
-import type { ToolExecutor } from '@lace/agent/tools/executor';
 
 export interface CompactionAgent {
-  generateSummary(summaryRequest: string, events: unknown[]): Promise<string>;
+  generateSummary(summaryRequest: string): Promise<string>;
 }
 
 /**
@@ -18,6 +17,4 @@ export interface CompactionContext {
   provider?: AIProvider;
   /** Optional Agent instance for in-conversation summarization */
   agent?: CompactionAgent;
-  /** Optional tool executor for strategies that need to use tools */
-  toolExecutor?: ToolExecutor;
 }

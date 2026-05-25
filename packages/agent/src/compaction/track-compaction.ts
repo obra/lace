@@ -131,7 +131,7 @@ async function maybeShrinkBlock(block: TrackBlock, ctx: CompactionContext): Prom
   let summary = '';
   try {
     if (ctx.agent) {
-      summary = await ctx.agent.generateSummary(prompt, []);
+      summary = await ctx.agent.generateSummary(prompt);
     } else if (ctx.provider) {
       const messages: ProviderMessage[] = [{ role: 'user', content: prompt }];
       const resp = await ctx.provider.createResponse(messages, [], 'default');
