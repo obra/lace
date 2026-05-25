@@ -18,6 +18,13 @@ export type ContentBlock =
 export type PromptEventData = {
   type: 'prompt';
   content: ContentBlock[];
+  /**
+   * Producer-defined demux key for the new track-based compaction strategy.
+   * Shape: `<kind>:<id>` (e.g. `slack:T123:C456:1.0`, `job:job_abc`, `alarm:xyz`).
+   * Lace stores opaquely; compaction reads it. Optional — legacy events lack
+   * it and are bucketed as `'untracked'` at compaction time.
+   */
+  track?: string;
 };
 
 export type MessageEventData = {
@@ -76,6 +83,16 @@ export type TurnEndEventData = {
      * default to 0 when absent.
      */
     cacheReadInputTokens?: number;
+    /**
+     * The LAST API call's on-the-wire input context size for this turn (not
+     * summed across calls). Tool-loop turns issue multiple API calls; the
+     * `inputTokens`/cache field sums above are turn-cumulative. Compaction
+     * needs the most recent call's snapshot so its pressure arithmetic
+     * matches what the next call will actually send. Required for the
+     * track-based compaction trigger. Undefined on events written before
+     * this field shipped.
+     */
+    lastCallInputContextTokens?: number;
     /** Computed USD cost for the turn, including cache-tier pricing. */
     costUsd: number;
   };
@@ -111,6 +128,8 @@ export type ContextInjectedEventData = {
   type: 'context_injected';
   content: ContentBlock[];
   priority?: string;
+  /** See PromptEventData.track. */
+  track?: string;
 };
 
 export type SystemPromptSetEventData = {
