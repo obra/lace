@@ -331,6 +331,24 @@ describe('ContainerManager', () => {
       expect(adoptSpy).not.toHaveBeenCalled();
       expect(createSpy).not.toHaveBeenCalled();
     });
+
+    it('accepts daemon-normalized persistent mount sources without trailing slashes', async () => {
+      const specWithTrailingSlashMount: ContainerSpec = {
+        ...boxSpec,
+        mounts: [{ source: '/host/skills/', target: '/var/lace/skills/0', readonly: true }],
+      };
+      vi.spyOn(runtime, 'daemonInspect').mockResolvedValueOnce({
+        id: 'sen-box-shell',
+        state: 'running',
+        mounts: [{ source: '/host/skills', target: '/var/lace/skills/0', readonly: true }],
+      });
+      const adoptSpy = vi.spyOn(runtime, 'adopt');
+
+      const handle = await manager.materialize(specWithTrailingSlashMount);
+
+      expect(handle.containerId).toBe('sen-box-shell');
+      expect(adoptSpy).toHaveBeenCalledOnce();
+    });
   });
 
   describe('inspect', () => {

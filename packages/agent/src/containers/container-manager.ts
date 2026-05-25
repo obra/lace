@@ -43,9 +43,20 @@ function specNameFromContainerId(containerId: string): string {
   return containerId.slice(CONTAINER_ID_PREFIX.length);
 }
 
+function normalizeMountPath(value: string): string {
+  if (/^[A-Za-z]:[\\/]$/.test(value)) return value;
+  let out = value;
+  while (out.length > 1 && /[\\/]$/.test(out)) {
+    out = out.slice(0, -1);
+  }
+  return out;
+}
+
 function sameMount(a: ContainerMount, b: ContainerMount): boolean {
   return (
-    a.source === b.source && a.target === b.target && Boolean(a.readonly) === Boolean(b.readonly)
+    normalizeMountPath(a.source) === normalizeMountPath(b.source) &&
+    normalizeMountPath(a.target) === normalizeMountPath(b.target) &&
+    Boolean(a.readonly) === Boolean(b.readonly)
   );
 }
 
