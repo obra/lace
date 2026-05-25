@@ -5,6 +5,7 @@ import { isEventDataOfType } from '@lace/agent/storage/event-types';
 import type { TypedDurableEvent, ContextCompactedEventData } from '@lace/agent/storage/event-types';
 import { renderCompactionPrefix } from './track-render';
 import type { CompactionContext } from './types';
+import type { ProviderMessage } from '@lace/agent/providers/base-provider';
 import { coreToolResultFromProtocol, toNonEmptyString } from '../rpc/utils';
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 
@@ -110,6 +111,38 @@ export function salienceForTrack(trackId: string, events: TypedDurableEvent[]): 
     return slackSalience(trackId, events);
   }
   return untrackedSalience(trackId, events);
+}
+
+const SOFT_TOKEN_CAP_PER_TRACK = 5_000;
+
+/**
+ * If a track's deterministic block exceeds the token cap and a provider/agent
+ * is available, ask the LLM to summarize. Falls back to the original block on
+ * any error or empty response.
+ */
+async function maybeShrinkBlock(block: TrackBlock, ctx: CompactionContext): Promise<TrackBlock> {
+  if (block.estimatedTokens <= SOFT_TOKEN_CAP_PER_TRACK) return block;
+  if (!ctx.provider && !ctx.agent) return block;
+  const trackKind = block.trackId.split(':')[0];
+  const prompt =
+    `Summarize the following ${trackKind} track conversation concisely. ` +
+    `Preserve who said what, key decisions, and open questions. ` +
+    `Output at most 800 tokens.\n\n${block.body}`;
+  let summary = '';
+  try {
+    if (ctx.agent) {
+      summary = await ctx.agent.generateSummary(prompt, []);
+    } else if (ctx.provider) {
+      const messages: ProviderMessage[] = [{ role: 'user', content: prompt }];
+      const resp = await ctx.provider.createResponse(messages, [], 'default');
+      summary = resp.content;
+    }
+  } catch {
+    return block; // on error, keep deterministic block
+  }
+  if (!summary.trim()) return block;
+  const body = `### ${block.trackId}\n${summary}`;
+  return { trackId: block.trackId, body, estimatedTokens: estimate(body) };
 }
 
 function jobSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock {
@@ -275,7 +308,7 @@ export function splitAtTailBoundary(
  */
 export async function compact(
   events: TypedDurableEvent[],
-  _ctx: CompactionContext
+  ctx: CompactionContext
 ): Promise<CompactResult> {
   const { earlier, tail } = splitAtTailBoundary(events, TAIL_TURNS);
 
@@ -288,7 +321,8 @@ export async function compact(
     const blocks: TrackBlock[] = [];
     for (const [trackId, trackEvents] of groups) {
       const block = salienceForTrack(trackId, trackEvents);
-      if (block) blocks.push(block);
+      if (!block) continue;
+      blocks.push(await maybeShrinkBlock(block, ctx));
     }
     prefixContent = renderCompactionPrefix({
       blocks,

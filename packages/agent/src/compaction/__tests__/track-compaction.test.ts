@@ -11,6 +11,7 @@ import {
 } from '../track-compaction';
 import type { CompactionContext } from '../types';
 import type { DurableEventData, TypedDurableEvent } from '@lace/agent/storage/event-types';
+import type { AIProvider } from '@lace/agent/providers/base-provider';
 
 const event = (
   seq: number,
@@ -273,6 +274,72 @@ describe('splitAtTailBoundary', () => {
     const { earlier, tail } = splitAtTailBoundary(events, 10);
     expect(earlier).toEqual([]);
     expect(tail.length).toBe(3);
+  });
+});
+
+describe('compact() with LLM fallback', () => {
+  // Build a text that is long enough that many entries in the body will exceed
+  // the 5K-token cap. untrackedSalience truncates each prompt to 500 chars and
+  // prefixes "User: " (6 chars), so each entry contributes ~506 chars (~127 tokens).
+  // 42 earlier turns × 127 tokens ≈ 5,334 tokens — comfortably over the cap.
+  const longEntry = 'a'.repeat(500);
+
+  it('calls provider.createResponse when a track block exceeds 5K tokens', async () => {
+    const calls: Array<{ messages: unknown; tools: unknown }> = [];
+    const mockProvider = {
+      createResponse: async (messages: unknown, tools: unknown) => {
+        calls.push({ messages, tools });
+        return { content: 'condensed summary', usage: { promptTokens: 0, completionTokens: 50 } };
+      },
+      setSystemPrompt: () => {},
+    } as unknown as AIProvider;
+
+    // Build an untracked track with 42 earlier turns (no `track` field → 'untracked').
+    const events: TypedDurableEvent[] = [];
+    let seq = 1;
+    for (let i = 0; i < 42; i++) {
+      events.push(
+        event(seq++, 'prompt', {
+          content: [{ type: 'text', text: longEntry }],
+        })
+      );
+      events.push(turnStart(seq++, `turn_${i}`));
+      events.push(turnEnd(seq++, `turn_${i}`));
+    }
+    // Add 10 trailing turns on a different track to satisfy the tail-size requirement.
+    for (let i = 0; i < 10; i++) {
+      events.push(event(seq++, 'prompt', { content: [], track: 'slack:T:C:1' }));
+      events.push(turnStart(seq++, `tail_${i}`));
+      events.push(turnEnd(seq++, `tail_${i}`));
+    }
+    const result = await compact(events, { threadId: 'sess', provider: mockProvider });
+    expect(calls.length).toBeGreaterThan(0);
+    expect(result.compactionEvent.data.preserved[0]).toMatchObject({
+      role: 'user',
+      content: expect.stringContaining('condensed summary'),
+    });
+  });
+
+  it('does NOT call provider when all tracks fit', async () => {
+    let called = false;
+    const mockProvider = {
+      createResponse: async () => {
+        called = true;
+        return { content: '', usage: { promptTokens: 0, completionTokens: 0 } };
+      },
+      setSystemPrompt: () => {},
+    } as unknown as AIProvider;
+    const events: TypedDurableEvent[] = [];
+    let seq = 1;
+    for (let i = 0; i < 12; i++) {
+      events.push(
+        event(seq++, 'prompt', { content: [{ type: 'text', text: 'short' }], track: 'slack:T:C:0' })
+      );
+      events.push(turnStart(seq++, `turn_${i}`));
+      events.push(turnEnd(seq++, `turn_${i}`));
+    }
+    await compact(events, { threadId: 'sess', provider: mockProvider });
+    expect(called).toBe(false);
   });
 });
 
