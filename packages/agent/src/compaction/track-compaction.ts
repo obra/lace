@@ -190,29 +190,83 @@ function dedupeConsecutive<T>(arr: T[], key: (item: T) => string): T[] {
   return out;
 }
 
+type SlackEntry =
+  | { kind: 'in'; user: string; displayName?: string; text: string }
+  | { kind: 'out'; text: string };
+
+type SlackGroup =
+  | { kind: 'in'; user: string; displayName?: string; entries: Array<{ text: string }> }
+  | { kind: 'out'; entries: Array<{ text: string }> };
+
 function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock {
-  const inbound: Array<{ user: string; text: string }> = [];
-  const outbound: string[] = [];
+  // Collect entries in chronological (eventSeq) order — interleaves inbound
+  // prompt messages with outbound tool_use sends rather than segregating them.
+  const entries: SlackEntry[] = [];
   for (const e of events) {
     if (isEventOfType(e, 'prompt')) {
       const text = extractText(e);
-      // Pull just the <current> portion if the new envelope is in use; else
-      // include the whole text (untouched).
       const current = extractCurrentMessages(text);
-      if (current) inbound.push(...current);
-      else if (text.trim()) inbound.push({ user: 'unknown', text: text.trim().slice(0, 500) });
+      if (current) {
+        for (const msg of current) {
+          entries.push({
+            kind: 'in',
+            user: msg.user,
+            displayName: msg.displayName,
+            text: msg.text,
+          });
+        }
+      } else if (text.trim()) {
+        entries.push({ kind: 'in', user: 'unknown', text: text.trim().slice(0, 500) });
+      }
     } else if (isEventOfType(e, 'tool_use')) {
       if (e.data.name === 'slack/send_message') {
         const t = typeof e.data.input?.text === 'string' ? e.data.input.text : '';
-        if (t.trim()) outbound.push(t.trim().slice(0, 500));
+        if (t.trim()) entries.push({ kind: 'out', text: t.trim().slice(0, 500) });
       }
     }
   }
-  const dedupedInbound = dedupeConsecutive(inbound, (m) => `${m.user}\0${m.text}`);
-  const dedupedOutbound = dedupeConsecutive(outbound, (t) => t);
+
+  // Group consecutive entries by speaker key so back-and-forth threads show as
+  // alternating speaker blocks. Inbound speaker key uses user UID (display name
+  // is a presentation detail, not a grouping key). Outbound is always "out".
+  const groups: SlackGroup[] = [];
+  for (const entry of entries) {
+    const speakerKey = entry.kind === 'in' ? `in:${entry.user}` : 'out';
+    const last = groups.length > 0 ? groups[groups.length - 1] : undefined;
+    const lastKey = last === undefined ? undefined : last.kind === 'in' ? `in:${last.user}` : 'out';
+    if (last && lastKey === speakerKey) {
+      last.entries.push({ text: entry.text });
+    } else if (entry.kind === 'in') {
+      groups.push({
+        kind: 'in',
+        user: entry.user,
+        displayName: entry.displayName,
+        entries: [{ text: entry.text }],
+      });
+    } else {
+      groups.push({ kind: 'out', entries: [{ text: entry.text }] });
+    }
+  }
+
+  // Within each speaker block, dedupe consecutive identical entries.
+  for (const group of groups) {
+    group.entries = dedupeConsecutive(group.entries, (e) => e.text);
+  }
+
   const lines: string[] = [`### ${trackId}`];
-  for (const msg of dedupedInbound) lines.push(`- [u/${msg.user}]: ${truncate(msg.text, 240)}`);
-  for (const t of dedupedOutbound) lines.push(`- [me]: ${truncate(t, 240)}`);
+  for (const group of groups) {
+    lines.push(''); // blank line before each header
+    const header =
+      group.kind === 'in'
+        ? group.displayName
+          ? `#### [${group.displayName}/${group.user}]`
+          : `#### [u/${group.user}]`
+        : '#### You';
+    lines.push(header);
+    for (const entry of group.entries) {
+      lines.push(`- ${truncate(entry.text, 240)}`);
+    }
+  }
   const body = lines.join('\n');
   return { trackId, body, estimatedTokens: estimate(body) };
 }
@@ -251,20 +305,32 @@ function extractText(e: TypedDurableEvent): string {
   return '';
 }
 
+// Regexes for extractCurrentMessages — module-level constants to avoid
+// re-compilation on each call. Not flagged global so they're safe for matchAll.
+const SLACK_MSG_RE = /<slack_message\s+([^>]+)>([\s\S]*?)<\/slack_message>/g;
+const USER_ATTR_RE = /\buser="([^"]+)"/;
+const DISPLAY_ATTR_RE = /\bdisplay_name="([^"]+)"/;
+
 function extractCurrentMessages(
   envelopeText: string
-): Array<{ user: string; text: string }> | null {
+): Array<{ user: string; displayName?: string; text: string }> | null {
   // Parse new-envelope `<current count="N"><slack_message ...>TEXT</slack_message>...</current>`
-  // and return { user, text } objects. Returns null if no <current> block found.
+  // and return { user, displayName?, text } objects. Returns null if no <current> block found.
   const currentMatch = envelopeText.match(/<current[^>]*>([\s\S]*?)<\/current>/);
   if (!currentMatch) return null;
   const inner = currentMatch[1];
-  const msgs: Array<{ user: string; text: string }> = [];
-  // Match user attribute in any position within the opening tag
-  const msgRegex = /<slack_message[^>]*\buser="([^"]+)"[^>]*>([\s\S]*?)<\/slack_message>/g;
-  let m: RegExpExecArray | null;
-  while ((m = msgRegex.exec(inner)) !== null) {
-    msgs.push({ user: m[1], text: m[2].trim() });
+  const msgs: Array<{ user: string; displayName?: string; text: string }> = [];
+  // Use matchAll with a copy of the regex to avoid shared lastIndex state across callers.
+  for (const m of inner.matchAll(new RegExp(SLACK_MSG_RE.source, 'g'))) {
+    const attrs = m[1];
+    const userMatch = USER_ATTR_RE.exec(attrs);
+    const displayMatch = DISPLAY_ATTR_RE.exec(attrs);
+    if (!userMatch) continue; // user attr required per spec
+    msgs.push({
+      user: userMatch[1],
+      ...(displayMatch ? { displayName: displayMatch[1] } : {}),
+      text: m[2].trim(),
+    });
   }
   return msgs;
 }

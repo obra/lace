@@ -154,7 +154,7 @@ describe('salienceForTrack', () => {
           content: [
             {
               type: 'text',
-              text: '<messages channel="C1" thread_ts="1.0"><current count="1"><slack_message user="U1">hello</slack_message></current></messages>',
+              text: '<messages channel="C1" thread_ts="1.0"><current count="1"><slack_message user="U1" display_name="Test User">hello</slack_message></current></messages>',
             },
           ],
           track: 'slack:T:C1:1.0',
@@ -175,14 +175,17 @@ describe('salienceForTrack', () => {
       event(4, 'turn_end', { stopReason: 'end_turn' }, 'turn_1'),
     ];
     const block = salienceForTrack('slack:T:C1:1.0', events);
-    expect(block?.body).toContain('hello');
-    expect(block?.body).toContain('[u/U1]: hello');
-    expect(block?.body).toContain('hi back');
-    expect(block?.body).toContain('[me]: hi back');
+    expect(block?.body).toContain('#### [Test User/U1]');
+    expect(block?.body).toContain('- hello');
+    expect(block?.body).not.toContain('[u/U1]: hello');
+    expect(block?.body).toContain('#### You');
+    expect(block?.body).toContain('- hi back');
+    expect(block?.body).not.toContain('[me]: hi back');
   });
 
-  it('slack tracks dedupe consecutive identical inbound messages', () => {
-    // Two consecutive prompts with the same user+text — should appear only once
+  it('slack tracks dedupe consecutive identical inbound messages within a speaker block', () => {
+    // Two consecutive prompts with the same user+text — should appear only once,
+    // and the speaker header should appear only once for the combined block.
     const sameMessage =
       '<messages channel="C1" thread_ts="1.0"><current count="1"><slack_message user="U1">hello</slack_message></current></messages>';
     const events: TypedDurableEvent[] = [
@@ -196,10 +199,90 @@ describe('salienceForTrack', () => {
       }),
     ];
     const block = salienceForTrack('slack:T:C1:1.0', events);
-    // Should contain the formatted line exactly once
     const body = block?.body ?? '';
-    const occurrences = body.split('[u/U1]: hello').length - 1;
-    expect(occurrences).toBe(1);
+    // The message line appears exactly once (dedupe within block)
+    const msgOccurrences = body.split('- hello').length - 1;
+    expect(msgOccurrences).toBe(1);
+    // The header appears exactly once (grouped into one speaker block)
+    const headerOccurrences = body.split('#### [u/U1]').length - 1;
+    expect(headerOccurrences).toBe(1);
+  });
+
+  it('slack tracks interleave inbound and outbound chronologically', () => {
+    // Alternating prompt/tool_use produces alternating speaker blocks, not
+    // all-inbound-then-all-outbound.
+    const events: TypedDurableEvent[] = [
+      event(1, 'prompt', {
+        content: [
+          {
+            type: 'text',
+            text: '<messages channel="C1" thread_ts="1.0"><current count="1"><slack_message user="U1">hi</slack_message></current></messages>',
+          },
+        ],
+        track: 'slack:T:C1:1.0',
+      }),
+      event(2, 'turn_start', {}, 'turn_1'),
+      event(
+        3,
+        'tool_use',
+        { toolCallId: 't1', name: 'slack/send_message', input: { channel: 'C1', text: 'reply1' } },
+        'turn_1'
+      ),
+      event(4, 'turn_end', { stopReason: 'end_turn' }, 'turn_1'),
+      event(5, 'prompt', {
+        content: [
+          {
+            type: 'text',
+            text: '<messages channel="C1" thread_ts="1.0"><current count="1"><slack_message user="U1">bye</slack_message></current></messages>',
+          },
+        ],
+        track: 'slack:T:C1:1.0',
+      }),
+      event(6, 'turn_start', {}, 'turn_2'),
+      event(
+        7,
+        'tool_use',
+        { toolCallId: 't2', name: 'slack/send_message', input: { channel: 'C1', text: 'reply2' } },
+        'turn_2'
+      ),
+      event(8, 'turn_end', { stopReason: 'end_turn' }, 'turn_2'),
+    ];
+    const block = salienceForTrack('slack:T:C1:1.0', events);
+    const body = block?.body ?? '';
+    // Four distinct speaker blocks (U1 → You → U1 → You)
+    const inHeaders = body.split('#### [u/U1]').length - 1;
+    const outHeaders = body.split('#### You').length - 1;
+    expect(inHeaders).toBe(2);
+    expect(outHeaders).toBe(2);
+    // Messages appear in the right order: hi before reply1 before bye before reply2
+    const hiIdx = body.indexOf('- hi');
+    const reply1Idx = body.indexOf('- reply1');
+    const byeIdx = body.indexOf('- bye');
+    const reply2Idx = body.indexOf('- reply2');
+    expect(hiIdx).toBeLessThan(reply1Idx);
+    expect(reply1Idx).toBeLessThan(byeIdx);
+    expect(byeIdx).toBeLessThan(reply2Idx);
+  });
+
+  it('slack tracks fall back to [u/UID] header when display_name is absent', () => {
+    // A slack_message with no display_name attribute must render as [u/U2], not
+    // [u/null/U2] or any other broken format.
+    const events: TypedDurableEvent[] = [
+      event(1, 'prompt', {
+        content: [
+          {
+            type: 'text',
+            text: '<messages channel="C1" thread_ts="1.0"><current count="1"><slack_message user="U2">no name</slack_message></current></messages>',
+          },
+        ],
+        track: 'slack:T:C1:1.0',
+      }),
+    ];
+    const block = salienceForTrack('slack:T:C1:1.0', events);
+    const body = block?.body ?? '';
+    expect(body).toContain('#### [u/U2]');
+    expect(body).not.toContain('null');
+    expect(body).toContain('- no name');
   });
 
   it('job tracks emit "delegated X → outcome" using job_started/job_finished', () => {
