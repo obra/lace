@@ -303,6 +303,7 @@ export function buildPersonaContainerSpec(input: {
       workingDirectory: runtime.workingDirectory,
       mounts,
       env,
+      managedMountTargetPrefixes: [`${SUBAGENT_SKILLS_TARGET}/`],
       restartPolicy: 'unless-stopped',
       ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
     };
@@ -327,6 +328,7 @@ export function buildPersonaContainerSpec(input: {
     workingDirectory: runtime.workingDirectory,
     mounts: perInvocationMounts,
     env,
+    managedMountTargetPrefixes: [`${SUBAGENT_SKILLS_TARGET}/`],
     ...(runtime.ports ? { ports: runtime.ports } : {}),
     ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
   };

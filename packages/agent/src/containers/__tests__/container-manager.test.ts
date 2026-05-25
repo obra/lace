@@ -315,6 +315,7 @@ describe('ContainerManager', () => {
       const specWithSkillMount: ContainerSpec = {
         ...boxSpec,
         mounts: [{ source: '/host/skills', target: '/var/lace/skills/0', readonly: true }],
+        managedMountTargetPrefixes: ['/var/lace/skills/'],
       };
       vi.spyOn(runtime, 'daemonInspect').mockResolvedValueOnce({
         id: 'sen-box-shell',
@@ -336,6 +337,7 @@ describe('ContainerManager', () => {
       const specWithTrailingSlashMount: ContainerSpec = {
         ...boxSpec,
         mounts: [{ source: '/host/skills/', target: '/var/lace/skills/0', readonly: true }],
+        managedMountTargetPrefixes: ['/var/lace/skills/'],
       };
       vi.spyOn(runtime, 'daemonInspect').mockResolvedValueOnce({
         id: 'sen-box-shell',
@@ -348,6 +350,26 @@ describe('ContainerManager', () => {
 
       expect(handle.containerId).toBe('sen-box-shell');
       expect(adoptSpy).toHaveBeenCalledOnce();
+    });
+
+    it('rejects adopting a persistent container with stale managed skill mounts', async () => {
+      const specWithOneSkillMount: ContainerSpec = {
+        ...boxSpec,
+        mounts: [{ source: '/host/skills-a', target: '/var/lace/skills/0', readonly: true }],
+        managedMountTargetPrefixes: ['/var/lace/skills/'],
+      };
+      vi.spyOn(runtime, 'daemonInspect').mockResolvedValueOnce({
+        id: 'sen-box-shell',
+        state: 'running',
+        mounts: [
+          { source: '/host/skills-a', target: '/var/lace/skills/0', readonly: true },
+          { source: '/host/skills-b', target: '/var/lace/skills/1', readonly: true },
+        ],
+      });
+
+      await expect(manager.materialize(specWithOneSkillMount)).rejects.toThrow(
+        /unexpected managed mount .*\/var\/lace\/skills\/1/
+      );
     });
   });
 

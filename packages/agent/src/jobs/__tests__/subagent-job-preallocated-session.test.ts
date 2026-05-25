@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -288,7 +288,13 @@ describe('runSubagentJobProcess — preallocated sessionId (PRI-1796)', () => {
   it('remaps parent skillDirs for containerized child initialize', async () => {
     const jobId = 'job_container_skill_dirs_test';
     const outputPath = join(parentSessionDir, 'jobs', `${jobId}.log`);
-    const skillDirs = ['/host/sen-core/skills/innate', '/host/instance/user/skills/learned'];
+    const skillDirs = [
+      join(sessionRootDir, 'sen-core', 'skills', 'innate'),
+      join(sessionRootDir, 'instance', 'user', 'skills', 'learned'),
+    ];
+    for (const dir of skillDirs) {
+      mkdirSync(dir, { recursive: true });
+    }
     const personaContainerRuntime: PersonaContainerRuntime = {
       type: 'container',
       image: 'node:24-bookworm',
@@ -346,7 +352,7 @@ describe('runSubagentJobProcess — preallocated sessionId (PRI-1796)', () => {
     });
   });
 
-  it('uses default parent skillDirs for containerized child initialize', async () => {
+  it('uses existing default parent skillDirs for containerized child initialize', async () => {
     const jobId = 'job_container_default_skill_dirs_test';
     const outputPath = join(parentSessionDir, 'jobs', `${jobId}.log`);
     const defaultSkillDirs = [
@@ -355,6 +361,7 @@ describe('runSubagentJobProcess — preallocated sessionId (PRI-1796)', () => {
       join(homedir(), '.lace', 'skills') + '/',
       join(homedir(), '.claude', 'skills') + '/',
     ];
+    const mountedSkillDirs = defaultSkillDirs.filter((dir) => existsSync(dir));
     const personaContainerRuntime: PersonaContainerRuntime = {
       type: 'container',
       image: 'node:24-bookworm',
@@ -404,15 +411,10 @@ describe('runSubagentJobProcess — preallocated sessionId (PRI-1796)', () => {
 
     await completion;
 
-    expect(spawnOptions[0]).toMatchObject({ skillDirs: defaultSkillDirs });
+    expect(spawnOptions[0]).toMatchObject({ skillDirs: mountedSkillDirs });
     expect(initializeRequests).toHaveLength(1);
     expect(initializeRequests[0]).toMatchObject({
-      skillDirs: [
-        '/var/lace/skills/0',
-        '/var/lace/skills/1',
-        '/var/lace/skills/2',
-        '/var/lace/skills/3',
-      ],
+      skillDirs: mountedSkillDirs.map((_, index) => `/var/lace/skills/${index}`),
     });
   });
 

@@ -97,6 +97,7 @@ describe('buildPersonaContainerSpec', () => {
         SCRATCH_MOUNT,
       ])
     );
+    expect(spec.managedMountTargetPrefixes).toContain(`${SUBAGENT_SKILLS_TARGET}/`);
   });
 
   it('throws PersonaContainerSpecError on unknown mount name', () => {

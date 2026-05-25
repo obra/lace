@@ -25,6 +25,11 @@ export interface ContainerSpec {
   // sen-browser can enable `net.ipv6.conf.lo.disable_ipv6=0` for the chrome
   // launcher's port-availability check.
   sysctls?: Record<string, string>;
+  // Mount target namespaces owned by Lace. When adopting a daemon-side
+  // persistent container, ContainerManager rejects stale extra mounts under
+  // these prefixes so an old container cannot expose paths the new spec no
+  // longer advertises.
+  managedMountTargetPrefixes?: string[];
 }
 
 export interface ContainerHandle {

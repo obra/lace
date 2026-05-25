@@ -75,6 +75,12 @@ function getEffectiveSkillDirs(state: AgentServerState): string[] {
   return state.skillDirs ?? getSkillDirectories(state.activeSession?.meta.workDir);
 }
 
+function getSubagentHostSkillDirs(state: AgentServerState, isContainerized: boolean): string[] {
+  const skillDirs = getEffectiveSkillDirs(state);
+  if (!isContainerized) return skillDirs;
+  return skillDirs.filter((dir) => existsSync(dir));
+}
+
 /**
  * Server-level dependencies that runSubagentJobProcess needs.
  * These are passed in to avoid coupling to the global state object.
@@ -207,7 +213,8 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
     let teardownInitiated = false;
 
     try {
-      const parentSkillDirs = getEffectiveSkillDirs(state);
+      const isContainerizedSubagent = !!job.personaContainerRuntime;
+      const parentSkillDirs = getSubagentHostSkillDirs(state, isContainerizedSubagent);
       subagentProc = await spawnSubagent({
         parentSessionId: state.activeSession.meta.sessionId,
         personaName: job.persona,
@@ -819,7 +826,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       const subagentUserPersonasPaths: string[] = isContainerizedSubagent
         ? [SUBAGENT_USER_PERSONAS_TARGET]
         : [...currentState.personaRegistry.getUserPersonasPaths()];
-      const parentSkillDirs = getEffectiveSkillDirs(currentState);
+      const parentSkillDirs = getSubagentHostSkillDirs(currentState, isContainerizedSubagent);
       const subagentSkillDirs = isContainerizedSubagent
         ? parentSkillDirs.map((_, index) => `${SUBAGENT_SKILLS_TARGET}/${index}`)
         : [...parentSkillDirs];

@@ -60,6 +60,14 @@ function sameMount(a: ContainerMount, b: ContainerMount): boolean {
   );
 }
 
+function targetMatchesPrefix(target: string, prefix: string): boolean {
+  const normalizedTarget = normalizeMountPath(target);
+  const normalizedPrefix = normalizeMountPath(prefix);
+  return (
+    normalizedTarget === normalizedPrefix || normalizedTarget.startsWith(`${normalizedPrefix}/`)
+  );
+}
+
 function findMissingPersistentMount(
   spec: ContainerSpec,
   adoptable: ContainerInfo
@@ -69,6 +77,20 @@ function findMissingPersistentMount(
     if (!adoptable.mounts.some((existing) => sameMount(existing, mount))) {
       return mount;
     }
+  }
+  return null;
+}
+
+function findUnexpectedPersistentManagedMount(
+  spec: ContainerSpec,
+  adoptable: ContainerInfo
+): ContainerMount | null {
+  if (!spec.containerId || adoptable.mounts === undefined) return null;
+  const prefixes = spec.managedMountTargetPrefixes ?? [];
+  if (prefixes.length === 0) return null;
+  for (const mount of adoptable.mounts) {
+    if (!prefixes.some((prefix) => targetMatchesPrefix(mount.target, prefix))) continue;
+    if (!spec.mounts.some((expected) => sameMount(expected, mount))) return mount;
   }
   return null;
 }
@@ -155,6 +177,14 @@ export class ContainerManager {
         throw new ContainerError(
           `Existing persistent container '${adoptable.id}' is missing required mount ` +
             `${formatMount(missingMount)}. Remove or recreate the container and retry.`,
+          adoptable.id
+        );
+      }
+      const unexpectedMount = findUnexpectedPersistentManagedMount(spec, adoptable);
+      if (unexpectedMount) {
+        throw new ContainerError(
+          `Existing persistent container '${adoptable.id}' has unexpected managed mount ` +
+            `${formatMount(unexpectedMount)}. Remove or recreate the container and retry.`,
           adoptable.id
         );
       }
