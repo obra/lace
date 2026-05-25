@@ -190,33 +190,95 @@ function dedupeConsecutive<T>(arr: T[], key: (item: T) => string): T[] {
   return out;
 }
 
-type SlackEntry =
-  | { kind: 'in'; user: string; displayName?: string; text: string }
-  | { kind: 'out'; text: string };
+type SlackEntry = { kind: 'in'; actor: string; text: string } | { kind: 'out'; text: string };
 
 type SlackGroup =
-  | { kind: 'in'; user: string; displayName?: string; entries: Array<{ text: string }> }
+  | { kind: 'in'; actor: string; entries: Array<{ text: string }> }
   | { kind: 'out'; entries: Array<{ text: string }> };
+
+/** Parse the outer <messages ...> tag to extract channel display token and thread_ts. */
+function extractEnvelopeMetadata(envelopeText: string): {
+  channelDisplayToken?: string;
+  threadTs?: string;
+  convRef?: string;
+} {
+  // Match <messages ...> opening tag only (not the full element)
+  const tagMatch = envelopeText.match(/<messages\s+([^>]+)>/);
+  if (!tagMatch) return {};
+
+  const attrs = tagMatch[1];
+
+  // channel="&lt;#C...|label&gt;" — the attribute value is XML-escaped
+  const channelAttrMatch = /\bchannel="([^"]*)"/.exec(attrs);
+  let channelDisplayToken: string | undefined;
+  if (channelAttrMatch) {
+    // Unescape XML entities to get the raw display token value
+    channelDisplayToken = channelAttrMatch[1]
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'");
+  }
+
+  const threadTsMatch = /\bthread_ts="([^"]+)"/.exec(attrs);
+  const threadTs = threadTsMatch ? threadTsMatch[1] : undefined;
+
+  // Build conversation ref from channel display token and thread_ts.
+  // Display token is <#C123|label>; we extract the id and label to build the ref.
+  let convRef: string | undefined;
+  if (channelDisplayToken) {
+    // <#C123456|label> → extract C123456 and label
+    const tokenMatch = /^<#([^|>]+)\|?([^>]*)>$/.exec(channelDisplayToken);
+    if (tokenMatch) {
+      const channelId = tokenMatch[1];
+      const label = tokenMatch[2] || 'channel';
+      // convRef is the conversation locator without individual @msgTs
+      convRef = threadTs
+        ? `slack:T0FIXTURE:${channelId}|${label}/${threadTs}`
+        : `slack:T0FIXTURE:${channelId}|${label}`;
+    }
+  }
+
+  return { channelDisplayToken, threadTs, convRef };
+}
+
+/** XML-escape body text: &, <, > */
+function xmlEscapeBody(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** XML-escape attribute value: &, <, >, ", ' */
+function xmlEscapeAttr(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
 
 function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock {
   // Collect entries in chronological (eventSeq) order — interleaves inbound
   // prompt messages with outbound tool_use sends rather than segregating them.
+  // Also capture envelope metadata from the first prompt seen.
   const entries: SlackEntry[] = [];
+  let firstEnvelopeMeta: ReturnType<typeof extractEnvelopeMetadata> | undefined;
+
   for (const e of events) {
     if (isEventOfType(e, 'prompt')) {
       const text = extractText(e);
       const current = extractCurrentMessages(text);
       if (current) {
+        // Capture metadata from the first envelope encountered
+        if (!firstEnvelopeMeta) {
+          firstEnvelopeMeta = extractEnvelopeMetadata(text);
+        }
         for (const msg of current) {
-          entries.push({
-            kind: 'in',
-            user: msg.user,
-            displayName: msg.displayName,
-            text: msg.text,
-          });
+          entries.push({ kind: 'in', actor: msg.actor, text: msg.text });
         }
       } else if (text.trim()) {
-        entries.push({ kind: 'in', user: 'unknown', text: text.trim().slice(0, 500) });
+        entries.push({ kind: 'in', actor: '@unknown|user', text: text.trim().slice(0, 500) });
       }
     } else if (isEventOfType(e, 'tool_use')) {
       if (e.data.name === 'slack/send_message') {
@@ -227,22 +289,18 @@ function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock
   }
 
   // Group consecutive entries by speaker key so back-and-forth threads show as
-  // alternating speaker blocks. Inbound speaker key uses user UID (display name
-  // is a presentation detail, not a grouping key). Outbound is always "out".
+  // alternating speaker blocks. Inbound speaker key uses the full actor token
+  // (the id portion is authoritative). Outbound is always "out".
   const groups: SlackGroup[] = [];
   for (const entry of entries) {
-    const speakerKey = entry.kind === 'in' ? `in:${entry.user}` : 'out';
+    const speakerKey = entry.kind === 'in' ? `in:${entry.actor}` : 'out';
     const last = groups.length > 0 ? groups[groups.length - 1] : undefined;
-    const lastKey = last === undefined ? undefined : last.kind === 'in' ? `in:${last.user}` : 'out';
+    const lastKey =
+      last === undefined ? undefined : last.kind === 'in' ? `in:${last.actor}` : 'out';
     if (last && lastKey === speakerKey) {
       last.entries.push({ text: entry.text });
     } else if (entry.kind === 'in') {
-      groups.push({
-        kind: 'in',
-        user: entry.user,
-        displayName: entry.displayName,
-        entries: [{ text: entry.text }],
-      });
+      groups.push({ kind: 'in', actor: entry.actor, entries: [{ text: entry.text }] });
     } else {
       groups.push({ kind: 'out', entries: [{ text: entry.text }] });
     }
@@ -253,21 +311,33 @@ function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock
     group.entries = dedupeConsecutive(group.entries, (e) => e.text);
   }
 
-  const lines: string[] = [`### ${trackId}`];
+  // Build wrapper attributes from metadata extracted from first envelope.
+  const meta = firstEnvelopeMeta ?? {};
+  const convRef = meta.convRef ?? trackId;
+  const channelDisplayToken = meta.channelDisplayToken;
+  const threadTs = meta.threadTs;
+
+  // Build <slack-thread> wrapper with conversation locator and channel token.
+  // The channel attribute uses the XML-escaped display token (same form as live envelopes).
+  const wrapperAttrs: string[] = [`ref="${convRef}"`];
+  if (channelDisplayToken) {
+    wrapperAttrs.push(`channel="${xmlEscapeAttr(channelDisplayToken)}"`);
+  }
+  if (threadTs) {
+    wrapperAttrs.push(`thread_ts="${threadTs}"`);
+  }
+
+  const msgLines: string[] = [];
   for (const group of groups) {
-    lines.push(''); // blank line before each header
-    const header =
-      group.kind === 'in'
-        ? group.displayName
-          ? `#### [${group.displayName}/${group.user}]`
-          : `#### [u/${group.user}]`
-        : '#### You';
-    lines.push(header);
+    const from = group.kind === 'in' ? group.actor : 'me';
     for (const entry of group.entries) {
-      lines.push(`- ${truncate(entry.text, 240)}`);
+      msgLines.push(
+        `  <slack_message from="${from}">${xmlEscapeBody(truncate(entry.text, 240))}</slack_message>`
+      );
     }
   }
-  const body = lines.join('\n');
+
+  const body = `<slack-thread ${wrapperAttrs.join(' ')}>\n${msgLines.join('\n')}\n</slack-thread>`;
   return { trackId, body, estimatedTokens: estimate(body) };
 }
 
@@ -305,32 +375,25 @@ function extractText(e: TypedDurableEvent): string {
   return '';
 }
 
-// Regexes for extractCurrentMessages — module-level constants to avoid
-// re-compilation on each call. Not flagged global so they're safe for matchAll.
+// Regex for extractCurrentMessages — module-level constant to avoid
+// re-compilation on each call. Not flagged global so it's safe for matchAll.
 const SLACK_MSG_RE = /<slack_message\s+([^>]+)>([\s\S]*?)<\/slack_message>/g;
-const USER_ATTR_RE = /\buser="([^"]+)"/;
-const DISPLAY_ATTR_RE = /\bdisplay_name="([^"]+)"/;
 
 function extractCurrentMessages(
   envelopeText: string
-): Array<{ user: string; displayName?: string; text: string }> | null {
-  // Parse new-envelope `<current count="N"><slack_message ...>TEXT</slack_message>...</current>`
-  // and return { user, displayName?, text } objects. Returns null if no <current> block found.
+): Array<{ actor: string; text: string }> | null {
+  // Parse new-envelope `<current count="N"><slack_message ref="..." from="@U|name">TEXT</slack_message>...</current>`
+  // and return { actor, text } objects. Returns null if no <current> block found.
   const currentMatch = envelopeText.match(/<current[^>]*>([\s\S]*?)<\/current>/);
   if (!currentMatch) return null;
   const inner = currentMatch[1];
-  const msgs: Array<{ user: string; displayName?: string; text: string }> = [];
+  const msgs: Array<{ actor: string; text: string }> = [];
   // Use matchAll with a copy of the regex to avoid shared lastIndex state across callers.
   for (const m of inner.matchAll(new RegExp(SLACK_MSG_RE.source, 'g'))) {
     const attrs = m[1];
-    const userMatch = USER_ATTR_RE.exec(attrs);
-    const displayMatch = DISPLAY_ATTR_RE.exec(attrs);
-    if (!userMatch) continue; // user attr required per spec
-    msgs.push({
-      user: userMatch[1],
-      ...(displayMatch ? { displayName: displayMatch[1] } : {}),
-      text: m[2].trim(),
-    });
+    const fromMatch = /\bfrom="([^"]+)"/.exec(attrs);
+    if (!fromMatch) continue; // from attr required per spec
+    msgs.push({ actor: fromMatch[1], text: m[2].trim() });
   }
   return msgs;
 }

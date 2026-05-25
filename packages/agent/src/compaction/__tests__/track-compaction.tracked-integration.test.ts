@@ -59,19 +59,29 @@ describe('compact() against Ada retagged fixture', () => {
       expect(prefix).toContain('[Earlier conversation, compacted by track]');
 
       // With producer-side track-stamping, expect:
-      // - Slack threads section populated (was empty before)
+      // - Slack threads section populated with new XML format
       // - Subagent jobs section populated (already worked via lifecycle routing)
       // - Alarms / reminders / bootstrap DROPPED (return null from salience)
       // - System events should be much smaller (most events now have a track)
       expect(prefix).toContain('## Slack threads');
       expect(prefix).toContain('## Subagent jobs');
 
+      // New XML format assertions — spec-shaped slack output
+      expect(prefix).toContain('<slack-thread');
+      expect(prefix).toContain('from="@U0A2GP26U94|jesse"');
+      expect(prefix).toContain('from="me"');
+
+      // Old markdown format must be absent
+      expect(prefix).not.toContain('#### [Jesse Vincent/U0A2GP26U94]');
+      expect(prefix).not.toContain('#### You');
+
       // Token budget: with track-stamping, most events are now routed to specific
       // tracks. Slack messages are truncated to 240 chars, alarms/bootstrap/reminders
       // are dropped. Expect a dramatic shrink vs the 52K+ untracked baseline.
-      // With [u/UID]: format + consecutive-dedupe, prefix sits at ~11.6K tokens.
+      // With XML <slack-thread>/<slack_message from="..."> format + consecutive-dedupe,
+      // prefix sits at ~14K tokens (XML wrapper overhead vs old markdown headers).
       const estPrefixTokens = Math.ceil(prefix.length / 4);
-      expect(estPrefixTokens).toBeLessThan(13_000);
+      expect(estPrefixTokens).toBeLessThan(16_000);
       expect(estPrefixTokens).toBeGreaterThan(2_000);
 
       // There should be a meaningful number of events compacted.
