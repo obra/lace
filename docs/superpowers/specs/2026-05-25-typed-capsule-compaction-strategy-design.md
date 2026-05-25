@@ -1,9 +1,9 @@
-# Typed-Capsule Compaction Strategy — Design (v5)
+# Typed-Capsule Compaction Strategy — Design (v6)
 
-Date: 2026-05-25 (v1) / revised 2026-05-25 (v2) / revised 2026-05-25 (v3) / revised 2026-05-25 (v4) / revised 2026-05-25 (v5)
+Date: 2026-05-25 (v1) / revised 2026-05-25 (v2) / revised 2026-05-25 (v3) / revised 2026-05-25 (v4) / revised 2026-05-25 (v5) / revised 2026-05-25 (v6)
 Author: Jesse + Bot
 
-> v5 applies round-4 correctness fixes on top of v4. Round 4 surfaced 19 source-verified bugs in v4 — wrong field names, deadlock-inducing concurrency, broken reason-enum references, missing readSessionState plumbing, an in-flight tool-use guard that handled the single-call case but not parallel-call clusters, and several path / phrasing inaccuracies. v5 fixes every one, with explicit verifications against current lace `main` (post-PRI-1817/1820/1818/1824/1825/1835). The biggest correctness changes: the lifecycle hook now uses `appendDurableEvent` + `writeSessionState` directly (not the runner's `writeAndAdvance`, which would re-enter `runExclusive` and deadlock); the trigger reads `promptTokens` from the in-memory provider response (the in-memory shape uses `promptTokens`; the durable on-disk shape uses `inputTokens`); `trim-tool-results` is replaced by an extracted helper that operates on `TypedDurableEvent[]` and the legacy `LaceEvent[]` strategy file is deleted; `readSessionState` is explicitly required to whitelist the new `compactionDisabled` field; `'no-op'` is removed from the failure-event reason union (the strategy short-circuits before invoking instead); `/compact` and `ent/session/compact` get explicit failure-event-write contracts; `getModelContextWindow` becomes public. See the "v5 changelog" at the bottom for per-finding traceability; v4/v3/v2 changelogs remain below it for history.
+> v6 applies round-5 correctness fixes on top of v5. Round 5 surfaced 19 source-verified bugs in v5 — a failure-backoff walk that always terminates on `turn_end` (so N=3/N=10 escalations were unreachable), a `/compact` slash command that is NOT inside an outer `runExclusive` scope despite v5's claim, lifecycle-hook pseudocode that called non-existent `RunnerDependencies.createProviderForTurn`, a `compact()` signature claim that did not actually match `CompactionStrategy.compact()`, a message-builder iterate-and-reset paradox where the summary's reset throws away its own tail events, missing `writeSessionState` calls in the backoff helper, and a handful of dead/contradictory minor items. v6 fixes every one with explicit verifications against current lace `main` (post-PRI-1817/1820/1818/1824/1825/1835). The biggest correctness changes: the backoff walk now skips over `turn_end`/`prompt`/`turn_start` and only terminates on `conversation_summary` or other strategy-relevant events; `/compact` keeps using `writeAndAdvance` (no outer scope = no deadlock risk), and only the in-runner lifecycle hook + the RPC handler use the raw `appendDurableEvent` path because only they are inside an outer `runExclusive` scope; the lifecycle hook pseudocode now imports `createProviderForTurn` directly from `providers/turn-factory.ts` and sources `modelId`/`connectionId` from `this.config` + the same `getEffectiveConfig` channel the RPC handler uses; the new top-level `compact()` is documented as NOT an implementation of `CompactionStrategy.compact()` (only the name matches), and the strategy registry is killed for the typed-capsule path; the message-builder runs a two-pass algorithm with an explicit pre-scan for the latest summary; backoff state writes are explicit. See the "v6 changelog" at the bottom for per-finding traceability; v5/v4/v3/v2 changelogs remain below it for history.
 
 ## Purpose
 
@@ -41,10 +41,10 @@ Module layout:
 ```
 lace/packages/agent/src/
 ├── compaction/
-│   ├── registry.ts                     MODIFIED — drop TrimToolResultsStrategy from createDefaultStrategies (file deleted; see below)
-│   ├── trim-tool-results-strategy.ts   DELETED — operated on legacy `LaceEvent[]` from threads/types. The new strategy needs a function that operates on `TypedDurableEvent[]`; we extract that as `trimToolResultLines` (top-level in summarize-strategy.ts) and delete the old class entirely. No callers depend on the strategy-registry shape: `compact-dropped-messages.ts` only uses the registry under `strategyId === 'trim-tool-results'`, which is itself removed (see §"Strategy enum on the wire").
-│   ├── summarize-strategy.ts           REWRITTEN — emits typed capsule; capsule markdown + summarizer prompt + budget-retry + the new `trimToolResultLines(events: TypedDurableEvent[], lineCap: number): TypedDurableEvent[]` helper are top-level functions in this file
-│   ├── compact-dropped-messages.ts     MODIFIED — its ModelPinnedProvider wrapper is NOT reused (see R6 / §"Lifecycle hook"); its `strategyId === 'trim-tool-results'` branch is dead and removed; the file remains as the shim the `/compact` slash command and `ent/session/compact` RPC handler use for the `'summarize'` path (now wired to the new strategy)
+│   ├── registry.ts                     DELETED — the typed-capsule path does not register through `CompactionStrategy[]` at all (see §"Strategy registry — removed in v6"). The legacy `createDefaultStrategies()` factory was only consumed by `compact-dropped-messages.ts`, which is also deleted.
+│   ├── trim-tool-results-strategy.ts   DELETED — operated on legacy `LaceEvent[]` from threads/types. The new strategy needs a function that operates on `TypedDurableEvent[]`; we extract that as `trimToolResultLines` (top-level in summarize-strategy.ts) and delete the old class entirely. No callers depend on the strategy-registry shape: the only consumer was `compact-dropped-messages.ts`, which is itself deleted.
+│   ├── summarize-strategy.ts           REWRITTEN — exports the new top-level `compact()` function (NOT an implementation of `CompactionStrategy.compact()`; only the method name is shared — see §"`compact()` is not a `CompactionStrategy.compact()` implementation (Critical 4)"). Capsule markdown + summarizer prompt + budget-retry + the new `trimToolResultLines(events: TypedDurableEvent[], lineCap: number): TypedDurableEvent[]` helper are top-level functions in this file
+│   ├── compact-dropped-messages.ts     DELETED — its `compactDroppedMessagesWithCore` adapter takes `ProviderMessage[]` and routes through the legacy `LaceEvent[]` strategy interface (verified at `compact-dropped-messages.ts:201-237`). With the typed-capsule strategy the slash command and RPC handler call the new top-level `compact()` directly on `TypedDurableEvent[]` from canonical events; no `ProviderMessage[]` adapter is needed. The `ModelPinnedProvider` wrapper is gone with it (see §"Lifecycle hook" for the replacement pattern).
 │   ├── capsule-types.ts                NEW — capsule schema (zod)
 │   ├── tail-policy.ts                  NEW — last N turns + last K human prompts (single-pass walk)
 │   └── __tests__/
@@ -61,7 +61,7 @@ lace/packages/agent/src/
 │   └── session-operations.ts           MODIFIED — ent/session/compact emits conversation_summary via the new strategy; legacy 'trim-tool-results' wire option removed; failure path explicitly writes a `compaction_failed{reason:'user_initiated'}` event before rethrowing
 ├── storage/
 │   ├── event-types.ts                  MODIFIED — add conversation_summary + compaction_failed; REMOVE context_compacted; remove `strategy` enum value 'trim-tool-results' from RPC params
-│   ├── session-store.ts                MODIFIED — `SessionState` type gains `compactionDisabled?: boolean`; `readSessionState`'s whitelist parser MUST be updated to read the new field (the parser is an explicit per-field whitelist at `session-store.ts:147-162`; type-only additions are silently dropped on read without this change). See §"Failure backoff → persistent disable round-trip".
+│   ├── session-store.ts                MODIFIED — `SessionState` type gains `compactionDisabled?: boolean` and `nextRetryAtEventSeq?: number`; `readSessionState`'s whitelist parser MUST be updated to read both new fields (the function is at `session-store.ts:143-166`; the whitelist body is lines 147-162; type-only additions are silently dropped on read without this change — v6 Minor 1 corrects the v5 citation). See §"Failure backoff → persistent disable round-trip".
 │   └── recall/
 │       └── event-to-row.ts             MODIFIED — REMOVE context_compacted case; conversation_summary returns null (NOT indexed)
 └── message-building/
@@ -86,28 +86,58 @@ Three call sites currently produce `context_compacted`. All three are updated to
 
 All three call sites go through the same `compaction/summarize-strategy.ts:compact()` entry point and produce identically-shaped events. The strategy has no notion of caller intent; every call rebuilds the capsule from canonical events. (In v3 the spec allowed a `mode: 'rolling' | 'rebuild_from_canonical' | 'user_initiated'` parameter; v4 collapses this to a single always-rebuild path. The two user-driven call sites were already passing `'rebuild_from_canonical'` in v3, so they need no behavioral change.)
 
-#### Failure write contract for user-initiated callers (Critical 6)
+#### Failure write contract for user-initiated callers (Critical 6 in v5; refined in v6 Critical 2)
 
-Both `/compact` and `ent/session/compact` wrap their `compact()` call in `try/catch` and write a `compaction_failed` event before surfacing the error. Pseudocode (matches the runner's lifecycle-hook shape; both run inside their existing `runExclusive` scopes):
+`/compact` and `ent/session/compact` wrap their `compact()` call in `try/catch` and write a `compaction_failed` event before surfacing the error. They differ in HOW they write — because v6 verified that `/compact` is NOT inside an outer `runExclusive` scope, while the RPC handler IS:
+
+- **`ent/session/compact` RPC handler.** Runs inside `runExclusive(async () => { ... })` already (`session-operations.ts:468`). Its `try/catch` block writes via direct `appendDurableEvent` + `writeSessionState`, the same path the runner's lifecycle hook uses (see §"Lifecycle hook" and §"Strategy internal event writes (deadlock guard)"). Using `writeAndAdvance` from inside this scope would deadlock.
+
+- **`/compact` slash command.** Lives in `conversation/slash-commands.ts` (the handler is invoked from `rpc/handlers/prompt.ts:169` via `handleSlashCommand(...)`). The call site does NOT wrap the slash-command body in `runExclusive`. The slash command uses the `writeAndAdvance` parameter the caller passes in (which itself wraps each write in `runExclusive`); this is correct because there is no enclosing scope to deadlock against. The new strategy adds one more constraint: the new `compact()` call itself must be made OUTSIDE `writeAndAdvance` (which writes a single event), since `compact()` produces one event itself. The slash command writes the `conversation_summary` (or `compaction_failed`) event via the same `writeAndAdvance` it already uses today for `context_compacted`.
+
+Pseudocode for `ent/session/compact` (raw `appendDurableEvent` path, inside the existing `runExclusive` scope):
 
 ```ts
+// session-operations.ts ent/session/compact handler — already inside runExclusive
 try {
   const result = await compact(events, ctx);
-  // ... write conversation_summary as today ...
+  let sessionState = readSessionState(state.activeSession!.dir);
+  const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, result.event);
+  writeSessionState(state.activeSession!.dir, nextState);
 } catch (err) {
   let sessionState = readSessionState(state.activeSession!.dir);
   const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
     type: 'compaction_failed',
     data: {
-      type: 'compaction_failed',
       reason: 'user_initiated',
       errorMessage: err instanceof Error ? err.message : String(err),
     },
   });
   writeSessionState(state.activeSession!.dir, nextState);
-  throw err;   // slash command returns the error string to the user; RPC rethrows
+  throw err;   // RPC rethrows the JSON-RPC error
 }
 ```
+
+Pseudocode for `/compact` (writeAndAdvance path, no outer scope):
+
+```ts
+// slash-commands.ts handleSlashCommand 'compact' branch — NO outer runExclusive
+try {
+  const result = await compact(events, ctx);
+  await writeAndAdvance(result.event);  // writeAndAdvance wraps each write in runExclusive
+  return finishTurn(`Context compacted. Capsule attached.`);
+} catch (err) {
+  await writeAndAdvance({
+    type: 'compaction_failed',
+    data: {
+      reason: 'user_initiated',
+      errorMessage: err instanceof Error ? err.message : String(err),
+    },
+  });
+  return finishTurn(`Error during compaction: ${err instanceof Error ? err.message : String(err)}`);
+}
+```
+
+Note the **inner `data.type` field is OMITTED** in both pseudocode blocks (v6 Minor 2): `event-to-row.ts:37-40` documents that the inner `data.type` is NOT serialized — the wire convention has only the outer `type`. Earlier draft pseudocode that wrote `data: { type: 'compaction_failed', reason: ..., errorMessage: ... }` would have produced a redundant field that callers ignore but JSON readers (recall, harness, debug tooling) would see as confusingly duplicated.
 
 Backoff interaction: `compaction_failed{reason: 'user_initiated'}` events do **NOT** count toward the auto-trigger's consecutive-failure backoff. The backoff walk (§"Failure backoff") counts only events whose `reason` is `'global'` or `'emergency'` — operator presses of `/compact` shouldn't trip the M=10 persistent-disable. Failing user-initiated compactions still get a durable telemetry record (the operator can see them in `/compact` logs and dashboards), but they don't escalate. If the operator wants to disable the auto-trigger after seeing repeated user-initiated failures, they can do so explicitly via a future ops command (file a kata if that becomes useful).
 
@@ -119,7 +149,13 @@ In v2 the `ent/session/compact` RPC accepted a `strategy: 'summarize' | 'trim-to
 - `'trim-tool-results'` — **REMOVED from the wire enum.** No longer a user-facing choice.
 - `'selective'` — **REMOVED from the wire enum.** Was a stub in v2.
 
-The `trim-tool-results-strategy.ts` file stays in the codebase: still registered in the strategy registry so that the new summarize strategy can call it internally as a pre-pass via the existing strategy interface, AND so that the offline `sen2/compaction/` harness can still run it as a standalone strategy for measurement. Production runtime callers (slash command, RPC handler) only see `summarize`.
+The `trim-tool-results-strategy.ts` file is **DELETED** (see Critical 3 in the v5 changelog and the module layout box). Its trim logic is extracted as `trimToolResultLines` in `summarize-strategy.ts` and called internally by the new strategy. The offline `sen2/compaction/` harness imports the same helper directly. Production runtime callers (slash command, RPC handler) only see `summarize`.
+
+### Strategy registry — removed in v6
+
+`compaction/registry.ts` and the `CompactionStrategy[]` registration model are **DELETED** as part of v6. The legacy registry served only `compact-dropped-messages.ts` (which routed `ProviderMessage[]` through the `CompactionStrategy.compact(events: LaceEvent[], context: CompactionContext)` interface). With `compact-dropped-messages.ts` also deleted, no consumer remains. The new top-level `compact()` in `summarize-strategy.ts` is imported by name directly from the lifecycle hook, the `/compact` slash command, and the `ent/session/compact` RPC handler. No registry indirection.
+
+The `CompactionStrategy` interface in `compaction/types.ts` becomes unused. We delete it along with the registry. If a future second compaction strategy is ever added, the typed-capsule path's pattern (a top-level exported `compact()` function with a typed `CompactionContext`) is what to extend; the legacy `LaceEvent[]`-based interface is not the right base.
 
 ## Data model
 
@@ -215,7 +251,7 @@ lastCallInputContextTokens
   + (lastResponse.usage.cacheReadInputTokens ?? 0)
 ```
 
-**Field-name precision.** The in-memory `ProviderResponse.usage` shape (`packages/agent/src/providers/base-provider.ts:64-85`) uses `promptTokens` for the uncached-input integer; the durable on-disk `TurnEndEventData.usage` shape (`packages/agent/src/storage/event-types.ts:62-82`) uses `inputTokens` for the same value. The runner translates one to the other in its turn-end write at `runner.ts:986-1000`. The trigger reads from the **in-memory** `lastResponse` of the just-completed turn (i.e. the provider response, not the durable event), so it uses `promptTokens`. The durable `turn_end.usage.lastCallInputContextTokens` field itself is one integer (the sum), not the breakdown, so the in-memory-vs-durable shape mismatch never propagates past this formula.
+**Field-name precision (refined in v6 Important 7).** Two distinct concerns live in this area; v5 conflated them. The **WRITER** of the durable field (the precondition kata that lands in `runner.ts`) reads `response.usage.promptTokens` from the in-memory `ProviderResponse.usage` shape (`packages/agent/src/providers/base-provider.ts:64-85`, where the uncached-input integer is named `promptTokens`), computes the sum with the `?? 0` defaults shown above, and stores it as the single integer `lastCallInputContextTokens` on `turn_end.usage` (a new field on the durable `TurnEndEventData.usage` shape at `packages/agent/src/storage/event-types.ts:62-82`). The translation site that the precondition kata edits is `runner.ts:598-625` (where each tool-use iteration reads `response.usage.promptTokens` and accumulates) plus `runner.ts:986-1000` (where the accumulators are written into the durable `usage` block); the kata adds one more line in the read block that captures the LAST iteration's three fields, and one more line in the write block that emits the sum. The **READER** of the durable field — the trigger evaluator — only ever reads the on-disk integer `latestTurnEnd.data.usage.lastCallInputContextTokens`, never the in-memory provider response. There is no `promptTokens` access on the reader side. The in-memory-vs-durable shape mismatch is fully encapsulated inside the writer.
 
 For Anthropic: all three fields are populated; the sum IS the on-the-wire prefix size (uncached input + new cache writes + cache reads).
 
@@ -322,9 +358,22 @@ Note: v3 included a `rebuildEveryNCompactions: 10` knob and a `SessionState.comp
 
 ### Lifecycle hook
 
-In `runner.run()`, immediately after the successful `turn_end` write (the post-PRI-1818-#1 path that always writes turn_end), evaluate the trigger and — if it fires — run compaction inside the runner's existing serialization primitive. Code shape:
+In `runner.run()`, immediately after the successful `turn_end` write (the post-PRI-1818-#1 path that always writes turn_end), evaluate the trigger and — if it fires — run compaction inside the runner's existing serialization primitive. The pseudocode shows where every value comes from; v6 fixes v5's reference to non-existent `RunnerDependencies` fields by sourcing `modelId` from `this.config` (verified at `runner.ts:337`), `connectionId` from the same `getEffectiveConfig` channel the RPC handler uses, `modelMaxContext` from `this.provider.getModelContextWindow(modelId)` (after the Critical 7 visibility change), `tailConfig` from the registered defaults, and `createProviderForTurn` imported directly from `providers/turn-factory.ts:16` (NOT from `this.deps`).
 
 ```ts
+// Imports (added to runner.ts)
+import { createProviderForTurn } from '@lace/agent/providers/turn-factory';
+import { compact, SUMMARIZER_SYSTEM_PROMPT } from '@lace/agent/compaction/summarize-strategy';
+import { evaluateTrigger, DEFAULT_TRIGGER_CONFIG } from '@lace/agent/core/conversation/compaction-trigger';
+import { DEFAULT_TAIL_CONFIG } from '@lace/agent/compaction/tail-policy';
+
+// Inside runner.run(), after the successful turn_end write:
+const { modelId, sessionDir } = this.config;
+const modelMaxContext = this.provider.getModelContextWindow(modelId);
+const triggerConfig = DEFAULT_TRIGGER_CONFIG;
+const tailConfig = DEFAULT_TAIL_CONFIG;
+const targetCapsuleTokensPct = 0.10;
+
 const decision = evaluateTrigger(
   turnEndEvent,
   sessionEvents,
@@ -334,22 +383,38 @@ const decision = evaluateTrigger(
 );
 if (decision.fire) {
   // Serialize against the runner's own durable writes using its existing
-  // runExclusive primitive. This serves two purposes in v5:
+  // runExclusive primitive. This serves two purposes:
   //   1. Prevents the compaction write from racing the runner's normal
   //      writeAndAdvance calls (same as runner.ts:393-404).
   //   2. Acts as the in-process compaction mutex — re-entrant trigger
   //      evaluation on the same runner naturally serializes.
   // There is no separate compaction-lock module and no file-based flock
-  // in v4/v5. See §"Concurrency".
+  // in v4/v5/v6. See §"Concurrency".
   await this.deps.runExclusive(async () => {
     try {
+      // Source connectionId the same way RPC handlers do: via the
+      // session-config plumbing. `getEffectiveConfig(state.config,
+      // session.state.config)` is the pattern at session-operations.ts:475-476
+      // and slash-commands.ts:160. The runner's equivalent reads the session
+      // state directly because the runner doesn't have AgentServerState in
+      // scope — we read state.json at hook time, then call
+      // getEffectiveConfig with a session-config-shaped projection.
+      const sessionStateForConfig = readSessionState(sessionDir);
+      const effectiveConfig = getEffectiveConfig(
+        /* state.config */ undefined,
+        sessionStateForConfig.config,
+      );
+
       // Build a FRESH provider for the summarizer call. Do NOT mutate
       // this.provider — its system prompt must remain the agent's persona
       // for subsequent turns. Mirrors the existing /compact RPC handler
-      // pattern at session-operations.ts:507-511.
-      const summarizerProvider = await this.deps.createProviderForTurn({
-        connectionId: this.deps.connectionId,
-        modelId: this.deps.modelId,
+      // pattern at session-operations.ts:507-511. `createProviderForTurn`
+      // is a top-level export from providers/turn-factory.ts:16 — NOT a
+      // method on RunnerDependencies (v5 incorrectly referenced
+      // `this.deps.createProviderForTurn`, which does not exist).
+      const summarizerProvider = await createProviderForTurn({
+        connectionId: effectiveConfig.connectionId,
+        modelId,
       });
       summarizerProvider.setSystemPrompt(SUMMARIZER_SYSTEM_PROMPT);
 
@@ -360,35 +425,46 @@ if (decision.fire) {
         targetTokens: Math.floor(modelMaxContext * targetCapsuleTokensPct),
         tailConfig,
       });
-      // CRITICAL: `compact` MUST NOT call `writeAndAdvance` for its internal
-      // event appends. `writeAndAdvance` (runner.ts:392-404) itself wraps
-      // `runExclusive` — calling it from inside this outer `runExclusive`
-      // scope would deadlock the chained-promise mutex (server.ts:314-328).
-      // Instead `compact` calls `appendDurableEvent` + `writeSessionState`
-      // directly. The outer `runExclusive` here is what provides
-      // serialization; we are already inside it. See §"Strategy internal
-      // event writes (deadlock guard)" below.
+
+      // Persist the conversation_summary event via direct appendDurableEvent
+      // (NOT writeAndAdvance) for the deadlock reason in §"Strategy internal
+      // event writes (deadlock guard)". We're inside runExclusive already.
+      let sessionState = readSessionState(sessionDir);
+      const { nextState } = appendDurableEvent(sessionDir, sessionState, result.event);
+      // Clear backoff state on successful summary — see §"Failure backoff".
+      writeSessionState(sessionDir, {
+        ...nextState,
+        compactionDisabled: undefined,
+        nextRetryAtEventSeq: undefined,
+      });
     } catch (err) {
       logger.error('compaction failed; conversation continues uncompacted', {
         err, sessionDir,
       });
       // Persist failure event via direct appendDurableEvent (NOT writeAndAdvance)
       // for the same deadlock reason as above. We're inside runExclusive already.
-      const state = readSessionState(sessionDir);
-      const { nextState } = appendDurableEvent(sessionDir, state, {
+      // Compute backoff state FIRST, then write event + state together so the
+      // post-failure SessionState reflects nextRetryAtEventSeq / compactionDisabled.
+      let sessionState = readSessionState(sessionDir);
+      const { nextState } = appendDurableEvent(sessionDir, sessionState, {
         type: 'compaction_failed',
         data: {
-          type: 'compaction_failed',
           reason: decision.reason,
           errorMessage: err instanceof Error ? err.message : String(err),
         },
       });
-      writeSessionState(sessionDir, nextState);
-      maybeDisableForBackoff(sessionDir, triggerConfig);
+      const consecutive = countConsecutiveAutoFailuresAtEndOfLog(sessionDir);
+      const backoffPatch = computeBackoffStatePatch(nextState, consecutive);
+      writeSessionState(sessionDir, { ...nextState, ...backoffPatch });
+      if (backoffPatch.compactionDisabled === true) {
+        emitAlarm(sessionDir, 'compaction-disabled', { consecutive });
+      }
     }
   });
 }
 ```
+
+Two pseudocode helpers referenced above are defined in `compaction-trigger.ts`: `countConsecutiveAutoFailuresAtEndOfLog(sessionDir): number` (the walk algorithm from §"Failure backoff"), and `computeBackoffStatePatch(state: SessionState, consecutive: number): Partial<SessionState>` (returns `{ nextRetryAtEventSeq?, compactionDisabled? }` per the doubling table). The inner `data.type` field is OMITTED from the failure-event payload (v6 Minor 2 — `event-to-row.ts:37-40` documents the inner `data.type` is not serialized).
 
 #### Strategy internal event writes (deadlock guard — Critical 1)
 
@@ -425,7 +501,13 @@ This MUST be tested:
 - **`compaction-hook-deadlock.test.ts`** — synthetic test where `compact()` is stubbed to call `deps.writeAndAdvance(...)` instead of the correct direct path. Test must time out (or assert via a small timeout wrapper) — and the production strategy must pass the same harness with the correct direct-write path.
 - **`compaction-hook-success.test.ts`** — drives a real `compact()` call inside the outer `runExclusive`, asserts the `conversation_summary` event lands in the JSONL file, asserts the runner can do its next normal `writeAndAdvance` without hanging.
 
-The same rule applies to `compact()` callers from `/compact` and `ent/session/compact` — both already run inside `runExclusive` scopes (`session-operations.ts`'s handler does, `slash-commands.ts`'s compact handler does), so the same direct-write requirement applies to them. The contract is one rule for the whole codebase: **anything called from inside a `runExclusive` scope writes durably via `appendDurableEvent` + `writeSessionState` directly, never via `writeAndAdvance`.**
+The same rule applies to **`ent/session/compact`** — its handler at `session-operations.ts:468` runs inside `runExclusive`, so its `compact()` call and the surrounding event writes use the raw `appendDurableEvent` + `writeSessionState` path. **`/compact` is different (v6 Critical 2):** the slash-command handler is invoked from `rpc/handlers/prompt.ts:169` via `handleSlashCommand(...)` with NO enclosing `runExclusive` scope. The slash command uses the `writeAndAdvance` parameter the caller passes in (which internally wraps each write in its own `runExclusive`), and that path is safe — there's nothing outside to deadlock against.
+
+The contract is therefore two-pronged:
+- **Inside an outer `runExclusive` scope** (lifecycle hook, `ent/session/compact` handler): write durably via `appendDurableEvent` + `writeSessionState` directly, never via `writeAndAdvance`.
+- **Outside any outer `runExclusive` scope** (`/compact` slash command body): use the `writeAndAdvance` helper, which provides its own `runExclusive` per write.
+
+The wrong combination — `writeAndAdvance` inside an outer `runExclusive` — is what deadlocks. The right combination on each side is enumerated above.
 
 Key contract notes:
 - **Method name is `compact`, not `runCompaction`** (Important 6). The existing strategy interface (`compaction/types.ts` — `CompactionStrategy.compact(events, ctx)`) names this method `compact`; the new typed-capsule strategy keeps that name for consistency. The runner's lifecycle hook calls `compact(events, ctx)`, not `runCompaction(events, ctx)`. All spec references below use `compact`.
@@ -458,32 +540,54 @@ The trigger reads `isSubagentSession` from `this.deps` (sourced from session met
 
 ### Failure backoff
 
-`compaction_failed` events accumulate session-scoped consecutive-failure pressure. The count is derived at decision time by walking the event log **from end-of-log backward** (Important 7 — walk start is end-of-log, NOT latest `turn_end`; failure events are written AFTER the turn_end in the lifecycle hook, so a turn_end-anchored walk would miss them). Walk counts contiguous `compaction_failed` events with `reason` in `{'global','emergency'}` until the first non-failure event (a `conversation_summary` resets to 0; a `turn_end` is non-failure and also terminates the count). `compaction_failed{reason: 'user_initiated'}` events are SKIPPED by the walk (per §"Failure write contract for user-initiated callers") — they're transparent to backoff. The count is NOT stored as a field on the failure event (recoverable from the log; see §"Data model").
+`compaction_failed` events accumulate session-scoped consecutive-failure pressure. The count is derived at decision time by walking the event log **from end-of-log backward** (Important 7 — walk start is end-of-log, NOT latest `turn_end`; failure events are written AFTER the turn_end in the lifecycle hook, so a turn_end-anchored walk would miss them).
+
+**Walk semantics (v6 Critical 1 + Important 6).** The lifecycle hook fires AFTER `turn_end`, so consecutive `compaction_failed` events from different turns are SEPARATED by the next turn's `prompt`, `turn_start`, and `turn_end` events. v5's walk terminated on the very first `turn_end` it saw, which meant the count could never exceed 1 and the N=3 / N=10 escalations were unreachable. v6 fixes this:
+
+- The walk **SKIPS** (transparently steps past) every event whose type is on a "non-strategic" allowlist: `turn_end`, `turn_start`, `prompt`, `context_injected`, `message`, `tool_use`, `system_prompt_set`, `job_started`, `job_finished`, `job_update`, `job_session_assigned`, `permission_requested`, `permission_decided`, `permission_cancelled`, `checkpoint_created`, `files_rewound`. These events are normal turn machinery — they do not reset the count and do not increment it. The walk continues past them.
+- The walk **INCREMENTS** the count on `compaction_failed` events whose `reason` is `'global'` or `'emergency'`.
+- The walk **SKIPS** (transparently steps past, does not increment, does not reset) `compaction_failed` events whose `reason` is `'user_initiated'` — operator presses are transparent to the auto-trigger backoff (v6 Important 6 resolution).
+- The walk **RESETS** the count to 0 and TERMINATES on the first `conversation_summary` event. A successful summary clears the backoff regardless of how many failures preceded it.
+- The walk terminates when it runs out of events (start-of-log).
+
+In plain words: walk backward, count every `global`/`emergency` failure event you see, ignore everything else, stop the first time you see a successful summary or reach the start of the log.
+
+The count is NOT stored as a field on the failure event (recoverable from the log; see §"Data model"). The walk-test fixture must reflect the realistic on-disk shape — `..., turn_end_N, compaction_failed_N, prompt_{N+1}, turn_start_{N+1}, message_{N+1}, turn_end_{N+1}, compaction_failed_{N+1}, ...` — NOT back-to-back compaction_failed events (which the lifecycle hook cannot produce).
 
 #### Explicit retry-state field (Important 1)
 
 To make the doubling-window behavior explicit, `SessionState` carries a `nextRetryAtEventSeq: number | undefined` field (in addition to the `compactionDisabled?: boolean` field for M=10 persistent disable). The retry-at field is set on every backoff-relevant failure write and read on every trigger evaluation. v4's prior wording "Backoff window doubles each subsequent skip" was underspecified: there was no state field to anchor the doubling against.
 
-State update on failure (inside the lifecycle hook's catch block, AFTER appending the `compaction_failed` event):
+State update on failure (computed in the lifecycle hook's catch block AFTER appending the `compaction_failed` event, then written in the SAME `writeSessionState` call that persists the post-append `nextEventSeq` — v6 Critical 6 makes the persistence explicit; see the lifecycle-hook pseudocode for the exact call shape). The helper `computeBackoffStatePatch` is pure:
 
 ```ts
-// Count consecutive global/emergency compaction_failed events at end-of-log.
-const consecutive = countConsecutiveAutoFailuresAtEndOfLog(sessionDir);
-// Doubling table: 3 → skip 1 turn, 4 → skip 2, 5 → skip 4, 6 → skip 8, 7+ → cap at 16.
-// (Pre-N=3 we don't backoff at all — the failure is recorded but the next trigger
-// evaluation proceeds normally.)
-let skipTurns = 0;
-if (consecutive >= 3) {
-  skipTurns = Math.min(16, 1 << (consecutive - 3));
-}
-if (skipTurns > 0) {
-  const currentEventSeq = readSessionState(sessionDir).nextEventSeq - 1;
-  nextRetryAtEventSeq = currentEventSeq + skipTurns * EVENTS_PER_TURN_APPROX;
-  // We don't track exact "turns elapsed" — we approximate via event-seq distance.
-  // EVENTS_PER_TURN_APPROX = 4 (prompt, turn_start, message, turn_end is the floor;
-  // tool-using turns are longer, which means we wait LONGER than nominal — safe direction).
+// In compaction-trigger.ts
+export function computeBackoffStatePatch(
+  state: SessionState,
+  consecutive: number,
+): Partial<SessionState> {
+  if (consecutive >= 10) {
+    return { compactionDisabled: true, nextRetryAtEventSeq: undefined };
+  }
+  if (consecutive >= 3) {
+    // Doubling table: 3 → skip 1 turn, 4 → skip 2, 5 → skip 4, 6 → skip 8, 7+ → cap at 16.
+    const skipTurns = Math.min(16, 1 << (consecutive - 3));
+    const currentEventSeq = state.nextEventSeq - 1;
+    return { nextRetryAtEventSeq: currentEventSeq + skipTurns * EVENTS_PER_TURN_APPROX };
+  }
+  // <3 consecutive: no backoff state change. Return empty patch.
+  return {};
 }
 ```
+
+The caller then merges and persists:
+
+```ts
+const backoffPatch = computeBackoffStatePatch(nextState, consecutive);
+writeSessionState(sessionDir, { ...nextState, ...backoffPatch });
+```
+
+**Persistence is load-bearing (v6 Critical 6).** v5's pseudocode declared `nextRetryAtEventSeq` as a local variable and never called `writeSessionState`, which meant the field never reached disk and the gate-check (which reads via `readSessionState`) always saw `undefined`. v6 fixes this: every failure path explicitly merges the backoff patch into the post-append SessionState and calls `writeSessionState` in the same block. The lifecycle-hook pseudocode in §"Lifecycle hook" shows the exact call shape, including the M=10 alarm emit. The required test asserts that BOTH `nextRetryAtEventSeq` and `compactionDisabled` survive a process restart (write fields, simulate restart, re-read via `readSessionState`, gate check sees the persisted values).
 
 Trigger gate check (in `evaluateTrigger`, as part of gating rule 5):
 
@@ -493,17 +597,22 @@ if (state.nextRetryAtEventSeq !== undefined &&
     latestTurnEnd.eventSeq < state.nextRetryAtEventSeq) {
   return { fire: false, reason: 'backoff' };
 }
+if (state.compactionDisabled === true) {
+  return { fire: false, reason: 'disabled' };
+}
 ```
 
-On successful `conversation_summary` write, clear `nextRetryAtEventSeq` (and `compactionDisabled`). Now the next trigger evaluation reads the field as `undefined` and the backoff gate falls through.
+On successful `conversation_summary` write, clear `nextRetryAtEventSeq` AND `compactionDisabled` in the same `writeSessionState` call (see the success branch of the lifecycle-hook pseudocode). Now the next trigger evaluation reads both fields as `undefined` and the backoff gate falls through.
 
-This makes the backoff semantics testable and inspectable in isolation: the test asserts `nextRetryAtEventSeq` is set correctly per consecutive-failure count, without having to simulate turn-walking. The `SessionState` whitelist parser in `readSessionState` (Critical 4) gets BOTH new fields added at the same time.
+The `SessionState` whitelist parser in `readSessionState` (Critical 4) gets BOTH new fields added at the same time.
+
+**`EVENTS_PER_TURN_APPROX` (v6 Minor 5 — rationale corrected).** Set to a value that **under-estimates** the doubling-window cost would be wrong because we'd retry MORE OFTEN than nominal, not less often. Real Ada-like load runs ~12.5 events/turn (per the cost-audit pattern note in memory). v6 sets `EVENTS_PER_TURN_APPROX = 12` so the formula `currentEventSeq + skipTurns * 12` approximates the nominal "X turns from now" target on Ada-like load. Tool-using turns occasionally exceed 12 events, so we may wait slightly LONGER than nominal on those — safe direction. Lighter sessions (chat-only, ~4 events/turn) wait roughly 3x nominal — also safe direction; the backoff tier scaling (1→2→4→8→16) has plenty of headroom for over-waiting. If the over-wait turns out to bite on light sessions in practice, switch to counting `turn_end` events directly (a second walk per evaluation; deferred).
 
 Behavior summary:
 
-- **<3 consecutive failures.** No backoff; next trigger evaluation runs normally. Failure event still durably written for observability.
-- **N=3 consecutive failures (default).** `nextRetryAtEventSeq` set to ~1 turn out. Next trigger evaluation returns `fire: false, reason: 'backoff'`. Backoff window doubles each subsequent skip (1, 2, 4, 8, …) up to a cap of 16 turns.
-- **M=10 consecutive failures (default).** Mark the session "compaction disabled" via the `compactionDisabled` flag on `SessionState` and emit an `alarm` (existing PRI-1744 alarm channel). Operator must explicitly re-enable. The trigger reports `fire: false, reason: 'disabled'` from then on.
+- **<3 consecutive failures.** No backoff; next trigger evaluation runs normally. Failure event still durably written for observability. `nextRetryAtEventSeq` and `compactionDisabled` are NOT written (the empty-patch case).
+- **N=3 consecutive failures (default).** `nextRetryAtEventSeq` set to ~1 turn out (`currentEventSeq + 12`). Next trigger evaluation returns `fire: false, reason: 'backoff'`. Backoff window doubles each subsequent skip (1, 2, 4, 8, …) up to a cap of 16 turns.
+- **M=10 consecutive failures (default).** `compactionDisabled` flag set to `true` on `SessionState`, `nextRetryAtEventSeq` cleared, and an `alarm` emitted (existing PRI-1744 alarm channel). Operator must explicitly re-enable. The trigger reports `fire: false, reason: 'disabled'` from then on.
 
 A successful `conversation_summary` write resets BOTH the persistent-disable flag and the `nextRetryAtEventSeq` field (and, implicitly, the derived consecutive-failure count by virtue of the conversation_summary event terminating the walk).
 
@@ -511,7 +620,7 @@ This 4-tier backoff is retained from v3 (Jesse's call) as defense against transi
 
 #### Persistent disable round-trip (Critical 4 + Important 5)
 
-`readSessionState` at `session-store.ts:147-162` is an explicit whitelist parser. Type-only additions to the `SessionState` TS type are silently DROPPED on read — they round-trip-clear every time a session is loaded. Adding `compactionDisabled?: boolean` and `nextRetryAtEventSeq?: number` to the type without also updating the whitelist parser would mean the M=10 disable would re-engage as soon as the runner restarted, defeating the entire mechanism.
+`readSessionState` at `session-store.ts:143-166` is an explicit whitelist parser (v6 Minor 1 — the function body spans 143-166; the parser body itself is lines 147-162). Type-only additions to the `SessionState` TS type are silently DROPPED on read — they round-trip-clear every time a session is loaded. Adding `compactionDisabled?: boolean` and `nextRetryAtEventSeq?: number` to the type without also updating the whitelist parser would mean the M=10 disable would re-engage as soon as the runner restarted, defeating the entire mechanism.
 
 **Required source change** (implementation-order step 5):
 
@@ -584,7 +693,7 @@ Algorithm — **single backward walk**, tracking both turn-boundary and human-pr
 
 2. For each event visited:
    - If the event is a `turn_start`, increment `closedTurnsSeen`.
-   - If the event is a `prompt` from a human channel (default matcher: text-block content begins with one of `<messages channel="D"`, `<messages channel="C"`, `<messages channel="G"`, `<messages channel="im"`), record its seq in `preservedHumanPromptSeqs` and add `(bytesOfPromptBody / 3.5)` to `humanPromptTokenEstimate`.
+   - If the event is a `prompt` from a human channel (default matcher: text-block content begins with one of `<messages channel="D"`, `<messages channel="C"`, `<messages channel="G"` — these are Slack channel-ID prefixes for DMs / public channels / private channels respectively, verified against `sen-core-v2/src/slack/envelope.ts` and tests; v6 Important 8 removed `im` as it's not a Slack channel-ID prefix), record its seq in `preservedHumanPromptSeqs` and add `(bytesOfPromptBody / 3.5)` to `humanPromptTokenEstimate`.
    - Update `oldestVisitedSeq = event.eventSeq`.
 
 3. Termination check after each step:
@@ -596,31 +705,41 @@ Algorithm — **single backward walk**, tracking both turn-boundary and human-pr
 
 5. **In-flight tool-use guard — single AND parallel-call clusters (Important 3).** `tool_use` is **one event** that carries both `input` and `result` (`event-types.ts:28-35` — `ToolUseEventData` has both fields on a single event). The boundary risk is: if a `tool_use` event has `result === undefined` (tool hasn't completed yet), the next turn will mutate the event in place to add the result. The summarizer would see "tool call with no result"; the rebuilt tail would later mutate to add it. If the parent turn issued multiple parallel tool calls, several consecutive `tool_use` events may all be in-flight at once. v4's "walk left by one event" handled only the single-call case — for clusters, the second-and-onward in-flight events would still cross the boundary and be summarized.
 
-   Correct guard: **walk left as long as the event at `tailStartEventSeq` is a `tool_use` with `result === undefined`.** Loop until the boundary lands on either (a) a non-`tool_use` event, or (b) a `tool_use` event with `result !== undefined` (the parallel-call cluster's first completed call is fine to leave at the boundary because every later in-flight tool_use will be inside the tail). Algorithm:
+   Correct guard: **walk left as long as the event at `tailStartEventSeq` is a `tool_use` with `result === undefined`.** Loop until the boundary lands on either (a) a non-`tool_use` event, or (b) a `tool_use` event with `result !== undefined` (the parallel-call cluster's first completed call is fine to leave at the boundary because every later in-flight tool_use will be inside the tail).
 
-   ```
-   while (tailStartEventSeq > 1) {
-     const ev = events.find(e => e.eventSeq === tailStartEventSeq);
+   **v6 Important 4 — O(N·K) → O(N+K).** v5's pseudocode used `events.find(e => e.eventSeq === tailStartEventSeq)` inside the while loop, which is O(N) per iteration. For a long session with K in-flight tool_use events at the boundary the cost is O(N·K). v6 uses a backward index cursor (decrement the array index, not the eventSeq) and a single up-front index→event lookup, so the walk is O(N+K):
+
+   ```ts
+   // Find the array index corresponding to tailStartEventSeq once (O(N) up front).
+   // After the initial walk in steps 1-4, the boundary already sits on a known
+   // index — capture it as `tailIdx` rather than scanning by eventSeq each time.
+   let tailIdx = /* index in events[] of the event whose eventSeq === tailStartEventSeq */;
+   while (tailIdx > 0) {
+     const ev = events[tailIdx];
      if (ev?.type === 'tool_use' && (ev.data as ToolUseEventData).result === undefined) {
-       tailStartEventSeq -= 1;
+       tailIdx -= 1;
        continue;
      }
      break;
    }
+   tailStartEventSeq = events[tailIdx]!.eventSeq;
    ```
+
+   The same index-cursor pattern applies to step 6 (mid-turn split guard), which has the same shape. Both guards together stay O(N+K).
 
    Test fixture: three back-to-back `tool_use` events all with `result === undefined`, immediately preceded by a `message`. Proposed boundary lands on the middle tool_use; assertion is that the boundary walks left past ALL THREE in-flight tool_uses (and ideally settles on the `message` event before them). Existing single-call fixture also remains. NOTE: this is not addressing message-builder orphan-tool-block issues; for those, see §"Message-builder behavior → dropOrphanedToolBlocks".
 
 6. **Mid-turn split guard (Important 10).** The token-budget cap and turn-count cap can both fire while walking through a turn's middle events, leaving a tail whose first event has no preceding `turn_start`. After the boundary lands per steps 3–5, walk left further until the boundary either (a) lands on a `turn_start` event, or (b) sits at `eventSeq === 1`. This guarantees the rebuilt tail begins on a turn boundary, which the message-builder relies on for correct prompt/response sequencing.
 
-   Algorithm extension applied after step 5:
+   Algorithm extension applied after step 5 — same index-cursor pattern as step 5 (v6 Important 4):
 
-   ```
-   while (tailStartEventSeq > 1) {
-     const ev = events.find(e => e.eventSeq === tailStartEventSeq);
+   ```ts
+   while (tailIdx > 0) {
+     const ev = events[tailIdx];
      if (ev?.type === 'turn_start') break;
-     tailStartEventSeq -= 1;
+     tailIdx -= 1;
    }
+   tailStartEventSeq = events[tailIdx]!.eventSeq;
    ```
 
    Test: chat-heavy session where the token-budget cap fires mid-turn (between `message` and `tool_use` in the same turn); assertion is that the final `tailStartEventSeq` lands on the enclosing `turn_start`, not on the `tool_use` or `message`.
@@ -663,7 +782,19 @@ export async function compact(events: TypedDurableEvent[], ctx: CompactionContex
 
 `event` is required (not optional), tied to the Critical 5 resolution: callers short-circuit before invoking `compact()` when `tailStartEventSeq === 1`, so the strategy is never called in the "nothing to compact" case. Every successful `compact()` call produces exactly one `conversation_summary` event. If the summarizer call itself fails the strategy throws (caught by the caller's try/catch, which writes a `compaction_failed` event).
 
-The method is named `compact` (matching the existing `CompactionStrategy.compact()` interface), NOT `runCompaction` (Important 6). All spec references to the strategy entry point use `compact`.
+### `compact()` is not a `CompactionStrategy.compact()` implementation (v6 Critical 4)
+
+The new top-level `compact()` exported from `summarize-strategy.ts` shares ONLY the method name with the existing `CompactionStrategy.compact()` interface at `compaction/types.ts:49-61`. The signatures are different in every parameter:
+
+| Aspect | Legacy `CompactionStrategy.compact()` | New top-level `compact()` |
+|---|---|---|
+| First arg | `LaceEvent[]` (from `@lace/agent/threads/types`) | `TypedDurableEvent[]` (from `@lace/agent/storage/event-types`) |
+| Second arg | `CompactionContext = { threadId, provider?, agent?, toolExecutor? }` | `CompactionContext = { sessionDir, summarizer, modelMaxContext, targetTokens, tailConfig }` |
+| Return | `CompactionResult = { compactionEvent, compactedEvents }` | `CompactionResult = { event, metrics }` |
+
+The shared name is preserved because the verb still matches the verb in domain terms, but the strategy registry path (which depends on the legacy interface shape) is GONE in v6 (see §"Strategy registry — removed in v6"). The new `compact()` is imported as a top-level function from `summarize-strategy.ts` by name. No registry, no adapter, no shim. `compact-dropped-messages.ts` and its `compactDroppedMessagesWithCore(...)` wrapper are deleted alongside the registry.
+
+v5's wording "matches the existing `CompactionStrategy.compact()` interface" was incorrect. v6 replaces it with this explicit clarification. All spec references to the strategy entry point use `compact` (v5 Important 6 carried).
 
 ### trim-tool-results pre-pass (Critical 3 — extracted helper, old strategy deleted)
 
@@ -706,7 +837,7 @@ const capsule = await summarizeWithBudget({ /* uses trimmedForSummarizer */ });
 Key invariants:
 - **Pre-pass operates ONLY on the events feeding the summarizer.** The tail (events with `eventSeq >= tailStartEventSeq`) keeps its original, un-trimmed `tool_use.result` payloads. The message-builder renders the tail as-is on the next turn.
 - **No event mutation.** The helper returns a new list with defensively-copied events and results; the on-disk JSONL is unchanged.
-- **`trim-tool-results-strategy.ts` is DELETED.** No `LaceEvent[]` codepath remains. The strategy registry (`compaction/registry.ts:9` — `createDefaultStrategies()`) is updated to register only `SummarizeCompactionStrategy`. The `compact-dropped-messages.ts` `strategyId === 'trim-tool-results'` branch is dead code and removed (it was only reachable from the RPC wire enum value, which is itself removed; see §"Strategy enum on the wire"). The legacy `LaceEvent[]` shape is no longer referenced by the new code at all.
+- **`trim-tool-results-strategy.ts` is DELETED.** No `LaceEvent[]` codepath remains. In v6 the strategy registry (`compaction/registry.ts`) and `compact-dropped-messages.ts` are ALSO deleted (see §"Strategy registry — removed in v6" and the module-layout box) — the typed-capsule path bypasses the registry entirely. The legacy `LaceEvent[]` shape is no longer referenced by the new code at all.
 - **Harness measurement.** The standalone-trim-tool-results-measurement use case (offline `sen2/compaction/` harness measuring trim in isolation against fixtures) is folded into the same `trimToolResultLines` helper. The harness imports the helper directly and runs it against its `TypedDurableEvent[]`-shaped fixtures. (Fixture format may need a one-time conversion if it was saved as `LaceEvent[]`; file a kata if so.)
 
 ### Single rebuild path
@@ -774,13 +905,59 @@ A follow-up kata (referenced from this spec, filed later) can investigate whethe
 
 Four changes to `message-building/message-builder.ts`:
 
-1. **Render `conversation_summary` as the conversation prefix.** When the builder encounters a `conversation_summary` event:
-   - Reset `messages.length = 0` (same as today's `context_compacted` path).
-   - Render the capsule via `renderCapsuleAsMarkdown(event.data.capsule)`.
-   - Push **one** message of shape `{ role: 'user', content: renderedMarkdown }` as the first message in the rebuilt array. The agent reads this as user-provided framing context.
-   - **Only the LATEST `conversation_summary` event is rendered.** Earlier ones are skipped. Because every summary is cumulative from session start, the latest summary fully covers everything before its `recentTailStartsAtEventSeq`; rendering earlier summaries would duplicate content.
-   - All canonical events with `eventSeq < latestSummary.recentTailStartsAtEventSeq` are skipped (they're represented inside the capsule).
-   - All events with `eventSeq >= latestSummary.recentTailStartsAtEventSeq` are processed normally.
+1. **Render `conversation_summary` as the conversation prefix — TWO-PASS algorithm (v6 Critical 5).** v5's single-pass description was incoherent: it said "reset `messages.length = 0` upon encountering `conversation_summary`" AND "events with `eventSeq >= latestSummary.recentTailStartsAtEventSeq` are processed normally." Under in-order iteration these are incompatible. Tail events sit at seqs `[recentTailStartsAtEventSeq, summary_seq - 1]` — they precede the summary in seq order. The reset on the summary throws them away after they've been processed. v6 rewrites the algorithm as two explicit passes:
+
+   **Pass 0 — pre-scan for the latest summary.**
+   ```ts
+   let latestSummary: { event: TypedDurableEvent, data: ConversationSummaryEventData } | null = null;
+   for (const ev of parsedEvents) {
+     if (ev.type === 'conversation_summary') {
+       latestSummary = { event: ev, data: ev.data as ConversationSummaryEventData };
+     }
+   }
+   ```
+
+   **Pass 1 — build messages, knowing the latest summary in advance.**
+   ```ts
+   for (const ev of parsedEvents) {
+     // If there's a latest summary, skip every event that's strictly summarized.
+     if (latestSummary !== null) {
+       // Events strictly summarized: eventSeq < latestSummary.data.recentTailStartsAtEventSeq.
+       // (These are the events the capsule replaces; the summary itself sits at
+       //  summary.event.eventSeq, somewhere AFTER recentTailStartsAtEventSeq.)
+       if (ev.eventSeq < latestSummary.data.recentTailStartsAtEventSeq) continue;
+
+       // When the iteration reaches the latestSummary event itself, push the
+       // capsule render as the FIRST entry in messages. Do NOT reset
+       // messages.length — that would discard the tail events already
+       // processed in seq order between recentTailStartsAtEventSeq and
+       // summary_seq. Instead, unshift to make the capsule the prefix.
+       if (ev === latestSummary.event) {
+         messages.unshift({
+           role: 'user',
+           content: renderCapsuleAsMarkdown(latestSummary.data.capsule),
+         });
+         continue;
+       }
+
+       // EARLIER conversation_summary events (those before latestSummary) are
+       // skipped — they're stale and the latestSummary's cumulative-from-1
+       // contract makes them redundant. The check is `latestSummary !== null
+       // && ev.type === 'conversation_summary' && ev !== latestSummary.event`.
+       if (ev.type === 'conversation_summary') continue;
+     }
+     // ...all other event types processed by the existing per-type handlers...
+   }
+   ```
+
+   The key invariant: under in-order iteration, when we process a tail event at seq `T` (where `recentTailStartsAtEventSeq <= T < summary_seq`), the summary has NOT yet been reached. We process the tail event normally, appending to `messages`. When iteration reaches `summary_seq`, we `unshift` the capsule render — putting it at position 0 — and continue. By the end of pass 1, `messages[0]` is the capsule and `messages[1..]` is the tail in seq order. Events after `summary_seq` (post-summary turns) continue to append at the end.
+
+   The "Only the LATEST `conversation_summary` event is rendered" rule is preserved: earlier summaries are skipped in pass 1, and the `unshift` only fires for `latestSummary.event` specifically.
+
+   **Tests for the two-pass case (new):**
+   - Tail events between `recentTailStartsAtEventSeq` and `summary_seq` survive into the rebuilt messages.
+   - Fixture: 5 events at seqs 1-5; `conversation_summary` event at seq 8 with `recentTailStartsAtEventSeq = 4`; 2 events at seqs 6-7 (the tail); 3 events at seqs 9-11 (post-summary). Assertion: `messages[0]` is the capsule render; `messages[1..]` contain the events at seqs 4-7 (tail; events 1-3 summarized) followed by events 9-11.
+   - Fixture: two summaries — one at seq 8 (`recentTailStartsAtEventSeq=4`), another at seq 16 (`recentTailStartsAtEventSeq=12`). Assertion: only the seq-16 summary is rendered; events 1-11 are skipped; events 12-15 (tail of latest summary, which includes the earlier summary at seq 8) are processed but the seq-8 summary is skipped by the `ev !== latestSummary.event && ev.type === 'conversation_summary'` rule.
 
 2. **Skip `compaction_failed` events.** They're telemetry; they don't affect prefix rendering. Explicitly skip (don't fall through to "unknown type").
 
@@ -799,7 +976,7 @@ Four changes to `message-building/message-builder.ts`:
 
    `context_compacted` is **not** on this list. After the Ada cutover, no live session has `context_compacted` on disk; any sub-session that somehow does fails loudly with a pointer at the cutover playbook.
 
-4. **Always run `dropOrphanedToolBlocks` against the rebuilt messages.** Currently the function is called only inside the `context_compacted` branch (`message-builder.ts:319`). Move the call out of that branch and run it ONCE at the end of pass-2 (after all events have been folded into `messages`), regardless of whether a `conversation_summary` event was present. Rationale: PRI-1818's crash-recovery path writes a synthesized `turn_end(stopReason='process_died')` after a SIGKILL/OOM; if the process died mid-tool-call, the `tool_use` event was already written with `result === undefined`, and the runner's repair path may produce a message stream where an `assistant.toolCalls[]` block has no matching `user.toolResults[]` follower. PRI-1820's `dropOrphanedToolBlocks` exists to defuse exactly this case (`message-builder.ts:152-189` was added specifically because Ada hit a tool_use without its result and every subsequent Anthropic call 400'd on the same toolu id). With v3's removal of `context_compacted`, that defense currently has no caller. Running it unconditionally as a post-pass costs one O(n) scan of messages and protects against the crash-recovery orphan source.
+4. **Always run `dropOrphanedToolBlocks` against the rebuilt messages.** Currently the function is called only inside the `context_compacted` branch (`message-builder.ts:319`). Move the call out of that branch and run it ONCE at the end of pass-2 (after all events have been folded into `messages`), regardless of whether a `conversation_summary` event was present. Rationale: PRI-1818's crash-recovery path writes a synthesized `turn_end(stopReason='process_died')` after a SIGKILL/OOM; if the process died mid-tool-call, the `tool_use` event was already written with `result === undefined`, and the runner's repair path may produce a message stream where an `assistant.toolCalls[]` block has no matching `user.toolResults[]` follower. PRI-1820's `dropOrphanedToolBlocks` exists to defuse exactly this case (function body at `message-builder.ts:114-189` — v6 Minor 3 corrects the v5 citation `:152-189` which only covered Pass B; Pass A starts at line 114). With v3's removal of `context_compacted`, that defense currently has no caller. Running it unconditionally as a post-pass costs one O(n) scan of messages and protects against the crash-recovery orphan source.
 
    The pass remains a defensive bottom-pass — if the rebuilt prefix is clean it's a no-op. Logging still emits a WARN on every dropped block so we can spot regressions that produce orphans in the first place.
 
@@ -885,9 +1062,9 @@ Full unit-test coverage for every module in the new strategy. Integration testin
 - **`budget-retry.test.ts`** (covering the budget helper that now lives inside `summarize-strategy.ts`): in-budget first try; over-budget then in-budget on first retry; all retries over-budget accepts smallest; the must-preserve fields preserved in the smallest-accepted output (synthetic summarizer that returns a known capsule); **measurement uses rendered markdown, not JSON bytes**.
 - **`compaction-trigger.test.ts`**: every threshold combination at v4 defaults (under 60% → no fire; between 60% and 90% → global; over 90% → emergency); **the `?? 0` cache-field defaults parameterized across `promptTokens`-only, `promptTokens + cacheRead`, `promptTokens + cacheCreation + cacheRead` (one test, three rows; the formula reduces identically)**; **stop-reason whitelist (Important 11): `end_turn`/`stop_sequence`/`max_turns` fire; ALL of `tool_use`/`pause_turn`/`refusal`/`cancelled`/`permission_cancelled`/`failed`/`budget_exceeded`/`incomplete`/`process_died`/`prompt_handler_caught`/`context_window_exceeded`/`max_output_tokens`/`provider_error_overloaded`/`provider_error_invalid`/`provider_error_network`/`provider_error_other`/`tool_error_throw`/`tool_error_timeout`/`internal_error` do NOT fire (one test, table-driven row per reason)**; **gating: `lastCallInputContextTokens` missing → no fire + log**; **gating: subagent session → no fire**; **gating: persistent-disable flag set → `fire: false, reason: 'disabled'`**; **gating: in backoff window (`nextRetryAtEventSeq > current eventSeq`) → `fire: false, reason: 'backoff'`**.
 - **`summarize-strategy.test.ts`**: emits one `conversation_summary` event with cumulative coverage (everything from event 1 up to `recentTailStartsAtEventSeq - 1` is represented); **`trimToolResultLines` helper applied to events fed to summarizer (Critical 3)**; **tail events are NOT trimmed**; **`trimToolResultLines` returns defensive copies — original event list is unmutated (assertion via deep-equal of input array before and after)**; prior `conversation_summary` events in the input are skipped (the underlying canonical events are re-summarized); error path lets the summarizer exception propagate so the caller emits `compaction_failed`; cost fields populated; **summarizer Provider parameter is the one the caller passed (no factory indirection)**; **method is `compact` not `runCompaction` (Important 6)**; **`compact()` writes via direct `appendDurableEvent` + `writeSessionState`, never `writeAndAdvance` (Critical 1)** — synthetic test where the strategy is invoked inside an outer `runExclusive` scope and the runner's normal `writeAndAdvance` is called immediately after; the second call must not hang.
-- **`message-builder.test.ts`**: session with one `conversation_summary` event rebuilds messages with the rendered markdown as a single role:user prefix; **session with two summaries reads only the latest, drops earlier ones**; session with zero summaries falls through to current pre-summary behavior; **session with `compaction_failed` events: events skipped, prefix unaffected**; **session with unknown event type: throws loudly**; **`dropOrphanedToolBlocks` runs as a post-pass even when no `conversation_summary` event is present (synthetic crash-recovery fixture: turn_end(process_died) + orphan tool_use)**.
+- **`message-builder.test.ts`**: session with one `conversation_summary` event rebuilds messages with the rendered markdown as a single role:user prefix; **session with two summaries reads only the latest, drops earlier ones**; session with zero summaries falls through to current pre-summary behavior; **session with `compaction_failed` events: events skipped, prefix unaffected**; **session with unknown event type: throws loudly**; **`dropOrphanedToolBlocks` runs as a post-pass even when no `conversation_summary` event is present (synthetic crash-recovery fixture: turn_end(process_died) + orphan tool_use)**; **two-pass algorithm — tail events between `recentTailStartsAtEventSeq` and `summary_seq` survive into the rebuilt messages (v6 Critical 5)** (fixture: 5 events at seqs 1-5; `conversation_summary` event at seq 8 with `recentTailStartsAtEventSeq=4`; 2 events at seqs 6-7 [the tail]; 3 events at seqs 9-11 [post-summary]; assertion: `messages[0]` is the capsule render and `messages[1..]` contain events 4-7 followed by 9-11); **two-pass algorithm — two summaries case (v6 Critical 5)** (fixture: summary at seq 8 with `recentTailStartsAtEventSeq=4`, second summary at seq 16 with `recentTailStartsAtEventSeq=12`; assertion: only seq-16 summary rendered; events 1-11 skipped; events 12-15 processed as tail with the seq-8 summary itself skipped).
 - **`event-to-row.test.ts`**: **`conversation_summary` event returns null (not indexed)**; **`compaction_failed` event returns null (not indexed)**; **no `context_compacted` case remains**.
-- **`backoff.test.ts`**: 3 consecutive failures → `nextRetryAtEventSeq` set per doubling table (Important 1); 10 consecutive → persistent-disable flag set on `SessionState.compactionDisabled` + alarm emitted; successful summary clears BOTH `nextRetryAtEventSeq` and `compactionDisabled`; **walk position: walks from end-of-log backward, NOT from latest `turn_end` (Important 7)** — fixture has `turn_end` followed by `compaction_failed` followed by `compaction_failed`; assertion is that the count is 2, not 0; **`compaction_failed{reason: 'user_initiated'}` events are SKIPPED by the backoff walk (Critical 6)** — fixture: 3 consecutive user-initiated failures + 0 global/emergency; assertion is no backoff, no disable; **mixed sequence: 2 global + 1 user_initiated + 1 global** → count is 3 (the user-initiated event doesn't reset the count but doesn't increment it either; spec says walk skips it transparently — assert this behavior explicitly).
+- **`backoff.test.ts`**: 3 consecutive failures → `nextRetryAtEventSeq` set per doubling table (Important 1); 10 consecutive → persistent-disable flag set on `SessionState.compactionDisabled` + alarm emitted; successful summary clears BOTH `nextRetryAtEventSeq` and `compactionDisabled`; **walk position: walks from end-of-log backward, NOT from latest `turn_end` (Important 7)** — fixture has `turn_end` followed by `compaction_failed` followed by `compaction_failed`; assertion is that the count is 2, not 0; **walk SKIPS over normal turn events between consecutive failures (v6 Critical 1)** — fixture matches the realistic on-disk shape `[message_1, turn_end_1, compaction_failed_1(global), prompt_2, turn_start_2, message_2, turn_end_2, compaction_failed_2(global), prompt_3, turn_start_3, message_3, turn_end_3, compaction_failed_3(global)]`; assertion: walk counts 3, not 1 (v5's `turn_end`-terminates-walk bug would have failed at count=1); **`compaction_failed{reason: 'user_initiated'}` events are SKIPPED by the backoff walk (Critical 6)** — fixture: 3 consecutive user-initiated failures + 0 global/emergency; assertion is no backoff, no disable; **mixed sequence: 2 global + 1 user_initiated + 1 global** → count is 3 (the user-initiated event doesn't reset the count but doesn't increment it either; spec says walk skips it transparently — assert this behavior explicitly); **persistence round-trip (v6 Critical 6)** — write `nextRetryAtEventSeq` and `compactionDisabled` via the lifecycle-hook's `writeSessionState(... ...backoffPatch)` call, simulate restart by closing-and-reopening the session, re-read via `readSessionState`, assert both fields survive and the gate-check in `evaluateTrigger` returns `fire: false, reason: 'backoff'` (or `'disabled'`); **`EVENTS_PER_TURN_APPROX = 12` (v6 Minor 5)** — fixture asserts the doubling-table math uses 12, not 4: for `consecutive=3`, `nextRetryAtEventSeq === currentEventSeq + 12` (`skipTurns=1` × EPTA=12).
 
 All unit tests use pure synthetic data — no LLM call. No mocking the API; pure-function logic only.
 
@@ -925,10 +1102,10 @@ Not blocking. Capture as follow-ups during implementation:
 2. `tail-policy.ts` (pure function on events + modelMaxContext; single-pass walk; testable in isolation)
 3. `summarize-strategy.ts` — includes the markdown renderer, the summarizer prompt builder, and the budget-retry helper as top-level functions in this file. Pure-function unit tests with synthetic Provider. Single rebuild path. Trim-tool-results pre-pass.
 4. `compaction-trigger.ts` (pure function on turn_end event + session events; tests cover all gating including stop-reason whitelist, parameterized `?? 0` cache-field defaults, subagent gate, persistent-disable gate, backoff gate)
-5. `event-types.ts` (add new types `ConversationSummaryEventData` + `CompactionFailedEventData`; remove `context_compacted` from `DurableEventData` discriminated union and delete `ContextCompactedEventData` type) + `session-store.ts` modifications: add `compactionDisabled?: boolean` and `nextRetryAtEventSeq?: number` to the `SessionState` type AND update `readSessionState`'s whitelist parser to hydrate both new fields (Critical 4; without the whitelist update they round-trip-clear on every read) + `providers/base-provider.ts`: change `getModelContextWindow` from `protected` to `public` (Critical 7) + `message-builder.ts` modifications (allowlist + always-run `dropOrphanedToolBlocks`) + tests for all of the above (especially `readSessionState` round-trip test for both new fields, and `loadSession`-with-orphan-repair round-trip test).
+5. `event-types.ts` (add new types `ConversationSummaryEventData` + `CompactionFailedEventData`; remove `context_compacted` from `DurableEventData` discriminated union and delete `ContextCompactedEventData` type) + `session-store.ts` modifications: add `compactionDisabled?: boolean` and `nextRetryAtEventSeq?: number` to the `SessionState` type AND update `readSessionState`'s whitelist parser to hydrate both new fields (Critical 4; without the whitelist update they round-trip-clear on every read) + `providers/base-provider.ts`: change `getModelContextWindow` from `protected` to `public` (Critical 7) + `message-builder.ts` modifications: (a) implement the two-pass algorithm from §"Message-builder behavior step 1" (v6 Critical 5), (b) **DELETE the existing `context_compacted` branch at `message-builder.ts:290-322` entirely** (v6 Important 5 — once the type is removed from `DurableEventData` the branch won't compile; the old `preserved[]` rebuild logic is gone with the type), (c) implement the explicit allowlist with throw on unknown types per §"Message-builder behavior step 3", (d) move `dropOrphanedToolBlocks` to run as a post-pass per §"Message-builder behavior step 4". Tests for all of the above (especially `readSessionState` round-trip test for both new fields, `loadSession`-with-orphan-repair round-trip test, and the two-pass message-builder fixtures from §"Message-builder behavior step 1").
 6. `event-to-row.ts` modifications (REMOVE `context_compacted` case; `conversation_summary` + `compaction_failed` fall through to null — NOT indexed) + tests
-7. Update `/compact` slash command (`conversation/slash-commands.ts`) + `ent/session/compact` RPC handler (`rpc/handlers/session-operations.ts`) to emit `conversation_summary` via the new strategy. Remove the `strategy` wire-enum values `'trim-tool-results'` and `'selective'` from the RPC params type.
-8. Runner integration in `runner.ts` (the trigger hook, the `createProviderForTurn` pattern, the single `runExclusive` scope around success+failure writes, the backoff helper)
+7. Update `/compact` slash command (`conversation/slash-commands.ts`) + `ent/session/compact` RPC handler (`rpc/handlers/session-operations.ts`) to emit `conversation_summary` via the new strategy. Slash command uses the `writeAndAdvance` parameter (no enclosing `runExclusive` scope — v6 Critical 2); RPC handler uses raw `appendDurableEvent` + `writeSessionState` (already inside its own `runExclusive`). Both paths get explicit `try/catch` per §"Failure write contract for user-initiated callers". Remove the `strategy` wire-enum values `'trim-tool-results'` and `'selective'` from the RPC params type. DELETE `compaction/compact-dropped-messages.ts` and `compaction/registry.ts` (v6 Important 1 / Critical 4); both modules are unreferenced after this step and their continued existence creates the temptation to wire the new strategy into a shape that doesn't fit.
+8. Runner integration in `runner.ts` (the trigger hook per §"Lifecycle hook"; imports `createProviderForTurn` from `providers/turn-factory.ts` and `compact` from `compaction/summarize-strategy`; sources `modelId` from `this.config` and `connectionId` from `getEffectiveConfig(...)` per v6 C3; single `runExclusive` scope around success+failure writes; raw `appendDurableEvent` + `writeSessionState` for the durable writes per v6 C2; explicit `writeSessionState` calls that persist `nextRetryAtEventSeq` / `compactionDisabled` per v6 C6)
 9. Sen-core companion PR: **delete** `sen-core-v2/src/turn-hooks/compaction-trigger.ts` and its wiring. This ships in lockstep with the lace trigger landing; sen-core no longer drives compaction.
 10. Register new strategy in `sen2/compaction/` harness as a strategy module
 11. First harness run against Ada-fixture; iterate on prompt/schema/thresholds based on output
@@ -1167,3 +1344,65 @@ No unresolvable tensions surfaced. Two minor decision points to flag:
 ### Findings I did not change (per spec instruction to surface tensions, not assume)
 
 None — every round-4 finding was source-verified and applied.
+
+---
+
+## v6 changelog (round-5 correctness fixes)
+
+Round 5 was a second-level correctness adversarial review of v5. Each numbered finding is accounted for. "Addressed how" entries describe the v6 change; "verified-as-bug" entries note the source verification.
+
+### Critical findings
+
+- **C1 — Backoff walk terminates on `turn_end`, so N=3 / N=10 escalations are unreachable.** Verified-as-bug. The lifecycle hook fires AFTER `turn_end` (lifecycle-hook pseudocode in §"Lifecycle hook"); so the on-disk shape between two consecutive failures is `..., turn_end_N, compaction_failed_N, prompt_{N+1}, turn_start_{N+1}, message_{N+1}, turn_end_{N+1}, compaction_failed_{N+1}, ...`. v5's walk terminated on the first `turn_end`, capping the count at 1. Addressed in the rewritten §"Failure backoff" → "Walk semantics (v6 Critical 1 + Important 6)": the walk now SKIPS over `turn_end`, `prompt`, `turn_start`, and the other non-strategic event types listed in the message-builder allowlist, only TERMINATING on a `conversation_summary` event or start-of-log, and only INCREMENTING on `compaction_failed{reason: 'global'|'emergency'}`. Test fixture updated to reflect the realistic on-disk shape (no back-to-back compaction_failed events).
+
+- **C2 — `/compact` slash command is NOT inside an outer `runExclusive` scope.** Verified-as-bug. `prompt.ts:169` invokes `handleSlashCommand(...)` with no enclosing `runExclusive`; only the `ent/session/compact` RPC handler at `session-operations.ts:468` wraps in `runExclusive`. v5 incorrectly claimed both ran inside `runExclusive`. Addressed in §"Failure write contract for user-initiated callers" (now refined per v6 Critical 2): two explicit pseudocode blocks — one for the RPC handler (raw `appendDurableEvent`, inside the existing outer scope) and one for the slash command (`writeAndAdvance`, no enclosing scope). The deadlock-guard contract in §"Strategy internal event writes (deadlock guard)" is also reworded as a two-pronged rule: inside an outer scope → raw appendDurableEvent; outside → writeAndAdvance.
+
+- **C3 — Lifecycle-hook pseudocode references nonexistent `RunnerDependencies.createProviderForTurn` / `connectionId` / `modelId`.** Verified-as-bug. `RunnerDependencies` at `core/conversation/types.ts:58-184` has `createProvider()` (no args), no `connectionId`, no `modelId`. `createProviderForTurn` is a top-level export at `providers/turn-factory.ts:16`. `modelId` lives on `this.config` (`runner.ts:337`). `connectionId` is sourced via `getEffectiveConfig(state.config, session.state.config)` at the RPC handler site (`session-operations.ts:475-476`). Addressed by rewriting the lifecycle-hook pseudocode in §"Lifecycle hook" to: import `createProviderForTurn` directly from `providers/turn-factory.ts`; destructure `modelId` and `sessionDir` from `this.config`; read `sessionStateForConfig` via `readSessionState(sessionDir)` then call `getEffectiveConfig` with `(undefined, sessionStateForConfig.config)` shape; pass `connectionId: effectiveConfig.connectionId` and `modelId` to `createProviderForTurn`. No new `RunnerDependencies` fields added — v6 picks option (b) from the briefing.
+
+- **C4 — `compact()` signature is NOT compatible with `CompactionStrategy.compact()`.** Verified-as-bug. Legacy interface at `compaction/types.ts:49-61`: `compact(events: LaceEvent[], context: CompactionContext): Promise<CompactionResult>` with `CompactionResult = {compactionEvent, compactedEvents}`. New function: `compact(events: TypedDurableEvent[], ctx: {sessionDir, summarizer, modelMaxContext, targetTokens, tailConfig}): Promise<{event, metrics}>`. Different on every parameter. Addressed by adding a new §"`compact()` is not a `CompactionStrategy.compact()` implementation (v6 Critical 4)" subsection with a comparison table; the strategy registry (`registry.ts`) and `compact-dropped-messages.ts` are DELETED in v6 (see §"Strategy registry — removed in v6" and the module layout box) — the new strategy is imported by name as a top-level function. No adapter, no shim. The `CompactionStrategy` interface in `compaction/types.ts` becomes unused and is deleted with the registry.
+
+- **C5 — Message-builder iterate-and-reset paradox.** Verified-as-bug. v5 said "reset `messages.length = 0` upon encountering the summary" AND "events with eventSeq ≥ `recentTailStartsAtEventSeq` are processed normally" — under in-order iteration these are incompatible (the tail events sit at seqs `[recentTailStartsAtEventSeq, summary_seq - 1]`, before the summary, so the reset throws them away). Addressed by rewriting §"Message-builder behavior step 1" as a two-pass algorithm: Pass 0 pre-scans for the latest `conversation_summary`; Pass 1 iterates in seq order, skipping events strictly summarized (`eventSeq < latestSummary.recentTailStartsAtEventSeq`), processing tail events normally, and when iteration reaches the `latestSummary.event` itself, calling `messages.unshift(...)` to PREPEND the capsule render (NOT `messages.length = 0` followed by push, which would discard the tail). Tests added for "tail events between recentTailStartsAtEventSeq and summary" and "two summaries — only the latest is rendered".
+
+- **C6 — `nextRetryAtEventSeq` and `compactionDisabled` pseudocode never persist to disk.** Verified-as-bug. v5's failure-backoff pseudocode declared the values as local variables and never called `writeSessionState`. Addressed by (a) extracting `computeBackoffStatePatch(state, consecutive): Partial<SessionState>` as a pure helper in `compaction-trigger.ts`, (b) showing the caller-side `writeSessionState(sessionDir, { ...nextState, ...backoffPatch })` call explicitly in the lifecycle-hook pseudocode in §"Lifecycle hook" (catch branch), and (c) showing the symmetric clear-on-success pattern in the success branch (`writeSessionState(sessionDir, { ...nextState, compactionDisabled: undefined, nextRetryAtEventSeq: undefined })`). Required test added: write the fields, simulate restart, re-read via `readSessionState`, assert the persisted values survive.
+
+### Important findings
+
+- **I1 — `compact-dropped-messages.ts` shim contradicts new signature.** Verified-as-bug. Same fix as C4 — the file is DELETED in v6 (module layout box and implementation-order step 7 updated). No adapter remains.
+
+- **I2 — `compact()` method-name claim doesn't preserve interface compatibility.** Same fix as C4. Wording updated everywhere.
+
+- **I3 — Lifecycle-hook pseudocode references undeclared `modelMaxContext` and `tailConfig` locals.** Addressed by the new lifecycle-hook pseudocode preamble in §"Lifecycle hook": `modelMaxContext = this.provider.getModelContextWindow(modelId)` (after Critical 7 visibility change); `tailConfig = DEFAULT_TAIL_CONFIG` imported from `compaction/tail-policy`; `triggerConfig = DEFAULT_TRIGGER_CONFIG` imported from `core/conversation/compaction-trigger`.
+
+- **I4 — In-flight tool_use cluster walk is O(N×K).** Verified-as-bug. v5 used `events.find(e => e.eventSeq === tailStartEventSeq)` inside a while loop. Addressed in §"Tail policy step 5" by switching to a backward index cursor (`tailIdx`) — single O(N) up-front to locate the boundary, then O(1) per decrement. Same pattern applied to step 6 (mid-turn split guard).
+
+- **I5 — `context_compacted` branch in message-builder not in step 5's deletion list.** Verified-as-bug. The branch at `message-builder.ts:290-322` references `ContextCompactedData`, which is gone once the type is removed from the union — won't compile. Addressed in implementation-order step 5: now explicitly says "DELETE the existing `context_compacted` branch at `message-builder.ts:290-322` entirely".
+
+- **I6 — Walk semantics for `user_initiated` are contradictory.** Verified-as-bug. v5 said "counts contiguous" AND "SKIPS user_initiated events" — mutually exclusive on a strict-contiguous walk. Addressed in §"Failure backoff" → "Walk semantics" (carrying the Critical 1 fix): the walk SKIPS over user_initiated failure events transparently (does not increment, does not reset). The walk continues looking for the next event. Test fixture covers this: mixed sequence 2 global + 1 user_initiated + 1 global → count is 3.
+
+- **I7 — Field-name precision note muddles writer vs reader.** Addressed by rewriting the "Field-name precision" paragraph in §"Trigger signal": now explicitly identifies WRITER (the precondition kata in `runner.ts`, which reads `response.usage.promptTokens` from the in-memory shape and emits the single integer to the durable shape) vs READER (the trigger evaluator, which only ever reads `latestTurnEnd.data.usage.lastCallInputContextTokens` from the durable event). Citations updated: writer reads at `runner.ts:598-625`, writer writes at `runner.ts:986-1000`. No `promptTokens` access on the reader side.
+
+- **I8 — Channel matcher includes a dead `"im"` entry.** Verified-as-bug. Slack channel IDs use `D` (DM), `C` (public channel), `G` (private channel). `im` is not a Slack channel-ID prefix; verified against `sen-core-v2/src/slack/envelope.ts` and its tests. Addressed in §"Tail policy step 2": dropped `<messages channel="im"`; matcher list is now `D` / `C` / `G` only, with the new "Slack channel-ID prefix" framing documented inline.
+
+### Minor findings
+
+- **M1 — `session-store.ts:147-162` citation off.** Verified-as-bug. The `readSessionState` function spans `:143-166`; the whitelist body itself is `:147-162`. Addressed in two places: the module-layout box (updated to `session-store.ts:143-166` with the parser-body sub-range called out) and the §"Persistent disable round-trip" subsection.
+
+- **M2 — Pseudocode duplicates `type` inside `data`.** Verified-as-bug. `event-to-row.ts:37-40` documents that the inner `data.type` is NOT serialized — wire convention has only the outer `type`. Addressed by removing the inner `data.type` from every pseudocode block in v6 (the `appendDurableEvent` calls in the lifecycle hook + the user-initiated failure-write blocks). Inline comment added in §"Failure write contract for user-initiated callers".
+
+- **M3 — `dropOrphanedToolBlocks` citation off.** Verified-as-bug. Function body is `message-builder.ts:114-189` (Pass A starts at 114, Pass B at 152). v5 said `:152-189` (Pass B only). Addressed in §"Message-builder behavior step 4": updated to `:114-189`.
+
+- **M4 — Runner translation citation off.** Verified-as-bug. The in-memory `promptTokens` → accumulator translation happens at `runner.ts:600` (read); the accumulator → durable `inputTokens` write happens at `runner.ts:986-1000`. v5 said `runner.ts:986-1000` for the translation. Addressed in the rewritten field-name-precision paragraph: writer reads at `:598-625`, writer writes at `:986-1000`. Both sites named explicitly.
+
+- **M5 — `EVENTS_PER_TURN_APPROX = 4` rationale is inverted.** Verified-as-bug. Real Ada-like load is ~12.5 events/turn; setting EPTA=4 means the formula reaches the target faster than nominal turns elapse, so we wait SHORTER than nominal, not longer. Addressed in §"Failure backoff": EPTA is now `12` (matches Ada-like load); rationale rewritten to be honest about over-waiting on light sessions (acceptable; safe direction; doubling-tier scaling has headroom). The "switch to walking turn_end events directly if over-wait bites" fallback is named as a deferred kata.
+
+### Findings disproved on re-verification (v6)
+
+None — every round-5 finding source-verified.
+
+### Findings I am surfacing to Jesse (v6)
+
+- **`compact-dropped-messages.ts` and `registry.ts` deletion.** I picked the cleaner path (delete both, import the new `compact()` by name from `summarize-strategy.ts`) over the adapter-shim path. The shim would have meant maintaining two `CompactionContext` shapes and two `CompactionResult` shapes for no current benefit. If a future user wants to provide a second strategy, the typed-capsule pattern (top-level exported `compact()` function with a typed `CompactionContext`) is what to extend; the legacy `LaceEvent[]`-based interface was not the right base. Surfacing because the briefing said "Pick one and document both paths" — I picked one and didn't document the rejected alternative beyond this note.
+
+- **`getEffectiveConfig` call shape in the lifecycle hook.** The RPC handler has `state.config` (AgentServerState) in scope; the runner does not. I wrote the hook as `getEffectiveConfig(undefined, sessionStateForConfig.config)` — passing `undefined` for the AgentServerState-level config. This works IF `getEffectiveConfig` tolerates an undefined first arg (most do — they fall back to session-level config). If it throws on undefined, the runner needs to receive a snapshot of `state.config` via `RunnerDependencies` (one new optional field). I did NOT add that field in this revision because adding a new dep field for a fallback case I haven't verified felt premature. If the implementer hits a throw, file a kata or thread one extra field.
+
+- **`EVENTS_PER_TURN_APPROX = 12`.** Set based on the cost-audit-pattern note that Ada runs ~12.5 events/turn. Lighter sessions wait longer; heavier sessions wait shorter. If the choice between "12 (Ada-tuned)" and "switch to counting turn_end events directly (accurate everywhere)" turns out to matter, the latter is the right answer but costs an extra walk per evaluation. Deferred per the briefing's "Acceptable because the backoff-tier scaling has plenty of headroom" framing.
