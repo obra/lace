@@ -349,6 +349,11 @@ export async function compact(
 
   const preservedTail = buildPreservedTail(tail);
 
+  // Avoid adjacent user-role messages: if the first tail entry is also user-role,
+  // merge the prefix into it rather than prepending a separate user entry.
+  // This keeps the role-alternation invariant that providers require.
+  const preserved = buildPreservedWithPrefix(prefixContent, preservedTail);
+
   return {
     compactionEvent: {
       type: 'context_compacted',
@@ -356,10 +361,41 @@ export async function compact(
         type: 'context_compacted',
         strategy: 'track-based',
         messagesCompacted: earlier.length,
-        preserved: [{ role: 'user', content: prefixContent }, ...preservedTail],
+        preserved,
       },
     },
   };
+}
+
+/**
+ * Prepend the compaction prefix to the preserved tail, merging into the first
+ * entry when it is also user-role to prevent consecutive user messages.
+ */
+function buildPreservedWithPrefix(prefix: string, tail: PreservedMessage[]): PreservedMessage[] {
+  if (tail.length === 0 || tail[0].role !== 'user') {
+    // No adjacency problem — prefix stands alone.
+    return [{ role: 'user', content: prefix }, ...tail];
+  }
+
+  // First tail entry is user-role: merge prefix into it.
+  const first = tail[0];
+  let mergedContent: string | ContentBlock[];
+  if (typeof first.content === 'string') {
+    mergedContent = prefix + '\n\n' + first.content;
+  } else {
+    // ContentBlock[] — build a merged block array preserving any existing blocks.
+    const prefixBlock: ContentBlock = { type: 'text', text: prefix };
+    mergedContent = [prefixBlock, ...first.content];
+  }
+
+  const mergedFirst: PreservedMessage = {
+    role: 'user',
+    content: mergedContent,
+    ...(first.toolCalls ? { toolCalls: first.toolCalls } : {}),
+    ...(first.toolResults ? { toolResults: first.toolResults } : {}),
+  };
+
+  return [mergedFirst, ...tail.slice(1)];
 }
 
 type PreservedMessage = {

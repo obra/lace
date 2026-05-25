@@ -2311,6 +2311,55 @@ describe('ConversationRunner', () => {
     it('fires track-based compaction after turn_end at 60%+ pressure', async () => {
       // Context window: 1_000_000. Prompt tokens: 700_000 → pressure = 0.70 > 0.60.
       // stopReason = 'end_turn' is a clean stop, so compaction must fire.
+      //
+      // Pre-seed 11 complete turns so splitAtTailBoundary finds earlier.length > 0
+      // and compact() produces a real event rather than { noop: true }.
+      // Each synthetic turn: prompt + turn_start + turn_end = 3 events.
+      const now = new Date().toISOString();
+      const preSeedLines: string[] = [
+        JSON.stringify({
+          eventSeq: 1,
+          timestamp: now,
+          type: 'system_prompt_set',
+          data: { type: 'system_prompt_set', text: 'You are a test assistant.' },
+        }),
+      ];
+      let seq = 2;
+      for (let i = 0; i < 11; i++) {
+        const tid = `pre_turn_${i}`;
+        preSeedLines.push(
+          JSON.stringify({
+            eventSeq: seq++,
+            timestamp: now,
+            type: 'prompt',
+            data: { type: 'prompt', content: [{ type: 'text', text: `seed ${i}` }] },
+          })
+        );
+        preSeedLines.push(
+          JSON.stringify({
+            eventSeq: seq++,
+            timestamp: now,
+            turnId: tid,
+            type: 'turn_start',
+            data: { type: 'turn_start' },
+          })
+        );
+        preSeedLines.push(
+          JSON.stringify({
+            eventSeq: seq++,
+            timestamp: now,
+            turnId: tid,
+            type: 'turn_end',
+            data: { type: 'turn_end', stopReason: 'end_turn' },
+          })
+        );
+      }
+      writeFileSync(join(sessionDir, 'events.jsonl'), preSeedLines.join('\n') + '\n');
+      writeFileSync(
+        join(sessionDir, 'state.json'),
+        JSON.stringify({ nextEventSeq: seq, nextStreamSeq: 1 })
+      );
+
       const provider = new CompactionTestProvider(1_000_000, 700_000, 'end_turn');
       const config: RunnerConfig = {
         sessionDir,

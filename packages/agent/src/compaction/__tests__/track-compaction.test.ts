@@ -345,10 +345,20 @@ describe('compact() with LLM fallback', () => {
     });
     expect(calls.length).toBeGreaterThan(0);
     expect(calls[0].modelId).toBe('test-model');
-    expect(result.compactionEvent.data.preserved[0]).toMatchObject({
-      role: 'user',
-      content: expect.stringContaining('condensed summary'),
-    });
+    // The prefix is merged into the first tail user message. Extract text
+    // from either a plain string or a ContentBlock[] to check for the summary.
+    const firstEntry = result.compactionEvent.data.preserved[0] as {
+      role: string;
+      content: string | Array<{ type: string; text?: string }>;
+    };
+    expect(firstEntry.role).toBe('user');
+    const firstText =
+      typeof firstEntry.content === 'string'
+        ? firstEntry.content
+        : (firstEntry.content as Array<{ type: string; text?: string }>)
+            .map((b) => b.text ?? '')
+            .join('');
+    expect(firstText).toContain('condensed summary');
   });
 
   it('does NOT call provider when all tracks fit', async () => {
@@ -397,9 +407,20 @@ describe('compact()', () => {
     expect(result.compactionEvent.data.strategy).toBe('track-based');
     expect(result.compactionEvent.data.messagesCompacted).toBe(6); // earlier events count
     expect(Array.isArray(result.compactionEvent.data.preserved)).toBe(true);
-    const first = result.compactionEvent.data.preserved[0] as { role: string; content: string };
+    const first = result.compactionEvent.data.preserved[0] as {
+      role: string;
+      content: string | Array<{ type: string; text?: string }>;
+    };
     expect(first.role).toBe('user');
-    expect(first.content).toContain('[Earlier conversation');
+    // The prefix is merged into the first tail user message. Extract the text
+    // regardless of whether content is a string or a ContentBlock[].
+    const firstText =
+      typeof first.content === 'string'
+        ? first.content
+        : (first.content as Array<{ type: string; text?: string }>)
+            .map((b) => b.text ?? '')
+            .join('');
+    expect(firstText).toContain('[Earlier conversation');
   });
 
   it('returns noop when there is nothing to compact (≤10 turns)', async () => {
@@ -410,6 +431,61 @@ describe('compact()', () => {
     ];
     const result = await compact(events, ctx);
     expect('noop' in result && result.noop).toBe(true);
+  });
+
+  it('merges prefix into first tail user message to avoid adjacent user roles', async () => {
+    // Build 12 turns: 2 go to earlier, 10 go to tail. The first tail event is a
+    // prompt (user-role). Without the merge, preserved[] would start with two
+    // consecutive user entries: [prefix, prompt, ...] which providers reject.
+    const events: TypedDurableEvent[] = [];
+    let seq = 1;
+    for (let t = 0; t < 12; t++) {
+      events.push(
+        event(seq++, 'prompt', {
+          content: [{ type: 'text', text: `msg ${t}` }],
+          track: `slack:T${t}`,
+        })
+      );
+      events.push(turnStart(seq++, `turn_${t}`));
+      events.push(turnEnd(seq++, `turn_${t}`));
+    }
+    const result = await compact(events, ctx);
+    expect('compactionEvent' in result).toBe(true);
+    if (!('compactionEvent' in result)) return;
+    const preserved = result.compactionEvent.data.preserved as Array<{
+      role: string;
+      content: unknown;
+    }>;
+    // The prefix must NOT form a separate user entry before the first tail user
+    // message. Instead it is merged in: preserved[0] carries both the prefix
+    // text and the tail prompt's text.
+    const first = preserved[0];
+    expect(first.role).toBe('user');
+    const firstText =
+      typeof first.content === 'string'
+        ? (first.content as string)
+        : (first.content as Array<{ type: string; text?: string }>)
+            .map((b) => b.text ?? '')
+            .join('');
+    expect(firstText).toContain('[Earlier conversation');
+    // The merged first-tail prompt text is also present (turn 2, content 'msg 2').
+    expect(firstText).toContain('msg 2');
+    // Crucially, preserved[0] is the only place the prefix lives — no separate
+    // user prefix entry before it would make preserved[0] and preserved[1] both
+    // user-role (the prefix+tail merge prevents that adjacency).
+    if (preserved.length > 1) {
+      // If there's a second entry, the merge worked: preserved[0] consumed what
+      // would have been the standalone prefix. Verify the prefix text does NOT
+      // appear again as a separate entry.
+      const second = preserved[1];
+      const secondText =
+        typeof second.content === 'string'
+          ? (second.content as string)
+          : (second.content as Array<{ type: string; text?: string }>)
+              .map((b) => b.text ?? '')
+              .join('');
+      expect(secondText).not.toContain('[Earlier conversation');
+    }
   });
 
   it('preserves tool_use events in the tail as PreservedMessage with toolCalls + toolResults', async () => {
@@ -496,9 +572,18 @@ describe('compact()', () => {
     }
 
     const result = await compact(events, ctx);
-    const prefix = (result.compactionEvent.data.preserved[0] as { content: string }).content;
-    expect(prefix).toContain('IP check');
-    expect(prefix).toMatch(/completed/);
+    const firstEntry = result.compactionEvent.data.preserved[0] as {
+      role: string;
+      content: string | Array<{ type: string; text?: string }>;
+    };
+    const prefixText =
+      typeof firstEntry.content === 'string'
+        ? firstEntry.content
+        : (firstEntry.content as Array<{ type: string; text?: string }>)
+            .map((b) => b.text ?? '')
+            .join('');
+    expect(prefixText).toContain('IP check');
+    expect(prefixText).toMatch(/completed/);
   });
 
   it('preserves context_injected events in the tail as user-role messages', async () => {

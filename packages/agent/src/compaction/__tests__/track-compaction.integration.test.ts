@@ -44,11 +44,25 @@ describe('compact() against Ada fixture', () => {
       // prefix entry + at least some preserved tail entries
       expect(result.compactionEvent.data.preserved.length).toBeGreaterThan(1);
 
-      const first = result.compactionEvent.data.preserved[0] as {
+      const preserved = result.compactionEvent.data.preserved as Array<{
         role: string;
-        content: string;
-      };
-      const prefix = first.content;
+        content: string | Array<{ type: string; text?: string }>;
+      }>;
+
+      // Extract text from either string or ContentBlock[] for content assertions.
+      const extractText = (c: string | Array<{ type: string; text?: string }>) =>
+        typeof c === 'string' ? c : c.map((b) => b.text ?? '').join('');
+
+      const first = preserved[0];
+      const prefix = extractText(first.content);
+
+      // The prefix must not form a standalone user entry that would make the
+      // first two preserved entries both user-role. If preserved[1] exists and
+      // is also user-role, the prefix merge did not work.
+      if (preserved.length > 1 && preserved[1].role === 'user') {
+        // prefix must be absent from preserved[1] — it was merged into preserved[0]
+        expect(extractText(preserved[1].content)).not.toContain('[Earlier conversation');
+      }
       expect(prefix).toContain('[Earlier conversation, compacted by track]');
 
       // Rough token check: prefix should be non-trivial (real content from Ada).
