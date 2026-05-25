@@ -25,6 +25,7 @@ class MockContainerRuntime extends BaseContainerRuntime {
       this.createIdOverride?.(config) ?? config.id ?? `mock-${Math.random().toString(36).slice(2)}`;
     this.callLog.push(`create:${containerId}`);
     const info: ContainerInfo = { id: containerId, state: 'created' };
+    info.mounts = config.mounts;
     this.containers.set(containerId, info);
     this.registerMounts(containerId, config);
     return containerId;
@@ -222,6 +223,26 @@ describe('ContainerManager', () => {
       await manager.materialize(baseSpec, { beforeCreate });
 
       expect(beforeCreate).not.toHaveBeenCalled();
+    });
+
+    it('rejects reusing a per-invocation container with stale managed skill mounts', async () => {
+      const firstSpec: ContainerSpec = {
+        ...baseSpec,
+        mounts: [
+          { source: '/host/skills-a', target: '/var/lace/skills/0', readonly: true },
+          { source: '/host/skills-b', target: '/var/lace/skills/1', readonly: true },
+        ],
+        managedMountTargetPrefixes: ['/var/lace/skills/'],
+      };
+      const secondSpec: ContainerSpec = {
+        ...firstSpec,
+        mounts: [{ source: '/host/skills-a', target: '/var/lace/skills/0', readonly: true }],
+      };
+      await manager.materialize(firstSpec);
+
+      await expect(manager.materialize(secondSpec)).rejects.toThrow(
+        /unexpected managed mount .*\/var\/lace\/skills\/1/
+      );
     });
   });
 

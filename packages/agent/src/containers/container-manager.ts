@@ -81,11 +81,25 @@ function findMissingPersistentMount(
   return null;
 }
 
-function findUnexpectedPersistentManagedMount(
+function findMissingManagedMount(
   spec: ContainerSpec,
   adoptable: ContainerInfo
 ): ContainerMount | null {
-  if (!spec.containerId || adoptable.mounts === undefined) return null;
+  if (adoptable.mounts === undefined) return null;
+  const prefixes = spec.managedMountTargetPrefixes ?? [];
+  if (prefixes.length === 0) return null;
+  for (const mount of spec.mounts) {
+    if (!prefixes.some((prefix) => targetMatchesPrefix(mount.target, prefix))) continue;
+    if (!adoptable.mounts.some((existing) => sameMount(existing, mount))) return mount;
+  }
+  return null;
+}
+
+function findUnexpectedManagedMount(
+  spec: ContainerSpec,
+  adoptable: ContainerInfo
+): ContainerMount | null {
+  if (adoptable.mounts === undefined) return null;
   const prefixes = spec.managedMountTargetPrefixes ?? [];
   if (prefixes.length === 0) return null;
   for (const mount of adoptable.mounts) {
@@ -172,7 +186,8 @@ export class ContainerManager {
       : await this.tryInspect(inspectContainerId);
 
     if (adoptable) {
-      const missingMount = findMissingPersistentMount(spec, adoptable);
+      const missingMount =
+        findMissingPersistentMount(spec, adoptable) ?? findMissingManagedMount(spec, adoptable);
       if (missingMount) {
         throw new ContainerError(
           `Existing persistent container '${adoptable.id}' is missing required mount ` +
@@ -180,7 +195,7 @@ export class ContainerManager {
           adoptable.id
         );
       }
-      const unexpectedMount = findUnexpectedPersistentManagedMount(spec, adoptable);
+      const unexpectedMount = findUnexpectedManagedMount(spec, adoptable);
       if (unexpectedMount) {
         throw new ContainerError(
           `Existing persistent container '${adoptable.id}' has unexpected managed mount ` +
