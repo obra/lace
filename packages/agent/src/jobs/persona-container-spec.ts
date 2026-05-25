@@ -63,6 +63,21 @@ export class PersonaContainerSpecError extends Error {
   }
 }
 
+function normalizeContainerTarget(target: string): string {
+  let out = target;
+  while (out.length > 1 && out.endsWith('/')) {
+    out = out.slice(0, -1);
+  }
+  return out;
+}
+
+function isUnderManagedSkillTarget(target: string): boolean {
+  const normalized = normalizeContainerTarget(target);
+  return (
+    normalized === SUBAGENT_SKILLS_TARGET || normalized.startsWith(`${SUBAGENT_SKILLS_TARGET}/`)
+  );
+}
+
 /**
  * Shared core: resolves a persona's declared mounts against the embedder
  * registry, applies the auto-injection rules (persona / lace-data / credentials),
@@ -111,6 +126,12 @@ function resolvePersonaMountsAndEnv(input: {
         `Persona '${personaName}' declares mount 'lace' — reserved for ` +
           `lace's auto-injection of the lace source tree into subagent ` +
           `containers. Remove it from the persona file's runtime.mounts.`
+      );
+    }
+    if (isUnderManagedSkillTarget(target)) {
+      throw new PersonaContainerSpecError(
+        `Persona '${personaName}' declares mount '${mountName}' targeting '${target}' — ` +
+          `reserved for lace's managed skill mount namespace. Choose a different target.`
       );
     }
     // 'scratch' is reserved for per_invocation personas only — lace auto-injects
