@@ -175,7 +175,7 @@ describe('salienceForTrack', () => {
       event(4, 'turn_end', { stopReason: 'end_turn' }, 'turn_1'),
     ];
     const block = salienceForTrack('slack:T:C1:1.0', events);
-    expect(block?.body).toContain('<slack-thread');
+    expect(block?.body).toContain('<slack-thread ref="slack:T0FIXTURE:C1|test/1.0"');
     expect(block?.body).toContain('from="@U1|test"');
     expect(block?.body).toContain('>hello</slack_message>');
     expect(block?.body).toContain('from="me"');

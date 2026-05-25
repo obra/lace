@@ -248,16 +248,6 @@ function xmlEscapeBody(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** XML-escape attribute value: &, <, >, ", ' */
-function xmlEscapeAttr(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
 function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock {
   // Collect entries in chronological (eventSeq) order — interleaves inbound
   // prompt messages with outbound tool_use sends rather than segregating them.
@@ -311,21 +301,11 @@ function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock
     group.entries = dedupeConsecutive(group.entries, (e) => e.text);
   }
 
-  // Build wrapper attributes from metadata extracted from first envelope.
+  // Build wrapper ref from metadata extracted from first envelope.
+  // channel and thread_ts are already encoded in the ref (slack:<team>:<channel>|<label>/<thread_ts>),
+  // so emitting them as separate attributes would duplicate the information.
   const meta = firstEnvelopeMeta ?? {};
   const convRef = meta.convRef ?? trackId;
-  const channelDisplayToken = meta.channelDisplayToken;
-  const threadTs = meta.threadTs;
-
-  // Build <slack-thread> wrapper with conversation locator and channel token.
-  // The channel attribute uses the XML-escaped display token (same form as live envelopes).
-  const wrapperAttrs: string[] = [`ref="${convRef}"`];
-  if (channelDisplayToken) {
-    wrapperAttrs.push(`channel="${xmlEscapeAttr(channelDisplayToken)}"`);
-  }
-  if (threadTs) {
-    wrapperAttrs.push(`thread_ts="${threadTs}"`);
-  }
 
   const msgLines: string[] = [];
   for (const group of groups) {
@@ -337,7 +317,7 @@ function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock
     }
   }
 
-  const body = `<slack-thread ${wrapperAttrs.join(' ')}>\n${msgLines.join('\n')}\n</slack-thread>`;
+  const body = `<slack-thread ref="${convRef}">\n${msgLines.join('\n')}\n</slack-thread>`;
   return { trackId, body, estimatedTokens: estimate(body) };
 }
 

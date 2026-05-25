@@ -78,10 +78,11 @@ describe('compact() against Ada retagged fixture', () => {
       // Token budget: with track-stamping, most events are now routed to specific
       // tracks. Slack messages are truncated to 240 chars, alarms/bootstrap/reminders
       // are dropped. Expect a dramatic shrink vs the 52K+ untracked baseline.
-      // With XML <slack-thread>/<slack_message from="..."> format + consecutive-dedupe,
-      // prefix sits at ~14K tokens (XML wrapper overhead vs old markdown headers).
+      // With XML <slack-thread ref="...">/<slack_message from="..."> format +
+      // consecutive-dedupe, prefix sits at ~13.6K tokens (ref-only wrapper is
+      // smaller than the old channel/thread_ts wrapper).
       const estPrefixTokens = Math.ceil(prefix.length / 4);
-      expect(estPrefixTokens).toBeLessThan(16_000);
+      expect(estPrefixTokens).toBeLessThan(14_500);
       expect(estPrefixTokens).toBeGreaterThan(2_000);
 
       // There should be a meaningful number of events compacted.
