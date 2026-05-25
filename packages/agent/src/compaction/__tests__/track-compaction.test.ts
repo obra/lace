@@ -2,7 +2,11 @@
 // ABOUTME: Pure-function tests over synthetic TypedDurableEvent[] fixtures
 
 import { describe, it, expect } from 'vitest';
-import { buildTurnToTrackMap, groupEarlierEventsByTrack } from '../track-compaction';
+import {
+  buildTurnToTrackMap,
+  groupEarlierEventsByTrack,
+  salienceForTrack,
+} from '../track-compaction';
 import type { DurableEventData, TypedDurableEvent } from '@lace/agent/storage/event-types';
 
 const event = (
@@ -87,5 +91,100 @@ describe('groupEarlierEventsByTrack', () => {
     const groups = groupEarlierEventsByTrack(events, new Map());
     expect(groups.get('untracked')).toBeUndefined();
     expect(groups.get('slack:A')?.map((e) => e.eventSeq)).toEqual([2]);
+  });
+});
+
+describe('salienceForTrack', () => {
+  it('alarm tracks drop entirely (return null)', () => {
+    const events: TypedDurableEvent[] = [
+      event(1, 'context_injected', {
+        content: [{ type: 'text', text: '<notification kind="alarm-fired">...' }],
+        track: 'alarm:foo',
+      }),
+    ];
+    expect(salienceForTrack('alarm:foo', events)).toBeNull();
+  });
+
+  it('reminder tracks drop entirely', () => {
+    const events: TypedDurableEvent[] = [
+      event(1, 'context_injected', { content: [], track: 'reminder:r1' }),
+    ];
+    expect(salienceForTrack('reminder:r1', events)).toBeNull();
+  });
+
+  it('system:bootstrap drops entirely', () => {
+    const events: TypedDurableEvent[] = [
+      event(1, 'context_injected', { content: [], track: 'system:bootstrap' }),
+    ];
+    expect(salienceForTrack('system:bootstrap', events)).toBeNull();
+  });
+
+  it('system:idle-errors emits count-only', () => {
+    const events: TypedDurableEvent[] = [
+      event(1, 'context_injected', { content: [], track: 'system:idle-errors' }),
+      event(2, 'context_injected', { content: [], track: 'system:idle-errors' }),
+      event(3, 'context_injected', { content: [], track: 'system:idle-errors' }),
+    ];
+    const block = salienceForTrack('system:idle-errors', events);
+    expect(block?.body).toMatch(/3 idle-error reports/i);
+  });
+
+  it('slack tracks extract inbound text from prompts and outbound from slack_send_message tool_use', () => {
+    const events: TypedDurableEvent[] = [
+      event(
+        1,
+        'prompt',
+        {
+          content: [
+            {
+              type: 'text',
+              text: '<messages channel="C1" thread_ts="1.0"><current count="1"><slack_message user="U1">hello</slack_message></current></messages>',
+            },
+          ],
+          track: 'slack:T:C1:1.0',
+        },
+        undefined
+      ),
+      event(2, 'turn_start', {}, 'turn_1'),
+      event(
+        3,
+        'tool_use',
+        {
+          toolCallId: 't1',
+          name: 'slack/send_message',
+          input: { channel: 'C1', text: 'hi back' },
+        },
+        'turn_1'
+      ),
+      event(4, 'turn_end', { stopReason: 'end_turn' }, 'turn_1'),
+    ];
+    const block = salienceForTrack('slack:T:C1:1.0', events);
+    expect(block?.body).toContain('hello');
+    expect(block?.body).toContain('hi back');
+  });
+
+  it('job tracks emit "delegated X → outcome" using job_started/job_finished', () => {
+    const events: TypedDurableEvent[] = [
+      event(1, 'job_started', {
+        jobId: 'job_a',
+        jobType: 'delegate',
+        description: 'IP check',
+      }),
+      event(2, 'job_finished', { jobId: 'job_a', outcome: 'completed' }),
+    ];
+    const block = salienceForTrack('job:job_a', events);
+    expect(block?.body).toMatch(/IP check.*completed/);
+  });
+
+  it('untracked falls back to a generic prose extraction', () => {
+    const events: TypedDurableEvent[] = [
+      event(1, 'prompt', { content: [{ type: 'text', text: 'a legacy prompt' }] }),
+      event(2, 'turn_start', {}, 'turn_1'),
+      event(3, 'message', { content: 'an assistant reply' }, 'turn_1'),
+      event(4, 'turn_end', { stopReason: 'end_turn' }, 'turn_1'),
+    ];
+    const block = salienceForTrack('untracked', events);
+    expect(block?.body).toContain('a legacy prompt');
+    expect(block?.body).toContain('an assistant reply');
   });
 });
