@@ -1972,7 +1972,7 @@ describe('ConversationRunner', () => {
         //   3. retry end_turn (promptTokens=90, cacheCreation=0, cacheRead=700)
         //
         // lastCallInputContextTokens must equal only call 3's snapshot (790),
-        // NOT the cumulative sum across all three calls (300).
+        // NOT summed across calls like inputTokens is (100+110+90=300).
         let callCount = 0;
 
         class ThreeCallUsageProvider extends AIProvider {

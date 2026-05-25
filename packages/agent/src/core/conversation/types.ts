@@ -276,6 +276,13 @@ export interface RunResult {
     outputTokens: number;
     cacheCreationInputTokens?: number;
     cacheReadInputTokens?: number;
+    /**
+     * The LAST API call's on-the-wire input context size for this turn (not
+     * summed across calls). See TurnEndEventData.usage.lastCallInputContextTokens
+     * for the full rationale. Mirrored here because runner.run() returns the
+     * same shape as its emitted turn_end event.
+     */
+    lastCallInputContextTokens?: number;
     costUsd?: number;
   };
 }
