@@ -624,6 +624,19 @@ const SessionPromptResultSchema = z
       'incomplete',
       'permission_cancelled',
       'failed',
+      // PRI-1818: fine-grained error stopReasons written by the runner's
+      // finally block when the agentic loop threw. The runner rethrows after
+      // writing turn_end, so these values do not flow through the RPC response
+      // on a real run; they are listed for schema parity with the durable
+      // `turn_end` event shape so consumers reading both surfaces accept the
+      // same enum.
+      'provider_error_overloaded',
+      'provider_error_invalid',
+      'provider_error_network',
+      'provider_error_other',
+      'tool_error_throw',
+      'tool_error_timeout',
+      'internal_error',
     ]),
     stopDetails: LaceStopDetailsSchema.nullable().optional(),
     content: z.array(ContentBlockSchema),
@@ -2001,6 +2014,17 @@ const SessionUpdateTurnEndSchema = z
       'incomplete',
       'permission_cancelled',
       'failed',
+      // PRI-1818: fine-grained error stopReasons written by the runner's
+      // finally block when the agentic loop threw. Match the
+      // SessionPromptResultSchema enum so durable turn_end events and the
+      // session/update notification share a single shape.
+      'provider_error_overloaded',
+      'provider_error_invalid',
+      'provider_error_network',
+      'provider_error_other',
+      'tool_error_throw',
+      'tool_error_timeout',
+      'internal_error',
     ]),
     stopDetails: LaceStopDetailsSchema.nullable().optional(),
     cacheMissReason: BetaCacheMissReasonSchema.nullable().optional(),

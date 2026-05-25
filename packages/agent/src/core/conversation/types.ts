@@ -216,6 +216,20 @@ export interface RunParams {
  * provider reports `stopReason === 'failed'`). Non-terminal provider stops
  * (`'tool_use'`, `'pause_turn'`) are intentionally excluded — the runner
  * handles them internally.
+ *
+ * The error-shaped values (`provider_error_*`, `tool_error_*`, `internal_error`)
+ * are written by the runner's finally block when the agentic loop threw, so
+ * every `turn_start` has a matching `turn_end` even on failure. They surface
+ * in the durable `turn_end` event for downstream consumers (cost accounting,
+ * compaction, supervision UI). The runner rethrows after writing turn_end, so
+ * the returned `RunResult` never carries these values on a real run — they are
+ * included in the union for type compatibility with the internal stopReason
+ * variable that gets persisted to the durable log. See PRI-1818.
+ *
+ * `process_died` is intentionally NOT included — that label is written by the
+ * crash-recovery scan at session-open time when an orphan `turn_start` is
+ * found (PRI-1818 #3). `prompt_handler_caught` is the prompt.ts defense-in-
+ * depth fallback label (PRI-1818 #2) and is similarly not in this union.
  */
 export interface RunResult {
   /** Unique identifier for this turn */
@@ -232,7 +246,14 @@ export interface RunResult {
     | 'budget_exceeded'
     | 'incomplete'
     | 'permission_cancelled'
-    | 'failed';
+    | 'failed'
+    | 'provider_error_overloaded'
+    | 'provider_error_invalid'
+    | 'provider_error_network'
+    | 'provider_error_other'
+    | 'tool_error_throw'
+    | 'tool_error_timeout'
+    | 'internal_error';
   /**
    * Structured stop detail when the provider supplied one (refusal category,
    * stop sequence, max-output-tokens source, etc.). `null` for runner-derived
