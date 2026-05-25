@@ -1,5 +1,5 @@
 // ABOUTME: Track-based compaction strategy — demux + salience + render
-// ABOUTME: Replaces summarize-strategy.ts; reuses context_compacted event type
+// ABOUTME: Uses context_compacted event type for event-sourced replay
 
 import { isEventDataOfType } from '@lace/agent/storage/event-types';
 import type { TypedDurableEvent, ContextCompactedEventData } from '@lace/agent/storage/event-types';

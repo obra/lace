@@ -2,7 +2,6 @@
 // ABOUTME: Events include user messages, agent messages, tool calls, and tool results
 
 import type { ToolCall, ToolResult } from '@lace/agent/tools/types';
-import type { CompactionData } from '@lace/agent/compaction/types';
 import type { ApprovalDecision } from '@lace/agent/tools/types';
 import type { CombinedTokenUsage } from '@lace/agent/token-management/types';
 import type { MCPServerConfig } from '@lace/agent/config/mcp-types';
@@ -19,7 +18,6 @@ export const EVENT_TYPES = [
   'LOCAL_SYSTEM_MESSAGE',
   'SYSTEM_PROMPT',
   'USER_SYSTEM_PROMPT',
-  'COMPACTION',
   // Transient events (not persisted to database)
   'AGENT_TOKEN',
   'AGENT_STREAMING',
@@ -396,10 +394,6 @@ export type LaceEvent =
   | (BaseLaceEvent & {
       type: 'USER_SYSTEM_PROMPT';
       data: string;
-    })
-  | (BaseLaceEvent & {
-      type: 'COMPACTION';
-      data: CompactionData;
     })
   | (BaseLaceEvent & {
       type: 'AGENT_TOKEN';

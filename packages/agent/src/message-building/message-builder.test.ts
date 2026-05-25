@@ -180,9 +180,9 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_result recovery
   });
 
   it('preserves Ada-shape pattern (user-then-tool-result orphans) cleanly', () => {
-    // Mimics what summarize-strategy currently emits:
+    // Mimics the Ada-shape context_compacted event:
     // pure user messages first, then recent non-user events including tool_results
-    // whose tool_uses live in the older (summarized-away) events.
+    // whose tool_uses live in the older (compacted-away) events.
     const event = {
       type: 'context_compacted',
       eventSeq: 1,

@@ -1,15 +1,6 @@
-// ABOUTME: Compaction strategy system for conversation compression
-// ABOUTME: Enables conversation size reduction while preserving essential context
+// ABOUTME: Compaction system for conversation compression
+// ABOUTME: Track-based compaction reduces conversation size while preserving essential context
 
-export { registerDefaultStrategies } from './registry';
-export { TrimToolResultsStrategy } from './trim-tool-results-strategy';
-export { SummarizeCompactionStrategy } from './summarize-strategy';
-export { compactDroppedMessagesWithCore } from './compact-dropped-messages';
+export { compact } from './track-compaction';
 
-export type {
-  CompactionStrategy,
-  CompactionContext,
-  CompactionData,
-  CompactionResult,
-  CompactionAgent,
-} from './types';
+export type { CompactionContext } from './types';
