@@ -3,14 +3,19 @@
 
 import { describe, it, expect } from 'vitest';
 import { buildTurnToTrackMap, groupEarlierEventsByTrack } from '../track-compaction';
-import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
+import type { DurableEventData, TypedDurableEvent } from '@lace/agent/storage/event-types';
 
-const event = (seq: number, type: string, data: any, turnId?: string): TypedDurableEvent => ({
+const event = (
+  seq: number,
+  type: DurableEventData['type'],
+  data: Record<string, unknown>,
+  turnId?: string
+): TypedDurableEvent => ({
   eventSeq: seq,
   timestamp: `2026-05-24T00:00:${String(seq).padStart(2, '0')}Z`,
   ...(turnId ? { turnId } : {}),
-  type: type as any,
-  data: { type, ...data },
+  type,
+  data: { type, ...data } as TypedDurableEvent['data'],
 });
 
 describe('buildTurnToTrackMap', () => {

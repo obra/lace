@@ -1,11 +1,8 @@
 // ABOUTME: Track-based compaction strategy — demux + salience + render
 // ABOUTME: Replaces summarize-strategy.ts; reuses context_compacted event type
 
-import type {
-  TypedDurableEvent,
-  PromptEventData,
-  ContextInjectedEventData,
-} from '@lace/agent/storage/event-types';
+import { isEventDataOfType } from '@lace/agent/storage/event-types';
+import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 
 export const UNTRACKED = 'untracked' as const;
 
@@ -18,9 +15,8 @@ export function buildTurnToTrackMap(events: TypedDurableEvent[]): Map<string, st
   const map = new Map<string, string>();
   let pendingPromptTrack: string | undefined;
   for (const e of events) {
-    if (e.type === 'prompt') {
-      const data = e.data as PromptEventData;
-      pendingPromptTrack = data.track ?? UNTRACKED;
+    if (isEventDataOfType(e.data, 'prompt')) {
+      pendingPromptTrack = e.data.track ?? UNTRACKED;
       continue;
     }
     if (e.type === 'turn_start' && e.turnId) {
@@ -55,17 +51,14 @@ export function groupEarlierEventsByTrack(
   for (const e of events) {
     if (e.type === 'context_compacted') continue;
 
-    if (e.type === 'context_injected') {
-      const data = e.data as ContextInjectedEventData;
-      const ownTrack = data.track ?? UNTRACKED;
+    if (isEventDataOfType(e.data, 'context_injected')) {
       // Mid-turn injects use their OWN track regardless of enclosing turn.
-      push(ownTrack, e);
+      push(e.data.track ?? UNTRACKED, e);
       continue;
     }
 
-    if (e.type === 'prompt') {
-      const data = e.data as PromptEventData;
-      push(data.track ?? UNTRACKED, e);
+    if (isEventDataOfType(e.data, 'prompt')) {
+      push(e.data.track ?? UNTRACKED, e);
       continue;
     }
 
