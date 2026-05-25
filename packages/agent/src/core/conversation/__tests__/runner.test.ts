@@ -1963,6 +1963,134 @@ describe('ConversationRunner', () => {
       });
     });
 
+    describe('lastCallInputContextTokens on turn_end', () => {
+      it('writes lastCallInputContextTokens reflecting ONLY the final call, not all calls', async () => {
+        // Three-call turn:
+        //   1. tool_use (promptTokens=100, cacheCreation=500, cacheRead=0)
+        //   2. bare-text end_turn (promptTokens=110, cacheCreation=0, cacheRead=600)
+        //      → triggers bare-text retry (completedTurns > 0)
+        //   3. retry end_turn (promptTokens=90, cacheCreation=0, cacheRead=700)
+        //
+        // lastCallInputContextTokens must equal only call 3's snapshot (790),
+        // NOT the cumulative sum across all three calls (300).
+        let callCount = 0;
+
+        class ThreeCallUsageProvider extends AIProvider {
+          get providerName(): string {
+            return 'three-call-usage';
+          }
+          getProviderInfo() {
+            return {
+              name: 'three-call-usage',
+              displayName: 'Three Call Usage',
+              requiresApiKey: false,
+            };
+          }
+          isConfigured(): boolean {
+            return true;
+          }
+          get supportsStreaming(): boolean {
+            return true;
+          }
+          async createResponse(
+            messages: ProviderMessage[],
+            tools: Tool[],
+            model: string,
+            signal?: AbortSignal,
+            conversationState?: ConversationState,
+            options?: RequestOptions
+          ): Promise<ProviderResponse> {
+            return this.createStreamingResponse(
+              messages,
+              tools,
+              model,
+              signal,
+              conversationState,
+              options
+            );
+          }
+          async createStreamingResponse(): Promise<ProviderResponse> {
+            callCount++;
+            if (callCount === 1) {
+              return {
+                content: '',
+                toolCalls: [{ id: 'tc_1', name: 'bash', arguments: { command: 'echo hi' } }],
+                stopReason: 'tool_use',
+                usage: {
+                  promptTokens: 100,
+                  completionTokens: 20,
+                  cacheCreationInputTokens: 500,
+                  cacheReadInputTokens: 0,
+                },
+              };
+            }
+            if (callCount === 2) {
+              // Bare text — triggers bare-text retry since completedTurns > 0
+              return {
+                content: 'done',
+                toolCalls: [],
+                stopReason: 'end_turn',
+                usage: {
+                  promptTokens: 110,
+                  completionTokens: 5,
+                  cacheCreationInputTokens: 0,
+                  cacheReadInputTokens: 600,
+                },
+              };
+            }
+            // Third call (bare-text retry with tool_choice=required): final stop
+            return {
+              content: 'Verified.',
+              toolCalls: [],
+              stopReason: 'end_turn',
+              usage: {
+                promptTokens: 90,
+                completionTokens: 3,
+                cacheCreationInputTokens: 0,
+                cacheReadInputTokens: 700,
+              },
+            };
+          }
+        }
+
+        const config: RunnerConfig = {
+          sessionDir,
+          sessionId: 'sess_test',
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        };
+        const deps = createToolAwareMockDeps(() => new ThreeCallUsageProvider());
+        const runner = new ConversationRunner(config, deps);
+
+        const result = await runner.run({
+          content: [{ type: 'text', text: 'do work' }],
+          abortController: new AbortController(),
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+        });
+
+        expect(callCount).toBe(3);
+
+        // Cumulative input tokens across all three calls: 100 + 110 + 90
+        expect(result.usage.inputTokens).toBe(300);
+        // Snapshot of the LAST call only: 90 (input) + 0 (cache_creation) + 700 (cache_read)
+        expect(result.usage.lastCallInputContextTokens).toBe(790);
+
+        // Also verify the durable turn_end event carries the same value
+        const { events } = readDurableEvents(sessionDir, {});
+        const turnEndEvent = events.find((e: { type: string }) => e.type === 'turn_end') as
+          | {
+              type: string;
+              data: { usage: { inputTokens: number; lastCallInputContextTokens?: number } };
+            }
+          | undefined;
+        expect(turnEndEvent).toBeDefined();
+        expect(turnEndEvent?.data.usage.inputTokens).toBe(300);
+        expect(turnEndEvent?.data.usage.lastCallInputContextTokens).toBe(790);
+      });
+    });
+
     describe('empty assistant turn not persisted (Fix #2)', () => {
       /**
        * Provider that returns an empty response on turn 1, then stops.

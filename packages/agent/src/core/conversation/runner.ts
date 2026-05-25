@@ -384,6 +384,12 @@ export class ConversationRunner {
     let totalOutputTokens = 0;
     let totalCacheCreationInputTokens = 0;
     let totalCacheReadInputTokens = 0;
+    // Per-call snapshot of the LAST response's input + cache fields. Overwritten
+    // each call; the final value reflects the model's most recent on-the-wire
+    // context size. Used by the track-based compaction trigger.
+    let lastCallInputTokens = 0;
+    let lastCallCacheCreationInputTokens = 0;
+    let lastCallCacheReadInputTokens = 0;
     const previousSessionCostUsd = this.deps.getSessionCostUsd();
     let sessionCostUsd = previousSessionCostUsd;
 
@@ -606,6 +612,9 @@ export class ConversationRunner {
           totalOutputTokens += outputTokens;
           totalCacheCreationInputTokens += cacheCreationInputTokens;
           totalCacheReadInputTokens += cacheReadInputTokens;
+          lastCallInputTokens = inputTokens;
+          lastCallCacheCreationInputTokens = cacheCreationInputTokens;
+          lastCallCacheReadInputTokens = cacheReadInputTokens;
 
           // PRI-1817: real cache-aware cost. Anthropic bills cache_creation
           // at a premium over base input, cache_read at a steep discount.
@@ -994,6 +1003,10 @@ export class ConversationRunner {
               outputTokens: totalOutputTokens,
               cacheCreationInputTokens: totalCacheCreationInputTokens,
               cacheReadInputTokens: totalCacheReadInputTokens,
+              lastCallInputContextTokens:
+                lastCallInputTokens +
+                lastCallCacheCreationInputTokens +
+                lastCallCacheReadInputTokens,
               costUsd: turnCostUsd,
             },
           },
@@ -1026,6 +1039,8 @@ export class ConversationRunner {
         outputTokens: totalOutputTokens,
         cacheCreationInputTokens: totalCacheCreationInputTokens,
         cacheReadInputTokens: totalCacheReadInputTokens,
+        lastCallInputContextTokens:
+          lastCallInputTokens + lastCallCacheCreationInputTokens + lastCallCacheReadInputTokens,
         costUsd: turnCostUsd,
       },
     };
