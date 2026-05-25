@@ -441,12 +441,15 @@ export function registerSessionOperationHandlers(
       throwInvalidParams('strategy must be summarize|truncate|selective');
     }
 
+    // Default to 'summarize' (PRI-1824). 'truncate' only crops TOOL_RESULT
+    // text and reclaims ~10% of context on prose-heavy sessions, so making it
+    // the default was a near-no-op for callers that don't specify a strategy.
     const strategy =
       parsed?.strategy === 'summarize' ||
       parsed?.strategy === 'truncate' ||
       parsed?.strategy === 'selective'
         ? parsed.strategy
-        : 'truncate';
+        : 'summarize';
 
     const targetTokens =
       typeof parsed?.targetTokens === 'number' &&
