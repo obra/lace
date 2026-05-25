@@ -1,8 +1,8 @@
-// ABOUTME: Regression test that ent/session/compact (strategy:'summarize') calls
-// ABOUTME: setSystemPrompt(SUMMARIZER_SYSTEM_PROMPT) on the throwaway provider,
-// ABOUTME: preventing getEffectiveSystemPrompt warn-fallback noise (PRI-1799).
+// ABOUTME: Regression tests for ent/session/compact using the track-based strategy.
+// ABOUTME: Verifies the RPC handler returns the expected response shape and
+// ABOUTME: rejects unknown legacy strategy names.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,8 +10,6 @@ import { PassThrough } from 'node:stream';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../../../server';
 import { defaultInitializeParams } from '../../../__tests__/helpers/initialize';
-import { AIProvider } from '@lace/agent/providers/base-provider';
-import { SUMMARIZER_SYSTEM_PROMPT } from '@lace/agent/compaction/summarize-strategy';
 import { getSessionDir } from '@lace/agent/storage/session-store';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
@@ -30,11 +28,12 @@ function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
 
 /**
  * Write a minimal conversation into the session's events.jsonl so that
- * ent/session/compact has something to actually compact (dropped.length > 0).
+ * ent/session/compact has something to actually compact (earlier.length > 0
+ * after splitAtTailBoundary).
  *
  * We write a system_prompt_set + several message/turn_end events so that
- * buildProviderMessagesFromDurableEvents returns enough messages to pass the
- * preserveRecent threshold (default 10) and still have dropped messages.
+ * buildProviderMessagesFromDurableEvents returns enough messages and the
+ * track-based compaction has real events to process.
  */
 function writeMinimalConversation(sessionDir: string): void {
   const eventsPath = join(sessionDir, 'events.jsonl');
@@ -46,7 +45,7 @@ function writeMinimalConversation(sessionDir: string): void {
       type: 'system_prompt_set',
       data: { text: 'You are a test assistant.' },
     },
-    // 12 user+assistant turn pairs to ensure dropped.length > 0 after preserveRecent=0
+    // 12 user+assistant turn pairs to ensure earlier.length > 0 after tail split
     ...Array.from({ length: 12 }, (_, i) => [
       {
         eventSeq: 1 + i * 2,
@@ -68,7 +67,7 @@ function writeMinimalConversation(sessionDir: string): void {
   }
 }
 
-describe('ent/session/compact (strategy:summarize) — summarizer prompt (PRI-1799)', () => {
+describe('ent/session/compact — track-based strategy', () => {
   let originalLaceDir: string | undefined;
   let originalTestProvider: string | undefined;
   let tempDir: string;
@@ -96,10 +95,7 @@ describe('ent/session/compact (strategy:summarize) — summarizer prompt (PRI-17
     rmSync(workDir, { recursive: true, force: true });
   });
 
-  it('calls setSystemPrompt(SUMMARIZER_SYSTEM_PROMPT) on the throwaway provider', async () => {
-    // Spy on AIProvider.prototype.setSystemPrompt — TestAgentProvider inherits it.
-    const setSystemPromptSpy = vi.spyOn(AIProvider.prototype, 'setSystemPrompt');
-
+  it('returns previousTokens, currentTokens, and messagesCompacted', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
@@ -109,25 +105,60 @@ describe('ent/session/compact (strategy:summarize) — summarizer prompt (PRI-17
         sessionId: string;
       };
 
-      // Write enough conversation history that compact actually drops messages.
       const sessionDir = getSessionDir(newResult.sessionId);
       writeMinimalConversation(sessionDir);
 
-      // Reset the spy so we only see calls from the compact handler.
-      setSystemPromptSpy.mockClear();
+      const result = (await client.request('ent/session/compact', {
+        strategy: 'track-based',
+      })) as { previousTokens: number; currentTokens: number; messagesCompacted: number };
 
-      await client.request('ent/session/compact', {
-        strategy: 'summarize',
-        // preserveRecent:0 ensures ALL messages are in dropped, so the summarize
-        // path is reached even for a freshly populated session.
-        preserveRecent: 0,
-      });
-
-      // The compact handler must have called setSystemPrompt with the dedicated
-      // summarizer prompt — not with the session's agent persona.
-      expect(setSystemPromptSpy).toHaveBeenCalledWith(SUMMARIZER_SYSTEM_PROMPT);
+      expect(typeof result.previousTokens).toBe('number');
+      expect(typeof result.currentTokens).toBe('number');
+      expect(typeof result.messagesCompacted).toBe('number');
+      // Compaction should have reduced or maintained token count
+      expect(result.currentTokens).toBeLessThanOrEqual(result.previousTokens);
     } finally {
-      setSystemPromptSpy.mockRestore();
+      client.close();
+      server.close();
+    }
+  });
+
+  it('accepts no strategy (defaults to track-based)', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      await client.request('session/new', { cwd: workDir, mcpServers: [] });
+
+      // Should not throw when strategy is omitted
+      const result = (await client.request('ent/session/compact', {})) as {
+        previousTokens: number;
+        currentTokens: number;
+        messagesCompacted: number;
+      };
+
+      expect(typeof result.previousTokens).toBe('number');
+      expect(typeof result.currentTokens).toBe('number');
+      expect(typeof result.messagesCompacted).toBe('number');
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('rejects legacy strategy names', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      await client.request('session/new', { cwd: workDir, mcpServers: [] });
+
+      await expect(
+        client.request('ent/session/compact', { strategy: 'summarize' })
+      ).rejects.toMatchObject({ message: expect.stringContaining('track-based') });
+    } finally {
       client.close();
       server.close();
     }

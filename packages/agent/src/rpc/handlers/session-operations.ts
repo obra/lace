@@ -36,8 +36,8 @@ import {
   buildProviderMessagesFromDurableEvents,
   estimateProviderTokens,
 } from '../../message-building/message-builder';
-import { compactDroppedMessagesWithCore } from '../../compaction/compact-dropped-messages';
-import { SUMMARIZER_SYSTEM_PROMPT } from '@lace/agent/compaction/summarize-strategy';
+import { compact } from '@lace/agent/compaction/track-compaction';
+import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import { createProviderForTurn } from '../../providers/turn-factory';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { buildSessionConfigOptions, isApprovalMode } from '../session-config';
@@ -424,150 +424,53 @@ export function registerSessionOperationHandlers(
   peer.onRequest('ent/session/compact', async (params: unknown) => {
     assertSessionReady(state);
 
-    const parsed = params as
-      | {
-          strategy?: 'summarize' | 'trim-tool-results' | 'selective';
-          targetTokens?: number;
-          preserveRecent?: number;
-        }
-      | undefined;
-
-    if (
-      parsed?.strategy &&
-      parsed.strategy !== 'summarize' &&
-      parsed.strategy !== 'trim-tool-results' &&
-      parsed.strategy !== 'selective'
-    ) {
-      throwInvalidParams('strategy must be summarize|trim-tool-results|selective');
+    const parsed = params as { strategy?: string } | undefined;
+    if (parsed?.strategy && parsed.strategy !== 'track-based') {
+      throwInvalidParams('strategy must be track-based (legacy strategies removed)');
     }
 
-    // Default to 'summarize' (PRI-1824). 'truncate' only crops TOOL_RESULT
-    // text and reclaims ~10% of context on prose-heavy sessions, so making it
-    // the default was a near-no-op for callers that don't specify a strategy.
-    const strategy =
-      parsed?.strategy === 'summarize' ||
-      parsed?.strategy === 'trim-tool-results' ||
-      parsed?.strategy === 'selective'
-        ? parsed.strategy
-        : 'summarize';
-
-    const targetTokens =
-      typeof parsed?.targetTokens === 'number' &&
-      Number.isFinite(parsed.targetTokens) &&
-      parsed.targetTokens > 0
-        ? Math.trunc(parsed.targetTokens)
-        : undefined;
-
-    let preserveRecent =
-      typeof parsed?.preserveRecent === 'number' &&
-      Number.isFinite(parsed.preserveRecent) &&
-      parsed.preserveRecent >= 0
-        ? Math.trunc(parsed.preserveRecent)
-        : 10;
-
     return await runExclusive(async () => {
-      const { messages: beforeMessages, systemPrompt } = buildProviderMessagesFromDurableEvents(
-        state.activeSession!.dir
-      );
-      const systemPromptTokens = estimateTokens(systemPrompt);
-      const previousTokens = estimateProviderTokens(beforeMessages) + systemPromptTokens;
+      const sessionDir = state.activeSession!.dir;
 
-      const sessionStateForConfig = readSessionState(state.activeSession!.dir);
+      // Snapshot context size BEFORE compaction (for the response payload).
+      const { messages: beforeMessages, systemPrompt } =
+        buildProviderMessagesFromDurableEvents(sessionDir);
+      const previousTokens = estimateProviderTokens(beforeMessages) + estimateTokens(systemPrompt);
+
+      const sessionStateForConfig = readSessionState(sessionDir);
       const effectiveConfig = getEffectiveConfig(state.config, sessionStateForConfig.config);
+      const provider = await createProviderForTurn({
+        connectionId: effectiveConfig.connectionId,
+        modelId: effectiveConfig.modelId,
+      });
 
-      if (targetTokens !== undefined) {
-        while (
-          preserveRecent > 0 &&
-          systemPromptTokens + estimateProviderTokens(beforeMessages.slice(-preserveRecent)) >
-            targetTokens
-        ) {
-          preserveRecent -= 1;
-        }
-      }
+      const rawEvents = readDurableEvents(sessionDir, { limit: Number.MAX_SAFE_INTEGER });
+      // DurableEvent[] and TypedDurableEvent[] differ in their typing of `data`
+      // (Record<string, unknown> vs DurableEventData union). Runtime shape is
+      // identical. Same cast pattern is used in slash-commands.ts.
+      const events = rawEvents.events as unknown as TypedDurableEvent[];
 
-      const preservedRecentMessages =
-        preserveRecent > 0 ? beforeMessages.slice(-preserveRecent) : [];
-      const dropped = beforeMessages.slice(
-        0,
-        beforeMessages.length - preservedRecentMessages.length
-      );
+      const result = await compact(events, {
+        threadId: state.activeSession!.meta.sessionId,
+        provider,
+      });
 
-      let compactedDroppedMessages: ProviderMessage[] = [];
-      let summary: string | undefined;
-
-      if (dropped.length > 0) {
-        if (strategy === 'trim-tool-results') {
-          const result = await compactDroppedMessagesWithCore({
-            strategyId: 'trim-tool-results',
-            dropped,
-            threadId: state.activeSession!.meta.sessionId,
-          });
-          compactedDroppedMessages = result.messages;
-        } else {
-          const provider = await createProviderForTurn({
-            connectionId: effectiveConfig.connectionId,
-            modelId: effectiveConfig.modelId,
-          });
-          provider.setSystemPrompt(SUMMARIZER_SYSTEM_PROMPT);
-
-          const result = await compactDroppedMessagesWithCore({
-            strategyId: 'summarize',
-            dropped,
-            provider,
-            modelId: effectiveConfig.modelId || 'unknown-model',
-            threadId: state.activeSession!.meta.sessionId,
-          });
-          compactedDroppedMessages = result.messages;
-          summary = result.summary;
-        }
-      }
-
-      const nextProviderMessages: ProviderMessage[] = [
-        ...compactedDroppedMessages,
-        ...preservedRecentMessages,
-      ];
-
-      let _removedForBudget = 0;
-      let currentTokens = estimateProviderTokens(nextProviderMessages) + systemPromptTokens;
-      if (targetTokens !== undefined) {
-        while (nextProviderMessages.length > 0 && currentTokens > targetTokens) {
-          nextProviderMessages.shift();
-          _removedForBudget += 1;
-          currentTokens = estimateProviderTokens(nextProviderMessages) + systemPromptTokens;
-        }
-      }
-
-      const messagesCompacted = dropped.length;
-
-      const serializedPreserved = nextProviderMessages.map((m) => ({
-        role: m.role,
-        content: typeof m.content === 'string' ? m.content : '',
-        ...(Array.isArray(m.toolCalls) ? { toolCalls: m.toolCalls } : {}),
-        ...(Array.isArray(m.toolResults) ? { toolResults: m.toolResults } : {}),
-      }));
-
-      let sessionState = readSessionState(state.activeSession!.dir);
-      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+      let sessionState = readSessionState(sessionDir);
+      const { nextState } = appendDurableEvent(sessionDir, sessionState, {
         type: 'context_compacted',
-        data: {
-          strategy,
-          ...(targetTokens !== undefined ? { targetTokens } : {}),
-          preserveRecent,
-          messagesCompacted,
-          preserved: serializedPreserved,
-        },
+        data: result.compactionEvent.data as Record<string, unknown>,
       });
       sessionState = nextState;
-      writeSessionState(state.activeSession!.dir, sessionState);
+      writeSessionState(sessionDir, sessionState);
       state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+
+      const { messages: afterMessages } = buildProviderMessagesFromDurableEvents(sessionDir);
+      const currentTokens = estimateProviderTokens(afterMessages) + estimateTokens(systemPrompt);
 
       return {
         previousTokens,
         currentTokens,
-        messagesCompacted,
-        ...(strategy === 'summarize' && typeof summary === 'string' && summary.trim().length > 0
-          ? { summary }
-          : {}),
+        messagesCompacted: result.compactionEvent.data.messagesCompacted ?? 0,
       };
     });
   });
