@@ -750,7 +750,7 @@ export const EntAgentStatusResponseSchema = z
 
 const EntSessionCompactParamsSchema = z
   .object({
-    strategy: z.enum(['summarize', 'truncate', 'selective']).optional(),
+    strategy: z.enum(['summarize', 'trim-tool-results', 'selective']).optional(),
     targetTokens: z.number().optional(),
     preserveRecent: z.number().optional(),
   })
