@@ -487,6 +487,15 @@ export abstract class AIProvider extends EventEmitter {
     return catalogModel?.context_window || fallback;
   }
 
+  /**
+   * Public accessor for context-window size used by the compaction trigger.
+   * Falls back to 200 000 tokens when no catalog is loaded (e.g. test
+   * providers or providers that don't ship a catalog).
+   */
+  contextWindowForModel(modelId: string, fallback: number = 200_000): number {
+    return this.getModelContextWindow(modelId, fallback);
+  }
+
   // Get model max output tokens from catalog or fallback
   protected getModelMaxOutputTokens(modelId: string, fallback: number = 8192): number {
     if (!this._catalogData) {

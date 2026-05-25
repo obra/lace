@@ -2182,4 +2182,246 @@ describe('ConversationRunner', () => {
       });
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Track-based compaction trigger (Task 11)
+  // ---------------------------------------------------------------------------
+
+  describe('track-based compaction trigger', () => {
+    /**
+     * A provider whose usage can be configured at construction time, so we can
+     * precisely control lastCallInputContextTokens relative to the model's
+     * context window.
+     *
+     * getAvailableModels() returns a single model whose contextWindow is the
+     * value passed to the constructor, so contextWindowForModel() resolves it
+     * correctly. We hardcode stopReason so each test can exercise fire vs no-fire.
+     */
+    class CompactionTestProvider extends AIProvider {
+      constructor(
+        private readonly contextWindow: number,
+        private readonly promptTokens: number,
+        private readonly stopReason: string
+      ) {
+        super();
+      }
+
+      get providerName(): string {
+        return 'compaction-test';
+      }
+
+      getProviderInfo() {
+        return {
+          name: 'compaction-test',
+          displayName: 'Compaction Test Provider',
+          requiresApiKey: false,
+        };
+      }
+
+      isConfigured(): boolean {
+        return true;
+      }
+
+      get supportsStreaming(): boolean {
+        return true;
+      }
+
+      override getAvailableModels() {
+        return [
+          {
+            id: 'default',
+            displayName: 'Default',
+            contextWindow: this.contextWindow,
+            maxOutputTokens: 8192,
+          },
+        ];
+      }
+
+      override contextWindowForModel(_modelId: string, _fallback?: number): number {
+        return this.contextWindow;
+      }
+
+      protected async _createResponseImpl(): Promise<ProviderResponse> {
+        return {
+          content: 'done',
+          toolCalls: [],
+          stopReason: this.stopReason as ProviderResponse['stopReason'],
+          usage: {
+            promptTokens: this.promptTokens,
+            completionTokens: 10,
+            totalTokens: this.promptTokens + 10,
+          },
+        };
+      }
+
+      protected async _createStreamingResponseImpl(): Promise<ProviderResponse> {
+        return this._createResponseImpl();
+      }
+    }
+
+    let laceDir: string;
+    let sessionDir: string;
+    let sessionId: string;
+    let cwd: string;
+    let savedLaceDir: string | undefined;
+
+    beforeEach(() => {
+      laceDir = mkdtempSync(join(tmpdir(), 'lace-compaction-trigger-test-'));
+      sessionId = `sess_${randomUUID()}`;
+      sessionDir = join(laceDir, 'agent-sessions', sessionId);
+      cwd = join(tmpdir(), `lace-compaction-trigger-cwd-${randomUUID().substring(0, 8)}`);
+      mkdirSync(sessionDir, { recursive: true });
+      mkdirSync(cwd, { recursive: true });
+
+      writeFileSync(
+        join(sessionDir, 'meta.json'),
+        JSON.stringify({
+          sessionId,
+          workDir: cwd,
+          created: new Date().toISOString(),
+          persona: 'test',
+        })
+      );
+      writeFileSync(
+        join(sessionDir, 'state.json'),
+        JSON.stringify({ nextEventSeq: 2, nextStreamSeq: 1 })
+      );
+      writeFileSync(
+        join(sessionDir, 'events.jsonl'),
+        JSON.stringify({
+          eventSeq: 1,
+          timestamp: new Date().toISOString(),
+          type: 'system_prompt_set',
+          data: { type: 'system_prompt_set', text: 'You are a test assistant.' },
+        }) + '\n'
+      );
+
+      savedLaceDir = process.env.LACE_DIR;
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
+    });
+
+    afterEach(() => {
+      if (savedLaceDir === undefined) delete process.env.LACE_DIR;
+      else process.env.LACE_DIR = savedLaceDir;
+      if (existsSync(laceDir)) rmSync(laceDir, { recursive: true, force: true });
+      if (existsSync(cwd)) rmSync(cwd, { recursive: true, force: true });
+    });
+
+    it('fires track-based compaction after turn_end at 60%+ pressure', async () => {
+      // Context window: 1_000_000. Prompt tokens: 700_000 → pressure = 0.70 > 0.60.
+      // stopReason = 'end_turn' is a clean stop, so compaction must fire.
+      const provider = new CompactionTestProvider(1_000_000, 700_000, 'end_turn');
+      const config: RunnerConfig = {
+        sessionDir,
+        sessionId,
+        cwd,
+        executionMode: 'execute',
+        approvalMode: 'approve',
+      };
+      const deps = createMockDeps({
+        createProvider: vi.fn().mockImplementation(async () => provider),
+      });
+      const runner = new ConversationRunner(config, deps);
+
+      await runner.run({
+        content: [{ type: 'text', text: 'hello' }],
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
+      });
+
+      const { events } = readDurableEvents(sessionDir, {});
+      expect(events.some((e) => e.type === 'context_compacted')).toBe(true);
+    });
+
+    it('does not fire compaction when provider throws (non-clean stop reason)', async () => {
+      // When the provider throws, the runner sets stopReason = mapErrorToStopReason(err)
+      // which produces 'internal_error', 'provider_error_overloaded', etc. — all
+      // non-clean stop reasons that must NOT trigger compaction, even at emergency
+      // pressure levels.
+      class ThrowingHighPressureProvider extends AIProvider {
+        get providerName(): string {
+          return 'throwing-high-pressure';
+        }
+        getProviderInfo() {
+          return {
+            name: 'throwing-high-pressure',
+            displayName: 'Throwing High Pressure',
+            requiresApiKey: false,
+          };
+        }
+        isConfigured(): boolean {
+          return true;
+        }
+        get supportsStreaming(): boolean {
+          return true;
+        }
+        override contextWindowForModel(_modelId: string, _fallback?: number): number {
+          return 1_000_000;
+        }
+        protected async _createResponseImpl(): Promise<ProviderResponse> {
+          throw new Error('simulated provider failure at high pressure');
+        }
+        protected async _createStreamingResponseImpl(): Promise<ProviderResponse> {
+          throw new Error('simulated provider failure at high pressure');
+        }
+      }
+
+      const provider = new ThrowingHighPressureProvider();
+      const config: RunnerConfig = {
+        sessionDir,
+        sessionId,
+        cwd,
+        executionMode: 'execute',
+        approvalMode: 'approve',
+      };
+      const deps = createMockDeps({
+        createProvider: vi.fn().mockImplementation(async () => provider),
+      });
+      const runner = new ConversationRunner(config, deps);
+
+      // The runner re-throws after writing turn_end — catch so the test can
+      // inspect the durable log.
+      try {
+        await runner.run({
+          content: [{ type: 'text', text: 'hello' }],
+          abortController: new AbortController(),
+          turnId: `turn_${randomUUID()}`,
+          startedAt: new Date().toISOString(),
+        });
+      } catch {
+        // expected — provider failure causes the runner to throw
+      }
+
+      const { events } = readDurableEvents(sessionDir, {});
+      expect(events.some((e) => e.type === 'context_compacted')).toBe(false);
+    });
+
+    it('does not fire compaction when pressure is below 60%', async () => {
+      // Context window: 1_000_000. Prompt tokens: 400_000 → pressure = 0.40 < 0.60.
+      const provider = new CompactionTestProvider(1_000_000, 400_000, 'end_turn');
+      const config: RunnerConfig = {
+        sessionDir,
+        sessionId,
+        cwd,
+        executionMode: 'execute',
+        approvalMode: 'approve',
+      };
+      const deps = createMockDeps({
+        createProvider: vi.fn().mockImplementation(async () => provider),
+      });
+      const runner = new ConversationRunner(config, deps);
+
+      await runner.run({
+        content: [{ type: 'text', text: 'hello' }],
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
+      });
+
+      const { events } = readDurableEvents(sessionDir, {});
+      expect(events.some((e) => e.type === 'context_compacted')).toBe(false);
+    });
+  });
 });

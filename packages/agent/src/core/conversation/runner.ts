@@ -45,6 +45,9 @@ import type {
 } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import { logger } from '@lace/agent/utils/logger';
+import { computePressure, shouldFireCompaction } from './compaction-trigger';
+import { compact } from '@lace/agent/compaction/track-compaction';
+import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 
 /**
  * Non-enumerable sentinel applied to errors thrown out of `executeToolCall`.
@@ -1017,6 +1020,56 @@ export class ConversationRunner {
           turnId,
           stopReason,
         });
+      }
+
+      // Track-based compaction trigger. Runs synchronously in the runner's
+      // finally block after the turn_end write. Uses the raw
+      // appendDurableEvent + writeSessionState path (no writeAndAdvance) so
+      // we don't acquire a nested runExclusive lock and deadlock.
+      // Failures are logged but never abort the turn — pressure stays high and
+      // the next clean turn re-evaluates.
+      try {
+        const usage = {
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+          cacheCreationInputTokens: totalCacheCreationInputTokens,
+          cacheReadInputTokens: totalCacheReadInputTokens,
+          lastCallInputContextTokens:
+            lastCallInputTokens + lastCallCacheCreationInputTokens + lastCallCacheReadInputTokens,
+          costUsd: turnCostUsd,
+        };
+        const contextWindowSize = provider.contextWindowForModel(modelId ?? 'default');
+        const pressure = computePressure(usage, contextWindowSize);
+        if (shouldFireCompaction({ stopReason, pressure })) {
+          const allEvents = readDurableEvents(sessionDir, {
+            limit: Number.MAX_SAFE_INTEGER,
+          }).events;
+          const result = await compact(
+            // DurableEvent.data is Record<string,unknown>; TypedDurableEvent.data
+            // is the typed union. The shapes are identical on disk — this cast is
+            // safe because the event-log writer and event-types agree on the wire
+            // format.
+            allEvents as unknown as TypedDurableEvent[],
+            { threadId: sessionId, provider }
+          );
+          await this.deps.runExclusive(() => {
+            const sessionState = readSessionState(sessionDir);
+            const { nextState } = appendDurableEvent(sessionDir, sessionState, {
+              type: 'context_compacted',
+              // ContextCompactedEventData satisfies Record<string,unknown>; the
+              // cast here is the symmetric inverse of the one above.
+              data: result.compactionEvent.data as Record<string, unknown>,
+            });
+            writeSessionState(sessionDir, nextState);
+          });
+        }
+      } catch (compactionErr) {
+        logger.error('runner: track-based compaction failed', {
+          err: compactionErr instanceof Error ? compactionErr.message : String(compactionErr),
+          turnId,
+          stopReason,
+        });
+        // No persistent disable. Pressure stays high; next turn re-evaluates.
       }
     }
 
