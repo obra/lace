@@ -18,6 +18,8 @@ const HEADER = '[Earlier conversation, compacted by track]';
 export function renderCompactionPrefix(input: RenderInput): string {
   const slackBlocks = input.blocks.filter((b) => b.trackId.startsWith('slack:'));
   const jobBlocks = input.blocks.filter((b) => b.trackId.startsWith('job:'));
+  // Blocks with unknown track-id prefixes silently fall out — callers (salienceForTrack)
+  // must only emit blocks with known prefixes: 'slack:', 'job:', 'system:', or 'untracked'.
   const systemBlocks = input.blocks.filter(
     (b) => b.trackId.startsWith('system:') || b.trackId === 'untracked'
   );
@@ -26,17 +28,17 @@ export function renderCompactionPrefix(input: RenderInput): string {
 
   if (slackBlocks.length > 0) {
     parts.push('\n## Slack threads\n');
-    for (const b of slackBlocks) parts.push(b.body);
+    parts.push(slackBlocks.map((b) => b.body).join('\n\n'));
   }
 
   if (jobBlocks.length > 0) {
     parts.push('\n## Subagent jobs\n');
-    for (const b of jobBlocks) parts.push(b.body);
+    parts.push(jobBlocks.map((b) => b.body).join('\n\n'));
   }
 
   const { alarmsPending, remindersPending } = input.scheduler;
   if (alarmsPending > 0 || remindersPending > 0) {
-    parts.push('\n## Scheduler');
+    parts.push('\n## Scheduler\n');
     parts.push(
       `${alarmsPending} alarm${alarmsPending === 1 ? '' : 's'} pending, ${remindersPending} reminder${remindersPending === 1 ? '' : 's'} pending. Use \`list_alarms\` / \`list_reminders\` for details.`
     );
@@ -44,7 +46,7 @@ export function renderCompactionPrefix(input: RenderInput): string {
 
   if (systemBlocks.length > 0) {
     parts.push('\n## System events\n');
-    for (const b of systemBlocks) parts.push(b.body);
+    parts.push(systemBlocks.map((b) => b.body).join('\n\n'));
   }
 
   return parts.join('\n');
