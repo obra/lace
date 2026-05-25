@@ -770,9 +770,7 @@ export const EntAgentStatusResponseSchema = z
 
 const EntSessionCompactParamsSchema = z
   .object({
-    strategy: z.enum(['summarize', 'trim-tool-results', 'selective']).optional(),
-    targetTokens: z.number().optional(),
-    preserveRecent: z.number().optional(),
+    strategy: z.literal('track-based').optional(),
   })
   .strict();
 
@@ -781,7 +779,6 @@ const EntSessionCompactResultSchema = z
     previousTokens: z.number(),
     currentTokens: z.number(),
     messagesCompacted: z.number(),
-    summary: z.string().optional(),
   })
   .strict();
 

@@ -341,7 +341,7 @@ describe('protocol shapes (representative examples)', () => {
         jsonrpc: '2.0',
         id: 6,
         method: 'ent/session/compact',
-        params: { strategy: 'summarize', targetTokens: 1000, preserveRecent: 25 },
+        params: { strategy: 'track-based' },
       })
     ).not.toThrow();
 
