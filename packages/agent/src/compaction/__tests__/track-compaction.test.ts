@@ -212,14 +212,15 @@ describe('splitAtTailBoundary', () => {
     expect(earlier.length).toBe(6);
   });
 
-  it('snaps leftward to avoid splitting tool_use from tool_result', () => {
-    // Construct a 2-turn fixture where the boundary cuts mid-tool-pair.
-    // Tail size 1 turn: boundary should snap left to include the whole turn.
+  it('places boundary at prompt of (tailTurns+1)-th-from-end turn', () => {
+    // Two-turn fixture. With tail=1, boundary lands at the prompt before turn_2,
+    // so turn_1 (all 5 events) goes to earlier and turn_2 (3 events) goes to tail.
+    // This confirms the turn-boundary semantics: a tool_use and its result both
+    // live on turn_1, so they end up together in earlier — no snap needed.
     const events: TypedDurableEvent[] = [
       event(1, 'prompt', { content: [], track: 'slack:A' }),
       turnStart(2, 'turn_1'),
       event(3, 'tool_use', { toolCallId: 't1', name: 'bash', input: {} }, 'turn_1'),
-      // No turn_end yet — multi-call turn, tool_result for t1 lives in turn_1.
       event(
         4,
         'message',
@@ -227,7 +228,6 @@ describe('splitAtTailBoundary', () => {
         'turn_1'
       ),
       turnEnd(5, 'turn_1'),
-      // Second turn starts; if we asked for tail=1, it would include only turn_2.
       event(6, 'prompt', { content: [], track: 'slack:B' }),
       turnStart(7, 'turn_2'),
       turnEnd(8, 'turn_2'),
@@ -236,6 +236,32 @@ describe('splitAtTailBoundary', () => {
     // turn_2 is 3 events (prompt + turn_start + turn_end).
     expect(tail.length).toBe(3);
     expect(earlier.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('returns all-as-earlier when tailTurns is 0', () => {
+    const events: TypedDurableEvent[] = [
+      event(1, 'prompt', { content: [], track: 'slack:A' }),
+      turnStart(2, 'turn_1'),
+      turnEnd(3, 'turn_1'),
+    ];
+    const { earlier, tail } = splitAtTailBoundary(events, 0);
+    expect(earlier.length).toBe(3);
+    expect(tail.length).toBe(0);
+  });
+
+  it('bails out (all-as-tail) when target turn_end has no turnId', () => {
+    // turn_end with undefined turnId (e.g. crash-recovery synthesized)
+    const events: TypedDurableEvent[] = [
+      event(1, 'prompt', { content: [], track: 'slack:A' }),
+      turnStart(2, 'turn_1'),
+      turnEnd(3, 'turn_1'),
+      event(4, 'prompt', { content: [], track: 'slack:B' }),
+      // Note: NO turnId on this turn_end
+      event(5, 'turn_end', { stopReason: 'process_died' }),
+    ];
+    const { earlier, tail } = splitAtTailBoundary(events, 1);
+    expect(earlier).toEqual([]);
+    expect(tail.length).toBe(5);
   });
 
   it('returns all events as tail when total turns <= tail size', () => {
@@ -284,5 +310,47 @@ describe('compact()', () => {
     ];
     const result = await compact(events, ctx);
     expect(result.compactionEvent.data.messagesCompacted).toBe(0);
+  });
+
+  it('preserves tool_use events in the tail as PreservedMessage with toolCalls + toolResults', async () => {
+    const events: TypedDurableEvent[] = [
+      event(1, 'prompt', {
+        content: [{ type: 'text', text: 'use bash please' }],
+        track: 'slack:A',
+      }),
+      turnStart(2, 'turn_1'),
+      event(
+        3,
+        'tool_use',
+        {
+          toolCallId: 'tc_1',
+          name: 'bash',
+          input: { command: 'echo hi' },
+          result: { outcome: 'completed', content: [{ type: 'text', text: 'hi\n' }] },
+        },
+        'turn_1'
+      ),
+      turnEnd(4, 'turn_1'),
+    ];
+    const result = await compact(events, ctx);
+    // Only 1 turn; with TAIL_TURNS=10 everything goes to tail (earlier=0).
+    expect(result.compactionEvent.data.messagesCompacted).toBe(0);
+    const preserved = result.compactionEvent.data.preserved as Array<{
+      role: string;
+      content: string;
+      toolCalls?: unknown[];
+      toolResults?: unknown[];
+    }>;
+    // preserved[0] is the synthetic prefix (always present)
+    const promptEntry = preserved.find((p) => p.role === 'user' && p.content.includes('use bash'));
+    expect(promptEntry).toBeDefined();
+    const assistantWithToolCalls = preserved.find(
+      (p) => p.role === 'assistant' && Array.isArray(p.toolCalls)
+    );
+    expect(assistantWithToolCalls?.toolCalls?.length).toBe(1);
+    const userWithToolResults = preserved.find(
+      (p) => p.role === 'user' && Array.isArray(p.toolResults)
+    );
+    expect(userWithToolResults?.toolResults?.length).toBe(1);
   });
 });

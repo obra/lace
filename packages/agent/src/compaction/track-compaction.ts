@@ -5,6 +5,8 @@ import { isEventDataOfType } from '@lace/agent/storage/event-types';
 import type { TypedDurableEvent, ContextCompactedEventData } from '@lace/agent/storage/event-types';
 import { renderCompactionPrefix } from './track-render';
 import type { CompactionContext } from './types';
+import { coreToolResultFromProtocol, toNonEmptyString } from '../rpc/utils';
+import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 
 export const UNTRACKED = 'untracked' as const;
 
@@ -220,13 +222,19 @@ export interface CompactResult {
 /**
  * Split events into [earlier, tail] at the boundary that gives `tailTurns`
  * complete turns at the end. A turn is `prompt + turn_start ... turn_end`.
- * Snaps leftward if the boundary would split an assistant tool_use from its
- * matching tool_result.
+ *
+ * The boundary semantics (always set at a prompt or turn_start) guarantee that
+ * turns are never split, so tool_use/result pairs (both on the same turn) are
+ * always kept together in the same slice. No snap-left is needed.
  */
 export function splitAtTailBoundary(
   events: TypedDurableEvent[],
   tailTurns: number
 ): { earlier: TypedDurableEvent[]; tail: TypedDurableEvent[] } {
+  if (tailTurns <= 0) {
+    return { earlier: events.slice(), tail: [] };
+  }
+
   // Walk backwards counting turn_end events; the boundary is just before the
   // prompt that opens the (tailTurns)-th turn from the end.
   const turnEndIdxs: number[] = [];
@@ -239,6 +247,14 @@ export function splitAtTailBoundary(
   }
   const earliestTailTurnEndIdx = turnEndIdxs[turnEndIdxs.length - 1];
   const targetTurnId = events[earliestTailTurnEndIdx].turnId;
+
+  // No turnId means we can't reliably find the matching turn_start (e.g.
+  // crash-recovery synthesized turn_end). Return all-as-tail rather than
+  // risk mis-attributing events to the wrong slice.
+  if (!targetTurnId) {
+    return { earlier: [], tail: events.slice() };
+  }
+
   let boundary = earliestTailTurnEndIdx;
   for (let i = earliestTailTurnEndIdx; i >= 0; i--) {
     if (events[i].type === 'turn_start' && events[i].turnId === targetTurnId) {
@@ -250,49 +266,7 @@ export function splitAtTailBoundary(
       break;
     }
   }
-  boundary = snapLeftIfOrphanedTool(events, boundary);
   return { earlier: events.slice(0, boundary), tail: events.slice(boundary) };
-}
-
-/**
- * If the given boundary would leave a tool_use in the "earlier" slice whose
- * matching tool_result lives in the "tail" slice, snap the boundary leftward
- * until no such orphan exists. This preserves the tool_use/tool_result pairing
- * invariant required for valid Anthropic conversation turns.
- */
-function snapLeftIfOrphanedTool(events: TypedDurableEvent[], boundary: number): number {
-  while (boundary > 0) {
-    const oldToolCallIds = new Set<string>();
-    for (let i = 0; i < boundary; i++) {
-      const e = events[i];
-      if (isEventDataOfType(e.data, 'tool_use')) {
-        oldToolCallIds.add(e.data.toolCallId);
-      }
-    }
-    let hasOrphan = false;
-    for (let i = boundary; i < events.length && !hasOrphan; i++) {
-      const e = events[i];
-      if (!isEventDataOfType(e.data, 'message')) continue;
-      const content = e.data.content;
-      if (!Array.isArray(content)) continue;
-      for (const block of content) {
-        if (
-          typeof block === 'object' &&
-          block !== null &&
-          (block as { type?: unknown }).type === 'tool_result'
-        ) {
-          const tcid = (block as { toolCallId?: unknown }).toolCallId;
-          if (typeof tcid === 'string' && oldToolCallIds.has(tcid)) {
-            hasOrphan = true;
-            break;
-          }
-        }
-      }
-    }
-    if (!hasOrphan) return boundary;
-    boundary -= 1;
-  }
-  return boundary;
 }
 
 /**
@@ -322,9 +296,7 @@ export async function compact(
     });
   }
 
-  const preservedTail = tail
-    .filter((e) => e.type === 'message' || e.type === 'prompt')
-    .map((e) => preservedMessageFromEvent(e));
+  const preservedTail = buildPreservedTail(tail);
 
   return {
     compactionEvent: {
@@ -339,10 +311,80 @@ export async function compact(
   };
 }
 
-function preservedMessageFromEvent(e: TypedDurableEvent): {
-  role: 'user' | 'assistant';
+type PreservedMessage = {
+  role: 'user' | 'assistant' | 'system';
   content: string;
-} {
-  const text = extractText(e);
-  return { role: e.type === 'prompt' ? 'user' : 'assistant', content: text };
+  toolCalls?: CoreToolCall[];
+  toolResults?: CoreToolResult[];
+};
+
+/**
+ * Convert tail events into the PreservedMessage stream consumed by
+ * message-builder.ts when replaying a context_compacted event.
+ *
+ * Mirrors the logic in message-builder.ts:buildProviderMessagesFromDurableEvents:
+ * - `prompt`   → user entry
+ * - `message`  → assistant entry
+ * - `tool_use` → assistant entry (with toolCalls) + optional user entry (with toolResults)
+ *
+ * Consecutive tool_use events for the same turn are coalesced: tool calls are
+ * appended to the previous assistant entry; tool results are appended to the
+ * previous user entry when it already holds results.
+ */
+function buildPreservedTail(events: TypedDurableEvent[]): PreservedMessage[] {
+  const result: PreservedMessage[] = [];
+
+  for (const e of events) {
+    if (isEventDataOfType(e.data, 'prompt')) {
+      result.push({ role: 'user', content: extractText(e) });
+      continue;
+    }
+
+    if (isEventDataOfType(e.data, 'message')) {
+      result.push({ role: 'assistant', content: extractText(e) });
+      continue;
+    }
+
+    if (isEventDataOfType(e.data, 'tool_use')) {
+      const toolCallId = toNonEmptyString(e.data.toolCallId);
+      const name = toNonEmptyString(e.data.name);
+      if (!toolCallId || !name) continue;
+
+      const toolCall: CoreToolCall = {
+        id: toolCallId,
+        name,
+        arguments:
+          typeof e.data.input === 'object' && e.data.input
+            ? (e.data.input as Record<string, unknown>)
+            : {},
+      };
+
+      // Coalesce into previous assistant entry if it exists, otherwise push new.
+      const last = result.length > 0 ? result[result.length - 1] : undefined;
+      if (last && last.role === 'assistant') {
+        last.toolCalls = [...(last.toolCalls ?? []), toolCall];
+      } else {
+        result.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
+      }
+
+      if (e.data.result) {
+        const coreResult = coreToolResultFromProtocol(e.data.result, toolCallId);
+        // Coalesce into previous user entry if it already carries tool results.
+        const prev = result.length > 0 ? result[result.length - 1] : undefined;
+        const canAppend =
+          prev &&
+          prev.role === 'user' &&
+          Array.isArray(prev.toolResults) &&
+          prev.toolResults.length > 0;
+        if (canAppend && prev) {
+          prev.toolResults = [...(prev.toolResults ?? []), coreResult];
+        } else {
+          result.push({ role: 'user', content: '', toolResults: [coreResult] });
+        }
+      }
+      continue;
+    }
+  }
+
+  return result;
 }
