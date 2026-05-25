@@ -1,9 +1,9 @@
-# Typed-Capsule Compaction Strategy — Design (v3)
+# Typed-Capsule Compaction Strategy — Design (v4)
 
-Date: 2026-05-25 (v1) / revised 2026-05-25 (v2) / revised 2026-05-25 (v3)
+Date: 2026-05-25 (v1) / revised 2026-05-25 (v2) / revised 2026-05-25 (v3) / revised 2026-05-25 (v4)
 Author: Jesse + Bot
 
-> v3 applies Jesse's architectural reframes (R1–R7) and addresses the round-2 adversarial findings (B-C3 through B-I16). The reframes collapse several v2 sections — most notably the migration tool and the FTS-cleanup machinery — by making summaries non-recall-indexed and replacing the per-session migration with a one-time clear of Ada. See the "v3 changelog" at the bottom for per-finding traceability and disprove-on-re-verification notes; the "v2 changelog" still lists the round-1 finding resolutions.
+> v4 applies Jesse's round-3 YAGNI/DRY cuts on top of v3. The biggest structural changes: rolling mode is gone — rebuild is the only mode; the bounded-rebuild / mini-rebuild fallback chain is gone; the file-based flock is gone; envelope and config fields with no readers are gone. The architecture that remains is materially smaller and easier to implement. The typed capsule itself, the trigger + lifecycle hook, the `?? 0` provider compat formula, the unconditional `dropOrphanedToolBlocks` post-pass, the `createProviderForTurn` pattern, the one-time clear of Ada, and the recall-doesn't-index-summaries rule are all preserved. See the "v4 changelog" at the bottom for per-cut traceability; the v3 and v2 changelogs remain below it for history.
 
 ## Purpose
 
@@ -15,12 +15,14 @@ This spec defines a single new strategy that supersedes `summarize`, plus the tr
 
 - The compact critic (research report Phase 2). Adds an extra Anthropic call per compaction.
 - Semantic micro-checkpoints + agent-facing checkpoint-request tool (Phase 4).
-- Tool-result clearing as a distinct primitive (Phase 3). The capsule has a `toolState` field for future use but stays empty in v1. (Note: `trim-tool-results` is repurposed in v3 as a pre-pass inside the summarize strategy — see §"Compaction algorithm → trim-tool-results pre-pass".)
+- Tool-result clearing as a distinct primitive (Phase 3). The capsule has a `toolState` field for future use but stays empty in v1. (Note: `trim-tool-results` is repurposed in v3/v4 as a pre-pass inside the summarize strategy — see §"Compaction algorithm → trim-tool-results pre-pass".)
 - Behavioral-equivalence eval harness (Phase 5). Future kata.
-- Periodic rebuild drift-detection (Phase 6 — we do rebuild, just don't measure drift).
+- Periodic rebuild drift-detection (Phase 6 — we now always rebuild, so there's no rolling-vs-rebuild drift; bookkeeping for measuring rebuild fidelity itself is still future work).
 - Multi-user attribution beyond what the report's `participants` schema already encodes.
 - Per-API-call cache-position persistence (related: [PRI-1819](https://linear.app/prime-radiant/issue/PRI-1819) follow-up [PRI-1821](https://linear.app/prime-radiant/issue/PRI-1821) — handled separately).
 - Indexing capsule contents in recall/FTS. Recall reads canonical events only; the summary is for the model's working memory, not for search. See §"Recall (FTS) integration".
+- A rolling/incremental compaction mode. v4 always rebuilds the capsule from canonical events. See §"Compaction algorithm".
+- A bounded-rebuild fallback for sessions whose canonical prefix exceeds the summarizer's context window. v4 lets the summarizer call fail and emits `compaction_failed`; the operator notices via the alarm channel. See §"Failure modes → rebuild exceeds summarizer context".
 
 ## Preconditions (must ship before this)
 
@@ -41,14 +43,10 @@ lace/packages/agent/src/
 ├── compaction/
 │   ├── registry.ts                     (existing — keeps trim-tool-results registered)
 │   ├── trim-tool-results-strategy.ts   (existing — kept; now ALSO invoked internally as a pre-pass; see "trim-tool-results pre-pass")
-│   ├── summarize-strategy.ts           REWRITTEN — emits typed capsule
+│   ├── summarize-strategy.ts           REWRITTEN — emits typed capsule; capsule markdown + summarizer prompt + budget-retry are top-level functions in this file
 │   ├── compact-dropped-messages.ts     (existing — its ModelPinnedProvider wrapper is NOT reused; see R6 / "Lifecycle hook")
 │   ├── capsule-types.ts                NEW — capsule schema (zod)
-│   ├── capsule-markdown.ts             NEW — JSON capsule → markdown prefix
-│   ├── summarizer-prompt.ts            NEW — structured-output prompt
-│   ├── tail-policy.ts                  NEW — last N turns + last K human prompts
-│   ├── budget-retry.ts                 NEW — bounded-retry over-budget capsules
-│   ├── compaction-lock.ts              NEW — session-level mutex (in-memory + file-based flock); see "Concurrency"
+│   ├── tail-policy.ts                  NEW — last N turns + last K human prompts (single-pass walk)
 │   └── __tests__/
 ├── core/conversation/
 │   ├── runner.ts                       MODIFIED — hook after turn_end + new last-call usage field
@@ -65,7 +63,9 @@ lace/packages/agent/src/
     └── message-builder.ts              MODIFIED — render conversation_summary as prefix; reject unknown types; skip compaction_failed; ALWAYS run dropOrphanedToolBlocks regardless of whether a summary was rendered
 ```
 
-There is no migration tool in v3 (see §"Cutover: one-time clear of Ada"). The `sen2/compaction/scripts/migrate-old-compactions.ts` path from v2 is dropped.
+There is no migration tool in v4 (see §"Cutover: one-time clear of Ada"). The `sen2/compaction/scripts/migrate-old-compactions.ts` path from v2 was dropped in v3 and stays gone.
+
+There is no separate compaction-lock module (cut in v4 — see §"Concurrency"). The runner's existing `runExclusive` is the only serialization primitive.
 
 The old `context_compacted` event type is removed from the discriminated union entirely. There is no on-disk back-compat: the only session in production with `context_compacted` events on disk is Ada, and we wipe her `events.jsonl` rather than rewriting it. Future sessions never see `context_compacted` at all.
 
@@ -73,15 +73,15 @@ The old `context_compacted` event type is removed from the discriminated union e
 
 Three call sites currently produce `context_compacted`. All three are updated to produce `conversation_summary` in lockstep with this change:
 
-1. **The new in-runner trigger** (this spec's main subject). Hook after `turn_end`. Mode `rolling | rebuild_from_canonical`.
-2. **`/compact` slash command** in `conversation/slash-commands.ts` (around line 197). User-initiated. Mode `rebuild_from_canonical` (user invoked it explicitly; give them a fresh capsule).
-3. **`ent/session/compact` RPC handler** in `rpc/handlers/session-operations.ts` (around line 551). Programmatic / sen-core-driven. Mode `rebuild_from_canonical` for the same reason — and because the post-trigger world means sen-core no longer drives compaction, this RPC becomes user-tooling only (`compaction view`, manual ops console).
+1. **The new in-runner trigger** (this spec's main subject). Hook after `turn_end`.
+2. **`/compact` slash command** in `conversation/slash-commands.ts` (around line 197). User-initiated.
+3. **`ent/session/compact` RPC handler** in `rpc/handlers/session-operations.ts` (around line 551). Programmatic / sen-core-driven. Post-trigger, sen-core no longer drives compaction, so this RPC becomes user-tooling only (`compaction view`, manual ops console).
 
-All three call sites go through the same `compaction/summarize-strategy.ts:compact()` entry point and produce identically-shaped events. The strategy itself has no knowledge of which caller invoked it; the caller passes the mode.
+All three call sites go through the same `compaction/summarize-strategy.ts:compact()` entry point and produce identically-shaped events. The strategy has no notion of caller intent; every call rebuilds the capsule from canonical events. (In v3 the spec allowed a `mode: 'rolling' | 'rebuild_from_canonical' | 'user_initiated'` parameter; v4 collapses this to a single always-rebuild path. The two user-driven call sites were already passing `'rebuild_from_canonical'` in v3, so they need no behavioral change.)
 
 ### Strategy enum on the wire (RPC + slash)
 
-In v2 the `ent/session/compact` RPC accepted a `strategy: 'summarize' | 'trim-tool-results' | 'selective'` parameter. v3 collapses this:
+In v2 the `ent/session/compact` RPC accepted a `strategy: 'summarize' | 'trim-tool-results' | 'selective'` parameter. v3 collapsed this and v4 keeps the collapse:
 
 - `'summarize'` — the only accepted value. Default. Invokes the new typed-capsule strategy. The `trim-tool-results` pre-pass runs inside it (see §"Compaction algorithm → trim-tool-results pre-pass") — operators no longer choose it as a separate strategy.
 - `'trim-tool-results'` — **REMOVED from the wire enum.** No longer a user-facing choice.
@@ -101,15 +101,14 @@ export type ConversationSummaryEventData = {
   capsule: Capsule;                     // see capsule-types.ts
   generatedAt: string;                  // ISO timestamp
   /**
-   * Inclusive range of canonical eventSeqs that this summary represents.
-   * Always cumulative from the start of the session: every emitted summary
-   * has `fromInclusive = 1`. The message-builder reads only the latest
-   * conversation_summary event.
+   * The first canonical eventSeq that is NOT represented by this summary.
+   * Every event with eventSeq < recentTailStartsAtEventSeq is folded into
+   * the capsule; every event with eventSeq >= it is the verbatim tail.
+   * Because every summary is always cumulative from the start of the session,
+   * the inclusive range it represents is implicitly [1, recentTailStartsAtEventSeq - 1].
    */
-  replacesEventSeqRange: { fromInclusive: number; toInclusive: number };
   recentTailStartsAtEventSeq: number;
-  schemaVersion: 1;                     // numeric (per A-I21); NOT a string literal
-  generationMode: 'rolling' | 'rebuild_from_canonical' | 'user_initiated';
+  generationMode: 'rebuild_from_canonical';   // single-valued enum in v1 (every summary is rebuilt)
   generationCostUsd: number;
   generationTokens: {
     inputTokens: number;
@@ -117,35 +116,26 @@ export type ConversationSummaryEventData = {
     cacheReadInputTokens: number;
     cacheCreationInputTokens: number;
   };
-  budgetOverrunBy: number;              // 0 if capsule fit; positive if smallest-accepted
-  retries: number;                      // budget-retry count
-  // Metadata-only echoes of the research report §6 capsule envelope. Cheap to
-  // carry; useful for diagnostics / future drift detection. The strategy
-  // populates these from the summarizer's structured output if present, else
-  // sets sensible defaults.
-  purpose: string;                      // free-text label, e.g. "session_handoff", "bounded_rebuild"
-  criticStatus: 'unchecked';            // single-valued enum in v1 (no critic implemented)
-  sourceStartEventId: number;           // == replacesEventSeqRange.fromInclusive
-  sourceEndEventId: number;             // == replacesEventSeqRange.toInclusive
 };
 
 export type CompactionFailedEventData = {
   type: 'compaction_failed';
   reason: 'global' | 'emergency' | 'user_initiated';
-  errorMessage: string;                 // single canonical field name (per A-I20)
-  consecutiveFailures: number;          // see "Failure backoff"
+  errorMessage: string;                 // single canonical field name
 };
 ```
 
 The old `context_compacted` event type is **REMOVED** from the discriminated union. We do not maintain backwards compatibility (per CLAUDE.md — pre-release v1, no legacy code). The Ada cutover (§"Cutover: one-time clear of Ada") wipes the only on-disk source of `context_compacted` events. Any session that for whatever reason still has `context_compacted` on disk fails loudly at message-builder time with a pointer at the cutover playbook.
 
-Note on `generationMode`: v2 had a `'migration'` value. **Removed in v3** — there is no migration. The remaining three values cover every code path that writes a summary.
+Note on `generationMode`: v3 carried `'rolling' | 'rebuild_from_canonical' | 'user_initiated'`. v4 collapses to a single value (`'rebuild_from_canonical'`) because rolling is gone and the user-initiated callers always rebuild. The enum is retained (not removed) so that a future second mode — if one is ever justified — can extend it without a schema break.
 
-Note on `criticStatus`: kept as an enum (not a boolean) so a future critic implementation can extend it (`'critic_skipped' | 'critic_passed' | 'critic_revised' | 'critic_rejected'`) without a schema break. In v1 it is single-valued (`'unchecked'`); the union is intentionally narrow now.
+Note on `CompactionFailedEventData.reason`: `'user_initiated'` stays on the reason union even though it's gone from `generationMode`. A `/compact` invocation can still fail, and the failure event needs to record that it was operator-driven, not auto-triggered.
+
+Note on the failure event's `consecutiveFailures` counter (present in v3): **dropped in v4.** The count is recoverable from the event log itself by counting `compaction_failed` events since the most recent successful `conversation_summary`. The backoff helper (§"Failure backoff") derives the count at decision time.
 
 ### Capsule schema
 
-In `compaction/capsule-types.ts`. Mirrors §6 of `docs/research/working-memory-compaction.md`'s **per-section** sub-schemas. The envelope-level fields (`purpose`, `criticStatus`, `sourceStartEventId`, `sourceEndEventId`) live on the wrapping `ConversationSummaryEventData` shown above, **not** inside the Capsule itself, to keep the Capsule a pure content type and the storage envelope responsible for provenance.
+In `compaction/capsule-types.ts`. Mirrors §6 of `docs/research/working-memory-compaction.md`'s **per-section** sub-schemas. The envelope-level provenance fields all moved up to the wrapping `ConversationSummaryEventData` shown above; the capsule itself is a pure content type.
 
 All 13 capsule sections, zod-validated:
 
@@ -172,12 +162,11 @@ Sub-schemas mirror §6 of the research report's content fields exactly (envelope
 
 ### Markdown rendering
 
-`compaction/capsule-markdown.ts` exports `renderCapsuleAsMarkdown(capsule: Capsule): string`. Output structure follows §11 of the research report — labeled sections with bullet lists, easy for the model to read. The markdown is what the model sees as the conversation prefix; the JSON is for storage, validation, and diff.
+`renderCapsuleAsMarkdown(capsule: Capsule): string` is a top-level function in `summarize-strategy.ts` (folded in v4 from the previous standalone `capsule-markdown.ts`). Output structure follows §11 of the research report — labeled sections with bullet lists, easy for the model to read. The markdown is what the model sees as the conversation prefix; the JSON is for storage, validation, and diff.
 
 Renderer requirements:
 - Skip sections whose array is empty (don't emit empty headers).
 - Wrap exact quotes (`exactLanguageToPreserve`) in `> quoted text` blocks with attribution.
-- Mark items with `confidence < 0.5` (where the schema has a confidence field) with a parenthetical `(uncertain)`.
 
 ## Trigger and lifecycle hook
 
@@ -202,9 +191,9 @@ For non-Anthropic providers (OpenAI, Gemini, LMStudio, Ollama, OpenRouter): cach
 
 | Provider                | inputTokens | cacheCreation | cacheRead | Trigger arithmetic                                  |
 |-------------------------|-------------|---------------|-----------|------------------------------------------------------|
-| Anthropic (post-PRI-1817) | ✓           | ✓             | ✓         | Sum is the full prefix size on the wire. Correct.   |
-| Anthropic (pre-PRI-1817)  | ✓           | (missing)     | (missing) | Sum reduces to `inputTokens` (uncached only). Under-counts the prefix → under-fires the trigger. Acceptable degradation; sessions self-heal after the next turn writes cache fields. |
-| OpenAI / Gemini / LMStudio / Ollama / OpenRouter | ✓ | (n/a)     | (n/a)     | Sum reduces to `inputTokens`. **Correct** — those providers don't cache and `inputTokens` is the full prefix every call. |
+| Anthropic (post-PRI-1817) | y           | y             | y         | Sum is the full prefix size on the wire. Correct.   |
+| Anthropic (pre-PRI-1817)  | y           | (missing)     | (missing) | Sum reduces to `inputTokens` (uncached only). Under-counts the prefix → under-fires the trigger. Acceptable degradation; sessions self-heal after the next turn writes cache fields. |
+| OpenAI / Gemini / LMStudio / Ollama / OpenRouter | y | (n/a)     | (n/a)     | Sum reduces to `inputTokens`. **Correct** — those providers don't cache and `inputTokens` is the full prefix every call. |
 
 The `?? 0` defaults make the formula work on every provider with no special-casing. **PRI-1817 remains a precondition for Anthropic accuracy**, but the lace build starts on any session regardless of whether PRI-1817 has been applied yet.
 
@@ -214,29 +203,32 @@ The `?? 0` defaults make the formula work on every provider with no special-casi
 
 ```ts
 export type TriggerConfig = {
-  globalThresholdPct: number;            // default 0.60 (was 0.40 in v2 — see "Defaults rationale")
-  emergencyThresholdPct: number;         // default 0.90 (was 0.85 in v2)
-  rebuildEveryNCompactions: number;      // default 10
-  enabled: boolean;                      // default true; subagent sessions set to false
+  globalThresholdPct: number;            // tuned globally (default 0.60); not per-session-overridable
+  emergencyThresholdPct: number;         // tuned globally (default 0.90); not per-session-overridable
 };
 
 export type TriggerDecision =
   | { fire: false; reason: 'disabled' | 'below_threshold' | 'no_signal' | 'wrong_stop_reason' | 'backoff' }
-  | { fire: true; reason: 'global' | 'emergency'; mode: 'rolling' | 'rebuild_from_canonical' };
+  | { fire: true; reason: 'global' | 'emergency' };
 
 export function evaluateTrigger(
   latestTurnEnd: TypedDurableEvent & { data: TurnEndEventData },
   sessionEvents: TypedDurableEvent[],
   modelMaxContext: number,
   config: TriggerConfig,
+  isSubagentSession: boolean,
 ): TriggerDecision;
 ```
 
 Note: `modelMaxContext` is `number` (not `number | null`). See gating rule §4 below for why.
 
+Note: there is no `enabled` flag on `TriggerConfig`. Disabling subagent compaction is computed from the session-meta input (`isSubagentSession` parameter — see §"Subagent sessions"). The failure-backoff path also produces `fire: false, reason: 'disabled'` when the M=10 consecutive-failure cap is hit; that disablement persists via the failure-backoff state, not via this config struct.
+
+Note: there is no `mode` in `TriggerDecision`. Every fire is a full rebuild. Whether to rebuild and how to rebuild is no longer a decision — there is only the rebuild path.
+
 Gating rules (all must pass for `fire: true`):
 
-1. **Enabled.** `config.enabled === true`. Subagent sessions opt out by default; see §"Subagent sessions" below.
+1. **Not a disabled subagent.** `isSubagentSession === false` (or, if true, the per-session subagent-compaction toggle is on; not exposed in v4 — see §"Subagent sessions").
 2. **Successful turn.** `latestTurnEnd.data.stopReason` is in the "ran to natural completion" whitelist: `['end_turn', 'stop_sequence', 'max_turns']`.
    - `end_turn` — model finished a normal response.
    - `stop_sequence` — model hit a configured stop sequence (clean termination by configuration).
@@ -245,56 +237,56 @@ Gating rules (all must pass for `fire: true`):
 
 3. **Signal present.** `latestTurnEnd.data.usage?.lastCallInputContextTokens` is a finite positive number. Older transcripts written before the precondition kata lack this field. If missing, log warning + skip (don't compact a session we can't measure). Cache fields are NOT required here — the `?? 0` defaults make `lastCallInputContextTokens` itself the only required input.
 
-4. **Model bound known.** `modelMaxContext` is taken to always be a finite positive number — `base-provider.ts:481-488`'s `getModelContextWindow` ALWAYS returns a number (`catalogModel?.context_window || fallback` with a 200K default fallback). There is no null path. (B-C6: v2 had a dead `if null then skip` rule; removed in v3. The evaluator's caller passes the result of `getModelContextWindow` directly; the result is always defined.)
+4. **Model bound known.** `modelMaxContext` is taken to always be a finite positive number — `base-provider.ts:481-488`'s `getModelContextWindow` ALWAYS returns a number (`catalogModel?.context_window || fallback` with a 200K default fallback). There is no null path. The evaluator's caller passes the result of `getModelContextWindow` directly; the result is always defined.
 
-If gates 1–3 pass and `modelMaxContext` is in hand:
+5. **Not in failure backoff.** §"Failure backoff" reads the most recent run of consecutive `compaction_failed` events; if the window says skip, returns `fire: false, reason: 'backoff'`.
+
+If gates 1–5 pass:
 - `pct = lastCallInputContextTokens / modelMaxContext`
-- If `pct >= emergencyThresholdPct` → `fire: true, reason: 'emergency', mode: 'rebuild_from_canonical'`. Emergency always rebuilds because if a rolling compaction produced a stuck capsule we need a fresh anchor.
-- Else if `pct >= globalThresholdPct` → `fire: true, reason: 'global', mode`. Mode is `rolling` unless `sessionState.compactionsSinceLastRebuild >= rebuildEveryNCompactions`, in which case `rebuild_from_canonical`. (See §"Periodic-rebuild counter" for where this counter lives.)
+- If `pct >= emergencyThresholdPct` → `fire: true, reason: 'emergency'`.
+- Else if `pct >= globalThresholdPct` → `fire: true, reason: 'global'`.
 - Else → `fire: false, reason: 'below_threshold'`.
 
-Thresholds are pure percentages of model max context. No absolute fallback — self-tunes across models (1M-context model fires at 600K for global; 200K-context model fires at 120K). Config is per-session-overridable through existing session-config plumbing.
+Thresholds are pure percentages of model max context. No absolute fallback — self-tunes across models (1M-context model fires at 600K for global; 200K-context model fires at 120K). Constants are tuned globally for the whole fleet; per-session overrides are not exposed in v4 (file a kata if anyone needs it).
 
 ### Defaults rationale
 
-The headroom arithmetic at the new defaults:
+The headroom arithmetic at the v4 defaults:
 
 - `globalThresholdPct: 0.60` — trigger fires when last-call context hits 60% of model max.
-- `emergencyThresholdPct: 0.90` — emergency rebuild at 90% (was 0.85 in v2 — bumped because the global threshold moved up).
-- `targetCapsuleTokensPct: 0.10` of model max — capsule budget is 10% of context (was implicit ~20% in v2). For 1M-context Sonnet, capsule budget is 100K tokens.
-- `recentHumanPromptsTokenBudgetPct: 0.10` of model max — tail budget is 10% of context (was 0.20 in v2). For 1M-context Sonnet, tail budget is 100K tokens.
+- `emergencyThresholdPct: 0.90` — emergency rebuild at 90%.
+- `targetCapsuleTokensPct: 0.10` of model max — capsule budget is 10% of context. For 1M-context Sonnet, capsule budget is 100K tokens.
+- `recentHumanPromptsTokenBudgetPct: 0.10` of model max — tail budget is 10% of context. For 1M-context Sonnet, tail budget is 100K tokens.
 - Post-compaction state: capsule (10%) + tail (10%) = **20% of context**.
 - Headroom before the next trigger fires: **60% – 20% = 40% of context** ≈ **400K tokens at 1M context**.
 - Under Ada-like load (~70K tokens/turn growth), 400K headroom buys ~6–10 turns between compactions instead of every-turn churn. The next post-compaction trigger fires when the conversation has actually grown enough to need re-compaction; cache-creation cost (which dominates per-compaction cost) is paid weekly at most under Ada-like load, monthly+ under lighter load.
 
-Subagent default stays `enabled: false` — see §"Subagent sessions".
+Subagent default stays compaction-off — see §"Subagent sessions".
 
-### Periodic-rebuild counter
-
-The trigger needs to know how many rolling compactions have happened since the last rebuild. v3 specifies (B-I12) that this counter lives on `SessionState`:
-
-```ts
-// In storage/session-store.ts SessionState (extension):
-compactionsSinceLastRebuild?: number;   // optional; defaults to 0 if absent
-```
-
-- On a successful `conversation_summary` write with `generationMode === 'rolling'`: incremented by 1.
-- On a successful `conversation_summary` write with `generationMode === 'rebuild_from_canonical'`: reset to 0.
-- On `compaction_failed` write: unchanged (failures don't count as either).
-
-The trigger reads this counter from `sessionState` (already accessible at the hook site because `readSessionState(sessionDir)` is called inside `runExclusive` for the failure path). The counter persists across process restarts because it lives in `state.json` alongside `nextEventSeq`.
+Note: v3 included a `rebuildEveryNCompactions: 10` knob and a `SessionState.compactionsSinceLastRebuild` counter so the rolling path could periodically rebuild. v4 dropped both: every compaction is already a full rebuild. There is no counter to maintain.
 
 ### Lifecycle hook
 
-In `runner.run()`, immediately after the successful `turn_end` write (the post-PRI-1818-#1 path that always writes turn_end), evaluate the trigger and — if it fires — run compaction inside the session-level lock. Code shape:
+In `runner.run()`, immediately after the successful `turn_end` write (the post-PRI-1818-#1 path that always writes turn_end), evaluate the trigger and — if it fires — run compaction inside the runner's existing serialization primitive. Code shape:
 
 ```ts
-const decision = evaluateTrigger(turnEndEvent, sessionEvents, modelMaxContext, triggerConfig);
+const decision = evaluateTrigger(
+  turnEndEvent,
+  sessionEvents,
+  modelMaxContext,
+  triggerConfig,
+  this.deps.isSubagentSession,
+);
 if (decision.fire) {
-  // Acquire session-level compaction lock; blocks if another compaction is in
-  // flight on the same session (subagent or peer). Cross-process via flock.
-  // See "Concurrency" below.
-  await withCompactionLock(sessionDir, async () => {
+  // Serialize against the runner's own durable writes using its existing
+  // runExclusive primitive. This serves two purposes in v4:
+  //   1. Prevents the compaction write from racing the runner's normal
+  //      writeAndAdvance calls (same as runner.ts:393-404).
+  //   2. Acts as the in-process compaction mutex — re-entrant trigger
+  //      evaluation on the same runner naturally serializes.
+  // There is no separate compaction-lock module and no file-based flock
+  // in v4. See §"Concurrency".
+  await this.deps.runExclusive(async () => {
     try {
       // Build a FRESH provider for the summarizer call. Do NOT mutate
       // this.provider — its system prompt must remain the agent's persona
@@ -306,97 +298,89 @@ if (decision.fire) {
       });
       summarizerProvider.setSystemPrompt(SUMMARIZER_SYSTEM_PROMPT);
 
-      await runCompaction(sessionEvents, {
-        mode: decision.mode,
+      const result = await runCompaction(sessionEvents, {
         sessionDir,
         summarizer: summarizerProvider,
-        // ... other context (tailConfig, modelMaxContext, targetTokens, ...)
+        modelMaxContext,
+        targetTokens: Math.floor(modelMaxContext * targetCapsuleTokensPct),
+        tailConfig,
       });
-      resetConsecutiveFailures(sessionDir);
-      // Increment / reset periodic-rebuild counter inside the same lock
-      // (handled inside runCompaction → see "Periodic-rebuild counter").
+      // runCompaction internally appends conversation_summary via the same
+      // appendDurableEvent path the runner uses; we're already inside
+      // runExclusive so the writes serialize naturally.
     } catch (err) {
-      const consecutive = incrementConsecutiveFailures(sessionDir);
       logger.error('compaction failed; conversation continues uncompacted', {
-        err, sessionDir, consecutive,
+        err, sessionDir,
       });
-      // Persist failure event via runExclusive to match the runner's existing
-      // durable-write pattern at runner.ts:393-404. The failure write is NOT
-      // protected by the compaction lock alone — runExclusive serializes ALL
-      // event-log writes on the runner's deps, and the failure path must not
-      // race with the runner's own writeAndAdvance. (B-C3.)
-      await this.deps.runExclusive(() => {
-        const state = readSessionState(sessionDir);
-        const { nextState } = appendDurableEvent(sessionDir, state, {
+      // Persist failure event via the same in-progress runExclusive scope.
+      const state = readSessionState(sessionDir);
+      const { nextState } = appendDurableEvent(sessionDir, state, {
+        type: 'compaction_failed',
+        data: {
           type: 'compaction_failed',
-          data: {
-            type: 'compaction_failed',
-            reason: decision.reason,
-            errorMessage: err instanceof Error ? err.message : String(err),
-            consecutiveFailures: consecutive,
-          },
-        });
-        writeSessionState(sessionDir, nextState);
+          reason: decision.reason,
+          errorMessage: err instanceof Error ? err.message : String(err),
+        },
       });
-      maybeDisableForBackoff(sessionDir, consecutive, triggerConfig);
+      writeSessionState(sessionDir, nextState);
+      maybeDisableForBackoff(sessionDir, triggerConfig);
     }
   });
 }
 ```
 
-Key contract changes from v2:
-- **No `ModelPinnedProvider` wrapper.** R6: `ModelPinnedProvider` doesn't isolate the system prompt at request time — `_createResponseImpl` forwards to `inner._invokeCreateResponseImpl`, and the base provider's `getEffectiveSystemPrompt` reads the inner's state when the inner builds its request payload. Wrapping the runner's live provider and calling `setSystemPrompt` on the wrapper would either no-op (system prompt comes from inner) or mutate inner (defeats the isolation goal). The proven pattern, lifted from `session-operations.ts:507-511`, is to create a fresh provider instance via `createProviderForTurn` and call `setSystemPrompt` on it directly. The runner's `this.provider` is a different instance and stays untouched.
-- **`runExclusive` around the failure write** (B-C3). The runner's existing durable-write helper at `runner.ts:393-404` uses `await this.deps.runExclusive(() => { … })` to serialize event-log writes; the compaction failure path needs to match that contract. Without it, a `compaction_failed` write can race a runner-internal write and corrupt `state.json`.
+Key contract notes:
+- **Direct `summarizer: Provider` parameter to `runCompaction`** (v4 simplification). v3 used a `providerFactory: () => Promise<Provider>` indirection so future hierarchical-rebuild paths could spin up fresh providers per call. With rolling and bounded-rebuild gone, the strategy calls the summarizer exactly once per fire; the caller builds the provider directly and hands it in.
+- **No `ModelPinnedProvider` wrapper.** R6 (carried from v3): `ModelPinnedProvider` doesn't isolate the system prompt at request time — `_createResponseImpl` forwards to `inner._invokeCreateResponseImpl`, and the base provider's `getEffectiveSystemPrompt` reads the inner's state when the inner builds its request payload. The proven pattern, lifted from `session-operations.ts:507-511`, is to create a fresh provider instance via `createProviderForTurn` and call `setSystemPrompt` on it directly. The runner's `this.provider` is a different instance and stays untouched.
+- **One `runExclusive` scope wraps both the success and failure writes.** v3 split them across two `runExclusive` calls (one for the summary write, one for the failure write); v4 keeps them inside one scope, which is sufficient since the work between them is sequential and we want them to atomically observe the same SessionState.
 
-Hook runs synchronously inside `runner.run()` so the runner's caller knows compaction completed before the next prompt is accepted. The cost: a brief pause after every Nth turn (in practice ~weekly under Ada-like load).
-
-### CompactionContext refactor (R6)
-
-`compaction/summarize-strategy.ts`'s `CompactionContext` takes a `providerFactory: () => Promise<Provider>` rather than a `summarizer: Provider` directly:
-
-```ts
-export type CompactionContext = {
-  sessionDir: string;
-  providerFactory: () => Promise<Provider>;     // builds a fresh, summarizer-pinned provider
-  mode: 'rolling' | 'rebuild_from_canonical' | 'user_initiated';
-  modelMaxContext: number;
-  targetTokens: number;
-  tailConfig: TailConfig;
-};
-```
-
-Rationale: bounded-rebuild may need to make multiple summarizer calls (e.g. if a future hierarchical-rebuild lands), and each should get a fresh provider rather than reusing a possibly-stateful one. Callers pass a factory that does `createProviderForTurn(...) → setSystemPrompt(SUMMARIZER_SYSTEM_PROMPT)` and returns the provider. v1 strategy calls the factory exactly once.
+Hook runs synchronously inside `runner.run()` so the runner's caller knows compaction completed before the next prompt is accepted. The cost: a brief pause after every trigger fires (in practice ~weekly under Ada-like load).
 
 ### Concurrency
 
-A session-level mutex (`compaction/compaction-lock.ts`) serializes compaction within a session. Behaviors:
+In-memory serialization via the runner's existing `runExclusive` is the only concurrency control in v4. Behaviors:
 
-- **In-memory mutex.** Per-process; serializes re-entrant compactions within one lace process. Cheap.
-- **File-based `flock`** on `<sessionDir>/.compaction.lock` (B-I14). Required because multiple lace processes can attach to the same session directory (e.g. a CLI inspector script running while the agent runs). Acquired before in-memory mutex; released after.
-- **Re-entrant trigger.** If the trigger fires while a previous compaction is in flight (e.g. the prior turn's compaction is still running when a new turn ends), the second `withCompactionLock` call awaits the first. In practice this is rare because compaction is synchronous within `runner.run()` and the same runner handles both turns.
-- **Subagent compaction.** Subagents have their own session directories and their own locks; they don't contend with the parent. (Most subagent sessions have `enabled: false` anyway — see §"Subagent sessions".)
-- **`context_injected` priority='immediate' lands during compaction.** The injection write goes through `appendDurableEvent` independently of the lock and lands in the JSONL. The next post-compaction turn picks it up via `readImmediateInjectsSince`. No special handling; the existing PRI-1691 mechanism already covers mid-turn re-reads.
+- **Same-process re-entrance.** If the trigger fires while a previous compaction is in flight on the same runner, the second `runExclusive` call awaits the first. Because compaction runs synchronously inside `runner.run()`, this is rare in practice.
+- **Cross-process compaction (e.g. a CLI inspector script attached to the same session dir).** v4 does NOT defend against this. v3 specified a file-based `flock` to handle it. Rationale for the cut: no production caller does this today; the inspector tools we ship read events, they don't compact; if someone writes a tool that triggers compaction from another process, file a kata then. The signal-cleanup / NFS-locking complexity of `flock` isn't worth carrying for a hypothetical caller.
+- **Subagent compaction.** Subagents have their own session directories and their own runners. They don't contend with the parent runner's mutex. (Most subagent sessions have compaction off by default — see §"Subagent sessions".)
+- **`context_injected` priority='immediate' lands during compaction.** The injection write goes through `appendDurableEvent` independently. Because the runner's `runExclusive` is the same serialization primitive used by both writers, an in-flight compaction will block an immediate-priority injection until the compaction finishes. Then the next post-compaction turn picks up the injection via `readImmediateInjectsSince`. No special handling.
 - **User abort RPC during compaction.** Compaction is opaque to the existing abort plumbing. The abort signal cancels the next turn's prompt, not the in-flight compaction. Compaction runs to completion (or fails), the `conversation_summary` (or `compaction_failed`) event is written, then the runner returns and the abort takes effect. This is the simplest behavior; if compaction-abort becomes important, file a follow-up kata.
-- **Concurrent compaction from `/compact` slash or `ent/session/compact` RPC.** Same lock. The first caller wins; the second awaits and is a no-op if the first produced a fresh-enough capsule (operator can re-invoke if needed).
+- **Concurrent compaction from `/compact` slash or `ent/session/compact` RPC.** Same `runExclusive`. The first caller wins; the second awaits and runs against the freshly-compacted state (so it sees the just-written summary as the latest one and rebuilds again from canonical — operator can re-invoke if needed).
 
 ### Subagent sessions
 
-Default: `TriggerConfig.enabled = false` for sessions created via the subagent / delegate path. Rationale:
+Default: compaction OFF for subagent sessions. Rationale:
 
 - Subagent sessions are typically short-lived and finish well below the 60% global threshold.
 - Subagent context is reconstructed every time the parent re-delegates; a compacted subagent prefix can confuse the parent's view of what the subagent "saw".
 - Cost-wise, paying for a summarizer call on every subagent that hits 60% would multiply the per-session cost by every active subagent.
 
-Top-level sessions default to `enabled: true`. Configurable per-session via existing session-config plumbing if a particular subagent does need compaction.
+The trigger reads `isSubagentSession` from `this.deps` (sourced from session meta at runner construction time). No per-session config knob in v4 — if a long-running subagent does need compaction, file a kata and we'll thread it through. The default is computed; not exposed.
 
 ### Failure backoff
 
-`compaction_failed` events accumulate a session-scoped `consecutiveFailures` counter. Behavior:
+`compaction_failed` events accumulate session-scoped consecutive-failure pressure. The count is derived at decision time by walking the event log backward from the latest `turn_end`: count consecutive `compaction_failed` events with no intervening `conversation_summary`. v4 does NOT store the count as a field on the failure event (recoverable from the event log; see §"Data model").
+
+Behavior:
 
 - **N=3 consecutive failures (default).** Skip the next trigger evaluation; record `fire: false, reason: 'backoff'`. Backoff window doubles each subsequent skip (1 turn, 2 turns, 4 turns, …) up to a cap of 16 turns.
-- **M=10 consecutive failures (default).** Set `triggerConfig.enabled = false` for the session and emit an `alarm` (existing PRI-1744 alarm channel). Operator must explicitly re-enable.
+- **M=10 consecutive failures (default).** Mark the session "compaction disabled" (small persistent flag on `SessionState`) and emit an `alarm` (existing PRI-1744 alarm channel). Operator must explicitly re-enable. The trigger reports `fire: false, reason: 'disabled'` from then on.
 
-A successful `conversation_summary` write resets the counter to 0.
+A successful `conversation_summary` write resets the persistent-disable flag and (implicitly) the derived consecutive-failure count.
+
+This 4-tier backoff is retained from v3 (Jesse's call) as defense against transient API floods.
+
+### Failure modes → rebuild exceeds summarizer context
+
+If the canonical event prefix being summarized exceeds the summarizer's own context window, the summarizer call fails with a context-window error. The strategy catches the error and emits `compaction_failed` with the reason that drove the trigger (`'global'` or `'emergency'`). Operator notices via the existing PRI-1744 alarm channel.
+
+This is the expected behavior in v4. v3 had a bounded-rebuild + mini-rebuild fallback chain to handle this case in-band; v4 cuts the chain. Rationale:
+
+- The trigger fires at 60% (global) / 90% (emergency) of the **main agent's** context. In v1 the summarizer is the same model as the agent, so the canonical prefix being summarized is bounded by the model's own window minus the tail (~10%). Hitting "rebuild input exceeds summarizer context" is extremely unlikely under normal operation.
+- If it happens, the alarm + a `compaction_failed` event in the transcript is enough signal for the operator to investigate (probably the session has accumulated something pathological).
+- Carrying a full bounded-rebuild path — including a separately-named summarizer-budget constant and an "orphan oversized session" escape hatch — buys defense against a scenario that the trigger thresholds make rare.
+
+If real production data shows this failure firing more than rarely, file a kata at that point to add a hierarchical rebuild.
 
 ## Tail policy
 
@@ -404,14 +388,12 @@ A successful `conversation_summary` write resets the counter to 0.
 
 ```ts
 export type TailConfig = {
-  recentTurns: number;            // default 10
-  recentHumanPrompts: number;     // default 12  (see "Defaults rationale" below)
-  recentHumanPromptsTokenBudgetPct: number; // default 0.10 (was 0.20 in v2 — see R5)
-  humanChannelMatcher?: (event: TypedDurableEvent) => boolean;
+  recentTurns: number;                        // default 10
+  recentHumanPromptsTokenBudgetPct: number;   // default 0.10
 };
 
 export type TailSelection = {
-  tailStartEventSeq: number;      // first event seq that stays verbatim
+  tailStartEventSeq: number;       // first event seq that stays verbatim
   preservedHumanPromptSeqs: number[];  // for telemetry / debugging
 };
 
@@ -422,33 +404,48 @@ export function selectTail(
 ): TailSelection;
 ```
 
-Algorithm:
+Algorithm — **single backward walk**, tracking both turn-boundary and human-prompt-token criteria simultaneously. Stop at whichever boundary is met first; if both are still in progress at the end of the list, the walk stops naturally at event 1.
 
-1. Walk events backward from end, counting closed turns by `turn_start` boundaries. Stop at the `turn_start` whose turn index is `recentTurns` turns ago from the most recent. Record this as `turnWindowStartSeq`.
+1. Walk events from the end of `events` backward. Maintain three running variables: `closedTurnsSeen`, `humanPromptTokenEstimate`, and `oldestVisitedSeq`.
 
-2. Separately walk backward collecting up to `recentHumanPrompts` `prompt` events from a human channel. While walking, keep a running estimate of bytes-back-from-tail-end → tokens (`bytes / 3.5`). Stop **either** when `recentHumanPrompts` is hit **or** when projected tail-extension cost exceeds `recentHumanPromptsTokenBudgetPct * modelMaxContext`. With the v3 default of 0.10, the tail can never extend past ~10% of the model window.
+2. For each event visited:
+   - If the event is a `turn_start`, increment `closedTurnsSeen`.
+   - If the event is a `prompt` from a human channel (default matcher: text-block content begins with one of `<messages channel="D"`, `<messages channel="C"`, `<messages channel="G"`, `<messages channel="im"`), record its seq in `preservedHumanPromptSeqs` and add `(bytesOfPromptBody / 3.5)` to `humanPromptTokenEstimate`.
+   - Update `oldestVisitedSeq = event.eventSeq`.
 
-3. The default `humanChannelMatcher` matches any `prompt` event whose first text-block content begins with one of `<messages channel="D"`, `<messages channel="C"`, `<messages channel="G"`, `<messages channel="im"` (Slack DM / channel / group / IM prefixes). Configurable per session. Filing follow-up kata to widen further as new ingress sources arrive (email, web UI, etc.).
+3. Termination check after each step:
+   - **Turn-window boundary.** If `closedTurnsSeen >= recentTurns`, the proposed `tailStartEventSeq` is `oldestVisitedSeq` (we've consumed enough recent turns).
+   - **Token-budget boundary.** If `humanPromptTokenEstimate >= recentHumanPromptsTokenBudgetPct * modelMaxContext`, the proposed `tailStartEventSeq` is `oldestVisitedSeq` (we've used the tail's token budget).
+   - Stop at whichever boundary fires first.
 
-4. If the oldest preserved human prompt has `eventSeq < turnWindowStartSeq`, extend the tail backward to `oldestHumanPromptSeq`. Tail boundary is `min(turnWindowStartSeq, oldestHumanPromptSeq)`.
+4. If neither boundary fires before the walk runs out of events, `tailStartEventSeq = 1` (whole session is tail; the summarizer has nothing to summarize and the strategy emits no event — caller handles via `compaction_failed` with reason='no-op' or by short-circuiting before invoking).
 
-5. **In-flight tool-use guard.** `tool_use` is **one event** that carries both `input` and `result` (`event-types.ts:28-35` — `ToolUseEventData` has both fields on a single event). The boundary risk is: if the proposed boundary falls on a `tool_use` event whose `result === undefined` (tool hasn't completed yet), the next turn will mutate the event in place to add the result. The summarizer would see "tool call with no result"; the rebuilt tail would later mutate to add it. Guard: if the proposed boundary falls on a `tool_use` event with `result === undefined`, walk left by one event so the in-flight tool-use sits inside the tail (the tail re-reads the live event, so when the tool completes the tail naturally picks up the resolved form). NOTE: this is not addressing message-builder orphan-tool-block issues; for those, see §"Message-builder behavior → dropOrphanedToolBlocks" (B-C7).
+5. **In-flight tool-use guard.** `tool_use` is **one event** that carries both `input` and `result` (`event-types.ts:28-35` — `ToolUseEventData` has both fields on a single event). The boundary risk is: if the proposed boundary falls on a `tool_use` event whose `result === undefined` (tool hasn't completed yet), the next turn will mutate the event in place to add the result. The summarizer would see "tool call with no result"; the rebuilt tail would later mutate to add it. Guard: if the proposed `tailStartEventSeq` falls on a `tool_use` event with `result === undefined`, walk left by one event so the in-flight tool-use sits inside the tail (the tail re-reads the live event, so when the tool completes the tail naturally picks up the resolved form). NOTE: this is not addressing message-builder orphan-tool-block issues; for those, see §"Message-builder behavior → dropOrphanedToolBlocks".
 
-6. Return `tailStartEventSeq` (the smallest eventSeq that's in the tail) and the list of human prompt seqs that drove the policy.
+6. Return `tailStartEventSeq` and the list of human prompt seqs that drove the policy.
 
 The compactor sees: events with `eventSeq < tailStartEventSeq` → fed to summarizer. Events with `eventSeq >= tailStartEventSeq` → passed through verbatim to the message-builder.
 
 ### Defaults rationale
 
 - `recentTurns: 10` — unchanged.
-- `recentHumanPrompts: 12` — ~24 hours of conversation under Ada-like load.
-- `recentHumanPromptsTokenBudgetPct: 0.10` — lowered from v2's 0.20 to match R5's tighter capsule-plus-tail budget. Combined with capsule budget (`targetCapsuleTokensPct: 0.10`), post-compaction state is ~20% of context, leaving 40% headroom below the 60% global trigger.
+- `recentHumanPromptsTokenBudgetPct: 0.10` — combined with capsule budget (`targetCapsuleTokensPct: 0.10`), post-compaction state is ~20% of context, leaving 40% headroom below the 60% global trigger.
+
+Note: v3 also exposed `recentHumanPrompts: number` (a count cap, default 12) and `humanChannelMatcher?: (event) => boolean` (a per-session override knob). v4 drops both. The token-budget cap alone is what matters for context safety; the count cap added zero protection that 0.10-of-context didn't already provide. The default channel matcher is the only one we use; if non-Slack ingress arrives, widen the matcher in source.
 
 ## Compaction algorithm
 
 `compaction/summarize-strategy.ts` exports:
 
 ```ts
+export type CompactionContext = {
+  sessionDir: string;
+  summarizer: Provider;          // already pinned to SUMMARIZER_SYSTEM_PROMPT by caller
+  modelMaxContext: number;
+  targetTokens: number;
+  tailConfig: TailConfig;
+};
+
 export type CompactionResult = {
   event: TypedDurableEvent;      // the new conversation_summary event
   metrics: {
@@ -461,7 +458,7 @@ export type CompactionResult = {
 export async function compact(events: TypedDurableEvent[], ctx: CompactionContext): Promise<CompactionResult>;
 ```
 
-### trim-tool-results pre-pass (R3)
+### trim-tool-results pre-pass
 
 Before sending events to the summarizer, the strategy applies `TrimToolResultsStrategy` to a COPY of the events:
 
@@ -476,44 +473,18 @@ Key invariants:
 - **No event mutation.** The pre-pass returns a new list; the on-disk JSONL is unchanged.
 - **`trim-tool-results-strategy.ts` stays a registered strategy.** The new summarize strategy invokes it via the registry interface (cleaner than a bare function import; preserves the harness's ability to measure trim-tool-results in isolation against fixtures). On the wire, however, the RPC enum no longer exposes it (see §"Strategy enum on the wire").
 
-### Rolling mode
+### Single rebuild path
 
-1. Find the latest existing `conversation_summary` event in `events` (the "previous capsule"). If none, behaves like rebuild.
-2. Compute tail boundary via `selectTail(events, ctx.modelMaxContext, ctx.tailConfig)`.
-3. Identify events between `previousSummary.recentTailStartsAtEventSeq` and `tailStartEventSeq` — the "delta" since last compaction.
-4. **Empty/inverted delta guard (B-C8).** If `tailStartEventSeq <= previousSummary.recentTailStartsAtEventSeq` — i.e. the new tail extends back past or to the same point as the previous summary's tail boundary, so there is no new content to fold in — fall back to a mini-rebuild routed through the **bounded-rebuild path** (not a naive full rebuild). The mini-rebuild estimates `prefixTokens` for the segment `previousSummary.replacesEventSeqRange.fromInclusive` through `tailStartEventSeq - 1` and applies the same `summarizerBudget` check as §"Rebuild mode → bounded rebuild" before proceeding. This prevents the v2 empty-delta fallback from blowing past summarizer bounds on a long-running session whose tail drifts backward across compactions.
-5. Run trim-tool-results pre-pass on the delta events.
-6. Run summarizer (via `budget-retry.ts`) with prompt: `previousCapsule + trimmedDeltaEvents` → `newCapsule`.
-7. Emit `conversation_summary` event with `generationMode: 'rolling'`. **`replacesEventSeqRange` is always cumulative from 1**: `{ fromInclusive: 1, toInclusive: tailStartEventSeq - 1 }`.
-8. Increment `sessionState.compactionsSinceLastRebuild`.
+Every compaction reads canonical events up to `tailStartEventSeq - 1`, runs the trim-tool-results pre-pass on them, runs the summarizer once, and emits one `conversation_summary` event:
 
-### Rebuild mode
+1. Compute tail boundary: `tailStartEventSeq = selectTail(events, ctx.modelMaxContext, ctx.tailConfig).tailStartEventSeq`.
+2. Build `summarizerInput` = trim-tool-results pre-pass over events with `eventSeq < tailStartEventSeq`, skipping any prior `conversation_summary` events but keeping the original prompts/messages they replaced.
+3. Run the summarizer (via the budget-retry helper — top-level function inside `summarize-strategy.ts`) with prompt: all non-summary trimmed events → `capsule`.
+4. Emit `conversation_summary` with `generationMode: 'rebuild_from_canonical'`, `recentTailStartsAtEventSeq`, `generatedAt`, cost, and token usage.
 
-1. **Rebuild bounds check (R7).** Estimate `prefixTokens` (the sum of every non-summary event's content from session start to `tailStartEventSeq - 1`) via `estimateProviderTokens`. Compare against `summarizerBudget`, NOT against `ctx.modelMaxContext`:
+The strategy has no "rolling" path, no "bounded-rebuild" path, no "previous capsule" parameter, no delta computation. v3 split logic across §"Rolling mode" + §"Rebuild mode" + §"Bounded rebuild" + an empty-delta fallback; v4 has one path.
 
-   ```
-   summarizerBudget
-     = summarizerModelMaxContext
-     − SUMMARIZER_OVERHEAD_TOKENS
-   ```
-
-   `summarizerModelMaxContext` is the model max of the summarizer model. **In v1 the summarizer model is the same model the main agent uses**, so `summarizerModelMaxContext === ctx.modelMaxContext`. The split exists so that future tier-different summarizers (Haiku-class summarizer for Opus-class agent) keep the check correct.
-
-   `SUMMARIZER_OVERHEAD_TOKENS` reserves room for the summarizer's system prompt, the structured-output schema (zod → JSON schema is ~1–2K tokens at full surface), and the completion itself (the emitted capsule, target ~10% of model max). Pick **20,000 tokens** as the reserved overhead: rough breakdown is ~2K system + ~2K schema + 10K target output + 6K slack. This is a single named constant in `summarize-strategy.ts`; tunable in a follow-up after measurement.
-
-   If `prefixTokens > summarizerBudget` → fall through to "bounded rebuild" below. Otherwise straight rebuild.
-
-2. **Straight rebuild.** Read entire canonical event log up to `tailStartEventSeq`, skipping prior `conversation_summary` events but keeping the original prompts/messages they replaced. Compute tail via `selectTail`. Run trim-tool-results pre-pass. Run summarizer with prompt: all non-summary trimmed events → `freshCapsule`. Emit `conversation_summary` with `generationMode: 'rebuild_from_canonical'`, `replacesEventSeqRange: { fromInclusive: 1, toInclusive: tailStartEventSeq - 1 }`. Reset `sessionState.compactionsSinceLastRebuild = 0`.
-
-3. **Bounded rebuild.** When the canonical event prefix exceeds the summarizer's bounds:
-   1. Find the latest `conversation_summary` event ("the anchor capsule").
-   2. Read canonical events from `anchor.replacesEventSeqRange.toInclusive + 1` through `tailStartEventSeq - 1` (the post-anchor delta only).
-   3. Run trim-tool-results pre-pass on the delta.
-   4. Run summarizer with prompt: `anchorCapsule + trimmedDeltaEvents` → `freshCapsule`. (Structurally identical to rolling-mode but reads the underlying canonical events for the delta rather than the post-trim path.)
-   5. Emit `conversation_summary` with `generationMode: 'rebuild_from_canonical'`, `purpose: 'bounded_rebuild'`, cumulative range. Reset `sessionState.compactionsSinceLastRebuild = 0`.
-   6. If there is NO prior `conversation_summary` event AND the canonical event prefix exceeds summarizer bounds: emit `compaction_failed` with `errorMessage` describing the situation and the operator must intervene (truncation, or manually split the session). File follow-up kata: "hierarchical-from-scratch rebuild for orphan oversized sessions" — not built in v1 because the situation is rare and operator-fixable.
-
-In all rebuild paths the new event is appended via the same `appendDurableEvent` path lace uses today. After it lands, the message-builder picks it up on the next turn.
+If the summarizer call itself fails because the input exceeds the summarizer's own context window, the strategy lets the error propagate so the caller's catch block emits `compaction_failed`. See §"Failure modes → rebuild exceeds summarizer context".
 
 ### Model
 
@@ -521,11 +492,11 @@ Same provider+model as the main agent's conversation. Per the research report: "
 
 ### targetTokens default
 
-Defaults to `floor(modelMaxContext * targetCapsuleTokensPct)` — see R5. For 1M-context Sonnet, targetTokens defaults to **100K** (vs. ~200K in v2). The capsule itself is expected to be a small fraction of that bound in practice; the budget is a ceiling for the renderer.
+Defaults to `floor(modelMaxContext * targetCapsuleTokensPct)` — see R5. For 1M-context Sonnet, targetTokens defaults to **100K**. The capsule itself is expected to be a small fraction of that bound in practice; the budget is a ceiling for the renderer.
 
 ## Budget enforcement
 
-`compaction/budget-retry.ts`:
+`summarizeWithBudget` is a top-level helper inside `summarize-strategy.ts` (folded in v4 from the previous standalone `budget-retry.ts`):
 
 ```ts
 export async function summarizeWithBudget(args: {
@@ -535,18 +506,20 @@ export async function summarizeWithBudget(args: {
   targetTokens: number;
   renderForMeasurement: (capsule: Capsule) => string;  // see step 2
   maxRetries?: number;          // default 2
-}): Promise<{ capsule: Capsule; budgetOverrunBy: number; retries: number }>;
+}): Promise<{ capsule: Capsule }>;
 ```
 
 1. Call summarizer with normal prompt. Parse + validate result against `CapsuleSchema`.
 2. **Token measurement.** Compute approximate token size of what the **agent will actually see**, not the JSON storage form:
    `approxTokens = renderForMeasurement(capsule).length / 3.5`
    Callers pass `renderCapsuleAsMarkdown` as `renderForMeasurement`. The 3.5 chars/token ratio is calibrated for Anthropic markdown.
-3. If `tokens <= targetTokens` → return `{capsule, budgetOverrunBy: 0, retries: 0}`.
+3. If `tokens <= targetTokens` → return `{ capsule }`.
 4. Else: re-call with prefix `"Your prior output was X tokens; the target is Y. Compress further. Do not drop must-preserve fields: commitments, user corrections, do_not_infer, exact_language_to_preserve."`. Up to `maxRetries` re-runs.
-5. After max retries: accept the smallest version produced across all retries. Return with `budgetOverrunBy > 0` so the event's metadata can record it.
+5. After max retries: accept the smallest version produced across all retries.
 
 The must-preserve fields list is hard-coded; if a future bug shows the model dropping them under pressure, add a critic pass (deferred kata).
+
+Note on dropped diagnostics: v3 returned `{ capsule, budgetOverrunBy, retries }` and the wrapping event surfaced both as event fields. v4 returns just `{ capsule }` — `budgetOverrunBy` and `retries` had no readers and were diagnostic-only. If we ever want them, logging at WARN level inside this function is enough.
 
 ## Cache invariance
 
@@ -569,13 +542,13 @@ Four changes to `message-building/message-builder.ts`:
    - Reset `messages.length = 0` (same as today's `context_compacted` path).
    - Render the capsule via `renderCapsuleAsMarkdown(event.data.capsule)`.
    - Push **one** message of shape `{ role: 'user', content: renderedMarkdown }` as the first message in the rebuilt array. The agent reads this as user-provided framing context.
-   - **Only the LATEST `conversation_summary` event is rendered.** Earlier ones are skipped. Because `replacesEventSeqRange` is always cumulative from 1, the latest summary fully covers everything before its `recentTailStartsAtEventSeq`; rendering earlier summaries would duplicate content.
+   - **Only the LATEST `conversation_summary` event is rendered.** Earlier ones are skipped. Because every summary is cumulative from session start, the latest summary fully covers everything before its `recentTailStartsAtEventSeq`; rendering earlier summaries would duplicate content.
    - All canonical events with `eventSeq < latestSummary.recentTailStartsAtEventSeq` are skipped (they're represented inside the capsule).
    - All events with `eventSeq >= latestSummary.recentTailStartsAtEventSeq` are processed normally.
 
 2. **Skip `compaction_failed` events.** They're telemetry; they don't affect prefix rendering. Explicitly skip (don't fall through to "unknown type").
 
-3. **Reject unknown event types loudly.** Any event whose `type` is not in the known allowlist throws. Allowlist (B-I4 — enumerated explicitly, anything not on this list throws on the next turn so we cannot silently drop new event types we forgot to teach the builder about):
+3. **Reject unknown event types loudly.** Any event whose `type` is not in the known allowlist throws. Allowlist (enumerated explicitly so anything not on this list throws on the next turn — we cannot silently drop new event types we forgot to teach the builder about):
 
    ```
    prompt, message, tool_use, turn_start, turn_end, context_injected,
@@ -586,17 +559,17 @@ Four changes to `message-building/message-builder.ts`:
    compaction_failed              // NEW — skipped (no-op)
    ```
 
-   The current builder uses an open-switch with implicit fall-through ignoring unknown types; v3 closes that to an explicit allowlist plus a throw. The explicit no-op set above MUST be the same list as the current implicit-no-op set (turn_start, turn_end, job_*, permission_*, checkpoint_created, files_rewound, system_prompt_set after pass-1) so the behavior change is purely "newly unknown types now throw rather than silently doing nothing."
+   The current builder uses an open-switch with implicit fall-through ignoring unknown types; v3 closed that to an explicit allowlist plus a throw and v4 keeps it. The explicit no-op set above MUST be the same list as the current implicit-no-op set (turn_start, turn_end, job_*, permission_*, checkpoint_created, files_rewound, system_prompt_set after pass-1) so the behavior change is purely "newly unknown types now throw rather than silently doing nothing."
 
    `context_compacted` is **not** on this list. After the Ada cutover, no live session has `context_compacted` on disk; any sub-session that somehow does fails loudly with a pointer at the cutover playbook.
 
-4. **Always run `dropOrphanedToolBlocks` against the rebuilt messages (B-C7).** Currently the function is called only inside the `context_compacted` branch (`message-builder.ts:319`). Move the call out of that branch and run it ONCE at the end of pass-2 (after all events have been folded into `messages`), regardless of whether a `conversation_summary` event was present. Rationale: PRI-1818's crash-recovery path writes a synthesized `turn_end(stopReason='process_died')` after a SIGKILL/OOM; if the process died mid-tool-call, the `tool_use` event was already written with `result === undefined`, and the runner's repair path may produce a message stream where an `assistant.toolCalls[]` block has no matching `user.toolResults[]` follower. PRI-1820's `dropOrphanedToolBlocks` exists to defuse exactly this case (`message-builder.ts:152-189` was added specifically because Ada hit a tool_use without its result and every subsequent Anthropic call 400'd on the same toolu id). With v3's removal of `context_compacted`, that defense currently has no caller. Running it unconditionally as a post-pass costs one O(n) scan of messages and protects against the crash-recovery orphan source.
+4. **Always run `dropOrphanedToolBlocks` against the rebuilt messages.** Currently the function is called only inside the `context_compacted` branch (`message-builder.ts:319`). Move the call out of that branch and run it ONCE at the end of pass-2 (after all events have been folded into `messages`), regardless of whether a `conversation_summary` event was present. Rationale: PRI-1818's crash-recovery path writes a synthesized `turn_end(stopReason='process_died')` after a SIGKILL/OOM; if the process died mid-tool-call, the `tool_use` event was already written with `result === undefined`, and the runner's repair path may produce a message stream where an `assistant.toolCalls[]` block has no matching `user.toolResults[]` follower. PRI-1820's `dropOrphanedToolBlocks` exists to defuse exactly this case (`message-builder.ts:152-189` was added specifically because Ada hit a tool_use without its result and every subsequent Anthropic call 400'd on the same toolu id). With v3's removal of `context_compacted`, that defense currently has no caller. Running it unconditionally as a post-pass costs one O(n) scan of messages and protects against the crash-recovery orphan source.
 
    The pass remains a defensive bottom-pass — if the rebuilt prefix is clean it's a no-op. Logging still emits a WARN on every dropped block so we can spot regressions that produce orphans in the first place.
 
-## Recall (FTS) integration (R1)
+## Recall (FTS) integration
 
-`storage/recall/event-to-row.ts` currently has a `case 'context_compacted':` (line 80) that returns a `system`-kind row whose content is the summary text. **Both events change behavior in v3:**
+`storage/recall/event-to-row.ts` currently has a `case 'context_compacted':` (line 80) that returns a `system`-kind row whose content is the summary text. **Both events change behavior in v3/v4:**
 
 1. **Remove the `case 'context_compacted':` branch.** That event type no longer exists.
 2. **`conversation_summary` is NOT indexed.** The switch in `eventToRow` returns `null` (the default-case behavior for unknown / non-user-facing types) for `conversation_summary`. The summary is a rewrite for the model's working memory, not a search target. Recall already indexes the canonical events the summary was built from — `prompt`, `message`, `tool_use`, `context_injected` — so the search surface remains complete. Indexing the summary would surface paraphrased / lossy text alongside the original, inflate FTS row size (capsule markdown can be ~10K tokens), and confuse `/recall` results with two hits for the same conversational moment.
@@ -617,9 +590,9 @@ default:
   return null;
 ```
 
-## Cutover: one-time clear of Ada (R2)
+## Cutover: one-time clear of Ada
 
-v2 specified a per-session migration tool that read every `context_compacted` event, summarized them through a fresh model call, and rewrote each transcript JSONL in place with a single new `conversation_summary` event. That section is **DELETED in v3**.
+v2 specified a per-session migration tool that read every `context_compacted` event, summarized them through a fresh model call, and rewrote each transcript JSONL in place with a single new `conversation_summary` event. That section is **DELETED in v3** and stays deleted in v4.
 
 Instead: Ada is the only live agent with `context_compacted` events on disk. We zero her transcript at cutover.
 
@@ -637,7 +610,7 @@ Instead: Ada is the only live agent with `context_compacted` events on disk. We 
 
 ### Cost
 
-**Zero summarizer cost** at cutover. No model calls. (v2's migration was ~$8–10 for Ada because it ran a fresh-prefix summarizer over her 1M-token canonical history; v3 simply discards that history.)
+**Zero summarizer cost** at cutover. No model calls. (v2's migration was ~$8–10 for Ada because it ran a fresh-prefix summarizer over her 1M-token canonical history; v3/v4 simply discards that history.)
 
 ### What Ada loses
 
@@ -645,7 +618,7 @@ Her existing conversation context: pending commitments, ongoing tasks, prior cor
 
 The trade-off vs migration:
 - **Migration cost (v2 plan):** ~$10, plus the integration risk of a tool that rewrites her JSONL in place (file-system race, eventSeq preservation, FTS staleness, summarizer hallucination on a 1M-token prefix).
-- **Clear cost (v3 plan):** ~$0, but Ada starts fresh.
+- **Clear cost (v3+ plan):** ~$0, but Ada starts fresh.
 
 The cutover is intentional reset, not data loss in the catastrophic sense — Jesse (the operator) chose to take the hit rather than pay the migration risk for a single session. Future agents post-cutover never have `context_compacted` events on disk and never need either path.
 
@@ -659,12 +632,10 @@ If any non-Ada session somehow has `context_compacted` events on disk (e.g. a st
 
 ## Build / repo plumbing
 
-The `sen2/compaction/` repo declares `@lace/agent` as a `file:../lace/packages/agent` workspace dependency (see `compaction/package.json:18`). This means:
+The `sen2/compaction/` repo declares `@lace/agent` as a `file:../lace/packages/agent` workspace dependency. This means:
 
 - The lace package must be built before the compaction repo can `tsx` against it. `compaction`'s test/harness scripts assume `cd ../lace && npm run build` has been run.
 - Type-import edits in lace propagate to compaction via the `file:` link without a re-install.
-
-(v2 also documented the migration script's reliance on this; in v3 there is no migration script, but the harness path still depends on the workspace link for fixtures + strategy module imports.)
 
 ## Testing
 
@@ -673,16 +644,14 @@ Full unit-test coverage for every module in the new strategy. Integration testin
 ### Unit tests
 
 - **`capsule-types.test.ts`**: schema accepts the report's example payload; rejects every malformed shape we can think of (missing required field, wrong type per branch, unknown field if strict mode is on); every sub-schema gets its own test.
-- **`capsule-markdown.test.ts`**: rendering of each of the 13 sections; edge cases (empty arrays don't emit headers; all-optional-fields-absent renders correctly; multi-paragraph snippets preserve formatting; sections with special chars are escaped); quote blocks emit with attribution; uncertain items get `(uncertain)` marker.
-- **`tail-policy.test.ts`**: every branch — short session (all events in tail), normal turn-cut, human-prompt extends tail backward, in-flight `tool_use` (result undefined) at boundary, no human prompts in session, empty session, session with only one turn, channel matcher with custom regex, **token-budget cap fires before recentHumanPrompts is hit at the v3 0.10 default**.
-- **`budget-retry.test.ts`**: in-budget first try; over-budget then in-budget on first retry; all retries over-budget accepts smallest; the must-preserve fields preserved in the smallest-accepted output (synthetic summarizer that returns a known capsule); **measurement uses rendered markdown, not JSON bytes**.
-- **`compaction-trigger.test.ts`**: every threshold combination at v3 defaults (under 60% → no fire; between 60% and 90% → global; over 90% → emergency); **the `?? 0` cache-field defaults: Anthropic-with-cache-fields case (full sum), Anthropic-without-cache-fields case (input only), non-Anthropic case (input only)**; mode pick (first 9 compactions rolling, 10th rebuild, then back to rolling — counter sourced from `sessionState.compactionsSinceLastRebuild`); **stop-reason whitelist: `end_turn`/`stop_sequence`/`max_turns` fire; `tool_use`/`refusal`/`cancelled`/`failed`/`process_died`/`prompt_handler_caught`/`context_window_exceeded`/`max_output_tokens` do NOT fire**; **gating: `lastCallInputContextTokens` missing → no fire + log**; **gating: `enabled === false` → no fire**.
-- **`summarizer-prompt.test.ts`**: prompt construction for rolling (includes previous capsule) and rebuild (does not); correct field ordering; instruction text matches spec.
-- **`summarize-strategy.test.ts`**: rolling mode emits new event with **cumulative** `replacesEventSeqRange`; **trim-tool-results pre-pass is applied to events fed to summarizer**; **tail events are NOT trimmed**; **empty-delta fallback routes through bounded-rebuild check, not a naive full rebuild (B-C8)**; rebuild mode ignores prior summaries; **bounded-rebuild path when prefix exceeds `summarizerBudget = summarizerModelMaxContext − 20K`**; error path emits `compaction_failed` via `runExclusive` and rethrows; cost fields populated; **`CompactionContext.providerFactory` is invoked to create the summarizer provider (no `ModelPinnedProvider` reference)**; **`sessionState.compactionsSinceLastRebuild` increments on rolling, resets on rebuild**.
+- **`capsule-markdown.test.ts`** (covering the markdown renderer that now lives inside `summarize-strategy.ts`): rendering of each of the 13 sections; edge cases (empty arrays don't emit headers; all-optional-fields-absent renders correctly; multi-paragraph snippets preserve formatting; sections with special chars are escaped); quote blocks emit with attribution.
+- **`tail-policy.test.ts`**: every branch — short session (all events in tail), normal turn-cut, human-prompt extends tail backward, in-flight `tool_use` (result undefined) at boundary, no human prompts in session, empty session, session with only one turn, **token-budget cap fires before recentTurns is hit on a chat-heavy session**, **turn-cap fires before token-budget on a long-quiet-then-talky session**, **single-pass walk: visits each event at most once (instrument the matcher)**.
+- **`budget-retry.test.ts`** (covering the budget helper that now lives inside `summarize-strategy.ts`): in-budget first try; over-budget then in-budget on first retry; all retries over-budget accepts smallest; the must-preserve fields preserved in the smallest-accepted output (synthetic summarizer that returns a known capsule); **measurement uses rendered markdown, not JSON bytes**.
+- **`compaction-trigger.test.ts`**: every threshold combination at v4 defaults (under 60% → no fire; between 60% and 90% → global; over 90% → emergency); **the `?? 0` cache-field defaults parameterized across `inputTokens`-only, `inputTokens + cacheRead`, `inputTokens + cacheCreation + cacheRead` (one test, three rows; the formula reduces identically)**; **stop-reason whitelist: `end_turn`/`stop_sequence`/`max_turns` fire; `tool_use`/`refusal`/`cancelled`/`failed`/`process_died`/`prompt_handler_caught`/`context_window_exceeded`/`max_output_tokens` do NOT fire**; **gating: `lastCallInputContextTokens` missing → no fire + log**; **gating: subagent session → no fire**; **gating: persistent-disable flag set → `fire: false, reason: 'disabled'`**; **gating: in backoff window → `fire: false, reason: 'backoff'`**.
+- **`summarize-strategy.test.ts`**: emits one `conversation_summary` event with cumulative coverage (everything from event 1 up to `recentTailStartsAtEventSeq - 1` is represented); **trim-tool-results pre-pass is applied to events fed to summarizer**; **tail events are NOT trimmed**; prior `conversation_summary` events in the input are skipped (the underlying canonical events are re-summarized); error path lets the summarizer exception propagate so the caller emits `compaction_failed`; cost fields populated; **summarizer Provider parameter is the one the caller passed (no factory indirection)**.
 - **`message-builder.test.ts`**: session with one `conversation_summary` event rebuilds messages with the rendered markdown as a single role:user prefix; **session with two summaries reads only the latest, drops earlier ones**; session with zero summaries falls through to current pre-summary behavior; **session with `compaction_failed` events: events skipped, prefix unaffected**; **session with unknown event type: throws loudly**; **`dropOrphanedToolBlocks` runs as a post-pass even when no `conversation_summary` event is present (synthetic crash-recovery fixture: turn_end(process_died) + orphan tool_use)**.
 - **`event-to-row.test.ts`**: **`conversation_summary` event returns null (not indexed)**; **`compaction_failed` event returns null (not indexed)**; **no `context_compacted` case remains**.
-- **`compaction-lock.test.ts`**: re-entrant in-process call awaits prior; **two simulated processes contending via flock on `.compaction.lock` — second blocks until first releases**; cross-session calls don't contend; lock released on error.
-- **`backoff.test.ts`**: 3 consecutive failures → backoff window doubles; 10 consecutive → session disabled + alarm emitted; successful summary resets counter.
+- **`backoff.test.ts`**: 3 consecutive failures → backoff window doubles; 10 consecutive → persistent-disable flag set on SessionState + alarm emitted; successful summary clears the persistent flag.
 
 All unit tests use pure synthetic data — no LLM call. No mocking the API; pure-function logic only.
 
@@ -692,10 +661,10 @@ The `sen2/compaction/` harness is the e2e bed (runs against the saved Ada-fixtur
 
 1. Register the new strategy as a `compaction` repo strategy module (alongside `noop`). Strategy module wraps `runCompaction` from lace, importing through the `@lace/agent` workspace dep.
 2. `compaction harness new-summarize fixtures/ada-main --out scratch/runs/<date>` runs the real strategy against the saved 2,036-event session snapshot with a real Anthropic API summarizer call.
-3. Outputs: `events.jsonl` (post-compaction event sequence), `metrics.json` (size reduction, generation cost, retry count, budget overrun, capsule shape stats), `after.html` (rendered conversation prefix from the message-builder).
+3. Outputs: `events.jsonl` (post-compaction event sequence), `metrics.json` (size reduction, generation cost, capsule shape stats), `after.html` (rendered conversation prefix from the message-builder).
 4. Acceptance criteria (manual, iterative — driven by reading the harness output):
    - `events.jsonl` contains a `conversation_summary` event with valid capsule per zod schema.
-   - `replacesEventSeqRange.fromInclusive === 1` (cumulative range contract).
+   - The new event covers events 1 through `recentTailStartsAtEventSeq - 1` (cumulative coverage; derived from the field, not stored as a range).
    - Token reduction > 50% on the pre-compaction window.
    - `after.html` renders a readable conversation prefix that preserves the fixture's known commitments, corrections, and recent human comms.
    - Generation cost < $15 per run.
@@ -707,40 +676,35 @@ Harness runs are on-demand (not in CI) — they cost real Anthropic dollars. CI 
 
 Not blocking. Capture as follow-ups during implementation:
 
-- What's a sensible default `humanChannelMatcher` for non-Slack ingress? Today we have Slack DMs + channels. Email, web UI, etc. would need different matchers.
+- What's a sensible default channel matcher for non-Slack ingress? Today we have Slack DMs + channels. Email, web UI, etc. would need different matchers. (v4 dropped the per-session matcher override knob; widening the matcher is now a source-edit.)
 - Should the capsule include a version of itself in the prompt to the summarizer, or only natural-language framing? (Prompt design decision; A/B in the harness.)
 - The summarizer's `do not drop must-preserve fields` retry instruction: does it work in practice? If not, the critic pass from research Phase 2 becomes necessary.
-- Periodic-rebuild interval (`rebuildEveryNCompactions: 10`): tune from real data once we have multiple weeks of post-deploy sessions.
 - Compaction-abort: should an in-flight compaction be cancellable via the abort RPC? Today's behavior is "runs to completion then abort takes effect."
-- `SUMMARIZER_OVERHEAD_TOKENS = 20_000`: pure estimate; revisit after the harness gives us real numbers on system + schema + completion costs.
+- Does `rebuild exceeds summarizer context` ever fire in production? If yes more than rarely, file a kata for a hierarchical-rebuild fallback (the case v3's bounded-rebuild was guarding against).
 
 ## Implementation order (informs the plan, not the spec)
 
 0. **Precondition kata: `usage.lastCallInputContextTokens` on `turn_end`.** Tiny lace PR. File as PRI-XXXX. Must land + ship before any code below.
-1. Module scaffolding + `capsule-types.ts` (no behavior; just the schema; includes `schemaVersion: 1` as number)
-2. `capsule-markdown.ts` (pure function on Capsule; testable in isolation)
-3. `tail-policy.ts` (pure function on events + modelMaxContext; testable in isolation)
-4. `summarizer-prompt.ts` (pure function on events + previous capsule; testable in isolation)
-5. `budget-retry.ts` (wraps a Provider — testable with a synthetic Provider stub for pure-function unit tests; uses renderForMeasurement for size)
-6. `compaction-lock.ts` (session-level mutex; in-memory + flock; pure-function testable with a fake filesystem)
-7. `summarize-strategy.ts` (composes the above; pure-function unit tests with synthetic Provider; rolling + rebuild + bounded-rebuild paths; trim-tool-results pre-pass; `providerFactory` interface)
-8. `compaction-trigger.ts` (pure function on turn_end event + session events; tests cover all gating including stop-reason whitelist and `?? 0` cache-field defaults; reads `compactionsSinceLastRebuild` from sessionState)
-9. `event-types.ts` (add new types, remove `context_compacted`, add `compactionsSinceLastRebuild?: number` to SessionState) + `message-builder.ts` modifications (allowlist + always-run `dropOrphanedToolBlocks`) + tests
-10. `event-to-row.ts` modifications (REMOVE `context_compacted` case; `conversation_summary` + `compaction_failed` fall through to null — NOT indexed) + tests
-11. Update `/compact` slash command (`conversation/slash-commands.ts`) + `ent/session/compact` RPC handler (`rpc/handlers/session-operations.ts`) to emit `conversation_summary` via the new strategy. Remove the `strategy` wire-enum values `'trim-tool-results'` and `'selective'` from the RPC params type.
-12. Runner integration in `runner.ts` (the trigger hook, the `createProviderForTurn` pattern, the `runExclusive`-wrapped failure write, the backoff counter)
-13. Sen-core companion PR: **delete** `sen-core-v2/src/turn-hooks/compaction-trigger.ts` and its wiring. This ships in lockstep with the lace trigger landing; sen-core no longer drives compaction.
-14. Register new strategy in `sen2/compaction/` harness as a strategy module
-15. First harness run against Ada-fixture; iterate on prompt/schema/thresholds based on output
-16. **Cutover playbook** (replaces v2's migration script): document the stop / snapshot / truncate-events / drop-FTS / restart sequence. Write the script as a small shell helper under `sen2/compaction/scripts/cutover-clear.sh` so the exact commands are version-controlled and rerunnable on any future agent that ends up with `context_compacted` on disk.
-17. Execute the cutover against Ada on the new lace build.
+1. Module scaffolding + `capsule-types.ts` (no behavior; just the schema)
+2. `tail-policy.ts` (pure function on events + modelMaxContext; single-pass walk; testable in isolation)
+3. `summarize-strategy.ts` — includes the markdown renderer, the summarizer prompt builder, and the budget-retry helper as top-level functions in this file. Pure-function unit tests with synthetic Provider. Single rebuild path. Trim-tool-results pre-pass.
+4. `compaction-trigger.ts` (pure function on turn_end event + session events; tests cover all gating including stop-reason whitelist, parameterized `?? 0` cache-field defaults, subagent gate, persistent-disable gate, backoff gate)
+5. `event-types.ts` (add new types, remove `context_compacted`, add `compactionDisabled?: boolean` to SessionState for the M=10 backoff flag) + `message-builder.ts` modifications (allowlist + always-run `dropOrphanedToolBlocks`) + tests
+6. `event-to-row.ts` modifications (REMOVE `context_compacted` case; `conversation_summary` + `compaction_failed` fall through to null — NOT indexed) + tests
+7. Update `/compact` slash command (`conversation/slash-commands.ts`) + `ent/session/compact` RPC handler (`rpc/handlers/session-operations.ts`) to emit `conversation_summary` via the new strategy. Remove the `strategy` wire-enum values `'trim-tool-results'` and `'selective'` from the RPC params type.
+8. Runner integration in `runner.ts` (the trigger hook, the `createProviderForTurn` pattern, the single `runExclusive` scope around success+failure writes, the backoff helper)
+9. Sen-core companion PR: **delete** `sen-core-v2/src/turn-hooks/compaction-trigger.ts` and its wiring. This ships in lockstep with the lace trigger landing; sen-core no longer drives compaction.
+10. Register new strategy in `sen2/compaction/` harness as a strategy module
+11. First harness run against Ada-fixture; iterate on prompt/schema/thresholds based on output
+12. **Cutover playbook** (replaces v2's migration script): document the stop / snapshot / truncate-events / drop-FTS / restart sequence. Write the script as a small shell helper under `sen2/compaction/scripts/cutover-clear.sh` so the exact commands are version-controlled and rerunnable on any future agent that ends up with `context_compacted` on disk.
+13. Execute the cutover against Ada on the new lace build.
 
 ### Lockstep PRs
 
 | Repo | PR contents |
 |---|---|
 | lace | precondition kata: `usage.lastCallInputContextTokens` |
-| lace | typed-capsule strategy + trigger + message-builder + recall + slash-command + RPC handler + `SessionState.compactionsSinceLastRebuild` all in one PR |
+| lace | typed-capsule strategy + trigger + message-builder + recall + slash-command + RPC handler + `SessionState.compactionDisabled` all in one PR |
 | sen-core-v2 | delete `turn-hooks/compaction-trigger.ts` and its wiring |
 | compaction | harness strategy module + cutover-clear.sh playbook |
 
@@ -755,36 +719,36 @@ Listed in finding-number order. "Addressed" entries describe the change in v2; "
 ### Critical findings (round 1)
 
 1. **`context_compacted` writers** — Addressed by §"Writers that produce conversation_summary". `/compact`, `ent/session/compact`, and `event-to-row.ts` updated in lockstep.
-2. **Migration range contract** — Addressed in v2 by the cumulative-range contract on every `conversation_summary`. v3: section retained as the runtime contract (the migration sub-clause is deleted because there's no migration).
+2. **Migration range contract** — Addressed in v2 by the cumulative-range contract on every `conversation_summary`. v3: section retained as the runtime contract (the migration sub-clause is deleted because there's no migration). v4: the `replacesEventSeqRange` field itself is gone (the inclusive range is derived from `recentTailStartsAtEventSeq`), but the cumulative-from-1 invariant remains.
 3. **`fullContextTokens` formula** — Addressed by §"Preconditions §3" and §"Trigger signal". Per-call sum problem solved by adding `lastCallInputContextTokens` field on `turn_end`.
-4. **Rebuild bounded** — Addressed by §"Rebuild mode". v3 sharpens the budget check (see R7).
-5. **ModelPinnedProvider** — v2 used the wrapper. **Superseded in v3 by R6** — switched to `createProviderForTurn` pattern.
-6. **`appendDurableEvent` vs eventSeq preservation** — v2 documented direct JSONL writes for migration. **No longer relevant in v3** (no migration); however, the discovery that `appendDurableEvent` derives its own `eventSeq` (verified `event-log.ts:434`) is preserved as context for future migration-style work.
-7. **Recall FTS stale + new events un-indexed** — v2 addressed by per-session FTS cleanup. **Superseded in v3 by R1** — summaries are not indexed at all, removing the cleanup requirement.
+4. **Rebuild bounded** — Addressed by §"Rebuild mode" in v2/v3. v4: the bounded-rebuild path is gone; rebuilds that exceed summarizer context produce `compaction_failed`. See v4-cut #4.
+5. **ModelPinnedProvider** — v2 used the wrapper. Superseded in v3 by R6 — switched to `createProviderForTurn` pattern.
+6. **`appendDurableEvent` vs eventSeq preservation** — v2 documented direct JSONL writes for migration. No longer relevant in v3/v4 (no migration); however, the discovery that `appendDurableEvent` derives its own `eventSeq` (verified `event-log.ts:434`) is preserved as context for future migration-style work.
+7. **Recall FTS stale + new events un-indexed** — v2 addressed by per-session FTS cleanup. Superseded in v3 by R1 — summaries are not indexed at all, removing the cleanup requirement.
 8. **`compaction_failed` builder behavior** — Addressed by §"Message-builder behavior §2". v3 makes the allowlist explicit and exhaustive (B-I4).
-9. **Trigger fires NaN on pre-PRI-1817 events** — v2 made PRI-1817 a hard precondition. **Superseded in v3 by R4** — `?? 0` defaults make the formula correct across providers without refusing pre-PRI-1817 sessions.
+9. **Trigger fires NaN on pre-PRI-1817 events** — v2 made PRI-1817 a hard precondition. Superseded in v3 by R4 — `?? 0` defaults make the formula correct across providers without refusing pre-PRI-1817 sessions.
 
 ### Important findings (round 1)
 
 10. **Stop-reason gating** — Addressed by §"Trigger evaluator" gating rule §2. v3 broadens the whitelist to `['end_turn', 'stop_sequence', 'max_turns']` (B-C4).
 11. **`appendDurableEvent` signature** — Addressed by the code example in §"Lifecycle hook".
-12. **Re-entrant compaction** — Addressed by §"Concurrency". v3 adds the file-based flock requirement (B-I14).
+12. **Re-entrant compaction** — Addressed by §"Concurrency". v3 added the file-based flock requirement (B-I14); v4 dropped flock — only the in-process `runExclusive` mutex remains.
 13. **Subagent sessions** — Addressed by §"Subagent sessions".
-14. **Sen-core's existing trigger** — Addressed by §"Implementation order §13" and §"Lockstep PRs".
+14. **Sen-core's existing trigger** — Addressed by §"Implementation order" and §"Lockstep PRs".
 15. **Budget heuristic measures wrong thing** — Addressed by §"Budget enforcement §2".
-16. **Migration tail-start math** — v2 addressed via single-capsule-per-session. **No longer relevant in v3** (no migration).
+16. **Migration tail-start math** — v2 addressed via single-capsule-per-session. No longer relevant in v3/v4 (no migration).
 17. **Tool-use/tool-result walk-left mental model** — Addressed by §"Tail policy §5". v3 further clarifies the boundary between this guard (in-flight tool not yet completed) and `dropOrphanedToolBlocks` (crash-recovery orphans).
-18. **`errorMessage` vs `error` field-name** — Addressed by §"New durable event types". Field is consistently `errorMessage` everywhere. (A-I20 reaffirms.)
-19. **`recentHumanPrompts: 100` blows past 1M context** — Addressed by §"Tail policy §2" + §"Defaults rationale". v3 further tightens the token budget cap to 0.10 (R5).
-20. **Rolling-mode delta empty/inverted** — Addressed by §"Rolling mode §4". v3 routes the fallback through bounded-rebuild (B-C8).
-21. **Capsule schema drops envelope fields** — Addressed by §"New durable event types" (envelope fields on the wrapping event, capsule stays pure content). v3 narrows `criticStatus` to a single-valued enum (A-I22) and switches `schemaVersion` to numeric (A-I21).
-22. **No backoff after repeated failures** — Addressed by §"Failure backoff".
+18. **`errorMessage` vs `error` field-name** — Addressed by §"New durable event types". Field is consistently `errorMessage` everywhere.
+19. **`recentHumanPrompts: 100` blows past 1M context** — Addressed by §"Tail policy" + §"Defaults rationale". v3 tightened the token budget cap to 0.10; v4 dropped the count cap entirely in favor of the token-budget cap alone.
+20. **Rolling-mode delta empty/inverted** — Addressed by §"Rolling mode §4" in v3. v4 cut rolling mode, so the empty-delta concern is moot.
+21. **Capsule schema drops envelope fields** — Addressed by §"New durable event types" (envelope fields on the wrapping event, capsule stays pure content). v3 narrowed `criticStatus` to a single-valued enum (A-I22) and switched `schemaVersion` to numeric (A-I21); v4 dropped both fields outright (no readers).
+22. **No backoff after repeated failures** — Addressed by §"Failure backoff". v4 derives the consecutive-failure count from the event log instead of storing it on the failure event.
 23. **Message-builder reset semantics** — Addressed by §"Message-builder behavior §1".
-24. **Per-day-per-persona transcript layout** — v2 addressed via `<laceDir>` invocation in migration. **No longer relevant in v3** (no migration tool).
-25. **`modelMaxContext` undefined → trigger always fires** — v2 added a null gate. **Superseded in v3 by B-C6** — the lookup never returns null; the null gate was dead code; removed.
+24. **Per-day-per-persona transcript layout** — v2 addressed via `<laceDir>` invocation in migration. No longer relevant in v3/v4 (no migration tool).
+25. **`modelMaxContext` undefined → trigger always fires** — v2 added a null gate. Superseded in v3 by B-C6 — the lookup never returns null; the null gate was dead code; removed.
 26. **Cross-repo workspace dep** — Addressed by §"Build / repo plumbing".
-27. **Migration cost estimate off** — **No longer relevant in v3** (no migration; cutover cost is $0).
-28. **`humanChannelMatcher` default silently drops new channels** — Addressed by §"Tail policy §3".
+27. **Migration cost estimate off** — No longer relevant in v3/v4 (no migration; cutover cost is $0).
+28. **`humanChannelMatcher` default silently drops new channels** — Addressed by §"Tail policy" in v3; v4 dropped the per-session override knob — widening is a source-edit.
 
 ---
 
@@ -792,44 +756,110 @@ Listed in finding-number order. "Addressed" entries describe the change in v2; "
 
 ### Reframes (Jesse's architectural changes)
 
-- **R1 — Summaries are NOT recall-indexed.** §"Recall (FTS) integration" rewritten: `event-to-row.ts` returns null for both `conversation_summary` and `compaction_failed`. Removes the entire FTS-row-size / FTS-cleanup concern. Removes the `--rebuild-fts` flag (no script exists to need it).
-- **R2 — One-time clear of Ada, not migration.** §"Migration" → §"Cutover: one-time clear of Ada". Deleted: `migrate-old-compactions.ts`, `--dry-run`, `.pre-migration-<ISO>` backups, FTS cleanup, daily-transcript iteration, the `'migration'` `generationMode` value, the cost-of-migration sub-section, the "Other sessions" migration recipe. Replaced with: stop → snapshot → truncate `events.jsonl` → DROP FTS rows → restart on new build. Zero summarizer calls.
-- **R3 — `trim-tool-results` becomes a pre-pass.** §"Compaction algorithm → trim-tool-results pre-pass". Wire enum on RPC collapsed to `'summarize'` only; `'trim-tool-results'` and `'selective'` removed from the user-facing surface. `trim-tool-results-strategy.ts` stays registered so the new strategy can invoke it internally and the harness can still measure it in isolation. Spec specifies: pre-pass runs against events fed to the summarizer; tail events keep their original (un-trimmed) `tool_use.result`.
-- **R4 — `?? 0` defaults make it 100% provider-compat.** §"Preconditions §1" rewritten: PRI-1817 is precondition for Anthropic accuracy but lace starts on any session. §"Trigger signal" rewritten with the per-provider table. The `?? 0` is forward-compat across providers (not legacy back-compat per CLAUDE.md), so it's allowed.
-- **R5 — Trigger rebalance for real headroom.** §"Trigger evaluator" + §"Defaults rationale" updated: `globalThresholdPct: 0.60`, `emergencyThresholdPct: 0.90`, `targetCapsuleTokensPct: 0.10`, `recentHumanPromptsTokenBudgetPct: 0.10`. Arithmetic table shows 40% headroom between compactions; ~6–10 turns of growth under Ada-like load.
-- **R6 — `createProviderForTurn` pattern, not `ModelPinnedProvider`.** §"Lifecycle hook" rewritten. Verified pattern at `session-operations.ts:507-511`. `CompactionContext` refactored to take a `providerFactory: () => Promise<Provider>`. The runner's `this.provider` is provably untouched because the summarizer uses a wholly different instance.
-- **R7 — Bounded-rebuild uses summarizer's own budget.** §"Rebuild mode → Rebuild bounds check" updated. Compares against `summarizerBudget = summarizerModelMaxContext − SUMMARIZER_OVERHEAD_TOKENS` (20K reserve documented). For v1 (summarizer = main model) the formula reduces to the v2 check; for future tier-different summarizers it stays correct.
+- **R1 — Summaries are NOT recall-indexed.** §"Recall (FTS) integration" rewritten: `event-to-row.ts` returns null for both `conversation_summary` and `compaction_failed`. Removes the entire FTS-row-size / FTS-cleanup concern.
+- **R2 — One-time clear of Ada, not migration.** §"Migration" → §"Cutover: one-time clear of Ada". Deleted: `migrate-old-compactions.ts`, `--dry-run`, `.pre-migration-<ISO>` backups, FTS cleanup, daily-transcript iteration, the `'migration'` `generationMode` value, the cost-of-migration sub-section, the "Other sessions" migration recipe.
+- **R3 — `trim-tool-results` becomes a pre-pass.** §"Compaction algorithm → trim-tool-results pre-pass". Wire enum on RPC collapsed to `'summarize'` only.
+- **R4 — `?? 0` defaults make it 100% provider-compat.** §"Preconditions §1" rewritten: PRI-1817 is precondition for Anthropic accuracy but lace starts on any session.
+- **R5 — Trigger rebalance for real headroom.** §"Trigger evaluator" + §"Defaults rationale" updated.
+- **R6 — `createProviderForTurn` pattern, not `ModelPinnedProvider`.** §"Lifecycle hook" rewritten.
+- **R7 — Bounded-rebuild uses summarizer's own budget.** Superseded in v4 — bounded-rebuild is gone.
 
-### Round-2 critical findings
+### Round-2 critical findings (status in v3 retained unless noted)
 
-- **B-C3 — `runExclusive` around the failure write.** §"Lifecycle hook" code example wraps the `compaction_failed` `appendDurableEvent` call in `await this.deps.runExclusive(() => { … })`. Mirrors the runner's existing pattern at `runner.ts:393-404` (verified).
-- **B-C4 — Stop-reason whitelist.** §"Trigger evaluator" gating rule §2 expanded to `['end_turn', 'stop_sequence', 'max_turns']` with per-reason justification. PRI-1818's `process_died` (`event-types.ts:92`) and `prompt_handler_caught` (`event-types.ts:101`) explicitly excluded. `tool_use` excluded (mid-turn). Error/abort reasons excluded.
-- **B-C6 — Dead `modelMaxContext === null` gating rule.** Verified at `base-provider.ts:481-488`: `getModelContextWindow` always returns a number with a 200K fallback. §"Trigger evaluator" gating rule §4 rewritten: `modelMaxContext` is `number`, not `number | null`; the null gate is removed.
-- **B-C7 — `dropOrphanedToolBlocks` runs unconditionally.** §"Message-builder behavior §4" added. Moves the call out of the (removed) `context_compacted` branch and runs it as a post-pass over the final `messages` array. Defuses the crash-recovery orphan case (PRI-1818 #3 / PRI-1820). Verified `dropOrphanedToolBlocks` exists at `message-builder.ts:114-189` and currently only fires inside the `context_compacted` case.
-- **B-C8 — Empty-delta fallback goes through bounded-rebuild.** §"Rolling mode §4" rewritten. The empty/inverted-delta fallback now applies the same `summarizerBudget` check as the rebuild path before re-summarizing the segment.
+- B-C3 `runExclusive` around the failure write (v4 keeps it; collapses both writes into one scope).
+- B-C4 Stop-reason whitelist (carried).
+- B-C6 Dead `modelMaxContext === null` gating rule removed (carried).
+- B-C7 `dropOrphanedToolBlocks` runs unconditionally (carried).
+- B-C8 Empty-delta fallback goes through bounded-rebuild — superseded in v4 (no rolling mode means no empty delta).
 
-### Round-2 important findings
+### Round-2 important findings (status in v3 retained unless noted)
 
-- **B-I3 / A-I8 — Sen-core's existing trigger removal.** Still in §"Implementation order §13" and §"Lockstep PRs". Confirmed present.
-- **B-I4 — Explicit allowlist of event types in message-builder.** §"Message-builder behavior §3" enumerates the allowlist exhaustively. The list matches the current implicit-no-op set plus the two new types.
-- **B-I9 — Migration timestamp / eventSeq ordering.** **Dropped from v3** — no migration; ordering concern doesn't apply.
-- **B-I12 — `rebuildEveryNCompactions` counter location.** §"Periodic-rebuild counter" specifies `SessionState.compactionsSinceLastRebuild?: number`. Increment on rolling, reset on rebuild, unchanged on failure. Persists across process restarts via `state.json`.
-- **B-I14 — Multi-process compaction lock.** §"Concurrency" adds file-based `flock` on `<sessionDir>/.compaction.lock` in addition to the in-memory mutex.
-- **B-I15 / B-I16 — Migration-related deletes.** Both **dropped from v3** — no migration.
-- **A-I20 — `errorMessage` vs `error` field name.** §"New durable event types": `errorMessage` is the single canonical field name on `CompactionFailedEventData`.
-- **A-I21 — `schemaVersion` numeric vs string literal.** §"New durable event types": `schemaVersion: 1` (`number`), not `'1'` (`string`). Cleaner for future versioning + zod numeric branches.
-- **A-I22 — `criticStatus` enum.** §"New durable event types": `criticStatus: 'unchecked'` (single-valued enum) in v1. Note added explaining the union will widen when the critic ships.
+- B-I3 / A-I8 Sen-core's existing trigger removal (carried).
+- B-I4 Explicit allowlist of event types in message-builder (carried).
+- B-I9 Migration timestamp / eventSeq ordering — dropped from v3.
+- B-I12 `rebuildEveryNCompactions` counter location — superseded in v4 (no counter; no rebuildEveryN).
+- B-I14 Multi-process compaction lock — superseded in v4 (flock dropped).
+- B-I15 / B-I16 Migration-related deletes — dropped from v3.
+- A-I20 `errorMessage` vs `error` field name (carried).
+- A-I21 `schemaVersion` numeric vs string literal — superseded in v4 (`schemaVersion` field cut).
+- A-I22 `criticStatus` enum — superseded in v4 (`criticStatus` field cut).
 
-### Findings disproved on re-verification
+### Findings disproved on re-verification (v3)
 
-- **A-C4 (v2 critical: refuse-to-start on pre-PRI-1817 sessions).** v2 prescribed refusing startup. Re-verified against `runner.ts:598-608` and `event-types.ts:62-81`: the per-provider analysis (R4 table) shows `?? 0` defaults produce correct arithmetic for non-Anthropic and acceptably-degraded arithmetic for pre-PRI-1817 Anthropic. The refuse-to-start was over-strict; lace can start on any session. (Disproved by: provider-by-provider arithmetic walk-through.)
-- **A-C6 (v2 critical: FTS-row-size blowup for capsule contents).** v2 worried that capsule markdown (~10K tokens) would inflate FTS rows. Re-verified: with R1, the summary is never written to FTS. The concern evaporates. (Disproved by: R1's "summaries not indexed" decision.)
-- **B-C6 stricter reading: `modelMaxContext === null` gating rule.** v2 spec had a "if null then skip" gate. Re-verified `base-provider.ts:481-488`: function always returns a number. The gate was dead code. Removed in v3. (Disproved by: direct source read.)
-- **B-C7 stricter reading: "tool-use boundary guard solves a problem lace doesn't have."** v2's tail-policy guard treated `tool_use` as if it might be split across events. Re-verified `event-types.ts:28-35`: `ToolUseEventData` is one event with both `input` and optional `result`. The in-flight guard from v2 step 5 is still correct (it handles the unresolved-result case), but the **actual** orphan-tool-block source is crash-recovery, not boundary placement. v3 keeps the in-flight guard AND moves `dropOrphanedToolBlocks` to an unconditional post-pass to handle the real source. (Disproved by: re-reading `event-types.ts` plus understanding PRI-1818's repair path.)
+- A-C4 refuse-to-start on pre-PRI-1817 sessions (carried).
+- A-C6 FTS-row-size blowup for capsule contents (carried).
+- B-C6 stricter reading: `modelMaxContext === null` gating rule (carried).
+- B-C7 stricter reading: tool-use boundary guard vs orphan-block source (carried).
 
-### Findings I did not fully resolve and am surfacing to Jesse
+### Findings I did not fully resolve and am surfacing to Jesse (v3)
 
-- **Subagent default (still #13).** Defaulting subagent compaction OFF means a long-running subagent will eventually hit context window and die. v3 keeps the v2 trade-off; revisit if a long-running subagent actually OOMs in production.
-- **`SUMMARIZER_OVERHEAD_TOKENS = 20,000` is a rough estimate.** Not calibrated against real measurements. Flagged as an open question; should be tuned after the first few harness runs give us real numbers on system + schema + completion size.
-- **`compactionsSinceLastRebuild` and PRI-1819 cache-position persistence.** Both extend `SessionState`. There's a non-zero chance the PRI-1821 follow-up reshapes `SessionState` further. If both land near each other, the two PRs need to be cross-referenced so the field additions don't conflict. (Not blocking, but worth noting before either implementation starts.)
-- **`trim-tool-results-strategy.ts` registration.** v3 keeps it in the registry so the new strategy can invoke it internally and so the harness can still measure it in isolation. But removing it from the wire-enum while leaving it in the registry is mildly asymmetric — someone reading the registry can still call it via `compactionStrategiesById.get('trim-tool-results').compact(...)` from non-RPC code paths. That's intentional (the new summarize strategy does exactly this), but worth flagging so a future cleanup pass doesn't reflexively delete the registry entry. Alternative: make `trim-tool-results-strategy.ts` a plain non-exported helper inside `summarize-strategy.ts` and stop registering it. **I picked "stays registered" because the harness still needs it as a comparable strategy; happy to flip to non-exported if you'd rather minimize the registry surface.**
+- Subagent default OFF — carried.
+- `SUMMARIZER_OVERHEAD_TOKENS = 20,000` — superseded in v4 (constant cut along with bounded-rebuild).
+- `compactionsSinceLastRebuild` and PRI-1819 SessionState shape — superseded in v4 (`compactionsSinceLastRebuild` cut; only `compactionDisabled` added).
+- `trim-tool-results-strategy.ts` registration — carried (still registered; harness comparator + internal pre-pass caller).
+
+---
+
+## v4 changelog (round-3 YAGNI/DRY cuts)
+
+This round had no new "findings" — it was Jesse's reduction pass on v3's surface area. Each numbered cut from the briefing is accounted for below.
+
+### Architectural cuts
+
+- **Cut 1 — `CompactionContext.providerFactory` indirection.** Replaced by `summarizer: Provider` direct parameter. The lifecycle hook does `await createProviderForTurn(...)` + `setSystemPrompt(SUMMARIZER_SYSTEM_PROMPT)` and passes the resulting Provider into `runCompaction`. The "providerFactory invoked exactly once" test is replaced by a "summarizer param is the caller-supplied Provider" assertion (§"Unit tests → summarize-strategy.test.ts"). v3's §"CompactionContext refactor (R6)" section is deleted; `CompactionContext` definition moved inline into §"Compaction algorithm".
+- **Cut 2 — File-based `flock` cross-process lock.** §"Concurrency" rewritten. The runner's existing in-process `runExclusive` is the only mutex. `compaction/compaction-lock.ts` is removed from the module layout. The cross-process flock test is removed. The discussion of NFS / signal cleanup is gone. The "Cross-process compaction" bullet documents the deliberate non-defense.
+- **Cut 3 — `rolling` compaction mode.** Removed everywhere. `generationMode` is now a single-valued enum (`'rebuild_from_canonical'`). `rebuildEveryNCompactions` is gone. `SessionState.compactionsSinceLastRebuild` is gone. `TriggerDecision.mode` is gone (replaced with no field). The "10th compaction triggers rebuild" test is gone. §"Rolling mode" content is gone. The `previousCapsule` parameter to the summarizer prompt is gone. Any rolling-vs-rebuild trade-off discussion is gone. The compaction algorithm is now a single rebuild path documented in §"Compaction algorithm → Single rebuild path".
+- **Cut 4 — `bounded-rebuild` + `mini-rebuild` fallback chain.** §"Rebuild mode → Bounded rebuild" deleted. `summarizerBudget` constant + calculation deleted. `SUMMARIZER_OVERHEAD_TOKENS = 20_000` constant deleted. Mini-rebuild references gone. Empty-delta fallback gone (rolling is gone; empty delta can't happen). The orphan-oversized-session escape hatch and follow-up kata gone. Replaced by §"Failure modes → rebuild exceeds summarizer context": the summarizer call fails, the strategy emits `compaction_failed` with `reason: 'global'` or `'emergency'`, operator notices via alarm.
+
+### Envelope field cuts (from `ConversationSummaryEventData`)
+
+- **Cut 5 — `sourceStartEventId`.** Removed. It duplicated `replacesEventSeqRange.fromInclusive` which is the constant `1`.
+- **Cut 6 — `sourceEndEventId`.** Removed. It duplicated `replacesEventSeqRange.toInclusive` which is also removed (Cut 14).
+- **Cut 7 — `purpose`.** Removed. Written exactly once with `'bounded_rebuild'`, which is gone.
+- **Cut 8 — `criticStatus`.** Removed. Single-valued enum (`'unchecked'`) with no critic in v1; nothing reads it.
+- **Cut 9 — `budgetOverrunBy`.** Removed. Diagnostic field; no consumers. If we need it later, WARN-log inside `summarizeWithBudget`.
+- **Cut 10 — `retries`.** Removed. Same rationale as Cut 9.
+- **Cut 11 — `schemaVersion`.** Removed. The spec explicitly says no migration after the one-time clear; there is no migration story to version.
+- **Cut 12 — `'user_initiated'` value from `generationMode` enum.** Removed. `generationMode` is now single-valued (`'rebuild_from_canonical'`). NOTE: `'user_initiated'` stays on the `CompactionFailedEventData.reason` union — `/compact` invocations can still fail and need to mark themselves as operator-driven.
+
+### Other field cuts
+
+- **Cut 13 — `consecutiveFailures` on `CompactionFailedEventData`.** Removed. The count is recoverable by walking the event log backward from the latest `turn_end` and counting `compaction_failed` events with no intervening `conversation_summary`. §"Failure backoff" now derives the count at decision time.
+
+### Boundary deduplication
+
+- **Cut 14 — `replacesEventSeqRange.toInclusive`.** Removed. With `fromInclusive` (Cut 6 side-effect) and `toInclusive` both removed, and `sourceStartEventId` / `sourceEndEventId` also removed (Cuts 5, 6), the `replacesEventSeqRange` field as a whole became a degenerate `{ fromInclusive: 1 }` constant. v4 drops the field entirely; the inclusive range is derived from `recentTailStartsAtEventSeq` (range = `[1, recentTailStartsAtEventSeq - 1]`). The two spots that need the upper bound (message-builder rebuild, harness acceptance check) compute it inline.
+
+### Tail policy cuts
+
+- **Cut 15 — `recentHumanPrompts` count cap.** Removed. The token-budget cap (`recentHumanPromptsTokenBudgetPct`) is what matters for context safety; the count cap was redundant.
+- **Cut 16 — Single-pass tail walk.** §"Tail policy → Algorithm" rewritten: one backward walk tracking turn-boundary AND human-prompt-token-budget criteria simultaneously, stopping at whichever boundary fires first. v3's algorithm walked twice; v4 walks once. New unit-test row asserts each event is visited at most once.
+
+### Module collapse
+
+- **Cut 17 — Fold `summarizer-prompt.ts`, `budget-retry.ts`, `capsule-markdown.ts` into `summarize-strategy.ts` as top-level functions.** Module layout box updated; only `capsule-types.ts`, `tail-policy.ts`, and `compaction-trigger.ts` remain as separate files. The implementation-order steps updated accordingly. The test names retained their previous granularity (still talk about a "capsule-markdown" test, a "summarizer-prompt" test, a "budget-retry" test) but they all sit alongside `summarize-strategy.test.ts` testing top-level exports from one file.
+
+### Config knob cuts
+
+- **Cut 18 — `humanChannelMatcher` per-session config knob.** Removed from `TailConfig`. The default match logic is inline in §"Tail policy → Algorithm" step 2; widening it is a source edit. Open question retained as a kata-trigger for non-Slack ingress.
+- **Cut 19 — Per-session config overrides for `globalThresholdPct` / `emergencyThresholdPct`.** Documented as globally-tuned constants in §"Trigger evaluator". The note about "Configurable per session via existing session-config plumbing" from v3 is removed. File a kata if per-session ever becomes necessary.
+- **Cut 20 — Subagent `enabled: false` per-session override knob.** The `enabled` field is gone from `TriggerConfig` entirely. Subagent suppression now flows through an `isSubagentSession: boolean` parameter to `evaluateTrigger`, computed from session meta at runner construction time. The persistent-disable mechanism for the M=10 backoff cap is a separate `SessionState.compactionDisabled` flag (not a config knob) — see §"Failure backoff".
+
+### Confidence rendering cut
+
+- **Cut 21 — "Mark items with `confidence < 0.5` with `(uncertain)`" rule.** Removed from §"Markdown rendering" requirements list and from the `capsule-markdown.test.ts` test inventory. No downstream consumer reads the confidence value or the marker. The `confidence` field stays in the schema (the research report wants it captured), just not surfaced in the renderer.
+
+### Test cuts
+
+- **Cut 22 — "tail-policy under v3 0.10 default" test.** Removed from §"Unit tests → tail-policy.test.ts" inventory. The remaining tail-policy tests assert behavior under specified inputs without pinning a default value.
+- **Cut 23 — Three-way provider table tests.** Collapsed into ONE parametric test in §"Unit tests → compaction-trigger.test.ts" that asserts the `?? 0` formula across the three cache-field shapes (input-only, input+cacheRead, input+cacheCreation+cacheRead). The test runs the same arithmetic with three input rows.
+
+### Preserved per Jesse's call (round-3 keeps)
+
+- **All 13 capsule sections** — preserved as-is, confirmed in §"Capsule schema". `emotionalAndRelationshipContext`, `participants`, and `doNotInfer` remain in the union.
+- **4-tier failure backoff (1→2→4→8→16 turn skip + N=10 disable)** — preserved as-is, confirmed in §"Failure backoff". Defense against transient API floods.
+- **`compaction_failed` event type** — preserved as-is, confirmed in §"New durable event types". Durable telemetry > logs for observability dashboards.
+
+### Open-question consistency check
+
+The round-3 briefing asked: what was rolling mode used for in `/compact` and `ent/session/compact`? Verified against v3 §"Writers that produce conversation_summary" §§2-3: both user-initiated callers were already routed through `mode: 'rebuild_from_canonical'`. Removing rolling mode is invisible to them. The only stale rolling reference in either call site's v3 wording was the `'user_initiated'` `generationMode` value, which Cut 12 removes. v4 §"Writers that produce conversation_summary" §§2-3 now describe both as "user-initiated, no mode parameter, always rebuild" with no behavioral change.
