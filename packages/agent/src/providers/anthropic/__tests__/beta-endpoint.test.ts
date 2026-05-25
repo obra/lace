@@ -2,10 +2,11 @@
 // ABOUTME: Asserts the legacy anthropic-beta header is no longer sent on Anthropic-direct
 //
 // Manual smoke-test expectation (non-interactive context — documented here for the
-// next maintainer): a real Anthropic-direct request against an opus-4-7-1m-style
-// model should ship a `betas` array containing context-1m + the two observability
-// betas, and the SDK should send these on the wire via the `anthropic-beta` header.
-// We don't verify the on-wire serialization here — we verify the SDK call shape.
+// next maintainer): a real Anthropic-direct request against a model that declares
+// a per-model beta via `extra_headers["anthropic-beta"]` should ship a `betas`
+// array containing that beta plus the two observability betas, and the SDK
+// should send these on the wire via the `anthropic-beta` header. We don't
+// verify the on-wire serialization here — we verify the SDK call shape.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AnthropicProvider } from '@lace/agent/providers/anthropic-provider';
@@ -54,16 +55,16 @@ vi.mock('@lace/agent/utils/provider-logging', () => ({
   logProviderResponse: vi.fn(),
 }));
 
-const oneMillionCatalog: CatalogProvider = {
+const betaPassthroughCatalog: CatalogProvider = {
   name: 'Anthropic',
   id: 'anthropic',
   type: 'anthropic',
-  default_large_model_id: 'claude-opus-4-7-1m',
-  default_small_model_id: 'claude-opus-4-7-1m',
+  default_large_model_id: 'claude-test-beta-model',
+  default_small_model_id: 'claude-test-beta-model',
   models: [
     {
-      id: 'claude-opus-4-7-1m',
-      name: 'Claude Opus 4.7 (1M context)',
+      id: 'claude-test-beta-model',
+      name: 'Synthetic model that declares a per-model beta opt-in',
       context_window: 1_000_000,
       default_max_tokens: 32_000,
       extra_headers: { 'anthropic-beta': 'context-1m-2025-08-07' },
@@ -84,7 +85,7 @@ describe('AnthropicProvider beta endpoint migration', () => {
     vi.clearAllMocks();
     provider = new AnthropicProvider({
       apiKey: 'test-key',
-      catalogProvider: oneMillionCatalog,
+      catalogProvider: betaPassthroughCatalog,
     });
     provider.setSystemPrompt('test sys');
   });
@@ -101,7 +102,11 @@ describe('AnthropicProvider beta endpoint migration', () => {
         stop_reason: 'end_turn',
       });
 
-      await provider.createResponse([{ role: 'user', content: 'hi' }], [], 'claude-opus-4-7-1m');
+      await provider.createResponse(
+        [{ role: 'user', content: 'hi' }],
+        [],
+        'claude-test-beta-model'
+      );
 
       expect(mockCreate).toHaveBeenCalledTimes(1);
     });
@@ -113,7 +118,11 @@ describe('AnthropicProvider beta endpoint migration', () => {
         stop_reason: 'end_turn',
       });
 
-      await provider.createResponse([{ role: 'user', content: 'hi' }], [], 'claude-opus-4-7-1m');
+      await provider.createResponse(
+        [{ role: 'user', content: 'hi' }],
+        [],
+        'claude-test-beta-model'
+      );
 
       const payload = mockCreate.mock.calls[0]![0] as { betas?: string[] };
       expect(payload.betas).toEqual([
@@ -146,7 +155,11 @@ describe('AnthropicProvider beta endpoint migration', () => {
         stop_reason: 'end_turn',
       });
 
-      await provider.createResponse([{ role: 'user', content: 'hi' }], [], 'claude-opus-4-7-1m');
+      await provider.createResponse(
+        [{ role: 'user', content: 'hi' }],
+        [],
+        'claude-test-beta-model'
+      );
 
       const options = mockCreate.mock.calls[0]![1] as { headers?: Record<string, string> };
       // The base SDK extra-headers slot is empty/undefined — no anthropic-beta override.
@@ -156,7 +169,7 @@ describe('AnthropicProvider beta endpoint migration', () => {
     it('returns an empty betas[] when observability_betas_enabled is false and the model has no catalog betas', async () => {
       const optedOutProvider = new AnthropicProvider({
         apiKey: 'test-key',
-        catalogProvider: oneMillionCatalog,
+        catalogProvider: betaPassthroughCatalog,
         observability_betas_enabled: false,
       });
       optedOutProvider.setSystemPrompt('test sys');
@@ -200,7 +213,7 @@ describe('AnthropicProvider beta endpoint migration', () => {
       await provider.createStreamingResponse(
         [{ role: 'user', content: 'hi' }],
         [],
-        'claude-opus-4-7-1m'
+        'claude-test-beta-model'
       );
 
       expect(mockStream).toHaveBeenCalledTimes(1);
@@ -218,7 +231,7 @@ describe('AnthropicProvider beta endpoint migration', () => {
       await provider.createStreamingResponse(
         [{ role: 'user', content: 'hi' }],
         [],
-        'claude-opus-4-7-1m'
+        'claude-test-beta-model'
       );
 
       const payload = mockStream.mock.calls[0]![0] as { betas?: string[] };
@@ -241,7 +254,7 @@ describe('AnthropicProvider beta endpoint migration', () => {
       await provider.createStreamingResponse(
         [{ role: 'user', content: 'hi' }],
         [],
-        'claude-opus-4-7-1m'
+        'claude-test-beta-model'
       );
 
       const options = mockStream.mock.calls[0]![1] as { headers?: Record<string, string> };

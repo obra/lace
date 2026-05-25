@@ -1,10 +1,12 @@
 // ABOUTME: Tests for per-model catalog-beta passthrough in AnthropicProvider
-// ABOUTME: Verifies catalog-declared betas (e.g. 1M context) reach the SDK via betas[]
+// ABOUTME: Verifies catalog-declared betas reach the SDK via the typed betas[] array
 //
 // Note: chunk I migrated Anthropic-direct off the `anthropic-beta` extra_header
-// channel onto the typed `betas[]` field on `client.beta.messages.*`. The 1M
-// context opt-in still rides through catalog `extra_headers["anthropic-beta"]`,
-// but it now flows into betas[] (see `./anthropic/betas.ts::parseCatalogBetas`).
+// channel onto the typed `betas[]` field on `client.beta.messages.*`. Per-model
+// beta opt-ins are still declared via catalog `extra_headers["anthropic-beta"]`
+// but flow into betas[] (see `./anthropic/betas.ts::parseCatalogBetas`). The
+// synthetic `claude-test-beta-model` here exercises that path; no live model
+// in the catalog currently declares extra_headers, but the mechanism remains.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AnthropicProvider } from '../anthropic-provider';
@@ -43,16 +45,16 @@ vi.mock('../../utils/provider-logging.js', () => ({
   logProviderResponse: vi.fn(),
 }));
 
-const opus1mCatalog: CatalogProvider = {
+const betaPassthroughCatalog: CatalogProvider = {
   name: 'Anthropic',
   id: 'anthropic',
   type: 'anthropic',
-  default_large_model_id: 'claude-opus-4-7-1m',
-  default_small_model_id: 'claude-opus-4-7-1m',
+  default_large_model_id: 'claude-test-beta-model',
+  default_small_model_id: 'claude-test-beta-model',
   models: [
     {
-      id: 'claude-opus-4-7-1m',
-      name: 'Claude Opus 4.7 (1M context)',
+      id: 'claude-test-beta-model',
+      name: 'Synthetic model that declares a per-model beta opt-in',
       context_window: 1_000_000,
       default_max_tokens: 32000,
       extra_headers: { 'anthropic-beta': 'context-1m-2025-08-07' },
@@ -73,7 +75,7 @@ describe('AnthropicProvider catalog-beta passthrough', () => {
     vi.clearAllMocks();
     provider = new AnthropicProvider({
       apiKey: 'test-key',
-      catalogProvider: opus1mCatalog,
+      catalogProvider: betaPassthroughCatalog,
     });
     provider.setSystemPrompt('sys');
   });
@@ -89,7 +91,7 @@ describe('AnthropicProvider catalog-beta passthrough', () => {
       stop_reason: 'end_turn',
     });
 
-    await provider.createResponse([{ role: 'user', content: 'hi' }], [], 'claude-opus-4-7-1m');
+    await provider.createResponse([{ role: 'user', content: 'hi' }], [], 'claude-test-beta-model');
 
     expect(mockCreateResponse).toHaveBeenCalledTimes(1);
     const payload = mockCreateResponse.mock.calls[0]![0] as { betas?: string[] };
@@ -127,7 +129,7 @@ describe('AnthropicProvider catalog-beta passthrough', () => {
     await provider.createStreamingResponse(
       [{ role: 'user', content: 'hi' }],
       [],
-      'claude-opus-4-7-1m'
+      'claude-test-beta-model'
     );
 
     expect(mockStream).toHaveBeenCalledTimes(1);

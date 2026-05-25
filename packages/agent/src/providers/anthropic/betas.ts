@@ -52,7 +52,7 @@ export function parseCatalogBetas(catalog: CatalogProvider, model: string): Anth
  *
  * Sources, in precedence order (earlier sources keep their position when
  * later sources contain duplicates):
- *   1. Catalog betas declared on the model (e.g. context-1m for opus-4-7-1m).
+ *   1. Catalog betas declared on the model via `extra_headers["anthropic-beta"]`.
  *   2. Global observability betas — enabled by default; opt out by setting
  *      `observability_betas_enabled: false` on the per-instance config.
  *   3. Per-call additional betas from `opts.additionalBetas`.
