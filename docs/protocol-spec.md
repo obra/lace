@@ -38,13 +38,13 @@ confusion.
 
 **Subagent spawning**: When an agent spawns subagents (via Task tool or
 similar), the **agent process** is responsible for spawning and managing
-subagent processes. The supervisor/client sees subagents as background jobs via
+subagent processes. The client sees subagents as background jobs via
 `ent/job/*` methods. Subagent IDs are agent-generated (prefixed with
-`job_agent_`). The supervisor does NOT spawn subagent processes directly—it only
+`job_agent_`). The client does NOT spawn subagent processes directly—it only
 monitors them through the protocol.
 
 ```
-Supervisor/Client
+Client
       │
       ▼ (spawns)
   Agent Process ◄──── owns subagent lifecycle
@@ -59,7 +59,7 @@ first-class protocol peers—you cannot send `session/prompt` directly to a
 subagent. This is intentional for v1: it simplifies the protocol and matches the
 common case where subagents run autonomously and return results. If interactive
 multi-agent collaboration becomes a requirement, future protocol versions could
-add "subagent = full protocol peer" where the supervisor can connect to subagent
+add "subagent = full protocol peer" where the client can connect to subagent
 processes directly.
 
 **Note**: `session/list` queries available sessions on disk without loading
@@ -753,7 +753,7 @@ parent context injection.
 }
 ```
 
-**Report vs stream**: The supervisor sees the full job stream via `job_update`
+**Report vs stream**: The client sees the full job stream via `job_update`
 notifications. However, the parent agent SHOULD only incorporate `report` (not
 raw `output`) into its own LLM context to avoid context bloat. This preserves
 the "private subagent context" model—subagents can think verbosely without
@@ -787,7 +787,7 @@ Kill background job.
 
 ### 6.9 `ent/job/inject` (notification)
 
-Inject context into a running job (subagent). Allows supervisor to provide
+Inject context into a running job (subagent). Allows the client to provide
 additional information without making the job a full protocol peer.
 
 ```typescript
@@ -810,7 +810,7 @@ the injection is silently dropped.
 
 ### 6.10 `ent/agent/ping`
 
-Lightweight health check. Use for liveness detection and supervisor heartbeats.
+Lightweight health check. Use for liveness detection and client heartbeats.
 
 ```typescript
 // Request
@@ -840,8 +840,8 @@ unresponsive. For detailed status (session info, pending permissions), use
 Query agent status. Covers Claude SDK's `supportedModels()`,
 `mcpServerStatus()`, `accountInfo()`.
 
-Also returns pending permission requests, enabling protocol clients (e.g.,
-supervisors) to restore state after reconnection.
+Also returns pending permission requests, enabling protocol clients to restore
+state after reconnection.
 
 ```typescript
 // Request
@@ -892,8 +892,8 @@ supervisors) to restore state after reconnection.
 
 ### 6.12 `ent/session/events`
 
-Fetch session event history. Used by protocol clients (e.g., supervisors) that
-need to reconstruct conversation state after reconnection or process restart.
+Fetch session event history. Used by protocol clients that need to reconstruct
+conversation state after reconnection or process restart.
 
 **Durable events only**: This method returns durable events, not streaming
 deltas. For example, instead of individual `text_delta` updates, it returns
@@ -990,9 +990,9 @@ Code, Codex) should expose one `providerId`, one `connectionId`, and set
 `ProviderInfo.supportsConnections: false`. Credentials may use
 `{ kind: "ready" }` for ambient auth or implement device_code/browser flows.
 
-**Isolation requirement**: The web tier/supervisor MUST NOT read or write agent
-provider config files directly. All catalog refreshes, connection CRUD, and
-model visibility changes MUST flow through the Ent methods below.
+**Isolation requirement**: Clients MUST NOT read or write agent provider config
+files directly. All catalog refreshes, connection CRUD, and model visibility
+changes MUST flow through the Ent methods below.
 
 ### 6.14 `ent/providers/list`
 

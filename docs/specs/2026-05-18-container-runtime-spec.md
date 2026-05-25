@@ -108,16 +108,11 @@ Per Jesse's explicit authorization — no live consumers, no back-compat.
 - `packages/ent-protocol/src/schemas/methods.ts` — delete `ent/workspace/info`
   and `ent/workspace/create` method schemas (~100 lines around 1616–1700)
 
-### Production (supervisor)
+### Client fallout
 
-- `packages/supervisor/src/agent-method-handlers.ts` — delete the workspace
-  method entries (~10 lines)
-
-### Web / terminal fallout
-
-Per Jesse: deletion in web/terminal is acceptable, **don't add anything**. If a
-UI component or terminal command references the dead methods, delete it. Stub
-UIs that lose functionality are OK; do not invent replacements.
+Per Jesse: deletion is acceptable, **don't add anything**. If a client command
+references the dead methods, delete it. Stub flows that lose functionality are
+OK; do not invent replacements.
 
 ### Tests
 

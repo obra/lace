@@ -915,7 +915,7 @@ export class ConversationRunner {
             if (!result.shouldContinue) {
               shouldContinue = false;
               // When the permission request itself was cancelled (kata #37 —
-              // upstream supervisor has no handler, request races out in ~15ms)
+              // parent client has no handler, request races out in ~15ms)
               // the tool never ran. Surface that as a distinct stopReason so
               // subagent-job (and anything else mapping turn results to job
               // status) can mark the job as failed instead of silently

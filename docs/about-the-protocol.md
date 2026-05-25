@@ -92,7 +92,7 @@ All Ent-specific methods use the `ent/` prefix:
 - `ent/session/compact`
 - `ent/session/inject`
 - `ent/job/list`
-- `ent/session/configure` supports **env** to let the supervisor push
+- `ent/session/configure` supports **env** to let the client push
   per-session environment variables without touching agent config on disk.
 - Provider management extensions (see below) add catalog refresh and model
   enable/disable flows.
@@ -103,14 +103,12 @@ vs our extensions.
 ### UI / Agent Boundary (very important)
 
 In Lace, the **agent owns its on-disk state** under `~/.lace/**` (or the
-configured lace dir). UIs (web, TUI) MUST treat this as an implementation detail
-and MUST NOT read or write it directly.
+configured lace dir). Clients MUST treat this as an implementation detail and
+MUST NOT read or write it directly.
 
-- Web and TUI should only interact with providers/models/connections/credentials
+- Clients should only interact with providers/models/connections/credentials
   through Ent methods such as `ent/providers/catalog`, `ent/connections/*`, and
   `ent/models/*`.
-- Web may have its own datastore for web-only concepts (projects, settings)
-  outside the protocol.
 
 ---
 
@@ -132,7 +130,7 @@ session.
 ### What About Multi-Session?
 
 To work with multiple sessions concurrently, spawn multiple agent processes. The
-supervisor (client) manages the process pool.
+client manages the process pool.
 
 `session/list` queries available sessions on disk but doesn't load them. To work
 with a different session, spawn a new process.
@@ -240,11 +238,9 @@ When a protocol client needs to sync state—whether after a transport disconnec
 process restart, or simply joining an in-progress session—it needs to
 reconstruct conversation history and current state.
 
-**Architecture note**: In systems like Lace, the Ent protocol client is
-typically a long-running supervisor process, not the browser. A browser refresh
-reconnects to the supervisor via a separate transport (e.g., WebSocket); it
-doesn't imply an Ent transport reconnect. The APIs below are for the
-supervisor-to-agent connection.
+**Architecture note**: In systems like Lace, the Ent protocol client is the
+process that owns the agent transport. The APIs below are for the client-to-agent
+connection.
 
 ### The Solution
 
@@ -369,12 +365,12 @@ while continuing the conversation.
 When an agent uses the Task tool to spawn subagents:
 
 - The **agent process** spawns and owns the subagent process
-- The **supervisor/client** sees subagents via `ent/job/*` methods
+- The **client** sees subagents via `ent/job/*` methods
 - Job IDs are agent-generated (`job_agent_1`, `job_shell_1`)
-- The supervisor does NOT spawn subagent processes directly
+- The client does NOT spawn subagent processes directly
 
 This keeps the "one process = one conversation stream" model clean: the
-supervisor manages top-level agent processes, and each agent manages its own
+client manages top-level agent processes, and each agent manages its own
 subagents internally.
 
 ### Design Choice: Subagents as Jobs
@@ -390,7 +386,7 @@ intentional for v1:
 
 **Future extensibility**: If interactive multi-agent collaboration becomes a
 requirement, future protocol versions could add "subagent = full protocol peer"
-where the supervisor can connect to subagent processes directly. For now, we
+where the client can connect to subagent processes directly. For now, we
 accept that subagents are non-interactive and only return outputs.
 
 ---

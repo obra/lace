@@ -115,19 +115,6 @@
         "vitest": "^3.2.4",
       },
     },
-    "packages/supervisor": {
-      "name": "@lace/supervisor",
-      "version": "0.1.0",
-      "dependencies": {
-        "@lace/ent-protocol": "file:../ent-protocol",
-      },
-      "devDependencies": {
-        "@types/node": "^22.16.0",
-        "tsc-alias": "^1.8.16",
-        "typescript": "^5.6.0",
-        "vitest": "^3.2.4",
-      },
-    },
   },
   "trustedDependencies": [
     "esbuild",
@@ -344,8 +331,6 @@
     "@lace/cli": ["@lace/cli@workspace:packages/cli"],
 
     "@lace/ent-protocol": ["@lace/ent-protocol@workspace:packages/ent-protocol"],
-
-    "@lace/supervisor": ["@lace/supervisor@workspace:packages/supervisor"],
 
     "@lmstudio/lms-isomorphic": ["@lmstudio/lms-isomorphic@0.4.6", "", { "dependencies": { "ws": "^8.16.0" } }, ""],
 

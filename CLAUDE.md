@@ -11,13 +11,13 @@ and key entry points.
 ## Project Overview
 
 Lace is a TypeScript monorepo for an out-of-process AI coding agent runtime.
-The active surfaces are the Ent protocol package, the agent process, the
-supervisor process, and a CLI client.
+The active surfaces are the Ent protocol package, the agent process, and a CLI
+client.
 
 ## Development Commands
 
 ```bash
-npm run build         # Build protocol, agent, supervisor, and CLI packages
+npm run build         # Build protocol, agent, and CLI packages
 npm run dev           # Start the CLI client
 npm run typecheck     # Type-check all active packages
 npm run lint          # Lint packages that define lint scripts
@@ -48,7 +48,6 @@ Environment variables:
 
 - `packages/ent-protocol`: shared Ent protocol types, schemas, and transports.
 - `packages/agent`: out-of-process agent runtime and provider/tool logic.
-- `packages/supervisor`: process coordinator for agent runtimes.
 - `packages/cli`: command-line client for driving Ent-protocol agents.
 
 ## Import Style

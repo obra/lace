@@ -193,7 +193,7 @@ export type AgentServerState = {
    * cleared on session/close. Mid-flight fires are owned by the scheduler.
    */
   reminderScheduler?: ReminderScheduler;
-  // The JsonRpcPeer this agent process uses to talk to its supervisor (the
+  // The JsonRpcPeer this agent process uses to talk to its parent client (the
   // CLI for a root agent, or the parent lace-agent for a subagent). Set by
   // main.ts after peer construction. Used by emitSubagentExitedIfNeeded to
   // ask the parent to record a `subagent-exited` notification under its

@@ -8,7 +8,7 @@ export * from './schemas';
 // Re-export application types that don't conflict with schema types
 // Note: types/shared.ts has application-level types, schemas/shared.ts has wire protocol types
 // Conflicting types (ContentBlock, ModelInfo, ProviderInfo, ToolResult) are NOT re-exported here
-// Web should import from '@lace/ent-protocol/types/shared' for application types
+// Clients should import from '@lace/ent-protocol/types/shared' for application types
 export {
   // Tool types (non-conflicting)
   ToolAnnotations,

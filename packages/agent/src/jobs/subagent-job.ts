@@ -809,8 +809,8 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       // Inherit the parent's effective approvalMode so the child runs under
       // the same permission policy. Hardcoding 'ask' here caused kata #37: a
       // parent in `dangerouslySkipPermissions` would spawn a child that still
-      // asked, and the upstream supervisor's missing handler cancelled the
-      // request in ~15ms — silently dropping the subagent's writes.
+      // asked, and a parent client with no handler cancelled the request in
+      // ~15ms — silently dropping the subagent's writes.
       const parentEffective = getEffectiveConfig(
         currentState.config,
         currentState.activeSession?.state.config

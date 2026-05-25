@@ -23,8 +23,8 @@ export interface SubagentEffectiveConfig {
  * The child must inherit the parent's effective approvalMode — otherwise a
  * parent running with `dangerouslySkipPermissions` (e.g. an automated runner
  * that never attaches a permission handler) would spawn children that still
- * ask, and those requests would be cancelled by the upstream supervisor with
- * no handler, silently dropping the subagent's tool calls. When the parent
+ * ask, and those requests would be cancelled by a parent client with no
+ * handler, silently dropping the subagent's tool calls. When the parent
  * has no approvalMode set, fall back to `ask` (safe default — never grant a
  * silent permission bypass).
  */
