@@ -69,10 +69,9 @@ describe('compact() against Ada retagged fixture', () => {
       // Token budget: with track-stamping, most events are now routed to specific
       // tracks. Slack messages are truncated to 240 chars, alarms/bootstrap/reminders
       // are dropped. Expect a dramatic shrink vs the 52K+ untracked baseline.
-      // With new-format slack envelopes the <current> extraction path fires cleanly,
-      // bringing the prefix down to ~13K tokens (vs ~14.7K with the old fallback slice).
+      // With [u/UID]: format + consecutive-dedupe, prefix sits at ~11.6K tokens.
       const estPrefixTokens = Math.ceil(prefix.length / 4);
-      expect(estPrefixTokens).toBeLessThan(15_000);
+      expect(estPrefixTokens).toBeLessThan(13_000);
       expect(estPrefixTokens).toBeGreaterThan(2_000);
 
       // There should be a meaningful number of events compacted.

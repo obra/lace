@@ -176,7 +176,30 @@ describe('salienceForTrack', () => {
     ];
     const block = salienceForTrack('slack:T:C1:1.0', events);
     expect(block?.body).toContain('hello');
+    expect(block?.body).toContain('[u/U1]: hello');
     expect(block?.body).toContain('hi back');
+    expect(block?.body).toContain('[me]: hi back');
+  });
+
+  it('slack tracks dedupe consecutive identical inbound messages', () => {
+    // Two consecutive prompts with the same user+text — should appear only once
+    const sameMessage =
+      '<messages channel="C1" thread_ts="1.0"><current count="1"><slack_message user="U1">hello</slack_message></current></messages>';
+    const events: TypedDurableEvent[] = [
+      event(1, 'prompt', {
+        content: [{ type: 'text', text: sameMessage }],
+        track: 'slack:T:C1:1.0',
+      }),
+      event(2, 'prompt', {
+        content: [{ type: 'text', text: sameMessage }],
+        track: 'slack:T:C1:1.0',
+      }),
+    ];
+    const block = salienceForTrack('slack:T:C1:1.0', events);
+    // Should contain the formatted line exactly once
+    const body = block?.body ?? '';
+    const occurrences = body.split('[u/U1]: hello').length - 1;
+    expect(occurrences).toBe(1);
   });
 
   it('job tracks emit "delegated X → outcome" using job_started/job_finished', () => {

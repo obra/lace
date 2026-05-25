@@ -177,8 +177,21 @@ function statusGlyph(outcome: string): string {
   return outcome;
 }
 
+function dedupeConsecutive<T>(arr: T[], key: (item: T) => string): T[] {
+  const out: T[] = [];
+  let lastKey: string | undefined;
+  for (const item of arr) {
+    const k = key(item);
+    if (k !== lastKey) {
+      out.push(item);
+      lastKey = k;
+    }
+  }
+  return out;
+}
+
 function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock {
-  const inbound: string[] = [];
+  const inbound: Array<{ user: string; text: string }> = [];
   const outbound: string[] = [];
   for (const e of events) {
     if (isEventOfType(e, 'prompt')) {
@@ -187,7 +200,7 @@ function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock
       // include the whole text (untouched).
       const current = extractCurrentMessages(text);
       if (current) inbound.push(...current);
-      else if (text.trim()) inbound.push(text.trim().slice(0, 500));
+      else if (text.trim()) inbound.push({ user: 'unknown', text: text.trim().slice(0, 500) });
     } else if (isEventOfType(e, 'tool_use')) {
       if (e.data.name === 'slack/send_message') {
         const t = typeof e.data.input?.text === 'string' ? e.data.input.text : '';
@@ -195,9 +208,11 @@ function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock
       }
     }
   }
+  const dedupedInbound = dedupeConsecutive(inbound, (m) => `${m.user}\0${m.text}`);
+  const dedupedOutbound = dedupeConsecutive(outbound, (t) => t);
   const lines: string[] = [`### ${trackId}`];
-  for (const t of inbound) lines.push(`- They said: ${truncate(t, 240)}`);
-  for (const t of outbound) lines.push(`- You replied: ${truncate(t, 240)}`);
+  for (const msg of dedupedInbound) lines.push(`- [u/${msg.user}]: ${truncate(msg.text, 240)}`);
+  for (const t of dedupedOutbound) lines.push(`- [me]: ${truncate(t, 240)}`);
   const body = lines.join('\n');
   return { trackId, body, estimatedTokens: estimate(body) };
 }
@@ -236,17 +251,20 @@ function extractText(e: TypedDurableEvent): string {
   return '';
 }
 
-function extractCurrentMessages(envelopeText: string): string[] | null {
+function extractCurrentMessages(
+  envelopeText: string
+): Array<{ user: string; text: string }> | null {
   // Parse new-envelope `<current count="N"><slack_message ...>TEXT</slack_message>...</current>`
-  // and return the inner texts. Returns null if no <current> block found.
+  // and return { user, text } objects. Returns null if no <current> block found.
   const currentMatch = envelopeText.match(/<current[^>]*>([\s\S]*?)<\/current>/);
   if (!currentMatch) return null;
   const inner = currentMatch[1];
-  const msgs: string[] = [];
-  const msgRegex = /<slack_message[^>]*>([\s\S]*?)<\/slack_message>/g;
+  const msgs: Array<{ user: string; text: string }> = [];
+  // Match user attribute in any position within the opening tag
+  const msgRegex = /<slack_message[^>]*\buser="([^"]+)"[^>]*>([\s\S]*?)<\/slack_message>/g;
   let m: RegExpExecArray | null;
   while ((m = msgRegex.exec(inner)) !== null) {
-    msgs.push(m[1].trim());
+    msgs.push({ user: m[1], text: m[2].trim() });
   }
   return msgs;
 }
