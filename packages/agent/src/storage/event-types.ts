@@ -20,7 +20,7 @@ export type PromptEventData = {
   content: ContentBlock[];
   /**
    * Producer-defined demux key for the new track-based compaction strategy.
-   * Shape: `<kind>:<id>` (e.g. `slack:T123:C456:1.0`, `job:job_abc`, `alarm:xyz`).
+   * Shape: `<kind>:<opaque-suffix>` (e.g. `slack:T123:C456:1.0`, `job:job_abc`, `alarm:xyz`).
    * Lace stores opaquely; compaction reads it. Optional — legacy events lack
    * it and are bucketed as `'untracked'` at compaction time.
    */

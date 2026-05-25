@@ -60,7 +60,7 @@ describe('DurableEventData', () => {
 
 describe('track field', () => {
   it('PromptEventData accepts optional track', () => {
-    const e: TypedDurableEvent = {
+    const event: TypedDurableEvent = {
       eventSeq: 1,
       timestamp: '2026-05-24T00:00:00Z',
       type: 'prompt',
@@ -70,11 +70,14 @@ describe('track field', () => {
         track: 'slack:T1:C1:1.0',
       },
     };
-    expect(e.data.type === 'prompt' && e.data.track).toBe('slack:T1:C1:1.0');
+
+    if (event.data.type === 'prompt') {
+      expect(event.data.track).toBe('slack:T1:C1:1.0');
+    }
   });
 
   it('ContextInjectedEventData accepts optional track', () => {
-    const e: TypedDurableEvent = {
+    const event: TypedDurableEvent = {
       eventSeq: 2,
       timestamp: '2026-05-24T00:00:01Z',
       type: 'context_injected',
@@ -84,11 +87,14 @@ describe('track field', () => {
         track: 'alarm:abc',
       },
     };
-    expect(e.data.type === 'context_injected' && e.data.track).toBe('alarm:abc');
+
+    if (event.data.type === 'context_injected') {
+      expect(event.data.track).toBe('alarm:abc');
+    }
   });
 
   it('TurnEndEventData.usage accepts lastCallInputContextTokens', () => {
-    const e: TypedDurableEvent = {
+    const event: TypedDurableEvent = {
       eventSeq: 3,
       timestamp: '2026-05-24T00:00:02Z',
       type: 'turn_end',
@@ -105,6 +111,9 @@ describe('track field', () => {
         },
       },
     };
-    expect(e.data.type === 'turn_end' && e.data.usage?.lastCallInputContextTokens).toBe(600);
+
+    if (event.data.type === 'turn_end') {
+      expect(event.data.usage?.lastCallInputContextTokens).toBe(600);
+    }
   });
 });
