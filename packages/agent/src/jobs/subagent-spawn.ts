@@ -101,13 +101,13 @@ export async function spawnSubagent(options: SpawnSubagentOptions): Promise<Suba
     });
   }
 
-  return spawnNativeSubagent();
+  return spawnNativeSubagent(options.executionEnv);
 }
 
-function spawnNativeSubagent(): SubagentProcessHandle {
+function spawnNativeSubagent(executionEnv?: Record<string, string>): SubagentProcessHandle {
   const proc = spawn(process.execPath, [process.argv[1] ?? ''], {
     cwd: process.cwd(),
-    env: { ...process.env },
+    env: { ...process.env, ...(executionEnv ?? {}) },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
