@@ -1,6 +1,7 @@
 // ABOUTME: Tests for DurableEventData discriminated union type narrowing
 
 import { describe, it, expect } from 'vitest';
+import { isEventOfType } from '../event-types';
 import type { TypedDurableEvent } from '../event-types';
 
 describe('DurableEventData', () => {
@@ -91,6 +92,32 @@ describe('track field', () => {
     if (event.data.type === 'context_injected') {
       expect(event.data.track).toBe('alarm:abc');
     }
+  });
+
+  it('isEventOfType narrows by envelope-level type when data lacks discriminator', () => {
+    // Simulate on-disk event: data has no `type` field (as stored in JSONL)
+    const event = {
+      eventSeq: 1,
+      timestamp: '2026-05-25T00:00:00Z',
+      type: 'prompt',
+      data: { content: [{ type: 'text', text: 'hi' }] },
+    } as unknown as TypedDurableEvent;
+
+    if (isEventOfType(event, 'prompt')) {
+      expect(event.data.content).toBeDefined();
+    } else {
+      throw new Error('expected isEventOfType to narrow');
+    }
+  });
+
+  it('isEventOfType returns false when envelope type does not match', () => {
+    const event = {
+      eventSeq: 1,
+      timestamp: '2026-05-25T00:00:00Z',
+      type: 'turn_start',
+      data: {},
+    } as unknown as TypedDurableEvent;
+    expect(isEventOfType(event, 'prompt')).toBe(false);
   });
 
   it('TurnEndEventData.usage accepts lastCallInputContextTokens', () => {

@@ -250,3 +250,17 @@ export function isEventDataOfType<T extends DurableEventData['type']>(
 ): data is Extract<DurableEventData, { type: T }> {
   return data.type === type;
 }
+
+/**
+ * Type guard that narrows a TypedDurableEvent by its ENVELOPE-level `type`
+ * discriminator. Required because the on-disk JSONL format stores `type` at the
+ * envelope only — `event.data.type` is undefined when an event is loaded via
+ * readDurableEvents. Use this instead of isEventDataOfType when iterating
+ * events loaded from disk.
+ */
+export function isEventOfType<T extends DurableEventData['type']>(
+  event: TypedDurableEvent,
+  type: T
+): event is TypedDurableEvent & { type: T; data: Extract<DurableEventData, { type: T }> } {
+  return event.type === type;
+}

@@ -40,7 +40,9 @@ describe('compact() against Ada fixture', () => {
       const result = await compact(events, { threadId: 'sess_ada_fixture' });
 
       expect(result.compactionEvent.data.strategy).toBe('track-based');
-      expect(result.compactionEvent.data.preserved.length).toBeGreaterThan(0);
+
+      // prefix entry + at least some preserved tail entries
+      expect(result.compactionEvent.data.preserved.length).toBeGreaterThan(1);
 
       const first = result.compactionEvent.data.preserved[0] as {
         role: string;
@@ -49,14 +51,24 @@ describe('compact() against Ada fixture', () => {
       const prefix = first.content;
       expect(prefix).toContain('[Earlier conversation, compacted by track]');
 
-      // Rough token check: prefix should be well under 30K tokens.
+      // Rough token check: prefix should be non-trivial (real content from Ada).
+      // The Ada fixture is a long session (~2036 events) so 45K+ tokens is expected
+      // when bucketing all untracked prompts/messages; cap at 200K to guard against
+      // a runaway loop duplicating content.
       const estPrefixTokens = Math.ceil(prefix.length / 4);
-      expect(estPrefixTokens).toBeLessThan(30_000);
+      expect(estPrefixTokens).toBeGreaterThan(1_000);
+      expect(estPrefixTokens).toBeLessThan(200_000);
 
       // The Ada fixture predates track-stamping — all events land in 'untracked'
       // which renders under "## System events", not Slack/Jobs sections.
-      // Asserting the section that is actually produced:
       expect(prefix).toContain('## System events');
+
+      // The untracked salience extractor should produce User:/Assistant: lines
+      // from the actual Ada conversation content.
+      expect(prefix).toMatch(/User:|Assistant:/);
+
+      // There should be a meaningful number of events compacted.
+      expect(result.compactionEvent.data.messagesCompacted).toBeGreaterThan(0);
 
       // Dump for manual inspection when env flag is set.
       if (process.env.LACE_DUMP_COMPACTION) {

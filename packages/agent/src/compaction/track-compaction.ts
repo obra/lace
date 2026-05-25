@@ -1,7 +1,7 @@
 // ABOUTME: Track-based compaction strategy — demux + salience + render
 // ABOUTME: Uses context_compacted event type for event-sourced replay
 
-import { isEventDataOfType } from '@lace/agent/storage/event-types';
+import { isEventOfType } from '@lace/agent/storage/event-types';
 import type { TypedDurableEvent, ContextCompactedEventData } from '@lace/agent/storage/event-types';
 import { renderCompactionPrefix } from './track-render';
 import type { CompactionContext } from './types';
@@ -20,7 +20,7 @@ export function buildTurnToTrackMap(events: TypedDurableEvent[]): Map<string, st
   const map = new Map<string, string>();
   let pendingPromptTrack: string | undefined;
   for (const e of events) {
-    if (isEventDataOfType(e.data, 'prompt')) {
+    if (isEventOfType(e, 'prompt')) {
       pendingPromptTrack = e.data.track ?? UNTRACKED;
       continue;
     }
@@ -56,13 +56,13 @@ export function groupEarlierEventsByTrack(
   for (const e of events) {
     if (e.type === 'context_compacted') continue;
 
-    if (isEventDataOfType(e.data, 'context_injected')) {
+    if (isEventOfType(e, 'context_injected')) {
       // Mid-turn injects use their OWN track regardless of enclosing turn.
       push(e.data.track ?? UNTRACKED, e);
       continue;
     }
 
-    if (isEventDataOfType(e.data, 'prompt')) {
+    if (isEventOfType(e, 'prompt')) {
       push(e.data.track ?? UNTRACKED, e);
       continue;
     }
@@ -149,9 +149,9 @@ function jobSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock {
   let description = '(unknown)';
   let outcome: string | undefined;
   for (const e of events) {
-    if (isEventDataOfType(e.data, 'job_started')) {
+    if (isEventOfType(e, 'job_started')) {
       description = e.data.description ?? e.data.command ?? '(no description)';
-    } else if (isEventDataOfType(e.data, 'job_finished')) {
+    } else if (isEventOfType(e, 'job_finished')) {
       outcome = e.data.outcome;
     }
   }
@@ -171,14 +171,14 @@ function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock
   const inbound: string[] = [];
   const outbound: string[] = [];
   for (const e of events) {
-    if (isEventDataOfType(e.data, 'prompt')) {
+    if (isEventOfType(e, 'prompt')) {
       const text = extractText(e);
       // Pull just the <current> portion if the new envelope is in use; else
       // include the whole text (untouched).
       const current = extractCurrentMessages(text);
       if (current) inbound.push(...current);
       else if (text.trim()) inbound.push(text.trim().slice(0, 500));
-    } else if (isEventDataOfType(e.data, 'tool_use')) {
+    } else if (isEventOfType(e, 'tool_use')) {
       if (e.data.name === 'slack/send_message') {
         const t = typeof e.data.input?.text === 'string' ? e.data.input.text : '';
         if (t.trim()) outbound.push(t.trim().slice(0, 500));
@@ -195,10 +195,10 @@ function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock
 function untrackedSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock {
   const lines: string[] = [];
   for (const e of events) {
-    if (isEventDataOfType(e.data, 'prompt')) {
+    if (isEventOfType(e, 'prompt')) {
       const t = extractText(e).trim();
       if (t) lines.push(`User: ${truncate(t, 500)}`);
-    } else if (isEventDataOfType(e.data, 'message')) {
+    } else if (isEventOfType(e, 'message')) {
       const t = typeof e.data.content === 'string' ? e.data.content : extractText(e);
       if (t.trim()) lines.push(`Assistant: ${truncate(t.trim(), 500)}`);
     }
@@ -369,17 +369,17 @@ function buildPreservedTail(events: TypedDurableEvent[]): PreservedMessage[] {
   const result: PreservedMessage[] = [];
 
   for (const e of events) {
-    if (isEventDataOfType(e.data, 'prompt')) {
+    if (isEventOfType(e, 'prompt')) {
       result.push({ role: 'user', content: extractText(e) });
       continue;
     }
 
-    if (isEventDataOfType(e.data, 'message')) {
+    if (isEventOfType(e, 'message')) {
       result.push({ role: 'assistant', content: extractText(e) });
       continue;
     }
 
-    if (isEventDataOfType(e.data, 'tool_use')) {
+    if (isEventOfType(e, 'tool_use')) {
       const toolCallId = toNonEmptyString(e.data.toolCallId);
       const name = toNonEmptyString(e.data.name);
       if (!toolCallId || !name) continue;
