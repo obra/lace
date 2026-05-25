@@ -1406,3 +1406,53 @@ None — every round-5 finding source-verified.
 - **`getEffectiveConfig` call shape in the lifecycle hook.** The RPC handler has `state.config` (AgentServerState) in scope; the runner does not. I wrote the hook as `getEffectiveConfig(undefined, sessionStateForConfig.config)` — passing `undefined` for the AgentServerState-level config. This works IF `getEffectiveConfig` tolerates an undefined first arg (most do — they fall back to session-level config). If it throws on undefined, the runner needs to receive a snapshot of `state.config` via `RunnerDependencies` (one new optional field). I did NOT add that field in this revision because adding a new dep field for a fallback case I haven't verified felt premature. If the implementer hits a throw, file a kata or thread one extra field.
 
 - **`EVENTS_PER_TURN_APPROX = 12`.** Set based on the cost-audit-pattern note that Ada runs ~12.5 events/turn. Lighter sessions wait longer; heavier sessions wait shorter. If the choice between "12 (Ada-tuned)" and "switch to counting turn_end events directly (accurate everywhere)" turns out to matter, the latter is the right answer but costs an extra walk per evaluation. Deferred per the briefing's "Acceptable because the backoff-tier scaling has plenty of headroom" framing.
+
+---
+
+## Known issues to address during implementation (round 6 review, not spec-fixed)
+
+After 6 review rounds we stopped iterating the text. The following issues were surfaced in round 6 and confirmed against lace source but NOT patched in this spec. The implementer addresses each at PR time — most are mechanical and the implementer hits them immediately when the code doesn't compile or a test fails.
+
+### Critical (will fail compile or runtime)
+
+1. **Backoff `RESET` rule is wrong; should `TERMINATE` only.** §"Failure backoff → Walk semantics" line ~552: when the walk encounters a `conversation_summary`, the spec says RESET-to-0-then-TERMINATE. Walking backward from end-of-log, the walker has already counted all failures NEWER than the summary by the time it reaches the summary — RESET zeros them and returns 0. After Ada's first successful summary, N=3/N=10 escalations never trip. Fix: drop the RESET, just TERMINATE. The natural-language summary in the same section already describes the correct behavior; the formal rule contradicts it.
+
+2. **`compact()` write-ownership contradiction.** §"Strategy internal event writes (deadlock guard)" says `compact()` writes the `conversation_summary` event internally via raw `appendDurableEvent` + `writeSessionState`. But every caller pseudocode (lifecycle hook, RPC handler, `/compact`) ALSO writes `result.event` after `compact()` returns. Either double-write or contradiction. Recommended resolution: **caller writes** (cleaner separation; `compact()` is pure). Update the deadlock-guard section to specify that the CALLER's write goes through the right primitive per its context: RPC handler uses raw `appendDurableEvent` (inside its existing `runExclusive`); lifecycle hook uses raw `appendDurableEvent` (inside the runner's existing `runExclusive`); `/compact` uses `writeAndAdvance` (no enclosing scope). Drop the "compact() writes internally" wording.
+
+3. **`this.provider` doesn't exist on `ConversationRunner`.** Lifecycle-hook pseudocode at line ~372 calls `this.provider.getModelContextWindow(modelId)`. ConversationRunner has only `this.config` and `this.deps`; the provider is created per-run as a local at `runner.ts:376` via `await this.deps.createProvider()`. Fix: source `modelMaxContext` via the local `provider` variable AFTER it's created, OR use `(await this.deps.createProvider()).getModelContextWindow(modelId)` inside the hook (small cost: one extra provider construction).
+
+4. **`CompactionResult.event: TypedDurableEvent` vs `appendDurableEvent`'s `Omit<DurableEvent, 'eventSeq' | 'timestamp'>`.** `TypedDurableEvent` (`event-types.ts:212-219`) has REQUIRED `eventSeq` and `timestamp`. `appendDurableEvent` (`event-log.ts:399`) takes the Omit shape and derives `eventSeq` itself. Fix: change `CompactionResult.event` to `Omit<TypedDurableEvent, 'eventSeq' | 'timestamp'>`. The caller passes it to `appendDurableEvent` which derives the seq.
+
+5. **`compaction/index.ts` barrel re-exports deleted symbols.** After v6's deletions (`registry.ts`, `compact-dropped-messages.ts`, `trim-tool-results-strategy.ts`, `summarize-strategy.ts`'s `SummarizeCompactionStrategy` class), `compaction/index.ts` re-exports `registerDefaultStrategies`, `TrimToolResultsStrategy`, `SummarizeCompactionStrategy`, `compactDroppedMessagesWithCore`, and types from `./types`. Fix: update the barrel to export only the new top-level `compact()` function and the still-existing types.
+
+6. **`compaction/types.ts` `CompactionData` still needed by `threads/types.ts:5`.** Can't delete the whole `compaction/types.ts` file — `CompactionData` is used by the legacy `LaceEvent`'s `COMPACTION` branch. Fix: keep `CompactionData`, delete the `CompactionStrategy` interface (+ `CompactionContext`, `CompactionResult` legacy shapes if unreferenced after the registry deletion). Audit which exports are still consumed.
+
+7. **Existing tests reference deleted symbols.** `agent-process.e2e.test.ts:949` reads `SummarizeCompactionStrategy.RECENT_EVENT_COUNT`; `summarize-strategy.test.ts` instantiates `new SummarizeCompactionStrategy()` in many places; `trim-tool-results-strategy.test.ts` instantiates the deleted strategy; `slash-commands.compact.test.ts` and `session-operations.compact-budget.test.ts` import `compactDroppedMessagesWithCore` and exercise the `'trim-tool-results'` wire enum. Fix: delete or rewrite these tests as part of the implementation PR. Per CLAUDE.md these tests are for code being deleted, so deletion is appropriate (not a "failing test we shouldn't delete" case).
+
+### Important (will trip up the implementer)
+
+8. **Lifecycle-hook pseudocode references undeclared `sessionEvents` and `turnEndEvent` locals.** Spec uses both without showing derivation. `sessionEvents` should come from `readAllSessionEventLines(sessionDir)` then JSON.parse + type-narrow to `TypedDurableEvent[]`. `turnEndEvent` should be captured from the value returned by the `writeAndAdvance` call that wrote turn_end.
+
+9. **Runner-deps construction site is `prompt.ts:271`, not `server.ts`.** Spec line ~304 says "primary call site that builds `RunnerDependencies` is `server.ts`." Verified false — the construction lives in `rpc/handlers/prompt.ts:271`. Implementer must edit that file.
+
+10. **`connectionId` should be destructured from `this.config.connectionId`, not via `getEffectiveConfig(undefined, ...)`.** `RunnerConfig` already has `connectionId?: string` (`core/conversation/types.ts:43`), populated by `prompt.ts:234` from the same `getEffectiveConfig` call. The roundabout `getEffectiveConfig(undefined, ...)` in the hook pseudocode invents complexity already solved upstream.
+
+11. **Two-pass message-builder breaks alternating-role when tail begins with `prompt`.** When `messages.unshift(...capsule...)` runs with `role: 'user'` and the first tail event is also a `prompt` (the common case after `selectTail` lands on `turn_start` boundary), the rebuilt `messages[]` has two consecutive `'user'` entries. Anthropic's API enforces alternation in many configurations. Fix: either render the capsule as a `'system'`-prefixed user message OR fold the first tail-user-message into the capsule prefix.
+
+12. **Two-pass parser must capture `eventSeq` per event.** Current parser at `message-builder.ts:218` returns `{ type: string; data: Record<string, unknown> }` — no `eventSeq`. The new Pass 0 / Pass 1 algorithm references `ev.eventSeq` in every conditional. Implementer must update the parser to surface top-level `eventSeq` from each JSONL line.
+
+13. **Walk semantics for unknown event types are unspecified.** §"Failure backoff → Walk semantics" enumerates skip/terminate/increment rules for a fixed allowlist. Unknown future event types have undefined behavior. Recommended: throw (matches the message-builder's allowlist + throw posture for safety), OR document the defensive-skip fallback explicitly.
+
+14. **`String.startsWith()` vs `String.includes()` for channel matcher.** §"Tail policy step 2" says "begins with `<messages channel="D"`" etc. sen-core's `formatSlackBatch` may emit multi-channel prompts (joined with `\n\n`); only the first channel will match if the matcher is `startsWith`. Pick one and document. Recommended: `includes` (catches multi-channel batches; risk of false positive on user-injected literal strings is minimal).
+
+15. **Two-summaries test fixture description doesn't exercise the rule it claims.** §"Tests" two-summaries fixture: summary at seq 8 (`recentTailStartsAtEventSeq=4`), summary at seq 16 (`recentTailStartsAtEventSeq=12`). The seq-8 summary is excluded by the `eventSeq < 12` skip-strictly-summarized check that fires BEFORE the "skip non-latest summary" rule. Fix: rebuild the fixture so the older summary lives at seq 12-15 (inside the latest summary's tail range) to actually exercise the rule.
+
+### Minor
+
+16. `EVENTS_PER_TURN_APPROX` value (`12` in v6) contradicts the v5 changelog narrative ("I picked 4 as a floor"). Update or annotate. Cosmetic.
+
+17. `Provider` vs `AIProvider` naming inconsistency in spec text. Existing source uses `AIProvider` (`providers/base-provider.ts:168`). Spec uses `Provider`. Cosmetic but cuts confusion.
+
+---
+
+## End of spec
