@@ -159,6 +159,7 @@ export async function handleSlashCommand(
             connectionId: effectiveConfig.connectionId,
             modelId: effectiveConfig.modelId,
           }),
+          modelId: effectiveConfig.modelId,
         });
 
         await writeAndAdvance({

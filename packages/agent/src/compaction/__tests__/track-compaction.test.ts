@@ -285,10 +285,10 @@ describe('compact() with LLM fallback', () => {
   const longEntry = 'a'.repeat(500);
 
   it('calls provider.createResponse when a track block exceeds 5K tokens', async () => {
-    const calls: Array<{ messages: unknown; tools: unknown }> = [];
+    const calls: Array<{ messages: unknown; tools: unknown; modelId: string }> = [];
     const mockProvider = {
-      createResponse: async (messages: unknown, tools: unknown) => {
-        calls.push({ messages, tools });
+      createResponse: async (messages: unknown, tools: unknown, modelId: string) => {
+        calls.push({ messages, tools, modelId });
         return { content: 'condensed summary', usage: { promptTokens: 0, completionTokens: 50 } };
       },
       setSystemPrompt: () => {},
@@ -312,8 +312,13 @@ describe('compact() with LLM fallback', () => {
       events.push(turnStart(seq++, `tail_${i}`));
       events.push(turnEnd(seq++, `tail_${i}`));
     }
-    const result = await compact(events, { threadId: 'sess', provider: mockProvider });
+    const result = await compact(events, {
+      threadId: 'sess',
+      provider: mockProvider,
+      modelId: 'test-model',
+    });
     expect(calls.length).toBeGreaterThan(0);
+    expect(calls[0].modelId).toBe('test-model');
     expect(result.compactionEvent.data.preserved[0]).toMatchObject({
       role: 'user',
       content: expect.stringContaining('condensed summary'),
@@ -338,7 +343,9 @@ describe('compact() with LLM fallback', () => {
       events.push(turnStart(seq++, `turn_${i}`));
       events.push(turnEnd(seq++, `turn_${i}`));
     }
-    await compact(events, { threadId: 'sess', provider: mockProvider });
+    // modelId is set so the absence of a call is due to tracks fitting, not the
+    // missing-modelId guard.
+    await compact(events, { threadId: 'sess', provider: mockProvider, modelId: 'test-model' });
     expect(called).toBe(false);
   });
 });

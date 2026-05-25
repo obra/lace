@@ -17,4 +17,10 @@ export interface CompactionContext {
   provider?: AIProvider;
   /** Optional Agent instance for in-conversation summarization */
   agent?: CompactionAgent;
+  /**
+   * Provider's model id to use when an LLM fallback is needed (oversize tracks).
+   * When omitted, the LLM fallback path is skipped — only the deterministic
+   * block is returned.
+   */
+  modelId?: string;
 }

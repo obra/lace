@@ -1050,7 +1050,7 @@ export class ConversationRunner {
             // safe because the event-log writer and event-types agree on the wire
             // format.
             allEvents as unknown as TypedDurableEvent[],
-            { threadId: sessionId, provider }
+            { threadId: sessionId, provider, modelId: modelId ?? undefined }
           );
           await this.deps.runExclusive(() => {
             const sessionState = readSessionState(sessionDir);

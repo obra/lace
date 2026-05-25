@@ -123,6 +123,8 @@ const SOFT_TOKEN_CAP_PER_TRACK = 5_000;
 async function maybeShrinkBlock(block: TrackBlock, ctx: CompactionContext): Promise<TrackBlock> {
   if (block.estimatedTokens <= SOFT_TOKEN_CAP_PER_TRACK) return block;
   if (!ctx.provider && !ctx.agent) return block;
+  // If we have a provider but no modelId, we cannot select a model — skip LLM fallback.
+  if (ctx.provider && !ctx.modelId) return block;
   const trackKind = block.trackId.split(':')[0];
   const prompt =
     `Summarize the following ${trackKind} track conversation concisely. ` +
@@ -134,7 +136,7 @@ async function maybeShrinkBlock(block: TrackBlock, ctx: CompactionContext): Prom
       summary = await ctx.agent.generateSummary(prompt);
     } else if (ctx.provider) {
       const messages: ProviderMessage[] = [{ role: 'user', content: prompt }];
-      const resp = await ctx.provider.createResponse(messages, [], 'default');
+      const resp = await ctx.provider.createResponse(messages, [], ctx.modelId!);
       summary = resp.content;
     }
   } catch {
