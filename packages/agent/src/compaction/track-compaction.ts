@@ -5,7 +5,7 @@ import { isEventOfType } from '@lace/agent/storage/event-types';
 import type { TypedDurableEvent, ContextCompactedEventData } from '@lace/agent/storage/event-types';
 import { renderCompactionPrefix } from './track-render';
 import type { CompactionContext } from './types';
-import type { ProviderMessage } from '@lace/agent/providers/base-provider';
+import type { ProviderMessage, ContentBlock } from '@lace/agent/providers/base-provider';
 import { coreToolResultFromProtocol, toNonEmptyString } from '../rpc/utils';
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 
@@ -360,7 +360,7 @@ export async function compact(
 
 type PreservedMessage = {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  content: string | ContentBlock[];
   toolCalls?: CoreToolCall[];
   toolResults?: CoreToolResult[];
 };
@@ -383,20 +383,22 @@ function buildPreservedTail(events: TypedDurableEvent[]): PreservedMessage[] {
 
   for (const e of events) {
     if (isEventOfType(e, 'prompt')) {
-      result.push({ role: 'user', content: extractText(e) });
+      // Pass through the original content (string or ContentBlock[]) so images
+      // in the tail are not discarded — extractText would drop image blocks.
+      result.push({ role: 'user', content: e.data.content });
       continue;
     }
 
     if (isEventOfType(e, 'context_injected')) {
-      // Mirror message-builder.ts: injected context becomes a user-role message
-      // with the extracted text content. Dropping these would silently remove
-      // recent injected context (Slack threads, fired alarms, etc.) from the tail.
-      result.push({ role: 'user', content: extractText(e) });
+      // Mirror message-builder.ts: injected context becomes a user-role message.
+      // Pass through the original content to preserve any image blocks.
+      result.push({ role: 'user', content: e.data.content });
       continue;
     }
 
     if (isEventOfType(e, 'message')) {
-      result.push({ role: 'assistant', content: extractText(e) });
+      // Pass through the original content to preserve any image blocks.
+      result.push({ role: 'assistant', content: e.data.content ?? '' });
       continue;
     }
 

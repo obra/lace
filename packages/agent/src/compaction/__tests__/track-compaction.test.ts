@@ -437,12 +437,16 @@ describe('compact()', () => {
     expect(result.compactionEvent.data.messagesCompacted).toBe(0);
     const preserved = result.compactionEvent.data.preserved as Array<{
       role: string;
-      content: string;
+      content: string | Array<{ type: string; text?: string }>;
       toolCalls?: unknown[];
       toolResults?: unknown[];
     }>;
     // preserved[0] is the synthetic prefix (always present)
-    const promptEntry = preserved.find((p) => p.role === 'user' && p.content.includes('use bash'));
+    const contentText = (c: string | Array<{ type: string; text?: string }>) =>
+      typeof c === 'string' ? c : c.map((b) => b.text ?? '').join('');
+    const promptEntry = preserved.find(
+      (p) => p.role === 'user' && contentText(p.content).includes('use bash')
+    );
     expect(promptEntry).toBeDefined();
     const assistantWithToolCalls = preserved.find(
       (p) => p.role === 'assistant' && Array.isArray(p.toolCalls)
@@ -508,11 +512,38 @@ describe('compact()', () => {
     const result = await compact(events, ctx);
     const preserved = result.compactionEvent.data.preserved as Array<{
       role: string;
-      content: string;
+      content: string | Array<{ type: string; text?: string }>;
     }>;
+    const contentText = (c: string | Array<{ type: string; text?: string }>) =>
+      typeof c === 'string' ? c : c.map((b) => b.text ?? '').join('');
     const injectedEntry = preserved.find(
-      (p) => p.role === 'user' && p.content.includes('alarm fired')
+      (p) => p.role === 'user' && contentText(p.content).includes('alarm fired')
     );
     expect(injectedEntry).toBeDefined();
+  });
+
+  it('preserves image content blocks in tail prompts without flattening to text', async () => {
+    // A prompt with an image block in the tail must survive compaction with the
+    // image intact — extractText would silently drop it, losing visual context.
+    const imageBlock = {
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/png', data: 'abc123' },
+    };
+    const events: TypedDurableEvent[] = [
+      event(1, 'prompt', { content: [{ type: 'text', text: 'look at this' }, imageBlock] }),
+      turnStart(2, 'turn_1'),
+      turnEnd(3, 'turn_1'),
+    ];
+    const result = await compact(events, ctx);
+    // Everything is in tail (only 1 turn < TAIL_TURNS=10).
+    const preserved = result.compactionEvent.data.preserved as Array<{
+      role: string;
+      content: unknown;
+    }>;
+    const promptEntry = preserved.find((p) => p.role === 'user' && Array.isArray(p.content));
+    expect(promptEntry).toBeDefined();
+    const blocks = promptEntry!.content as Array<{ type: string }>;
+    expect(blocks.some((b) => b.type === 'image')).toBe(true);
+    expect(blocks.some((b) => b.type === 'text')).toBe(true);
   });
 });

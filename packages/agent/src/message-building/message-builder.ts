@@ -301,9 +301,14 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
         if (!msg || typeof msg !== 'object') continue;
         const msgObj = msg as PreservedMessage;
         const role = msgObj.role;
-        const content = msgObj.content;
+        const rawContent = msgObj.content;
         if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
-        if (typeof content !== 'string') continue;
+        // Accept string or ContentBlock[] — images in tail preserved messages
+        // must be passed through without being flattened to text.
+        if (typeof rawContent !== 'string' && !Array.isArray(rawContent)) continue;
+        const content: string | ContentBlock[] = Array.isArray(rawContent)
+          ? (rawContent as ContentBlock[])
+          : rawContent;
 
         const toolCalls = Array.isArray(msgObj.toolCalls) ? msgObj.toolCalls : undefined;
         const toolResults = Array.isArray(msgObj.toolResults) ? msgObj.toolResults : undefined;
