@@ -23,7 +23,7 @@ import {
 } from './subagent-job-helpers';
 import type { LaceStopDetails } from '@lace/agent/providers/base-provider';
 import { logger } from '@lace/agent/utils/logger';
-import { SUBAGENT_USER_PERSONAS_TARGET } from './persona-container-spec';
+import { SUBAGENT_SKILLS_TARGET, SUBAGENT_USER_PERSONAS_TARGET } from './persona-container-spec';
 import { spawnSubagent, type SubagentProcessHandle } from './subagent-spawn';
 import type { PerInvocationReaper } from './per-invocation-reaper';
 import type { ToolResult } from '@lace/ent-protocol';
@@ -208,6 +208,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         personaContainerRuntime: job.personaContainerRuntime,
         containerManager: state.containerManager,
         containerMounts: state.containerMounts,
+        ...(state.skillDirs ? { skillDirs: state.skillDirs } : {}),
         // PRI-1796: thread per_invocation fields for the in-container lace-agent
         // path. spawnContainerSubagent forwards these to buildPersonaContainerSpec.
         ...(job.containerSharing === 'per_invocation' && job.subagentSessionId
@@ -812,6 +813,11 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       const subagentUserPersonasPaths: string[] = isContainerizedSubagent
         ? [SUBAGENT_USER_PERSONAS_TARGET]
         : [...currentState.personaRegistry.getUserPersonasPaths()];
+      const subagentSkillDirs = currentState.skillDirs
+        ? isContainerizedSubagent
+          ? currentState.skillDirs.map((_, index) => `${SUBAGENT_SKILLS_TARGET}/${index}`)
+          : [...currentState.skillDirs]
+        : undefined;
 
       await childPeer.request('initialize', {
         protocolVersion: '1.0',
@@ -822,6 +828,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           'ent/jobStreaming': currentState.jobManager.getStreamingMode(),
         },
         userPersonasPaths: subagentUserPersonasPaths,
+        ...(subagentSkillDirs ? { skillDirs: subagentSkillDirs } : {}),
         config: buildSubagentInitConfig(parentEffective),
       });
 

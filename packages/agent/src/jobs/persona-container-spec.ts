@@ -51,6 +51,11 @@ export const SUBAGENT_CREDENTIALS_TARGET = '/var/credentials';
 // not to the persona-declared `runtime.mounts` map.
 export const SUBAGENT_LACE_TARGET = '/lace';
 
+// Fixed in-container root for embedder-supplied skill directories. Each parent
+// skill dir is mounted read-only at `${SUBAGENT_SKILLS_TARGET}/<index>` and the
+// child initialize request receives those in-container paths as `skillDirs`.
+export const SUBAGENT_SKILLS_TARGET = '/var/lace/skills';
+
 export class PersonaContainerSpecError extends Error {
   constructor(message: string) {
     super(message);
@@ -73,8 +78,10 @@ function resolvePersonaMountsAndEnv(input: {
   runtimeMounts: Record<string, string>;
   runtimeEnv: Record<string, string> | undefined;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
+  skillDirs?: readonly string[];
 }): { mounts: ContainerMount[]; env: Record<string, string> } {
-  const { personaName, containerSharing, runtimeMounts, runtimeEnv, containerMounts } = input;
+  const { personaName, containerSharing, runtimeMounts, runtimeEnv, containerMounts, skillDirs } =
+    input;
 
   const mounts: ContainerMount[] = [];
   for (const [mountName, target] of Object.entries(runtimeMounts)) {
@@ -190,6 +197,14 @@ function resolvePersonaMountsAndEnv(input: {
     });
   }
 
+  for (const [index, skillDir] of (skillDirs ?? []).entries()) {
+    mounts.push({
+      source: skillDir,
+      target: `${SUBAGENT_SKILLS_TARGET}/${index}`,
+      readonly: true,
+    });
+  }
+
   // Merge persona-declared env with auto-injected LACE_DIR. The auto-inject
   // wins: the mount IS the source of truth for where LACE_DIR resolves
   // inside the container, so a persona-supplied LACE_DIR pointing elsewhere
@@ -230,6 +245,7 @@ export function buildPersonaContainerSpec(input: {
   personaName: string;
   runtime: PersonaContainerRuntime;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
+  skillDirs?: readonly string[];
   // Required for per_invocation; ignored for persistent.
   childSessionId?: string;
   scratchDirHostPath?: string;
@@ -276,6 +292,7 @@ export function buildPersonaContainerSpec(input: {
     runtimeMounts: runtime.mounts,
     runtimeEnv: runtime.env,
     containerMounts,
+    skillDirs: input.skillDirs,
   });
 
   if (runtime.containerSharing === 'persistent') {

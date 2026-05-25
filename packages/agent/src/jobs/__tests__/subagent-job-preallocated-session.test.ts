@@ -17,6 +17,7 @@ import {
 import type { ContainerManager } from '@lace/agent/containers/container-manager';
 import type { MountRegistryEntry, JobState } from '@lace/agent/server-types';
 import type { SubagentProcessHandle } from '@lace/agent/jobs/subagent-spawn';
+import type { PersonaContainerRuntime } from '@lace/agent/jobs/persona-container-spec';
 
 // Mock spawnSubagent so we don't exec a real child process
 const spawnMock = vi.hoisted(() => ({
@@ -111,11 +112,15 @@ describe('runSubagentJobProcess — preallocated sessionId (PRI-1796)', () => {
   let parentWorkDir: string;
   let fakeHandle: FakeSubagentHandle;
   let requestSpy: ReturnType<typeof vi.spyOn>;
+  const spawnOptions: unknown[] = [];
+  const initializeRequests: Array<Record<string, unknown>> = [];
   const sessionNewRequests: Array<Record<string, unknown>> = [];
   const sessionResumeRequests: Array<Record<string, unknown>> = [];
   const previousLaceSessionDir = process.env.LACE_SESSION_DIR;
 
   beforeEach(() => {
+    spawnOptions.length = 0;
+    initializeRequests.length = 0;
     sessionNewRequests.length = 0;
     sessionResumeRequests.length = 0;
     sessionRootDir = mkdtempSync(join(tmpdir(), 'preallocated-subagent-'));
@@ -135,12 +140,18 @@ describe('runSubagentJobProcess — preallocated sessionId (PRI-1796)', () => {
     ensureSessionFiles(parentSessionDir);
 
     fakeHandle = makeFakeSubagent();
-    spawnMock.current = () => Promise.resolve(fakeHandle);
+    spawnMock.current = (options: unknown) => {
+      spawnOptions.push(options);
+      return Promise.resolve(fakeHandle);
+    };
 
     requestSpy = vi
       .spyOn(JsonRpcPeer.prototype, 'request')
       .mockImplementation(async (method: string, params?: unknown) => {
-        if (method === 'initialize') return undefined;
+        if (method === 'initialize') {
+          initializeRequests.push(params as Record<string, unknown>);
+          return undefined;
+        }
         if (method === 'session/new') {
           sessionNewRequests.push(params as Record<string, unknown>);
           // Return the sessionId passed in, or a default
@@ -223,6 +234,116 @@ describe('runSubagentJobProcess — preallocated sessionId (PRI-1796)', () => {
     expect(sessionResumeRequests).toHaveLength(0);
     // The job's subagentSessionId must still equal the preallocated id
     expect(job.subagentSessionId).toBe(preallocatedId);
+  });
+
+  it('passes parent skillDirs through child initialize', async () => {
+    const jobId = 'job_skill_dirs_test';
+    const outputPath = join(parentSessionDir, 'jobs', `${jobId}.log`);
+    const skillDirs = ['/host/sen-core/skills/innate', '/host/instance/user/skills/learned'];
+
+    let resolveCompletion: () => void = () => undefined;
+    const completion = new Promise<void>((r) => {
+      resolveCompletion = r;
+    });
+
+    const job: JobState = {
+      jobId,
+      type: 'delegate',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+      outputPath,
+      finished: false,
+      completion,
+      resolveCompletion,
+      subagentContent: [{ type: 'text', text: 'noop' }],
+    };
+
+    const state = {
+      initialized: true,
+      activeSession: {
+        meta: { sessionId: parentSessionId, workDir: parentWorkDir },
+        dir: parentSessionDir,
+        state: { nextEventSeq: 1, nextStreamSeq: 1, config: {} },
+      },
+      config: {},
+      skillDirs,
+      jobManager: {
+        getJob: vi.fn(),
+        addJob: vi.fn(),
+        getStreamingMode: () => 'full' as const,
+      },
+      containerManager: null as unknown as ContainerManager,
+      containerMounts: {} as Readonly<Record<string, MountRegistryEntry>>,
+      personaRegistry: { getUserPersonasPaths: () => [] },
+    };
+
+    runSubagentJobProcess(job, makeSubagentJobDeps({ state }));
+
+    await completion;
+
+    expect(initializeRequests).toHaveLength(1);
+    expect(initializeRequests[0]).toMatchObject({ skillDirs });
+  });
+
+  it('remaps parent skillDirs for containerized child initialize', async () => {
+    const jobId = 'job_container_skill_dirs_test';
+    const outputPath = join(parentSessionDir, 'jobs', `${jobId}.log`);
+    const skillDirs = ['/host/sen-core/skills/innate', '/host/instance/user/skills/learned'];
+    const personaContainerRuntime: PersonaContainerRuntime = {
+      type: 'container',
+      image: 'node:24-bookworm',
+      workingDirectory: '/work',
+      mounts: {},
+      containerSharing: 'persistent',
+    };
+
+    let resolveCompletion: () => void = () => undefined;
+    const completion = new Promise<void>((r) => {
+      resolveCompletion = r;
+    });
+
+    const job: JobState = {
+      jobId,
+      type: 'delegate',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+      outputPath,
+      finished: false,
+      completion,
+      resolveCompletion,
+      subagentContent: [{ type: 'text', text: 'noop' }],
+      persona: 'shell',
+      personaContainerRuntime,
+    };
+
+    const state = {
+      initialized: true,
+      activeSession: {
+        meta: { sessionId: parentSessionId, workDir: parentWorkDir },
+        dir: parentSessionDir,
+        state: { nextEventSeq: 1, nextStreamSeq: 1, config: {} },
+      },
+      config: {},
+      skillDirs,
+      jobManager: {
+        getJob: vi.fn(),
+        addJob: vi.fn(),
+        getStreamingMode: () => 'full' as const,
+      },
+      containerManager: {} as ContainerManager,
+      containerMounts: {} as Readonly<Record<string, MountRegistryEntry>>,
+      personaRegistry: { getUserPersonasPaths: () => [] },
+    };
+
+    runSubagentJobProcess(job, makeSubagentJobDeps({ state }));
+
+    await completion;
+
+    expect(spawnOptions[0]).toMatchObject({ skillDirs });
+    expect(initializeRequests).toHaveLength(1);
+    expect(initializeRequests[0]).toMatchObject({
+      skillDirs: ['/var/lace/skills/0', '/var/lace/skills/1'],
+    });
   });
 
   it('calls session/resume (not session/new) when subagentSessionPreallocated is absent', async () => {
