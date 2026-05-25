@@ -412,8 +412,8 @@ state and pass live names to skip them.
   native `spawn`. Smoke is the only real test. Reserve PM bandwidth.
 - **Docker availability in CI**. Integration tests for DockerContainerRuntime
   gate on docker presence. Unit tests use mocks.
-- **packages/web fallout from K-49c**. If web app referenced `ent/workspace/*`,
-  those components break. Per Jesse: delete, don't add.
+- **Client fallout from K-49c**. If deleted workspace APIs still have clients,
+  delete the clients instead of adding compatibility shims.
 
 ## Worker dispatch order
 

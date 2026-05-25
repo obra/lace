@@ -47,27 +47,16 @@ jobs:
       - name: Run linting
         run: npm run lint
 
-      - name: Check Prettier formatting (core)
-        run: npx prettier --check "packages/core/src/*.ts"
-
-      - name: Check Prettier formatting (web)
-        run: npx prettier --check "packages/web/**/*.ts" "packages/web/**/*.tsx"
+      - name: Check Prettier formatting
+        run: npx prettier --check "packages/{agent,supervisor,ent-protocol,cli}/src/**/*.ts"
 
       - name: Run tests with coverage
         run: npm run test:coverage
 
-      #- name: Install Playwright dependencies
-      #  run: npx playwright install --with-deps chromium
-
-      #- name: Run E2E tests
-      #  run: |
-      #    cd packages/web
-      #    npm run test:playwright:ci
-
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: ./coverage/lcov.info,./packages/web/coverage/lcov.info
+          files: ./packages/agent/coverage/lcov.info
           fail_ci_if_error: false
 
       - name: Notify completion

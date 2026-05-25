@@ -13,7 +13,7 @@ export default defineConfig({
       reporter: ['text', 'html', 'lcov'],
       exclude: ['node_modules/', 'dist/', '**/*.test.ts', '**/*.spec.ts'],
     },
-    environment: 'jsdom', // Default to jsdom for React components
+    environment: 'node',
     setupFiles: ['./src/test-setup.ts'],
     env: {
       // Disable colors in test environment to ensure consistent output
@@ -27,7 +27,7 @@ export default defineConfig({
       test: {
         include: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
         exclude: ['packages/**'],
-        environment: 'jsdom',
+        environment: 'node',
         setupFiles: ['./src/test-setup.ts'],
       },
     },

@@ -36,33 +36,7 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
     }
   }
 
-  // Check if running from a bundled build (React Router 7 style)
-  if (importMetaUrl.includes('/build/server/assets/')) {
-    // Running from bundle - find project root from the bundle path
-    const buildIndex = importMetaUrl.indexOf('/packages/web/build/');
-    if (buildIndex === -1) {
-      throw new Error(`Cannot determine project root from bundle path: ${importMetaUrl}`);
-    }
-
-    const projectRoot = importMetaUrl.substring(0, buildIndex);
-
-    // Map known resource requests to their actual locations
-    if (relativePath === 'data') {
-      return path.resolve(
-        projectRoot.replace('file://', ''),
-        'packages/agent/src/providers/catalog/data'
-      );
-    } else if (relativePath === 'agent-personas') {
-      return path.resolve(
-        projectRoot.replace('file://', ''),
-        'packages/agent/config/agent-personas'
-      );
-    } else {
-      throw new Error(
-        `Unknown resource path '${relativePath}' in bundled mode. Add explicit mapping.`
-      );
-    }
-  } else if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === 'production') {
     // In production (standalone), resolve relative to the working directory
     // The standalone structure is: standalone/src/... so we need to find the equivalent path
 

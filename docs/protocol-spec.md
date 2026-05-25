@@ -1020,9 +1020,9 @@ List available provider families supported by this agent runtime.
 
 ### 6.14.1 `ent/providers/catalog` (extension)
 
-Return the agent's provider catalog, including model metadata used by the web UI
-(pricing/context/etc). This replaces any web-server direct reads of catalog data
-from the agent package or filesystem.
+Return the agent's provider catalog, including model metadata used by clients
+(pricing/context/etc). This replaces direct reads of catalog data from the agent
+package or filesystem.
 
 ```typescript
 // Request
