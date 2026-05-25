@@ -444,35 +444,39 @@ export function registerSessionOperationHandlers(
         modelId: effectiveConfig.modelId,
       });
 
-      const rawEvents = readDurableEvents(sessionDir, { limit: Number.MAX_SAFE_INTEGER });
-      // DurableEvent[] and TypedDurableEvent[] differ in their typing of `data`
-      // (Record<string, unknown> vs DurableEventData union). Runtime shape is
-      // identical. Same cast pattern is used in slash-commands.ts.
-      const events = rawEvents.events as unknown as TypedDurableEvent[];
+      try {
+        const rawEvents = readDurableEvents(sessionDir, { limit: Number.MAX_SAFE_INTEGER });
+        // DurableEvent[] and TypedDurableEvent[] differ in their typing of `data`
+        // (Record<string, unknown> vs DurableEventData union). Runtime shape is
+        // identical. Same cast pattern is used in slash-commands.ts.
+        const events = rawEvents.events as unknown as TypedDurableEvent[];
 
-      const result = await compact(events, {
-        threadId: state.activeSession!.meta.sessionId,
-        provider,
-        modelId: effectiveConfig.modelId,
-      });
+        const result = await compact(events, {
+          threadId: state.activeSession!.meta.sessionId,
+          provider,
+          modelId: effectiveConfig.modelId,
+        });
 
-      let sessionState = readSessionState(sessionDir);
-      const { nextState } = appendDurableEvent(sessionDir, sessionState, {
-        type: 'context_compacted',
-        data: result.compactionEvent.data as Record<string, unknown>,
-      });
-      sessionState = nextState;
-      writeSessionState(sessionDir, sessionState);
-      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+        let sessionState = readSessionState(sessionDir);
+        const { nextState } = appendDurableEvent(sessionDir, sessionState, {
+          type: 'context_compacted',
+          data: result.compactionEvent.data as Record<string, unknown>,
+        });
+        sessionState = nextState;
+        writeSessionState(sessionDir, sessionState);
+        state.activeSession = loadSession(state.activeSession!.meta.sessionId);
 
-      const { messages: afterMessages } = buildProviderMessagesFromDurableEvents(sessionDir);
-      const currentTokens = estimateProviderTokens(afterMessages) + estimateTokens(systemPrompt);
+        const { messages: afterMessages } = buildProviderMessagesFromDurableEvents(sessionDir);
+        const currentTokens = estimateProviderTokens(afterMessages) + estimateTokens(systemPrompt);
 
-      return {
-        previousTokens,
-        currentTokens,
-        messagesCompacted: result.compactionEvent.data.messagesCompacted ?? 0,
-      };
+        return {
+          previousTokens,
+          currentTokens,
+          messagesCompacted: result.compactionEvent.data.messagesCompacted ?? 0,
+        };
+      } finally {
+        provider.cleanup();
+      }
     });
   });
 

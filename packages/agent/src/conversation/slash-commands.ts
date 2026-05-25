@@ -153,14 +153,15 @@ export async function handleSlashCommand(
 
         const effectiveConfig = getEffectiveConfig(state.config, state.activeSession.state.config);
 
-        const result = await compact(events, {
-          threadId: sessionId,
-          provider: await createProviderForTurn({
-            connectionId: effectiveConfig.connectionId,
-            modelId: effectiveConfig.modelId,
-          }),
+        const provider = await createProviderForTurn({
+          connectionId: effectiveConfig.connectionId,
           modelId: effectiveConfig.modelId,
         });
+        const result = await compact(events, {
+          threadId: sessionId,
+          provider,
+          modelId: effectiveConfig.modelId,
+        }).finally(() => provider.cleanup());
 
         await writeAndAdvance({
           type: 'context_compacted',
