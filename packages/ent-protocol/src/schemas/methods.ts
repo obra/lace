@@ -24,6 +24,15 @@ import {
 
 const EmptyParamsSchema = z.object({}).strict();
 const ContainerExecutionTokenEnvNameSchema = z.string().regex(/^[A-Z_][A-Z0-9_]*$/);
+export const DurableHandoffStatusSchema = z.enum([
+  'persisted-new',
+  'duplicate-already-handled',
+  'duplicate-safe-retry',
+  'duplicate-in-progress',
+  'duplicate-unsafe-retry',
+  'not-persisted',
+]);
+export type DurableHandoffStatus = z.infer<typeof DurableHandoffStatusSchema>;
 
 const ClientCapabilitiesSchema = z
   .object({
@@ -75,6 +84,7 @@ const AgentCapabilitiesSchema = z
     'ent/backgroundJobs': z.boolean(),
     'ent/fileCheckpointing': z.boolean(),
     'ent/structuredOutput': z.boolean(),
+    'ent/promptIdempotency': z.boolean().optional(),
     'ent/providers': z
       .object({
         list: z.boolean(),
@@ -492,6 +502,7 @@ const SessionPromptParamsSchema = z
   .object({
     content: z.array(ContentBlockSchema),
     maxTurns: z.number().optional(),
+    idempotencyKey: NonEmptyStringSchema.optional(),
     outputFormat: z
       .object({
         type: z.literal('json_schema'),
@@ -616,49 +627,57 @@ const LaceStopDetailsSchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 
-const SessionPromptResultSchema = z
-  .object({
-    turnId: NonEmptyStringSchema,
-    stopReason: z.enum([
-      'end_turn',
-      'stop_sequence',
-      'max_output_tokens',
-      'context_window_exceeded',
-      'refusal',
-      'max_turns',
-      'cancelled',
-      'budget_exceeded',
-      'incomplete',
-      'permission_cancelled',
-      'failed',
-      // PRI-1818: fine-grained error stopReasons written by the runner's
-      // finally block when the agentic loop threw. The runner rethrows after
-      // writing turn_end, so these values do not flow through the RPC response
-      // on a real run; they are listed for schema parity with the durable
-      // `turn_end` event shape so consumers reading both surfaces accept the
-      // same enum.
-      'provider_error_overloaded',
-      'provider_error_invalid',
-      'provider_error_network',
-      'provider_error_other',
-      'tool_error_throw',
-      'tool_error_timeout',
-      'internal_error',
-    ]),
-    stopDetails: LaceStopDetailsSchema.nullable().optional(),
-    content: z.array(ContentBlockSchema),
-    usage: UsageInfoSchema,
-    structuredOutput: z.unknown().optional(),
-    cost: z
-      .object({
-        inputCostUsd: z.number(),
-        outputCostUsd: z.number(),
-        totalCostUsd: z.number(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
+const SessionPromptResultSchema = z.union([
+  z
+    .object({
+      turnId: NonEmptyStringSchema,
+      stopReason: z.enum([
+        'end_turn',
+        'stop_sequence',
+        'max_output_tokens',
+        'context_window_exceeded',
+        'refusal',
+        'max_turns',
+        'cancelled',
+        'budget_exceeded',
+        'incomplete',
+        'permission_cancelled',
+        'failed',
+        // PRI-1818: fine-grained error stopReasons written by the runner's
+        // finally block when the agentic loop threw. The runner rethrows after
+        // writing turn_end, so these values do not flow through the RPC response
+        // on a real run; they are listed for schema parity with the durable
+        // `turn_end` event shape so consumers reading both surfaces accept the
+        // same enum.
+        'provider_error_overloaded',
+        'provider_error_invalid',
+        'provider_error_network',
+        'provider_error_other',
+        'tool_error_throw',
+        'tool_error_timeout',
+        'internal_error',
+      ]),
+      stopDetails: LaceStopDetailsSchema.nullable().optional(),
+      content: z.array(ContentBlockSchema),
+      usage: UsageInfoSchema,
+      structuredOutput: z.unknown().optional(),
+      cost: z
+        .object({
+          inputCostUsd: z.number(),
+          outputCostUsd: z.number(),
+          totalCostUsd: z.number(),
+        })
+        .strict()
+        .optional(),
+      durableHandoffStatus: DurableHandoffStatusSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      durableHandoffStatus: z.literal('duplicate-already-handled'),
+    })
+    .strict(),
+]);
 
 export const SessionPromptRequestSchema = z
   .object({
@@ -901,6 +920,16 @@ const EntSessionInjectParamsSchema = z
   .object({
     content: z.array(ContentBlockSchema),
     priority: z.enum(['immediate', 'normal', 'deferred']),
+    idempotencyKey: NonEmptyStringSchema.optional(),
+  })
+  .strict();
+
+export const EntSessionInjectRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/inject'),
+    params: EntSessionInjectParamsSchema,
   })
   .strict();
 
@@ -909,6 +938,20 @@ export const EntSessionInjectNotificationSchema = z
     jsonrpc: JsonRpcVersionSchema,
     method: z.literal('ent/session/inject'),
     params: EntSessionInjectParamsSchema,
+  })
+  .strict();
+
+const EntSessionInjectResultSchema = z
+  .object({
+    durableHandoffStatus: DurableHandoffStatusSchema.optional(),
+  })
+  .strict();
+
+export const EntSessionInjectResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntSessionInjectResultSchema,
   })
   .strict();
 
@@ -2329,6 +2372,7 @@ export const EntProtocolRequestSchema = z.union([
   EntSessionConfigureRequestSchema,
   EntSessionRewindRequestSchema,
   EntSessionCheckpointRequestSchema,
+  EntSessionInjectRequestSchema,
   EntSessionEventsRequestSchema,
   EntProvidersListRequestSchema,
   EntConnectionsListRequestSchema,

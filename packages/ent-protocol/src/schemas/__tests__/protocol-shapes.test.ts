@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as ProtocolSchemas from '../methods';
 import {
   EntProtocolNotificationSchema,
   EntProtocolRequestSchema,
@@ -9,6 +10,14 @@ import {
   SessionPromptResponseSchema,
   SessionRequestPermissionResponseSchema,
 } from '../methods';
+
+function schema(name: string) {
+  const value = (ProtocolSchemas as Record<string, unknown>)[name];
+  if (!value || typeof value !== 'object' || !('parse' in value)) {
+    throw new Error(`${name} is not exported`);
+  }
+  return value as { parse(input: unknown): unknown };
+}
 
 function boundedHostRuntimeBinding(cwd = '/tmp') {
   return {
@@ -201,6 +210,44 @@ describe('protocol shapes (representative examples)', () => {
           persona: 'lace',
           systemPrompt: { type: 'preset', preset: 'lace' },
           mcpServers: [],
+        },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'prompt-idempotent',
+        method: 'session/prompt',
+        params: {
+          content: [{ type: 'text', text: 'hello' }],
+          idempotencyKey: 'slack:C123:1748000000.000001',
+        },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'prompt-no-source',
+        method: 'session/prompt',
+        params: {
+          content: [{ type: 'text', text: 'hello' }],
+          idempotencyKey: 'slack:C123:1748000000.000001',
+          source: { kind: 'slack' },
+        },
+      })
+    ).toThrow();
+
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'inject-idempotent',
+        method: 'ent/session/inject',
+        params: {
+          content: [{ type: 'text', text: 'background context' }],
+          priority: 'normal',
+          idempotencyKey: 'slack:C123:1748000000.000002',
         },
       })
     ).not.toThrow();
@@ -545,6 +592,7 @@ describe('protocol shapes (representative examples)', () => {
             'ent/backgroundJobs': true,
             'ent/fileCheckpointing': false,
             'ent/structuredOutput': false,
+            'ent/promptIdempotency': true,
           },
         },
       })
@@ -557,6 +605,26 @@ describe('protocol shapes (representative examples)', () => {
         result: {
           sessionId: 'sess_00000000-0000-0000-0000-000000000001',
           created: '2026-01-04T00:00:00Z',
+        },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      SessionPromptResponseSchema.parse({
+        jsonrpc: '2.0',
+        id: 'prompt-duplicate',
+        result: {
+          durableHandoffStatus: 'duplicate-already-handled',
+        },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      schema('EntSessionInjectResponseSchema').parse({
+        jsonrpc: '2.0',
+        id: 'inject-idempotent',
+        result: {
+          durableHandoffStatus: 'persisted-new',
         },
       })
     ).not.toThrow();
