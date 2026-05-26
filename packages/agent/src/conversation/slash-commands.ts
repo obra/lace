@@ -163,7 +163,7 @@ export async function handleSlashCommand(
           modelId: effectiveConfig.modelId,
         }).finally(() => provider.cleanup());
 
-        if ('noop' in result && result.noop) {
+        if ('noop' in result) {
           return finishTurn('Context is already minimal. Nothing to compact.');
         }
 

@@ -1052,7 +1052,7 @@ export class ConversationRunner {
             allEvents as unknown as TypedDurableEvent[],
             { threadId: sessionId, provider, modelId: modelId ?? undefined }
           );
-          if (!('noop' in result && result.noop)) {
+          if (!('noop' in result)) {
             await this.deps.runExclusive(() => {
               const sessionState = readSessionState(sessionDir);
               const { nextState } = appendDurableEvent(sessionDir, sessionState, {

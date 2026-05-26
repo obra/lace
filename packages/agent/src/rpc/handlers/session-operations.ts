@@ -21,7 +21,7 @@ import {
   restoreCheckpointFiles,
 } from '../../storage/checkpoint-store';
 import { deriveCheckpointFilesFromDurableEvents } from '../../storage/files-from-events';
-import type { ProviderMessage, ContentBlock } from '../../providers/base-provider';
+import type { ContentBlock } from '../../providers/base-provider';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import type { AgentServerState, CreateToolExecutorFn } from '../../server-types';
 import type { Tool } from '../../tools/tool';
@@ -457,7 +457,7 @@ export function registerSessionOperationHandlers(
           modelId: effectiveConfig.modelId,
         });
 
-        if ('noop' in result && result.noop) {
+        if ('noop' in result) {
           return {
             previousTokens,
             currentTokens: previousTokens,

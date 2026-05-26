@@ -86,13 +86,9 @@ describe('compact() against Ada fixture', () => {
 
       // Dump for manual inspection when env flag is set.
       if (process.env.LACE_DUMP_COMPACTION) {
-        // eslint-disable-next-line no-console
         console.log('\n--- COMPACTION PREFIX ---\n' + prefix + '\n--- END ---\n');
-        // eslint-disable-next-line no-console
         console.log(`prefix length: ${prefix.length} chars, ~${estPrefixTokens} tokens`);
-        // eslint-disable-next-line no-console
         console.log(`messagesCompacted: ${result.compactionEvent.data.messagesCompacted}`);
-        // eslint-disable-next-line no-console
         console.log(`preserved tail entries: ${result.compactionEvent.data.preserved.length - 1}`);
       }
     },

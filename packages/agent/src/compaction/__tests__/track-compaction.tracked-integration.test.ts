@@ -89,13 +89,9 @@ describe('compact() against Ada retagged fixture', () => {
       expect(result.compactionEvent.data.messagesCompacted).toBeGreaterThan(0);
 
       if (process.env.LACE_DUMP_COMPACTION) {
-        // eslint-disable-next-line no-console
         console.log('\n--- COMPACTION PREFIX (TRACKED) ---\n' + prefix + '\n--- END ---\n');
-        // eslint-disable-next-line no-console
         console.log(`prefix length: ${prefix.length} chars, ~${estPrefixTokens} tokens`);
-        // eslint-disable-next-line no-console
         console.log(`messagesCompacted: ${result.compactionEvent.data.messagesCompacted}`);
-        // eslint-disable-next-line no-console
         console.log(`preserved tail entries: ${result.compactionEvent.data.preserved.length - 1}`);
       }
     },
