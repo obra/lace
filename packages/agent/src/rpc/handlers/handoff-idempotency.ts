@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import type { DurableHandoffStatus } from '@lace/ent-protocol';
 import { readAllSessionEventLines, type DurableEvent } from '@lace/agent/storage/event-log';
 
@@ -26,12 +27,14 @@ export function readDurableEventsForHandoff(sessionDir: string): StrictEventRead
 export function classifyPromptHandoff(
   events: DurableEvent[],
   idempotencyKey: string,
+  content: unknown[],
   activeTurnId?: string
 ): DurableHandoffStatus {
   const prompt = events.find(
     (event) => event.type === 'prompt' && eventIdempotencyKey(event) === idempotencyKey
   );
   if (!prompt) return 'persisted-new';
+  if (!isDeepStrictEqual(prompt.data?.content, content)) return 'duplicate-unsafe-retry';
   if (!prompt.turnId) return 'duplicate-unsafe-retry';
   if (activeTurnId === prompt.turnId) return 'duplicate-in-progress';
 
@@ -49,10 +52,28 @@ export function classifyPromptHandoff(
   return 'duplicate-unsafe-retry';
 }
 
-export function hasContextInjectedHandoff(events: DurableEvent[], idempotencyKey: string): boolean {
-  return events.some(
+export function classifyContextInjectedHandoff(
+  events: DurableEvent[],
+  idempotencyKey: string,
+  content: unknown[]
+): DurableHandoffStatus {
+  const event = events.find(
     (event) => event.type === 'context_injected' && eventIdempotencyKey(event) === idempotencyKey
   );
+  if (!event) return 'persisted-new';
+  return isDeepStrictEqual(event.data?.content, content)
+    ? 'duplicate-already-handled'
+    : 'duplicate-unsafe-retry';
+}
+
+export function rejectHandoffSourceMetadata(params: unknown): void {
+  if (!params || typeof params !== 'object' || Array.isArray(params)) return;
+  if (!Object.prototype.hasOwnProperty.call(params, 'source')) return;
+  throw {
+    code: -32602,
+    message: 'source metadata is not accepted',
+    data: { category: 'protocol' },
+  };
 }
 
 export function handoffError(

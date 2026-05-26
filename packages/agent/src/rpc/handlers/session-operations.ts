@@ -43,8 +43,9 @@ import { createProviderForTurn } from '../../providers/turn-factory';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { buildSessionConfigOptions, isApprovalMode } from '../session-config';
 import {
+  classifyContextInjectedHandoff,
   handoffError,
-  hasContextInjectedHandoff,
+  rejectHandoffSourceMetadata,
   readDurableEventsForHandoff,
 } from './handoff-idempotency';
 
@@ -234,8 +235,16 @@ export async function injectIntoActiveSession(
       if (!readResult.ok) {
         throw handoffError('DuplicateUnsafeRetry', 'duplicate-unsafe-retry');
       }
-      if (hasContextInjectedHandoff(readResult.events, idempotencyKey)) {
-        return { durableHandoffStatus: 'duplicate-already-handled' };
+      const status = classifyContextInjectedHandoff(
+        readResult.events,
+        idempotencyKey,
+        parsed.content
+      );
+      if (status === 'duplicate-already-handled') {
+        return { durableHandoffStatus: status };
+      }
+      if (status !== 'persisted-new') {
+        throw handoffError('DuplicateUnsafeRetry', status);
       }
     }
 
@@ -616,6 +625,7 @@ export function registerSessionOperationHandlers(
 
   peer.onRequest('ent/session/inject', async (params: unknown) => {
     assertInitialized(state);
+    rejectHandoffSourceMetadata(params);
     const parsed = params as {
       content: unknown[];
       priority: 'immediate' | 'normal' | 'deferred';

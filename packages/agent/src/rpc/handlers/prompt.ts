@@ -33,6 +33,7 @@ import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import {
   classifyPromptHandoff,
   handoffError,
+  rejectHandoffSourceMetadata,
   readDurableEventsForHandoff,
   withDurableHandoffStatus,
 } from './handoff-idempotency';
@@ -76,7 +77,9 @@ export function registerPromptHandler(
     idempotencyKey?: unknown;
   }) => {
     assertInitialized(state);
+    rejectHandoffSourceMetadata(params);
     const idempotencyKey = toNonEmptyString(params.idempotencyKey);
+    const promptContent = Array.isArray(params.content) ? params.content : [];
     if (!state.activeSession) {
       throw {
         code: AcpErrorCodes.SessionNotFound,
@@ -92,7 +95,12 @@ export function registerPromptHandler(
         if (!state.activeSession) return 'not-persisted';
         const readResult = readDurableEventsForHandoff(state.activeSession.dir);
         if (!readResult.ok) return 'duplicate-unsafe-retry';
-        return classifyPromptHandoff(readResult.events, idempotencyKey, state.activeTurn?.turnId);
+        return classifyPromptHandoff(
+          readResult.events,
+          idempotencyKey,
+          promptContent,
+          state.activeTurn?.turnId
+        );
       });
       if (status === 'duplicate-already-handled') {
         return { durableHandoffStatus: status };
@@ -117,6 +125,19 @@ export function registerPromptHandler(
           ...(idempotencyKey ? { durableHandoffStatus: 'not-persisted' } : {}),
         },
       };
+    }
+
+    if (params.outputFormat !== undefined) {
+      const of = params.outputFormat as { type?: string; schema?: object };
+      if (
+        !of ||
+        typeof of !== 'object' ||
+        of.type !== 'json_schema' ||
+        typeof of.schema !== 'object' ||
+        of.schema === null
+      ) {
+        throwInvalidParams('outputFormat must be { type: "json_schema", schema: object }');
+      }
     }
 
     const effectiveConfig = getEffectiveConfig(state.config, state.activeSession.state.config);
@@ -159,8 +180,6 @@ export function registerPromptHandler(
     let promptWritten = false;
 
     try {
-      const promptContent = parsed.content as unknown[];
-
       await writeAndAdvance({
         type: 'prompt',
         data: {
@@ -245,19 +264,6 @@ export function registerPromptHandler(
           }
 
           (parsed.content as unknown[]) = [{ type: 'text', text: effectivePromptText }];
-        }
-      }
-
-      if (parsed.outputFormat !== undefined) {
-        const of = parsed.outputFormat as { type?: string; schema?: object };
-        if (
-          !of ||
-          typeof of !== 'object' ||
-          of.type !== 'json_schema' ||
-          typeof of.schema !== 'object' ||
-          of.schema === null
-        ) {
-          throwInvalidParams('outputFormat must be { type: "json_schema", schema: object }');
         }
       }
 
