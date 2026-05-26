@@ -263,7 +263,6 @@ describe.skipIf(skipOnWindows)(
           runtimeBinding: {
             schemaVersion: 1,
             identity: { runtimeId: 'rt_workspace_reconcile' },
-            agentPlacement: 'host',
             toolRuntime: {
               type: 'boundedHost',
               root: tmpRoot,
@@ -308,7 +307,6 @@ describe.skipIf(skipOnWindows)(
           runtimeBinding: {
             schemaVersion: 1,
             identity: { runtimeId: 'rt_workspace_reconcile' },
-            agentPlacement: 'host',
             toolRuntime: {
               type: 'boundedHost',
               root: tmpRoot,
@@ -372,7 +370,6 @@ describe.skipIf(skipOnWindows)(
           runtimeBinding: {
             schemaVersion: 1,
             identity: { runtimeId: 'rt_stale_reconcile' },
-            agentPlacement: 'host',
             toolRuntime: {
               type: 'boundedHost',
               root: tmpRoot,
@@ -417,7 +414,6 @@ describe.skipIf(skipOnWindows)(
           runtimeBinding: {
             schemaVersion: 1,
             identity: { runtimeId: 'rt_alias_reconcile' },
-            agentPlacement: 'host',
             toolRuntime: {
               type: 'boundedHost',
               root: tmpRoot,

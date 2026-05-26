@@ -18,7 +18,6 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
         type: 'container',
-        agentPlacement: 'host',
         containerSharing: 'per_invocation',
         image: 'node:24-bookworm',
         workingDirectory: '/work',
@@ -29,7 +28,6 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       containerMounts: {},
     });
 
-    expect(binding.agentPlacement).toBe('host');
     expect(binding.toolRuntime).toMatchObject({
       type: 'container',
       cwd: '/work',
@@ -73,7 +71,6 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
         type: 'container',
-        agentPlacement: 'host',
         containerSharing: 'per_invocation',
         image: 'node:24-bookworm',
         workingDirectory: '/work',
@@ -100,7 +97,6 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       personaName: 'box-shell',
       runtime: {
         type: 'container',
-        agentPlacement: 'host',
         containerSharing: 'persistent',
         image: 'sen-box:dev',
         workingDirectory: '/home/agent',
@@ -130,7 +126,6 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
         type: 'container',
-        agentPlacement: 'host',
         containerSharing: 'per_invocation',
         image: 'sen-browser:dev',
         workingDirectory: '/work',
@@ -154,7 +149,6 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
         type: 'container',
-        agentPlacement: 'host',
         containerSharing: 'per_invocation',
         image: 'sen-box:dev',
         workingDirectory: '/work',
@@ -178,7 +172,6 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
         type: 'container',
-        agentPlacement: 'host',
         containerSharing: 'per_invocation',
         image: 'example/app@sha256:' + 'a'.repeat(64),
         workingDirectory: '/work',
@@ -205,7 +198,6 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         scratchDirHostPath: SCRATCH_PATH,
         runtime: {
           type: 'container',
-          agentPlacement: 'host',
           containerSharing: 'per_invocation',
           image: 'node:24-bookworm',
           workingDirectory: '/work',
@@ -220,7 +212,6 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
 describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminator (PRI-1796)', () => {
   const perInvocationRuntime = {
     type: 'container' as const,
-    agentPlacement: 'host' as const,
     containerSharing: 'per_invocation' as const,
     image: 'devcontainer:latest',
     workingDirectory: '/workspace',
@@ -229,7 +220,6 @@ describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminato
 
   const persistentRuntime = {
     type: 'container' as const,
-    agentPlacement: 'host' as const,
     containerSharing: 'persistent' as const,
     image: 'sen-box:dev',
     workingDirectory: '/home/agent',

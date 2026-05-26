@@ -103,7 +103,6 @@ describe('storage/session-store', () => {
         runtimeBinding: {
           schemaVersion: 1,
           identity: { runtimeId: 'rt_test' },
-          agentPlacement: 'host',
           toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
         },
       },
@@ -112,7 +111,6 @@ describe('storage/session-store', () => {
     expect(readSessionState(sessionDir).config?.runtimeBinding).toEqual({
       schemaVersion: 1,
       identity: { runtimeId: 'rt_test' },
-      agentPlacement: 'host',
       toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
     });
   });

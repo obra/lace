@@ -67,7 +67,6 @@ describe('persona-mount-conflict validator', () => {
       'pets',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /home
@@ -78,7 +77,6 @@ describe('persona-mount-conflict validator', () => {
       'cattle',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /data
@@ -100,7 +98,6 @@ describe('persona-mount-conflict validator', () => {
       'brain',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /knowledge
@@ -111,7 +108,6 @@ describe('persona-mount-conflict validator', () => {
       'worker',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /shared
@@ -138,31 +134,21 @@ describe('persona-mount-conflict validator', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Test 3: reserved mount names are excluded from conflict detection
+  // Test 3: only the Lace-managed scratch mount name is excluded from conflict detection
   // ---------------------------------------------------------------------------
-  it('assertNoMountConflict ignores reserved mount names', () => {
-    // The schema rejects some of these (e.g., 'scratch' on per_invocation, 'persona', 'lace-data',
-    // 'credentials', 'lace' are rejected by resolvePersonaMountsAndEnv at materialization time).
-    // The conflict validator itself must filter reserved names regardless of whether the schema
-    // would also catch them. We test this by constructing ParsedPersona objects directly
-    // rather than going through the registry parser (which enforces schema rules on mount names).
-    //
-    // The reserved names at the validator level are: persona, lace-data, credentials, lace, scratch.
-    // We create a minimal parsed persona manually so we can use normally-invalid names for the test.
+  it('assertNoMountConflict ignores only the scratch mount name', () => {
+    // The persona schema rejects scratch on per_invocation at materialization
+    // time, but the conflict validator still filters it because Lace owns that
+    // injected mount. Legacy auto-injected names are ordinary declared mounts now.
     const parsed = {
       config: {
         runtime: {
           type: 'container' as const,
-          agentPlacement: 'host' as const,
           containerSharing: 'per_invocation' as const,
           image: 'img:latest',
           workingDirectory: '/work',
           mounts: {
             scratch: '/work',
-            persona: '/personas',
-            'lace-data': '/var/lace',
-            credentials: '/creds',
-            lace: '/lace',
           },
           env: {},
         },
@@ -170,10 +156,6 @@ describe('persona-mount-conflict validator', () => {
       body: 'Body.',
     };
 
-    // Build a registry that has a persistent persona claiming the same reserved names.
-    // We do this by creating a ParsedPersona-shaped object directly rather than a file,
-    // since the schema rejects these names as mount names. Instead, we construct a
-    // minimal fake registry.
     const fakeRegistry = {
       listAvailablePersonas: () => [
         { name: 'persistent-pet', isUserDefined: false, path: '/fake/persistent-pet.md' },
@@ -182,16 +164,11 @@ describe('persona-mount-conflict validator', () => {
         config: {
           runtime: {
             type: 'container' as const,
-            agentPlacement: 'host' as const,
             containerSharing: 'persistent' as const,
             image: 'img:latest',
             workingDirectory: '/home',
             mounts: {
               scratch: '/home/scratch',
-              persona: '/personas',
-              'lace-data': '/var/lace',
-              credentials: '/creds',
-              lace: '/lace',
             },
             env: {},
           },
@@ -200,7 +177,6 @@ describe('persona-mount-conflict validator', () => {
       }),
     };
 
-    // Should not throw — all declared mounts are reserved names
     expect(() =>
       assertNoMountConflict(
         'worker',
@@ -211,6 +187,35 @@ describe('persona-mount-conflict validator', () => {
     ).not.toThrow();
   });
 
+  it('assertNoMountConflict treats legacy auto-injected names as ordinary mounts', () => {
+    writePersona(
+      'persistent-personas',
+      `runtime:
+  type: container
+  containerSharing: persistent
+  image: img:latest
+  workingDirectory: /personas
+  mounts:
+    persona: /personas`
+    );
+    writePersona(
+      'worker',
+      `runtime:
+  type: container
+  containerSharing: per_invocation
+  image: img:latest
+  workingDirectory: /work
+  mounts:
+    persona: /personas`
+    );
+    const reg = makeRegistry();
+    const parsed = reg.parsePersona('worker');
+
+    expect(() => assertNoMountConflict('worker', parsed, reg, {})).toThrow(
+      PersonaSharingViolationError
+    );
+  });
+
   // ---------------------------------------------------------------------------
   // Test 4: assertNoMountConflict is a no-op for persistent personas
   // ---------------------------------------------------------------------------
@@ -219,7 +224,6 @@ describe('persona-mount-conflict validator', () => {
       'pet-a',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /home
@@ -230,7 +234,6 @@ describe('persona-mount-conflict validator', () => {
       'pet-b',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /home
@@ -252,7 +255,6 @@ describe('persona-mount-conflict validator', () => {
       'brain',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /knowledge
@@ -263,7 +265,6 @@ describe('persona-mount-conflict validator', () => {
       'worker',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /shared
@@ -297,7 +298,6 @@ describe('persona-mount-conflict validator', () => {
       'brain',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /home
@@ -308,7 +308,6 @@ describe('persona-mount-conflict validator', () => {
       'worker',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /data
@@ -339,7 +338,6 @@ describe('persona-mount-conflict validator', () => {
       'brain',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /home
@@ -350,7 +348,6 @@ describe('persona-mount-conflict validator', () => {
       'worker',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /data
@@ -385,7 +382,6 @@ describe('persona-mount-conflict validator', () => {
       'pet-a',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /logs
@@ -396,7 +392,6 @@ describe('persona-mount-conflict validator', () => {
       'pet-b',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /logs2
@@ -407,7 +402,6 @@ describe('persona-mount-conflict validator', () => {
       'cattle-c',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /cattle-logs
@@ -443,7 +437,6 @@ describe('persona-mount-conflict validator', () => {
       'box-shell',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /knowledge
@@ -454,7 +447,6 @@ describe('persona-mount-conflict validator', () => {
       'shell',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /shared
@@ -480,7 +472,6 @@ describe('persona-mount-conflict validator', () => {
       'box-shell',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /knowledge
@@ -491,7 +482,6 @@ describe('persona-mount-conflict validator', () => {
       'shell',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /shared
@@ -523,7 +513,6 @@ describe('persona-mount-conflict validator', () => {
       'box-shell',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /knowledge
@@ -534,7 +523,6 @@ describe('persona-mount-conflict validator', () => {
       'shell',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /shared
@@ -565,7 +553,6 @@ describe('persona-mount-conflict validator', () => {
       'box-shell',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /knowledge
@@ -576,7 +563,6 @@ describe('persona-mount-conflict validator', () => {
       'shell',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /shared
@@ -604,7 +590,6 @@ describe('persona-mount-conflict validator', () => {
       'box-shell',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /knowledge
@@ -615,7 +600,6 @@ describe('persona-mount-conflict validator', () => {
       'shell',
       `runtime:
   type: container
-  agentPlacement: host
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /shared

@@ -68,7 +68,6 @@ const RuntimeExecutionBindingSchema = z
   .object({
     schemaVersion: z.literal(1),
     identity: z.object({ runtimeId: z.string().min(1) }).strict(),
-    agentPlacement: z.enum(['host', 'container']),
     toolRuntime: z.discriminatedUnion('type', [
       HostRuntimeDescriptorSchema,
       BoundedHostRuntimeDescriptorSchema,
@@ -87,7 +86,6 @@ export function buildDefaultBoundedHostRuntimeBinding(input: {
   const binding: RuntimeExecutionBinding = {
     schemaVersion: 1,
     identity: { runtimeId: 'pending' },
-    agentPlacement: 'host',
     toolRuntime: { type: 'boundedHost', root: input.cwd, cwd: input.cwd },
   };
   return {

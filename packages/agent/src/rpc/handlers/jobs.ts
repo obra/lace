@@ -132,13 +132,11 @@ export function registerJobHandlers(peer: JsonRpcPeer, state: AgentServerState):
     const job = state.jobManager.getJob(jobId);
     if (!job || job.status !== 'running') return { success: false };
 
-    if (job.proc || job.containerExec) {
+    if (job.proc) {
       // Kill the process with SIGTERM, then SIGKILL if still running
       await killJob(job, { waitMs: 500, forceKill: true });
 
       // Wait extra time after SIGKILL for stubborn processes.
-      // !job.finished works for both native (proc) and container-exec jobs;
-      // proc.exitCode would always be null for container jobs since proc is unset.
       if (!job.finished) {
         await Promise.race([
           job.completion,

@@ -17,7 +17,6 @@ import {
   assertNoMountConflict,
   PersonaSharingViolationError,
 } from '@lace/agent/config/persona-mount-conflict';
-import type { PersonaContainerRuntime } from '@lace/agent/jobs/persona-container-spec';
 import { buildPerInvocationSpecName } from '@lace/agent/jobs/persona-container-spec';
 import { buildPersonaProjectedRuntimeBinding } from '@lace/agent/jobs/persona-projected-binding';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
@@ -151,20 +150,16 @@ Parameters:
       childSessionId = resumeSessionId;
     } else {
       // Fresh spawn — mint a new session id. Used only when the persona is
-      // per_invocation and host-placed; ignored for all other paths.
+      // per_invocation; ignored for all other paths.
       childSessionId = `sess_${randomUUID()}`;
     }
 
     // --- Step 2: Resolve persona bundle (if any) before any job creation ---
     let personaModelDefault: string | undefined;
-    // Set ONLY for the explicit in-container path (`agentPlacement: 'container'`)
-    // — i.e. the lace-agent itself runs inside the persona container.
-    let personaContainerRuntime: PersonaContainerRuntime | undefined;
-    // Set ONLY for host-placed persona containers (`agentPlacement: 'host'`)
-    // — the host-side lace-agent reaches into the container for tool exec via
-    // this projected binding.
+    // Set for container personas: the host-side lace-agent reaches into the
+    // container for tool exec via this projected binding.
     let projectedRuntimeBinding: RuntimeExecutionBinding | undefined;
-    // Scratch dir host path; set for per_invocation personas (both host and container placement).
+    // Scratch dir host path; set for per_invocation personas.
     let scratchDirHostPath: string | undefined;
     // Container sharing mode from the resolved persona runtime.
     let containerSharing: 'per_invocation' | 'persistent' | undefined;
@@ -185,9 +180,7 @@ Parameters:
           const runtime = parsed.config.runtime;
           containerSharing = runtime.containerSharing;
 
-          // Per-invocation setup runs for BOTH host AND container placements.
-          // The scratch directory and spec name are placement-agnostic; only the
-          // projected binding is host-placement-specific.
+          // Per-invocation setup is shared by every projected container persona.
           if (runtime.containerSharing === 'per_invocation') {
             // Compute and mkdir the per-invocation scratch directory on the
             // host. Idempotent: the resume path finds an existing dir; the
@@ -209,33 +202,24 @@ Parameters:
             }
           }
 
-          if (runtime.agentPlacement === 'host') {
-            // Host-placed: project the persona container into a host-side
-            // RuntimeExecutionBinding. The session runner threads the
-            // embedder-supplied named-mount registry into ToolContext;
-            // when absent (e.g. unit-test fixtures), fall back to {} so
-            // personas with `mounts: {}` still resolve and personas that
-            // DO declare mounts fail with a clear "unknown mount" error.
-            //
-            // The persona-declared image string (tag or digest) flows through
-            // verbatim — no pre-resolution. The projected runtime captures
-            // the daemon's `.Image` field post-create for audit (see
-            // projected-container.ts).
-            projectedRuntimeBinding = buildPersonaProjectedRuntimeBinding({
-              parentSessionId: context.activeSessionId ?? 'delegate',
-              personaName: persona,
-              runtime,
-              containerMounts: context.containerMounts ?? {},
-              ...(runtime.containerSharing === 'per_invocation'
-                ? { childSessionId: childSessionId!, scratchDirHostPath }
-                : {}),
-            });
-          } else {
-            // Container-placed: lace-agent runs inside the persona container.
-            // childSessionId and scratchDirHostPath are forwarded via createJob
-            // options so subagent-job.ts can pass them to spawnSubagent.
-            personaContainerRuntime = runtime;
-          }
+          // Project the persona container into a host-side RuntimeExecutionBinding.
+          // The session runner threads the embedder-supplied named-mount registry
+          // into ToolContext; when absent (e.g. unit-test fixtures), fall back to
+          // {} so personas with `mounts: {}` still resolve and personas that do
+          // declare mounts fail with a clear "unknown mount" error.
+          //
+          // The persona-declared image string (tag or digest) flows through
+          // verbatim — no pre-resolution. The projected runtime captures the
+          // daemon's `.Image` field post-create for audit (see projected-container.ts).
+          projectedRuntimeBinding = buildPersonaProjectedRuntimeBinding({
+            parentSessionId: context.activeSessionId ?? 'delegate',
+            personaName: persona,
+            runtime,
+            containerMounts: context.containerMounts ?? {},
+            ...(runtime.containerSharing === 'per_invocation'
+              ? { childSessionId: childSessionId!, scratchDirHostPath }
+              : {}),
+          });
         }
       } catch (err) {
         if (
@@ -262,11 +246,8 @@ Parameters:
 
     // Per-call modelId wins; otherwise fall back to persona default (if any).
     const effectiveModelId = modelId ?? personaModelDefault;
-    // Inherit the parent's host binding only when the persona doesn't impose
-    // its own runtime — i.e. neither a projected (host-placed) binding nor
-    // an in-container lace-agent runtime.
-    const inheritedRuntimeBinding =
-      !personaContainerRuntime && !projectedRuntimeBinding ? runtimeBinding : undefined;
+    // Inherit the parent's binding only when the persona doesn't impose its own runtime.
+    const inheritedRuntimeBinding = !projectedRuntimeBinding ? runtimeBinding : undefined;
     const effectiveRuntimeBinding = projectedRuntimeBinding ?? inheritedRuntimeBinding;
 
     // Create the job
@@ -281,7 +262,6 @@ Parameters:
           ? { turnId: context.turnId, turnSeq: context.turnSeq }
           : undefined,
       ...(persona ? { persona } : {}),
-      ...(personaContainerRuntime ? { personaContainerRuntime } : {}),
       ...(effectiveRuntimeBinding ? { runtimeBinding: effectiveRuntimeBinding } : {}),
       // Resume: pass prior session id via resumeSessionId (mutually exclusive
       // with newSubagentSessionId — enforced by JobManager).

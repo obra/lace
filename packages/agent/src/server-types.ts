@@ -17,8 +17,6 @@ import type { Tool } from './tools/tool';
 import type { SkillRegistry } from './skills';
 import type { PersonaRegistry } from './config/persona-registry';
 import type { ContainerManager } from './containers/container-manager';
-import type { ExecStreamHandle } from './containers/types';
-import type { PersonaContainerRuntime } from './jobs/persona-container-spec';
 import type { ReminderScheduler } from './reminders';
 import type { RuntimeExecutionBinding } from './tools/runtime/types';
 import type { RuntimeSecretResolver } from './tools/runtime/secrets';
@@ -99,10 +97,6 @@ export type JobState = {
   exitCode?: number;
   outputPath: string;
   proc?: ChildProcess;
-  // When the subagent runs inside a persona container, the long-lived stream
-  // for the in-container lace-agent process is stored here instead of `proc`.
-  // job-control consults both fields to terminate the right thing.
-  containerExec?: ExecStreamHandle;
   permissionAbortController?: AbortController;
   childPeer?: JsonRpcPeer;
   subagentSessionId?: string;
@@ -116,7 +110,7 @@ export type JobState = {
   containerSharing?: 'per_invocation' | 'persistent';
   // Per-invocation container spec name used by the reaper (PRI-1796).
   // Computed once at delegate time; read by maybeScheduleReapAfter so it
-  // works for both host-placed (runtimeBinding) and in-container (personaContainerRuntime) paths.
+  // can schedule cleanup after a projected-container subagent exits.
   containerSpecName?: string;
   childTransportClose?: () => void;
   finished: boolean;
@@ -135,12 +129,6 @@ export type JobState = {
   containerExecutionMetadata?: ContainerExecutionMetadata;
   // Persona bundle applied to subagent session (delegate jobs only)
   persona?: string;
-  // Carries the parsed persona runtime ONLY when `agentPlacement: 'container'`
-  // — i.e. the lace-agent itself runs inside the persona container. Host-placed
-  // persona containers flow through `runtimeBinding` instead (the projected
-  // binding describes how the host-side lace-agent reaches into the container
-  // for tool execution).
-  personaContainerRuntime?: PersonaContainerRuntime;
 };
 
 // Server State Type

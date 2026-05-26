@@ -12,7 +12,6 @@ import type {
   JobNotificationType,
 } from '../server-types';
 import { MAX_CONCURRENT_JOBS } from '../server-types';
-import type { PersonaContainerRuntime } from './persona-container-spec';
 import { toNonEmptyString } from '../rpc/utils';
 import { getJobOutputPath } from './job-file-utils';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
@@ -53,14 +52,9 @@ export type CreateJobOptions = {
   containerSharing?: 'per_invocation' | 'persistent';
   // Persona-bundle support for delegate jobs
   persona?: string;
-  // Parsed persona container runtime for the in-container lace-agent path
-  // (`agentPlacement: 'container'`). Host-placed persona containers do NOT use
-  // this field — they flow through `runtimeBinding` as projected bindings.
-  personaContainerRuntime?: PersonaContainerRuntime;
   // Per-invocation container spec name for the idle-TTL reaper (PRI-1796).
   // Computed by delegate.ts and stored here so maybeScheduleReapAfter can
-  // use it regardless of whether runtimeBinding or personaContainerRuntime
-  // was the placement path.
+  // use it without reconstructing the projected container binding.
   containerSpecName?: string;
   containerExecutionIdentity?: ContainerExecutionIdentityConfig;
 };
@@ -150,27 +144,15 @@ function buildContainerExecutionContext(input: {
   persona?: string;
   parentSessionId: string;
   runtimeBinding?: RuntimeExecutionBinding;
-  personaContainerRuntime?: PersonaContainerRuntime;
   containerSpecName?: string;
 }): { executionEnv: Record<string, string>; metadata: ContainerExecutionMetadata } | undefined {
   if (!input.identity || !input.persona) return undefined;
-  if (
-    !input.personaContainerRuntime &&
-    !(
-      input.runtimeBinding?.agentPlacement === 'host' &&
-      input.runtimeBinding.toolRuntime.type === 'container'
-    )
-  ) {
+  if (input.runtimeBinding?.toolRuntime.type !== 'container') {
     return undefined;
   }
 
   const token = randomBytes(32).toString('base64url');
-  const containerId =
-    input.runtimeBinding?.toolRuntime.type === 'container'
-      ? resolveContainerId(input.runtimeBinding.toolRuntime.spec)
-      : input.containerSpecName
-        ? resolveContainerId({ name: input.containerSpecName })
-        : undefined;
+  const containerId = resolveContainerId(input.runtimeBinding.toolRuntime.spec);
   return {
     executionEnv: { [input.identity.tokenEnvName]: token },
     metadata: {
@@ -780,7 +762,6 @@ export class JobManager {
             persona: options.persona,
             parentSessionId: activeSession.sessionId,
             runtimeBinding: options.runtimeBinding,
-            personaContainerRuntime: options.personaContainerRuntime,
             containerSpecName: options.containerSpecName,
           })
         : undefined;
@@ -823,9 +804,6 @@ export class JobManager {
                 }
               : {}),
             ...(options.persona ? { persona: options.persona } : {}),
-            ...(options.personaContainerRuntime
-              ? { personaContainerRuntime: options.personaContainerRuntime }
-              : {}),
           }
         : {}),
     };

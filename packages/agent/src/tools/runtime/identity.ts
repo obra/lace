@@ -106,7 +106,6 @@ function normalizeToolRuntimeForIdentity(toolRuntime: ToolRuntimeDescriptor): un
 function normalizeRuntimeIdentityInput(input: RuntimeIdInput): unknown {
   const common = {
     schemaVersion: input.binding.schemaVersion,
-    agentPlacement: input.binding.agentPlacement,
     scope: input.scope,
     sessionId: input.sessionId,
     ...(input.scope === 'job' ? { jobId: input.jobId } : {}),

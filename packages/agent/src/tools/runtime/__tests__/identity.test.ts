@@ -7,14 +7,12 @@ describe('runtime identity', () => {
     const binding: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'runtime:session:sess_123:d33ee12dd7d5f31b' },
-      agentPlacement: 'host',
       toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
     };
 
     expect(
       canonicalRuntimeIdentityJson({
         schemaVersion: binding.schemaVersion,
-        agentPlacement: binding.agentPlacement,
         scope: 'session',
         sessionId: 'sess_123',
         toolRuntime: binding.toolRuntime,
@@ -26,7 +24,6 @@ describe('runtime identity', () => {
     const binding: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'runtime-session' },
-      agentPlacement: 'host',
       toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
     };
 
@@ -39,7 +36,6 @@ describe('runtime identity', () => {
     const binding: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'runtime:session:sess_123:540af98facc5cf4c' },
-      agentPlacement: 'host',
       toolRuntime: {
         type: 'boundedHost',
         root: '/tmp/ws',
@@ -56,13 +52,11 @@ describe('runtime identity', () => {
     const first: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'runtime:session:sess_123:old' },
-      agentPlacement: 'host',
       toolRuntime: { type: 'boundedHost', root: '/tmp/ws', cwd: '/tmp/ws/pkg' },
     };
     const normalized: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'runtime:session:sess_123:old' },
-      agentPlacement: 'host',
       toolRuntime: { type: 'boundedHost', root: '/tmp/ws', cwd: '/tmp/ws/pkg' },
     };
 
@@ -75,7 +69,6 @@ describe('runtime identity', () => {
     const binding: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'runtime:job:sess_123:job_456:4412929fcf49cd3e' },
-      agentPlacement: 'host',
       toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
     };
 
@@ -93,7 +86,6 @@ describe('runtime identity', () => {
     const binding: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'runtime:session:sess_123:572e0f4cb1e340fb' },
-      agentPlacement: 'host',
       toolRuntime: {
         type: 'container',
         spec: {
@@ -128,7 +120,6 @@ describe('runtime identity', () => {
     const first: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'runtime:session:sess_123:ordered' },
-      agentPlacement: 'host',
       toolRuntime: {
         type: 'container',
         spec: {
@@ -185,7 +176,6 @@ describe('runtime identity', () => {
     const binding: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'runtime:mcp:sess_123:server_1:runtime' },
-      agentPlacement: 'host',
       toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
     };
 

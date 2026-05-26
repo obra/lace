@@ -121,7 +121,6 @@ describe('createRunShellJobProcess', () => {
       runtimeBinding: {
         schemaVersion: 1,
         identity: { runtimeId: 'rt_test' },
-        agentPlacement: 'host',
         toolRuntime: { type: 'boundedHost', root: '/tmp', cwd: '/tmp' },
       },
     };
@@ -254,7 +253,6 @@ describe('createRunShellJobProcess', () => {
       runtimeBinding: {
         schemaVersion: 1,
         identity: { runtimeId: 'rt_bounded_host_job' },
-        agentPlacement: 'host',
         toolRuntime: {
           type: 'boundedHost',
           root: process.cwd(),

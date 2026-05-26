@@ -78,7 +78,6 @@ describe('server job runtime binding persistence', () => {
     const runtimeBinding: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'rt_server_job' },
-      agentPlacement: 'host',
       toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
     };
 

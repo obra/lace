@@ -1,6 +1,6 @@
 // ABOUTME: Regression test for PRI-1786 Task 5B — when a delegate job carries
-// ABOUTME: a host-projected runtimeBinding (no personaContainerRuntime), the
-// ABOUTME: subagent must spawn natively, pass the parent host workDir as cwd to
+// ABOUTME: a projected container runtimeBinding, the subagent must spawn
+// ABOUTME: natively, pass the parent host workDir as cwd to
 // ABOUTME: session/new, forward config.runtimeBinding, and write a
 // ABOUTME: job_session_assigned event into the parent host session event log.
 
@@ -83,7 +83,6 @@ function makeFakeSubagent(): FakeSubagentHandle {
       return waitPromise;
     },
     nativeProcess: null,
-    containerExec: null,
     resolveExit() {
       if (exitCode !== null) return;
       exitCode = 0;
@@ -213,7 +212,6 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
     const runtimeBinding: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'rt_projected_subagent' },
-      agentPlacement: 'host',
       toolRuntime: {
         type: 'container',
         cwd: '/work',
@@ -248,8 +246,6 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
       persona: 'shell',
       subagentContent: [{ type: 'text', text: 'noop' }],
       runtimeBinding,
-      // personaContainerRuntime intentionally left undefined — this is the
-      // host-placed projected case under test.
     };
 
     const finalizeJob = vi.fn(async (j: JobState) => {
@@ -328,7 +324,6 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
     const runtimeBinding: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'rt_projected_identity' },
-      agentPlacement: 'host',
       toolRuntime: {
         type: 'container',
         cwd: '/work',

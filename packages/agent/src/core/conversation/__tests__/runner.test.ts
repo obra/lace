@@ -483,7 +483,6 @@ describe('ConversationRunner', () => {
         const runtimeBinding: RuntimeExecutionBinding = {
           schemaVersion: 1,
           identity: { runtimeId: 'rt_custom_bounded_host' },
-          agentPlacement: 'host',
           toolRuntime: { type: 'boundedHost', root: runtimeCwd, cwd: runtimeCwd },
         };
         const executor = new ToolExecutor();
@@ -569,7 +568,6 @@ describe('ConversationRunner', () => {
         const runtimeBinding: RuntimeExecutionBinding = {
           schemaVersion: 1,
           identity: { runtimeId: 'rt_bounded_host_runner' },
-          agentPlacement: 'host',
           toolRuntime: {
             type: 'boundedHost',
             root: boundedHostCwd,

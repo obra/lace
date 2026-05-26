@@ -69,7 +69,6 @@ function makeFakeSubagent(): FakeSubagentHandle {
       return waitPromise;
     },
     nativeProcess: null,
-    containerExec: null,
     resolveExit() {
       if (exitCode !== null) return;
       exitCode = 0;

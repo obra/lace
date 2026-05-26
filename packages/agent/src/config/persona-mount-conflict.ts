@@ -5,9 +5,9 @@ import type { PersonaRegistry, ParsedPersona } from './persona-registry';
 import type { MountRegistryEntry } from '@lace/agent/server-types';
 import { logger } from '@lace/agent/utils/logger';
 
-// Reserved mount names are lace-managed and don't count as author-chosen
-// overlaps. Mirrors the names rejected in resolvePersonaMountsAndEnv.
-const RESERVED_MOUNT_NAMES = new Set(['persona', 'lace-data', 'credentials', 'lace', 'scratch']);
+// `scratch` is Lace-managed for per_invocation personas and does not count as
+// an author-chosen overlap. Other names are ordinary persona-declared mounts.
+const RESERVED_MOUNT_NAMES = new Set(['scratch']);
 
 export class PersonaSharingViolationError extends Error {
   constructor(
@@ -96,10 +96,9 @@ function buildPersistentByNameMap(registry: PersonaRegistry): Map<string, Set<st
 /**
  * Spawn-time hook. Throws PersonaSharingViolationError if the given per_invocation
  * persona's declared mounts overlap with any persistent persona's mounts.
- * Reserved/auto-injected mounts are filtered out. Mounts that the containerMounts
- * registry marks as readonly are also excluded: they carry no write path so they
- * are not an R6 threat. Mounts absent from the registry default to read-write
- * (conservative).
+ * Lace-managed mounts are filtered out. Mounts that the containerMounts registry
+ * marks as readonly are also excluded: they carry no write path so they are not
+ * an R6 threat. Mounts absent from the registry default to read-write (conservative).
  */
 export function assertNoMountConflict(
   personaName: string,

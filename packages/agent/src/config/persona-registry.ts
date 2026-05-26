@@ -33,13 +33,10 @@ const portMappingSchema = z
   })
   .strict();
 
-// agentPlacement controls where the lace agent process executes for this
-// persona. 'host' (default) runs the agent on the embedder host and reaches
-// into the container via docker exec; 'container' runs lace itself inside the
-// container. containerSharing declares the sharing model: 'per_invocation'
-// creates a fresh container per delegate invocation; 'persistent' adopts a
-// long-lived one shared across delegates.
-const agentPlacementSchema = z.enum(['host', 'container']).optional().default('host');
+// containerSharing declares the sharing model: 'per_invocation' creates a fresh
+// container per delegate invocation; 'persistent' adopts a long-lived one shared
+// across delegates. In both cases the lace agent stays on the host and projects
+// tools into the container runtime.
 const containerSharingSchema = z.enum(['per_invocation', 'persistent']);
 
 // Linux sysctl keys are dot-separated lowercase tokens (e.g.
@@ -50,7 +47,6 @@ const sysctlKeySchema = z.string().regex(/^[a-z0-9_]+(\.[a-z0-9_]+)+$/);
 const runtimeContainerSchema = z
   .object({
     type: z.literal('container'),
-    agentPlacement: agentPlacementSchema,
     containerSharing: containerSharingSchema,
     image: z.string().min(1),
     workingDirectory: z.string().min(1),

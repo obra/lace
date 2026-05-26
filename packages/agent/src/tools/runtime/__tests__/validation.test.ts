@@ -10,7 +10,6 @@ describe('runtime binding validation', () => {
       identity: {
         runtimeId: expect.stringMatching(/^runtime:session:sess_123:/),
       },
-      agentPlacement: 'host',
       toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
     });
   });
@@ -20,7 +19,6 @@ describe('runtime binding validation', () => {
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
         identity: { runtimeId: 'rt_host' },
-        agentPlacement: 'host',
         toolRuntime: {
           type: 'host',
           cwd: '/repo',
@@ -36,7 +34,6 @@ describe('runtime binding validation', () => {
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
         identity: { runtimeId: 'rt_bounded' },
-        agentPlacement: 'host',
         toolRuntime: {
           type: 'boundedHost',
           root: '/repo',
@@ -57,7 +54,6 @@ describe('runtime binding validation', () => {
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
         identity: { runtimeId: 'old_local' },
-        agentPlacement: 'host',
         toolRuntime: {
           type: 'local',
           cwd: '/repo',
@@ -71,7 +67,6 @@ describe('runtime binding validation', () => {
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
         identity: { runtimeId: 'old_workspace' },
-        agentPlacement: 'host',
         toolRuntime: {
           type: 'workspace',
           projectRoot: '/project',
@@ -87,7 +82,6 @@ describe('runtime binding validation', () => {
       parseRuntimeExecutionBinding({
         schemaVersion: 99,
         identity: { runtimeId: 'rt_bad' },
-        agentPlacement: 'host',
         toolRuntime: {
           type: 'host',
           cwd: '/repo',
@@ -101,7 +95,6 @@ describe('runtime binding validation', () => {
       parseRuntimeExecutionBinding({
         schemaVersion: 99,
         identity: { runtimeId: 'rt_bad_container' },
-        agentPlacement: 'host',
         toolRuntime: {
           type: 'container',
           cwd: '/workspace',
@@ -121,7 +114,6 @@ describe('runtime binding validation', () => {
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
         identity: { runtimeId: 'rt_container' },
-        agentPlacement: 'host',
         toolRuntime: {
           type: 'container',
           cwd: '/workspace',
@@ -140,7 +132,6 @@ describe('runtime binding validation', () => {
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
         identity: { runtimeId: 'rt_container_tag' },
-        agentPlacement: 'host',
         toolRuntime: {
           type: 'container',
           cwd: '/workspace',
@@ -160,7 +151,6 @@ describe('runtime binding validation', () => {
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
         identity: { runtimeId: 'rt_container_sysctls' },
-        agentPlacement: 'host',
         toolRuntime: {
           type: 'container',
           cwd: '/work',
@@ -174,5 +164,19 @@ describe('runtime binding validation', () => {
         },
       })
     ).not.toThrow();
+  });
+
+  it('rejects legacy agentPlacement on runtime bindings', () => {
+    expect(() =>
+      parseRuntimeExecutionBinding({
+        schemaVersion: 1,
+        identity: { runtimeId: 'rt_legacy' },
+        agentPlacement: 'host',
+        toolRuntime: {
+          type: 'host',
+          cwd: '/repo',
+        },
+      })
+    ).toThrow(/agentPlacement/i);
   });
 });

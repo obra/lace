@@ -192,7 +192,6 @@ describe.skipIf(!DOCKER_AVAILABLE)('PRI-1796 persona container sharing integrati
 
     const perInvocationRuntime: PersonaContainerRuntime = {
       type: 'container',
-      agentPlacement: 'host',
       containerSharing: 'per_invocation',
       image: TEST_PER_INVOCATION_IMAGE,
       workingDirectory: '/work',
@@ -227,7 +226,6 @@ describe.skipIf(!DOCKER_AVAILABLE)('PRI-1796 persona container sharing integrati
 
     const persistentRuntime: PersonaContainerRuntime = {
       type: 'container',
-      agentPlacement: 'host',
       containerSharing: 'persistent',
       image: TEST_PERSISTENT_IMAGE,
       workingDirectory: '/tmp',
@@ -390,10 +388,10 @@ describe.skipIf(!DOCKER_AVAILABLE)('PRI-1796 persona container sharing integrati
   }, 120_000);
 
   // -------------------------------------------------------------------------
-  // Test 3-smoke: concurrent persistent delegates exec into same container
+  // Test 3-smoke: concurrent persistent delegates use the same projected container
   // -------------------------------------------------------------------------
 
-  it('concurrent persistent delegates exec into same container', async () => {
+  it('concurrent persistent delegates use the same projected container', async () => {
     // Use a unique persona name to avoid colliding with a real sen-box-shell on the host
     const personaName = `test-pri1796-${uuidv4().slice(0, 8)}`;
     const expectedDockerName = `sen-${personaName}`;

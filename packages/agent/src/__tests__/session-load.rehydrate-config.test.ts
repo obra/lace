@@ -46,7 +46,6 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     return {
       schemaVersion: 1,
       identity: { runtimeId: 'rt_workspace_session' },
-      agentPlacement: 'host',
       toolRuntime: {
         type: 'boundedHost',
         root: tempDir,
@@ -55,7 +54,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     };
   }
 
-  function containerAgentRuntimeBinding(cwd: string): RuntimeExecutionBinding {
+  function legacyAgentPlacementRuntimeBinding(cwd: string): unknown {
     return {
       schemaVersion: 1,
       identity: { runtimeId: 'rt_container_agent_session' },
@@ -259,7 +258,6 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     const runtimeBinding: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'rt_resume_inherited' },
-      agentPlacement: 'host',
       toolRuntime: { type: 'boundedHost', root: tempDir, cwd: tempDir },
     };
     const resumeState = createAgentServerState();
@@ -311,7 +309,6 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     expect(state.activeSession?.state.config?.runtimeBinding).toEqual(runtimeBinding);
     expect(runtimeBinding).toMatchObject({
       schemaVersion: 1,
-      agentPlacement: 'host',
       toolRuntime: { type: 'boundedHost', root: tempDir, cwd: tempDir },
     });
     expect(runtimeBinding?.identity.runtimeId).toMatch(
@@ -356,7 +353,6 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       expect(state.activeSession?.state.config?.runtimeBinding).toEqual(runtimeBinding);
       expect(runtimeBinding).toMatchObject({
         schemaVersion: 1,
-        agentPlacement: 'host',
         toolRuntime: { type: 'boundedHost', root: tempDir, cwd: tempDir },
       });
       expect(runtimeBinding?.identity.runtimeId).toMatch(
@@ -426,7 +422,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
   });
 
   it.each(['session/new', 'session/load', 'session/resume'] as const)(
-    'rejects container-agent runtimeBinding during %s',
+    'rejects legacy agentPlacement runtimeBinding during %s',
     async (method) => {
       const setupState = createAgentServerState();
       const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, setupState));
@@ -445,7 +441,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
           ...(created ? { sessionId: created.sessionId } : {}),
           cwd: tempDir,
           mcpServers: [],
-          config: { runtimeBinding: containerAgentRuntimeBinding(tempDir) },
+          config: { runtimeBinding: legacyAgentPlacementRuntimeBinding(tempDir) },
         })
       ).rejects.toMatchObject({ code: -32602 });
     }
@@ -537,7 +533,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     ]);
   });
 
-  it('rejects stored container-agent runtimeBinding during session/load', async () => {
+  it('rejects stored legacy agentPlacement runtimeBinding during session/load', async () => {
     const setupState = createAgentServerState();
     const { client: setupClient } = createPairedPeers((peer) =>
       registerAgentRpcMethods(peer, setupState)
@@ -548,7 +544,10 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
       cwd: tempDir,
       mcpServers: [],
     })) as { sessionId: string };
-    persistRuntimeBinding(created.sessionId, containerAgentRuntimeBinding(tempDir));
+    persistRuntimeBinding(
+      created.sessionId,
+      legacyAgentPlacementRuntimeBinding(tempDir) as RuntimeExecutionBinding
+    );
 
     const loadState = createAgentServerState();
     const { client: loadClient } = createPairedPeers((peer) =>

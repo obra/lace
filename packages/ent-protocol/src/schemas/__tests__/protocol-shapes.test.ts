@@ -23,7 +23,6 @@ function boundedHostRuntimeBinding(cwd = '/tmp') {
   return {
     schemaVersion: 1,
     identity: { runtimeId: 'rt_bounded_host_protocol' },
-    agentPlacement: 'host',
     toolRuntime: { type: 'boundedHost', root: cwd, cwd },
   };
 }
@@ -32,7 +31,6 @@ function boundedHostWorkspaceRuntimeBinding(cwd = '/project') {
   return {
     schemaVersion: 1,
     identity: { runtimeId: 'rt_bounded_host_wide_root_protocol' },
-    agentPlacement: 'host',
     toolRuntime: {
       type: 'boundedHost',
       root: '/tmp/workspace',
@@ -45,7 +43,6 @@ function containerRuntimeBinding() {
   return {
     schemaVersion: 1,
     identity: { runtimeId: 'rt_container_protocol' },
-    agentPlacement: 'host',
     toolRuntime: {
       type: 'container',
       cwd: '/workspace',

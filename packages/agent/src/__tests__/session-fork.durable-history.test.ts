@@ -155,7 +155,6 @@ describe('session/fork durable history', () => {
     const sourceRuntimeBinding: RuntimeExecutionBinding = {
       schemaVersion: 1,
       identity: { runtimeId: 'rt_source_session' },
-      agentPlacement: 'host',
       toolRuntime: { type: 'boundedHost', root: sourceCwd, cwd: sourceCwd },
     };
 

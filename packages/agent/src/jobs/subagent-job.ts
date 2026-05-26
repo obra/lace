@@ -24,7 +24,6 @@ import {
 import type { LaceStopDetails } from '@lace/agent/providers/base-provider';
 import { logger } from '@lace/agent/utils/logger';
 import { getSkillDirectories } from '@lace/agent/skills';
-import { SUBAGENT_SKILLS_TARGET, SUBAGENT_USER_PERSONAS_TARGET } from './persona-container-spec';
 import { spawnSubagent, type SubagentProcessHandle } from './subagent-spawn';
 import type { PerInvocationReaper } from './per-invocation-reaper';
 import type { SessionId, ToolResult } from '@lace/ent-protocol';
@@ -73,11 +72,9 @@ interface RpcErrorLike {
   data?: Record<string, unknown>;
 }
 
-function getSubagentHostSkillDirs(state: AgentServerState, isContainerized: boolean): string[] {
+function getSubagentHostSkillDirs(state: AgentServerState): string[] {
   if (state.skillDirs !== undefined) return state.skillDirs;
-  const skillDirs = getSkillDirectories(state.activeSession?.meta.workDir);
-  if (!isContainerized) return skillDirs;
-  return skillDirs.filter((dir) => existsSync(dir));
+  return getSkillDirectories(state.activeSession?.meta.workDir);
 }
 
 /**
@@ -141,9 +138,8 @@ export function maybeScheduleReapAfter(
   if (!reaper) return;
   if (job.containerSharing !== 'per_invocation') return;
   if (!job.subagentSessionId) return;
-  // Use the pre-computed containerSpecName stored on the job. This works for
-  // both host-placed (runtimeBinding) and container-placed (personaContainerRuntime)
-  // paths — the delegate tool computes and stores it in both cases (PRI-1796).
+  // Use the pre-computed containerSpecName stored on the job. The delegate tool
+  // computes it once while building the projected runtime binding (PRI-1796).
   if (!job.containerSpecName) return;
   reaper.scheduleReap(job.subagentSessionId, job.containerSpecName);
 }
@@ -152,7 +148,7 @@ function buildRuntimeBindingWithExecutionEnv(
   binding: RuntimeExecutionBinding,
   executionEnv: Record<string, string>
 ): RuntimeExecutionBinding {
-  if (binding.agentPlacement !== 'host' || binding.toolRuntime.type !== 'container') {
+  if (binding.toolRuntime.type !== 'container') {
     return binding;
   }
 
@@ -172,10 +168,8 @@ function buildRuntimeBindingWithExecutionEnv(
 }
 
 /**
- * Runs a subagent job process by spawning (or exec'ing into a persona
- * container) a lace-agent process and communicating with it via JSON-RPC
- * over stdio. Strategy is chosen by spawnSubagent based on the parent
- * job's persona runtime.
+ * Runs a subagent job process by spawning a host-side lace-agent process and
+ * communicating with it via JSON-RPC over stdio.
  */
 export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependencies): void {
   const {
@@ -240,33 +234,16 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
     // onExit handler uses this to distinguish unexpected child death (persist
     // diagnostic, close peer to wake pending RPCs) from clean teardown (no-op).
     let teardownInitiated = false;
-    let isContainerizedSubagent = false;
     let subagentHostSkillDirs: string[] = [];
 
     try {
-      isContainerizedSubagent = !!job.personaContainerRuntime;
-      subagentHostSkillDirs = getSubagentHostSkillDirs(state, isContainerizedSubagent);
+      subagentHostSkillDirs = getSubagentHostSkillDirs(state);
       subagentProc = await spawnSubagent({
-        parentSessionId: state.activeSession.meta.sessionId,
-        personaName: job.persona,
-        personaContainerRuntime: job.personaContainerRuntime,
-        containerManager: state.containerManager,
-        containerMounts: state.containerMounts,
-        skillDirs: subagentHostSkillDirs,
-        // PRI-1796: thread per_invocation fields for the in-container lace-agent
-        // path. spawnContainerSubagent forwards these to buildPersonaContainerSpec.
-        ...(job.containerSharing === 'per_invocation' && job.subagentSessionId
-          ? { childSessionId: job.subagentSessionId }
-          : {}),
-        ...(job.scratchDirHostPath ? { scratchDirHostPath: job.scratchDirHostPath } : {}),
         ...(executionEnv ? { executionEnv } : {}),
       });
 
       if (subagentProc.nativeProcess) {
         job.proc = subagentProc.nativeProcess;
-      }
-      if (subagentProc.containerExec) {
-        job.containerExec = subagentProc.containerExec;
       }
 
       subagentProc.onSpawnError((err) => {
@@ -525,7 +502,6 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         record.status = outcome;
         record.finished = true;
         record.proc = undefined;
-        record.containerExec = undefined;
         record.childPeer = undefined;
         record.subagentSessionId = undefined;
         record.childTransportClose = undefined;
@@ -894,17 +870,12 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         currentState.activeSession?.state.config
       );
 
-      // Subagent must be able to resolve user personas on its own session/new
-      // (delegate threads `persona: '<name>'` through). For container subagents,
-      // the user-personas dir is auto-mounted at a fixed in-container path. For
-      // native subagents, the child shares the parent's filesystem so the
-      // parent's host paths apply directly.
-      const subagentUserPersonasPaths: string[] = isContainerizedSubagent
-        ? [SUBAGENT_USER_PERSONAS_TARGET]
-        : [...currentState.personaRegistry.getUserPersonasPaths()];
-      const subagentSkillDirs = isContainerizedSubagent
-        ? subagentHostSkillDirs.map((_, index) => `${SUBAGENT_SKILLS_TARGET}/${index}`)
-        : [...subagentHostSkillDirs];
+      // Subagent must be able to resolve user personas on its own session/new.
+      // The child process runs on the host, so the parent's host paths apply directly.
+      const subagentUserPersonasPaths: string[] = [
+        ...currentState.personaRegistry.getUserPersonasPaths(),
+      ];
+      const subagentSkillDirs = [...subagentHostSkillDirs];
 
       await childPeer.request('initialize', {
         protocolVersion: '1.0',
@@ -931,13 +902,10 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       const isPreallocatedFresh =
         !!job.subagentSessionId && job.subagentSessionPreallocated === true;
 
-      const subagentWorkDir = job.personaContainerRuntime
-        ? job.personaContainerRuntime.workingDirectory
-        : currentState.activeSession!.meta.workDir;
-      const inheritedRuntimeConfig =
-        !isContainerizedSubagent && runtimeBindingForChild
-          ? { config: { runtimeBinding: runtimeBindingForChild } }
-          : {};
+      const subagentWorkDir = currentState.activeSession!.meta.workDir;
+      const inheritedRuntimeConfig = runtimeBindingForChild
+        ? { config: { runtimeBinding: runtimeBindingForChild } }
+        : {};
       if (isResume) {
         await childPeer.request('session/resume', {
           sessionId: job.subagentSessionId,

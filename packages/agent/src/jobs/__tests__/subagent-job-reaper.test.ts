@@ -46,7 +46,6 @@ describe('maybeScheduleReapAfter', () => {
       runtimeBinding: {
         schemaVersion: 1,
         identity: { runtimeId: 'rt_test' },
-        agentPlacement: 'host',
         toolRuntime: {
           type: 'container',
           spec: {
@@ -74,7 +73,6 @@ describe('maybeScheduleReapAfter', () => {
       runtimeBinding: {
         schemaVersion: 1,
         identity: { runtimeId: 'rt_test' },
-        agentPlacement: 'host',
         toolRuntime: {
           type: 'container',
           spec: {
@@ -100,7 +98,6 @@ describe('maybeScheduleReapAfter', () => {
       runtimeBinding: {
         schemaVersion: 1,
         identity: { runtimeId: 'rt_test' },
-        agentPlacement: 'host',
         toolRuntime: { type: 'host', cwd: '/work' },
       },
     });
@@ -118,7 +115,6 @@ describe('maybeScheduleReapAfter', () => {
       runtimeBinding: {
         schemaVersion: 1,
         identity: { runtimeId: 'rt_test' },
-        agentPlacement: 'host',
         toolRuntime: {
           type: 'container',
           spec: {
@@ -161,7 +157,6 @@ describe('maybeScheduleReapAfter', () => {
       runtimeBinding: {
         schemaVersion: 1,
         identity: { runtimeId: 'rt_test' },
-        agentPlacement: 'host',
         toolRuntime: { type: 'host', cwd: '/work' },
       },
       // containerSpecName intentionally absent
@@ -180,7 +175,6 @@ describe('maybeScheduleReapAfter', () => {
       runtimeBinding: {
         schemaVersion: 1,
         identity: { runtimeId: 'rt_test' },
-        agentPlacement: 'host',
         toolRuntime: {
           type: 'container',
           spec: {
@@ -199,16 +193,15 @@ describe('maybeScheduleReapAfter', () => {
 
   // ---------------------------------------------------------------------------
   // PRI-1796: maybeScheduleReapAfter uses job.containerSpecName instead of
-  // digging into runtimeBinding — so in-container lace-agent path (no binding)
-  // also gets reaped.
+  // digging into runtimeBinding, so reap scheduling does not depend on the
+  // projected binding still being present.
   // ---------------------------------------------------------------------------
-  it('schedules reap using job.containerSpecName when runtimeBinding is absent (in-container lace-agent path)', () => {
+  it('schedules reap using job.containerSpecName when runtimeBinding is absent', () => {
     const reaper = makeReaper();
     const job = makeJob({
       containerSharing: 'per_invocation',
       subagentSessionId: 'sess_abc',
       containerSpecName: 'abc12345-myagent-def67890',
-      // NO runtimeBinding — simulates personaContainerRuntime path
     });
 
     maybeScheduleReapAfter(job, reaper);

@@ -105,7 +105,6 @@ export const RuntimeExecutionBindingSchema = z
         runtimeId: NonEmptyStringSchema,
       })
       .strict(),
-    agentPlacement: z.enum(['host', 'container']),
     toolRuntime: z.discriminatedUnion('type', [
       HostRuntimeDescriptorSchema,
       BoundedHostRuntimeDescriptorSchema,

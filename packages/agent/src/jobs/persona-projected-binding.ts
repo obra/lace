@@ -1,5 +1,5 @@
 // ABOUTME: Build host-side projected RuntimeExecutionBinding for container personas
-// ABOUTME: Used by delegate when agentPlacement: host — projects container tools to host agent
+// ABOUTME: Used by delegate to project container tools to the host agent
 
 import type { MountRegistryEntry } from '@lace/agent/server-types';
 import { buildRuntimeId } from '@lace/agent/tools/runtime/identity';
@@ -53,7 +53,6 @@ export function buildPersonaProjectedRuntimeBinding(input: {
   const binding: RuntimeExecutionBinding = {
     schemaVersion: 1,
     identity: { runtimeId: 'pending' },
-    agentPlacement: 'host',
     toolRuntime: {
       type: 'container',
       spec: runtimeSpec,

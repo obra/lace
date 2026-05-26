@@ -6,16 +6,18 @@
 ## The two sharing models
 
 **`per_invocation`** — each fresh `delegate(persona=X, …)` call mints a new
-subagent session and a new container. The container is isolated from all other
-delegates, even concurrent ones of the same persona. A
+subagent session and a new projected tool container. The subagent Lace process
+runs on the host; its tools execute in the container. The container is isolated
+from all other delegates, even concurrent ones of the same persona. A
 `delegate(resume=jobId, …)` within the idle TTL window reuses the prior subagent
 session and its container (same `/work`, same running processes). After the TTL
 expires the container is reaped; the host scratch directory outlives it.
 
 **`persistent`** — a single long-lived container named `sen-<persona>` (e.g.
-`sen-box-shell`) survives process restarts and host reboots. All delegates exec
-into the same container and see each other's filesystem state. This is
-intentional: use `persistent` for personas that accumulate state across calls.
+`sen-box-shell`) survives process restarts and host reboots. All delegates use
+the same projected tool container and see each other's filesystem state through
+tool execution. This is intentional: use `persistent` for personas that
+accumulate state across calls.
 
 ## Naming scheme
 
@@ -89,5 +91,7 @@ Enforcement is two-layer:
   `PersonaSharingViolationError` before the binding is built. The delegate tool
   returns `status: 'failed'` with the error text.
 
-Reserved/auto-injected mount names (`persona`, `lace-data`, `credentials`,
-`lace`, `scratch`) are excluded from the conflict check.
+Only the per_invocation `scratch` mount name is excluded from the conflict
+check. Other mount names, including the old in-container agent support names
+(`persona`, `lace-data`, `credentials`, `lace`), are ordinary persona-declared
+mounts.

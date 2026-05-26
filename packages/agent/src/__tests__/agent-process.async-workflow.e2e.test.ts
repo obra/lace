@@ -80,7 +80,6 @@ describe('async job workflow (E2E)', () => {
     expect(jobStarted?.data).toMatchObject({
       runtimeBinding: {
         schemaVersion: 1,
-        agentPlacement: 'host',
         toolRuntime: { type: 'boundedHost', root: ctx.workDir, cwd: ctx.workDir },
       },
     });

@@ -86,7 +86,6 @@ Body.`;
     const content = `---
 runtime:
   type: container
-  agentPlacement: host
   containerSharing: per_invocation
   image: ghcr.io/example/lace-shell:latest
   workingDirectory: /workspace
@@ -106,7 +105,6 @@ Body.`;
     const result = registry.parsePersona('container-runtime');
     expect(result.config.runtime).toEqual({
       type: 'container',
-      agentPlacement: 'host',
       containerSharing: 'per_invocation',
       image: 'ghcr.io/example/lace-shell:latest',
       workingDirectory: '/workspace',
@@ -120,7 +118,6 @@ Body.`;
     const content = `---
 runtime:
   type: container
-  agentPlacement: host
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /w
@@ -133,7 +130,6 @@ Body.`;
     const result = registry.parsePersona('container-minimal');
     expect(result.config.runtime).toEqual({
       type: 'container',
-      agentPlacement: 'host',
       containerSharing: 'per_invocation',
       image: 'img:latest',
       workingDirectory: '/w',
@@ -146,7 +142,6 @@ Body.`;
     const content = `---
 runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: ghcr.io/example/sen-box:latest
   workingDirectory: /home/agent
@@ -161,7 +156,6 @@ Body.`;
 
     expect(registry.parsePersona('persistent-runtime').config.runtime).toEqual({
       type: 'container',
-      agentPlacement: 'host',
       containerSharing: 'persistent',
       image: 'ghcr.io/example/sen-box:latest',
       workingDirectory: '/home/agent',
@@ -174,7 +168,6 @@ Body.`;
     const content = `---
 runtime:
   type: container
-  agentPlacement: host
   containerSharing: per_invocation
   image: sen-browser:dev
   workingDirectory: /work
@@ -192,7 +185,7 @@ Body.`;
     });
   });
 
-  it('parses runtime.agentPlacement=container for explicit lace-in-container execution', () => {
+  it('rejects legacy runtime.agentPlacement', () => {
     const content = `---
 runtime:
   type: container
@@ -203,14 +196,10 @@ runtime:
   mounts: {}
 ---
 Body.`;
-    writeFileSync(path.join(tempBundledDir, 'container-placement.md'), content);
+    writeFileSync(path.join(tempBundledDir, 'legacy-placement.md'), content);
     registry = makeRegistry([userPersonaDir]);
 
-    expect(registry.parsePersona('container-placement').config.runtime).toMatchObject({
-      type: 'container',
-      agentPlacement: 'container',
-      containerSharing: 'per_invocation',
-    });
+    expect(() => registry.parsePersona('legacy-placement')).toThrow(/agentPlacement/);
   });
 
   it('throws when runtime.type=container is missing image', () => {
@@ -312,7 +301,6 @@ body
     const content = `---
 runtime:
   type: container
-  agentPlacement: host
   containerSharing: persistent
   image: img:latest
   workingDirectory: /home/agent

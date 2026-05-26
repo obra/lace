@@ -209,7 +209,6 @@ export function createFinalizeJob(
     }
 
     job.proc = undefined;
-    job.containerExec = undefined;
     job.childPeer = undefined;
     job.subagentSessionId = undefined;
     job.childTransportClose = undefined;

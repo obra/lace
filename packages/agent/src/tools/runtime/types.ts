@@ -3,7 +3,6 @@ import type { Readable, Writable } from 'node:stream';
 export type RuntimeBindingSchemaVersion = 1;
 export type RuntimeSecretNamespace = 'session' | 'project' | 'host-service';
 export type ToolRuntimeKind = 'host' | 'boundedHost' | 'container';
-export type AgentPlacement = 'host' | 'container';
 
 export interface RuntimeSecretReference {
   namespace: RuntimeSecretNamespace;
@@ -70,7 +69,6 @@ export interface RuntimeExecutionBinding {
   schemaVersion: RuntimeBindingSchemaVersion;
   identity: RuntimeBindingIdentity;
   toolRuntime: ToolRuntimeDescriptor;
-  agentPlacement: AgentPlacement;
   // Present on persona container bindings; absent on host/bounded-host bindings.
   // Lets post-exit handlers (Chunk E) branch on lifecycle without inspecting
   // toolRuntime internals (PRI-1796).

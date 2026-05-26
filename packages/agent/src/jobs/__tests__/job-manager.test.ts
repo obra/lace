@@ -745,7 +745,6 @@ describe('JobManager', () => {
       const runtimeBinding: RuntimeExecutionBinding = {
         schemaVersion: 1,
         identity: { runtimeId: 'rt_job_manager' },
-        agentPlacement: 'host',
         toolRuntime: { type: 'boundedHost', root: '/repo', cwd: '/repo' },
       };
 

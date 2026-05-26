@@ -69,7 +69,6 @@ function makeFakeSubagent(): FakeSubagentHandle {
       return waitPromise;
     },
     nativeProcess: null,
-    containerExec: null,
     simulateCrash(stderrText: string, code = 1) {
       stderr.write(stderrText);
       stderr.end();
@@ -111,15 +110,6 @@ describe('runSubagentJobProcess — child_exit propagation (PRI-1774)', () => {
       resolveCompletion,
       persona: 'box-shell',
       subagentContent: [{ type: 'text', text: 'echo hello' }],
-      personaContainerRuntime: {
-        type: 'container',
-        agentPlacement: 'container',
-        containerSharing: 'persistent',
-        image: 'sen-box:dev',
-        workingDirectory: '/home/agent',
-        mounts: {},
-        env: {},
-      },
     };
 
     const finalizeJob = vi.fn(async (j: JobState) => {
