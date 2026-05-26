@@ -219,6 +219,7 @@ export function registerInitializeHandler(
         'ent/backgroundJobs': true,
         'ent/fileCheckpointing': true,
         'ent/structuredOutput': false,
+        'ent/promptIdempotency': true,
         'ent/providers': {
           list: true,
           connections: true,

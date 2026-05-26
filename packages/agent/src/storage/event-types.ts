@@ -25,6 +25,7 @@ export type PromptEventData = {
    * it and are bucketed as `'untracked'` at compaction time.
    */
   track?: string;
+  idempotencyKey?: string;
 };
 
 export type MessageEventData = {
@@ -136,6 +137,7 @@ export type ContextInjectedEventData = {
   priority?: string;
   /** See PromptEventData.track. */
   track?: string;
+  idempotencyKey?: string;
 };
 
 export type SystemPromptSetEventData = {

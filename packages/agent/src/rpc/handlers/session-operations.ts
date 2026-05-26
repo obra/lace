@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import {
   AcpErrorCodes,
   EntErrorCodes,
+  type DurableHandoffStatus,
   type JsonRpcPeer,
   type ContextBreakdown,
   type ThreadTokenUsage,
@@ -41,6 +42,11 @@ import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import { createProviderForTurn } from '../../providers/turn-factory';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { buildSessionConfigOptions, isApprovalMode } from '../session-config';
+import {
+  handoffError,
+  hasContextInjectedHandoff,
+  readDurableEventsForHandoff,
+} from './handoff-idempotency';
 
 /**
  * Compute context breakdown for the active session
@@ -204,15 +210,33 @@ export async function injectIntoActiveSession(
   state: AgentServerState,
   peer: JsonRpcPeer,
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
-  parsed: { content: unknown[]; priority: 'immediate' | 'normal' | 'deferred' }
-): Promise<void> {
-  await runExclusive(() => {
+  parsed: {
+    content: unknown[];
+    priority: 'immediate' | 'normal' | 'deferred';
+    idempotencyKey?: unknown;
+  }
+): Promise<{ durableHandoffStatus: DurableHandoffStatus } | undefined> {
+  return await runExclusive(() => {
+    const idempotencyKey = toNonEmptyString(parsed.idempotencyKey);
     if (!state.activeSession) {
       throw {
         code: AcpErrorCodes.SessionNotFound,
         message: 'SessionNotFound',
-        data: { category: 'session' },
+        data: {
+          category: 'session',
+          ...(idempotencyKey ? { durableHandoffStatus: 'not-persisted' } : {}),
+        },
       };
+    }
+
+    if (idempotencyKey) {
+      const readResult = readDurableEventsForHandoff(state.activeSession.dir);
+      if (!readResult.ok) {
+        throw handoffError('DuplicateUnsafeRetry', 'duplicate-unsafe-retry');
+      }
+      if (hasContextInjectedHandoff(readResult.events, idempotencyKey)) {
+        return { durableHandoffStatus: 'duplicate-already-handled' };
+      }
     }
 
     let sessionState: SessionState = readSessionState(state.activeSession.dir);
@@ -221,6 +245,7 @@ export async function injectIntoActiveSession(
       data: {
         content: Array.isArray(parsed.content) ? parsed.content : [],
         priority: parsed.priority,
+        ...(idempotencyKey ? { idempotencyKey } : {}),
       },
     });
     sessionState = nextState;
@@ -246,6 +271,8 @@ export async function injectIntoActiveSession(
       ...state.activeSession,
       state: readSessionState(state.activeSession.dir),
     };
+
+    return idempotencyKey ? { durableHandoffStatus: 'persisted-new' } : undefined;
   });
 }
 
@@ -589,18 +616,22 @@ export function registerSessionOperationHandlers(
 
   peer.onRequest('ent/session/inject', async (params: unknown) => {
     assertInitialized(state);
-    const parsed = params as { content: unknown[]; priority: 'immediate' | 'normal' | 'deferred' };
+    const parsed = params as {
+      content: unknown[];
+      priority: 'immediate' | 'normal' | 'deferred';
+      idempotencyKey?: unknown;
+    };
     const priority =
       parsed?.priority === 'immediate' ||
       parsed?.priority === 'normal' ||
       parsed?.priority === 'deferred'
         ? parsed.priority
         : 'normal';
-    await injectIntoActiveSession(state, peer, runExclusive, {
+    return await injectIntoActiveSession(state, peer, runExclusive, {
       content: Array.isArray(parsed?.content) ? parsed.content : [],
       priority,
+      idempotencyKey: parsed?.idempotencyKey,
     });
-    return undefined;
   });
 
   peer.onRequest('ent/session/events', async (params: unknown) => {

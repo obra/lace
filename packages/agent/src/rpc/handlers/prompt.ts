@@ -21,7 +21,7 @@ import type {
   AgentServerState,
   CreateToolExecutorFn,
 } from '@lace/agent/server-types';
-import { throwInvalidParams, assertInitialized } from '@lace/agent/rpc/utils';
+import { throwInvalidParams, assertInitialized, toNonEmptyString } from '@lace/agent/rpc/utils';
 import { handleSlashCommand } from '@lace/agent/conversation/slash-commands';
 import { createProviderForTurn, getModelPricing } from '@lace/agent/conversation/provider-factory';
 import { ConversationRunner } from '@lace/agent/core/conversation/runner';
@@ -30,6 +30,12 @@ import { getEffectiveConfig } from '@lace/agent/core/session';
 import { SkillRegistry, getSkillDirectories } from '@lace/agent/skills';
 import { getOrCreateSessionToolExecutor } from '@lace/agent/server';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
+import {
+  classifyPromptHandoff,
+  handoffError,
+  readDurableEventsForHandoff,
+  withDurableHandoffStatus,
+} from './handoff-idempotency';
 
 /**
  * Register the session/prompt RPC handler.
@@ -63,20 +69,53 @@ export function registerPromptHandler(
   }) => Promise<{ jobId: string }>,
   runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null }
 ) {
-  const handlePrompt = async (params: { content: unknown[]; outputFormat?: unknown }) => {
+  const handlePrompt = async (params: {
+    content: unknown[];
+    outputFormat?: unknown;
+    maxTurns?: number;
+    idempotencyKey?: unknown;
+  }) => {
     assertInitialized(state);
+    const idempotencyKey = toNonEmptyString(params.idempotencyKey);
     if (!state.activeSession) {
       throw {
         code: AcpErrorCodes.SessionNotFound,
         message: 'SessionNotFound',
-        data: { category: 'session' },
+        data: {
+          category: 'session',
+          ...(idempotencyKey ? { durableHandoffStatus: 'not-persisted' } : {}),
+        },
       };
+    }
+    if (idempotencyKey) {
+      const status = await runExclusive(() => {
+        if (!state.activeSession) return 'not-persisted';
+        const readResult = readDurableEventsForHandoff(state.activeSession.dir);
+        if (!readResult.ok) return 'duplicate-unsafe-retry';
+        return classifyPromptHandoff(readResult.events, idempotencyKey, state.activeTurn?.turnId);
+      });
+      if (status === 'duplicate-already-handled') {
+        return { durableHandoffStatus: status };
+      }
+      if (status === 'duplicate-in-progress') {
+        throw {
+          code: AcpErrorCodes.SessionBusy,
+          message: 'SessionBusy',
+          data: { category: 'session', durableHandoffStatus: status },
+        };
+      }
+      if (status !== 'persisted-new') {
+        throw handoffError('DuplicateUnsafeRetry', status);
+      }
     }
     if (state.activeTurn) {
       throw {
         code: AcpErrorCodes.SessionBusy,
         message: 'SessionBusy',
-        data: { category: 'session' },
+        data: {
+          category: 'session',
+          ...(idempotencyKey ? { durableHandoffStatus: 'not-persisted' } : {}),
+        },
       };
     }
 
@@ -88,6 +127,7 @@ export function registerPromptHandler(
     const abortController = new AbortController();
 
     state.activeTurn = { turnId, startedAt, status: 'running', abortController };
+    let ownsActiveTurn = true;
 
     // Hoisted outside the try so the catch handler (PRI-1818 #2 fallback) can
     // reuse the same write path to synthesize a turn_end. The turnSeq counter
@@ -116,11 +156,19 @@ export function registerPromptHandler(
     // before turn_start (e.g. param-validation failure inside the try), no
     // fallback turn_end is needed.
     let turnStartWritten = false;
+    let promptWritten = false;
 
     try {
       const promptContent = parsed.content as unknown[];
 
-      await writeAndAdvance({ type: 'prompt', data: { content: promptContent } });
+      await writeAndAdvance({
+        type: 'prompt',
+        data: {
+          content: promptContent,
+          ...(idempotencyKey ? { idempotencyKey } : {}),
+        },
+      });
+      promptWritten = true;
       await writeAndAdvance({ type: 'turn_start', data: {} });
       turnStartWritten = true;
       await emitSessionUpdate({ type: 'turn_start' }, { turnId, turnSeq: 0 });
@@ -372,6 +420,7 @@ export function registerPromptHandler(
 
       state.activeSession = loadSession(state.activeSession.meta.sessionId);
       state.activeTurn = null;
+      ownsActiveTurn = false;
 
       // Bug 3 fix: catch immediate-inject events that landed in the closing
       // microseconds of the turn (after the runner's last iteration but before
@@ -400,6 +449,7 @@ export function registerPromptHandler(
         stopReason: result.stopReason,
         content: result.content,
         usage: protocolUsage,
+        ...(idempotencyKey ? { durableHandoffStatus: 'persisted-new' as const } : {}),
       };
     } catch (err) {
       // PRI-1818 #2: defense-in-depth fallback turn_end. The runner is
@@ -422,9 +472,14 @@ export function registerPromptHandler(
           });
         }
       }
+      if (idempotencyKey && promptWritten) {
+        throw withDurableHandoffStatus(err, 'persisted-new');
+      }
       throw err;
     } finally {
-      state.activeTurn = null;
+      if (ownsActiveTurn && state.activeTurn?.turnId === turnId) {
+        state.activeTurn = null;
+      }
     }
   };
 
@@ -439,6 +494,13 @@ export function registerPromptHandler(
 
   // Register the RPC handler
   peer.onRequest('session/prompt', async (params: unknown) => {
-    return handlePrompt(params as { content: unknown[]; outputFormat?: unknown });
+    return handlePrompt(
+      params as {
+        content: unknown[];
+        outputFormat?: unknown;
+        maxTurns?: number;
+        idempotencyKey?: unknown;
+      }
+    );
   });
 }
