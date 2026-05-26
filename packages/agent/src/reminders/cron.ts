@@ -19,11 +19,7 @@ export function getAgentTimezone(): string {
 }
 
 /** Next match strictly > `after`. */
-export function computeNextCronFire(
-  expr: string,
-  timezone: string,
-  after: Date
-): number {
+export function computeNextCronFire(expr: string, timezone: string, after: Date): number {
   const interval = CronExpressionParser.parse(expr, {
     tz: timezone,
     currentDate: after, // cron-parser's `next()` returns strictly > currentDate.

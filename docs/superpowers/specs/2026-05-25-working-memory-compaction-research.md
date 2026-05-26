@@ -2,7 +2,12 @@
 
 **Codex handoff report**  
 **Prepared:** 2026-05-25  
-**Scope:** One persistent model conversation/context for one coherent agent persona, receiving messages from many users. Core memory and archival memory are assumed to exist separately or to be built later. This report focuses on **how to trim, rewrite, or compact the live chain of user messages, assistant messages, and occasional tool traces** when the working context approaches its limit.
+**Scope:** One persistent model conversation/context for one coherent agent
+persona, receiving messages from many users. Core memory and archival memory are
+assumed to exist separately or to be built later. This report focuses on **how
+to trim, rewrite, or compact the live chain of user messages, assistant
+messages, and occasional tool traces** when the working context approaches its
+limit.
 
 ---
 
@@ -27,7 +32,9 @@ SYSTEM / DEVELOPER PERSONA
 + current user message
 ```
 
-The compacted state should be **typed, inspectable, diffable, critic-checkable, and behaviorally evaluated** against the full transcript. It is not durable memory. It is the agent persona's **live conversational state**.
+The compacted state should be **typed, inspectable, diffable, critic-checkable,
+and behaviorally evaluated** against the full transcript. It is not durable
+memory. It is the agent persona's **live conversational state**.
 
 The compact should preserve:
 
@@ -67,13 +74,19 @@ canonical transcript log
 
 ## 1. Problem framing
 
-The system is designed to feel like one coherent employee/team-mate. All users interact with one shared agent persona through a chat-like surface. Tasks may be handled by ephemeral subagents, but the main continuity problem is the primary chat chain.
+The system is designed to feel like one coherent employee/team-mate. All users
+interact with one shared agent persona through a chat-like surface. Tasks may be
+handled by ephemeral subagents, but the main continuity problem is the primary
+chat chain.
 
 The target invariant is:
 
-> After compaction, the agent should continue as if it still had the relevant parts of the full transcript, while using far fewer context tokens.
+> After compaction, the agent should continue as if it still had the relevant
+> parts of the full transcript, while using far fewer context tokens.
 
-This is not the same as long-term memory extraction. Core memory and archival memory are separate systems. This report concerns **working-memory compaction**: the bounded, live context that the next model call sees.
+This is not the same as long-term memory extraction. Core memory and archival
+memory are separate systems. This report concerns **working-memory compaction**:
+the bounded, live context that the next model call sees.
 
 ### 1.1 Why this is hard
 
@@ -91,7 +104,9 @@ A long multi-user transcript contains several kinds of state intermixed:
 - jokes and style;
 - implicit context from the last few turns.
 
-A generic summary tends to flatten these into a plausible narrative. That is dangerous: it erases repairs, merges users, hardens uncertainty into fact, and loses the local relationship texture that makes the agent feel continuous.
+A generic summary tends to flatten these into a plausible narrative. That is
+dangerous: it erases repairs, merges users, hardens uncertainty into fact, and
+loses the local relationship texture that makes the agent feel continuous.
 
 ### 1.2 The key architectural distinction
 
@@ -107,7 +122,9 @@ with:
 single unbounded transcript continuity
 ```
 
-The persona may remain one coherent entity while the active context is carefully rewritten. The transcript remains canonical and auditable; the compact is a lossy working state.
+The persona may remain one coherent entity while the active context is carefully
+rewritten. The transcript remains canonical and auditable; the compact is a
+lossy working state.
 
 ---
 
@@ -115,18 +132,24 @@ The persona may remain one coherent entity while the active context is carefully
 
 ### 2.1 OpenAI: server-side and standalone compaction
 
-OpenAI's current Responses API documentation describes compaction as a way to support long-running interactions by reducing context size while preserving state needed for future turns. It supports server-side compaction via context management and standalone compaction via `/responses/compact`.
+OpenAI's current Responses API documentation describes compaction as a way to
+support long-running interactions by reducing context size while preserving
+state needed for future turns. It supports server-side compaction via context
+management and standalone compaction via `/responses/compact`.
 
 Relevant links:
 
-- OpenAI compaction guide: https://developers.openai.com/api/docs/guides/compaction
-- OpenAI compact endpoint reference: https://developers.openai.com/api/reference/resources/responses/methods/compact/
+- OpenAI compaction guide:
+  https://developers.openai.com/api/docs/guides/compaction
+- OpenAI compact endpoint reference:
+  https://developers.openai.com/api/reference/resources/responses/methods/compact/
 
 Important implication:
 
 - Provider-native compaction is useful and should be tested.
 - However, the provider-native compact can be opaque/provider-specific.
-- For this product, the canonical compact should be human-readable, schema-governed, auditable, and eval-tested.
+- For this product, the canonical compact should be human-readable,
+  schema-governed, auditable, and eval-tested.
 
 Recommended posture:
 
@@ -141,40 +164,55 @@ canonical transcript = source of truth
 Anthropic distinguishes multiple context-management primitives:
 
 - compaction: summarize/replace older context;
-- tool-result clearing: drop old re-fetchable tool payloads while preserving that the call happened;
+- tool-result clearing: drop old re-fetchable tool payloads while preserving
+  that the call happened;
 - memory: external structured note-taking or file-backed state.
 
 Relevant links:
 
-- Anthropic compaction docs: https://platform.claude.com/docs/en/build-with-claude/compaction
-- Anthropic context editing docs: https://platform.claude.com/docs/en/build-with-claude/context-editing
-- Anthropic context-engineering cookbook: https://platform.claude.com/cookbook/tool-use-context-engineering-context-engineering-tools
-- Anthropic engineering post on effective context engineering: https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
+- Anthropic compaction docs:
+  https://platform.claude.com/docs/en/build-with-claude/compaction
+- Anthropic context editing docs:
+  https://platform.claude.com/docs/en/build-with-claude/context-editing
+- Anthropic context-engineering cookbook:
+  https://platform.claude.com/cookbook/tool-use-context-engineering-context-engineering-tools
+- Anthropic engineering post on effective context engineering:
+  https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
 
 Important implication:
 
-- Your proposed "ephemeral tool call" primitive is aligned with real market practice.
+- Your proposed "ephemeral tool call" primitive is aligned with real market
+  practice.
 - Tool-result clearing should be separate from transcript compaction.
-- Compaction is not only about token caps; it is also about keeping the active context focused and performant.
+- Compaction is not only about token caps; it is also about keeping the active
+  context focused and performant.
 
 ### 2.3 LangChain / LangGraph: trim, delete, summarize, custom state
 
-LangChain documents short-term memory as part of agent state and describes practical options including trimming, deleting, summarizing, and custom strategies.
+LangChain documents short-term memory as part of agent state and describes
+practical options including trimming, deleting, summarizing, and custom
+strategies.
 
 Relevant links:
 
-- LangChain short-term memory docs: https://docs.langchain.com/oss/python/langchain/short-term-memory
-- LangChain context engineering docs: https://docs.langchain.com/oss/python/langchain/context-engineering
-- LangChain context engineering blog: https://www.langchain.com/blog/context-engineering-for-agents
+- LangChain short-term memory docs:
+  https://docs.langchain.com/oss/python/langchain/short-term-memory
+- LangChain context engineering docs:
+  https://docs.langchain.com/oss/python/langchain/context-engineering
+- LangChain context engineering blog:
+  https://www.langchain.com/blog/context-engineering-for-agents
 
 Important implication:
 
-- A good runtime should treat compaction as an explicit pre-model state transformation.
-- A custom strategy is appropriate here because the product needs persona continuity, speaker attribution, repairs, and multi-user scoping.
+- A good runtime should treat compaction as an explicit pre-model state
+  transformation.
+- A custom strategy is appropriate here because the product needs persona
+  continuity, speaker attribution, repairs, and multi-user scoping.
 
 ### 2.4 Inspect AI: compaction as interchangeable strategies
 
-Inspect AI documents multiple compaction strategies, including native, summary, edit, and trim compaction.
+Inspect AI documents multiple compaction strategies, including native, summary,
+edit, and trim compaction.
 
 Relevant link:
 
@@ -193,11 +231,14 @@ Important implication:
 
 ### 2.5 Claude Code and coding-agent practice
 
-Claude Code exposes practical context management: subagents run in separate contexts, `/compact` or auto-compaction preserves important information, and file/tool-heavy side work is isolated from the main conversation.
+Claude Code exposes practical context management: subagents run in separate
+contexts, `/compact` or auto-compaction preserves important information, and
+file/tool-heavy side work is isolated from the main conversation.
 
 Relevant links:
 
-- Claude Code context window docs: https://code.claude.com/docs/en/context-window
+- Claude Code context window docs:
+  https://code.claude.com/docs/en/context-window
 - Claude Code subagents docs: https://code.claude.com/docs/en/sub-agents
 - Claude Code best practices: https://code.claude.com/docs/en/best-practices
 
@@ -205,15 +246,18 @@ Important implication:
 
 - Keep noisy work out of the main persona context where possible.
 - Side tasks can return summaries/metadata rather than raw logs.
-- In your system, ephemeral subagents handle many tasks already; therefore the main compaction problem is mainly chat continuity and occasional tool traces.
+- In your system, ephemeral subagents handle many tasks already; therefore the
+  main compaction problem is mainly chat continuity and occasional tool traces.
 
 ### 2.6 Letta / MemGPT / Mem0 / Zep
 
-These are more about long-term memory than transcript compaction, but they inform architecture.
+These are more about long-term memory than transcript compaction, but they
+inform architecture.
 
 Relevant links:
 
-- Letta compaction: https://docs.letta.com/guides/core-concepts/messages/compaction/
+- Letta compaction:
+  https://docs.letta.com/guides/core-concepts/messages/compaction/
 - MemGPT paper: https://arxiv.org/abs/2310.08560
 - Mem0 paper: https://arxiv.org/abs/2504.19413
 - Zep paper: https://arxiv.org/abs/2501.13956
@@ -234,7 +278,9 @@ Important implication:
 
 ### 3.1 Long context is not reliable memory
 
-**Lost in the Middle** shows that models do not use long contexts uniformly. Performance often improves when relevant information appears near the beginning or end and degrades when information is buried in the middle.
+**Lost in the Middle** shows that models do not use long contexts uniformly.
+Performance often improves when relevant information appears near the beginning
+or end and degrades when information is buried in the middle.
 
 Relevant links:
 
@@ -250,7 +296,9 @@ Compaction is reshaping: move high-signal state to a position and form the model
 
 ### 3.2 Recursive summarization
 
-**Recursively Summarizing Enables Long-Term Dialogue Memory** proposes generating memory summaries from small dialogue contexts and recursively updating them using the previous memory plus new dialogue.
+**Recursively Summarizing Enables Long-Term Dialogue Memory** proposes
+generating memory summaries from small dialogue contexts and recursively
+updating them using the previous memory plus new dialogue.
 
 Relevant link:
 
@@ -264,7 +312,8 @@ Design implication:
 
 ### 3.3 ReSum and periodic context summarization
 
-**ReSum** proposes periodic summarization of growing interaction histories into compact reasoning states for long-horizon agents.
+**ReSum** proposes periodic summarization of growing interaction histories into
+compact reasoning states for long-horizon agents.
 
 Relevant links:
 
@@ -275,14 +324,16 @@ Design implication:
 
 - Your idea of "summarize recent history while it is fresh" is promising.
 - Use semantic episodes rather than raw turn counts.
-- The agent may request checkpoints, but the runtime should validate and perform them.
+- The agent may request checkpoints, but the runtime should validate and perform
+  them.
 
 ### 3.4 Prompt compression
 
 Prompt compression work distinguishes:
 
 - hard prompt compression: remove/paraphrase tokens or spans;
-- soft prompt compression: encode content into latent/special tokens or compressed representations.
+- soft prompt compression: encode content into latent/special tokens or
+  compressed representations.
 
 Relevant links:
 
@@ -292,12 +343,16 @@ Relevant links:
 Design implication:
 
 - Prompt compression is useful background for cost and density.
-- But the canonical compact for this system should be natural-language/structured and inspectable.
-- Opaque token compression may be an optimization, not the product's canonical state.
+- But the canonical compact for this system should be
+  natural-language/structured and inspectable.
+- Opaque token compression may be an optimization, not the product's canonical
+  state.
 
 ### 3.5 Agent reflection and synthesized memory
 
-**Generative Agents** used observations, reflection, and planning to produce believable behavior. **Reflexion** used verbal feedback/reflections as an episodic memory buffer.
+**Generative Agents** used observations, reflection, and planning to produce
+believable behavior. **Reflexion** used verbal feedback/reflections as an
+episodic memory buffer.
 
 Relevant links:
 
@@ -307,25 +362,31 @@ Relevant links:
 Design implication:
 
 - Synthetic text state can change future behavior.
-- Therefore compacted working memory must be treated as powerful behavioral control state, not inert summary.
+- Therefore compacted working memory must be treated as powerful behavioral
+  control state, not inert summary.
 
 ### 3.6 Long-term conversational memory benchmarks
 
 Relevant benchmarks:
 
-- **LoCoMo**: long-term conversations grounded in personas and temporal event graphs; evaluates QA, event summarization, and multimodal dialogue generation.
+- **LoCoMo**: long-term conversations grounded in personas and temporal event
+  graphs; evaluates QA, event summarization, and multimodal dialogue generation.
   - Paper: https://arxiv.org/abs/2402.17753
   - Project: https://snap-research.github.io/locomo/
-- **BEAM**: very long coherent dialogues up to 10M tokens with diverse memory probes.
+- **BEAM**: very long coherent dialogues up to 10M tokens with diverse memory
+  probes.
   - OpenReview: https://openreview.net/forum?id=y59hf5lrMn
   - GitHub: https://github.com/mohammadtavakoli78/BEAM
-- **MemoryAgentBench**: evaluates memory agents across accurate retrieval, test-time learning, long-range understanding, and selective forgetting/conflict handling.
+- **MemoryAgentBench**: evaluates memory agents across accurate retrieval,
+  test-time learning, long-range understanding, and selective
+  forgetting/conflict handling.
   - arXiv: https://arxiv.org/abs/2507.05257
   - GitHub: https://github.com/HUST-AI-HYZ/MemoryAgentBench
 
 Design implication:
 
-- Public benchmarks are useful inspiration, but this product needs custom evals for:
+- Public benchmarks are useful inspiration, but this product needs custom evals
+  for:
   - persona continuity;
   - multi-user attribution;
   - assistant repair preservation;
@@ -339,15 +400,18 @@ Design implication:
 
 ### Principle 1: The compact is working memory, not truth
 
-The canonical transcript is truth. The compact is a lossy active-state projection.
+The canonical transcript is truth. The compact is a lossy active-state
+projection.
 
 ### Principle 2: The compact must be inspectable
 
-Do not rely only on opaque provider-native compaction. The canonical compact should be readable, diffable, and critic-checkable.
+Do not rely only on opaque provider-native compaction. The canonical compact
+should be readable, diffable, and critic-checkable.
 
 ### Principle 3: Recent turns stay raw
 
-The most recent turns contain live references, tone, repairs, and user intent. Keep a recent verbatim tail.
+The most recent turns contain live references, tone, repairs, and user intent.
+Keep a recent verbatim tail.
 
 ### Principle 4: Preserve corrections and repairs
 
@@ -383,11 +447,13 @@ Alice prefers concise planning updates. Do not infer this preference applies to 
 
 ### Principle 6: Tool outputs are not conversation
 
-Large tool results should not remain in the live chat context indefinitely. Replace them with digest + handle + refetch instruction.
+Large tool results should not remain in the live chat context indefinitely.
+Replace them with digest + handle + refetch instruction.
 
 ### Principle 7: The agent may request compaction, but the runtime owns it
 
-The main agent can notice salience. It should not unilaterally rewrite its own history.
+The main agent can notice salience. It should not unilaterally rewrite its own
+history.
 
 ### Principle 8: Rebuild periodically
 
@@ -395,7 +461,8 @@ Recursive compaction is cheap; canonical rebuild is hygiene.
 
 ### Principle 9: Evaluate behavior, not aesthetics
 
-A compact that "looks good" can still change the agent's behavior. Compare full-transcript behavior to compacted-context behavior.
+A compact that "looks good" can still change the agent's behavior. Compare
+full-transcript behavior to compacted-context behavior.
 
 ### Principle 10: Include negative state
 
@@ -516,14 +583,14 @@ The following TypeScript-like interfaces are implementation guidance for Codex.
 
 ```ts
 export type EventType =
-  | "user_message"
-  | "assistant_message"
-  | "tool_call"
-  | "tool_result"
-  | "tool_result_cleared"
-  | "micro_checkpoint"
-  | "global_compaction"
-  | "system_event";
+  | 'user_message'
+  | 'assistant_message'
+  | 'tool_call'
+  | 'tool_result'
+  | 'tool_result_cleared'
+  | 'micro_checkpoint'
+  | 'global_compaction'
+  | 'system_event';
 
 export interface TranscriptEvent {
   id: string;
@@ -532,7 +599,12 @@ export interface TranscriptEvent {
   speakerId?: string;
   speakerDisplayName?: string;
   sourceSurface?: string;
-  visibilityScope?: "global_persona" | "team" | "project" | "user_private" | "unknown";
+  visibilityScope?:
+    | 'global_persona'
+    | 'team'
+    | 'project'
+    | 'user_private'
+    | 'unknown';
   parentEventIds?: string[];
   content: string;
   tokenCount?: number;
@@ -547,18 +619,18 @@ export interface TranscriptEvent {
 export interface EventClassification {
   eventId: string;
   labels: Array<
-    | "normal_chat"
-    | "user_correction"
-    | "assistant_repair"
-    | "decision"
-    | "commitment"
-    | "open_question"
-    | "relationship_signal"
-    | "style_preference"
-    | "tool_result_large"
-    | "tool_result_refetchable"
-    | "privacy_sensitive"
-    | "possible_checkpoint_boundary"
+    | 'normal_chat'
+    | 'user_correction'
+    | 'assistant_repair'
+    | 'decision'
+    | 'commitment'
+    | 'open_question'
+    | 'relationship_signal'
+    | 'style_preference'
+    | 'tool_result_large'
+    | 'tool_result_refetchable'
+    | 'privacy_sensitive'
+    | 'possible_checkpoint_boundary'
   >;
   confidence: number;
   rationale: string;
@@ -614,7 +686,7 @@ export interface WorkingMemoryCompact {
   doNotInfer: DoNotInferRule[];
 
   criticStatus?: {
-    status: "unchecked" | "pass" | "fail" | "patched";
+    status: 'unchecked' | 'pass' | 'fail' | 'patched';
     checkedAt?: string;
     notes?: string[];
   };
@@ -646,7 +718,7 @@ export interface CommitmentState {
   commitment: string;
   madeBy: string;
   madeTo?: string;
-  status: "open" | "done" | "superseded" | "cancelled" | "unknown";
+  status: 'open' | 'done' | 'superseded' | 'cancelled' | 'unknown';
   dueAt?: string;
   confidence: number;
 }
@@ -679,7 +751,7 @@ export interface UserCorrectionState {
 export interface ChronologyItem {
   sourceEventIds: string[];
   event: string;
-  importance: "high" | "medium" | "low";
+  importance: 'high' | 'medium' | 'low';
 }
 
 export interface ExactSnippet {
@@ -703,12 +775,20 @@ export interface ToolResultRef {
   originalCall: Record<string, unknown>;
   createdAt: string;
   visibilityScope?: string;
-  reFetchPolicy: "safe_to_refetch" | "refetch_may_change" | "non_refetchable" | "unknown";
+  reFetchPolicy:
+    | 'safe_to_refetch'
+    | 'refetch_may_change'
+    | 'non_refetchable'
+    | 'unknown';
   refetchInstruction?: string;
   contentHash?: string;
   compactDigest: string;
   whenToRefetch: string;
-  rawResultStatus: "present_in_context" | "cleared_from_context" | "stored_externally" | "unavailable";
+  rawResultStatus:
+    | 'present_in_context'
+    | 'cleared_from_context'
+    | 'stored_externally'
+    | 'unavailable';
 }
 ```
 
@@ -716,13 +796,13 @@ export interface ToolResultRef {
 
 ```ts
 export type CheckpointType =
-  | "completed_topic"
-  | "decision"
-  | "user_correction"
-  | "agent_repair"
-  | "relationship_context"
-  | "tool_result_processed"
-  | "open_question_handoff";
+  | 'completed_topic'
+  | 'decision'
+  | 'user_correction'
+  | 'agent_repair'
+  | 'relationship_context'
+  | 'tool_result_processed'
+  | 'open_question_handoff';
 
 export interface MicroCheckpoint {
   checkpointId: string;
@@ -735,7 +815,7 @@ export interface MicroCheckpoint {
   mayDiscard: string[];
   doNotInfer: string[];
   relatedToolResultRefs?: string[];
-  criticStatus?: "unchecked" | "pass" | "fail" | "patched";
+  criticStatus?: 'unchecked' | 'pass' | 'fail' | 'patched';
 }
 ```
 
@@ -762,10 +842,10 @@ Start with a policy like:
 
 ```ts
 export interface RecentTailPolicy {
-  minTurns: number;         // e.g. 10
-  maxTurns: number;         // e.g. 30
-  minTokens: number;        // e.g. 8_000
-  maxTokens: number;        // e.g. 20_000
+  minTurns: number; // e.g. 10
+  maxTurns: number; // e.g. 30
+  minTokens: number; // e.g. 8_000
+  maxTokens: number; // e.g. 20_000
   neverCompactUnresolvedExchange: true;
   preserveUserCorrectionsUntilAcknowledged: true;
 }
@@ -785,10 +865,10 @@ Use multiple thresholds:
 
 ```ts
 export interface CompactionThresholds {
-  warnAtContextUsagePct: number;        // e.g. 0.55
-  opportunisticCheckpointPct: number;   // e.g. 0.65
-  globalCompactPct: number;             // e.g. 0.75
-  emergencyCompactPct: number;          // e.g. 0.90
+  warnAtContextUsagePct: number; // e.g. 0.55
+  opportunisticCheckpointPct: number; // e.g. 0.65
+  globalCompactPct: number; // e.g. 0.75
+  emergencyCompactPct: number; // e.g. 0.90
 }
 ```
 
@@ -849,7 +929,8 @@ tool_result_processed
 open_question_handoff
 ```
 
-Avoid raw "last N turns" as the conceptual unit. Turns are just UI artifacts. The right unit is an episode that changed conversational state.
+Avoid raw "last N turns" as the conceptual unit. Turns are just UI artifacts.
+The right unit is an episode that changed conversational state.
 
 ### 8.3 Agent-requested compaction
 
@@ -875,19 +956,19 @@ Expose a tool to the main agent, but make it advisory:
     "turn_range": {
       "type": "object",
       "properties": {
-        "start_event_id": {"type": "string"},
-        "end_event_id": {"type": "string"}
+        "start_event_id": { "type": "string" },
+        "end_event_id": { "type": "string" }
       },
       "required": ["start_event_id", "end_event_id"]
     },
-    "why_preserve": {"type": "string"},
+    "why_preserve": { "type": "string" },
     "must_preserve": {
       "type": "array",
-      "items": {"type": "string"}
+      "items": { "type": "string" }
     },
     "may_discard": {
       "type": "array",
-      "items": {"type": "string"}
+      "items": { "type": "string" }
     }
   }
 }
@@ -945,7 +1026,7 @@ Agent-facing advisory tool:
   "name": "mark_tool_result_ephemeral",
   "description": "Request that a large tool result be replaced after a short retention period by a compact digest and a refetch handle.",
   "parameters": {
-    "tool_call_id": {"type": "string"},
+    "tool_call_id": { "type": "string" },
     "reason": {
       "type": "string",
       "enum": [
@@ -955,9 +1036,9 @@ Agent-facing advisory tool:
         "contains_sensitive_or_noisy_content"
       ]
     },
-    "minimum_digest": {"type": "string"},
-    "refetch_instruction": {"type": "string"},
-    "retain_for_turns": {"type": "integer"}
+    "minimum_digest": { "type": "string" },
+    "refetch_instruction": { "type": "string" },
+    "retain_for_turns": { "type": "integer" }
   }
 }
 ```
@@ -966,7 +1047,8 @@ Agent-facing advisory tool:
 
 ## 9. Prompt library
 
-These prompts are intentionally written as operational prompts. They should be versioned and eval-tested.
+These prompts are intentionally written as operational prompts. They should be
+versioned and eval-tested.
 
 ### 9.1 Global working-memory compactor prompt
 
@@ -1076,7 +1158,7 @@ checkpoint:
     should be framed as a platform-agnostic shared agent persona with one model
     conversation/context.
   speaker_attribution:
-    user_abc: "Clarified that Slack is not the actual scope."
+    user_abc: 'Clarified that Slack is not the actual scope.'
   must_preserve:
     - Do not assume channel/thread/DM semantics.
     - Focus on compacting the live chain of user and assistant messages.
@@ -1130,22 +1212,22 @@ tool_result_ref:
   id: toolres_abc123
   tool_name: web_search
   original_call:
-    query: "OpenAI Responses API compaction docs"
-  created_at: "2026-05-25T..."
+    query: 'OpenAI Responses API compaction docs'
+  created_at: '2026-05-25T...'
   source_event_ids: [evt_204, evt_205]
-  visibility_scope: "global_persona"
-  re_fetch_policy: "refetch_may_change"
+  visibility_scope: 'global_persona'
+  re_fetch_policy: 'refetch_may_change'
   refetch_instruction: >
     Re-run the same web search or open the OpenAI compaction guide if exact API
     parameters are needed.
-  content_hash: "sha256:..."
+  content_hash: 'sha256:...'
   compact_digest: >
     OpenAI supports compaction for long-running conversations, including
     server-side and standalone compaction in the Responses API.
   when_to_refetch: >
     Refetch if implementation details, parameter names, or current availability
     are needed.
-  raw_result_status: "cleared_from_context"
+  raw_result_status: 'cleared_from_context'
 ```
 
 ### 9.4 Compact critic prompt
@@ -1288,11 +1370,14 @@ async function handleEvent(event: TranscriptEvent) {
   const classification = await classifyEvent(event);
   await eventIndex.storeClassification(classification);
 
-  if (classification.labels.includes("tool_result_large")) {
-    await toolResultManager.maybeCreateDigestAndScheduleClear(event, classification);
+  if (classification.labels.includes('tool_result_large')) {
+    await toolResultManager.maybeCreateDigestAndScheduleClear(
+      event,
+      classification
+    );
   }
 
-  if (classification.labels.includes("possible_checkpoint_boundary")) {
+  if (classification.labels.includes('possible_checkpoint_boundary')) {
     await checkpointPlanner.maybeCreateCheckpoint(event);
   }
 
@@ -1300,15 +1385,15 @@ async function handleEvent(event: TranscriptEvent) {
 
   if (contextState.usagePct >= thresholds.globalCompactPct) {
     await compactionManager.runGlobalCompaction({
-      reason: "token_threshold",
-      mode: "rolling"
+      reason: 'token_threshold',
+      mode: 'rolling',
     });
   }
 
   if (shouldRunPeriodicRebuild()) {
     await compactionManager.runGlobalCompaction({
-      reason: "periodic_rebuild",
-      mode: "rebuild_from_canonical_log"
+      reason: 'periodic_rebuild',
+      mode: 'rebuild_from_canonical_log',
     });
   }
 }
@@ -1319,19 +1404,17 @@ async function handleEvent(event: TranscriptEvent) {
 ```ts
 async function runGlobalCompaction(args: {
   reason: string;
-  mode: "rolling" | "rebuild_from_canonical_log";
+  mode: 'rolling' | 'rebuild_from_canonical_log';
 }) {
   const tailBoundary = await chooseRecentTailBoundary();
 
   const sourceEvents =
-    args.mode === "rolling"
+    args.mode === 'rolling'
       ? await getEventsSinceLastCompactUntil(tailBoundary)
       : await getCanonicalEventsUntil(tailBoundary);
 
   const priorCompact =
-    args.mode === "rolling"
-      ? await compactStore.getCurrent()
-      : undefined;
+    args.mode === 'rolling' ? await compactStore.getCurrent() : undefined;
 
   const checkpoints = await checkpointStore.getUnmergedBefore(tailBoundary);
   const toolRefs = await toolResultStore.getActiveRefsBefore(tailBoundary);
@@ -1341,25 +1424,25 @@ async function runGlobalCompaction(args: {
     sourceEvents,
     checkpoints,
     toolRefs,
-    tailBoundary
+    tailBoundary,
   });
 
   const critic = await compactCritic.audit({
     compact: draftCompact,
     sourceEvents,
     checkpoints,
-    toolRefs
+    toolRefs,
   });
 
   const finalCompact =
-    critic.status === "PASS"
+    critic.status === 'PASS'
       ? draftCompact
       : await compactor.patch({ draftCompact, critic, sourceEvents });
 
   await compactStore.save(finalCompact);
   await transcriptLog.append({
     id: newId(),
-    type: "global_compaction",
+    type: 'global_compaction',
     createdAt: now(),
     content: JSON.stringify(finalCompact),
     metadata: {
@@ -1367,8 +1450,8 @@ async function runGlobalCompaction(args: {
       mode: args.mode,
       sourceStartEventId: sourceEvents[0]?.id,
       sourceEndEventId: sourceEvents[sourceEvents.length - 1]?.id,
-      tailBoundaryEventId: tailBoundary.eventId
-    }
+      tailBoundaryEventId: tailBoundary.eventId,
+    },
   });
 
   await checkpointStore.markMerged(finalCompact);
@@ -1378,7 +1461,9 @@ async function runGlobalCompaction(args: {
 ### 10.3 Context assembly
 
 ```ts
-async function assembleContext(currentUserEvent: TranscriptEvent): Promise<ModelMessage[]> {
+async function assembleContext(
+  currentUserEvent: TranscriptEvent
+): Promise<ModelMessage[]> {
   const system = await loadSystemPersona();
   const coreMemory = await maybeLoadCoreMemorySnippets(currentUserEvent);
   const compact = await compactStore.getCurrent();
@@ -1388,7 +1473,7 @@ async function assembleContext(currentUserEvent: TranscriptEvent): Promise<Model
   const recentTail = await transcriptLog.getRecentTail({
     minTurns: 10,
     maxTokens: 20_000,
-    neverCompactUnresolvedExchange: true
+    neverCompactUnresolvedExchange: true,
   });
 
   return renderModelMessages({
@@ -1399,7 +1484,7 @@ async function assembleContext(currentUserEvent: TranscriptEvent): Promise<Model
     checkpoints,
     toolRefs,
     recentTail,
-    currentUserEvent
+    currentUserEvent,
   });
 }
 ```
@@ -1411,8 +1496,10 @@ async function maybeCreateDigestAndScheduleClear(
   toolResultEvent: TranscriptEvent,
   classification: EventClassification
 ) {
-  const isLarge = classification.labels.includes("tool_result_large");
-  const isRefetchable = classification.labels.includes("tool_result_refetchable");
+  const isLarge = classification.labels.includes('tool_result_large');
+  const isRefetchable = classification.labels.includes(
+    'tool_result_refetchable'
+  );
 
   if (!isLarge) return;
 
@@ -1422,10 +1509,11 @@ async function maybeCreateDigestAndScheduleClear(
     await toolResultStore.scheduleClear({
       toolResultEventId: toolResultEvent.id,
       retainForTurns: 2,
-      clearAtTopicBoundary: true
+      clearAtTopicBoundary: true,
     });
   } else {
-    const compacted = await toolResultDigester.compactNonRefetchable(toolResultEvent);
+    const compacted =
+      await toolResultDigester.compactNonRefetchable(toolResultEvent);
     await toolResultStore.saveCompactedResult(compacted);
   }
 }
@@ -1435,7 +1523,8 @@ async function maybeCreateDigestAndScheduleClear(
 
 ## 11. The canonical working-memory compact template
 
-Use this as the rendered text if not using JSON. JSON/YAML is better for machine validation, but this is easier for the model to read.
+Use this as the rendered text if not using JSON. JSON/YAML is better for machine
+validation, but this is easier for the model to read.
 
 ```text
 <working_memory_compact>
@@ -1527,7 +1616,8 @@ For each participant:
 
 ### 12.1 Typed compaction capsules
 
-Structured compacts outperform freeform summaries for this use case because they force the model to preserve state classes that generic summarizers drop.
+Structured compacts outperform freeform summaries for this use case because they
+force the model to preserve state classes that generic summarizers drop.
 
 Especially important fields:
 
@@ -1544,11 +1634,13 @@ do_not_infer
 
 ### 12.2 Recent verbatim tail
 
-Keep recent turns raw. Summaries are worst near the live edge of the conversation because tone, pronouns, and unresolved references are dense.
+Keep recent turns raw. Summaries are worst near the live edge of the
+conversation because tone, pronouns, and unresolved references are dense.
 
 ### 12.3 Semantic micro-checkpoints
 
-The user-proposed "summarize recent history while fresh" idea is strong. Implement it as semantic checkpointing, not arbitrary last-N summarization.
+The user-proposed "summarize recent history while fresh" idea is strong.
+Implement it as semantic checkpointing, not arbitrary last-N summarization.
 
 Strong checkpoint types:
 
@@ -1564,11 +1656,13 @@ completed_topic
 
 ### 12.4 Ephemeral tool-result handles
 
-This is a high-confidence MVP feature. It saves tokens while preserving recoverability.
+This is a high-confidence MVP feature. It saves tokens while preserving
+recoverability.
 
 ### 12.5 Separate compaction role/call
 
-Best practice is to separate compaction from the main persona as a runtime operation.
+Best practice is to separate compaction from the main persona as a runtime
+operation.
 
 Important nuance:
 
@@ -1577,15 +1671,18 @@ separate compaction role/call: yes
 separate underlying model: optional
 ```
 
-Use strong models for global compaction. Use cheaper models for tool digests and simple micro-checkpoints if evals pass.
+Use strong models for global compaction. Use cheaper models for tool digests and
+simple micro-checkpoints if evals pass.
 
 ### 12.6 Compact critic
 
-Use a critic pass to catch lost commitments, lost corrections, merged users, and uncertainty hardening.
+Use a critic pass to catch lost commitments, lost corrections, merged users, and
+uncertainty hardening.
 
 ### 12.7 Periodic rebuild
 
-Rolling compaction is efficient but drift-prone. Rebuild from canonical transcript periodically.
+Rolling compaction is efficient but drift-prone. Rebuild from canonical
+transcript periodically.
 
 ---
 
@@ -1606,23 +1703,29 @@ Common failures:
 
 ### 13.2 Oldest-message trimming as the primary mechanism
 
-This deletes the origins of commitments and repairs. It is acceptable only for known-low-value content.
+This deletes the origins of commitments and repairs. It is acceptable only for
+known-low-value content.
 
 ### 13.3 Undifferentiated vector retrieval
 
-Vector retrieval can recover old content, but it does not maintain the agent's current conversational self. It also struggles with authority, contradiction, and recency.
+Vector retrieval can recover old content, but it does not maintain the agent's
+current conversational self. It also struggles with authority, contradiction,
+and recency.
 
 ### 13.4 Opaque provider compaction as the only state
 
-Opaque compaction is not inspectable enough for an employee-like persona. It may be an optimization, not the canonical product state.
+Opaque compaction is not inspectable enough for an employee-like persona. It may
+be an optimization, not the canonical product state.
 
 ### 13.5 Tool clearing without digest/refetch handle
 
-A placeholder like "tool result removed" is insufficient. The agent needs a digest, provenance, and refetch instruction.
+A placeholder like "tool result removed" is insufficient. The agent needs a
+digest, provenance, and refetch instruction.
 
 ### 13.6 Treating many users as one user
 
-"The user wants..." is dangerous in a shared multi-user persona. Use speaker IDs and scoping.
+"The user wants..." is dangerous in a shared multi-user persona. Use speaker IDs
+and scoping.
 
 ---
 
@@ -1665,20 +1768,20 @@ Rubric:
 
 ### 14.2 Probe categories
 
-| Probe | What it tests |
-|---|---|
-| Commitment recall | Does the agent remember what it promised? |
-| Correction recall | Does it avoid repeating a corrected mistake? |
-| Speaker attribution | Does it know who said what? |
-| Multi-user boundary | Does it avoid applying Alice's preference to Bob? |
-| Live-topic continuity | Does it answer the unresolved current question? |
-| Emotional continuity | Does it preserve rapport, apology, frustration, humor? |
-| Persona continuity | Does it sound like the same teammate? |
-| Tool refetch | Can it recover cleared tool details when needed? |
-| Staleness | Does recent info override old compacted info? |
-| Uncertainty | Does it preserve "maybe" vs "known"? |
-| Privacy | Does it avoid leaking scoped/local context? |
-| Compaction drift | Does behavior degrade after repeated compactions? |
+| Probe                 | What it tests                                          |
+| --------------------- | ------------------------------------------------------ |
+| Commitment recall     | Does the agent remember what it promised?              |
+| Correction recall     | Does it avoid repeating a corrected mistake?           |
+| Speaker attribution   | Does it know who said what?                            |
+| Multi-user boundary   | Does it avoid applying Alice's preference to Bob?      |
+| Live-topic continuity | Does it answer the unresolved current question?        |
+| Emotional continuity  | Does it preserve rapport, apology, frustration, humor? |
+| Persona continuity    | Does it sound like the same teammate?                  |
+| Tool refetch          | Can it recover cleared tool details when needed?       |
+| Staleness             | Does recent info override old compacted info?          |
+| Uncertainty           | Does it preserve "maybe" vs "known"?                   |
+| Privacy               | Does it avoid leaking scoped/local context?            |
+| Compaction drift      | Does behavior degrade after repeated compactions?      |
 
 ### 14.3 Synthetic transcript generator
 
@@ -1863,7 +1966,8 @@ Recursive is cheaper and faster; periodic rebuild catches drift.
 
 ### Experiment 5: Multi-user attribution stress
 
-Create transcripts where users disagree, correct one another, and reveal scoped/private information.
+Create transcripts where users disagree, correct one another, and reveal
+scoped/private information.
 
 Expected compact language:
 
@@ -2094,7 +2198,8 @@ src/
 
 - [ ] Append-only canonical transcript log with event IDs.
 - [ ] WorkingMemoryCompact schema.
-- [ ] Context assembler: system + compact + checkpoints + tool refs + recent tail + current message.
+- [ ] Context assembler: system + compact + checkpoints + tool refs + recent
+      tail + current message.
 - [ ] Global compactor prompt and model call.
 - [ ] Recent verbatim tail selection.
 - [ ] Compact critic prompt and model call.
@@ -2120,7 +2225,8 @@ src/
 
 - [ ] Behavioral-equivalence judge.
 - [ ] Synthetic transcript generator.
-- [ ] Probe suites for corrections, commitments, multi-user attribution, tool refetch, emotional continuity.
+- [ ] Probe suites for corrections, commitments, multi-user attribution, tool
+      refetch, emotional continuity.
 - [ ] Drift evaluation after repeated compaction.
 
 ---
@@ -2133,17 +2239,18 @@ Use separate compaction **role/call**. Underlying model may vary.
 
 Recommended defaults:
 
-| Operation | Suggested model tier |
-|---|---|
-| Tool-result digest | cheap/mid model |
-| Micro-checkpoint | cheap/mid model, unless high-risk |
-| Global compact | same tier as main model or one tier below only after evals |
-| Compact critic | same tier as global compact |
-| Periodic rebuild | strong model |
+| Operation          | Suggested model tier                                       |
+| ------------------ | ---------------------------------------------------------- |
+| Tool-result digest | cheap/mid model                                            |
+| Micro-checkpoint   | cheap/mid model, unless high-risk                          |
+| Global compact     | same tier as main model or one tier below only after evals |
+| Compact critic     | same tier as global compact                                |
+| Periodic rebuild   | strong model                                               |
 
 ### 19.2 Provider-native compaction
 
-Implement a provider abstraction, but do not make provider-native opaque compaction canonical.
+Implement a provider abstraction, but do not make provider-native opaque
+compaction canonical.
 
 ```ts
 export interface CompactionProvider {
@@ -2303,13 +2410,16 @@ These need empirical tuning:
 1. How large should the recent verbatim tail be for your main model?
 2. What threshold should trigger global compaction?
 3. How often should periodic rebuild happen?
-4. Should micro-checkpoints be included directly in context or only fed into global compaction?
+4. Should micro-checkpoints be included directly in context or only fed into
+   global compaction?
 5. Which tool results are truly re-fetchable?
 6. What participant visibility scopes are required for privacy?
 7. How often does the main agent request useful checkpoints vs noisy ones?
-8. Which model is cost-effective for global compaction without degrading persona continuity?
+8. Which model is cost-effective for global compaction without degrading persona
+   continuity?
 9. Should the compact be JSON, YAML, or text sections?
-10. How much emotional/relationship state is useful before it becomes creepy or stale?
+10. How much emotional/relationship state is useful before it becomes creepy or
+    stale?
 
 ---
 
@@ -2365,44 +2475,53 @@ These need empirical tuning:
     https://aclanthology.org/2024.tacl-1.9/  
     https://arxiv.org/abs/2307.03172
 
-16. Wang et al. — Recursively Summarizing Enables Long-Term Dialogue Memory in Large Language Models  
+16. Wang et al. — Recursively Summarizing Enables Long-Term Dialogue Memory in
+    Large Language Models  
     https://arxiv.org/abs/2308.15022
 
-17. Wu et al. — ReSum: Unlocking Long-Horizon Search Intelligence via Context Summarization  
+17. Wu et al. — ReSum: Unlocking Long-Horizon Search Intelligence via Context
+    Summarization  
     https://arxiv.org/html/2509.13313v2  
     https://openreview.net/forum?id=PjIK38mwKm
 
 18. Li et al. — Prompt Compression for Large Language Models: A Survey  
     https://arxiv.org/abs/2410.12388
 
-19. Jiang et al. — LongLLMLingua: Accelerating and Enhancing LLMs in Long Context Scenarios via Prompt Compression  
+19. Jiang et al. — LongLLMLingua: Accelerating and Enhancing LLMs in Long
+    Context Scenarios via Prompt Compression  
     https://arxiv.org/abs/2310.06839
 
 20. Park et al. — Generative Agents: Interactive Simulacra of Human Behavior  
     https://arxiv.org/abs/2304.03442
 
-21. Shinn et al. — Reflexion: Language Agents with Verbal Reinforcement Learning  
+21. Shinn et al. — Reflexion: Language Agents with Verbal Reinforcement
+    Learning  
     https://arxiv.org/abs/2303.11366
 
-22. Maharana et al. — Evaluating Very Long-Term Conversational Memory of LLM Agents / LoCoMo  
+22. Maharana et al. — Evaluating Very Long-Term Conversational Memory of LLM
+    Agents / LoCoMo  
     https://arxiv.org/abs/2402.17753  
     https://snap-research.github.io/locomo/
 
-23. Tavakoli et al. — BEAM: Benchmarking and Enhancing Long-Term Memory in LLMs  
+23. Tavakoli et al. — BEAM: Benchmarking and Enhancing Long-Term Memory in
+    LLMs  
     https://openreview.net/forum?id=y59hf5lrMn  
     https://github.com/mohammadtavakoli78/BEAM
 
-24. Hu et al. — MemoryAgentBench / Evaluating Memory in LLM Agents via Incremental Multi-Turn Interactions  
+24. Hu et al. — MemoryAgentBench / Evaluating Memory in LLM Agents via
+    Incremental Multi-Turn Interactions  
     https://arxiv.org/abs/2507.05257  
     https://github.com/HUST-AI-HYZ/MemoryAgentBench
 
 25. Packer et al. — MemGPT: Towards LLMs as Operating Systems  
     https://arxiv.org/abs/2310.08560
 
-26. Chhikara et al. — Mem0: Building Production-Ready AI Agents with Scalable Long-Term Memory  
+26. Chhikara et al. — Mem0: Building Production-Ready AI Agents with Scalable
+    Long-Term Memory  
     https://arxiv.org/abs/2504.19413
 
-27. Rasmussen et al. — Zep: A Temporal Knowledge Graph Architecture for Agent Memory  
+27. Rasmussen et al. — Zep: A Temporal Knowledge Graph Architecture for Agent
+    Memory  
     https://arxiv.org/abs/2501.13956
 
 28. Graphiti repository  
@@ -2435,7 +2554,8 @@ if tokens > limit:
 
 The core product insight:
 
-> The compact is not a summary. It is the live, bounded, editable representation of the agent persona's conversational self.
+> The compact is not a summary. It is the live, bounded, editable representation
+> of the agent persona's conversational self.
 
 The MVP should prove that:
 

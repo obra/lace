@@ -232,12 +232,7 @@ export class ReminderScheduler {
         if (newNext !== row.next_fire_at) {
           // If the persisted time is meaningfully in the past, count fires dropped during downtime.
           if (row.next_fire_at < now - 60_000) {
-            const dropped = countCronMatchesInWindow(
-              row.recurs.expr,
-              tz,
-              row.next_fire_at,
-              now
-            );
+            const dropped = countCronMatchesInWindow(row.recurs.expr, tz, row.next_fire_at, now);
             logger.warn('reminders.dropped_fires', {
               row_id: row.id,
               prompt: row.prompt,
@@ -397,10 +392,7 @@ export class ReminderScheduler {
     });
   }
 
-  private computePostFire(
-    prior: ReminderRow,
-    firedAt: number
-  ): { nextRow: ReminderRow | null } {
+  private computePostFire(prior: ReminderRow, firedAt: number): { nextRow: ReminderRow | null } {
     if (prior.recurs === null) {
       // One-shot: delete after firing.
       return { nextRow: null };

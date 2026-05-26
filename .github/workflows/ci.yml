@@ -48,7 +48,7 @@ jobs:
         run: npm run lint
 
       - name: Check Prettier formatting
-        run: npx prettier --check "packages/{agent,ent-protocol,cli}/src/**/*.ts"
+        run: npm run format:check
 
       - name: Run tests with coverage
         run: npm run test:coverage

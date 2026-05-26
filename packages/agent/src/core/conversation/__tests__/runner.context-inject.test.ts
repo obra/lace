@@ -4,7 +4,7 @@
 // Also verifies PRI-1744: context_injected events written between turns (after
 // turn_end but before run()) are picked up via findLastTurnEndEventSeq watermark.
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';

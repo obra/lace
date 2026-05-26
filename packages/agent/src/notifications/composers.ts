@@ -147,4 +147,3 @@ export function composeSubagentExitedBody(s: SubagentExitedReminderCompose): str
     .join('\n');
   return `${head}:\n${lines}`;
 }
-

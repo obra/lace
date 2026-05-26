@@ -1,18 +1,37 @@
 # Reminders Rework Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the shipped `schedule_alarm` / `cancel_alarm` / `list_alarms` surface with a single `manage_reminders` tool backed by a new per-session async-mutex scheduler, per the spec at `docs/specs/2026-05-22-alarms-coherent-design.md`.
+**Goal:** Replace the shipped `schedule_alarm` / `cancel_alarm` / `list_alarms`
+surface with a single `manage_reminders` tool backed by a new per-session
+async-mutex scheduler, per the spec at
+`docs/specs/2026-05-22-alarms-coherent-design.md`.
 
-**Architecture:** One tool (`manage_reminders`) with action enum (`schedule`/`cancel`/`list`); type-discriminated `next`/`recurs` time fields; per-session async mutex serializes the fire path and tool handlers; single-write fire path with at-most-one-missed-on-failure semantics; storage in `<sessionDir>/reminders.json` with a simplified row shape (no `status`, no `notify_attempts`); notification kind `reminder` with structured attributes for envelope metadata; cron evaluated in agent localtime via `process.env.TZ` / `Intl` fallback.
+**Architecture:** One tool (`manage_reminders`) with action enum
+(`schedule`/`cancel`/`list`); type-discriminated `next`/`recurs` time fields;
+per-session async mutex serializes the fire path and tool handlers; single-write
+fire path with at-most-one-missed-on-failure semantics; storage in
+`<sessionDir>/reminders.json` with a simplified row shape (no `status`, no
+`notify_attempts`); notification kind `reminder` with structured attributes for
+envelope metadata; cron evaluated in agent localtime via `process.env.TZ` /
+`Intl` fallback.
 
-**Tech Stack:** TypeScript 5.6+, Node 20.18+, zod for schema validation, `cron-parser` for cron evaluation, Vitest for tests, lace's existing `atomicWriteJson`/`injectNotification`/`appendDurableEvent` utilities.
+**Tech Stack:** TypeScript 5.6+, Node 20.18+, zod for schema validation,
+`cron-parser` for cron evaluation, Vitest for tests, lace's existing
+`atomicWriteJson`/`injectNotification`/`appendDurableEvent` utilities.
 
 **Reading order before starting:**
-1. `docs/specs/2026-05-22-alarms-coherent-design.md` — the spec this plan implements.
+
+1. `docs/specs/2026-05-22-alarms-coherent-design.md` — the spec this plan
+   implements.
 2. `packages/agent/src/alarms/` — the shipped code being replaced.
-3. `packages/agent/src/notifications/notification-wrapper.ts` — utility being modified.
-4. `packages/agent/src/server.ts:262-340` — alarm scheduler wiring being replaced.
+3. `packages/agent/src/notifications/notification-wrapper.ts` — utility being
+   modified.
+4. `packages/agent/src/server.ts:262-340` — alarm scheduler wiring being
+   replaced.
 
 ---
 
@@ -66,17 +85,24 @@ packages/agent/src/tools/implementations/__tests__/cancel_alarm.test.ts
 packages/agent/src/tools/implementations/__tests__/list_alarms.test.ts
 ```
 
-**Why this structure:** The new subsystem is built in parallel under `packages/agent/src/reminders/` while the old `alarms/` directory keeps the system working. Only the final task deletes old code, by which point the new system is wired up and tests pass. This makes the transition reviewable as one commit and trivially revertable.
+**Why this structure:** The new subsystem is built in parallel under
+`packages/agent/src/reminders/` while the old `alarms/` directory keeps the
+system working. Only the final task deletes old code, by which point the new
+system is wired up and tests pass. This makes the transition reviewable as one
+commit and trivially revertable.
 
 ---
 
 ## Task 1: Async mutex utility
 
 **Files:**
+
 - Create: `packages/agent/src/reminders/async-mutex.ts`
 - Create: `packages/agent/src/reminders/__tests__/async-mutex.test.ts`
 
-Lace's existing `runExclusive` pattern (see `server.ts:413`) is a Promise-chain mutex tied to `AgentServerState.sessionMutex`. We need a standalone version we can attach to the reminder scheduler.
+Lace's existing `runExclusive` pattern (see `server.ts:413`) is a Promise-chain
+mutex tied to `AgentServerState.sessionMutex`. We need a standalone version we
+can attach to the reminder scheduler.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -133,7 +159,8 @@ describe('AsyncMutex', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd packages/agent && npx vitest --run src/reminders/__tests__/async-mutex.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/reminders/__tests__/async-mutex.test.ts`
 Expected: FAIL with "Cannot find module '../async-mutex'".
 
 - [ ] **Step 3: Write the implementation**
@@ -171,7 +198,8 @@ export class AsyncMutex {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd packages/agent && npx vitest --run src/reminders/__tests__/async-mutex.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/reminders/__tests__/async-mutex.test.ts`
 Expected: 3 tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -186,9 +214,12 @@ git commit -m "feat(reminders): add per-session AsyncMutex utility"
 ## Task 2: Reminders types module
 
 **Files:**
+
 - Create: `packages/agent/src/reminders/types.ts`
 
-The new row shape is structurally simpler than the alarm one: no `status` field, no `pending_cancel`, no `notify_attempts`, no separate `kind` enum. Recurrence is a discriminated union directly on the row.
+The new row shape is structurally simpler than the alarm one: no `status` field,
+no `pending_cancel`, no `notify_attempts`, no separate `kind` enum. Recurrence
+is a discriminated union directly on the row.
 
 - [ ] **Step 1: Write the types**
 
@@ -236,8 +267,9 @@ export const MIN_INTERVAL_MS = MIN_INTERVAL_SECONDS * 1000;
 
 - [ ] **Step 2: Verify type-check**
 
-Run: `cd packages/agent && npx tsc --noEmit -p tsconfig.json`
-Expected: no errors related to `reminders/types.ts`. (If there are unrelated pre-existing errors in the package, ignore — we only care that the new file type-checks.)
+Run: `cd packages/agent && npx tsc --noEmit -p tsconfig.json` Expected: no
+errors related to `reminders/types.ts`. (If there are unrelated pre-existing
+errors in the package, ignore — we only care that the new file type-checks.)
 
 - [ ] **Step 3: Commit**
 
@@ -251,10 +283,16 @@ git commit -m "feat(reminders): add ReminderRow + recurrence type discriminated 
 ## Task 3: Cron helpers — 5-min floor with 20-sample window
 
 **Files:**
+
 - Create: `packages/agent/src/reminders/cron.ts`
 - Create: `packages/agent/src/reminders/__tests__/cron.test.ts`
 
-The new floor is **5 minutes**, sampled over the next 20 cron fires (catches irregular patterns the shipped 2-sample check missed). Drop `assertValidIanaTimezone` — the timezone is no longer agent-supplied; we pull from `process.env.TZ`. Drop jitter — the original purpose (back-firing protection across many agents) doesn't apply to a single-session local scheduler.
+The new floor is **5 minutes**, sampled over the next 20 cron fires (catches
+irregular patterns the shipped 2-sample check missed). Drop
+`assertValidIanaTimezone` — the timezone is no longer agent-supplied; we pull
+from `process.env.TZ`. Drop jitter — the original purpose (back-firing
+protection across many agents) doesn't apply to a single-session local
+scheduler.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -295,29 +333,46 @@ describe('computeNextCronFire', () => {
 
 describe('assertCronAtLeast5MinInterval', () => {
   it('accepts cron with min delta >= 5 minutes', () => {
-    expect(() => assertCronAtLeast5MinInterval('*/5 * * * *', 'UTC')).not.toThrow();
-    expect(() => assertCronAtLeast5MinInterval('0 9 * * 1-5', 'UTC')).not.toThrow();
-    expect(() => assertCronAtLeast5MinInterval('0,30 9-17 * * 1-5', 'UTC')).not.toThrow();
+    expect(() =>
+      assertCronAtLeast5MinInterval('*/5 * * * *', 'UTC')
+    ).not.toThrow();
+    expect(() =>
+      assertCronAtLeast5MinInterval('0 9 * * 1-5', 'UTC')
+    ).not.toThrow();
+    expect(() =>
+      assertCronAtLeast5MinInterval('0,30 9-17 * * 1-5', 'UTC')
+    ).not.toThrow();
   });
   it('rejects cron with min delta < 5 minutes', () => {
-    expect(() => assertCronAtLeast5MinInterval('*/1 * * * *', 'UTC')).toThrow(/minimum interval is 5 minutes/i);
-    expect(() => assertCronAtLeast5MinInterval('* * * * *', 'UTC')).toThrow(/minimum interval is 5 minutes/i);
+    expect(() => assertCronAtLeast5MinInterval('*/1 * * * *', 'UTC')).toThrow(
+      /minimum interval is 5 minutes/i
+    );
+    expect(() => assertCronAtLeast5MinInterval('* * * * *', 'UTC')).toThrow(
+      /minimum interval is 5 minutes/i
+    );
   });
   it('rejects cron with tight cluster across 20-sample window', () => {
     // `0,1 9 * * *` fires at 9:00 and 9:01 daily — 1-min gap inside cluster, 23h59m gap between clusters.
     // 20 samples spans ~10 days and sees the 1-min gap.
-    expect(() => assertCronAtLeast5MinInterval('0,1 9 * * *', 'UTC')).toThrow(/minimum interval is 5 minutes/i);
+    expect(() => assertCronAtLeast5MinInterval('0,1 9 * * *', 'UTC')).toThrow(
+      /minimum interval is 5 minutes/i
+    );
   });
   it('rejects invalid cron syntax', () => {
-    expect(() => assertCronAtLeast5MinInterval('not a cron', 'UTC')).toThrow(/invalid cron expression/i);
-    expect(() => assertCronAtLeast5MinInterval('0 9', 'UTC')).toThrow(/invalid cron expression/i);
+    expect(() => assertCronAtLeast5MinInterval('not a cron', 'UTC')).toThrow(
+      /invalid cron expression/i
+    );
+    expect(() => assertCronAtLeast5MinInterval('0 9', 'UTC')).toThrow(
+      /invalid cron expression/i
+    );
   });
 });
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd packages/agent && npx vitest --run src/reminders/__tests__/cron.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/reminders/__tests__/cron.test.ts`
 Expected: FAIL with module-not-found errors.
 
 - [ ] **Step 3: Write the implementation**
@@ -363,7 +418,10 @@ export function computeNextCronFire(
  * irregular patterns like `0,1 9 * * *` (1-min cluster gap) that a
  * 2-sample check would miss.
  */
-export function assertCronAtLeast5MinInterval(expr: string, timezone: string): void {
+export function assertCronAtLeast5MinInterval(
+  expr: string,
+  timezone: string
+): void {
   let interval: ReturnType<typeof CronExpressionParser.parse>;
   try {
     interval = CronExpressionParser.parse(expr, { tz: timezone });
@@ -398,7 +456,8 @@ export function assertCronAtLeast5MinInterval(expr: string, timezone: string): v
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd packages/agent && npx vitest --run src/reminders/__tests__/cron.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/reminders/__tests__/cron.test.ts`
 Expected: All tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -413,10 +472,13 @@ git commit -m "feat(reminders): cron helpers with 5-min floor and 20-sample wind
 ## Task 4: ReminderStore
 
 **Files:**
+
 - Create: `packages/agent/src/reminders/store.ts`
 - Create: `packages/agent/src/reminders/__tests__/store.test.ts`
 
-`ReminderStore` is intentionally simpler than `AlarmStore`. No `status` machinery, no `claim/markFired/rescheduleCron`. The store is just load + persist. The scheduler does state computation; the store does I/O.
+`ReminderStore` is intentionally simpler than `AlarmStore`. No `status`
+machinery, no `claim/markFired/rescheduleCron`. The store is just load +
+persist. The scheduler does state computation; the store does I/O.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -456,7 +518,9 @@ describe('ReminderStore', () => {
     const s = new ReminderStore(dir);
     s.save([exampleRow()]);
     expect(existsSync(join(dir, 'reminders.json'))).toBe(true);
-    const raw = JSON.parse(readFileSync(join(dir, 'reminders.json'), 'utf8')) as {
+    const raw = JSON.parse(
+      readFileSync(join(dir, 'reminders.json'), 'utf8')
+    ) as {
       reminders: ReminderRow[];
     };
     expect(raw.reminders).toHaveLength(1);
@@ -466,7 +530,10 @@ describe('ReminderStore', () => {
   it('load reads previously-saved snapshot', () => {
     const dir = tempSessionDir();
     const s = new ReminderStore(dir);
-    s.save([exampleRow('reminder_111111111111'), exampleRow('reminder_222222222222')]);
+    s.save([
+      exampleRow('reminder_111111111111'),
+      exampleRow('reminder_222222222222'),
+    ]);
     const s2 = new ReminderStore(dir);
     const rows = s2.list();
     expect(rows.map((r) => r.id).sort()).toEqual([
@@ -504,7 +571,8 @@ describe('ReminderStore', () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd packages/agent && npx vitest --run src/reminders/__tests__/store.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/reminders/__tests__/store.test.ts`
 Expected: FAIL with module-not-found errors.
 
 - [ ] **Step 3: Write the implementation**
@@ -534,9 +602,13 @@ export class ReminderStore {
   list(): ReminderRow[] {
     if (!existsSync(this.path)) return [];
     try {
-      const raw = JSON.parse(readFileSync(this.path, 'utf8')) as Partial<RemindersSnapshot>;
+      const raw = JSON.parse(
+        readFileSync(this.path, 'utf8')
+      ) as Partial<RemindersSnapshot>;
       const rows = Array.isArray(raw.reminders) ? raw.reminders : [];
-      return rows.filter((r): r is ReminderRow => typeof (r as ReminderRow)?.id === 'string');
+      return rows.filter(
+        (r): r is ReminderRow => typeof (r as ReminderRow)?.id === 'string'
+      );
     } catch (err) {
       logger.warn('reminders.store.corrupt_snapshot', {
         path: this.path,
@@ -556,7 +628,8 @@ export class ReminderStore {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd packages/agent && npx vitest --run src/reminders/__tests__/store.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/reminders/__tests__/store.test.ts`
 Expected: All tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -571,10 +644,12 @@ git commit -m "feat(reminders): add ReminderStore (pure load/save)"
 ## Task 5: ReminderScheduler — fire path under the mutex
 
 **Files:**
+
 - Create: `packages/agent/src/reminders/scheduler.ts`
 - Create: `packages/agent/src/reminders/__tests__/scheduler.test.ts`
 
-The scheduler owns the mutex, the in-memory min-heap, the wake timer, and the fire path (§3.3 of the spec). Schedule, cancel, and list call into it.
+The scheduler owns the mutex, the in-memory min-heap, the wake timer, and the
+fire path (§3.3 of the spec). Schedule, cancel, and list call into it.
 
 ### What it exposes
 
@@ -591,11 +666,14 @@ class ReminderScheduler {
 }
 ```
 
-The deps include `sessionDir`, `now()`, `notifier`, `onError`. The scheduler creates its own `ReminderStore`, `AsyncMutex`, and heap internally.
+The deps include `sessionDir`, `now()`, `notifier`, `onError`. The scheduler
+creates its own `ReminderStore`, `AsyncMutex`, and heap internally.
 
 ### What this task covers
 
-The fire path only (§3.3). Schedule, cancel, and list go in later tasks. We'll test by directly inserting a row via the store, ticking the scheduler, and asserting the notification was emitted.
+The fire path only (§3.3). Schedule, cancel, and list go in later tasks. We'll
+test by directly inserting a row via the store, ticking the scheduler, and
+asserting the notification was emitted.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -641,7 +719,11 @@ describe('ReminderScheduler fire path', () => {
     const row = makeRow({ next_fire_at: 1000 });
     store.save([row]);
 
-    const fired: Array<{ row: ReminderRow; firedAt: number; fireCount: number }> = [];
+    const fired: Array<{
+      row: ReminderRow;
+      firedAt: number;
+      fireCount: number;
+    }> = [];
     const sched = new ReminderScheduler({
       sessionDir: dir,
       now: () => 2000, // past next_fire_at
@@ -683,7 +765,11 @@ describe('ReminderScheduler fire path', () => {
     const rows = new ReminderStore(dir).list();
     expect(rows).toHaveLength(1);
     expect(rows[0].next_fire_at).toBe(2000 + 5 * 60_000);
-    expect(rows[0].recurs).toEqual({ kind: 'count', interval_ms: 5 * 60_000, remaining: 2 });
+    expect(rows[0].recurs).toEqual({
+      kind: 'count',
+      interval_ms: 5 * 60_000,
+      remaining: 2,
+    });
     expect(rows[0].fire_count).toBe(1);
     expect(rows[0].fired_at).toBe(2000);
   });
@@ -729,7 +815,9 @@ describe('ReminderScheduler fire path', () => {
 
     const rows = new ReminderStore(dir).list();
     expect(rows).toHaveLength(1);
-    expect(rows[0].next_fire_at).toBe(new Date('2026-05-23T09:00:00Z').getTime());
+    expect(rows[0].next_fire_at).toBe(
+      new Date('2026-05-23T09:00:00Z').getTime()
+    );
   });
 
   it('on notifier failure, post-fire state is still committed (at-most-one-missed)', async () => {
@@ -784,13 +872,18 @@ describe('ReminderScheduler fire path', () => {
       },
     });
     // Force store.save to throw once on next call.
-    const realSave = (sched as unknown as { store: { save: typeof ReminderStore.prototype.save } }).store.save;
+    const realSave = (
+      sched as unknown as {
+        store: { save: typeof ReminderStore.prototype.save };
+      }
+    ).store.save;
     let calls = 0;
-    (sched as unknown as { store: { save: typeof realSave } }).store.save = function (rows) {
-      calls++;
-      if (calls === 1) throw new Error('disk full');
-      return realSave.call(this, rows);
-    };
+    (sched as unknown as { store: { save: typeof realSave } }).store.save =
+      function (rows) {
+        calls++;
+        if (calls === 1) throw new Error('disk full');
+        return realSave.call(this, rows);
+      };
 
     await sched.tickForTest(2000);
 
@@ -806,7 +899,8 @@ describe('ReminderScheduler fire path', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd packages/agent && npx vitest --run src/reminders/__tests__/scheduler.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/reminders/__tests__/scheduler.test.ts`
 Expected: FAIL with module-not-found.
 
 - [ ] **Step 3: Write the implementation**
@@ -948,7 +1042,9 @@ export class ReminderScheduler {
       const idx = rows.findIndex((r) => r.id === id);
       if (idx < 0) return; // Cancelled between tick and mutex acquire.
 
-      const prior: ReminderRow = JSON.parse(JSON.stringify(rows[idx])) as ReminderRow;
+      const prior: ReminderRow = JSON.parse(
+        JSON.stringify(rows[idx])
+      ) as ReminderRow;
       const firedAt = this.now();
 
       // Compute post-fire state.
@@ -1024,7 +1120,11 @@ export class ReminderScheduler {
     }
     // Cron.
     const tz = getAgentTimezone();
-    const nextFireAt = computeNextCronFire(prior.recurs.expr, tz, new Date(firedAt));
+    const nextFireAt = computeNextCronFire(
+      prior.recurs.expr,
+      tz,
+      new Date(firedAt)
+    );
     return {
       nextRow: {
         ...prior,
@@ -1039,7 +1139,8 @@ export class ReminderScheduler {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd packages/agent && npx vitest --run src/reminders/__tests__/scheduler.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/reminders/__tests__/scheduler.test.ts`
 Expected: All tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -1054,10 +1155,14 @@ git commit -m "feat(reminders): ReminderScheduler fire path under per-session mu
 ## Task 6: Boot recovery (cron recompute + schedule_shifted log)
 
 **Files:**
+
 - Modify: `packages/agent/src/reminders/scheduler.ts`
 - Modify: `packages/agent/src/reminders/__tests__/scheduler.test.ts`
 
-§3.4 of the spec: recompute cron rows against the current TZ; log `dropped_fires` for cron with downtime-skipped matches; log `schedule_shifted` for count-interval rows with stale `next_fire_at`; write the recovered snapshot once.
+§3.4 of the spec: recompute cron rows against the current TZ; log
+`dropped_fires` for cron with downtime-skipped matches; log `schedule_shifted`
+for count-interval rows with stale `next_fire_at`; write the recovered snapshot
+once.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1080,7 +1185,10 @@ describe('ReminderScheduler boot recovery', () => {
     // Force Intl to also return empty to simulate stripped container; mock via stub.
     const origResolvedOptions = Intl.DateTimeFormat.prototype.resolvedOptions;
     Intl.DateTimeFormat.prototype.resolvedOptions = function () {
-      return { ...origResolvedOptions.call(this), timeZone: '' } as Intl.ResolvedDateTimeFormatOptions;
+      return {
+        ...origResolvedOptions.call(this),
+        timeZone: '',
+      } as Intl.ResolvedDateTimeFormatOptions;
     };
     try {
       const sched = new ReminderScheduler({
@@ -1120,7 +1228,9 @@ describe('ReminderScheduler boot recovery', () => {
     await sched.stop();
 
     const rows = new ReminderStore(dir).list();
-    expect(rows[0].next_fire_at).toBe(new Date('2026-05-23T09:00:00Z').getTime());
+    expect(rows[0].next_fire_at).toBe(
+      new Date('2026-05-23T09:00:00Z').getTime()
+    );
   });
 
   it('logs dropped_fires for cron when downtime skipped matches', async () => {
@@ -1149,9 +1259,14 @@ describe('ReminderScheduler boot recovery', () => {
     await sched.start();
     await sched.stop();
 
-    const calls = warnSpy.mock.calls.filter((c) => c[0] === 'reminders.dropped_fires');
+    const calls = warnSpy.mock.calls.filter(
+      (c) => c[0] === 'reminders.dropped_fires'
+    );
     expect(calls).toHaveLength(1);
-    expect(calls[0][1]).toMatchObject({ row_id: 'reminder_bbbbbbbbbbbb', dropped_count: 3 });
+    expect(calls[0][1]).toMatchObject({
+      row_id: 'reminder_bbbbbbbbbbbb',
+      dropped_count: 3,
+    });
   });
 
   it('logs schedule_shifted for count-interval with stale next_fire_at', async () => {
@@ -1183,9 +1298,13 @@ describe('ReminderScheduler boot recovery', () => {
     const rows = new ReminderStore(dir).list();
     expect(rows[0].next_fire_at).toBe(now + 30 * 60_000);
     // remaining is preserved.
-    expect((rows[0].recurs as { kind: 'count'; remaining: number }).remaining).toBe(5);
+    expect(
+      (rows[0].recurs as { kind: 'count'; remaining: number }).remaining
+    ).toBe(5);
 
-    const calls = warnSpy.mock.calls.filter((c) => c[0] === 'reminders.schedule_shifted');
+    const calls = warnSpy.mock.calls.filter(
+      (c) => c[0] === 'reminders.schedule_shifted'
+    );
     expect(calls).toHaveLength(1);
   });
 
@@ -1237,8 +1356,10 @@ describe('ReminderScheduler boot recovery', () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd packages/agent && npx vitest --run src/reminders/__tests__/scheduler.test.ts`
-Expected: 5 new tests FAIL (recovery does basic load only; no recompute, no logs).
+Run:
+`cd packages/agent && npx vitest --run src/reminders/__tests__/scheduler.test.ts`
+Expected: 5 new tests FAIL (recovery does basic load only; no recompute, no
+logs).
 
 - [ ] **Step 3: Update `bootRecover` in `scheduler.ts`**
 
@@ -1338,7 +1459,8 @@ function countCronMatchesInWindow(
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd packages/agent && npx vitest --run src/reminders/__tests__/scheduler.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/reminders/__tests__/scheduler.test.ts`
 Expected: All tests (including prior fire-path tests) PASS.
 
 - [ ] **Step 5: Commit**
@@ -1353,10 +1475,12 @@ git commit -m "feat(reminders): boot recovery with cron recompute + dropped_fire
 ## Task 7: Scheduler schedule / cancel / list APIs
 
 **Files:**
+
 - Modify: `packages/agent/src/reminders/scheduler.ts`
 - Modify: `packages/agent/src/reminders/__tests__/scheduler.test.ts`
 
-The scheduler now exposes the action handlers that the `manage_reminders` tool will call. Each handler acquires the mutex.
+The scheduler now exposes the action handlers that the `manage_reminders` tool
+will call. Each handler acquires the mutex.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1367,8 +1491,12 @@ import { randomUUID } from 'node:crypto';
 
 describe('ReminderScheduler schedule', () => {
   const origTZ = process.env.TZ;
-  beforeEach(() => { process.env.TZ = 'UTC'; });
-  afterEach(() => { process.env.TZ = origTZ; });
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
+  afterEach(() => {
+    process.env.TZ = origTZ;
+  });
 
   it('persists a one-shot row, returns id and next_fire_at', async () => {
     const dir = tempSessionDir();
@@ -1410,7 +1538,9 @@ describe('ReminderScheduler schedule', () => {
       recurs: { kind: 'cron', expr: '0 9 * * *' },
     });
 
-    expect(result.row.next_fire_at).toBe(new Date('2026-05-22T09:00:00Z').getTime());
+    expect(result.row.next_fire_at).toBe(
+      new Date('2026-05-22T09:00:00Z').getTime()
+    );
     await sched.stop();
   });
 
@@ -1445,11 +1575,16 @@ describe('ReminderScheduler schedule', () => {
 });
 
 describe('ReminderScheduler cancel', () => {
-  beforeEach(() => { process.env.TZ = 'UTC'; });
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
 
   it('deletes a pending row and returns cancelled:true', async () => {
     const dir = tempSessionDir();
-    const row = makeRow({ id: 'reminder_111111111111', next_fire_at: 10_000_000_000 });
+    const row = makeRow({
+      id: 'reminder_111111111111',
+      next_fire_at: 10_000_000_000,
+    });
     new ReminderStore(dir).save([row]);
 
     const sched = new ReminderScheduler({
@@ -1506,7 +1641,8 @@ describe('ReminderScheduler list', () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd packages/agent && npx vitest --run src/reminders/__tests__/scheduler.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/reminders/__tests__/scheduler.test.ts`
 Expected: New tests FAIL (no schedule/cancel/list yet).
 
 - [ ] **Step 3: Add the handlers to `scheduler.ts`**
@@ -1603,7 +1739,8 @@ async list(): Promise<ReminderRow[]> {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd packages/agent && npx vitest --run src/reminders/__tests__/scheduler.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/reminders/__tests__/scheduler.test.ts`
 Expected: All tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -1618,6 +1755,7 @@ git commit -m "feat(reminders): schedule/cancel/list scheduler APIs"
 ## Task 8: Reminders index + package exports
 
 **Files:**
+
 - Create: `packages/agent/src/reminders/index.ts`
 
 - [ ] **Step 1: Write the file**
@@ -1644,8 +1782,7 @@ export {
 
 - [ ] **Step 2: Verify type-check**
 
-Run: `cd packages/agent && npx tsc --noEmit -p tsconfig.json`
-Expected: clean.
+Run: `cd packages/agent && npx tsc --noEmit -p tsconfig.json` Expected: clean.
 
 - [ ] **Step 3: Commit**
 
@@ -1659,10 +1796,14 @@ git commit -m "feat(reminders): index module exports"
 ## Task 9: Notification wrapper — typed attributes API + new NotificationKind
 
 **Files:**
-- Modify: `packages/agent/src/notifications/notification-wrapper.ts`
-- Modify: `packages/agent/src/notifications/__tests__/notification-wrapper.test.ts`
 
-The wrapper gains a typed `attributes: Record<string, string | number>` parameter alongside the existing `identifiers`. `undefined`/`null` values are omitted; `NaN`/non-finite numbers throw; body is XML-escaped (`&` then `<`).
+- Modify: `packages/agent/src/notifications/notification-wrapper.ts`
+- Modify:
+  `packages/agent/src/notifications/__tests__/notification-wrapper.test.ts`
+
+The wrapper gains a typed `attributes: Record<string, string | number>`
+parameter alongside the existing `identifiers`. `undefined`/`null` values are
+omitted; `NaN`/non-finite numbers throw; body is XML-escaped (`&` then `<`).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1682,7 +1823,10 @@ describe('buildNotification — typed attributes', () => {
   it('omits attributes whose value is undefined or null', () => {
     const out = buildNotification({
       kind: 'reminder',
-      attributes: { 'last-fired-at': undefined as unknown as string, 'fire-count': 1 },
+      attributes: {
+        'last-fired-at': undefined as unknown as string,
+        'fire-count': 1,
+      },
       body: 'hi',
     });
     expect(out).not.toContain('last-fired-at');
@@ -1691,7 +1835,11 @@ describe('buildNotification — typed attributes', () => {
 
   it('throws on NaN attribute values', () => {
     expect(() =>
-      buildNotification({ kind: 'reminder', attributes: { 'fire-count': NaN }, body: 'hi' })
+      buildNotification({
+        kind: 'reminder',
+        attributes: { 'fire-count': NaN },
+        body: 'hi',
+      })
     ).toThrow(/non-finite/i);
   });
 
@@ -1721,7 +1869,8 @@ describe('buildNotification — typed attributes', () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd packages/agent && npx vitest --run src/notifications/__tests__/notification-wrapper.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/notifications/__tests__/notification-wrapper.test.ts`
 Expected: New tests FAIL.
 
 - [ ] **Step 3: Update `notification-wrapper.ts`**
@@ -1762,7 +1911,9 @@ function escapeXmlText(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 }
 
-function attrValueToString(v: string | number | null | undefined): string | null {
+function attrValueToString(
+  v: string | number | null | undefined
+): string | null {
   if (v === undefined || v === null) return null;
   if (typeof v === 'number') {
     if (!Number.isFinite(v)) {
@@ -1792,12 +1943,16 @@ export function buildNotification(opts: BuildNotificationOptions): string {
 }
 ```
 
-- [ ] **Step 4: Run all notification-wrapper tests to confirm nothing else regressed**
+- [ ] **Step 4: Run all notification-wrapper tests to confirm nothing else
+      regressed**
 
-Run: `cd packages/agent && npx vitest --run src/notifications/__tests__/notification-wrapper.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/notifications/__tests__/notification-wrapper.test.ts`
 Expected: ALL tests PASS.
 
-If existing tests for `'alarm-fired'` / `'alarm-expired'` fail because those kinds no longer exist in the union: **leave them failing for now**. They will be deleted in the final cleanup task (Task 16) along with the alarm code.
+If existing tests for `'alarm-fired'` / `'alarm-expired'` fail because those
+kinds no longer exist in the union: **leave them failing for now**. They will be
+deleted in the final cleanup task (Task 16) along with the alarm code.
 
 - [ ] **Step 5: Commit**
 
@@ -1811,10 +1966,13 @@ git commit -m "feat(notifications): typed attributes API + XML body escape; add 
 ## Task 10: Reminder composer + subagent-exited compact format
 
 **Files:**
+
 - Modify: `packages/agent/src/notifications/composers.ts`
 - Modify: `packages/agent/src/notifications/__tests__/composers.test.ts`
 
-A reminder's body is just the prompt verbatim. The composer is trivial. The subagent-exited composer changes to use the compact `<id> [<next-fire-at>]: <prompt-truncated>` format when more than 5 reminders.
+A reminder's body is just the prompt verbatim. The composer is trivial. The
+subagent-exited composer changes to use the compact
+`<id> [<next-fire-at>]: <prompt-truncated>` format when more than 5 reminders.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1864,7 +2022,8 @@ describe('composeSubagentExitedBody (reminders)', () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd packages/agent && npx vitest --run src/notifications/__tests__/composers.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/notifications/__tests__/composers.test.ts`
 Expected: New tests FAIL.
 
 - [ ] **Step 3: Add the composers**
@@ -1907,7 +2066,9 @@ function truncateAtWordBoundary(s: string, max: number): string {
   return `${sliced}...`;
 }
 
-export function composeSubagentExitedBody(s: SubagentExitedReminderCompose): string {
+export function composeSubagentExitedBody(
+  s: SubagentExitedReminderCompose
+): string {
   const personaWord = s.persona.length > 0 ? `${s.persona} ` : '';
   const n = s.pendingReminders.length;
   const head = `Your ${personaWord}subagent exited gracefully but had ${n} pending reminder${
@@ -1926,7 +2087,10 @@ export function composeSubagentExitedBody(s: SubagentExitedReminderCompose): str
   // Compact format: one line per reminder, prompt truncated to 200 chars at word boundary.
   const lines = s.pendingReminders
     .map((r) => {
-      const truncated = truncateAtWordBoundary(r.prompt, SUBAGENT_BUBBLE_PROMPT_TRUNCATE);
+      const truncated = truncateAtWordBoundary(
+        r.prompt,
+        SUBAGENT_BUBBLE_PROMPT_TRUNCATE
+      );
       return `  ${r.id} [${r.next_fire_at_iso}]: ${truncated}`;
     })
     .join('\n');
@@ -1936,10 +2100,13 @@ export function composeSubagentExitedBody(s: SubagentExitedReminderCompose): str
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd packages/agent && npx vitest --run src/notifications/__tests__/composers.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/notifications/__tests__/composers.test.ts`
 Expected: New tests PASS.
 
-If existing tests for `composeAlarmFiredBody` / `composeAlarmExpiredBody` still pass: good (they stay until cleanup). If they fail due to type changes upstream: leave failing; cleanup task removes them.
+If existing tests for `composeAlarmFiredBody` / `composeAlarmExpiredBody` still
+pass: good (they stay until cleanup). If they fail due to type changes upstream:
+leave failing; cleanup task removes them.
 
 - [ ] **Step 5: Commit**
 
@@ -1953,6 +2120,7 @@ git commit -m "feat(notifications): add reminder + subagent-exited (reminders) c
 ## Task 11: Notifications index exports
 
 **Files:**
+
 - Modify: `packages/agent/src/notifications/index.ts`
 
 - [ ] **Step 1: Update the file**
@@ -1960,17 +2128,23 @@ git commit -m "feat(notifications): add reminder + subagent-exited (reminders) c
 ```ts
 // packages/agent/src/notifications/index.ts
 export { buildNotification } from './notification-wrapper';
-export type { NotificationKind, BuildNotificationOptions } from './notification-wrapper';
+export type {
+  NotificationKind,
+  BuildNotificationOptions,
+} from './notification-wrapper';
 export { injectNotification } from './inject-notification';
-export type { InjectNotificationOptions, IdleWakeHooks } from './inject-notification';
+export type {
+  InjectNotificationOptions,
+  IdleWakeHooks,
+} from './inject-notification';
 export * from './composers';
 export { formatAbsoluteTime } from './format-time';
 ```
 
 - [ ] **Step 2: Verify type-check**
 
-Run: `cd packages/agent && npx tsc --noEmit -p tsconfig.json`
-Expected: clean (or pre-existing unrelated errors only).
+Run: `cd packages/agent && npx tsc --noEmit -p tsconfig.json` Expected: clean
+(or pre-existing unrelated errors only).
 
 - [ ] **Step 3: Commit**
 
@@ -1984,12 +2158,18 @@ git commit -m "chore(notifications): export BuildNotificationOptions type"
 ## Task 12: manage_reminders zod schema and routing
 
 **Files:**
+
 - Create: `packages/agent/src/tools/implementations/manage_reminders.ts`
-- Create: `packages/agent/src/tools/implementations/__tests__/manage_reminders.test.ts`
+- Create:
+  `packages/agent/src/tools/implementations/__tests__/manage_reminders.test.ts`
 
-This task covers the schema and input routing. The tool's executor logic (calling into the scheduler) is in the next task.
+This task covers the schema and input routing. The tool's executor logic
+(calling into the scheduler) is in the next task.
 
-The schema accepts `{action, prompt?, next?, recurs?, id?}`. Type-discriminates `next` (number-or-ISO-string-with-offset) and `recurs` (cron-string-or-count-number). Stringified non-negative integers coerce to numbers.
+The schema accepts `{action, prompt?, next?, recurs?, id?}`. Type-discriminates
+`next` (number-or-ISO-string-with-offset) and `recurs`
+(cron-string-or-count-number). Stringified non-negative integers coerce to
+numbers.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2023,7 +2203,11 @@ describe('parseManageRemindersInput', () => {
 
   it('schedule rejects negative integer string', () => {
     expect(() =>
-      parseManageRemindersInput({ action: 'schedule', prompt: 'hi', next: '-300' })
+      parseManageRemindersInput({
+        action: 'schedule',
+        prompt: 'hi',
+        next: '-300',
+      })
     ).toThrow(/negative/i);
   });
 
@@ -2039,7 +2223,11 @@ describe('parseManageRemindersInput', () => {
 
   it('schedule rejects ISO without offset', () => {
     expect(() =>
-      parseManageRemindersInput({ action: 'schedule', prompt: 'hi', next: '2026-05-23T09:00:00' })
+      parseManageRemindersInput({
+        action: 'schedule',
+        prompt: 'hi',
+        next: '2026-05-23T09:00:00',
+      })
     ).toThrow(/offset/i);
   });
 
@@ -2061,12 +2249,21 @@ describe('parseManageRemindersInput', () => {
       recurs: 5,
     });
     if (r.kind !== 'schedule') throw new Error();
-    expect(r.recurs).toEqual({ kind: 'count', interval_ms: 1_800_000, remaining: 5 });
+    expect(r.recurs).toEqual({
+      kind: 'count',
+      interval_ms: 1_800_000,
+      remaining: 5,
+    });
   });
 
   it('schedule rejects recurs:1', () => {
     expect(() =>
-      parseManageRemindersInput({ action: 'schedule', prompt: 'hi', next: 1800, recurs: 1 })
+      parseManageRemindersInput({
+        action: 'schedule',
+        prompt: 'hi',
+        next: 1800,
+        recurs: 1,
+      })
     ).toThrow(/recurs: 1.*one-shot/i);
   });
 
@@ -2088,7 +2285,10 @@ describe('parseManageRemindersInput', () => {
   });
 
   it('cancel requires id', () => {
-    const r = parseManageRemindersInput({ action: 'cancel', id: 'reminder_abc123abc123' });
+    const r = parseManageRemindersInput({
+      action: 'cancel',
+      id: 'reminder_abc123abc123',
+    });
     expect(r.kind).toBe('cancel');
     if (r.kind !== 'cancel') throw new Error();
     expect(r.id).toBe('reminder_abc123abc123');
@@ -2109,7 +2309,8 @@ describe('parseManageRemindersInput', () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd packages/agent && npx vitest --run src/tools/implementations/__tests__/manage_reminders.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/tools/implementations/__tests__/manage_reminders.test.ts`
 Expected: FAIL with module-not-found.
 
 - [ ] **Step 3: Write the schema + routing**
@@ -2126,10 +2327,7 @@ import {
   assertCronAtLeast5MinInterval,
   getAgentTimezone,
 } from '@lace/agent/reminders/cron';
-import {
-  ReminderScheduler,
-  type ReminderRecurs,
-} from '@lace/agent/reminders';
+import { ReminderScheduler, type ReminderRecurs } from '@lace/agent/reminders';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
 const INT_STRING_RE = /^\d+$/;
@@ -2162,7 +2360,9 @@ export type ParsedInput =
 function coerceIntegerString(v: number | string, fieldName: string): number {
   if (typeof v === 'number') {
     if (!Number.isInteger(v) || v < 0) {
-      throw new Error(`\`${fieldName}\` must be a non-negative integer; got ${v}`);
+      throw new Error(
+        `\`${fieldName}\` must be a non-negative integer; got ${v}`
+      );
     }
     return v;
   }
@@ -2261,7 +2461,7 @@ export function parseManageRemindersInput(rawInput: unknown): ParsedInput {
   if (recurs && recurs.kind === 'count') {
     if (delaySeconds === null) {
       throw new Error(
-        '`recurs: <count>` (count) requires `next` as a number of seconds — without an interval the system doesn\'t know when to fire. Pass `next: <seconds>, recurs: <count>`.'
+        "`recurs: <count>` (count) requires `next` as a number of seconds — without an interval the system doesn't know when to fire. Pass `next: <seconds>, recurs: <count>`."
       );
     }
     if (delaySeconds < 300) {
@@ -2269,7 +2469,11 @@ export function parseManageRemindersInput(rawInput: unknown): ParsedInput {
         `\`next: ${delaySeconds}\` is below the 5-minute (300s) floor for count-interval reminders`
       );
     }
-    recurs = { kind: 'count', interval_ms: delaySeconds * 1000, remaining: recurs.remaining };
+    recurs = {
+      kind: 'count',
+      interval_ms: delaySeconds * 1000,
+      remaining: recurs.remaining,
+    };
   }
 
   if (recurs === null && delaySeconds === null && absoluteFireAt === null) {
@@ -2296,7 +2500,8 @@ export { schema as manageRemindersSchema };
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd packages/agent && npx vitest --run src/tools/implementations/__tests__/manage_reminders.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/tools/implementations/__tests__/manage_reminders.test.ts`
 Expected: All tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -2311,13 +2516,17 @@ git commit -m "feat(reminders): manage_reminders schema + per-action input parsi
 ## Task 13: ManageRemindersTool executor
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/implementations/manage_reminders.ts`
-- Modify: `packages/agent/src/tools/implementations/__tests__/manage_reminders.test.ts`
-- Modify: `packages/agent/src/tools/types.ts` (add `reminderScheduler` to ToolContext)
+- Modify:
+  `packages/agent/src/tools/implementations/__tests__/manage_reminders.test.ts`
+- Modify: `packages/agent/src/tools/types.ts` (add `reminderScheduler` to
+  ToolContext)
 
 - [ ] **Step 1: Update ToolContext**
 
-In `packages/agent/src/tools/types.ts`, add the new field (keep `alarmScheduler` for now; we'll remove it in the cleanup task):
+In `packages/agent/src/tools/types.ts`, add the new field (keep `alarmScheduler`
+for now; we'll remove it in the cleanup task):
 
 ```ts
 // Add this import near the top with the other type imports:
@@ -2353,8 +2562,12 @@ function ctxWithScheduler(sched: ReminderScheduler): ToolContext {
 
 describe('ManageRemindersTool execution', () => {
   const origTZ = process.env.TZ;
-  beforeEach(() => { process.env.TZ = 'UTC'; });
-  afterEach(() => { process.env.TZ = origTZ; });
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
+  afterEach(() => {
+    process.env.TZ = origTZ;
+  });
 
   it('schedule returns the new row', async () => {
     const dir = tempSessionDir();
@@ -2398,7 +2611,10 @@ describe('ManageRemindersTool execution', () => {
       recurs: null,
     });
     const tool = new ManageRemindersTool();
-    const result = await tool.execute({ action: 'cancel', id }, ctxWithScheduler(sched));
+    const result = await tool.execute(
+      { action: 'cancel', id },
+      ctxWithScheduler(sched)
+    );
     const body = JSON.parse((result.content?.[0] as { text: string }).text);
     expect(body).toEqual({ cancelled: true });
     await sched.stop();
@@ -2412,22 +2628,35 @@ describe('ManageRemindersTool execution', () => {
       notifier: async () => {},
     });
     await sched.start();
-    await sched.schedule({ prompt: 'cron', delaySeconds: null, recurs: { kind: 'cron', expr: '0 9 * * 1-5' } });
+    await sched.schedule({
+      prompt: 'cron',
+      delaySeconds: null,
+      recurs: { kind: 'cron', expr: '0 9 * * 1-5' },
+    });
     await sched.schedule({
       prompt: 'count',
       delaySeconds: 1800,
       recurs: { kind: 'count', interval_ms: 1800_000, remaining: 5 },
     });
-    await sched.schedule({ prompt: 'oneshot', delaySeconds: 300, recurs: null });
+    await sched.schedule({
+      prompt: 'oneshot',
+      delaySeconds: 300,
+      recurs: null,
+    });
 
     const tool = new ManageRemindersTool();
-    const result = await tool.execute({ action: 'list' }, ctxWithScheduler(sched));
+    const result = await tool.execute(
+      { action: 'list' },
+      ctxWithScheduler(sched)
+    );
     const body = JSON.parse((result.content?.[0] as { text: string }).text) as {
       reminders: Array<{ recurs: unknown; next?: number }>;
     };
     expect(body.reminders).toHaveLength(3);
     // The cron row's recurs is the cron string; count is the remaining number; one-shot is null.
-    expect(body.reminders.find((r) => r.recurs === '0 9 * * 1-5')).toBeDefined();
+    expect(
+      body.reminders.find((r) => r.recurs === '0 9 * * 1-5')
+    ).toBeDefined();
     expect(body.reminders.find((r) => r.recurs === 5)).toBeDefined();
     expect(body.reminders.find((r) => r.recurs === null)).toBeDefined();
     await sched.stop();
@@ -2455,7 +2684,10 @@ describe('ManageRemindersTool execution', () => {
     });
     await sched.start();
     const tool = new ManageRemindersTool();
-    const result = await tool.execute({ action: 'list' }, ctxWithScheduler(sched));
+    const result = await tool.execute(
+      { action: 'list' },
+      ctxWithScheduler(sched)
+    );
     const body = JSON.parse((result.content?.[0] as { text: string }).text) as {
       reminders: Array<{ recurs: unknown; next?: number }>;
     };
@@ -2473,7 +2705,9 @@ Append to `manage_reminders.ts`:
 ```ts
 import { formatAbsoluteTime } from '@lace/agent/notifications/format-time';
 
-function recursToWire(recurs: ReminderRecurs):
+function recursToWire(
+  recurs: ReminderRecurs
+):
   | { recurs: string }
   | { recurs: number; next: number }
   | { recurs: null; next?: number } {
@@ -2484,7 +2718,10 @@ function recursToWire(recurs: ReminderRecurs):
     if (recurs.remaining === 1) {
       return { recurs: null, next: Math.round(recurs.interval_ms / 1000) };
     }
-    return { recurs: recurs.remaining, next: Math.round(recurs.interval_ms / 1000) };
+    return {
+      recurs: recurs.remaining,
+      next: Math.round(recurs.interval_ms / 1000),
+    };
   }
   return { recurs: null };
 }
@@ -2504,14 +2741,18 @@ function rowToWire(row: {
     prompt: row.prompt,
     next_fire_at: formatAbsoluteTime(row.next_fire_at, tz),
     set_at: formatAbsoluteTime(row.created_at, tz),
-    last_fired_at: row.fired_at !== null ? formatAbsoluteTime(row.fired_at, tz) : null,
+    last_fired_at:
+      row.fired_at !== null ? formatAbsoluteTime(row.fired_at, tz) : null,
     fire_count: row.fire_count,
     ...recursToWire(row.recurs),
   };
 }
 
 function ok(body: Record<string, unknown>): ToolResult {
-  return { status: 'completed', content: [{ type: 'text', text: JSON.stringify(body) }] };
+  return {
+    status: 'completed',
+    content: [{ type: 'text', text: JSON.stringify(body) }],
+  };
 }
 
 function err(text: string): ToolResult {
@@ -2586,7 +2827,8 @@ const MANAGE_REMINDERS_DESCRIPTION = [
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd packages/agent && npx vitest --run src/tools/implementations/__tests__/manage_reminders.test.ts`
+Run:
+`cd packages/agent && npx vitest --run src/tools/implementations/__tests__/manage_reminders.test.ts`
 Expected: All tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -2601,10 +2843,13 @@ git commit -m "feat(reminders): ManageRemindersTool — schedule/cancel/list exe
 ## Task 14: Server wiring — replace alarm scheduler with reminder scheduler
 
 **Files:**
+
 - Modify: `packages/agent/src/server-types.ts`
 - Modify: `packages/agent/src/server.ts`
 
-Replace `alarmScheduler` on `AgentServerState` and the `ensureAlarmSchedulerForActiveSession` function. The new notifier composes a `<notification kind="reminder">` with the structured attributes.
+Replace `alarmScheduler` on `AgentServerState` and the
+`ensureAlarmSchedulerForActiveSession` function. The new notifier composes a
+`<notification kind="reminder">` with the structured attributes.
 
 - [ ] **Step 1: Update `server-types.ts`**
 
@@ -2625,11 +2870,14 @@ import type { ReminderScheduler } from './reminders';
   reminderScheduler?: ReminderScheduler;
 ```
 
-Leave the old field in place for now if there's any other reference (we'll remove it in the cleanup task), but add the new one. If you can replace cleanly: do so.
+Leave the old field in place for now if there's any other reference (we'll
+remove it in the cleanup task), but add the new one. If you can replace cleanly:
+do so.
 
 - [ ] **Step 2: Update `server.ts`**
 
-Replace `ensureAlarmSchedulerForActiveSession` and `shutdownAlarms` with reminder equivalents:
+Replace `ensureAlarmSchedulerForActiveSession` and `shutdownAlarms` with
+reminder equivalents:
 
 ```ts
 // At the top — replace alarms imports with:
@@ -2645,7 +2893,9 @@ import { formatAbsoluteTime } from './notifications/format-time';
 // Replace ensureAlarmSchedulerForActiveSession with:
 export async function ensureReminderSchedulerForActiveSession(
   state: AgentServerState,
-  runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null },
+  runPromptInternalRef: {
+    current: ((content: unknown[]) => Promise<void>) | null;
+  },
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>
 ): Promise<void> {
   if (!state.activeSession) return;
@@ -2660,7 +2910,11 @@ export async function ensureReminderSchedulerForActiveSession(
     triggerInternalTurn: (): void => {
       if (!runPromptInternalRef.current) return;
       setImmediate(() => {
-        if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
+        if (
+          !state.activeTurn &&
+          state.activeSession &&
+          runPromptInternalRef.current
+        ) {
           void runPromptInternalRef.current([]);
         }
       });
@@ -2676,8 +2930,14 @@ export async function ensureReminderSchedulerForActiveSession(
       const attributes: Record<string, string | number | null | undefined> = {
         'set-at': formatAbsoluteTime(ctx.row.created_at, tz),
         'fired-at': formatAbsoluteTime(ctx.firedAt, tz),
-        'last-fired-at': ctx.lastFiredAt !== null ? formatAbsoluteTime(ctx.lastFiredAt, tz) : undefined,
-        'next-fire-at': ctx.nextFireAt !== null ? formatAbsoluteTime(ctx.nextFireAt, tz) : undefined,
+        'last-fired-at':
+          ctx.lastFiredAt !== null
+            ? formatAbsoluteTime(ctx.lastFiredAt, tz)
+            : undefined,
+        'next-fire-at':
+          ctx.nextFireAt !== null
+            ? formatAbsoluteTime(ctx.nextFireAt, tz)
+            : undefined,
         'fire-count': ctx.row.recurs === null ? undefined : ctx.fireCount,
       };
       // Use runExclusive so eventSeq doesn't collide with the runner's writes.
@@ -2701,7 +2961,9 @@ export async function ensureReminderSchedulerForActiveSession(
   await state.reminderScheduler.start();
 }
 
-export async function shutdownReminders(state: AgentServerState): Promise<void> {
+export async function shutdownReminders(
+  state: AgentServerState
+): Promise<void> {
   if (state.reminderScheduler) {
     await state.reminderScheduler.stop();
     state.reminderScheduler = undefined;
@@ -2709,7 +2971,8 @@ export async function shutdownReminders(state: AgentServerState): Promise<void> 
 }
 ```
 
-Update the call sites within `server.ts` from `ensureAlarmScheduler` / `shutdownAlarms` to the new names. Find them by:
+Update the call sites within `server.ts` from `ensureAlarmScheduler` /
+`shutdownAlarms` to the new names. Find them by:
 
 ```bash
 grep -n "ensureAlarmScheduler\|shutdownAlarms\|alarmScheduler" packages/agent/src/server.ts
@@ -2717,9 +2980,12 @@ grep -n "ensureAlarmScheduler\|shutdownAlarms\|alarmScheduler" packages/agent/sr
 
 Update each one. The `runExclusive` parameter signature doesn't change.
 
-- [ ] **Step 3: Update `injectNotification` to accept the new `attributes` parameter**
+- [ ] **Step 3: Update `injectNotification` to accept the new `attributes`
+      parameter**
 
-Check `packages/agent/src/notifications/inject-notification.ts`. It currently takes `{kind, identifiers, body}`. Add an `attributes` field that it forwards to `buildNotification`:
+Check `packages/agent/src/notifications/inject-notification.ts`. It currently
+takes `{kind, identifiers, body}`. Add an `attributes` field that it forwards to
+`buildNotification`:
 
 ```ts
 // In InjectNotificationOptions:
@@ -2736,7 +3002,9 @@ Check `packages/agent/src/notifications/inject-notification.ts`. It currently ta
 
 - [ ] **Step 4: Add the tool to the executor**
 
-In `packages/agent/src/tools/executor.ts`, register the new tool. Find where `ScheduleAlarmTool`, `CancelAlarmTool`, `ListAlarmsTool` are added (line ~301) and add:
+In `packages/agent/src/tools/executor.ts`, register the new tool. Find where
+`ScheduleAlarmTool`, `CancelAlarmTool`, `ListAlarmsTool` are added (line ~301)
+and add:
 
 ```ts
 import { ManageRemindersTool } from './implementations/manage_reminders';
@@ -2745,12 +3013,15 @@ import { ManageRemindersTool } from './implementations/manage_reminders';
       new ManageRemindersTool(),
 ```
 
-Leave the three alarm tools registered for now — they will be removed in the cleanup task.
+Leave the three alarm tools registered for now — they will be removed in the
+cleanup task.
 
 - [ ] **Step 5: Run the full test suite to catch regressions**
 
-Run: `cd packages/agent && npx vitest --run`
-Expected: NEW tests all pass. Pre-existing alarm tests may still pass (alarm code untouched). The old `'alarm-fired'` / `'alarm-expired'` notification-wrapper tests may fail because the union type changed — that's expected; cleanup removes them.
+Run: `cd packages/agent && npx vitest --run` Expected: NEW tests all pass.
+Pre-existing alarm tests may still pass (alarm code untouched). The old
+`'alarm-fired'` / `'alarm-expired'` notification-wrapper tests may fail because
+the union type changed — that's expected; cleanup removes them.
 
 - [ ] **Step 6: Commit**
 
@@ -2764,8 +3035,11 @@ git commit -m "feat(reminders): wire ReminderScheduler into server + register Ma
 ## Task 15: Wire reminderScheduler into the ToolContext
 
 **Files:**
-- Modify: `packages/agent/src/server.ts` (look for where the ToolContext is constructed for executor.execute)
-- Or wherever ToolContext is assembled per turn (it varies in lace; grep for "alarmScheduler:" assignment)
+
+- Modify: `packages/agent/src/server.ts` (look for where the ToolContext is
+  constructed for executor.execute)
+- Or wherever ToolContext is assembled per turn (it varies in lace; grep for
+  "alarmScheduler:" assignment)
 
 - [ ] **Step 1: Find the assignment site**
 
@@ -2787,8 +3061,7 @@ At every assignment site, add the corresponding line, e.g.:
 
 - [ ] **Step 3: Run tests**
 
-Run: `cd packages/agent && npx vitest --run`
-Expected: no new failures.
+Run: `cd packages/agent && npx vitest --run` Expected: no new failures.
 
 - [ ] **Step 4: Commit**
 
@@ -2802,9 +3075,11 @@ git commit -m "chore(reminders): pass reminderScheduler through ToolContext"
 ## Task 16: End-to-end smoke test
 
 **Files:**
+
 - Create: `packages/agent/src/reminders/__tests__/e2e.test.ts`
 
-Validate the full chain: schedule via the tool → scheduler ticks → notifier injects → context_injected event appears in events.jsonl.
+Validate the full chain: schedule via the tool → scheduler ticks → notifier
+injects → context_injected event appears in events.jsonl.
 
 - [ ] **Step 1: Write the test**
 
@@ -2822,14 +3097,21 @@ import type { ToolContext } from '@lace/agent/tools/types';
 function tempSessionDir(): string {
   const dir = mkdtempSync(join(tmpdir(), 'lace-reminders-e2e-'));
   // Seed an empty state.json so injectNotification doesn't crash on the read.
-  writeFileSync(join(dir, 'state.json'), JSON.stringify({ nextEventSeq: 1, nextStreamSeq: 1 }));
+  writeFileSync(
+    join(dir, 'state.json'),
+    JSON.stringify({ nextEventSeq: 1, nextStreamSeq: 1 })
+  );
   return dir;
 }
 
 describe('Reminders end-to-end (tool → scheduler → notifier)', () => {
   const origTZ = process.env.TZ;
-  beforeEach(() => { process.env.TZ = 'UTC'; });
-  afterEach(() => { process.env.TZ = origTZ; });
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
+  afterEach(() => {
+    process.env.TZ = origTZ;
+  });
 
   it('schedule, fire, observe notification body', async () => {
     const dir = tempSessionDir();
@@ -2846,8 +3128,14 @@ describe('Reminders end-to-end (tool → scheduler → notifier)', () => {
             'set-at': new Date(ctx.row.created_at).toISOString(),
             'fired-at': new Date(ctx.firedAt).toISOString(),
             'fire-count': ctx.row.recurs === null ? undefined : ctx.fireCount,
-            'last-fired-at': ctx.lastFiredAt !== null ? new Date(ctx.lastFiredAt).toISOString() : undefined,
-            'next-fire-at': ctx.nextFireAt !== null ? new Date(ctx.nextFireAt).toISOString() : undefined,
+            'last-fired-at':
+              ctx.lastFiredAt !== null
+                ? new Date(ctx.lastFiredAt).toISOString()
+                : undefined,
+            'next-fire-at':
+              ctx.nextFireAt !== null
+                ? new Date(ctx.nextFireAt).toISOString()
+                : undefined,
           },
           body: ctx.row.prompt,
         });
@@ -2859,7 +3147,10 @@ describe('Reminders end-to-end (tool → scheduler → notifier)', () => {
     const tool = new ManageRemindersTool();
     await tool.execute(
       { action: 'schedule', prompt: 'fire soon', next: 0 }, // 0-second delay
-      { signal: new AbortController().signal, reminderScheduler: sched } as ToolContext
+      {
+        signal: new AbortController().signal,
+        reminderScheduler: sched,
+      } as ToolContext
     );
 
     // The scheduler should fire it on its first tick. Wait briefly.
@@ -2892,6 +3183,7 @@ git commit -m "test(reminders): end-to-end smoke (tool → scheduler → notifie
 ## Task 17: Cleanup — delete the alarm subsystem
 
 **Files:** (all deleted)
+
 - `packages/agent/src/alarms/` (entire directory)
 - `packages/agent/src/tools/implementations/schedule_alarm.ts`
 - `packages/agent/src/tools/implementations/cancel_alarm.ts`
@@ -2901,21 +3193,32 @@ git commit -m "test(reminders): end-to-end smoke (tool → scheduler → notifie
 - `packages/agent/src/tools/implementations/__tests__/list_alarms.test.ts`
 
 **Files modified:**
+
 - `packages/agent/src/server-types.ts` — remove `alarmScheduler` field.
-- `packages/agent/src/server.ts` — remove the old `ensureAlarmSchedulerForActiveSession`, `shutdownAlarms`, and the `alarmScheduler` import.
-- `packages/agent/src/tools/types.ts` — remove `alarmScheduler` from `ToolContext` and the `AlarmScheduler` import.
-- `packages/agent/src/tools/executor.ts` — remove the three alarm tool registrations and imports.
-- `packages/agent/src/notifications/composers.ts` — remove `composeAlarmFiredBody`, `composeAlarmExpiredBody`, related types.
-- `packages/agent/src/notifications/__tests__/composers.test.ts` — remove the alarm composer tests.
+- `packages/agent/src/server.ts` — remove the old
+  `ensureAlarmSchedulerForActiveSession`, `shutdownAlarms`, and the
+  `alarmScheduler` import.
+- `packages/agent/src/tools/types.ts` — remove `alarmScheduler` from
+  `ToolContext` and the `AlarmScheduler` import.
+- `packages/agent/src/tools/executor.ts` — remove the three alarm tool
+  registrations and imports.
+- `packages/agent/src/notifications/composers.ts` — remove
+  `composeAlarmFiredBody`, `composeAlarmExpiredBody`, related types.
+- `packages/agent/src/notifications/__tests__/composers.test.ts` — remove the
+  alarm composer tests.
 
 - [ ] **Step 1: Confirm no remaining alarm references in the new code**
 
 ```bash
 grep -rn "AlarmScheduler\|AlarmStore\|ScheduleAlarmTool\|CancelAlarmTool\|ListAlarmsTool\|alarm-fired\|alarm-expired\|composeAlarmFired\|composeAlarmExpired" packages/agent/src --include='*.ts' | grep -v __tests__ | grep -v '\.test\.'
 ```
-Expected: matches only inside `packages/agent/src/alarms/` and `packages/agent/src/tools/implementations/{schedule,cancel,list}_alarm.ts` (files we're about to delete).
 
-If anything else references the old names, fix those references to use the new ones before deleting.
+Expected: matches only inside `packages/agent/src/alarms/` and
+`packages/agent/src/tools/implementations/{schedule,cancel,list}_alarm.ts`
+(files we're about to delete).
+
+If anything else references the old names, fix those references to use the new
+ones before deleting.
 
 - [ ] **Step 2: Delete the alarms directory and old tool files**
 
@@ -2931,35 +3234,46 @@ git rm packages/agent/src/tools/implementations/schedule_alarm.ts \
 
 - [ ] **Step 3: Remove residual references**
 
-In `packages/agent/src/server-types.ts`, remove the `alarmScheduler?: AlarmScheduler;` field and the `import type { AlarmScheduler } from './alarms/alarm-scheduler';` line.
+In `packages/agent/src/server-types.ts`, remove the
+`alarmScheduler?: AlarmScheduler;` field and the
+`import type { AlarmScheduler } from './alarms/alarm-scheduler';` line.
 
 In `packages/agent/src/server.ts`, remove:
+
 - `import { AlarmScheduler } from './alarms/alarm-scheduler';`
 - `import { AlarmStore } from './alarms/alarm-store';`
-- The old `ensureAlarmSchedulerForActiveSession` function (now superseded by `ensureReminderSchedulerForActiveSession`).
+- The old `ensureAlarmSchedulerForActiveSession` function (now superseded by
+  `ensureReminderSchedulerForActiveSession`).
 - The old `shutdownAlarms` function (now superseded by `shutdownReminders`).
-- Any call sites that still reference the old names — they should already have been replaced in Task 14 / 15; this is the final sweep.
+- Any call sites that still reference the old names — they should already have
+  been replaced in Task 14 / 15; this is the final sweep.
 
 In `packages/agent/src/tools/types.ts`, remove:
+
 - `import type { AlarmScheduler } from '@lace/agent/alarms/alarm-scheduler';`
 - The `alarmScheduler?: AlarmScheduler;` field.
 
 In `packages/agent/src/tools/executor.ts`, remove:
+
 - `import { ScheduleAlarmTool } from './implementations/schedule_alarm';`
 - `import { CancelAlarmTool } from './implementations/cancel_alarm';`
 - `import { ListAlarmsTool } from './implementations/list_alarms';`
 - The three `new ...AlarmTool()` entries in the tool list.
 
 In `packages/agent/src/notifications/composers.ts`, remove:
-- `composeAlarmFiredBody`, `composeAlarmExpiredBody`, `AlarmFiredCompose`, `AlarmExpiredCompose` exports.
 
-In `packages/agent/src/notifications/__tests__/composers.test.ts`, remove the `describe` blocks for the deleted composers.
+- `composeAlarmFiredBody`, `composeAlarmExpiredBody`, `AlarmFiredCompose`,
+  `AlarmExpiredCompose` exports.
+
+In `packages/agent/src/notifications/__tests__/composers.test.ts`, remove the
+`describe` blocks for the deleted composers.
 
 - [ ] **Step 4: Run the entire test suite**
 
 ```bash
 cd packages/agent && npx vitest --run
 ```
+
 Expected: ALL tests PASS. If anything still references the deleted code, fix it.
 
 - [ ] **Step 5: Run type-check across the package**
@@ -2967,6 +3281,7 @@ Expected: ALL tests PASS. If anything still references the deleted code, fix it.
 ```bash
 cd packages/agent && npx tsc --noEmit -p tsconfig.json
 ```
+
 Expected: clean.
 
 - [ ] **Step 6: Run lint**
@@ -2974,6 +3289,7 @@ Expected: clean.
 ```bash
 cd packages/agent && npm run lint
 ```
+
 Expected: clean.
 
 - [ ] **Step 7: Commit**
@@ -2988,6 +3304,7 @@ git commit -m "refactor(reminders): delete alarm subsystem; switch to manage_rem
 ## Task 18: Documentation — update CLAUDE.md / CODE-MAP / READMEs
 
 **Files:**
+
 - Modify: `packages/agent/CLAUDE.md` (if it references alarms)
 - Modify: `docs/architecture/CODE-MAP.md`
 - Modify: any README in `packages/agent/src/` that names the alarm subsystem
@@ -2998,14 +3315,19 @@ git commit -m "refactor(reminders): delete alarm subsystem; switch to manage_rem
 grep -rn "alarm\|AlarmScheduler\|schedule_alarm" docs/ packages/agent/CLAUDE.md packages/agent/README.md 2>/dev/null | grep -v -i "may not exist\|past tense"
 ```
 
-- [ ] **Step 2: Update each match** to refer to reminders / `manage_reminders` / `ReminderScheduler`. Don't rewrite history (keep references to PRI-1744 in changelogs intact — that's about the prior change).
+- [ ] **Step 2: Update each match** to refer to reminders / `manage_reminders` /
+      `ReminderScheduler`. Don't rewrite history (keep references to PRI-1744 in
+      changelogs intact — that's about the prior change).
 
 - [ ] **Step 3: Verify**
 
 ```bash
 grep -rn "schedule_alarm\|AlarmScheduler\|cancel_alarm\|list_alarms" docs/ packages/agent/CLAUDE.md packages/agent/README.md 2>/dev/null | grep -v specs/2026
 ```
-Expected: no matches (the spec doc at `docs/specs/2026-05-22-alarms-coherent-design.md` is the historical record and stays).
+
+Expected: no matches (the spec doc at
+`docs/specs/2026-05-22-alarms-coherent-design.md` is the historical record and
+stays).
 
 - [ ] **Step 4: Commit**
 
@@ -3022,7 +3344,9 @@ This is bookkeeping, not code. Close the Linear tickets per spec §7:
 
 - [ ] **Step 1: Update Linear**
 
-Close as won't-do (with a comment linking to this plan and `docs/specs/2026-05-22-alarms-coherent-design.md`):
+Close as won't-do (with a comment linking to this plan and
+`docs/specs/2026-05-22-alarms-coherent-design.md`):
+
 - PRI-1761 (metadata payload) — folded into prompt
 - PRI-1762 (discriminated union schema) — dropped kind entirely
 - PRI-1763 (update_alarm) — cancel + schedule composes
@@ -3032,6 +3356,7 @@ Close as won't-do (with a comment linking to this plan and `docs/specs/2026-05-2
 - PRI-1767 (sub-hour cron) — flat 5-min floor
 
 Close as done:
+
 - PRI-1759 (umbrella) — once this rework lands.
 
 - [ ] **Step 2: No commit needed for ticket changes**
@@ -3041,11 +3366,13 @@ Close as done:
 ## Self-Review Checklist (run before finalizing the plan)
 
 **Spec coverage** — every spec section should map to at least one task:
+
 - §1.1–1.3 (schema, cross-field rules) → Task 12 (parseManageRemindersInput)
 - §1.4 (TZ) → Tasks 3, 5, 6 (cron helpers + scheduler + boot recovery)
 - §1.5 (no history) → covered by absence (no history-write code)
 - §1.6 (no update/preview/chrono) → covered by absence
-- §2 (notification body + escape) → Task 9 (wrapper) + Task 14 (notifier composes)
+- §2 (notification body + escape) → Task 9 (wrapper) + Task 14 (notifier
+  composes)
 - §2.1 (attributes) → Tasks 9, 14
 - §2.2 (attributes-not-prose) → covered structurally by Task 9
 - §2.3 (localtime ISO) → Task 14 (uses formatAbsoluteTime with agent TZ)
@@ -3056,10 +3383,12 @@ Close as done:
 - §3.4 (boot recovery) → Task 6
 - §3.5 (cancel) → Task 7
 - §3.6 (schedule) → Task 7
-- §3.7 (multi-row tick) → Task 5 (heap.shift loop in tickForTest; production tick rechedules after each fire)
+- §3.7 (multi-row tick) → Task 5 (heap.shift loop in tickForTest; production
+  tick rechedules after each fire)
 - §3.8 (list mutex-free) → Task 7 (list does not acquire mutex)
 - §3.9 (50-cap) → Task 7 (enforced in schedule)
-- §3.10 (no-deadlock) → covered by Task 14's notifier not calling back into the scheduler
+- §3.10 (no-deadlock) → covered by Task 14's notifier not calling back into the
+  scheduler
 - §3.11 (cross-session writes) → unchanged
 - §4 (tool description) → Task 13 (MANAGE_REMINDERS_DESCRIPTION)
 - §5 (Claude comparison) → no code task; doc remains as design rationale
@@ -3068,23 +3397,40 @@ Close as done:
 - §8 (open questions) → no code action
 - Appendix A (worked examples) → tests in Tasks 5–13 cover the major shapes
 
-**Placeholder scan** — search for: TBD, TODO, "implement later", "as above", "similar to Task" — none found in the task bodies (the Self-Review section itself uses "above" but doesn't direct work).
+**Placeholder scan** — search for: TBD, TODO, "implement later", "as above",
+"similar to Task" — none found in the task bodies (the Self-Review section
+itself uses "above" but doesn't direct work).
 
-**Type consistency** — `ReminderRecurs`, `ReminderRow`, `RemindersSnapshot`, `MAX_ACTIVE_REMINDERS`, `MIN_INTERVAL_MS` are defined in Task 2 and used consistently in Tasks 4–13. The `ScheduleInput` / `ScheduleResult` / `CancelResult` / `FireContext` types defined in Tasks 5/7 match their uses in Tasks 13/14.
+**Type consistency** — `ReminderRecurs`, `ReminderRow`, `RemindersSnapshot`,
+`MAX_ACTIVE_REMINDERS`, `MIN_INTERVAL_MS` are defined in Task 2 and used
+consistently in Tasks 4–13. The `ScheduleInput` / `ScheduleResult` /
+`CancelResult` / `FireContext` types defined in Tasks 5/7 match their uses in
+Tasks 13/14.
 
 **Things the engineer should know that aren't obvious from the code:**
-- Lace already has `atomicWriteJson` at `packages/agent/src/storage/atomic-write.ts` — use it; don't re-implement.
-- Lace already has a `runExclusive` mutex pattern at `server.ts:413`. Our `AsyncMutex` is a standalone version of the same idea.
-- The `logger` at `@lace/agent/utils/logger` is the structured-log convention; `logger.warn('reminders.foo', { ...fields })` matches the codebase style.
-- Lace tests use Vitest; co-located in `__tests__/` next to source. `tempdir`-based session dirs are the norm; the AlarmStore test on disk shows the pattern.
-- `cron-parser` is already a dependency (used by the old `alarms/cron.ts`); don't add it again.
+
+- Lace already has `atomicWriteJson` at
+  `packages/agent/src/storage/atomic-write.ts` — use it; don't re-implement.
+- Lace already has a `runExclusive` mutex pattern at `server.ts:413`. Our
+  `AsyncMutex` is a standalone version of the same idea.
+- The `logger` at `@lace/agent/utils/logger` is the structured-log convention;
+  `logger.warn('reminders.foo', { ...fields })` matches the codebase style.
+- Lace tests use Vitest; co-located in `__tests__/` next to source.
+  `tempdir`-based session dirs are the norm; the AlarmStore test on disk shows
+  the pattern.
+- `cron-parser` is already a dependency (used by the old `alarms/cron.ts`);
+  don't add it again.
 
 ---
 
-**Plan complete and saved to `docs/superpowers/plans/2026-05-22-reminders-rework.md`. Two execution options:**
+**Plan complete and saved to
+`docs/superpowers/plans/2026-05-22-reminders-rework.md`. Two execution
+options:**
 
-**1. Subagent-Driven (recommended)** — I dispatch a fresh subagent per task, review between tasks, fast iteration.
+**1. Subagent-Driven (recommended)** — I dispatch a fresh subagent per task,
+review between tasks, fast iteration.
 
-**2. Inline Execution** — Execute tasks in this session using executing-plans, batch execution with checkpoints.
+**2. Inline Execution** — Execute tasks in this session using executing-plans,
+batch execution with checkpoints.
 
 **Which approach?**

@@ -1,38 +1,77 @@
 # Cache-Control Hardening Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Enforce the invariant *"the system prompt is the bytes computed at session creation and does not change for the lifetime of the session"*, fix the regressions introduced by PRI-1804/1806, and close the remaining cache-prefix determinism holes that the adversarial reviews surfaced.
+**Goal:** Enforce the invariant _"the system prompt is the bytes computed at
+session creation and does not change for the lifetime of the session"_, fix the
+regressions introduced by PRI-1804/1806, and close the remaining cache-prefix
+determinism holes that the adversarial reviews surfaced.
 
-**Architecture:** Introduce a new durable event type `system_prompt_set` that holds the rendered system-prompt text and is written exactly once at session creation. Session-rebuild reads this single event to recover the frozen prompt. All `context_injected` events become `role: 'user'` messages — they are runtime context, not part of the system prompt. `getEffectiveSystemPrompt` ignores `messages` entirely and returns only the value set via `setSystemPrompt`. The runner reads the frozen prompt at the top of each `run()` and pushes it into the provider before any request. Variable interpolation (sessionDate, git status, project tree, OS, tools) runs exactly once at session creation and the rendered text is what gets persisted.
+**Architecture:** Introduce a new durable event type `system_prompt_set` that
+holds the rendered system-prompt text and is written exactly once at session
+creation. Session-rebuild reads this single event to recover the frozen prompt.
+All `context_injected` events become `role: 'user'` messages — they are runtime
+context, not part of the system prompt. `getEffectiveSystemPrompt` ignores
+`messages` entirely and returns only the value set via `setSystemPrompt`. The
+runner reads the frozen prompt at the top of each `run()` and pushes it into the
+provider before any request. Variable interpolation (sessionDate, git status,
+project tree, OS, tools) runs exactly once at session creation and the rendered
+text is what gets persisted.
 
-**Tech Stack:** TypeScript 5.6+, Vitest, Anthropic SDK 0.60, durable-event-sourced session storage (JSONL), monorepo (`packages/agent`).
+**Tech Stack:** TypeScript 5.6+, Vitest, Anthropic SDK 0.60,
+durable-event-sourced session storage (JSONL), monorepo (`packages/agent`).
 
 ---
 
 ## File Structure
 
 **New files:**
-- `packages/agent/src/storage/system-prompt-event.ts` — helpers for writing/reading the new event type
-- `packages/agent/src/providers/__tests__/cache-control-streaming.test.ts` — streaming-path cache_control smoke test
-- `packages/agent/src/providers/__tests__/cache-control-byte-stable.test.ts` — two-turn byte-compare test asserting message prefix invariance
-- `packages/agent/src/providers/__tests__/anthropic-provider-count-tokens.test.ts` — verifies `countTokensExplicit` shape parity with `_createRequestPayload`
+
+- `packages/agent/src/storage/system-prompt-event.ts` — helpers for
+  writing/reading the new event type
+- `packages/agent/src/providers/__tests__/cache-control-streaming.test.ts` —
+  streaming-path cache_control smoke test
+- `packages/agent/src/providers/__tests__/cache-control-byte-stable.test.ts` —
+  two-turn byte-compare test asserting message prefix invariance
+- `packages/agent/src/providers/__tests__/anthropic-provider-count-tokens.test.ts`
+  — verifies `countTokensExplicit` shape parity with `_createRequestPayload`
 
 **Modified files:**
-- `packages/agent/src/storage/event-types.ts` — add `SystemPromptSetEventData` to the discriminated union
-- `packages/agent/src/rpc/handlers/session.ts` — write `system_prompt_set` event at session creation instead of two `context_injected` events
-- `packages/agent/src/message-building/message-builder.ts` — return `{messages, systemPrompt}` instead of `ProviderMessage[]`; convert `context_injected` to `role:'user'`
-- `packages/agent/src/core/conversation/runner.ts` — read frozen system prompt, call `provider.setSystemPrompt()` once per run; fix loop-reminder double-injection
-- `packages/agent/src/providers/base-provider.ts` — `getEffectiveSystemPrompt` returns only `_systemPrompt`, no fallback string
-- `packages/agent/src/providers/openai-provider.ts` — use base helper instead of inline join
-- `packages/agent/src/providers/cache-control.ts` — fix `enforceBreakpointBudget` to evict tail first AND handle system/tools overflow; expand cacheable-block whitelist; anchor Bedrock substring matching
-- `packages/agent/src/providers/format-converters.ts` — drop `(no response)` placeholder; emit empty assistant turns correctly
-- `packages/agent/src/tools/executor.ts` — replace `localeCompare` with byte-stable comparison
+
+- `packages/agent/src/storage/event-types.ts` — add `SystemPromptSetEventData`
+  to the discriminated union
+- `packages/agent/src/rpc/handlers/session.ts` — write `system_prompt_set` event
+  at session creation instead of two `context_injected` events
+- `packages/agent/src/message-building/message-builder.ts` — return
+  `{messages, systemPrompt}` instead of `ProviderMessage[]`; convert
+  `context_injected` to `role:'user'`
+- `packages/agent/src/core/conversation/runner.ts` — read frozen system prompt,
+  call `provider.setSystemPrompt()` once per run; fix loop-reminder
+  double-injection
+- `packages/agent/src/providers/base-provider.ts` — `getEffectiveSystemPrompt`
+  returns only `_systemPrompt`, no fallback string
+- `packages/agent/src/providers/openai-provider.ts` — use base helper instead of
+  inline join
+- `packages/agent/src/providers/cache-control.ts` — fix
+  `enforceBreakpointBudget` to evict tail first AND handle system/tools
+  overflow; expand cacheable-block whitelist; anchor Bedrock substring matching
+- `packages/agent/src/providers/format-converters.ts` — drop `(no response)`
+  placeholder; emit empty assistant turns correctly
+- `packages/agent/src/tools/executor.ts` — replace `localeCompare` with
+  byte-stable comparison
 
 **Test files updated:**
-- `packages/agent/src/providers/__tests__/anthropic-provider.test.ts` — multi-system-message test updated for new invariant
-- `packages/agent/src/providers/__tests__/cache-control.test.ts` — `enforceBreakpointBudget` policy tests updated to expect tail-first eviction
-- `packages/agent/src/message-building/message-builder.test.ts` (if it exists) or `packages/agent/src/__tests__/system-prompt-injection.test.ts` — update for new event type
+
+- `packages/agent/src/providers/__tests__/anthropic-provider.test.ts` —
+  multi-system-message test updated for new invariant
+- `packages/agent/src/providers/__tests__/cache-control.test.ts` —
+  `enforceBreakpointBudget` policy tests updated to expect tail-first eviction
+- `packages/agent/src/message-building/message-builder.test.ts` (if it exists)
+  or `packages/agent/src/__tests__/system-prompt-injection.test.ts` — update for
+  new event type
 
 ---
 
@@ -40,65 +79,117 @@
 
 ### Current data flow (broken)
 
-1. **Session creation** (`rpc/handlers/session.ts:413-461`) calls `loadPromptConfig` which interpolates `sessionDate`, git status, project tree, etc. into the persona template. Two `context_injected` events are written with `priority: 'normal'`: one for the persona, one for `userInstructions`.
+1. **Session creation** (`rpc/handlers/session.ts:413-461`) calls
+   `loadPromptConfig` which interpolates `sessionDate`, git status, project
+   tree, etc. into the persona template. Two `context_injected` events are
+   written with `priority: 'normal'`: one for the persona, one for
+   `userInstructions`.
 
-2. **Session rebuild** (`message-building/message-builder.ts:171-177`) reads `events.jsonl` and converts EVERY `context_injected` event — regardless of priority — into `role: 'system'` messages.
+2. **Session rebuild** (`message-building/message-builder.ts:171-177`) reads
+   `events.jsonl` and converts EVERY `context_injected` event — regardless of
+   priority — into `role: 'system'` messages.
 
-3. **Provider request** (`providers/base-provider.ts:571-599`) concatenates all `role: 'system'` messages via `getEffectiveSystemPrompt`, joins with `\n\n`, falls back to literal `"You are a helpful assistant."` if none found. Result wraps into a single `TextBlockParam` with `cache_control`.
+3. **Provider request** (`providers/base-provider.ts:571-599`) concatenates all
+   `role: 'system'` messages via `getEffectiveSystemPrompt`, joins with `\n\n`,
+   falls back to literal `"You are a helpful assistant."` if none found. Result
+   wraps into a single `TextBlockParam` with `cache_control`.
 
 **Bugs this causes:**
-- Every peer `ent/session/inject` adds another `context_injected` event → becomes `role:'system'` → concatenated into a single text block → the single text block's bytes change → the entire system cache invalidates.
-- The PRI-1804 #4 "fix" persisted the loop-reminder as `context_injected` AND pushed it in-memory as `role:'user'` without advancing `lastSeenEventSeq`. Next turn re-reads it as `role:'system'`. Result: the reminder appears twice in the SAME run AND migrates between roles across restarts.
-- `GitVariableProvider` runs every time `loadPromptConfig` runs. If we ever re-render (we don't right now, but the invariant should be loud), a single new untracked file mutates `clean → dirty` and busts the system cache.
-- The `sessionDate` (PRI-1804 #1) is only stable across a UTC day. At midnight UTC, the next session has a different prompt.
+
+- Every peer `ent/session/inject` adds another `context_injected` event →
+  becomes `role:'system'` → concatenated into a single text block → the single
+  text block's bytes change → the entire system cache invalidates.
+- The PRI-1804 #4 "fix" persisted the loop-reminder as `context_injected` AND
+  pushed it in-memory as `role:'user'` without advancing `lastSeenEventSeq`.
+  Next turn re-reads it as `role:'system'`. Result: the reminder appears twice
+  in the SAME run AND migrates between roles across restarts.
+- `GitVariableProvider` runs every time `loadPromptConfig` runs. If we ever
+  re-render (we don't right now, but the invariant should be loud), a single new
+  untracked file mutates `clean → dirty` and busts the system cache.
+- The `sessionDate` (PRI-1804 #1) is only stable across a UTC day. At midnight
+  UTC, the next session has a different prompt.
 
 ### Desired data flow
 
-1. **Session creation** writes a single `system_prompt_set` event holding the FULL rendered text (persona + userInstructions concatenated with `\n\n`).
+1. **Session creation** writes a single `system_prompt_set` event holding the
+   FULL rendered text (persona + userInstructions concatenated with `\n\n`).
 
-2. **Session rebuild** reads the `system_prompt_set` event into a returned `systemPrompt: string`. All `context_injected` events become `role: 'user'` messages (they are runtime context, not session-foundational).
+2. **Session rebuild** reads the `system_prompt_set` event into a returned
+   `systemPrompt: string`. All `context_injected` events become `role: 'user'`
+   messages (they are runtime context, not session-foundational).
 
-3. **Runner** reads the frozen `systemPrompt` from rebuild output. Calls `provider.setSystemPrompt(text)` once before the first turn. The provider's `_systemPrompt` field never changes again for the session lifetime.
+3. **Runner** reads the frozen `systemPrompt` from rebuild output. Calls
+   `provider.setSystemPrompt(text)` once before the first turn. The provider's
+   `_systemPrompt` field never changes again for the session lifetime.
 
-4. **Provider request** — `getEffectiveSystemPrompt(messages)` returns `_systemPrompt` directly. It does not walk messages. Empty `_systemPrompt` throws (no silent fallback string).
+4. **Provider request** — `getEffectiveSystemPrompt(messages)` returns
+   `_systemPrompt` directly. It does not walk messages. Empty `_systemPrompt`
+   throws (no silent fallback string).
 
-5. **`cache_control` on `system[0]`** is stable across the entire session — first request writes the cache, every subsequent request reads it.
+5. **`cache_control` on `system[0]`** is stable across the entire session —
+   first request writes the cache, every subsequent request reads it.
 
 ### Backward compatibility
 
-Per project policy in `CLAUDE.md`, we do not preserve back-compat code paths. However, sessions in flight when this change deploys still have only old-style `context_injected` events. Approach: when rebuilding such sessions, the message-builder detects the absence of `system_prompt_set` and treats the first run of `context_injected` events (those written before the first `prompt` event) as the legacy system prompt, hoisting them into `systemPrompt`. New sessions always go through `system_prompt_set` and never trip the legacy path.
+Per project policy in `CLAUDE.md`, we do not preserve back-compat code paths.
+However, sessions in flight when this change deploys still have only old-style
+`context_injected` events. Approach: when rebuilding such sessions, the
+message-builder detects the absence of `system_prompt_set` and treats the first
+run of `context_injected` events (those written before the first `prompt` event)
+as the legacy system prompt, hoisting them into `systemPrompt`. New sessions
+always go through `system_prompt_set` and never trip the legacy path.
 
 ### How tests work here
 
 - Vitest. Run from `packages/agent` (cwd matters — workspaces).
-- Mock the Anthropic SDK by `vi.mock('@anthropic-ai/sdk', ...)` (existing pattern in tests).
-- The local-HTTP-server smoke pattern from `anthropic-provider-smoke-pri-1799.test.ts` is the standard for wire-level assertions.
+- Mock the Anthropic SDK by `vi.mock('@anthropic-ai/sdk', ...)` (existing
+  pattern in tests).
+- The local-HTTP-server smoke pattern from
+  `anthropic-provider-smoke-pri-1799.test.ts` is the standard for wire-level
+  assertions.
 - Vi config: `npx vitest --run src/path/to/test.ts` runs a single file.
 - Test fixtures often use `tmpdir()` + `mkdirSync` for ephemeral session dirs.
 
 ### How runner reminders persist
 
-Runner uses `appendDurableEvent(sessionDir, ...)` via the `writeAndAdvance` helper. `lastSeenEventSeq` is the watermark for re-reading immediate injects from peers (PRI-1691). If we write a durable event from the runner itself and DON'T advance `lastSeenEventSeq`, the next iteration's `readImmediateInjectsSince` re-emits the same event into `providerMessages`.
+Runner uses `appendDurableEvent(sessionDir, ...)` via the `writeAndAdvance`
+helper. `lastSeenEventSeq` is the watermark for re-reading immediate injects
+from peers (PRI-1691). If we write a durable event from the runner itself and
+DON'T advance `lastSeenEventSeq`, the next iteration's
+`readImmediateInjectsSince` re-emits the same event into `providerMessages`.
 
 ---
 
 # Phase 1: Urgent Regressions
 
-These tasks fix bugs introduced by PRI-1804 and PRI-1806 that are live on `main` right now. They are independent of the architectural changes in Phase 2 — do them first so the bleeding stops.
+These tasks fix bugs introduced by PRI-1804 and PRI-1806 that are live on `main`
+right now. They are independent of the architectural changes in Phase 2 — do
+them first so the bleeding stops.
 
 ---
 
 ### Task 1A: Stop loop-reminder double-injection
 
 **Files:**
+
 - Modify: `packages/agent/src/core/conversation/runner.ts:245-264`
-- Test: `packages/agent/src/core/conversation/runner-loop-reminder.test.ts` (new)
+- Test: `packages/agent/src/core/conversation/runner-loop-reminder.test.ts`
+  (new)
 
-**Problem:** PRI-1804 #4 introduced `writeAndAdvance` for the reminder but also kept the in-memory append. Plus `lastSeenEventSeq` isn't advanced after the write. Next iteration's `readImmediateInjectsSince` re-reads the just-written event and appends it again. The model sees the reminder twice.
+**Problem:** PRI-1804 #4 introduced `writeAndAdvance` for the reminder but also
+kept the in-memory append. Plus `lastSeenEventSeq` isn't advanced after the
+write. Next iteration's `readImmediateInjectsSince` re-reads the just-written
+event and appends it again. The model sees the reminder twice.
 
-**Resolution:** Write durably AND advance `lastSeenEventSeq` so the next iteration's re-read won't pick it up again. DO NOT also push in-memory — the next iteration's re-read would have done that anyway, but we already pushed it. Simpler fix: push in-memory only (don't persist). Or: push in-memory AND advance the watermark.
+**Resolution:** Write durably AND advance `lastSeenEventSeq` so the next
+iteration's re-read won't pick it up again. DO NOT also push in-memory — the
+next iteration's re-read would have done that anyway, but we already pushed it.
+Simpler fix: push in-memory only (don't persist). Or: push in-memory AND advance
+the watermark.
 
-The cleanest: push in-memory, don't persist. The reminder is ephemeral runtime guidance; it doesn't need to survive restart. If a session restarts mid-conversation, missing one reminder at turn 50 is fine.
+The cleanest: push in-memory, don't persist. The reminder is ephemeral runtime
+guidance; it doesn't need to survive restart. If a session restarts
+mid-conversation, missing one reminder at turn 50 is fine.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -118,10 +209,7 @@ import { join } from 'node:path';
 
 describe('PRI-1804 #4 regression — loop reminder must not double-inject', () => {
   it('runner.ts does not call writeAndAdvance for the loop reminder', () => {
-    const src = readFileSync(
-      join(__dirname, 'runner.ts'),
-      'utf8'
-    );
+    const src = readFileSync(join(__dirname, 'runner.ts'), 'utf8');
     // Find the reminder block (anchor on the LOOP_CHECK_INTERVAL guard).
     const blockMatch = src.match(
       /completedTurns % ConversationRunner\.LOOP_CHECK_INTERVAL[\s\S]{0,1200}/
@@ -148,26 +236,33 @@ describe('PRI-1804 #4 regression — loop reminder must not double-inject', () =
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest --run src/core/conversation/runner-loop-reminder.test.ts`
-Expected: FAIL — "expected not to contain `writeAndAdvance`" (current code has `writeAndAdvance` inside the block).
+Expected: FAIL — "expected not to contain `writeAndAdvance`" (current code has
+`writeAndAdvance` inside the block).
 
 - [ ] **Step 3: Apply the fix**
 
 In `packages/agent/src/core/conversation/runner.ts`, replace lines 245-264 with:
 
 ```typescript
-        // Inject a reminder every LOOP_CHECK_INTERVAL turns to help detect
-        // stuck loops. PRI-1804 #4 (revised after adversarial review): push
-        // the reminder into providerMessages in-memory ONLY. Do NOT persist
-        // it as a context_injected event — persisting caused the next
-        // iteration's readImmediateInjectsSince to re-read and re-append
-        // the same reminder, doubling it in the message stream. The
-        // reminder is intentionally ephemeral runtime guidance; if the
-        // session restarts mid-run, missing one nudge at turn 50 is fine.
-        if (completedTurns > 0 && completedTurns % ConversationRunner.LOOP_CHECK_INTERVAL === 0) {
-          const reminder =
-            '<system-reminder>You have completed many agentic turns. If you believe you are stuck in a loop or not making progress, stop and ask the user for guidance. Otherwise, continue.</system-reminder>';
-          providerMessages = [...providerMessages, { role: 'user' as const, content: reminder }];
-        }
+// Inject a reminder every LOOP_CHECK_INTERVAL turns to help detect
+// stuck loops. PRI-1804 #4 (revised after adversarial review): push
+// the reminder into providerMessages in-memory ONLY. Do NOT persist
+// it as a context_injected event — persisting caused the next
+// iteration's readImmediateInjectsSince to re-read and re-append
+// the same reminder, doubling it in the message stream. The
+// reminder is intentionally ephemeral runtime guidance; if the
+// session restarts mid-run, missing one nudge at turn 50 is fine.
+if (
+  completedTurns > 0 &&
+  completedTurns % ConversationRunner.LOOP_CHECK_INTERVAL === 0
+) {
+  const reminder =
+    '<system-reminder>You have completed many agentic turns. If you believe you are stuck in a loop or not making progress, stop and ask the user for guidance. Otherwise, continue.</system-reminder>';
+  providerMessages = [
+    ...providerMessages,
+    { role: 'user' as const, content: reminder },
+  ];
+}
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -195,60 +290,91 @@ one at turn 50 across a process restart is acceptable.
 ### Task 1B: Fix `enforceBreakpointBudget` eviction direction
 
 **Files:**
+
 - Modify: `packages/agent/src/providers/cache-control.ts:260-295`
-- Test: `packages/agent/src/providers/__tests__/cache-control.test.ts:288-318` (existing test gets updated)
+- Test: `packages/agent/src/providers/__tests__/cache-control.test.ts:288-318`
+  (existing test gets updated)
 
-**Problem:** Current implementation strips the OLDEST cache_control marker first. By construction in a Lace request, the oldest marker is the stable anchor. Stripping the anchor first defeats PRI-1802 — exactly the breakpoint that PRI-1802 added to defeat the 20-block lookback window.
+**Problem:** Current implementation strips the OLDEST cache_control marker
+first. By construction in a Lace request, the oldest marker is the stable
+anchor. Stripping the anchor first defeats PRI-1802 — exactly the breakpoint
+that PRI-1802 added to defeat the 20-block lookback window.
 
-**Resolution:** Strip the NEWEST marker first (the rolling tail). The tail is regenerated cheaply on every turn (every turn writes a new tail breakpoint anyway); evicting it loses one turn's cache extension but preserves the long-lived anchor.
+**Resolution:** Strip the NEWEST marker first (the rolling tail). The tail is
+regenerated cheaply on every turn (every turn writes a new tail breakpoint
+anyway); evicting it loses one turn's cache extension but preserves the
+long-lived anchor.
 
 - [ ] **Step 1: Write the updated failing test**
 
-In `packages/agent/src/providers/__tests__/cache-control.test.ts`, replace the existing test `enforceBreakpointBudget strips oldest message-level markers first when over cap` (around line 290) with:
+In `packages/agent/src/providers/__tests__/cache-control.test.ts`, replace the
+existing test
+`enforceBreakpointBudget strips oldest message-level markers first when over cap`
+(around line 290) with:
 
 ```typescript
-  it('enforceBreakpointBudget strips NEWEST message-level markers first when over cap (PRI-1802 anchor preservation)', () => {
-    // 5 markers in messages — over the cap of 4. Strip the NEWEST first
-    // so the stable anchor (oldest) survives. This is the breakpoint that
-    // PRI-1802 added specifically to defeat Anthropic's 20-block lookback
-    // window; evicting it first would defeat the whole point.
-    const messages = [
-      user({ ...text('first'), cache_control: MARKER_1H } as Anthropic.TextBlockParam),
-      user({ ...text('second'), cache_control: MARKER_1H } as Anthropic.TextBlockParam),
-      user({ ...text('third'), cache_control: MARKER_1H } as Anthropic.TextBlockParam),
-      user({ ...text('fourth'), cache_control: MARKER_1H } as Anthropic.TextBlockParam),
-      user({ ...text('fifth'), cache_control: MARKER_1H } as Anthropic.TextBlockParam),
-    ];
-    const result = enforceBreakpointBudget({ messages });
+it('enforceBreakpointBudget strips NEWEST message-level markers first when over cap (PRI-1802 anchor preservation)', () => {
+  // 5 markers in messages — over the cap of 4. Strip the NEWEST first
+  // so the stable anchor (oldest) survives. This is the breakpoint that
+  // PRI-1802 added specifically to defeat Anthropic's 20-block lookback
+  // window; evicting it first would defeat the whole point.
+  const messages = [
+    user({
+      ...text('first'),
+      cache_control: MARKER_1H,
+    } as Anthropic.TextBlockParam),
+    user({
+      ...text('second'),
+      cache_control: MARKER_1H,
+    } as Anthropic.TextBlockParam),
+    user({
+      ...text('third'),
+      cache_control: MARKER_1H,
+    } as Anthropic.TextBlockParam),
+    user({
+      ...text('fourth'),
+      cache_control: MARKER_1H,
+    } as Anthropic.TextBlockParam),
+    user({
+      ...text('fifth'),
+      cache_control: MARKER_1H,
+    } as Anthropic.TextBlockParam),
+  ];
+  const result = enforceBreakpointBudget({ messages });
 
-    const remainingMarkers = result.flatMap((m) =>
-      Array.isArray(m.content)
-        ? m.content.filter((b) => (b as { cache_control?: unknown }).cache_control)
-        : []
-    );
-    expect(remainingMarkers).toHaveLength(MAX_CACHE_BREAKPOINTS);
+  const remainingMarkers = result.flatMap((m) =>
+    Array.isArray(m.content)
+      ? m.content.filter(
+          (b) => (b as { cache_control?: unknown }).cache_control
+        )
+      : []
+  );
+  expect(remainingMarkers).toHaveLength(MAX_CACHE_BREAKPOINTS);
 
-    // Last (newest) message lost its marker
-    expect(
-      Array.isArray(result[4].content) &&
-        (result[4].content[0] as { cache_control?: unknown }).cache_control
-    ).toBeFalsy();
-    // First (oldest = anchor position) kept it
-    expect(
-      Array.isArray(result[0].content) &&
-        (result[0].content[0] as { cache_control?: unknown }).cache_control
-    ).toEqual(MARKER_1H);
-  });
+  // Last (newest) message lost its marker
+  expect(
+    Array.isArray(result[4].content) &&
+      (result[4].content[0] as { cache_control?: unknown }).cache_control
+  ).toBeFalsy();
+  // First (oldest = anchor position) kept it
+  expect(
+    Array.isArray(result[0].content) &&
+      (result[0].content[0] as { cache_control?: unknown }).cache_control
+  ).toEqual(MARKER_1H);
+});
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest --run src/providers/__tests__/cache-control.test.ts -t "strips NEWEST"`
-Expected: FAIL — current implementation strips oldest, so the first message still has its marker and the last one does not.
+Run:
+`npx vitest --run src/providers/__tests__/cache-control.test.ts -t "strips NEWEST"`
+Expected: FAIL — current implementation strips oldest, so the first message
+still has its marker and the last one does not.
 
 - [ ] **Step 3: Fix the implementation**
 
-In `packages/agent/src/providers/cache-control.ts`, replace the body of `enforceBreakpointBudget` (the loop body, ~lines 273-294):
+In `packages/agent/src/providers/cache-control.ts`, replace the body of
+`enforceBreakpointBudget` (the loop body, ~lines 273-294):
 
 ```typescript
 export function enforceBreakpointBudget(payload: {
@@ -278,7 +404,10 @@ export function enforceBreakpointBudget(payload: {
       if ((block as { cache_control?: unknown }).cache_control) {
         toDrop--;
         touched = true;
-        const { cache_control: _drop, ...rest } = block as unknown as Record<string, unknown>;
+        const { cache_control: _drop, ...rest } = block as unknown as Record<
+          string,
+          unknown
+        >;
         return rest as unknown as Anthropic.ContentBlockParam;
       }
       return block;
@@ -291,8 +420,8 @@ export function enforceBreakpointBudget(payload: {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest --run src/providers/__tests__/cache-control.test.ts`
-Expected: PASS (all cache-control unit tests, including the updated one).
+Run: `npx vitest --run src/providers/__tests__/cache-control.test.ts` Expected:
+PASS (all cache-control unit tests, including the updated one).
 
 - [ ] **Step 5: Commit**
 
@@ -315,44 +444,58 @@ sacrificed.
 ### Task 1C: Handle `enforceBreakpointBudget` over-cap when system/tools are over
 
 **Files:**
-- Modify: `packages/agent/src/providers/cache-control.ts` (`enforceBreakpointBudget`)
-- Test: `packages/agent/src/providers/__tests__/cache-control.test.ts` (add a new test in the same describe block)
 
-**Problem:** If the cap is exceeded because of markers in `system` or `tools` (not just `messages`), the function only strips from `messages` and may return without bringing the count down. The 400 from Anthropic is still possible. The function name implies it enforces the cap; it doesn't fully.
+- Modify: `packages/agent/src/providers/cache-control.ts`
+  (`enforceBreakpointBudget`)
+- Test: `packages/agent/src/providers/__tests__/cache-control.test.ts` (add a
+  new test in the same describe block)
 
-**Resolution:** If after stripping all message markers we're STILL over cap, log a warning and return the unmodified messages — callers are responsible for not generating >4 markers across system+tools+anchor+tail. With current code paths Lace never sends >2 system or >1 tool markers; the assertion is purely defensive. A loud warning surfaces the bug fast if a future caller introduces a 5th marker upstream.
+**Problem:** If the cap is exceeded because of markers in `system` or `tools`
+(not just `messages`), the function only strips from `messages` and may return
+without bringing the count down. The 400 from Anthropic is still possible. The
+function name implies it enforces the cap; it doesn't fully.
+
+**Resolution:** If after stripping all message markers we're STILL over cap, log
+a warning and return the unmodified messages — callers are responsible for not
+generating >4 markers across system+tools+anchor+tail. With current code paths
+Lace never sends >2 system or >1 tool markers; the assertion is purely
+defensive. A loud warning surfaces the bug fast if a future caller introduces a
+5th marker upstream.
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `packages/agent/src/providers/__tests__/cache-control.test.ts` inside the `describe('budget enforcement (PRI-1806 #1)', ...)` block:
+Add to `packages/agent/src/providers/__tests__/cache-control.test.ts` inside the
+`describe('budget enforcement (PRI-1806 #1)', ...)` block:
 
 ```typescript
-  it('logs a warning when system/tools markers push the total over cap (PRI-1806 #1 follow-up)', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+it('logs a warning when system/tools markers push the total over cap (PRI-1806 #1 follow-up)', () => {
+  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-    // 4 markers in system + 1 in tools = 5 total, all message-level slots empty
-    const result = enforceBreakpointBudget({
-      system: [
-        { type: 'text', text: 'a', cache_control: MARKER_1H },
-        { type: 'text', text: 'b', cache_control: MARKER_1H },
-        { type: 'text', text: 'c', cache_control: MARKER_1H },
-        { type: 'text', text: 'd', cache_control: MARKER_1H },
-      ] as Anthropic.TextBlockParam[],
-      tools: [{ cache_control: MARKER_1H }],
-      messages: [user(text('plain'))],
-    });
-
-    // Messages array unchanged (no message markers to strip).
-    expect(result).toHaveLength(1);
-    // Warning fired so we surface this in production logs.
-    expect(warnSpy).toHaveBeenCalled();
-    expect(warnSpy.mock.calls[0][0]).toMatch(/cache_control budget/i);
-
-    warnSpy.mockRestore();
+  // 4 markers in system + 1 in tools = 5 total, all message-level slots empty
+  const result = enforceBreakpointBudget({
+    system: [
+      { type: 'text', text: 'a', cache_control: MARKER_1H },
+      { type: 'text', text: 'b', cache_control: MARKER_1H },
+      { type: 'text', text: 'c', cache_control: MARKER_1H },
+      { type: 'text', text: 'd', cache_control: MARKER_1H },
+    ] as Anthropic.TextBlockParam[],
+    tools: [{ cache_control: MARKER_1H }],
+    messages: [user(text('plain'))],
   });
+
+  // Messages array unchanged (no message markers to strip).
+  expect(result).toHaveLength(1);
+  // Warning fired so we surface this in production logs.
+  expect(warnSpy).toHaveBeenCalled();
+  expect(warnSpy.mock.calls[0][0]).toMatch(/cache_control budget/i);
+
+  warnSpy.mockRestore();
+});
 ```
 
-Add `import { vi } from 'vitest';` at the top of the file if it isn't already there (it already is, alongside `describe, it, expect`). The current file imports only `describe, it, expect`. Update the import line at the top:
+Add `import { vi } from 'vitest';` at the top of the file if it isn't already
+there (it already is, alongside `describe, it, expect`). The current file
+imports only `describe, it, expect`. Update the import line at the top:
 
 ```typescript
 import { describe, it, expect, vi } from 'vitest';
@@ -360,12 +503,14 @@ import { describe, it, expect, vi } from 'vitest';
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest --run src/providers/__tests__/cache-control.test.ts -t "logs a warning"`
+Run:
+`npx vitest --run src/providers/__tests__/cache-control.test.ts -t "logs a warning"`
 Expected: FAIL — `warnSpy` was not called.
 
 - [ ] **Step 3: Update implementation**
 
-In `packages/agent/src/providers/cache-control.ts`, modify `enforceBreakpointBudget` to add the warning at the end:
+In `packages/agent/src/providers/cache-control.ts`, modify
+`enforceBreakpointBudget` to add the warning at the end:
 
 ```typescript
 export function enforceBreakpointBudget(payload: {
@@ -388,7 +533,10 @@ export function enforceBreakpointBudget(payload: {
       if ((block as { cache_control?: unknown }).cache_control) {
         toDrop--;
         touched = true;
-        const { cache_control: _drop, ...rest } = block as unknown as Record<string, unknown>;
+        const { cache_control: _drop, ...rest } = block as unknown as Record<
+          string,
+          unknown
+        >;
         return rest as unknown as Anthropic.ContentBlockParam;
       }
       return block;
@@ -415,8 +563,8 @@ export function enforceBreakpointBudget(payload: {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest --run src/providers/__tests__/cache-control.test.ts`
-Expected: PASS (all cache-control tests).
+Run: `npx vitest --run src/providers/__tests__/cache-control.test.ts` Expected:
+PASS (all cache-control tests).
 
 - [ ] **Step 5: Commit**
 
@@ -437,61 +585,87 @@ request.
 ### Task 1D: Fix OpenAI provider system-prompt divergence
 
 **Files:**
-- Modify: `packages/agent/src/providers/openai-provider.ts` (find the `_createResponsesAPIPayload` method around line 500-520)
-- Test: `packages/agent/src/providers/openai-provider.test.ts` (find the existing tests, add one)
 
-**Problem:** When PRI-1804 #3 changed `getEffectiveSystemPrompt` to concatenate ALL `role: 'system'` messages with `\n\n`, the OpenAI provider's Responses-API path was bypassed. That path has its own inline join — different separator (`\n`) AND it stringifies `content` arrays naively, producing `"[object Object]"` when content is an array of blocks. Two paths in the OpenAI provider now produce different system prompts for the same input.
+- Modify: `packages/agent/src/providers/openai-provider.ts` (find the
+  `_createResponsesAPIPayload` method around line 500-520)
+- Test: `packages/agent/src/providers/openai-provider.test.ts` (find the
+  existing tests, add one)
 
-**Resolution:** Replace the inline join with a call to `this.getEffectiveSystemPrompt(messages)`. Both paths go through the same well-tested code.
+**Problem:** When PRI-1804 #3 changed `getEffectiveSystemPrompt` to concatenate
+ALL `role: 'system'` messages with `\n\n`, the OpenAI provider's Responses-API
+path was bypassed. That path has its own inline join — different separator
+(`\n`) AND it stringifies `content` arrays naively, producing
+`"[object Object]"` when content is an array of blocks. Two paths in the OpenAI
+provider now produce different system prompts for the same input.
+
+**Resolution:** Replace the inline join with a call to
+`this.getEffectiveSystemPrompt(messages)`. Both paths go through the same
+well-tested code.
 
 - [ ] **Step 1: Investigate the current code**
 
-Run: `grep -n "system\|role === 'system'" packages/agent/src/providers/openai-provider.ts | head -20`
+Run:
+`grep -n "system\|role === 'system'" packages/agent/src/providers/openai-provider.ts | head -20`
 
 Read the file around line 500-520 to find the Responses-API system handling.
 
 - [ ] **Step 2: Write the failing test**
 
-Add to `packages/agent/src/providers/openai-provider.test.ts` (find a good insertion point near other system-prompt tests):
+Add to `packages/agent/src/providers/openai-provider.test.ts` (find a good
+insertion point near other system-prompt tests):
 
 ```typescript
-  it('Responses-API path goes through getEffectiveSystemPrompt for system messages (regression: PRI-1804 #3)', async () => {
-    // After PRI-1804 #3, getEffectiveSystemPrompt joins multiple role:system
-    // messages with \n\n. The Responses-API path used to do its own \n-join
-    // and stringified content arrays naively — that divergence is the bug.
-    // Verify the Responses-API path now matches.
-    mockCreateResponses.mockResolvedValue({
-      // Minimal response shape...
-      output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'ok' }] }],
-      usage: { input_tokens: 1, output_tokens: 1 },
-    });
-
-    await provider.createResponse(
-      [
-        { role: 'system', content: 'First system block.' },
-        { role: 'system', content: 'Second system block.' },
-        { role: 'user', content: 'Hello' },
-      ],
-      [],
-      'gpt-4o'
-    );
-
-    const callArgs = mockCreateResponses.mock.calls[0][0];
-    // System should be the \n\n join, matching what getEffectiveSystemPrompt produces.
-    expect(callArgs.instructions ?? callArgs.system).toContain('First system block.\n\nSecond system block.');
+it('Responses-API path goes through getEffectiveSystemPrompt for system messages (regression: PRI-1804 #3)', async () => {
+  // After PRI-1804 #3, getEffectiveSystemPrompt joins multiple role:system
+  // messages with \n\n. The Responses-API path used to do its own \n-join
+  // and stringified content arrays naively — that divergence is the bug.
+  // Verify the Responses-API path now matches.
+  mockCreateResponses.mockResolvedValue({
+    // Minimal response shape...
+    output: [
+      {
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'output_text', text: 'ok' }],
+      },
+    ],
+    usage: { input_tokens: 1, output_tokens: 1 },
   });
+
+  await provider.createResponse(
+    [
+      { role: 'system', content: 'First system block.' },
+      { role: 'system', content: 'Second system block.' },
+      { role: 'user', content: 'Hello' },
+    ],
+    [],
+    'gpt-4o'
+  );
+
+  const callArgs = mockCreateResponses.mock.calls[0][0];
+  // System should be the \n\n join, matching what getEffectiveSystemPrompt produces.
+  expect(callArgs.instructions ?? callArgs.system).toContain(
+    'First system block.\n\nSecond system block.'
+  );
+});
 ```
 
-(Adapt the assertion to the actual Responses-API field name — check what the existing tests use; it might be `instructions` or `input` with a system role item.)
+(Adapt the assertion to the actual Responses-API field name — check what the
+existing tests use; it might be `instructions` or `input` with a system role
+item.)
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `npx vitest --run src/providers/openai-provider.test.ts -t "Responses-API path goes through"`
-Expected: FAIL — the current code uses `\n` separator and broken content stringification.
+Run:
+`npx vitest --run src/providers/openai-provider.test.ts -t "Responses-API path goes through"`
+Expected: FAIL — the current code uses `\n` separator and broken content
+stringification.
 
 - [ ] **Step 4: Apply the fix**
 
-In `packages/agent/src/providers/openai-provider.ts`, find the Responses-API payload builder (around line 508-509 based on the adversarial review). It currently has logic like:
+In `packages/agent/src/providers/openai-provider.ts`, find the Responses-API
+payload builder (around line 508-509 based on the adversarial review). It
+currently has logic like:
 
 ```typescript
 const systemText = messages
@@ -506,7 +680,8 @@ Replace with:
 const systemText = this.getEffectiveSystemPrompt(messages);
 ```
 
-If the surrounding code expects the result to be only non-empty, wrap appropriately:
+If the surrounding code expects the result to be only non-empty, wrap
+appropriately:
 
 ```typescript
 const systemText = this.getEffectiveSystemPrompt(messages);
@@ -515,8 +690,8 @@ const systemText = this.getEffectiveSystemPrompt(messages);
 
 - [ ] **Step 5: Run test to verify it passes AND verify no regressions**
 
-Run: `npx vitest --run src/providers/openai-provider.test.ts`
-Expected: PASS (all OpenAI tests).
+Run: `npx vitest --run src/providers/openai-provider.test.ts` Expected: PASS
+(all OpenAI tests).
 
 - [ ] **Step 6: Commit**
 
@@ -538,19 +713,24 @@ paths produce identical system prompts.
 
 # Phase 2: System Prompt Invariant
 
-This is the architectural change. After this phase, the system prompt is computed exactly once per session at creation, persisted as a dedicated event, and never recomputed or mutated.
+This is the architectural change. After this phase, the system prompt is
+computed exactly once per session at creation, persisted as a dedicated event,
+and never recomputed or mutated.
 
 ---
 
 ### Task 2A: Add `system_prompt_set` event type
 
 **Files:**
+
 - Modify: `packages/agent/src/storage/event-types.ts`
-- Test: `packages/agent/src/storage/event-types.test.ts` (may not exist — if not, the type-check is the test)
+- Test: `packages/agent/src/storage/event-types.test.ts` (may not exist — if
+  not, the type-check is the test)
 
 - [ ] **Step 1: Add the type to the discriminated union**
 
-In `packages/agent/src/storage/event-types.ts`, add after `ContextInjectedEventData` (around line 57):
+In `packages/agent/src/storage/event-types.ts`, add after
+`ContextInjectedEventData` (around line 57):
 
 ```typescript
 export type SystemPromptSetEventData = {
@@ -559,7 +739,8 @@ export type SystemPromptSetEventData = {
 };
 ```
 
-Then add `SystemPromptSetEventData` to the `DurableEventData` union (around line 130):
+Then add `SystemPromptSetEventData` to the `DurableEventData` union (around line
+130):
 
 ```typescript
 export type DurableEventData =
@@ -571,14 +752,13 @@ export type DurableEventData =
   | ContextCompactedEventData
   | ContextInjectedEventData
   | SystemPromptSetEventData
-  | JobStartedEventData
-  // ...rest unchanged
+  | JobStartedEventData;
+// ...rest unchanged
 ```
 
 - [ ] **Step 2: Run typecheck to ensure the type compiles**
 
-Run: `cd packages/agent && npx tsc --noEmit`
-Expected: clean (no errors).
+Run: `cd packages/agent && npx tsc --noEmit` Expected: clean (no errors).
 
 - [ ] **Step 3: Commit**
 
@@ -597,20 +777,28 @@ to recover the frozen prompt without walking context_injected events.
 ### Task 2B: Write `system_prompt_set` at session creation
 
 **Files:**
-- Modify: `packages/agent/src/rpc/handlers/session.ts:413-461`
-- Test: `packages/agent/src/__tests__/system-prompt-injection.test.ts` (existing; assertions need updating)
 
-**Resolution:** Replace the two `context_injected` writes with a single `system_prompt_set` write whose `text` is `systemPrompt + '\n\n' + userInstructions` (when userInstructions is non-empty).
+- Modify: `packages/agent/src/rpc/handlers/session.ts:413-461`
+- Test: `packages/agent/src/__tests__/system-prompt-injection.test.ts`
+  (existing; assertions need updating)
+
+**Resolution:** Replace the two `context_injected` writes with a single
+`system_prompt_set` write whose `text` is
+`systemPrompt + '\n\n' + userInstructions` (when userInstructions is non-empty).
 
 - [ ] **Step 1: Read existing test to know what to update**
 
-Run: `cat packages/agent/src/__tests__/system-prompt-injection.test.ts | head -120`
+Run:
+`cat packages/agent/src/__tests__/system-prompt-injection.test.ts | head -120`
 
-Identify the assertions that look for `type === 'context_injected'`. They'll need to look for `type === 'system_prompt_set'` instead.
+Identify the assertions that look for `type === 'context_injected'`. They'll
+need to look for `type === 'system_prompt_set'` instead.
 
 - [ ] **Step 2: Update the test expectations**
 
-In `packages/agent/src/__tests__/system-prompt-injection.test.ts`, find every assertion that reads the first event of the session as `context_injected`. Replace with `system_prompt_set` and update the data extraction:
+In `packages/agent/src/__tests__/system-prompt-injection.test.ts`, find every
+assertion that reads the first event of the session as `context_injected`.
+Replace with `system_prompt_set` and update the data extraction:
 
 ```typescript
 // OLD pattern:
@@ -626,38 +814,38 @@ Apply this to BOTH occurrences in the file (around lines 84 and 277).
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `npx vitest --run src/__tests__/system-prompt-injection.test.ts`
-Expected: FAIL — first event is still `context_injected`, not `system_prompt_set`.
+Run: `npx vitest --run src/__tests__/system-prompt-injection.test.ts` Expected:
+FAIL — first event is still `context_injected`, not `system_prompt_set`.
 
 - [ ] **Step 4: Update session.ts**
 
 In `packages/agent/src/rpc/handlers/session.ts`, replace lines 442-461:
 
 ```typescript
-    let sessionState: SessionState = readSessionState(sessionDir);
+let sessionState: SessionState = readSessionState(sessionDir);
 
-    // Compose the full system prompt text (persona + user instructions).
-    // Persisted as a single `system_prompt_set` event so the system prompt
-    // is byte-stable for the lifetime of the session — see plan
-    // 2026-05-23-cache-control-hardening.md for the invariant.
-    const fullSystemPrompt = promptConfig.userInstructions.trim()
-      ? `${promptConfig.systemPrompt}\n\n${promptConfig.userInstructions}`
-      : promptConfig.systemPrompt;
+// Compose the full system prompt text (persona + user instructions).
+// Persisted as a single `system_prompt_set` event so the system prompt
+// is byte-stable for the lifetime of the session — see plan
+// 2026-05-23-cache-control-hardening.md for the invariant.
+const fullSystemPrompt = promptConfig.userInstructions.trim()
+  ? `${promptConfig.systemPrompt}\n\n${promptConfig.userInstructions}`
+  : promptConfig.systemPrompt;
 
-    const { nextState } = appendDurableEvent(sessionDir, sessionState, {
-      type: 'system_prompt_set',
-      data: { text: fullSystemPrompt },
-    });
-    sessionState = nextState;
-    writeSessionState(sessionDir, sessionState);
+const { nextState } = appendDurableEvent(sessionDir, sessionState, {
+  type: 'system_prompt_set',
+  data: { text: fullSystemPrompt },
+});
+sessionState = nextState;
+writeSessionState(sessionDir, sessionState);
 
-    state.activeSession = { ...state.activeSession, state: sessionState };
+state.activeSession = { ...state.activeSession, state: sessionState };
 ```
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `npx vitest --run src/__tests__/system-prompt-injection.test.ts`
-Expected: PASS.
+Run: `npx vitest --run src/__tests__/system-prompt-injection.test.ts` Expected:
+PASS.
 
 - [ ] **Step 6: Commit**
 
@@ -678,10 +866,18 @@ invariant system prompt.
 ### Task 2C: Update message-builder to return `{messages, systemPrompt}`
 
 **Files:**
-- Modify: `packages/agent/src/message-building/message-builder.ts`
-- Test: add a new file `packages/agent/src/message-building/message-builder.test.ts` (or whichever exists)
 
-**Resolution:** Change the signature of `buildProviderMessagesFromDurableEvents` to return `{messages: ProviderMessage[]; systemPrompt: string}`. All `context_injected` events become `role: 'user'` messages — they are runtime context, not session-foundational. A `system_prompt_set` event populates the returned `systemPrompt` field. Multiple `system_prompt_set` events: last one wins (defensive — should not happen in normal flow).
+- Modify: `packages/agent/src/message-building/message-builder.ts`
+- Test: add a new file
+  `packages/agent/src/message-building/message-builder.test.ts` (or whichever
+  exists)
+
+**Resolution:** Change the signature of `buildProviderMessagesFromDurableEvents`
+to return `{messages: ProviderMessage[]; systemPrompt: string}`. All
+`context_injected` events become `role: 'user'` messages — they are runtime
+context, not session-foundational. A `system_prompt_set` event populates the
+returned `systemPrompt` field. Multiple `system_prompt_set` events: last one
+wins (defensive — should not happen in normal flow).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -712,8 +908,16 @@ describe('buildProviderMessagesFromDurableEvents', () => {
   it('returns the system prompt text from a system_prompt_set event', () => {
     const dir = makeSessionDir('sps');
     writeEvents(dir, [
-      { eventSeq: 1, type: 'system_prompt_set', data: { type: 'system_prompt_set', text: 'You are Lace.' } },
-      { eventSeq: 2, type: 'prompt', data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] } },
+      {
+        eventSeq: 1,
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'You are Lace.' },
+      },
+      {
+        eventSeq: 2,
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+      },
     ]);
 
     const result = buildProviderMessagesFromDurableEvents(dir);
@@ -726,12 +930,23 @@ describe('buildProviderMessagesFromDurableEvents', () => {
   it('converts context_injected events to role:user messages (not role:system)', () => {
     const dir = makeSessionDir('ci-user');
     writeEvents(dir, [
-      { eventSeq: 1, type: 'system_prompt_set', data: { type: 'system_prompt_set', text: 'sys' } },
-      { eventSeq: 2, type: 'prompt', data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] } },
+      {
+        eventSeq: 1,
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'sys' },
+      },
+      {
+        eventSeq: 2,
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+      },
       {
         eventSeq: 3,
         type: 'context_injected',
-        data: { type: 'context_injected', content: [{ type: 'text', text: 'runtime nudge' }] },
+        data: {
+          type: 'context_injected',
+          content: [{ type: 'text', text: 'runtime nudge' }],
+        },
       },
     ]);
 
@@ -747,7 +962,11 @@ describe('buildProviderMessagesFromDurableEvents', () => {
   it('returns empty systemPrompt when no system_prompt_set event is present (legacy session)', () => {
     const dir = makeSessionDir('legacy');
     writeEvents(dir, [
-      { eventSeq: 1, type: 'prompt', data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] } },
+      {
+        eventSeq: 1,
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+      },
     ]);
 
     const result = buildProviderMessagesFromDurableEvents(dir);
@@ -760,9 +979,21 @@ describe('buildProviderMessagesFromDurableEvents', () => {
   it('uses the LAST system_prompt_set event when multiple exist (defensive)', () => {
     const dir = makeSessionDir('multi-sps');
     writeEvents(dir, [
-      { eventSeq: 1, type: 'system_prompt_set', data: { type: 'system_prompt_set', text: 'first' } },
-      { eventSeq: 2, type: 'system_prompt_set', data: { type: 'system_prompt_set', text: 'second' } },
-      { eventSeq: 3, type: 'prompt', data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] } },
+      {
+        eventSeq: 1,
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'first' },
+      },
+      {
+        eventSeq: 2,
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'second' },
+      },
+      {
+        eventSeq: 3,
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+      },
     ]);
 
     const result = buildProviderMessagesFromDurableEvents(dir);
@@ -775,12 +1006,14 @@ describe('buildProviderMessagesFromDurableEvents', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest --run src/message-building/message-builder.test.ts`
-Expected: FAIL — `result.systemPrompt` is undefined (the function currently returns just an array).
+Run: `npx vitest --run src/message-building/message-builder.test.ts` Expected:
+FAIL — `result.systemPrompt` is undefined (the function currently returns just
+an array).
 
 - [ ] **Step 3: Update the function signature and body**
 
-In `packages/agent/src/message-building/message-builder.ts`, replace the function body:
+In `packages/agent/src/message-building/message-builder.ts`, replace the
+function body:
 
 ```typescript
 /**
@@ -847,11 +1080,14 @@ export function buildProviderMessagesFromDurableEvents(
       // KEEP the existing logic for all other event types verbatim.
 ```
 
-Continue with the existing body for `context_compacted` and all other event types unchanged. The function's return statement at the end now returns the object: `return { messages, systemPrompt };`.
+Continue with the existing body for `context_compacted` and all other event
+types unchanged. The function's return statement at the end now returns the
+object: `return { messages, systemPrompt };`.
 
 - [ ] **Step 4: Update all call sites**
 
-Run: `grep -rn "buildProviderMessagesFromDurableEvents" packages/agent/src 2>/dev/null`
+Run:
+`grep -rn "buildProviderMessagesFromDurableEvents" packages/agent/src 2>/dev/null`
 
 For each call site, change from:
 
@@ -862,22 +1098,24 @@ const messages = buildProviderMessagesFromDurableEvents(sessionDir);
 to:
 
 ```typescript
-const { messages, systemPrompt } = buildProviderMessagesFromDurableEvents(sessionDir);
+const { messages, systemPrompt } =
+  buildProviderMessagesFromDurableEvents(sessionDir);
 ```
 
 Known call sites to update (verify with grep, this list may not be exhaustive):
+
 - `packages/agent/src/core/conversation/runner.ts:204`
 - Any other places where the function is invoked
 
-For test files, update only the test files that destructure the result (most just check `.length`).
+For test files, update only the test files that destructure the result (most
+just check `.length`).
 
 - [ ] **Step 5: Run tests to verify**
 
-Run: `npx vitest --run src/message-building/`
-Expected: PASS.
+Run: `npx vitest --run src/message-building/` Expected: PASS.
 
-Run: `npx vitest --run src/core/conversation/`
-Expected: PASS (some tests may need destructuring updates).
+Run: `npx vitest --run src/core/conversation/` Expected: PASS (some tests may
+need destructuring updates).
 
 - [ ] **Step 6: Commit**
 
@@ -902,8 +1140,12 @@ lifetime of a session.
 ### Task 2D: Runner reads frozen systemPrompt and calls setSystemPrompt
 
 **Files:**
-- Modify: `packages/agent/src/core/conversation/runner.ts` (around line 204 where `buildProviderMessagesFromDurableEvents` is called, and around line 179 where `createProvider` is called)
-- Test: covered by the runner's existing tests; add one assertion to a regression test if needed
+
+- Modify: `packages/agent/src/core/conversation/runner.ts` (around line 204
+  where `buildProviderMessagesFromDurableEvents` is called, and around line 179
+  where `createProvider` is called)
+- Test: covered by the runner's existing tests; add one assertion to a
+  regression test if needed
 
 - [ ] **Step 1: Read current runner code**
 
@@ -911,27 +1153,29 @@ Look at lines 175-220 to understand the flow.
 
 - [ ] **Step 2: Update the runner**
 
-Replace the line `let providerMessages = buildProviderMessagesFromDurableEvents(sessionDir);` with:
+Replace the line
+`let providerMessages = buildProviderMessagesFromDurableEvents(sessionDir);`
+with:
 
 ```typescript
-    const { messages: rebuiltMessages, systemPrompt: frozenSystemPrompt } =
-      buildProviderMessagesFromDurableEvents(sessionDir);
-    let providerMessages = rebuiltMessages;
+const { messages: rebuiltMessages, systemPrompt: frozenSystemPrompt } =
+  buildProviderMessagesFromDurableEvents(sessionDir);
+let providerMessages = rebuiltMessages;
 
-    // PRI-1804 invariant: the system prompt is computed once at session
-    // creation and never changes for the session lifetime. Push it into
-    // the provider here; it stays in `_systemPrompt` for every turn.
-    if (frozenSystemPrompt) {
-      provider.setSystemPrompt(frozenSystemPrompt);
-    }
+// PRI-1804 invariant: the system prompt is computed once at session
+// creation and never changes for the session lifetime. Push it into
+// the provider here; it stays in `_systemPrompt` for every turn.
+if (frozenSystemPrompt) {
+  provider.setSystemPrompt(frozenSystemPrompt);
+}
 ```
 
-(Put the `setSystemPrompt` call AFTER `provider = await this.deps.createProvider();` — i.e., after line 179.)
+(Put the `setSystemPrompt` call AFTER
+`provider = await this.deps.createProvider();` — i.e., after line 179.)
 
 - [ ] **Step 3: Run runner tests**
 
-Run: `npx vitest --run src/core/conversation/`
-Expected: PASS.
+Run: `npx vitest --run src/core/conversation/` Expected: PASS.
 
 - [ ] **Step 4: Commit**
 
@@ -950,47 +1194,56 @@ _systemPrompt is set once and never changes for the session lifetime.
 ### Task 2E: `getEffectiveSystemPrompt` returns only `_systemPrompt`
 
 **Files:**
+
 - Modify: `packages/agent/src/providers/base-provider.ts:571-599`
-- Test: existing tests in `src/providers/__tests__/anthropic-provider.test.ts` — particularly the multi-system-message test added in PRI-1804
+- Test: existing tests in `src/providers/__tests__/anthropic-provider.test.ts` —
+  particularly the multi-system-message test added in PRI-1804
 
 - [ ] **Step 1: Update the multi-system-message test expectation**
 
-In `packages/agent/src/providers/__tests__/anthropic-provider.test.ts`, find the test added in PRI-1804 (search for `concatenates multiple role:system`). After this plan's changes, role:system messages are no longer the source of truth — `_systemPrompt` is. Update the test:
+In `packages/agent/src/providers/__tests__/anthropic-provider.test.ts`, find the
+test added in PRI-1804 (search for `concatenates multiple role:system`). After
+this plan's changes, role:system messages are no longer the source of truth —
+`_systemPrompt` is. Update the test:
 
 ```typescript
-    it('uses _systemPrompt (set via setSystemPrompt) and ignores any role:system messages in input (PRI-1804 invariant)', async () => {
-      mockCreateResponse.mockResolvedValue({
-        content: [{ type: 'text', text: 'r' }],
-        usage: { input_tokens: 1, output_tokens: 1 },
-      });
+it('uses _systemPrompt (set via setSystemPrompt) and ignores any role:system messages in input (PRI-1804 invariant)', async () => {
+  mockCreateResponse.mockResolvedValue({
+    content: [{ type: 'text', text: 'r' }],
+    usage: { input_tokens: 1, output_tokens: 1 },
+  });
 
-      provider.setSystemPrompt('Frozen prompt set at session start.');
+  provider.setSystemPrompt('Frozen prompt set at session start.');
 
-      // role:system messages in the input must NOT influence the request's system block.
-      await provider.createResponse(
-        [
-          { role: 'system', content: 'This must be ignored.' },
-          { role: 'system', content: 'This too.' },
-          { role: 'user', content: 'Hello' },
-        ],
-        [],
-        'claude-sonnet-4-20250514'
-      );
+  // role:system messages in the input must NOT influence the request's system block.
+  await provider.createResponse(
+    [
+      { role: 'system', content: 'This must be ignored.' },
+      { role: 'system', content: 'This too.' },
+      { role: 'user', content: 'Hello' },
+    ],
+    [],
+    'claude-sonnet-4-20250514'
+  );
 
-      const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
-      const sysBlocks = callArgs.system as Array<{ text: string }>;
-      expect(sysBlocks[0].text).toBe('Frozen prompt set at session start.');
-    });
+  const callArgs = mockCreateResponse.mock
+    .calls[0][0] as Anthropic.Messages.MessageCreateParams;
+  const sysBlocks = callArgs.system as Array<{ text: string }>;
+  expect(sysBlocks[0].text).toBe('Frozen prompt set at session start.');
+});
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest --run src/providers/__tests__/anthropic-provider.test.ts -t "uses _systemPrompt"`
-Expected: FAIL — current `getEffectiveSystemPrompt` concatenates the two `role:system` messages and ignores `_systemPrompt`.
+Run:
+`npx vitest --run src/providers/__tests__/anthropic-provider.test.ts -t "uses _systemPrompt"`
+Expected: FAIL — current `getEffectiveSystemPrompt` concatenates the two
+`role:system` messages and ignores `_systemPrompt`.
 
 - [ ] **Step 3: Rewrite `getEffectiveSystemPrompt`**
 
-In `packages/agent/src/providers/base-provider.ts`, replace the entire `getEffectiveSystemPrompt` method (around lines 571-599):
+In `packages/agent/src/providers/base-provider.ts`, replace the entire
+`getEffectiveSystemPrompt` method (around lines 571-599):
 
 ```typescript
   // System prompt handling.
@@ -1019,19 +1272,24 @@ In `packages/agent/src/providers/base-provider.ts`, replace the entire `getEffec
 
 - [ ] **Step 4: Run tests to check what broke**
 
-Run: `npx vitest --run src/providers/`
-Expected: most tests still pass, but tests that relied on `role:system` messages in `messages` may now fail because they don't call `setSystemPrompt` and end up using the fallback. Update those tests to call `setSystemPrompt` explicitly.
+Run: `npx vitest --run src/providers/` Expected: most tests still pass, but
+tests that relied on `role:system` messages in `messages` may now fail because
+they don't call `setSystemPrompt` and end up using the fallback. Update those
+tests to call `setSystemPrompt` explicitly.
 
 Likely affected tests:
-- `anthropic-provider.test.ts` — `should filter out system messages correctly` and the multi-system test from PRI-1804
+
+- `anthropic-provider.test.ts` — `should filter out system messages correctly`
+  and the multi-system test from PRI-1804
 - Any other provider test that constructs `{ role: 'system', ... }` messages
 
-For each affected test, add `provider.setSystemPrompt('Test system prompt');` (or whatever value the test expects) in the `beforeEach` or in the test body before `provider.createResponse(...)`.
+For each affected test, add `provider.setSystemPrompt('Test system prompt');`
+(or whatever value the test expects) in the `beforeEach` or in the test body
+before `provider.createResponse(...)`.
 
 - [ ] **Step 5: Run full provider suite to confirm green**
 
-Run: `npx vitest --run src/providers/`
-Expected: PASS.
+Run: `npx vitest --run src/providers/` Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
@@ -1054,70 +1312,123 @@ and edge cases but warns loudly.
 ### Task 2F: Legacy session migration
 
 **Files:**
-- Modify: `packages/agent/src/message-building/message-builder.ts`
-- Test: `packages/agent/src/message-building/message-builder.test.ts` (add a new test)
 
-**Resolution:** A legacy session has no `system_prompt_set` event but has one or two `context_injected` events at the beginning (before the first `prompt` event). Detect this pattern and use the concatenation of those pre-prompt context_injected events as the legacy system prompt. After the first `prompt` event, all `context_injected` events become `role:'user'` messages as normal.
+- Modify: `packages/agent/src/message-building/message-builder.ts`
+- Test: `packages/agent/src/message-building/message-builder.test.ts` (add a new
+  test)
+
+**Resolution:** A legacy session has no `system_prompt_set` event but has one or
+two `context_injected` events at the beginning (before the first `prompt`
+event). Detect this pattern and use the concatenation of those pre-prompt
+context_injected events as the legacy system prompt. After the first `prompt`
+event, all `context_injected` events become `role:'user'` messages as normal.
 
 - [ ] **Step 1: Add the failing test**
 
-In `packages/agent/src/message-building/message-builder.test.ts`, add to the describe block:
+In `packages/agent/src/message-building/message-builder.test.ts`, add to the
+describe block:
 
 ```typescript
-  it('legacy session — uses pre-prompt context_injected events as systemPrompt when no system_prompt_set exists', () => {
-    const dir = makeSessionDir('legacy-with-ci');
-    writeEvents(dir, [
-      // Two pre-prompt context_injected events: legacy persona + userInstructions
-      { eventSeq: 1, type: 'context_injected', data: { type: 'context_injected', content: [{ type: 'text', text: 'Legacy persona.' }] } },
-      { eventSeq: 2, type: 'context_injected', data: { type: 'context_injected', content: [{ type: 'text', text: 'Legacy user instructions.' }] } },
-      // First prompt event ends the "system prompt" run
-      { eventSeq: 3, type: 'prompt', data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] } },
-      // Post-prompt context_injected → role:user
-      { eventSeq: 4, type: 'context_injected', data: { type: 'context_injected', content: [{ type: 'text', text: 'runtime nudge' }] } },
-    ]);
+it('legacy session — uses pre-prompt context_injected events as systemPrompt when no system_prompt_set exists', () => {
+  const dir = makeSessionDir('legacy-with-ci');
+  writeEvents(dir, [
+    // Two pre-prompt context_injected events: legacy persona + userInstructions
+    {
+      eventSeq: 1,
+      type: 'context_injected',
+      data: {
+        type: 'context_injected',
+        content: [{ type: 'text', text: 'Legacy persona.' }],
+      },
+    },
+    {
+      eventSeq: 2,
+      type: 'context_injected',
+      data: {
+        type: 'context_injected',
+        content: [{ type: 'text', text: 'Legacy user instructions.' }],
+      },
+    },
+    // First prompt event ends the "system prompt" run
+    {
+      eventSeq: 3,
+      type: 'prompt',
+      data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+    },
+    // Post-prompt context_injected → role:user
+    {
+      eventSeq: 4,
+      type: 'context_injected',
+      data: {
+        type: 'context_injected',
+        content: [{ type: 'text', text: 'runtime nudge' }],
+      },
+    },
+  ]);
 
-    const result = buildProviderMessagesFromDurableEvents(dir);
-    expect(result.systemPrompt).toBe('Legacy persona.\n\nLegacy user instructions.');
-    expect(result.messages).toEqual([
-      { role: 'user', content: 'hi' },
-      { role: 'user', content: 'runtime nudge' },
-    ]);
+  const result = buildProviderMessagesFromDurableEvents(dir);
+  expect(result.systemPrompt).toBe(
+    'Legacy persona.\n\nLegacy user instructions.'
+  );
+  expect(result.messages).toEqual([
+    { role: 'user', content: 'hi' },
+    { role: 'user', content: 'runtime nudge' },
+  ]);
 
-    rmSync(dir, { recursive: true });
-  });
+  rmSync(dir, { recursive: true });
+});
 
-  it('legacy migration is bypassed when a system_prompt_set event is present (new session takes precedence)', () => {
-    const dir = makeSessionDir('new-session');
-    writeEvents(dir, [
-      { eventSeq: 1, type: 'system_prompt_set', data: { type: 'system_prompt_set', text: 'New session sys prompt.' } },
-      { eventSeq: 2, type: 'context_injected', data: { type: 'context_injected', content: [{ type: 'text', text: 'Should NOT become system.' }] } },
-      { eventSeq: 3, type: 'prompt', data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] } },
-    ]);
+it('legacy migration is bypassed when a system_prompt_set event is present (new session takes precedence)', () => {
+  const dir = makeSessionDir('new-session');
+  writeEvents(dir, [
+    {
+      eventSeq: 1,
+      type: 'system_prompt_set',
+      data: { type: 'system_prompt_set', text: 'New session sys prompt.' },
+    },
+    {
+      eventSeq: 2,
+      type: 'context_injected',
+      data: {
+        type: 'context_injected',
+        content: [{ type: 'text', text: 'Should NOT become system.' }],
+      },
+    },
+    {
+      eventSeq: 3,
+      type: 'prompt',
+      data: { type: 'prompt', content: [{ type: 'text', text: 'hi' }] },
+    },
+  ]);
 
-    const result = buildProviderMessagesFromDurableEvents(dir);
-    expect(result.systemPrompt).toBe('New session sys prompt.');
-    expect(result.messages).toEqual([
-      { role: 'user', content: 'Should NOT become system.' },
-      { role: 'user', content: 'hi' },
-    ]);
+  const result = buildProviderMessagesFromDurableEvents(dir);
+  expect(result.systemPrompt).toBe('New session sys prompt.');
+  expect(result.messages).toEqual([
+    { role: 'user', content: 'Should NOT become system.' },
+    { role: 'user', content: 'hi' },
+  ]);
 
-    rmSync(dir, { recursive: true });
-  });
+  rmSync(dir, { recursive: true });
+});
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest --run src/message-building/message-builder.test.ts -t "legacy session"`
-Expected: FAIL — first test fails because legacy sessions return `systemPrompt: ''`.
+Run:
+`npx vitest --run src/message-building/message-builder.test.ts -t "legacy session"`
+Expected: FAIL — first test fails because legacy sessions return
+`systemPrompt: ''`.
 
 - [ ] **Step 3: Implement the legacy migration**
 
-In `packages/agent/src/message-building/message-builder.ts`, refactor the function to do two passes:
+In `packages/agent/src/message-building/message-builder.ts`, refactor the
+function to do two passes:
 
 ```typescript
-export function buildProviderMessagesFromDurableEvents(
-  sessionDir: string
-): { messages: ProviderMessage[]; systemPrompt: string } {
+export function buildProviderMessagesFromDurableEvents(sessionDir: string): {
+  messages: ProviderMessage[];
+  systemPrompt: string;
+} {
   const eventsPath = join(sessionDir, 'events.jsonl');
   let raw = '';
   try {
@@ -1127,12 +1438,17 @@ export function buildProviderMessagesFromDurableEvents(
   }
 
   const lines = raw.split('\n').filter((l) => l.length > 0);
-  const parsedEvents: Array<{ type: string; data: Record<string, unknown> }> = [];
+  const parsedEvents: Array<{ type: string; data: Record<string, unknown> }> =
+    [];
   for (const line of lines) {
     try {
-      const parsed = JSON.parse(line) as { type?: string; data?: Record<string, unknown> };
+      const parsed = JSON.parse(line) as {
+        type?: string;
+        data?: Record<string, unknown>;
+      };
       const type = typeof parsed.type === 'string' ? parsed.type : '';
-      const data = typeof parsed.data === 'object' && parsed.data ? parsed.data : {};
+      const data =
+        typeof parsed.data === 'object' && parsed.data ? parsed.data : {};
       parsedEvents.push({ type, data });
     } catch {
       // skip malformed line
@@ -1163,7 +1479,9 @@ export function buildProviderMessagesFromDurableEvents(
     for (const e of parsedEvents) {
       if (e.type === 'prompt') break;
       if (e.type === 'context_injected') {
-        const contentArr = Array.isArray((e.data as { content?: unknown }).content)
+        const contentArr = Array.isArray(
+          (e.data as { content?: unknown }).content
+        )
           ? ((e.data as { content: unknown[] }).content as ContentBlock[])
           : [];
         const text = extractTextFromContentBlocks(contentArr);
@@ -1183,8 +1501,11 @@ export function buildProviderMessagesFromDurableEvents(
     if (e.type === 'system_prompt_set') continue;
 
     if (e.type === 'prompt') {
-      const content = extractContentBlocks((e.data as Record<string, unknown>).content);
-      const hasContent = typeof content === 'string' ? content.trim() : content.length > 0;
+      const content = extractContentBlocks(
+        (e.data as Record<string, unknown>).content
+      );
+      const hasContent =
+        typeof content === 'string' ? content.trim() : content.length > 0;
       if (hasContent) messages.push({ role: 'user', content });
       sawFirstPrompt = true;
       continue;
@@ -1196,7 +1517,9 @@ export function buildProviderMessagesFromDurableEvents(
       if (!hasSystemPromptSet && !sawFirstPrompt) continue;
 
       const eventData = e.data as ContextInjectedData;
-      const contentArr = Array.isArray(eventData.content) ? eventData.content : [];
+      const contentArr = Array.isArray(eventData.content)
+        ? eventData.content
+        : [];
       const content = extractTextFromContentBlocks(contentArr);
       if (content.trim()) messages.push({ role: 'user', content });
       continue;
@@ -1211,12 +1534,15 @@ export function buildProviderMessagesFromDurableEvents(
 }
 ```
 
-(Adapt the body to include all the existing event handlers. The existing function has logic for `context_compacted`, `message`, `tool_use`, etc. — preserve all of that, just change the iteration variable from `line` parse to `e: ParsedEvent`.)
+(Adapt the body to include all the existing event handlers. The existing
+function has logic for `context_compacted`, `message`, `tool_use`, etc. —
+preserve all of that, just change the iteration variable from `line` parse to
+`e: ParsedEvent`.)
 
 - [ ] **Step 4: Run tests**
 
-Run: `npx vitest --run src/message-building/`
-Expected: PASS (all message-builder tests including the two new legacy tests).
+Run: `npx vitest --run src/message-building/` Expected: PASS (all
+message-builder tests including the two new legacy tests).
 
 - [ ] **Step 5: Commit**
 
@@ -1237,89 +1563,121 @@ this migration entirely.
 
 # Phase 3: Cache Prefix Robustness
 
-These tasks close the remaining determinism holes — locale-dependent sorting, the placeholder-on-empty-assistant problem, Bedrock substring matching, the whitelist gap.
+These tasks close the remaining determinism holes — locale-dependent sorting,
+the placeholder-on-empty-assistant problem, Bedrock substring matching, the
+whitelist gap.
 
 ---
 
 ### Task 3A: Expand cacheable-block whitelist
 
 **Files:**
-- Modify: `packages/agent/src/providers/cache-control.ts` (`CACHEABLE_BLOCK_TYPES`)
+
+- Modify: `packages/agent/src/providers/cache-control.ts`
+  (`CACHEABLE_BLOCK_TYPES`)
 - Test: `packages/agent/src/providers/__tests__/cache-control.test.ts`
 
-**Resolution:** Add `server_tool_use`, `web_search_tool_result`, `search_result` to the whitelist. SDK 0.60's type defs at `node_modules/@anthropic-ai/sdk/resources/messages/messages.d.ts` confirm these accept `cache_control`.
+**Resolution:** Add `server_tool_use`, `web_search_tool_result`, `search_result`
+to the whitelist. SDK 0.60's type defs at
+`node_modules/@anthropic-ai/sdk/resources/messages/messages.d.ts` confirm these
+accept `cache_control`.
 
 - [ ] **Step 1: Verify SDK types**
 
-Run: `grep -B2 "cache_control" node_modules/@anthropic-ai/sdk/resources/messages/messages.d.ts | grep "interface" | head -20`
+Run:
+`grep -B2 "cache_control" node_modules/@anthropic-ai/sdk/resources/messages/messages.d.ts | grep "interface" | head -20`
 
-Confirm the three types `ServerToolUseBlockParam`, `WebSearchToolResultBlockParam`, `SearchResultBlockParam` are listed.
+Confirm the three types `ServerToolUseBlockParam`,
+`WebSearchToolResultBlockParam`, `SearchResultBlockParam` are listed.
 
 - [ ] **Step 2: Write the failing test**
 
-Add to `packages/agent/src/providers/__tests__/cache-control.test.ts` (in the whitelist describe block):
+Add to `packages/agent/src/providers/__tests__/cache-control.test.ts` (in the
+whitelist describe block):
 
 ```typescript
-  it('treats SDK-cacheable block types beyond the original 5 as cacheable (PRI-1806 #5 follow-up)', () => {
-    // SDK 0.60 confirms cache_control is accepted on:
-    //   - server_tool_use
-    //   - web_search_tool_result
-    //   - search_result
-    // The previous whitelist excluded these, leaving cache reach on the floor.
-    const messages: Anthropic.MessageParam[] = [
-      user(text('hi')),
-      assistant(text('thinking')),
-      user(text('go')),
-      assistant({ type: 'server_tool_use', id: 'st1', name: 'web_search', input: {} } as unknown as Anthropic.ContentBlockParam),
-      user({ type: 'web_search_tool_result', tool_use_id: 'st1', content: [] } as unknown as Anthropic.ContentBlockParam),
-      user(text('final question')),
-    ];
+it('treats SDK-cacheable block types beyond the original 5 as cacheable (PRI-1806 #5 follow-up)', () => {
+  // SDK 0.60 confirms cache_control is accepted on:
+  //   - server_tool_use
+  //   - web_search_tool_result
+  //   - search_result
+  // The previous whitelist excluded these, leaving cache reach on the floor.
+  const messages: Anthropic.MessageParam[] = [
+    user(text('hi')),
+    assistant(text('thinking')),
+    user(text('go')),
+    assistant({
+      type: 'server_tool_use',
+      id: 'st1',
+      name: 'web_search',
+      input: {},
+    } as unknown as Anthropic.ContentBlockParam),
+    user({
+      type: 'web_search_tool_result',
+      tool_use_id: 'st1',
+      content: [],
+    } as unknown as Anthropic.ContentBlockParam),
+    user(text('final question')),
+  ];
 
-    const out = attachMessageCacheBreakpoints(messages, OPTIONS_1H);
-    const flat = flattenBlocks(out);
-    const markers = flat.filter((b) => b.cache_control !== undefined);
+  const out = attachMessageCacheBreakpoints(messages, OPTIONS_1H);
+  const flat = flattenBlocks(out);
+  const markers = flat.filter((b) => b.cache_control !== undefined);
 
-    // Should have a tail marker on the final 'text' block at minimum.
-    expect(markers.length).toBeGreaterThan(0);
+  // Should have a tail marker on the final 'text' block at minimum.
+  expect(markers.length).toBeGreaterThan(0);
 
-    // The server_tool_use and web_search_tool_result blocks should be
-    // ELIGIBLE as anchor targets — not skipped as if they were thinking blocks.
-    // Verify by ensuring neither is the LAST block in the cacheable position list
-    // accidentally, and by verifying the helper doesn't bail.
-    expect(out).not.toBe(messages); // helper modified the input
-  });
+  // The server_tool_use and web_search_tool_result blocks should be
+  // ELIGIBLE as anchor targets — not skipped as if they were thinking blocks.
+  // Verify by ensuring neither is the LAST block in the cacheable position list
+  // accidentally, and by verifying the helper doesn't bail.
+  expect(out).not.toBe(messages); // helper modified the input
+});
 ```
 
 - [ ] **Step 3: Run test to verify it fails or passes accidentally**
 
-Run: `npx vitest --run src/providers/__tests__/cache-control.test.ts -t "PRI-1806 #5 follow-up"`
-Expected: this might already pass since the helper just produces a tail marker on the final text block. The test verifies the helper doesn't BAIL on the new block types — which it might or might not. Add a stronger assertion:
+Run:
+`npx vitest --run src/providers/__tests__/cache-control.test.ts -t "PRI-1806 #5 follow-up"`
+Expected: this might already pass since the helper just produces a tail marker
+on the final text block. The test verifies the helper doesn't BAIL on the new
+block types — which it might or might not. Add a stronger assertion:
 
 Replace the last `expect(out).not.toBe(messages)` with:
 
 ```typescript
-    // Stronger: confirm the new block types are considered cacheable by the
-    // helper's internal logic — assert the anchor (if placed) didn't skip
-    // over them due to whitelist exclusion. Build a conversation where
-    // these blocks are the ONLY candidates at the anchor distance:
-    const longMessages: Anthropic.MessageParam[] = [
-      user(text('start')),
-      assistant(text('1'), text('2'), text('3'), text('4'), text('5')),
-      assistant({ type: 'server_tool_use', id: 'st1', name: 'web_search', input: {} } as unknown as Anthropic.ContentBlockParam),
-      user({ type: 'web_search_tool_result', tool_use_id: 'st1', content: [] } as unknown as Anthropic.ContentBlockParam),
-      assistant(text('a'), text('b'), text('c')),
-      user(text('final')),
-    ];
-    const longOut = attachMessageCacheBreakpoints(longMessages, OPTIONS_1H);
-    const longFlat = flattenBlocks(longOut);
-    const longMarkers = longFlat.filter((b) => b.cache_control !== undefined);
-    // 2 markers (anchor + tail) once we're at >= 10 cacheable blocks.
-    expect(longMarkers).toHaveLength(2);
+// Stronger: confirm the new block types are considered cacheable by the
+// helper's internal logic — assert the anchor (if placed) didn't skip
+// over them due to whitelist exclusion. Build a conversation where
+// these blocks are the ONLY candidates at the anchor distance:
+const longMessages: Anthropic.MessageParam[] = [
+  user(text('start')),
+  assistant(text('1'), text('2'), text('3'), text('4'), text('5')),
+  assistant({
+    type: 'server_tool_use',
+    id: 'st1',
+    name: 'web_search',
+    input: {},
+  } as unknown as Anthropic.ContentBlockParam),
+  user({
+    type: 'web_search_tool_result',
+    tool_use_id: 'st1',
+    content: [],
+  } as unknown as Anthropic.ContentBlockParam),
+  assistant(text('a'), text('b'), text('c')),
+  user(text('final')),
+];
+const longOut = attachMessageCacheBreakpoints(longMessages, OPTIONS_1H);
+const longFlat = flattenBlocks(longOut);
+const longMarkers = longFlat.filter((b) => b.cache_control !== undefined);
+// 2 markers (anchor + tail) once we're at >= 10 cacheable blocks.
+expect(longMarkers).toHaveLength(2);
 ```
 
 - [ ] **Step 4: Update the whitelist**
 
-In `packages/agent/src/providers/cache-control.ts`, expand `CACHEABLE_BLOCK_TYPES`:
+In `packages/agent/src/providers/cache-control.ts`, expand
+`CACHEABLE_BLOCK_TYPES`:
 
 ```typescript
 const CACHEABLE_BLOCK_TYPES: ReadonlySet<string> = new Set([
@@ -1337,8 +1695,8 @@ const CACHEABLE_BLOCK_TYPES: ReadonlySet<string> = new Set([
 
 - [ ] **Step 5: Run tests**
 
-Run: `npx vitest --run src/providers/__tests__/cache-control.test.ts`
-Expected: PASS.
+Run: `npx vitest --run src/providers/__tests__/cache-control.test.ts` Expected:
+PASS.
 
 - [ ] **Step 6: Commit**
 
@@ -1359,12 +1717,17 @@ workloads. Add them.
 ### Task 3B: Replace `localeCompare` with byte-stable comparison
 
 **Files:**
+
 - Modify: `packages/agent/src/tools/executor.ts:107-115`
-- Test: `packages/agent/src/tools/executor.test.ts` (or add new test if no executor test exists)
+- Test: `packages/agent/src/tools/executor.test.ts` (or add new test if no
+  executor test exists)
 
-**Problem:** `localeCompare()` without a locale arg uses the host's default locale. On machines with non-default locales (Turkish, German with ß, etc.), sort order can differ for the same input.
+**Problem:** `localeCompare()` without a locale arg uses the host's default
+locale. On machines with non-default locales (Turkish, German with ß, etc.),
+sort order can differ for the same input.
 
-**Resolution:** Use binary comparison: `a.name < b.name ? -1 : a.name > b.name ? 1 : 0`.
+**Resolution:** Use binary comparison:
+`a.name < b.name ? -1 : a.name > b.name ? 1 : 0`.
 
 - [ ] **Step 1: Find existing executor tests**
 
@@ -1374,7 +1737,8 @@ If a test file exists, add to it. Otherwise create a new minimal one.
 
 - [ ] **Step 2: Write the failing test**
 
-Either to existing executor.test.ts or to a new file `packages/agent/src/tools/executor-tool-ordering.test.ts`:
+Either to existing executor.test.ts or to a new file
+`packages/agent/src/tools/executor-tool-ordering.test.ts`:
 
 ```typescript
 // ABOUTME: Tests for getAllTools() deterministic byte-stable ordering
@@ -1422,12 +1786,13 @@ describe('ToolExecutor.getAllTools — byte-stable ordering (PRI-1804 #2)', () =
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `npx vitest --run src/tools/`
-Expected: FAIL — current `localeCompare` produces a different order (case-insensitive in default ICU).
+Run: `npx vitest --run src/tools/` Expected: FAIL — current `localeCompare`
+produces a different order (case-insensitive in default ICU).
 
 - [ ] **Step 4: Apply the fix**
 
-In `packages/agent/src/tools/executor.ts`, replace lines 107-115 (the `getAllTools` body):
+In `packages/agent/src/tools/executor.ts`, replace lines 107-115 (the
+`getAllTools` body):
 
 ```typescript
   getAllTools(): Tool[] {
@@ -1446,8 +1811,7 @@ In `packages/agent/src/tools/executor.ts`, replace lines 107-115 (the `getAllToo
 
 - [ ] **Step 5: Run tests**
 
-Run: `npx vitest --run src/tools/`
-Expected: PASS.
+Run: `npx vitest --run src/tools/` Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
@@ -1468,41 +1832,52 @@ Use binary comparison instead.
 ### Task 3C: Anchor Bedrock substring matching with delimiter
 
 **Files:**
+
 - Modify: `packages/agent/src/providers/cache-control.ts:48-62`
 - Test: `packages/agent/src/providers/__tests__/cache-control.test.ts`
 
-**Problem:** `modelId.includes('claude-opus-4-5')` also matches `claude-opus-4-50-future-v1:0` (hypothetical). And misses future versions like `claude-opus-4-6`, `claude-opus-5-0`.
+**Problem:** `modelId.includes('claude-opus-4-5')` also matches
+`claude-opus-4-50-future-v1:0` (hypothetical). And misses future versions like
+`claude-opus-4-6`, `claude-opus-5-0`.
 
 **Resolution:** Anchor with a trailing delimiter. Use word-boundary regex.
 
 - [ ] **Step 1: Add failing tests**
 
-In `packages/agent/src/providers/__tests__/cache-control.test.ts` (in the `bedrockCacheTtlFor` describe block):
+In `packages/agent/src/providers/__tests__/cache-control.test.ts` (in the
+`bedrockCacheTtlFor` describe block):
 
 ```typescript
-  it('rejects hypothetical bad substring matches (PRI-1806 #5 follow-up)', () => {
-    // 'claude-opus-4-50' should NOT match the 'claude-opus-4-5' substring.
-    expect(bedrockCacheTtlFor('anthropic.claude-opus-4-50-future-v1:0')).toBe('5m');
-    // Reverse — 'claude-opus-4-5-something' SHOULD match.
-    expect(bedrockCacheTtlFor('anthropic.claude-opus-4-5-newvariant-v2:0')).toBe('1h');
-  });
+it('rejects hypothetical bad substring matches (PRI-1806 #5 follow-up)', () => {
+  // 'claude-opus-4-50' should NOT match the 'claude-opus-4-5' substring.
+  expect(bedrockCacheTtlFor('anthropic.claude-opus-4-50-future-v1:0')).toBe(
+    '5m'
+  );
+  // Reverse — 'claude-opus-4-5-something' SHOULD match.
+  expect(bedrockCacheTtlFor('anthropic.claude-opus-4-5-newvariant-v2:0')).toBe(
+    '1h'
+  );
+});
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest --run src/providers/__tests__/cache-control.test.ts -t "rejects hypothetical"`
+Run:
+`npx vitest --run src/providers/__tests__/cache-control.test.ts -t "rejects hypothetical"`
 Expected: FAIL — substring match wrongly returns `'1h'` for `claude-opus-4-50`.
 
 - [ ] **Step 3: Update the matcher**
 
-In `packages/agent/src/providers/cache-control.ts`, replace `bedrockCacheTtlFor`:
+In `packages/agent/src/providers/cache-control.ts`, replace
+`bedrockCacheTtlFor`:
 
 ```typescript
 // Match Bedrock model IDs that support 1h TTL. Use word-boundary anchoring
 // (delimiter at end of substring) so e.g. `claude-opus-4-50-…` does NOT
 // match `claude-opus-4-5`. The allowed delimiters are `-` (the version
 // separator continues) or end-of-string.
-const BEDROCK_1H_TTL_MODEL_REGEX = /(?:claude-opus-4-5|claude-sonnet-4-5|claude-haiku-4-5)(?:-|$)/;
+const BEDROCK_1H_TTL_MODEL_REGEX =
+  /(?:claude-opus-4-5|claude-sonnet-4-5|claude-haiku-4-5)(?:-|$)/;
 
 /**
  * Pick the longest cache TTL the given Bedrock model accepts. Bedrock 1h
@@ -1519,8 +1894,10 @@ Remove the now-unused `BEDROCK_1H_TTL_MODEL_SUBSTRINGS` constant.
 
 - [ ] **Step 4: Run tests**
 
-Run: `npx vitest --run src/providers/__tests__/cache-control.test.ts -t "bedrockCacheTtlFor"`
-Expected: PASS — both the original allowlist tests and the new substring-edge-case test pass.
+Run:
+`npx vitest --run src/providers/__tests__/cache-control.test.ts -t "bedrockCacheTtlFor"`
+Expected: PASS — both the original allowlist tests and the new
+substring-edge-case test pass.
 
 - [ ] **Step 5: Commit**
 
@@ -1540,12 +1917,19 @@ word-boundary regex (substring + '-' or end-of-string).
 ### Task 3D: Drop `(no response)` placeholder; reject empty assistant content
 
 **Files:**
+
 - Modify: `packages/agent/src/providers/format-converters.ts:121-130`
 - Test: `packages/agent/src/providers/__tests__/format-converters.test.ts`
 
-**Problem:** The `(no response)` placeholder is now permanently embedded in the cached prefix and the model will learn to mimic it. Also: the with-toolCalls branch handles empty-text by OMITTING the text block; the no-toolCalls branch with empty-text shouldn't exist at all (an assistant message with no text and no tools is semantically empty — upstream should not emit it).
+**Problem:** The `(no response)` placeholder is now permanently embedded in the
+cached prefix and the model will learn to mimic it. Also: the with-toolCalls
+branch handles empty-text by OMITTING the text block; the no-toolCalls branch
+with empty-text shouldn't exist at all (an assistant message with no text and no
+tools is semantically empty — upstream should not emit it).
 
-**Resolution:** Drop the placeholder. If the assistant message has no tool calls AND no text content, OMIT the entire message rather than emitting a placeholder. Upstream code paths that produce such messages should be flagged as bugs.
+**Resolution:** Drop the placeholder. If the assistant message has no tool calls
+AND no text content, OMIT the entire message rather than emitting a placeholder.
+Upstream code paths that produce such messages should be flagged as bugs.
 
 - [ ] **Step 1: Find existing format-converters tests**
 
@@ -1553,7 +1937,8 @@ Run: `find packages/agent/src/providers -name "format-converters*.test.ts"`
 
 - [ ] **Step 2: Write the failing test**
 
-In `packages/agent/src/providers/__tests__/format-converters.test.ts`, add (or in `enhanced-provider-conversion.test.ts` if that's where similar tests live):
+In `packages/agent/src/providers/__tests__/format-converters.test.ts`, add (or
+in `enhanced-provider-conversion.test.ts` if that's where similar tests live):
 
 ```typescript
 import { convertToAnthropicFormat } from '../format-converters';
@@ -1596,19 +1981,23 @@ describe('convertToAnthropicFormat — empty assistant content (PRI-1806 #6 foll
     ];
     const out = convertToAnthropicFormat(messages);
     expect(out).toHaveLength(1);
-    expect((out[0].content as Array<{ type: string }>)[0]?.type).toBe('tool_use');
+    expect((out[0].content as Array<{ type: string }>)[0]?.type).toBe(
+      'tool_use'
+    );
   });
 });
 ```
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `npx vitest --run src/providers/__tests__/format-converters.test.ts -t "PRI-1806 #6"`
+Run:
+`npx vitest --run src/providers/__tests__/format-converters.test.ts -t "PRI-1806 #6"`
 Expected: FAIL — current code emits `(no response)`.
 
 - [ ] **Step 4: Update the converter**
 
-In `packages/agent/src/providers/format-converters.ts`, replace the no-toolCalls branch (the `else` around line 120-130):
+In `packages/agent/src/providers/format-converters.ts`, replace the no-toolCalls
+branch (the `else` around line 120-130):
 
 ```typescript
         } else {
@@ -1628,23 +2017,25 @@ In `packages/agent/src/providers/format-converters.ts`, replace the no-toolCalls
         }
 ```
 
-Then update the outer `.map()` call to filter out nulls. Find the call (around line 50): `return messages.filter(...).map(...)`. Change to:
+Then update the outer `.map()` call to filter out nulls. Find the call (around
+line 50): `return messages.filter(...).map(...)`. Change to:
 
 ```typescript
-  return messages
-    .filter((msg) => msg.role !== 'system')
-    .map((msg): Anthropic.MessageParam | null => {
-      // ... existing body, returning null for empty assistant turns
-    })
-    .filter((m): m is Anthropic.MessageParam => m !== null);
+return messages
+  .filter((msg) => msg.role !== 'system')
+  .map((msg): Anthropic.MessageParam | null => {
+    // ... existing body, returning null for empty assistant turns
+  })
+  .filter((m): m is Anthropic.MessageParam => m !== null);
 ```
 
-You'll need to adjust the return-type annotation on the inner arrow function to allow `null`.
+You'll need to adjust the return-type annotation on the inner arrow function to
+allow `null`.
 
 - [ ] **Step 5: Run tests**
 
-Run: `npx vitest --run src/providers/`
-Expected: PASS. The PRI-1806 smoke and earlier tests should also still pass.
+Run: `npx vitest --run src/providers/` Expected: PASS. The PRI-1806 smoke and
+earlier tests should also still pass.
 
 - [ ] **Step 6: Commit**
 
@@ -1664,17 +2055,32 @@ entirely and treat upstream code that emits one as a bug.
 ### Task 3E: Calibration uses explicit system prompt; no more warn spam
 
 **Files:**
-- Modify: `packages/agent/src/providers/anthropic-provider.ts:124-160` (`_calibrateTokenCostsImpl`)
 
-**Problem:** `_calibrateTokenCostsImpl` calls `countTokensExplicit([], systemPrompt, [], model)` with empty messages. That eventually calls `getEffectiveSystemPrompt(messages=[])` which warns. Tests and production calibration both spam the warning.
+- Modify: `packages/agent/src/providers/anthropic-provider.ts:124-160`
+  (`_calibrateTokenCostsImpl`)
 
-**Resolution:** `countTokensExplicit` already takes `systemPrompt` as a parameter. It currently calls `_countTokensImpl` for the empty-messages case which re-resolves through `getEffectiveSystemPrompt`. Just thread the explicit `systemPrompt` directly into the SDK call — no re-resolution needed.
+**Problem:** `_calibrateTokenCostsImpl` calls
+`countTokensExplicit([], systemPrompt, [], model)` with empty messages. That
+eventually calls `getEffectiveSystemPrompt(messages=[])` which warns. Tests and
+production calibration both spam the warning.
+
+**Resolution:** `countTokensExplicit` already takes `systemPrompt` as a
+parameter. It currently calls `_countTokensImpl` for the empty-messages case
+which re-resolves through `getEffectiveSystemPrompt`. Just thread the explicit
+`systemPrompt` directly into the SDK call — no re-resolution needed.
 
 - [ ] **Step 1: Read the current code**
 
-Look at `countTokensExplicit` in `anthropic-provider.ts`. It already takes `systemPrompt` and passes it to `beta.messages.countTokens({ system: systemWithCaching, ... })`. So this is already correct — the warn spam came from `_countTokensImpl` (`anthropic-provider.ts:107-118`) which calls `getEffectiveSystemPrompt`.
+Look at `countTokensExplicit` in `anthropic-provider.ts`. It already takes
+`systemPrompt` and passes it to
+`beta.messages.countTokens({ system: systemWithCaching, ... })`. So this is
+already correct — the warn spam came from `_countTokensImpl`
+(`anthropic-provider.ts:107-118`) which calls `getEffectiveSystemPrompt`.
 
-Actual fix location: `_countTokensImpl` calls `getEffectiveSystemPrompt(messages)`. If messages is empty AND no system prompt is set, it warns. The fix is in `getEffectiveSystemPrompt`: don't warn when called with empty messages — that's the legitimate calibration path.
+Actual fix location: `_countTokensImpl` calls
+`getEffectiveSystemPrompt(messages)`. If messages is empty AND no system prompt
+is set, it warns. The fix is in `getEffectiveSystemPrompt`: don't warn when
+called with empty messages — that's the legitimate calibration path.
 
 - [ ] **Step 2: Update `getEffectiveSystemPrompt`**
 
@@ -1699,8 +2105,7 @@ In `packages/agent/src/providers/base-provider.ts`, modify the fallback path:
 
 - [ ] **Step 3: Verify no tests broke**
 
-Run: `npx vitest --run src/providers/`
-Expected: PASS.
+Run: `npx vitest --run src/providers/` Expected: PASS.
 
 - [ ] **Step 4: Commit**
 
@@ -1719,16 +2124,21 @@ real request).
 
 # Phase 4: Test Coverage
 
-These tests close the gaps the adversarial reviewers found in the smoke / property coverage.
+These tests close the gaps the adversarial reviewers found in the smoke /
+property coverage.
 
 ---
 
 ### Task 4A: Streaming cache_control smoke test
 
 **Files:**
-- Create: `packages/agent/src/providers/__tests__/cache-control-streaming.test.ts`
 
-**Problem:** The smoke probes test `createResponse` only. The runner uses `createStreamingResponse` exclusively. The cache_control shape on the stream path has never been verified at the HTTP layer.
+- Create:
+  `packages/agent/src/providers/__tests__/cache-control-streaming.test.ts`
+
+**Problem:** The smoke probes test `createResponse` only. The runner uses
+`createStreamingResponse` exclusively. The cache_control shape on the stream
+path has never been verified at the HTTP layer.
 
 - [ ] **Step 1: Write the smoke test**
 
@@ -1763,44 +2173,58 @@ describe('PRI-1804/1806 streaming smoke — cache_control on the stream path', (
         captured.push({ body });
         // Return a minimal SSE stream for the SDK to consume.
         res.writeHead(200, { 'content-type': 'text/event-stream' });
-        res.write(`event: message_start\ndata: ${JSON.stringify({
-          type: 'message_start',
-          message: {
-            id: 'msg_smoke',
-            type: 'message',
-            role: 'assistant',
-            model: 'claude-sonnet-4-20250514',
-            content: [],
-            stop_reason: null,
-            stop_sequence: null,
-            usage: { input_tokens: 10, output_tokens: 0 },
-          },
-        })}\n\n`);
-        res.write(`event: content_block_start\ndata: ${JSON.stringify({
-          type: 'content_block_start',
-          index: 0,
-          content_block: { type: 'text', text: '' },
-        })}\n\n`);
-        res.write(`event: content_block_delta\ndata: ${JSON.stringify({
-          type: 'content_block_delta',
-          index: 0,
-          delta: { type: 'text_delta', text: 'ok' },
-        })}\n\n`);
-        res.write(`event: content_block_stop\ndata: ${JSON.stringify({
-          type: 'content_block_stop',
-          index: 0,
-        })}\n\n`);
-        res.write(`event: message_delta\ndata: ${JSON.stringify({
-          type: 'message_delta',
-          delta: { stop_reason: 'end_turn', stop_sequence: null },
-          usage: { output_tokens: 1 },
-        })}\n\n`);
-        res.write(`event: message_stop\ndata: ${JSON.stringify({ type: 'message_stop' })}\n\n`);
+        res.write(
+          `event: message_start\ndata: ${JSON.stringify({
+            type: 'message_start',
+            message: {
+              id: 'msg_smoke',
+              type: 'message',
+              role: 'assistant',
+              model: 'claude-sonnet-4-20250514',
+              content: [],
+              stop_reason: null,
+              stop_sequence: null,
+              usage: { input_tokens: 10, output_tokens: 0 },
+            },
+          })}\n\n`
+        );
+        res.write(
+          `event: content_block_start\ndata: ${JSON.stringify({
+            type: 'content_block_start',
+            index: 0,
+            content_block: { type: 'text', text: '' },
+          })}\n\n`
+        );
+        res.write(
+          `event: content_block_delta\ndata: ${JSON.stringify({
+            type: 'content_block_delta',
+            index: 0,
+            delta: { type: 'text_delta', text: 'ok' },
+          })}\n\n`
+        );
+        res.write(
+          `event: content_block_stop\ndata: ${JSON.stringify({
+            type: 'content_block_stop',
+            index: 0,
+          })}\n\n`
+        );
+        res.write(
+          `event: message_delta\ndata: ${JSON.stringify({
+            type: 'message_delta',
+            delta: { stop_reason: 'end_turn', stop_sequence: null },
+            usage: { output_tokens: 1 },
+          })}\n\n`
+        );
+        res.write(
+          `event: message_stop\ndata: ${JSON.stringify({ type: 'message_stop' })}\n\n`
+        );
         res.end();
       });
     });
 
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+    await new Promise<void>((resolve) =>
+      server.listen(0, '127.0.0.1', () => resolve())
+    );
     const addr = server.address();
     if (!addr || typeof addr === 'string') throw new Error('no address');
     baseURL = `http://127.0.0.1:${addr.port}`;
@@ -1828,7 +2252,13 @@ describe('PRI-1804/1806 streaming smoke — cache_control on the stream path', (
       messages.push({
         role: 'user',
         content: '',
-        toolResults: [{ id: `t${i}`, content: [{ type: 'text', text: `r${i}` }], status: 'completed' }],
+        toolResults: [
+          {
+            id: `t${i}`,
+            content: [{ type: 'text', text: `r${i}` }],
+            status: 'completed',
+          },
+        ],
       });
     }
     messages.push({ role: 'user', content: 'final' });
@@ -1836,22 +2266,36 @@ describe('PRI-1804/1806 streaming smoke — cache_control on the stream path', (
     // Drive the streaming API. Listen for the 'complete' event and resolve.
     await new Promise<void>((resolve) => {
       provider.once('complete', () => resolve());
-      void provider.createStreamingResponse(messages, [
-        // Minimal tool to exercise the tool-cache path
-        new (class extends (require('@lace/agent/tools/tool').Tool as new () => {
-          name: string;
-          description: string;
-          schema: object;
-          executeValidated: (a: unknown, b: unknown) => Promise<{ content: { type: string; text: string }[] }>;
-        })() {
-          name = 'tool';
-          description = 'A test tool';
-          schema = { _def: { typeName: 'ZodObject' }, parse: (x: unknown) => x } as object;
-          async executeValidated(_a: unknown, _b: unknown) {
-            return { content: [{ type: 'text', text: 'ok' }] };
-          }
-        })() as unknown as Parameters<typeof provider.createStreamingResponse>[1][number],
-      ], 'claude-sonnet-4-20250514');
+      void provider.createStreamingResponse(
+        messages,
+        [
+          // Minimal tool to exercise the tool-cache path
+          new (class extends (
+            require('@lace/agent/tools/tool').Tool as new () => {
+              name: string;
+              description: string;
+              schema: object;
+              executeValidated: (
+                a: unknown,
+                b: unknown
+              ) => Promise<{ content: { type: string; text: string }[] }>;
+            }
+          )() {
+            name = 'tool';
+            description = 'A test tool';
+            schema = {
+              _def: { typeName: 'ZodObject' },
+              parse: (x: unknown) => x,
+            } as object;
+            async executeValidated(_a: unknown, _b: unknown) {
+              return { content: [{ type: 'text', text: 'ok' }] };
+            }
+          })() as unknown as Parameters<
+            typeof provider.createStreamingResponse
+          >[1][number],
+        ],
+        'claude-sonnet-4-20250514'
+      );
     });
 
     expect(captured).toHaveLength(1);
@@ -1859,7 +2303,10 @@ describe('PRI-1804/1806 streaming smoke — cache_control on the stream path', (
 
     // Same invariants as the non-streaming smoke probe:
     expect(Array.isArray(body.system)).toBe(true);
-    expect(body.system![0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
+    expect(body.system![0].cache_control).toEqual({
+      type: 'ephemeral',
+      ttl: '1h',
+    });
     const lastTool = body.tools![body.tools!.length - 1];
     expect(lastTool.cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
     // 4 markers expected on this long conversation (system + last-tool + anchor + tail).
@@ -1869,7 +2316,9 @@ describe('PRI-1804/1806 streaming smoke — cache_control on the stream path', (
 });
 ```
 
-(The tool construction in this test is awkward because we're avoiding pulling in the full Tool class machinery. If that block fails to compile, simplify by importing Tool and creating a proper subclass like the other test files do.)
+(The tool construction in this test is awkward because we're avoiding pulling in
+the full Tool class machinery. If that block fails to compile, simplify by
+importing Tool and creating a proper subclass like the other test files do.)
 
 - [ ] **Step 2: Run the test**
 
@@ -1893,13 +2342,18 @@ Adversarial review found the smoke probes only tested createResponse
 ### Task 4B: Two-turn byte-compare cache-invariance test
 
 **Files:**
-- Create: `packages/agent/src/providers/__tests__/cache-control-byte-stable.test.ts`
 
-**Problem:** No test verifies that consecutive turns produce a byte-identical message PREFIX. Any non-determinism leak (e.g., a future regression of PRI-1804 #1 / #2) would silently bust cache without breaking any test.
+- Create:
+  `packages/agent/src/providers/__tests__/cache-control-byte-stable.test.ts`
+
+**Problem:** No test verifies that consecutive turns produce a byte-identical
+message PREFIX. Any non-determinism leak (e.g., a future regression of PRI-1804
+#1 / #2) would silently bust cache without breaking any test.
 
 - [ ] **Step 1: Write the test**
 
-Create `packages/agent/src/providers/__tests__/cache-control-byte-stable.test.ts`:
+Create
+`packages/agent/src/providers/__tests__/cache-control-byte-stable.test.ts`:
 
 ```typescript
 // ABOUTME: Asserts that two consecutive provider requests with the same
@@ -1941,16 +2395,18 @@ describe('PRI-1804 invariant — message prefix is byte-stable across consecutiv
       req.on('end', () => {
         captured.push(body);
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({
-          id: `msg_${captured.length}`,
-          type: 'message',
-          role: 'assistant',
-          model: 'claude-sonnet-4-20250514',
-          content: [{ type: 'text', text: 'ok' }],
-          stop_reason: 'end_turn',
-          stop_sequence: null,
-          usage: { input_tokens: 1, output_tokens: 1 },
-        }));
+        res.end(
+          JSON.stringify({
+            id: `msg_${captured.length}`,
+            type: 'message',
+            role: 'assistant',
+            model: 'claude-sonnet-4-20250514',
+            content: [{ type: 'text', text: 'ok' }],
+            stop_reason: 'end_turn',
+            stop_sequence: null,
+            usage: { input_tokens: 1, output_tokens: 1 },
+          })
+        );
       });
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
@@ -1960,7 +2416,9 @@ describe('PRI-1804 invariant — message prefix is byte-stable across consecutiv
   });
 
   afterAll(async () => {
-    await new Promise<void>((res, rej) => server.close((e) => (e ? rej(e) : res())));
+    await new Promise<void>((res, rej) =>
+      server.close((e) => (e ? rej(e) : res()))
+    );
   });
 
   it('shared message prefix is byte-identical across two consecutive turns (only the tail changes)', async () => {
@@ -1994,8 +2452,16 @@ describe('PRI-1804 invariant — message prefix is byte-stable across consecutiv
     );
 
     expect(captured).toHaveLength(2);
-    const body1 = JSON.parse(captured[0]) as { system: unknown; tools: unknown; messages: unknown[] };
-    const body2 = JSON.parse(captured[1]) as { system: unknown; tools: unknown; messages: unknown[] };
+    const body1 = JSON.parse(captured[0]) as {
+      system: unknown;
+      tools: unknown;
+      messages: unknown[];
+    };
+    const body2 = JSON.parse(captured[1]) as {
+      system: unknown;
+      tools: unknown;
+      messages: unknown[];
+    };
 
     // system block must be byte-identical
     expect(JSON.stringify(body1.system)).toBe(JSON.stringify(body2.system));
@@ -2010,8 +2476,12 @@ describe('PRI-1804 invariant — message prefix is byte-stable across consecutiv
     const stripCacheControl = (s: string) =>
       s.replace(/,?"cache_control":\{[^}]*\}/g, '');
 
-    const prefix1 = JSON.stringify(body1.messages.slice(0, body1.messages.length - 1));
-    const prefix2 = JSON.stringify(body2.messages.slice(0, body1.messages.length - 1));
+    const prefix1 = JSON.stringify(
+      body1.messages.slice(0, body1.messages.length - 1)
+    );
+    const prefix2 = JSON.stringify(
+      body2.messages.slice(0, body1.messages.length - 1)
+    );
     expect(stripCacheControl(prefix1)).toBe(stripCacheControl(prefix2));
   });
 });
@@ -2019,7 +2489,8 @@ describe('PRI-1804 invariant — message prefix is byte-stable across consecutiv
 
 - [ ] **Step 2: Run the test**
 
-Run: `npx vitest --run src/providers/__tests__/cache-control-byte-stable.test.ts`
+Run:
+`npx vitest --run src/providers/__tests__/cache-control-byte-stable.test.ts`
 Expected: PASS.
 
 - [ ] **Step 3: Commit**
@@ -2040,13 +2511,17 @@ variable-provider re-runs, timestamps embedded in tool descriptions, etc.)
 ### Task 4C: countTokensExplicit shape parity test
 
 **Files:**
-- Create: `packages/agent/src/providers/__tests__/anthropic-provider-count-tokens.test.ts`
 
-**Problem:** PRI-1806 #2 made `countTokensExplicit` mirror the wire shape of `_createRequestPayload`. There's no test that asserts the parity.
+- Create:
+  `packages/agent/src/providers/__tests__/anthropic-provider-count-tokens.test.ts`
+
+**Problem:** PRI-1806 #2 made `countTokensExplicit` mirror the wire shape of
+`_createRequestPayload`. There's no test that asserts the parity.
 
 - [ ] **Step 1: Write the test**
 
-Create `packages/agent/src/providers/__tests__/anthropic-provider-count-tokens.test.ts`:
+Create
+`packages/agent/src/providers/__tests__/anthropic-provider-count-tokens.test.ts`:
 
 ```typescript
 // ABOUTME: Asserts that countTokensExplicit (used by calibration and budget
@@ -2071,7 +2546,13 @@ vi.mock('@anthropic-ai/sdk', () => ({
 }));
 
 vi.mock('../../utils/logger.js', () => ({
-  logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), trace: vi.fn(), warn: vi.fn() },
+  logger: {
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    trace: vi.fn(),
+    warn: vi.fn(),
+  },
 }));
 
 vi.mock('../../utils/provider-logging.js', () => ({
@@ -2083,7 +2564,10 @@ class TestTool extends Tool {
   name = 'tool';
   description = 'A tool';
   schema = z.object({ x: z.string() });
-  protected async executeValidated(args: { x: string }, _c: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(
+    args: { x: string },
+    _c: ToolContext
+  ): Promise<ToolResult> {
     return Promise.resolve(this.createResult(args.x));
   }
 }
@@ -2092,7 +2576,10 @@ describe('countTokensExplicit shape parity with _createRequestPayload (PRI-1806 
   beforeEach(() => {
     vi.clearAllMocks();
     mockCountTokens.mockResolvedValue({ input_tokens: 100 });
-    mockCreate.mockResolvedValue({ content: [{ type: 'text', text: 'ok' }], usage: { input_tokens: 1, output_tokens: 1 } });
+    mockCreate.mockResolvedValue({
+      content: [{ type: 'text', text: 'ok' }],
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
   });
 
   it('countTokens and create receive the same cache_control structure', async () => {
@@ -2126,7 +2613,8 @@ describe('countTokensExplicit shape parity with _createRequestPayload (PRI-1806 
 
 - [ ] **Step 2: Run the test**
 
-Run: `npx vitest --run src/providers/__tests__/anthropic-provider-count-tokens.test.ts`
+Run:
+`npx vitest --run src/providers/__tests__/anthropic-provider-count-tokens.test.ts`
 Expected: PASS.
 
 - [ ] **Step 3: Commit**
@@ -2145,13 +2633,16 @@ shape exactly, so token estimates reflect what we actually send.
 
 # Phase 5: Polish (optional, do if time permits)
 
-These are nice-to-have improvements flagged by the adversarial review. None are correctness-critical.
+These are nice-to-have improvements flagged by the adversarial review. None are
+correctness-critical.
 
 ---
 
 ### Task 5A: Anchor placement bias improvement (optional)
 
-Per Reviewer C #3: place the anchor mid-history (at `min(ANCHOR_OFFSET_RAW_BLOCKS, cacheable.length/2)`) rather than at the exact threshold, so there's more margin against a big-Δ next turn.
+Per Reviewer C #3: place the anchor mid-history (at
+`min(ANCHOR_OFFSET_RAW_BLOCKS, cacheable.length/2)`) rather than at the exact
+threshold, so there's more margin against a big-Δ next turn.
 
 Skip unless explicitly requested — current placement is correct just suboptimal.
 
@@ -2159,7 +2650,9 @@ Skip unless explicitly requested — current placement is correct just suboptima
 
 ### Task 5B: `isMessageEmpty` cleanup
 
-Per Reviewer D #9: the current ternary `typeof msg.content === 'string' ? msg.content.length === 0 : msg.content.length === 0` is dead code (same expression on both branches). Replace with a clearer form.
+Per Reviewer D #9: the current ternary
+`typeof msg.content === 'string' ? msg.content.length === 0 : msg.content.length === 0`
+is dead code (same expression on both branches). Replace with a clearer form.
 
 - [ ] Edit `packages/agent/src/providers/cache-control.ts`:
 
@@ -2177,7 +2670,8 @@ function isMessageEmpty(msg: Anthropic.MessageParam): boolean {
 
 ### Task 5C: `sessionDate` documentation in persona template
 
-Per Reviewer D #15: `sessionDate` is computed in UTC. The persona template doesn't say so. Update the env section:
+Per Reviewer D #15: `sessionDate` is computed in UTC. The persona template
+doesn't say so. Update the env section:
 
 - [ ] Edit `packages/agent/config/agent-personas/sections/environment.md`:
 
@@ -2185,7 +2679,8 @@ Per Reviewer D #15: `sessionDate` is computed in UTC. The persona template doesn
 - Current Date (UTC): {{{system.sessionDate}}}
 ```
 
-(Adding "(UTC)" makes the convention explicit so the model handles the cutover correctly.)
+(Adding "(UTC)" makes the convention explicit so the model handles the cutover
+correctly.)
 
 - [ ] Update the PRI-1674 baselines accordingly:
 
@@ -2207,7 +2702,8 @@ Expected: all green.
 
 - [ ] `npx tsc --noEmit` — clean.
 
-- [ ] `npx eslint --max-warnings 0 src/providers/cache-control.ts src/providers/anthropic-provider.ts src/providers/bedrock-provider.ts src/providers/base-provider.ts src/providers/openai-provider.ts src/providers/format-converters.ts src/core/conversation/runner.ts src/message-building/message-builder.ts src/storage/event-types.ts src/rpc/handlers/session.ts src/tools/executor.ts src/providers/__tests__/cache-control.test.ts src/providers/__tests__/cache-control-streaming.test.ts src/providers/__tests__/cache-control-byte-stable.test.ts src/providers/__tests__/anthropic-provider-count-tokens.test.ts` — clean.
+- [ ] `npx eslint --max-warnings 0 src/providers/cache-control.ts src/providers/anthropic-provider.ts src/providers/bedrock-provider.ts src/providers/base-provider.ts src/providers/openai-provider.ts src/providers/format-converters.ts src/core/conversation/runner.ts src/message-building/message-builder.ts src/storage/event-types.ts src/rpc/handlers/session.ts src/tools/executor.ts src/providers/__tests__/cache-control.test.ts src/providers/__tests__/cache-control-streaming.test.ts src/providers/__tests__/cache-control-byte-stable.test.ts src/providers/__tests__/anthropic-provider-count-tokens.test.ts`
+      — clean.
 
 ### Task 6B: Push and FF-merge to main
 
@@ -2216,4 +2712,6 @@ Expected: all green.
 
 ### Task 6C: Mark all related Linear tickets resolved
 
-The fix touches issues raised against PRI-1799 / PRI-1802 / PRI-1804 / PRI-1806. File a single new ticket "Cache-control hardening (2026-05-23)" linking to this plan and mark closed after merge.
+The fix touches issues raised against PRI-1799 / PRI-1802 / PRI-1804 / PRI-1806.
+File a single new ticket "Cache-control hardening (2026-05-23)" linking to this
+plan and mark closed after merge.

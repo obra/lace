@@ -20,8 +20,12 @@ function ctxWithScheduler(sched: ReminderScheduler): ToolContext {
 
 describe('parseManageRemindersInput', () => {
   const origTZ = process.env.TZ;
-  beforeEach(() => { process.env.TZ = 'UTC'; });
-  afterEach(() => { process.env.TZ = origTZ; });
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
+  afterEach(() => {
+    process.env.TZ = origTZ;
+  });
 
   it('schedule with delaySeconds (number)', () => {
     const r = parseManageRemindersInput({
@@ -124,16 +128,18 @@ describe('parseManageRemindersInput', () => {
   });
 
   it('unknown action rejected', () => {
-    expect(() =>
-      parseManageRemindersInput({ action: 'frobnicate' } as never)
-    ).toThrow(/action/i);
+    expect(() => parseManageRemindersInput({ action: 'frobnicate' } as never)).toThrow(/action/i);
   });
 });
 
 describe('ManageRemindersTool execution', () => {
   const origTZ = process.env.TZ;
-  beforeEach(() => { process.env.TZ = 'UTC'; });
-  afterEach(() => { process.env.TZ = origTZ; });
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
+  afterEach(() => {
+    process.env.TZ = origTZ;
+  });
 
   it('schedule returns the new row as JSON', async () => {
     const dir = tempSessionDir();
@@ -149,7 +155,10 @@ describe('ManageRemindersTool execution', () => {
       ctxWithScheduler(sched)
     );
     expect(result.status).toBe('completed');
-    const body = JSON.parse((result.content?.[0] as { text: string }).text) as Record<string, unknown>;
+    const body = JSON.parse((result.content?.[0] as { text: string }).text) as Record<
+      string,
+      unknown
+    >;
     expect(body.id).toMatch(/^reminder_[0-9a-f]{12}$/);
     expect(body.next_fire_at).toBeDefined();
     expect(body.recurs).toBe(null);
@@ -171,7 +180,9 @@ describe('ManageRemindersTool execution', () => {
     });
     const tool = new ManageRemindersTool();
     const result = await tool.execute({ action: 'cancel', id }, ctxWithScheduler(sched));
-    const body = JSON.parse((result.content?.[0] as { text: string }).text) as { cancelled: boolean };
+    const body = JSON.parse((result.content?.[0] as { text: string }).text) as {
+      cancelled: boolean;
+    };
     expect(body.cancelled).toBe(true);
     await sched.stop();
   });
@@ -184,7 +195,11 @@ describe('ManageRemindersTool execution', () => {
       notifier: async () => {},
     });
     await sched.start();
-    await sched.schedule({ prompt: 'cron', delaySeconds: null, recurs: { kind: 'cron', expr: '0 9 * * 1-5' } });
+    await sched.schedule({
+      prompt: 'cron',
+      delaySeconds: null,
+      recurs: { kind: 'cron', expr: '0 9 * * 1-5' },
+    });
     await sched.schedule({
       prompt: 'count',
       delaySeconds: 1800,
@@ -237,8 +252,12 @@ describe('ManageRemindersTool execution', () => {
 
 describe('ManageRemindersTool cancel persist_failed', () => {
   const origTZ = process.env.TZ;
-  beforeEach(() => { process.env.TZ = 'UTC'; });
-  afterEach(() => { process.env.TZ = origTZ; });
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
+  afterEach(() => {
+    process.env.TZ = origTZ;
+  });
 
   it('cancel surfaces retry_safe:true on persist_failed', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'lace-mr-tool-'));
@@ -264,10 +283,10 @@ describe('ManageRemindersTool cancel persist_failed', () => {
     }) as typeof origSave;
 
     const tool = new ManageRemindersTool();
-    const result = await tool.execute(
-      { action: 'cancel', id },
-      { signal: new AbortController().signal, reminderScheduler: sched } as ToolContext
-    );
+    const result = await tool.execute({ action: 'cancel', id }, {
+      signal: new AbortController().signal,
+      reminderScheduler: sched,
+    } as ToolContext);
     const body = JSON.parse((result.content?.[0] as { text: string }).text) as {
       cancelled: boolean;
       reason?: string;
@@ -283,8 +302,12 @@ describe('ManageRemindersTool cancel persist_failed', () => {
 
 describe('ManageRemindersTool ISO absolute-time precision', () => {
   const origTZ = process.env.TZ;
-  beforeEach(() => { process.env.TZ = 'UTC'; });
-  afterEach(() => { process.env.TZ = origTZ; });
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
+  afterEach(() => {
+    process.env.TZ = origTZ;
+  });
 
   it('preserves millisecond precision when given an ISO timestamp', async () => {
     const dir = tempSessionDir();
@@ -300,10 +323,10 @@ describe('ManageRemindersTool ISO absolute-time precision', () => {
     const targetMs = new Date(targetIso).getTime();
 
     const tool = new ManageRemindersTool();
-    const result = await tool.execute(
-      { action: 'schedule', prompt: 'test', next: targetIso },
-      { signal: new AbortController().signal, reminderScheduler: sched } as ToolContext
-    );
+    const result = await tool.execute({ action: 'schedule', prompt: 'test', next: targetIso }, {
+      signal: new AbortController().signal,
+      reminderScheduler: sched,
+    } as ToolContext);
     expect(result.status).toBe('completed');
 
     // Read the row back from disk and verify next_fire_at is EXACTLY targetMs.

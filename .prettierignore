@@ -39,3 +39,6 @@ bun.lockb
 
 # Documentation that shouldn't be auto-formatted
 CHANGELOG.md
+
+# Byte-identical test fixtures - tests assert exact match against these
+tests/scenarios/pri-1674-baseline/

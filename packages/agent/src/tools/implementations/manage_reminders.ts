@@ -3,10 +3,7 @@
 // ABOUTME: docs/specs/2026-05-22-alarms-coherent-design.md.
 
 import { z } from 'zod';
-import {
-  assertCronAtLeast5MinInterval,
-  getAgentTimezone,
-} from '@lace/agent/reminders/cron';
+import { assertCronAtLeast5MinInterval, getAgentTimezone } from '@lace/agent/reminders/cron';
 import type { ReminderRecurs } from '@lace/agent/reminders';
 
 const INT_STRING_RE = /^\d+$/;
@@ -180,10 +177,9 @@ import { Tool } from '../tool';
 import { formatAbsoluteTime } from '@lace/agent/notifications/format-time';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
-function recursToWire(recurs: ReminderRecurs):
-  | { recurs: string }
-  | { recurs: number; next: number }
-  | { recurs: null; next?: number } {
+function recursToWire(
+  recurs: ReminderRecurs
+): { recurs: string } | { recurs: number; next: number } | { recurs: null; next?: number } {
   if (recurs === null) return { recurs: null };
   if (recurs.kind === 'cron') return { recurs: recurs.expr };
   if (recurs.kind === 'count') {

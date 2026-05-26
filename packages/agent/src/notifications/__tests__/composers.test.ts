@@ -116,10 +116,12 @@ describe('composers', () => {
     expect(body).not.toContain('Recent output');
     expect(body).toContain('Call job_output');
   });
-
 });
 
-import { composeReminderBody, composeSubagentExitedBody as composeSubagentExitedBodyReminders } from '../composers';
+import {
+  composeReminderBody,
+  composeSubagentExitedBody as composeSubagentExitedBodyReminders,
+} from '../composers';
 
 describe('composeReminderBody', () => {
   it("returns the prompt verbatim (escaping is the wrapper's job)", () => {
@@ -132,7 +134,11 @@ describe('composeSubagentExitedBody (reminders)', () => {
     const body = composeSubagentExitedBodyReminders({
       persona: 'sen-box',
       pendingReminders: [
-        { id: 'reminder_aaaa', prompt: 'check the deploy', next_fire_at_iso: '2026-05-22T16:00:00-07:00' },
+        {
+          id: 'reminder_aaaa',
+          prompt: 'check the deploy',
+          next_fire_at_iso: '2026-05-22T16:00:00-07:00',
+        },
         { id: 'reminder_bbbb', prompt: 'ping ops', next_fire_at_iso: '2026-05-22T17:00:00-07:00' },
       ],
     });

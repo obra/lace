@@ -92,8 +92,8 @@ All Ent-specific methods use the `ent/` prefix:
 - `ent/session/compact`
 - `ent/session/inject`
 - `ent/job/list`
-- `ent/session/configure` supports **env** to let the client push
-  per-session environment variables without touching agent config on disk.
+- `ent/session/configure` supports **env** to let the client push per-session
+  environment variables without touching agent config on disk.
 - Provider management extensions (see below) add catalog refresh and model
   enable/disable flows.
 
@@ -239,8 +239,8 @@ process restart, or simply joining an in-progress session—it needs to
 reconstruct conversation history and current state.
 
 **Architecture note**: In systems like Lace, the Ent protocol client is the
-process that owns the agent transport. The APIs below are for the client-to-agent
-connection.
+process that owns the agent transport. The APIs below are for the
+client-to-agent connection.
 
 ### The Solution
 
@@ -369,9 +369,9 @@ When an agent uses the Task tool to spawn subagents:
 - Job IDs are agent-generated (`job_agent_1`, `job_shell_1`)
 - The client does NOT spawn subagent processes directly
 
-This keeps the "one process = one conversation stream" model clean: the
-client manages top-level agent processes, and each agent manages its own
-subagents internally.
+This keeps the "one process = one conversation stream" model clean: the client
+manages top-level agent processes, and each agent manages its own subagents
+internally.
 
 ### Design Choice: Subagents as Jobs
 
@@ -386,8 +386,8 @@ intentional for v1:
 
 **Future extensibility**: If interactive multi-agent collaboration becomes a
 requirement, future protocol versions could add "subagent = full protocol peer"
-where the client can connect to subagent processes directly. For now, we
-accept that subagents are non-interactive and only return outputs.
+where the client can connect to subagent processes directly. For now, we accept
+that subagents are non-interactive and only return outputs.
 
 ---
 

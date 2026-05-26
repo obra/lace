@@ -182,7 +182,7 @@ function appendPrompt(fixture: SessionFixture, text: string): void {
   } as Omit<TypedDurableEvent, 'eventSeq' | 'timestamp'>);
 }
 
-function appendMessage(fixture: SessionFixture, text: string): void {
+function _appendMessage(fixture: SessionFixture, text: string): void {
   appendDurableEvent(fixture.sessionDir, { nextEventSeq: 1, nextStreamSeq: 1 }, {
     type: 'message',
     data: { type: 'message', content: [{ type: 'text', text }] },

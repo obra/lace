@@ -37,7 +37,10 @@ describe('ensureReminderSchedulerForActiveSession — TZ-unset graceful degradat
     delete process.env.TZ;
     // Make Intl also return an empty string so getAgentTimezone() has nothing to fall back to.
     Intl.DateTimeFormat.prototype.resolvedOptions = function () {
-      return { ...origResolvedOptions.call(this), timeZone: '' } as Intl.ResolvedDateTimeFormatOptions;
+      return {
+        ...origResolvedOptions.call(this),
+        timeZone: '',
+      } as Intl.ResolvedDateTimeFormatOptions;
     };
   });
 

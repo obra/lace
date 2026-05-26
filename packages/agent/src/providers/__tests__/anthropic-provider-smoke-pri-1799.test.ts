@@ -142,7 +142,6 @@ describe('PRI-1799 smoke: real outgoing request body has three 1h cache_control 
     mkdirSync(outDir, { recursive: true });
     const outFile = join(outDir, `request-${Date.now()}.json`);
     writeFileSync(outFile, JSON.stringify(body, null, 2));
-    // eslint-disable-next-line no-console
     console.log(`[PRI-1799 smoke] captured request body written to ${outFile}`);
 
     // ── 1. system block has cache_control with 1h ttl ───────────────────

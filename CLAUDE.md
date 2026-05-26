@@ -10,8 +10,8 @@ and key entry points.
 
 ## Project Overview
 
-Lace is a TypeScript monorepo for an out-of-process AI coding agent runtime.
-The active surfaces are the Ent protocol package, the agent process, and a CLI
+Lace is a TypeScript monorepo for an out-of-process AI coding agent runtime. The
+active surfaces are the Ent protocol package, the agent process, and a CLI
 client.
 
 ## Development Commands

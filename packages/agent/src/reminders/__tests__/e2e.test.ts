@@ -39,13 +39,9 @@ describe('Reminders end-to-end (tool → scheduler → notifier)', () => {
             'fired-at': new Date(ctx.firedAt).toISOString(),
             'fire-count': ctx.row.recurs === null ? undefined : ctx.fireCount,
             'last-fired-at':
-              ctx.lastFiredAt !== null
-                ? new Date(ctx.lastFiredAt).toISOString()
-                : undefined,
+              ctx.lastFiredAt !== null ? new Date(ctx.lastFiredAt).toISOString() : undefined,
             'next-fire-at':
-              ctx.nextFireAt !== null
-                ? new Date(ctx.nextFireAt).toISOString()
-                : undefined,
+              ctx.nextFireAt !== null ? new Date(ctx.nextFireAt).toISOString() : undefined,
           },
           body: composeReminderBody({ prompt: ctx.row.prompt }),
         });

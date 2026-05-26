@@ -226,7 +226,10 @@ describe('ReminderScheduler boot recovery', () => {
     // Force Intl to also return empty to simulate stripped container; mock via stub.
     const origResolvedOptions = Intl.DateTimeFormat.prototype.resolvedOptions;
     Intl.DateTimeFormat.prototype.resolvedOptions = function () {
-      return { ...origResolvedOptions.call(this), timeZone: '' } as Intl.ResolvedDateTimeFormatOptions;
+      return {
+        ...origResolvedOptions.call(this),
+        timeZone: '',
+      } as Intl.ResolvedDateTimeFormatOptions;
     };
     try {
       const sched = new ReminderScheduler({
@@ -424,8 +427,12 @@ describe('ReminderScheduler boot recovery', () => {
 
 describe('ReminderScheduler schedule', () => {
   const origTZ = process.env.TZ;
-  beforeEach(() => { process.env.TZ = 'UTC'; });
-  afterEach(() => { process.env.TZ = origTZ; });
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
+  afterEach(() => {
+    process.env.TZ = origTZ;
+  });
 
   it('persists a one-shot row, returns id and next_fire_at', async () => {
     const dir = tempSessionDir();
@@ -502,7 +509,9 @@ describe('ReminderScheduler schedule', () => {
 });
 
 describe('ReminderScheduler cancel', () => {
-  beforeEach(() => { process.env.TZ = 'UTC'; });
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
 
   it('deletes a pending row and returns cancelled:true', async () => {
     const dir = tempSessionDir();
@@ -567,7 +576,9 @@ describe('ReminderScheduler cancel', () => {
 });
 
 describe('ReminderScheduler list', () => {
-  beforeEach(() => { process.env.TZ = 'UTC'; });
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
 
   it('returns all current rows sorted by next_fire_at ascending', async () => {
     const dir = tempSessionDir();
@@ -595,8 +606,12 @@ describe('ReminderScheduler list', () => {
 
 describe('ReminderScheduler far-future timer', () => {
   const origTZ = process.env.TZ;
-  beforeEach(() => { process.env.TZ = 'UTC'; });
-  afterEach(() => { process.env.TZ = origTZ; });
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
+  afterEach(() => {
+    process.env.TZ = origTZ;
+  });
 
   it('does not emit TimeoutOverflowWarning for reminders >24.8 days out', async () => {
     const dir = tempSessionDir();
@@ -636,8 +651,12 @@ describe('ReminderScheduler far-future timer', () => {
 
 describe('ReminderScheduler exception handling', () => {
   const origTZ = process.env.TZ;
-  beforeEach(() => { process.env.TZ = 'UTC'; });
-  afterEach(() => { process.env.TZ = origTZ; });
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
+  afterEach(() => {
+    process.env.TZ = origTZ;
+  });
 
   it('cron exhaustion onError includes the row id', async () => {
     const dir = tempSessionDir();
@@ -658,7 +677,9 @@ describe('ReminderScheduler exception handling', () => {
       sessionDir: dir,
       now: () => 2000,
       notifier: async () => {},
-      onError: (err) => { errors.push(err); },
+      onError: (err) => {
+        errors.push(err);
+      },
     });
 
     const cronMod = await import('../cron');
@@ -696,8 +717,12 @@ describe('ReminderScheduler exception handling', () => {
     const sched = new ReminderScheduler({
       sessionDir: dir,
       now: () => 2000,
-      notifier: async () => { notified++; },
-      onError: () => { errors++; },
+      notifier: async () => {
+        notified++;
+      },
+      onError: () => {
+        errors++;
+      },
     });
 
     // Monkey-patch computeNextCronFire to throw, simulating an exhausted cron.
@@ -737,7 +762,9 @@ describe('ReminderScheduler exception handling', () => {
       sessionDir: dir,
       now: () => 2000,
       notifier: async () => {},
-      onError: () => { errors++; },
+      onError: () => {
+        errors++;
+      },
     });
 
     // Monkey-patch the scheduler's computePostFire to throw, simulating an
@@ -783,7 +810,9 @@ describe('ReminderScheduler exception handling', () => {
       sessionDir: dir,
       now: () => 2000,
       notifier: async () => {},
-      onError: () => { errors++; },
+      onError: () => {
+        errors++;
+      },
     });
 
     // Force store.save to throw on the first call (fire's persist attempt).
@@ -831,7 +860,9 @@ describe('ReminderScheduler exception handling', () => {
     sched.store.list = origList;
     const fired: number[] = [];
     (sched as unknown as { notifier: (ctx: { firedAt: number }) => Promise<void> }).notifier =
-      async (ctx: { firedAt: number }) => { fired.push(ctx.firedAt); };
+      async (ctx: { firedAt: number }) => {
+        fired.push(ctx.firedAt);
+      };
 
     await sched.tickForTest(3000);
     expect(fired).toHaveLength(1);
@@ -840,8 +871,12 @@ describe('ReminderScheduler exception handling', () => {
 
 describe('ReminderScheduler.stop drains in-flight fire', () => {
   const origTZ = process.env.TZ;
-  beforeEach(() => { process.env.TZ = 'UTC'; });
-  afterEach(() => { process.env.TZ = origTZ; });
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+  });
+  afterEach(() => {
+    process.env.TZ = origTZ;
+  });
 
   it('does not return until any in-flight fire has committed to disk', async () => {
     const dir = tempSessionDir();
@@ -855,7 +890,9 @@ describe('ReminderScheduler.stop drains in-flight fire', () => {
 
     // notifier blocks until we resolve the gate, simulating a slow inject.
     let resolveNotify: () => void;
-    const notifyGate = new Promise<void>((r) => { resolveNotify = r; });
+    const notifyGate = new Promise<void>((r) => {
+      resolveNotify = r;
+    });
     let notifyCallCount = 0;
 
     const sched = new ReminderScheduler({
@@ -882,7 +919,9 @@ describe('ReminderScheduler.stop drains in-flight fire', () => {
 
     // Call stop. It MUST not resolve until the notifier resolves.
     let stopResolved = false;
-    const stopPromise = sched.stop().then(() => { stopResolved = true; });
+    const stopPromise = sched.stop().then(() => {
+      stopResolved = true;
+    });
 
     // Yield a few microtasks; stop should still be pending because mutex held.
     for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));

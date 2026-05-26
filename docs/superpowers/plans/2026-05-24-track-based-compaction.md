@@ -1,41 +1,71 @@
 # Track-based Compaction Implementation Plan (lace side)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace lace's `summarize` compaction strategy with a track-aware strategy that demuxes per-track input (Slack threads / subagent jobs / scheduler / system), applies per-track salience filters, and produces a structured markdown prefix + verbatim recent-turn tail.
+**Goal:** Replace lace's `summarize` compaction strategy with a track-aware
+strategy that demuxes per-track input (Slack threads / subagent jobs / scheduler
+/ system), applies per-track salience filters, and produces a structured
+markdown prefix + verbatim recent-turn tail.
 
-**Architecture:** Producers stamp a `track?: string` on durable `prompt` and `context_injected` events. Compaction reads canonical events, builds turnId → track map, groups earlier events by track, applies per-track salience extraction (with LLM fallback for oversize tracks), and writes one `context_compacted` event whose `preserved[]` is `[prefix-user-message, ...verbatim-tail-messages]`. Trigger lives inside lace's runner, fires after `turn_end` with 60%/90% context-window pressure thresholds.
+**Architecture:** Producers stamp a `track?: string` on durable `prompt` and
+`context_injected` events. Compaction reads canonical events, builds turnId →
+track map, groups earlier events by track, applies per-track salience extraction
+(with LLM fallback for oversize tracks), and writes one `context_compacted`
+event whose `preserved[]` is `[prefix-user-message, ...verbatim-tail-messages]`.
+Trigger lives inside lace's runner, fires after `turn_end` with 60%/90%
+context-window pressure thresholds.
 
-**Tech Stack:** TypeScript strict, vitest, lace's existing event-sourcing + storage layer (`appendDurableEvent`, `readDurableEvents`, `writeAndAdvance`), existing `CompactionContext` type with `agent`/`provider` access for the LLM-fallback path.
+**Tech Stack:** TypeScript strict, vitest, lace's existing event-sourcing +
+storage layer (`appendDurableEvent`, `readDurableEvents`, `writeAndAdvance`),
+existing `CompactionContext` type with `agent`/`provider` access for the
+LLM-fallback path.
 
-**Spec:** `docs/superpowers/specs/2026-05-24-track-based-compaction-design.md` in this worktree.
+**Spec:** `docs/superpowers/specs/2026-05-24-track-based-compaction-design.md`
+in this worktree.
 
-**Scope of this plan:** Lace only. Producer track-stamping (sen-core slack listener, sen-core delegate, scheduler MCP) is a separate plan that ships lockstep — out of scope here.
+**Scope of this plan:** Lace only. Producer track-stamping (sen-core slack
+listener, sen-core delegate, scheduler MCP) is a separate plan that ships
+lockstep — out of scope here.
 
 ---
 
 ## File map
 
 **Create:**
-- `packages/agent/src/compaction/track-compaction.ts` — `compact()` + demux + per-track salience filters
-- `packages/agent/src/compaction/track-render.ts` — markdown renderer for compacted blocks
-- `packages/agent/src/core/conversation/compaction-trigger.ts` — pressure evaluator + threshold predicate
+
+- `packages/agent/src/compaction/track-compaction.ts` — `compact()` + demux +
+  per-track salience filters
+- `packages/agent/src/compaction/track-render.ts` — markdown renderer for
+  compacted blocks
+- `packages/agent/src/core/conversation/compaction-trigger.ts` — pressure
+  evaluator + threshold predicate
 - `packages/agent/src/compaction/__tests__/track-compaction.test.ts`
 - `packages/agent/src/compaction/__tests__/track-render.test.ts`
 - `packages/agent/src/core/conversation/__tests__/compaction-trigger.test.ts`
 
 **Modify:**
-- `packages/agent/src/storage/event-types.ts` — add `track?` field; add `lastCallInputContextTokens` to TurnEndUsage
-- `packages/agent/src/core/conversation/runner.ts` — populate `lastCallInputContextTokens`; hook trigger after `turn_end`
-- `packages/agent/src/conversation/slash-commands.ts` — `/compact` calls new `compact()`
-- `packages/agent/src/rpc/handlers/session-operations.ts` — `ent/session/compact` calls new `compact()`; drop `trim-tool-results` wire enum
+
+- `packages/agent/src/storage/event-types.ts` — add `track?` field; add
+  `lastCallInputContextTokens` to TurnEndUsage
+- `packages/agent/src/core/conversation/runner.ts` — populate
+  `lastCallInputContextTokens`; hook trigger after `turn_end`
+- `packages/agent/src/conversation/slash-commands.ts` — `/compact` calls new
+  `compact()`
+- `packages/agent/src/rpc/handlers/session-operations.ts` —
+  `ent/session/compact` calls new `compact()`; drop `trim-tool-results` wire
+  enum
 
 **Delete:**
+
 - `packages/agent/src/compaction/summarize-strategy.ts`
 - `packages/agent/src/compaction/summarize-strategy.test.ts`
 - `packages/agent/src/compaction/registry.ts`
 - `packages/agent/src/compaction/compact-dropped-messages.ts`
-- `packages/agent/src/compaction/trim-tool-results-strategy.ts` (its callers are also deleted)
+- `packages/agent/src/compaction/trim-tool-results-strategy.ts` (its callers are
+  also deleted)
 - `packages/agent/src/compaction/trim-tool-results-strategy.test.ts`
 
 ---
@@ -43,6 +73,7 @@
 ## Task 1: Add `track?` field + `lastCallInputContextTokens` to event types
 
 **Files:**
+
 - Modify: `packages/agent/src/storage/event-types.ts:18-21, 41-82, 110-114`
 - Test: `packages/agent/src/storage/__tests__/event-types.test.ts`
 
@@ -80,7 +111,9 @@ describe('track field', () => {
         track: 'alarm:abc',
       },
     };
-    expect(e.data.type === 'context_injected' && e.data.track).toBe('alarm:abc');
+    expect(e.data.type === 'context_injected' && e.data.track).toBe(
+      'alarm:abc'
+    );
   });
 
   it('TurnEndEventData.usage accepts lastCallInputContextTokens', () => {
@@ -101,7 +134,9 @@ describe('track field', () => {
         },
       },
     };
-    expect(e.data.type === 'turn_end' && e.data.usage?.lastCallInputContextTokens).toBe(600);
+    expect(
+      e.data.type === 'turn_end' && e.data.usage?.lastCallInputContextTokens
+    ).toBe(600);
   });
 });
 ```
@@ -109,13 +144,15 @@ describe('track field', () => {
 - [ ] **Step 2: Verify failure**
 
 Run: `npx vitest --run packages/agent/src/storage/__tests__/event-types.test.ts`
-Expected: TypeScript error — `track`, `lastCallInputContextTokens` not assignable.
+Expected: TypeScript error — `track`, `lastCallInputContextTokens` not
+assignable.
 
 - [ ] **Step 3: Add fields**
 
 Modify `packages/agent/src/storage/event-types.ts`:
 
 Replace `PromptEventData`:
+
 ```ts
 export type PromptEventData = {
   type: 'prompt';
@@ -131,6 +168,7 @@ export type PromptEventData = {
 ```
 
 Replace `ContextInjectedEventData`:
+
 ```ts
 export type ContextInjectedEventData = {
   type: 'context_injected';
@@ -141,7 +179,9 @@ export type ContextInjectedEventData = {
 };
 ```
 
-In `TurnEndEventData.usage`, add after `cacheReadInputTokens?: number;` and before `costUsd: number;`:
+In `TurnEndEventData.usage`, add after `cacheReadInputTokens?: number;` and
+before `costUsd: number;`:
+
 ```ts
     /**
      * The LAST API call's on-the-wire input context size for this turn (not
@@ -172,14 +212,20 @@ git commit -m "storage: add track field + lastCallInputContextTokens to event ty
 ## Task 2: Populate `lastCallInputContextTokens` in runner.ts
 
 **Files:**
-- Modify: `packages/agent/src/core/conversation/runner.ts:383, 595-625, 985-1000`
+
+- Modify:
+  `packages/agent/src/core/conversation/runner.ts:383, 595-625, 985-1000`
 - Test: `packages/agent/src/core/conversation/__tests__/runner.test.ts`
 
-Runner today tracks `totalInputTokens`, `totalCacheCreationInputTokens`, `totalCacheReadInputTokens` as turn-cumulative sums. We add three running variables that capture the LAST API call's values, then write their sum on `turn_end.usage.lastCallInputContextTokens`.
+Runner today tracks `totalInputTokens`, `totalCacheCreationInputTokens`,
+`totalCacheReadInputTokens` as turn-cumulative sums. We add three running
+variables that capture the LAST API call's values, then write their sum on
+`turn_end.usage.lastCallInputContextTokens`.
 
 - [ ] **Step 1: Write failing test**
 
-Add to `packages/agent/src/core/conversation/__tests__/runner.test.ts` (in the existing describe block):
+Add to `packages/agent/src/core/conversation/__tests__/runner.test.ts` (in the
+existing describe block):
 
 ```ts
 it('writes lastCallInputContextTokens on turn_end for multi-call turns', async () => {
@@ -189,7 +235,14 @@ it('writes lastCallInputContextTokens on turn_end for multi-call turns', async (
   const mockProvider = makeMockProvider([
     {
       stopReason: 'tool_use',
-      content: [{ type: 'tool_use', name: 'bash', toolCallId: 't1', input: { command: 'echo' } }],
+      content: [
+        {
+          type: 'tool_use',
+          name: 'bash',
+          toolCallId: 't1',
+          input: { command: 'echo' },
+        },
+      ],
       usage: {
         promptTokens: 100,
         completionTokens: 20,
@@ -215,63 +268,69 @@ it('writes lastCallInputContextTokens on turn_end for multi-call turns', async (
 });
 ```
 
-Note: adapt to the existing `runner.test.ts` patterns; reuse helpers already in the file.
+Note: adapt to the existing `runner.test.ts` patterns; reuse helpers already in
+the file.
 
 - [ ] **Step 2: Verify failure**
 
-Run: `npx vitest --run packages/agent/src/core/conversation/__tests__/runner.test.ts -t "lastCallInputContextTokens"`
+Run:
+`npx vitest --run packages/agent/src/core/conversation/__tests__/runner.test.ts -t "lastCallInputContextTokens"`
 Expected: FAIL — field is `undefined` on the emitted `turn_end`.
 
 - [ ] **Step 3: Update runner.ts**
 
-Around `runner.ts:383` (where `let totalInputTokens = 0;` lives), add three siblings:
+Around `runner.ts:383` (where `let totalInputTokens = 0;` lives), add three
+siblings:
 
 ```ts
-    let totalInputTokens = 0;
-    let totalOutputTokens = 0;
-    let totalCacheCreationInputTokens = 0;
-    let totalCacheReadInputTokens = 0;
-    // Per-call snapshot of the LAST response's input + cache fields. Overwritten
-    // each call; the final value reflects the model's most recent on-the-wire
-    // context size. Used by the track-based compaction trigger.
-    let lastCallInputTokens = 0;
-    let lastCallCacheCreationInputTokens = 0;
-    let lastCallCacheReadInputTokens = 0;
+let totalInputTokens = 0;
+let totalOutputTokens = 0;
+let totalCacheCreationInputTokens = 0;
+let totalCacheReadInputTokens = 0;
+// Per-call snapshot of the LAST response's input + cache fields. Overwritten
+// each call; the final value reflects the model's most recent on-the-wire
+// context size. Used by the track-based compaction trigger.
+let lastCallInputTokens = 0;
+let lastCallCacheCreationInputTokens = 0;
+let lastCallCacheReadInputTokens = 0;
 ```
 
-In the per-response usage block at `runner.ts:599-608`, after `totalCacheReadInputTokens += cacheReadInputTokens;`:
+In the per-response usage block at `runner.ts:599-608`, after
+`totalCacheReadInputTokens += cacheReadInputTokens;`:
 
 ```ts
-          lastCallInputTokens = inputTokens;
-          lastCallCacheCreationInputTokens = cacheCreationInputTokens;
-          lastCallCacheReadInputTokens = cacheReadInputTokens;
+lastCallInputTokens = inputTokens;
+lastCallCacheCreationInputTokens = cacheCreationInputTokens;
+lastCallCacheReadInputTokens = cacheReadInputTokens;
 ```
 
-In the `turn_end` write at `runner.ts:985-1000`, in the `usage` block add a `lastCallInputContextTokens` field:
+In the `turn_end` write at `runner.ts:985-1000`, in the `usage` block add a
+`lastCallInputContextTokens` field:
 
 ```ts
-        await writeAndAdvance({
-          type: 'turn_end',
-          data: {
-            stopReason,
-            stopDetails,
-            cacheMissReason: lastCacheMissReason ?? null,
-            usage: {
-              inputTokens: totalInputTokens,
-              outputTokens: totalOutputTokens,
-              cacheCreationInputTokens: totalCacheCreationInputTokens,
-              cacheReadInputTokens: totalCacheReadInputTokens,
-              lastCallInputContextTokens:
-                lastCallInputTokens +
-                lastCallCacheCreationInputTokens +
-                lastCallCacheReadInputTokens,
-              costUsd: turnCostUsd,
-            },
-          },
-        });
+await writeAndAdvance({
+  type: 'turn_end',
+  data: {
+    stopReason,
+    stopDetails,
+    cacheMissReason: lastCacheMissReason ?? null,
+    usage: {
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
+      cacheCreationInputTokens: totalCacheCreationInputTokens,
+      cacheReadInputTokens: totalCacheReadInputTokens,
+      lastCallInputContextTokens:
+        lastCallInputTokens +
+        lastCallCacheCreationInputTokens +
+        lastCallCacheReadInputTokens,
+      costUsd: turnCostUsd,
+    },
+  },
+});
 ```
 
-Also mirror this in the second `usage` block at `runner.ts:1024-1030` (the return value):
+Also mirror this in the second `usage` block at `runner.ts:1024-1030` (the
+return value):
 
 ```ts
       usage: {
@@ -289,7 +348,8 @@ Also mirror this in the second `usage` block at `runner.ts:1024-1030` (the retur
 
 - [ ] **Step 4: Verify pass**
 
-Run: `npx vitest --run packages/agent/src/core/conversation/__tests__/runner.test.ts -t "lastCallInputContextTokens"`
+Run:
+`npx vitest --run packages/agent/src/core/conversation/__tests__/runner.test.ts -t "lastCallInputContextTokens"`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -304,14 +364,19 @@ git commit -m "runner: emit usage.lastCallInputContextTokens on turn_end"
 ## Task 3: Build compaction-trigger.ts pressure evaluator
 
 **Files:**
-- Create: `packages/agent/src/core/conversation/compaction-trigger.ts`
-- Test: `packages/agent/src/core/conversation/__tests__/compaction-trigger.test.ts`
 
-The trigger is a pure function. Given a `TurnEndEventData.usage`, a context-window size, and a recent state (just the trigger's own count of how many compactions have happened, in-memory), decide whether to compact.
+- Create: `packages/agent/src/core/conversation/compaction-trigger.ts`
+- Test:
+  `packages/agent/src/core/conversation/__tests__/compaction-trigger.test.ts`
+
+The trigger is a pure function. Given a `TurnEndEventData.usage`, a
+context-window size, and a recent state (just the trigger's own count of how
+many compactions have happened, in-memory), decide whether to compact.
 
 - [ ] **Step 1: Write failing test**
 
-Create `packages/agent/src/core/conversation/__tests__/compaction-trigger.test.ts`:
+Create
+`packages/agent/src/core/conversation/__tests__/compaction-trigger.test.ts`:
 
 ```ts
 // ABOUTME: Tests for the track-based compaction trigger
@@ -330,15 +395,21 @@ const usage = (overrides: Partial<NonNullable<TurnEndEventData['usage']>>) => ({
 
 describe('computePressure', () => {
   it('uses lastCallInputContextTokens when present', () => {
-    expect(computePressure(usage({ lastCallInputContextTokens: 500_000 }), 1_000_000)).toBe(0.5);
+    expect(
+      computePressure(usage({ lastCallInputContextTokens: 500_000 }), 1_000_000)
+    ).toBe(0.5);
   });
 
   it('falls back to inputTokens + cache fields when lastCallInputContextTokens absent', () => {
     expect(
       computePressure(
-        usage({ inputTokens: 100, cacheCreationInputTokens: 200, cacheReadInputTokens: 300 }),
-        1_000,
-      ),
+        usage({
+          inputTokens: 100,
+          cacheCreationInputTokens: 200,
+          cacheReadInputTokens: 300,
+        }),
+        1_000
+      )
     ).toBe(0.6);
   });
 
@@ -384,7 +455,8 @@ describe('shouldFireCompaction', () => {
 
 - [ ] **Step 2: Verify failure**
 
-Run: `npx vitest --run packages/agent/src/core/conversation/__tests__/compaction-trigger.test.ts`
+Run:
+`npx vitest --run packages/agent/src/core/conversation/__tests__/compaction-trigger.test.ts`
 Expected: FAIL — module not found.
 
 - [ ] **Step 3: Implement**
@@ -412,7 +484,7 @@ const CLEAN_STOP_REASONS = new Set(['end_turn', 'stop_sequence', 'max_turns']);
  */
 export function computePressure(
   usage: TurnEndEventData['usage'] | undefined,
-  contextWindowSize: number,
+  contextWindowSize: number
 ): number {
   if (!usage || contextWindowSize <= 0) return 0;
   if (typeof usage.lastCallInputContextTokens === 'number') {
@@ -445,7 +517,8 @@ export function shouldFireCompaction(args: {
 
 - [ ] **Step 4: Verify pass**
 
-Run: `npx vitest --run packages/agent/src/core/conversation/__tests__/compaction-trigger.test.ts`
+Run:
+`npx vitest --run packages/agent/src/core/conversation/__tests__/compaction-trigger.test.ts`
 Expected: PASS (8+ tests).
 
 - [ ] **Step 5: Commit**
@@ -460,10 +533,13 @@ git commit -m "core: add compaction-trigger pressure evaluator"
 ## Task 4: Demux helpers in track-compaction.ts
 
 **Files:**
-- Create: `packages/agent/src/compaction/track-compaction.ts` (initial: just demux helpers + types)
+
+- Create: `packages/agent/src/compaction/track-compaction.ts` (initial: just
+  demux helpers + types)
 - Test: `packages/agent/src/compaction/__tests__/track-compaction.test.ts`
 
-Build the turnId-to-track resolver and the event grouping. Pure functions over `TypedDurableEvent[]`.
+Build the turnId-to-track resolver and the event grouping. Pure functions over
+`TypedDurableEvent[]`.
 
 - [ ] **Step 1: Write failing test**
 
@@ -474,10 +550,18 @@ Create `packages/agent/src/compaction/__tests__/track-compaction.test.ts`:
 // ABOUTME: Pure-function tests over synthetic TypedDurableEvent[] fixtures
 
 import { describe, it, expect } from 'vitest';
-import { buildTurnToTrackMap, groupEarlierEventsByTrack } from '../track-compaction';
+import {
+  buildTurnToTrackMap,
+  groupEarlierEventsByTrack,
+} from '../track-compaction';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 
-const event = (seq: number, type: string, data: any, turnId?: string): TypedDurableEvent => ({
+const event = (
+  seq: number,
+  type: string,
+  data: any,
+  turnId?: string
+): TypedDurableEvent => ({
   eventSeq: seq,
   timestamp: `2026-05-24T00:00:${String(seq).padStart(2, '0')}Z`,
   ...(turnId ? { turnId } : {}),
@@ -488,7 +572,10 @@ const event = (seq: number, type: string, data: any, turnId?: string): TypedDura
 describe('buildTurnToTrackMap', () => {
   it('maps turnId to the track of the immediately preceding prompt', () => {
     const events: TypedDurableEvent[] = [
-      event(1, 'prompt', { content: [{ type: 'text', text: 'hi' }], track: 'slack:A' }),
+      event(1, 'prompt', {
+        content: [{ type: 'text', text: 'hi' }],
+        track: 'slack:A',
+      }),
       event(2, 'turn_start', {}, 'turn_X'),
       event(3, 'message', { content: 'reply' }, 'turn_X'),
       event(4, 'turn_end', { stopReason: 'end_turn' }, 'turn_X'),
@@ -525,14 +612,21 @@ describe('groupEarlierEventsByTrack', () => {
     const events: TypedDurableEvent[] = [
       event(1, 'prompt', { content: [], track: 'slack:A' }),
       event(2, 'turn_start', {}, 'turn_1'),
-      event(3, 'tool_use', { toolCallId: 't1', name: 'bash', input: {} }, 'turn_1'),
+      event(
+        3,
+        'tool_use',
+        { toolCallId: 't1', name: 'bash', input: {} },
+        'turn_1'
+      ),
       event(4, 'context_injected', { content: [], track: 'alarm:X' }), // mid-turn (no turnId)
       event(5, 'message', { content: 'ok' }, 'turn_1'),
       event(6, 'turn_end', { stopReason: 'end_turn' }, 'turn_1'),
     ];
     const turnToTrack = new Map([['turn_1', 'slack:A']]);
     const groups = groupEarlierEventsByTrack(events, turnToTrack);
-    expect(groups.get('slack:A')?.map((e) => e.eventSeq)).toEqual([1, 2, 3, 5, 6]);
+    expect(groups.get('slack:A')?.map((e) => e.eventSeq)).toEqual([
+      1, 2, 3, 5, 6,
+    ]);
     expect(groups.get('alarm:X')?.map((e) => e.eventSeq)).toEqual([4]);
   });
 
@@ -560,7 +654,8 @@ describe('groupEarlierEventsByTrack', () => {
 
 - [ ] **Step 2: Verify failure**
 
-Run: `npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts`
+Run:
+`npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts`
 Expected: FAIL — module not found.
 
 - [ ] **Step 3: Implement demux**
@@ -584,7 +679,9 @@ export const UNTRACKED = 'untracked' as const;
  * immediately preceding `prompt` event. Used to attribute in-turn events
  * (tool_use, message, turn_end) to a track.
  */
-export function buildTurnToTrackMap(events: TypedDurableEvent[]): Map<string, string> {
+export function buildTurnToTrackMap(
+  events: TypedDurableEvent[]
+): Map<string, string> {
   const map = new Map<string, string>();
   let pendingPromptTrack: string | undefined;
   for (const e of events) {
@@ -613,7 +710,7 @@ export function buildTurnToTrackMap(events: TypedDurableEvent[]): Map<string, st
  */
 export function groupEarlierEventsByTrack(
   events: TypedDurableEvent[],
-  turnToTrack: Map<string, string>,
+  turnToTrack: Map<string, string>
 ): Map<string, TypedDurableEvent[]> {
   const groups = new Map<string, TypedDurableEvent[]>();
   const push = (track: string, e: TypedDurableEvent) => {
@@ -654,7 +751,8 @@ export function groupEarlierEventsByTrack(
 
 - [ ] **Step 4: Verify pass**
 
-Run: `npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts`
+Run:
+`npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts`
 Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
@@ -669,10 +767,14 @@ git commit -m "compaction: add track demux helpers"
 ## Task 5: Per-track salience filters
 
 **Files:**
-- Modify: `packages/agent/src/compaction/track-compaction.ts` (add salience functions)
-- Test: `packages/agent/src/compaction/__tests__/track-compaction.test.ts` (extend)
 
-Each salience filter takes a track's events and returns a `TrackBlock` (track id + summary text + rough token count). Filters by track-kind prefix.
+- Modify: `packages/agent/src/compaction/track-compaction.ts` (add salience
+  functions)
+- Test: `packages/agent/src/compaction/__tests__/track-compaction.test.ts`
+  (extend)
+
+Each salience filter takes a track's events and returns a `TrackBlock` (track
+id + summary text + rough token count). Filters by track-kind prefix.
 
 - [ ] **Step 1: Write failing tests**
 
@@ -685,7 +787,9 @@ describe('salienceForTrack', () => {
   it('alarm tracks drop entirely (return null)', () => {
     const events: TypedDurableEvent[] = [
       event(1, 'context_injected', {
-        content: [{ type: 'text', text: '<notification kind="alarm-fired">...' }],
+        content: [
+          { type: 'text', text: '<notification kind="alarm-fired">...' },
+        ],
         track: 'alarm:foo',
       }),
     ];
@@ -708,9 +812,18 @@ describe('salienceForTrack', () => {
 
   it('system:idle-errors emits count-only', () => {
     const events: TypedDurableEvent[] = [
-      event(1, 'context_injected', { content: [], track: 'system:idle-errors' }),
-      event(2, 'context_injected', { content: [], track: 'system:idle-errors' }),
-      event(3, 'context_injected', { content: [], track: 'system:idle-errors' }),
+      event(1, 'context_injected', {
+        content: [],
+        track: 'system:idle-errors',
+      }),
+      event(2, 'context_injected', {
+        content: [],
+        track: 'system:idle-errors',
+      }),
+      event(3, 'context_injected', {
+        content: [],
+        track: 'system:idle-errors',
+      }),
     ];
     const block = salienceForTrack('system:idle-errors', events);
     expect(block?.body).toMatch(/3 idle-error reports/i);
@@ -718,19 +831,31 @@ describe('salienceForTrack', () => {
 
   it('slack tracks extract inbound text from prompts and outbound from slack_send_message tool_use', () => {
     const events: TypedDurableEvent[] = [
-      event(1, 'prompt', {
-        content: [{
-          type: 'text',
-          text: '<messages channel="C1" thread_ts="1.0"><current count="1"><slack_message user="U1">hello</slack_message></current></messages>',
-        }],
-        track: 'slack:T:C1:1.0',
-      }, undefined),
+      event(
+        1,
+        'prompt',
+        {
+          content: [
+            {
+              type: 'text',
+              text: '<messages channel="C1" thread_ts="1.0"><current count="1"><slack_message user="U1">hello</slack_message></current></messages>',
+            },
+          ],
+          track: 'slack:T:C1:1.0',
+        },
+        undefined
+      ),
       event(2, 'turn_start', {}, 'turn_1'),
-      event(3, 'tool_use', {
-        toolCallId: 't1',
-        name: 'slack/send_message',
-        input: { channel: 'C1', text: 'hi back' },
-      }, 'turn_1'),
+      event(
+        3,
+        'tool_use',
+        {
+          toolCallId: 't1',
+          name: 'slack/send_message',
+          input: { channel: 'C1', text: 'hi back' },
+        },
+        'turn_1'
+      ),
       event(4, 'turn_end', { stopReason: 'end_turn' }, 'turn_1'),
     ];
     const block = salienceForTrack('slack:T:C1:1.0', events);
@@ -753,7 +878,9 @@ describe('salienceForTrack', () => {
 
   it('untracked falls back to a generic prose extraction', () => {
     const events: TypedDurableEvent[] = [
-      event(1, 'prompt', { content: [{ type: 'text', text: 'a legacy prompt' }] }),
+      event(1, 'prompt', {
+        content: [{ type: 'text', text: 'a legacy prompt' }],
+      }),
       event(2, 'turn_start', {}, 'turn_1'),
       event(3, 'message', { content: 'an assistant reply' }, 'turn_1'),
       event(4, 'turn_end', { stopReason: 'end_turn' }, 'turn_1'),
@@ -767,7 +894,8 @@ describe('salienceForTrack', () => {
 
 - [ ] **Step 2: Verify failure**
 
-Run: `npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts -t "salienceForTrack"`
+Run:
+`npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts -t "salienceForTrack"`
 Expected: FAIL — `salienceForTrack` not exported.
 
 - [ ] **Step 3: Implement**
@@ -798,7 +926,7 @@ const estimate = (s: string) => Math.ceil(s.length / 4);
  */
 export function salienceForTrack(
   trackId: string,
-  events: TypedDurableEvent[],
+  events: TypedDurableEvent[]
 ): TrackBlock | null {
   if (trackId.startsWith('alarm:') || trackId.startsWith('reminder:')) {
     return null;
@@ -846,7 +974,10 @@ function statusGlyph(outcome: string): string {
   return outcome + ':';
 }
 
-function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock {
+function slackSalience(
+  trackId: string,
+  events: TypedDurableEvent[]
+): TrackBlock {
   const inbound: string[] = [];
   const outbound: string[] = [];
   for (const e of events) {
@@ -872,7 +1003,10 @@ function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock
   return { trackId, body, estimatedTokens: estimate(body) };
 }
 
-function untrackedSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock {
+function untrackedSalience(
+  trackId: string,
+  events: TypedDurableEvent[]
+): TrackBlock {
   const lines: string[] = [];
   for (const e of events) {
     if (e.type === 'prompt') {
@@ -894,7 +1028,9 @@ function extractText(e: TypedDurableEvent): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
     return content
-      .filter((b): b is { type: 'text'; text: string } => (b as any)?.type === 'text')
+      .filter(
+        (b): b is { type: 'text'; text: string } => (b as any)?.type === 'text'
+      )
       .map((b) => b.text)
       .join('\n');
   }
@@ -904,7 +1040,9 @@ function extractText(e: TypedDurableEvent): string {
 function extractCurrentMessages(envelopeText: string): string[] | null {
   // Parse new-envelope `<current count="N"><slack_message ...>TEXT</slack_message>...</current>`
   // and return the inner texts. Returns null if no <current> block found.
-  const currentMatch = envelopeText.match(/<current[^>]*>([\s\S]*?)<\/current>/);
+  const currentMatch = envelopeText.match(
+    /<current[^>]*>([\s\S]*?)<\/current>/
+  );
   if (!currentMatch) return null;
   const inner = currentMatch[1];
   const msgs: string[] = [];
@@ -924,7 +1062,8 @@ function truncate(s: string, max: number): string {
 
 - [ ] **Step 4: Verify pass**
 
-Run: `npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts`
+Run:
+`npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts`
 Expected: PASS (all tests including new ones).
 
 - [ ] **Step 5: Commit**
@@ -939,10 +1078,12 @@ git commit -m "compaction: add per-track salience filters (slack/job/alarm/syste
 ## Task 6: Renderer in track-render.ts
 
 **Files:**
+
 - Create: `packages/agent/src/compaction/track-render.ts`
 - Test: `packages/agent/src/compaction/__tests__/track-render.test.ts`
 
-Pure function: given track blocks + a scheduler-state roll-up, produce the markdown prefix string.
+Pure function: given track blocks + a scheduler-state roll-up, produce the
+markdown prefix string.
 
 - [ ] **Step 1: Write failing test**
 
@@ -958,8 +1099,16 @@ import type { TrackBlock } from '../track-compaction';
 describe('renderCompactionPrefix', () => {
   it('emits the header and the per-section blocks in fixed order', () => {
     const blocks: TrackBlock[] = [
-      { trackId: 'slack:T:C1:1.0', body: '### slack:T:C1:1.0\n- They said: hi', estimatedTokens: 10 },
-      { trackId: 'job:job_a', body: '- job:job_a ✓ completed: IP check', estimatedTokens: 8 },
+      {
+        trackId: 'slack:T:C1:1.0',
+        body: '### slack:T:C1:1.0\n- They said: hi',
+        estimatedTokens: 10,
+      },
+      {
+        trackId: 'job:job_a',
+        body: '- job:job_a ✓ completed: IP check',
+        estimatedTokens: 8,
+      },
     ];
     const out = renderCompactionPrefix({
       blocks,
@@ -977,7 +1126,11 @@ describe('renderCompactionPrefix', () => {
   it('skips empty sections', () => {
     const out = renderCompactionPrefix({
       blocks: [
-        { trackId: 'job:a', body: '- job:a ✓ completed: x', estimatedTokens: 5 },
+        {
+          trackId: 'job:a',
+          body: '- job:a ✓ completed: x',
+          estimatedTokens: 5,
+        },
       ],
       scheduler: { alarmsPending: 0, remindersPending: 0 },
     });
@@ -988,9 +1141,16 @@ describe('renderCompactionPrefix', () => {
 
   it('emits system events section only if any present', () => {
     const blocks: TrackBlock[] = [
-      { trackId: 'system:idle-errors', body: '3 idle-error reports since last compaction.', estimatedTokens: 6 },
+      {
+        trackId: 'system:idle-errors',
+        body: '3 idle-error reports since last compaction.',
+        estimatedTokens: 6,
+      },
     ];
-    const out = renderCompactionPrefix({ blocks, scheduler: { alarmsPending: 0, remindersPending: 0 } });
+    const out = renderCompactionPrefix({
+      blocks,
+      scheduler: { alarmsPending: 0, remindersPending: 0 },
+    });
     expect(out).toContain('## System events');
     expect(out).toContain('3 idle-error reports');
   });
@@ -999,7 +1159,8 @@ describe('renderCompactionPrefix', () => {
 
 - [ ] **Step 2: Verify failure**
 
-Run: `npx vitest --run packages/agent/src/compaction/__tests__/track-render.test.ts`
+Run:
+`npx vitest --run packages/agent/src/compaction/__tests__/track-render.test.ts`
 Expected: FAIL — module not found.
 
 - [ ] **Step 3: Implement**
@@ -1025,10 +1186,12 @@ export type RenderInput = {
 const HEADER = '[Earlier conversation, compacted by track]';
 
 export function renderCompactionPrefix(input: RenderInput): string {
-  const slackBlocks = input.blocks.filter((b) => b.trackId.startsWith('slack:'));
+  const slackBlocks = input.blocks.filter((b) =>
+    b.trackId.startsWith('slack:')
+  );
   const jobBlocks = input.blocks.filter((b) => b.trackId.startsWith('job:'));
   const systemBlocks = input.blocks.filter(
-    (b) => b.trackId.startsWith('system:') || b.trackId === 'untracked',
+    (b) => b.trackId.startsWith('system:') || b.trackId === 'untracked'
   );
 
   const parts: string[] = [HEADER];
@@ -1047,7 +1210,7 @@ export function renderCompactionPrefix(input: RenderInput): string {
   if (alarmsPending > 0 || remindersPending > 0) {
     parts.push('\n## Scheduler');
     parts.push(
-      `${alarmsPending} alarm${alarmsPending === 1 ? '' : 's'} pending, ${remindersPending} reminder${remindersPending === 1 ? '' : 's'} pending. Use \`list_alarms\` / \`list_reminders\` for details.`,
+      `${alarmsPending} alarm${alarmsPending === 1 ? '' : 's'} pending, ${remindersPending} reminder${remindersPending === 1 ? '' : 's'} pending. Use \`list_alarms\` / \`list_reminders\` for details.`
     );
   }
 
@@ -1062,7 +1225,8 @@ export function renderCompactionPrefix(input: RenderInput): string {
 
 - [ ] **Step 4: Verify pass**
 
-Run: `npx vitest --run packages/agent/src/compaction/__tests__/track-render.test.ts`
+Run:
+`npx vitest --run packages/agent/src/compaction/__tests__/track-render.test.ts`
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Commit**
@@ -1077,12 +1241,16 @@ git commit -m "compaction: add markdown renderer for compacted prefix"
 ## Task 7: Wire `compact()` orchestrator
 
 **Files:**
+
 - Modify: `packages/agent/src/compaction/track-compaction.ts` (add `compact()`)
-- Test: `packages/agent/src/compaction/__tests__/track-compaction.test.ts` (extend)
+- Test: `packages/agent/src/compaction/__tests__/track-compaction.test.ts`
+  (extend)
 
-The `compact()` function orchestrates demux + salience + tail-split + render. It's PURE: returns `{compactionEvent, preserved}` without writing.
+The `compact()` function orchestrates demux + salience + tail-split + render.
+It's PURE: returns `{compactionEvent, preserved}` without writing.
 
-Tail size: **10 turns verbatim**. Snap leftward if the boundary splits a tool_use from its tool_result.
+Tail size: **10 turns verbatim**. Snap leftward if the boundary splits a
+tool_use from its tool_result.
 
 - [ ] **Step 1: Write failing test**
 
@@ -1102,7 +1270,9 @@ describe('splitAtTailBoundary', () => {
     const events: TypedDurableEvent[] = [];
     let seq = 1;
     for (let t = 0; t < 12; t++) {
-      events.push(event(seq++, 'prompt', { content: [], track: `slack:T${t}` }));
+      events.push(
+        event(seq++, 'prompt', { content: [], track: `slack:T${t}` })
+      );
       events.push(turnStart(seq++, `turn_${t}`));
       events.push(turnEnd(seq++, `turn_${t}`));
     }
@@ -1118,9 +1288,19 @@ describe('splitAtTailBoundary', () => {
     const events: TypedDurableEvent[] = [
       event(1, 'prompt', { content: [], track: 'slack:A' }),
       turnStart(2, 'turn_1'),
-      event(3, 'tool_use', { toolCallId: 't1', name: 'bash', input: {} }, 'turn_1'),
+      event(
+        3,
+        'tool_use',
+        { toolCallId: 't1', name: 'bash', input: {} },
+        'turn_1'
+      ),
       // No turn_end yet — multi-call turn, tool_result for t1 lives in turn_1.
-      event(4, 'message', { content: [{ type: 'tool_result', toolCallId: 't1', content: 'ok' }] }, 'turn_1'),
+      event(
+        4,
+        'message',
+        { content: [{ type: 'tool_result', toolCallId: 't1', content: 'ok' }] },
+        'turn_1'
+      ),
       turnEnd(5, 'turn_1'),
       // Second turn starts; if we asked for tail=1, it would include only turn_2.
       event(6, 'prompt', { content: [], track: 'slack:B' }),
@@ -1152,7 +1332,12 @@ describe('compact()', () => {
     const events: TypedDurableEvent[] = [];
     let seq = 1;
     for (let t = 0; t < 12; t++) {
-      events.push(event(seq++, 'prompt', { content: [{ type: 'text', text: `msg ${t}` }], track: `slack:T:C:${t}` }));
+      events.push(
+        event(seq++, 'prompt', {
+          content: [{ type: 'text', text: `msg ${t}` }],
+          track: `slack:T:C:${t}`,
+        })
+      );
       events.push(turnStart(seq++, `turn_${t}`));
       events.push(turnEnd(seq++, `turn_${t}`));
     }
@@ -1168,7 +1353,10 @@ describe('compact()', () => {
 
   it('returns the original tail unchanged when nothing to compact', async () => {
     const events: TypedDurableEvent[] = [
-      event(1, 'prompt', { content: [{ type: 'text', text: 'one' }], track: 'slack:A' }),
+      event(1, 'prompt', {
+        content: [{ type: 'text', text: 'one' }],
+        track: 'slack:A',
+      }),
       turnStart(2, 'turn_1'),
       turnEnd(3, 'turn_1'),
     ];
@@ -1181,7 +1369,8 @@ describe('compact()', () => {
 
 - [ ] **Step 2: Verify failure**
 
-Run: `npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts -t "splitAtTailBoundary|compact\\(\\)"`
+Run:
+`npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts -t "splitAtTailBoundary|compact\\(\\)"`
 Expected: FAIL — `splitAtTailBoundary` and `compact` not exported.
 
 - [ ] **Step 3: Implement**
@@ -1204,7 +1393,7 @@ const TAIL_TURNS = 10;
  */
 export function splitAtTailBoundary(
   events: TypedDurableEvent[],
-  tailTurns: number,
+  tailTurns: number
 ): { earlier: TypedDurableEvent[]; tail: TypedDurableEvent[] } {
   // Walk backwards counting turn_end events; the boundary is just before the
   // prompt that opens the (tailTurns)-th turn from the end.
@@ -1236,7 +1425,10 @@ export function splitAtTailBoundary(
   return { earlier: events.slice(0, boundary), tail: events.slice(boundary) };
 }
 
-function snapLeftIfOrphanedTool(events: TypedDurableEvent[], boundary: number): number {
+function snapLeftIfOrphanedTool(
+  events: TypedDurableEvent[],
+  boundary: number
+): number {
   while (boundary > 0) {
     const oldToolCallIds = new Set<string>();
     for (let i = 0; i < boundary; i++) {
@@ -1253,7 +1445,11 @@ function snapLeftIfOrphanedTool(events: TypedDurableEvent[], boundary: number): 
       if (!Array.isArray(content)) continue;
       for (const block of content) {
         const b = block as { type?: string; toolCallId?: string };
-        if (b.type === 'tool_result' && b.toolCallId && oldToolCallIds.has(b.toolCallId)) {
+        if (
+          b.type === 'tool_result' &&
+          b.toolCallId &&
+          oldToolCallIds.has(b.toolCallId)
+        ) {
           hasOrphan = true;
           break;
         }
@@ -1272,13 +1468,14 @@ function snapLeftIfOrphanedTool(events: TypedDurableEvent[], boundary: number): 
  */
 export async function compact(
   events: TypedDurableEvent[],
-  _ctx: CompactionContext,
+  _ctx: CompactionContext
 ): Promise<CompactionResult> {
   const { earlier, tail } = splitAtTailBoundary(events, TAIL_TURNS);
 
   let prefixContent: string;
   if (earlier.length === 0) {
-    prefixContent = '[Earlier conversation, compacted by track]\n(no earlier content)';
+    prefixContent =
+      '[Earlier conversation, compacted by track]\n(no earlier content)';
   } else {
     const turnToTrack = buildTurnToTrackMap(events);
     const groups = groupEarlierEventsByTrack(earlier, turnToTrack);
@@ -1326,7 +1523,8 @@ function preservedMessageFromEvent(e: TypedDurableEvent): {
 
 - [ ] **Step 4: Verify pass**
 
-Run: `npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts`
+Run:
+`npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts`
 Expected: PASS (all tests).
 
 - [ ] **Step 5: Commit**
@@ -1341,10 +1539,13 @@ git commit -m "compaction: wire compact() orchestrator with tail-snap"
 ## Task 8: LLM fallback for oversize tracks
 
 **Files:**
+
 - Modify: `packages/agent/src/compaction/track-compaction.ts`
 - Test: `packages/agent/src/compaction/__tests__/track-compaction.test.ts`
 
-When a single track's deterministic block exceeds 5,000 tokens (estimated), call `ctx.provider` or `ctx.agent` to summarize. Same provider as the session — no provider-pinning.
+When a single track's deterministic block exceeds 5,000 tokens (estimated), call
+`ctx.provider` or `ctx.agent` to summarize. Same provider as the session — no
+provider-pinning.
 
 - [ ] **Step 1: Write failing test**
 
@@ -1359,7 +1560,10 @@ describe('compact() with LLM fallback', () => {
     const mockProvider = {
       createResponse: async (messages: any, tools: any) => {
         calls.push({ messages, tools });
-        return { content: 'condensed summary', usage: { promptTokens: 0, completionTokens: 50 } };
+        return {
+          content: 'condensed summary',
+          usage: { promptTokens: 0, completionTokens: 50 },
+        };
       },
       setSystemPrompt: () => {},
     } as unknown as AIProvider;
@@ -1369,20 +1573,32 @@ describe('compact() with LLM fallback', () => {
     let seq = 1;
     const longText = 'x'.repeat(2500);
     for (let i = 0; i < 12; i++) {
-      events.push(event(seq++, 'prompt', {
-        content: [{ type: 'text', text: `<messages><current count="1"><slack_message user="U">${longText}</slack_message></current></messages>` }],
-        track: 'slack:T:C:0',
-      }));
+      events.push(
+        event(seq++, 'prompt', {
+          content: [
+            {
+              type: 'text',
+              text: `<messages><current count="1"><slack_message user="U">${longText}</slack_message></current></messages>`,
+            },
+          ],
+          track: 'slack:T:C:0',
+        })
+      );
       events.push(turnStart(seq++, `turn_${i}`));
       events.push(turnEnd(seq++, `turn_${i}`));
     }
     // Add 10 trailing turns to satisfy the tail-size requirement.
     for (let i = 0; i < 10; i++) {
-      events.push(event(seq++, 'prompt', { content: [], track: 'slack:T:C:1' }));
+      events.push(
+        event(seq++, 'prompt', { content: [], track: 'slack:T:C:1' })
+      );
       events.push(turnStart(seq++, `tail_${i}`));
       events.push(turnEnd(seq++, `tail_${i}`));
     }
-    const result = await compact(events, { threadId: 'sess', provider: mockProvider });
+    const result = await compact(events, {
+      threadId: 'sess',
+      provider: mockProvider,
+    });
     expect(calls.length).toBeGreaterThan(0);
     const data = result.compactionEvent.data as any;
     expect(data.preserved[0].content).toContain('condensed summary');
@@ -1400,7 +1616,12 @@ describe('compact() with LLM fallback', () => {
     const events: TypedDurableEvent[] = [];
     let seq = 1;
     for (let i = 0; i < 12; i++) {
-      events.push(event(seq++, 'prompt', { content: [{ type: 'text', text: 'short' }], track: 'slack:T:C:0' }));
+      events.push(
+        event(seq++, 'prompt', {
+          content: [{ type: 'text', text: 'short' }],
+          track: 'slack:T:C:0',
+        })
+      );
       events.push(turnStart(seq++, `turn_${i}`));
       events.push(turnEnd(seq++, `turn_${i}`));
     }
@@ -1412,19 +1633,21 @@ describe('compact() with LLM fallback', () => {
 
 - [ ] **Step 2: Verify failure**
 
-Run: `npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts -t "LLM fallback"`
+Run:
+`npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts -t "LLM fallback"`
 Expected: FAIL — provider never called.
 
 - [ ] **Step 3: Implement**
 
-In `packages/agent/src/compaction/track-compaction.ts`, add a constant and a helper, and replace the loop inside `compact()`:
+In `packages/agent/src/compaction/track-compaction.ts`, add a constant and a
+helper, and replace the loop inside `compact()`:
 
 ```ts
 const SOFT_TOKEN_CAP_PER_TRACK = 5_000;
 
 async function maybeShrinkBlock(
   block: TrackBlock,
-  ctx: CompactionContext,
+  ctx: CompactionContext
 ): Promise<TrackBlock> {
   if (block.estimatedTokens <= SOFT_TOKEN_CAP_PER_TRACK) return block;
   if (!ctx.provider && !ctx.agent) return block; // no summarizer available; return as-is
@@ -1440,7 +1663,7 @@ async function maybeShrinkBlock(
       const resp = await ctx.provider.createResponse(
         [{ role: 'user', content: prompt }],
         [],
-        'default',
+        'default'
       );
       summary = resp.content;
     }
@@ -1455,19 +1678,21 @@ async function maybeShrinkBlock(
 In the `compact()` body, change the block-collection to be async:
 
 ```ts
-    const blocks: TrackBlock[] = [];
-    for (const [trackId, trackEvents] of groups) {
-      const block = salienceForTrack(trackId, trackEvents);
-      if (!block) continue;
-      blocks.push(await maybeShrinkBlock(block, _ctx));
-    }
+const blocks: TrackBlock[] = [];
+for (const [trackId, trackEvents] of groups) {
+  const block = salienceForTrack(trackId, trackEvents);
+  if (!block) continue;
+  blocks.push(await maybeShrinkBlock(block, _ctx));
+}
 ```
 
-(Rename `_ctx` to `ctx` since we now use it — remove the underscore in the parameter list.)
+(Rename `_ctx` to `ctx` since we now use it — remove the underscore in the
+parameter list.)
 
 - [ ] **Step 4: Verify pass**
 
-Run: `npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts`
+Run:
+`npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.test.ts`
 Expected: PASS (all tests including LLM-fallback).
 
 - [ ] **Step 5: Commit**
@@ -1482,28 +1707,42 @@ git commit -m "compaction: add LLM fallback for tracks exceeding 5K-token cap"
 ## Task 9: Update `/compact` slash command
 
 **Files:**
-- Modify: `packages/agent/src/conversation/slash-commands.ts:1-225` (specifically lines 13-14 imports and lines 133-211 `case 'compact'`)
 
-The current `/compact` calls `compactDroppedMessagesWithCore` against the provider-message array. The new one reads canonical events, calls `compact()`, writes `context_compacted` via `writeAndAdvance`.
+- Modify: `packages/agent/src/conversation/slash-commands.ts:1-225`
+  (specifically lines 13-14 imports and lines 133-211 `case 'compact'`)
+
+The current `/compact` calls `compactDroppedMessagesWithCore` against the
+provider-message array. The new one reads canonical events, calls `compact()`,
+writes `context_compacted` via `writeAndAdvance`.
 
 - [ ] **Step 1: Find current callsite**
 
-Read `packages/agent/src/conversation/slash-commands.ts:133-211` to locate the `case 'compact'` branch and the `writeAndAdvance` parameter passed by the caller.
+Read `packages/agent/src/conversation/slash-commands.ts:133-211` to locate the
+`case 'compact'` branch and the `writeAndAdvance` parameter passed by the
+caller.
 
 - [ ] **Step 2: Write failing test**
 
-Find an existing `slash-commands.test.ts` (if present) or create one that asserts /compact emits an event with `strategy: 'track-based'`. Skip this step's detailed code if the test file doesn't exist; instead add the assertion to the existing RPC integration test in Task 10 and rely on type-checking + the integration test in Task 13 to catch regressions here.
+Find an existing `slash-commands.test.ts` (if present) or create one that
+asserts /compact emits an event with `strategy: 'track-based'`. Skip this step's
+detailed code if the test file doesn't exist; instead add the assertion to the
+existing RPC integration test in Task 10 and rely on type-checking + the
+integration test in Task 13 to catch regressions here.
 
 - [ ] **Step 3: Replace the case body**
 
 Replace lines 13-14:
+
 ```ts
 import { compact } from '@lace/agent/compaction/track-compaction';
 import { readDurableEvents } from '@lace/agent/storage/event-log';
 ```
-(Remove the imports of `compactDroppedMessagesWithCore` and `SUMMARIZER_SYSTEM_PROMPT`.)
+
+(Remove the imports of `compactDroppedMessagesWithCore` and
+`SUMMARIZER_SYSTEM_PROMPT`.)
 
 Replace the `case 'compact'` body with:
+
 ```ts
     case 'compact': {
       try {
@@ -1530,12 +1769,14 @@ Replace the `case 'compact'` body with:
     }
 ```
 
-(Adapt parameter names to whatever the existing slash-command signature provides — `ctx.session`, `ctx.provider`, `writeAndAdvance` are the names the current file uses; confirm by reading the function signature in `slash-commands.ts`.)
+(Adapt parameter names to whatever the existing slash-command signature provides
+— `ctx.session`, `ctx.provider`, `writeAndAdvance` are the names the current
+file uses; confirm by reading the function signature in `slash-commands.ts`.)
 
 - [ ] **Step 4: Verify build**
 
-Run: `npx tsc --noEmit -p packages/agent/tsconfig.json`
-Expected: no errors. If errors, fix the parameter names.
+Run: `npx tsc --noEmit -p packages/agent/tsconfig.json` Expected: no errors. If
+errors, fix the parameter names.
 
 - [ ] **Step 5: Commit**
 
@@ -1549,85 +1790,105 @@ git commit -m "conversation: /compact uses new track-based compact()"
 ## Task 10: Update `ent/session/compact` RPC handler
 
 **Files:**
+
 - Modify: `packages/agent/src/rpc/handlers/session-operations.ts:39-40, 424-580`
-- Test: `packages/agent/src/rpc/handlers/__tests__/session-operations.compact-prompt.test.ts` (update)
+- Test:
+  `packages/agent/src/rpc/handlers/__tests__/session-operations.compact-prompt.test.ts`
+  (update)
 
 Replace the dual-strategy dispatcher with a single call to the new `compact()`.
 
 - [ ] **Step 1: Update RPC handler**
 
 Replace lines 39-40:
+
 ```ts
 import { compact } from '@lace/agent/compaction/track-compaction';
 ```
-(Remove the imports of `compactDroppedMessagesWithCore` and `SUMMARIZER_SYSTEM_PROMPT`.)
 
-Replace the `peer.onRequest('ent/session/compact', ...)` body (lines 424-580 approximately) with:
+(Remove the imports of `compactDroppedMessagesWithCore` and
+`SUMMARIZER_SYSTEM_PROMPT`.)
+
+Replace the `peer.onRequest('ent/session/compact', ...)` body (lines 424-580
+approximately) with:
+
 ```ts
-  peer.onRequest('ent/session/compact', async (params: unknown) => {
-    assertSessionReady(state);
+peer.onRequest('ent/session/compact', async (params: unknown) => {
+  assertSessionReady(state);
 
-    const parsed = params as { strategy?: string } | undefined;
-    if (parsed?.strategy && parsed.strategy !== 'track-based') {
-      throwInvalidParams('strategy must be track-based (legacy strategies removed)');
-    }
+  const parsed = params as { strategy?: string } | undefined;
+  if (parsed?.strategy && parsed.strategy !== 'track-based') {
+    throwInvalidParams(
+      'strategy must be track-based (legacy strategies removed)'
+    );
+  }
 
-    return await runExclusive(async () => {
-      const sessionDir = state.activeSession!.dir;
-      const events = readDurableEvents(sessionDir);
-      const { messages: beforeMessages, systemPrompt } = buildProviderMessagesFromDurableEvents(
-        sessionDir,
-      );
-      const previousTokens =
-        estimateProviderTokens(beforeMessages) + estimateTokens(systemPrompt);
+  return await runExclusive(async () => {
+    const sessionDir = state.activeSession!.dir;
+    const events = readDurableEvents(sessionDir);
+    const { messages: beforeMessages, systemPrompt } =
+      buildProviderMessagesFromDurableEvents(sessionDir);
+    const previousTokens =
+      estimateProviderTokens(beforeMessages) + estimateTokens(systemPrompt);
 
-      const sessionStateForConfig = readSessionState(sessionDir);
-      const effectiveConfig = getEffectiveConfig(state.config, sessionStateForConfig.config);
+    const sessionStateForConfig = readSessionState(sessionDir);
+    const effectiveConfig = getEffectiveConfig(
+      state.config,
+      sessionStateForConfig.config
+    );
 
-      const provider = await createProviderForTurn({
-        connectionId: effectiveConfig.connectionId,
-        modelId: effectiveConfig.modelId,
-      });
-
-      const result = await compact(events, {
-        threadId: state.activeSession!.meta.sessionId,
-        provider,
-      });
-
-      let sessionState = readSessionState(sessionDir);
-      const { nextState } = appendDurableEvent(sessionDir, sessionState, {
-        type: 'context_compacted',
-        data: result.compactionEvent.data,
-      });
-      sessionState = nextState;
-      writeSessionState(sessionDir, sessionState);
-      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-
-      const { messages: afterMessages } = buildProviderMessagesFromDurableEvents(sessionDir);
-      const currentTokens = estimateProviderTokens(afterMessages) + estimateTokens(systemPrompt);
-
-      return {
-        previousTokens,
-        currentTokens,
-        messagesCompacted: (result.compactionEvent.data as { messagesCompacted: number })
-          .messagesCompacted,
-      };
+    const provider = await createProviderForTurn({
+      connectionId: effectiveConfig.connectionId,
+      modelId: effectiveConfig.modelId,
     });
+
+    const result = await compact(events, {
+      threadId: state.activeSession!.meta.sessionId,
+      provider,
+    });
+
+    let sessionState = readSessionState(sessionDir);
+    const { nextState } = appendDurableEvent(sessionDir, sessionState, {
+      type: 'context_compacted',
+      data: result.compactionEvent.data,
+    });
+    sessionState = nextState;
+    writeSessionState(sessionDir, sessionState);
+    state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+
+    const { messages: afterMessages } =
+      buildProviderMessagesFromDurableEvents(sessionDir);
+    const currentTokens =
+      estimateProviderTokens(afterMessages) + estimateTokens(systemPrompt);
+
+    return {
+      previousTokens,
+      currentTokens,
+      messagesCompacted: (
+        result.compactionEvent.data as { messagesCompacted: number }
+      ).messagesCompacted,
+    };
   });
+});
 ```
 
 Add the `readDurableEvents` import if not already present.
 
 - [ ] **Step 2: Update test**
 
-`packages/agent/src/rpc/handlers/__tests__/session-operations.compact-prompt.test.ts` references the old `strategy: 'summarize' | 'trim-tool-results'` enum. Update it to:
+`packages/agent/src/rpc/handlers/__tests__/session-operations.compact-prompt.test.ts`
+references the old `strategy: 'summarize' | 'trim-tool-results'` enum. Update it
+to:
+
 - Pass `strategy: 'track-based'` (or no strategy)
 - Assert the returned event has `data.strategy === 'track-based'`
-- Drop assertions on `targetTokens`, `preserveRecent`, `summary` (these are no longer in the response)
+- Drop assertions on `targetTokens`, `preserveRecent`, `summary` (these are no
+  longer in the response)
 
 - [ ] **Step 3: Verify**
 
-Run: `npx vitest --run packages/agent/src/rpc/handlers/__tests__/session-operations.compact-prompt.test.ts`
+Run:
+`npx vitest --run packages/agent/src/rpc/handlers/__tests__/session-operations.compact-prompt.test.ts`
 Expected: PASS after updates.
 
 - [ ] **Step 4: Commit**
@@ -1642,14 +1903,19 @@ git commit -m "rpc: ent/session/compact uses track-based compact(); remove legac
 ## Task 11: Hook trigger in runner.run() after turn_end
 
 **Files:**
-- Modify: `packages/agent/src/core/conversation/runner.ts` (after the `turn_end` write at line ~1000)
+
+- Modify: `packages/agent/src/core/conversation/runner.ts` (after the `turn_end`
+  write at line ~1000)
 - Test: `packages/agent/src/core/conversation/__tests__/runner.test.ts`
 
-After the runner writes `turn_end`, call the trigger; if it fires, call `compact()` and write the resulting event via the same raw `appendDurableEvent` path the runner uses elsewhere.
+After the runner writes `turn_end`, call the trigger; if it fires, call
+`compact()` and write the resulting event via the same raw `appendDurableEvent`
+path the runner uses elsewhere.
 
 - [ ] **Step 1: Write failing test**
 
-Add a test that runs a turn at 70% pressure with a clean stopReason, then asserts a `context_compacted` event appears in the session's event log:
+Add a test that runs a turn at 70% pressure with a clean stopReason, then
+asserts a `context_compacted` event appears in the session's event log:
 
 ```ts
 it('fires track-based compaction after turn_end at 60%+ pressure', async () => {
@@ -1683,7 +1949,8 @@ it('does not fire on error stop reasons', async () => {
 });
 ```
 
-(Adapt to runner test harness conventions; reuse `makeMockProvider` if it exists, or follow the pattern of nearby tests.)
+(Adapt to runner test harness conventions; reuse `makeMockProvider` if it
+exists, or follow the pattern of nearby tests.)
 
 - [ ] **Step 2: Verify failure**
 
@@ -1691,57 +1958,65 @@ Run the new tests. Expected: FAIL — no compaction fires.
 
 - [ ] **Step 3: Implement**
 
-In `runner.ts`, immediately after the successful `turn_end` write (after the try/catch that wraps `writeAndAdvance({type: 'turn_end', ...})` at ~line 1000), add:
+In `runner.ts`, immediately after the successful `turn_end` write (after the
+try/catch that wraps `writeAndAdvance({type: 'turn_end', ...})` at ~line 1000),
+add:
 
 ```ts
-      // Track-based compaction trigger. Synchronous in the runner's
-      // runExclusive scope; uses the raw appendDurableEvent path (the runner
-      // is already inside the scope).
-      try {
-        const usage = {
-          inputTokens: totalInputTokens,
-          outputTokens: totalOutputTokens,
-          cacheCreationInputTokens: totalCacheCreationInputTokens,
-          cacheReadInputTokens: totalCacheReadInputTokens,
-          lastCallInputContextTokens:
-            lastCallInputTokens +
-            lastCallCacheCreationInputTokens +
-            lastCallCacheReadInputTokens,
-          costUsd: turnCostUsd,
-        };
-        const contextWindowSize = provider.getModelContextWindow();
-        const pressure = computePressure(usage, contextWindowSize);
-        if (shouldFireCompaction({ stopReason, pressure })) {
-          const events = readDurableEvents(sessionDir);
-          const result = await compact(events, { threadId: sessionId, provider });
-          let sessionState = readSessionState(sessionDir);
-          const { nextState } = appendDurableEvent(sessionDir, sessionState, {
-            type: 'context_compacted',
-            data: result.compactionEvent.data,
-          });
-          writeSessionState(sessionDir, nextState);
-        }
-      } catch (compactionErr) {
-        logger.error('runner: track-based compaction failed', {
-          err: compactionErr instanceof Error ? compactionErr.message : String(compactionErr),
-          turnId,
-          stopReason,
-        });
-        // No persistent disable. Pressure stays high; next turn re-evaluates.
-      }
+// Track-based compaction trigger. Synchronous in the runner's
+// runExclusive scope; uses the raw appendDurableEvent path (the runner
+// is already inside the scope).
+try {
+  const usage = {
+    inputTokens: totalInputTokens,
+    outputTokens: totalOutputTokens,
+    cacheCreationInputTokens: totalCacheCreationInputTokens,
+    cacheReadInputTokens: totalCacheReadInputTokens,
+    lastCallInputContextTokens:
+      lastCallInputTokens +
+      lastCallCacheCreationInputTokens +
+      lastCallCacheReadInputTokens,
+    costUsd: turnCostUsd,
+  };
+  const contextWindowSize = provider.getModelContextWindow();
+  const pressure = computePressure(usage, contextWindowSize);
+  if (shouldFireCompaction({ stopReason, pressure })) {
+    const events = readDurableEvents(sessionDir);
+    const result = await compact(events, { threadId: sessionId, provider });
+    let sessionState = readSessionState(sessionDir);
+    const { nextState } = appendDurableEvent(sessionDir, sessionState, {
+      type: 'context_compacted',
+      data: result.compactionEvent.data,
+    });
+    writeSessionState(sessionDir, nextState);
+  }
+} catch (compactionErr) {
+  logger.error('runner: track-based compaction failed', {
+    err:
+      compactionErr instanceof Error
+        ? compactionErr.message
+        : String(compactionErr),
+    turnId,
+    stopReason,
+  });
+  // No persistent disable. Pressure stays high; next turn re-evaluates.
+}
 ```
 
 Add imports at the top of `runner.ts`:
+
 ```ts
 import { computePressure, shouldFireCompaction } from './compaction-trigger';
 import { compact } from '@lace/agent/compaction/track-compaction';
 ```
 
-The names `sessionDir`, `sessionId`, `provider` must match the runner's local variable names — read lines 360-400 to confirm.
+The names `sessionDir`, `sessionId`, `provider` must match the runner's local
+variable names — read lines 360-400 to confirm.
 
 - [ ] **Step 4: Verify pass**
 
-Run: `npx vitest --run packages/agent/src/core/conversation/__tests__/runner.test.ts -t "compaction"`
+Run:
+`npx vitest --run packages/agent/src/core/conversation/__tests__/runner.test.ts -t "compaction"`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -1756,6 +2031,7 @@ git commit -m "runner: wire track-based compaction trigger after turn_end"
 ## Task 12: Delete legacy compaction strategy files
 
 **Files:**
+
 - Delete: `packages/agent/src/compaction/summarize-strategy.ts`
 - Delete: `packages/agent/src/compaction/summarize-strategy.test.ts`
 - Delete: `packages/agent/src/compaction/registry.ts`
@@ -1763,7 +2039,8 @@ git commit -m "runner: wire track-based compaction trigger after turn_end"
 - Delete: `packages/agent/src/compaction/trim-tool-results-strategy.ts`
 - Delete: `packages/agent/src/compaction/trim-tool-results-strategy.test.ts`
 - Modify: `packages/agent/src/compaction/index.ts` (drop deleted exports)
-- Modify: `packages/agent/src/compaction/types.ts` (drop `CompactionStrategy` interface if unused)
+- Modify: `packages/agent/src/compaction/types.ts` (drop `CompactionStrategy`
+  interface if unused)
 
 - [ ] **Step 1: Delete files**
 
@@ -1778,22 +2055,27 @@ rm packages/agent/src/compaction/summarize-strategy.ts \
 
 - [ ] **Step 2: Update barrel + types**
 
-Read `packages/agent/src/compaction/index.ts` and remove any exports from deleted files. Add:
+Read `packages/agent/src/compaction/index.ts` and remove any exports from
+deleted files. Add:
+
 ```ts
 export { compact } from './track-compaction';
 ```
 
-Read `packages/agent/src/compaction/types.ts`. If `CompactionStrategy` interface has no remaining callers (verify with `grep -rn "CompactionStrategy"` in `src/`), remove it. Keep `CompactionContext` and `CompactionResult` since the new code uses them.
+Read `packages/agent/src/compaction/types.ts`. If `CompactionStrategy` interface
+has no remaining callers (verify with `grep -rn "CompactionStrategy"` in
+`src/`), remove it. Keep `CompactionContext` and `CompactionResult` since the
+new code uses them.
 
 - [ ] **Step 3: Verify build**
 
-Run: `npx tsc --noEmit -p packages/agent/tsconfig.json`
-Expected: no errors. If errors point to other callers, follow the import trail and update those callsites.
+Run: `npx tsc --noEmit -p packages/agent/tsconfig.json` Expected: no errors. If
+errors point to other callers, follow the import trail and update those
+callsites.
 
 - [ ] **Step 4: Verify full test suite**
 
-Run: `npx vitest --run packages/agent`
-Expected: all tests pass.
+Run: `npx vitest --run packages/agent` Expected: all tests pass.
 
 - [ ] **Step 5: Commit**
 
@@ -1807,9 +2089,15 @@ git commit -m "compaction: delete legacy summarize + trim-tool-results + registr
 ## Task 13: Integration test against the Ada fixture
 
 **Files:**
-- Create: `packages/agent/src/compaction/__tests__/track-compaction.integration.test.ts`
 
-This test reads the real Ada fixture from `sen2/compaction/fixtures/ada-main/events.jsonl` and verifies the new `compact()` runs end-to-end on it. The fixture path is outside the lace repo — the test reads via a path computed from `__dirname`; if missing, the test skips with a clear message.
+- Create:
+  `packages/agent/src/compaction/__tests__/track-compaction.integration.test.ts`
+
+This test reads the real Ada fixture from
+`sen2/compaction/fixtures/ada-main/events.jsonl` and verifies the new
+`compact()` runs end-to-end on it. The fixture path is outside the lace repo —
+the test reads via a path computed from `__dirname`; if missing, the test skips
+with a clear message.
 
 - [ ] **Step 1: Write the test**
 
@@ -1827,7 +2115,7 @@ import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 
 const FIXTURE_PATH = path.resolve(
   __dirname,
-  '../../../../../../../compaction/fixtures/ada-main/events.jsonl',
+  '../../../../../../../compaction/fixtures/ada-main/events.jsonl'
 );
 
 describe('compact() against Ada fixture', () => {
@@ -1861,25 +2149,30 @@ describe('compact() against Ada fixture', () => {
       expect(prefix).toContain('## Slack threads');
       expect(prefix).toContain('## Subagent jobs');
     },
-    30_000,
+    30_000
   );
 });
 ```
 
 - [ ] **Step 2: Verify**
 
-Run: `npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.integration.test.ts`
-Expected (if fixture present): PASS. Expected (if fixture absent): test is skipped — fine.
+Run:
+`npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.integration.test.ts`
+Expected (if fixture present): PASS. Expected (if fixture absent): test is
+skipped — fine.
 
 - [ ] **Step 3: Eyeball the rendered prefix**
 
-Add a manual smoke step: run the test with `--reporter=verbose` and dump the rendered prefix to console if the assertion fails. Eyeball the output for obvious gaps (e.g., a thread's user prompts not appearing, jobs not listed).
+Add a manual smoke step: run the test with `--reporter=verbose` and dump the
+rendered prefix to console if the assertion fails. Eyeball the output for
+obvious gaps (e.g., a thread's user prompts not appearing, jobs not listed).
 
 ```bash
 LACE_DUMP_COMPACTION=1 npx vitest --run packages/agent/src/compaction/__tests__/track-compaction.integration.test.ts
 ```
 
-(Add a `console.log(prefix)` guarded by `if (process.env.LACE_DUMP_COMPACTION)` inside the test body so this works.)
+(Add a `console.log(prefix)` guarded by `if (process.env.LACE_DUMP_COMPACTION)`
+inside the test body so this works.)
 
 - [ ] **Step 4: Commit**
 
@@ -1897,6 +2190,7 @@ git commit -m "compaction: integration test against Ada fixture"
 ```bash
 npx vitest --run packages/agent
 ```
+
 Expected: all green.
 
 - [ ] **Run lint**
@@ -1904,6 +2198,7 @@ Expected: all green.
 ```bash
 npm run lint --workspace=packages/agent
 ```
+
 Expected: clean.
 
 - [ ] **Run typecheck**
@@ -1911,6 +2206,7 @@ Expected: clean.
 ```bash
 npx tsc --noEmit -p packages/agent/tsconfig.json
 ```
+
 Expected: no errors.
 
 - [ ] **Run full lace build**
@@ -1918,6 +2214,8 @@ Expected: no errors.
 ```bash
 npm run build
 ```
+
 Expected: success.
 
-- [ ] **Use superpowers:finishing-a-development-branch** to complete the branch (commit any outstanding work, prepare for merge to main).
+- [ ] **Use superpowers:finishing-a-development-branch** to complete the branch
+      (commit any outstanding work, prepare for merge to main).

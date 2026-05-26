@@ -38,10 +38,10 @@ confusion.
 
 **Subagent spawning**: When an agent spawns subagents (via Task tool or
 similar), the **agent process** is responsible for spawning and managing
-subagent processes. The client sees subagents as background jobs via
-`ent/job/*` methods. Subagent IDs are agent-generated (prefixed with
-`job_agent_`). The client does NOT spawn subagent processes directly—it only
-monitors them through the protocol.
+subagent processes. The client sees subagents as background jobs via `ent/job/*`
+methods. Subagent IDs are agent-generated (prefixed with `job_agent_`). The
+client does NOT spawn subagent processes directly—it only monitors them through
+the protocol.
 
 ```
 Client
