@@ -17,7 +17,6 @@ import { logger } from '@lace/agent/utils/logger';
 import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import { v4 as uuidv4 } from 'uuid';
-import { existsSync, mkdirSync } from 'fs';
 import { appendEnvironmentOverlayArgs, commandWithExecEnvironment } from './exec-environment';
 
 const execFileAsync = promisify(execFile);
@@ -175,13 +174,6 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
 
     if (this.containers.has(containerName)) {
       throw new ContainerError(`Container name already in use: ${containerName}`, containerName);
-    }
-
-    for (const mount of config.mounts) {
-      if (!existsSync(mount.source)) {
-        logger.info('Creating mount source directory', { path: mount.source });
-        mkdirSync(mount.source, { recursive: true });
-      }
     }
 
     const args = this.buildCreateArgs(containerName, config);

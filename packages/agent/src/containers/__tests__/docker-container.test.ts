@@ -47,12 +47,6 @@ vi.mock('child_process', () => ({
   spawn: mockSpawn,
 }));
 
-// Avoid touching real filesystem for mount source directories.
-vi.mock('fs', () => ({
-  existsSync: vi.fn().mockReturnValue(true),
-  mkdirSync: vi.fn(),
-}));
-
 import { DockerContainerRuntime } from '../docker-container';
 import { ContainerError, ContainerNotFoundError } from '../types';
 
