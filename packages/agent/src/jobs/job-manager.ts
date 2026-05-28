@@ -19,6 +19,11 @@ import { readAllSessionEventLines } from '../storage/event-log';
 import type { SessionId } from '@lace/ent-protocol';
 import { resolveContainerId } from '../containers/container-manager';
 import { fingerprintContainerExecutionToken } from './container-execution-metadata';
+import { logger } from '../utils/logger';
+
+// Same POSIX-ish convention used by initialize.ts for containerExecutionIdentity.
+// Host-supplied env var names must look like real env vars; values may be any string.
+const SPAWN_ENV_NAME_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
 
 export type JobManagerDeps = {
   getActiveSession: () => { sessionId: string; dir: string } | null;
@@ -27,6 +32,21 @@ export type JobManagerDeps = {
   runShellProcess: (job: JobState) => void;
   runSubagentProcess: (job: JobState) => void;
   setupProgressTimer?: (job: JobState) => void;
+  /**
+   * Optional: ask the embedder (e.g. sen-core) for per-spawn env vars to merge
+   * into the delegate container's executionEnv. Called once per delegate job,
+   * after lace has computed the base executionEnv. Returns extra env vars; the
+   * caller merges them with conflict resolution and shape validation applied.
+   * If the embedder doesn't implement `host/spawn/env`, the implementation
+   * should resolve to {} (or reject — JobManager treats either as no-op + warn
+   * and never blocks the spawn). See PRI-1867 M4.
+   */
+  fetchEmbedderSpawnEnv?: (request: {
+    jobId: string;
+    persona: string;
+    parentSessionId: string;
+    runtimeId?: string;
+  }) => Promise<Record<string, string>>;
 };
 
 /**
@@ -137,6 +157,47 @@ type ProgressBatch = {
 };
 
 const PROGRESS_BATCH_WINDOW_MS = 200;
+
+/**
+ * Merge embedder-supplied env vars into the base executionEnv from
+ * buildContainerExecutionContext.
+ *
+ * Filters out:
+ *   - names that don't match SPAWN_ENV_NAME_PATTERN (warn + drop)
+ *   - names that collide with anything already in base (lace-managed env vars
+ *     like SEN_AGENT_TOKEN; warn + drop the embedder value)
+ *   - non-string values (warn + drop)
+ *
+ * Returns a fresh map; never mutates `base`. Caller decides whether to assign
+ * the result onto the JobState.
+ */
+function mergeEmbedderSpawnEnv(
+  base: Record<string, string>,
+  embedderEnv: Record<string, string>,
+  jobId: string
+): Record<string, string> {
+  const merged: Record<string, string> = { ...base };
+  for (const [name, value] of Object.entries(embedderEnv)) {
+    if (typeof value !== 'string') {
+      logger.warn('host_spawn_env.malformed_value_dropped', {
+        jobId,
+        name,
+        actualType: typeof value,
+      });
+      continue;
+    }
+    if (!SPAWN_ENV_NAME_PATTERN.test(name)) {
+      logger.warn('host_spawn_env.malformed_name_dropped', { jobId, name });
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(merged, name)) {
+      logger.warn('host_spawn_env.conflict_with_lace_managed_dropped', { jobId, name });
+      continue;
+    }
+    merged[name] = value;
+  }
+  return merged;
+}
 
 function buildContainerExecutionContext(input: {
   identity?: ContainerExecutionIdentityConfig;
@@ -766,6 +827,48 @@ export class JobManager {
           })
         : undefined;
 
+    // PRI-1867 M4: ask the embedder for per-spawn env additions (e.g. sen-core's
+    // placeholder tokens for sen-credential-proxy). Only applies to delegate
+    // jobs that actually got a containerExecutionContext (i.e. containerized
+    // spawn with an identity config). Failure of the host RPC is non-fatal —
+    // the spawn proceeds with the base executionEnv.
+    let finalExecutionEnv = containerExecutionContext?.executionEnv;
+    if (
+      type === 'delegate' &&
+      containerExecutionContext &&
+      options.persona &&
+      this.deps.fetchEmbedderSpawnEnv
+    ) {
+      try {
+        const embedderEnv = await this.deps.fetchEmbedderSpawnEnv({
+          jobId,
+          persona: options.persona,
+          parentSessionId: activeSession.sessionId,
+          ...(options.runtimeBinding?.identity.runtimeId
+            ? { runtimeId: options.runtimeBinding.identity.runtimeId }
+            : {}),
+        });
+        if (embedderEnv && typeof embedderEnv === 'object' && !Array.isArray(embedderEnv)) {
+          finalExecutionEnv = mergeEmbedderSpawnEnv(
+            containerExecutionContext.executionEnv,
+            embedderEnv,
+            jobId
+          );
+        } else {
+          logger.warn('host_spawn_env.malformed_response_ignored', {
+            jobId,
+            actualType: Array.isArray(embedderEnv) ? 'array' : typeof embedderEnv,
+          });
+        }
+      } catch (err) {
+        // Embedder method missing or RPC error — log and proceed with base env.
+        logger.warn('host_spawn_env.request_failed', {
+          jobId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     const job: JobState = {
       jobId,
       parentJobId: options.parentJobId,
@@ -786,7 +889,7 @@ export class JobManager {
       ...(options.runtimeBinding ? { runtimeBinding: options.runtimeBinding } : {}),
       ...(containerExecutionContext
         ? {
-            executionEnv: containerExecutionContext.executionEnv,
+            executionEnv: finalExecutionEnv ?? containerExecutionContext.executionEnv,
             containerExecutionMetadata: containerExecutionContext.metadata,
           }
         : {}),

@@ -676,4 +676,51 @@ describe('protocol shapes (representative examples)', () => {
       })
     ).not.toThrow();
   });
+
+  it('accepts host/spawn/env request and response shapes (PRI-1867)', () => {
+    expect(() =>
+      schema('HostSpawnEnvRequestSchema').parse({
+        jsonrpc: '2.0',
+        id: 'a_1',
+        method: 'host/spawn/env',
+        params: {
+          jobId: 'job_abc',
+          persona: 'shell',
+          parentSessionId: 'sess_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+          runtimeId: 'rt_xyz',
+        },
+      })
+    ).not.toThrow();
+
+    // runtimeId is optional
+    expect(() =>
+      schema('HostSpawnEnvRequestSchema').parse({
+        jsonrpc: '2.0',
+        id: 'a_2',
+        method: 'host/spawn/env',
+        params: {
+          jobId: 'job_abc',
+          persona: 'shell',
+          parentSessionId: 'sess_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+        },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      schema('HostSpawnEnvResponseSchema').parse({
+        jsonrpc: '2.0',
+        id: 'a_1',
+        result: { env: { HTTPBIN_BEARER_TEST: 'sen-placeholder-abc' } },
+      })
+    ).not.toThrow();
+
+    // Empty env is valid (embedder declined to inject anything).
+    expect(() =>
+      schema('HostSpawnEnvResponseSchema').parse({
+        jsonrpc: '2.0',
+        id: 'a_2',
+        result: { env: {} },
+      })
+    ).not.toThrow();
+  });
 });

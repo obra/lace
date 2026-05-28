@@ -2355,6 +2355,48 @@ export const SessionRequestPermissionResponseSchema = z
   })
   .strict();
 
+// host/spawn/env — outbound (lace → embedder). During delegate-job creation,
+// after lace builds the base executionEnv from containerExecutionIdentity, it
+// asks the embedder for any additional env vars to merge into the spawn env
+// (e.g. sen-core's per-spawn placeholder tokens). The embedder may return an
+// empty record, or not implement the method at all — lace treats both as
+// "no extra env" and proceeds with the base executionEnv. The spawn is never
+// blocked by this call. See PRI-1867 M4.
+const HostSpawnEnvParamsSchema = z
+  .object({
+    jobId: NonEmptyStringSchema,
+    persona: NonEmptyStringSchema,
+    parentSessionId: SessionIdSchema,
+    runtimeId: NonEmptyStringSchema.optional(),
+  })
+  .strict();
+
+export const HostSpawnEnvRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('host/spawn/env'),
+    params: HostSpawnEnvParamsSchema,
+  })
+  .strict();
+
+const HostSpawnEnvResultSchema = z
+  .object({
+    env: z.record(z.string(), z.string()),
+  })
+  .strict();
+
+export const HostSpawnEnvResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: HostSpawnEnvResultSchema,
+  })
+  .strict();
+
+export type HostSpawnEnvParams = z.infer<typeof HostSpawnEnvParamsSchema>;
+export type HostSpawnEnvResult = z.infer<typeof HostSpawnEnvResultSchema>;
+
 export const EntProtocolRequestSchema = z.union([
   InitializeRequestSchema,
   SessionNewRequestSchema,
@@ -2399,6 +2441,7 @@ export const EntProtocolRequestSchema = z.union([
   EntJobOutputRequestSchema,
   EntJobKillRequestSchema,
   SessionRequestPermissionRequestSchema,
+  HostSpawnEnvRequestSchema,
 ]);
 
 export const EntProtocolNotificationSchema = z.union([

@@ -441,6 +441,16 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     runShellProcess: (job) => void runShellJobProcess(job),
     runSubagentProcess: (job) => void runSubagentJobProcess(job),
     setupProgressTimer: (job) => setupProgressTimer(job),
+    // PRI-1867 M4: ask the embedder for per-spawn env additions via the
+    // host-bound `host/spawn/env` JSON-RPC method. Errors (missing handler,
+    // bad response shape, transport error) are absorbed by JobManager and
+    // never block the spawn — see job-manager.ts for the recovery path.
+    fetchEmbedderSpawnEnv: async (request) => {
+      const response = (await peer.request('host/spawn/env', request)) as {
+        env?: Record<string, string>;
+      } | null;
+      return response?.env ?? {};
+    },
   });
 
   // Persist job_started event to session storage
