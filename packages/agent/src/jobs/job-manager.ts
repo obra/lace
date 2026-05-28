@@ -23,7 +23,11 @@ import { logger } from '../utils/logger';
 
 // Same POSIX-ish convention used by initialize.ts for containerExecutionIdentity.
 // Host-supplied env var names must look like real env vars; values may be any string.
-const SPAWN_ENV_NAME_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
+// Both upper- and lower-case are valid POSIX env var names — some
+// conventional vars (https_proxy, http_proxy, no_proxy) are commonly lowercase
+// and tools read either case differently. Allow both rather than forcing
+// uppercase only.
+const SPAWN_ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export type JobManagerDeps = {
   getActiveSession: () => { sessionId: string; dir: string } | null;

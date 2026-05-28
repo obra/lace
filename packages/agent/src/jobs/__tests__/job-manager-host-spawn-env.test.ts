@@ -137,9 +137,10 @@ describe('JobManager.createJob — host/spawn/env merge (PRI-1867 M4)', () => {
       VALID_NAME: 'ok',
       'bad-name': 'dropped-1',
       '': 'dropped-2',
-      lowercase: 'dropped-3',
+      lowercase: 'kept-3',
       '1STARTS_WITH_DIGIT': 'dropped-4',
       ANOTHER_VALID: 'ok-2',
+      https_proxy: 'kept-https-proxy',
     });
     const deps = createDeps({ fetchEmbedderSpawnEnv });
     const manager = new JobManager(deps);
@@ -148,9 +149,12 @@ describe('JobManager.createJob — host/spawn/env merge (PRI-1867 M4)', () => {
 
     expect(job.executionEnv?.VALID_NAME).toBe('ok');
     expect(job.executionEnv?.ANOTHER_VALID).toBe('ok-2');
+    // Lowercase env var names are valid POSIX and conventional for
+    // proxy vars (https_proxy, no_proxy, etc.) — keep them.
+    expect(job.executionEnv?.lowercase).toBe('kept-3');
+    expect(job.executionEnv?.https_proxy).toBe('kept-https-proxy');
     expect(job.executionEnv?.['bad-name']).toBeUndefined();
     expect(job.executionEnv?.['']).toBeUndefined();
-    expect(job.executionEnv?.lowercase).toBeUndefined();
     expect(job.executionEnv?.['1STARTS_WITH_DIGIT']).toBeUndefined();
   });
 
