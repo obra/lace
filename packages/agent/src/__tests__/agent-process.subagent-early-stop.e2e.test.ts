@@ -22,15 +22,18 @@ describe('lace-agent subagent early-stop bug (kata #31)', () => {
     'subagent with persona toolScope completes ≥2 model turns when the prompt requires a tool call',
     { timeout: 20_000 },
     async () => {
-      // Write a user persona whose toolScope does NOT include file_read.
-      // This models the kata-#31 scenario: the persona has a narrow tool
-      // scope (e.g. only bash) so the wire-payload tool list sent to the
-      // subagent's provider excludes the read tools its prompt would need.
+      // Write a user persona whose toolScope includes file_read but has a
+      // narrow scope overall. With verbatim-allowlist semantics (PRI-1900),
+      // tools: is the complete set — personas must explicitly list every tool
+      // they need, including builtins. The kata-#31 regression is that
+      // subagents stop after a single turn when a toolScope is present; the
+      // fix is tested by confirming the subagent completes ≥2 model turns
+      // (one to call file_read, one to summarise the result).
       const personasDir = join(ctx.laceDir, 'agent-personas');
       mkdirSync(personasDir, { recursive: true });
       writeFileSync(
         join(personasDir, 'librarian.md'),
-        '---\ntools:\n  - bash\n---\nYou are a librarian.\n'
+        '---\ntools:\n  - bash\n  - file_read\n---\nYou are a librarian.\n'
       );
 
       // Opt the TestAgentProvider into faithful wire-tools mode so it only

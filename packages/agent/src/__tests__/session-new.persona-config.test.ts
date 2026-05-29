@@ -90,11 +90,9 @@ You are a frontmatter persona.`
 
     const loaded = loadSession(created.sessionId);
     expect(loaded.state.config?.modelId).toBe('claude-3-5-sonnet');
-    // Persona tools are additive over lace builtins. file_read and bash are
-    // both builtins and persona-declared, so they appear once in the union.
-    expect(loaded.state.config?.toolScope).toContain('file_read');
-    expect(loaded.state.config?.toolScope).toContain('bash');
-    expect(loaded.state.config?.toolScope).toContain('ripgrep_search'); // builtin
+    // Persona tools: is the verbatim allowlist (Claude Code semantics).
+    // The persona declares file_read and bash, so toolScope is exactly those two.
+    expect(loaded.state.config?.toolScope).toEqual(['file_read', 'bash']);
     expect(loaded.state.config?.mcpServers).toEqual([
       {
         name: 'fs',
@@ -397,12 +395,9 @@ scoped persona`
     })) as { sessionId: string };
 
     const loaded = loadSession(created.sessionId);
-    // Persona tools are additive over lace builtins — file_read is a builtin
-    // so it is already included; the scope is the union, deduplicated.
-    expect(loaded.state.config?.toolScope).toContain('file_read');
-    // Builtins are always present even when persona names only a subset.
-    expect(loaded.state.config?.toolScope).toContain('bash');
-    expect(loaded.state.config?.toolScope).toContain('ripgrep_search');
+    // Persona tools: is the verbatim allowlist (Claude Code semantics).
+    // The persona declares only file_read, so toolScope is exactly that.
+    expect(loaded.state.config?.toolScope).toEqual(['file_read']);
   });
 
   it('persists the requested persona name in session meta.json', async () => {
@@ -462,10 +457,10 @@ scoped persona`
     expect(loaded.meta.persona).toBeUndefined();
   });
 
-  it('persona tools are additive over lace builtins (MCP-only persona keeps builtins)', async () => {
-    // Models the kata-#31 scenario: a persona declares only specialized
-    // (e.g. MCP-namespaced) tools. Lace builtins are part of the platform and
-    // MUST remain available so the subagent can read files, search, etc.
+  it('persona tools: is verbatim allowlist — MCP-only persona gets only declared tools', async () => {
+    // PRI-1900: persona tools: is now a complete allowlist, not additive.
+    // A persona that declares only MCP-namespaced tools gets exactly those;
+    // if it also needs builtins it must list them explicitly.
     writeFileSync(
       join(userPersonasDir, 'mcponly.md'),
       `---
@@ -489,17 +484,59 @@ mcp-only persona`
     })) as { sessionId: string };
 
     const loaded = loadSession(created.sessionId);
-    const scope = loaded.state.config?.toolScope ?? [];
-    // Persona-declared tool present.
-    expect(scope).toContain('knowledge/grep');
-    // Lace builtins always present.
-    expect(scope).toContain('file_read');
-    expect(scope).toContain('ripgrep_search');
-    expect(scope).toContain('bash');
-    expect(scope).toContain('file_write');
-    expect(scope).toContain('delegate');
-    // No duplicates from the union.
-    expect(new Set(scope).size).toBe(scope.length);
+    // Exact allowlist: only the declared tool, no implicit builtins.
+    expect(loaded.state.config?.toolScope).toEqual(['knowledge/grep']);
+  });
+
+  it('allowlist: persona tools: is the exact toolScope (no implicit builtins)', async () => {
+    writeFileSync(
+      join(userPersonasDir, 'narrow.md'),
+      '---\ntools:\n  - bash\n---\nYou are narrow.'
+    );
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    await client.request(
+      'initialize',
+      defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+    );
+    const { sessionId } = (await client.request('session/new', {
+      cwd: tempDir,
+      persona: 'narrow',
+    })) as { sessionId: string };
+    const session = loadSession(sessionId);
+    expect(session.state.config?.toolScope).toEqual(['bash']);
+  });
+
+  it('allowlist: empty tools: yields zero tools', async () => {
+    writeFileSync(join(userPersonasDir, 'notools.md'), '---\ntools: []\n---\nYou have no tools.');
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    await client.request(
+      'initialize',
+      defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+    );
+    const { sessionId } = (await client.request('session/new', {
+      cwd: tempDir,
+      persona: 'notools',
+    })) as { sessionId: string };
+    const session = loadSession(sessionId);
+    expect(session.state.config?.toolScope).toEqual([]);
+  });
+
+  it('omitted tools: inherits all (no toolScope stored)', async () => {
+    writeFileSync(join(userPersonasDir, 'wide.md'), '---\n---\nYou inherit all tools.');
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    await client.request(
+      'initialize',
+      defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+    );
+    const { sessionId } = (await client.request('session/new', {
+      cwd: tempDir,
+      persona: 'wide',
+    })) as { sessionId: string };
+    const session = loadSession(sessionId);
+    expect(session.state.config?.toolScope).toBeUndefined();
   });
 
   describe('session/new always persists personaName', () => {

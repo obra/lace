@@ -47,7 +47,6 @@ import { SkillRegistry, getSkillDirectories } from '../../skills';
 import { killAllRunningJobs } from '../../jobs';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { PersonaNotFoundError, PersonaParseError } from '../../config/persona-registry';
-import { LACE_BUILTIN_TOOL_NAMES } from '../../tools/executor';
 import {
   applyEmbedderMcpServers,
   buildSessionConfigOptions,
@@ -416,14 +415,13 @@ export function registerSessionHandlers(
         const { config: personaConfig } = state.personaRegistry.parsePersona(requestedPersona);
         if (personaConfig.model) personaDefaults.modelId = personaConfig.model;
         if (personaConfig.tools) {
-          // Persona `tools:` frontmatter is ADDITIVE over lace builtins.
-          // Builtins are platform tools (file_read, bash, ripgrep_search, ...)
-          // that should always be available; the persona layer only declares
-          // its specialized additions (typically MCP-namespaced tools).
-          // Treating persona.tools as a strict allowlist caused kata #31:
-          // subagents lost access to file_read and stopped after one turn.
-          const union = new Set<string>([...LACE_BUILTIN_TOOL_NAMES, ...personaConfig.tools]);
-          personaDefaults.toolScope = Array.from(union);
+          // Persona `tools:` is the COMPLETE allowlist (Claude Code semantics):
+          // present = exactly these tools (no implicit builtins); omitted =
+          // inherit all; `[]` = zero tools. Personas that need a builtin must
+          // list it explicitly. (This replaced the earlier additive union;
+          // see PRI-1900 — the migration re-audited every persona that
+          // declares tools: so none silently lose a builtin they rely on.)
+          personaDefaults.toolScope = [...personaConfig.tools];
         }
         if (personaConfig.mcpServers) {
           personaDefaults.mcpServers = Object.entries(personaConfig.mcpServers).map(
