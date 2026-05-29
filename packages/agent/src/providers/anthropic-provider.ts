@@ -263,6 +263,17 @@ export class AnthropicProvider extends AIProvider {
       ? { diagnostics: { previous_message_id: conversationState?.previousResponseId ?? null } }
       : {};
 
+    // Native structured outputs: when the caller constrains the answer to a
+    // JSON schema, attach `output_config.format` and the structured-outputs
+    // beta. The `.create()`/`.stream()` calls (unlike `.parse()`) do not
+    // auto-inject this beta, so we add it explicitly. The schema shape matches
+    // BetaJSONOutputFormat exactly (validated upstream at the prompt handler).
+    const outputFormat = opts?.outputFormat;
+    const effectiveBetas = outputFormat
+      ? [...betas, 'structured-outputs-2025-12-15' as AnthropicBeta]
+      : betas;
+    const outputConfigField = outputFormat ? { output_config: { format: outputFormat } } : {};
+
     // The beta endpoint param shape is structurally compatible with the
     // base MessageParam (same `role` + `content` fields), but the SDK's
     // declared content-block union differs. Cast at this single boundary
@@ -274,8 +285,9 @@ export class AnthropicProvider extends AIProvider {
       messages: cappedMessages as unknown as BetaMessageParam[],
       system: systemWithCaching,
       tools: anthropicTools,
-      betas,
+      betas: effectiveBetas,
       ...diagnosticsField,
+      ...outputConfigField,
     };
 
     // Comprehensive debug logging of request metadata (excluding message content)
@@ -298,6 +310,26 @@ export class AnthropicProvider extends AIProvider {
     });
 
     return payload;
+  }
+
+  /**
+   * Parse the response text into a structured object when the request set
+   * `outputFormat`. Native structured outputs guarantee the text is valid JSON
+   * matching the schema; a parse failure means the model didn't honor the
+   * contract — we log and return undefined so consumers fail-closed rather than
+   * acting on garbage.
+   */
+  private _extractStructuredOutput(textContent: string, options?: RequestOptions): unknown {
+    if (!options?.outputFormat) return undefined;
+    try {
+      return JSON.parse(textContent);
+    } catch (err) {
+      logger.warn('Anthropic structured-output response was not valid JSON', {
+        provider: this.providerName,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return undefined;
+    }
   }
 
   protected async _createResponseImpl(
@@ -390,6 +422,7 @@ export class AnthropicProvider extends AIProvider {
             model: requestPayload.model,
             previousResponseId: conversationState?.previousResponseId ?? null,
           }),
+          structuredOutput: this._extractStructuredOutput(textContent, options),
         };
       },
       { signal }
@@ -574,6 +607,7 @@ export class AnthropicProvider extends AIProvider {
               model: requestPayload.model,
               previousResponseId: conversationState?.previousResponseId ?? null,
             }),
+            structuredOutput: this._extractStructuredOutput(textContent, options),
           };
 
           // Emit completion event

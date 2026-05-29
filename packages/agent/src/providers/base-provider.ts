@@ -113,6 +113,15 @@ export interface ProviderResponse {
    * | BetaCacheMissPreviousMessageNotFound | BetaCacheMissUnavailable
    */
   cacheMissReason?: BetaCacheMissReason | null;
+  /**
+   * The model's response parsed as a structured object, populated only when the
+   * request set `RequestOptions.outputFormat`. With Anthropic native structured
+   * outputs the response text is guaranteed valid JSON matching the schema; the
+   * provider JSON-parses it and surfaces the object here. `undefined` when no
+   * outputFormat was requested or the text could not be parsed (consumers
+   * fail-closed on the latter).
+   */
+  structuredOutput?: unknown;
 }
 
 export interface ModelInfo {
@@ -145,6 +154,14 @@ export interface ConversationState {
 
 export interface RequestOptions {
   toolChoice?: 'auto' | 'required' | 'none';
+  /**
+   * Anthropic-direct only: constrain the model's final answer to a JSON schema
+   * via native structured outputs. When set, the provider sends
+   * `output_config.format` plus the `structured-outputs-2025-12-15` beta, and
+   * returns the parsed object on `ProviderResponse.structuredOutput`. Bedrock
+   * and non-Anthropic providers ignore this field.
+   */
+  outputFormat?: { type: 'json_schema'; schema: Record<string, unknown> };
   /**
    * Anthropic-direct only: additional typed beta opt-ins to add to the
    * computed betas[] for this single request, on top of catalog + global
