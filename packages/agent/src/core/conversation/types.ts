@@ -285,4 +285,11 @@ export interface RunResult {
     lastCallInputContextTokens?: number;
     costUsd?: number;
   };
+  /**
+   * The model's answer parsed as a structured object, present only when the
+   * prompt requested an `outputFormat`. Carried up from
+   * `ProviderResponse.structuredOutput`. `undefined` when no outputFormat was
+   * requested or the response text could not be parsed.
+   */
+  structuredOutput?: unknown;
 }

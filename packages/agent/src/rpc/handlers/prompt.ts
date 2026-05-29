@@ -390,6 +390,7 @@ export function registerPromptHandler(
         content: promptContent as RunnerDependencies extends { content: infer C }
           ? C
           : { type: 'text'; text: string }[],
+        ...(params.outputFormat !== undefined ? { outputFormat: params.outputFormat } : {}),
         maxTurns,
         abortController,
         turnId,
@@ -455,6 +456,9 @@ export function registerPromptHandler(
         stopReason: result.stopReason,
         content: result.content,
         usage: protocolUsage,
+        ...(result.structuredOutput !== undefined
+          ? { structuredOutput: result.structuredOutput }
+          : {}),
         ...(idempotencyKey ? { durableHandoffStatus: 'persisted-new' as const } : {}),
       };
     } catch (err) {

@@ -218,7 +218,7 @@ export function registerInitializeHandler(
         'ent/contextInjection': true,
         'ent/backgroundJobs': true,
         'ent/fileCheckpointing': true,
-        'ent/structuredOutput': false,
+        'ent/structuredOutput': true,
         'ent/promptIdempotency': true,
         'ent/providers': {
           list: true,

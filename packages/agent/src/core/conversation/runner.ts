@@ -332,6 +332,10 @@ export class ConversationRunner {
       turnId,
       startedAt,
     } = params;
+    // Native structured outputs: the prompt handler validated this shape
+    // ({ type: 'json_schema', schema }) before constructing the runner, so the
+    // cast is safe. Threaded into every provider call's RequestOptions below.
+    const runOutputFormat = params.outputFormat as RequestOptions['outputFormat'] | undefined;
     const {
       sessionDir,
       cwd,
@@ -438,6 +442,10 @@ export class ConversationRunner {
     // NEVER_SUBMITTED pattern where model says "Done" instead of verifying)
     let retriedWithToolChoice = false;
     let nextRequestOptions: RequestOptions | undefined;
+    // Carries forward the parsed structured object from the last provider
+    // response that produced one, surfaced on the RunResult for the prompt
+    // handler. Only set when this turn requested an outputFormat.
+    let lastStructuredOutput: unknown;
     let lastResponseId: string | undefined;
     // Cache-diagnosis-2026-04-07 only meaningful on Anthropic-direct. We carry
     // forward the LAST provider response's cache_miss_reason for this turn so
@@ -562,15 +570,25 @@ export class ConversationRunner {
         provider.on('thinking_end', onThinkingEnd);
         let response;
         try {
+          // Merge the turn-level outputFormat into the per-call options. Unlike
+          // nextRequestOptions (a one-shot tool_choice nudge), outputFormat
+          // applies to every call this turn so the final answer stays
+          // schema-constrained even after tool-use iterations.
+          const requestOptions: RequestOptions | undefined = runOutputFormat
+            ? { ...nextRequestOptions, outputFormat: runOutputFormat }
+            : nextRequestOptions;
           response = await provider.createStreamingResponse(
             providerMessages,
             toolsForProvider,
             modelId || 'unknown-model',
             abortController.signal,
             lastResponseId ? { previousResponseId: lastResponseId } : undefined,
-            nextRequestOptions
+            requestOptions
           );
           nextRequestOptions = undefined; // Reset after use
+          if (response.structuredOutput !== undefined) {
+            lastStructuredOutput = response.structuredOutput;
+          }
           lastResponseId = response.responseId;
           lastCacheMissReason = response.cacheMissReason ?? null;
         } catch (providerError) {
@@ -1098,6 +1116,7 @@ export class ConversationRunner {
           lastCallInputTokens + lastCallCacheCreationInputTokens + lastCallCacheReadInputTokens,
         costUsd: turnCostUsd,
       },
+      ...(lastStructuredOutput !== undefined ? { structuredOutput: lastStructuredOutput } : {}),
     };
   }
 
