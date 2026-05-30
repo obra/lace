@@ -136,6 +136,15 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       args.push('--network', config.network);
     }
 
+    // A gateway-routed persona (PRI-1919) cannot use docker's embedded resolver
+    // (127.0.0.11): once netns-init points the default route at the broker, the
+    // embedded resolver's external forwarding dies. The broker is both the
+    // gateway and a DNS forwarder, so point resolv.conf at it. DNS to the
+    // gateway IP is permitted by the persona's OUTPUT isolation rule.
+    if (config.gatewayRoute) {
+      args.push('--dns', config.gatewayRoute);
+    }
+
     args.push(config.image);
 
     if (config.command && config.command.length > 0) {

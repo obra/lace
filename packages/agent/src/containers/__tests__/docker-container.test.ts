@@ -851,6 +851,26 @@ describe('DockerContainerRuntime', () => {
       expect(args).toBeDefined();
       expect(args!.some((a) => a === '--cap-add')).toBe(false);
       expect(args!.some((a) => a === '--network')).toBe(false);
+      expect(args!.some((a) => a === '--dns')).toBe(false);
+    });
+
+    it('emits --dns <gatewayRoute> so a gateway-routed persona resolves via the broker', async () => {
+      await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+        network: 'quarantine',
+        gatewayRoute: '172.31.250.2',
+      });
+
+      const args = findCallWithSubcommand('create');
+      expect(args).toBeDefined();
+      const dnsIdx = args!.indexOf('--dns');
+      expect(dnsIdx).toBeGreaterThan(-1);
+      expect(args![dnsIdx + 1]).toBe('172.31.250.2');
+      // Must appear before the image.
+      expect(dnsIdx).toBeLessThan(args!.indexOf('alpine:latest'));
     });
 
     it('emits multiple --cap-add flags when capAdd has multiple entries', async () => {
