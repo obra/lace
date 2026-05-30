@@ -206,6 +206,26 @@ describe('runtime binding validation', () => {
     ).not.toThrow();
   });
 
+  it('accepts projected container binding with gatewayRoute (PRI-1919)', () => {
+    expect(() =>
+      parseRuntimeExecutionBinding({
+        schemaVersion: 1,
+        identity: { runtimeId: 'rt_container_gateway' },
+        toolRuntime: {
+          type: 'container',
+          cwd: '/work',
+          spec: {
+            name: 'sess1-box',
+            image: 'sen-box:dev',
+            workingDirectory: '/work',
+            mounts: [],
+            gatewayRoute: '172.31.250.1',
+          },
+        },
+      })
+    ).not.toThrow();
+  });
+
   it('rejects legacy agentPlacement on runtime bindings', () => {
     expect(() =>
       parseRuntimeExecutionBinding({

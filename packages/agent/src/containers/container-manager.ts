@@ -177,6 +177,7 @@ export class ContainerManager {
       sysctls: spec.sysctls,
       capAdd: spec.capAdd,
       network: spec.network,
+      gatewayRoute: spec.gatewayRoute,
     };
 
     // Box specs may have a daemon-side container that survived this process —

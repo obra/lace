@@ -65,6 +65,9 @@ const runtimeContainerSchema = z
     // Docker network name forwarded to `docker create --network <name>`.
     // PRI-1919: persona containers join the quarantine network.
     network: z.string().min(1).optional(),
+    // IPv4 address of the egress gateway for the post-start netns-init sidecar.
+    // PRI-1919: sets the persona's default route to route all egress via the broker.
+    gatewayRoute: z.string().min(1).optional(),
   })
   .strict();
 

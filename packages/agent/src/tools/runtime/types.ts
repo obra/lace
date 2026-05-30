@@ -66,6 +66,9 @@ export type ToolRuntimeDescriptor =
         // Docker network name forwarded to `docker create --network <name>`.
         // PRI-1919: persona containers join the quarantine network.
         network?: string;
+        // IPv4 address of the egress gateway. When set, a privileged one-shot
+        // sidecar sets the persona's default route after start. PRI-1919.
+        gatewayRoute?: string;
       };
       cwd: string;
       helper?: RuntimeHelperDescriptor;

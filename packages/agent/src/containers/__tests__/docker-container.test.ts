@@ -875,6 +875,84 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
+  describe('gatewayRoute netns-init (PRI-1919)', () => {
+    it('runs netns-init sidecar with the gatewayRoute after start', async () => {
+      const id = await runtime.create({
+        name: 'persona',
+        image: 'sen-box:dev',
+        workingDirectory: '/w',
+        mounts: [],
+        gatewayRoute: '172.31.250.1',
+      });
+      mockExecFile.mockClear();
+      await runtime.start(id);
+
+      // The first call should be `docker start <id>`
+      const startArgs = mockExecFile.mock.calls[0]?.[1] as string[];
+      expect(startArgs).toEqual(['start', id]);
+
+      // The second call should be the netns-init sidecar
+      const sidecarArgs = mockExecFile.mock.calls[1]?.[1] as string[];
+      expect(sidecarArgs).toBeDefined();
+      expect(sidecarArgs[0]).toBe('run');
+      expect(sidecarArgs).toContain('--rm');
+      expect(sidecarArgs).toContain('--network');
+      expect(sidecarArgs[sidecarArgs.indexOf('--network') + 1]).toBe(`container:${id}`);
+      expect(sidecarArgs).toContain('--cap-add');
+      expect(sidecarArgs[sidecarArgs.indexOf('--cap-add') + 1]).toBe('NET_ADMIN');
+      expect(sidecarArgs).toContain('--entrypoint');
+      expect(sidecarArgs[sidecarArgs.indexOf('--entrypoint') + 1]).toBe('sh');
+      // image must be present
+      expect(sidecarArgs).toContain('sen-box:dev');
+      const imageIdx = sidecarArgs.indexOf('sen-box:dev');
+      // trailing args: -c "ip route replace default via <ip>"
+      expect(sidecarArgs.slice(imageIdx + 1)).toEqual([
+        '-c',
+        'ip route replace default via 172.31.250.1',
+      ]);
+    });
+
+    it('does NOT run netns-init when gatewayRoute is absent', async () => {
+      const id = await runtime.create({
+        name: 'persona',
+        image: 'sen-box:dev',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+      mockExecFile.mockClear();
+      await runtime.start(id);
+
+      // Only `docker start` should have been called — no sidecar run
+      expect(mockExecFile.mock.calls).toHaveLength(1);
+      expect((mockExecFile.mock.calls[0]?.[1] as string[])[0]).toBe('start');
+    });
+
+    it('throws ContainerError and marks container failed when sidecar exits non-zero', async () => {
+      const id = await runtime.create({
+        name: 'persona',
+        image: 'sen-box:dev',
+        workingDirectory: '/w',
+        mounts: [],
+        gatewayRoute: '172.31.250.1',
+      });
+
+      setExecFileResponses([
+        // docker start succeeds
+        { match: (args) => args[0] === 'start', stdout: '', stderr: '' },
+        // sidecar fails
+        {
+          match: (args) => args[0] === 'run',
+          error: Object.assign(new Error('ip: command not found'), {
+            code: 1,
+            stderr: 'ip: command not found',
+          }),
+        },
+      ]);
+
+      await expect(runtime.start(id)).rejects.toBeInstanceOf(ContainerError);
+    });
+  });
+
   describe('daemonInspect (kata #62)', () => {
     it('shells out to docker inspect and returns parsed info without requiring cache', async () => {
       const payload = {

@@ -54,6 +54,9 @@ const ContainerRuntimeDescriptorSchema = z
         capAdd: z.array(z.string().min(1)).optional(),
         // PRI-1919: forwarded to `docker create --network <name>`.
         network: z.string().min(1).optional(),
+        // PRI-1919: IPv4 address of the egress gateway for the post-start
+        // netns-init sidecar. Validated as a non-empty string (loose IPv4).
+        gatewayRoute: z.string().min(1).optional(),
       })
       .strict(),
     helper: z

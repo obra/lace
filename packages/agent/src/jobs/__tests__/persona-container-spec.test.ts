@@ -265,6 +265,40 @@ describe('buildPersonaContainerSpec persistent', () => {
     expect(spec.capAdd).toEqual(['NET_ADMIN']);
     expect(spec.network).toBe('quarantine');
   });
+
+  it('passes runtime gatewayRoute through to spec (PRI-1919)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: {
+        ...perInvocationRuntime,
+        gatewayRoute: '172.31.250.1',
+      },
+      containerMounts: {},
+    });
+
+    expect(spec.gatewayRoute).toBe('172.31.250.1');
+  });
+
+  it('passes gatewayRoute through containerSpecToRuntimeSpec (PRI-1919)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: {
+        ...perInvocationRuntime,
+        gatewayRoute: '172.31.250.1',
+      },
+      containerMounts: {},
+    });
+
+    expect(containerSpecToRuntimeSpec({ spec })).toMatchObject({
+      gatewayRoute: '172.31.250.1',
+    });
+  });
 });
 
 describe('containerSpecToRuntimeSpec', () => {

@@ -160,6 +160,7 @@ export function buildPersonaContainerSpec(input: {
       ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
       ...(runtime.capAdd ? { capAdd: runtime.capAdd } : {}),
       ...(runtime.network ? { network: runtime.network } : {}),
+      ...(runtime.gatewayRoute ? { gatewayRoute: runtime.gatewayRoute } : {}),
     };
   }
 
@@ -186,6 +187,7 @@ export function buildPersonaContainerSpec(input: {
     ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
     ...(runtime.capAdd ? { capAdd: runtime.capAdd } : {}),
     ...(runtime.network ? { network: runtime.network } : {}),
+    ...(runtime.gatewayRoute ? { gatewayRoute: runtime.gatewayRoute } : {}),
   };
 }
 
@@ -213,5 +215,6 @@ export function containerSpecToRuntimeSpec(input: {
     ...(spec.sysctls ? { sysctls: spec.sysctls } : {}),
     ...(spec.capAdd ? { capAdd: spec.capAdd } : {}),
     ...(spec.network ? { network: spec.network } : {}),
+    ...(spec.gatewayRoute ? { gatewayRoute: spec.gatewayRoute } : {}),
   };
 }

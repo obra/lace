@@ -59,6 +59,9 @@ interface DockerPsRowJson {
 
 export class DockerContainerRuntime extends BaseContainerRuntime {
   private readonly dockerBin: string;
+  // Stores the full ContainerConfig keyed by container id so start() can
+  // access gatewayRoute and image after create() has returned.
+  private readonly configs = new Map<string, ContainerConfig>();
 
   constructor(dockerBin: string = 'docker') {
     super();
@@ -218,6 +221,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       mounts: config.mounts,
     };
     this.containers.set(containerName, info);
+    this.configs.set(containerName, { ...config, id: containerName });
     this.registerMounts(containerName, config);
 
     return containerName;
@@ -245,6 +249,61 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       info.state = 'failed';
       throw new ContainerError(
         `Failed to start container: ${stderr || errMessage}`,
+        containerId,
+        error instanceof Error ? error : undefined
+      );
+    }
+
+    const config = this.configs.get(containerId);
+    if (config?.gatewayRoute) {
+      await this.runNetnsInit(containerId, config.image, config.gatewayRoute, info);
+    }
+  }
+
+  /**
+   * Launch a privileged one-shot sidecar into the persona container's network
+   * namespace to replace its default route with the egress gateway IP. The
+   * persona itself does NOT need NET_ADMIN — the sidecar holds the cap and
+   * exits immediately. PRI-1919 transparent egress gateway.
+   */
+  private async runNetnsInit(
+    containerId: string,
+    image: string,
+    gatewayRoute: string,
+    info: ContainerInfo
+  ): Promise<void> {
+    const sidecarArgs = [
+      'run',
+      '--rm',
+      '--network',
+      `container:${containerId}`,
+      '--cap-add',
+      'NET_ADMIN',
+      '--entrypoint',
+      'sh',
+      image,
+      '-c',
+      `ip route replace default via ${gatewayRoute}`,
+    ];
+    logger.info('Running netns-init sidecar to set default route', {
+      containerId,
+      gatewayRoute,
+      image,
+    });
+    try {
+      await execFileAsync(this.dockerBin, sidecarArgs);
+      logger.info('netns-init sidecar complete', { containerId, gatewayRoute });
+    } catch (error: unknown) {
+      const stderr = (error as ExecFileError).stderr || '';
+      const errMessage = error instanceof Error ? error.message : String(error);
+      info.state = 'failed';
+      logger.error('netns-init sidecar failed — persona has no gateway route; aborting start', {
+        containerId,
+        gatewayRoute,
+        stderr: stderr || errMessage,
+      });
+      throw new ContainerError(
+        `netns-init sidecar failed (exit non-zero): ${stderr || errMessage}`,
         containerId,
         error instanceof Error ? error : undefined
       );
@@ -302,6 +361,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
     }
 
     this.containers.delete(containerId);
+    this.configs.delete(containerId);
     this.unregisterMounts(containerId);
   }
 

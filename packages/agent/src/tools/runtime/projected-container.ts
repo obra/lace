@@ -255,6 +255,9 @@ async function containerSpecFromDescriptor(
   if (descriptor.spec.network) {
     spec.network = descriptor.spec.network;
   }
+  if (descriptor.spec.gatewayRoute) {
+    spec.gatewayRoute = descriptor.spec.gatewayRoute;
+  }
 
   return helper.hooks ? { spec, hooks: helper.hooks } : { spec };
 }

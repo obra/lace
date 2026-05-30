@@ -226,6 +226,26 @@ Body.`;
     });
   });
 
+  it('parses runtime.type=container with gatewayRoute (PRI-1919)', () => {
+    const content = `---
+runtime:
+  type: container
+  containerSharing: per_invocation
+  image: sen-box:dev
+  workingDirectory: /work
+  mounts: {}
+  gatewayRoute: "172.31.250.1"
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'gateway-runtime.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(registry.parsePersona('gateway-runtime').config.runtime).toMatchObject({
+      type: 'container',
+      gatewayRoute: '172.31.250.1',
+    });
+  });
+
   it('rejects legacy runtime.agentPlacement', () => {
     const content = `---
 runtime:

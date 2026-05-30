@@ -34,6 +34,11 @@ export interface ContainerSpec {
   // Docker network name forwarded to `docker create --network <name>`.
   // PRI-1919: persona containers join the quarantine network.
   network?: string;
+
+  // IPv4 address of the egress gateway. When set, a privileged one-shot sidecar
+  // sets the persona's default route after `docker start`. PRI-1919.
+  gatewayRoute?: string;
+
   // Mount target namespaces owned by Lace. When adopting a daemon-side
   // persistent container, ContainerManager rejects stale extra mounts under
   // these prefixes so an old container cannot expose paths the new spec no

@@ -194,6 +194,25 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
+  it('threads descriptor gatewayRoute into the materialized spec (PRI-1919)', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    projectedDescriptor.spec.gatewayRoute = '172.31.250.1';
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
+
+    expect(manager.materialize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gatewayRoute: '172.31.250.1',
+      })
+    );
+  });
+
   it('mounts host-provided runtime helpers read-only when helper mode is mount', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = {
