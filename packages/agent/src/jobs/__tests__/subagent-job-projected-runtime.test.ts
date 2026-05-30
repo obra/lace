@@ -829,4 +829,115 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
 
     expect(state.jobManager.getJob(mappedJobId)?.containerExecutionMetadata).toBeUndefined();
   });
+
+  it('forwards child container_network_attached/detached updates to the parent (PRI-1919)', async () => {
+    const emittedUpdates: unknown[] = [];
+    const emitSessionUpdate = vi.fn(async (update: unknown) => {
+      emittedUpdates.push(update);
+    });
+    const finalizeJob = vi.fn(async (j: JobState) => {
+      j.finished = true;
+      j.resolveCompletion();
+    });
+    const state = {
+      activeSession: {
+        meta: { sessionId: parentSessionId, workDir: parentWorkDir },
+        dir: parentSessionDir,
+        state: { nextEventSeq: 1, nextStreamSeq: 1, config: {} },
+      },
+      config: {},
+      jobManager: undefined as unknown as JobManager,
+      containerManager: null as unknown as ContainerManager,
+      containerMounts: {},
+      personaRegistry: {
+        getUserPersonasPaths: () => [],
+      },
+    };
+
+    let nextEventSeq = 1;
+    state.jobManager = new JobManager({
+      getActiveSession: () => ({ sessionId: parentSessionId, dir: parentSessionDir }),
+      persistEvent: async (event) => {
+        appendTestDurableEvent(parentSessionDir, event, nextEventSeq++);
+      },
+      emitUpdate: vi.fn(),
+      runShellProcess: vi.fn(),
+      runSubagentProcess: vi.fn(),
+    });
+
+    requestSpy.mockImplementation(async (method: string, params?: unknown) => {
+      if (method === 'initialize') return undefined;
+      if (method === 'session/new') {
+        sessionNewRequests.push(params as Record<string, unknown>);
+        return { sessionId: 'sess_child_projected' };
+      }
+      if (method === 'ent/session/configure') return undefined;
+      if (method === 'session/set_config_option') return undefined;
+      if (method === 'session/prompt') {
+        // The child materializes its persona container and emits the network
+        // lifecycle updates into its own session; the parent relay must forward
+        // them up unchanged so the embedder can register the source-IP mapping.
+        await sessionUpdateHandler?.({
+          type: 'container_network_attached',
+          containerName: 'sen-persistent-box',
+          containerId: 'sen-persistent-box',
+          sourceIp: '172.31.250.3',
+          networkName: 'quarantine',
+        });
+        await sessionUpdateHandler?.({
+          type: 'container_network_detached',
+          containerName: 'sen-persistent-box',
+          containerId: 'sen-persistent-box',
+        });
+        queueMicrotask(() => fakeHandle.resolveExit());
+        return { stopReason: 'completed' };
+      }
+      throw new Error(`Unexpected childPeer.request method in test: ${method}`);
+    });
+
+    let resolveCompletion: () => void = () => undefined;
+    const completion = new Promise<void>((resolve) => {
+      resolveCompletion = resolve;
+    });
+    const parentJob: JobState = {
+      jobId: 'job_parent_delegate',
+      type: 'delegate',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+      outputPath: join(parentSessionDir, 'jobs', 'job_parent_delegate.log'),
+      finished: false,
+      completion,
+      resolveCompletion,
+      subagentContent: [{ type: 'text', text: 'noop' }],
+    };
+
+    runSubagentJobProcess(parentJob, {
+      getState: () => state as never,
+      runExclusive: async <T>(work: () => Promise<T> | T) => work(),
+      emitSessionUpdate,
+      requestPermissionFromClient: vi.fn(),
+      finalizeJob,
+      runPromptInternalRef: { current: null },
+      topLevelPeer: { notify: vi.fn() } as unknown as JsonRpcPeer,
+    });
+
+    await completion;
+
+    expect(emittedUpdates).toContainEqual(
+      expect.objectContaining({
+        type: 'container_network_attached',
+        containerName: 'sen-persistent-box',
+        containerId: 'sen-persistent-box',
+        sourceIp: '172.31.250.3',
+        networkName: 'quarantine',
+      })
+    );
+    expect(emittedUpdates).toContainEqual(
+      expect.objectContaining({
+        type: 'container_network_detached',
+        containerName: 'sen-persistent-box',
+        containerId: 'sen-persistent-box',
+      })
+    );
+  });
 });
