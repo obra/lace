@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { appendFileSync, chmodSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { getLaceDir } from '../../config/lace-dir';
+import { resolveMcpServerPaths } from '../../config/mcp-path-resolution';
 import {
   SECURE_DIR_MODE,
   SECURE_FILE_MODE,
@@ -207,7 +208,9 @@ async function activateStoredSession(
 
   const loadedWithMcpServers = mergeMcpServersIntoLoadedSession(
     loaded,
-    params.mcpServers,
+    // PRI-1912: resolve relative host-placement command/args against mcpBaseDir
+    // before applying embedder servers (same as session/new).
+    resolveMcpServerPaths(params.mcpServers, state.personaRegistry.getMcpBaseDir()),
     activeRuntimeBinding
   );
   const switchingSessions =
@@ -461,7 +464,14 @@ export function registerSessionHandlers(
       toNonEmptyString(parsed.config?.connectionId) ?? state.config.connectionId;
     const effectiveMcpServers =
       parsed.mcpServers !== undefined
-        ? mergeMcpServers(personaDefaults.mcpServers, parsed.mcpServers)
+        ? mergeMcpServers(
+            personaDefaults.mcpServers,
+            // PRI-1912: resolve relative host-placement command/args in the
+            // embedder's request servers against mcpBaseDir (persona defaults are
+            // already resolved by parsePersona). Resolve BEFORE merge so the
+            // stdio→toolRuntime placement default does not skip them.
+            resolveMcpServerPaths(parsed.mcpServers, state.personaRegistry.getMcpBaseDir())
+          )
         : personaDefaults.mcpServers
           ? defaultMcpServerPlacements(personaDefaults.mcpServers)
           : undefined;

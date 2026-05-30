@@ -7,6 +7,7 @@ import { spawnSync } from 'child_process';
 import matter from 'gray-matter';
 import { z } from 'zod';
 import { getLaceDir } from './lace-dir';
+import { resolveMcpServerCommandArgs } from './mcp-path-resolution';
 import { scanEmbeddedFiles, resolveResourcePath } from '@lace/agent/utils/resource-resolver';
 import { logger } from '@lace/agent/utils/logger';
 
@@ -373,22 +374,12 @@ export class PersonaRegistry {
     const baseDir = this.mcpBaseDir;
     if (baseDir === undefined || config.mcpServers === undefined) return config;
 
-    const resolveIfRelative = (value: string): string =>
-      value.startsWith('./') || value.startsWith('../') ? path.resolve(baseDir, value) : value;
-
     let changed = false;
     const mcpServers: NonNullable<PersonaConfig['mcpServers']> = {};
     for (const [serverId, server] of Object.entries(config.mcpServers)) {
-      if ((server.placement ?? 'host') !== 'host') {
-        mcpServers[serverId] = server;
-        continue;
-      }
-      const command = resolveIfRelative(server.command);
-      const args = server.args?.map(resolveIfRelative);
-      if (command !== server.command || (args && args.some((a, i) => a !== server.args?.[i]))) {
-        changed = true;
-      }
-      mcpServers[serverId] = { ...server, command, ...(args ? { args } : {}) };
+      const resolved = resolveMcpServerCommandArgs(server, baseDir);
+      if (resolved !== server) changed = true;
+      mcpServers[serverId] = resolved;
     }
 
     return changed ? { ...config, mcpServers } : config;
