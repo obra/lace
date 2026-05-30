@@ -275,6 +275,14 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
     const sidecarArgs = [
       'run',
       '--rm',
+      // Run as root: --cap-add NET_ADMIN only populates the BOUNDING set, which
+      // a non-root user (the persona image runs as `sen`) cannot exercise without
+      // file caps on `ip`. The ephemeral sidecar runs `ip route` for milliseconds
+      // and exits; it never touches the persona's processes/filesystem (only its
+      // netns), so root here does NOT weaken the workload (which stays non-root,
+      // no NET_ADMIN). Mirrors Istio's privileged istio-init + unprivileged app.
+      '--user',
+      '0:0',
       '--network',
       `container:${containerId}`,
       '--cap-add',

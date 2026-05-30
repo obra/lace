@@ -896,6 +896,10 @@ describe('DockerContainerRuntime', () => {
       expect(sidecarArgs).toBeDefined();
       expect(sidecarArgs[0]).toBe('run');
       expect(sidecarArgs).toContain('--rm');
+      // Sidecar runs as root so the NET_ADMIN cap is in the EFFECTIVE set (the
+      // persona image runs as non-root, which can't exercise a bounding-only cap).
+      expect(sidecarArgs).toContain('--user');
+      expect(sidecarArgs[sidecarArgs.indexOf('--user') + 1]).toBe('0:0');
       expect(sidecarArgs).toContain('--network');
       expect(sidecarArgs[sidecarArgs.indexOf('--network') + 1]).toBe(`container:${id}`);
       expect(sidecarArgs).toContain('--cap-add');
@@ -1059,6 +1063,10 @@ describe('DockerContainerRuntime', () => {
       const sidecarArgs = mockExecFile.mock.calls[0]?.[1] as string[];
       expect(sidecarArgs[0]).toBe('run');
       expect(sidecarArgs).toContain('--rm');
+      // Sidecar runs as root so the NET_ADMIN cap is in the EFFECTIVE set (the
+      // persona image runs as non-root, which can't exercise a bounding-only cap).
+      expect(sidecarArgs).toContain('--user');
+      expect(sidecarArgs[sidecarArgs.indexOf('--user') + 1]).toBe('0:0');
       expect(sidecarArgs).toContain('--network');
       expect(sidecarArgs[sidecarArgs.indexOf('--network') + 1]).toBe('container:sen-box-shell');
       expect(sidecarArgs).toContain('--cap-add');
