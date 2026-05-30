@@ -262,9 +262,15 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
 
   /**
    * Launch a privileged one-shot sidecar into the persona container's network
-   * namespace to replace its default route with the egress gateway IP. The
-   * persona itself does NOT need NET_ADMIN — the sidecar holds the cap and
-   * exits immediately. PRI-1919 transparent egress gateway.
+   * namespace to (1) replace its default route with the egress gateway IP and
+   * (2) install subagent↔subagent isolation: OUTPUT rules that ACCEPT the
+   * gateway and DROP every other host on the persona's own subnet. The persona
+   * itself does NOT need NET_ADMIN — the sidecar holds the cap and exits
+   * immediately, and the persona cannot remove the rules. Hub-and-spoke:
+   * main↔persona is via `docker exec` (not L3, unaffected); persona→gateway and
+   * persona→external are allowed; persona↔persona is denied. The gateway bridge
+   * keeps docker's default icc (enabled) — enable_icc=false would also drop the
+   * persona→gateway hop. PRI-1919 transparent egress gateway.
    */
   private async runNetnsInit(
     containerId: string,
@@ -272,12 +278,25 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
     gatewayRoute: string,
     info: ContainerInfo
   ): Promise<void> {
+    // Flush+rebuild OUTPUT for determinism + idempotency (this also runs on
+    // adopt()). The persona has no NET_ADMIN, so OUTPUT is otherwise empty; the
+    // subnet is derived from eth0 (the persona's only interface) — iptables
+    // masks the host CIDR to the network, so `-d 172.31.250.x/24` == the /24.
+    // ACCEPT the gateway BEFORE the subnet DROP so the gateway stays reachable.
+    const netnsInitScript = [
+      'set -e',
+      `ip route replace default via ${gatewayRoute}`,
+      `SUBNET=$(ip -o -4 addr show dev eth0 | awk '{print $4}' | head -1)`,
+      'iptables -F OUTPUT',
+      `iptables -A OUTPUT -d ${gatewayRoute} -j ACCEPT`,
+      'iptables -A OUTPUT -d "$SUBNET" -j DROP',
+    ].join('; ');
     const sidecarArgs = [
       'run',
       '--rm',
       // Run as root: --cap-add NET_ADMIN only populates the BOUNDING set, which
       // a non-root user (the persona image runs as `sen`) cannot exercise without
-      // file caps on `ip`. The ephemeral sidecar runs `ip route` for milliseconds
+      // file caps on `ip`/`iptables`. The ephemeral sidecar runs for milliseconds
       // and exits; it never touches the persona's processes/filesystem (only its
       // netns), so root here does NOT weaken the workload (which stays non-root,
       // no NET_ADMIN). Mirrors Istio's privileged istio-init + unprivileged app.
@@ -291,7 +310,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       'sh',
       image,
       '-c',
-      `ip route replace default via ${gatewayRoute}`,
+      netnsInitScript,
     ];
     logger.info('Running netns-init sidecar to set default route', {
       containerId,

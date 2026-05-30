@@ -909,10 +909,16 @@ describe('DockerContainerRuntime', () => {
       // image must be present
       expect(sidecarArgs).toContain('sen-box:dev');
       const imageIdx = sidecarArgs.indexOf('sen-box:dev');
-      // trailing args: -c "ip route replace default via <ip>"
+      // trailing args: -c "<set default route + install subagent↔subagent
+      // isolation OUTPUT rules>". Gateway is ACCEPTed before the subnet DROP.
       expect(sidecarArgs.slice(imageIdx + 1)).toEqual([
         '-c',
-        'ip route replace default via 172.31.250.1',
+        'set -e; ' +
+          'ip route replace default via 172.31.250.1; ' +
+          "SUBNET=$(ip -o -4 addr show dev eth0 | awk '{print $4}' | head -1); " +
+          'iptables -F OUTPUT; ' +
+          'iptables -A OUTPUT -d 172.31.250.1 -j ACCEPT; ' +
+          'iptables -A OUTPUT -d "$SUBNET" -j DROP',
       ]);
     });
 
@@ -1077,7 +1083,12 @@ describe('DockerContainerRuntime', () => {
       const imageIdx = sidecarArgs.indexOf('sen-box:dev');
       expect(sidecarArgs.slice(imageIdx + 1)).toEqual([
         '-c',
-        'ip route replace default via 172.31.250.1',
+        'set -e; ' +
+          'ip route replace default via 172.31.250.1; ' +
+          "SUBNET=$(ip -o -4 addr show dev eth0 | awk '{print $4}' | head -1); " +
+          'iptables -F OUTPUT; ' +
+          'iptables -A OUTPUT -d 172.31.250.1 -j ACCEPT; ' +
+          'iptables -A OUTPUT -d "$SUBNET" -j DROP',
       ]);
     });
 
