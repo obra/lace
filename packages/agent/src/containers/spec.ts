@@ -25,6 +25,15 @@ export interface ContainerSpec {
   // sen-browser can enable `net.ipv6.conf.lo.disable_ipv6=0` for the chrome
   // launcher's port-availability check.
   sysctls?: Record<string, string>;
+
+  // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
+  // PRI-1919: persona containers need NET_ADMIN to replace the default route
+  // via the transparent egress gateway.
+  capAdd?: string[];
+
+  // Docker network name forwarded to `docker create --network <name>`.
+  // PRI-1919: persona containers join the quarantine network.
+  network?: string;
   // Mount target namespaces owned by Lace. When adopting a daemon-side
   // persistent container, ContainerManager rejects stale extra mounts under
   // these prefixes so an old container cannot expose paths the new spec no

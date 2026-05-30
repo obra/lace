@@ -175,6 +175,8 @@ export class ContainerManager {
       ports: spec.ports,
       restartPolicy: spec.restartPolicy,
       sysctls: spec.sysctls,
+      capAdd: spec.capAdd,
+      network: spec.network,
     };
 
     // Box specs may have a daemon-side container that survived this process —

@@ -50,6 +50,10 @@ const ContainerRuntimeDescriptorSchema = z
         // Validated as opaque key/value pairs at this layer — the persona
         // schema enforces the dot-separated key shape upstream.
         sysctls: z.record(z.string(), z.string()).optional(),
+        // PRI-1919: forwarded to `docker create --cap-add <cap>` per entry.
+        capAdd: z.array(z.string().min(1)).optional(),
+        // PRI-1919: forwarded to `docker create --network <name>`.
+        network: z.string().min(1).optional(),
       })
       .strict(),
     helper: z

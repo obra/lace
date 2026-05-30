@@ -247,6 +247,24 @@ describe('buildPersonaContainerSpec persistent', () => {
     expect(spec.env).toEqual({ LACE_DIR: '/persona/lace', OTHER: 'keep' });
     expect(spec.sysctls).toEqual({ 'net.ipv6.conf.lo.disable_ipv6': '0' });
   });
+
+  it('passes runtime capAdd and network through to spec (PRI-1919)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'browser',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: {
+        ...perInvocationRuntime,
+        capAdd: ['NET_ADMIN'],
+        network: 'quarantine',
+      },
+      containerMounts: {},
+    });
+
+    expect(spec.capAdd).toEqual(['NET_ADMIN']);
+    expect(spec.network).toBe('quarantine');
+  });
 });
 
 describe('containerSpecToRuntimeSpec', () => {

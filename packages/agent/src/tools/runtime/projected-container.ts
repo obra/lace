@@ -249,6 +249,12 @@ async function containerSpecFromDescriptor(
   if (descriptor.spec.sysctls) {
     spec.sysctls = descriptor.spec.sysctls;
   }
+  if (descriptor.spec.capAdd) {
+    spec.capAdd = descriptor.spec.capAdd;
+  }
+  if (descriptor.spec.network) {
+    spec.network = descriptor.spec.network;
+  }
 
   return helper.hooks ? { spec, hooks: helper.hooks } : { spec };
 }

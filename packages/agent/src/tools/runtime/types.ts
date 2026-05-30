@@ -60,6 +60,12 @@ export type ToolRuntimeDescriptor =
         // PRI-1790: sen-browser declares `net.ipv6.conf.lo.disable_ipv6=0`
         // so superpowers-chrome's port-availability check can bind to `::1`.
         sysctls?: Record<string, string>;
+        // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
+        // PRI-1919: persona containers need NET_ADMIN for transparent egress gateway.
+        capAdd?: string[];
+        // Docker network name forwarded to `docker create --network <name>`.
+        // PRI-1919: persona containers join the quarantine network.
+        network?: string;
       };
       cwd: string;
       helper?: RuntimeHelperDescriptor;

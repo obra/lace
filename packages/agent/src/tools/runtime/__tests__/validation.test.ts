@@ -166,6 +166,46 @@ describe('runtime binding validation', () => {
     ).not.toThrow();
   });
 
+  it('accepts projected container binding with capAdd (PRI-1919)', () => {
+    expect(() =>
+      parseRuntimeExecutionBinding({
+        schemaVersion: 1,
+        identity: { runtimeId: 'rt_container_capadd' },
+        toolRuntime: {
+          type: 'container',
+          cwd: '/work',
+          spec: {
+            name: 'sess1-box',
+            image: 'sen-box:dev',
+            workingDirectory: '/work',
+            mounts: [],
+            capAdd: ['NET_ADMIN'],
+          },
+        },
+      })
+    ).not.toThrow();
+  });
+
+  it('accepts projected container binding with network (PRI-1919)', () => {
+    expect(() =>
+      parseRuntimeExecutionBinding({
+        schemaVersion: 1,
+        identity: { runtimeId: 'rt_container_network' },
+        toolRuntime: {
+          type: 'container',
+          cwd: '/work',
+          spec: {
+            name: 'sess1-box',
+            image: 'sen-box:dev',
+            workingDirectory: '/work',
+            mounts: [],
+            network: 'quarantine',
+          },
+        },
+      })
+    ).not.toThrow();
+  });
+
   it('rejects legacy agentPlacement on runtime bindings', () => {
     expect(() =>
       parseRuntimeExecutionBinding({

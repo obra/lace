@@ -156,6 +156,44 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
+  it('threads descriptor capAdd into the materialized spec (PRI-1919)', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    projectedDescriptor.spec.capAdd = ['NET_ADMIN'];
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
+
+    expect(manager.materialize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        capAdd: ['NET_ADMIN'],
+      })
+    );
+  });
+
+  it('threads descriptor network into the materialized spec (PRI-1919)', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    projectedDescriptor.spec.network = 'quarantine';
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
+
+    expect(manager.materialize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        network: 'quarantine',
+      })
+    );
+  });
+
   it('mounts host-provided runtime helpers read-only when helper mode is mount', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = {

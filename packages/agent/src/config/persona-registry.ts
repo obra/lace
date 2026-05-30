@@ -59,6 +59,12 @@ const runtimeContainerSchema = z
     // PRI-1790: sen-browser needs `net.ipv6.conf.lo.disable_ipv6=0` so the
     // container has an `::1` for superpowers-chrome's port-availability check.
     sysctls: z.record(sysctlKeySchema, z.string()).optional(),
+    // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
+    // PRI-1919: persona containers need NET_ADMIN for the transparent egress gateway.
+    capAdd: z.array(z.string().regex(/^[A-Z_]+$/)).optional(),
+    // Docker network name forwarded to `docker create --network <name>`.
+    // PRI-1919: persona containers join the quarantine network.
+    network: z.string().min(1).optional(),
   })
   .strict();
 

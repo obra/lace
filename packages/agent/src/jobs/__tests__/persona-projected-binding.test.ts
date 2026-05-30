@@ -141,6 +141,52 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     });
   });
 
+  it('threads persona-declared capAdd into the projected descriptor (PRI-1919)', () => {
+    const binding = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'box',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: {
+        type: 'container',
+        containerSharing: 'per_invocation',
+        image: 'sen-box:dev',
+        workingDirectory: '/work',
+        mounts: {},
+        capAdd: ['NET_ADMIN'],
+      },
+      containerMounts: {},
+    });
+
+    expect(binding.toolRuntime).toMatchObject({
+      type: 'container',
+      spec: { capAdd: ['NET_ADMIN'] },
+    });
+  });
+
+  it('threads persona-declared network into the projected descriptor (PRI-1919)', () => {
+    const binding = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'box',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: {
+        type: 'container',
+        containerSharing: 'per_invocation',
+        image: 'sen-box:dev',
+        workingDirectory: '/work',
+        mounts: {},
+        network: 'quarantine',
+      },
+      containerMounts: {},
+    });
+
+    expect(binding.toolRuntime).toMatchObject({
+      type: 'container',
+      spec: { network: 'quarantine' },
+    });
+  });
+
   it('passes the persona-declared image reference through verbatim (tag, digest, anything)', () => {
     const tagOnly = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,

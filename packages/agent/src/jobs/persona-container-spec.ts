@@ -158,6 +158,8 @@ export function buildPersonaContainerSpec(input: {
       env,
       restartPolicy: 'unless-stopped',
       ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
+      ...(runtime.capAdd ? { capAdd: runtime.capAdd } : {}),
+      ...(runtime.network ? { network: runtime.network } : {}),
     };
   }
 
@@ -182,6 +184,8 @@ export function buildPersonaContainerSpec(input: {
     env,
     ...(runtime.ports ? { ports: runtime.ports } : {}),
     ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
+    ...(runtime.capAdd ? { capAdd: runtime.capAdd } : {}),
+    ...(runtime.network ? { network: runtime.network } : {}),
   };
 }
 
@@ -207,5 +211,7 @@ export function containerSpecToRuntimeSpec(input: {
     ...(spec.ports ? { ports: spec.ports } : {}),
     ...(spec.restartPolicy ? { restartPolicy: spec.restartPolicy } : {}),
     ...(spec.sysctls ? { sysctls: spec.sysctls } : {}),
+    ...(spec.capAdd ? { capAdd: spec.capAdd } : {}),
+    ...(spec.network ? { network: spec.network } : {}),
   };
 }

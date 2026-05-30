@@ -185,6 +185,47 @@ Body.`;
     });
   });
 
+  it('parses runtime.type=container with capAdd (PRI-1919)', () => {
+    const content = `---
+runtime:
+  type: container
+  containerSharing: per_invocation
+  image: sen-box:dev
+  workingDirectory: /work
+  mounts: {}
+  capAdd:
+    - NET_ADMIN
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'capadd-runtime.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(registry.parsePersona('capadd-runtime').config.runtime).toMatchObject({
+      type: 'container',
+      capAdd: ['NET_ADMIN'],
+    });
+  });
+
+  it('parses runtime.type=container with network (PRI-1919)', () => {
+    const content = `---
+runtime:
+  type: container
+  containerSharing: per_invocation
+  image: sen-box:dev
+  workingDirectory: /work
+  mounts: {}
+  network: quarantine
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'network-runtime.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(registry.parsePersona('network-runtime').config.runtime).toMatchObject({
+      type: 'container',
+      network: 'quarantine',
+    });
+  });
+
   it('rejects legacy runtime.agentPlacement', () => {
     const content = `---
 runtime:
