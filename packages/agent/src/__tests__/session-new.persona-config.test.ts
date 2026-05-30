@@ -5,10 +5,17 @@ import { PassThrough } from 'node:stream';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { vi } from 'vitest';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
-import { createAgentServerState, registerAgentRpcMethods } from '../server';
+import {
+  createAgentServerState,
+  registerAgentRpcMethods,
+  createToolExecutorForMode,
+} from '../server';
 import { loadSession } from '../storage/session-store';
 import { defaultInitializeParams } from './helpers/initialize';
+import type { JobManager } from '../jobs/job-manager';
+import type { JobState } from '../server-types';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -574,6 +581,79 @@ mcp-only persona`
 
       const loaded = loadSession(created.sessionId);
       expect(loaded.state.config?.personaName).toBe('custom');
+    });
+  });
+
+  describe('PRI-1911 regression: state.personaRegistry (set by initialize) reaches DelegateTool', () => {
+    // This test guards the full wiring chain:
+    //   initialize(userPersonasPaths=[D]) → state.personaRegistry
+    //   → createToolExecutorForMode(state.personaRegistry)
+    //   → ToolExecutor.registerAllAvailableTools({ personaRegistry })
+    //   → new DelegateTool({ personaRegistry })
+    //   → this.personaRegistry.parsePersona(...)
+    //
+    // Without this wiring, DelegateTool falls back to the module-level
+    // defaultPersonaRegistry whose userPersonasPaths = [<LACE_DIR>/agent-personas],
+    // and persona files placed only in the embedder-supplied D are invisible.
+
+    it('delegate tool created via state.personaRegistry resolves a persona in the embedder-supplied dir', async () => {
+      // Place a persona ONLY in our custom dir, not in the default LACE_DIR/agent-personas.
+      const customPersonaName = 'delegate-wiring-regression';
+      writeFileSync(join(userPersonasDir, `${customPersonaName}.md`), 'Regression persona body.');
+
+      // Boot the server and run initialize with our custom dir.
+      const state = createAgentServerState();
+      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+      await client.request(
+        'initialize',
+        defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+      );
+
+      // state.personaRegistry is now built from userPersonasDir.
+      // Use createToolExecutorForMode the same way the prompt handler does.
+      const { executor } = await createToolExecutorForMode(
+        'execute',
+        undefined, // no MCP
+        undefined, // no jobManager — use DelegateTool.execute directly with a mock
+        undefined, // no skillRegistry
+        undefined, // no toolScope
+        state.personaRegistry
+      );
+
+      const delegate = executor.getTool('delegate');
+      expect(delegate).toBeDefined();
+
+      // Use background:true so the tool returns immediately after createJob
+      // without waiting for job completion.
+      const mockJobManager: JobManager = {
+        createJob: vi.fn().mockResolvedValue({
+          jobId: 'job_pri1911',
+          job: {
+            jobId: 'job_pri1911',
+            type: 'delegate' as const,
+            status: 'running' as const,
+            // Never-resolving completion is safe: background:true returns
+            // immediately on createJob and the test never awaits this promise.
+            completion: new Promise<void>(() => {}),
+          } as unknown as JobState,
+        }),
+        listJobs: vi.fn().mockReturnValue([]),
+      } as unknown as JobManager;
+
+      const result = await delegate!.execute(
+        { prompt: 'hello', persona: customPersonaName, background: true },
+        { signal: new AbortController().signal, jobManager: mockJobManager }
+      );
+
+      // If wiring is broken, DelegateTool falls back to defaultPersonaRegistry
+      // (which sees LACE_DIR/agent-personas, not userPersonasDir) and returns
+      // status:'failed' with a PersonaNotFoundError message.
+      expect(result.status).toBe('completed');
+      expect(mockJobManager.createJob).toHaveBeenCalledWith(
+        'delegate',
+        expect.objectContaining({ persona: customPersonaName })
+      );
     });
   });
 });
