@@ -120,6 +120,8 @@ export function registerInitializeHandler(
       state.personaRegistry = new PersonaRegistry({
         bundledPersonasPath: resolveResourcePath(import.meta.url, 'agent-personas'),
         userPersonasPaths: userPaths,
+        // PRI-1912: base for resolving relative host-placement MCP paths.
+        ...(typeof parsed.mcpBaseDir === 'string' ? { mcpBaseDir: parsed.mcpBaseDir } : {}),
       });
     }
 

@@ -134,6 +134,7 @@ describe('runSubagentJobProcess — child_exit propagation (PRI-1774)', () => {
       containerMounts,
       personaRegistry: {
         getUserPersonasPaths: () => [],
+        getMcpBaseDir: () => undefined,
       },
     };
 

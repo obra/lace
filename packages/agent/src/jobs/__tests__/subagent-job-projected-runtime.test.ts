@@ -270,6 +270,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
       containerMounts,
       personaRegistry: {
         getUserPersonasPaths: () => [],
+        getMcpBaseDir: () => undefined,
       },
     };
 
@@ -363,6 +364,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
       containerExecutionIdentity: { tokenEnvName: 'SEN_AGENT_TOKEN' },
       personaRegistry: {
         getUserPersonasPaths: () => [],
+        getMcpBaseDir: () => undefined,
       },
     };
 
@@ -512,6 +514,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
       containerExecutionIdentity: { tokenEnvName: 'SEN_AGENT_TOKEN' },
       personaRegistry: {
         getUserPersonasPaths: () => [],
+        getMcpBaseDir: () => undefined,
       },
     };
 
@@ -589,6 +592,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
       containerMounts: {},
       personaRegistry: {
         getUserPersonasPaths: () => [],
+        getMcpBaseDir: () => undefined,
       },
     };
 
@@ -719,6 +723,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
       containerMounts: {},
       personaRegistry: {
         getUserPersonasPaths: () => [],
+        getMcpBaseDir: () => undefined,
       },
     };
 
@@ -851,6 +856,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
       containerMounts: {},
       personaRegistry: {
         getUserPersonasPaths: () => [],
+        getMcpBaseDir: () => undefined,
       },
     };
 

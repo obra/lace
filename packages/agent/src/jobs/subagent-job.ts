@@ -911,6 +911,9 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         ...currentState.personaRegistry.getUserPersonasPaths(),
       ];
       const subagentSkillDirs = [...subagentHostSkillDirs];
+      // PRI-1912: the child re-parses personas, so it needs the same MCP base
+      // dir to resolve relative host-placement command/args.
+      const subagentMcpBaseDir = currentState.personaRegistry.getMcpBaseDir();
 
       await childPeer.request('initialize', {
         protocolVersion: '1.0',
@@ -921,6 +924,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           'ent/jobStreaming': currentState.jobManager.getStreamingMode(),
         },
         userPersonasPaths: subagentUserPersonasPaths,
+        ...(subagentMcpBaseDir ? { mcpBaseDir: subagentMcpBaseDir } : {}),
         skillDirs: subagentSkillDirs,
         config: buildSubagentInitConfig(parentEffective),
         ...(currentState.containerExecutionIdentity

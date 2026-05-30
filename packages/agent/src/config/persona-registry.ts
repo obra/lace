@@ -164,6 +164,11 @@ export class PersonaNotFoundError extends Error {
 export interface PersonaRegistryOptions {
   bundledPersonasPath: string;
   userPersonasPaths: readonly string[]; // ordered: earlier overrides later
+  // PRI-1912: embedder package root. Relative `command`/`args` of host-placement
+  // MCP servers in a persona are resolved against this at parse time (the
+  // embedder spawns them from a cwd that differs from where the server scripts
+  // live). Undefined ⇒ relative paths are left verbatim.
+  mcpBaseDir?: string;
 }
 
 export class PersonaRegistry {
@@ -173,11 +178,18 @@ export class PersonaRegistry {
   private readonly USER_CACHE_TTL = 5000; // 5 seconds
   private readonly bundledPersonasPath: string;
   private readonly userPersonasPaths: readonly string[];
+  private readonly mcpBaseDir: string | undefined;
 
   constructor(opts: PersonaRegistryOptions) {
     this.bundledPersonasPath = opts.bundledPersonasPath;
     this.userPersonasPaths = opts.userPersonasPaths;
+    this.mcpBaseDir = opts.mcpBaseDir;
     this.loadBundledPersonas();
+  }
+
+  /** Embedder package root for resolving relative host-placement MCP paths. */
+  getMcpBaseDir(): string | undefined {
+    return this.mcpBaseDir;
   }
 
   /** Ordered list of user persona search paths (earlier wins). */
@@ -345,7 +357,41 @@ export class PersonaRegistry {
       throw new PersonaParseError(`Invalid frontmatter for persona '${name}': ${issues}`);
     }
 
-    return { config: validated.data, body: parsed.content };
+    return { config: this.resolveMcpPaths(validated.data), body: parsed.content };
+  }
+
+  /**
+   * PRI-1912: resolve relative `command`/`args` of host-placement MCP servers
+   * against `mcpBaseDir`. Host-placement servers run from the embedder's package
+   * root (where the server scripts live), not lace's cwd, so a relative path
+   * must be anchored there. toolRuntime-placement servers run inside the persona
+   * container — their relative paths are container-side and are left untouched.
+   * Absolute paths and bare command names (no `./`/`../`) pass through, so this
+   * is idempotent over already-absolute configs.
+   */
+  private resolveMcpPaths(config: PersonaConfig): PersonaConfig {
+    const baseDir = this.mcpBaseDir;
+    if (baseDir === undefined || config.mcpServers === undefined) return config;
+
+    const resolveIfRelative = (value: string): string =>
+      value.startsWith('./') || value.startsWith('../') ? path.resolve(baseDir, value) : value;
+
+    let changed = false;
+    const mcpServers: NonNullable<PersonaConfig['mcpServers']> = {};
+    for (const [serverId, server] of Object.entries(config.mcpServers)) {
+      if ((server.placement ?? 'host') !== 'host') {
+        mcpServers[serverId] = server;
+        continue;
+      }
+      const command = resolveIfRelative(server.command);
+      const args = server.args?.map(resolveIfRelative);
+      if (command !== server.command || (args && args.some((a, i) => a !== server.args?.[i]))) {
+        changed = true;
+      }
+      mcpServers[serverId] = { ...server, command, ...(args ? { args } : {}) };
+    }
+
+    return changed ? { ...config, mcpServers } : config;
   }
 
   // Reads raw persona file content. User overrides bundled; bundled falls back to embedded files.

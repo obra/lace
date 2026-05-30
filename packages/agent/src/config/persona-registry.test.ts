@@ -56,6 +56,58 @@ describe('PersonaRegistry', () => {
     expect(lacePersona?.path).toContain('agent-personas');
   });
 
+  it('resolves host-placement relative MCP command/args against mcpBaseDir (PRI-1912)', () => {
+    mkdirSync(userPersonaDir, { recursive: true });
+    writeFileSync(
+      path.join(userPersonaDir, 'worker.md'),
+      [
+        '---',
+        'mcpServers:',
+        '  knowledge:',
+        '    command: ./node_modules/.bin/tsx',
+        '    args:',
+        '      - ./src/mcp/servers/knowledge.ts',
+        '      - --flag',
+        '  absolute-host:',
+        '    command: node',
+        '    args:',
+        '      - /opt/abs/index.js',
+        '  in-container:',
+        '    command: ./rel/in/container.js',
+        '    placement: toolRuntime',
+        '---',
+        'body',
+      ].join('\n')
+    );
+
+    const registry = new PersonaRegistry({
+      bundledPersonasPath: tempBundledDir,
+      userPersonasPaths: [userPersonaDir],
+      mcpBaseDir: '/pkg/root',
+    });
+
+    const servers = registry.parsePersona('worker').config.mcpServers!;
+    // Host placement (the default): relative command/args resolve under mcpBaseDir.
+    expect(servers.knowledge.command).toBe('/pkg/root/node_modules/.bin/tsx');
+    expect(servers.knowledge.args).toEqual(['/pkg/root/src/mcp/servers/knowledge.ts', '--flag']);
+    // Absolute path and bare command name are left untouched.
+    expect(servers['absolute-host'].command).toBe('node');
+    expect(servers['absolute-host'].args).toEqual(['/opt/abs/index.js']);
+    // toolRuntime placement runs inside the persona container — a relative path
+    // there is container-side and must NOT be resolved against the host base.
+    expect(servers['in-container'].command).toBe('./rel/in/container.js');
+  });
+
+  it('leaves relative MCP paths unchanged when no mcpBaseDir is configured', () => {
+    mkdirSync(userPersonaDir, { recursive: true });
+    writeFileSync(
+      path.join(userPersonaDir, 'worker.md'),
+      ['---', 'mcpServers:', '  k:', '    command: ./x', '---', 'b'].join('\n')
+    );
+    const { config } = makeRegistry().parsePersona('worker');
+    expect(config.mcpServers!.k.command).toBe('./x');
+  });
+
   it('validates persona existence', () => {
     writeFileSync(path.join(tempBundledDir, 'lace.md'), 'Default persona');
     registry = makeRegistry();
