@@ -675,6 +675,28 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
   }
 
   /**
+   * Resolve the container's IPv4 address on `networkName` via `docker inspect`.
+   * Returns undefined when the network is absent, the container is gone, or the
+   * inspect fails — callers degrade gracefully (the transparent egress gateway
+   * skips the source-IP mapping rather than blocking). PRI-1919.
+   */
+  async inspectNetworkIp(containerId: string, networkName: string): Promise<string | undefined> {
+    try {
+      const { stdout } = await execFileAsync(this.dockerBin, [
+        'inspect',
+        containerId,
+        '--format',
+        '{{json .NetworkSettings.Networks}}',
+      ]);
+      const networks = JSON.parse(stdout) as Record<string, { IPAddress?: string } | undefined>;
+      const ip = networks?.[networkName]?.IPAddress;
+      return ip && ip.length > 0 ? ip : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
    * Register an existing daemon-side container into the in-process cache and
    * mount map. Mirrors the bookkeeping `create()` performs after a successful
    * `docker create`, so subsequent `start()` and `execStream()` work against

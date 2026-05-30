@@ -69,6 +69,13 @@ class MockContainerRuntime extends BaseContainerRuntime {
     throw new Error('execStreamImpl not set');
   }
 
+  public networkIp: string | undefined = '172.31.250.3';
+
+  async inspectNetworkIp(containerId: string, networkName: string): Promise<string | undefined> {
+    this.callLog.push(`inspectNetworkIp:${containerId}:${networkName}`);
+    return this.networkIp;
+  }
+
   /** test helper: directly create-then-stop to simulate a leftover stopped container */
   async seedStopped(containerId: string): Promise<void> {
     this.create({
@@ -458,6 +465,80 @@ describe('ContainerManager', () => {
       await manager.destroy('sess1-worker');
 
       expect(await manager.inspect('sess1-worker')).toBeNull();
+    });
+  });
+
+  describe('network lifecycle observer (PRI-1919)', () => {
+    const gatewaySpec: ContainerSpec = {
+      ...baseSpec,
+      network: 'ada-sen_quarantine',
+      gatewayRoute: '172.31.250.2',
+    };
+
+    it('emits onAttached with the resolved source IP after materialize', async () => {
+      const onAttached = vi.fn();
+      const onDetached = vi.fn();
+      manager.setNetworkLifecycleObserver({ onAttached, onDetached });
+
+      const handle = await manager.materialize(gatewaySpec);
+
+      expect(onAttached).toHaveBeenCalledWith({
+        containerName: 'sess1-worker',
+        containerId: handle.containerId,
+        sourceIp: '172.31.250.3',
+        networkName: 'ada-sen_quarantine',
+      });
+      expect(onDetached).not.toHaveBeenCalled();
+    });
+
+    it('does not emit onAttached for a non-gateway spec', async () => {
+      const onAttached = vi.fn();
+      manager.setNetworkLifecycleObserver({ onAttached, onDetached: vi.fn() });
+
+      await manager.materialize(baseSpec);
+
+      expect(onAttached).not.toHaveBeenCalled();
+    });
+
+    it('does not emit onAttached when the IP cannot be resolved', async () => {
+      runtime.networkIp = undefined;
+      const onAttached = vi.fn();
+      manager.setNetworkLifecycleObserver({ onAttached, onDetached: vi.fn() });
+
+      await manager.materialize(gatewaySpec);
+
+      expect(onAttached).not.toHaveBeenCalled();
+    });
+
+    it('emits onAttached on the adopt-already-running path', async () => {
+      const onAttached = vi.fn();
+      manager.setNetworkLifecycleObserver({ onAttached, onDetached: vi.fn() });
+
+      await manager.materialize(gatewaySpec);
+      onAttached.mockClear();
+      // Second materialize observes the running container (adopt path) and must
+      // re-assert the mapping so it survives any registry loss.
+      await manager.materialize(gatewaySpec);
+
+      expect(onAttached).toHaveBeenCalledWith({
+        containerName: 'sess1-worker',
+        containerId: 'lace-sess1-worker',
+        sourceIp: '172.31.250.3',
+        networkName: 'ada-sen_quarantine',
+      });
+    });
+
+    it('emits onDetached on destroy', async () => {
+      const onDetached = vi.fn();
+      manager.setNetworkLifecycleObserver({ onAttached: vi.fn(), onDetached });
+
+      await manager.materialize(gatewaySpec);
+      await manager.destroy('sess1-worker');
+
+      expect(onDetached).toHaveBeenCalledWith({
+        containerName: 'sess1-worker',
+        containerId: 'lace-sess1-worker',
+      });
     });
   });
 

@@ -144,6 +144,15 @@ export interface ContainerRuntime {
    */
   adopt(config: ContainerConfig, state: ContainerState): Promise<void>;
 
+  /**
+   * Resolve the container's IPv4 address on the named docker network, or
+   * undefined when unavailable (network absent, container gone, daemon error,
+   * or the runtime has no network concept — e.g. AppleContainerRuntime).
+   * Optional: only runtimes backing the PRI-1919 transparent egress gateway
+   * implement it; ContainerManager treats its absence as "no source IP".
+   */
+  inspectNetworkIp?(containerId: string, networkName: string): Promise<string | undefined>;
+
   // Path translation
   translateToContainer(hostPath: string, containerId: string): string;
   translateToHost(containerPath: string, containerId: string): string;
